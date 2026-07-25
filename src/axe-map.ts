@@ -199,6 +199,15 @@ export function scForAxeRule(ruleId: string): string {
 //                             identical rule id)
 //   - form-field-multiple-labels → static twin of the same id        (src/rules/forms.ts)
 //   - aria-required-children → static twin of the same id            (src/rules/scripts-aria.ts)
+//   - aria-required-attr    → static twin of the same id             (src/rules/scripts-aria.ts)
+//   - aria-valid-attr       → static twin invalid-aria-attr           (src/rules/scripts-aria.ts)
+//   - aria-valid-attr-value → static twin invalid-aria-value          (src/rules/scripts-aria.ts)
+//   - aria-required-parent  → static twin of the same id              (src/rules/scripts-aria.ts)
+//   - autocomplete-valid    → static twin autocomplete-token-invalid  (src/rules/forms.ts)
+//   - label-content-name-mismatch → static twin label-in-name-mismatch (src/rules/links.ts)
+//   - td-headers-attr       → static twin headers-attr-dangling       (src/rules/tables.ts)
+//   - th-has-data-cells     → static twin th-no-data-cells            (src/rules/tables.ts)
+//   - definition-list / dlitem → static twin dl-structure             (src/rules/headings.ts)
 // Deliberately NOT pinned (stay advisory, tag-based decision applies): empty-table-header,
 // page-has-heading-one (consistent with h1-missing/h1-multiple now being advisory — see
 // src/rules/headings.ts), region, accesskeys, image-redundant-alt — none of these has a
@@ -218,6 +227,16 @@ export const AXE_ADVISORY_EXCEPTIONS: Record<string, boolean> = {
   "nested-interactive": false,
   "form-field-multiple-labels": false,
   "aria-required-children": false,
+  "aria-required-attr": false,
+  "aria-required-parent": false,
+  "aria-valid-attr": false,
+  "aria-valid-attr-value": false,
+  "autocomplete-valid": false,
+  "label-content-name-mismatch": false,
+  "td-headers-attr": false,
+  "th-has-data-cells": false,
+  "definition-list": false,
+  dlitem: false,
 };
 
 // Data companion to AXE_ADVISORY_EXCEPTIONS: which static rule id(s) (src/rules/*.ts,
@@ -233,6 +252,16 @@ export const AXE_STATIC_TWIN: Record<string, string[]> = {
   "landmark-one-main": ["missing-main-landmark", "multiple-main-landmark"],
   "empty-heading": ["empty-heading"],
   "duplicate-id": ["duplicate-id"],
+  "aria-required-attr": ["aria-required-attr"],
+  "aria-required-parent": ["aria-required-parent"],
+  "aria-valid-attr": ["invalid-aria-attr"],
+  "aria-valid-attr-value": ["invalid-aria-value"],
+  "autocomplete-valid": ["autocomplete-token-invalid"],
+  "label-content-name-mismatch": ["label-in-name-mismatch"],
+  "td-headers-attr": ["headers-attr-dangling"],
+  "th-has-data-cells": ["th-no-data-cells"],
+  "definition-list": ["dl-structure"],
+  dlitem: ["dl-structure"],
   "nested-interactive": ["nested-interactive"],
   "form-field-multiple-labels": ["form-field-multiple-labels"],
   "aria-required-children": ["aria-required-children"],

@@ -11,6 +11,22 @@ import { ruleIds } from "../src/rules/registry.js";
 
 /** A minimal document that carries the target defect of exactly one rule. */
 const SEED: Record<string, string> = {
+  // ARIA vocabulary validation (4.1.2 / 1.3.1)
+  "invalid-aria-attr": `<main><div role="button" aria-labeledby="x">go</div></main>`,
+  "invalid-aria-value": `<main><div role="button" aria-expanded="yes">go</div></main>`,
+  "aria-required-attr": `<main><div role="checkbox">Accept</div></main>`,
+  "aria-required-parent": `<main><div role="tab">One</div></main>`,
+  "aria-prohibited-attr": `<main><p role="paragraph" aria-label="Intro">Text</p></main>`,
+  // structure
+  "dl-structure": `<main><dt>Term</dt></main>`,
+  "headers-attr-dangling": `<main><table><caption>t</caption><tr><th id="a">A</th></tr><tr><td headers="ghost">1</td></tr></table></main>`,
+  "th-no-data-cells": `<main><table><caption>t</caption><tr><th id="a">A</th><th id="b">B</th></tr><tr><td headers="a">1</td></tr></table></main>`,
+  // forms / authentication / context change
+  "autocomplete-token-invalid": `<main><form><label for="ac">Email</label><input id="ac" type="text" autocomplete="e-mail"></form></main>`,
+  "credential-entry-blocked": `<main><form><label for="pw">Password</label><input id="pw" type="password" autocomplete="off"></form></main>`,
+  "on-input-context-change": `<main><form><label for="ch">Country</label><select id="ch" onchange="this.form.submit()"><option>FR</option></select></form></main>`,
+  // 2.5.3 label in name
+  "label-in-name-mismatch": `<main><button aria-label="Submit">Send now</button></main>`,
   // images (1.1.1)
   "img-alt-missing": `<main><img src="x.png"></main>`,
   "input-image-alt-missing": `<main><input type="image" src="go.png"></main>`,

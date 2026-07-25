@@ -28,11 +28,11 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 1.3.1 | Info and Relationships | A | judgment | fieldset-legend-missing, data-table-no-headers, table-caption-missing, layout-table-data-markup, heading-order-skip, h1-missing, h1-multiple, list-structure, empty-heading, label-for-dangling, missing-main-landmark, multiple-main-landmark, sortable-header-no-aria-sort, nav-landmark-missing, nav-landmark-unnamed, radio-checkbox-group-ungrouped, table-empty-data-cell, css-generated-content-informative | 3.1, 5.1, 5.2, 5.4, 5.5, 5.6, 5.7, 5.8, 7.3, 8.9, 9.1, 9.2, 9.3, 9.4, 10.1, 10.2, 11.1, 11.5, 11.6, 11.7, 11.8, 12.6, 13.3, 13.4 |
+| 1.3.1 | Info and Relationships | A | judgment | fieldset-legend-missing, data-table-no-headers, table-caption-missing, layout-table-data-markup, heading-order-skip, h1-missing, h1-multiple, list-structure, dl-structure, empty-heading, label-for-dangling, missing-main-landmark, multiple-main-landmark, sortable-header-no-aria-sort, nav-landmark-missing, nav-landmark-unnamed, aria-required-parent, headers-attr-dangling, th-no-data-cells, radio-checkbox-group-ungrouped, table-empty-data-cell, css-generated-content-informative | 3.1, 5.1, 5.2, 5.4, 5.5, 5.6, 5.7, 5.8, 7.3, 8.9, 9.1, 9.2, 9.3, 9.4, 10.1, 10.2, 11.1, 11.5, 11.6, 11.7, 11.8, 12.6, 13.3, 13.4 |
 | 1.3.2 | Meaningful Sequence | A | judgment | — | 5.3, 8.10, 10.1, 10.3, 10.8, 13.3, 13.4 |
 | 1.3.3 | Sensory Characteristics | A | judgment | — | 10.9, 10.10 |
 | 1.3.4 | Orientation | AA | needs-rendering | — | 13.9 |
-| 1.3.5 | Identify Input Purpose | AA | judgment | field-purpose-incomplete | 11.13 |
+| 1.3.5 | Identify Input Purpose | AA | judgment | field-purpose-incomplete, autocomplete-token-invalid | 11.13 |
 
 ## 1.4 Distinguishable
 
@@ -88,7 +88,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 |---|---|---|---|---|---|
 | 2.5.1 | Pointer Gestures | A | judgment | — | 13.10 |
 | 2.5.2 | Pointer Cancellation | A | judgment | — | 13.11 |
-| 2.5.3 | Label in Name | A | judgment | — | 6.1, 7.1, 11.2, 11.9 |
+| 2.5.3 | Label in Name | A | judgment | label-in-name-mismatch | 6.1, 7.1, 11.2, 11.9 |
 | 2.5.4 | Motion Actuation | A | judgment | — | 13.12 |
 | 2.5.7 | Dragging Movements | AA | judgment | — | — |
 | 2.5.8 | Target Size (Minimum) | AA | needs-rendering | — | — |
@@ -105,7 +105,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
 | 3.2.1 | On Focus | A | judgment | — | 7.4, 13.2 |
-| 3.2.2 | On Input | A | judgment | — | 7.4 |
+| 3.2.2 | On Input | A | judgment | on-input-context-change | 7.4 |
 | 3.2.3 | Consistent Navigation | AA | judgment | — | 12.2, 12.4, 12.5, 12.7 |
 | 3.2.4 | Consistent Identification | AA | judgment | — | 11.3 |
 | 3.2.6 | Consistent Help | A | judgment | — | — |
@@ -119,11 +119,11 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 | 3.3.3 | Error Suggestion | AA | judgment | — | 11.11 |
 | 3.3.4 | Error Prevention (Legal, Financial, Data) | AA | judgment | — | 11.12 |
 | 3.3.7 | Redundant Entry | A | judgment | — | — |
-| 3.3.8 | Accessible Authentication (Minimum) | AA | judgment | — | — |
+| 3.3.8 | Accessible Authentication (Minimum) | AA | judgment | credential-entry-blocked | — |
 
 ## 4.1 Compatible
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 4.1.2 | Name, Role, Value | A | judgment | iframe-title-missing, invalid-aria-role, aria-ref-missing-id, redundant-aria, clickable-noninteractive, aria-required-children, aria-hidden-focusable, nested-interactive, duplicate-id, control-label-missing, placeholder-as-label, form-field-multiple-labels, select-has-option, button-empty-name, icon-only-control-unnamed, control-name-title-only, field-purpose-incomplete, disabled-context-content | 1.2, 1.3, 1.9, 2.1, 2.2, 4.13, 5.3, 7.1, 7.2, 8.2, 9.1, 10.8, 11.1, 11.9, 12.6, 13.3, 13.4 |
+| 4.1.2 | Name, Role, Value | A | judgment | iframe-title-missing, invalid-aria-role, aria-ref-missing-id, redundant-aria, clickable-noninteractive, aria-required-children, aria-hidden-focusable, nested-interactive, invalid-aria-attr, invalid-aria-value, aria-required-attr, aria-prohibited-attr, duplicate-id, control-label-missing, placeholder-as-label, form-field-multiple-labels, select-has-option, button-empty-name, icon-only-control-unnamed, control-name-title-only, field-purpose-incomplete, disabled-context-content | 1.2, 1.3, 1.9, 2.1, 2.2, 4.13, 5.3, 7.1, 7.2, 8.2, 9.1, 10.8, 11.1, 11.9, 12.6, 13.3, 13.4 |
 | 4.1.3 | Status Messages | AA | judgment | live-region-conflict, status-message-not-assertive | 7.5 |

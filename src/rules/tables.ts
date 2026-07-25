@@ -180,4 +180,82 @@ const tableEmptyDataCell: Rule = {
   },
 };
 
-export const tablesRules: Rule[] = [dataTableNoHeaders, tableCaptionMissing, layoutTableDataMarkup, sortableHeaderNoAriaSort, tableEmptyDataCell];
+
+/** The <table> a cell belongs to (nearest table ancestor), or undefined. */
+function ownerTable(el: El, doc: Doc): El | undefined {
+  return ancestors(el).find((a) => a.tag === "table");
+}
+
+// A `headers` attribute pointing at ids that are not header cells OF THE SAME TABLE builds
+// no association at all: the screen reader announces the cell with no header context, which
+// is exactly the situation `headers` was added to prevent.
+const headersAttrDangling: Rule = {
+  id: "headers-attr-dangling",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (el.tag !== "td" && el.tag !== "th") continue;
+      const raw = (attr(el, "headers") ?? "").trim();
+      if (!raw || raw.includes("{")) continue;
+      const table = ownerTable(el, doc);
+      if (!table) continue;
+      const inTable = new Map(descendants(table).filter((d) => d.tag === "th" || d.tag === "td").map((d) => [attr(d, "id") ?? "", d]));
+      const bad = raw
+        .split(/\s+/)
+        .filter(Boolean)
+        .filter((id) => {
+          const target = inTable.get(id);
+          return !target || target === el; // absent from this table, or the cell itself
+        });
+      if (!bad.length) continue;
+      out.push({ criteriaId: "1.3.1", el, msgId: "headers-attr-dangling", params: { ids: bad.join(" ") } });
+    }
+    return out;
+  },
+};
+
+// A header cell that heads NOTHING — no data cell resolves to it, by scope or by `headers`.
+// It is announced as a header for an empty set, and the columns it looks like it covers are
+// in fact unheaded.
+const thNoDataCells: Rule = {
+  id: "th-no-data-cells",
+  criteria: ["1.3.1"],
+  severity: "mineur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const table of doc.elements) {
+      if (table.tag !== "table" || isLayoutTable(table)) continue;
+      const cells = descendants(table).filter((d) => d.tag === "td" || d.tag === "th");
+      const headers = cells.filter((c) => c.tag === "th");
+      if (!headers.length) continue;
+      const dataCells = cells.filter((c) => c.tag === "td");
+      // A table with no data cells at all is a heading-only skeleton — nothing to assign,
+      // and data-table-no-headers already owns that shape.
+      if (!dataCells.length) continue;
+      // Only a FULLY headers-wired table can be judged here: as soon as one data cell
+      // relies on implicit row/column position, an unreferenced header may still head it,
+      // and deciding that needs a real table model (colspan, rowspan, header rows).
+      if (!dataCells.every((c) => (attr(c, "headers") ?? "").trim() !== "")) continue;
+      const referenced = new Set(dataCells.flatMap((c) => (attr(c, "headers") ?? "").split(/\s+/).filter(Boolean)));
+      for (const th of headers) {
+        if (mayInjectContent(th) || !visibleText(th).trim()) continue; // empty/injected: other rules own it
+        const id = attr(th, "id") ?? "";
+        if (id && referenced.has(id)) continue; // explicitly referenced by a data cell
+        out.push({ criteriaId: "1.3.1", el: th, msgId: "th-no-data-cells" });
+      }
+    }
+    return out;
+  },
+};
+
+export const tablesRules: Rule[] = [
+  dataTableNoHeaders,
+  tableCaptionMissing,
+  layoutTableDataMarkup,
+  sortableHeaderNoAriaSort,
+  tableEmptyDataCell,
+  headersAttrDangling,
+  thNoDataCells,
+];

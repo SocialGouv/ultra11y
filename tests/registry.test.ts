@@ -4,8 +4,8 @@ import { allSC, getSC } from "../src/wcag.js";
 
 describe("rule registry ↔ WCAG dataset coverage", () => {
   it("registers 60 rules with unique ids", () => {
-    expect(ALL_RULES.length).toBe(60);
-    expect(new Set(ruleIds()).size).toBe(60);
+    expect(ALL_RULES.length).toBe(72);
+    expect(new Set(ruleIds()).size).toBe(72);
   });
 
   it("every rule maps only to real WCAG SCs, never to the removed 4.1.1", () => {

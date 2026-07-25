@@ -249,6 +249,7 @@
         "h1-missing",
         "h1-multiple",
         "list-structure",
+        "dl-structure",
         "empty-heading",
         "label-for-dangling",
         "missing-main-landmark",
@@ -256,6 +257,9 @@
         "sortable-header-no-aria-sort",
         "nav-landmark-missing",
         "nav-landmark-unnamed",
+        "aria-required-parent",
+        "headers-attr-dangling",
+        "th-no-data-cells",
         "radio-checkbox-group-ungrouped",
         "table-empty-data-cell",
         "css-generated-content-informative"
@@ -378,7 +382,7 @@
       "level": "AA",
       "addedIn": "2.1",
       "automatability": "judgment",
-      "ruleIds": ["field-purpose-incomplete"],
+      "ruleIds": ["field-purpose-incomplete", "autocomplete-token-invalid"],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/identify-input-purpose.html",
       "techniques": ["H98"]
     },
@@ -776,7 +780,7 @@
       "level": "A",
       "addedIn": "2.1",
       "automatability": "judgment",
-      "ruleIds": [],
+      "ruleIds": ["label-in-name-mismatch"],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html",
       "techniques": [
         "ARIA14",
@@ -900,7 +904,7 @@
       "level": "A",
       "addedIn": "2.0",
       "automatability": "judgment",
-      "ruleIds": [],
+      "ruleIds": ["on-input-context-change"],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/on-input.html",
       "techniques": ["F22", "F36", "F37", "F41", "F9", "G107", "G13", "G76", "G80", "H32", "H84", "SCR19"]
     },
@@ -1063,7 +1067,7 @@
       "level": "AA",
       "addedIn": "2.2",
       "automatability": "judgment",
-      "ruleIds": [],
+      "ruleIds": ["credential-entry-blocked"],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/accessible-authentication-minimum.html"
     },
     {
@@ -1084,6 +1088,10 @@
         "aria-required-children",
         "aria-hidden-focusable",
         "nested-interactive",
+        "invalid-aria-attr",
+        "invalid-aria-value",
+        "aria-required-attr",
+        "aria-prohibited-attr",
         "duplicate-id",
         "control-label-missing",
         "placeholder-as-label",

@@ -194,4 +194,35 @@ const emptyHeading: Rule = {
   },
 };
 
-export const headingsRules: Rule[] = [headingOrderSkip, h1Missing, h1Multiple, listStructure, emptyHeading];
+
+// A description list only conveys its term/description pairing when the markup is
+// well-formed: <dl> takes <dt>/<dd> (optionally wrapped in <div>), and <dt>/<dd> mean
+// nothing outside a <dl>. Broken either way, the relationship is purely visual.
+const DL_ALLOWED = new Set(["dt", "dd", "div", "script", "template", "slot", "#fragment"]);
+
+const dlStructure: Rule = {
+  id: "dl-structure",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (el.tag === "dl") {
+        if (mayInjectContent(el)) continue; // children projected by a slot/component
+        for (const child of el.children) {
+          if (child.type !== "element" || !isIntrinsic(child.tag)) continue;
+          if (DL_ALLOWED.has(child.tag)) continue;
+          out.push({ criteriaId: "1.3.1", el: child, msgId: "dl-structure.foreign-child", params: { tag: child.tag } });
+        }
+        continue;
+      }
+      if (el.tag !== "dt" && el.tag !== "dd") continue;
+      const chain = ancestors(el);
+      if (chain.some((a) => a.tag === "dl" || !isIntrinsic(a.tag))) continue; // inside a dl, or a component may supply one
+      out.push({ criteriaId: "1.3.1", el, msgId: "dl-structure.orphan", params: { tag: el.tag } });
+    }
+    return out;
+  },
+};
+
+export const headingsRules: Rule[] = [headingOrderSkip, h1Missing, h1Multiple, listStructure, emptyHeading, dlStructure];

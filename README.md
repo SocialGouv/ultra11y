@@ -2,7 +2,7 @@
 
 > Audit HTML/CSS/JSX against **WCAG 2.2 AA** accessibility and produce a dated compliance report — or author/review accessible markup without regressions. A [skills.sh](https://skills.sh) agent skill: a deterministic, zero-dependency static engine **plus** the agent's judgment, with `check`/`verify` gates against hallucinated non-conformities. **The central deliverable is the auditor conformance block** — theme, criterion + official wording, test(s), WCAG mapping + level, finding, expected state, verification, `file:line` occurrences — rendered identically by the `report` (compliance doc), the `prd` backlog and the GitHub issues, in the active standard's vocabulary and **in your language** (`--lang auto` follows the conversation/repo). **WCAG is the worldwide core; country standards (RGAA, …) are pluggable in-repo packs.**
 
-ultra11y is built around an honest **division of labour**. Automated tools only catch a fraction of accessibility problems, so the engine does the *mechanical* work — 60 machine-detectable static checks tied to the WCAG 2.2 success criteria — and is explicit about everything it can't decide statically. What it can't, the **AI agent adjudicates** (statically, from the evidence, gated by `verify`/`check`) — not a deferral to a human:
+ultra11y is built around an honest **division of labour**. Automated tools only catch a fraction of accessibility problems, so the engine does the *mechanical* work — 72 machine-detectable static checks tied to the WCAG 2.2 success criteria — and is explicit about everything it can't decide statically. What it can't, the **AI agent adjudicates** (statically, from the evidence, gated by `verify`/`check`) — not a deferral to a human:
 
 - **Automatable (engine):** missing `alt`/`lang`/`title`, unlabeled fields, empty links/buttons, icon-only controls, iframes without title, tables without headers, heading-level skips, empty/dangling headings & labels, duplicate ids, invalid/broken ARIA, positive `tabindex`, autoplay/timed-refresh/`blink`/`marquee` media…
 - **Agent judgment (gated):** alt-text relevance, link purpose in context, reading/tab order, caption accuracy — the agent rules on these via `verify --manual` → `--apply`, each verdict carrying a justification (or a groundable NC), never a silent "conforming".
@@ -11,6 +11,20 @@ ultra11y is built around an honest **division of labour**. Automated tools only 
 - **Stateful scan probes:** the local runtime drives the page with bounded, non-navigating interactions (fill inputs then re-measure overflow; a live-region probe for status messages 4.1.3) — `--no-interact` opts out; `--interact-clicks` re-enables button clicks on authenticated scans (destructive-named buttons are never clicked).
 - **Normative page sample (échantillon):** a country-standard audit runs over a declared `sample.pages` set — `sample check` lints its coverage against the standard's required page kinds, `scan --sample` scans it, and an un-scanned `--standard rgaa` report is flagged **partial**.
 - **Pack-only detection (declarative):** a standards pack can ship its own `rules` (a bounded, ReDoS-guarded matcher DSL — no code) and normativity/severity `overrides`, projecting onto its criteria without forking the engine.
+
+## Measured against a corpus it did not write
+
+A self-authored fixture can only prove that a rule fires on the defect written for it. So the engine is also scored against the **[W3C ACT-Rules Community Group](https://act-rules.github.io) test corpus** — 1 134 `passed` / `failed` / `inapplicable` examples across 91 rules, authored independently of this project:
+
+| | |
+|---|---|
+| Rules scored | **32** (the ACT rules an equivalent engine check exists for) |
+| `failed` examples caught | **103 / 149** |
+| `passed` / `inapplicable` examples left alone | **291 / 291** — no unexplained false positive |
+| Deliberate divergences | 9, each argued on the record |
+| Declared gaps (statically decidable, not implemented) | 13 |
+
+Rules needing a rendered page (computed contrast, keyboard traps) or a human call (is this heading descriptive?) are **declared and routed**, not silently scored zero. The full per-rule matrix — including every gap and every divergence — is generated into [`skills/ultra11y/references/act.md`](skills/ultra11y/references/act.md) and re-checked on every build; the corpus itself is refreshed daily by a workflow, so the numbers cannot quietly go stale.
 
 ## Install
 

@@ -1,8 +1,9 @@
 // Theme 7 — Scripts / ARIA correctness (the statically-checkable slice).
 import type { Doc, El } from "../parse/html.js";
-import { attr, hasAttr, descendants, ancestors } from "../parse/html.js";
+import { attr, hasAttr, hasBoundAttr, hasDynamicSpread, descendants, ancestors } from "../parse/html.js";
 import { isIntrinsic } from "../parse/jsx-bridge.js";
-import { mayInjectContent } from "../name.js";
+import { mayInjectContent, isHiddenFromAT, isDisplayHidden, isPresentational } from "../name.js";
+import { ARIA_ATTRS, ARIA_REQUIRED_ATTRS, ARIA_REQUIRED_PARENT, IMPLICIT_CONTAINER_ROLE, NAME_PROHIBITED_ROLES, isValidAriaValue } from "../aria.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
 const INTERACTIVE_ROLES = [
@@ -145,9 +146,12 @@ const invalidAriaRole: Rule = {
       const role = (attr(el, "role") ?? "").trim();
       if (!role) continue;
       if (role.includes("{")) continue; // dynamic role expression (role={…}) — value unknown, can't validate
+      // A `role` attribute is a FALLBACK LIST: the first token that names a real role
+      // wins, so `role="doc-biblioref link"` is valid even though the first token is not
+      // a concrete WAI-ARIA role here. Only a list where NOTHING resolves is a defect.
       const tokens = role.split(/\s+/);
       const bad = tokens.filter((t) => !VALID_ROLES.has(t.toLowerCase()));
-      if (bad.length) {
+      if (bad.length === tokens.length) {
         out.push({
           criteriaId: "4.1.2",
           el,
@@ -298,6 +302,8 @@ const ariaRequiredChildren: Rule = {
       const req = REQUIRED_CHILDREN[role];
       if (!req) continue;
       if (hasAttr(el, "aria-owns")) continue; // children may be referenced elsewhere
+      if (attr(el, "aria-busy") === "true") continue; // still loading — the tree is knowingly incomplete
+      if (isHiddenFromAT(el)) continue; // not exposed: no owned elements to require
       if (descendants(el).some((d) => satisfiesChild(d, req))) continue;
       if (mayInjectContent(el)) continue; // required children injected via <slot>/component/{@render}
       out.push({
@@ -319,7 +325,12 @@ const ariaHiddenFocusable: Rule = {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
       if (attr(el, "aria-hidden") !== "true") continue;
-      const focusableHere = isFocusable(el) || descendants(el).some(isFocusable);
+      // `aria-hidden` is this rule's subject, so the shared exposure guard cannot apply —
+      // but an element the source hides outright (inline display:none, [hidden]) is not in
+      // the focus order either, and reporting it would be a defect nobody can reach.
+      if (isDisplayHidden(el)) continue;
+      const focusable = (n: El): boolean => isFocusable(n) && !isDisplayHidden(n);
+      const focusableHere = focusable(el) || descendants(el).some(focusable);
       if (!focusableHere) continue;
       out.push({
         criteriaId: "4.1.2",
@@ -440,6 +451,174 @@ const statusMessageNotAssertive: Rule = {
   },
 };
 
+
+// ---- ARIA vocabulary validation (WAI-ARIA 1.2 tables live in src/aria.ts) -------------
+
+/** Every literal `aria-*` attribute on an element, skipping dynamic bindings whose value
+ *  (or very presence) the static parse cannot resolve. */
+function literalAriaAttrs(el: El): [string, string][] {
+  const out: [string, string][] = [];
+  for (const key in el.attribs) {
+    const k = key.toLowerCase();
+    if (!k.startsWith("aria-")) continue;
+    const v = el.attribs[key] ?? "";
+    if (v.includes("{")) continue; // JSX/SFC expression — value unknown, never guess
+    out.push([k, v]);
+  }
+  return out;
+}
+
+// A MISSPELLED aria-* attribute (`aria-labeledby`, `aria-role`) is inert: the browser
+// exposes nothing, and the author believes the element is named. Only literal, intrinsic
+// elements are checked — a component prop named `aria-foo` is that component's business.
+const invalidAriaAttr: Rule = {
+  id: "invalid-aria-attr",
+  criteria: ["4.1.2"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      for (const [name] of literalAriaAttrs(el)) {
+        if (ARIA_ATTRS.has(name)) continue;
+        out.push({ criteriaId: "4.1.2", el, msgId: "invalid-aria-attr", params: { attr: name } });
+      }
+    }
+    return out;
+  },
+};
+
+// An out-of-vocabulary VALUE (`aria-expanded="yes"`, `aria-level="0"`) is treated as if the
+// attribute were absent, so the state the author meant to expose never reaches the user.
+const invalidAriaValue: Rule = {
+  id: "invalid-aria-value",
+  criteria: ["4.1.2"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      for (const [name, value] of literalAriaAttrs(el)) {
+        if (!ARIA_ATTRS.has(name)) continue; // invalid-aria-attr owns unknown names
+        if (hasBoundAttr(el, name) && !value) continue; // dynamically bound: present, value unknown
+        if (isValidAriaValue(name, value)) continue;
+        out.push({ criteriaId: "4.1.2", el, msgId: "invalid-aria-value", params: { attr: name, value } });
+      }
+    }
+    return out;
+  },
+};
+
+/** Does the element's NATIVE semantics already expose this state? A `<input
+ *  type="checkbox">` maintains its own checked state, an `<h2>` its own level — re-declaring
+ *  the role does not create an obligation to also hand-maintain the ARIA mirror. */
+function nativelyProvides(el: El, ariaAttr: string): boolean {
+  const type = (attr(el, "type") ?? "").toLowerCase();
+  switch (ariaAttr) {
+    case "aria-checked":
+      return el.tag === "input" && (type === "checkbox" || type === "radio");
+    case "aria-level":
+      return /^h[1-6]$/.test(el.tag);
+    case "aria-valuenow":
+      return el.tag === "progress" || el.tag === "meter" || (el.tag === "input" && type === "range");
+    case "aria-selected":
+      return el.tag === "option";
+    case "aria-expanded":
+      return el.tag === "details" || el.tag === "select";
+    default:
+      return false;
+  }
+}
+
+// A role whose ARIA definition REQUIRES a state, used without it: `role="checkbox"` with no
+// aria-checked announces a checkbox whose state is unknowable.
+const ariaRequiredAttr: Rule = {
+  id: "aria-required-attr",
+  criteria: ["4.1.2"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      if (!role || role.includes("{")) continue;
+      const required = ARIA_REQUIRED_ATTRS[role.split(/\s+/)[0] ?? ""];
+      if (!required) continue;
+      if (isHiddenFromAT(el)) continue; // not exposed: no state to expose
+      if (hasDynamicSpread(el)) continue; // a spread may carry the state
+      const missing = required.filter((a) => !hasBoundAttr(el, a) && !nativelyProvides(el, a));
+      if (!missing.length) continue;
+      out.push({ criteriaId: "4.1.2", el, msgId: "aria-required-attr", params: { role, attrs: missing.join(", ") } });
+    }
+    return out;
+  },
+};
+
+/** The role an element exposes: explicit `role`, else the unambiguous native one. */
+function effectiveRole(el: El): string {
+  const explicit = (attr(el, "role") ?? "").trim().toLowerCase();
+  if (explicit && !explicit.includes("{")) return explicit.split(/\s+/)[0] ?? "";
+  return IMPLICIT_CONTAINER_ROLE[el.tag] ?? "";
+}
+
+// A role that only means something inside a specific container (`tab` outside a `tablist`,
+// `option` outside a `listbox`) is not exposed as that role at all.
+const ariaRequiredParent: Rule = {
+  id: "aria-required-parent",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      if (!role || role.includes("{")) continue;
+      const accepted = ARIA_REQUIRED_PARENT[role.split(/\s+/)[0] ?? ""];
+      if (!accepted) continue;
+      if (isHiddenFromAT(el)) continue;
+      const chain = ancestors(el);
+      // A component ancestor may render the required container around this element, and
+      // aria-owns can supply the relationship from elsewhere — neither is visible here.
+      if (chain.some((a) => !isIntrinsic(a.tag))) continue;
+      if (doc.elements.some((e) => hasAttr(e, "aria-owns"))) continue;
+      // ARIA ownership stops at the first ancestor that DECLARES a role: a `role="listitem"`
+      // wrapped in a `role="tabpanel"` is owned by the tabpanel, not by the list further up.
+      // Role-less wrapper elements are traversed through — generic <div>s between a list and
+      // its items are everywhere in real markup, and browsers repair them.
+      // `role="presentation"`/`none` removes the element's semantics, so it is transparent
+      // for ownership — the list below it still owns the items.
+      const owner = chain.find((a) => !isPresentational(a) && ((attr(a, "role") ?? "").trim() !== "" || IMPLICIT_CONTAINER_ROLE[a.tag]));
+      if (owner && accepted.includes(effectiveRole(owner))) continue;
+      if (!owner && chain.some((a) => accepted.includes(effectiveRole(a)))) continue;
+      out.push({ criteriaId: "1.3.1", el, msgId: "aria-required-parent", params: { role, parents: accepted.join(" / ") } });
+    }
+    return out;
+  },
+};
+
+// Naming a role that PROHIBITS a name (a paragraph, an emphasis, a presentational element)
+// hands assistive tech text it has nowhere to put — dropped by some, announced out of
+// context by others. `role="presentation"`/`none` additionally LOSES its own effect as soon
+// as it carries a name, so the element silently keeps its semantics.
+const ariaProhibitedAttr: Rule = {
+  id: "aria-prohibited-attr",
+  criteria: ["4.1.2"],
+  severity: "mineur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      if (!role || role.includes("{")) continue;
+      if (!NAME_PROHIBITED_ROLES.has(role)) continue;
+      const named = ["aria-label", "aria-labelledby"].filter((a) => (attr(el, a) ?? "").trim() !== "");
+      if (!named.length) continue;
+      out.push({ criteriaId: "4.1.2", el, msgId: "aria-prohibited-attr", params: { role, attrs: named.join(", ") } });
+    }
+    return out;
+  },
+};
+
 export const scriptsAriaRules: Rule[] = [
   invalidAriaRole,
   ariaRefMissingId,
@@ -450,4 +629,9 @@ export const scriptsAriaRules: Rule[] = [
   nestedInteractive,
   liveRegionConflict,
   statusMessageNotAssertive,
+  invalidAriaAttr,
+  invalidAriaValue,
+  ariaRequiredAttr,
+  ariaRequiredParent,
+  ariaProhibitedAttr,
 ];

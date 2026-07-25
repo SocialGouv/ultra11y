@@ -1,6 +1,6 @@
 ---
 name: ultra11y
-description: "Use to AUDIT existing HTML/CSS/JSX against WCAG 2.2 AA accessibility and produce a dated auditor-conformance report, OR to AUTHOR/REVIEW accessible markup (native-HTML-first, ARIA last). An install-free engine (`node scripts/ultra11y.mjs`, no keys) runs 60 static checks across WCAG criteria — alt/lang/title, unlabeled fields, empty links/buttons, tables, heading skips, invalid ARIA, positive tabindex — deciding what it can; the AI agent adjudicates the judgment criteria (alt relevance, link purpose) itself via `verify --manual`, gated, and the needs-rendering ones (contrast, focus, zoom) go to the scan tier — never silently conforming. WCAG 2.2 AA is the worldwide core; RGAA and other standards are pluggable packs (`--standard rgaa`, `--pack`). JSX/TSX parse to a real AST (`audit --graph`); `report`/`prd`/`--gh-issues` share one auditor block per criterion; check/verify reject hallucinated non-conformities. Triggers: 'audit WCAG/a11y', 'make accessible', 'fix a11y', 'audit RGAA'."
+description: "Use to AUDIT existing HTML/CSS/JSX against WCAG 2.2 AA accessibility and produce a dated auditor-conformance report, OR to AUTHOR/REVIEW accessible markup (native-HTML-first, ARIA last). An install-free engine (`node scripts/ultra11y.mjs`, no keys) runs 72 static checks across WCAG criteria — alt/lang/title, unlabeled fields, empty links/buttons, tables, heading skips, invalid ARIA, positive tabindex — deciding what it can; the AI agent adjudicates the judgment criteria (alt relevance, link purpose) itself via `verify --manual`, gated, and the needs-rendering ones (contrast, focus, zoom) go to the scan tier — never silently conforming. WCAG 2.2 AA is the worldwide core; RGAA and other standards are pluggable packs (`--standard rgaa`, `--pack`). JSX/TSX parse to a real AST (`audit --graph`); `report`/`prd`/`--gh-issues` share one auditor block per criterion; check/verify reject hallucinated non-conformities. Triggers: 'audit WCAG/a11y', 'make accessible', 'fix a11y', 'audit RGAA'."
 license: MIT
 metadata:
   version: 2.20.0
@@ -120,6 +120,11 @@ contribute your country (see `references/standards.md`). Packs (and their concre
   **`references/forbidden-patterns.md`**.
 - **"What does criterion X mean"** → `criteria` (e.g. `criteria 1.4.3`, or
   `criteria --standard rgaa 8.3`); see **`references/criteria.md`**.
+- **"How trustworthy is a given check / what does the engine NOT catch"** → the engine is
+  scored against the **W3C ACT-Rules test corpus** (~1 100 third-party examples): which
+  checks are consistent, where recall is partial, which deviations are deliberate, and
+  which statically-decidable rules are still missing — read **`references/act.md`**. Use it
+  to calibrate how much of a criterion the engine really settles before you adjudicate.
 - **"Country standard (RGAA, Section 508, EN 301 549)"** → `--standard <pack>` on
   `report`/`prd`/`criteria`/`check`/`verify`; see **`references/standards.md`** and
   **`references/methodology.md`**. **For an RGAA audit, PROPOSE the scan by default**: a real
