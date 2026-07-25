@@ -1,7 +1,8 @@
 // Theme 6 / 7 — Links & buttons: accessible-name presence (empty-name + icon-only).
 import type { Doc, El } from "../parse/html.js";
 import { attr, hasAttr, descendants, visibleText } from "../parse/html.js";
-import { accessibleName, mayInjectContent, isFormField, controlLabel } from "../name.js";
+import { isIntrinsic } from "../parse/jsx-bridge.js";
+import { accessibleName, mayInjectContent, isFormField, controlLabel, isNameExempt } from "../name.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
 function hasIconChild(el: El): boolean {
@@ -34,7 +35,7 @@ const linkEmptyName: Rule = {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
       if (el.tag !== "a" || !hasAttr(el, "href")) continue;
-      if (attr(el, "aria-hidden") === "true") continue;
+      if (isNameExempt(el)) continue; // not exposed, or explicitly presentational
       if (accessibleName(el, doc) !== "") continue;
       if (mayInjectContent(el)) continue; // name supplied by a <slot>/child component
       if (hasIconChild(el)) continue; // handled by icon-only-control-unnamed
@@ -56,7 +57,7 @@ const buttonEmptyName: Rule = {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
       if (!isButton(el)) continue;
-      if (attr(el, "aria-hidden") === "true") continue;
+      if (isNameExempt(el)) continue; // not exposed, or explicitly presentational
       if (accessibleName(el, doc) !== "") continue;
       if (mayInjectContent(el)) continue; // name supplied by a <slot>/child component
       if (hasIconChild(el)) continue; // handled by icon-only-control-unnamed
@@ -80,7 +81,7 @@ const iconOnlyControlUnnamed: Rule = {
       const link = el.tag === "a" && hasAttr(el, "href");
       const button = isButton(el);
       if (!link && !button) continue;
-      if (attr(el, "aria-hidden") === "true") continue;
+      if (isNameExempt(el)) continue; // not exposed, or explicitly presentational
       if (accessibleName(el, doc) !== "") continue;
       if (mayInjectContent(el)) continue; // name supplied by a <slot>/child component
       if (!hasIconChild(el)) continue;
@@ -109,7 +110,7 @@ const controlNameTitleOnly: Rule = {
       const link = el.tag === "a" && hasAttr(el, "href");
       const field = !link && !isButton(el) && isFormField(el);
       if (!link && !isButton(el) && !field) continue;
-      if (attr(el, "aria-hidden") === "true") continue;
+      if (isNameExempt(el)) continue; // not exposed, or explicitly presentational
       const title = (attr(el, "title") ?? "").trim();
       if (!title || title.includes("{")) continue; // no title, or dynamic value
       if (hasAttr(el, "aria-label") || hasAttr(el, "aria-labelledby")) continue; // named by ARIA, title is supplementary
@@ -138,4 +139,56 @@ const controlNameTitleOnly: Rule = {
   },
 };
 
-export const linksRules: Rule[] = [linkEmptyName, buttonEmptyName, iconOnlyControlUnnamed, controlNameTitleOnly];
+
+/** Normalise for the label-in-name comparison: case, punctuation and whitespace are not
+ *  what voice control matches on. */
+const normalizeName = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u201c\u201d]/g, "'")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+// WCAG 2.5.3 Label in Name: when a control shows a visible text label, that text must be
+// CONTAINED in its accessible name. A voice-control user says what they see ("click Send");
+// if the accessible name is "Submit", the command silently does nothing. Only reported when
+// both halves are literal text — a dynamic name proves nothing either way.
+const labelInNameMismatch: Rule = {
+  id: "label-in-name-mismatch",
+  criteria: ["2.5.3"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      const link = el.tag === "a" && hasAttr(el, "href");
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      if (!link && !isButton(el) && !["button", "link", "menuitem", "tab", "checkbox", "radio", "switch"].includes(role)) continue;
+      if (isNameExempt(el)) continue;
+      // The override must be a LITERAL aria-label: aria-labelledby points at text elsewhere
+      // in the page, which the visible label may legitimately extend rather than contradict.
+      const ariaLabel = (attr(el, "aria-label") ?? "").trim();
+      if (!ariaLabel || ariaLabel.includes("{")) continue;
+      if (hasAttr(el, "aria-labelledby")) continue; // labelledby wins over aria-label; different question
+      const visible = visibleText(el).trim();
+      if (!visible || visible.includes("{")) continue;
+      // A one- or two-character run ("X", "OK", "→") is a glyph, not a label a voice-control
+      // user would speak — 2.5.3 is about VISIBLE LABEL TEXT, and comparing glyphs to names
+      // manufactures noise.
+      if (visible.length < 3) continue;
+      if (mayInjectContent(el)) continue; // the visible text may come from a slot/component
+      const name = normalizeName(ariaLabel);
+      const label = normalizeName(visible);
+      if (!label || !name || name.includes(label)) continue;
+      out.push({
+        criteriaId: "2.5.3",
+        el,
+        msgId: "label-in-name-mismatch",
+        params: { visible, name: ariaLabel },
+      });
+    }
+    return out;
+  },
+};
+
+export const linksRules: Rule[] = [linkEmptyName, buttonEmptyName, iconOnlyControlUnnamed, controlNameTitleOnly, labelInNameMismatch];

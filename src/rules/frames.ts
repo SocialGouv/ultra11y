@@ -1,6 +1,7 @@
 // Theme 2 — Frames.
 import type { Doc, El } from "../parse/html.js";
 import { attr, hasBoundAttr } from "../parse/html.js";
+import { isNameExempt } from "../name.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
 const iframeTitleMissing: Rule = {
@@ -11,7 +12,7 @@ const iframeTitleMissing: Rule = {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
       if (el.tag !== "iframe") continue;
-      if (attr(el, "aria-hidden") === "true") continue;
+      if (isNameExempt(el)) continue; // not exposed, or explicitly presentational
       const title = (attr(el, "title") ?? "").trim();
       const aria = (attr(el, "aria-label") ?? "").trim();
       // aria-labelledby is the highest-precedence accname source. A present value names the

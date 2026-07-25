@@ -323,9 +323,12 @@ describe("checkReport --in (pack applicability gate)", () => {
   it("fails a hand-edited RGAA report that over-projects an NC onto an inapplicable criterion", () => {
     // Inject a fake NC auditor block for RGAA 1.4 (CAPTCHA) — a criterion the audit
     // never derives as NC. The applicability gate must catch it.
+    // Insert INSIDE section 2 (the non-conformity section) — a block after it, e.g. in the
+    // Recommendations section, is not an NC projection at all.
+    const ncHeading = /^## 2\..*$/m.exec(rgaaReport)![0];
     const tampered = rgaaReport.replace(
-      "## 3.",
-      "#### 🔴 RGAA 1.4 — CAPTCHA\n**Thématique** : 1.\n**Critère** : 1.4 — CAPTCHA\n- [ ] `x.html:1` (`img`) — bogus\n\n## 3.",
+      ncHeading,
+      `${ncHeading}\n\n#### 🔴 RGAA 1.4 — CAPTCHA\n**Thématique** : 1.\n**Critère** : 1.4 — CAPTCHA\n- [ ] \`x.html:1\` (\`img\`) — bogus\n`,
     );
     const r = checkReport(tampered, "rgaa", "fr", { audit: bad });
     expect(r.ok).toBe(false);

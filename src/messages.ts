@@ -34,6 +34,156 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
       en: () => `Add alt="…" (a description if the image conveys information, alt="" if it is decorative).`,
     },
   },
+  "autocomplete-token-invalid": {
+    message: {
+      fr: (p) => `autocomplete="${p.value}" n'appartient pas au vocabulaire HTML — la finalité du champ n'est pas identifiable.`,
+      en: (p) => `autocomplete="${p.value}" is not in the HTML autofill vocabulary — the field's purpose is not identifiable.`,
+    },
+    remediation: {
+      fr: () => `Utilisez un token de la liste WCAG « Input Purposes » (par ex. given-name, email, tel, postal-code, current-password).`,
+      en: () => `Use a token from the WCAG "Input Purposes" list (e.g. given-name, email, tel, postal-code, current-password).`,
+    },
+  },
+  "credential-entry-blocked.paste": {
+    message: {
+      fr: (p) => `Le collage est bloqué sur ce champ <input type="${p.type}"> — la saisie du secret devient un test de mémoire.`,
+      en: (p) => `Paste is blocked on this <input type="${p.type}"> — entering the secret becomes a memory test.`,
+    },
+    remediation: {
+      fr: () => `Retirez le gestionnaire qui annule l'événement paste : les gestionnaires de mots de passe doivent pouvoir remplir le champ.`,
+      en: () => `Remove the handler cancelling the paste event: password managers must be able to fill the field.`,
+    },
+  },
+  "credential-entry-blocked.autocomplete": {
+    message: {
+      fr: (p) => `autocomplete="off" sur un champ d'identification (<input type="${p.type}">) — le remplissage automatique est désactivé.`,
+      en: (p) => `autocomplete="off" on a credential field (<input type="${p.type}">) — automatic filling is disabled.`,
+    },
+    remediation: {
+      fr: () => `Déclarez la finalité réelle (autocomplete="username" / "current-password" / "one-time-code") au lieu de "off".`,
+      en: () => `Declare the real purpose (autocomplete="username" / "current-password" / "one-time-code") instead of "off".`,
+    },
+  },
+  "on-input-context-change": {
+    message: {
+      fr: (p) => `Changer la valeur de ce <${p.tag}> déclenche seul un changement de contexte (envoi/navigation).`,
+      en: (p) => `Changing this <${p.tag}>'s value alone triggers a change of context (submit/navigation).`,
+    },
+    remediation: {
+      fr: () => `Attendez une action explicite (bouton « Valider »), ou annoncez le changement avant qu'il ne survienne.`,
+      en: () => `Wait for an explicit action (a "Submit" button), or announce the change before it happens.`,
+    },
+  },
+  "label-in-name-mismatch": {
+    message: {
+      fr: (p) => `Le libellé visible « ${p.visible} » n'est pas contenu dans le nom accessible « ${p.name} » — la commande vocale échoue.`,
+      en: (p) => `The visible label "${p.visible}" is not contained in the accessible name "${p.name}" — voice control fails.`,
+    },
+    remediation: {
+      fr: (p) => `Faites commencer aria-label par le texte visible (« ${p.visible} … »), ou retirez aria-label et laissez le texte nommer le contrôle.`,
+      en: (p) => `Start aria-label with the visible text ("${p.visible} …"), or drop aria-label and let the text name the control.`,
+    },
+  },
+  "headers-attr-dangling": {
+    message: {
+      fr: (p) => `headers="${p.ids}" ne désigne aucune cellule d'en-tête de ce tableau — l'association n'existe pas.`,
+      en: (p) => `headers="${p.ids}" points at no header cell of this table — the association does not exist.`,
+    },
+    remediation: {
+      fr: () => `Faites pointer headers vers les id de <th> du MÊME tableau, ou utilisez scope="col"/"row".`,
+      en: () => `Point headers at the ids of <th> cells in the SAME table, or use scope="col"/"row".`,
+    },
+  },
+  "th-no-data-cells": {
+    message: {
+      fr: () => `Cet en-tête n'est référencé par aucune cellule de données alors que le tableau utilise headers — il n'en-tête rien.`,
+      en: () => `This header is referenced by no data cell although the table uses headers — it heads nothing.`,
+    },
+    remediation: {
+      fr: () => `Ajoutez son id au headers des cellules qu'il en-tête, ou retirez-le s'il ne sert qu'à la mise en forme.`,
+      en: () => `Add its id to the headers of the cells it heads, or remove it if it is purely presentational.`,
+    },
+  },
+  "dl-structure.foreign-child": {
+    message: {
+      fr: (p) => `<${p.tag}> comme enfant direct de <dl> — seuls <dt>, <dd> (et <div> les groupant) sont admis.`,
+      en: (p) => `<${p.tag}> as a direct child of <dl> — only <dt>, <dd> (and a grouping <div>) are allowed.`,
+    },
+    remediation: {
+      fr: () => `Déplacez le contenu dans un <dd>, ou sortez-le de la liste de définitions.`,
+      en: () => `Move the content into a <dd>, or take it out of the description list.`,
+    },
+  },
+  "dl-structure.orphan": {
+    message: {
+      fr: (p) => `<${p.tag}> hors de tout <dl> — la relation terme/description n'est pas exposée.`,
+      en: (p) => `<${p.tag}> outside any <dl> — the term/description relationship is not exposed.`,
+    },
+    remediation: {
+      fr: (p) => `Enveloppez les paires <dt>/<dd> dans un <dl> (le <${p.tag}> seul n'a aucune sémantique).`,
+      en: (p) => `Wrap the <dt>/<dd> pairs in a <dl> (a lone <${p.tag}> carries no semantics).`,
+    },
+  },
+  "invalid-aria-attr": {
+    message: {
+      fr: (p) => `Attribut ${p.attr} inconnu de WAI-ARIA — il est ignoré par les navigateurs et n'expose rien.`,
+      en: (p) => `${p.attr} is not a WAI-ARIA attribute — browsers ignore it, so it exposes nothing.`,
+    },
+    remediation: {
+      fr: (p) => `Corrigez l'orthographe de ${p.attr} (par ex. aria-labelledby, aria-describedby) ou retirez l'attribut.`,
+      en: (p) => `Fix the spelling of ${p.attr} (e.g. aria-labelledby, aria-describedby) or remove the attribute.`,
+    },
+  },
+  "invalid-aria-value": {
+    message: {
+      fr: (p) => `${p.attr}="${p.value}" n'est pas une valeur admise — l'état est traité comme absent.`,
+      en: (p) => `${p.attr}="${p.value}" is not an allowed value — the state is treated as absent.`,
+    },
+    remediation: {
+      fr: (p) => `Utilisez une valeur définie par WAI-ARIA pour ${p.attr} (par ex. true/false, ou un entier pour aria-level).`,
+      en: (p) => `Use a value WAI-ARIA defines for ${p.attr} (e.g. true/false, or an integer for aria-level).`,
+    },
+  },
+  "aria-required-attr": {
+    message: {
+      fr: (p) => `role="${p.role}" sans ${p.attrs} — l'état requis par ce rôle n'est pas exposé.`,
+      en: (p) => `role="${p.role}" without ${p.attrs} — the state this role requires is not exposed.`,
+    },
+    remediation: {
+      fr: (p) => `Ajoutez ${p.attrs} et tenez la valeur à jour, ou utilisez l'élément natif équivalent qui gère l'état seul.`,
+      en: (p) => `Add ${p.attrs} and keep it in sync, or use the native element, which manages the state on its own.`,
+    },
+  },
+  "aria-required-parent": {
+    message: {
+      fr: (p) => `role="${p.role}" hors de son conteneur requis (${p.parents}) — le rôle n'est pas exposé.`,
+      en: (p) => `role="${p.role}" outside its required container (${p.parents}) — the role is not exposed.`,
+    },
+    remediation: {
+      fr: (p) => `Placez l'élément dans un conteneur ${p.parents}, ou reliez-le via aria-owns.`,
+      en: (p) => `Put the element inside a ${p.parents} container, or wire it up with aria-owns.`,
+    },
+  },
+  "aria-prohibited-attr": {
+    message: {
+      fr: (p) => `role="${p.role}" interdit un nom d'auteur, mais ${p.attrs} en fournit un — restitution imprévisible.`,
+      en: (p) => `role="${p.role}" prohibits an author-provided name, yet ${p.attrs} supplies one — restitution is unpredictable.`,
+    },
+    remediation: {
+      fr: (p) => `Retirez ${p.attrs}, ou donnez à l'élément un rôle qui accepte d'être nommé.`,
+      en: (p) => `Remove ${p.attrs}, or give the element a role that accepts a name.`,
+    },
+  },
+  "img-alt-missing.title-only": {
+    message: {
+      fr: (p) => `<${p.tag}> sans alt : le nom accessible vient du seul title, restitué de façon peu fiable (survol uniquement).`,
+      en: (p) => `<${p.tag}> has no alt: its accessible name comes from title alone, which is restituted unreliably (hover only).`,
+    },
+    remediation: {
+      fr: () => `Recommandation : déplacez le texte du title vers alt="…" (alt="" si l'image est décorative).`,
+      en: () => `Recommendation: move the title text into alt="…" (alt="" if the image is decorative).`,
+    },
+  },
   "decorative-alt-misuse.empty-but-named": {
     message: {
       fr: () => `Image décorative (alt="") mais nommée par aria-label/title — incohérence décoratif/informatif.`,

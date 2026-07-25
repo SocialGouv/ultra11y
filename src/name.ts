@@ -14,8 +14,61 @@ export function mayInjectContent(el: El): boolean {
   return descendants(el).some((d) => d.tag === "slot" || (d.tag !== "#fragment" && !isIntrinsic(d.tag)));
 }
 
-/** Text content of a subtree, with <img> alt and <svg><title> folded in. */
-function nameFromContent(el: El): string {
+// Inline style declarations that take an element (and its subtree) out of the
+// accessibility tree entirely. Only INLINE styles are visible to a static parse — a
+// class-driven `display:none` is invisible here, which is why this stays a narrow,
+// high-confidence suppression rather than a general visibility model.
+const HIDDEN_STYLE = /(^|;)\s*(display\s*:\s*none|visibility\s*:\s*(hidden|collapse))\s*(;|$)/i;
+
+/** Is the element not rendered at all — `[hidden]`, or an inline `display:none` /
+ *  `visibility:hidden` on itself or an ancestor? Such an element is in no focus order and
+ *  exposes nothing, whatever its ARIA says. */
+export function isDisplayHidden(el: El): boolean {
+  for (const node of [el, ...ancestors(el)]) {
+    if (hasAttr(node, "hidden")) return true;
+    if (HIDDEN_STYLE.test(attr(node, "style") ?? "")) return true;
+  }
+  return false;
+}
+
+/** Is this element removed from the accessibility tree by something the source shows —
+ *  `hidden`, an inline `display:none`/`visibility:hidden`, or an `aria-hidden="true"`
+ *  ancestor? Such an element exposes no name to anyone, so a rule demanding one would be
+ *  reporting a defect nobody can experience. (`aria-hidden` on the element ITSELF is
+ *  included; a rule whose subject IS aria-hidden must use `isDisplayHidden` instead.) */
+export function isHiddenFromAT(el: El): boolean {
+  if (isDisplayHidden(el)) return true;
+  return [el, ...ancestors(el)].some((node) => attr(node, "aria-hidden") === "true");
+}
+
+/** `role="presentation"`/`role="none"` — the author has explicitly removed the element's
+ *  semantics, so it exposes no name to remove. */
+export function isPresentational(el: El): boolean {
+  return ["presentation", "none"].includes((attr(el, "role") ?? "").trim().toLowerCase());
+}
+
+/** Should a rule that demands an accessible name stay silent on this element? True when
+ *  the element is not in the accessibility tree at all, or is explicitly presentational.
+ *  Reporting either would be a defect no user can experience — the precision failure the
+ *  W3C ACT corpus catches most often. */
+export function isNameExempt(el: El): boolean {
+  return isHiddenFromAT(el) || isPresentational(el);
+}
+
+/** The name an embedded image contributes to its container's accessible name. Per the
+ *  accname computation an `<img>` is named by aria-labelledby > aria-label > alt > title,
+ *  so a link wrapping `<img aria-label="…">` or `<img title="…">` is NOT unnamed.
+ *  `doc` resolves an aria-labelledby to the text it points at; without one, the mere
+ *  presence of the attribute still counts as "named" (the reference may resolve at
+ *  runtime, and aria-ref-missing-id owns the dangling-idref case). */
+function embeddedImageName(n: El, doc?: Doc): string {
+  const labelled = (attr(n, "aria-labelledby") ?? "").trim();
+  if (labelled) return doc ? ariaLabelledbyText(n, doc) || labelled : labelled;
+  return (boundAttr(n, "aria-label") ?? attr(n, "alt") ?? attr(n, "title") ?? "").trim();
+}
+
+/** Text content of a subtree, with <img> names and <svg><title> folded in. */
+function nameFromContent(el: El, doc?: Doc): string {
   let out = "";
   const walk = (n: HNode): void => {
     if (n.type === "text") {
@@ -23,13 +76,13 @@ function nameFromContent(el: El): string {
       return;
     }
     if (n.tag === "img") {
-      const a = attr(n, "alt");
+      const a = embeddedImageName(n, doc);
       if (a) out += " " + a;
       return;
     }
     if (n.tag === "svg") {
       const title = descendants(n).find((d) => d.tag === "title");
-      if (title) out += " " + nameFromContent(title);
+      if (title) out += " " + nameFromContent(title, doc);
       return;
     }
     // aria-hidden subtrees contribute nothing
@@ -78,7 +131,7 @@ export function accessibleName(el: El, doc: Doc): string {
     }
   }
   // 4. content + title fallback
-  const content = nameFromContent(el);
+  const content = nameFromContent(el, doc);
   if (content) return content;
   return (attr(el, "title") ?? "").trim();
 }

@@ -24,7 +24,9 @@ const metaViewportZoomBlock: Rule = {
       // Only a real, finite maximum-scale < 2 blocks zoom. An empty (`maximum-scale=`)
       // or malformed value must NOT be treated as 0 (Number("") === 0) and falsely flagged.
       const maxScaleNum = maxScale !== undefined && maxScale.trim() !== "" ? Number(maxScale) : Number.NaN;
-      const blocked = userScalable === "no" || userScalable === "0" || (Number.isFinite(maxScaleNum) && maxScaleNum < 2);
+      // A maximum-scale of 0 or less is invalid: browsers discard it, so zoom is NOT
+      // blocked (`maximum-scale=-1` is a W3C ACT "passed" example).
+      const blocked = userScalable === "no" || userScalable === "0" || (Number.isFinite(maxScaleNum) && maxScaleNum > 0 && maxScaleNum < 2);
       if (!blocked) continue;
       out.push({
         criteriaId: "1.4.4",

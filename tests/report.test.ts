@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runAudit } from "../src/audit.js";
+import { runAudit, buildAudit } from "../src/audit.js";
+import { parseSource } from "../src/parse/source.js";
 import { renderReport, renderPackReport, writeReport, untestedNeedsRendering } from "../src/report.js";
 import { mergeDynamic } from "../src/scan.js";
-import { prdUnits } from "../src/prd.js";
+import { prdUnits, partitionUnits } from "../src/prd.js";
 import { derivePackResults, loadPack, packConformancePct } from "../src/standards/index.js";
 import type { AuditResult, DynamicResult, Finding } from "../src/types.js";
 
@@ -50,8 +51,15 @@ describe("renderReport (WCAG 2.2 AA markdown)", () => {
   });
 
   it("the NC section is EXACTLY the prd/auditor backlog units for this audit — no report-local re-grouping", () => {
-    const units = prdUnits(bad, "wcag", "fr");
-    for (const u of units) expect(md).toContain(`**Critère de succès** : ${u.criteriaId} — ${u.title}`);
+    // Advisory units are NOT non-conformities: they render in their own Recommendations
+    // section with a « Recommandation (non normative) » label, so the NC section must
+    // match the NC units exactly — nothing more, nothing less.
+    const { nc, advisory } = partitionUnits(prdUnits(bad, "wcag", "fr"));
+    for (const u of nc) expect(md).toContain(`**Critère de succès** : ${u.criteriaId} — ${u.title}`);
+    for (const u of advisory) {
+      expect(md).not.toContain(`**Critère de succès** : ${u.criteriaId} — ${u.title}`);
+      expect(md).toContain(`**Recommandation (non normative)** — ${u.criteriaId}`);
+    }
   });
 
   it("lists manual criteria under the residual-risk section with the agent-adjudication warning", () => {
@@ -330,8 +338,10 @@ describe("renderReport — advisory recommendations section", () => {
   });
 
   it("omits the Recommendations section when there is no advisory finding", () => {
-    const md = renderReport(bad, "en");
-    expect(md).not.toContain("Recommendations (non-normative)");
+    // A page whose only defect is normative — no advisory rule can fire on it.
+    const onlyNormative = buildAudit([parseSource('<main><form><input type="text" name="q"></form></main>', "f.html")], ["f.html"]);
+    expect(onlyNormative.findings.some((f) => f.advisory)).toBe(false);
+    expect(renderReport(onlyNormative, "en")).not.toContain("Recommendations (non-normative)");
   });
 
   it("still keeps the required 1–5 numbered sections intact with the advisory section present", () => {

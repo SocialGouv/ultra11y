@@ -1,6 +1,7 @@
 // Theme 8 — Mandatory elements (the statically-checkable slice).
-import type { Doc, El } from "../parse/html.js";
+import type { Doc, El, HNode } from "../parse/html.js";
 import { attr, hasAttr, visibleText, allIds, elementsByTag } from "../parse/html.js";
+import { isDisplayHidden } from "../name.js";
 import { type Rule, type RuleFinding, shellHeadInjected } from "./rule.js";
 
 // Next.js App Router sets the document <title> via `export const metadata = { title }`
@@ -131,6 +132,18 @@ const inlineLangChangeMissing: Rule = {
 // singletons must not be flagged invalid (the old /^[A-Za-z]{2,3}…/ rejected them).
 const BCP47 = /^([A-Za-z]{2,3}|[xXiI])(-[A-Za-z0-9]{1,8})*$/;
 
+/** Does this element govern any rendered text of its own — text that is neither hidden nor
+ *  re-declared by a descendant's own `lang`? */
+function governsText(el: El): boolean {
+  const walk = (n: HNode): boolean => {
+    if (n.type === "text") return n.data.trim() !== "";
+    if (hasAttr(n, "lang")) return false; // the descendant declares its own language
+    if (isDisplayHidden(n)) return false;
+    return n.children.some(walk);
+  };
+  return el.children.some(walk);
+}
+
 const langInvalid: Rule = {
   id: "lang-invalid",
   criteria: ["3.1.1", "3.1.2"],
@@ -141,6 +154,11 @@ const langInvalid: Rule = {
       const lang = (attr(el, "lang") ?? "").trim();
       if (!lang) continue; // empty handled by inline-lang-change-missing / html-lang-missing
       if (BCP47.test(lang)) continue;
+      // A malformed `lang` only misdeclares something if it actually GOVERNS text. On
+      // <html> that is the whole document; elsewhere, text sitting under a descendant with
+      // its own `lang`, or inside a hidden subtree, is not governed by this attribute — and
+      // an element governing no text at all declares a language for nobody.
+      if (el.tag !== "html" && !governsText(el)) continue;
       out.push({
         criteriaId: el.tag === "html" ? "3.1.1" : "3.1.2",
         el,

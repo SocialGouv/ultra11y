@@ -22,12 +22,18 @@ const autoplayMedia: Rule = {
     for (const el of doc.elements) {
       if (el.tag !== "audio" && el.tag !== "video") continue;
       if (!hasAttr(el, "autoplay")) continue;
-      // muted video has no sound → it falls under moving content (13.8), audio always 4.10
+      // `controls` IS the mechanism 1.4.2 asks for (pause/stop/volume), so autoplay with
+      // native controls conforms — reporting it would be inventing a non-conformity.
+      if (hasAttr(el, "controls")) continue;
+      // muted video has no sound → it falls under moving content (13.8), audio always 4.10.
+      // Whether the movement lasts the 5 seconds 2.2.2 requires is not knowable from the
+      // source, so this is a recommendation to check, never an asserted failure.
       if (el.tag === "video" && mutedStatically(el)) {
         out.push({
           criteriaId: "2.2.2",
           el,
           msgId: "autoplay-media.muted-video",
+          advisory: true,
         });
         continue;
       }
@@ -42,13 +48,16 @@ const autoplayMedia: Rule = {
   },
 };
 
-// A <video> that carries audio (not muted) but ships no <track> — no synchronized
-// captions/subtitles. We flag the structural absence; whether captions are *required*
-// (the video may be silent/decorative) stays a human judgment, hence majeur not bloquant.
+// A <video> that carries audio (not muted) but ships no <track> element. The absence is
+// worth surfacing, but it is NOT proof of a 1.2.2 failure: captions can be embedded in the
+// media container itself, and the audio track may be silent. Neither is knowable from
+// source, so this is a NON-NORMATIVE recommendation — 1.2.2 stays a judgment criterion the
+// agent adjudicates against the real media, rather than being flipped to NC on a guess.
 const mediaNoTrack: Rule = {
   id: "media-no-track",
   criteria: ["1.2.2"],
   severity: "majeur",
+  advisory: true,
   run(doc: Doc): RuleFinding[] {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {

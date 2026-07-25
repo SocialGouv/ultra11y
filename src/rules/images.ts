@@ -1,10 +1,14 @@
 // Theme 1 — Images.
 import type { Doc, El } from "../parse/html.js";
 import { attr, hasAttr, hasBoundAttr, boundAttr, hasDynamicSpread, visibleText, ancestors, descendants } from "../parse/html.js";
-import { accessibleName } from "../name.js";
+import { accessibleName, isNameExempt } from "../name.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
-const isHidden = (el: El): boolean => attr(el, "aria-hidden") === "true" || ["presentation", "none"].includes((attr(el, "role") ?? "").trim());
+// Not exposed to assistive tech (aria-hidden / [hidden] / an inline display:none or
+// visibility:hidden, on the element or an ancestor), or explicitly presentational —
+// either way there is no accessible name to demand. Shared with the other rule families
+// via src/name.ts so the whole engine agrees on what "not exposed" means.
+const isHidden = isNameExempt;
 // A dynamically-bound name (`:aria-label`, `v-bind:aria-labelledby`) names the element
 // even though we cannot resolve its value — treat it as present, not missing.
 const named = (el: El): boolean => !!(boundAttr(el, "aria-label") ?? "").trim() || hasBoundAttr(el, "aria-labelledby");
@@ -28,6 +32,21 @@ const imgAltMissing: Rule = {
       // role="img" on a non-<img> element (e.g. <svg role="img"><title>…) is named by its
       // <title>/text content, not an alt attribute — accept that accessible name.
       if (el.tag !== "img" && el.tag !== "area" && accessibleName(el, doc).trim() !== "") continue;
+      // `title` IS an accname fallback for an image, so 1.1.1 is technically satisfied and
+      // asserting a non-conformity would be inventing one. It is still the wrong tool —
+      // `title` is hover-only, absent on touch and unevenly announced — so this stays a
+      // recommendation to move the text into `alt`, never a normative failure.
+      if ((attr(el, "title") ?? "").trim() !== "") {
+        out.push({
+          criteriaId: "1.1.1",
+          el,
+          msgId: "img-alt-missing.title-only",
+          params: { tag: el.tag },
+          advisory: true,
+          severity: "mineur",
+        });
+        continue;
+      }
       out.push({
         criteriaId: "1.1.1",
         el,
@@ -99,6 +118,7 @@ const inputImageAltMissing: Rule = {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
       if (el.tag !== "input" || (attr(el, "type") ?? "").toLowerCase() !== "image") continue;
+      if (isHidden(el)) continue;
       const alt = (boundAttr(el, "alt") ?? "").trim();
       if (alt || named(el) || (attr(el, "title") ?? "").trim()) continue;
       out.push({
