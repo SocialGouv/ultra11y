@@ -136,6 +136,23 @@ export interface ExpandOpts {
   ext?: string[];
   noDefaultExcludes?: boolean; // audit test/spec/story/__tests__ markup too
   onWarn?: (msg: string) => void;
+  // Memo of directory walks, shared by the calls that expand the SAME inputs with a
+  // different extension allowlist — `audit --graph` discovers twice (markup, then
+  // markup + .ts/.js for the dependency graph) and the tree walk is identical both
+  // times because the extension filter is applied AFTER it. Caller-owned and
+  // per-run on purpose: a module-level cache would go stale across audits (a
+  // `fix --iterate` re-audit must always see the current tree).
+  walkCache?: Map<string, string[]>;
+}
+
+/** Walk `dir` once per ExpandOpts.walkCache. Without a cache, walks every time. */
+function walkCached(dir: string, opts: ExpandOpts): string[] {
+  const hit = opts.walkCache?.get(dir);
+  if (hit) return hit;
+  const acc: string[] = [];
+  walk(dir, acc);
+  opts.walkCache?.set(dir, acc);
+  return acc;
 }
 
 /** Expand inputs (paths/dirs/globs) into a sorted, de-duplicated file list. */
@@ -152,15 +169,13 @@ export function expandInputs(inputs: string[], opts: ExpandOpts = {}): string[] 
       // A positional glob input is ONE glob (no comma-splitting — that is an
       // --include/--exclude flag affordance), compiled by the engine.
       const match = engineCompileGlobs([input])!;
-      const acc: string[] = [];
-      walk(staticBase(input), acc);
+      const acc = walkCached(staticBase(input), opts);
       // Honour the markup allowlist for globs too — a broad `src/**` must not pull
       // in .js/.css/.json and parse them as HTML (engine scope is markup only).
       for (const f of acc) if (match(toPosix(f)) && exts.has(ext(f))) files.add(f);
     } else if (existsSync(input)) {
       if (statSync(input).isDirectory()) {
-        const acc: string[] = [];
-        walk(input, acc);
+        const acc = walkCached(input, opts);
         for (const f of acc) if (exts.has(ext(f))) files.add(f);
       } else if (exts.has(ext(input))) {
         files.add(input);

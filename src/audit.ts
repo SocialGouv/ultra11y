@@ -15,7 +15,7 @@ import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
 import { listPacks } from "./standards/registry.js";
 import { runPackRules } from "./standards/pack-rules.js";
-import { buildGraphStreaming } from "./graph/build.js";
+import { buildGraphAndDocs } from "./graph/build.js";
 import type { DepGraph } from "./graph/graph.js";
 import { discover } from "./discover.js";
 import { GRAPH_ONLY_EXT } from "./glob.js";
@@ -277,6 +277,10 @@ export function runAudit(opts: AuditInput): AuditResult {
   let duplicateFiles = 0;
   let truncated: FinalizeExtra["truncated"];
 
+  // `--graph` expands the same inputs twice (markup, then markup + .ts/.js). The tree
+  // walk is the identical, extension-agnostic part of both — share it.
+  const walkCache = new Map<string, string[]>();
+
   const {
     files: discovered,
     gitUnavailable,
@@ -290,6 +294,7 @@ export function runAudit(opts: AuditInput): AuditResult {
     staged: opts.staged,
     noDefaultExcludes: opts.noDefaultExcludes,
     onWarn: opts.onWarn,
+    walkCache,
   });
   // In staged mode, read the index blob (from discovery) instead of the working tree.
   const useStaged = opts.staged === true && !gitUnavailable;
@@ -313,6 +318,12 @@ export function runAudit(opts: AuditInput): AuditResult {
   // of whatever --ext adds — a barrel/plain-JS module is never an audit target (see
   // `files` above), but it is real cross-file structure the graph resolves through.
   let graph: DepGraph | undefined;
+  // Docs the graph pass already parsed, handed over so the audit loop below does not
+  // read and parse the very same markup a second time. Never used in --staged mode:
+  // there the audit must see the INDEX blob while the graph pass read the working
+  // tree, so the two can legitimately differ. Nor under --jsx, which forces a parser
+  // the graph pass does not apply.
+  let carried: Map<string, Doc> | undefined;
   if (opts.graph || opts.captureCoverage) {
     const graphExt = [...GRAPH_ONLY_EXT, ...(opts.ext ?? [])];
     const graphFiles = discover(opts.inputs, {
@@ -320,8 +331,11 @@ export function runAudit(opts: AuditInput): AuditResult {
       exclude: opts.exclude,
       ext: graphExt,
       noDefaultExcludes: opts.noDefaultExcludes,
+      walkCache,
     }).files;
-    graph = buildGraphStreaming(graphFiles);
+    const built = buildGraphAndDocs(graphFiles, { carryDocs: !useStaged && !opts.forceJsx });
+    graph = built.graph;
+    if (built.docs.size) carried = built.docs;
   }
 
   for (let i = 0; i < files.length; i++) {
@@ -338,8 +352,12 @@ export function runAudit(opts: AuditInput): AuditResult {
     const file = files[i]!;
     let content: string;
     const staged = useStaged ? stagedContent?.get(file) : undefined;
+    // A carried Doc already holds the file's source, so a hit skips the read entirely.
+    const reused = staged === undefined ? carried?.get(file) : undefined;
     if (staged !== undefined) {
       content = staged;
+    } else if (reused) {
+      content = reused.source;
     } else {
       try {
         content = readText(file);
@@ -355,7 +373,7 @@ export function runAudit(opts: AuditInput): AuditResult {
       }
       seen.add(h);
     }
-    foldDoc(acc, parseSource(content, file, { forceJsx: opts.forceJsx }), graph);
+    foldDoc(acc, reused ?? parseSource(content, file, { forceJsx: opts.forceJsx }), graph);
   }
 
   const canonicalFiles = acc.fileCount;

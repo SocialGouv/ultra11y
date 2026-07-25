@@ -21,6 +21,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:perf": "vitest run --config vitest.perf.config.ts",
+    "bench": "node scripts/bench.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome ci .",
     "lint:fix": "biome check --write .",
@@ -31,6 +33,8 @@
     "build:pack:rgaa": "node scripts/build-pack-rgaa.mjs",
     "check:pack:rgaa": "node scripts/build-pack-rgaa.mjs --check",
     "build:criteria": "node scripts/ultra11y.mjs criteria --generate > skills/ultra11y/references/criteria.md",
+    "build:act": "UPDATE_ACT_MATRIX=1 vitest run tests/act-matrix-sync.test.ts",
+    "build:act:refresh": "node scripts/build-act-corpus.mjs --refresh",
     "demo": "node scripts/ultra11y.mjs audit tests/fixtures/non-conforming/bad.html --out /tmp/ultra11y-demo --json > /dev/null && node scripts/ultra11y.mjs report --in /tmp/ultra11y-demo/audit-latest.json --out /tmp/ultra11y-demo && node scripts/ultra11y.mjs check --report /tmp/ultra11y-demo/wcag-*.md && node scripts/ultra11y.mjs criteria --list",
     "release": "semantic-release"
   },

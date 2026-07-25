@@ -2,7 +2,8 @@
 import type { Doc, El } from "../parse/html.js";
 import { attr, hasAttr, hasDynamicSpread, descendants, ancestors, visibleText, textContent } from "../parse/html.js";
 import { isIntrinsic } from "../parse/jsx-bridge.js";
-import { controlLabel, isFormField, mayInjectContent } from "../name.js";
+import { controlLabel, isFormField, mayInjectContent, isNameExempt } from "../name.js";
+import { isValidAutocomplete, CREDENTIAL_FIELDS } from "../autofill.js";
 
 // The element's WHOLE content is a slot/snippet passthrough — a DIRECT `<slot>` child or
 // a `{@render …}`/`{children}` render-expression text node — so the legend the caller
@@ -24,6 +25,7 @@ const controlLabelMissing: Rule = {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
       if (!isFormField(el)) continue;
+      if (isNameExempt(el)) continue; // not exposed, or explicitly presentational
       const { via } = controlLabel(el, doc);
       if (via && REAL_LABEL.has(via)) continue;
       // title yields an accessible name (accname fallback / WCAG H65) — a weak one, surfaced
@@ -136,6 +138,10 @@ const selectHasOption: Rule = {
   },
 };
 
+// An attribute key that carries an element id (`id`, `inputId`, `data-testid`, `htmlFor`…):
+// the signature a design-system component uses to hand an id down to the control it renders.
+const ID_ATTR_KEY = /id/i;
+
 // A <label for="x"> whose target id exists nowhere in the document — the visible label
 // is not programmatically associated with any field (a common typo'd for/id pairing).
 // Same-document only; cross-file label/field association is out of scope (see references/cross-file.md).
@@ -145,6 +151,29 @@ const labelForDangling: Rule = {
   severity: "majeur",
   run(doc: Doc): RuleFinding[] {
     const out: RuleFinding[] = [];
+    // value -> the elements carrying it under an id-bearing attribute key, built ONCE
+    // and only when a dangling `for` is actually seen. The probe below used to be a full
+    // `doc.elements.some(... Object.entries(e.attribs) ...)` scan *inside* the label loop:
+    // quadratic, and on a form-heavy page it dominated the entire audit (~8 s for 8k labels).
+    let idProps: Map<string, El[]> | undefined;
+    const idPropCarriers = (value: string): El[] | undefined => {
+      if (!idProps) {
+        idProps = new Map();
+        for (const e of doc.elements) {
+          for (const k in e.attribs) {
+            if (!ID_ATTR_KEY.test(k)) continue;
+            const v = e.attribs[k];
+            if (!v) continue;
+            const bucket = idProps.get(v);
+            // Attributes of one element are consecutive, so comparing the tail is enough
+            // to keep an element from being counted twice (e.g. id="x" AND data-id="x").
+            if (!bucket) idProps.set(v, [e]);
+            else if (bucket[bucket.length - 1] !== e) bucket.push(e);
+          }
+        }
+      }
+      return idProps.get(value);
+    };
     for (const el of doc.elements) {
       if (el.tag !== "label") continue;
       const f = (attr(el, "for") ?? "").trim();
@@ -153,7 +182,7 @@ const labelForDangling: Rule = {
       // Wired via an id-bearing prop on a sibling component? Design-system field/upload
       // components take the input id as a prop (e.g. <FileUpload inputId="x"/>) and render
       // the <input id="x"> internally — the association is real, just not a literal id here.
-      const passedAsIdProp = doc.elements.some((e) => e !== el && Object.entries(e.attribs).some(([k, v]) => v === f && /id/i.test(k)));
+      const passedAsIdProp = idPropCarriers(f)?.some((e) => e !== el) ?? false;
       if (passedAsIdProp) continue;
       out.push({
         criteriaId: "1.3.1",
@@ -458,6 +487,95 @@ const dateFieldsUngrouped: Rule = {
   },
 };
 
+
+// WCAG 1.3.5 asks for a token from the HTML autofill vocabulary. A MISSPELLED or invented
+// value ("nope", "user-name", "emailaddress") is worse than none: it reads as compliant,
+// autofills nothing, and no assistive technology can infer the field's purpose from it.
+const autocompleteTokenInvalid: Rule = {
+  id: "autocomplete-token-invalid",
+  criteria: ["1.3.5"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag) || !["input", "select", "textarea"].includes(el.tag)) continue;
+      const value = attr(el, "autocomplete");
+      if (value === undefined || value.includes("{")) continue; // absent, or a dynamic binding
+      if (value.trim() === "") continue; // empty is "no declaration", not a wrong one
+      if (hasAttr(el, "disabled") || attr(el, "aria-disabled") === "true") continue; // a disabled control collects nothing
+      if (isNameExempt(el)) continue; // not exposed, or explicitly presentational
+      if (isValidAutocomplete(value)) continue;
+      out.push({ criteriaId: "1.3.5", el, msgId: "autocomplete-token-invalid", params: { value: value.trim() } });
+    }
+    return out;
+  },
+};
+
+/** The autofill field name a control declares, ignoring qualifiers. "" when absent. */
+function autofillField(el: El): string {
+  const tokens = (attr(el, "autocomplete") ?? "")
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  return tokens.find((t) => CREDENTIAL_FIELDS.has(t)) ?? "";
+}
+
+// WCAG 2.2 — 3.3.8 Accessible Authentication (Minimum). An authentication step must not
+// force the user to reproduce a secret from memory or by hand. Blocking paste on a password
+// field, or switching autofill off on a credential field, does exactly that: it breaks
+// password managers and makes the step a cognitive-function test.
+const credentialEntryBlocked: Rule = {
+  id: "credential-entry-blocked",
+  criteria: ["3.3.8"],
+  severity: "bloquant",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag) || el.tag !== "input") continue;
+      const type = (attr(el, "type") ?? "text").toLowerCase();
+      const field = autofillField(el);
+      const isCredential = type === "password" || field !== "";
+      if (!isCredential) continue;
+      // Paste blocked by a handler that cancels the event. Only a literal, self-evident
+      // cancellation counts — an arbitrary handler may well permit the paste.
+      const paste = (attr(el, "onpaste") ?? attr(el, "onPaste") ?? "").replace(/\s+/g, "");
+      if (/preventDefault|returnfalse/i.test(paste)) {
+        out.push({ criteriaId: "3.3.8", el, msgId: "credential-entry-blocked.paste", params: { type } });
+        continue;
+      }
+      if ((attr(el, "autocomplete") ?? "").trim().toLowerCase() === "off") {
+        out.push({ criteriaId: "3.3.8", el, msgId: "credential-entry-blocked.autocomplete", params: { type } });
+      }
+    }
+    return out;
+  },
+};
+
+// WCAG 3.2.2 On Input: changing a control's value must not, on its own, submit the form or
+// navigate. Only literal, unmistakable handlers are reported — anything else is the agent's
+// call, not the engine's.
+const CONTEXT_CHANGE = /\b(submit\(\)|form\.submit|location\s*[.=]|location\.href|window\.open|router\.(push|replace)|navigate\()/;
+
+const onInputContextChange: Rule = {
+  id: "on-input-context-change",
+  criteria: ["3.2.2"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag) || !["input", "select", "textarea"].includes(el.tag)) continue;
+      for (const key of ["onchange", "onChange"]) {
+        const handler = attr(el, key);
+        if (!handler || !CONTEXT_CHANGE.test(handler)) continue;
+        out.push({ criteriaId: "3.2.2", el, msgId: "on-input-context-change", params: { tag: el.tag } });
+        break;
+      }
+    }
+    return out;
+  },
+};
+
 export const formsRules: Rule[] = [
   controlLabelMissing,
   placeholderAsLabel,
@@ -471,4 +589,7 @@ export const formsRules: Rule[] = [
   disabledContextContent,
   radioCheckboxGroupUngrouped,
   dateFieldsUngrouped,
+  autocompleteTokenInvalid,
+  credentialEntryBlocked,
+  onInputContextChange,
 ];

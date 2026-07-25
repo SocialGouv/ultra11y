@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { gitStagedFiles, stagedContent, hasUnstagedChanges } from "../src/discover.js";
+import { gitStagedFiles, stagedContent, stagedContents, hasUnstagedChanges } from "../src/discover.js";
 import { runAudit } from "../src/audit.js";
 import { runFix } from "../src/fix.js";
 
@@ -195,5 +195,50 @@ describe("fix --staged --write", () => {
     expect(stillFailing.findings.some((f) => f.ruleId === "img-alt-missing")).toBe(true);
     // Index blob is unchanged — no TODO stub was committed.
     expect(git(repo, "show", ":./a.html")).toBe(`<img src="x">`);
+  });
+});
+
+// The staged snapshot used to cost one `git show` PROCESS per file; it is now a single
+// `git cat-file --batch`. The batch protocol frames each blob by its BYTE size, so the
+// riskiest case is non-ASCII content: slicing the stream by character offsets would
+// desynchronise every blob after the first accented one.
+describe("staged snapshot — batched index reads", () => {
+  const files: Record<string, string> = {
+    "a.html": `<img src="a.png">`,
+    "accents.html": `<p>Représentation accentuée — déjà vu, ça coûte cher</p><img src="é.png">`,
+    "emoji.html": `<p>🎯 mixed 漢字 content</p><button></button>`,
+    "empty.html": "",
+    "big.html": `<div>${"x".repeat(50_000)}</div>`,
+  };
+
+  it("returns exactly what a per-file `git show` returns, byte for byte", () => {
+    const repo = initRepo();
+    for (const [name, body] of Object.entries(files)) writeFileSync(join(repo, name), body);
+    git(repo, "add", ".");
+
+    const batched = inRepo(repo, () => stagedContents(Object.keys(files)));
+    const oneByOne = inRepo(repo, () => new Map(Object.keys(files).map((f) => [f, stagedContent(f)])));
+
+    expect([...batched.keys()].sort()).toEqual(Object.keys(files).sort());
+    for (const [name, body] of Object.entries(files)) {
+      expect(batched.get(name), `${name} vs the real index blob`).toBe(body);
+      expect(batched.get(name), `${name} vs per-file git show`).toBe(oneByOne.get(name));
+    }
+  });
+
+  it("omits a path with no index blob instead of inventing one", () => {
+    const repo = initRepo();
+    writeFileSync(join(repo, "staged.html"), "<p>staged</p>");
+    writeFileSync(join(repo, "untracked.html"), "<p>untracked</p>");
+    git(repo, "add", "staged.html");
+
+    const batched = inRepo(repo, () => stagedContents(["staged.html", "untracked.html", "never-existed.html"]));
+    expect([...batched.keys()]).toEqual(["staged.html"]);
+    expect(batched.get("staged.html")).toBe("<p>staged</p>");
+  });
+
+  it("is a no-op on an empty request", () => {
+    const repo = initRepo();
+    expect(inRepo(repo, () => stagedContents([])).size).toBe(0);
   });
 });

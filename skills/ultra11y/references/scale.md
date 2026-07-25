@@ -37,7 +37,13 @@ and you **focus** it. Recommended loop:
 - **Deterministic**: stable order (priority then path) → reproducible audits, stable canonical
   file choice, `check:build` holds.
 - **Incremental**: `--changed`/`--since` make the audit proportional to the diff, not the repo —
-  what makes hooks/CI viable (see `references/automation.md`).
+  what makes hooks/CI viable (see `references/automation.md`). Honest caveat: the diff modes
+  pay a **fixed cost of a few `git` invocations** before auditing anything, so on a small repo
+  a full scan can actually be the faster of the two. The win starts around a few hundred
+  markup files and grows from there.
+- **One pass over the tree**: `--graph` discovers markup and the `.ts/.js` modules it resolves
+  through, but walks the tree once and parses each markup file once — the graph pass hands its
+  parsed documents to the audit pass instead of every file being read and parsed twice.
 
 > In `--changed` mode, de-duplication is disabled: a changed file is always audited, never
 > merged with a file that was not read.

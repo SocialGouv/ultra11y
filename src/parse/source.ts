@@ -5,7 +5,7 @@
 // always produces a result.
 import { parseHtml, type Doc } from "./html.js";
 import { jsxToHtml } from "./jsx.js";
-import { parseJsxAst } from "./jsx-ast.js";
+import { parseJsxAst, type AstFile } from "./jsx-ast.js";
 import { jsxAstToDoc } from "./jsx-bridge.js";
 import { parseCaptureProvenance } from "../capture.js";
 
@@ -41,12 +41,21 @@ export function splitAstroFrontmatter(source: string): { frontmatter: string; bl
 }
 
 export function parseSource(source: string, file: string, opts: { forceJsx?: boolean } = {}): Doc {
+  return parseSourceWithAst(source, file, opts).doc;
+}
+
+/** `parseSource` plus the Babel AST it built on the way (null for HTML/SFC templates,
+ *  and for a JSX file that only survived the lossy fallback). The dependency-graph pass
+ *  needs BOTH — the Doc to extract markup facts and the AST to extract imports/exports —
+ *  and going through this one function is what lets the graph hand its already-parsed
+ *  Docs to the audit loop instead of every markup file being read and parsed twice. */
+export function parseSourceWithAst(source: string, file: string, opts: { forceJsx?: boolean } = {}): { doc: Doc; ast: AstFile | null } {
   const kind = detectKind(file, opts.forceJsx);
   if (kind === "jsx") {
     const ast = parseJsxAst(source);
-    if (ast) return jsxAstToDoc(ast, source, file);
+    if (ast) return { doc: jsxAstToDoc(ast, source, file), ast };
     // Catastrophic parse failure → lossy fallback (flagged lossy in the Doc).
-    return parseHtml(jsxToHtml(source), file, true);
+    return { doc: parseHtml(jsxToHtml(source), file, true), ast: null };
   }
   // .astro's frontmatter fence is stripped (blanked) before HTML parsing — see
   // splitAstroFrontmatter. .vue/.svelte have no such fence (their <script> block
@@ -62,5 +71,5 @@ export function parseSource(source: string, file: string, opts: { forceJsx?: boo
     const capture = parseCaptureProvenance(source);
     if (capture) doc.capture = capture;
   }
-  return doc;
+  return { doc, ast: null };
 }

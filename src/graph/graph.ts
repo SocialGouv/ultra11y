@@ -13,6 +13,9 @@ export interface DepGraph {
   // Engine-backed specifier resolution (relative / ESM ".js" / tsconfig-alias
   // imports) bounded to `known`, with the original resolver as fallback.
   resolveSpec: SpecResolver;
+  // Memo for `resolveUsage` top-level lookups (`file#name` -> def, null = "no such
+  // component"). Read-only graph, so a hit is always correct; see resolveUsage.
+  usageCache: Map<string, ComponentDef | null>;
 }
 
 export function buildGraph(nodes: FileGraphNode[], aliases: AliasMap = [], tsconfigStartDir?: string): DepGraph {
@@ -25,7 +28,7 @@ export function buildGraph(nodes: FileGraphNode[], aliases: AliasMap = [], tscon
     known.add(n.file);
     for (const id of n.definesIds) allIds.add(id);
   }
-  return { nodes: map, known, allIds, resolveSpec: makeSpecResolver(known, aliases, tsconfigStartDir) };
+  return { nodes: map, known, allIds, resolveSpec: makeSpecResolver(known, aliases, tsconfigStartDir), usageCache: new Map() };
 }
 
 /** Resolve a component used as `<localName/>` in `file` to its definition, following the
@@ -36,8 +39,26 @@ export function buildGraph(nodes: FileGraphNode[], aliases: AliasMap = [], tscon
 export function resolveUsage(graph: DepGraph, file: string, localName: string, seen: Set<string> = new Set()): ComponentDef | undefined {
   const posix = toPosix(file);
   const visitKey = `${posix}#${localName}`;
+  // Top-level lookups are memoised: the graph is read-only for the whole audit, so
+  // `(file, name)` always resolves the same way, and several cross rules walk the very
+  // same component usages independently. Recursive hops keep their `seen` set and are
+  // NOT cached — their result is relative to the path already taken.
+  const memoized = seen.size === 0;
+  if (memoized) {
+    const hit = graph.usageCache.get(visitKey);
+    if (hit !== undefined) return hit ?? undefined;
+  }
   if (seen.has(visitKey)) return undefined;
   seen.add(visitKey);
+  if (memoized) {
+    const out = resolveUsageUncached(graph, posix, localName, seen);
+    graph.usageCache.set(visitKey, out ?? null);
+    return out;
+  }
+  return resolveUsageUncached(graph, posix, localName, seen);
+}
+
+function resolveUsageUncached(graph: DepGraph, posix: string, localName: string, seen: Set<string>): ComponentDef | undefined {
   const node = graph.nodes.get(posix);
   if (!node) return undefined;
   // Namespaced usage `<UI.Button/>` → namespace import `import * as UI` + member Button.

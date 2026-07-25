@@ -39,6 +39,9 @@ jobs:
       - name: Test (with coverage)
         run: pnpm run test:coverage
 
+      - name: Perf shape (own process — timing needs the machine to itself)
+        run: pnpm run test:perf
+
       - name: Smoke-run the committed bundle (offline, fixture)
         run: pnpm run demo # audit -> report -> check -> criteria
 

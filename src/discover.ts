@@ -79,6 +79,51 @@ export function stagedContent(file: string): string | null {
   return git(["show", `:./${toPosix(file)}`], 32 * 1024 * 1024);
 }
 
+/** Index blobs for MANY paths in ONE `git cat-file --batch` instead of one `git show`
+ *  process per file — the pre-commit hook's cost used to grow one spawn at a time.
+ *  Falls back to per-file `git show` when the batch is unavailable, so behaviour is
+ *  identical either way (a path with no index blob is simply absent from the map).
+ *
+ *  `--batch` answers each request with `<sha> <type> <size>\n<size bytes>\n`, or
+ *  `<request> missing\n`. Sizes are BYTE counts, so the stream is walked as a Buffer
+ *  and each blob decoded afterwards — slicing utf8 by character count would corrupt
+ *  any file containing non-ASCII. */
+export function stagedContents(files: string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!files.length) return out;
+  const requests = files.map((f) => `:./${toPosix(f)}`);
+  let buf: Buffer | null = null;
+  try {
+    buf = execFileSync("git", ["cat-file", "--batch"], {
+      input: `${requests.join("\n")}\n`,
+      stdio: ["pipe", "pipe", "ignore"],
+      maxBuffer: 512 * 1024 * 1024,
+    });
+  } catch {
+    buf = null;
+  }
+  if (buf === null) {
+    for (const f of files) {
+      const c = stagedContent(f);
+      if (c !== null) out.set(f, c);
+    }
+    return out;
+  }
+  let pos = 0;
+  for (const file of files) {
+    const nl = buf.indexOf(0x0a, pos);
+    if (nl === -1) break; // truncated stream — the rest is simply not resolved
+    const header = buf.toString("utf8", pos, nl);
+    pos = nl + 1;
+    const m = /^[0-9a-f]{40,64} \w+ (\d+)$/.exec(header);
+    if (!m) continue; // "<request> missing" (or an ambiguous name): no index blob
+    const size = Number(m[1]);
+    out.set(file, buf.toString("utf8", pos, pos + size));
+    pos += size + 1; // blob + its trailing newline
+  }
+  return out;
+}
+
 /** True when the working tree differs from the index for `file` (unstaged edits).
  *  A partially-staged file must never be auto-fixed + re-staged: writing index-derived
  *  output over the working tree and `git add`-ing it would silently stage those edits. */
@@ -102,8 +147,14 @@ export function priority(file: string): number {
   return 2;
 }
 
-function byPriorityThenPath(a: string, b: string): number {
-  return priority(a) - priority(b) || (a < b ? -1 : a > b ? 1 : 0);
+/** Sort by priority tier, then path — deterministic, and the tier is computed ONCE per
+ *  file instead of twice per comparison (the two `priority()` regexes used to run
+ *  ~4·n·log n times on every discovery). */
+function sortByPriorityThenPath(files: string[]): string[] {
+  return files
+    .map((file) => ({ file, tier: priority(file) }))
+    .sort((a, b) => a.tier - b.tier || (a.file < b.file ? -1 : a.file > b.file ? 1 : 0))
+    .map((d) => d.file);
 }
 
 /** Resolve inputs into an ordered candidate file list. In `--changed` mode this
@@ -129,11 +180,7 @@ export function discover(inputs: string[], opts: DiscoverOpts = {}): Discovery {
       // No existsSync: a staged-added file may be edited/removed on disk, yet its index
       // blob is exactly what the commit would record — audit that.
       const scoped = stagedFiles.filter((f) => filter(f) && (!inScope || inScope(f)));
-      staged = new Map();
-      for (const f of scoped) {
-        const c = stagedContent(f);
-        if (c !== null) staged.set(f, c);
-      }
+      staged = stagedContents(scoped);
       files = [...staged.keys()];
     }
   } else if (changedMode) {
@@ -151,6 +198,6 @@ export function discover(inputs: string[], opts: DiscoverOpts = {}): Discovery {
     files = expandInputs(inputs, opts);
   }
 
-  files = [...new Set(files)].sort(byPriorityThenPath);
+  files = sortByPriorityThenPath([...new Set(files)]);
   return { files, changedMode, gitUnavailable, ...(staged ? { stagedContent: staged } : {}) };
 }
