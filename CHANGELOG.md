@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [2.21.0](https://github.com/maxgfr/ultra11y/compare/v2.20.0...v2.21.0) (2026-07-25)
+
+
+### Bug Fixes
+
+* **cli:** two error paths that reported the wrong thing ([01bdfde](https://github.com/maxgfr/ultra11y/commit/01bdfde50acc53d1823766dfc51beb81e625022f))
+* **rules:** stop reporting defects a user cannot experience ([2b642f9](https://github.com/maxgfr/ultra11y/commit/2b642f9fdc6f53e25a568826da6cb9680a9f5b6b))
+
+
+### Features
+
+* **act:** score the engine against the official W3C ACT test corpus ([cb6751b](https://github.com/maxgfr/ultra11y/commit/cb6751b12d1aa09fef1e159708de3bd52bf72ecd))
+* **judgment:** a decision protocol for all 52 criteria the engine hands over ([c5b08fa](https://github.com/maxgfr/ultra11y/commit/c5b08fa9407517e8fe9458184c510323c1fe5fdb))
+* **rules:** 12 new static checks — ARIA vocabulary, 2.5.3, autocomplete, tables, dl, 3.2.2, 3.3.8 ([5b24b9a](https://github.com/maxgfr/ultra11y/commit/5b24b9a172418c2fc07b65dd3b8863c48e5ab181))
+
+
+### Performance Improvements
+
+* **engine:** drop the quadratic label scan, the --graph double parse and the per-file staged spawns ([ffccd28](https://github.com/maxgfr/ultra11y/commit/ffccd28688aa37cbd20b11f5e48e2122b2e8da94))
+
 # [2.20.0](https://github.com/maxgfr/ultra11y/compare/v2.19.0...v2.20.0) (2026-07-24)
 
 
