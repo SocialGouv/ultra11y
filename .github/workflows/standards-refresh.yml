@@ -1,0 +1,134 @@
+name: Standards source refresh
+
+# Daily re-fetch of the upstream normative sources this repo vendors:
+#   - the WCAG 2.2 success-criterion universe and the W3C AUTHORIZED French titles
+#     (scripts/vendor/wcag-2.2-*.json -> src/data/wcag*.json)
+#   - the DINUM RGAA 4.1.2 source (scripts/vendor/rgaa/* -> src/data/standards/rgaa*.json)
+#
+# Without this, a normative dataset silently drifts from the standard it claims to
+# reproduce — the exact failure mode where an audit tool stops being trustworthy.
+#
+#   - nothing changed upstream -> green no-op.
+#   - changed + every gate green -> commit + push straight to main, then trigger
+#     release.yml and ci.yml explicitly (a GITHUB_TOKEN push does NOT trigger them).
+#   - any gate red -> nothing is pushed and no PR is opened; the run fails and the next
+#     daily cron retries. A red run means a normative change needs human adjudication
+#     (a renamed criterion, a new SC, a changed test grid) — never auto-resolve it.
+on:
+  schedule:
+    - cron: "35 5 * * *" # daily; offset from act-refresh so the two never race
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency: standards-refresh
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Re-fetch the vendored W3C sources (SC universe + authorized fr titles)
+        run: |
+          node scripts/build-standards.mjs --refresh-universe
+          node scripts/build-standards.mjs --refresh-fr
+
+      - name: Re-fetch the vendored DINUM RGAA source and rebuild the pack
+        run: node scripts/build-pack-rgaa.mjs --fetch
+
+      - name: Rebuild every derived dataset and doc
+        run: |
+          node scripts/build-standards.mjs
+          pnpm run build:criteria
+          pnpm run build:act
+
+      - name: Detect a change
+        id: detect
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "vendored sources and derived datasets unchanged"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git --no-pager diff --stat
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure git identity
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Rebuild the bundle and stage build outputs
+        # check:build diffs the working tree against the INDEX, so stage first — otherwise
+        # the refresh itself reads as "bundle out of date".
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          pnpm run build
+          git add -A
+
+      - name: Typecheck
+        if: steps.detect.outputs.changed == 'true'
+        run: pnpm run typecheck
+
+      - name: Lint
+        if: steps.detect.outputs.changed == 'true'
+        run: pnpm run lint
+
+      - name: Test (with coverage)
+        if: steps.detect.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -o pipefail
+          # A data-integrity or golden failure here is a NORMATIVE change that needs a
+          # human — never pass -u/--update.
+          pnpm run test:coverage | tee /tmp/test-output.log
+
+      - name: RGAA pack is byte-reproducible from its source
+        if: steps.detect.outputs.changed == 'true'
+        run: pnpm run check:pack:rgaa
+
+      - name: Build is reproducible (committed bundles up to date)
+        if: steps.detect.outputs.changed == 'true'
+        run: pnpm run check:build
+
+      - name: Smoke-run the committed bundle (offline, fixture)
+        if: steps.detect.outputs.changed == 'true'
+        run: pnpm run demo
+
+      - name: Commit and push the refreshed sources to main
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          SUMMARY=$(sed -E 's/\x1b\[[0-9;]*m//g' /tmp/test-output.log | grep -E "Test Files|Tests" | tail -2 || true)
+          git add -A
+          git commit \
+            -m "chore(standards): refresh the vendored WCAG and RGAA sources" \
+            -m "automated refresh, all gates green" \
+            -m "${SUMMARY:-no test summary captured}"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: Trigger release.yml and ci.yml on main
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          gh workflow run release.yml --ref main
+          gh workflow run ci.yml --ref main

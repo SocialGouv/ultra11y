@@ -89,7 +89,29 @@ ACT Rules Format test methodology (W3C)
 
 ultra11y's ACT consistency suite (tests/fixtures/act/, tests/act-suite.test.ts)
 is structured after the W3C ACT Rules Format (passed / failed / inapplicable
-expectations, per-rule consistency). The test HTML is ORIGINAL, authored for
-ultra11y — no normative text or example markup is reproduced from the W3C ACT
-rules. The ACT Rules Format is © W3C. Reference:
+expectations, per-rule consistency). The test HTML there is ORIGINAL, authored
+for ultra11y. The ACT Rules Format is © W3C. Reference:
         https://www.w3.org/TR/act-rules-format/
+
+================================================================================
+Bundled ACT-Rules Community Group test cases
+================================================================================
+
+scripts/vendor/act-testcases.json is a vendored snapshot of the test corpus
+published by the ACT-Rules Community Group, fetched from
+
+        https://act-rules.github.io/testcases.json
+
+and the per-case documents it indexes. It is used ONLY to measure this engine
+against externally-authored examples (tests/act-official.test.ts, and the
+generated matrix in skills/ultra11y/references/act.md); none of it ships in the
+runtime bundle.
+
+The ACT-Rules Community Group work is provided under the W3C Software and
+Document Notice and License:
+
+        https://act-rules.github.io/pages/license/
+        https://www.w3.org/Consortium/Legal/2015/copyright-software-and-document
+
+Attribution: « ACT-Rules Community Group test cases — https://act-rules.github.io ».
+Refresh with `node scripts/build-act-corpus.mjs --refresh`.
