@@ -1328,6 +1328,18 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     );
     return 0;
   }
+  // A local target that does not exist is a user error, independent of any runtime — say
+  // so BEFORE probing for Playwright/Docker, otherwise a machine with neither reports
+  // "no runtime available" for what is really a typo in the path.
+  for (const target of p.positionals.filter((a) => a !== "-")) {
+    if (/^https?:\/\//i.test(target) || existsSync(target)) continue;
+    console.error(
+      lang === "fr"
+        ? `ultra11y scan : fichier introuvable (file not found) : ${target}. Passez une URL http(s):// ou un fichier HTML existant.`
+        : `ultra11y scan: File not found: ${target}. Pass an http(s):// URL or an existing HTML file.`,
+    );
+    return 1;
+  }
   // Resolve the execution runtime. `auto` (default) prefers the local host/target
   // Playwright (no Docker) when it resolves from --cwd, else falls back to Docker.
   const cwd = typeof p.flags.cwd === "string" && p.flags.cwd ? (p.flags.cwd as string) : process.cwd();
@@ -1818,12 +1830,18 @@ function isInvokedDirectly(): boolean {
   return import.meta.url === pathToFileURL(argv1).href;
 }
 
+// Set `process.exitCode` — never `process.exit()`. On a PIPE, stdout is asynchronous,
+// so `process.exit()` tears the process down before the pending writes flush: a large
+// `audit --json | jq` used to receive exactly 65536 bytes of truncated, invalid JSON.
+// Letting the event loop drain naturally keeps the exit code AND the whole payload.
 if (isInvokedDirectly()) {
   main(process.argv.slice(2)).then(
-    (code) => process.exit(code),
+    (code) => {
+      process.exitCode = code;
+    },
     (err: unknown) => {
       console.error(err instanceof Error ? err.message : err);
-      process.exit(1);
+      process.exitCode = 1;
     },
   );
 }

@@ -81,6 +81,29 @@ describe("e2e: audit", () => {
     expect(r.code).toBe(0);
     expect(() => JSON.parse(r.stdout)).not.toThrow();
   });
+
+  // Regression: the CLI used to end with `main().then(code => process.exit(code))`.
+  // On a PIPE stdout is asynchronous, so the process died before the pending writes
+  // flushed and a large payload was cut at exactly one pipe buffer (65536 bytes),
+  // producing invalid JSON for any `audit --json | jq` on a real repository.
+  it("--json survives a payload larger than the 64 KiB pipe buffer", () => {
+    const dir = mkTmp("u11y-bigjson-");
+    // Each file carries several distinct defects so the payload grows fast and stays
+    // representative (findings, not padding). 120 files ≫ 64 KiB of JSON.
+    for (let i = 0; i < 120; i++) {
+      writeFileSync(
+        join(dir, `page-${i}.html`),
+        `<!doctype html><html><head></head><body><img src="a${i}.png"><a href="/x${i}"></a>` +
+          `<button></button><input type="text" name="q${i}"><iframe src="/e${i}"></iframe></body></html>`,
+      );
+    }
+    const r = runCli(["audit", join(dir, "*.html"), "--json"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout.length, "payload must exceed one pipe buffer for this test to mean anything").toBeGreaterThan(65536);
+    const j = JSON.parse(r.stdout) as { findings: unknown[]; scope: { files: number } };
+    expect(j.scope.files).toBe(120);
+    expect(j.findings.length).toBeGreaterThan(120);
+  });
 });
 
 describe("e2e: report", () => {
