@@ -1,6 +1,6 @@
 ---
 name: ultra11y
-description: "Use to AUDIT existing HTML/CSS/JSX against WCAG 2.2 AA accessibility and produce a dated auditor-conformance report, OR to AUTHOR/REVIEW accessible markup (native-HTML-first, ARIA last). An install-free engine (`node scripts/ultra11y.mjs`, no keys) runs 72 static checks across WCAG criteria — alt/lang/title, unlabeled fields, empty links/buttons, tables, heading skips, invalid ARIA, positive tabindex — deciding what it can; the AI agent adjudicates the judgment criteria (alt relevance, link purpose) itself via `verify --manual`, gated, and the needs-rendering ones (contrast, focus, zoom) go to the scan tier — never silently conforming. WCAG 2.2 AA is the worldwide core; RGAA and other standards are pluggable packs (`--standard rgaa`, `--pack`). JSX/TSX parse to a real AST (`audit --graph`); `report`/`prd`/`--gh-issues` share one auditor block per criterion; check/verify reject hallucinated non-conformities. Triggers: 'audit WCAG/a11y', 'make accessible', 'fix a11y', 'audit RGAA'."
+description: "Use to AUDIT existing HTML/CSS/JSX against WCAG 2.2 AA accessibility and produce a dated auditor-conformance report, OR to AUTHOR/REVIEW accessible markup (native-HTML-first, ARIA last). An install-free engine (`node scripts/ultra11y.mjs`, no keys) runs 72 static checks tied to WCAG criteria — alt/lang/title, unlabeled fields, empty links/buttons, tables, headings, ARIA vocabulary, label-in-name, autocomplete — measured against the official W3C ACT corpus. The engine decides 3 of the 55 criteria; the AI agent adjudicates the 38 judgment ones from harvested evidence + a per-criterion decision protocol (`verify --manual`, gated, fannable via `orchestrate`), and the 14 rendering ones go to `scan` — never silently conforming. Library/SFC code is audited as RENDERED captures (`render --setup`); country standards are pluggable packs (`--standard rgaa`, `scan --sample`). check/verify reject invented non-conformities. Triggers: 'audit WCAG/a11y', 'make accessible', 'fix a11y', 'audit RGAA'."
 license: MIT
 metadata:
   version: 2.20.0
@@ -29,6 +29,11 @@ contribute your country (see `references/standards.md`). Packs (and their concre
 **AI-ingested** and gated by `pack check` so a fabricated mapping never passes — see
 `references/packs.md` and `references/guidance.md`.
 
+**Most of the work is yours.** Of the 55 WCAG 2.2 AA success criteria, the engine can decide
+**3** outright; **14** need a rendered page (`scan`) and **38** are judgment calls the agent
+adjudicates. So the engine's clean run is a starting point, never a verdict — and
+`references/adjudication.md` is the page you actually work from.
+
 > **Core rules:**
 > 1. **Never invent a non-conformity**: every `NC` cites a real, resolvable element (`check` verifies it).
 > 2. **Native HTML first, ARIA last**; never duplicate implicit semantics.
@@ -53,6 +58,39 @@ contribute your country (see `references/standards.md`). Packs (and their concre
 >    `role="alert"`, landmark role names. The engine's own fr catalog follows this; match
 >    it. Normative standard vocabulary (RGAA wording such as « lien d'évitement ») keeps
 >    its official French.
+
+## The reference library
+
+Domain knowledge first, then the tooling. Read the one that matches the question in front of you.
+
+| Accessibility knowledge | |
+|---|---|
+| `references/adjudication.md` | How to decide each of the 52 criteria the engine hands you — the decision rule, when NA is legitimate, the questions |
+| `references/naming.md` | Accessible-name computation, 2.5.3 label-in-name, visually-hidden CSS, naming images/SVG/figures |
+| `references/widgets.md` | ARIA APG composite patterns, keyboard contracts, focus management, SPA route changes, live regions |
+| `references/forms-and-errors.md` | Labels and instructions, the `autocomplete` token list, error identification/suggestion/prevention, redundant entry, accessible authentication |
+| `references/structure.md` | Headings, landmarks, lists and `dl`, simple and complex tables, meaningful sequence |
+| `references/media-and-motion.md` | Captions/audio description/transcripts, pointer gestures, target size, orientation, reflow, reduced motion |
+| `references/forbidden-patterns.md` | 15 anti-patterns: bad → why → native fix → criterion |
+| `references/focus-and-logic.md` | The focus/keyboard criteria you own, and how to reason about them |
+| `references/criteria.md` | The 55 criteria: level, automatability class, engine rules, pack mapping (generated) |
+| `references/act.md` | What the engine is measured to catch — and what it demonstrably does not (generated) |
+
+| Running the tool | |
+|---|---|
+| `references/audit.md` | The audit loop end to end, and the normative page sample |
+| `references/judgment.md` | The adjudication + refutation worklists, verdict vocabulary, fail-closed fold |
+| `references/verify.md` | The `check`/`verify` gates |
+| `references/false-positives.md` | Where a finding may still be wrong, and how to refute it |
+| `references/rendered.md` · `references/automation.md` | Auditing produced HTML, captures, hooks and CI |
+| `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
+| `references/scale.md` | Focusing an audit on a large repository |
+| `references/fix.md` · `references/correction.md` | Applying fixes, by priority, without regressions |
+| `references/prd.md` | The auditor block as a backlog, and GitHub issues |
+| `references/standards.md` · `references/packs.md` · `references/guidance.md` | Country standards, authoring a pack, implementation guidance |
+| `references/methodology.md` | Statuses, pass rate, severities, report format |
+| `references/cross-file.md` | `--graph`: imports and cross-file rules |
+| `references/orchestration.md` | Fanning the judgment phases out across subagents |
 
 ## Choose by situation
 
@@ -127,92 +165,54 @@ contribute your country (see `references/standards.md`). Packs (and their concre
   to calibrate how much of a criterion the engine really settles before you adjudicate.
 - **"Country standard (RGAA, Section 508, EN 301 549)"** → `--standard <pack>` on
   `report`/`prd`/`criteria`/`check`/`verify`; see **`references/standards.md`** and
-  **`references/methodology.md`**. **For an RGAA audit, PROPOSE the scan by default**: a real
-  RGAA audit runs over a normative page **sample** (échantillon) — declare it in
-  `.ultra11yrc.json` under `sample.pages` (+ `transverse`), lint its coverage with
-  `sample check` (which required page kinds it lacks, per the pack's `sampleMethodology`), then
-  `scan --sample` that sample (Playwright + axe + probes; per-page `storageState` for
-  authenticated pages) and `--merge` the result into the audit. Without a merged scan,
-  `--standard rgaa` reports are marked **partial** (a CLI warning + a report banner: the
-  needs-rendering criteria were not tested) — say so instead of implying full coverage.
+  **`references/methodology.md`**. **For a country-standard audit, PROPOSE the scan by
+  default**: such an audit is normatively defined over a declared page **sample**, and an
+  un-scanned `--standard rgaa` report is marked **partial** — say so rather than implying
+  full coverage. The sample workflow (`sample check`, `scan --sample`, `--merge`) is in
+  **`references/audit.md`**.
 - **"High-assurance audit"** → `verify --report … --semantic`; see **`references/verify.md`**.
-- **"Check contrast / rendering (dynamic tier)"** → `scan <url> --merge …` (axe-core in a
-  headless browser). `--runtime local` (default when Playwright resolves from `--cwd`, **no
-  Docker**) also probes focus visibility (2.4.7), 200% zoom (1.4.4), text spacing (1.4.12) and
-  content-on-hover (1.4.13) (target size 2.5.8 via axe), and takes `--storage-state` for
-  authenticated pages. It additionally runs **stateful** probes (bounded, non-navigating: fill
-  inputs then re-measure overflow, and a live-region probe for status messages 4.1.3) — disable
-  them with `--no-interact`; on an authenticated (`--storage-state`) scan the live-region probe
-  does not click buttons unless you pass `--interact-clicks` (a destructive-named button is never
-  clicked either way); see **`references/dynamic.md`**.
+- **"Check contrast / rendering (dynamic tier)"** → `scan <url> --merge …` runs axe-core in a
+  headless browser and, on the local runtime, probes focus visibility, 200% zoom, text
+  spacing and content-on-hover, with bounded stateful interactions and authenticated pages;
+  read **`references/dynamic.md`**.
 
 ## Orchestration — route by harness
 
 The judgment phases fan out: `ADJUDICATE.todo.json` (one item per residual criterion) and
-`VERIFY.todo.json` (one entry per NC claim) are independent per-item worklists. The engine
-manages the fan-out — `orchestrate` emits the orchestration from the CURRENT worklists,
-with absolute paths and the real item ids baked in:
-
-```
-node scripts/ultra11y.mjs orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list]
-```
-
-| Your harness | How to run each judgment phase |
-|---|---|
-| Has the Workflow tool | `orchestrate --run <RUN> --phase <p>`, then `Workflow({ scriptPath: "<RUN>/orchestration/<p>.workflow.mjs" })`. Subagents RETURN verdict fragments; fold them into the worklist yourself, then `verify --apply` as usual. |
-| Subagents but no Workflow tool | Same `orchestrate`; dispatch one subagent per batch following `<RUN>/orchestration/agents/<role>.md` (the workflow script shows batches + prompts). One writer: you fold results in. |
-| Eco mode, or no subagents | `orchestrate --run <RUN> --eco` → follow `<RUN>/orchestration/RUNBOOK.md` sequentially, playing each role yourself. Correctness-identical; only wall-clock differs. |
-
-Fan-out is an optimization, never a requirement — the gates (`check`, `verify --apply`)
-are harness-independent and every phase has a sequential fallback with identical
-artifacts. Subagents never write: the emitted contracts end with the one-writer rule,
-and `--apply` (the fail-closed fold) always stays with you, the orchestrator. Re-run
-`orchestrate` whenever a worklist changes (emission is deterministic and idempotent);
-`--phase <p>` before its worklist exists fails and names the command that produces it.
+`VERIFY.todo.json` (one entry per NC claim) are independent per-item worklists, and
+`orchestrate --run <dir>` emits a launchable workflow, per-role dispatch contracts and a
+sequential RUNBOOK from whichever worklists currently exist. Fan-out is an optimization,
+never a requirement: the gates are harness-independent, every phase has a sequential
+fallback with identical artifacts, and the fail-closed `verify --apply` fold always stays
+with you. Read **`references/orchestration.md`** for the routing table and the rules.
 
 ## Command cheat sheet
 
+The full surface is in `--help`; these are the lines you reach for.
+
 ```
-node scripts/ultra11y.mjs audit "src/**/*.html" --json > audit.json
-node scripts/ultra11y.mjs audit - < component.html          # HTML via stdin
-node scripts/ultra11y.mjs audit "src/**/*.tsx" --jsx        # JSX/TSX as a real AST (streams to stdout; add --out audits to persist)
-node scripts/ultra11y.mjs audit "src/**/*.tsx" --graph      # + imports & cross-file rules
-node scripts/ultra11y.mjs audit --changed --json            # only the git diff (large repo)
-node scripts/ultra11y.mjs audit --staged --fail-on blocking # gate EXACTLY the staged snapshot (pre-commit)
-node scripts/ultra11y.mjs audit "src/**" --no-default-excludes   # also audit test/spec/story markup
-node scripts/ultra11y.mjs report --in audit.json --out audits          # → audits/wcag-YYYY-MM-DD.md (auditor block per NC criterion)
-node scripts/ultra11y.mjs report --in audit.json --standard rgaa       # derived RGAA report (France pack)
-node scripts/ultra11y.mjs prd    --in audit.json --gh-issues           # SAME auditor block as a backlog (+ one GitHub issue per criterion)
-node scripts/ultra11y.mjs prd    --in audit.json --gh-single          # SAME auditor block (+ ONE consolidated GitHub issue)
-node scripts/ultra11y.mjs prd    --in audit.json --format doc          # product-requirements doc (epics/stories/AC)
-node scripts/ultra11y.mjs audit "src/**/*.tsx" --graph --pack ./packs/section508.json   # load an external pack at runtime
-node scripts/ultra11y.mjs pack check ./packs/section508.json --guidance ./packs/section508.guidance.json   # gate an (AI-)authored pack
-node scripts/ultra11y.mjs criteria 1.4.3                    # one WCAG success criterion
-node scripts/ultra11y.mjs criteria --list                   # all SCs grouped by guideline
-node scripts/ultra11y.mjs criteria --standard rgaa --theme 8   # a pack theme
-node scripts/ultra11y.mjs check  --report audits/wcag-YYYY-MM-DD.md
-node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --semantic
-node scripts/ultra11y.mjs orchestrate --run audits              # emit multi-agent workflows + contracts + RUNBOOK from the current worklists
-node scripts/ultra11y.mjs orchestrate --run audits --eco        # sequential low-token path (RUNBOOK + contracts only)
-node scripts/ultra11y.mjs render                            # build→audit recipe (or --scaffold SSR)
-node scripts/ultra11y.mjs render --setup                    # install the zero-touch capture harvester (tests → .ultra11y/captures)
-node scripts/ultra11y.mjs render --coverage                 # which components have a rendered capture vs blind spots
-node scripts/ultra11y.mjs audit --require-captures          # gate: every opaque/control component must have a rendered capture
-node scripts/ultra11y.mjs audit "dist/**/*.html"            # audit the RENDERED HTML (reliable for DSFR/MUI…)
-node scripts/ultra11y.mjs fix "src/**/*.html" --write --iterate    # fix and re-apply to a fixpoint
-node scripts/ultra11y.mjs fix --staged --write --safe       # auto-apply SAFE fixes to staged files + re-stage
-node scripts/ultra11y.mjs init --hook                       # pre-commit gate: strict staged snapshot + safe auto-fix
-node scripts/ultra11y.mjs init --hook --baseline            # opt-in: regression gate (hook + baseline)
-node scripts/ultra11y.mjs audit "src/**/*.tsx" --jsx --out audits   # persist audits/audit-latest.json (for scan --merge / report --in)
-node scripts/ultra11y.mjs scan https://example.com --merge audits/audit-latest.json  # dynamic tier (auto runtime)
-node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd packages/app --storage-state .auth/user.json  # no-Docker axe + probes, authed
-node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd packages/app --no-interact   # skip the stateful probes
-node scripts/ultra11y.mjs sample check --standard rgaa      # lint the .ultra11yrc.json page sample vs the standard's required kinds
-node scripts/ultra11y.mjs scan --sample --runtime local --cwd packages/app --merge audits/audit-latest.json  # scan the normative page sample (authed pages via --interact-clicks)
-node scripts/ultra11y.mjs prd --in audit.json --no-technical   # auditor block WITHOUT the technical ticket sections
+node scripts/ultra11y.mjs audit "src/**/*.tsx" --graph --out audits --json   # the default audit (AST + cross-file, persisted)
+node scripts/ultra11y.mjs audit - < component.html                           # a snippet via stdin
+node scripts/ultra11y.mjs audit --changed --json                             # only the git diff (large repo)
+node scripts/ultra11y.mjs audit --staged --fail-on blocking                  # gate EXACTLY the staged snapshot (pre-commit)
+node scripts/ultra11y.mjs audit "dist/**/*.html"                             # the RENDERED HTML (reliable for DSFR/MUI…)
+node scripts/ultra11y.mjs render --setup                                     # install the capture harvester (tests → .ultra11y/captures)
+node scripts/ultra11y.mjs audit --require-captures                           # gate the components with no rendered capture
+node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd . --merge audits/audit-latest.json
+node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --in audits/audit-latest.json --manual --out audits
+node scripts/ultra11y.mjs verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json --out audits
+node scripts/ultra11y.mjs orchestrate --run audits                           # fan the judgment phases out (--eco for the sequential path)
+node scripts/ultra11y.mjs report --in audits/audit-latest.json --out audits  # → audits/wcag-YYYY-MM-DD.md
+node scripts/ultra11y.mjs prd    --in audits/audit-latest.json --gh-issues   # the same auditor block as a backlog
+node scripts/ultra11y.mjs check  --report audits/wcag-YYYY-MM-DD.md          # integrity gate
+node scripts/ultra11y.mjs criteria 1.4.3                                     # one success criterion (--list for all)
+node scripts/ultra11y.mjs fix "src/**/*.html" --write --iterate               # apply the safe codemods to a fixpoint
+node scripts/ultra11y.mjs init --hook                                        # pre-commit gate (--baseline for the regression variant)
+node scripts/ultra11y.mjs pack check ./packs/section508.json                  # gate an (AI-)authored standards pack
 ```
-Machine output everywhere with `--json`. `--lang` follows the conversation (pass it
-explicitly); unset it auto-resolves repo `<html lang>` → standard's default locale → English.
+Add `--standard rgaa` to `report`/`prd`/`criteria`/`check`/`verify` for a country standard,
+`--pack ./pack.json` to load one at runtime, and `--json` anywhere for machine output.
+`--lang` follows the conversation (pass it explicitly — Core rule 5).
 
 ## The loop: audit → render → judge → fix → re-audit
 
@@ -253,27 +253,19 @@ re-run this cycle.)
 
 ## Combining engine, judgment and residual risk
 
-The `audit` output classes each success criterion: `C`/`NC`/`NA` for the static subset;
-`manual` for the rendering/judgment criteria (listed in `residualRisks`). Each SC carries an
-`automatability` class — **`static`** (the engine can decide), **`needs-rendering`** (decide
-via `scan`/the rendered DOM, never source), or **`judgment`** (the AI agent adjudicates from the
-source + context the engine harvests) — which tells you *why* a criterion is `manual` and how to
-close it. The engine's `NC`s are **confirmed candidates** (cited `file:line`); a finding marked
-`preliminary: true` (SFC/library source) is provisional — confirm against the render or refute
-it. The agent adjudicates the `judgment` criteria via `verify --manual` (each verdict recorded
-with a `justification` or a groundable finding, folded back FAIL-CLOSED by `verify --apply --in`)
-and routes the rendering criteria to `scan` — a criterion is never silently marked "conforming".
-The report is complete only when every applicable criterion is a justified `C`/`NC`/`NA` and
-every residual risk is named.
+`audit` classes each criterion `C`/`NC`/`NA` for the static subset and `manual` for the rest,
+each carrying an `automatability` class that says WHY it is manual and how to close it:
+**`static`** (the engine decides), **`needs-rendering`** (`scan`), **`judgment`** (you, from
+the harvested evidence and the decision protocol). Engine `NC`s are confirmed candidates
+with a cited `file:line`; a `preliminary: true` finding (SFC/library source) is provisional —
+confirm it against the render or refute it. A criterion is never silently marked conforming:
+the report is complete only when every applicable criterion is a justified `C`/`NC`/`NA` and
+every residual risk is named. See **`references/methodology.md`**.
 
-**Advisory (non-normative) recommendations are a distinct class.** A good-practice signal with
-NO failing normative test — an `advisory` pack rule (e.g. RGAA's download-link recommendation),
-a best-practice-only axe violation, or an agent `recommendations[]` verdict — is rendered as
-« Recommandation (non normative) » under a dedicated section, **never** as a non-conformity: it
-can never flip a criterion to `NC` nor enter `conformancePct`, but stays attached to its
-criterion so grounding/`check` still resolve it. An `NC` needs a `normativeRef` citing the
-failed test; a recommendation does not. Do not promote a recommendation to an NC (see
-`references/false-positives.md` and `references/judgment.md`).
+**Advisory recommendations are a distinct class.** A good-practice signal with NO failing
+normative test renders under a dedicated section and can never flip a criterion to `NC` nor
+enter `conformancePct`. An `NC` needs a `normativeRef`; a recommendation does not. Do not
+promote one to the other — see **`references/false-positives.md`**.
 
 ## Do not
 

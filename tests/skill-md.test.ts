@@ -113,9 +113,10 @@ describe("skill docs stay in sync with the CLI", () => {
 });
 
 describe("SKILL.md routes to the references (progressive disclosure)", () => {
-  it("ships exactly the twenty-one reference docs", () => {
+  it("ships exactly the twenty-eight reference docs", () => {
     expect(refFiles.sort()).toEqual([
       "act.md",
+      "adjudication.md",
       "audit.md",
       "authoring.md",
       "automation.md",
@@ -127,15 +128,21 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "fix.md",
       "focus-and-logic.md",
       "forbidden-patterns.md",
+      "forms-and-errors.md",
       "guidance.md",
       "judgment.md",
+      "media-and-motion.md",
       "methodology.md",
+      "naming.md",
+      "orchestration.md",
       "packs.md",
       "prd.md",
       "rendered.md",
       "scale.md",
       "standards.md",
+      "structure.md",
       "verify.md",
+      "widgets.md",
     ]);
   });
 
