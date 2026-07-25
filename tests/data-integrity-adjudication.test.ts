@@ -1,15 +1,35 @@
 import { describe, it, expect } from "vitest";
-import manualQuestions from "../src/data/manual-questions.json";
-import { hasSC } from "../src/wcag.js";
+import adjudication from "../src/data/adjudication.json";
+import { hasSC, allSC } from "../src/wcag.js";
 
-// The curated judgment-question bank (src/data/manual-questions.json) is rendered per
-// residual criterion by `formatAdjudication`. It is SC-keyed onto the WCAG core — mirror
-// the data-integrity.test.ts style: every key must be a real SC, every question must carry
-// both languages, non-empty. This is the honest-judgment-tier guard: the bank never keys a
-// question to a fabricated criterion, and never ships a half-translated prompt.
-const bank = manualQuestions as Record<string, { fr: string; en: string }[]>;
+// The adjudication protocol (src/data/adjudication.json, built by
+// scripts/build-adjudication.mjs) is rendered per residual criterion by
+// `formatAdjudication`. This is the honest-judgment-tier guard: EVERY criterion the engine
+// cannot decide must carry a decision rule and at least one question, in both languages,
+// keyed to a real success criterion. A criterion handed to the agent with no stated rule is
+// where an audit quietly turns into an opinion.
+type LocaleText = { fr: string; en: string };
+const protocol = adjudication as Record<string, { decide: LocaleText; na?: LocaleText; questions: LocaleText[] }>;
+const bank = Object.fromEntries(Object.entries(protocol).map(([sc, p]) => [sc, p.questions])) as Record<string, LocaleText[]>;
 
-describe("manual-questions.json integrity", () => {
+describe("adjudication.json integrity", () => {
+  it("covers EVERY criterion the static engine cannot decide — no silent hand-off", () => {
+    const needed = allSC()
+      .filter((c) => c.automatability !== "static")
+      .map((c) => c.sc)
+      .sort();
+    expect(Object.keys(protocol).sort()).toEqual(needed);
+  });
+
+  it("states a decision rule for every criterion, in both languages", () => {
+    for (const [sc, p] of Object.entries(protocol)) {
+      for (const lang of ["fr", "en"] as const) {
+        expect(p.decide?.[lang]?.trim().length, `${sc}.decide.${lang}`).toBeGreaterThan(40);
+        if (p.na) expect(p.na[lang]?.trim().length, `${sc}.na.${lang}`).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it("is non-empty and keys only real WCAG success criteria", () => {
     const keys = Object.keys(bank);
     expect(keys.length).toBeGreaterThan(0);

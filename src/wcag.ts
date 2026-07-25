@@ -120,3 +120,9 @@ export function compareSC(a: string, b: string): number {
 }
 
 export { data as wcag };
+
+/** The W3C technique/failure ids recorded for a success criterion — the set a non-conformity
+ *  on that criterion may legitimately cite. Empty when the dataset records none. */
+export function techniquesFor(id: string): string[] {
+  return getSC(id)?.techniques ?? [];
+}

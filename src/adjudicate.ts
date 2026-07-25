@@ -18,8 +18,8 @@ import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
 import { type Doc, type El, elementsByTag, attr, textContent, ancestors, snippet as elSnippet } from "./parse/html.js";
 import { parseInlineStyle } from "./color.js";
-import manualQuestionsJson from "./data/manual-questions.json";
-import { scTitle, getSC, hasSC } from "./wcag.js";
+import adjudicationJson from "./data/adjudication.json";
+import { scTitle, getSC, hasSC, techniquesFor, allSC, guidelineTitle } from "./wcag.js";
 import { groundItems, type GroundingSummary } from "./grounding.js";
 import { type StandardId, isCore, loadPack, hasId, getCriterion } from "./standards/index.js";
 
@@ -488,6 +488,9 @@ const T = {
     evidence: "Évidences",
     none: "(aucune évidence automatique — décidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "À vérifier manuellement",
+    decide: "Règle de décision",
+    na: "Non applicable si",
+    refs: "Références normatives mobilisables (techniques/échecs W3C de ce critère)",
   },
   en: {
     title: "# Criteria adjudication (ultra11y)",
@@ -503,12 +506,69 @@ const T = {
     evidence: "Evidence",
     none: "(no automatic evidence — decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
+    decide: "Decision rule",
+    na: "Not applicable when",
+    refs: "Normative references you may cite (this criterion's W3C techniques/failures)",
   },
 } as const;
 
-// SC-keyed curated question bank (src/data/manual-questions.json): the checks static
-// analysis cannot decide, rendered per residual item by `formatAdjudication` in both langs.
-const MANUAL_QUESTIONS = manualQuestionsJson as Record<string, { fr: string; en: string }[]>;
+// SC-keyed adjudication protocol (src/data/adjudication.json, built by
+// scripts/build-adjudication.mjs): for every criterion the static engine cannot settle, the
+// rule that decides Conforming vs Non-conforming, when NA is legitimate, and the concrete
+// questions that get you there. Rendered per residual item in both languages — a criterion
+// handed to the agent with no stated decision rule is where an audit turns into an opinion.
+type LocaleText = { fr: string; en: string };
+const ADJUDICATION = adjudicationJson as Record<string, { decide: LocaleText; na?: LocaleText; questions: LocaleText[] }>;
+
+/** Cap on techniques listed per criterion: 1.1.1 alone carries 52, which would bury the
+ *  decision rule under a wall of ids. The full list stays in `criteria <sc>`. */
+const MAX_REFS = 12;
+
+/** Render the per-criterion decision protocol as a standalone reference
+ *  (skills/ultra11y/references/adjudication.md). Generated from the same dataset the
+ *  worklist uses, so the page an agent reads and the prompt it answers can never drift. */
+export function renderAdjudicationReference(lang: Lang = "en"): string {
+  const out: string[] = [];
+  out.push("<!-- GENERATED from src/data/adjudication.json by `pnpm run build:adjudication` — do not edit by hand. -->", "");
+  out.push("# Deciding the criteria the engine hands you", "");
+  out.push(
+    "The static engine decides 3 of the 55 WCAG 2.2 AA success criteria outright. The other 52",
+    "come back as residual risks: 14 need a rendered page (the `scan` tier), 38 are judgment",
+    "calls. This page is the decision rule for each of them — what makes it Conforming, when",
+    "`NA` is legitimate, and the questions that get you there.",
+    "",
+    "It is the same dataset `verify --manual` loads into `ADJUDICATE.md`, so the worklist and",
+    "this page can never disagree. Two rules govern every verdict below:",
+    "",
+    "- **A non-conformity must cite a normative test that resolves.** The worklist proposes the",
+    "  criterion's W3C techniques; `verify --apply` rejects a `normativeRef` that does not exist.",
+    "- **A good practice with no failing test is a recommendation**, not a non-conformity — it",
+    "  never flips a criterion, never enters the conformance rate.",
+    "",
+  );
+  const byGuideline = new Map<string, string[]>();
+  for (const sc of allSC()) {
+    const protocol = ADJUDICATION[sc.sc];
+    if (!protocol) continue;
+    const lines = byGuideline.get(sc.guideline) ?? [];
+    lines.push(`### ${sc.sc} — ${scTitle(sc.sc, lang) ?? sc.title}  ·  ${sc.level}  ·  _${sc.automatability}_`, "", `**Decide.** ${protocol.decide[lang]}`, "");
+    if (protocol.na) lines.push(`**Not applicable when.** ${protocol.na[lang]}`, "");
+    if (protocol.questions.length) {
+      lines.push("**Ask.**", "");
+      for (const q of protocol.questions) lines.push(`- ${q[lang]}`);
+      lines.push("");
+    }
+    const refs = techniquesFor(sc.sc);
+    if (refs.length)
+      lines.push(`**Citable references.** ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` … (\`criteria ${sc.sc}\`)` : ""}`, "");
+    byGuideline.set(sc.guideline, lines);
+  }
+  for (const [guideline, lines] of byGuideline) {
+    out.push(`## ${guideline} ${guidelineTitle(guideline, lang) ?? ""}`.trimEnd(), "");
+    out.push(...lines);
+  }
+  return out.join("\n");
+}
 
 export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en"): string {
   const s = T[lang];
@@ -521,11 +581,22 @@ export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en")
       for (const e of it.evidence) out.push(`- \`${e.file}:${e.line}\` (\`${e.selector}\`)${e.note ? ` — ${e.note}` : ""}`);
       out.push("");
     }
-    const questions = MANUAL_QUESTIONS[it.criteriaId];
-    if (questions?.length) {
-      out.push(`> ${s.questions}:`, "");
-      for (const q of questions) out.push(`- ${q[lang]}`);
-      out.push("");
+    const protocol = ADJUDICATION[it.criteriaId];
+    if (protocol) {
+      out.push(`> **${s.decide}** — ${protocol.decide[lang]}`, "");
+      if (protocol.na) out.push(`> **${s.na}** — ${protocol.na[lang]}`, "");
+      if (protocol.questions.length) {
+        out.push(`> ${s.questions}:`, "");
+        for (const q of protocol.questions) out.push(`- ${q[lang]}`);
+        out.push("");
+      }
+    }
+    // The techniques a NC on this criterion may legitimately cite. `verify --apply`
+    // rejects a normativeRef that does not resolve, so proposing the valid ones here is
+    // what keeps the agent from inventing one.
+    const refs = techniquesFor(it.criteriaId);
+    if (refs.length) {
+      out.push(`> ${s.refs}: ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` … (\`criteria ${it.criteriaId}\`)` : ""}`, "");
     }
   }
   return out.join("\n");

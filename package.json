@@ -35,6 +35,8 @@
     "build:criteria": "node scripts/ultra11y.mjs criteria --generate > skills/ultra11y/references/criteria.md",
     "build:act": "UPDATE_ACT_MATRIX=1 vitest run tests/act-matrix-sync.test.ts",
     "build:act:refresh": "node scripts/build-act-corpus.mjs --refresh",
+    "build:adjudication": "node scripts/build-adjudication.mjs && UPDATE_ADJUDICATION_MD=1 vitest run tests/adjudication-md-sync.test.ts",
+    "check:adjudication": "node scripts/build-adjudication.mjs --check",
     "demo": "node scripts/ultra11y.mjs audit tests/fixtures/non-conforming/bad.html --out /tmp/ultra11y-demo --json > /dev/null && node scripts/ultra11y.mjs report --in /tmp/ultra11y-demo/audit-latest.json --out /tmp/ultra11y-demo && node scripts/ultra11y.mjs check --report /tmp/ultra11y-demo/wcag-*.md && node scripts/ultra11y.mjs criteria --list",
     "release": "semantic-release"
   },

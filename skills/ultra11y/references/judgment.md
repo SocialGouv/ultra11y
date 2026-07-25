@@ -43,15 +43,27 @@ This phase makes each verdict defensible and recorded, never invented, never sil
    the report's §2 and re-enter the verify worklist; `report`/`prd` re-render with the adjudicated
    statuses; §5 shrinks to only the still-`manual` items.
 
-### The judgment-question bank
+### The decision protocol
 
 Each residual criterion in `ADJUDICATE.md` is pre-loaded, alongside the harvested evidence,
-with a curated **question bank** (`src/data/manual-questions.json`, SC-keyed onto the WCAG
-core, both languages) — the concrete questions an auditor asks to decide *that* criterion
-(e.g. under 2.4.4 "does each link's text, in context, convey its destination?"; under 4.1.3
-"is every status change announced in a live region?"). They frame the call; they are prompts,
-not verdicts — you still answer from the evidence and record `C`/`NC`/`NA`/`manual` (+ a
-recommendation where a good practice has no failing normative test).
+with its **decision protocol** (`src/data/adjudication.json`, both languages, covering ALL 52
+criteria the engine cannot decide):
+
+- **the decision rule** — what makes this criterion Conforming vs Non-conforming. Not a hint:
+  the rule you apply. A criterion handed over with no stated rule is where an audit quietly
+  turns into an opinion;
+- **when `NA` is legitimate** — so "not applicable" is a justified verdict rather than an
+  escape hatch;
+- **the questions** an auditor asks to get there;
+- **the citable references** — this criterion's W3C techniques and failures, i.e. exactly the
+  set a `normativeRef` may come from. `verify --apply` rejects one that does not resolve, so
+  proposing the valid ones is what stops an invented citation.
+
+The same protocol is published as a standalone page, `references/adjudication.md`, generated
+from that dataset — read it when you want the whole picture rather than one worklist item.
+They are prompts, not verdicts: you still answer from the evidence and record
+`C`/`NC`/`NA`/`manual` (+ a recommendation where a good practice has no failing normative
+test).
 4. **Rendering required**: a `manual` item marked `needs-rendered-dom` (computed contrast, visible
    focus, 200% zoom, 320px reflow, content-on-hover) is decided on the **render** (the `scan` tier,
    or inspection) — never from the source.

@@ -1,0 +1,503 @@
+#!/usr/bin/env node
+// DEV-ONLY (not in `bin`). Authors src/data/adjudication.json: the decision protocol the
+// AI agent follows for every success criterion the static engine cannot settle on its own.
+//
+// Why this exists. The engine decides 3 criteria outright; the other 52 are handed to the
+// agent (judgment) or to the `scan` tier (rendering). Until now the worklist gave the agent
+// the harvested evidence and a question bank covering FIVE criteria — for the other 47 it
+// said, in effect, "decide from the source". A criterion with no stated decision rule is
+// where an audit quietly turns into an opinion.
+//
+// Each entry carries:
+//   decide    — what makes the criterion Conforming vs Non-conforming. The rule, not a hint.
+//   na        — when "not applicable" is legitimate (omitted when the criterion always applies).
+//   questions — the concrete questions an auditor asks to reach that verdict.
+//
+// Technique/failure references are NOT duplicated here: wcag.json already carries the W3C
+// technique ids per criterion, and the renderer surfaces them, so a normativeRef can only
+// ever be one the dataset already validates.
+//
+// Usage:
+//   node scripts/build-adjudication.mjs           # emit src/data/adjudication.json
+//   node scripts/build-adjudication.mjs --check   # rebuild in memory, exit 1 on drift
+import { writeFileSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const OUT = join(root, "src", "data", "adjudication.json");
+const BIOME = join(root, "node_modules", ".bin", "biome");
+
+const q = (fr, en) => ({ fr, en });
+
+/** SC -> { decide, na?, questions[] }. Covers every non-`static` criterion. */
+const ADJUDICATION = {
+  "1.1.1": {
+    decide: q(
+      "Conforme si CHAQUE contenu non textuel porte une alternative qui remplit la même fonction : description du sens pour une image informative, alt=\"\" pour une image décorative, description de l'action pour un contrôle. Non conforme dès qu'une alternative est absente, vide alors que l'image porte du sens, ou hors sujet (nom de fichier, « image », « logo »).",
+      'Conforming when EVERY non-text content carries an alternative serving the same purpose: a description of the meaning for an informative image, alt="" for a decorative one, a description of the action for a control. Non-conforming as soon as one alternative is missing, empty on a meaningful image, or off-topic (a file name, "image", "logo").',
+    ),
+    na: q("Aucun contenu non textuel dans le périmètre.", "No non-text content in scope."),
+    questions: [
+      q(
+        "Pour chaque alt : décrit-il ce que l'image APPORTE ici, et non ce qu'elle montre ? Une même photo peut demander deux alternatives différentes selon le contexte.",
+        "For each alt: does it describe what the image CONTRIBUTES here, rather than what it depicts? The same photo can need two different alternatives in two contexts.",
+      ),
+      q(
+        "Les images purement décoratives ont-elles alt=\"\" (et non un alt absent) ? Une image de décoration nommée pollue autant qu'une image informative muette.",
+        'Do the purely decorative images carry alt="" (not a missing alt)? A named decorative image is as harmful as a silent informative one.',
+      ),
+      q(
+        "Pour un graphique ou une infographie : l'alternative donne-t-elle la DONNÉE (ou renvoie-t-elle à un tableau équivalent), ou se contente-t-elle de nommer le graphique ?",
+        "For a chart or infographic: does the alternative give the DATA (or point to an equivalent table), or does it merely name the chart?",
+      ),
+    ],
+  },
+  "1.2.1": {
+    decide: q(
+      "Conforme si chaque média audio-seul dispose d'une transcription textuelle, et chaque média vidéo-seul d'une transcription OU d'une piste audio équivalente. Non conforme si le média porte de l'information disponible nulle part ailleurs.",
+      "Conforming when every audio-only media has a text transcript, and every video-only media a transcript OR an equivalent audio track. Non-conforming when the media carries information available nowhere else.",
+    ),
+    na: q("Aucun média audio-seul ou vidéo-seul.", "No audio-only or video-only media."),
+    questions: [
+      q("La transcription est-elle atteignable depuis la page du média (lien adjacent, panneau dépliant), et non enfouie ailleurs ?", "Is the transcript reachable from the media's own page (an adjacent link, a disclosure panel) rather than buried elsewhere?"),
+      q("Couvre-t-elle TOUT le contenu, y compris l'identification des locuteurs et les sons signifiants ?", "Does it cover ALL the content, including speaker identification and meaningful sounds?"),
+    ],
+  },
+  "1.2.2": {
+    decide: q(
+      "Conforme si toute vidéo pré-enregistrée porteuse de parole dispose de sous-titres synchronisés (piste <track kind=\"captions\">, sous-titres intégrés au conteneur, ou lecteur en fournissant). Non conforme si la parole n'est restituée par aucun sous-titre.",
+      'Conforming when every prerecorded video carrying speech has synchronized captions (a <track kind="captions">, captions embedded in the container, or a player supplying them). Non-conforming when the speech is restituted by no caption at all.',
+    ),
+    na: q("Aucune vidéo pré-enregistrée porteuse de son signifiant.", "No prerecorded video carrying meaningful audio."),
+    questions: [
+      q(
+        "L'absence de <track> prouve-t-elle vraiment l'absence de sous-titres ? Vérifiez le conteneur et le lecteur : les sous-titres peuvent être intégrés — c'est pourquoi le moteur ne classe pas ce cas en non-conformité.",
+        "Does a missing <track> really prove there are no captions? Check the container and the player: captions can be embedded — which is why the engine does not class this as a non-conformity.",
+      ),
+      q("Les sous-titres couvrent-ils aussi les sons non verbaux signifiants (musique, alarme, rire) ?", "Do the captions also cover meaningful non-speech sounds (music, alarm, laughter)?"),
+    ],
+  },
+  "1.2.3": {
+    decide: q(
+      "Conforme si chaque vidéo pré-enregistrée sonore offre une audiodescription OU une alternative textuelle complète décrivant l'information visuelle. Non conforme si l'information portée par l'image seule n'est restituée nulle part.",
+      "Conforming when every prerecorded video with audio offers audio description OR a complete text alternative describing the visual information. Non-conforming when information carried only by the picture is restituted nowhere.",
+    ),
+    na: q("Aucune vidéo pré-enregistrée sonore.", "No prerecorded video with audio."),
+    questions: [q("Quelle information n'existe QUE dans l'image (texte à l'écran, démonstration, graphique) ? Est-elle dite ou décrite ailleurs ?", "What information exists ONLY in the picture (on-screen text, a demonstration, a chart)? Is it spoken or described elsewhere?")],
+  },
+  "1.2.4": {
+    decide: q(
+      "Conforme si tout contenu audio diffusé en direct dispose de sous-titres en temps réel. Non conforme sinon.",
+      "Conforming when every live audio broadcast has real-time captions. Non-conforming otherwise.",
+    ),
+    na: q("Aucune diffusion en direct.", "No live broadcast."),
+    questions: [q("Y a-t-il un flux live (webinaire, direct, visioconférence intégrée) dans le périmètre ? Le prestataire de sous-titrage est-il en place pour CHAQUE session ?", "Is there a live stream (a webinar, a broadcast, an embedded conference) in scope? Is the captioning provider in place for EVERY session?")],
+  },
+  "1.2.5": {
+    decide: q(
+      "Conforme si chaque vidéo pré-enregistrée sonore dispose d'une audiodescription (piste dédiée ou version audiodécrite). Attention : au niveau AA, l'alternative textuelle seule ne suffit plus, contrairement à 1.2.3.",
+      "Conforming when every prerecorded video with audio has audio description (a dedicated track or an audio-described version). Note: at AA a text alternative alone no longer suffices, unlike 1.2.3.",
+    ),
+    na: q("Aucune vidéo pré-enregistrée sonore.", "No prerecorded video with audio."),
+    questions: [q("Une piste d'audiodescription existe-t-elle réellement, ou seule la transcription de 1.2.3 est-elle fournie ?", "Does an audio-description track actually exist, or is only the 1.2.3 transcript provided?")],
+  },
+  "1.3.1": {
+    decide: q(
+      "Conforme si chaque relation et structure perçue visuellement (titres, listes, tableaux, groupes de champs, régions) est déterminable par programme. Non conforme dès qu'une relation n'existe que visuellement — un « titre » en <div> gras, une liste faite de <br>, un couple libellé/valeur en <span>.",
+      "Conforming when every relationship and structure conveyed visually (headings, lists, tables, field groups, regions) is programmatically determinable. Non-conforming as soon as a relationship exists visually only — a bold <div> acting as a heading, a list built from <br>, a label/value pair in <span>s.",
+    ),
+    questions: [
+      q(
+        "Cohérence des techniques (RGAA 9.1) : la MÊME technique de structuration (hn vs caption, balisage ul/ol/dl) est-elle employée sur TOUS les tableaux/pages similaires — pas au cas par cas ?",
+        "Technique consistency (RGAA 9.1): is the SAME structuring technique (hn vs caption, ul/ol/dl markup) used across ALL similar tables/pages — not instance by instance?",
+      ),
+      q(
+        "Champs présentés en div (RGAA 8.9) : pour chaque paire libellé/valeur affichée avec des <div>/<span>, la relation est-elle autre chose que visuelle (<dl>/<dt>/<dd> ou association ARIA) ?",
+        "Div-presented fields (RGAA 8.9): for each label/value pair shown with <div>/<span>, is the relationship anything other than visual (<dl>/<dt>/<dd> or an ARIA association)?",
+      ),
+      q("Le contenu lu sans CSS garde-t-il le même sens et le même ordre ?", "Read without CSS, does the content keep the same meaning and the same order?"),
+    ],
+  },
+  "1.3.2": {
+    decide: q(
+      "Conforme si l'ordre de lecture du DOM produit une séquence qui garde le sens. Non conforme quand l'ordre visuel et l'ordre DOM divergent au point de changer le sens (colonnes réordonnées en CSS, `order`/`flex-direction: *-reverse`, positionnement absolu).",
+      "Conforming when the DOM reading order produces a sequence that preserves meaning. Non-conforming when the visual and DOM orders diverge enough to change the meaning (columns reordered in CSS, `order`/`flex-direction: *-reverse`, absolute positioning).",
+    ),
+    questions: [
+      q("En lisant le DOM de haut en bas, la séquence reste-t-elle compréhensible — ou une colonne latérale s'intercale-t-elle au milieu d'un texte ?", "Reading the DOM top to bottom, does the sequence stay understandable — or does a side column cut through the middle of a text?"),
+      q("Un `order` CSS ou un `flex-direction` inversé déplace-t-il visuellement des éléments porteurs de sens ?", "Does a CSS `order` or a reversed `flex-direction` visually move meaning-bearing elements?"),
+    ],
+  },
+  "1.3.3": {
+    decide: q(
+      "Conforme si aucune instruction ne repose UNIQUEMENT sur une caractéristique sensorielle (forme, couleur, taille, position, son). Non conforme pour « cliquez sur le bouton vert », « voir l'encadré à droite », « le champ ci-dessous » sans autre repère.",
+      'Conforming when no instruction relies SOLELY on a sensory characteristic (shape, colour, size, position, sound). Non-conforming for "click the green button", "see the box on the right", "the field below" with no other cue.',
+    ),
+    questions: [q("Chaque instruction nomme-t-elle aussi la cible (libellé, intitulé) en plus de sa position ou de sa couleur ?", "Does each instruction also name its target (a label, a heading) in addition to its position or colour?")],
+  },
+  "1.3.4": {
+    decide: q(
+      "Conforme si le contenu s'affiche dans les deux orientations. Non conforme si l'affichage est verrouillé (CSS `transform`/`orientation` media query bloquante, verrouillage applicatif) sans que l'orientation soit essentielle.",
+      "Conforming when the content displays in both orientations. Non-conforming when display is locked (a blocking CSS `transform`/orientation media query, an app-level lock) without the orientation being essential.",
+    ),
+    questions: [q("L'orientation est-elle vraiment ESSENTIELLE (piano, chèque à photographier), ou juste un choix de mise en page ?", "Is the orientation genuinely ESSENTIAL (a piano keyboard, a cheque to photograph), or merely a layout choice?")],
+  },
+  "1.3.5": {
+    decide: q(
+      "Conforme si chaque champ collectant une information SUR L'UTILISATEUR déclare sa finalité avec un token `autocomplete` de la liste WCAG. Non conforme si le token manque ou n'appartient pas au vocabulaire.",
+      "Conforming when every field collecting information ABOUT THE USER declares its purpose with an `autocomplete` token from the WCAG list. Non-conforming when the token is missing or outside the vocabulary.",
+    ),
+    na: q("Aucun champ ne collecte d'information sur l'utilisateur.", "No field collects information about the user."),
+    questions: [q("Le champ collecte-t-il une donnée de l'UTILISATEUR (nom, e-mail, adresse, téléphone) — et non une donnée métier (n° de commande, mot-clé de recherche) ?", "Does the field collect data about the USER (name, email, address, phone) — rather than business data (an order number, a search keyword)?")],
+  },
+  "1.4.1": {
+    decide: q(
+      "Conforme si aucune information n'est donnée par la couleur SEULE. Non conforme pour un lien dans un paragraphe distingué par la seule couleur, un statut « rouge/vert » sans texte ni icône, un champ en erreur signalé par une bordure colorée uniquement.",
+      "Conforming when no information is conveyed by colour ALONE. Non-conforming for an in-paragraph link distinguished only by colour, a red/green status with no text or icon, a field error signalled only by a coloured border.",
+    ),
+    questions: [q("Vu en niveaux de gris, chaque information reste-t-elle distinguable ?", "Seen in greyscale, does every piece of information stay distinguishable?")],
+  },
+  "1.4.3": {
+    decide: q(
+      "Décidé sur le rendu (`scan`) : 4,5:1 pour le texte courant, 3:1 pour le texte large (≥ 18,66 px gras ou ≥ 24 px). Le moteur tranche le sous-ensemble des couleurs littérales en style inline ; tout le reste exige les styles calculés.",
+      "Decided on the render (`scan`): 4.5:1 for body text, 3:1 for large text (>= 18.66px bold or >= 24px). The engine settles the inline-literal colour subset; everything else needs computed styles.",
+    ),
+    questions: [q("Les états (survol, focus, désactivé) et le texte sur image/dégradé ont-ils été mesurés, pas seulement l'état au repos ?", "Have the states (hover, focus, disabled) and text over images/gradients been measured, not just the resting state?")],
+  },
+  "1.4.4": {
+    decide: q(
+      "Décidé sur le rendu : à 200 % de zoom texte, aucun contenu ni fonctionnalité n'est perdu, tronqué ou superposé. Non conforme si un `meta viewport` bloque le zoom.",
+      "Decided on the render: at 200% text zoom no content or functionality is lost, truncated or overlapped. Non-conforming when a `meta viewport` blocks zooming.",
+    ),
+    questions: [q("À 200 %, des textes se chevauchent-ils, ou des boutons sortent-ils de leur conteneur ?", "At 200%, does any text overlap, or any button escape its container?")],
+  },
+  "1.4.5": {
+    decide: q(
+      "Conforme si le texte est du vrai texte, sauf logotype ou présentation essentielle. Non conforme pour un titre, un bouton ou une citation composés en image.",
+      "Conforming when text is real text, except for a logotype or an essential presentation. Non-conforming for a heading, a button or a quotation baked into an image.",
+    ),
+    questions: [q("L'image de texte est-elle un logo (exempté) ou une mise en forme qui pourrait être obtenue en CSS ?", "Is the image of text a logo (exempt), or a styling that CSS could reproduce?")],
+  },
+  "1.4.10": {
+    decide: q(
+      "Décidé sur le rendu : à 320 px de large (équivalent 400 % sur 1280 px), aucun défilement bidirectionnel n'est requis, sauf pour un contenu qui l'exige par nature (carte, tableau de données larges).",
+      "Decided on the render: at 320 CSS px wide (equivalent to 400% on 1280px), no two-dimensional scrolling is required, except for content that inherently needs it (a map, a wide data table).",
+    ),
+    questions: [q("Le défilement horizontal restant concerne-t-il un contenu réellement exempté, ou toute la page ?", "Does the remaining horizontal scrolling apply to genuinely exempt content, or to the whole page?")],
+  },
+  "1.4.11": {
+    decide: q(
+      "Décidé sur le rendu : 3:1 pour les composants d'interface (bordure de champ, contour de bouton, indicateur de focus) et pour les parties signifiantes des graphiques.",
+      "Decided on the render: 3:1 for user-interface components (a field border, a button outline, the focus indicator) and for the meaningful parts of graphics.",
+    ),
+    questions: [q("La bordure qui identifie un champ, et l'indicateur de focus, atteignent-ils 3:1 contre leur fond ?", "Do the border identifying a field, and the focus indicator, reach 3:1 against their background?")],
+  },
+  "1.4.12": {
+    decide: q(
+      "Décidé sur le rendu : en forçant hauteur de ligne 1,5×, espacement de paragraphe 2×, lettres 0,12× et mots 0,16×, aucun contenu n'est perdu ni tronqué.",
+      "Decided on the render: forcing line height 1.5x, paragraph spacing 2x, letter spacing 0.12x and word spacing 0.16x, no content is lost or clipped.",
+    ),
+    questions: [q("Des conteneurs à hauteur fixe coupent-ils le texte une fois l'espacement augmenté ?", "Do any fixed-height containers clip text once the spacing is increased?")],
+  },
+  "1.4.13": {
+    decide: q(
+      "Décidé sur le rendu : tout contenu additionnel apparu au survol ou au focus doit être masquable (Échap), survolable (le pointeur peut l'atteindre) et persistant (il ne disparaît pas tout seul).",
+      "Decided on the render: any additional content shown on hover or focus must be dismissible (Escape), hoverable (the pointer can reach it) and persistent (it does not vanish on its own).",
+    ),
+    questions: [q("L'infobulle survit-elle au déplacement du pointeur vers elle, et Échap la ferme-t-il sans déplacer le focus ?", "Does the tooltip survive the pointer moving onto it, and does Escape close it without moving focus?")],
+  },
+  "2.1.1": {
+    decide: q(
+      "Conforme si toute fonctionnalité est utilisable au clavier seul. Non conforme dès qu'une action n'existe qu'à la souris (handler sur un élément non interactif, glisser-déposer sans équivalent, survol obligatoire).",
+      "Conforming when every function is operable with the keyboard alone. Non-conforming as soon as an action exists only for the mouse (a handler on a non-interactive element, drag-and-drop with no equivalent, mandatory hover).",
+    ),
+    questions: [
+      q("Chaque `onClick`/`onMouseEnter` sur un élément non natif a-t-il un équivalent clavier (élément natif, ou role + tabindex + gestion Entrée/Espace) ?", "Does each `onClick`/`onMouseEnter` on a non-native element have a keyboard equivalent (a native element, or role + tabindex + Enter/Space handling)?"),
+      q("Les widgets composites (menu, onglets, combobox) suivent-ils le contrat clavier attendu (flèches, Échap, Origine/Fin) ?", "Do the composite widgets (menu, tabs, combobox) follow the expected keyboard contract (arrows, Escape, Home/End)?"),
+    ],
+  },
+  "2.1.2": {
+    decide: q(
+      "Décidé sur le rendu : le focus doit pouvoir ENTRER et SORTIR de chaque composant au clavier seul. Non conforme pour une modale, un lecteur embarqué ou un éditeur qui capture le focus définitivement.",
+      "Decided on the render: focus must be able to ENTER and LEAVE every component with the keyboard alone. Non-conforming for a modal, an embedded player or an editor that captures focus permanently.",
+    ),
+    questions: [q("Dans chaque modale et chaque iframe tierce, Tab finit-il par ressortir — et Échap rend-il la main ?", "In every modal and third-party iframe, does Tab eventually get out — and does Escape hand control back?")],
+  },
+  "2.1.4": {
+    decide: q(
+      "Conforme si tout raccourci composé d'un seul caractère imprimable peut être désactivé, remappé, ou n'est actif qu'au focus du composant concerné. Non conforme s'il est global et non désactivable.",
+      "Conforming when every single-printable-character shortcut can be turned off, remapped, or is active only while its component has focus. Non-conforming when it is global and cannot be disabled.",
+    ),
+    na: q("Aucun raccourci à caractère unique.", "No single-character shortcut."),
+    questions: [q("Un utilisateur de reconnaissance vocale qui dicte du texte peut-il déclencher ce raccourci par accident ?", "Could a speech-input user dictating text trigger this shortcut by accident?")],
+  },
+  "2.2.1": {
+    decide: q(
+      "Conforme si toute limite de temps peut être désactivée, ajustée (×10) ou prolongée sur demande. Exemptions : temps réel, événement essentiel, limite > 20 heures.",
+      "Conforming when every time limit can be turned off, adjusted (x10) or extended on request. Exemptions: real-time activity, an essential event, a limit longer than 20 hours.",
+    ),
+    na: q("Aucune limite de temps.", "No time limit."),
+    questions: [q("La session expire-t-elle ? L'utilisateur est-il averti AVANT expiration et peut-il prolonger ?", "Does the session expire? Is the user warned BEFORE it does, and can they extend it?")],
+  },
+  "2.2.2": {
+    decide: q(
+      "Conforme si tout contenu en mouvement, clignotant ou défilant qui dure plus de 5 secondes et démarre automatiquement peut être mis en pause, arrêté ou masqué. Idem pour toute mise à jour automatique.",
+      "Conforming when any moving, blinking or scrolling content lasting more than 5 seconds and starting automatically can be paused, stopped or hidden. Same for any auto-updating content.",
+    ),
+    na: q("Aucun contenu en mouvement ni mise à jour automatique.", "No moving content and no automatic updates."),
+    questions: [q("Carrousels, animations et bandeaux défilants ont-ils un contrôle de pause atteignable au clavier ?", "Do carousels, animations and scrolling banners have a pause control reachable by keyboard?")],
+  },
+  "2.3.1": {
+    decide: q(
+      "Décidé sur le rendu : rien ne clignote plus de 3 fois par seconde, sauf sous les seuils de flash général et de flash rouge.",
+      "Decided on the render: nothing flashes more than three times per second, unless it stays below the general and red flash thresholds.",
+    ),
+    na: q("Aucun contenu clignotant.", "No flashing content."),
+    questions: [q("Une vidéo ou une animation contient-elle des flashs rapides (explosions, stroboscope) ?", "Does any video or animation contain rapid flashes (explosions, strobe effects)?")],
+  },
+  "2.4.1": {
+    decide: q(
+      "Conforme si un mécanisme permet d'éviter les blocs répétés : lien d'évitement fonctionnel, ou structuration en régions (landmarks) et en titres. Non conforme si l'utilisateur doit traverser la navigation à chaque page.",
+      "Conforming when a mechanism bypasses repeated blocks: a working skip link, or a structure of landmarks and headings. Non-conforming when the user must traverse the navigation on every page.",
+    ),
+    questions: [q("Le lien d'évitement est-il le PREMIER élément focalisable, visible au focus, et sa cible reçoit-elle réellement le focus ?", "Is the skip link the FIRST focusable element, visible on focus, and does its target actually receive focus?")],
+  },
+  "2.4.3": {
+    decide: q(
+      "Conforme si l'ordre de tabulation préserve le sens et l'opérabilité. Non conforme quand le focus saute de façon incohérente, entre dans un contenu masqué, ou ne suit pas l'ordre visuel là où celui-ci porte le sens.",
+      "Conforming when the tab order preserves meaning and operability. Non-conforming when focus jumps incoherently, enters hidden content, or departs from the visual order where that order carries meaning.",
+    ),
+    questions: [
+      q(
+        "SPA (RGAA 12.8) : après une navigation partielle, le focus est-il déplacé vers le nouveau contenu (et non laissé sur le lien cliqué ni renvoyé en haut) ?",
+        "SPA (RGAA 12.8): after a partial navigation, is focus moved to the new content (not left on the clicked link, nor reset to the top)?",
+      ),
+      q("À l'ouverture d'une modale, le focus entre-t-il dedans ; à la fermeture, revient-il sur le déclencheur ?", "When a modal opens, does focus move into it; when it closes, does it return to the trigger?"),
+    ],
+  },
+  "2.4.4": {
+    decide: q(
+      "Conforme si la fonction de chaque lien se comprend depuis son intitulé seul, ou depuis son intitulé + son contexte immédiat (phrase, item de liste, cellule + en-têtes). Non conforme pour « en savoir plus », « cliquez ici », une URL brute, ou deux liens de même intitulé menant ailleurs.",
+      'Conforming when each link\'s purpose is understandable from its text alone, or from its text plus its immediate context (sentence, list item, cell + headers). Non-conforming for "read more", "click here", a bare URL, or two identically-named links going to different destinations.',
+    ),
+    questions: [
+      q("Lu hors contexte, l'intitulé dit-il OÙ le lien mène ou CE QU'il déclenche ?", "Read out of context, does the text say WHERE the link goes or WHAT it triggers?"),
+      q("Deux liens portant le même intitulé mènent-ils à la même destination ?", "Do two links with the same text lead to the same destination?"),
+      q("Un lien de téléchargement annonce-t-il le format et le poids (recommandation, non normatif) ?", "Does a download link state the format and size (a recommendation, not normative)?"),
+    ],
+  },
+  "2.4.5": {
+    decide: q(
+      "Conforme si au moins DEUX moyens permettent d'atteindre chaque page : moteur de recherche, plan du site, navigation principale, fil d'Ariane, index. Exemption : une page qui est une étape d'un processus.",
+      "Conforming when at least TWO ways lead to each page: a search engine, a site map, the main navigation, a breadcrumb, an index. Exemption: a page that is a step in a process.",
+    ),
+    questions: [q("Les deux moyens existent-ils sur l'ENSEMBLE du site, ou seulement sur l'accueil ?", "Do the two ways exist across the WHOLE site, or only on the home page?")],
+  },
+  "2.4.6": {
+    decide: q(
+      "Conforme si chaque titre décrit la section qu'il introduit et chaque libellé décrit ce que le champ attend. Non conforme pour un titre générique (« Section 2 »), un libellé vague (« Valeur »), ou un intitulé qui ne correspond pas au contenu.",
+      'Conforming when each heading describes the section it introduces and each label describes what the field expects. Non-conforming for a generic heading ("Section 2"), a vague label ("Value"), or a heading that does not match its content.',
+    ),
+    questions: [
+      q("La suite des titres, lue seule, donne-t-elle un plan compréhensible de la page ?", "Read on their own, do the headings give an understandable outline of the page?"),
+      q(
+        "Concision des titres de tableaux (RGAA 5.5) : chaque <caption> est-il un intitulé COURT et pertinent ? Un titre clair mais verbeux doit devenir une brève introduction, les détails étant déportés dans un texte associé via aria-labelledby/aria-describedby.",
+        "Table-title concision (RGAA 5.5): is each <caption> a SHORT, relevant title? A clear but verbose title should become a brief intro, with the details moved into text associated via aria-labelledby/aria-describedby.",
+      ),
+    ],
+  },
+  "2.4.7": {
+    decide: q(
+      "Décidé sur le rendu : chaque élément focalisable montre un indicateur de focus visible. Non conforme pour un `outline: none` non remplacé.",
+      "Decided on the render: every focusable element shows a visible focus indicator. Non-conforming for an unreplaced `outline: none`.",
+    ),
+    questions: [q("L'indicateur est-il visible sur TOUS les fonds (thème sombre, survol, éléments sur image) ?", "Is the indicator visible on ALL backgrounds (dark theme, hover, elements over images)?")],
+  },
+  "2.4.11": {
+    decide: q(
+      "Décidé sur le rendu : l'élément qui reçoit le focus n'est pas entièrement masqué par un contenu créé par l'auteur (en-tête collant, bandeau de cookies, barre d'action).",
+      "Decided on the render: the element receiving focus is not entirely hidden by author-created content (a sticky header, a cookie banner, an action bar).",
+    ),
+    questions: [q("En tabulant vers le bas puis vers le haut, un en-tête ou un pied collant recouvre-t-il l'élément focalisé ?", "Tabbing down then up, does a sticky header or footer cover the focused element?")],
+  },
+  "2.5.1": {
+    decide: q(
+      "Conforme si toute fonctionnalité utilisant un geste multipoint ou basé sur un tracé dispose d'une alternative à pointeur unique. Non conforme pour un pincement, un balayage ou un tracé sans équivalent bouton.",
+      "Conforming when every function using a multipoint or path-based gesture has a single-pointer alternative. Non-conforming for a pinch, a swipe or a path with no button equivalent.",
+    ),
+    na: q("Aucun geste complexe.", "No complex gesture."),
+    questions: [q("Carrousels, cartes et curseurs offrent-ils des boutons en plus du geste ?", "Do carousels, maps and sliders offer buttons in addition to the gesture?")],
+  },
+  "2.5.2": {
+    decide: q(
+      "Conforme si aucune fonctionnalité ne s'exécute à l'APPUI (down-event), ou si elle est annulable/réversible. Non conforme pour une action déclenchée dès `mousedown`/`touchstart` sans possibilité d'annuler en éloignant le pointeur.",
+      "Conforming when no function executes on the DOWN event, or when it is abortable/reversible. Non-conforming for an action fired on `mousedown`/`touchstart` with no way to abort by moving the pointer away.",
+    ),
+    questions: [q("Des handlers `onMouseDown`/`onTouchStart` déclenchent-ils l'action au lieu de `onClick` ?", "Do any `onMouseDown`/`onTouchStart` handlers fire the action instead of `onClick`?")],
+  },
+  "2.5.3": {
+    decide: q(
+      "Conforme si, pour chaque contrôle portant un libellé textuel visible, ce texte est CONTENU dans le nom accessible. Non conforme quand `aria-label` remplace le texte visible par un autre libellé : la commande vocale ne trouve plus la cible.",
+      "Conforming when, for every control with a visible text label, that text is CONTAINED in the accessible name. Non-conforming when `aria-label` replaces the visible text with a different wording: voice control can no longer find the target.",
+    ),
+    questions: [q("Le nom accessible COMMENCE-t-il idéalement par le texte visible, pour que la commande vocale corresponde au premier mot prononcé ?", "Does the accessible name ideally START with the visible text, so voice control matches the first spoken word?")],
+  },
+  "2.5.4": {
+    decide: q(
+      "Conforme si toute fonctionnalité déclenchée par un mouvement de l'appareil (secousse, inclinaison) dispose d'un équivalent dans l'interface ET peut être désactivée.",
+      "Conforming when every function triggered by device motion (shake, tilt) has an equivalent in the interface AND can be disabled.",
+    ),
+    na: q("Aucune activation par mouvement.", "No motion actuation."),
+    questions: [q("Un écouteur `devicemotion`/`deviceorientation` déclenche-t-il une action sans bouton équivalent ?", "Does a `devicemotion`/`deviceorientation` listener trigger an action with no equivalent button?")],
+  },
+  "2.5.7": {
+    decide: q(
+      "Conforme si toute action réalisée par glissement dispose d'une alternative à pointeur unique sans glissement (boutons, champ de saisie, menu). Non conforme pour un réordonnancement, un curseur ou un kanban glisser-déposer seul.",
+      "Conforming when every dragging action has a single-pointer alternative that does not require dragging (buttons, an input, a menu). Non-conforming for reordering, a slider or a kanban that only supports drag-and-drop.",
+    ),
+    na: q("Aucune interaction par glissement.", "No dragging interaction."),
+    questions: [q("Les listes réordonnables offrent-elles des boutons « monter »/« descendre » en plus du glissement ?", 'Do the reorderable lists offer "move up"/"move down" buttons in addition to dragging?')],
+  },
+  "2.5.8": {
+    decide: q(
+      "Décidé sur le rendu : la cible de pointage fait au moins 24×24 px CSS, sauf espacement suffisant, équivalent ailleurs, cible en ligne dans du texte, ou taille imposée par la loi.",
+      "Decided on the render: the pointer target is at least 24x24 CSS px, unless there is sufficient spacing, an equivalent elsewhere, an inline-in-text target, or a legally mandated size.",
+    ),
+    questions: [q("Les petites icônes (fermer, éditer, supprimer) atteignent-elles 24 px, ou bénéficient-elles de l'exception d'espacement ?", "Do the small icons (close, edit, delete) reach 24px, or do they benefit from the spacing exception?")],
+  },
+  "3.1.2": {
+    decide: q(
+      "Conforme si chaque passage dans une langue différente de celle de la page porte un `lang` correct. Exemptions : noms propres, termes techniques, mots passés dans l'usage.",
+      "Conforming when every passage in a language other than the page's carries a correct `lang`. Exemptions: proper nouns, technical terms, words that have entered the vernacular.",
+    ),
+    na: q("Aucun changement de langue.", "No change of language."),
+    questions: [q("Les citations, titres d'œuvres et expressions étrangères sont-ils marqués — et le sous-tag correspond-il vraiment à la langue du texte ?", "Are quotations, work titles and foreign expressions marked — and does the subtag actually match the text's language?")],
+  },
+  "3.2.1": {
+    decide: q(
+      "Conforme si recevoir le focus ne déclenche AUCUN changement de contexte. Non conforme si le focus ouvre une fenêtre, soumet un formulaire ou déplace le focus ailleurs.",
+      "Conforming when receiving focus triggers NO change of context. Non-conforming when focus opens a window, submits a form or moves focus elsewhere.",
+    ),
+    questions: [q("Des handlers `onFocus` naviguent-ils, ouvrent-ils une modale ou déplacent-ils le focus ?", "Do any `onFocus` handlers navigate, open a modal or move focus?")],
+  },
+  "3.2.2": {
+    decide: q(
+      "Conforme si modifier la valeur d'un contrôle ne déclenche pas seul un changement de contexte, ou si l'utilisateur en a été averti avant. Non conforme pour un `<select>` qui navigue au changement.",
+      "Conforming when changing a control's value does not by itself trigger a change of context, or when the user was warned beforehand. Non-conforming for a `<select>` that navigates on change.",
+    ),
+    questions: [q("Le changement est-il annoncé AVANT (texte d'aide au-dessus du champ), ou l'utilisateur le découvre-t-il après coup ?", "Is the change announced BEFORE (help text above the field), or does the user discover it afterwards?")],
+  },
+  "3.2.3": {
+    decide: q(
+      "Conforme si les mécanismes de navigation répétés apparaissent dans le MÊME ordre relatif d'une page à l'autre. Non conforme si l'ordre des entrées du menu change selon les pages.",
+      "Conforming when repeated navigation mechanisms appear in the SAME relative order from page to page. Non-conforming when the menu entries reorder across pages.",
+    ),
+    questions: [q("Sur l'échantillon de pages, la navigation principale, le fil d'Ariane et le pied de page gardent-ils le même ordre ?", "Across the page sample, do the main navigation, the breadcrumb and the footer keep the same order?")],
+  },
+  "3.2.4": {
+    decide: q(
+      "Conforme si les composants de même fonction sont identifiés de la même manière partout (même intitulé, même icône, même nom accessible). Non conforme si « Rechercher » devient « Trouver » selon les pages.",
+      'Conforming when components with the same function are identified the same way everywhere (same wording, same icon, same accessible name). Non-conforming when "Search" becomes "Find" from page to page.',
+    ),
+    questions: [q("Les icônes récurrentes (imprimer, partager, télécharger) portent-elles partout le même nom accessible ?", "Do the recurring icons (print, share, download) carry the same accessible name everywhere?")],
+  },
+  "3.2.6": {
+    decide: q(
+      "Conforme si, quand un mécanisme d'aide (contact, chat, FAQ, aide contextuelle) est présent sur plusieurs pages, il apparaît dans le même ordre relatif. Nouveauté WCAG 2.2.",
+      "Conforming when, wherever a help mechanism (contact, chat, FAQ, contextual help) appears on multiple pages, it sits in the same relative order. New in WCAG 2.2.",
+    ),
+    na: q("Aucun mécanisme d'aide.", "No help mechanism."),
+    questions: [q("Le lien de contact ou le widget de chat occupe-t-il la même position relative sur toutes les pages qui le portent ?", "Does the contact link or chat widget sit in the same relative position on every page that carries it?")],
+  },
+  "3.3.1": {
+    decide: q(
+      "Conforme si chaque erreur de saisie détectée automatiquement est identifiée EN TEXTE et le champ fautif désigné. Non conforme pour une bordure rouge seule, ou un message non relié au champ.",
+      "Conforming when every automatically detected input error is identified IN TEXT and the offending field is pointed out. Non-conforming for a red border alone, or a message not associated with its field.",
+    ),
+    na: q("Aucune détection d'erreur de saisie.", "No automatic input-error detection."),
+    questions: [q("Le message d'erreur est-il relié au champ (`aria-describedby`/`aria-errormessage`) et annoncé au moment où il apparaît ?", "Is the error message tied to the field (`aria-describedby`/`aria-errormessage`) and announced when it appears?")],
+  },
+  "3.3.2": {
+    decide: q(
+      "Conforme si chaque champ porte un libellé ou une instruction quand une saisie est attendue. Non conforme si le format attendu (date, mot de passe, téléphone) n'est indiqué nulle part avant l'erreur.",
+      "Conforming when every field carries a label or instruction where input is expected. Non-conforming when the expected format (date, password, phone) is stated nowhere before the error.",
+    ),
+    questions: [q("Le format et les contraintes sont-ils annoncés AVANT la saisie, et non seulement dans le message d'erreur ?", "Are the format and constraints stated BEFORE input, not only in the error message?")],
+  },
+  "3.3.3": {
+    decide: q(
+      "Conforme si, quand la correction est connue, une suggestion est proposée. Non conforme pour un « champ invalide » qui ne dit pas ce qui est attendu, sauf si le suggérer compromettrait la sécurité.",
+      'Conforming when, where the correction is known, a suggestion is offered. Non-conforming for an "invalid field" that does not say what is expected, unless suggesting it would compromise security.',
+    ),
+    na: q("Aucune erreur de saisie détectée automatiquement.", "No automatically detected input error."),
+    questions: [q("Le message dit-il COMMENT corriger (« la date doit être au format JJ/MM/AAAA »), ou seulement que c'est faux ?", 'Does the message say HOW to fix it ("the date must be DD/MM/YYYY"), or only that it is wrong?')],
+  },
+  "3.3.4": {
+    decide: q(
+      "Conforme si les envois à portée juridique, financière ou modifiant des données sont réversibles, vérifiés, ou confirmés. Non conforme pour une suppression ou une commande définitive en un clic.",
+      "Conforming when legal, financial or data-modifying submissions are reversible, checked, or confirmed. Non-conforming for a one-click irreversible deletion or order.",
+    ),
+    na: q("Aucune transaction à portée juridique, financière ou modifiant des données.", "No legal, financial or data-modifying transaction."),
+    questions: [q("L'utilisateur peut-il relire et corriger avant validation définitive ?", "Can the user review and correct before final submission?")],
+  },
+  "3.3.7": {
+    decide: q(
+      "Conforme si aucune information déjà saisie dans le même processus n'est redemandée, sauf ressaisie essentielle (confirmation de mot de passe) ou information devenue invalide. Nouveauté WCAG 2.2.",
+      "Conforming when no information already entered in the same process is asked for again, unless re-entry is essential (password confirmation) or the information is no longer valid. New in WCAG 2.2.",
+    ),
+    questions: [q("Un tunnel multi-étapes redemande-t-il l'adresse ou l'e-mail déjà saisis, sans pré-remplissage ni sélection ?", "Does a multi-step flow ask again for an address or email already entered, with no prefill and no selection?")],
+  },
+  "3.3.8": {
+    decide: q(
+      "Conforme si aucune étape d'authentification n'exige un test de fonction cognitive (mémoriser, transcrire, résoudre), sauf alternative, aide, reconnaissance d'objet ou contenu fourni par l'utilisateur. Le collage et le remplissage automatique doivent rester possibles. Nouveauté WCAG 2.2.",
+      "Conforming when no authentication step requires a cognitive function test (memorise, transcribe, solve), unless an alternative, a mechanism, object recognition or user-provided content is available. Pasting and autofill must remain possible. New in WCAG 2.2.",
+    ),
+    na: q("Aucune authentification.", "No authentication."),
+    questions: [
+      q("Le collage est-il possible dans les champs d'identification, et le gestionnaire de mots de passe peut-il les remplir ?", "Is pasting possible in the credential fields, and can a password manager fill them?"),
+      q("Un CAPTCHA de transcription ou un code à ressaisir de mémoire est-il imposé sans alternative ?", "Is a transcription CAPTCHA or a code to retype from memory imposed with no alternative?"),
+    ],
+  },
+  "4.1.2": {
+    decide: q(
+      "Conforme si chaque composant d'interface expose un nom, un rôle et — quand il porte un état — une valeur, tenus à jour. Non conforme pour un widget custom sans rôle, sans nom, ou dont l'état ARIA ne suit pas l'état réel.",
+      "Conforming when every user-interface component exposes a name, a role and — where it carries state — a value, all kept up to date. Non-conforming for a custom widget with no role, no name, or whose ARIA state does not track the real one.",
+    ),
+    questions: [
+      q("Pour chaque widget custom : le rôle correspond-il au comportement réel, et l'état (`aria-expanded`, `aria-checked`, `aria-selected`) suit-il l'interaction ?", "For each custom widget: does the role match the actual behaviour, and does the state (`aria-expanded`, `aria-checked`, `aria-selected`) track the interaction?"),
+      q("Le nom accessible correspond-il à ce que l'utilisateur voit et dirait ?", "Does the accessible name match what the user sees and would say?"),
+    ],
+  },
+  "4.1.3": {
+    decide: q(
+      "Conforme si chaque message de statut (succès, erreur, résultat de recherche, chargement) est exposé par un rôle ou une propriété permettant l'annonce SANS recevoir le focus. Non conforme pour un message inséré dans un conteneur ordinaire.",
+      "Conforming when every status message (success, error, search results, loading) is exposed through a role or property allowing announcement WITHOUT receiving focus. Non-conforming for a message inserted into an ordinary container.",
+    ),
+    na: q("Aucun message de statut.", "No status message."),
+    questions: [
+      q("La région live existe-t-elle DANS LE DOM avant l'insertion du message (une région créée en même temps que son contenu n'est pas annoncée) ?", "Does the live region exist IN THE DOM before the message is inserted (a region created together with its content is not announced)?"),
+      q("La politesse est-elle adaptée : `polite` pour un statut, `alert`/`assertive` pour une erreur bloquante ?", "Is the politeness right: `polite` for a status, `alert`/`assertive` for a blocking error?"),
+    ],
+  },
+};
+
+function biomeFormat(text, relPath) {
+  return execFileSync(BIOME, ["format", `--stdin-file-path=${relPath}`], { input: text, encoding: "utf8" });
+}
+
+const json = biomeFormat(`${JSON.stringify(ADJUDICATION, null, 2)}\n`, "src/data/adjudication.json");
+
+if (process.argv.includes("--check")) {
+  const current = readFileSync(OUT, "utf8");
+  if (current !== json) {
+    process.stderr.write("build-adjudication: src/data/adjudication.json is out of date — run node scripts/build-adjudication.mjs\n");
+    process.exitCode = 1;
+  } else {
+    process.stdout.write(`build-adjudication: up to date (${Object.keys(ADJUDICATION).length} criteria)\n`);
+  }
+} else {
+  writeFileSync(OUT, json);
+  process.stdout.write(`build-adjudication: ${Object.keys(ADJUDICATION).length} criteria → ${OUT}\n`);
+}
