@@ -487,7 +487,6 @@ const dateFieldsUngrouped: Rule = {
   },
 };
 
-
 // WCAG 1.3.5 asks for a token from the HTML autofill vocabulary. A MISSPELLED or invented
 // value ("nope", "user-name", "emailaddress") is worse than none: it reads as compliant,
 // autofills nothing, and no assistive technology can infer the field's purpose from it.
@@ -513,11 +512,7 @@ const autocompleteTokenInvalid: Rule = {
 
 /** The autofill field name a control declares, ignoring qualifiers. "" when absent. */
 function autofillField(el: El): string {
-  const tokens = (attr(el, "autocomplete") ?? "")
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
+  const tokens = (attr(el, "autocomplete") ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
   return tokens.find((t) => CREDENTIAL_FIELDS.has(t)) ?? "";
 }
 

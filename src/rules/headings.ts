@@ -194,7 +194,6 @@ const emptyHeading: Rule = {
   },
 };
 
-
 // A description list only conveys its term/description pairing when the markup is
 // well-formed: <dl> takes <dt>/<dd> (optionally wrapped in <div>), and <dt>/<dd> mean
 // nothing outside a <dl>. Broken either way, the relationship is purely visual.

@@ -451,7 +451,6 @@ const statusMessageNotAssertive: Rule = {
   },
 };
 
-
 // ---- ARIA vocabulary validation (WAI-ARIA 1.2 tables live in src/aria.ts) -------------
 
 /** Every literal `aria-*` attribute on an element, skipping dynamic bindings whose value

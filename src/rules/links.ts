@@ -139,7 +139,6 @@ const controlNameTitleOnly: Rule = {
   },
 };
 
-
 /** Normalise for the label-in-name comparison: case, punctuation and whitespace are not
  *  what voice control matches on. */
 const normalizeName = (s: string): string =>

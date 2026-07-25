@@ -154,7 +154,11 @@ export const ACT_RULES: Record<string, ActMapping> = {
   ff89c9: { engineRules: ["aria-required-parent"], scope: "static" },
   "307n5z": { engineRules: [], scope: "static", gap: true, note: "presentational-children conflict" },
   a25f45: { engineRules: ["headers-attr-dangling"], scope: "static" },
-  d0f69e: { engineRules: ["th-no-data-cells"], scope: "static", note: "only the explicit `headers`-wired shape is decided; scope-based assignment needs a full table model" },
+  d0f69e: {
+    engineRules: ["th-no-data-cells"],
+    scope: "static",
+    note: "only the explicit `headers`-wired shape is decided; scope-based assignment needs a full table model",
+  },
   e6952f: { engineRules: [], scope: "static", gap: true, note: "duplicate attributes are collapsed by the parser; needs a raw-source scan" },
   "5b7ae0": { engineRules: [], scope: "static", gap: true, note: "lang vs xml:lang mismatch" },
   m6b1q3: { engineRules: [], scope: "static", gap: true, note: "role-specific accessible name (menuitem)" },

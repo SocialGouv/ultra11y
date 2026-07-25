@@ -180,7 +180,6 @@ const tableEmptyDataCell: Rule = {
   },
 };
 
-
 /** The <table> a cell belongs to (nearest table ancestor), or undefined. */
 function ownerTable(el: El, doc: Doc): El | undefined {
   return ancestors(el).find((a) => a.tag === "table");
@@ -201,7 +200,11 @@ const headersAttrDangling: Rule = {
       if (!raw || raw.includes("{")) continue;
       const table = ownerTable(el, doc);
       if (!table) continue;
-      const inTable = new Map(descendants(table).filter((d) => d.tag === "th" || d.tag === "td").map((d) => [attr(d, "id") ?? "", d]));
+      const inTable = new Map(
+        descendants(table)
+          .filter((d) => d.tag === "th" || d.tag === "td")
+          .map((d) => [attr(d, "id") ?? "", d]),
+      );
       const bad = raw
         .split(/\s+/)
         .filter(Boolean)
