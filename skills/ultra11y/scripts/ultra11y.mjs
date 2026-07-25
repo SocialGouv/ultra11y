@@ -264,6 +264,7 @@ var wcag_default = {
         "h1-missing",
         "h1-multiple",
         "list-structure",
+        "dl-structure",
         "empty-heading",
         "label-for-dangling",
         "missing-main-landmark",
@@ -271,6 +272,9 @@ var wcag_default = {
         "sortable-header-no-aria-sort",
         "nav-landmark-missing",
         "nav-landmark-unnamed",
+        "aria-required-parent",
+        "headers-attr-dangling",
+        "th-no-data-cells",
         "radio-checkbox-group-ungrouped",
         "table-empty-data-cell",
         "css-generated-content-informative"
@@ -393,7 +397,7 @@ var wcag_default = {
       level: "AA",
       addedIn: "2.1",
       automatability: "judgment",
-      ruleIds: ["field-purpose-incomplete"],
+      ruleIds: ["field-purpose-incomplete", "autocomplete-token-invalid"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/identify-input-purpose.html",
       techniques: ["H98"]
     },
@@ -791,7 +795,7 @@ var wcag_default = {
       level: "A",
       addedIn: "2.1",
       automatability: "judgment",
-      ruleIds: [],
+      ruleIds: ["label-in-name-mismatch"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html",
       techniques: [
         "ARIA14",
@@ -915,7 +919,7 @@ var wcag_default = {
       level: "A",
       addedIn: "2.0",
       automatability: "judgment",
-      ruleIds: [],
+      ruleIds: ["on-input-context-change"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/on-input.html",
       techniques: ["F22", "F36", "F37", "F41", "F9", "G107", "G13", "G76", "G80", "H32", "H84", "SCR19"]
     },
@@ -1078,7 +1082,7 @@ var wcag_default = {
       level: "AA",
       addedIn: "2.2",
       automatability: "judgment",
-      ruleIds: [],
+      ruleIds: ["credential-entry-blocked"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/accessible-authentication-minimum.html"
     },
     {
@@ -1099,6 +1103,10 @@ var wcag_default = {
         "aria-required-children",
         "aria-hidden-focusable",
         "nested-interactive",
+        "invalid-aria-attr",
+        "invalid-aria-value",
+        "aria-required-attr",
+        "aria-prohibited-attr",
         "duplicate-id",
         "control-label-missing",
         "placeholder-as-label",
@@ -1770,6 +1778,9 @@ function meta() {
     license: data.license,
     criteriaSource: data.criteriaSource
   };
+}
+function techniquesFor(id) {
+  return getSC(id)?.techniques ?? [];
 }
 
 // node_modules/entities/dist/decode-codepoint.js
@@ -30988,6 +30999,14 @@ function staticBase(glob) {
   const slash = head.lastIndexOf("/");
   return slash === -1 ? "." : head.slice(0, slash) || ".";
 }
+function walkCached(dir, opts) {
+  const hit = opts.walkCache?.get(dir);
+  if (hit) return hit;
+  const acc = [];
+  walk2(dir, acc);
+  opts.walkCache?.set(dir, acc);
+  return acc;
+}
 function expandInputs(inputs, opts = {}) {
   const include = compileGlobs2(opts.include);
   const exclude = compileGlobs2(opts.exclude);
@@ -30998,13 +31017,11 @@ function expandInputs(inputs, opts = {}) {
     if (input === "-") continue;
     if (hasGlob(input)) {
       const match = compileGlobs([input]);
-      const acc = [];
-      walk2(staticBase(input), acc);
+      const acc = walkCached(staticBase(input), opts);
       for (const f of acc) if (match(toPosix(f)) && exts.has(ext(f))) files.add(f);
     } else if (existsSync6(input)) {
       if (statSync5(input).isDirectory()) {
-        const acc = [];
-        walk2(input, acc);
+        const acc = walkCached(input, opts);
         for (const f of acc) if (exts.has(ext(f))) files.add(f);
       } else if (exts.has(ext(input))) {
         files.add(input);
@@ -31146,11 +31163,14 @@ function splitAstroFrontmatter(source) {
   return { frontmatter, blanked };
 }
 function parseSource(source, file, opts = {}) {
+  return parseSourceWithAst(source, file, opts).doc;
+}
+function parseSourceWithAst(source, file, opts = {}) {
   const kind = detectKind(file, opts.forceJsx);
   if (kind === "jsx") {
     const ast = parseJsxAst(source);
-    if (ast) return jsxAstToDoc(ast, source, file);
-    return parseHtml(jsxToHtml(source), file, true);
+    if (ast) return { doc: jsxAstToDoc(ast, source, file), ast };
+    return { doc: parseHtml(jsxToHtml(source), file, true), ast: null };
   }
   const isAstro = kind === "sfc" && /\.astro$/i.test(file);
   const htmlSource = isAstro ? splitAstroFrontmatter(source).blanked : source;
@@ -31159,7 +31179,7 @@ function parseSource(source, file, opts = {}) {
     const capture = parseCaptureProvenance(source);
     if (capture) doc.capture = capture;
   }
-  return doc;
+  return { doc, ast: null };
 }
 
 // src/messages.ts
@@ -31173,6 +31193,156 @@ var MSG_CATALOG = {
     remediation: {
       fr: () => `Ajoutez alt="\u2026" (description si l'image porte de l'information, alt="" si elle est d\xE9corative).`,
       en: () => `Add alt="\u2026" (a description if the image conveys information, alt="" if it is decorative).`
+    }
+  },
+  "autocomplete-token-invalid": {
+    message: {
+      fr: (p) => `autocomplete="${p.value}" n'appartient pas au vocabulaire HTML \u2014 la finalit\xE9 du champ n'est pas identifiable.`,
+      en: (p) => `autocomplete="${p.value}" is not in the HTML autofill vocabulary \u2014 the field's purpose is not identifiable.`
+    },
+    remediation: {
+      fr: () => `Utilisez un token de la liste WCAG \xAB Input Purposes \xBB (par ex. given-name, email, tel, postal-code, current-password).`,
+      en: () => `Use a token from the WCAG "Input Purposes" list (e.g. given-name, email, tel, postal-code, current-password).`
+    }
+  },
+  "credential-entry-blocked.paste": {
+    message: {
+      fr: (p) => `Le collage est bloqu\xE9 sur ce champ <input type="${p.type}"> \u2014 la saisie du secret devient un test de m\xE9moire.`,
+      en: (p) => `Paste is blocked on this <input type="${p.type}"> \u2014 entering the secret becomes a memory test.`
+    },
+    remediation: {
+      fr: () => `Retirez le gestionnaire qui annule l'\xE9v\xE9nement paste : les gestionnaires de mots de passe doivent pouvoir remplir le champ.`,
+      en: () => `Remove the handler cancelling the paste event: password managers must be able to fill the field.`
+    }
+  },
+  "credential-entry-blocked.autocomplete": {
+    message: {
+      fr: (p) => `autocomplete="off" sur un champ d'identification (<input type="${p.type}">) \u2014 le remplissage automatique est d\xE9sactiv\xE9.`,
+      en: (p) => `autocomplete="off" on a credential field (<input type="${p.type}">) \u2014 automatic filling is disabled.`
+    },
+    remediation: {
+      fr: () => `D\xE9clarez la finalit\xE9 r\xE9elle (autocomplete="username" / "current-password" / "one-time-code") au lieu de "off".`,
+      en: () => `Declare the real purpose (autocomplete="username" / "current-password" / "one-time-code") instead of "off".`
+    }
+  },
+  "on-input-context-change": {
+    message: {
+      fr: (p) => `Changer la valeur de ce <${p.tag}> d\xE9clenche seul un changement de contexte (envoi/navigation).`,
+      en: (p) => `Changing this <${p.tag}>'s value alone triggers a change of context (submit/navigation).`
+    },
+    remediation: {
+      fr: () => `Attendez une action explicite (bouton \xAB Valider \xBB), ou annoncez le changement avant qu'il ne survienne.`,
+      en: () => `Wait for an explicit action (a "Submit" button), or announce the change before it happens.`
+    }
+  },
+  "label-in-name-mismatch": {
+    message: {
+      fr: (p) => `Le libell\xE9 visible \xAB ${p.visible} \xBB n'est pas contenu dans le nom accessible \xAB ${p.name} \xBB \u2014 la commande vocale \xE9choue.`,
+      en: (p) => `The visible label "${p.visible}" is not contained in the accessible name "${p.name}" \u2014 voice control fails.`
+    },
+    remediation: {
+      fr: (p) => `Faites commencer aria-label par le texte visible (\xAB ${p.visible} \u2026 \xBB), ou retirez aria-label et laissez le texte nommer le contr\xF4le.`,
+      en: (p) => `Start aria-label with the visible text ("${p.visible} \u2026"), or drop aria-label and let the text name the control.`
+    }
+  },
+  "headers-attr-dangling": {
+    message: {
+      fr: (p) => `headers="${p.ids}" ne d\xE9signe aucune cellule d'en-t\xEAte de ce tableau \u2014 l'association n'existe pas.`,
+      en: (p) => `headers="${p.ids}" points at no header cell of this table \u2014 the association does not exist.`
+    },
+    remediation: {
+      fr: () => `Faites pointer headers vers les id de <th> du M\xCAME tableau, ou utilisez scope="col"/"row".`,
+      en: () => `Point headers at the ids of <th> cells in the SAME table, or use scope="col"/"row".`
+    }
+  },
+  "th-no-data-cells": {
+    message: {
+      fr: () => `Cet en-t\xEAte n'est r\xE9f\xE9renc\xE9 par aucune cellule de donn\xE9es alors que le tableau utilise headers \u2014 il n'en-t\xEAte rien.`,
+      en: () => `This header is referenced by no data cell although the table uses headers \u2014 it heads nothing.`
+    },
+    remediation: {
+      fr: () => `Ajoutez son id au headers des cellules qu'il en-t\xEAte, ou retirez-le s'il ne sert qu'\xE0 la mise en forme.`,
+      en: () => `Add its id to the headers of the cells it heads, or remove it if it is purely presentational.`
+    }
+  },
+  "dl-structure.foreign-child": {
+    message: {
+      fr: (p) => `<${p.tag}> comme enfant direct de <dl> \u2014 seuls <dt>, <dd> (et <div> les groupant) sont admis.`,
+      en: (p) => `<${p.tag}> as a direct child of <dl> \u2014 only <dt>, <dd> (and a grouping <div>) are allowed.`
+    },
+    remediation: {
+      fr: () => `D\xE9placez le contenu dans un <dd>, ou sortez-le de la liste de d\xE9finitions.`,
+      en: () => `Move the content into a <dd>, or take it out of the description list.`
+    }
+  },
+  "dl-structure.orphan": {
+    message: {
+      fr: (p) => `<${p.tag}> hors de tout <dl> \u2014 la relation terme/description n'est pas expos\xE9e.`,
+      en: (p) => `<${p.tag}> outside any <dl> \u2014 the term/description relationship is not exposed.`
+    },
+    remediation: {
+      fr: (p) => `Enveloppez les paires <dt>/<dd> dans un <dl> (le <${p.tag}> seul n'a aucune s\xE9mantique).`,
+      en: (p) => `Wrap the <dt>/<dd> pairs in a <dl> (a lone <${p.tag}> carries no semantics).`
+    }
+  },
+  "invalid-aria-attr": {
+    message: {
+      fr: (p) => `Attribut ${p.attr} inconnu de WAI-ARIA \u2014 il est ignor\xE9 par les navigateurs et n'expose rien.`,
+      en: (p) => `${p.attr} is not a WAI-ARIA attribute \u2014 browsers ignore it, so it exposes nothing.`
+    },
+    remediation: {
+      fr: (p) => `Corrigez l'orthographe de ${p.attr} (par ex. aria-labelledby, aria-describedby) ou retirez l'attribut.`,
+      en: (p) => `Fix the spelling of ${p.attr} (e.g. aria-labelledby, aria-describedby) or remove the attribute.`
+    }
+  },
+  "invalid-aria-value": {
+    message: {
+      fr: (p) => `${p.attr}="${p.value}" n'est pas une valeur admise \u2014 l'\xE9tat est trait\xE9 comme absent.`,
+      en: (p) => `${p.attr}="${p.value}" is not an allowed value \u2014 the state is treated as absent.`
+    },
+    remediation: {
+      fr: (p) => `Utilisez une valeur d\xE9finie par WAI-ARIA pour ${p.attr} (par ex. true/false, ou un entier pour aria-level).`,
+      en: (p) => `Use a value WAI-ARIA defines for ${p.attr} (e.g. true/false, or an integer for aria-level).`
+    }
+  },
+  "aria-required-attr": {
+    message: {
+      fr: (p) => `role="${p.role}" sans ${p.attrs} \u2014 l'\xE9tat requis par ce r\xF4le n'est pas expos\xE9.`,
+      en: (p) => `role="${p.role}" without ${p.attrs} \u2014 the state this role requires is not exposed.`
+    },
+    remediation: {
+      fr: (p) => `Ajoutez ${p.attrs} et tenez la valeur \xE0 jour, ou utilisez l'\xE9l\xE9ment natif \xE9quivalent qui g\xE8re l'\xE9tat seul.`,
+      en: (p) => `Add ${p.attrs} and keep it in sync, or use the native element, which manages the state on its own.`
+    }
+  },
+  "aria-required-parent": {
+    message: {
+      fr: (p) => `role="${p.role}" hors de son conteneur requis (${p.parents}) \u2014 le r\xF4le n'est pas expos\xE9.`,
+      en: (p) => `role="${p.role}" outside its required container (${p.parents}) \u2014 the role is not exposed.`
+    },
+    remediation: {
+      fr: (p) => `Placez l'\xE9l\xE9ment dans un conteneur ${p.parents}, ou reliez-le via aria-owns.`,
+      en: (p) => `Put the element inside a ${p.parents} container, or wire it up with aria-owns.`
+    }
+  },
+  "aria-prohibited-attr": {
+    message: {
+      fr: (p) => `role="${p.role}" interdit un nom d'auteur, mais ${p.attrs} en fournit un \u2014 restitution impr\xE9visible.`,
+      en: (p) => `role="${p.role}" prohibits an author-provided name, yet ${p.attrs} supplies one \u2014 restitution is unpredictable.`
+    },
+    remediation: {
+      fr: (p) => `Retirez ${p.attrs}, ou donnez \xE0 l'\xE9l\xE9ment un r\xF4le qui accepte d'\xEAtre nomm\xE9.`,
+      en: (p) => `Remove ${p.attrs}, or give the element a role that accepts a name.`
+    }
+  },
+  "img-alt-missing.title-only": {
+    message: {
+      fr: (p) => `<${p.tag}> sans alt : le nom accessible vient du seul title, restitu\xE9 de fa\xE7on peu fiable (survol uniquement).`,
+      en: (p) => `<${p.tag}> has no alt: its accessible name comes from title alone, which is restituted unreliably (hover only).`
+    },
+    remediation: {
+      fr: () => `Recommandation : d\xE9placez le texte du title vers alt="\u2026" (alt="" si l'image est d\xE9corative).`,
+      en: () => `Recommendation: move the title text into alt="\u2026" (alt="" if the image is decorative).`
     }
   },
   "decorative-alt-misuse.empty-but-named": {
@@ -32011,7 +32181,30 @@ var collapse = (s) => s.replace(/\s+/g, " ").trim();
 function mayInjectContent(el) {
   return descendants(el).some((d) => d.tag === "slot" || d.tag !== "#fragment" && !isIntrinsic(d.tag));
 }
-function nameFromContent(el) {
+var HIDDEN_STYLE = /(^|;)\s*(display\s*:\s*none|visibility\s*:\s*(hidden|collapse))\s*(;|$)/i;
+function isDisplayHidden(el) {
+  for (const node of [el, ...ancestors(el)]) {
+    if (hasAttr(node, "hidden")) return true;
+    if (HIDDEN_STYLE.test(attr(node, "style") ?? "")) return true;
+  }
+  return false;
+}
+function isHiddenFromAT(el) {
+  if (isDisplayHidden(el)) return true;
+  return [el, ...ancestors(el)].some((node) => attr(node, "aria-hidden") === "true");
+}
+function isPresentational(el) {
+  return ["presentation", "none"].includes((attr(el, "role") ?? "").trim().toLowerCase());
+}
+function isNameExempt(el) {
+  return isHiddenFromAT(el) || isPresentational(el);
+}
+function embeddedImageName(n, doc) {
+  const labelled = (attr(n, "aria-labelledby") ?? "").trim();
+  if (labelled) return doc ? ariaLabelledbyText(n, doc) || labelled : labelled;
+  return (boundAttr(n, "aria-label") ?? attr(n, "alt") ?? attr(n, "title") ?? "").trim();
+}
+function nameFromContent(el, doc) {
   let out2 = "";
   const walk3 = (n) => {
     if (n.type === "text") {
@@ -32019,13 +32212,13 @@ function nameFromContent(el) {
       return;
     }
     if (n.tag === "img") {
-      const a = attr(n, "alt");
+      const a = embeddedImageName(n, doc);
       if (a) out2 += " " + a;
       return;
     }
     if (n.tag === "svg") {
       const title2 = descendants(n).find((d) => d.tag === "title");
-      if (title2) out2 += " " + nameFromContent(title2);
+      if (title2) out2 += " " + nameFromContent(title2, doc);
       return;
     }
     if (attr(n, "aria-hidden") === "true") return;
@@ -32064,7 +32257,7 @@ function accessibleName(el, doc) {
       return (attr(el, "title") ?? "").trim();
     }
   }
-  const content = nameFromContent(el);
+  const content = nameFromContent(el, doc);
   if (content) return content;
   return (attr(el, "title") ?? "").trim();
 }
@@ -32094,7 +32287,7 @@ function controlLabel(el, doc) {
 }
 
 // src/rules/images.ts
-var isHidden = (el) => attr(el, "aria-hidden") === "true" || ["presentation", "none"].includes((attr(el, "role") ?? "").trim());
+var isHidden = isNameExempt;
 var named = (el) => !!(boundAttr(el, "aria-label") ?? "").trim() || hasBoundAttr(el, "aria-labelledby");
 var imgAltMissing = {
   id: "img-alt-missing",
@@ -32111,6 +32304,17 @@ var imgAltMissing = {
       if (hasBoundAttr(el, "alt") && !whitespaceAlt || named(el)) continue;
       if (hasDynamicSpread(el)) continue;
       if (el.tag !== "img" && el.tag !== "area" && accessibleName(el, doc).trim() !== "") continue;
+      if ((attr(el, "title") ?? "").trim() !== "") {
+        out2.push({
+          criteriaId: "1.1.1",
+          el,
+          msgId: "img-alt-missing.title-only",
+          params: { tag: el.tag },
+          advisory: true,
+          severity: "mineur"
+        });
+        continue;
+      }
       out2.push({
         criteriaId: "1.1.1",
         el,
@@ -32179,6 +32383,7 @@ var inputImageAltMissing = {
     const out2 = [];
     for (const el of doc.elements) {
       if (el.tag !== "input" || (attr(el, "type") ?? "").toLowerCase() !== "image") continue;
+      if (isHidden(el)) continue;
       const alt = (boundAttr(el, "alt") ?? "").trim();
       if (alt || named(el) || (attr(el, "title") ?? "").trim()) continue;
       out2.push({
@@ -32250,7 +32455,7 @@ var iframeTitleMissing = {
     const out2 = [];
     for (const el of doc.elements) {
       if (el.tag !== "iframe") continue;
-      if (attr(el, "aria-hidden") === "true") continue;
+      if (isNameExempt(el)) continue;
       const title2 = (attr(el, "title") ?? "").trim();
       const aria = (attr(el, "aria-label") ?? "").trim();
       const labelledby = (attr(el, "aria-labelledby") ?? "").trim();
@@ -32266,6 +32471,195 @@ var iframeTitleMissing = {
   }
 };
 var framesRules = [iframeTitleMissing];
+
+// src/aria.ts
+var ARIA_ATTRS = /* @__PURE__ */ new Set([
+  "aria-activedescendant",
+  "aria-atomic",
+  "aria-autocomplete",
+  "aria-braillelabel",
+  "aria-brailleroledescription",
+  "aria-busy",
+  "aria-checked",
+  "aria-colcount",
+  "aria-colindex",
+  "aria-colindextext",
+  "aria-colspan",
+  "aria-controls",
+  "aria-current",
+  "aria-describedby",
+  "aria-description",
+  "aria-details",
+  "aria-disabled",
+  "aria-dropeffect",
+  "aria-errormessage",
+  "aria-expanded",
+  "aria-flowto",
+  "aria-grabbed",
+  "aria-haspopup",
+  "aria-hidden",
+  "aria-invalid",
+  "aria-keyshortcuts",
+  "aria-label",
+  "aria-labelledby",
+  "aria-level",
+  "aria-live",
+  "aria-modal",
+  "aria-multiline",
+  "aria-multiselectable",
+  "aria-orientation",
+  "aria-owns",
+  "aria-placeholder",
+  "aria-posinset",
+  "aria-pressed",
+  "aria-readonly",
+  "aria-relevant",
+  "aria-required",
+  "aria-roledescription",
+  "aria-rowcount",
+  "aria-rowindex",
+  "aria-rowindextext",
+  "aria-rowspan",
+  "aria-selected",
+  "aria-setsize",
+  "aria-sort",
+  "aria-valuemax",
+  "aria-valuemin",
+  "aria-valuenow",
+  "aria-valuetext"
+]);
+var BOOL = ["true", "false"];
+var ARIA_VALUE_TYPE = {
+  "aria-atomic": { kind: "token", values: BOOL },
+  "aria-busy": { kind: "token", values: BOOL },
+  "aria-disabled": { kind: "token", values: BOOL },
+  "aria-modal": { kind: "token", values: BOOL },
+  "aria-multiline": { kind: "token", values: BOOL },
+  "aria-multiselectable": { kind: "token", values: BOOL },
+  "aria-readonly": { kind: "token", values: BOOL },
+  "aria-required": { kind: "token", values: BOOL },
+  // `undefined` is a legal literal value for these three (it means "not applicable").
+  "aria-hidden": { kind: "token", values: [...BOOL, "undefined"] },
+  "aria-expanded": { kind: "token", values: [...BOOL, "undefined"] },
+  "aria-selected": { kind: "token", values: [...BOOL, "undefined"] },
+  "aria-grabbed": { kind: "token", values: [...BOOL, "undefined"] },
+  // tristate
+  "aria-checked": { kind: "token", values: [...BOOL, "mixed", "undefined"] },
+  "aria-pressed": { kind: "token", values: [...BOOL, "mixed", "undefined"] },
+  // enumerations
+  "aria-autocomplete": { kind: "token", values: ["inline", "list", "both", "none"] },
+  "aria-current": { kind: "token", values: [...BOOL, "page", "step", "location", "date", "time"] },
+  "aria-haspopup": { kind: "token", values: [...BOOL, "menu", "listbox", "tree", "grid", "dialog"] },
+  "aria-invalid": { kind: "token", values: [...BOOL, "grammar", "spelling"] },
+  "aria-live": { kind: "token", values: ["off", "polite", "assertive"] },
+  "aria-orientation": { kind: "token", values: ["horizontal", "vertical", "undefined"] },
+  "aria-sort": { kind: "token", values: ["ascending", "descending", "none", "other"] },
+  "aria-dropeffect": { kind: "tokenlist", values: ["copy", "execute", "link", "move", "none", "popup"] },
+  "aria-relevant": { kind: "tokenlist", values: ["additions", "all", "removals", "text"] },
+  // numeric
+  "aria-colcount": { kind: "integer" },
+  "aria-colindex": { kind: "integer" },
+  "aria-colspan": { kind: "integer" },
+  "aria-level": { kind: "integer" },
+  "aria-posinset": { kind: "integer" },
+  "aria-rowcount": { kind: "integer" },
+  "aria-rowindex": { kind: "integer" },
+  "aria-rowspan": { kind: "integer" },
+  "aria-setsize": { kind: "integer" },
+  "aria-valuemax": { kind: "number" },
+  "aria-valuemin": { kind: "number" },
+  "aria-valuenow": { kind: "number" },
+  // references
+  "aria-activedescendant": { kind: "idref" },
+  "aria-details": { kind: "idref" },
+  "aria-errormessage": { kind: "idref" },
+  "aria-controls": { kind: "idrefs" },
+  "aria-describedby": { kind: "idrefs" },
+  "aria-flowto": { kind: "idrefs" },
+  "aria-labelledby": { kind: "idrefs" },
+  "aria-owns": { kind: "idrefs" }
+};
+function isValidAriaValue(attrName2, value) {
+  const type = ARIA_VALUE_TYPE[attrName2];
+  if (!type) return true;
+  const v = value.trim();
+  switch (type.kind) {
+    case "token":
+      return type.values.includes(v.toLowerCase());
+    case "tokenlist": {
+      const parts2 = v.split(/\s+/).filter(Boolean);
+      return parts2.length > 0 && parts2.every((p) => type.values.includes(p.toLowerCase()));
+    }
+    case "integer":
+      return /^-?\d+$/.test(v);
+    case "number":
+      return /^-?\d+(\.\d+)?$/.test(v);
+    case "idref":
+      return v.split(/\s+/).filter(Boolean).length <= 1;
+    default:
+      return true;
+  }
+}
+var ARIA_REQUIRED_ATTRS = {
+  checkbox: ["aria-checked"],
+  combobox: ["aria-expanded", "aria-controls"],
+  heading: ["aria-level"],
+  menuitemcheckbox: ["aria-checked"],
+  menuitemradio: ["aria-checked"],
+  meter: ["aria-valuenow"],
+  option: ["aria-selected"],
+  radio: ["aria-checked"],
+  scrollbar: ["aria-controls", "aria-valuenow"],
+  slider: ["aria-valuenow"],
+  switch: ["aria-checked"]
+};
+var ARIA_REQUIRED_PARENT = {
+  columnheader: ["row"],
+  gridcell: ["row"],
+  listitem: ["list", "directory"],
+  menuitem: ["menu", "menubar", "group"],
+  menuitemcheckbox: ["menu", "menubar", "group"],
+  menuitemradio: ["menu", "menubar", "group"],
+  option: ["listbox", "group"],
+  row: ["grid", "rowgroup", "table", "treegrid"],
+  rowgroup: ["grid", "table", "treegrid"],
+  rowheader: ["row"],
+  tab: ["tablist"],
+  treeitem: ["tree", "group"]
+};
+var IMPLICIT_CONTAINER_ROLE = {
+  ul: "list",
+  ol: "list",
+  li: "listitem",
+  table: "table",
+  thead: "rowgroup",
+  tbody: "rowgroup",
+  tfoot: "rowgroup",
+  tr: "row",
+  td: "cell",
+  th: "columnheader",
+  datalist: "listbox",
+  optgroup: "group",
+  option: "option",
+  fieldset: "group"
+};
+var NAME_PROHIBITED_ROLES = /* @__PURE__ */ new Set([
+  "caption",
+  "code",
+  "deletion",
+  "emphasis",
+  "generic",
+  "insertion",
+  "mark",
+  "none",
+  "paragraph",
+  "presentation",
+  "strong",
+  "subscript",
+  "superscript",
+  "term",
+  "time"
+]);
 
 // src/rules/scripts-aria.ts
 var INTERACTIVE_ROLES = [
@@ -32401,7 +32795,7 @@ var invalidAriaRole = {
       if (role.includes("{")) continue;
       const tokens = role.split(/\s+/);
       const bad = tokens.filter((t2) => !VALID_ROLES.has(t2.toLowerCase()));
-      if (bad.length) {
+      if (bad.length === tokens.length) {
         out2.push({
           criteriaId: "4.1.2",
           el,
@@ -32539,6 +32933,8 @@ var ariaRequiredChildren = {
       const req = REQUIRED_CHILDREN[role];
       if (!req) continue;
       if (hasAttr(el, "aria-owns")) continue;
+      if (attr(el, "aria-busy") === "true") continue;
+      if (isHiddenFromAT(el)) continue;
       if (descendants(el).some((d) => satisfiesChild(d, req))) continue;
       if (mayInjectContent(el)) continue;
       out2.push({
@@ -32559,7 +32955,9 @@ var ariaHiddenFocusable = {
     const out2 = [];
     for (const el of doc.elements) {
       if (attr(el, "aria-hidden") !== "true") continue;
-      const focusableHere = isFocusable(el) || descendants(el).some(isFocusable);
+      if (isDisplayHidden(el)) continue;
+      const focusable = (n) => isFocusable(n) && !isDisplayHidden(n);
+      const focusableHere = focusable(el) || descendants(el).some(focusable);
       if (!focusableHere) continue;
       out2.push({
         criteriaId: "4.1.2",
@@ -32659,6 +33057,136 @@ var statusMessageNotAssertive = {
     return out2;
   }
 };
+function literalAriaAttrs(el) {
+  const out2 = [];
+  for (const key in el.attribs) {
+    const k = key.toLowerCase();
+    if (!k.startsWith("aria-")) continue;
+    const v = el.attribs[key] ?? "";
+    if (v.includes("{")) continue;
+    out2.push([k, v]);
+  }
+  return out2;
+}
+var invalidAriaAttr = {
+  id: "invalid-aria-attr",
+  criteria: ["4.1.2"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      for (const [name2] of literalAriaAttrs(el)) {
+        if (ARIA_ATTRS.has(name2)) continue;
+        out2.push({ criteriaId: "4.1.2", el, msgId: "invalid-aria-attr", params: { attr: name2 } });
+      }
+    }
+    return out2;
+  }
+};
+var invalidAriaValue = {
+  id: "invalid-aria-value",
+  criteria: ["4.1.2"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      for (const [name2, value] of literalAriaAttrs(el)) {
+        if (!ARIA_ATTRS.has(name2)) continue;
+        if (hasBoundAttr(el, name2) && !value) continue;
+        if (isValidAriaValue(name2, value)) continue;
+        out2.push({ criteriaId: "4.1.2", el, msgId: "invalid-aria-value", params: { attr: name2, value } });
+      }
+    }
+    return out2;
+  }
+};
+function nativelyProvides(el, ariaAttr) {
+  const type = (attr(el, "type") ?? "").toLowerCase();
+  switch (ariaAttr) {
+    case "aria-checked":
+      return el.tag === "input" && (type === "checkbox" || type === "radio");
+    case "aria-level":
+      return /^h[1-6]$/.test(el.tag);
+    case "aria-valuenow":
+      return el.tag === "progress" || el.tag === "meter" || el.tag === "input" && type === "range";
+    case "aria-selected":
+      return el.tag === "option";
+    case "aria-expanded":
+      return el.tag === "details" || el.tag === "select";
+    default:
+      return false;
+  }
+}
+var ariaRequiredAttr = {
+  id: "aria-required-attr",
+  criteria: ["4.1.2"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      if (!role || role.includes("{")) continue;
+      const required = ARIA_REQUIRED_ATTRS[role.split(/\s+/)[0] ?? ""];
+      if (!required) continue;
+      if (isHiddenFromAT(el)) continue;
+      if (hasDynamicSpread(el)) continue;
+      const missing = required.filter((a) => !hasBoundAttr(el, a) && !nativelyProvides(el, a));
+      if (!missing.length) continue;
+      out2.push({ criteriaId: "4.1.2", el, msgId: "aria-required-attr", params: { role, attrs: missing.join(", ") } });
+    }
+    return out2;
+  }
+};
+function effectiveRole(el) {
+  const explicit = (attr(el, "role") ?? "").trim().toLowerCase();
+  if (explicit && !explicit.includes("{")) return explicit.split(/\s+/)[0] ?? "";
+  return IMPLICIT_CONTAINER_ROLE[el.tag] ?? "";
+}
+var ariaRequiredParent = {
+  id: "aria-required-parent",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      if (!role || role.includes("{")) continue;
+      const accepted = ARIA_REQUIRED_PARENT[role.split(/\s+/)[0] ?? ""];
+      if (!accepted) continue;
+      if (isHiddenFromAT(el)) continue;
+      const chain = ancestors(el);
+      if (chain.some((a) => !isIntrinsic(a.tag))) continue;
+      if (doc.elements.some((e) => hasAttr(e, "aria-owns"))) continue;
+      const owner = chain.find((a) => !isPresentational(a) && ((attr(a, "role") ?? "").trim() !== "" || IMPLICIT_CONTAINER_ROLE[a.tag]));
+      if (owner && accepted.includes(effectiveRole(owner))) continue;
+      if (!owner && chain.some((a) => accepted.includes(effectiveRole(a)))) continue;
+      out2.push({ criteriaId: "1.3.1", el, msgId: "aria-required-parent", params: { role, parents: accepted.join(" / ") } });
+    }
+    return out2;
+  }
+};
+var ariaProhibitedAttr = {
+  id: "aria-prohibited-attr",
+  criteria: ["4.1.2"],
+  severity: "mineur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      if (!role || role.includes("{")) continue;
+      if (!NAME_PROHIBITED_ROLES.has(role)) continue;
+      const named3 = ["aria-label", "aria-labelledby"].filter((a) => (attr(el, a) ?? "").trim() !== "");
+      if (!named3.length) continue;
+      out2.push({ criteriaId: "4.1.2", el, msgId: "aria-prohibited-attr", params: { role, attrs: named3.join(", ") } });
+    }
+    return out2;
+  }
+};
 var scriptsAriaRules = [
   invalidAriaRole,
   ariaRefMissingId,
@@ -32668,7 +33196,12 @@ var scriptsAriaRules = [
   ariaHiddenFocusable,
   nestedInteractive,
   liveRegionConflict,
-  statusMessageNotAssertive
+  statusMessageNotAssertive,
+  invalidAriaAttr,
+  invalidAriaValue,
+  ariaRequiredAttr,
+  ariaRequiredParent,
+  ariaProhibitedAttr
 ];
 
 // src/rules/mandatory.ts
@@ -32775,6 +33308,15 @@ var inlineLangChangeMissing = {
   }
 };
 var BCP47 = /^([A-Za-z]{2,3}|[xXiI])(-[A-Za-z0-9]{1,8})*$/;
+function governsText(el) {
+  const walk3 = (n) => {
+    if (n.type === "text") return n.data.trim() !== "";
+    if (hasAttr(n, "lang")) return false;
+    if (isDisplayHidden(n)) return false;
+    return n.children.some(walk3);
+  };
+  return el.children.some(walk3);
+}
 var langInvalid = {
   id: "lang-invalid",
   criteria: ["3.1.1", "3.1.2"],
@@ -32785,6 +33327,7 @@ var langInvalid = {
       const lang = (attr(el, "lang") ?? "").trim();
       if (!lang) continue;
       if (BCP47.test(lang)) continue;
+      if (el.tag !== "html" && !governsText(el)) continue;
       out2.push({
         criteriaId: el.tag === "html" ? "3.1.1" : "3.1.2",
         el,
@@ -32953,7 +33496,32 @@ var emptyHeading = {
     return out2;
   }
 };
-var headingsRules = [headingOrderSkip, h1Missing, h1Multiple, listStructure, emptyHeading];
+var DL_ALLOWED = /* @__PURE__ */ new Set(["dt", "dd", "div", "script", "template", "slot", "#fragment"]);
+var dlStructure = {
+  id: "dl-structure",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (el.tag === "dl") {
+        if (mayInjectContent(el)) continue;
+        for (const child of el.children) {
+          if (child.type !== "element" || !isIntrinsic(child.tag)) continue;
+          if (DL_ALLOWED.has(child.tag)) continue;
+          out2.push({ criteriaId: "1.3.1", el: child, msgId: "dl-structure.foreign-child", params: { tag: child.tag } });
+        }
+        continue;
+      }
+      if (el.tag !== "dt" && el.tag !== "dd") continue;
+      const chain = ancestors(el);
+      if (chain.some((a) => a.tag === "dl" || !isIntrinsic(a.tag))) continue;
+      out2.push({ criteriaId: "1.3.1", el, msgId: "dl-structure.orphan", params: { tag: el.tag } });
+    }
+    return out2;
+  }
+};
+var headingsRules = [headingOrderSkip, h1Missing, h1Multiple, listStructure, emptyHeading, dlStructure];
 
 // src/rules/tables.ts
 var declaredLayout = (t2) => ["presentation", "none"].includes((attr(t2, "role") ?? "").trim());
@@ -33099,7 +33667,68 @@ var tableEmptyDataCell = {
     return out2;
   }
 };
-var tablesRules = [dataTableNoHeaders, tableCaptionMissing, layoutTableDataMarkup, sortableHeaderNoAriaSort, tableEmptyDataCell];
+function ownerTable(el, doc) {
+  return ancestors(el).find((a) => a.tag === "table");
+}
+var headersAttrDangling = {
+  id: "headers-attr-dangling",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (el.tag !== "td" && el.tag !== "th") continue;
+      const raw = (attr(el, "headers") ?? "").trim();
+      if (!raw || raw.includes("{")) continue;
+      const table = ownerTable(el, doc);
+      if (!table) continue;
+      const inTable = new Map(
+        descendants(table).filter((d) => d.tag === "th" || d.tag === "td").map((d) => [attr(d, "id") ?? "", d])
+      );
+      const bad = raw.split(/\s+/).filter(Boolean).filter((id) => {
+        const target = inTable.get(id);
+        return !target || target === el;
+      });
+      if (!bad.length) continue;
+      out2.push({ criteriaId: "1.3.1", el, msgId: "headers-attr-dangling", params: { ids: bad.join(" ") } });
+    }
+    return out2;
+  }
+};
+var thNoDataCells = {
+  id: "th-no-data-cells",
+  criteria: ["1.3.1"],
+  severity: "mineur",
+  run(doc) {
+    const out2 = [];
+    for (const table of doc.elements) {
+      if (table.tag !== "table" || isLayoutTable(table)) continue;
+      const cells = descendants(table).filter((d) => d.tag === "td" || d.tag === "th");
+      const headers = cells.filter((c2) => c2.tag === "th");
+      if (!headers.length) continue;
+      const dataCells = cells.filter((c2) => c2.tag === "td");
+      if (!dataCells.length) continue;
+      if (!dataCells.every((c2) => (attr(c2, "headers") ?? "").trim() !== "")) continue;
+      const referenced = new Set(dataCells.flatMap((c2) => (attr(c2, "headers") ?? "").split(/\s+/).filter(Boolean)));
+      for (const th of headers) {
+        if (mayInjectContent(th) || !visibleText(th).trim()) continue;
+        const id = attr(th, "id") ?? "";
+        if (id && referenced.has(id)) continue;
+        out2.push({ criteriaId: "1.3.1", el: th, msgId: "th-no-data-cells" });
+      }
+    }
+    return out2;
+  }
+};
+var tablesRules = [
+  dataTableNoHeaders,
+  tableCaptionMissing,
+  layoutTableDataMarkup,
+  sortableHeaderNoAriaSort,
+  tableEmptyDataCell,
+  headersAttrDangling,
+  thNoDataCells
+];
 
 // src/rules/links.ts
 function hasIconChild(el) {
@@ -33130,7 +33759,7 @@ var linkEmptyName = {
     const out2 = [];
     for (const el of doc.elements) {
       if (el.tag !== "a" || !hasAttr(el, "href")) continue;
-      if (attr(el, "aria-hidden") === "true") continue;
+      if (isNameExempt(el)) continue;
       if (accessibleName(el, doc) !== "") continue;
       if (mayInjectContent(el)) continue;
       if (hasIconChild(el)) continue;
@@ -33151,7 +33780,7 @@ var buttonEmptyName = {
     const out2 = [];
     for (const el of doc.elements) {
       if (!isButton(el)) continue;
-      if (attr(el, "aria-hidden") === "true") continue;
+      if (isNameExempt(el)) continue;
       if (accessibleName(el, doc) !== "") continue;
       if (mayInjectContent(el)) continue;
       if (hasIconChild(el)) continue;
@@ -33174,7 +33803,7 @@ var iconOnlyControlUnnamed = {
       const link = el.tag === "a" && hasAttr(el, "href");
       const button = isButton(el);
       if (!link && !button) continue;
-      if (attr(el, "aria-hidden") === "true") continue;
+      if (isNameExempt(el)) continue;
       if (accessibleName(el, doc) !== "") continue;
       if (mayInjectContent(el)) continue;
       if (!hasIconChild(el)) continue;
@@ -33198,7 +33827,7 @@ var controlNameTitleOnly = {
       const link = el.tag === "a" && hasAttr(el, "href");
       const field = !link && !isButton(el) && isFormField(el);
       if (!link && !isButton(el) && !field) continue;
-      if (attr(el, "aria-hidden") === "true") continue;
+      if (isNameExempt(el)) continue;
       const title2 = (attr(el, "title") ?? "").trim();
       if (!title2 || title2.includes("{")) continue;
       if (hasAttr(el, "aria-label") || hasAttr(el, "aria-labelledby")) continue;
@@ -33219,7 +33848,118 @@ var controlNameTitleOnly = {
     return out2;
   }
 };
-var linksRules = [linkEmptyName, buttonEmptyName, iconOnlyControlUnnamed, controlNameTitleOnly];
+var normalizeName = (s) => s.toLowerCase().replace(/[\u2018\u2019\u201c\u201d]/g, "'").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+var labelInNameMismatch = {
+  id: "label-in-name-mismatch",
+  criteria: ["2.5.3"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag)) continue;
+      const link = el.tag === "a" && hasAttr(el, "href");
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      if (!link && !isButton(el) && !["button", "link", "menuitem", "tab", "checkbox", "radio", "switch"].includes(role)) continue;
+      if (isNameExempt(el)) continue;
+      const ariaLabel = (attr(el, "aria-label") ?? "").trim();
+      if (!ariaLabel || ariaLabel.includes("{")) continue;
+      if (hasAttr(el, "aria-labelledby")) continue;
+      const visible = visibleText(el).trim();
+      if (!visible || visible.includes("{")) continue;
+      if (visible.length < 3) continue;
+      if (mayInjectContent(el)) continue;
+      const name2 = normalizeName(ariaLabel);
+      const label = normalizeName(visible);
+      if (!label || !name2 || name2.includes(label)) continue;
+      out2.push({
+        criteriaId: "2.5.3",
+        el,
+        msgId: "label-in-name-mismatch",
+        params: { visible, name: ariaLabel }
+      });
+    }
+    return out2;
+  }
+};
+var linksRules = [linkEmptyName, buttonEmptyName, iconOnlyControlUnnamed, controlNameTitleOnly, labelInNameMismatch];
+
+// src/autofill.ts
+var AUTOFILL_FIELD_NAMES = /* @__PURE__ */ new Set([
+  "name",
+  "honorific-prefix",
+  "given-name",
+  "additional-name",
+  "family-name",
+  "honorific-suffix",
+  "nickname",
+  "organization-title",
+  "username",
+  "new-password",
+  "current-password",
+  "one-time-code",
+  "organization",
+  "street-address",
+  "address-line1",
+  "address-line2",
+  "address-line3",
+  "address-level4",
+  "address-level3",
+  "address-level2",
+  "address-level1",
+  "country",
+  "country-name",
+  "postal-code",
+  "cc-name",
+  "cc-given-name",
+  "cc-additional-name",
+  "cc-family-name",
+  "cc-number",
+  "cc-exp",
+  "cc-exp-month",
+  "cc-exp-year",
+  "cc-csc",
+  "cc-type",
+  "transaction-currency",
+  "transaction-amount",
+  "language",
+  "bday",
+  "bday-day",
+  "bday-month",
+  "bday-year",
+  "sex",
+  "url",
+  "photo",
+  "tel",
+  "tel-country-code",
+  "tel-national",
+  "tel-area-code",
+  "tel-local",
+  "tel-local-prefix",
+  "tel-local-suffix",
+  "tel-extension",
+  "email",
+  "impp"
+]);
+var CONTACT_TOKENS = /* @__PURE__ */ new Set(["home", "work", "mobile", "fax", "pager"]);
+var PURPOSE_TOKENS = /* @__PURE__ */ new Set(["shipping", "billing"]);
+var CONTACTABLE = /^(tel|email|impp)(-|$)/;
+function isValidAutocomplete(value) {
+  const tokens = value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return false;
+  if (tokens.length === 1 && (tokens[0] === "on" || tokens[0] === "off")) return true;
+  let i2 = 0;
+  if (tokens[i2]?.startsWith("section-") && tokens[i2].length > "section-".length) i2++;
+  if (tokens[i2] && PURPOSE_TOKENS.has(tokens[i2])) i2++;
+  const contactAt = i2;
+  if (tokens[i2] && CONTACT_TOKENS.has(tokens[i2])) i2++;
+  const field = tokens[i2];
+  if (!field || !AUTOFILL_FIELD_NAMES.has(field)) return false;
+  if (contactAt !== i2 && !CONTACTABLE.test(field)) return false;
+  i2++;
+  if (tokens[i2] === "webauthn") i2++;
+  return i2 === tokens.length;
+}
+var CREDENTIAL_FIELDS = /* @__PURE__ */ new Set(["username", "current-password", "new-password", "one-time-code", "email"]);
 
 // src/rules/forms.ts
 function contentInjected(el) {
@@ -33234,6 +33974,7 @@ var controlLabelMissing = {
     const out2 = [];
     for (const el of doc.elements) {
       if (!isFormField(el)) continue;
+      if (isNameExempt(el)) continue;
       const { via } = controlLabel(el, doc);
       if (via && REAL_LABEL.has(via)) continue;
       if (via === "title") continue;
@@ -33337,18 +34078,36 @@ var selectHasOption = {
     return out2;
   }
 };
+var ID_ATTR_KEY = /id/i;
 var labelForDangling = {
   id: "label-for-dangling",
   criteria: ["1.3.1"],
   severity: "majeur",
   run(doc) {
     const out2 = [];
+    let idProps;
+    const idPropCarriers = (value) => {
+      if (!idProps) {
+        idProps = /* @__PURE__ */ new Map();
+        for (const e of doc.elements) {
+          for (const k in e.attribs) {
+            if (!ID_ATTR_KEY.test(k)) continue;
+            const v = e.attribs[k];
+            if (!v) continue;
+            const bucket = idProps.get(v);
+            if (!bucket) idProps.set(v, [e]);
+            else if (bucket[bucket.length - 1] !== e) bucket.push(e);
+          }
+        }
+      }
+      return idProps.get(value);
+    };
     for (const el of doc.elements) {
       if (el.tag !== "label") continue;
       const f = (attr(el, "for") ?? "").trim();
       if (!f || f.includes("{")) continue;
       if (doc.byId.has(f)) continue;
-      const passedAsIdProp = doc.elements.some((e) => e !== el && Object.entries(e.attribs).some(([k, v]) => v === f && /id/i.test(k)));
+      const passedAsIdProp = idPropCarriers(f)?.some((e) => e !== el) ?? false;
       if (passedAsIdProp) continue;
       out2.push({
         criteriaId: "1.3.1",
@@ -33594,6 +34353,72 @@ var dateFieldsUngrouped = {
     return out2;
   }
 };
+var autocompleteTokenInvalid = {
+  id: "autocomplete-token-invalid",
+  criteria: ["1.3.5"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag) || !["input", "select", "textarea"].includes(el.tag)) continue;
+      const value = attr(el, "autocomplete");
+      if (value === void 0 || value.includes("{")) continue;
+      if (value.trim() === "") continue;
+      if (hasAttr(el, "disabled") || attr(el, "aria-disabled") === "true") continue;
+      if (isNameExempt(el)) continue;
+      if (isValidAutocomplete(value)) continue;
+      out2.push({ criteriaId: "1.3.5", el, msgId: "autocomplete-token-invalid", params: { value: value.trim() } });
+    }
+    return out2;
+  }
+};
+function autofillField(el) {
+  const tokens = (attr(el, "autocomplete") ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return tokens.find((t2) => CREDENTIAL_FIELDS.has(t2)) ?? "";
+}
+var credentialEntryBlocked = {
+  id: "credential-entry-blocked",
+  criteria: ["3.3.8"],
+  severity: "bloquant",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag) || el.tag !== "input") continue;
+      const type = (attr(el, "type") ?? "text").toLowerCase();
+      const field = autofillField(el);
+      const isCredential = type === "password" || field !== "";
+      if (!isCredential) continue;
+      const paste = (attr(el, "onpaste") ?? attr(el, "onPaste") ?? "").replace(/\s+/g, "");
+      if (/preventDefault|returnfalse/i.test(paste)) {
+        out2.push({ criteriaId: "3.3.8", el, msgId: "credential-entry-blocked.paste", params: { type } });
+        continue;
+      }
+      if ((attr(el, "autocomplete") ?? "").trim().toLowerCase() === "off") {
+        out2.push({ criteriaId: "3.3.8", el, msgId: "credential-entry-blocked.autocomplete", params: { type } });
+      }
+    }
+    return out2;
+  }
+};
+var CONTEXT_CHANGE = /\b(submit\(\)|form\.submit|location\s*[.=]|location\.href|window\.open|router\.(push|replace)|navigate\()/;
+var onInputContextChange = {
+  id: "on-input-context-change",
+  criteria: ["3.2.2"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!isIntrinsic(el.tag) || !["input", "select", "textarea"].includes(el.tag)) continue;
+      for (const key of ["onchange", "onChange"]) {
+        const handler = attr(el, key);
+        if (!handler || !CONTEXT_CHANGE.test(handler)) continue;
+        out2.push({ criteriaId: "3.2.2", el, msgId: "on-input-context-change", params: { tag: el.tag } });
+        break;
+      }
+    }
+    return out2;
+  }
+};
 var formsRules = [
   controlLabelMissing,
   placeholderAsLabel,
@@ -33606,7 +34431,10 @@ var formsRules = [
   fieldPurposeIncomplete,
   disabledContextContent,
   radioCheckboxGroupUngrouped,
-  dateFieldsUngrouped
+  dateFieldsUngrouped,
+  autocompleteTokenInvalid,
+  credentialEntryBlocked,
+  onInputContextChange
 ];
 
 // src/rules/navigation.ts
@@ -33783,11 +34611,13 @@ var autoplayMedia = {
     for (const el of doc.elements) {
       if (el.tag !== "audio" && el.tag !== "video") continue;
       if (!hasAttr(el, "autoplay")) continue;
+      if (hasAttr(el, "controls")) continue;
       if (el.tag === "video" && mutedStatically(el)) {
         out2.push({
           criteriaId: "2.2.2",
           el,
-          msgId: "autoplay-media.muted-video"
+          msgId: "autoplay-media.muted-video",
+          advisory: true
         });
         continue;
       }
@@ -33805,6 +34635,7 @@ var mediaNoTrack = {
   id: "media-no-track",
   criteria: ["1.2.2"],
   severity: "majeur",
+  advisory: true,
   run(doc) {
     const out2 = [];
     for (const el of doc.elements) {
@@ -33840,7 +34671,7 @@ var metaViewportZoomBlock = {
       const userScalable = pairs.get("user-scalable");
       const maxScale = pairs.get("maximum-scale");
       const maxScaleNum = maxScale !== void 0 && maxScale.trim() !== "" ? Number(maxScale) : Number.NaN;
-      const blocked = userScalable === "no" || userScalable === "0" || Number.isFinite(maxScaleNum) && maxScaleNum < 2;
+      const blocked = userScalable === "no" || userScalable === "0" || Number.isFinite(maxScaleNum) && maxScaleNum > 0 && maxScaleNum < 2;
       if (!blocked) continue;
       out2.push({
         criteriaId: "1.4.4",
@@ -34061,10 +34892,10 @@ var metaRefreshRedirect = {
   severity: "majeur",
   run(doc) {
     const out2 = [];
-    for (const el of doc.elements) {
-      if (el.tag !== "meta") continue;
-      if ((attr(el, "http-equiv") ?? "").toLowerCase() !== "refresh") continue;
+    const first = doc.elements.find((e) => e.tag === "meta" && (attr(e, "http-equiv") ?? "").toLowerCase() === "refresh");
+    for (const el of first ? [first] : []) {
       const content = (attr(el, "content") ?? "").trim();
+      if (!/^\d+\s*(?:[;,]|$)/.test(content)) continue;
       const seconds = Number.parseInt(content, 10);
       if (!Number.isFinite(seconds) || seconds <= 0) continue;
       if (seconds > 72e3) continue;
@@ -34293,13 +35124,17 @@ function makeSpecResolver(known, aliases = [], startDir) {
   const files = [...backMap.keys()].sort().map((rel) => ({ rel }));
   for (const cfg of startDir ? tsconfigChain(startDir) : []) files.push({ rel: toPosix(cfg) });
   const ctx = buildResolveContext({ root: "", files });
+  const memo = /* @__PURE__ */ new Map();
   return (fromFile, spec) => {
+    const key = `${fromFile}\0${spec}`;
+    const cached = memo.get(key);
+    if (cached !== void 0) return cached;
     const r = resolveImport(toPosix(absPath(fromFile)), ext(fromFile), spec, ctx);
-    if (r.kind === "resolved") {
-      const hit = backMap.get(r.target);
-      if (hit) return hit;
-    }
-    return resolveSpecifier(fromFile, spec, known, aliases);
+    let out2 = null;
+    if (r.kind === "resolved") out2 = backMap.get(r.target) ?? null;
+    if (out2 === null) out2 = resolveSpecifier(fromFile, spec, known, aliases);
+    memo.set(key, out2);
+    return out2;
   };
 }
 
@@ -34313,13 +35148,26 @@ function buildGraph2(nodes, aliases = [], tsconfigStartDir) {
     known.add(n.file);
     for (const id of n.definesIds) allIds2.add(id);
   }
-  return { nodes: map, known, allIds: allIds2, resolveSpec: makeSpecResolver(known, aliases, tsconfigStartDir) };
+  return { nodes: map, known, allIds: allIds2, resolveSpec: makeSpecResolver(known, aliases, tsconfigStartDir), usageCache: /* @__PURE__ */ new Map() };
 }
 function resolveUsage(graph, file, localName, seen = /* @__PURE__ */ new Set()) {
   const posix3 = toPosix(file);
   const visitKey = `${posix3}#${localName}`;
+  const memoized = seen.size === 0;
+  if (memoized) {
+    const hit = graph.usageCache.get(visitKey);
+    if (hit !== void 0) return hit ?? void 0;
+  }
   if (seen.has(visitKey)) return void 0;
   seen.add(visitKey);
+  if (memoized) {
+    const out2 = resolveUsageUncached(graph, posix3, localName, seen);
+    graph.usageCache.set(visitKey, out2 ?? null);
+    return out2;
+  }
+  return resolveUsageUncached(graph, posix3, localName, seen);
+}
+function resolveUsageUncached(graph, posix3, localName, seen) {
   const node = graph.nodes.get(posix3);
   if (!node) return void 0;
   if (localName.includes(".")) {
@@ -39317,8 +40165,17 @@ function sfcScriptSource(content, file) {
   if (/\.astro$/i.test(file)) return splitAstroFrontmatter(content).frontmatter;
   return [...content.matchAll(SCRIPT_BLOCK_RE)].map((m) => m[1] ?? "").join("\n");
 }
+var CARRY_MAX_BYTES = 12 * 1024 * 1024;
+var CARRY_MAX_ELEMENTS = 3e5;
 function buildGraphStreaming(files) {
+  return buildGraphAndDocs(files).graph;
+}
+function buildGraphAndDocs(files, opts = {}) {
+  const budget = opts.carryBudget ?? { bytes: CARRY_MAX_BYTES, elements: CARRY_MAX_ELEMENTS };
   const nodes = [];
+  const docs = /* @__PURE__ */ new Map();
+  let carriedBytes = 0;
+  let carriedElements = 0;
   for (const file of files) {
     let content;
     try {
@@ -39329,25 +40186,29 @@ function buildGraphStreaming(files) {
     let ast = null;
     let doc;
     let sfc = false;
+    let auditable = false;
     if (GRAPH_ONLY.has(ext(file))) {
       ast = parseJsxAst(content);
       doc = emptyDoc(file, content);
-    } else if (detectKind(file) === "jsx") {
-      ast = parseJsxAst(content);
-      doc = ast ? jsxAstToDoc(ast, content, file) : parseHtml(jsxToHtml(content), file, true);
     } else if (detectKind(file) === "sfc") {
       sfc = true;
-      const htmlSource = /\.astro$/i.test(file) ? splitAstroFrontmatter(content).blanked : content;
-      doc = parseHtml(htmlSource, file, false, true);
+      auditable = true;
+      doc = parseSource(content, file);
       const scriptSrc = sfcScriptSource(content, file);
       if (scriptSrc) ast = parseJsxAst(scriptSrc);
     } else {
-      doc = parseHtml(content, file, false);
+      auditable = true;
+      ({ doc, ast } = parseSourceWithAst(content, file));
+    }
+    if (opts.carryDocs && auditable && carriedBytes + content.length <= budget.bytes && carriedElements + doc.elements.length <= budget.elements) {
+      docs.set(file, doc);
+      carriedBytes += content.length;
+      carriedElements += doc.elements.length;
     }
     nodes.push(extractGraphNode(ast, doc, file, { sfc }));
   }
   const startDir = files[0] ? dirname6(files[0]) : process.cwd();
-  return buildGraph2(nodes, readTsAliases(startDir), startDir);
+  return { graph: buildGraph2(nodes, readTsAliases(startDir), startDir), docs };
 }
 
 // src/discover.ts
@@ -39392,6 +40253,42 @@ function gitStagedFiles() {
 function stagedContent(file) {
   return git(["show", `:./${toPosix(file)}`], 32 * 1024 * 1024);
 }
+function stagedContents(files) {
+  const out2 = /* @__PURE__ */ new Map();
+  if (!files.length) return out2;
+  const requests = files.map((f) => `:./${toPosix(f)}`);
+  let buf = null;
+  try {
+    buf = execFileSync("git", ["cat-file", "--batch"], {
+      input: `${requests.join("\n")}
+`,
+      stdio: ["pipe", "pipe", "ignore"],
+      maxBuffer: 512 * 1024 * 1024
+    });
+  } catch {
+    buf = null;
+  }
+  if (buf === null) {
+    for (const f of files) {
+      const c2 = stagedContent(f);
+      if (c2 !== null) out2.set(f, c2);
+    }
+    return out2;
+  }
+  let pos = 0;
+  for (const file of files) {
+    const nl = buf.indexOf(10, pos);
+    if (nl === -1) break;
+    const header2 = buf.toString("utf8", pos, nl);
+    pos = nl + 1;
+    const m = /^[0-9a-f]{40,64} \w+ (\d+)$/.exec(header2);
+    if (!m) continue;
+    const size = Number(m[1]);
+    out2.set(file, buf.toString("utf8", pos, pos + size));
+    pos += size + 1;
+  }
+  return out2;
+}
 function hasUnstagedChanges(file) {
   return !!git(["diff", "--name-only", "--", file])?.trim();
 }
@@ -39406,8 +40303,8 @@ function priority(file) {
   if (TIER1.test(rel)) return 1;
   return 2;
 }
-function byPriorityThenPath(a, b) {
-  return priority(a) - priority(b) || (a < b ? -1 : a > b ? 1 : 0);
+function sortByPriorityThenPath(files) {
+  return files.map((file) => ({ file, tier: priority(file) })).sort((a, b) => a.tier - b.tier || (a.file < b.file ? -1 : a.file > b.file ? 1 : 0)).map((d) => d.file);
 }
 function discover(inputs, opts = {}) {
   const changedMode = !!(opts.changed || opts.since || opts.staged);
@@ -39424,11 +40321,7 @@ function discover(inputs, opts = {}) {
       const filter = makeFilter(opts);
       const inScope = inScopeMatcher(inputs);
       const scoped = stagedFiles.filter((f) => filter(f) && (!inScope || inScope(f)));
-      staged = /* @__PURE__ */ new Map();
-      for (const f of scoped) {
-        const c2 = stagedContent(f);
-        if (c2 !== null) staged.set(f, c2);
-      }
+      staged = stagedContents(scoped);
       files = [...staged.keys()];
     }
   } else if (changedMode) {
@@ -39445,7 +40338,7 @@ function discover(inputs, opts = {}) {
   } else {
     files = expandInputs(inputs, opts);
   }
-  files = [...new Set(files)].sort(byPriorityThenPath);
+  files = sortByPriorityThenPath([...new Set(files)]);
   return { files, changedMode, gitUnavailable, ...staged ? { stagedContent: staged } : {} };
 }
 
@@ -39599,6 +40492,7 @@ function runAudit(opts) {
   const seen = /* @__PURE__ */ new Set();
   let duplicateFiles = 0;
   let truncated;
+  const walkCache = /* @__PURE__ */ new Map();
   const {
     files: discovered,
     gitUnavailable,
@@ -39611,22 +40505,27 @@ function runAudit(opts) {
     since: opts.since,
     staged: opts.staged,
     noDefaultExcludes: opts.noDefaultExcludes,
-    onWarn: opts.onWarn
+    onWarn: opts.onWarn,
+    walkCache
   });
   const useStaged = opts.staged === true && !gitUnavailable;
   const diffMode = opts.changed || opts.since || opts.staged;
   const relevantCaptures = opts.captureDiff && diffMode && opts.captureDir ? capturesForSources(opts.captureDir, discovered).filter((c2) => !discovered.includes(c2)) : [];
   const files = relevantCaptures.length ? [...discovered, ...relevantCaptures] : discovered;
   let graph;
+  let carried;
   if (opts.graph || opts.captureCoverage) {
     const graphExt = [...GRAPH_ONLY_EXT, ...opts.ext ?? []];
     const graphFiles = discover(opts.inputs, {
       include: opts.include,
       exclude: opts.exclude,
       ext: graphExt,
-      noDefaultExcludes: opts.noDefaultExcludes
+      noDefaultExcludes: opts.noDefaultExcludes,
+      walkCache
     }).files;
-    graph = buildGraphStreaming(graphFiles);
+    const built = buildGraphAndDocs(graphFiles, { carryDocs: !useStaged && !opts.forceJsx });
+    graph = built.graph;
+    if (built.docs.size) carried = built.docs;
   }
   for (let i2 = 0; i2 < files.length; i2++) {
     if (opts.maxFiles && opts.maxFiles > 0 && acc.fileCount >= opts.maxFiles) {
@@ -39640,8 +40539,11 @@ function runAudit(opts) {
     const file = files[i2];
     let content;
     const staged = useStaged ? stagedContent2?.get(file) : void 0;
+    const reused = staged === void 0 ? carried?.get(file) : void 0;
     if (staged !== void 0) {
       content = staged;
+    } else if (reused) {
+      content = reused.source;
     } else {
       try {
         content = readText(file);
@@ -39657,7 +40559,7 @@ function runAudit(opts) {
       }
       seen.add(h);
     }
-    foldDoc(acc, parseSource(content, file, { forceJsx: opts.forceJsx }), graph);
+    foldDoc(acc, reused ?? parseSource(content, file, { forceJsx: opts.forceJsx }), graph);
   }
   const canonicalFiles = acc.fileCount;
   if (opts.inputs.includes("-") && opts.stdin !== void 0 && !(opts.maxFiles && opts.maxFiles > 0 && acc.fileCount >= opts.maxFiles)) {
@@ -44074,58 +44976,776 @@ function sectionBody(md, n) {
 import { mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
 import { join as join24 } from "path";
 
-// src/data/manual-questions.json
-var manual_questions_default = {
-  "1.3.1": [
-    {
-      fr: "Coh\xE9rence des techniques (RGAA 9.1) : v\xE9rifiez que la M\xCAME technique de structuration (hn vs caption, balisage de liste ul/ol/dl) est employ\xE9e sur TOUS les tableaux/pages similaires \u2014 pas au cas par cas.",
-      en: "Technique consistency (RGAA 9.1): verify the SAME structuring technique (hn vs caption, ul/ol/dl list markup) is used across ALL similar tables/pages \u2014 not instance by instance."
+// src/data/adjudication.json
+var adjudication_default = {
+  "1.1.1": {
+    decide: {
+      fr: `Conforme si CHAQUE contenu non textuel porte une alternative qui remplit la m\xEAme fonction : description du sens pour une image informative, alt="" pour une image d\xE9corative, description de l'action pour un contr\xF4le. Non conforme d\xE8s qu'une alternative est absente, vide alors que l'image porte du sens, ou hors sujet (nom de fichier, \xAB image \xBB, \xAB logo \xBB).`,
+      en: 'Conforming when EVERY non-text content carries an alternative serving the same purpose: a description of the meaning for an informative image, alt="" for a decorative one, a description of the action for a control. Non-conforming as soon as one alternative is missing, empty on a meaningful image, or off-topic (a file name, "image", "logo").'
     },
-    {
-      fr: "Champs pr\xE9sent\xE9s en div (RGAA 8.9) : pour chaque paire libell\xE9/valeur affich\xE9e avec des <div>/<span>, v\xE9rifiez que la relation n'est pas seulement visuelle (utilisez <dl>/<dt>/<dd> ou une association ARIA).",
-      en: "Div-presented fields (RGAA 8.9): for each label/value pair shown with <div>/<span>, verify the relationship is not conveyed only visually (use <dl>/<dt>/<dd> or an ARIA association)."
+    na: {
+      fr: "Aucun contenu non textuel dans le p\xE9rim\xE8tre.",
+      en: "No non-text content in scope."
     },
-    {
-      fr: "Listes (RGAA 9.3) : v\xE9rifiez que chaque liste utilise le bon balisage (ul/ol pour une \xE9num\xE9ration, dl pour des couples cl\xE9/valeur) plut\xF4t que des retours \xE0 la ligne ou des <div>.",
-      en: "Lists (RGAA 9.3): verify each list uses the right markup (ul/ol for an enumeration, dl for key/value pairs) rather than line breaks or <div>s."
-    }
-  ],
-  "2.4.3": [
-    {
-      fr: "Titre en SPA (RGAA 12.8) : lors d'un rechargement partiel (navigation c\xF4t\xE9 client), v\xE9rifiez que le <title> de la page est mis \xE0 jour pour refl\xE9ter la nouvelle vue.",
-      en: "SPA page title (RGAA 12.8): on a partial (client-side) reload, verify the page <title> is updated to reflect the new view."
+    questions: [
+      {
+        fr: "Pour chaque alt : d\xE9crit-il ce que l'image APPORTE ici, et non ce qu'elle montre ? Une m\xEAme photo peut demander deux alternatives diff\xE9rentes selon le contexte.",
+        en: "For each alt: does it describe what the image CONTRIBUTES here, rather than what it depicts? The same photo can need two different alternatives in two contexts."
+      },
+      {
+        fr: `Les images purement d\xE9coratives ont-elles alt="" (et non un alt absent) ? Une image de d\xE9coration nomm\xE9e pollue autant qu'une image informative muette.`,
+        en: 'Do the purely decorative images carry alt="" (not a missing alt)? A named decorative image is as harmful as a silent informative one.'
+      },
+      {
+        fr: "Pour un graphique ou une infographie : l'alternative donne-t-elle la DONN\xC9E (ou renvoie-t-elle \xE0 un tableau \xE9quivalent), ou se contente-t-elle de nommer le graphique ?",
+        en: "For a chart or infographic: does the alternative give the DATA (or point to an equivalent table), or does it merely name the chart?"
+      }
+    ]
+  },
+  "1.2.1": {
+    decide: {
+      fr: "Conforme si chaque m\xE9dia audio-seul dispose d'une transcription textuelle, et chaque m\xE9dia vid\xE9o-seul d'une transcription OU d'une piste audio \xE9quivalente. Non conforme si le m\xE9dia porte de l'information disponible nulle part ailleurs.",
+      en: "Conforming when every audio-only media has a text transcript, and every video-only media a transcript OR an equivalent audio track. Non-conforming when the media carries information available nowhere else."
     },
-    {
-      fr: "Gestion du focus en SPA (RGAA 12.8) : \xE0 chaque changement de vue, v\xE9rifiez que le focus est d\xE9plac\xE9 vers une cible pertinente (titre de la nouvelle vue, premier \xE9l\xE9ment du contenu).",
-      en: "SPA focus management (RGAA 12.8): on each view change, verify focus is moved to a sensible target (the new view's heading, the first content element)."
+    na: {
+      fr: "Aucun m\xE9dia audio-seul ou vid\xE9o-seul.",
+      en: "No audio-only or video-only media."
     },
-    {
-      fr: "Menu mobile : \xE0 l'ouverture d'un menu burger, v\xE9rifiez que le focus atteint la cible attendue et reste pi\xE9g\xE9 dans le menu tant qu'il est ouvert.",
-      en: "Mobile menu: when a hamburger menu opens, verify focus reaches the expected target and stays trapped inside the menu while it is open."
-    }
-  ],
-  "2.4.4": [
-    {
-      fr: "Intitul\xE9 de lien (RGAA 6.1) : v\xE9rifiez que le nom accessible de chaque lien est explicite hors contexte. Annoncer le format d'un document t\xE9l\xE9chargeable (\xAB (PDF) \xBB) est une RECOMMANDATION, pas une non-conformit\xE9.",
-      en: `Link name (RGAA 6.1): verify each link's accessible name is explicit out of context. Naming a downloadable document's format ("(PDF)") is a RECOMMENDATION, not a non-conformity.`
-    }
-  ],
-  "2.4.6": [
-    {
-      fr: "Concision des titres de tableaux (RGAA 5.5) : v\xE9rifiez que chaque <caption> est un intitul\xE9 COURT et pertinent ; un titre clair mais verbeux doit devenir une br\xE8ve introduction, les d\xE9tails \xE9tant d\xE9port\xE9s dans un texte associ\xE9 via aria-labelledby/aria-describedby.",
-      en: "Table-title concision (RGAA 5.5): verify each <caption> is a SHORT, relevant title; a clear but verbose title should become a brief intro, with the details moved into text associated via aria-labelledby/aria-describedby."
-    }
-  ],
-  "4.1.3": [
-    {
-      fr: "Focus OU r\xE9gion live (RGAA 12.8/7.5) : apr\xE8s une action asynchrone, v\xE9rifiez que SOIT le focus est d\xE9plac\xE9 vers le nouveau contenu, SOIT une r\xE9gion live l'annonce \u2014 pas les deux, pas aucun.",
-      en: "Focus move XOR live region (RGAA 12.8/7.5): after an async action, verify EITHER focus moves to the new content OR a live region announces it \u2014 not both, not neither."
+    questions: [
+      {
+        fr: "La transcription est-elle atteignable depuis la page du m\xE9dia (lien adjacent, panneau d\xE9pliant), et non enfouie ailleurs ?",
+        en: "Is the transcript reachable from the media's own page (an adjacent link, a disclosure panel) rather than buried elsewhere?"
+      },
+      {
+        fr: "Couvre-t-elle TOUT le contenu, y compris l'identification des locuteurs et les sons signifiants ?",
+        en: "Does it cover ALL the content, including speaker identification and meaningful sounds?"
+      }
+    ]
+  },
+  "1.2.2": {
+    decide: {
+      fr: `Conforme si toute vid\xE9o pr\xE9-enregistr\xE9e porteuse de parole dispose de sous-titres synchronis\xE9s (piste <track kind="captions">, sous-titres int\xE9gr\xE9s au conteneur, ou lecteur en fournissant). Non conforme si la parole n'est restitu\xE9e par aucun sous-titre.`,
+      en: 'Conforming when every prerecorded video carrying speech has synchronized captions (a <track kind="captions">, captions embedded in the container, or a player supplying them). Non-conforming when the speech is restituted by no caption at all.'
     },
-    {
-      fr: "Messages de statut (RGAA 7.4/7.5) : v\xE9rifiez que les messages d'\xE9tat (succ\xE8s, erreur, chargement) sont expos\xE9s via role=status/alert ou aria-live, sans d\xE9placer le focus intempestivement.",
-      en: "Status messages (RGAA 7.4/7.5): verify status messages (success, error, loading) are exposed via role=status/alert or aria-live, without stealing focus unexpectedly."
-    }
-  ]
+    na: {
+      fr: "Aucune vid\xE9o pr\xE9-enregistr\xE9e porteuse de son signifiant.",
+      en: "No prerecorded video carrying meaningful audio."
+    },
+    questions: [
+      {
+        fr: "L'absence de <track> prouve-t-elle vraiment l'absence de sous-titres ? V\xE9rifiez le conteneur et le lecteur : les sous-titres peuvent \xEAtre int\xE9gr\xE9s \u2014 c'est pourquoi le moteur ne classe pas ce cas en non-conformit\xE9.",
+        en: "Does a missing <track> really prove there are no captions? Check the container and the player: captions can be embedded \u2014 which is why the engine does not class this as a non-conformity."
+      },
+      {
+        fr: "Les sous-titres couvrent-ils aussi les sons non verbaux signifiants (musique, alarme, rire) ?",
+        en: "Do the captions also cover meaningful non-speech sounds (music, alarm, laughter)?"
+      }
+    ]
+  },
+  "1.2.3": {
+    decide: {
+      fr: "Conforme si chaque vid\xE9o pr\xE9-enregistr\xE9e sonore offre une audiodescription OU une alternative textuelle compl\xE8te d\xE9crivant l'information visuelle. Non conforme si l'information port\xE9e par l'image seule n'est restitu\xE9e nulle part.",
+      en: "Conforming when every prerecorded video with audio offers audio description OR a complete text alternative describing the visual information. Non-conforming when information carried only by the picture is restituted nowhere."
+    },
+    na: {
+      fr: "Aucune vid\xE9o pr\xE9-enregistr\xE9e sonore.",
+      en: "No prerecorded video with audio."
+    },
+    questions: [
+      {
+        fr: "Quelle information n'existe QUE dans l'image (texte \xE0 l'\xE9cran, d\xE9monstration, graphique) ? Est-elle dite ou d\xE9crite ailleurs ?",
+        en: "What information exists ONLY in the picture (on-screen text, a demonstration, a chart)? Is it spoken or described elsewhere?"
+      }
+    ]
+  },
+  "1.2.4": {
+    decide: {
+      fr: "Conforme si tout contenu audio diffus\xE9 en direct dispose de sous-titres en temps r\xE9el. Non conforme sinon.",
+      en: "Conforming when every live audio broadcast has real-time captions. Non-conforming otherwise."
+    },
+    na: {
+      fr: "Aucune diffusion en direct.",
+      en: "No live broadcast."
+    },
+    questions: [
+      {
+        fr: "Y a-t-il un flux live (webinaire, direct, visioconf\xE9rence int\xE9gr\xE9e) dans le p\xE9rim\xE8tre ? Le prestataire de sous-titrage est-il en place pour CHAQUE session ?",
+        en: "Is there a live stream (a webinar, a broadcast, an embedded conference) in scope? Is the captioning provider in place for EVERY session?"
+      }
+    ]
+  },
+  "1.2.5": {
+    decide: {
+      fr: "Conforme si chaque vid\xE9o pr\xE9-enregistr\xE9e sonore dispose d'une audiodescription (piste d\xE9di\xE9e ou version audiod\xE9crite). Attention : au niveau AA, l'alternative textuelle seule ne suffit plus, contrairement \xE0 1.2.3.",
+      en: "Conforming when every prerecorded video with audio has audio description (a dedicated track or an audio-described version). Note: at AA a text alternative alone no longer suffices, unlike 1.2.3."
+    },
+    na: {
+      fr: "Aucune vid\xE9o pr\xE9-enregistr\xE9e sonore.",
+      en: "No prerecorded video with audio."
+    },
+    questions: [
+      {
+        fr: "Une piste d'audiodescription existe-t-elle r\xE9ellement, ou seule la transcription de 1.2.3 est-elle fournie ?",
+        en: "Does an audio-description track actually exist, or is only the 1.2.3 transcript provided?"
+      }
+    ]
+  },
+  "1.3.1": {
+    decide: {
+      fr: "Conforme si chaque relation et structure per\xE7ue visuellement (titres, listes, tableaux, groupes de champs, r\xE9gions) est d\xE9terminable par programme. Non conforme d\xE8s qu'une relation n'existe que visuellement \u2014 un \xAB titre \xBB en <div> gras, une liste faite de <br>, un couple libell\xE9/valeur en <span>.",
+      en: "Conforming when every relationship and structure conveyed visually (headings, lists, tables, field groups, regions) is programmatically determinable. Non-conforming as soon as a relationship exists visually only \u2014 a bold <div> acting as a heading, a list built from <br>, a label/value pair in <span>s."
+    },
+    questions: [
+      {
+        fr: "Coh\xE9rence des techniques (RGAA 9.1) : la M\xCAME technique de structuration (hn vs caption, balisage ul/ol/dl) est-elle employ\xE9e sur TOUS les tableaux/pages similaires \u2014 pas au cas par cas ?",
+        en: "Technique consistency (RGAA 9.1): is the SAME structuring technique (hn vs caption, ul/ol/dl markup) used across ALL similar tables/pages \u2014 not instance by instance?"
+      },
+      {
+        fr: "Champs pr\xE9sent\xE9s en div (RGAA 8.9) : pour chaque paire libell\xE9/valeur affich\xE9e avec des <div>/<span>, la relation est-elle autre chose que visuelle (<dl>/<dt>/<dd> ou association ARIA) ?",
+        en: "Div-presented fields (RGAA 8.9): for each label/value pair shown with <div>/<span>, is the relationship anything other than visual (<dl>/<dt>/<dd> or an ARIA association)?"
+      },
+      {
+        fr: "Le contenu lu sans CSS garde-t-il le m\xEAme sens et le m\xEAme ordre ?",
+        en: "Read without CSS, does the content keep the same meaning and the same order?"
+      }
+    ]
+  },
+  "1.3.2": {
+    decide: {
+      fr: "Conforme si l'ordre de lecture du DOM produit une s\xE9quence qui garde le sens. Non conforme quand l'ordre visuel et l'ordre DOM divergent au point de changer le sens (colonnes r\xE9ordonn\xE9es en CSS, `order`/`flex-direction: *-reverse`, positionnement absolu).",
+      en: "Conforming when the DOM reading order produces a sequence that preserves meaning. Non-conforming when the visual and DOM orders diverge enough to change the meaning (columns reordered in CSS, `order`/`flex-direction: *-reverse`, absolute positioning)."
+    },
+    questions: [
+      {
+        fr: "En lisant le DOM de haut en bas, la s\xE9quence reste-t-elle compr\xE9hensible \u2014 ou une colonne lat\xE9rale s'intercale-t-elle au milieu d'un texte ?",
+        en: "Reading the DOM top to bottom, does the sequence stay understandable \u2014 or does a side column cut through the middle of a text?"
+      },
+      {
+        fr: "Un `order` CSS ou un `flex-direction` invers\xE9 d\xE9place-t-il visuellement des \xE9l\xE9ments porteurs de sens ?",
+        en: "Does a CSS `order` or a reversed `flex-direction` visually move meaning-bearing elements?"
+      }
+    ]
+  },
+  "1.3.3": {
+    decide: {
+      fr: "Conforme si aucune instruction ne repose UNIQUEMENT sur une caract\xE9ristique sensorielle (forme, couleur, taille, position, son). Non conforme pour \xAB cliquez sur le bouton vert \xBB, \xAB voir l'encadr\xE9 \xE0 droite \xBB, \xAB le champ ci-dessous \xBB sans autre rep\xE8re.",
+      en: 'Conforming when no instruction relies SOLELY on a sensory characteristic (shape, colour, size, position, sound). Non-conforming for "click the green button", "see the box on the right", "the field below" with no other cue.'
+    },
+    questions: [
+      {
+        fr: "Chaque instruction nomme-t-elle aussi la cible (libell\xE9, intitul\xE9) en plus de sa position ou de sa couleur ?",
+        en: "Does each instruction also name its target (a label, a heading) in addition to its position or colour?"
+      }
+    ]
+  },
+  "1.3.4": {
+    decide: {
+      fr: "Conforme si le contenu s'affiche dans les deux orientations. Non conforme si l'affichage est verrouill\xE9 (CSS `transform`/`orientation` media query bloquante, verrouillage applicatif) sans que l'orientation soit essentielle.",
+      en: "Conforming when the content displays in both orientations. Non-conforming when display is locked (a blocking CSS `transform`/orientation media query, an app-level lock) without the orientation being essential."
+    },
+    questions: [
+      {
+        fr: "L'orientation est-elle vraiment ESSENTIELLE (piano, ch\xE8que \xE0 photographier), ou juste un choix de mise en page ?",
+        en: "Is the orientation genuinely ESSENTIAL (a piano keyboard, a cheque to photograph), or merely a layout choice?"
+      }
+    ]
+  },
+  "1.3.5": {
+    decide: {
+      fr: "Conforme si chaque champ collectant une information SUR L'UTILISATEUR d\xE9clare sa finalit\xE9 avec un token `autocomplete` de la liste WCAG. Non conforme si le token manque ou n'appartient pas au vocabulaire.",
+      en: "Conforming when every field collecting information ABOUT THE USER declares its purpose with an `autocomplete` token from the WCAG list. Non-conforming when the token is missing or outside the vocabulary."
+    },
+    na: {
+      fr: "Aucun champ ne collecte d'information sur l'utilisateur.",
+      en: "No field collects information about the user."
+    },
+    questions: [
+      {
+        fr: "Le champ collecte-t-il une donn\xE9e de l'UTILISATEUR (nom, e-mail, adresse, t\xE9l\xE9phone) \u2014 et non une donn\xE9e m\xE9tier (n\xB0 de commande, mot-cl\xE9 de recherche) ?",
+        en: "Does the field collect data about the USER (name, email, address, phone) \u2014 rather than business data (an order number, a search keyword)?"
+      }
+    ]
+  },
+  "1.4.1": {
+    decide: {
+      fr: "Conforme si aucune information n'est donn\xE9e par la couleur SEULE. Non conforme pour un lien dans un paragraphe distingu\xE9 par la seule couleur, un statut \xAB rouge/vert \xBB sans texte ni ic\xF4ne, un champ en erreur signal\xE9 par une bordure color\xE9e uniquement.",
+      en: "Conforming when no information is conveyed by colour ALONE. Non-conforming for an in-paragraph link distinguished only by colour, a red/green status with no text or icon, a field error signalled only by a coloured border."
+    },
+    questions: [
+      {
+        fr: "Vu en niveaux de gris, chaque information reste-t-elle distinguable ?",
+        en: "Seen in greyscale, does every piece of information stay distinguishable?"
+      }
+    ]
+  },
+  "1.4.3": {
+    decide: {
+      fr: "D\xE9cid\xE9 sur le rendu (`scan`) : 4,5:1 pour le texte courant, 3:1 pour le texte large (\u2265 18,66 px gras ou \u2265 24 px). Le moteur tranche le sous-ensemble des couleurs litt\xE9rales en style inline ; tout le reste exige les styles calcul\xE9s.",
+      en: "Decided on the render (`scan`): 4.5:1 for body text, 3:1 for large text (>= 18.66px bold or >= 24px). The engine settles the inline-literal colour subset; everything else needs computed styles."
+    },
+    questions: [
+      {
+        fr: "Les \xE9tats (survol, focus, d\xE9sactiv\xE9) et le texte sur image/d\xE9grad\xE9 ont-ils \xE9t\xE9 mesur\xE9s, pas seulement l'\xE9tat au repos ?",
+        en: "Have the states (hover, focus, disabled) and text over images/gradients been measured, not just the resting state?"
+      }
+    ]
+  },
+  "1.4.4": {
+    decide: {
+      fr: "D\xE9cid\xE9 sur le rendu : \xE0 200 % de zoom texte, aucun contenu ni fonctionnalit\xE9 n'est perdu, tronqu\xE9 ou superpos\xE9. Non conforme si un `meta viewport` bloque le zoom.",
+      en: "Decided on the render: at 200% text zoom no content or functionality is lost, truncated or overlapped. Non-conforming when a `meta viewport` blocks zooming."
+    },
+    questions: [
+      {
+        fr: "\xC0 200 %, des textes se chevauchent-ils, ou des boutons sortent-ils de leur conteneur ?",
+        en: "At 200%, does any text overlap, or any button escape its container?"
+      }
+    ]
+  },
+  "1.4.5": {
+    decide: {
+      fr: "Conforme si le texte est du vrai texte, sauf logotype ou pr\xE9sentation essentielle. Non conforme pour un titre, un bouton ou une citation compos\xE9s en image.",
+      en: "Conforming when text is real text, except for a logotype or an essential presentation. Non-conforming for a heading, a button or a quotation baked into an image."
+    },
+    questions: [
+      {
+        fr: "L'image de texte est-elle un logo (exempt\xE9) ou une mise en forme qui pourrait \xEAtre obtenue en CSS ?",
+        en: "Is the image of text a logo (exempt), or a styling that CSS could reproduce?"
+      }
+    ]
+  },
+  "1.4.10": {
+    decide: {
+      fr: "D\xE9cid\xE9 sur le rendu : \xE0 320 px de large (\xE9quivalent 400 % sur 1280 px), aucun d\xE9filement bidirectionnel n'est requis, sauf pour un contenu qui l'exige par nature (carte, tableau de donn\xE9es larges).",
+      en: "Decided on the render: at 320 CSS px wide (equivalent to 400% on 1280px), no two-dimensional scrolling is required, except for content that inherently needs it (a map, a wide data table)."
+    },
+    questions: [
+      {
+        fr: "Le d\xE9filement horizontal restant concerne-t-il un contenu r\xE9ellement exempt\xE9, ou toute la page ?",
+        en: "Does the remaining horizontal scrolling apply to genuinely exempt content, or to the whole page?"
+      }
+    ]
+  },
+  "1.4.11": {
+    decide: {
+      fr: "D\xE9cid\xE9 sur le rendu : 3:1 pour les composants d'interface (bordure de champ, contour de bouton, indicateur de focus) et pour les parties signifiantes des graphiques.",
+      en: "Decided on the render: 3:1 for user-interface components (a field border, a button outline, the focus indicator) and for the meaningful parts of graphics."
+    },
+    questions: [
+      {
+        fr: "La bordure qui identifie un champ, et l'indicateur de focus, atteignent-ils 3:1 contre leur fond ?",
+        en: "Do the border identifying a field, and the focus indicator, reach 3:1 against their background?"
+      }
+    ]
+  },
+  "1.4.12": {
+    decide: {
+      fr: "D\xE9cid\xE9 sur le rendu : en for\xE7ant hauteur de ligne 1,5\xD7, espacement de paragraphe 2\xD7, lettres 0,12\xD7 et mots 0,16\xD7, aucun contenu n'est perdu ni tronqu\xE9.",
+      en: "Decided on the render: forcing line height 1.5x, paragraph spacing 2x, letter spacing 0.12x and word spacing 0.16x, no content is lost or clipped."
+    },
+    questions: [
+      {
+        fr: "Des conteneurs \xE0 hauteur fixe coupent-ils le texte une fois l'espacement augment\xE9 ?",
+        en: "Do any fixed-height containers clip text once the spacing is increased?"
+      }
+    ]
+  },
+  "1.4.13": {
+    decide: {
+      fr: "D\xE9cid\xE9 sur le rendu : tout contenu additionnel apparu au survol ou au focus doit \xEAtre masquable (\xC9chap), survolable (le pointeur peut l'atteindre) et persistant (il ne dispara\xEEt pas tout seul).",
+      en: "Decided on the render: any additional content shown on hover or focus must be dismissible (Escape), hoverable (the pointer can reach it) and persistent (it does not vanish on its own)."
+    },
+    questions: [
+      {
+        fr: "L'infobulle survit-elle au d\xE9placement du pointeur vers elle, et \xC9chap la ferme-t-il sans d\xE9placer le focus ?",
+        en: "Does the tooltip survive the pointer moving onto it, and does Escape close it without moving focus?"
+      }
+    ]
+  },
+  "2.1.1": {
+    decide: {
+      fr: "Conforme si toute fonctionnalit\xE9 est utilisable au clavier seul. Non conforme d\xE8s qu'une action n'existe qu'\xE0 la souris (handler sur un \xE9l\xE9ment non interactif, glisser-d\xE9poser sans \xE9quivalent, survol obligatoire).",
+      en: "Conforming when every function is operable with the keyboard alone. Non-conforming as soon as an action exists only for the mouse (a handler on a non-interactive element, drag-and-drop with no equivalent, mandatory hover)."
+    },
+    questions: [
+      {
+        fr: "Chaque `onClick`/`onMouseEnter` sur un \xE9l\xE9ment non natif a-t-il un \xE9quivalent clavier (\xE9l\xE9ment natif, ou role + tabindex + gestion Entr\xE9e/Espace) ?",
+        en: "Does each `onClick`/`onMouseEnter` on a non-native element have a keyboard equivalent (a native element, or role + tabindex + Enter/Space handling)?"
+      },
+      {
+        fr: "Les widgets composites (menu, onglets, combobox) suivent-ils le contrat clavier attendu (fl\xE8ches, \xC9chap, Origine/Fin) ?",
+        en: "Do the composite widgets (menu, tabs, combobox) follow the expected keyboard contract (arrows, Escape, Home/End)?"
+      }
+    ]
+  },
+  "2.1.2": {
+    decide: {
+      fr: "D\xE9cid\xE9 sur le rendu : le focus doit pouvoir ENTRER et SORTIR de chaque composant au clavier seul. Non conforme pour une modale, un lecteur embarqu\xE9 ou un \xE9diteur qui capture le focus d\xE9finitivement.",
+      en: "Decided on the render: focus must be able to ENTER and LEAVE every component with the keyboard alone. Non-conforming for a modal, an embedded player or an editor that captures focus permanently."
+    },
+    questions: [
+      {
+        fr: "Dans chaque modale et chaque iframe tierce, Tab finit-il par ressortir \u2014 et \xC9chap rend-il la main ?",
+        en: "In every modal and third-party iframe, does Tab eventually get out \u2014 and does Escape hand control back?"
+      }
+    ]
+  },
+  "2.1.4": {
+    decide: {
+      fr: "Conforme si tout raccourci compos\xE9 d'un seul caract\xE8re imprimable peut \xEAtre d\xE9sactiv\xE9, remapp\xE9, ou n'est actif qu'au focus du composant concern\xE9. Non conforme s'il est global et non d\xE9sactivable.",
+      en: "Conforming when every single-printable-character shortcut can be turned off, remapped, or is active only while its component has focus. Non-conforming when it is global and cannot be disabled."
+    },
+    na: {
+      fr: "Aucun raccourci \xE0 caract\xE8re unique.",
+      en: "No single-character shortcut."
+    },
+    questions: [
+      {
+        fr: "Un utilisateur de reconnaissance vocale qui dicte du texte peut-il d\xE9clencher ce raccourci par accident ?",
+        en: "Could a speech-input user dictating text trigger this shortcut by accident?"
+      }
+    ]
+  },
+  "2.2.1": {
+    decide: {
+      fr: "Conforme si toute limite de temps peut \xEAtre d\xE9sactiv\xE9e, ajust\xE9e (\xD710) ou prolong\xE9e sur demande. Exemptions : temps r\xE9el, \xE9v\xE9nement essentiel, limite > 20 heures.",
+      en: "Conforming when every time limit can be turned off, adjusted (x10) or extended on request. Exemptions: real-time activity, an essential event, a limit longer than 20 hours."
+    },
+    na: {
+      fr: "Aucune limite de temps.",
+      en: "No time limit."
+    },
+    questions: [
+      {
+        fr: "La session expire-t-elle ? L'utilisateur est-il averti AVANT expiration et peut-il prolonger ?",
+        en: "Does the session expire? Is the user warned BEFORE it does, and can they extend it?"
+      }
+    ]
+  },
+  "2.2.2": {
+    decide: {
+      fr: "Conforme si tout contenu en mouvement, clignotant ou d\xE9filant qui dure plus de 5 secondes et d\xE9marre automatiquement peut \xEAtre mis en pause, arr\xEAt\xE9 ou masqu\xE9. Idem pour toute mise \xE0 jour automatique.",
+      en: "Conforming when any moving, blinking or scrolling content lasting more than 5 seconds and starting automatically can be paused, stopped or hidden. Same for any auto-updating content."
+    },
+    na: {
+      fr: "Aucun contenu en mouvement ni mise \xE0 jour automatique.",
+      en: "No moving content and no automatic updates."
+    },
+    questions: [
+      {
+        fr: "Carrousels, animations et bandeaux d\xE9filants ont-ils un contr\xF4le de pause atteignable au clavier ?",
+        en: "Do carousels, animations and scrolling banners have a pause control reachable by keyboard?"
+      }
+    ]
+  },
+  "2.3.1": {
+    decide: {
+      fr: "D\xE9cid\xE9 sur le rendu : rien ne clignote plus de 3 fois par seconde, sauf sous les seuils de flash g\xE9n\xE9ral et de flash rouge.",
+      en: "Decided on the render: nothing flashes more than three times per second, unless it stays below the general and red flash thresholds."
+    },
+    na: {
+      fr: "Aucun contenu clignotant.",
+      en: "No flashing content."
+    },
+    questions: [
+      {
+        fr: "Une vid\xE9o ou une animation contient-elle des flashs rapides (explosions, stroboscope) ?",
+        en: "Does any video or animation contain rapid flashes (explosions, strobe effects)?"
+      }
+    ]
+  },
+  "2.4.1": {
+    decide: {
+      fr: "Conforme si un m\xE9canisme permet d'\xE9viter les blocs r\xE9p\xE9t\xE9s : lien d'\xE9vitement fonctionnel, ou structuration en r\xE9gions (landmarks) et en titres. Non conforme si l'utilisateur doit traverser la navigation \xE0 chaque page.",
+      en: "Conforming when a mechanism bypasses repeated blocks: a working skip link, or a structure of landmarks and headings. Non-conforming when the user must traverse the navigation on every page."
+    },
+    questions: [
+      {
+        fr: "Le lien d'\xE9vitement est-il le PREMIER \xE9l\xE9ment focalisable, visible au focus, et sa cible re\xE7oit-elle r\xE9ellement le focus ?",
+        en: "Is the skip link the FIRST focusable element, visible on focus, and does its target actually receive focus?"
+      }
+    ]
+  },
+  "2.4.3": {
+    decide: {
+      fr: "Conforme si l'ordre de tabulation pr\xE9serve le sens et l'op\xE9rabilit\xE9. Non conforme quand le focus saute de fa\xE7on incoh\xE9rente, entre dans un contenu masqu\xE9, ou ne suit pas l'ordre visuel l\xE0 o\xF9 celui-ci porte le sens.",
+      en: "Conforming when the tab order preserves meaning and operability. Non-conforming when focus jumps incoherently, enters hidden content, or departs from the visual order where that order carries meaning."
+    },
+    questions: [
+      {
+        fr: "SPA (RGAA 12.8) : apr\xE8s une navigation partielle, le focus est-il d\xE9plac\xE9 vers le nouveau contenu (et non laiss\xE9 sur le lien cliqu\xE9 ni renvoy\xE9 en haut) ?",
+        en: "SPA (RGAA 12.8): after a partial navigation, is focus moved to the new content (not left on the clicked link, nor reset to the top)?"
+      },
+      {
+        fr: "\xC0 l'ouverture d'une modale, le focus entre-t-il dedans ; \xE0 la fermeture, revient-il sur le d\xE9clencheur ?",
+        en: "When a modal opens, does focus move into it; when it closes, does it return to the trigger?"
+      }
+    ]
+  },
+  "2.4.4": {
+    decide: {
+      fr: "Conforme si la fonction de chaque lien se comprend depuis son intitul\xE9 seul, ou depuis son intitul\xE9 + son contexte imm\xE9diat (phrase, item de liste, cellule + en-t\xEAtes). Non conforme pour \xAB en savoir plus \xBB, \xAB cliquez ici \xBB, une URL brute, ou deux liens de m\xEAme intitul\xE9 menant ailleurs.",
+      en: `Conforming when each link's purpose is understandable from its text alone, or from its text plus its immediate context (sentence, list item, cell + headers). Non-conforming for "read more", "click here", a bare URL, or two identically-named links going to different destinations.`
+    },
+    questions: [
+      {
+        fr: "Lu hors contexte, l'intitul\xE9 dit-il O\xD9 le lien m\xE8ne ou CE QU'il d\xE9clenche ?",
+        en: "Read out of context, does the text say WHERE the link goes or WHAT it triggers?"
+      },
+      {
+        fr: "Deux liens portant le m\xEAme intitul\xE9 m\xE8nent-ils \xE0 la m\xEAme destination ?",
+        en: "Do two links with the same text lead to the same destination?"
+      },
+      {
+        fr: "Un lien de t\xE9l\xE9chargement annonce-t-il le format et le poids (recommandation, non normatif) ?",
+        en: "Does a download link state the format and size (a recommendation, not normative)?"
+      }
+    ]
+  },
+  "2.4.5": {
+    decide: {
+      fr: "Conforme si au moins DEUX moyens permettent d'atteindre chaque page : moteur de recherche, plan du site, navigation principale, fil d'Ariane, index. Exemption : une page qui est une \xE9tape d'un processus.",
+      en: "Conforming when at least TWO ways lead to each page: a search engine, a site map, the main navigation, a breadcrumb, an index. Exemption: a page that is a step in a process."
+    },
+    questions: [
+      {
+        fr: "Les deux moyens existent-ils sur l'ENSEMBLE du site, ou seulement sur l'accueil ?",
+        en: "Do the two ways exist across the WHOLE site, or only on the home page?"
+      }
+    ]
+  },
+  "2.4.6": {
+    decide: {
+      fr: "Conforme si chaque titre d\xE9crit la section qu'il introduit et chaque libell\xE9 d\xE9crit ce que le champ attend. Non conforme pour un titre g\xE9n\xE9rique (\xAB Section 2 \xBB), un libell\xE9 vague (\xAB Valeur \xBB), ou un intitul\xE9 qui ne correspond pas au contenu.",
+      en: 'Conforming when each heading describes the section it introduces and each label describes what the field expects. Non-conforming for a generic heading ("Section 2"), a vague label ("Value"), or a heading that does not match its content.'
+    },
+    questions: [
+      {
+        fr: "La suite des titres, lue seule, donne-t-elle un plan compr\xE9hensible de la page ?",
+        en: "Read on their own, do the headings give an understandable outline of the page?"
+      },
+      {
+        fr: "Concision des titres de tableaux (RGAA 5.5) : chaque <caption> est-il un intitul\xE9 COURT et pertinent ? Un titre clair mais verbeux doit devenir une br\xE8ve introduction, les d\xE9tails \xE9tant d\xE9port\xE9s dans un texte associ\xE9 via aria-labelledby/aria-describedby.",
+        en: "Table-title concision (RGAA 5.5): is each <caption> a SHORT, relevant title? A clear but verbose title should become a brief intro, with the details moved into text associated via aria-labelledby/aria-describedby."
+      }
+    ]
+  },
+  "2.4.7": {
+    decide: {
+      fr: "D\xE9cid\xE9 sur le rendu : chaque \xE9l\xE9ment focalisable montre un indicateur de focus visible. Non conforme pour un `outline: none` non remplac\xE9.",
+      en: "Decided on the render: every focusable element shows a visible focus indicator. Non-conforming for an unreplaced `outline: none`."
+    },
+    questions: [
+      {
+        fr: "L'indicateur est-il visible sur TOUS les fonds (th\xE8me sombre, survol, \xE9l\xE9ments sur image) ?",
+        en: "Is the indicator visible on ALL backgrounds (dark theme, hover, elements over images)?"
+      }
+    ]
+  },
+  "2.4.11": {
+    decide: {
+      fr: "D\xE9cid\xE9 sur le rendu : l'\xE9l\xE9ment qui re\xE7oit le focus n'est pas enti\xE8rement masqu\xE9 par un contenu cr\xE9\xE9 par l'auteur (en-t\xEAte collant, bandeau de cookies, barre d'action).",
+      en: "Decided on the render: the element receiving focus is not entirely hidden by author-created content (a sticky header, a cookie banner, an action bar)."
+    },
+    questions: [
+      {
+        fr: "En tabulant vers le bas puis vers le haut, un en-t\xEAte ou un pied collant recouvre-t-il l'\xE9l\xE9ment focalis\xE9 ?",
+        en: "Tabbing down then up, does a sticky header or footer cover the focused element?"
+      }
+    ]
+  },
+  "2.5.1": {
+    decide: {
+      fr: "Conforme si toute fonctionnalit\xE9 utilisant un geste multipoint ou bas\xE9 sur un trac\xE9 dispose d'une alternative \xE0 pointeur unique. Non conforme pour un pincement, un balayage ou un trac\xE9 sans \xE9quivalent bouton.",
+      en: "Conforming when every function using a multipoint or path-based gesture has a single-pointer alternative. Non-conforming for a pinch, a swipe or a path with no button equivalent."
+    },
+    na: {
+      fr: "Aucun geste complexe.",
+      en: "No complex gesture."
+    },
+    questions: [
+      {
+        fr: "Carrousels, cartes et curseurs offrent-ils des boutons en plus du geste ?",
+        en: "Do carousels, maps and sliders offer buttons in addition to the gesture?"
+      }
+    ]
+  },
+  "2.5.2": {
+    decide: {
+      fr: "Conforme si aucune fonctionnalit\xE9 ne s'ex\xE9cute \xE0 l'APPUI (down-event), ou si elle est annulable/r\xE9versible. Non conforme pour une action d\xE9clench\xE9e d\xE8s `mousedown`/`touchstart` sans possibilit\xE9 d'annuler en \xE9loignant le pointeur.",
+      en: "Conforming when no function executes on the DOWN event, or when it is abortable/reversible. Non-conforming for an action fired on `mousedown`/`touchstart` with no way to abort by moving the pointer away."
+    },
+    questions: [
+      {
+        fr: "Des handlers `onMouseDown`/`onTouchStart` d\xE9clenchent-ils l'action au lieu de `onClick` ?",
+        en: "Do any `onMouseDown`/`onTouchStart` handlers fire the action instead of `onClick`?"
+      }
+    ]
+  },
+  "2.5.3": {
+    decide: {
+      fr: "Conforme si, pour chaque contr\xF4le portant un libell\xE9 textuel visible, ce texte est CONTENU dans le nom accessible. Non conforme quand `aria-label` remplace le texte visible par un autre libell\xE9 : la commande vocale ne trouve plus la cible.",
+      en: "Conforming when, for every control with a visible text label, that text is CONTAINED in the accessible name. Non-conforming when `aria-label` replaces the visible text with a different wording: voice control can no longer find the target."
+    },
+    questions: [
+      {
+        fr: "Le nom accessible COMMENCE-t-il id\xE9alement par le texte visible, pour que la commande vocale corresponde au premier mot prononc\xE9 ?",
+        en: "Does the accessible name ideally START with the visible text, so voice control matches the first spoken word?"
+      }
+    ]
+  },
+  "2.5.4": {
+    decide: {
+      fr: "Conforme si toute fonctionnalit\xE9 d\xE9clench\xE9e par un mouvement de l'appareil (secousse, inclinaison) dispose d'un \xE9quivalent dans l'interface ET peut \xEAtre d\xE9sactiv\xE9e.",
+      en: "Conforming when every function triggered by device motion (shake, tilt) has an equivalent in the interface AND can be disabled."
+    },
+    na: {
+      fr: "Aucune activation par mouvement.",
+      en: "No motion actuation."
+    },
+    questions: [
+      {
+        fr: "Un \xE9couteur `devicemotion`/`deviceorientation` d\xE9clenche-t-il une action sans bouton \xE9quivalent ?",
+        en: "Does a `devicemotion`/`deviceorientation` listener trigger an action with no equivalent button?"
+      }
+    ]
+  },
+  "2.5.7": {
+    decide: {
+      fr: "Conforme si toute action r\xE9alis\xE9e par glissement dispose d'une alternative \xE0 pointeur unique sans glissement (boutons, champ de saisie, menu). Non conforme pour un r\xE9ordonnancement, un curseur ou un kanban glisser-d\xE9poser seul.",
+      en: "Conforming when every dragging action has a single-pointer alternative that does not require dragging (buttons, an input, a menu). Non-conforming for reordering, a slider or a kanban that only supports drag-and-drop."
+    },
+    na: {
+      fr: "Aucune interaction par glissement.",
+      en: "No dragging interaction."
+    },
+    questions: [
+      {
+        fr: "Les listes r\xE9ordonnables offrent-elles des boutons \xAB monter \xBB/\xAB descendre \xBB en plus du glissement ?",
+        en: 'Do the reorderable lists offer "move up"/"move down" buttons in addition to dragging?'
+      }
+    ]
+  },
+  "2.5.8": {
+    decide: {
+      fr: "D\xE9cid\xE9 sur le rendu : la cible de pointage fait au moins 24\xD724 px CSS, sauf espacement suffisant, \xE9quivalent ailleurs, cible en ligne dans du texte, ou taille impos\xE9e par la loi.",
+      en: "Decided on the render: the pointer target is at least 24x24 CSS px, unless there is sufficient spacing, an equivalent elsewhere, an inline-in-text target, or a legally mandated size."
+    },
+    questions: [
+      {
+        fr: "Les petites ic\xF4nes (fermer, \xE9diter, supprimer) atteignent-elles 24 px, ou b\xE9n\xE9ficient-elles de l'exception d'espacement ?",
+        en: "Do the small icons (close, edit, delete) reach 24px, or do they benefit from the spacing exception?"
+      }
+    ]
+  },
+  "3.1.2": {
+    decide: {
+      fr: "Conforme si chaque passage dans une langue diff\xE9rente de celle de la page porte un `lang` correct. Exemptions : noms propres, termes techniques, mots pass\xE9s dans l'usage.",
+      en: "Conforming when every passage in a language other than the page's carries a correct `lang`. Exemptions: proper nouns, technical terms, words that have entered the vernacular."
+    },
+    na: {
+      fr: "Aucun changement de langue.",
+      en: "No change of language."
+    },
+    questions: [
+      {
+        fr: "Les citations, titres d'\u0153uvres et expressions \xE9trang\xE8res sont-ils marqu\xE9s \u2014 et le sous-tag correspond-il vraiment \xE0 la langue du texte ?",
+        en: "Are quotations, work titles and foreign expressions marked \u2014 and does the subtag actually match the text's language?"
+      }
+    ]
+  },
+  "3.2.1": {
+    decide: {
+      fr: "Conforme si recevoir le focus ne d\xE9clenche AUCUN changement de contexte. Non conforme si le focus ouvre une fen\xEAtre, soumet un formulaire ou d\xE9place le focus ailleurs.",
+      en: "Conforming when receiving focus triggers NO change of context. Non-conforming when focus opens a window, submits a form or moves focus elsewhere."
+    },
+    questions: [
+      {
+        fr: "Des handlers `onFocus` naviguent-ils, ouvrent-ils une modale ou d\xE9placent-ils le focus ?",
+        en: "Do any `onFocus` handlers navigate, open a modal or move focus?"
+      }
+    ]
+  },
+  "3.2.2": {
+    decide: {
+      fr: "Conforme si modifier la valeur d'un contr\xF4le ne d\xE9clenche pas seul un changement de contexte, ou si l'utilisateur en a \xE9t\xE9 averti avant. Non conforme pour un `<select>` qui navigue au changement.",
+      en: "Conforming when changing a control's value does not by itself trigger a change of context, or when the user was warned beforehand. Non-conforming for a `<select>` that navigates on change."
+    },
+    questions: [
+      {
+        fr: "Le changement est-il annonc\xE9 AVANT (texte d'aide au-dessus du champ), ou l'utilisateur le d\xE9couvre-t-il apr\xE8s coup ?",
+        en: "Is the change announced BEFORE (help text above the field), or does the user discover it afterwards?"
+      }
+    ]
+  },
+  "3.2.3": {
+    decide: {
+      fr: "Conforme si les m\xE9canismes de navigation r\xE9p\xE9t\xE9s apparaissent dans le M\xCAME ordre relatif d'une page \xE0 l'autre. Non conforme si l'ordre des entr\xE9es du menu change selon les pages.",
+      en: "Conforming when repeated navigation mechanisms appear in the SAME relative order from page to page. Non-conforming when the menu entries reorder across pages."
+    },
+    questions: [
+      {
+        fr: "Sur l'\xE9chantillon de pages, la navigation principale, le fil d'Ariane et le pied de page gardent-ils le m\xEAme ordre ?",
+        en: "Across the page sample, do the main navigation, the breadcrumb and the footer keep the same order?"
+      }
+    ]
+  },
+  "3.2.4": {
+    decide: {
+      fr: "Conforme si les composants de m\xEAme fonction sont identifi\xE9s de la m\xEAme mani\xE8re partout (m\xEAme intitul\xE9, m\xEAme ic\xF4ne, m\xEAme nom accessible). Non conforme si \xAB Rechercher \xBB devient \xAB Trouver \xBB selon les pages.",
+      en: 'Conforming when components with the same function are identified the same way everywhere (same wording, same icon, same accessible name). Non-conforming when "Search" becomes "Find" from page to page.'
+    },
+    questions: [
+      {
+        fr: "Les ic\xF4nes r\xE9currentes (imprimer, partager, t\xE9l\xE9charger) portent-elles partout le m\xEAme nom accessible ?",
+        en: "Do the recurring icons (print, share, download) carry the same accessible name everywhere?"
+      }
+    ]
+  },
+  "3.2.6": {
+    decide: {
+      fr: "Conforme si, quand un m\xE9canisme d'aide (contact, chat, FAQ, aide contextuelle) est pr\xE9sent sur plusieurs pages, il appara\xEEt dans le m\xEAme ordre relatif. Nouveaut\xE9 WCAG 2.2.",
+      en: "Conforming when, wherever a help mechanism (contact, chat, FAQ, contextual help) appears on multiple pages, it sits in the same relative order. New in WCAG 2.2."
+    },
+    na: {
+      fr: "Aucun m\xE9canisme d'aide.",
+      en: "No help mechanism."
+    },
+    questions: [
+      {
+        fr: "Le lien de contact ou le widget de chat occupe-t-il la m\xEAme position relative sur toutes les pages qui le portent ?",
+        en: "Does the contact link or chat widget sit in the same relative position on every page that carries it?"
+      }
+    ]
+  },
+  "3.3.1": {
+    decide: {
+      fr: "Conforme si chaque erreur de saisie d\xE9tect\xE9e automatiquement est identifi\xE9e EN TEXTE et le champ fautif d\xE9sign\xE9. Non conforme pour une bordure rouge seule, ou un message non reli\xE9 au champ.",
+      en: "Conforming when every automatically detected input error is identified IN TEXT and the offending field is pointed out. Non-conforming for a red border alone, or a message not associated with its field."
+    },
+    na: {
+      fr: "Aucune d\xE9tection d'erreur de saisie.",
+      en: "No automatic input-error detection."
+    },
+    questions: [
+      {
+        fr: "Le message d'erreur est-il reli\xE9 au champ (`aria-describedby`/`aria-errormessage`) et annonc\xE9 au moment o\xF9 il appara\xEEt ?",
+        en: "Is the error message tied to the field (`aria-describedby`/`aria-errormessage`) and announced when it appears?"
+      }
+    ]
+  },
+  "3.3.2": {
+    decide: {
+      fr: "Conforme si chaque champ porte un libell\xE9 ou une instruction quand une saisie est attendue. Non conforme si le format attendu (date, mot de passe, t\xE9l\xE9phone) n'est indiqu\xE9 nulle part avant l'erreur.",
+      en: "Conforming when every field carries a label or instruction where input is expected. Non-conforming when the expected format (date, password, phone) is stated nowhere before the error."
+    },
+    questions: [
+      {
+        fr: "Le format et les contraintes sont-ils annonc\xE9s AVANT la saisie, et non seulement dans le message d'erreur ?",
+        en: "Are the format and constraints stated BEFORE input, not only in the error message?"
+      }
+    ]
+  },
+  "3.3.3": {
+    decide: {
+      fr: "Conforme si, quand la correction est connue, une suggestion est propos\xE9e. Non conforme pour un \xAB champ invalide \xBB qui ne dit pas ce qui est attendu, sauf si le sugg\xE9rer compromettrait la s\xE9curit\xE9.",
+      en: 'Conforming when, where the correction is known, a suggestion is offered. Non-conforming for an "invalid field" that does not say what is expected, unless suggesting it would compromise security.'
+    },
+    na: {
+      fr: "Aucune erreur de saisie d\xE9tect\xE9e automatiquement.",
+      en: "No automatically detected input error."
+    },
+    questions: [
+      {
+        fr: "Le message dit-il COMMENT corriger (\xAB la date doit \xEAtre au format JJ/MM/AAAA \xBB), ou seulement que c'est faux ?",
+        en: 'Does the message say HOW to fix it ("the date must be DD/MM/YYYY"), or only that it is wrong?'
+      }
+    ]
+  },
+  "3.3.4": {
+    decide: {
+      fr: "Conforme si les envois \xE0 port\xE9e juridique, financi\xE8re ou modifiant des donn\xE9es sont r\xE9versibles, v\xE9rifi\xE9s, ou confirm\xE9s. Non conforme pour une suppression ou une commande d\xE9finitive en un clic.",
+      en: "Conforming when legal, financial or data-modifying submissions are reversible, checked, or confirmed. Non-conforming for a one-click irreversible deletion or order."
+    },
+    na: {
+      fr: "Aucune transaction \xE0 port\xE9e juridique, financi\xE8re ou modifiant des donn\xE9es.",
+      en: "No legal, financial or data-modifying transaction."
+    },
+    questions: [
+      {
+        fr: "L'utilisateur peut-il relire et corriger avant validation d\xE9finitive ?",
+        en: "Can the user review and correct before final submission?"
+      }
+    ]
+  },
+  "3.3.7": {
+    decide: {
+      fr: "Conforme si aucune information d\xE9j\xE0 saisie dans le m\xEAme processus n'est redemand\xE9e, sauf ressaisie essentielle (confirmation de mot de passe) ou information devenue invalide. Nouveaut\xE9 WCAG 2.2.",
+      en: "Conforming when no information already entered in the same process is asked for again, unless re-entry is essential (password confirmation) or the information is no longer valid. New in WCAG 2.2."
+    },
+    questions: [
+      {
+        fr: "Un tunnel multi-\xE9tapes redemande-t-il l'adresse ou l'e-mail d\xE9j\xE0 saisis, sans pr\xE9-remplissage ni s\xE9lection ?",
+        en: "Does a multi-step flow ask again for an address or email already entered, with no prefill and no selection?"
+      }
+    ]
+  },
+  "3.3.8": {
+    decide: {
+      fr: "Conforme si aucune \xE9tape d'authentification n'exige un test de fonction cognitive (m\xE9moriser, transcrire, r\xE9soudre), sauf alternative, aide, reconnaissance d'objet ou contenu fourni par l'utilisateur. Le collage et le remplissage automatique doivent rester possibles. Nouveaut\xE9 WCAG 2.2.",
+      en: "Conforming when no authentication step requires a cognitive function test (memorise, transcribe, solve), unless an alternative, a mechanism, object recognition or user-provided content is available. Pasting and autofill must remain possible. New in WCAG 2.2."
+    },
+    na: {
+      fr: "Aucune authentification.",
+      en: "No authentication."
+    },
+    questions: [
+      {
+        fr: "Le collage est-il possible dans les champs d'identification, et le gestionnaire de mots de passe peut-il les remplir ?",
+        en: "Is pasting possible in the credential fields, and can a password manager fill them?"
+      },
+      {
+        fr: "Un CAPTCHA de transcription ou un code \xE0 ressaisir de m\xE9moire est-il impos\xE9 sans alternative ?",
+        en: "Is a transcription CAPTCHA or a code to retype from memory imposed with no alternative?"
+      }
+    ]
+  },
+  "4.1.2": {
+    decide: {
+      fr: "Conforme si chaque composant d'interface expose un nom, un r\xF4le et \u2014 quand il porte un \xE9tat \u2014 une valeur, tenus \xE0 jour. Non conforme pour un widget custom sans r\xF4le, sans nom, ou dont l'\xE9tat ARIA ne suit pas l'\xE9tat r\xE9el.",
+      en: "Conforming when every user-interface component exposes a name, a role and \u2014 where it carries state \u2014 a value, all kept up to date. Non-conforming for a custom widget with no role, no name, or whose ARIA state does not track the real one."
+    },
+    questions: [
+      {
+        fr: "Pour chaque widget custom : le r\xF4le correspond-il au comportement r\xE9el, et l'\xE9tat (`aria-expanded`, `aria-checked`, `aria-selected`) suit-il l'interaction ?",
+        en: "For each custom widget: does the role match the actual behaviour, and does the state (`aria-expanded`, `aria-checked`, `aria-selected`) track the interaction?"
+      },
+      {
+        fr: "Le nom accessible correspond-il \xE0 ce que l'utilisateur voit et dirait ?",
+        en: "Does the accessible name match what the user sees and would say?"
+      }
+    ]
+  },
+  "4.1.3": {
+    decide: {
+      fr: "Conforme si chaque message de statut (succ\xE8s, erreur, r\xE9sultat de recherche, chargement) est expos\xE9 par un r\xF4le ou une propri\xE9t\xE9 permettant l'annonce SANS recevoir le focus. Non conforme pour un message ins\xE9r\xE9 dans un conteneur ordinaire.",
+      en: "Conforming when every status message (success, error, search results, loading) is exposed through a role or property allowing announcement WITHOUT receiving focus. Non-conforming for a message inserted into an ordinary container."
+    },
+    na: {
+      fr: "Aucun message de statut.",
+      en: "No status message."
+    },
+    questions: [
+      {
+        fr: "La r\xE9gion live existe-t-elle DANS LE DOM avant l'insertion du message (une r\xE9gion cr\xE9\xE9e en m\xEAme temps que son contenu n'est pas annonc\xE9e) ?",
+        en: "Does the live region exist IN THE DOM before the message is inserted (a region created together with its content is not announced)?"
+      },
+      {
+        fr: "La politesse est-elle adapt\xE9e : `polite` pour un statut, `alert`/`assertive` pour une erreur bloquante ?",
+        en: "Is the politeness right: `polite` for a status, `alert`/`assertive` for a blocking error?"
+      }
+    ]
+  }
 };
 
 // src/adjudicate.ts
@@ -44434,7 +46054,10 @@ var T2 = {
     then: "Puis : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (\xE9choue si un verdict manque une justification/finding/reason).",
     evidence: "\xC9vidences",
     none: "(aucune \xE9vidence automatique \u2014 d\xE9cidez depuis la source, ou laissez `manual` avec une raison)",
-    questions: "\xC0 v\xE9rifier manuellement"
+    questions: "\xC0 v\xE9rifier manuellement",
+    decide: "R\xE8gle de d\xE9cision",
+    na: "Non applicable si",
+    refs: "R\xE9f\xE9rences normatives mobilisables (techniques/\xE9checs W3C de ce crit\xE8re)"
   },
   en: {
     title: "# Criteria adjudication (ultra11y)",
@@ -44449,10 +46072,14 @@ var T2 = {
     then: "Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (fails if any verdict lacks its justification/finding/reason).",
     evidence: "Evidence",
     none: "(no automatic evidence \u2014 decide from source, or leave `manual` with a reason)",
-    questions: "To verify manually"
+    questions: "To verify manually",
+    decide: "Decision rule",
+    na: "Not applicable when",
+    refs: "Normative references you may cite (this criterion's W3C techniques/failures)"
   }
 };
-var MANUAL_QUESTIONS = manual_questions_default;
+var ADJUDICATION = adjudication_default;
+var MAX_REFS = 12;
 function formatAdjudication(items, lang = "en") {
   const s = T2[lang];
   const out2 = [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
@@ -44464,11 +46091,19 @@ function formatAdjudication(items, lang = "en") {
       for (const e of it.evidence) out2.push(`- \`${e.file}:${e.line}\` (\`${e.selector}\`)${e.note ? ` \u2014 ${e.note}` : ""}`);
       out2.push("");
     }
-    const questions = MANUAL_QUESTIONS[it.criteriaId];
-    if (questions?.length) {
-      out2.push(`> ${s.questions}:`, "");
-      for (const q of questions) out2.push(`- ${q[lang]}`);
-      out2.push("");
+    const protocol = ADJUDICATION[it.criteriaId];
+    if (protocol) {
+      out2.push(`> **${s.decide}** \u2014 ${protocol.decide[lang]}`, "");
+      if (protocol.na) out2.push(`> **${s.na}** \u2014 ${protocol.na[lang]}`, "");
+      if (protocol.questions.length) {
+        out2.push(`> ${s.questions}:`, "");
+        for (const q of protocol.questions) out2.push(`- ${q[lang]}`);
+        out2.push("");
+      }
+    }
+    const refs = techniquesFor(it.criteriaId);
+    if (refs.length) {
+      out2.push(`> ${s.refs}: ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` \u2026 (\`criteria ${it.criteriaId}\`)` : ""}`, "");
     }
   }
   return out2.join("\n");
@@ -44653,7 +46288,17 @@ var AXE_ADVISORY_EXCEPTIONS = {
   "duplicate-id": false,
   "nested-interactive": false,
   "form-field-multiple-labels": false,
-  "aria-required-children": false
+  "aria-required-children": false,
+  "aria-required-attr": false,
+  "aria-required-parent": false,
+  "aria-valid-attr": false,
+  "aria-valid-attr-value": false,
+  "autocomplete-valid": false,
+  "label-content-name-mismatch": false,
+  "td-headers-attr": false,
+  "th-has-data-cells": false,
+  "definition-list": false,
+  dlitem: false
 };
 function axeAdvisory(tags) {
   const t2 = tags ?? [];
@@ -47994,6 +49639,13 @@ async function cmdScan(p) {
     );
     return 0;
   }
+  for (const target of p.positionals.filter((a) => a !== "-")) {
+    if (/^https?:\/\//i.test(target) || existsSync17(target)) continue;
+    console.error(
+      lang === "fr" ? `ultra11y scan : fichier introuvable (file not found) : ${target}. Passez une URL http(s):// ou un fichier HTML existant.` : `ultra11y scan: File not found: ${target}. Pass an http(s):// URL or an existing HTML file.`
+    );
+    return 1;
+  }
   const cwd = typeof p.flags.cwd === "string" && p.flags.cwd ? p.flags.cwd : process.cwd();
   const storageState = typeof p.flags["storage-state"] === "string" && p.flags["storage-state"] ? p.flags["storage-state"] : void 0;
   const runtimeFlag = typeof p.flags.runtime === "string" && p.flags.runtime ? p.flags.runtime : p.flags.local === true ? "local" : p.flags.docker === true ? "docker" : "auto";
@@ -48366,10 +50018,12 @@ function isInvokedDirectly() {
 }
 if (isInvokedDirectly()) {
   main(process.argv.slice(2)).then(
-    (code2) => process.exit(code2),
+    (code2) => {
+      process.exitCode = code2;
+    },
     (err2) => {
       console.error(err2 instanceof Error ? err2.message : err2);
-      process.exit(1);
+      process.exitCode = 1;
     }
   );
 }
