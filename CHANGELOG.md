@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [2.23.0](https://github.com/maxgfr/ultra11y/compare/v2.22.0...v2.23.0) (2026-07-29)
+
+
+### Bug Fixes
+
+* **adjudicate:** the citation gate was unsound under a country standard ([1b9210e](https://github.com/maxgfr/ultra11y/commit/1b9210e6479746d95e4025797c76b407f61db574))
+
+
+### Features
+
+* **action:** a shipped GitHub Action covering the code AND the pages ([d0c8dcd](https://github.com/maxgfr/ultra11y/commit/d0c8dcd764befc045ef05dc8fc5a025f9f712cf6))
+* **ci:** SARIF and GitHub annotations, so findings land on the line of code ([57b707a](https://github.com/maxgfr/ultra11y/commit/57b707acaec101c9d96dc9e980aecdb7f1904dc8))
+* **dev:** see the defects on the page you are building, while you build it ([ddf37a9](https://github.com/maxgfr/ultra11y/commit/ddf37a9ca64e5036d0e20b9b48978fbe1bc59a67))
+* **e2e:** audit a page inside the Playwright/Cypress run you already have ([60584a7](https://github.com/maxgfr/ultra11y/commit/60584a7c83152b575b6d248a1a05ab938316e479))
+* **pack:** use what the standard actually ships, on every surface ([7ea3f19](https://github.com/maxgfr/ultra11y/commit/7ea3f19fbe7734d5c4b0fb78ec4df678081fdc28))
+* **pages:** the per-page criterion grid RGAA actually needs ([c1641b8](https://github.com/maxgfr/ultra11y/commit/c1641b85d6288bc529adba90a5ebc83c67eee9d7))
+* **rendered:** decide contrast and colour-only links offline, from a snapshot ([53b2a3e](https://github.com/maxgfr/ultra11y/commit/53b2a3e52b67e7893651d194d5e30907db144038))
+* **rendered:** three more criteria decided offline, and the CI loose ends closed ([cddb309](https://github.com/maxgfr/ultra11y/commit/cddb309201d59f35afbd2f07345290bbe0f29005))
+* **snapshot:** a rendered PAGE on disk, so page-scoped criteria become decidable ([550cbf5](https://github.com/maxgfr/ultra11y/commit/550cbf5e1d306b77fd262e3960633885261339c2))
+
 # [2.22.0](https://github.com/maxgfr/ultra11y/compare/v2.21.0...v2.22.0) (2026-07-26)
 
 
