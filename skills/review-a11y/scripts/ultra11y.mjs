@@ -1782,6 +1782,15 @@ function meta() {
     criteriaSource: data.criteriaSource
   };
 }
+function compareSC(a, b) {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i2 = 0; i2 < Math.max(pa.length, pb.length); i2++) {
+    const d = (pa[i2] ?? 0) - (pb[i2] ?? 0);
+    if (d) return d;
+  }
+  return 0;
+}
 function techniquesFor(id) {
   return getSC(id)?.techniques ?? [];
 }
@@ -31506,13 +31515,13 @@ function computeDelta(graph, symbols, diff, depth = DEFAULT_DELTA_DEPTH) {
       const shown = exportedNames.slice(0, 3).join(", ") + (exportedNames.length > 3 ? ", \u2026" : "");
       reasons.push(exportedNames.length === 1 ? `exported symbol ${shown} changed` : `exported symbols ${shown} changed`);
     }
-    const pct = percentile(metricValues, metricOf(m));
-    if (pct >= 0.9) {
+    const pct2 = percentile(metricValues, metricOf(m));
+    if (pct2 >= 0.9) {
       score += RISK_WEIGHTS.hubHigh;
-      reasons.push(`${metricName} p${Math.round(pct * 100)} hub`);
-    } else if (pct >= 0.75) {
+      reasons.push(`${metricName} p${Math.round(pct2 * 100)} hub`);
+    } else if (pct2 >= 0.75) {
       score += RISK_WEIGHTS.hubMed;
-      reasons.push(`${metricName} p${Math.round(pct * 100)} hub`);
+      reasons.push(`${metricName} p${Math.round(pct2 * 100)} hub`);
     }
     const depthByRel = /* @__PURE__ */ new Map();
     const impModules = /* @__PURE__ */ new Set();
@@ -45225,10 +45234,196 @@ function writePrd(r, opts) {
   return [p];
 }
 
+// src/pages.ts
+function pageScopesFrom(snapshots) {
+  return snapshots.map((s) => ({
+    id: s.meta.id,
+    name: s.meta.name,
+    url: s.meta.url,
+    ...s.meta.auth !== void 0 ? { auth: s.meta.auth } : {},
+    ...s.meta.route ? { route: s.meta.route } : {},
+    ...s.meta.sources ? { sources: s.meta.sources } : {},
+    ...s.meta.notes ? { notes: s.meta.notes } : {},
+    basis: "snapshot"
+  }));
+}
+function pageScopesFromSample(sample) {
+  return (sample?.pages ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    url: p.url,
+    ...p.auth !== void 0 ? { auth: p.auth } : {},
+    ...p.notes ? { notes: p.notes } : {},
+    basis: "attributed"
+  }));
+}
+function pagesOf(result) {
+  const fromScope = result.scope.pages ?? [];
+  const ids = new Set(fromScope.map((p) => p.id));
+  const urls = new Set(fromScope.map((p) => p.url));
+  const extra = pageScopesFromSample(result.scope.sample).filter((p) => !ids.has(p.id) && !urls.has(p.url));
+  return [...fromScope, ...extra];
+}
+function pathMatch2(a, b) {
+  const x = a.split("\\").join("/");
+  const y = b.split("\\").join("/");
+  return x === y || x.endsWith(`/${y}`) || y.endsWith(`/${x}`);
+}
+function attributePages(result, pages) {
+  if (!pages.length) return;
+  const byName = new Map(pages.map((p) => [p.name.toLowerCase(), p.id]));
+  const byUrl = new Map(pages.map((p) => [p.url, p.id]));
+  for (const f of result.findings) {
+    if (f.page) continue;
+    if (isUrlPath(f.file)) {
+      const hit = byUrl.get(f.file);
+      if (hit) f.page = hit;
+      continue;
+    }
+    const sampleName = f.sample?.page?.toLowerCase();
+    if (sampleName && byName.has(sampleName)) {
+      f.page = byName.get(sampleName);
+      continue;
+    }
+    const src = f.origin?.sourceFile ?? f.file;
+    for (const p of pages) {
+      if (p.sources?.some((s) => pathMatch2(src, s))) {
+        f.page = p.id;
+        break;
+      }
+    }
+  }
+}
+function unattributedFindings(result) {
+  return result.findings.filter((f) => !f.page);
+}
+function pageStatus(c2, pageFindings, basis) {
+  if (pageFindings.some((f) => !f.advisory)) return "NC";
+  if (c2.status === "manual") return "manual";
+  if (c2.status === "NA") return "NA";
+  return basis === "snapshot" ? "C" : "manual";
+}
+function pct(criteria) {
+  const c2 = criteria.filter((x) => x.status === "C").length;
+  const nc = criteria.filter((x) => x.status === "NC").length;
+  return c2 + nc === 0 ? 100 : Math.round(c2 / (c2 + nc) * 100);
+}
+function derivePages(result, pages) {
+  if (!pages.length) return [];
+  const out2 = [];
+  for (const p of pages) {
+    const own = result.findings.filter((f) => f.page === p.id);
+    const criteria = result.criteria.map((c2) => {
+      const pf = own.filter((f) => f.criteriaId === c2.id);
+      return {
+        id: c2.id,
+        guideline: c2.guideline,
+        status: pageStatus(c2, pf, p.basis),
+        findings: pf,
+        ...c2.justification ? { justification: c2.justification } : {},
+        ...c2.decidedBy ? { decidedBy: c2.decidedBy } : {}
+      };
+    });
+    out2.push({
+      id: p.id,
+      name: p.name,
+      url: p.url,
+      ...p.auth !== void 0 ? { auth: p.auth } : {},
+      basis: p.basis,
+      criteria,
+      findings: own,
+      conformancePct: pct(criteria)
+    });
+  }
+  return out2;
+}
+var MARK = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
+var L3 = {
+  fr: {
+    title: "Grille par page",
+    note: "Statut de chaque crit\xE8re, page par page. `C` conforme \xB7 `NC` non conforme \xB7 `\u2014` non applicable \xB7 `?` \xE0 \xE9valuer.",
+    criterion: "Crit\xE8re",
+    theme: "Th\xE9matique",
+    none: "Aucune page dans le p\xE9rim\xE8tre : aucun instantan\xE9 (.ultra11y/pages) ni \xE9chantillon scann\xE9.",
+    basisNote: "Une page marqu\xE9e \xAB source \xBB n'a pas d'instantan\xE9 : ses constats proviennent du code, donc l'absence de constat n'y vaut PAS conformit\xE9 \u2014 les crit\xE8res restent \xAB \xE0 \xE9valuer \xBB.",
+    unattributed: (n) => `${n} constat(s) non rattach\xE9(s) \xE0 une page (code partag\xE9, fichier hors routes) \u2014 compt\xE9s dans l'audit global, jamais r\xE9partis d'office.`,
+    rate: "Taux",
+    snapshot: "instantan\xE9",
+    source: "source"
+  },
+  en: {
+    title: "Per-page grid",
+    note: "Each criterion's status, page by page. `C` conforming \xB7 `NC` non-conforming \xB7 `\u2014` not applicable \xB7 `?` to assess.",
+    criterion: "Criterion",
+    theme: "Theme",
+    none: "No page in scope: no snapshot (.ultra11y/pages) and no scanned sample.",
+    basisNote: 'A page marked "source" has no snapshot: its findings come from the code, so the absence of a finding there does NOT mean conforming \u2014 those criteria stay "to assess".',
+    unattributed: (n) => `${n} unattributed finding(s) (shared code, file outside any route) \u2014 counted in the overall audit, never spread across pages.`,
+    rate: "Rate",
+    snapshot: "snapshot",
+    source: "source"
+  }
+};
+function pageView(result, page) {
+  return {
+    ...result,
+    criteria: page.criteria,
+    findings: page.findings,
+    ...result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {}
+  };
+}
+function gridOf(result, derived, standard, lang) {
+  const status = /* @__PURE__ */ new Map();
+  const put = (rowId, pageId, s) => {
+    const m = status.get(rowId) ?? /* @__PURE__ */ new Map();
+    m.set(pageId, s);
+    status.set(rowId, m);
+  };
+  if (isCore(standard)) {
+    const rows2 = [...result.criteria].sort((a, b) => compareSC(a.id, b.id)).map((c2) => ({ id: c2.id, label: `${c2.id} ${scTitle(c2.id, lang) ?? ""}`.trim(), group: c2.guideline }));
+    for (const p of derived) for (const c2 of p.criteria) put(c2.id, p.id, c2.status);
+    return { rows: rows2, status };
+  }
+  const pack = loadPack(standard);
+  const rows = pack.criteria.map((pc) => ({ id: pc.id, label: pc.id, group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim() }));
+  for (const p of derived) for (const pc of derivePackResults(pageView(result, p), standard)) put(pc.id, p.id, pc.status);
+  return { rows, status };
+}
+function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
+  const s = L3[lang];
+  const out2 = [];
+  out2.push(`## \u{1F4CA} ${s.title}`, "");
+  const derived = derivePages(result, pages);
+  if (!derived.length) {
+    out2.push(s.none, "");
+    return out2.join("\n");
+  }
+  out2.push(`> ${s.note}`, "");
+  if (derived.some((p) => p.basis === "attributed")) out2.push(`> \u26A0\uFE0F ${s.basisNote}`, "");
+  const head = [isCore(standard) ? s.criterion : s.criterion, ...derived.map((p) => `${p.name}${p.auth ? " \u{1F512}" : ""}`)];
+  out2.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
+  out2.push(`| **${s.rate}** | ${derived.map((p) => `**${p.conformancePct}%**`).join(" | ")} |`);
+  out2.push(`| _${s.snapshot}?_ | ${derived.map((p) => p.basis === "snapshot" ? `_${s.snapshot}_` : `_${s.source}_`).join(" | ")} |`);
+  const { rows, status } = gridOf(result, derived, standard, lang);
+  let group = "";
+  for (const row of rows) {
+    if (row.group !== group) {
+      group = row.group;
+      out2.push(`| **${group}** | ${derived.map(() => "").join(" | ")} |`);
+    }
+    const cells = derived.map((p) => MARK[status.get(row.id)?.get(p.id) ?? "manual"]);
+    out2.push(`| ${row.label} | ${cells.join(" | ")} |`);
+  }
+  out2.push("");
+  const orphans = unattributedFindings(result);
+  if (orphans.length) out2.push(`> ${s.unattributed(orphans.length)}`, "");
+  return out2.join("\n");
+}
+
 // src/report.ts
 var ICON3 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
 var SEV_ORDER3 = ["bloquant", "majeur", "mineur"];
-var L3 = {
+var L4 = {
   fr: {
     title: (std) => `Rapport d'audit d'accessibilit\xE9 \u2014 ${std}`,
     wcagStd: "WCAG 2.2 niveau AA",
@@ -45344,10 +45539,10 @@ function untestedNeedsRendering(r) {
 function partialAuditBanner(lang, untested = NEEDS_RENDERING.map((c2) => c2.sc)) {
   const set = new Set(untested);
   const labels = NEEDS_RENDERING.filter((c2) => set.has(c2.sc)).map((c2) => c2.label[lang]);
-  return L3[lang].partialAudit(labels.join(", "));
+  return L4[lang].partialAudit(labels.join(", "));
 }
 function render(r, lang, opts) {
-  const s = L3[lang];
+  const s = L4[lang];
   const out2 = [];
   out2.push(`# ${s.title(opts.std)}`, "");
   out2.push(`- **${s.date}** : ${r.date}`);
@@ -45397,6 +45592,8 @@ function render(r, lang, opts) {
     out2.push(`## \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
     for (const u of advisoryUnits) out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###" }));
   }
+  const pageScope = pagesOf(r);
+  if (pageScope.length) out2.push(renderPageGrid(r, pageScope, opts.standard, lang));
   if (r.scope.sample?.pages.length) {
     out2.push(`## \u{1F4C4} ${s.perPageTitle}`, "", `> ${s.perPageNote}`, "");
     if (r.scope.sample.transverse?.length) out2.push(`> ${s.transverseNote(r.scope.sample.transverse.join(", "))}`, "");
@@ -45428,7 +45625,7 @@ function render(r, lang, opts) {
   return out2.join("\n");
 }
 function renderReport(r, lang = "en") {
-  const s = L3[lang];
+  const s = L4[lang];
   const byGuideline = /* @__PURE__ */ new Map();
   for (const c2 of r.criteria) {
     const title2 = scTitle(c2.id, lang);
@@ -45441,7 +45638,7 @@ function renderReport(r, lang = "en") {
 function renderPackReport(r, pack, lang = "en") {
   const derived = derivePackResults(r, pack.key);
   const std = `${pack.name} ${pack.baseVersion}`;
-  const s = L3[lang];
+  const s = L4[lang];
   const naReason = lang === "fr" ? "Aucun crit\xE8re de succ\xE8s WCAG mapp\xE9 n'est applicable dans le p\xE9rim\xE8tre." : "No mapped WCAG success criterion is applicable in scope.";
   const byTheme = /* @__PURE__ */ new Map();
   for (const pr of derived) {
@@ -45460,7 +45657,7 @@ function renderPackReport(r, pack, lang = "en") {
   const groups = pack.themes.map((t2) => ({ key: `${t2.number}.`, title: themeName(pack, t2.number, lang) ?? "", rows: byTheme.get(t2.number) ?? [] }));
   return render(r, lang, {
     std,
-    groupHead: L3[lang].byTheme,
+    groupHead: L4[lang].byTheme,
     groups,
     derivedOf: std,
     standard: pack.key,
@@ -45645,7 +45842,7 @@ function detectFrameworks(deps, has2) {
   for (const [pkg, label] of Object.entries(KNOWN_LIBS)) if (dep(pkg)) componentLibraries.push(label);
   return { frameworks, componentLibraries };
 }
-var L4 = {
+var L5 = {
   fr: {
     title: "Obtenir du HTML rendu \xE0 auditer (render)",
     why: "Auditer les sources JSX d'une biblioth\xE8que de composants donne des faux n\xE9gatifs : il faut auditer le HTML r\xE9ellement produit.",
@@ -45676,7 +45873,7 @@ var L4 = {
   }
 };
 function renderPlan(d, lang = "fr") {
-  const s = L4[lang];
+  const s = L5[lang];
   const out2 = [`# ${s.title}`, "", `> ${s.why}`, ""];
   if (d.componentLibraries.length) out2.push(`> \u{1F9E9} ${s.libNote(d.componentLibraries.join(", "))}`, "");
   out2.push(`## ${s.detected}`, "");
@@ -46319,14 +46516,14 @@ function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
   if (!rateM) {
     issues.push(s.rateMissing);
   } else {
-    const pct = parseFloat(rateM[1].replace(",", "."));
-    if (pct < 0 || pct > 100) issues.push(s.rateRange(rateM[1]));
+    const pct2 = parseFloat(rateM[1].replace(",", "."));
+    if (pct2 < 0 || pct2 > 100) issues.push(s.rateRange(rateM[1]));
     else if (core) {
       const totals = synthesisTotals(md);
       if (totals) {
         const { c: c2, nc } = totals;
         const expected = c2 + nc === 0 ? 100 : Math.round(c2 / (c2 + nc) * 100);
-        if (Math.abs(pct - expected) > 1) issues.push(s.rateInconsistent(rateM[1], expected, c2, nc));
+        if (Math.abs(pct2 - expected) > 1) issues.push(s.rateInconsistent(rateM[1], expected, c2, nc));
       }
     }
   }
@@ -50667,6 +50864,7 @@ Usage:
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin \u2192 .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
+  ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
 
 Commands:
   audit      Run the static engine over the inputs (files/globs, or '-' for stdin)
@@ -50785,6 +50983,16 @@ Commands:
              has been captured. Because a snapshot is a FULL document (a component
              capture is a fragment), the page-scoped rules run on it: that is where
              html lang (RGAA 8.3) and page title (8.5/8.6) become decidable.
+  pages      The per-page criterion grid \u2014 RGAA is a per-page norm, the engine's
+             verdict is scope-wide, and this bridges the two. One row per criterion
+             (the pack's own under --standard), one column per page. Rebuilt from a
+             committed audit.json alone: no snapshots on disk, no browser.
+             Two honesty rules: a finding is attributed to a page only when something
+             SAYS so (the snapshot it was raised on, the scanned URL, the sample page
+             name, or the page's recorded source files) \u2014 anything else is reported as
+             UNATTRIBUTED, never spread across pages; and "no finding here" means
+             conforming only for a page whose real rendered DOM was audited. A page
+             known only by source attribution keeps its undecided criteria "to assess".
 
 Options:
   --out <dir>        output dir (report/prd/scan default: audits); for audit, persist
@@ -50913,6 +51121,7 @@ var COMMANDS = [
   "scan",
   "sample",
   "snapshot",
+  "pages",
   "fix",
   "init",
   "pack",
@@ -51152,6 +51361,13 @@ async function cmdAudit(p) {
     onWarn: (m) => console.error(m)
   });
   lang = resolveLang(p.flags, { audit: result });
+  if (usePages) {
+    const scope = pageScopesFrom(readSnapshots("."));
+    if (scope.length) {
+      result.scope.pages = scope;
+      attributePages(result, scope);
+    }
+  }
   if (typeof p.flags.out === "string") {
     const out2 = p.flags.out;
     const asFile = out2.toLowerCase().endsWith(".json");
@@ -51218,6 +51434,40 @@ async function cmdAudit(p) {
   }
   if (!failOnSet && !requireCaptures) return 0;
   return failing.length || blindSpots.length ? 1 : 0;
+}
+async function cmdPages(p) {
+  const inFlag = p.flags.in;
+  if (typeof inFlag !== "string" || !inFlag) {
+    console.error("ultra11y pages: --in <audit.json> is required ('-' for stdin).");
+    return 2;
+  }
+  const standard = stdOf(p, "pages");
+  if (standard === null) return 2;
+  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "pages", "--in");
+  if (raw === null) return 2;
+  let result;
+  try {
+    result = JSON.parse(raw);
+  } catch {
+    console.error("ultra11y pages: --in is not valid JSON (expected an AuditResult).");
+    return 2;
+  }
+  if (!isCurrentAudit(result)) {
+    console.error("ultra11y pages: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+    return 2;
+  }
+  const lang = resolveLang(p.flags, { audit: result, standard });
+  const scope = pagesOf(result);
+  if (!scope.length) {
+    console.error(
+      lang === "fr" ? "ultra11y pages : aucune page dans le p\xE9rim\xE8tre. Capturez des instantan\xE9s (render --e2e) ou scannez un \xE9chantillon (scan --sample)." : "ultra11y pages: no page in scope. Capture snapshots (render --e2e) or scan a sample (scan --sample)."
+    );
+    return 1;
+  }
+  attributePages(result, scope);
+  if (p.flags.json) console.log(JSON.stringify({ pages: derivePages(result, scope), unattributed: unattributedFindings(result).length }, null, 2));
+  else console.log(renderPageGrid(result, scope, standard, lang));
+  return 0;
 }
 async function cmdSnapshot(p) {
   const sub = p.positionals[0];
@@ -52266,6 +52516,8 @@ async function main(argv) {
       return cmdSample(p);
     case "snapshot":
       return cmdSnapshot(p);
+    case "pages":
+      return cmdPages(p);
     case "fix":
       return cmdFix(p);
     case "init":

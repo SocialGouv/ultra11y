@@ -84,7 +84,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/false-positives.md` | Where a finding may still be wrong, and how to refute it |
 | `references/rendered.md` · `references/automation.md` | Auditing produced HTML, captures, hooks and CI |
 | `references/ci.md` | `--format sarif\|github`: inline PR annotations, code scanning, job summary |
-| `references/pages.md` | Page snapshots: the rendered page on disk, page identity, the verified join |
+| `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), and its honesty rules |
 | `references/e2e.md` | `render --e2e`: auditing a page during your Playwright/Cypress run |
 | `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
 | `references/scale.md` | Focusing an audit on a large repository |
@@ -166,6 +166,12 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   (computed styles, boxes, a11y tree, screenshot), ingested by `audit` automatically. Because
   it is a FULL document, the page-scoped rules run on it — that is where RGAA 8.3 (lang),
   8.5/8.6 (title) and 12.6 become decidable at all; read **`references/pages.md`**.
+- **"Give me the RGAA grid, page by page"** → `pages --in audits/audit-latest.json --standard
+  rgaa` (also embedded in `report`): one row per criterion, one column per page, rebuilt from
+  the committed audit.json alone. Two rules hold: a finding is attributed to a page only when
+  something SAYS so (else it is reported as unattributed, never spread), and `C` by silence is
+  earned only by a page whose real DOM was audited — a source-only page keeps its undecided
+  criteria « à évaluer »; read **`references/pages.md`**.
 - **"Show the findings ON the pull request, not just a red job"** → `--format sarif` (upload
   to code scanning → inline annotations at the right file:line) or `--format github`
   (`::error::` workflow commands + a `$GITHUB_STEP_SUMMARY` table) — from `report

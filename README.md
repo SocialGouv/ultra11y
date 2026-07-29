@@ -56,6 +56,7 @@ ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format 
 ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress] [--captures <dir>] [--out <file>] [--json]
 ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   # payload on stdin → .ultra11y/pages/<id>/ + audit
 ultra11y snapshot list  [--root <dir>] [--json]
+ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   # the per-page criterion grid
 ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
 ultra11y check    --report <md> [--standard <pack>] [--quiet] [--json]
 ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--json]
@@ -102,6 +103,14 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   a snapshot is a full document, the page-scoped rules finally run — RGAA **8.3** (`lang`),
   **8.5/8.6** (`title`) — and every finding carries both its page and the source file that
   rendered it. See `references/e2e.md` and `references/pages.md`.
+- **Page by page** — RGAA is a per-page norm; the engine's verdict is scope-wide. `pages`
+  bridges the two: one row per criterion, one column per page, embedded in `report` and
+  rebuilt from a committed `audit.json` alone. The per-page status is not recomputed — a
+  per-page *view* of the audit runs through the very same projection the report uses, so grid
+  and report agree by construction. Two rules hold the line: a finding is attributed to a page
+  only when something **says** so (else it is counted as unattributed, never spread across
+  pages), and a criterion is conforming *by silence* only on a page whose real rendered DOM
+  was audited. See `references/pages.md`.
 - **CI surfaces** — a red job says *that* the build broke, not *where*. `--format sarif` emits
   SARIF 2.1.0 for GitHub code scanning, so each finding lands as an **inline annotation on the
   causing line** of the PR; `--format github` does the same via `::error::` workflow commands

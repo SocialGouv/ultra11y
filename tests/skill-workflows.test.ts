@@ -128,6 +128,12 @@ describe("pages.md teaches page snapshots", () => {
     expect(t).toMatch(/document-order/i);
     expect(t).toMatch(/refused/i);
   });
+  it("teaches the per-page grid and its two honesty rules", () => {
+    expect(t).toMatch(/ultra11y\.mjs pages/);
+    expect(t).toContain("--standard rgaa");
+    expect(t).toMatch(/unattributed/i);
+    expect(t).toMatch(/absence of evidence/i);
+  });
 });
 
 describe("ci.md teaches the CI output formats", () => {

@@ -217,6 +217,44 @@ export interface CriterionResult {
   decidedBy?: "engine" | "agent" | "scan";
 }
 
+// ---- the page dimension -----------------------------------------------------------------
+// RGAA (and every other country standard) is a PER-PAGE norm: an audit runs over a declared
+// sample of pages, and each criterion gets a status ON EACH PAGE. The engine's own verdict is
+// scope-wide, so the page dimension is derived (src/pages.ts) rather than measured a second
+// time. `scope.pages` records which pages were in play; the grid is computed on demand.
+
+/** A page in scope, recorded on the AuditResult so the grid can be rebuilt from the JSON
+ *  alone — no snapshots on disk, no browser. */
+export interface PageScope {
+  id: string; // stable page id (a snapshot directory name)
+  name: string;
+  url: string;
+  auth?: boolean;
+  route?: string;
+  // Source files that rendered this page. Used to attribute SOURCE findings to it.
+  sources?: string[];
+  notes?: string;
+  // How much this page's verdict can be trusted:
+  //  • "snapshot"   — its real rendered DOM was audited, so absence of a finding for an
+  //                   engine-decidable criterion genuinely means conforming ON THIS PAGE;
+  //  • "attributed" — only source findings were mapped onto it, so absence of a finding
+  //                   proves nothing and every undecided criterion stays `manual`.
+  basis: "snapshot" | "attributed";
+}
+
+/** One page's projection of the audit. Derived, never stored on the AuditResult: the full
+ *  grid is criteria × pages and would bloat the JSON for no gain. */
+export interface PageResult {
+  id: string;
+  name: string;
+  url: string;
+  auth?: boolean;
+  basis: "snapshot" | "attributed";
+  criteria: CriterionResult[];
+  findings: Finding[];
+  conformancePct: number;
+}
+
 export interface GuidelineTally {
   key: string; // WCAG guideline number, e.g. "1.4"
   title: string;
@@ -270,6 +308,10 @@ export interface AuditResult {
     // tier was run over (name/url/auth/notes per page, storageState paths dropped). Drives
     // the report's « Constats par page » section. Optional/additive.
     sample?: SampleScope;
+    // Set when PAGE SNAPSHOTS (.ultra11y/pages) were ingested: the pages in scope, with the
+    // source files that rendered each. Recorded so the per-page grid can be rebuilt from this
+    // JSON alone — offline, with no snapshots and no browser. Optional/additive.
+    pages?: PageScope[];
     // Set when dynamic scan results were merged in: which needs-rendering SCs the scan's
     // engines/probes actually MEASURED (verdict coverage — independent of whether anything
     // was found). Docker runner: 320px reflow only; the local runtime adds zoom / text

@@ -11,6 +11,7 @@ import { guidelineTitle, scTitle } from "./wcag.js";
 import { prdUnits, partitionUnits } from "./prd.js";
 import { renderAuditorUnit } from "./auditor.js";
 import { resolveMessage } from "./messages.js";
+import { pagesOf, renderPageGrid } from "./pages.js";
 import {
   type StandardId,
   CORE,
@@ -276,6 +277,12 @@ function render(
     out.push(`## 💡 ${s.recTitle}`, "", `> ${s.recNote}`, "");
     for (const u of advisoryUnits) out.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###" }));
   }
+
+  // « Grille par page » — the per-page criterion matrix. RGAA is a per-page norm, so this is
+  // the section an auditor actually reads. UNNUMBERED heading, like the per-page findings
+  // below, so `check`'s §1–5 numbering gate and the packReportNcIds parser are untouched.
+  const pageScope = pagesOf(r);
+  if (pageScope.length) out.push(renderPageGrid(r, pageScope, opts.standard, lang));
 
   // « Constats par page » — Ara-style per-sample-page synthesis (name + URL + auth badge +
   // NC/advisory counts, then the page's findings). Only when a page sample was recorded

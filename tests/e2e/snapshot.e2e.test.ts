@@ -173,3 +173,56 @@ console.log(JSON.stringify({ findings: r.findings.length, failing: failingFindin
     expect(r.stderr).toMatch(/--runner/);
   });
 });
+
+describe("the per-page grid, rebuilt from the audit JSON alone", () => {
+  const twoPages = (cwd: string) => {
+    write(cwd, PAGE); // Accueil: no lang, no title, image without alt
+    write(cwd, {
+      meta: { v: 1, id: "contact", name: "Contact", url: "https://example.com/contact", sources: ["app/contact/page.tsx"] },
+      dom: '<!doctype html><html lang="fr"><head><title>Contact</title></head><body><main><h1>Contact</h1></main></body></html>',
+    });
+    runCli(["audit", ".", "--out", ".", "--json"], { cwd });
+  };
+
+  it("gives each page its own verdict from one shared audit", () => {
+    const cwd = mkTmp();
+    twoPages(cwd);
+    const r = runCli(["pages", "--in", "audit-latest.json", "--standard", "rgaa", "--json"], { cwd });
+    expect(r.code, r.stderr).toBe(0);
+    const { pages } = JSON.parse(r.stdout) as { pages: { id: string; conformancePct: number; basis: string }[] };
+    const accueil = pages.find((p) => p.id === "accueil");
+    const contact = pages.find((p) => p.id === "contact");
+    expect(accueil?.conformancePct).toBeLessThan(100);
+    expect(contact?.conformancePct).toBe(100);
+    expect(accueil?.basis).toBe("snapshot");
+  });
+
+  it("renders a grid naming both pages and the RGAA criteria", () => {
+    const cwd = mkTmp();
+    twoPages(cwd);
+    const md = runCli(["pages", "--in", "audit-latest.json", "--standard", "rgaa", "--lang", "fr"], { cwd }).stdout;
+    expect(md).toContain("Page d'accueil"); // the page NAME from meta.json, not its id
+    expect(md).toContain("Contact");
+    expect(md).toContain("Images"); // RGAA theme 1
+    expect(md).toContain("NC");
+  });
+
+  it("embeds the grid in the report, and `check` still validates that report", () => {
+    const cwd = mkTmp();
+    twoPages(cwd);
+    runCli(["report", "--in", "audit-latest.json", "--standard", "rgaa", "--out", ".", "--lang", "fr"], { cwd });
+    const report = readFileSync(join(cwd, `rgaa-${new Date().toISOString().slice(0, 10)}.md`), "utf8");
+    expect(report).toContain("Grille par page");
+    const check = runCli(["check", "--report", `rgaa-${new Date().toISOString().slice(0, 10)}.md`, "--standard", "rgaa"], { cwd });
+    expect(check.code, check.stdout + check.stderr).toBe(0);
+  });
+
+  it("says what to do rather than emitting an empty grid when no page is in scope", () => {
+    const cwd = mkTmp();
+    writeFileSync(join(cwd, "a.html"), "<!doctype html><html><body><img src=x></body></html>");
+    runCli(["audit", "a.html", "--out", ".", "--json"], { cwd });
+    const r = runCli(["pages", "--in", "audit-latest.json"], { cwd });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/render --e2e|scan --sample/);
+  });
+});

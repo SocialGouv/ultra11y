@@ -36,6 +36,7 @@ import { auditSummary, captureCoverageSummary } from "./output.js";
 import { toSarif } from "./sarif.js";
 import { annotations, stepSummary } from "./annotate.js";
 import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type StyleDigest } from "./snapshot.js";
+import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
 import { resolveStandard, getPack, isCore, CORE, type StandardId } from "./standards/index.js";
 import { loadRuntimeStandards, loadConfig } from "./config.js";
@@ -74,6 +75,7 @@ Usage:
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
+  ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
 
 Commands:
   audit      Run the static engine over the inputs (files/globs, or '-' for stdin)
@@ -192,6 +194,16 @@ Commands:
              has been captured. Because a snapshot is a FULL document (a component
              capture is a fragment), the page-scoped rules run on it: that is where
              html lang (RGAA 8.3) and page title (8.5/8.6) become decidable.
+  pages      The per-page criterion grid — RGAA is a per-page norm, the engine's
+             verdict is scope-wide, and this bridges the two. One row per criterion
+             (the pack's own under --standard), one column per page. Rebuilt from a
+             committed audit.json alone: no snapshots on disk, no browser.
+             Two honesty rules: a finding is attributed to a page only when something
+             SAYS so (the snapshot it was raised on, the scanned URL, the sample page
+             name, or the page's recorded source files) — anything else is reported as
+             UNATTRIBUTED, never spread across pages; and "no finding here" means
+             conforming only for a page whose real rendered DOM was audited. A page
+             known only by source attribution keeps its undecided criteria "to assess".
 
 Options:
   --out <dir>        output dir (report/prd/scan default: audits); for audit, persist
@@ -321,6 +333,7 @@ const COMMANDS = [
   "scan",
   "sample",
   "snapshot",
+  "pages",
   "fix",
   "init",
   "pack",
@@ -656,6 +669,16 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   // it's available — every message from here on uses this, not the pre-audit fallback.
   lang = resolveLang(p.flags, { audit: result });
 
+  // Record the pages in scope + attribute the source findings to them, so the per-page grid
+  // rebuilds later from this JSON alone (no snapshots on disk, no browser).
+  if (usePages) {
+    const scope = pageScopesFrom(readSnapshots("."));
+    if (scope.length) {
+      result.scope.pages = scope;
+      attributePages(result, scope);
+    }
+  }
+
   // Only persist audit-latest.json when an output dir is explicitly requested. A plain
   // `audit` streams to stdout (--json / text summary) and must NOT litter the CWD with an
   // audits/ folder. Chain via `audit … --out audits` when you want the file (e.g. for
@@ -747,6 +770,46 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   }
   if (!failOnSet && !requireCaptures) return 0;
   return failing.length || blindSpots.length ? 1 : 0;
+}
+
+// `pages` — the per-page criterion grid. RGAA is a per-page norm; the engine's verdict is
+// scope-wide. Everything needed to bridge the two is already on the AuditResult, so this
+// rebuilds the grid offline from a committed audit.json — no snapshots, no browser.
+async function cmdPages(p: ParsedArgs): Promise<number> {
+  const inFlag = p.flags.in;
+  if (typeof inFlag !== "string" || !inFlag) {
+    console.error("ultra11y pages: --in <audit.json> is required ('-' for stdin).");
+    return 2;
+  }
+  const standard = stdOf(p, "pages");
+  if (standard === null) return 2;
+  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "pages", "--in");
+  if (raw === null) return 2;
+  let result: unknown;
+  try {
+    result = JSON.parse(raw);
+  } catch {
+    console.error("ultra11y pages: --in is not valid JSON (expected an AuditResult).");
+    return 2;
+  }
+  if (!isCurrentAudit(result)) {
+    console.error("ultra11y pages: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+    return 2;
+  }
+  const lang = resolveLang(p.flags, { audit: result, standard });
+  const scope = pagesOf(result);
+  if (!scope.length) {
+    console.error(
+      lang === "fr"
+        ? "ultra11y pages : aucune page dans le périmètre. Capturez des instantanés (render --e2e) ou scannez un échantillon (scan --sample)."
+        : "ultra11y pages: no page in scope. Capture snapshots (render --e2e) or scan a sample (scan --sample).",
+    );
+    return 1;
+  }
+  attributePages(result, scope);
+  if (p.flags.json) console.log(JSON.stringify({ pages: derivePages(result, scope), unattributed: unattributedFindings(result).length }, null, 2));
+  else console.log(renderPageGrid(result, scope, standard, lang));
+  return 0;
 }
 
 // `snapshot write` — the single surface every browser-side producer writes through (the E2E
@@ -2073,6 +2136,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdSample(p);
     case "snapshot":
       return cmdSnapshot(p);
+    case "pages":
+      return cmdPages(p);
     case "fix":
       return cmdFix(p);
     case "init":

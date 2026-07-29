@@ -77,6 +77,45 @@ recorded so the tail reads as *unmeasured*, never as *clean*.
 
 ## Producing snapshots
 
+## The per-page grid
+
+RGAA is a **per-page** norm: an audit runs over a declared sample and each criterion gets a
+status *on each page*. The engine's verdict is scope-wide. `pages` bridges the two.
+
+```
+node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa
+node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --json
+```
+
+One row per criterion (the pack's own under `--standard`), one column per page:
+`C` conforming · `NC` non-conforming · `—` not applicable · `?` to assess. The same grid is
+embedded in `report` whenever pages are in scope. It rebuilds from a committed `audit.json`
+**alone** — no snapshots on disk, no browser — because `scope.pages` records the pages and
+every finding carries its `page`.
+
+The per-page status is not computed a second time: a per-page *view* of the audit is fed to
+the very same projection the report uses (`derivePackResults`). Grid and report therefore
+agree by construction — out-of-scope criteria (RGAA 8.1), scoped-out siblings, pack overrides
+and advisory handling all come from one implementation, not from a second one that drifts.
+
+### Two honesty rules
+
+**1. A finding is attributed to a page only when something says so.** In order: the snapshot
+it was raised on, the scanned page URL, the `scan --sample` page name, then the page's own
+recorded `sources`. Anything else stays **unattributed** and is reported as a count —
+never spread across every page, which would invent non-conformities. A shared component
+matches the first page deterministically rather than being duplicated onto each.
+
+**2. "No finding here" means conforming only for a page whose real DOM was audited.** A page
+with a snapshot earns `C` by silence, because the rules genuinely ran against its document. A
+page assembled purely by source attribution (`basis: "attributed"` — e.g. a `scan --sample`
+page with no snapshot) keeps its undecided criteria `manual`: absence of evidence is not
+evidence of absence. The grid marks which is which, and warns when any page is source-only.
+
+A non-normative recommendation never flips a page criterion to `NC`, exactly as in core.
+
+## Producing snapshots
+
 Anything that drives a browser can write one — the format is the contract, not the producer.
 The engine ships a browser-side collector (`COLLECT_SNAPSHOT`) that returns the DOM, the
 style digest and the boxes for the current page in a single `page.evaluate`; a producer
