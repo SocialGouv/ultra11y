@@ -3,7 +3,7 @@ name: review-a11y
 description: "Use to REVIEW code changes for accessibility — '/review-a11y', 'review my changes/PR/branch for a11y', 'accessibility review of this diff'. Scopes to exactly the code under change (staged files, working diff, or branch vs merge-base), runs the bundled install-free ultra11y engine (node scripts/ultra11y.mjs, no keys; static WCAG 2.2 AA checks tied to success criteria, cross-file JSX/TSX via --graph), then adds YOUR judgment: refute false positives (SFC/library-source findings are preliminary), decide alt relevance and link purpose, name the rendering criteria (contrast, focus, zoom) as residual risks — never invent a non-conformity. Output: a severity-ranked review (blocking → major → minor) with file:line, concrete fixes, residual risks and a one-line verdict, in the conversation's language (technical tokens stay in English). Companion of the ultra11y skill (full audits, reports, PRD, RGAA packs). Triggers: 'review a11y', 'a11y review', 'accessibility review'."
 license: MIT
 metadata:
-  version: 2.23.0
+  version: 2.24.0
 ---
 
 # review-a11y — accessibility review of changed code

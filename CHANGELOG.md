@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [2.24.0](https://github.com/maxgfr/ultra11y/compare/v2.23.0...v2.24.0) (2026-07-29)
+
+
+### Features
+
+* **mcp:** serve ultra11y over the Model Context Protocol ([9fc50b9](https://github.com/maxgfr/ultra11y/commit/9fc50b9d80e8426bf10555b14579c99ad8a77c05))
+
 # [2.23.0](https://github.com/maxgfr/ultra11y/compare/v2.22.0...v2.23.0) (2026-07-29)
 
 
