@@ -860,7 +860,7 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
     console.error("ultra11y snapshot write: no payload on stdin (expected {meta, dom, styles?, boxes?, axtree?}).");
     return 2;
   }
-  let payload: { meta?: unknown; dom?: unknown; styles?: StyleDigest; boxes?: BoxDigest; axtree?: AxNode };
+  let payload: { meta?: unknown; dom?: unknown; styles?: StyleDigest; boxes?: BoxDigest; axtree?: AxNode; screenshot?: unknown };
   try {
     payload = JSON.parse(raw);
   } catch {
@@ -889,6 +889,17 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
   } catch (e) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
+  }
+
+  // The screenshot rides in as base64 (the producer has bytes, not a path). It powers the
+  // pixel tier — measuring contrast where the CSSOM cannot, i.e. text over a gradient or an
+  // image. A malformed one is dropped rather than fatal: the CSSOM rules still run.
+  if (typeof payload.screenshot === "string" && payload.screenshot) {
+    try {
+      writeFileSync(join(dir, "screen.png"), Buffer.from(payload.screenshot, "base64"));
+    } catch {
+      console.error("ultra11y snapshot write: the screenshot could not be written — the pixel tier will be skipped for this page.");
+    }
   }
 
   // Audit exactly this page's DOM — not the whole pages tree — so a producer checking one

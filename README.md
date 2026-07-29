@@ -2,7 +2,7 @@
 
 > Audit HTML/CSS/JSX against **WCAG 2.2 AA** accessibility and produce a dated compliance report — or author/review accessible markup without regressions. A [skills.sh](https://skills.sh) agent skill: a deterministic, zero-dependency static engine **plus** the agent's judgment, with `check`/`verify` gates against hallucinated non-conformities. **The central deliverable is the auditor conformance block** — theme, criterion + official wording, test(s), WCAG mapping + level, finding, expected state, verification, `file:line` occurrences — rendered identically by the `report` (compliance doc), the `prd` backlog and the GitHub issues, in the active standard's vocabulary and **in your language** (`--lang auto` follows the conversation/repo). **WCAG is the worldwide core; country standards (RGAA, …) are pluggable in-repo packs.**
 
-ultra11y is built around an honest **division of labour**. Automated tools only catch a fraction of accessibility problems, so the engine does the *mechanical* work — 72 machine-detectable static checks tied to the WCAG 2.2 success criteria — and is explicit about everything it can't decide statically. What it can't, the **AI agent adjudicates** (statically, from the evidence, gated by `verify`/`check`) — not a deferral to a human:
+ultra11y is built around an honest **division of labour**. Automated tools only catch a fraction of accessibility problems, so the engine does the *mechanical* work — 75 machine-detectable static checks tied to the WCAG 2.2 success criteria — and is explicit about everything it can't decide statically. What it can't, the **AI agent adjudicates** (statically, from the evidence, gated by `verify`/`check`) — not a deferral to a human:
 
 - **Automatable (engine):** missing `alt`/`lang`/`title`, unlabeled fields, empty links/buttons, icon-only controls, iframes without title, tables without headers, heading-level skips, empty/dangling headings & labels, duplicate ids, invalid/broken ARIA, positive `tabindex`, autoplay/timed-refresh/`blink`/`marquee` media…
 - **Agent judgment (gated):** alt-text relevance, link purpose in context, reading/tab order, caption accuracy — the agent rules on these via `verify --manual` → `--apply`, each verdict carrying a justification (or a groundable NC), never a silent "conforming".
@@ -103,6 +103,17 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   a snapshot is a full document, the page-scoped rules finally run — RGAA **8.3** (`lang`),
   **8.5/8.6** (`title`) — and every finding carries both its page and the source file that
   rendered it. See `references/e2e.md` and `references/pages.md`.
+- **Rendered tier (offline)** — three rules read a snapshot's browser-only signals inside the
+  ordinary `audit`: **no browser, no Docker, no running server**. `rendered-contrast` measures
+  contrast on the *computed* styles (the inline-literal rule could only see colours written in
+  the markup); `rendered-contrast-pixel` measures it **on the screenshot** for text over a
+  gradient or image, where `background-color` is transparent and every CSSOM-based checker —
+  axe-core included — is blind; `rendered-link-colour-only` makes **RGAA 10.6** decidable at
+  all. Each can say *"I don't know"*: an unresolvable backdrop, a varied region, an
+  unverifiable digest all leave the criterion undecided rather than guessed, and without
+  signals the rules do not fire, so no pre-existing verdict changes.
+  `tests/rgaa-coverage.test.ts` ratchets the result: **44 of 106** RGAA criteria now map onto
+  an engine rule, and the number can only go up.
 - **Page by page** — RGAA is a per-page norm; the engine's verdict is scope-wide. `pages`
   bridges the two: one row per criterion, one column per page, embedded in `report` and
   rebuilt from a committed `audit.json` alone. The per-page status is not recomputed — a

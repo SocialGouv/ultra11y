@@ -875,7 +875,7 @@
       "particularCases": ["Dans ces situations, les critères sont non applicables pour ces éléments :", "[object Object]"],
       "wcag": ["1.4.3"],
       "appliesTo": {
-        "ruleIds": ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal"]
+        "ruleIds": ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
       }
     },
     {
@@ -2181,7 +2181,7 @@
       "techniques": ["F24"],
       "wcag": ["1.4.3"],
       "appliesTo": {
-        "ruleIds": ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal"]
+        "ruleIds": ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
       }
     },
     {
@@ -2204,7 +2204,7 @@
       "techniques": ["G183", "F73"],
       "wcag": ["1.4.1"],
       "appliesTo": {
-        "ruleIds": []
+        "ruleIds": ["rendered-link-colour-only"]
       }
     },
     {

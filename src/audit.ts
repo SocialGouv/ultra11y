@@ -8,6 +8,7 @@ import type { AuditResult, CriterionResult, Finding, ResidualRisk, Status, Guide
 import { VERSION, SCHEMA_VERSION } from "./types.js";
 import { allSC, allGuidelines } from "./wcag.js";
 import { parseSource } from "./parse/source.js";
+import { attachSignals } from "./snapshot.js";
 import { attr, elementsByTag, type Doc, type CaptureProvenance } from "./parse/html.js";
 import { computeCaptureCoverage, enrichCaptureOrigins, readCaptureDir, capturesForSources } from "./capture.js";
 import { isFullDocument } from "./rules/rule.js";
@@ -373,7 +374,13 @@ export function runAudit(opts: AuditInput): AuditResult {
       }
       seen.add(h);
     }
-    foldDoc(acc, reused ?? parseSource(content, file, { forceJsx: opts.forceJsx }), graph);
+    const doc = reused ?? parseSource(content, file, { forceJsx: opts.forceJsx });
+    // A page snapshot carries browser-only signals beside its dom.html (computed styles,
+    // boxes, a11y tree, screenshot). Attaching them here — after the parse, where file IO
+    // already lives — is what lets the rendered rules decide criteria the source cannot,
+    // OFFLINE and with no browser. A no-op for every other file.
+    attachSignals(doc);
+    foldDoc(acc, doc, graph);
   }
 
   const canonicalFiles = acc.fileCount;

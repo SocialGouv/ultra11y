@@ -128,6 +128,13 @@ describe("pages.md teaches page snapshots", () => {
     expect(t).toMatch(/document-order/i);
     expect(t).toMatch(/refused/i);
   });
+  it("teaches the rendered tier, its three rules and why it can be trusted", () => {
+    expect(t).toContain("rendered-contrast");
+    expect(t).toContain("rendered-link-colour-only");
+    expect(t).toContain("10.6");
+    expect(t).toMatch(/I don't know|I don’t know/i);
+    expect(t).toMatch(/44 of 106/);
+  });
   it("teaches the per-page grid and its two honesty rules", () => {
     expect(t).toMatch(/ultra11y\.mjs pages/);
     expect(t).toContain("--standard rgaa");

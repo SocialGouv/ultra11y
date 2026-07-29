@@ -2,6 +2,7 @@
 // tree that the rules walk. Zero runtime deps beyond htmlparser2 (bundled).
 import { parseDocument } from "htmlparser2";
 import type { Document, ChildNode, Element as DhElement } from "domhandler";
+import type { RenderSignals } from "../types.js";
 
 export interface El {
   type: "element";
@@ -49,6 +50,12 @@ export interface Doc {
   // are ground truth (not preliminary) and re-attributed to the source component via
   // `Finding.origin`. Optional/additive; absent for ordinary source/HTML files.
   capture?: CaptureProvenance;
+  // Set when this Doc is a PAGE SNAPSHOT's dom.html and its sibling signal files verified
+  // against it: computed styles, laid-out boxes, the accessibility tree, a screenshot. What a
+  // browser knows and source cannot. Absent for every ordinary file — which is why the
+  // rendered rules (src/rules/rendered.ts) simply do not fire there, and adding that tier
+  // cannot change any pre-existing verdict.
+  signals?: RenderSignals;
   roots: HNode[];
   elements: El[];
   byId: Map<string, El>;

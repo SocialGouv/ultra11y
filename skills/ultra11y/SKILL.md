@@ -1,6 +1,6 @@
 ---
 name: ultra11y
-description: "Use to AUDIT existing HTML/CSS/JSX against WCAG 2.2 AA accessibility and produce a dated auditor-conformance report, OR to AUTHOR/REVIEW accessible markup (native-HTML-first, ARIA last). An install-free engine (`node scripts/ultra11y.mjs`, no keys) runs 72 static checks tied to WCAG criteria — alt/lang/title, unlabeled fields, empty links/buttons, tables, headings, ARIA vocabulary, label-in-name, autocomplete — measured against the official W3C ACT corpus. The engine decides 3 of the 55 criteria; the AI agent adjudicates the 38 judgment ones from harvested evidence + a per-criterion decision protocol (`verify --manual`, gated, fannable via `orchestrate`), and the 14 rendering ones go to `scan` — never silently conforming. Library/SFC code is audited as RENDERED captures (`render --setup`); country standards are pluggable packs (`--standard rgaa`, `scan --sample`). check/verify reject invented non-conformities. Triggers: 'audit WCAG/a11y', 'make accessible', 'fix a11y', 'audit RGAA'."
+description: "Use to AUDIT existing HTML/CSS/JSX against WCAG 2.2 AA accessibility and produce a dated auditor-conformance report, OR to AUTHOR/REVIEW accessible markup (native-HTML-first, ARIA last). An install-free engine (`node scripts/ultra11y.mjs`, no keys) runs 75 static checks tied to WCAG criteria — alt/lang/title, unlabeled fields, empty links/buttons, tables, headings, ARIA vocabulary, label-in-name, autocomplete — measured against the official W3C ACT corpus. The engine decides 3 of the 55 criteria; the AI agent adjudicates the 38 judgment ones from harvested evidence + a per-criterion decision protocol (`verify --manual`, gated, fannable via `orchestrate`), and the 14 rendering ones go to `scan` — never silently conforming. Library/SFC code is audited as RENDERED captures (`render --setup`); country standards are pluggable packs (`--standard rgaa`, `scan --sample`). check/verify reject invented non-conformities. Triggers: 'audit WCAG/a11y', 'make accessible', 'fix a11y', 'audit RGAA'."
 license: MIT
 metadata:
   version: 2.22.0
@@ -166,6 +166,12 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   (computed styles, boxes, a11y tree, screenshot), ingested by `audit` automatically. Because
   it is a FULL document, the page-scoped rules run on it — that is where RGAA 8.3 (lang),
   8.5/8.6 (title) and 12.6 become decidable at all; read **`references/pages.md`**.
+- **"Decide the rendering criteria without a browser in CI"** → once a page snapshot exists,
+  the **rendered tier** runs inside the ordinary `audit`: computed-style contrast
+  (RGAA 3.2/10.5), screenshot-measured contrast for text over a gradient/image (the CSSOM
+  blind spot axe-core shares), and colour-only link identification (**RGAA 10.6**, previously
+  undecidable). Each leaves the criterion `manual` when it cannot measure — never a guess;
+  read **`references/pages.md`**.
 - **"Give me the RGAA grid, page by page"** → `pages --in audits/audit-latest.json --standard
   rgaa` (also embedded in `report`): one row per criterion, one column per page, rebuilt from
   the committed audit.json alone. Two rules hold: a finding is attributed to a page only when

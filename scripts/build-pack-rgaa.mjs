@@ -94,6 +94,7 @@ const RULE_SC = {
   "aria-required-children": ["4.1.2"], "autoplay-media": ["1.4.2", "2.2.2"], "blink-marquee": ["2.2.2"],
   "button-empty-name": ["4.1.2"], "canvas-fallback-missing": ["1.1.1"], "chart-no-accessible-name": ["1.1.1"],
   "clickable-noninteractive": ["4.1.2", "2.1.1"], "contrast-literal": ["1.4.3"], "control-label-missing": ["4.1.2"],
+  "rendered-contrast": ["1.4.3"], "rendered-contrast-pixel": ["1.4.3"], "rendered-link-colour-only": ["1.4.1"],
   "css-generated-content-informative": ["1.3.1"], "date-fields-ungrouped": ["3.3.2"], "disabled-context-content": ["4.1.2"],
   "control-name-title-only": ["4.1.2"], "cross-icon-only-unnamed": ["4.1.2"],
   "cross-prop-drilled-name-lost": ["4.1.2"], "data-table-no-headers": ["1.3.1"],
@@ -125,6 +126,13 @@ const RULE_TO_CRITERIA = {
   "iframe-title-missing": ["2.1"], "axe:frame-title": ["2.1"], "axe:frame-title-unique": ["2.1"],
   // Theme 3 / 10.5 — colour contrast (3.2 text/bg, 10.5 CSS declarations)
   "contrast-literal": ["3.2", "10.5"], "axe:color-contrast": ["3.2", "10.5"], "axe:color-contrast-enhanced": ["3.2", "10.5"],
+  // Rendered tier: contrast measured on the real page (computed styles) and on the
+  // screenshot, for the gradient/background-image case the CSSOM cannot express.
+  "rendered-contrast": ["3.2", "10.5"], "rendered-contrast-pixel": ["3.2", "10.5"],
+  // 10.6 — a link in running text identified by colour alone. Deliberately NOT also
+  // mapped to 3.1 (the general "information by colour alone"): 10.6 is RGAA's specific
+  // criterion for links, and claiming both would count one defect twice.
+  "rendered-link-colour-only": ["10.6"],
   // Theme 4 — multimedia (4.3 captions)
   "media-no-track": ["4.3"], "axe:audio-caption": ["4.3"], "axe:video-caption": ["4.3"],
   // Theme 5 — tables (5.4 title, 5.6/5.7 headers, 5.8 layout-table markup)

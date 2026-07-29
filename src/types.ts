@@ -217,6 +217,70 @@ export interface CriterionResult {
   decidedBy?: "engine" | "agent" | "scan";
 }
 
+// ---- rendered signals (page snapshots) ---------------------------------------------------
+// What a browser knows and source does not: the COMPUTED styles, the laid-out boxes and the
+// accessibility tree. Collected by src/snapshot.ts, consumed by the rendered rules
+// (src/rules/rendered.ts). Indexed by DOCUMENT-ORDER ORDINAL — a selector would have to
+// survive serialization and re-parsing, an ordinal does not — and each entry repeats its
+// `tag` so the join can be VERIFIED rather than trusted.
+
+/** One element's computed style. `css` keys are CSS camelCase; values are exactly as the
+ *  browser serialized them (`rgb(0, 0, 0)`, `16px`) and are never re-parsed at collection. */
+export interface StyleEntry {
+  i: number;
+  tag: string;
+  css: Record<string, string>;
+}
+
+export interface StyleDigest {
+  v: number;
+  entries: StyleEntry[];
+  // Set when the collector hit its element cap. A truncated digest must never read as
+  // "nothing more to see": the rendered rules leave the tail undecided.
+  truncated?: boolean;
+}
+
+export interface BoxEntry {
+  i: number;
+  tag: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface BoxDigest {
+  v: number;
+  entries: BoxEntry[];
+  truncated?: boolean;
+}
+
+/** The accessibility tree as the browser computed it. Deliberately loose: producers differ. */
+export interface AxNode {
+  role?: string;
+  name?: string;
+  value?: string;
+  description?: string;
+  level?: number;
+  disabled?: boolean;
+  focusable?: boolean;
+  children?: AxNode[];
+}
+
+/** The signals attached to a Doc parsed from a page snapshot's `dom.html`. Absent for every
+ *  ordinary source file — a rendered rule simply does not fire, which is why adding this tier
+ *  cannot change any existing verdict. */
+export interface RenderSignals {
+  /** Computed style by document-order index. Absent when the digest failed verification. */
+  styles?: Map<number, StyleEntry>;
+  boxes?: Map<number, BoxEntry>;
+  axtree?: AxNode;
+  /** Absolute path to the page screenshot, when one was captured. */
+  screenshot?: string;
+  /** The collector truncated: elements past the cap have NO signals and stay undecided. */
+  truncated?: boolean;
+}
+
 // ---- the page dimension -----------------------------------------------------------------
 // RGAA (and every other country standard) is a PER-PAGE norm: an audit runs over a declared
 // sample of pages, and each criterion gets a status ON EACH PAGE. The engine's own verdict is

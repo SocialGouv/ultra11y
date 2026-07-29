@@ -106,11 +106,55 @@ const PAGE_SEED: Record<string, string> = {
 const CROSS = new Set(ruleIds().filter((id) => id.startsWith("cross-")));
 const fires = (ruleId: string, html: string): boolean => runRules(parseSource(html, `${ruleId}.html`)).some((f) => f.ruleId === ruleId);
 
+// RENDERED rules (src/rules/rendered.ts) cannot be seeded by markup alone: they decide from a
+// page snapshot's browser-only signals. Their seed therefore carries the computed styles too,
+// attached exactly as src/snapshot.ts attaches them (by document-order index).
+interface SignalSeed {
+  html: string;
+  styles: [string, Record<string, string>][]; // [tag, computed declarations], document order
+}
+
+const SIGNAL_SEED: Record<string, SignalSeed> = {
+  "rendered-contrast": {
+    html: `<!doctype html><html lang="en"><head><title>t</title></head><body><main><p>low</p></main></body></html>`,
+    styles: [
+      ["html", {}],
+      ["head", {}],
+      ["title", {}],
+      ["body", { backgroundColor: "rgb(255, 255, 255)" }],
+      ["main", {}],
+      ["p", { color: "rgb(200, 200, 200)", fontSize: "16px" }],
+    ],
+  },
+  "rendered-link-colour-only": {
+    html: `<!doctype html><html lang="en"><head><title>t</title></head><body><main><p>see <a href="/x">here</a></p></main></body></html>`,
+    styles: [
+      ["html", {}],
+      ["head", {}],
+      ["title", {}],
+      ["body", { backgroundColor: "rgb(255, 255, 255)" }],
+      ["main", {}],
+      ["p", { color: "rgb(0, 0, 0)", fontSize: "16px" }],
+      ["a", { color: "rgb(0, 0, 238)", textDecorationLine: "none", fontWeight: "400" }],
+    ],
+  },
+};
+
+// Seeded in tests/rendered-rules.test.ts instead: it needs a real PNG on disk, and this file
+// is deliberately I/O-free. Named here so the gap is DECLARED, never silent.
+const COVERED_ELSEWHERE = new Set(["rendered-contrast-pixel"]);
+
+const firesWithSignals = (ruleId: string, seed: SignalSeed): boolean => {
+  const doc = parseSource(seed.html, `${ruleId}.html`);
+  doc.signals = { styles: new Map(seed.styles.map(([tag, css], i) => [i, { i, tag, css }])) };
+  return runRules(doc).some((f) => f.ruleId === ruleId);
+};
+
 describe("recall matrix — every registered static rule catches its seeded defect", () => {
   const registered = ruleIds().filter((id) => !CROSS.has(id));
 
   it("seeds a defect fixture for every registered (non-cross) rule — no silent coverage gap", () => {
-    const seeded = new Set([...Object.keys(SEED), ...Object.keys(PAGE_SEED)]);
+    const seeded = new Set([...Object.keys(SEED), ...Object.keys(PAGE_SEED), ...Object.keys(SIGNAL_SEED), ...COVERED_ELSEWHERE]);
     const missing = registered.filter((id) => !seeded.has(id));
     expect(missing, `rules with no recall fixture: ${missing.join(", ")}`).toEqual([]);
   });
@@ -121,6 +165,12 @@ describe("recall matrix — every registered static rule catches its seeded defe
   for (const [ruleId, html] of Object.entries(PAGE_SEED)) {
     it(`catches ${ruleId} (page-scoped)`, () => expect(fires(ruleId, html), `${ruleId} did not fire on its seed`).toBe(true));
   }
+  for (const [ruleId, seed] of Object.entries(SIGNAL_SEED)) {
+    it(`catches ${ruleId} (rendered signals)`, () => expect(firesWithSignals(ruleId, seed), `${ruleId} did not fire on its seed`).toBe(true));
+  }
+  it("declares, rather than hides, the rules seeded in another file", () => {
+    for (const id of COVERED_ELSEWHERE) expect(registered).toContain(id);
+  });
 });
 
 describe("recall — WebAIM Million top-6 (the failures that dominate the real web)", () => {

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { realpathSync as realpathSync2, writeFileSync as writeFileSync14, mkdirSync as mkdirSync11, existsSync as existsSync20, readFileSync as readFileSync16, appendFileSync } from "fs";
-import { join as join35, relative as relative3, sep as sep4, dirname as dirname9 } from "path";
+import { realpathSync as realpathSync2, writeFileSync as writeFileSync14, mkdirSync as mkdirSync11, existsSync as existsSync20, readFileSync as readFileSync17, appendFileSync } from "fs";
+import { join as join35, relative as relative3, sep as sep4, dirname as dirname10 } from "path";
 import { fileURLToPath as fileURLToPath4, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
@@ -410,7 +410,7 @@ var wcag_default = {
       level: "A",
       addedIn: "2.0",
       automatability: "needs-rendering",
-      ruleIds: [],
+      ruleIds: ["rendered-link-colour-only"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html",
       techniques: ["C15", "F14", "F26", "F73", "F78", "G111", "G117", "G138", "G14", "G140", "G149", "G165", "G182", "G183", "G195", "G205", "G96", "SCR31"]
     },
@@ -436,7 +436,7 @@ var wcag_default = {
       level: "AA",
       addedIn: "2.0",
       automatability: "needs-rendering",
-      ruleIds: ["contrast-literal"],
+      ruleIds: ["contrast-literal", "rendered-contrast", "rendered-contrast-pixel"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
       techniques: ["C29", "F24", "G136", "G145", "G148", "G174", "G18"]
     },
@@ -32604,6 +32604,216 @@ function parseSourceWithAst(source, file, opts = {}) {
   return { doc, ast: null };
 }
 
+// src/snapshot.ts
+import { existsSync as existsSync9, mkdirSync as mkdirSync4, readFileSync as readFileSync10, readdirSync as readdirSync4, writeFileSync as writeFileSync5 } from "fs";
+import { dirname as dirname5, join as join21 } from "path";
+var SNAPSHOT_VERSION = 1;
+var PAGES_DIR = ".ultra11y/pages";
+var ID_RE = /^[a-z0-9][a-z0-9-]*$/i;
+function validateSnapshotMeta(raw) {
+  const issues = [];
+  const err2 = (path, message) => {
+    issues.push({ path, message });
+  };
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    err2("meta", "meta must be an object { v, id, name, url, \u2026 }");
+    return { ok: false, issues };
+  }
+  const m = raw;
+  const v = typeof m.v === "number" ? m.v : Number.NaN;
+  if (!Number.isFinite(v) || v < 1) err2("meta.v", "v must be a positive integer snapshot-format version");
+  else if (v > SNAPSHOT_VERSION) err2("meta.v", `snapshot format v${v} is newer than this engine understands (v${SNAPSHOT_VERSION}) \u2014 upgrade ultra11y`);
+  if (typeof m.id !== "string" || !m.id.trim()) err2("meta.id", "id must be a non-empty string");
+  else if (!ID_RE.test(m.id)) err2("meta.id", `id "${m.id}" must match ${ID_RE} (it becomes a directory name)`);
+  if (typeof m.name !== "string" || !m.name.trim()) err2("meta.name", "name must be a non-empty string");
+  if (typeof m.url !== "string" || !m.url.trim()) err2("meta.url", "url must be a non-empty string");
+  if (m.auth !== void 0 && typeof m.auth !== "boolean") err2("meta.auth", "auth must be a boolean");
+  if (m.route !== void 0 && typeof m.route !== "string") err2("meta.route", "route must be a string");
+  if (m.notes !== void 0 && typeof m.notes !== "string") err2("meta.notes", "notes must be a string");
+  if (m.sources !== void 0 && (!Array.isArray(m.sources) || m.sources.some((s) => typeof s !== "string")))
+    err2("meta.sources", "sources must be an array of strings");
+  if (issues.length) return { ok: false, issues };
+  return {
+    ok: true,
+    issues,
+    meta: {
+      v,
+      id: m.id,
+      name: m.name,
+      url: m.url,
+      ...typeof m.route === "string" ? { route: m.route } : {},
+      ...typeof m.auth === "boolean" ? { auth: m.auth } : {},
+      ...m.viewport && typeof m.viewport === "object" ? { viewport: m.viewport } : {},
+      ...typeof m.capturedAt === "string" ? { capturedAt: m.capturedAt } : {},
+      ...typeof m.runner === "string" ? { runner: m.runner } : {},
+      ...Array.isArray(m.sources) ? { sources: m.sources } : {},
+      ...typeof m.notes === "string" ? { notes: m.notes } : {}
+    }
+  };
+}
+function snapshotDir(root, id) {
+  return join21(root, PAGES_DIR, id);
+}
+function writeSnapshot(root, snap) {
+  const dir = snapshotDir(root, snap.meta.id);
+  mkdirSync4(dir, { recursive: true });
+  writeFileSync5(join21(dir, "meta.json"), `${JSON.stringify(snap.meta, null, 2)}
+`);
+  const comment = formatCaptureComment({
+    v: 1,
+    page: snap.meta.id,
+    url: snap.meta.url,
+    ...snap.meta.sources?.[0] ? { sourceFile: snap.meta.sources[0] } : {},
+    name: snap.meta.name
+  });
+  writeFileSync5(join21(dir, "dom.html"), `${comment}
+${snap.dom}
+`);
+  if (snap.styles) writeFileSync5(join21(dir, "styles.json"), `${JSON.stringify(snap.styles)}
+`);
+  if (snap.boxes) writeFileSync5(join21(dir, "boxes.json"), `${JSON.stringify(snap.boxes)}
+`);
+  if (snap.axtree) writeFileSync5(join21(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}
+`);
+  return dir;
+}
+function readJson2(file) {
+  try {
+    return JSON.parse(readFileSync10(file, "utf8"));
+  } catch {
+    return void 0;
+  }
+}
+function readSnapshot(dir) {
+  const rawMeta = readJson2(join21(dir, "meta.json"));
+  if (rawMeta === void 0) return null;
+  const v = validateSnapshotMeta(rawMeta);
+  if (!v.ok || !v.meta) return null;
+  let dom;
+  try {
+    dom = readFileSync10(join21(dir, "dom.html"), "utf8");
+  } catch {
+    return null;
+  }
+  const styles = readJson2(join21(dir, "styles.json"));
+  const boxes = readJson2(join21(dir, "boxes.json"));
+  const axtree = readJson2(join21(dir, "axtree.json"));
+  const shot = join21(dir, "screen.png");
+  return {
+    meta: v.meta,
+    dom,
+    ...styles ? { styles } : {},
+    ...boxes ? { boxes } : {},
+    ...axtree ? { axtree } : {},
+    ...existsSync9(shot) ? { screenshot: "screen.png" } : {}
+  };
+}
+function readSnapshots(root) {
+  const base = join21(root, PAGES_DIR);
+  let dirs;
+  try {
+    dirs = readdirSync4(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+  } catch {
+    return [];
+  }
+  const out2 = [];
+  for (const d of dirs.sort()) {
+    const s = readSnapshot(join21(base, d));
+    if (s) out2.push(s);
+  }
+  return out2;
+}
+var COLLECTED_CSS = [
+  "color",
+  "backgroundColor",
+  "backgroundImage",
+  "fontSize",
+  "fontWeight",
+  "fontStyle",
+  "textDecorationLine",
+  "textTransform",
+  "lineHeight",
+  "letterSpacing",
+  "wordSpacing",
+  "whiteSpace",
+  "display",
+  "visibility",
+  "opacity",
+  "position",
+  "overflowX",
+  "overflowY",
+  "outlineStyle",
+  "outlineWidth",
+  "outlineColor",
+  "borderBottomStyle",
+  "borderBottomWidth",
+  "cursor"
+];
+var COLLECT_MAX_ELEMENTS = 5e3;
+var COLLECT_SNAPSHOT = `(() => {
+  const PROPS = ${JSON.stringify(COLLECTED_CSS)};
+  const MAX = ${COLLECT_MAX_ELEMENTS};
+  const els = document.querySelectorAll('*');
+  const styles = [];
+  const boxes = [];
+  const n = Math.min(els.length, MAX);
+  for (let i = 0; i < n; i++) {
+    const el = els[i];
+    const tag = el.tagName.toLowerCase();
+    const cs = getComputedStyle(el);
+    const css = {};
+    for (const p of PROPS) {
+      const v = cs[p];
+      if (v !== undefined && v !== null && v !== '') css[p] = String(v);
+    }
+    styles.push({ i: i, tag: tag, css: css });
+    const r = el.getBoundingClientRect();
+    boxes.push({ i: i, tag: tag, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
+  }
+  const truncated = els.length > MAX;
+  return {
+    dom: document.documentElement.outerHTML,
+    title: document.title,
+    lang: document.documentElement.getAttribute('lang') || '',
+    url: location.href,
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    styles: { v: 1, entries: styles, truncated: truncated },
+    boxes: { v: 1, entries: boxes, truncated: truncated }
+  };
+})()`;
+function isSnapshotDom(file) {
+  const posix3 = file.split("\\").join("/");
+  return posix3.endsWith("/dom.html") && posix3.includes(`${PAGES_DIR}/`);
+}
+function align(doc, entries) {
+  const out2 = /* @__PURE__ */ new Map();
+  for (const e of entries) {
+    const el = doc.elements[e.i];
+    if (!el || el.tag !== e.tag) return null;
+    out2.set(e.i, e);
+  }
+  return out2;
+}
+function attachSignals(doc) {
+  if (!isSnapshotDom(doc.file)) return;
+  const dir = dirname5(doc.file);
+  const styles = readJson2(join21(dir, "styles.json"));
+  const boxes = readJson2(join21(dir, "boxes.json"));
+  const axtree = readJson2(join21(dir, "axtree.json"));
+  const shot = join21(dir, "screen.png");
+  const alignedStyleMap = styles ? align(doc, styles.entries) : null;
+  const alignedBoxMap = boxes ? align(doc, boxes.entries) : null;
+  const truncated = Boolean(styles?.truncated || boxes?.truncated);
+  const signals = {
+    ...alignedStyleMap ? { styles: alignedStyleMap } : {},
+    ...alignedBoxMap ? { boxes: alignedBoxMap } : {},
+    ...axtree ? { axtree } : {},
+    ...existsSync9(shot) ? { screenshot: shot } : {},
+    ...truncated ? { truncated } : {}
+  };
+  if (Object.keys(signals).length) doc.signals = signals;
+}
+
 // src/messages.ts
 var MSG_CATALOG = {
   // ---- Theme 1 — Images (src/rules/images.ts) ---------------------------------
@@ -32847,6 +33057,39 @@ var MSG_CATALOG = {
     remediation: {
       fr: (p) => `Assombrissez le texte ou \xE9claircissez le fond pour atteindre au moins ${p.min}:1 (contraste calcul\xE9 sur des couleurs inline litt\xE9rales).`,
       en: (p) => `Darken the text or lighten the background to reach at least ${p.min}:1 (contrast computed from literal inline colours).`
+    }
+  },
+  // ---- Rendered tier (src/rules/rendered.ts) — decided from a page snapshot's signals -----
+  // These say WHERE the measurement came from, because that is what makes them auditable: a
+  // computed style, or a region of the screenshot. An auditor can go and re-check either.
+  "rendered-contrast": {
+    message: {
+      fr: (p) => `Contraste insuffisant au rendu : ratio ${p.ratio}:1 entre le texte et son fond effectif (minimum ${p.min}:1 pour du texte ${p.textSize === "large" ? "large" : "normal"}).`,
+      en: (p) => `Insufficient contrast at render: ${p.ratio}:1 between the text and its effective background (minimum ${p.min}:1 for ${p.textSize === "large" ? "large" : "normal"} text).`
+    },
+    remediation: {
+      fr: (p) => `Assombrissez le texte ou \xE9claircissez le fond pour atteindre au moins ${p.min}:1 (mesur\xE9 sur les styles calcul\xE9s de la page rendue).`,
+      en: (p) => `Darken the text or lighten the background to reach at least ${p.min}:1 (measured from the rendered page's computed styles).`
+    }
+  },
+  "rendered-contrast-pixel": {
+    message: {
+      fr: (p) => `Contraste insuffisant mesur\xE9 sur la capture d'\xE9cran : ratio ${p.ratio}:1 (minimum ${p.min}:1 pour du texte ${p.textSize === "large" ? "large" : "normal"}). Le fond vient d'une image ou d'un d\xE9grad\xE9, invisible aux styles calcul\xE9s.`,
+      en: (p) => `Insufficient contrast measured on the screenshot: ${p.ratio}:1 (minimum ${p.min}:1 for ${p.textSize === "large" ? "large" : "normal"} text). The background comes from an image or gradient, which computed styles cannot express.`
+    },
+    remediation: {
+      fr: (p) => `Garantissez au moins ${p.min}:1 sur toute la zone : ajoutez un fond opaque sous le texte, un voile, ou une ombre port\xE9e. Le fond a \xE9t\xE9 mesur\xE9 sur les pixels de la zone occup\xE9e par le texte.`,
+      en: (p) => `Guarantee at least ${p.min}:1 across the whole area: add an opaque backing behind the text, a scrim, or a text shadow. The background was measured on the pixels of the text's own box.`
+    }
+  },
+  "rendered-link-colour-only": {
+    message: {
+      fr: (p) => `Lien dans un bloc de texte distingu\xE9 par la COULEUR SEULE (\xE9cart de ${p.ratio}:1 avec le texte environnant, sans soulignement, bordure ni fond) \u2014 invisible pour qui ne per\xE7oit pas cette diff\xE9rence de couleur.`,
+      en: (p) => `Link inside a text block distinguished by COLOUR ALONE (${p.ratio}:1 apart from the surrounding text, with no underline, border or background) \u2014 invisible to anyone who does not perceive that colour difference.`
+    },
+    remediation: {
+      fr: () => `Ajoutez un indice non chromatique : text-decoration: underline (le plus simple), une bordure basse, ou une graisse nettement sup\xE9rieure. \xC0 d\xE9faut, un contraste d'au moins 3:1 avec le texte environnant ET un indice au survol/focus.`,
+      en: () => `Add a non-colour cue: text-decoration: underline (simplest), a bottom border, or a distinctly heavier weight. Failing that, at least 3:1 contrast with the surrounding text AND a cue on hover/focus.`
     }
   },
   // ---- Theme 5 — Data tables (src/rules/tables.ts) ----------------------------
@@ -36310,6 +36553,306 @@ var contrastLiteral = {
 };
 var colorsRules = [contrastLiteral];
 
+// src/rules/rendered.ts
+import { readFileSync as readFileSync11 } from "fs";
+
+// src/pixel.ts
+import { inflateSync } from "zlib";
+var SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+function paeth(a, b, c2) {
+  const p = a + b - c2;
+  const pa = Math.abs(p - a);
+  const pb = Math.abs(p - b);
+  const pc = Math.abs(p - c2);
+  if (pa <= pb && pa <= pc) return a;
+  return pb <= pc ? b : c2;
+}
+function decodePng(buf) {
+  if (buf.length < 8 + 25) return null;
+  for (let i2 = 0; i2 < SIGNATURE.length; i2++) if (buf[i2] !== SIGNATURE[i2]) return null;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  let interlace = 0;
+  const idat = [];
+  let off = 8;
+  while (off + 8 <= buf.length) {
+    const len = buf.readUInt32BE(off);
+    const type = buf.toString("ascii", off + 4, off + 8);
+    const dataStart = off + 8;
+    const dataEnd = dataStart + len;
+    if (dataEnd + 4 > buf.length) return null;
+    if (type === "IHDR") {
+      if (len < 13) return null;
+      width = buf.readUInt32BE(dataStart);
+      height = buf.readUInt32BE(dataStart + 4);
+      bitDepth = buf[dataStart + 8] ?? 0;
+      colorType = buf[dataStart + 9] ?? 0;
+      interlace = buf[dataStart + 12] ?? 0;
+    } else if (type === "IDAT") {
+      idat.push(buf.subarray(dataStart, dataEnd));
+    } else if (type === "IEND") {
+      break;
+    }
+    off = dataEnd + 4;
+  }
+  if (!width || !height || !idat.length) return null;
+  if (bitDepth !== 8) return null;
+  if (colorType !== 2 && colorType !== 6) return null;
+  if (interlace !== 0) return null;
+  const channels = colorType === 6 ? 4 : 3;
+  let raw;
+  try {
+    raw = inflateSync(Buffer.concat(idat));
+  } catch {
+    return null;
+  }
+  const stride = width * channels;
+  if (raw.length < height * (stride + 1)) return null;
+  const out2 = Buffer.alloc(height * stride);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)] ?? 0;
+    const lineIn = y * (stride + 1) + 1;
+    const lineOut = y * stride;
+    const prevOut = lineOut - stride;
+    for (let i2 = 0; i2 < stride; i2++) {
+      const x = raw[lineIn + i2] ?? 0;
+      const a = i2 >= channels ? out2[lineOut + i2 - channels] ?? 0 : 0;
+      const b = y > 0 ? out2[prevOut + i2] ?? 0 : 0;
+      const c2 = y > 0 && i2 >= channels ? out2[prevOut + i2 - channels] ?? 0 : 0;
+      let v;
+      switch (filter) {
+        case 0:
+          v = x;
+          break;
+        case 1:
+          v = x + a;
+          break;
+        case 2:
+          v = x + b;
+          break;
+        case 3:
+          v = x + (a + b >> 1);
+          break;
+        case 4:
+          v = x + paeth(a, b, c2);
+          break;
+        default:
+          return null;
+      }
+      out2[lineOut + i2] = v & 255;
+    }
+  }
+  return {
+    width,
+    height,
+    at(x, y) {
+      if (x < 0 || y < 0 || x >= width || y >= height) return void 0;
+      const p = y * stride + x * channels;
+      return {
+        r: out2[p] ?? 0,
+        g: out2[p + 1] ?? 0,
+        b: out2[p + 2] ?? 0,
+        a: channels === 4 ? (out2[p + 3] ?? 255) / 255 : 1
+      };
+    }
+  };
+}
+function clamp(img, r) {
+  const x = Math.max(0, Math.round(r.x));
+  const y = Math.max(0, Math.round(r.y));
+  const x2 = Math.min(img.width, Math.round(r.x + r.w));
+  const y2 = Math.min(img.height, Math.round(r.y + r.h));
+  if (x2 <= x || y2 <= y) return null;
+  return { x, y, w: x2 - x, h: y2 - y };
+}
+var MAX_SAMPLES = 4096;
+var DOMINANCE = 0.6;
+var BUCKET = 16;
+function dominantBackground(img, rect) {
+  const r = clamp(img, rect);
+  if (!r) return null;
+  const step = Math.max(1, Math.floor(Math.sqrt(r.w * r.h / MAX_SAMPLES)));
+  const counts = /* @__PURE__ */ new Map();
+  let total = 0;
+  for (let y = r.y; y < r.y + r.h; y += step) {
+    for (let x = r.x; x < r.x + r.w; x += step) {
+      const p = img.at(x, y);
+      if (!p) continue;
+      const key = Math.round(p.r / BUCKET) << 16 | Math.round(p.g / BUCKET) << 8 | Math.round(p.b / BUCKET);
+      const cur = counts.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+      cur.n++;
+      cur.r += p.r;
+      cur.g += p.g;
+      cur.b += p.b;
+      counts.set(key, cur);
+      total++;
+    }
+  }
+  if (!total) return null;
+  let best = null;
+  for (const c2 of counts.values()) if (!best || c2.n > best.n) best = c2;
+  if (!best || best.n / total < DOMINANCE) return null;
+  return { r: Math.round(best.r / best.n), g: Math.round(best.g / best.n), b: Math.round(best.b / best.n), a: 1 };
+}
+
+// src/rules/rendered.ts
+var SKIP_TAGS2 = /* @__PURE__ */ new Set(["script", "style", "head", "title", "meta", "noscript", "link", "html", "br", "wbr"]);
+function styleAt(doc, i2) {
+  return doc.signals?.styles?.get(i2);
+}
+function hasDirectText2(el) {
+  return el.children.some((c2) => c2.type === "text" && c2.data.trim() !== "");
+}
+function invisible(css) {
+  if (css.display === "none" || css.visibility === "hidden") return true;
+  const op = Number.parseFloat(css.opacity ?? "1");
+  return Number.isFinite(op) && op === 0;
+}
+function backdropOf(doc, index, el) {
+  for (let p = el; p; p = p.parent) {
+    const i2 = index.get(p);
+    if (i2 === void 0) continue;
+    const css = styleAt(doc, i2)?.css;
+    if (!css) continue;
+    const img = css.backgroundImage;
+    if (img && img !== "none") return void 0;
+    const c2 = parseColor(css.backgroundColor ?? "");
+    if (c2 && c2.a >= 1) return { color: c2, fromImage: false };
+  }
+  return void 0;
+}
+function isLargeText(css) {
+  const px = Number.parseFloat(css.fontSize ?? "");
+  if (!Number.isFinite(px)) return false;
+  const weight = Number.parseInt(css.fontWeight ?? "400", 10);
+  const bold = Number.isFinite(weight) ? weight >= 700 : css.fontWeight === "bold";
+  return px >= 24 || px >= 18.66 && bold;
+}
+function elementIndex(doc) {
+  const m = /* @__PURE__ */ new Map();
+  doc.elements.forEach((el, i2) => m.set(el, i2));
+  return m;
+}
+var renderedContrast = {
+  id: "rendered-contrast",
+  criteria: ["1.4.3"],
+  severity: "majeur",
+  run(doc) {
+    if (!doc.signals?.styles) return [];
+    const index = elementIndex(doc);
+    const out2 = [];
+    for (const [el, i2] of index) {
+      if (SKIP_TAGS2.has(el.tag) || !hasDirectText2(el)) continue;
+      const css = styleAt(doc, i2)?.css;
+      if (!css || invisible(css)) continue;
+      const fg = parseColor(css.color ?? "");
+      if (!fg || fg.a < 1) continue;
+      const bd = backdropOf(doc, index, el);
+      if (!bd) continue;
+      const ratio = contrastRatio(fg, bd.color);
+      const large = isLargeText(css);
+      const min = large ? 3 : 4.5;
+      if (ratio >= min) continue;
+      out2.push({
+        criteriaId: "1.4.3",
+        el,
+        msgId: "rendered-contrast",
+        params: { ratio: ratio.toFixed(2), min, textSize: large ? "large" : "normal" }
+      });
+    }
+    return out2;
+  }
+};
+var renderedContrastPixel = {
+  id: "rendered-contrast-pixel",
+  criteria: ["1.4.3"],
+  severity: "majeur",
+  run(doc) {
+    const shot = doc.signals?.screenshot;
+    const boxes = doc.signals?.boxes;
+    if (!shot || !boxes || !doc.signals?.styles) return [];
+    let img = null;
+    try {
+      img = decodePng(readFileSync11(shot));
+    } catch {
+      return [];
+    }
+    if (!img) return [];
+    const index = elementIndex(doc);
+    const out2 = [];
+    for (const [el, i2] of index) {
+      if (SKIP_TAGS2.has(el.tag) || !hasDirectText2(el)) continue;
+      const css = styleAt(doc, i2)?.css;
+      if (!css || invisible(css)) continue;
+      if (backdropOf(doc, index, el)) continue;
+      const fg = parseColor(css.color ?? "");
+      if (!fg || fg.a < 1) continue;
+      const box = boxes.get(i2);
+      if (!box || box.w < 4 || box.h < 4) continue;
+      const bg = dominantBackground(img, box);
+      if (!bg) continue;
+      const ratio = contrastRatio(fg, bg);
+      const large = isLargeText(css);
+      const min = large ? 3 : 4.5;
+      if (ratio >= min) continue;
+      out2.push({
+        criteriaId: "1.4.3",
+        el,
+        msgId: "rendered-contrast-pixel",
+        params: { ratio: ratio.toFixed(2), min, textSize: large ? "large" : "normal" }
+      });
+    }
+    return out2;
+  }
+};
+function hasNonColourAffordance(css, parentCss) {
+  const deco = css.textDecorationLine ?? "";
+  if (deco && deco !== "none") return true;
+  if ((css.borderBottomStyle ?? "none") !== "none" && Number.parseFloat(css.borderBottomWidth ?? "0") > 0) return true;
+  const bg = parseColor(css.backgroundColor ?? "");
+  if (bg && bg.a > 0) return true;
+  const w = Number.parseInt(css.fontWeight ?? "400", 10);
+  const pw = Number.parseInt(parentCss?.fontWeight ?? "400", 10);
+  if (Number.isFinite(w) && Number.isFinite(pw) && w >= pw + 200) return true;
+  return false;
+}
+var TEXT_BLOCK = /* @__PURE__ */ new Set(["p", "li", "dd", "dt", "td", "th", "blockquote", "figcaption", "caption"]);
+var renderedLinkColourOnly = {
+  id: "rendered-link-colour-only",
+  criteria: ["1.4.1"],
+  severity: "majeur",
+  run(doc) {
+    if (!doc.signals?.styles) return [];
+    const index = elementIndex(doc);
+    const out2 = [];
+    for (const [el, i2] of index) {
+      if (el.tag !== "a" || !hasDirectText2(el)) continue;
+      const parent = el.parent;
+      if (!parent || !TEXT_BLOCK.has(parent.tag)) continue;
+      const css = styleAt(doc, i2)?.css;
+      const pi = index.get(parent);
+      const parentCss = pi === void 0 ? void 0 : styleAt(doc, pi)?.css;
+      if (!css || !parentCss || invisible(css)) continue;
+      if (hasNonColourAffordance(css, parentCss)) continue;
+      const linkColor = parseColor(css.color ?? "");
+      const textColor = parseColor(parentCss.color ?? "");
+      if (!linkColor || !textColor) continue;
+      const distinct = contrastRatio(linkColor, textColor);
+      if (distinct <= 1.02) continue;
+      out2.push({
+        criteriaId: "1.4.1",
+        el,
+        msgId: "rendered-link-colour-only",
+        params: { ratio: distinct.toFixed(2) }
+      });
+    }
+    return out2;
+  }
+};
+var renderedRules = [renderedContrast, renderedContrastPixel, renderedLinkColourOnly];
+
 // src/rules/timing.ts
 var metaRefreshRedirect = {
   id: "meta-refresh-redirect",
@@ -36357,6 +36900,7 @@ var timingRules = [metaRefreshRedirect, blinkMarquee];
 // src/rules/registry.ts
 var ALL_RULES = [
   ...colorsRules,
+  ...renderedRules,
   ...imagesRules,
   ...framesRules,
   ...scriptsAriaRules,
@@ -36418,7 +36962,7 @@ function crossToFinding(doc, ruleId, def, cf) {
 import { resolve as absPath } from "path";
 
 // src/graph/resolve.ts
-import { dirname as dirname5, join as join21 } from "path";
+import { dirname as dirname6, join as join22 } from "path";
 var EXT_ORDER = [".tsx", ".jsx", ".ts", ".js"];
 function candidates(base) {
   const out2 = [base];
@@ -36428,7 +36972,7 @@ function candidates(base) {
     for (const e of EXT_ORDER) out2.push(stripped + e);
   }
   for (const e of EXT_ORDER) out2.push(base + e);
-  for (const e of EXT_ORDER) out2.push(join21(base, `index${e}`));
+  for (const e of EXT_ORDER) out2.push(join22(base, `index${e}`));
   return out2;
 }
 function matchKnown(base, known) {
@@ -36440,7 +36984,7 @@ function matchKnown(base, known) {
 }
 function resolveSpecifier(fromFile, spec, known, aliases) {
   if (spec.startsWith(".")) {
-    return matchKnown(join21(dirname5(toPosix(fromFile)), spec), known);
+    return matchKnown(join22(dirname6(toPosix(fromFile)), spec), known);
   }
   if (aliases?.length) {
     for (const rule of aliases) {
@@ -36448,7 +36992,7 @@ function resolveSpecifier(fromFile, spec, known, aliases) {
         if (!spec.startsWith(rule.prefix)) continue;
         const rest = spec.slice(rule.prefix.length);
         for (const base of rule.bases) {
-          const hit = matchKnown(join21(base, rest), known);
+          const hit = matchKnown(join22(base, rest), known);
           if (hit) return hit;
         }
       } else if (spec === rule.prefix) {
@@ -36463,11 +37007,11 @@ function resolveSpecifier(fromFile, spec, known, aliases) {
 }
 
 // src/graph/tsconfig.ts
-import { existsSync as existsSync9, readFileSync as readFileSync10 } from "fs";
-import { dirname as dirname6, join as join22, resolve as resolve3, relative } from "path";
+import { existsSync as existsSync10, readFileSync as readFileSync12 } from "fs";
+import { dirname as dirname7, join as join23, resolve as resolve3, relative } from "path";
 function readJsonish(path) {
   try {
-    const raw = readFileSync10(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1").replace(/,(\s*[}\]])/g, "$1");
+    const raw = readFileSync12(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1").replace(/,(\s*[}\]])/g, "$1");
     return JSON.parse(raw);
   } catch {
     return null;
@@ -36476,9 +37020,9 @@ function readJsonish(path) {
 function findTsconfig(startDir) {
   let dir = resolve3(startDir);
   for (let i2 = 0; i2 < 30; i2++) {
-    const p = join22(dir, "tsconfig.json");
-    if (existsSync9(p)) return p;
-    const parent = dirname6(dir);
+    const p = join23(dir, "tsconfig.json");
+    if (existsSync10(p)) return p;
+    const parent = dirname7(dir);
     if (parent === dir) break;
     dir = parent;
   }
@@ -36494,15 +37038,15 @@ function tsconfigChain(startDir) {
     const p = queue.shift();
     if (seen.has(p)) continue;
     seen.add(p);
-    if (!existsSync9(p)) continue;
+    if (!existsSync10(p)) continue;
     out2.push(p);
     const cfg = readJsonish(p);
     const exts = Array.isArray(cfg?.extends) ? cfg.extends : typeof cfg?.extends === "string" ? [cfg.extends] : [];
-    const dir = dirname6(p);
+    const dir = dirname7(p);
     for (const e of exts) {
       if (typeof e !== "string") continue;
       const cands = e.endsWith(".json") ? [resolve3(dir, e)] : [resolve3(dir, `${e}.json`), resolve3(dir, e, "tsconfig.json")];
-      const hit = cands.find((c2) => existsSync9(c2));
+      const hit = cands.find((c2) => existsSync10(c2));
       if (hit) queue.push(hit);
     }
   }
@@ -36511,7 +37055,7 @@ function tsconfigChain(startDir) {
 function readTsAliases(startDir, cwd = process.cwd()) {
   const tsconfigPath = findTsconfig(startDir);
   if (!tsconfigPath) return [];
-  const root = dirname6(tsconfigPath);
+  const root = dirname7(tsconfigPath);
   const cfg = readJsonish(tsconfigPath);
   if (!cfg) return [];
   let co = cfg.compilerOptions ?? {};
@@ -36535,7 +37079,7 @@ function readTsAliases(startDir, cwd = process.cwd()) {
     const bases = targets.map((t2) => {
       const star = t2.indexOf("*");
       const tp = wildcard && star >= 0 ? t2.slice(0, star) : t2;
-      return toPosix(relative(cwd, join22(baseAbs, tp))) || ".";
+      return toPosix(relative(cwd, join23(baseAbs, tp))) || ".";
     });
     out2.push({ prefix: prefix2, wildcard, bases });
   }
@@ -37728,7 +38272,7 @@ var rgaa_default = {
       particularCases: ["Dans ces situations, les crit\xE8res sont non applicables pour ces \xE9l\xE9ments\xA0:", "[object Object]"],
       wcag: ["1.4.3"],
       appliesTo: {
-        ruleIds: ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal"]
+        ruleIds: ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
       }
     },
     {
@@ -39034,7 +39578,7 @@ var rgaa_default = {
       techniques: ["F24"],
       wcag: ["1.4.3"],
       appliesTo: {
-        ruleIds: ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal"]
+        ruleIds: ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
       }
     },
     {
@@ -39057,7 +39601,7 @@ var rgaa_default = {
       techniques: ["G183", "F73"],
       wcag: ["1.4.1"],
       appliesTo: {
-        ruleIds: []
+        ruleIds: ["rendered-link-colour-only"]
       }
     },
     {
@@ -41334,7 +41878,7 @@ function runPackRules(doc, pack) {
 }
 
 // src/graph/build.ts
-import { dirname as dirname7 } from "path";
+import { dirname as dirname8 } from "path";
 
 // src/graph/imports.ts
 var NAME_PROPS2 = /* @__PURE__ */ new Set(["aria-label", "aria-labelledby", "title", "label", "alt"]);
@@ -41632,14 +42176,14 @@ function buildGraphAndDocs(files, opts = {}) {
     }
     nodes.push(extractGraphNode(ast, doc, file, { sfc }));
   }
-  const startDir = files[0] ? dirname7(files[0]) : process.cwd();
+  const startDir = files[0] ? dirname8(files[0]) : process.cwd();
   return { graph: buildGraph2(nodes, readTsAliases(startDir), startDir), docs };
 }
 
 // src/discover.ts
-import { existsSync as existsSync10 } from "fs";
+import { existsSync as existsSync11 } from "fs";
 import { execFileSync } from "child_process";
-import { join as join23, relative as relative2 } from "path";
+import { join as join24, relative as relative2 } from "path";
 function git(args2, maxBuffer) {
   try {
     return execFileSync("git", args2, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], ...maxBuffer ? { maxBuffer } : {} });
@@ -41664,7 +42208,7 @@ function gitChangedFiles(ref) {
   add2(git(["diff", "--name-only", "--diff-filter=d", "--cached", base]));
   add2(git(["ls-files", "--others", "--exclude-standard"]));
   const cwd = process.cwd();
-  return [...out2].map((p) => relative2(cwd, join23(repoRoot2, p)));
+  return [...out2].map((p) => relative2(cwd, join24(repoRoot2, p)));
 }
 function gitStagedFiles() {
   const top = git(["rev-parse", "--show-toplevel"]);
@@ -41673,7 +42217,7 @@ function gitStagedFiles() {
   if (out2 === null) return null;
   const repoRoot2 = top.trim();
   const cwd = process.cwd();
-  return out2.split("\n").map((s) => s.trim()).filter(Boolean).map((p) => relative2(cwd, join23(repoRoot2, p)));
+  return out2.split("\n").map((s) => s.trim()).filter(Boolean).map((p) => relative2(cwd, join24(repoRoot2, p)));
 }
 function stagedContent(file) {
   return git(["show", `:./${toPosix(file)}`], 32 * 1024 * 1024);
@@ -41758,7 +42302,7 @@ function discover(inputs, opts = {}) {
     } else {
       const filter = makeFilter(opts);
       const inScope = inScopeMatcher(inputs);
-      files = changed.filter((f) => existsSync10(f) && filter(f) && (!inScope || inScope(f)));
+      files = changed.filter((f) => existsSync11(f) && filter(f) && (!inScope || inScope(f)));
     }
   } else {
     files = expandInputs(inputs, opts);
@@ -41984,7 +42528,9 @@ function runAudit(opts) {
       }
       seen.add(h);
     }
-    foldDoc(acc, reused ?? parseSource(content, file, { forceJsx: opts.forceJsx }), graph);
+    const doc = reused ?? parseSource(content, file, { forceJsx: opts.forceJsx });
+    attachSignals(doc);
+    foldDoc(acc, doc, graph);
   }
   const canonicalFiles = acc.fileCount;
   if (opts.inputs.includes("-") && opts.stdin !== void 0 && !(opts.maxFiles && opts.maxFiles > 0 && acc.fileCount >= opts.maxFiles)) {
@@ -42002,12 +42548,12 @@ function runAudit(opts) {
 }
 
 // src/report.ts
-import { mkdirSync as mkdirSync5, writeFileSync as writeFileSync6 } from "fs";
-import { join as join25 } from "path";
+import { mkdirSync as mkdirSync6, writeFileSync as writeFileSync7 } from "fs";
+import { join as join26 } from "path";
 
 // src/prd.ts
-import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync5 } from "fs";
-import { join as join24 } from "path";
+import { mkdirSync as mkdirSync5, writeFileSync as writeFileSync6 } from "fs";
+import { join as join25 } from "path";
 
 // src/standards/pack.ts
 function localize(pack, s, lang) {
@@ -45211,10 +45757,10 @@ function renderPrdDoc(r, lang = "en", standard = "wcag") {
   return out2.join("\n");
 }
 function writePrd(r, opts) {
-  mkdirSync4(opts.out, { recursive: true });
+  mkdirSync5(opts.out, { recursive: true });
   if (opts.format === "doc") {
-    const p2 = join24(opts.out, `prd-doc-${r.date}.md`);
-    writeFileSync5(p2, renderPrdDoc(r, opts.lang, opts.standard));
+    const p2 = join25(opts.out, `prd-doc-${r.date}.md`);
+    writeFileSync6(p2, renderPrdDoc(r, opts.lang, opts.standard));
     return [p2];
   }
   const remediation = opts.format === "remediation";
@@ -45223,14 +45769,14 @@ function writePrd(r, opts) {
     const files = remediation ? renderPerCriterion(r, opts.lang, opts.standard) : renderAuditorPerCriterion(r, opts.lang, opts.standard, { technical });
     const paths = [];
     for (const f of files) {
-      const p2 = join24(opts.out, f.name);
-      writeFileSync5(p2, f.content);
+      const p2 = join25(opts.out, f.name);
+      writeFileSync6(p2, f.content);
       paths.push(p2);
     }
     return paths;
   }
-  const p = join24(opts.out, `prd-${r.date}.md`);
-  writeFileSync5(p, remediation ? renderBacklog(r, opts.lang, opts.standard) : renderAuditorBacklog(r, opts.lang, opts.standard, { technical }));
+  const p = join25(opts.out, `prd-${r.date}.md`);
+  writeFileSync6(p, remediation ? renderBacklog(r, opts.lang, opts.standard) : renderAuditorBacklog(r, opts.lang, opts.standard, { technical }));
   return [p];
 }
 
@@ -45668,9 +46214,9 @@ function renderPackReport(r, pack, lang = "en") {
 function writeReport(r, opts) {
   const core = isCore(opts.standard);
   const md = core ? renderReport(r, opts.lang) : renderPackReport(r, loadPack(opts.standard), opts.lang);
-  mkdirSync5(opts.out, { recursive: true });
-  const path = join25(opts.out, `${core ? "wcag" : opts.standard}-${r.date}.md`);
-  writeFileSync6(path, md);
+  mkdirSync6(opts.out, { recursive: true });
+  const path = join26(opts.out, `${core ? "wcag" : opts.standard}-${r.date}.md`);
+  writeFileSync7(path, md);
   return path;
 }
 
@@ -46233,12 +46779,12 @@ function renderCriteriaReference() {
 }
 
 // src/check.ts
-import { existsSync as existsSync12, readFileSync as readFileSync12 } from "fs";
-import { dirname as dirname8, join as join27 } from "path";
+import { existsSync as existsSync13, readFileSync as readFileSync14 } from "fs";
+import { dirname as dirname9, join as join28 } from "path";
 
 // src/verify.ts
-import { mkdirSync as mkdirSync6, writeFileSync as writeFileSync7 } from "fs";
-import { join as join26 } from "path";
+import { mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
+import { join as join27 } from "path";
 var VERIFY_MAX = 40;
 var plain = (s) => s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
 function auditorCriterionLine(standard) {
@@ -46412,16 +46958,16 @@ function applyVerdicts(items, expected) {
   return { ok: failures.length === 0, total, refuted, unsupported, unadjudicated, invalid, missing, failures };
 }
 function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") {
-  mkdirSync6(outDir, { recursive: true });
-  const todoPath = join26(outDir, "VERIFY.todo.json");
-  const mdPath = join26(outDir, "VERIFY.md");
-  writeFileSync7(todoPath, JSON.stringify(items, null, 2) + "\n");
-  writeFileSync7(mdPath, formatWorklist(items, semantic, standard, lang));
+  mkdirSync7(outDir, { recursive: true });
+  const todoPath = join27(outDir, "VERIFY.todo.json");
+  const mdPath = join27(outDir, "VERIFY.md");
+  writeFileSync8(todoPath, JSON.stringify(items, null, 2) + "\n");
+  writeFileSync8(mdPath, formatWorklist(items, semantic, standard, lang));
   return { todoPath, mdPath, count: items.length };
 }
 
 // src/grounding.ts
-import { existsSync as existsSync11, readFileSync as readFileSync11 } from "fs";
+import { existsSync as existsSync12, readFileSync as readFileSync13 } from "fs";
 import { resolve as resolve4 } from "path";
 var WINDOW = 10;
 var norm2 = (s) => s.replace(/\s+/g, " ").trim();
@@ -46440,10 +46986,10 @@ function selectorProbes(selector) {
 function groundFinding(g, opts = {}) {
   if (isUnresolvable(g.file)) return { ok: true, moved: false };
   const path = resolve4(opts.cwd ?? process.cwd(), g.file);
-  if (!existsSync11(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
+  if (!existsSync12(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
   let text;
   try {
-    text = readFileSync11(path, "utf8");
+    text = readFileSync13(path, "utf8");
   } catch {
     return { ok: false, moved: false, issue: `cited file unreadable: ${g.file}` };
   }
@@ -46590,11 +47136,11 @@ function checkSemantic(md, opts) {
   const standard = opts.standard ?? "wcag";
   const s = M[lang];
   const empty = { total: 0, grounded: 0, moved: 0, failed: 0 };
-  const artifact = opts.verdictsPath ?? join27(dirname8(opts.reportPath), "VERIFY.todo.json");
-  if (!existsSync12(artifact)) return { ok: false, issues: [s.semanticMissing(artifact)], ...empty };
+  const artifact = opts.verdictsPath ?? join28(dirname9(opts.reportPath), "VERIFY.todo.json");
+  if (!existsSync13(artifact)) return { ok: false, issues: [s.semanticMissing(artifact)], ...empty };
   let items;
   try {
-    const parsed = JSON.parse(readFileSync12(artifact, "utf8"));
+    const parsed = JSON.parse(readFileSync14(artifact, "utf8"));
     if (!Array.isArray(parsed)) throw new Error("not an array");
     items = parsed;
   } catch {
@@ -46626,8 +47172,8 @@ function sectionBody(md, n) {
 }
 
 // src/adjudicate.ts
-import { mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
-import { join as join28 } from "path";
+import { mkdirSync as mkdirSync8, writeFileSync as writeFileSync9 } from "fs";
+import { join as join29 } from "path";
 
 // src/data/adjudication.json
 var adjudication_default = {
@@ -47550,7 +48096,7 @@ function docsForAudit(audit, cwd) {
   const docs = [];
   for (const f of files) {
     try {
-      docs.push(parseSource(readText(cwd ? join28(cwd, f) : f), f));
+      docs.push(parseSource(readText(cwd ? join29(cwd, f) : f), f));
     } catch {
     }
   }
@@ -47762,9 +48308,9 @@ function formatAdjudication(items, lang = "en") {
   return out2.join("\n");
 }
 function writeAdjudication(items, outDir, opts) {
-  mkdirSync7(outDir, { recursive: true });
-  const todoPath = join28(outDir, "ADJUDICATE.todo.json");
-  const mdPath = join28(outDir, "ADJUDICATE.md");
+  mkdirSync8(outDir, { recursive: true });
+  const todoPath = join29(outDir, "ADJUDICATE.todo.json");
+  const mdPath = join29(outDir, "ADJUDICATE.md");
   const file = {
     tool: "ultra11y",
     kind: "adjudication",
@@ -47773,16 +48319,16 @@ function writeAdjudication(items, outDir, opts) {
     auditDate: opts.auditDate,
     items
   };
-  writeFileSync8(todoPath, JSON.stringify(file, null, 2) + "\n");
-  writeFileSync8(mdPath, formatAdjudication(items, opts.lang ?? "en"));
+  writeFileSync9(todoPath, JSON.stringify(file, null, 2) + "\n");
+  writeFileSync9(mdPath, formatAdjudication(items, opts.lang ?? "en"));
   return { todoPath, mdPath, count: items.length };
 }
 
 // src/scan.ts
 import { execFileSync as execFileSync3 } from "child_process";
-import { mkdtempSync as mkdtempSync2, writeFileSync as writeFileSync9, existsSync as existsSync14, statSync as statSync7, readdirSync as readdirSync4, rmSync as rmSync3, readFileSync as readFileSync13 } from "fs";
+import { mkdtempSync as mkdtempSync2, writeFileSync as writeFileSync10, existsSync as existsSync15, statSync as statSync7, readdirSync as readdirSync5, rmSync as rmSync3, readFileSync as readFileSync15 } from "fs";
 import { tmpdir } from "os";
-import { join as join29, resolve as resolve5 } from "path";
+import { join as join30, resolve as resolve5 } from "path";
 import { fileURLToPath as fileURLToPath3 } from "url";
 
 // src/axe-map.ts
@@ -48024,7 +48570,7 @@ async function crawlUrls(start2, opts) {
 }
 
 // src/sample.ts
-import { existsSync as existsSync13 } from "fs";
+import { existsSync as existsSync14 } from "fs";
 function looksLikeTarget(u) {
   return /^https?:\/\//i.test(u) || /^(\.\.?[/\\]|[/\\])/.test(u) || /\.x?html?$/i.test(u);
 }
@@ -48060,7 +48606,7 @@ function validateSample(raw) {
     if (p.auth !== void 0 && typeof p.auth !== "boolean") err2(`sample.pages[${i2}].auth`, "auth must be a boolean");
     if (p.storageState !== void 0 && (typeof p.storageState !== "string" || p.storageState.trim() === "")) {
       err2(`sample.pages[${i2}].storageState`, "storageState must be a non-empty file path string");
-    } else if (typeof p.storageState === "string" && p.storageState.trim() !== "" && !existsSync13(p.storageState)) {
+    } else if (typeof p.storageState === "string" && p.storageState.trim() !== "" && !existsSync14(p.storageState)) {
       warn(
         `sample.pages[${i2}].storageState`,
         `storageState path not found: "${p.storageState}" (resolved from the current directory) \u2014 the scan will not be able to load this session`
@@ -48185,11 +48731,11 @@ function imageExists(tag) {
 }
 var CTX_PREFIX = "ultra11y-dyn-";
 function buildImage(tag = IMAGE_TAG) {
-  const ctx = mkdtempSync2(join29(tmpdir(), CTX_PREFIX));
+  const ctx = mkdtempSync2(join30(tmpdir(), CTX_PREFIX));
   try {
-    writeFileSync9(join29(ctx, "runner.mjs"), RUNNER);
-    writeFileSync9(join29(ctx, "package.json"), PKG);
-    writeFileSync9(join29(ctx, "Dockerfile"), DOCKERFILE);
+    writeFileSync10(join30(ctx, "runner.mjs"), RUNNER);
+    writeFileSync10(join30(ctx, "package.json"), PKG);
+    writeFileSync10(join30(ctx, "Dockerfile"), DOCKERFILE);
     execFileSync3("docker", ["build", "-t", tag, ctx], { stdio: "inherit", timeout: 9e5 });
   } finally {
     rmSync3(ctx, { recursive: true, force: true });
@@ -48198,9 +48744,9 @@ function buildImage(tag = IMAGE_TAG) {
 function cleanTempContexts() {
   let removed = 0;
   const dir = tmpdir();
-  for (const name2 of readdirSync4(dir)) {
+  for (const name2 of readdirSync5(dir)) {
     if (!name2.startsWith(CTX_PREFIX)) continue;
-    rmSync3(join29(dir, name2), { recursive: true, force: true });
+    rmSync3(join30(dir, name2), { recursive: true, force: true });
     removed++;
   }
   return removed;
@@ -48311,7 +48857,7 @@ function toDynamicResult(out2, target, lang = "en", engine = "axe-core@playwrigh
 var DOCKER_TESTED_SCS = ["1.4.10"];
 function runScan(opts) {
   const isUrl3 = /^https?:\/\//i.test(opts.target);
-  if (!isUrl3 && !existsSync14(opts.target)) {
+  if (!isUrl3 && !existsSync15(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
   if (!dockerAvailable()) {
@@ -48319,7 +48865,7 @@ function runScan(opts) {
   }
   const tag = opts.tag ?? IMAGE_TAG;
   if (!imageExists(tag)) buildImage(tag);
-  const isFile = !isUrl3 && existsSync14(opts.target) && statSync7(opts.target).isFile();
+  const isFile = !isUrl3 && existsSync15(opts.target) && statSync7(opts.target).isFile();
   const out2 = runRunner(opts.target, isFile, tag);
   return { ...toDynamicResult(out2, opts.target), testedScs: [...DOCKER_TESTED_SCS] };
 }
@@ -48397,10 +48943,10 @@ async function runCrawlScan(opts) {
 var sevRank = { bloquant: 3, majeur: 2, mineur: 1 };
 function resolveHostAnchor(file, snippet2) {
   const s = snippet2?.trim();
-  if (!s || !existsSync14(file)) return null;
+  if (!s || !existsSync15(file)) return null;
   let source;
   try {
-    source = readFileSync13(file, "utf8");
+    source = readFileSync15(file, "utf8");
   } catch {
     return null;
   }
@@ -48499,186 +49045,6 @@ function mergeDynamic(audit, dynamic, lang = "en") {
 import { existsSync as existsSync16, statSync as statSync8 } from "fs";
 import { createRequire } from "module";
 import { resolve as resolve6 } from "path";
-
-// src/snapshot.ts
-import { existsSync as existsSync15, mkdirSync as mkdirSync8, readFileSync as readFileSync14, readdirSync as readdirSync5, writeFileSync as writeFileSync10 } from "fs";
-import { join as join30 } from "path";
-var SNAPSHOT_VERSION = 1;
-var PAGES_DIR = ".ultra11y/pages";
-var ID_RE = /^[a-z0-9][a-z0-9-]*$/i;
-function validateSnapshotMeta(raw) {
-  const issues = [];
-  const err2 = (path, message) => {
-    issues.push({ path, message });
-  };
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    err2("meta", "meta must be an object { v, id, name, url, \u2026 }");
-    return { ok: false, issues };
-  }
-  const m = raw;
-  const v = typeof m.v === "number" ? m.v : Number.NaN;
-  if (!Number.isFinite(v) || v < 1) err2("meta.v", "v must be a positive integer snapshot-format version");
-  else if (v > SNAPSHOT_VERSION) err2("meta.v", `snapshot format v${v} is newer than this engine understands (v${SNAPSHOT_VERSION}) \u2014 upgrade ultra11y`);
-  if (typeof m.id !== "string" || !m.id.trim()) err2("meta.id", "id must be a non-empty string");
-  else if (!ID_RE.test(m.id)) err2("meta.id", `id "${m.id}" must match ${ID_RE} (it becomes a directory name)`);
-  if (typeof m.name !== "string" || !m.name.trim()) err2("meta.name", "name must be a non-empty string");
-  if (typeof m.url !== "string" || !m.url.trim()) err2("meta.url", "url must be a non-empty string");
-  if (m.auth !== void 0 && typeof m.auth !== "boolean") err2("meta.auth", "auth must be a boolean");
-  if (m.route !== void 0 && typeof m.route !== "string") err2("meta.route", "route must be a string");
-  if (m.notes !== void 0 && typeof m.notes !== "string") err2("meta.notes", "notes must be a string");
-  if (m.sources !== void 0 && (!Array.isArray(m.sources) || m.sources.some((s) => typeof s !== "string")))
-    err2("meta.sources", "sources must be an array of strings");
-  if (issues.length) return { ok: false, issues };
-  return {
-    ok: true,
-    issues,
-    meta: {
-      v,
-      id: m.id,
-      name: m.name,
-      url: m.url,
-      ...typeof m.route === "string" ? { route: m.route } : {},
-      ...typeof m.auth === "boolean" ? { auth: m.auth } : {},
-      ...m.viewport && typeof m.viewport === "object" ? { viewport: m.viewport } : {},
-      ...typeof m.capturedAt === "string" ? { capturedAt: m.capturedAt } : {},
-      ...typeof m.runner === "string" ? { runner: m.runner } : {},
-      ...Array.isArray(m.sources) ? { sources: m.sources } : {},
-      ...typeof m.notes === "string" ? { notes: m.notes } : {}
-    }
-  };
-}
-function snapshotDir(root, id) {
-  return join30(root, PAGES_DIR, id);
-}
-function writeSnapshot(root, snap) {
-  const dir = snapshotDir(root, snap.meta.id);
-  mkdirSync8(dir, { recursive: true });
-  writeFileSync10(join30(dir, "meta.json"), `${JSON.stringify(snap.meta, null, 2)}
-`);
-  const comment = formatCaptureComment({
-    v: 1,
-    page: snap.meta.id,
-    url: snap.meta.url,
-    ...snap.meta.sources?.[0] ? { sourceFile: snap.meta.sources[0] } : {},
-    name: snap.meta.name
-  });
-  writeFileSync10(join30(dir, "dom.html"), `${comment}
-${snap.dom}
-`);
-  if (snap.styles) writeFileSync10(join30(dir, "styles.json"), `${JSON.stringify(snap.styles)}
-`);
-  if (snap.boxes) writeFileSync10(join30(dir, "boxes.json"), `${JSON.stringify(snap.boxes)}
-`);
-  if (snap.axtree) writeFileSync10(join30(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}
-`);
-  return dir;
-}
-function readJson2(file) {
-  try {
-    return JSON.parse(readFileSync14(file, "utf8"));
-  } catch {
-    return void 0;
-  }
-}
-function readSnapshot(dir) {
-  const rawMeta = readJson2(join30(dir, "meta.json"));
-  if (rawMeta === void 0) return null;
-  const v = validateSnapshotMeta(rawMeta);
-  if (!v.ok || !v.meta) return null;
-  let dom;
-  try {
-    dom = readFileSync14(join30(dir, "dom.html"), "utf8");
-  } catch {
-    return null;
-  }
-  const styles = readJson2(join30(dir, "styles.json"));
-  const boxes = readJson2(join30(dir, "boxes.json"));
-  const axtree = readJson2(join30(dir, "axtree.json"));
-  const shot = join30(dir, "screen.png");
-  return {
-    meta: v.meta,
-    dom,
-    ...styles ? { styles } : {},
-    ...boxes ? { boxes } : {},
-    ...axtree ? { axtree } : {},
-    ...existsSync15(shot) ? { screenshot: "screen.png" } : {}
-  };
-}
-function readSnapshots(root) {
-  const base = join30(root, PAGES_DIR);
-  let dirs;
-  try {
-    dirs = readdirSync5(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
-  } catch {
-    return [];
-  }
-  const out2 = [];
-  for (const d of dirs.sort()) {
-    const s = readSnapshot(join30(base, d));
-    if (s) out2.push(s);
-  }
-  return out2;
-}
-var COLLECTED_CSS = [
-  "color",
-  "backgroundColor",
-  "backgroundImage",
-  "fontSize",
-  "fontWeight",
-  "fontStyle",
-  "textDecorationLine",
-  "textTransform",
-  "lineHeight",
-  "letterSpacing",
-  "wordSpacing",
-  "whiteSpace",
-  "display",
-  "visibility",
-  "opacity",
-  "position",
-  "overflowX",
-  "overflowY",
-  "outlineStyle",
-  "outlineWidth",
-  "outlineColor",
-  "borderBottomStyle",
-  "borderBottomWidth",
-  "cursor"
-];
-var COLLECT_MAX_ELEMENTS = 5e3;
-var COLLECT_SNAPSHOT = `(() => {
-  const PROPS = ${JSON.stringify(COLLECTED_CSS)};
-  const MAX = ${COLLECT_MAX_ELEMENTS};
-  const els = document.querySelectorAll('*');
-  const styles = [];
-  const boxes = [];
-  const n = Math.min(els.length, MAX);
-  for (let i = 0; i < n; i++) {
-    const el = els[i];
-    const tag = el.tagName.toLowerCase();
-    const cs = getComputedStyle(el);
-    const css = {};
-    for (const p of PROPS) {
-      const v = cs[p];
-      if (v !== undefined && v !== null && v !== '') css[p] = String(v);
-    }
-    styles.push({ i: i, tag: tag, css: css });
-    const r = el.getBoundingClientRect();
-    boxes.push({ i: i, tag: tag, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
-  }
-  const truncated = els.length > MAX;
-  return {
-    dom: document.documentElement.outerHTML,
-    title: document.title,
-    lang: document.documentElement.getAttribute('lang') || '',
-    url: location.href,
-    viewport: { width: window.innerWidth, height: window.innerHeight },
-    styles: { v: 1, entries: styles, truncated: truncated },
-    boxes: { v: 1, entries: boxes, truncated: truncated }
-  };
-})()`;
-
-// src/scan-local.ts
 var LOCAL_ENGINE = "axe-core@playwright (local)";
 var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13"];
 function localTestedScs(interact) {
@@ -50130,6 +50496,18 @@ const COLLECT = ${JSON.stringify(COLLECT_SNAPSHOT)};
 
 export async function checkA11y(page, opts = {}) {
   const collected = await page.evaluate(COLLECT);
+  // A VIEWPORT screenshot, deliberately \u2014 the boxes come from getBoundingClientRect, which is
+  // viewport-relative, so a full-page capture would put the two coordinate systems out of
+  // step. It feeds the pixel tier: contrast where the CSSOM cannot answer (text over an
+  // image or a gradient). \`screenshot: false\` skips it.
+  let shot;
+  if (opts.screenshot !== false) {
+    try {
+      shot = (await page.screenshot({ fullPage: false })).toString("base64");
+    } catch {
+      // A screenshot failure must never fail the accessibility check itself.
+    }
+  }
   const url = collected.url || page.url();
   const id = opts.as || slugify(url);
   const payload = {
@@ -50148,6 +50526,7 @@ export async function checkA11y(page, opts = {}) {
     dom: collected.dom,
     styles: collected.styles,
     boxes: collected.boxes,
+    ...(shot ? { screenshot: shot } : {}),
   };
   const result = auditSnapshot(payload);
   const failOn = opts.failOn === undefined ? "blocking" : opts.failOn;
@@ -50574,7 +50953,7 @@ ${g.errors.map((e) => `  \u2717 ${e}`).join("\n")}`);
 }
 
 // src/orchestrate.ts
-import { existsSync as existsSync19, mkdirSync as mkdirSync10, readFileSync as readFileSync15, rmSync as rmSync4, writeFileSync as writeFileSync13 } from "fs";
+import { existsSync as existsSync19, mkdirSync as mkdirSync10, readFileSync as readFileSync16, rmSync as rmSync4, writeFileSync as writeFileSync13 } from "fs";
 import { join as join34, resolve as resolve7 } from "path";
 
 // src/orchestrate-templates.ts
@@ -50785,7 +51164,7 @@ function listPhases(runDir, engineAbs) {
   let adjReady = false;
   if (existsSync19(adjPath)) {
     try {
-      const f = JSON.parse(readFileSync15(adjPath, "utf8"));
+      const f = JSON.parse(readFileSync16(adjPath, "utf8"));
       if (f && f.kind === "adjudication" && Array.isArray(f.items)) {
         adjReady = true;
         adjIds = f.items.map((i2) => i2.criteriaId);
@@ -50798,7 +51177,7 @@ function listPhases(runDir, engineAbs) {
   let verReady = false;
   if (existsSync19(verPath)) {
     try {
-      const items = JSON.parse(readFileSync15(verPath, "utf8"));
+      const items = JSON.parse(readFileSync16(verPath, "utf8"));
       if (Array.isArray(items)) {
         verReady = true;
         verIds = items.map((i2) => String(i2.n));
@@ -51441,7 +51820,7 @@ async function cmdAudit(p) {
     const asFile = out2.toLowerCase().endsWith(".json");
     const target = asFile ? out2 : join35(out2, "audit-latest.json");
     try {
-      mkdirSync11(asFile ? dirname9(out2) : out2, { recursive: true });
+      mkdirSync11(asFile ? dirname10(out2) : out2, { recursive: true });
       writeFileSync14(target, JSON.stringify(result, null, 2) + "\n");
       console.error(lang === "fr" ? `\u2192 audit \xE9crit dans ${target}` : `\u2192 audit written to ${target}`);
     } catch {
@@ -51592,6 +51971,13 @@ async function cmdSnapshot(p) {
   } catch (e) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
+  }
+  if (typeof payload.screenshot === "string" && payload.screenshot) {
+    try {
+      writeFileSync14(join35(dir, "screen.png"), Buffer.from(payload.screenshot, "base64"));
+    } catch {
+      console.error("ultra11y snapshot write: the screenshot could not be written \u2014 the pixel tier will be skipped for this page.");
+    }
   }
   const result = runAudit({ inputs: [join35(dir, "dom.html")], onWarn: (m) => console.error(m) });
   const failOnRaw = p.flags["fail-on"];
@@ -51843,7 +52229,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const rel = ".ultra11y/capture-setup.mjs";
     const out2 = join35(root, rel);
     try {
-      mkdirSync11(dirname9(out2), { recursive: true });
+      mkdirSync11(dirname10(out2), { recursive: true });
       writeFileSync14(out2, captureSetup());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out2}: ${e instanceof Error ? e.message : String(e)}`);
@@ -51863,7 +52249,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const gaLine = ".ultra11y/captures/*.html text eol=lf linguist-generated=true";
     const gaPath = join35(root, ".gitattributes");
     try {
-      const existing = existsSync20(gaPath) ? readFileSync16(gaPath, "utf8") : "";
+      const existing = existsSync20(gaPath) ? readFileSync17(gaPath, "utf8") : "";
       if (!existing.includes(".ultra11y/captures/")) {
         appendFileSync(gaPath, (existing && !existing.endsWith("\n") ? "\n" : "") + gaLine + "\n");
         console.log(lang === "fr" ? `.gitattributes : ajout\xE9 \xAB ${gaLine} \xBB` : `.gitattributes: added "${gaLine}"`);
@@ -51872,7 +52258,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     }
     try {
       const giPath = join35(root, ".gitignore");
-      if (existsSync20(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync16(giPath, "utf8")))
+      if (existsSync20(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync17(giPath, "utf8")))
         console.error(
           lang === "fr" ? "\u26A0\uFE0F .ultra11y semble ignor\xE9 par .gitignore \u2014 les captures doivent \xEAtre committ\xE9es pour le gate (ajoutez \xAB !.ultra11y/captures/ \xBB)." : '\u26A0\uFE0F .ultra11y appears gitignored \u2014 captures must be committed for the gate (add "!.ultra11y/captures/").'
         );

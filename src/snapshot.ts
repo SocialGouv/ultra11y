@@ -28,9 +28,13 @@
 // entry repeats its `tag` so the join can be VERIFIED (`alignedStyles`); on any mismatch the
 // whole digest is refused rather than silently mis-attributing a style to the wrong element.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { formatCaptureComment } from "./capture.js";
 import { parseHtml } from "./parse/html.js";
+import type { Doc } from "./parse/html.js";
+import type { AxNode, BoxDigest, BoxEntry, RenderSignals, StyleDigest, StyleEntry } from "./types.js";
+
+export type { AxNode, BoxDigest, BoxEntry, RenderSignals, StyleDigest, StyleEntry };
 
 export const SNAPSHOT_VERSION = 1;
 export const PAGES_DIR = ".ultra11y/pages";
@@ -55,50 +59,6 @@ export interface SnapshotMeta {
   // SOURCE findings — see src/pages.ts.
   sources?: string[];
   notes?: string;
-}
-
-/** One element's computed style. `css` keys are CSS camelCase, values as the browser
- *  serialized them (`rgb(0, 0, 0)`, `16px`) — never re-parsed here. */
-export interface StyleEntry {
-  i: number; // document-order index of the element
-  tag: string; // repeated so the join can be verified
-  css: Record<string, string>;
-}
-
-export interface StyleDigest {
-  v: number;
-  entries: StyleEntry[];
-  // Set when the collector hit its element cap. A truncated digest must never read as
-  // "nothing more to see" — the rendered rules degrade to `manual` for the tail.
-  truncated?: boolean;
-}
-
-export interface BoxEntry {
-  i: number;
-  tag: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-export interface BoxDigest {
-  v: number;
-  entries: BoxEntry[];
-  truncated?: boolean;
-}
-
-/** The accessibility tree as the browser computed it — roles and names the engine would
- *  otherwise have to infer from markup. Deliberately loose: producers differ. */
-export interface AxNode {
-  role?: string;
-  name?: string;
-  value?: string;
-  description?: string;
-  level?: number;
-  disabled?: boolean;
-  focusable?: boolean;
-  children?: AxNode[];
 }
 
 export interface Snapshot {
@@ -376,3 +336,52 @@ export const COLLECT_SNAPSHOT = `(() => {
     boxes: { v: 1, entries: boxes, truncated: truncated }
   };
 })()`;
+
+// ---- attaching signals to a parsed Doc ---------------------------------------------------
+
+/** Is this file a page snapshot's serialized DOM? */
+export function isSnapshotDom(file: string): boolean {
+  const posix = file.split("\\").join("/");
+  return posix.endsWith("/dom.html") && posix.includes(`${PAGES_DIR}/`);
+}
+
+/** Verify a digest's entries against a parsed document by document-order ordinal, returning
+ *  the index or null. Shared by styles and boxes: the entry repeats its tag, so a digest
+ *  collected from a DIFFERENT DOM than the one serialized is caught and refused WHOLESALE.
+ *  Refusing everything is the point — a silently shifted index would attribute one element's
+ *  colour to another and manufacture a non-conformity out of nothing. */
+function align<T extends { i: number; tag: string }>(doc: Doc, entries: T[]): Map<number, T> | null {
+  const out = new Map<number, T>();
+  for (const e of entries) {
+    const el = doc.elements[e.i];
+    if (!el || el.tag !== e.tag) return null;
+    out.set(e.i, e);
+  }
+  return out;
+}
+
+/** Load and verify the signals sitting beside a snapshot's `dom.html`, and attach them to the
+ *  Doc. A no-op for any other file, and for a snapshot whose signals do not verify — in which
+ *  case the rendered rules simply do not fire and their criteria stay `manual`, which is the
+ *  honest outcome (never a guess, never a silent conformity). */
+export function attachSignals(doc: Doc): void {
+  if (!isSnapshotDom(doc.file)) return;
+  const dir = dirname(doc.file);
+  const styles = readJson<StyleDigest>(join(dir, "styles.json"));
+  const boxes = readJson<BoxDigest>(join(dir, "boxes.json"));
+  const axtree = readJson<AxNode>(join(dir, "axtree.json"));
+  const shot = join(dir, "screen.png");
+
+  const alignedStyleMap = styles ? align(doc, styles.entries) : null;
+  const alignedBoxMap = boxes ? align(doc, boxes.entries) : null;
+  const truncated = Boolean(styles?.truncated || boxes?.truncated);
+
+  const signals: RenderSignals = {
+    ...(alignedStyleMap ? { styles: alignedStyleMap } : {}),
+    ...(alignedBoxMap ? { boxes: alignedBoxMap } : {}),
+    ...(axtree ? { axtree } : {}),
+    ...(existsSync(shot) ? { screenshot: shot } : {}),
+    ...(truncated ? { truncated } : {}),
+  };
+  if (Object.keys(signals).length) doc.signals = signals;
+}

@@ -103,6 +103,18 @@ const COLLECT = ${JSON.stringify(COLLECT_SNAPSHOT)};
 
 export async function checkA11y(page, opts = {}) {
   const collected = await page.evaluate(COLLECT);
+  // A VIEWPORT screenshot, deliberately — the boxes come from getBoundingClientRect, which is
+  // viewport-relative, so a full-page capture would put the two coordinate systems out of
+  // step. It feeds the pixel tier: contrast where the CSSOM cannot answer (text over an
+  // image or a gradient). \`screenshot: false\` skips it.
+  let shot;
+  if (opts.screenshot !== false) {
+    try {
+      shot = (await page.screenshot({ fullPage: false })).toString("base64");
+    } catch {
+      // A screenshot failure must never fail the accessibility check itself.
+    }
+  }
   const url = collected.url || page.url();
   const id = opts.as || slugify(url);
   const payload = {
@@ -121,6 +133,7 @@ export async function checkA11y(page, opts = {}) {
     dom: collected.dom,
     styles: collected.styles,
     boxes: collected.boxes,
+    ...(shot ? { screenshot: shot } : {}),
   };
   const result = auditSnapshot(payload);
   const failOn = opts.failOn === undefined ? "blocking" : opts.failOn;

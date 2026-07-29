@@ -77,6 +77,59 @@ recorded so the tail reads as *unmeasured*, never as *clean*.
 
 ## Producing snapshots
 
+## The rendered tier — criteria only a browser can answer, decided offline
+
+A snapshot carries what a browser knows and source does not. Three rules read it, and they
+run inside the ordinary `audit` — **no browser, no Docker, no running server**, from a
+committed artefact. That is the point: CI decides these without booting the app.
+
+| Rule | WCAG | RGAA | Reads |
+|---|---|---|---|
+| `rendered-contrast` | 1.4.3 | **3.2 / 10.5** | computed `color` vs the nearest opaque ancestor background |
+| `rendered-contrast-pixel` | 1.4.3 | **3.2 / 10.5** | the screenshot, where the CSSOM cannot answer |
+| `rendered-link-colour-only` | 1.4.1 | **10.6** | computed styles of a link inside running text |
+
+**`rendered-contrast` beats the inline-literal rule** it sits beside: `contrast-literal` can
+only judge colours written inline in the markup, so it says nothing about a real stylesheet.
+The computed value is the value the user sees, and large-text thresholds need no unit guessing
+because the browser already resolved everything to px.
+
+**`rendered-contrast-pixel` exists for one case**: text over a gradient, a background image or
+a translucent stack. There, `background-color` is `rgba(0,0,0,0)` and no style analysis will
+recover the real backdrop — a documented blind spot of every CSSOM-based check, axe-core
+included. The screenshot is the only place the answer exists. It is deliberately narrow: it
+runs **only** where `rendered-contrast` declined, so one defect is never counted twice, and it
+reports only when the measured region has one dominant colour. Contrast against a photograph
+is not a single number, and pretending it is would be a fabricated finding.
+
+**`rendered-link-colour-only` makes RGAA 10.6 decidable at all** — it had no rule before. A
+coloured link with `text-decoration: none` in a paragraph is invisible to source analysis (the
+rule lives in a stylesheet) and to axe-core. It is scoped to links *with text* *inside a text
+block*, which is where the criterion applies; a nav or button-styled link is out of scope by
+construction, and an underline, a bottom border, a background or a distinctly heavier weight
+all clear it.
+
+### What makes this tier trustworthy
+
+It can say "non-conforming" because it can also say **"I don't know"**. Each of these leaves
+the criterion undecided rather than guessing:
+
+- no ancestor declares an opaque background, or the backdrop is an image → no CSSOM verdict;
+- the screenshot region is genuinely varied → no pixel verdict;
+- the element sits past the collector's cap (`truncated: true`) → no signals, no verdict;
+- the style digest does not verify against the DOM → the **whole** digest is refused.
+
+And without `doc.signals` — every ordinary source file — the rules do not fire at all, so
+adding this tier cannot change a single pre-existing verdict.
+
+### How much of RGAA the engine can evidence
+
+`tests/rgaa-coverage.test.ts` pins the number and ratchets it: **44 of 106** criteria map onto
+an engine rule, up from 43 before this tier. It can only go up — a refactor that silently
+unmaps a criterion fails CI rather than quietly shrinking the audit. Criteria nothing can
+decide stay at zero *visibly*: RGAA 8.1 maps only to the removed WCAG 4.1.1, and 13.3 depends
+on downloadable office documents.
+
 ## The per-page grid
 
 RGAA is a **per-page** norm: an audit runs over a declared sample and each criterion gets a

@@ -271,6 +271,50 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
     },
   },
 
+  // ---- Rendered tier (src/rules/rendered.ts) — decided from a page snapshot's signals -----
+  // These say WHERE the measurement came from, because that is what makes them auditable: a
+  // computed style, or a region of the screenshot. An auditor can go and re-check either.
+  "rendered-contrast": {
+    message: {
+      fr: (p) =>
+        `Contraste insuffisant au rendu : ratio ${p.ratio}:1 entre le texte et son fond effectif (minimum ${p.min}:1 pour du texte ${p.textSize === "large" ? "large" : "normal"}).`,
+      en: (p) =>
+        `Insufficient contrast at render: ${p.ratio}:1 between the text and its effective background (minimum ${p.min}:1 for ${p.textSize === "large" ? "large" : "normal"} text).`,
+    },
+    remediation: {
+      fr: (p) => `Assombrissez le texte ou éclaircissez le fond pour atteindre au moins ${p.min}:1 (mesuré sur les styles calculés de la page rendue).`,
+      en: (p) => `Darken the text or lighten the background to reach at least ${p.min}:1 (measured from the rendered page's computed styles).`,
+    },
+  },
+  "rendered-contrast-pixel": {
+    message: {
+      fr: (p) =>
+        `Contraste insuffisant mesuré sur la capture d'écran : ratio ${p.ratio}:1 (minimum ${p.min}:1 pour du texte ${p.textSize === "large" ? "large" : "normal"}). Le fond vient d'une image ou d'un dégradé, invisible aux styles calculés.`,
+      en: (p) =>
+        `Insufficient contrast measured on the screenshot: ${p.ratio}:1 (minimum ${p.min}:1 for ${p.textSize === "large" ? "large" : "normal"} text). The background comes from an image or gradient, which computed styles cannot express.`,
+    },
+    remediation: {
+      fr: (p) =>
+        `Garantissez au moins ${p.min}:1 sur toute la zone : ajoutez un fond opaque sous le texte, un voile, ou une ombre portée. Le fond a été mesuré sur les pixels de la zone occupée par le texte.`,
+      en: (p) =>
+        `Guarantee at least ${p.min}:1 across the whole area: add an opaque backing behind the text, a scrim, or a text shadow. The background was measured on the pixels of the text's own box.`,
+    },
+  },
+  "rendered-link-colour-only": {
+    message: {
+      fr: (p) =>
+        `Lien dans un bloc de texte distingué par la COULEUR SEULE (écart de ${p.ratio}:1 avec le texte environnant, sans soulignement, bordure ni fond) — invisible pour qui ne perçoit pas cette différence de couleur.`,
+      en: (p) =>
+        `Link inside a text block distinguished by COLOUR ALONE (${p.ratio}:1 apart from the surrounding text, with no underline, border or background) — invisible to anyone who does not perceive that colour difference.`,
+    },
+    remediation: {
+      fr: () =>
+        `Ajoutez un indice non chromatique : text-decoration: underline (le plus simple), une bordure basse, ou une graisse nettement supérieure. À défaut, un contraste d'au moins 3:1 avec le texte environnant ET un indice au survol/focus.`,
+      en: () =>
+        `Add a non-colour cue: text-decoration: underline (simplest), a bottom border, or a distinctly heavier weight. Failing that, at least 3:1 contrast with the surrounding text AND a cue on hover/focus.`,
+    },
+  },
+
   // ---- Theme 5 — Data tables (src/rules/tables.ts) ----------------------------
   "data-table-no-headers.no-th": {
     message: {

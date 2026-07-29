@@ -38,9 +38,9 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 1.4.1 | Use of Color | A | needs-rendering | — | 3.1, 10.6, 10.7, 10.9, 10.10 |
+| 1.4.1 | Use of Color | A | needs-rendering | rendered-link-colour-only | 3.1, 10.6, 10.7, 10.9, 10.10 |
 | 1.4.2 | Audio Control | A | static | autoplay-media | 4.10 |
-| 1.4.3 | Contrast (Minimum) | AA | needs-rendering | contrast-literal | 3.2, 10.5 |
+| 1.4.3 | Contrast (Minimum) | AA | needs-rendering | contrast-literal, rendered-contrast, rendered-contrast-pixel | 3.2, 10.5 |
 | 1.4.4 | Resize Text | AA | needs-rendering | meta-viewport-zoom-block | 10.4 |
 | 1.4.5 | Images of Text | AA | needs-rendering | — | 1.8 |
 | 1.4.10 | Reflow | AA | needs-rendering | — | 10.11 |

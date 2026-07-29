@@ -16,10 +16,12 @@ import { navigationRules } from "./navigation.js";
 import { multimediaRules } from "./multimedia.js";
 import { presentationRules } from "./presentation.js";
 import { colorsRules } from "./colors.js";
+import { renderedRules } from "./rendered.js";
 import { timingRules } from "./timing.js";
 
 export const ALL_RULES: Rule[] = [
   ...colorsRules,
+  ...renderedRules,
   ...imagesRules,
   ...framesRules,
   ...scriptsAriaRules,
