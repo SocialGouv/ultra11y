@@ -9,8 +9,15 @@ name: Release
 #   - commits the bump back to `main` as `chore(release): <v> [skip ci]`,
 #   - tags `v<version>` and creates the GitHub release with auto notes + tarball,
 #   - publishes the `ultra11y` package to the npm registry.
-# The GitHub side uses the built-in GITHUB_TOKEN; the npm publish needs an NPM_TOKEN
-# repository secret (an npm automation token). Without it the publish step fails.
+#
+# NO NPM TOKEN. The npm publish authenticates by OIDC "trusted publishing": the job asks
+# GitHub for a short-lived OIDC id-token (hence `id-token: write`) and exchanges it with
+# registry.npmjs.org for a publish credential scoped to this package. Nothing long-lived is
+# stored anywhere, so there is no secret to leak or rotate.
+#
+# It requires, on npmjs.com → the package → Settings → Trusted publisher: this repository and
+# THIS workflow file (`release.yml`). Change the file name and the exchange stops matching.
+# The GitHub side still uses the built-in GITHUB_TOKEN.
 on:
   push:
     branches: [main]
@@ -20,6 +27,7 @@ permissions:
   contents: write # push the bump commit + tag, create the release
   issues: write
   pull-requests: write
+  id-token: write # REQUIRED for npm trusted publishing (the OIDC token exchange)
 
 jobs:
   release:
@@ -36,7 +44,16 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          registry-url: https://registry.npmjs.org # writes the .npmrc @semantic-release/npm authenticates against
+          registry-url: https://registry.npmjs.org # the registry `npm publish` targets
+
+      # The OIDC exchange that actually publishes is done by the npm CLI, not by
+      # semantic-release: the plugin only pre-flights it. Trusted publishing landed in npm
+      # 11.5.1, and Node 24 still ships an older 11.x — so pin the CLI explicitly rather than
+      # inherit whatever the runner image happens to carry.
+      - name: Ensure npm supports trusted publishing (>= 11.5.1)
+        run: |
+          npm install -g npm@latest
+          npm --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -48,22 +65,13 @@ jobs:
           pnpm test
           pnpm run check:build
 
-      # Fail EARLY and readably. @semantic-release/npm verifies the token in verifyConditions,
-      # so a missing secret already aborts before anything is tagged — but with a message that
-      # does not say what to do. This one does.
-      - name: Preflight — npm credentials
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "${NPM_TOKEN:-}" ]; then
-            echo "::error::NPM_TOKEN is not set. ultra11y publishes to npm on release: add an npm automation token as the NPM_TOKEN repository secret (Settings → Secrets and variables → Actions), or drop @semantic-release/npm from .releaserc.json to keep GitHub-only releases."
-            exit 1
-          fi
-
+      # No NPM_TOKEN: @semantic-release/npm establishes the OIDC context itself
+      # (lib/trusted-publishing/) and skips token auth entirely when it succeeds. If the
+      # exchange fails — no trusted publisher configured, or the workflow renamed — it logs
+      # the reason and falls back to demanding a token, which is the honest failure.
       - name: Release (semantic-release)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm exec semantic-release
 
       # `uses: maxgfr/ultra11y@v2` has to resolve to something. semantic-release only creates

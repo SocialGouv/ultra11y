@@ -166,6 +166,12 @@ describe("ci.md teaches the CI output formats", () => {
     expect(t).toMatch(/gate\*\* runs last|gate runs last/i);
     expect(t).toContain("fail-on");
   });
+  it("documents how the repo publishes itself, tokenlessly", () => {
+    expect(t).toContain("id-token: write");
+    expect(t).toMatch(/trusted publish/i);
+    expect(t).toMatch(/11\.5\.1/);
+    expect(t).toMatch(/first.*publish is manual|manual/i);
+  });
   it("documents the sticky PR comment and its best-effort posture", () => {
     expect(t).toContain("ULTRA11Y_PR_COMMENT");
     expect(t).toMatch(/edits it in place|sticky/i);

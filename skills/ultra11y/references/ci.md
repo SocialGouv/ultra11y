@@ -140,3 +140,26 @@ It is best-effort, like issue creation: off a pull request, or with no `gh`/no a
 reports `skipped` and the run carries on. A comment is never worth failing a build over. If
 listing the existing comments fails (permissions, rate limit) it creates a new one — a
 duplicate comment is a far smaller harm than dropping the report.
+
+## How this repo publishes itself (npm trusted publishing)
+
+ultra11y's own release workflow holds **no npm token**. It publishes by OIDC: the job asks
+GitHub for a short-lived id-token (`permissions: id-token: write`) and exchanges it with
+registry.npmjs.org for a credential scoped to this package. Nothing long-lived is stored, so
+there is no secret to leak or rotate.
+
+Two things it depends on, both easy to break silently:
+
+- **A trusted publisher** configured on npmjs.com for the package, naming this repository and
+  **this workflow file**. Rename `release.yml` and the exchange stops matching.
+- **npm >= 11.5.1** on the runner. `@semantic-release/npm` only *pre-flights* the exchange;
+  the publish itself is `npm publish`, and the CLI does its own OIDC handshake. Node 24 still
+  ships an older 11.x, so the workflow upgrades the CLI explicitly.
+
+The package must exist before a trusted publisher can be attached to it, so the **first**
+publish is manual — `npm publish` from a logged-in shell, after `pnpm run build`. The name is
+unscoped and `publishConfig.access` is set, so nothing else is needed. Every release after
+that is tokenless.
+
+If the exchange fails, `@semantic-release/npm` logs why and falls back to demanding a token —
+it does not publish unauthenticated.
