@@ -142,6 +142,56 @@
         "en": "State the file format and size in the link text, e.g. “Annual report (PDF, 2 MB)”.",
         "fr": "Indiquez le format et le poids du fichier dans l’intitulé du lien, par exemple « Rapport annuel (PDF, 2 Mo) »."
       }
+    },
+    {
+      "id": "optgroup-without-label",
+      "criterion": "11.8",
+      "wcag": ["1.3.1"],
+      "severity": "majeur",
+      "match": {
+        "tag": "optgroup",
+        "attrs": [
+          {
+            "name": "label",
+            "op": "absent"
+          }
+        ]
+      },
+      "message": {
+        "en": "<optgroup> without a label attribute — the group of options is unnamed (RGAA test 11.8.2).",
+        "fr": "<optgroup> sans attribut label — le regroupement d’options n’est pas nommé (test RGAA 11.8.2)."
+      },
+      "remediation": {
+        "en": "Add label=\"…\" naming what the options in this group have in common, e.g. <optgroup label=\"Europe\">.",
+        "fr": "Ajoutez label=\"…\" nommant ce que les options du groupe ont en commun, par ex. <optgroup label=\"Europe\">."
+      }
+    },
+    {
+      "id": "dir-value-invalid",
+      "criterion": "8.10",
+      "wcag": ["1.3.2"],
+      "severity": "majeur",
+      "match": {
+        "attrs": [
+          {
+            "name": "dir",
+            "op": "present"
+          },
+          {
+            "name": "dir",
+            "op": "matches",
+            "value": "^(?!(rtl|ltr|auto)$).+$"
+          }
+        ]
+      },
+      "message": {
+        "en": "dir attribute with a value that is not rtl, ltr or auto — the reading direction change is not declared conformantly (RGAA test 8.10.2).",
+        "fr": "Attribut dir dont la valeur n’est ni rtl, ni ltr, ni auto — le changement de sens de lecture n’est pas déclaré conformément (test RGAA 8.10.2)."
+      },
+      "remediation": {
+        "en": "Use dir=\"rtl\" or dir=\"ltr\" (or dir=\"auto\"), matching the reading direction of the text it carries.",
+        "fr": "Utilisez dir=\"rtl\" ou dir=\"ltr\" (ou dir=\"auto\"), en accord avec le sens de lecture du texte porté."
+      }
     }
   ],
   "themes": [
@@ -1981,7 +2031,7 @@
       "techniques": ["H56"],
       "wcag": ["1.3.2"],
       "appliesTo": {
-        "ruleIds": []
+        "ruleIds": ["pack:rgaa:dir-value-invalid"]
       }
     },
     {
@@ -2716,7 +2766,7 @@
       ],
       "wcag": ["1.3.1"],
       "appliesTo": {
-        "ruleIds": []
+        "ruleIds": ["pack:rgaa:optgroup-without-label"]
       }
     },
     {

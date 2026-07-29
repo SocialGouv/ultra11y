@@ -11,6 +11,7 @@ import {
   loadPack,
   listPacks,
   packsForSc,
+  packGlossary,
   getCriterion as getPackCriterion,
   listTheme as listPackTheme,
   titlePlain as packTitlePlain,
@@ -99,6 +100,11 @@ export interface CriteriaOpts {
   json?: boolean;
   lang: Lang;
   standard: StandardId;
+  // `--glossary [term]`: look up a term the standard DEFINES. A pack's tests refer to these
+  // constantly ("[image porteuse d'information](#…)"), and the definitions are normative —
+  // "if necessary" and "relevant" mean what the glossary says they mean. `true` lists every
+  // term; a string resolves one (by anchor or by title, accent-insensitively).
+  glossary?: string | boolean;
 }
 
 function runWcag(opts: CriteriaOpts): number {
@@ -121,8 +127,56 @@ function runWcag(opts: CriteriaOpts): number {
   return 0;
 }
 
+// Accent- and case-insensitive folding, so "alternative textuelle" finds
+// "alternative-textuelle-image" and "Légende" finds "legende-d-image".
+const foldTerm = (s: string): string =>
+  s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+function runGlossary(opts: CriteriaOpts): number {
+  const pack = loadPack(opts.standard);
+  const glossary = packGlossary(opts.standard) ?? {};
+  const anchors = Object.keys(glossary);
+  if (!anchors.length) {
+    console.error(`ultra11y criteria: ${pack.name} ships no glossary.`);
+    return 2;
+  }
+  const term = typeof opts.glossary === "string" ? opts.glossary.trim() : "";
+  if (!term) {
+    if (opts.json) console.log(JSON.stringify(glossary, null, 2));
+    else for (const a of anchors.sort()) console.log(`${a}\t${glossary[a]?.title ?? ""}`);
+    return 0;
+  }
+  const want = foldTerm(term);
+  // Exact anchor, then exact folded title, then a prefix match — never a fuzzy guess that
+  // could hand back the definition of a different normative term.
+  const hit =
+    anchors.find((a) => a === term) ??
+    anchors.find((a) => foldTerm(a) === want) ??
+    anchors.find((a) => foldTerm(glossary[a]?.title ?? "") === want) ??
+    anchors.find((a) => foldTerm(a).startsWith(want));
+  if (!hit) {
+    const near = anchors.filter((a) => foldTerm(a).includes(want) || foldTerm(glossary[a]?.title ?? "").includes(want)).slice(0, 8);
+    console.error(`ultra11y criteria: no ${pack.name} glossary term matching "${term}".${near.length ? ` Did you mean: ${near.join(", ")}?` : ""}`);
+    return 2;
+  }
+  const entry = glossary[hit]!;
+  if (opts.json) console.log(JSON.stringify({ anchor: hit, ...entry }, null, 2));
+  else {
+    console.log(`${pack.name} — ${entry.title}  (#${hit})`);
+    console.log("");
+    console.log(entry.body);
+  }
+  return 0;
+}
+
 function runPack(opts: CriteriaOpts): number {
   const pack = loadPack(opts.standard);
+  if (opts.glossary !== undefined && opts.glossary !== false) return runGlossary(opts);
   if (opts.id) {
     const c = getPackCriterion(pack, opts.id);
     if (!c) {
@@ -147,6 +201,10 @@ function runPack(opts: CriteriaOpts): number {
 }
 
 export function runCriteria(opts: CriteriaOpts): number {
+  if (opts.glossary !== undefined && opts.glossary !== false && isCore(opts.standard)) {
+    console.error("ultra11y criteria: --glossary needs a country standard (e.g. --standard rgaa); WCAG ships no glossary here.");
+    return 2;
+  }
   return isCore(opts.standard) ? runWcag(opts) : runPack(opts);
 }
 

@@ -78,7 +78,11 @@ export function attributePages(result: AuditResult, pages: PageScope[]): void {
   const byName = new Map(pages.map((p) => [p.name.toLowerCase(), p.id]));
   const byUrl = new Map(pages.map((p) => [p.url, p.id]));
 
-  for (const f of result.findings) {
+  // Declarative PACK-RULE findings are attributed exactly like core ones. They used to be
+  // skipped here, which made `pageView`'s `packFindings.filter(f => f.page === page.id)`
+  // always empty: a pack rule could be NC in the report and reach no cell of the grid, while
+  // the grid claimed to agree with the report "by construction".
+  for (const f of [...result.findings, ...(result.packFindings ?? [])]) {
     if (f.page) continue; // the snapshot it was raised on already said which page it is
 
     // A merged dynamic finding keeps the scanned page URL as its `file`.

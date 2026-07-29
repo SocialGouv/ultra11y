@@ -148,8 +148,9 @@ adding this tier cannot change a single pre-existing verdict.
 
 ### How much of RGAA the engine can evidence
 
-`tests/rgaa-coverage.test.ts` pins the number and ratchets it: **46 of 106** criteria map onto
-an engine rule, up from 43 before this tier. It can only go up — a refactor that silently
+`tests/rgaa-coverage.test.ts` pins the number and ratchets it: **48 of 106** criteria map onto
+an engine rule, up from 43 before this tier — the rendered rules plus two declarative pack
+rules (`optgroup` without `label`, an invalid `dir` value). It can only go up — a refactor that silently
 unmaps a criterion fails CI rather than quietly shrinking the audit. Criteria nothing can
 decide stay at zero *visibly*: RGAA 8.1 maps only to the removed WCAG 4.1.1, and 13.3 depends
 on downloadable office documents.

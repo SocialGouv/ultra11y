@@ -11,7 +11,7 @@
 // to an invented line.
 import { findingsAtOrAbove } from "./baseline.js";
 import { resolveMessage, resolveRemediation } from "./messages.js";
-import { packCriteriaForFinding } from "./standards/derive.js";
+import { findingsForStandard, packCriteriaForFinding } from "./standards/derive.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
 import type { AuditResult, Finding, Lang, Severity } from "./types.js";
 import { isUrlPath, repoRelative } from "./util.js";
@@ -54,7 +54,8 @@ export function annotations(result: AuditResult, opts: AnnotateOptions = {}): st
   const standard = opts.standard ?? CORE;
   const lang = opts.lang ?? "en";
   const baseDir = opts.baseDir ?? process.cwd();
-  const scoped = opts.failOn ? findingsAtOrAbove(result.findings, opts.failOn) : result.findings;
+  const all = findingsForStandard(result, standard);
+  const scoped = opts.failOn ? findingsAtOrAbove(all, opts.failOn) : all;
   const out: string[] = [];
   for (const f of scoped) {
     if (isUrl(f.file)) continue; // no repo line to annotate — reported in the summary instead
@@ -115,13 +116,18 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
   out.push(`## ${s.title} — ${stdLabel}`, "");
   out.push(`\`${result.date}\` · ${result.scope.files} ${s.files} · **${result.conformancePct}%** ${s.rate}`, "");
 
-  if (!result.findings.length) {
+  // Resolve the standard's findings BEFORE the empty check: a page whose only defect comes
+  // from a declarative pack rule has an empty `result.findings` and would otherwise be
+  // reported as clean under `--standard`.
+  const baseDir = opts.baseDir ?? process.cwd();
+  const all = findingsForStandard(result, standard);
+
+  if (!all.length) {
     out.push(s.none, "");
     return out.join("\n");
   }
 
-  const baseDir = opts.baseDir ?? process.cwd();
-  const sorted = [...result.findings].sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity));
+  const sorted = [...all].sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity));
   out.push(`### ${s.findings} (${sorted.length})`, "");
   out.push(`| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} |`, "| --- | --- | --- | --- |");
   for (const f of sorted.slice(0, MAX_ROWS)) {
@@ -133,7 +139,7 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
   if (sorted.length > MAX_ROWS) out.push("", s.more(sorted.length - MAX_ROWS));
   out.push("");
 
-  const unanchored = result.findings.filter((f) => isUrl(f.file)).length;
+  const unanchored = all.filter((f) => isUrl(f.file)).length;
   if (unanchored) out.push(`> ${s.unanchored(unanchored)}`, "");
 
   // Per-page synthesis, when a page sample was scanned and merged in.
@@ -142,7 +148,7 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
     out.push(`### ${s.perPage}`, "");
     out.push(`| ${s.page} | ${s.count} |`, "| --- | --- |");
     for (const pg of pages) {
-      const n = result.findings.filter((f) => f.file === pg.url || (f.sample?.page !== undefined && f.sample.page === pg.name)).length;
+      const n = all.filter((f) => f.file === pg.url || (f.sample?.page !== undefined && f.sample.page === pg.name)).length;
       out.push(`| ${pg.name} — \`${pg.url}\` | ${n} |`);
     }
     out.push("");

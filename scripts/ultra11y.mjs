@@ -37740,6 +37740,56 @@ var rgaa_default = {
         en: "State the file format and size in the link text, e.g. \u201CAnnual report (PDF, 2 MB)\u201D.",
         fr: "Indiquez le format et le poids du fichier dans l\u2019intitul\xE9 du lien, par exemple \xAB Rapport annuel (PDF, 2 Mo) \xBB."
       }
+    },
+    {
+      id: "optgroup-without-label",
+      criterion: "11.8",
+      wcag: ["1.3.1"],
+      severity: "majeur",
+      match: {
+        tag: "optgroup",
+        attrs: [
+          {
+            name: "label",
+            op: "absent"
+          }
+        ]
+      },
+      message: {
+        en: "<optgroup> without a label attribute \u2014 the group of options is unnamed (RGAA test 11.8.2).",
+        fr: "<optgroup> sans attribut label \u2014 le regroupement d\u2019options n\u2019est pas nomm\xE9 (test RGAA 11.8.2)."
+      },
+      remediation: {
+        en: 'Add label="\u2026" naming what the options in this group have in common, e.g. <optgroup label="Europe">.',
+        fr: 'Ajoutez label="\u2026" nommant ce que les options du groupe ont en commun, par ex. <optgroup label="Europe">.'
+      }
+    },
+    {
+      id: "dir-value-invalid",
+      criterion: "8.10",
+      wcag: ["1.3.2"],
+      severity: "majeur",
+      match: {
+        attrs: [
+          {
+            name: "dir",
+            op: "present"
+          },
+          {
+            name: "dir",
+            op: "matches",
+            value: "^(?!(rtl|ltr|auto)$).+$"
+          }
+        ]
+      },
+      message: {
+        en: "dir attribute with a value that is not rtl, ltr or auto \u2014 the reading direction change is not declared conformantly (RGAA test 8.10.2).",
+        fr: "Attribut dir dont la valeur n\u2019est ni rtl, ni ltr, ni auto \u2014 le changement de sens de lecture n\u2019est pas d\xE9clar\xE9 conform\xE9ment (test RGAA 8.10.2)."
+      },
+      remediation: {
+        en: 'Use dir="rtl" or dir="ltr" (or dir="auto"), matching the reading direction of the text it carries.',
+        fr: 'Utilisez dir="rtl" ou dir="ltr" (ou dir="auto"), en accord avec le sens de lecture du texte port\xE9.'
+      }
     }
   ],
   themes: [
@@ -39579,7 +39629,7 @@ var rgaa_default = {
       techniques: ["H56"],
       wcag: ["1.3.2"],
       appliesTo: {
-        ruleIds: []
+        ruleIds: ["pack:rgaa:dir-value-invalid"]
       }
     },
     {
@@ -40314,7 +40364,7 @@ var rgaa_default = {
       ],
       wcag: ["1.3.1"],
       appliesTo: {
-        ruleIds: []
+        ruleIds: ["pack:rgaa:optgroup-without-label"]
       }
     },
     {
@@ -42977,6 +43027,11 @@ function derivePackResults(audit, packKey) {
     const base = deriveBase(pc);
     return enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
   });
+}
+function findingsForStandard(audit, standard) {
+  if (standard === CORE_KEY) return audit.findings;
+  const mine = (audit.packFindings ?? []).filter((f) => f.ruleId.startsWith(`pack:${standard}:`));
+  return mine.length ? [...audit.findings, ...mine] : audit.findings;
 }
 
 // src/standards/vocabulary.ts
@@ -45817,6 +45872,9 @@ var L2 = {
     acWhen: "un utilisateur de technologie d'assistance y acc\xE8de",
     givenElements: (sel) => `les \xE9l\xE9ments ${sel} concern\xE9s`,
     techniques: "Techniques WCAG",
+    toRuleOn: "Crit\xE8res \xE0 trancher",
+    toRuleOnNote: "Le moteur ne peut pas les d\xE9cider : ils rel\xE8vent du jugement ou du rendu. Ce ne sont PAS des non-conformit\xE9s \u2014 ils sont ind\xE9cid\xE9s. G\xE9n\xE9rez la worklist (`verify --manual --standard <pack>`), qui porte l'\xE9nonc\xE9 complet de chaque test.",
+    tests: "tests",
     docNote: "Document d'exigences (PRD) g\xE9n\xE9r\xE9 depuis l'audit statique : une \xE9pop\xE9e par th\xE8me, une user story par crit\xE8re, des crit\xE8res d'acceptation ancr\xE9s sur les intitul\xE9s WCAG. Adjugez les crit\xE8res \xAB \xE0 \xE9valuer \xBB avec `verify --manual` (agent IA, gat\xE9), le rendu via `scan`."
   },
   en: {
@@ -45847,6 +45905,9 @@ var L2 = {
     acWhen: "a user of assistive technology reaches them",
     givenElements: (sel) => `the affected ${sel} elements`,
     techniques: "WCAG techniques",
+    toRuleOn: "Criteria to rule on",
+    toRuleOnNote: "The engine cannot decide these: they are judgment or rendering calls. They are NOT non-conformities \u2014 they are undecided. Generate the worklist (`verify --manual --standard <pack>`), which carries the full wording of every test.",
+    tests: "tests",
     docNote: "Product-requirements document generated from the static audit: one epic per theme, one user story per criterion, acceptance criteria anchored to the WCAG success-criterion text. Adjudicate the \u201Cto assess\u201D criteria with `verify --manual` (AI agent, gated), rendering via `scan`."
   }
 };
@@ -45969,6 +46030,7 @@ function renderBacklog(r, lang = "en", standard = "wcag") {
   const out2 = header(r, lang, s.title(standardLabel(standard)), void 0, ratePct);
   if (!units.length) {
     out2.push(s.none, "");
+    out2.push(...toRuleOnSection(r, standard, lang));
     return out2.join("\n");
   }
   for (const sev of SEV_ORDER2) {
@@ -46022,6 +46084,22 @@ function acceptanceCriteria(unit, standard, lang, opts = {}) {
     return `${prefix2}**${s.given}** ${s.givenElements(hints)} \xB7 **${s.when}** ${s.acWhen} \xB7 **${s.then}** \xAB ${req} \xBB (WCAG ${sc}).`;
   });
 }
+function toRuleOnSection(r, standard, lang) {
+  if (isCore(standard)) return [];
+  const s = L2[lang];
+  const pack = loadPack(standard);
+  const manual = derivePackResults(r, standard).filter((pc) => pc.status === "manual");
+  if (!manual.length) return [];
+  const out2 = [`## ${s.toRuleOn} (${manual.length})`, "", `> ${s.toRuleOnNote}`, ""];
+  for (const pc of manual) {
+    const crit = pack.criteria.find((c2) => c2.id === pc.id);
+    const title2 = crit ? titlePlain(pack, crit, lang) : pc.id;
+    const tests = Object.keys(crit?.tests ?? {});
+    out2.push(`- [ ] **${pack.name} ${pc.id}** \u2014 ${title2}${tests.length ? `  \xB7  ${s.tests}: ${tests.map((k) => `\`${pc.id}.${k}\``).join(" ")}` : ""}`);
+  }
+  out2.push("");
+  return out2;
+}
 function renderPrdDoc(r, lang = "en", standard = "wcag") {
   const s = L2[lang];
   const units = prdUnits(r, standard, lang);
@@ -46031,6 +46109,7 @@ function renderPrdDoc(r, lang = "en", standard = "wcag") {
     out2.push(s.none, "");
     return out2.join("\n");
   }
+  out2.push(...toRuleOnSection(r, standard, lang));
   for (const epic of epicsOf(units, standard, lang)) {
     out2.push(`## ${s.epic} \u2014 ${epic.title}`, "");
     for (const u of epic.units) {
@@ -46114,7 +46193,7 @@ function attributePages(result, pages) {
   if (!pages.length) return;
   const byName = new Map(pages.map((p) => [p.name.toLowerCase(), p.id]));
   const byUrl = new Map(pages.map((p) => [p.url, p.id]));
-  for (const f of result.findings) {
+  for (const f of [...result.findings, ...result.packFindings ?? []]) {
     if (f.page) continue;
     if (isUrlPath(f.file)) {
       const hit = byUrl.get(f.file);
@@ -46291,6 +46370,8 @@ var L4 = {
     naTitle: "4. Crit\xE8res non applicables (NA)",
     manualTitle: "5. Crit\xE8res \xE0 adjuger (jugement / rendu) \u2014 non d\xE9cid\xE9s par le moteur statique",
     manualWarn: "Adjugez-les avec `verify --manual` (l'agent d\xE9cide depuis la source, de fa\xE7on gat\xE9e) ; les crit\xE8res de rendu passent par `scan`. Aucun ne doit \xEAtre marqu\xE9 \xAB conforme \xBB sans justification enregistr\xE9e et gat\xE9e.",
+    testsToRule: "tests \xE0 trancher",
+    manualHowTo: "G\xE9n\xE9rez la worklist : `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Chaque item y porte l'\xE9nonc\xE9 complet de ses tests, sa note technique, ses cas particuliers, sa guidance et les termes que le r\xE9f\xE9rentiel d\xE9finit.",
     outOfScope: "Hors p\xE9rim\xE8tre moteur \u2014 mapp\xE9 sur des SC hors WCAG 2.2 AA ; v\xE9rification manuelle.",
     scopedOut: "Les non-conformit\xE9s WCAG relev\xE9es concernent des \xE9l\xE9ments hors du p\xE9rim\xE8tre de ce crit\xE8re \u2014 \xE0 \xE9valuer s\xE9par\xE9ment.",
     nothing: "Aucun.",
@@ -46340,6 +46421,8 @@ var L4 = {
     naTitle: "4. Not-applicable criteria (NA)",
     manualTitle: "5. Criteria to adjudicate (judgment / rendering) \u2014 not decided by the static engine",
     manualWarn: "Adjudicate these with `verify --manual` (the agent decides from source, gated); rendering criteria go to `scan`. None may be marked \u201Cconforming\u201D without a recorded, gated justification.",
+    testsToRule: "tests to rule on",
+    manualHowTo: "Generate the worklist: `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Each item carries the full wording of its tests, its technical note, its particular cases, its guidance and the terms the standard defines.",
     outOfScope: "Out of engine scope \u2014 mapped to SCs outside WCAG 2.2 AA; manual verification.",
     scopedOut: "The WCAG failures found concern elements outside this criterion's scope \u2014 assess separately.",
     nothing: "None.",
@@ -46462,7 +46545,16 @@ function render(r, lang, opts) {
   out2.push(na.length ? na.map((x) => `- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}`).join("\n") : s.nothing, "");
   out2.push(`## ${s.manualTitle}`, "", `> ${s.manualWarn}`, "");
   const manual = rows.filter((x) => x.status === "manual");
-  out2.push(manual.length ? manual.map((x) => `- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}`).join("\n") : s.nothing, "");
+  if (!manual.length) out2.push(s.nothing, "");
+  else {
+    const pack5 = isCore(opts.standard) ? void 0 : loadPack(opts.standard);
+    for (const x of manual) {
+      const tests = pack5 ? Object.keys(getCriterion(pack5, x.id)?.tests ?? {}) : [];
+      const testRef = tests.length ? ` \u2014 ${s.testsToRule}: ${tests.map((k) => `\`${x.id}.${k}\``).join(" \xB7 ")}` : "";
+      out2.push(`- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}${testRef}`);
+    }
+    out2.push("", `> ${s.manualHowTo}`, "");
+  }
   return out2.join("\n");
 }
 function renderReport(r, lang = "en") {
@@ -47015,8 +47107,40 @@ function runWcag(opts) {
   console.log(opts.json ? JSON.stringify(allSC(), null, 2) : wcagList(opts.lang));
   return 0;
 }
+var foldTerm = (s) => s.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+function runGlossary(opts) {
+  const pack = loadPack(opts.standard);
+  const glossary = packGlossary(opts.standard) ?? {};
+  const anchors = Object.keys(glossary);
+  if (!anchors.length) {
+    console.error(`ultra11y criteria: ${pack.name} ships no glossary.`);
+    return 2;
+  }
+  const term = typeof opts.glossary === "string" ? opts.glossary.trim() : "";
+  if (!term) {
+    if (opts.json) console.log(JSON.stringify(glossary, null, 2));
+    else for (const a of anchors.sort()) console.log(`${a}	${glossary[a]?.title ?? ""}`);
+    return 0;
+  }
+  const want = foldTerm(term);
+  const hit = anchors.find((a) => a === term) ?? anchors.find((a) => foldTerm(a) === want) ?? anchors.find((a) => foldTerm(glossary[a]?.title ?? "") === want) ?? anchors.find((a) => foldTerm(a).startsWith(want));
+  if (!hit) {
+    const near = anchors.filter((a) => foldTerm(a).includes(want) || foldTerm(glossary[a]?.title ?? "").includes(want)).slice(0, 8);
+    console.error(`ultra11y criteria: no ${pack.name} glossary term matching "${term}".${near.length ? ` Did you mean: ${near.join(", ")}?` : ""}`);
+    return 2;
+  }
+  const entry = glossary[hit];
+  if (opts.json) console.log(JSON.stringify({ anchor: hit, ...entry }, null, 2));
+  else {
+    console.log(`${pack.name} \u2014 ${entry.title}  (#${hit})`);
+    console.log("");
+    console.log(entry.body);
+  }
+  return 0;
+}
 function runPack(opts) {
   const pack = loadPack(opts.standard);
+  if (opts.glossary !== void 0 && opts.glossary !== false) return runGlossary(opts);
   if (opts.id) {
     const c2 = getCriterion(pack, opts.id);
     if (!c2) {
@@ -47040,6 +47164,10 @@ function runPack(opts) {
   return 0;
 }
 function runCriteria(opts) {
+  if (opts.glossary !== void 0 && opts.glossary !== false && isCore(opts.standard)) {
+    console.error("ultra11y criteria: --glossary needs a country standard (e.g. --standard rgaa); WCAG ships no glossary here.");
+    return 2;
+  }
   return isCore(opts.standard) ? runWcag(opts) : runPack(opts);
 }
 function renderCriteriaReference() {
@@ -50715,7 +50843,7 @@ function toSarif(result, opts = {}) {
   const rules = [];
   const indexOf = /* @__PURE__ */ new Map();
   const results = [];
-  for (const f of result.findings) {
+  for (const f of findingsForStandard(result, standard)) {
     let idx = indexOf.get(f.ruleId);
     if (idx === void 0) {
       idx = rules.length;
@@ -50776,7 +50904,8 @@ function annotations(result, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
   const baseDir = opts.baseDir ?? process.cwd();
-  const scoped = opts.failOn ? findingsAtOrAbove(result.findings, opts.failOn) : result.findings;
+  const all = findingsForStandard(result, standard);
+  const scoped = opts.failOn ? findingsAtOrAbove(all, opts.failOn) : all;
   const out2 = [];
   for (const f of scoped) {
     if (isUrl2(f.file)) continue;
@@ -50832,12 +50961,13 @@ function stepSummary(result, opts = {}) {
   const out2 = [];
   out2.push(`## ${s.title} \u2014 ${stdLabel}`, "");
   out2.push(`\`${result.date}\` \xB7 ${result.scope.files} ${s.files} \xB7 **${result.conformancePct}%** ${s.rate}`, "");
-  if (!result.findings.length) {
+  const baseDir = opts.baseDir ?? process.cwd();
+  const all = findingsForStandard(result, standard);
+  if (!all.length) {
     out2.push(s.none, "");
     return out2.join("\n");
   }
-  const baseDir = opts.baseDir ?? process.cwd();
-  const sorted = [...result.findings].sort((a, b) => SEV_ORDER5.indexOf(a.severity) - SEV_ORDER5.indexOf(b.severity));
+  const sorted = [...all].sort((a, b) => SEV_ORDER5.indexOf(a.severity) - SEV_ORDER5.indexOf(b.severity));
   out2.push(`### ${s.findings} (${sorted.length})`, "");
   out2.push(`| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} |`, "| --- | --- | --- | --- |");
   for (const f of sorted.slice(0, MAX_ROWS)) {
@@ -50847,14 +50977,14 @@ function stepSummary(result, opts = {}) {
   }
   if (sorted.length > MAX_ROWS) out2.push("", s.more(sorted.length - MAX_ROWS));
   out2.push("");
-  const unanchored = result.findings.filter((f) => isUrl2(f.file)).length;
+  const unanchored = all.filter((f) => isUrl2(f.file)).length;
   if (unanchored) out2.push(`> ${s.unanchored(unanchored)}`, "");
   const pages = result.scope.sample?.pages ?? [];
   if (pages.length) {
     out2.push(`### ${s.perPage}`, "");
     out2.push(`| ${s.page} | ${s.count} |`, "| --- | --- |");
     for (const pg of pages) {
-      const n = result.findings.filter((f) => f.file === pg.url || f.sample?.page !== void 0 && f.sample.page === pg.name).length;
+      const n = all.filter((f) => f.file === pg.url || f.sample?.page !== void 0 && f.sample.page === pg.name).length;
       out2.push(`| ${pg.name} \u2014 \`${pg.url}\` | ${n} |`);
     }
     out2.push("");
@@ -51765,14 +51895,21 @@ var ADJUDICATE_SCHEMA = {
             description: "REQUIRED (>=1, groundable) for NC",
             items: {
               type: "object",
-              required: ["file", "line", "message"],
+              // `normativeRef` is REQUIRED by the fold (src/adjudicate.ts): an NC with none is
+              // rejected. Omitting it here made every fan-out adjudication produce NC verdicts
+              // that `verify --apply` then refused.
+              required: ["file", "line", "message", "normativeRef"],
               properties: {
                 file: { type: "string" },
                 line: { type: "integer" },
                 selector: { type: "string" },
                 message: { type: "string" },
                 snippet: { type: "string" },
-                severity: { enum: ["bloquant", "majeur", "mineur"] }
+                severity: { enum: ["bloquant", "majeur", "mineur"] },
+                normativeRef: {
+                  type: "string",
+                  description: "The precise failed test of the ACTIVE standard. WCAG core: a success-criterion id (e.g. '1.1.1'). Country standard: a test OF THIS ITEM'S OWN CRITERION (e.g. '11.2.1' on item 11.2) \u2014 a WCAG id looks alike but denotes an unrelated test and is rejected."
+                }
               }
             }
           }
@@ -51869,7 +52006,7 @@ function agentContracts(runAbs, engineAbs) {
   return {
     adjudicator: `# Contract: adjudicator
 
-You adjudicate residual judgment criteria of an ultra11y WCAG audit \u2014 the success criteria the deterministic engine could not decide (alt-text relevance, link purpose in context, reading order\u2026).
+You adjudicate the residual judgment criteria of an ultra11y audit \u2014 the ones the deterministic engine could not decide (alt-text relevance, link purpose in context, reading order\u2026). The ACTIVE STANDARD is recorded in the worklist's \`standard\` field: under a country standard (e.g. \`rgaa\`) the items are that standard's OWN criteria, each carrying its numbered tests \u2014 not WCAG success criteria.
 
 Worklist: \`${join34(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: "adjudication"\` and \`items[]\`). Handle ONLY the criteria whose \`criteriaId\` is named in your prompt (\`ITEMS=<id,\u2026>\`).
 
@@ -51878,12 +52015,12 @@ For EACH of your criteria:
 1. Read its worklist entry. \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) harvested from the audited code \u2014 open the cited files at the cited lines whenever the snippet alone cannot decide.
 2. Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold):
    - \`C\` (conforming) \u2014 REQUIRES \`justification\` explaining why the evidence satisfies the criterion.
-   - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity? }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected.
+   - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the item's OWN tests, which the worklist lists for you under \xAB tests to rule on \xBB.
    - \`NA\` (not applicable) \u2014 REQUIRES \`justification\`.
    - \`manual\` (still undecidable) \u2014 REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide, e.g. computed contrast) or \`undecidable\` (the evidence cannot settle it either way).
 3. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with a reason \u2014 that is a valid, honest verdict; the scan tier or a human picks it up.
 
-Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "reason", "findings" }] }\` \u2014 your ITEMS only, every field grounded in what you actually read.
+Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "reason", "findings" }] }\` \u2014 your ITEMS only, every field grounded in what you actually read, every NC finding carrying its \`normativeRef\`.
 ${footer}`,
     refuter: `# Contract: refuter
 
@@ -52073,6 +52210,7 @@ Usage:
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
+  ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES \u2014 its tests depend on them)
   ultra11y check    --report <md> [--standard <pack>] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
   ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
   ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (adjudicate the manual criteria)
@@ -52139,6 +52277,12 @@ Commands:
              (criteria 1.4.3) or the full list grouped by guideline (--list).
              --standard <pack>: a pack criterion, a pack theme (--theme N), or its
              theme list. Carries the WCAG\u2194pack cross-refs + automatability class.
+             --glossary [<term>] looks up a term the standard DEFINES (RGAA ships
+             119). These definitions are normative \u2014 what "if necessary" or
+             "relevant" mean in a test is decided there \u2014 and the adjudication
+             worklist now inlines the ones each criterion's own tests cite. With no
+             term, lists them all. Resolves by anchor or title, accent-insensitive;
+             an unknown term errors with suggestions rather than a near-miss.
   check      Integrity gate on a produced report: every cited criterion resolves,
              every NA is justified, sections + pass-rate maths are well-formed.
              --standard tells it which id grammar/registry to validate against.
@@ -52274,6 +52418,7 @@ Options:
   --runner <name>    render --e2e: force playwright|cypress instead of auto-detecting
   --root <dir>       snapshot: project root holding .ultra11y/pages (default: .)
   --port <n>         dev: port for the side-car (default: 4111)
+  --glossary [<t>]   criteria: look up a term the country standard defines (or list all)
   --next             dev: write the Next.js overlay component instead of serving
   --require-captures audit: gate \u2014 fail if any opaque/control component lacks a rendered capture (implies --graph)
   --write            fix: apply fixes to disk (default is a dry-run diff)
@@ -52403,7 +52548,8 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "phase",
   "root",
   "runner",
-  "port"
+  "port",
+  "glossary"
 ]);
 var INIT_VALUE_FLAGS = new Set([...VALUE_FLAGS2].filter((f) => f !== "baseline"));
 function valueFlagsFor(command) {
@@ -52897,7 +53043,8 @@ function cmdCriteria(p) {
     list: p.flags.list === true,
     json: p.flags.json === true,
     lang: resolveLang(p.flags, { standard }),
-    standard
+    standard,
+    ...p.flags.glossary !== void 0 ? { glossary: p.flags.glossary } : {}
   });
 }
 async function cmdReport(p) {

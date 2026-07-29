@@ -3,7 +3,7 @@
 // the results of the WCAG SCs it maps to and fold them with the same NC-dominates rule.
 // Presentation-only: the canonical, gated verdict lives on the WCAG core.
 import type { AuditResult, CriterionResult, Status, Finding, Severity } from "../types.js";
-import { loadPack } from "./registry.js";
+import { CORE_KEY, loadPack } from "./registry.js";
 import { knownScStatus } from "../wcag.js";
 import type { LocaleString, PackCriterion, PackOverride, SecondaryMapping, StandardPack } from "./types.js";
 
@@ -210,4 +210,17 @@ export function derivePackResults(audit: AuditResult, packKey: string): PackCrit
     const base = deriveBase(pc);
     return enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
   });
+}
+
+/** The findings a rendering keyed by `standard` should show.
+ *
+ *  The core is WCAG: a declarative pack rule's finding is NOT a WCAG non-conformity and must
+ *  never enter a WCAG-keyed surface (nor `audit --fail-on`, which is why `audit` takes no
+ *  `--standard`). Under a pack, its own rule findings are part of its verdict and belong in
+ *  every rendering of it — the report already includes them; SARIF, the annotations and the
+ *  per-page grid used to drop them silently. */
+export function findingsForStandard(audit: AuditResult, standard: string): Finding[] {
+  if (standard === CORE_KEY) return audit.findings;
+  const mine = (audit.packFindings ?? []).filter((f) => f.ruleId.startsWith(`pack:${standard}:`));
+  return mine.length ? [...audit.findings, ...mine] : audit.findings;
 }

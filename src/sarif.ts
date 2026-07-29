@@ -14,7 +14,7 @@
 //    class of error the whole engine is built to refuse.
 import { findingId } from "./baseline.js";
 import { resolveMessage, resolveRemediation } from "./messages.js";
-import { packCriteriaForFinding } from "./standards/derive.js";
+import { findingsForStandard, packCriteriaForFinding } from "./standards/derive.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
 import type { AuditResult, Finding, Lang, Severity } from "./types.js";
 import { VERSION } from "./types.js";
@@ -154,7 +154,7 @@ export function toSarif(result: AuditResult, opts: SarifOptions = {}): SarifLog 
   const indexOf = new Map<string, number>();
   const results: SarifResult[] = [];
 
-  for (const f of result.findings) {
+  for (const f of findingsForStandard(result, standard)) {
     let idx = indexOf.get(f.ruleId);
     if (idx === undefined) {
       idx = rules.length;

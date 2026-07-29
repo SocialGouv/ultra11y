@@ -17,6 +17,7 @@ import {
   CORE,
   isCore,
   loadPack,
+  getCriterion as getPackCriterion,
   derivePackResults,
   packCriteriaForFinding,
   packConformancePct,
@@ -58,6 +59,9 @@ const L = {
     manualTitle: "5. Critères à adjuger (jugement / rendu) — non décidés par le moteur statique",
     manualWarn:
       "Adjugez-les avec `verify --manual` (l'agent décide depuis la source, de façon gatée) ; les critères de rendu passent par `scan`. Aucun ne doit être marqué « conforme » sans justification enregistrée et gatée.",
+    testsToRule: "tests à trancher",
+    manualHowTo:
+      "Générez la worklist : `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Chaque item y porte l'énoncé complet de ses tests, sa note technique, ses cas particuliers, sa guidance et les termes que le référentiel définit.",
     outOfScope: "Hors périmètre moteur — mappé sur des SC hors WCAG 2.2 AA ; vérification manuelle.",
     scopedOut: "Les non-conformités WCAG relevées concernent des éléments hors du périmètre de ce critère — à évaluer séparément.",
     nothing: "Aucun.",
@@ -115,6 +119,9 @@ const L = {
     manualTitle: "5. Criteria to adjudicate (judgment / rendering) — not decided by the static engine",
     manualWarn:
       "Adjudicate these with `verify --manual` (the agent decides from source, gated); rendering criteria go to `scan`. None may be marked “conforming” without a recorded, gated justification.",
+    testsToRule: "tests to rule on",
+    manualHowTo:
+      "Generate the worklist: `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Each item carries the full wording of its tests, its technical note, its particular cases, its guidance and the terms the standard defines.",
     outOfScope: "Out of engine scope — mapped to SCs outside WCAG 2.2 AA; manual verification.",
     scopedOut: "The WCAG failures found concern elements outside this criterion's scope — assess separately.",
     nothing: "None.",
@@ -321,10 +328,22 @@ function render(
   const na = rows.filter((x) => x.status === "NA");
   out.push(na.length ? na.map((x) => `- ${x.label}${x.justification ? ` — _${x.justification}_` : ""}`).join("\n") : s.nothing, "");
 
-  // 5. manual worklist
+  // 5. manual worklist. Under a country standard this is where nearly the whole audit lives
+  // (99 of RGAA's 106 criteria can only ever derive `manual`), so a bare label per line hid
+  // the actual work. Name the criterion's own numbered tests: that is what has to be ruled
+  // on, and what `verify --manual` hands the agent.
   out.push(`## ${s.manualTitle}`, "", `> ${s.manualWarn}`, "");
   const manual = rows.filter((x) => x.status === "manual");
-  out.push(manual.length ? manual.map((x) => `- ${x.label}${x.justification ? ` — _${x.justification}_` : ""}`).join("\n") : s.nothing, "");
+  if (!manual.length) out.push(s.nothing, "");
+  else {
+    const pack5 = isCore(opts.standard) ? undefined : loadPack(opts.standard);
+    for (const x of manual) {
+      const tests = pack5 ? Object.keys(getPackCriterion(pack5, x.id)?.tests ?? {}) : [];
+      const testRef = tests.length ? ` — ${s.testsToRule}: ${tests.map((k) => `\`${x.id}.${k}\``).join(" · ")}` : "";
+      out.push(`- ${x.label}${x.justification ? ` — _${x.justification}_` : ""}${testRef}`);
+    }
+    out.push("", `> ${s.manualHowTo}`, "");
+  }
 
   return out.join("\n");
 }

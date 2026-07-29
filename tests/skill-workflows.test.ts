@@ -133,7 +133,7 @@ describe("pages.md teaches page snapshots", () => {
     expect(t).toContain("rendered-link-colour-only");
     expect(t).toContain("10.6");
     expect(t).toMatch(/I don't know|I don’t know/i);
-    expect(t).toMatch(/46 of 106/);
+    expect(t).toMatch(/48 of 106/);
     expect(t).toContain("rendered-nontext-contrast");
     expect(t).toMatch(/could not look/i);
   });
@@ -170,6 +170,23 @@ describe("ci.md teaches the CI output formats", () => {
     expect(t).toContain("ULTRA11Y_PR_COMMENT");
     expect(t).toMatch(/edits it in place|sticky/i);
     expect(t).toMatch(/best-effort/i);
+  });
+});
+
+describe("judgment.md teaches adjudicating under a country standard", () => {
+  const t = read("judgment.md");
+  it("says the worklist is keyed by the standard's own criteria", () => {
+    expect(t).toContain("--standard rgaa");
+    expect(t).toMatch(/RGAA criteria/);
+    expect(t).toMatch(/99 of/);
+  });
+  it("states the citation rule and WHY it exists", () => {
+    expect(t).toContain("normativeRef");
+    expect(t).toMatch(/own tests/i);
+    expect(t).toContain("1.4.3");
+  });
+  it("points at the glossary lookup", () => {
+    expect(t).toContain("--glossary");
   });
 });
 

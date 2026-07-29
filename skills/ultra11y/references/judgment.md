@@ -88,3 +88,28 @@ Then `node scripts/ultra11y.mjs verify --apply VERIFY.todo.json` is green again 
 > For a country standard's own test grid, `criteria --standard rgaa <id>` shows the RGAA tests
 > behind a WCAG SC. The pre-completion checklist stops you concluding too early. The rule that
 > never bends: no residual criterion reaches `C` without a recorded, gated justification.
+
+## Under a country standard, the worklist speaks that standard
+
+`verify --manual --standard rgaa` keys the worklist by **RGAA criteria**, not WCAG success
+criteria — which is the granularity that matters, since 99 of RGAA's 106 criteria can only
+ever derive `manual`. Each item carries, inline:
+
+- the criterion's **numbered tests, in full** (`11.2.1` … `11.2.6`) — what actually has to be
+  ruled on;
+- its **technical note** and **particular cases**;
+- its **implementation guidance** (before/after), previously reserved for criteria that
+  already had a finding;
+- the **definitions** of the terms its own tests cite, from the standard's glossary.
+
+**`normativeRef` must cite one of the item's OWN tests.** This is not pedantry: an RGAA test
+id has the same `N.N.N` shape as a WCAG success criterion, so a laxer check accepted the WCAG
+id an agent naturally reaches for and read it as an unrelated test — citing `1.4.3` (Contrast
+Minimum) validated as RGAA test 1.4.3, which is about CAPTCHA images. The worklist now lists
+the acceptable references per item, and anything else is rejected.
+
+Verdicts fold into `packAdjudication`, not onto the WCAG criteria: a pack decision must not
+rewrite the core verdict, and since WCAG 1.1.1 alone fans out to 19 RGAA criteria, folding by
+success criterion would let those criteria overwrite one another.
+
+Look a defined term up on its own with `criteria --standard rgaa --glossary <term>`.

@@ -301,6 +301,51 @@ async function main() {
         fr: "Indiquez le format et le poids du fichier dans l’intitulé du lien, par exemple « Rapport annuel (PDF, 2 Mo) ».",
       },
     },
+    // RGAA 11.8.2 — "Dans chaque balise <select>, chaque balise <optgroup> possède-t-elle un
+    // attribut label ?" Fully mechanical, and the criterion had no rule at all. Its siblings
+    // 11.8.1 ("si nécessaire") and 11.8.3 ("le label est-il pertinent ?") stay the agent's:
+    // this rule decides the one test of the three that is decidable from markup, which is
+    // exactly what the DSL is for. NORMATIVE — a missing `label` is a plain failure.
+    {
+      id: "optgroup-without-label",
+      criterion: "11.8",
+      wcag: ["1.3.1"],
+      severity: "majeur",
+      match: { tag: "optgroup", attrs: [{ name: "label", op: "absent" }] },
+      message: {
+        en: "<optgroup> without a label attribute — the group of options is unnamed (RGAA test 11.8.2).",
+        fr: "<optgroup> sans attribut label — le regroupement d’options n’est pas nommé (test RGAA 11.8.2).",
+      },
+      remediation: {
+        en: 'Add label="…" naming what the options in this group have in common, e.g. <optgroup label="Europe">.',
+        fr: 'Ajoutez label="…" nommant ce que les options du groupe ont en commun, par ex. <optgroup label="Europe">.',
+      },
+    },
+    // RGAA 8.10.2 — the FIRST of its two sub-conditions: "La valeur de l'attribut dir est
+    // conforme (rtl ou ltr)". Mechanical. The second ("la valeur est pertinente") and 8.10.1
+    // (is a reading-direction change signalled at all?) need language detection and stay
+    // manual. Anchored negative lookahead so only a genuinely invalid value matches; `auto`
+    // is valid HTML and is accepted.
+    {
+      id: "dir-value-invalid",
+      criterion: "8.10",
+      wcag: ["1.3.2"],
+      severity: "majeur",
+      match: {
+        attrs: [
+          { name: "dir", op: "present" },
+          { name: "dir", op: "matches", value: "^(?!(rtl|ltr|auto)$).+$" },
+        ],
+      },
+      message: {
+        en: "dir attribute with a value that is not rtl, ltr or auto — the reading direction change is not declared conformantly (RGAA test 8.10.2).",
+        fr: "Attribut dir dont la valeur n’est ni rtl, ni ltr, ni auto — le changement de sens de lecture n’est pas déclaré conformément (test RGAA 8.10.2).",
+      },
+      remediation: {
+        en: 'Use dir="rtl" or dir="ltr" (or dir="auto"), matching the reading direction of the text it carries.',
+        fr: 'Utilisez dir="rtl" ou dir="ltr" (ou dir="auto"), en accord avec le sens de lecture du texte porté.',
+      },
+    },
   ];
   // Wire each rule's namespaced id (`pack:rgaa:<id>`) into the criterion it reports under,
   // so derivePackResults routes its finding onto that criterion through the same

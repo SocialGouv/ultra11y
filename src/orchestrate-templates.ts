@@ -40,7 +40,10 @@ const ADJUDICATE_SCHEMA = {
             description: "REQUIRED (>=1, groundable) for NC",
             items: {
               type: "object",
-              required: ["file", "line", "message"],
+              // `normativeRef` is REQUIRED by the fold (src/adjudicate.ts): an NC with none is
+              // rejected. Omitting it here made every fan-out adjudication produce NC verdicts
+              // that `verify --apply` then refused.
+              required: ["file", "line", "message", "normativeRef"],
               properties: {
                 file: { type: "string" },
                 line: { type: "integer" },
@@ -48,6 +51,11 @@ const ADJUDICATE_SCHEMA = {
                 message: { type: "string" },
                 snippet: { type: "string" },
                 severity: { enum: ["bloquant", "majeur", "mineur"] },
+                normativeRef: {
+                  type: "string",
+                  description:
+                    "The precise failed test of the ACTIVE standard. WCAG core: a success-criterion id (e.g. '1.1.1'). Country standard: a test OF THIS ITEM'S OWN CRITERION (e.g. '11.2.1' on item 11.2) — a WCAG id looks alike but denotes an unrelated test and is rejected.",
+                },
               },
             },
           },
@@ -160,7 +168,7 @@ export function agentContracts(runAbs: string, engineAbs: string): Record<string
   return {
     adjudicator: `# Contract: adjudicator
 
-You adjudicate residual judgment criteria of an ultra11y WCAG audit — the success criteria the deterministic engine could not decide (alt-text relevance, link purpose in context, reading order…).
+You adjudicate the residual judgment criteria of an ultra11y audit — the ones the deterministic engine could not decide (alt-text relevance, link purpose in context, reading order…). The ACTIVE STANDARD is recorded in the worklist's \`standard\` field: under a country standard (e.g. \`rgaa\`) the items are that standard's OWN criteria, each carrying its numbered tests — not WCAG success criteria.
 
 Worklist: \`${join(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: "adjudication"\` and \`items[]\`). Handle ONLY the criteria whose \`criteriaId\` is named in your prompt (\`ITEMS=<id,…>\`).
 
@@ -169,12 +177,12 @@ For EACH of your criteria:
 1. Read its worklist entry. \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) harvested from the audited code — open the cited files at the cited lines whenever the snippet alone cannot decide.
 2. Rule it (the apply gate is FAIL-CLOSED — a verdict missing its required field does not fold):
    - \`C\` (conforming) — REQUIRES \`justification\` explaining why the evidence satisfies the criterion.
-   - \`NC\` (non-conforming) — REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity? }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected.
+   - \`NC\` (non-conforming) — REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test — under a country standard, one of the item's OWN tests, which the worklist lists for you under « tests to rule on ».
    - \`NA\` (not applicable) — REQUIRES \`justification\`.
    - \`manual\` (still undecidable) — REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide, e.g. computed contrast) or \`undecidable\` (the evidence cannot settle it either way).
 3. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with a reason — that is a valid, honest verdict; the scan tier or a human picks it up.
 
-Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "reason", "findings" }] }\` — your ITEMS only, every field grounded in what you actually read.
+Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "reason", "findings" }] }\` — your ITEMS only, every field grounded in what you actually read, every NC finding carrying its \`normativeRef\`.
 ${footer}`,
     refuter: `# Contract: refuter
 

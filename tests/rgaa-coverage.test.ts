@@ -18,7 +18,7 @@ const withRules = pack.criteria.filter((c) => (c.appliesTo?.ruleIds.length ?? 0)
 
 // Measured before the rendered tier landed: 43 of 106. Raise this line when coverage grows;
 // never lower it.
-const FLOOR = 46;
+const FLOOR = 48;
 
 describe("how much of RGAA the engine can evidence", () => {
   it(`maps at least ${FLOOR} of the ${pack.criteria.length} criteria onto an engine rule`, () => {
@@ -85,10 +85,24 @@ describe("the rendered tier's own contribution", () => {
     expect(has("3.1", "rendered-link-colour-only")).toBe(false);
   });
 
+  it("adds the two tests the declarative DSL can genuinely decide", () => {
+    // The DSL decides one class: "the element exists — is its attribute well-formed?".
+    // 11.8.2 (<optgroup> without label) and 8.10.2 (dir value not rtl/ltr/auto) are exactly
+    // that. Their sibling tests ("si nécessaire", "est-il pertinent ?") stay the agent's.
+    expect(has("11.8", "pack:rgaa:optgroup-without-label")).toBe(true);
+    expect(has("8.10", "pack:rgaa:dir-value-invalid")).toBe(true);
+  });
+
   it("leaves criteria no rule can evidence alone, rather than forcing a verdict", () => {
     // 8.1 maps only to the REMOVED WCAG 4.1.1: permanently out of the engine's reach.
     expect(pack.criteria.find((c) => c.id === "8.1")?.appliesTo?.ruleIds ?? []).toEqual([]);
     // 13.3 depends on downloadable office documents — nothing in the DOM decides it.
     expect(pack.criteria.find((c) => c.id === "13.3")?.appliesTo?.ruleIds ?? []).toEqual([]);
+    // Structurally out of the DSL's reach, and honestly left alone: 11.4 is positional
+    // (no sibling/order notion), 10.14 needs CSS :hover rules, 13.2 needs JS semantics,
+    // and the whole of theme 12 needs cross-page reasoning runPackRules cannot do.
+    for (const id of ["11.4", "10.14", "13.2", "12.1", "12.2", "12.5"]) {
+      expect(pack.criteria.find((c) => c.id === id)?.appliesTo?.ruleIds ?? [], `RGAA ${id}`).toEqual([]);
+    }
   });
 });

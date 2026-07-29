@@ -110,6 +110,14 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   the per-page grid accumulating. The overlay detaches itself before collecting — otherwise it
   would audit itself and shift every element index — and renders nothing outside development.
   See `references/devtools.md`.
+- **A country standard is adjudicated at its OWN granularity** — 99 of RGAA's 106 criteria can
+  only ever derive `manual`, so ~93% of an RGAA audit is settled by the agent. `verify --manual
+  --standard rgaa` now keys the worklist by **RGAA criteria**, each carrying its numbered tests
+  in full, its technical note, its particular cases, its guidance and the glossary definitions
+  its tests cite (119 entries that previously had no reader). A `normativeRef` must cite one of
+  the item's **own** tests — the laxer check accepted a WCAG id that happened to collide with
+  an unrelated RGAA test number. Verdicts fold into a separate `packAdjudication` layer so a
+  pack decision never rewrites the WCAG core. See `references/judgment.md`.
 - **Rendered tier (offline)** — six rules read a snapshot's browser-only signals inside the
   ordinary `audit`: **no browser, no Docker, no running server**. `rendered-contrast` measures
   contrast on the *computed* styles (the inline-literal rule could only see colours written in
@@ -123,7 +131,7 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   Each can say *"I don't know"*: an unresolvable backdrop, a varied region, a cross-origin
   stylesheet, a `box-shadow` that might be the boundary — all leave the criterion undecided
   rather than guessed, and without signals the rules do not fire, so no pre-existing verdict
-  changes. `tests/rgaa-coverage.test.ts` ratchets the result: **46 of 106** RGAA criteria now
+  changes. `tests/rgaa-coverage.test.ts` ratchets the result: **48 of 106** RGAA criteria now
   map onto an engine rule, up from 43, and the number can only go up.
 - **Page by page** — RGAA is a per-page norm; the engine's verdict is scope-wide. `pages`
   bridges the two: one row per criterion, one column per page, embedded in `report` and

@@ -55,6 +55,10 @@ const L = {
     acWhen: "un utilisateur de technologie d'assistance y accède",
     givenElements: (sel: string) => `les éléments ${sel} concernés`,
     techniques: "Techniques WCAG",
+    toRuleOn: "Critères à trancher",
+    toRuleOnNote:
+      "Le moteur ne peut pas les décider : ils relèvent du jugement ou du rendu. Ce ne sont PAS des non-conformités — ils sont indécidés. Générez la worklist (`verify --manual --standard <pack>`), qui porte l'énoncé complet de chaque test.",
+    tests: "tests",
     docNote:
       "Document d'exigences (PRD) généré depuis l'audit statique : une épopée par thème, une user story par critère, des critères d'acceptation ancrés sur les intitulés WCAG. Adjugez les critères « à évaluer » avec `verify --manual` (agent IA, gaté), le rendu via `scan`.",
   },
@@ -86,6 +90,10 @@ const L = {
     acWhen: "a user of assistive technology reaches them",
     givenElements: (sel: string) => `the affected ${sel} elements`,
     techniques: "WCAG techniques",
+    toRuleOn: "Criteria to rule on",
+    toRuleOnNote:
+      "The engine cannot decide these: they are judgment or rendering calls. They are NOT non-conformities — they are undecided. Generate the worklist (`verify --manual --standard <pack>`), which carries the full wording of every test.",
+    tests: "tests",
     docNote:
       "Product-requirements document generated from the static audit: one epic per theme, one user story per criterion, acceptance criteria anchored to the WCAG success-criterion text. Adjudicate the “to assess” criteria with `verify --manual` (AI agent, gated), rendering via `scan`.",
   },
@@ -257,6 +265,7 @@ export function renderBacklog(r: AuditResult, lang: Lang = "en", standard: Stand
   const out = header(r, lang, s.title(standardLabel(standard)), undefined, ratePct);
   if (!units.length) {
     out.push(s.none, "");
+    out.push(...toRuleOnSection(r, standard, lang));
     return out.join("\n");
   }
   for (const sev of SEV_ORDER) {
@@ -334,6 +343,33 @@ export function acceptanceCriteria(unit: PrdUnit, standard: StandardId, lang: La
 
 /** A product-requirements document: epics by theme, one user story per criterion, with
  *  Given/When/Then acceptance criteria anchored to the real WCAG SC titles + the task list. */
+/** The criteria still to RULE ON — a country standard's real remaining work.
+ *
+ *  Deliberately NOT a `PrdUnit`. A unit is something with findings: it feeds report §2, the
+ *  auditor blocks, the GitHub issues and `check`'s NC-projection gate, so putting a `manual`
+ *  criterion there would make undecided work read as a non-conformity — the one thing this
+ *  tool must never do. This is a separate section listing what has to be decided, and the
+ *  numbered tests to decide it against.
+ *
+ *  It matters because 99 of RGAA's 106 criteria can only ever derive `manual`: without this
+ *  the backlog of an RGAA audit was silently missing ~93% of the job. */
+export function toRuleOnSection(r: AuditResult, standard: StandardId, lang: Lang): string[] {
+  if (isCore(standard)) return [];
+  const s = L[lang];
+  const pack = loadPack(standard);
+  const manual = derivePackResults(r, standard).filter((pc) => pc.status === "manual");
+  if (!manual.length) return [];
+  const out: string[] = [`## ${s.toRuleOn} (${manual.length})`, "", `> ${s.toRuleOnNote}`, ""];
+  for (const pc of manual) {
+    const crit = pack.criteria.find((c) => c.id === pc.id);
+    const title = crit ? packTitlePlain(pack, crit, lang) : pc.id;
+    const tests = Object.keys(crit?.tests ?? {});
+    out.push(`- [ ] **${pack.name} ${pc.id}** — ${title}${tests.length ? `  ·  ${s.tests}: ${tests.map((k) => `\`${pc.id}.${k}\``).join(" ")}` : ""}`);
+  }
+  out.push("");
+  return out;
+}
+
 export function renderPrdDoc(r: AuditResult, lang: Lang = "en", standard: StandardId = "wcag"): string {
   const s = L[lang];
   const units = prdUnits(r, standard, lang);
@@ -343,6 +379,7 @@ export function renderPrdDoc(r: AuditResult, lang: Lang = "en", standard: Standa
     out.push(s.none, "");
     return out.join("\n");
   }
+  out.push(...toRuleOnSection(r, standard, lang));
   for (const epic of epicsOf(units, standard, lang)) {
     out.push(`## ${s.epic} — ${epic.title}`, "");
     for (const u of epic.units) {

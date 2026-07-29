@@ -61,6 +61,7 @@ Usage:
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
+  ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES — its tests depend on them)
   ultra11y check    --report <md> [--standard <pack>] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
   ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
   ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (adjudicate the manual criteria)
@@ -127,6 +128,12 @@ Commands:
              (criteria 1.4.3) or the full list grouped by guideline (--list).
              --standard <pack>: a pack criterion, a pack theme (--theme N), or its
              theme list. Carries the WCAG↔pack cross-refs + automatability class.
+             --glossary [<term>] looks up a term the standard DEFINES (RGAA ships
+             119). These definitions are normative — what "if necessary" or
+             "relevant" mean in a test is decided there — and the adjudication
+             worklist now inlines the ones each criterion's own tests cite. With no
+             term, lists them all. Resolves by anchor or title, accent-insensitive;
+             an unknown term errors with suggestions rather than a near-miss.
   check      Integrity gate on a produced report: every cited criterion resolves,
              every NA is justified, sections + pass-rate maths are well-formed.
              --standard tells it which id grammar/registry to validate against.
@@ -262,6 +269,7 @@ Options:
   --runner <name>    render --e2e: force playwright|cypress instead of auto-detecting
   --root <dir>       snapshot: project root holding .ultra11y/pages (default: .)
   --port <n>         dev: port for the side-car (default: 4111)
+  --glossary [<t>]   criteria: look up a term the country standard defines (or list all)
   --next             dev: write the Next.js overlay component instead of serving
   --require-captures audit: gate — fail if any opaque/control component lacks a rendered capture (implies --graph)
   --write            fix: apply fixes to disk (default is a dry-run diff)
@@ -396,6 +404,7 @@ const VALUE_FLAGS = new Set([
   "root",
   "runner",
   "port",
+  "glossary",
 ]);
 // `init` treats --baseline as a boolean selector ("write the baseline"), not a
 // path, so it must NOT consume the following token. audit/fix keep it as a value
@@ -1062,6 +1071,7 @@ function cmdCriteria(p: ParsedArgs): number {
     json: p.flags.json === true,
     lang: resolveLang(p.flags, { standard }),
     standard,
+    ...(p.flags.glossary !== undefined ? { glossary: p.flags.glossary } : {}),
   });
 }
 
