@@ -58,7 +58,23 @@ const slug = (s) =>
 
 // [term](#anchor) -> term
 const plain = (s) => s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
-const toArr = (v) => (Array.isArray(v) ? v.map(String) : v == null ? [] : [String(v)]);
+// DINUM nests a bullet list inside a note as `{ ul: [...] }` (17 places across
+// technicalNote / particularCases). A plain `String(v)` on those produced a literal
+// "[object Object]" in the shipped pack, silently deleting the normative sub-conditions an
+// auditor needs — e.g. every exception under RGAA 1.2's images-of-text rule. Flatten the
+// node instead of stringifying it, and refuse anything still unrecognised rather than
+// emitting placeholder text (see the assertion at the end of this file).
+const flattenNode = (v) => {
+  if (v == null) return [];
+  if (typeof v === "string") return [v];
+  if (Array.isArray(v)) return v.flatMap(flattenNode);
+  if (typeof v === "object") {
+    const list = v.ul ?? v.ol ?? v.li ?? v.p ?? v.text;
+    if (list !== undefined) return flattenNode(list);
+  }
+  return [];
+};
+const toArr = (v) => flattenNode(v);
 
 // crude HTML -> plaintext for glossary bodies
 const deHtml = (s) =>
@@ -402,6 +418,21 @@ async function main() {
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "rgaa.json"), packText);
   writeFileSync(join(OUT, "rgaa.glossary.json"), glossaryText);
+
+  // A normative sentence that stringified to "[object Object]" is a DELETED sub-condition an
+  // auditor would have had to apply. Fail the build rather than ship placeholder text.
+  const stringified = [];
+  for (const c of criteria) {
+    for (const field of ["technicalNote", "particularCases"]) {
+      for (const line of c[field] ?? []) if (String(line).includes("[object Object]")) stringified.push(`${c.id}.${field}`);
+    }
+    for (const [k, lines] of Object.entries(c.tests ?? {})) {
+      for (const line of lines) if (String(line).includes("[object Object]")) stringified.push(`${c.id} test ${k}`);
+    }
+  }
+  if (stringified.length) {
+    throw new Error(`build-pack-rgaa: ${stringified.length} normative text(s) stringified to "[object Object]" — extend flattenNode: ${stringified.join(", ")}`);
+  }
 
   const noWcag = criteria.filter((c) => c.wcag.length === 0).map((c) => c.id);
   console.log(`build-pack-rgaa: ${themes.length} themes, ${criteria.length} criteria → src/data/standards/rgaa.json`);

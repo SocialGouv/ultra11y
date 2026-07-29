@@ -872,7 +872,13 @@
         ]
       },
       "techniques": ["G18", "G136", "G148", "G174", "G145", "C29"],
-      "particularCases": ["Dans ces situations, les critères sont non applicables pour ces éléments :", "[object Object]"],
+      "particularCases": [
+        "Dans ces situations, les critères sont non applicables pour ces éléments :",
+        "- Le texte fait partie d’un logo ou d’un nom de marque d’un organisme ou d’une société ;",
+        "- Le texte ou l’image de texte est purement décoratif ;",
+        "- Le texte fait partie d’une image véhiculant une information mais le texte lui-même n’apporte aucune information essentielle ;",
+        "- Le texte ou l’image de texte fait partie d’un élément d’interface sur lequel aucune action n’est possible (par exemple un bouton avec l’attribut `disabled`)."
+      ],
       "wcag": ["1.4.3"],
       "appliesTo": {
         "ruleIds": ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
@@ -908,7 +914,16 @@
         ]
       },
       "techniques": ["G18", "G195", "G207", "G174", "G145", "G183", "F78"],
-      "particularCases": ["Les cas suivants sont non applicables pour ce critère :", "[object Object]"],
+      "particularCases": [
+        "Les cas suivants sont non applicables pour ce critère :",
+        "- Composant d’interface inactif (par exemple, un bouton avec un attribut `disabled`) sur lequel aucune action n’est possible ;",
+        "- Composant d’interface pour lequel l’apparence est gérée par les styles natifs du navigateur sans aucune modification par l’auteur (par exemple, le style au focus natif dans Chrome ou Firefox) ;",
+        "- Composant d’interface pour lequel la couleur n’est pas nécessaire pour identifier le composant ou son état (par exemple, un groupe de liens faisant office de navigation dont la position dans la page, la taille et la couleur du texte permettent de comprendre qu’il s’agit de liens même si la couleur du soulignement des liens avec le fond blanc n’a pas un ratio de 3:1 et que le texte lui a un ratio de 4.5:1) ;",
+        "- [Élément graphique](#element-graphique) ou parties d’élément graphique non porteur d’information ou ayant une alternative (description longue, informations identiques visibles dans la page) ;",
+        "- [Élément graphique](#element-graphique) ou parties d’élément graphique faisant partie d’un logo ou du nom de marque d’un organisme ou d’une société ;",
+        "- [Élément graphique](#element-graphique) ou parties d’élément graphique dont la présentation est essentielle à l’information véhiculée (par exemple, drapeaux, logotypes, photos de personnes ou de scènes, captures d’écran, diagrammes médicaux, carte de chaleurs) ;",
+        "- [Élément graphique](#element-graphique) ou parties d’élément graphique dynamiques dont le contraste au survol / focus est suffisant."
+      ],
       "wcag": ["1.4.11"],
       "appliesTo": {
         "ruleIds": ["rendered-nontext-contrast"]
@@ -949,7 +964,13 @@
       "techniques": ["G58", "G69", "G78", "G158", "G159", "G173", "G8", "G166", "H96", "SM6", "SM7"],
       "particularCases": [
         "Il existe une gestion de cas particulier lorsque :",
-        "[object Object]",
+        "- Le [média temporel](#media-temporel-type-son-video-et-synchronise) est utilisé à des fins décoratives (c’est-à-dire qu’il n’apporte aucune information) ;",
+        "- Le [média temporel](#media-temporel-type-son-video-et-synchronise) est lui-même une alternative à un contenu de la page (une vidéo en langue des signes ou la vocalisation d’un texte, par exemple) ;",
+        "- Le [média temporel](#media-temporel-type-son-video-et-synchronise) est utilisé pour accéder à une version agrandie ;",
+        "- Le [média temporel](#media-temporel-type-son-video-et-synchronise) est utilisé comme un [CAPTCHA](#captcha) ;",
+        "- Le [média temporel](#media-temporel-type-son-video-et-synchronise) fait partie d’un test qui deviendrait inutile si la [transcription textuelle](#transcription-textuelle-media-temporel), les [sous-titres synchronisés](#sous-titres-synchronises-objet-multimedia) ou l’[audiodescription](#audiodescription-synchronisee-media-temporel) étaient communiqués ;",
+        "- Pour les services de l’État, les collectivités territoriales et leurs établissements : si le [média temporel](#media-temporel-type-son-video-et-synchronise) a été publié entre le 23 septembre 2019 et le 23 septembre 2020 sur un site internet, intranet ou extranet créé depuis le 23 septembre 2018, il est exempté de l’obligation d’accessibilité ;",
+        "- Pour les personnes de droit privé mentionnées aux 2° à 4° du I de l’article 47 de la loi du 11 février 2005 : si le [média temporel](#media-temporel-type-son-video-et-synchronise) a été publié avant le 23 septembre 2020, il est exempté de l’obligation d’accessibilité.",
         "Dans ces situations, le critère est non applicable.",
         "Ce cas particulier s’applique également aux critères 4.2, 4.3, 4.5."
       ],
@@ -1134,7 +1155,13 @@
         ]
       },
       "techniques": ["H35", "H46"],
-      "particularCases": ["Il existe une gestion de cas particulier lorsque :", "[object Object]", "Dans ces situations, le critère est non applicable."],
+      "particularCases": [
+        "Il existe une gestion de cas particulier lorsque :",
+        "- Le [média non temporel](#media-non-temporel) est utilisé à des fins décoratives (c’est-à-dire qu’il n’apporte aucune information) ;",
+        "- Le [média non temporel](#media-non-temporel) est diffusé dans un [environnement maîtrisé](#environnement-maitrise) ;",
+        "- Le [média non temporel](#media-non-temporel) est inséré via JavaScript en vérifiant la présence et la version du plug-in, en remplacement d’un [contenu alternatif](#contenu-alternatif) déjà présent.",
+        "Dans ces situations, le critère est non applicable."
+      ],
       "wcag": ["1.1.1"],
       "appliesTo": {
         "ruleIds": []
@@ -1515,14 +1542,18 @@
       "techniques": ["H30", "H78", "H79", "H80", "H81", "G53", "G91", "F63", "F89", "ARIA7", "ARIA8"],
       "technicalNote": [
         "Lorsque l’intitulé visible est complété par une autre expression dans le nom accessible :",
-        "[object Object]",
+        "- WCAG insiste sur le placement de l’intitulé visible au début du nom accessible sans toutefois réserver l’exclusivité de cet emplacement ;",
+        "- WCAG considère comme un cas d’échec une correspondance non exacte de la chaîne de caractères de l’intitulé visible au sein du nom accessible.",
         "Par exemple, si l’on considère l’intitulé visible « Commander maintenant » complété dans le nom accessible par l’expression « produit X », on peut avoir les différents cas suivants :",
-        "[object Object]"
+        "- « Commander maintenant produit X » est valide (bonne pratique) ;",
+        "- « Produit X : commander maintenant » est valide ;",
+        "- « Commander produit X maintenant » est non valide."
       ],
       "particularCases": [
         "Il existe une gestion de cas particuliers pour les tests 6.1.1, 6.1.2, 6.1.3 et 6.1.4 lorsque le lien est [ambigu pour tout le monde](#ambigu-pour-tout-le-monde). Dans cette situation, où il n’est pas possible de rendre le lien explicite dans son contexte, le critère est non applicable.",
         "Il existe une gestion de cas particuliers pour le test 6.1.5 lorsque :",
-        "[object Object]",
+        "- La ponctuation et les lettres majuscules sont présentes dans le texte de l’[intitulé visible](#intitule-visible) : elles peuvent être ignorées dans le nom accessible sans porter à conséquence ;",
+        "- Le texte de l’[intitulé visible](#intitule-visible) sert de symbole : le texte ne doit pas être interprété littéralement au niveau du nom accessible. Le nom doit exprimer la fonction véhiculée par le symbole (par exemple, “B” au niveau d’un éditeur de texte aura pour nom accessible “Mettre en gras”, le signe “>” en fonction du contexte signifiera “Suivant” ou “Lancer la vidéo”). Le cas des symboles mathématiques fait cependant exception (voir la note ci-dessous).",
         "Note : si l’étiquette visible représente une expression mathématique, les symboles mathématiques peuvent être repris littéralement pour servir d’étiquette au nom accessible (ex. : “A>B”). Il est laissé à l’utilisateur le soin d’opérer la correspondance entre l’expression et ce qu’il doit épeler compte tenu de la connaissance qu’il a du fonctionnement de son logiciel de saisie vocale (“A plus grand que B” ou “A supérieur à B”)."
       ],
       "wcag": ["1.1.1", "2.4.4", "2.5.3"],
@@ -1586,7 +1617,8 @@
       ],
       "particularCases": [
         "Il existe une gestion de cas particuliers pour le test 7.1.3 lorsque :",
-        "[object Object]",
+        "- La ponctuation et les lettres majuscules sont présentes dans le texte de l’intitulé visible : elles peuvent être ignorées dans le nom accessible sans porter à conséquence ;",
+        "- Le texte de l’intitulé visible sert de symbole : le texte ne doit pas être interprété littéralement au niveau du nom accessible. Le nom doit exprimer la fonction véhiculée par le symbole (par exemple, “B” au niveau d’un éditeur de texte aura pour nom accessible “Mettre en gras”, le signe “>” en fonction du contexte signifiera “Suivant” ou “Lancer la vidéo”). Le cas des symboles mathématiques fait cependant exception (voir la note ci-dessous).",
         "Note : si l’étiquette visible représente une expression mathématique, les symboles mathématiques peuvent être repris littéralement pour servir d’étiquette au nom accessible (ex. : “A>B”). Il est laissé à l’utilisateur le soin d’opérer la correspondance entre l’expression et ce qu’il doit épeler compte tenu de la connaissance qu’il a du fonctionnement de son logiciel de saisie vocale (“A plus grand que B” ou “A supérieur à B”)."
       ],
       "wcag": ["2.5.3", "4.1.2"],
@@ -1716,7 +1748,9 @@
       "techniques": ["ARIA19", "ARIA22", "ARIA23"],
       "technicalNote": [
         "Les rôles WAI-ARIA `log`, `status` et `alert` ont implicitement une valeur d’attribut WAI-ARIA `aria-live` et `aria-atomic`. On pourra donc considérer (conformément à la spécification WAI-ARIA 1.1) que :",
-        "[object Object]",
+        "- Un attribut WAI-ARIA `aria-live=\"polite\"` associé à un message de statut peut valoir pour un rôle WAI-ARIA `log` ;",
+        "- Un attribut WAI-ARIA `aria-live=\"polite\"` et un attribut WAI-ARIA `aria-atomic=\"true\"` associés à un message de statut peuvent valoir pour un rôle WAI-ARIA `status` ;",
+        "- Un attribut WAI-ARIA `aria-live=\"assertive\"` et un attribut WAI-ARIA `aria-atomic=\"true\"` associés à un message de statut peuvent valoir pour un rôle WAI-ARIA `alert`.",
         "C’est sous réserve que la nature du message de statut satisfasse bien à la correspondance implicitement établie. Dans le cas d’un message de statut indiquant la progression d’un processus et matérialisé graphiquement par une barre de progression, un rôle WAI-ARIA `progressbar` explicite est nécessaire."
       ],
       "wcag": ["4.1.3"],
@@ -1870,7 +1904,11 @@
       "techniques": ["H58"],
       "particularCases": [
         "Il y a une gestion de cas particuliers sur le changement de langue pour les cas suivants :",
-        "[object Object]",
+        "- Nom propre, le critère est non applicable ;",
+        "- Nom commun de langue étrangère présent dans le dictionnaire officiel de la langue (voir note 1 ci-dessous) par défaut de la page web, le critère est non applicable ;",
+        "- Le terme de langue étrangère soumis, via un [champ de formulaire](#champ-de-saisie-de-formulaire) et rappelé dans la page (par exemple comme indication du terme recherché dans le cas d’un moteur de recherche), le critère est non applicable ;",
+        "- Passage de texte dont la langue ne peut pas être déterminée : le critère est non applicable ;",
+        "- Terme ou passage de texte issus d’une langue morte ou imaginaire pour laquelle il n’existe pas d’interprétation vocale : le critère est non applicable.",
         "Note 1 : le dictionnaire officiel est celui recommandé par l’académie en charge de la langue en question. Pour la France, par exemple, le lien vers le dictionnaire officiel se trouve sur le site de l’Académie française à l’adresse suivante : http://www.academie-francaise.fr/le-dictionnaire/la-9e-edition. Pour toute demande auprès du service du dictionnaire de l’Académie française, utiliser le formulaire de contact du service du dictionnaire.",
         "Note 2 : pour les noms communs de langue étrangère, absents dans le dictionnaire officiel de la langue par défaut de la page web, et qui sont passés dans le langage commun (exemple : newsletter) : le critère est applicable, uniquement lorsque l’absence d’indication de langue peut provoquer une incompréhension pour la restitution."
       ],
@@ -2151,7 +2189,9 @@
       "techniques": ["G146", "G179", "F69", "F80", "SCR34", "C12", "C13", "C14", "C17", "C28"],
       "particularCases": [
         "Font exception à ce critère, les contenus pour lesquels l’utilisateur n’a pas de possibilité de personnalisation :",
-        "[object Object]"
+        "- Les sous-titres incrustés dans une vidéo ;",
+        "- Les textes en image ;",
+        "- Le texte au sein d’une balise `<canvas>`."
       ],
       "wcag": ["1.4.4"],
       "appliesTo": {
@@ -2337,7 +2377,11 @@
       "particularCases": [
         "L'objectif de ce critère est de garantir un défilement dans une unique direction pour une lecture facilitée selon le sens de l'écriture.",
         "Font exception à ce critère, les contenus dont l'agencement requiert deux dimensions pour être compris ou utilisés comme :",
-        "[object Object]",
+        "- Les images, les graphiques ou les vidéos ;",
+        "- Les jeux (jeux de plateforme, par exemple) ;",
+        "- Les présentations (type diaporama, par exemple) ;",
+        "- Les tableaux de données ;",
+        "- Les interfaces où il est nécessaire d'avoir un ascenseur horizontal lors de la manipulation de l'interface.",
         "Note : la majorité des navigateurs sur les systèmes d'exploitation sur mobile (Android, iOS) ne gère pas correctement la redistribution en cas de zoom. Dans ce contexte, le critère sera considéré comme non applicable sur ces environnements."
       ],
       "wcag": ["1.4.10"],
@@ -2366,7 +2410,9 @@
       "techniques": ["C8", "C21", "C35", "C36"],
       "particularCases": [
         "Font exception à ce critère, les contenus pour lesquels l’utilisateur n’a pas de possibilité de personnalisation :",
-        "[object Object]"
+        "- Les sous-titres directement intégrés à une vidéo ;",
+        "- Les images texte ;",
+        "- Le texte au sein d’une balise `<canvas>`."
       ],
       "wcag": ["1.4.12"],
       "appliesTo": {
@@ -2519,7 +2565,8 @@
       "techniques": ["G82", "G131", "H44", "H65", "ARIA6", "ARIA9", "ARIA14", "ARIA16"],
       "particularCases": [
         "Il existe une gestion de cas particuliers pour le test 11.2.5 lorsque :",
-        "[object Object]",
+        "- La ponctuation et les lettres majuscules sont présentes dans le texte de l’[intitulé visible](#intitule-visible) : elles peuvent être ignorées dans le nom accessible sans porter à conséquence ;",
+        "- Le texte de l’[intitulé visible](#intitule-visible) sert de symbole : le texte ne doit pas être interprété littéralement au niveau du nom accessible. Le nom doit exprimer la fonction véhiculée par le symbole (par exemple, “B” au niveau d’un éditeur de texte aura pour nom accessible “Mettre en gras”, le signe “>” en fonction du contexte signifiera “Suivant” ou “Lancer la vidéo”). Le cas des symboles mathématiques fait cependant exception (voir la note ci-dessous).",
         "Note : si l’étiquette visible représente une expression mathématique, les symboles mathématiques peuvent être repris littéralement pour servir d’étiquette au nom accessible (ex. : “A>B”). Il est laissé à l’utilisateur le soin d’opérer la correspondance entre l’expression et ce qu’il doit épeler compte tenu de la connaissance qu’il a du fonctionnement de son logiciel de saisie vocale (“A plus grand que B” ou “A supérieur à B”).",
         "Ce cas particulier s’applique également au test 11.9.2."
       ],
@@ -2576,7 +2623,13 @@
         ]
       },
       "techniques": ["G162"],
-      "particularCases": ["Les tests 11.4.2 et 11.4.3 seront considérés comme non applicables :", "[object Object]"],
+      "particularCases": [
+        "Les tests 11.4.2 et 11.4.3 seront considérés comme non applicables :",
+        "- Dans le cas où l’[étiquette](#etiquette-de-champ-de-formulaire) mélange une portion de texte qui se lit de droite à gauche avec une portion de texte qui se lit de gauche à droite ;",
+        "- Dans le cas où un formulaire contient des labels de plusieurs langues qui se liraient de droite à gauche et inversement. Par exemple, un formulaire de commande en arabe qui propose une liste de cases à cocher de produit en langue française ou mixant des produits en langue arabe ou en langue française ;",
+        "- Dans le cas où les champs de type `radio` ou `checkbox` et les balises ayant un attribut WAI-ARIA `role=\"checkbox\"`, `role=\"radio\"` ou `role=\"switch\"` ne sont pas visuellement présentés sous forme de bouton radio ou de case à cocher ;",
+        "- Dans le cas où les champs seraient utilisés dans un contexte où il pourrait être légitime, du point de vue de l’expérience utilisateur, de placer les étiquettes de manière différente à celle requise dans les tests 11.4.2 et 11.4.3."
+      ],
       "wcag": ["3.3.2"],
       "appliesTo": {
         "ruleIds": []
@@ -2770,11 +2823,14 @@
       ],
       "technicalNote": [
         "Dans un long formulaire dont la majorité des champs sont obligatoires, on pourrait constater que ce sont les quelques champs restés facultatifs qui sont explicitement signalés comme tels. Dans ce cas, il faudrait s’assurer que :",
-        "[object Object]"
+        "- Un message précise visuellement en haut de formulaire que “tous les champs sont obligatoires sauf ceux indiqués comme étant facultatifs” ;",
+        "- Une mention “facultatif” est présente visuellement dans le libellé des champs facultatifs ou dans la légende d’un groupe de champs facultatifs ;",
+        "- Un attribut `required` ou `aria-required=\"true\"` reste associé à chaque champ qui n’est pas concerné par ce caractère facultatif."
       ],
       "particularCases": [
         "Le test 11.10.1 et le test 11.10.2 seront considérés comme non applicables lorsque le formulaire comporte un seul [champ de formulaire](#champ-de-saisie-de-formulaire) ou qu’il indique les champs optionnels de manière :",
-        "[object Object]",
+        "- Visible ;",
+        "- Dans la balise `<label>` ou dans la [légende](#legende) associée au champ.",
         "Dans le cas où l’ensemble des champs d’un formulaire sont obligatoires, les tests 11.10.1 et 11.10.2 restent applicables."
       ],
       "wcag": ["3.3.1", "3.3.2"],
@@ -2904,7 +2960,13 @@
         ]
       },
       "techniques": ["G61", "F66"],
-      "particularCases": ["Il existe une gestion de cas particuliers lorsque :", "[object Object]", "Dans ces situations, le critère est non applicable."],
+      "particularCases": [
+        "Il existe une gestion de cas particuliers lorsque :",
+        "- La page est la page d’accueil ;",
+        "- Le site web est constitué d’une seule page ;",
+        "- Le changement fait suite à une modification initiée par l’utilisateur.",
+        "Dans ces situations, le critère est non applicable."
+      ],
       "wcag": ["3.2.3"],
       "appliesTo": {
         "ruleIds": []
@@ -3207,7 +3269,11 @@
         ]
       },
       "techniques": ["F15", "G10", "G135"],
-      "particularCases": ["Il existe une gestion de cas particuliers :", "[object Object]", "Dans cette situation, le critère est non applicable."],
+      "particularCases": [
+        "Il existe une gestion de cas particuliers :",
+        "- Pour les personnes de droit privé mentionnées aux 2° à 4° du I de l’article 47 de la loi du 11 février 2005 : si les fichiers bureautiques (ex : PDF, documents Microsoft ou LibreOffice, etc.) ont été publiés avant le 23 septembre 2018 (sauf si ce sont des documents nécessaires pour accomplir une démarche administrative relevant des tâches effectuées par l’organisme concerné), ils sont exemptés de l’obligation d’accessibilité.",
+        "Dans cette situation, le critère est non applicable."
+      ],
       "wcag": ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
       "appliesTo": {
         "ruleIds": []
@@ -3387,7 +3453,11 @@
         ]
       },
       "techniques": ["G215", "G216"],
-      "particularCases": ["Il existe une gestion de cas particuliers dans deux types de situation :", "[object Object]"],
+      "particularCases": [
+        "Il existe une gestion de cas particuliers dans deux types de situation :",
+        "- Le critère ne s’applique qu’à des fonctionnalités mises en place par l’auteur du site. Il ne concerne donc pas les gestes requis par l’agent utilisateur ou le système d’exploitation ;",
+        "- Le critère ne s’applique pas aux fonctionnalités dont la réalisation d’un geste complexe est essentielle (exécuter le tracé d’une signature, par exemple)."
+      ],
       "wcag": ["2.5.1"],
       "appliesTo": {
         "ruleIds": []
@@ -3413,7 +3483,8 @@
       "techniques": [],
       "technicalNote": [
         "Deux exemples de mécanisme mis en place pour annuler ou abandonner une action déclenchée au moyen d’un dispositif de pointage sur un point unique de l’écran :",
-        "[object Object]"
+        "- Une fenêtre modale permettant d’annuler l’action après son achèvement ;",
+        "- Pour une fonction de glisser/déposer, le fait d’abandonner l’action si l’utilisateur relâche l’élément en dehors de la zone cible."
       ],
       "particularCases": [
         "Il existe une gestion de cas particulier lorsque la fonctionnalité nécessite que le comportement attendu soit réalisé lors d’un événement descendant, par exemple, un émulateur de clavier dont les touches doivent s’activer à la pression comme sur un clavier physique. Dans ces situations, le critère est non applicable."
@@ -3444,7 +3515,11 @@
         ]
       },
       "techniques": [],
-      "particularCases": ["Il existe une gestion de cas particulier lorsque :", "[object Object]"],
+      "particularCases": [
+        "Il existe une gestion de cas particulier lorsque :",
+        "- Le mouvement est essentiel à l’accomplissement de la fonctionnalité (ex. podomètre) ;",
+        "- La détection du mouvement est utilisée pour contrôler une fonctionnalité au travers d’une interface compatible avec l’accessibilité."
+      ],
       "wcag": ["2.5.4"],
       "appliesTo": {
         "ruleIds": []

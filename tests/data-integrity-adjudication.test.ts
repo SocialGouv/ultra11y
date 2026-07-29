@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import adjudication from "../src/data/adjudication.json";
 import { hasSC, allSC } from "../src/wcag.js";
+import { loadPack } from "../src/standards/index.js";
 
 // The adjudication protocol (src/data/adjudication.json, built by
 // scripts/build-adjudication.mjs) is rendered per residual criterion by
@@ -76,5 +77,29 @@ describe("adjudication.json integrity", () => {
     for (const sc of ["2.4.2", "1.4.2", "3.1.1"]) {
       expect(bank[sc], `${sc} is static — must not carry manual questions`).toBeUndefined();
     }
+  });
+});
+
+describe("the RGAA pack ships no stringified object", () => {
+  // DINUM nests bullet lists as `{ ul: [...] }`. A `String(v)` on those used to emit a
+  // literal "[object Object]" into 22 normative texts across 21 criteria — silently deleting
+  // sub-conditions an auditor must apply, e.g. the four cases where RGAA 3.2 is NOT
+  // applicable. The builder now flattens them and fails the build if any survive.
+  const pack = loadPack("rgaa");
+
+  it("carries no placeholder text in any normative field", () => {
+    const bad: string[] = [];
+    for (const c of pack.criteria) {
+      for (const line of [...(c.technicalNote ?? []), ...(c.particularCases ?? []), ...Object.values(c.tests ?? {}).flat()]) {
+        if (String(line).includes("[object Object]")) bad.push(c.id);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("kept the sub-conditions that were being dropped (RGAA 3.2's non-applicability cases)", () => {
+    const pc = pack.criteria.find((c) => c.id === "3.2")?.particularCases ?? [];
+    expect(pc.join(" ")).toMatch(/logo/i);
+    expect(pc.join(" ")).toMatch(/décorat/i);
   });
 });

@@ -188,7 +188,25 @@ export function derivePackResults(audit: AuditResult, packKey: string): PackCrit
   // ruleId — so a sibling rule on the same SC is never pulled onto the secondary criterion.
   const enabledSecondary = (pack.secondaryMappings ?? []).filter((m) => m.enabled === true);
   const secondarySources = enabledSecondary.length ? [...audit.criteria.flatMap((c) => c.findings), ...myPackFindings] : [];
+  // An agent adjudication recorded AT THIS PACK'S GRANULARITY wins over the derivation. The
+  // engine's projection is an inference from WCAG; a recorded verdict is a decision taken on
+  // the pack's own criterion, against its own numbered tests. Nothing else in the pipeline
+  // needs to know: report, per-page grid, PRD and packConformancePct all read this function.
+  const adjudicated = audit.packAdjudication?.standard === packKey ? new Map(audit.packAdjudication.criteria.map((c) => [c.id, c])) : undefined;
+
   return pack.criteria.map((pc) => {
+    const decided = adjudicated?.get(pc.id);
+    if (decided) {
+      return {
+        id: pc.id,
+        theme: pc.theme,
+        status: decided.status,
+        findings: decided.findings,
+        scs: pc.wcag,
+        ...(decided.justification ? { justification: decided.justification } : {}),
+        decidedBy: "agent" as const,
+      };
+    }
     const base = deriveBase(pc);
     return enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
   });

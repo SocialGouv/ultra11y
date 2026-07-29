@@ -245,6 +245,10 @@ describe("applyAdjudication — fail-closed validation", () => {
 // The WCAG-core branch (hasSC) is covered above; this exercises the RGAA pack branch,
 // which had no coverage at all.
 describe("applyAdjudication — pack normativeRef resolution (RGAA)", () => {
+  // Under a pack the worklist is keyed by PACK criterion, so a citation is checked against
+  // that criterion's own numbered tests. Building a WCAG-keyed worklist and folding it as
+  // RGAA (what these tests used to do) is the incoherent state that let a WCAG success
+  // criterion be silently read as an unrelated RGAA test — see tests/adjudicate-pack.test.ts.
   const rgaaFile = (items: AdjudicationItem[]): AdjudicationFile => ({
     tool: "ultra11y",
     kind: "adjudication",
@@ -253,55 +257,49 @@ describe("applyAdjudication — pack normativeRef resolution (RGAA)", () => {
     auditDate: "2026-07-08",
     items,
   });
-  const decideAllRgaa = (over: Partial<AdjudicationItem>, only?: string) =>
-    buildAdjudicationWorklist(auditPage()).map((i) =>
-      only && i.criteriaId !== only
-        ? { ...i, verdict: "manual" as const, reason: "undecidable" }
-        : { ...i, verdict: "manual" as const, reason: "undecidable", ...over },
+  /** Every RGAA item left `manual`, except `only`, which takes `over`. */
+  const decideAllRgaa = (over: Partial<AdjudicationItem>, only: string) =>
+    buildAdjudicationWorklist(auditPage(), { standard: "rgaa" }).map((i) =>
+      i.criteriaId === only
+        ? { ...i, verdict: "manual" as const, reason: "undecidable", ...over }
+        : { ...i, verdict: "manual" as const, reason: "undecidable" },
     );
-
-  it('accepts a pack CRITERION id as normativeRef (RGAA "1.1")', () => {
-    const items = decideAllRgaa(
-      { verdict: "NC", findings: [{ file: PAGE, line: 9, selector: "img", message: 'alt="chart" is vague', snippet: 'alt="chart"', normativeRef: "1.1" }] },
-      "1.1.1",
-    );
-    const r = applyAdjudication(auditPage(), rgaaFile(items));
-    expect(r.ok).toBe(true);
-  });
-
-  it('accepts a pack TEST id as normativeRef (RGAA "1.1.1", i.e. criterion 1.1 / test 1)', () => {
-    const items = decideAllRgaa(
+  const ncOn = (criterion: string, normativeRef: string) =>
+    decideAllRgaa(
       {
         verdict: "NC",
-        findings: [{ file: PAGE, line: 9, selector: "img", message: 'alt="chart" is vague', snippet: 'alt="chart"', normativeRef: "1.1.1" }],
+        reason: null,
+        findings: [{ file: PAGE, line: 9, selector: "img", message: 'alt="chart" is vague', snippet: 'alt="chart"', normativeRef }],
       },
-      "1.1.1",
+      criterion,
     );
-    const r = applyAdjudication(auditPage(), rgaaFile(items));
-    expect(r.ok).toBe(true);
+
+  it('accepts the pack CRITERION id itself as normativeRef (RGAA "1.1" on criterion 1.1)', () => {
+    const r = applyAdjudication(auditPage(), rgaaFile(ncOn("1.1", "1.1")));
+    expect(r.ok, r.issues.join(" | ")).toBe(true);
   });
 
-  it('rejects a normativeRef whose criterion id does not exist in the RGAA pack ("9.9.9")', () => {
-    const items = decideAllRgaa(
-      { verdict: "NC", findings: [{ file: PAGE, line: 9, selector: "img", message: 'alt="chart" is vague', snippet: 'alt="chart"', normativeRef: "9.9.9" }] },
-      "1.1.1",
-    );
-    const r = applyAdjudication(auditPage(), rgaaFile(items));
-    expect(r.ok).toBe(false);
-    expect(r.issues.join("\n")).toMatch(/9\.9\.9|does not resolve/);
+  it('accepts one of that criterion\'s own tests (RGAA "1.1.1" on criterion 1.1)', () => {
+    const r = applyAdjudication(auditPage(), rgaaFile(ncOn("1.1", "1.1.1")));
+    expect(r.ok, r.issues.join(" | ")).toBe(true);
   });
 
-  it('rejects a normativeRef with a real criterion but an unknown test key ("1.1.99")', () => {
-    const items = decideAllRgaa(
-      {
-        verdict: "NC",
-        findings: [{ file: PAGE, line: 9, selector: "img", message: 'alt="chart" is vague', snippet: 'alt="chart"', normativeRef: "1.1.99" }],
-      },
-      "1.1.1",
-    );
-    const r = applyAdjudication(auditPage(), rgaaFile(items));
+  it('rejects a criterion id absent from the pack ("9.9.9")', () => {
+    const r = applyAdjudication(auditPage(), rgaaFile(ncOn("1.1", "9.9.9")));
     expect(r.ok).toBe(false);
-    expect(r.issues.join("\n")).toMatch(/1\.1\.99|does not resolve/);
+    expect(r.issues.join("\n")).toMatch(/9\.9\.9/);
+  });
+
+  it('rejects a real criterion with an unknown test key ("1.1.99")', () => {
+    const r = applyAdjudication(auditPage(), rgaaFile(ncOn("1.1", "1.1.99")));
+    expect(r.ok).toBe(false);
+    expect(r.issues.join("\n")).toMatch(/1\.1\.99/);
+  });
+
+  it("rejects a test belonging to ANOTHER criterion — the collision that used to pass", () => {
+    // "3.2.1" is a real RGAA test, but of criterion 3.2, not 1.1.
+    const r = applyAdjudication(auditPage(), rgaaFile(ncOn("1.1", "3.2.1")));
+    expect(r.ok).toBe(false);
   });
 });
 

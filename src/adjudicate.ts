@@ -11,7 +11,7 @@
 // decisions are the AGENT's, statically, gated — not a deferral to a human.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AuditResult, Automatability, Finding, Lang, ResidualRisk, Severity, Status } from "./types.js";
+import type { AuditResult, Automatability, Finding, Lang, PackCriterionAdjudication, ResidualRisk, Severity, Status } from "./types.js";
 import { SCHEMA_VERSION } from "./types.js";
 import { discover } from "./discover.js";
 import { readText } from "./util.js";
@@ -21,7 +21,21 @@ import { parseInlineStyle } from "./color.js";
 import adjudicationJson from "./data/adjudication.json";
 import { scTitle, getSC, hasSC, techniquesFor, allSC, guidelineTitle } from "./wcag.js";
 import { groundItems, type GroundingSummary } from "./grounding.js";
-import { type StandardId, isCore, loadPack, hasId, getCriterion } from "./standards/index.js";
+import {
+  type StandardId,
+  CORE,
+  isCore,
+  loadPack,
+  hasId,
+  getCriterion,
+  derivePackResults,
+  resolveGlossary,
+  titlePlain as packTitlePlain,
+  type StandardPack,
+  type PackCriterion,
+} from "./standards/index.js";
+import { guidanceForCriterion } from "./guidance/index.js";
+import { guidanceExampleBlock } from "./prd.js";
 
 /** Cap on evidence items harvested per criterion — bounded so a huge page can't produce an
  *  unreadable worklist; the honest overflow count is recorded in `evidenceTruncated`. */
@@ -284,27 +298,72 @@ function docsForAudit(audit: AuditResult, cwd?: string): Doc[] {
   return docs;
 }
 
-/** Build the adjudication worklist: one item per residual-risk (manual) criterion, with
- *  its harvested evidence (capped + honestly truncated). */
+function blankItem(criteriaId: string, automatability: Automatability, title: string | undefined, harvested: Evidence[]): AdjudicationItem {
+  const evidence = harvested.slice(0, ADJUDICATE_MAX_EVIDENCE);
+  return {
+    criteriaId,
+    automatability,
+    ...(title ? { title } : {}),
+    evidence,
+    ...(harvested.length > ADJUDICATE_MAX_EVIDENCE ? { evidenceTruncated: { shown: evidence.length, total: harvested.length } } : {}),
+    verdict: null,
+    justification: "",
+    reason: null,
+    findings: [],
+    recommendations: [],
+    decidedBy: "agent" as const,
+  };
+}
+
+/** Evidence for a PACK criterion: the union of the harvesters of every success criterion it
+ *  maps onto, de-duplicated. A pack criterion is finer than a WCAG SC (1.1.1 fans out to 19
+ *  RGAA criteria), so the same element would otherwise be listed once per mapped SC. */
+function packEvidence(scs: string[], docs: Doc[]): Evidence[] {
+  const out: Evidence[] = [];
+  const seen = new Set<string>();
+  for (const sc of scs) {
+    for (const e of HARVESTERS[sc]?.(docs) ?? []) {
+      const key = `${e.file}:${e.line}:${e.selector}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(e);
+    }
+  }
+  return out;
+}
+
+/** Build the adjudication worklist.
+ *
+ *  For the WCAG core: one item per residual-risk (manual) success criterion.
+ *
+ *  For a COUNTRY STANDARD: one item per PACK criterion that derives `manual` — which is where
+ *  almost the whole standard lives (99 of RGAA's 106 criteria can only ever derive `manual`).
+ *  Keying by the pack's own criteria is not cosmetic: it is what lets an item carry the
+ *  criterion's numbered tests, and therefore what lets `normativeRefResolves` check a citation
+ *  against THIS criterion's tests instead of accepting any id of the right shape. */
 export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: string; standard?: StandardId } = {}): AdjudicationItem[] {
   const docs = docsForAudit(audit, opts.cwd);
-  return audit.residualRisks.map((r: ResidualRisk) => {
-    const harvested = HARVESTERS[r.criteriaId]?.(docs) ?? [];
-    const evidence = harvested.slice(0, ADJUDICATE_MAX_EVIDENCE);
-    return {
-      criteriaId: r.criteriaId,
-      automatability: r.automatability,
-      title: scTitle(r.criteriaId) ?? undefined,
-      evidence,
-      ...(harvested.length > ADJUDICATE_MAX_EVIDENCE ? { evidenceTruncated: { shown: evidence.length, total: harvested.length } } : {}),
-      verdict: null,
-      justification: "",
-      reason: null,
-      findings: [],
-      recommendations: [],
-      decidedBy: "agent" as const,
-    };
-  });
+  const standard = opts.standard;
+
+  if (standard !== undefined && !isCore(standard)) {
+    const pack = loadPack(standard);
+    return derivePackResults(audit, standard)
+      .filter((pc) => pc.status === "manual")
+      .map((pc) => {
+        const crit = getCriterion(pack, pc.id);
+        const scs = crit?.wcag ?? pc.scs;
+        // The worst automatability among the mapped SCs: a criterion needing a rendered DOM
+        // for any of them needs one, full stop. A criterion whose SCs are all outside the
+        // core (RGAA 8.1 → the removed 4.1.1) is still the agent's to decide from source.
+        const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a): a is Automatability => !!a);
+        const automatability: Automatability = autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
+        return blankItem(pc.id, automatability, crit ? packTitlePlain(pack, crit, "fr") : undefined, packEvidence(scs, docs));
+      });
+  }
+
+  return audit.residualRisks.map((r: ResidualRisk) =>
+    blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? undefined, HARVESTERS[r.criteriaId]?.(docs) ?? []),
+  );
 }
 
 export interface ApplyAdjudicationResult {
@@ -319,21 +378,42 @@ export interface ApplyAdjudicationResult {
 const NC_SEVERITY_DEFAULT: Severity = "majeur";
 const MANUAL_REASONS = new Set(["needs-rendered-dom", "undecidable"]);
 
-/** Does an NC finding's `normativeRef` resolve against the ACTIVE standard? For the WCAG
- *  core, it must be a real success-criterion id (reuses `hasSC`). For a pack, it must be a
- *  real pack criterion id, or a pack TEST id ("<criterionId>.<testKey>"). Fail-closed: an
- *  absent/blank/unresolvable ref makes the whole adjudication fail (mirrors verify.ts). */
-function normativeRefResolves(ref: string | undefined, standard: StandardId): boolean {
+/** Does an NC finding's `normativeRef` resolve against the ACTIVE standard?
+ *
+ *  Core: a real success-criterion id (reuses `hasSC`).
+ *
+ *  Pack: the criterion the ref names must be `itemCriterionId` ITSELF — either cited bare
+ *  ("11.2") or as one of its own tests ("11.2.1").
+ *
+ *  That last constraint is load-bearing, not pedantry. A pack test id has the same `N.N.N`
+ *  shape as a WCAG success criterion, so a laxer check accepted the WCAG id an agent would
+ *  naturally reach for and silently read it as an unrelated pack test: citing "1.4.3"
+ *  (Contrast Minimum) resolved as RGAA test 1.4.3, which is about CAPTCHA images. Binding the
+ *  citation to the item's own criterion removes the collision entirely.
+ *
+ *  Fail-closed: an absent/blank/unresolvable ref fails the whole adjudication (mirrors
+ *  verify.ts). */
+function normativeRefResolves(ref: string | undefined, standard: StandardId, itemCriterionId?: string): boolean {
   const r = (ref ?? "").trim();
   if (!r) return false;
   if (isCore(standard)) return hasSC(r);
   const pack = loadPack(standard);
-  if (hasId(pack, r)) return true; // a pack criterion id (e.g. RGAA "1.1")
-  // A pack test id "<criterionId>.<testKey>" (e.g. RGAA "1.1.1"): split at the last dot.
-  const dot = r.lastIndexOf(".");
-  if (dot <= 0) return false;
-  const crit = getCriterion(pack, r.slice(0, dot));
-  return !!crit?.tests && Object.hasOwn(crit.tests, r.slice(dot + 1));
+  // Which criterion does the ref name? Either the criterion itself, or "<criterion>.<test>".
+  let critId = hasId(pack, r) ? r : undefined;
+  let testKey: string | undefined;
+  if (critId === undefined) {
+    const dot = r.lastIndexOf(".");
+    if (dot <= 0) return false;
+    const head = r.slice(0, dot);
+    if (!hasId(pack, head)) return false;
+    critId = head;
+    testKey = r.slice(dot + 1);
+  }
+  const crit = getCriterion(pack, critId);
+  if (!crit) return false;
+  if (testKey !== undefined && !(crit.tests && Object.hasOwn(crit.tests, testKey))) return false;
+  // The citation must belong to the criterion being adjudicated.
+  return itemCriterionId === undefined || critId === itemCriterionId;
 }
 
 /** Fold an adjudication file back into the audit. FAIL-CLOSED (see module header). Returns
@@ -343,8 +423,17 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
   const issues: string[] = [];
   const byId = new Map(adj.items.map((it) => [it.criteriaId, it]));
 
-  // Coverage: every residual criterion must be adjudicated.
-  for (const r of audit.residualRisks) if (!byId.has(r.criteriaId)) issues.push(`criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+  // Coverage. Under the core that means every residual success criterion; under a pack it
+  // means every pack criterion that derives `manual` — the pack's own granularity, which is
+  // what the worklist was built at.
+  const packMode = !isCore(adj.standard);
+  if (packMode) {
+    for (const pc of derivePackResults(audit, adj.standard)) {
+      if (pc.status === "manual" && !byId.has(pc.id)) issues.push(`criterion ${pc.id}: missing from the adjudication (coverage gap)`);
+    }
+  } else {
+    for (const r of audit.residualRisks) if (!byId.has(r.criteriaId)) issues.push(`criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+  }
 
   // Per-item fail-closed validation.
   const groundInputs: { file: string; line: number; selector?: string; snippet?: string }[] = [];
@@ -361,8 +450,12 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
         // standard. A good practice with no normative test is a recommendation, not an NC.
         if (!f.normativeRef || !f.normativeRef.trim()) {
           issues.push(`criterion ${it.criteriaId}: an NC finding requires a normativeRef citing the failed test of the active standard`);
-        } else if (!normativeRefResolves(f.normativeRef, adj.standard)) {
-          issues.push(`criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" does not resolve to a test of ${adj.standard} (fabricated?)`);
+        } else if (!normativeRefResolves(f.normativeRef, adj.standard, isCore(adj.standard) ? undefined : it.criteriaId)) {
+          issues.push(
+            isCore(adj.standard)
+              ? `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" does not resolve to a test of ${adj.standard} (fabricated?)`
+              : `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" is not a test of ${adj.standard} ${it.criteriaId} — cite one of its own tests (e.g. "${it.criteriaId}.1"); a WCAG id looks alike but denotes an unrelated test`,
+          );
         }
         groundInputs.push({ file: f.file, line: f.line, selector: f.selector, snippet: f.snippet });
       }
@@ -392,6 +485,46 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
   const newFindings: Finding[] = [];
   let applied = 0;
   let stillManual = 0;
+
+  // PACK MODE. The items are the pack's own criteria, which have no counterpart in
+  // `next.criteria` (a WCAG-keyed list). Recording them there would be wrong twice over: it
+  // would let a pack decision rewrite the WCAG core verdict, and — since 1.1.1 alone fans out
+  // to 19 RGAA criteria — it would let those criteria overwrite one another on a shared
+  // success criterion. They get their own layer, which `derivePackResults` then prefers.
+  if (packMode) {
+    const decided: PackCriterionAdjudication[] = [];
+    for (const it of adj.items) {
+      if (it.verdict === "manual") {
+        stillManual++;
+        decided.push({
+          id: it.criteriaId,
+          status: "manual",
+          reason: it.reason === "needs-rendered-dom" ? "needs-rendered-dom" : "undecidable",
+          justification: it.reason === "needs-rendered-dom" ? residualScanReason() : residualUndecidableReason(),
+          findings: [],
+          decidedBy: "agent",
+        });
+        continue;
+      }
+      applied++;
+      const fs = it.verdict === "NC" ? it.findings.map((f) => agentFinding(it.criteriaId, f)) : [];
+      const recs = (it.recommendations ?? []).map((rec) => agentFinding(it.criteriaId, rec, true));
+      newFindings.push(...fs, ...recs);
+      decided.push({
+        id: it.criteriaId,
+        status: it.verdict as Status,
+        ...(it.verdict === "C" || it.verdict === "NA" ? { justification: it.justification.trim() } : {}),
+        findings: [...fs, ...recs],
+        decidedBy: "agent",
+      });
+    }
+    next.packAdjudication = { standard: adj.standard, criteria: decided };
+    // The agent's findings still join the flat list so grounding, `check` and the reports can
+    // resolve them — but they never touch a WCAG criterion's status.
+    next.findings = [...next.findings, ...newFindings];
+    next.adjudicated = { date: adj.auditDate, applied, stillManual };
+    return { ok: true, audit: next, issues, applied, stillManual, grounding };
+  }
 
   for (const it of adj.items) {
     const c = critById.get(it.criteriaId);
@@ -491,6 +624,12 @@ const T = {
     decide: "Règle de décision",
     na: "Non applicable si",
     refs: "Références normatives mobilisables (techniques/échecs W3C de ce critère)",
+    packIntro: (name: string) =>
+      `Référentiel actif : **${name}**. Les items ci-dessous sont des critères ${name}, pas des critères de succès WCAG. Un \`normativeRef\` DOIT citer un test du critère de l'item (par ex. \`11.2.1\`) — un id WCAG y ressemble mais désigne un tout autre test et sera rejeté.`,
+    packTests: (name: string, id: string) => `Tests ${name} ${id} à trancher`,
+    technicalNote: "Note technique",
+    particularCases: "Cas particuliers",
+    glossary: "Termes définis par le référentiel",
   },
   en: {
     title: "# Criteria adjudication (ultra11y)",
@@ -509,6 +648,12 @@ const T = {
     decide: "Decision rule",
     na: "Not applicable when",
     refs: "Normative references you may cite (this criterion's W3C techniques/failures)",
+    packIntro: (name: string) =>
+      `Active standard: **${name}**. The items below are ${name} criteria, not WCAG success criteria. A \`normativeRef\` MUST cite a test OF THE ITEM'S CRITERION (e.g. \`11.2.1\`) — a WCAG id looks alike but denotes an unrelated test and will be rejected.`,
+    packTests: (name: string, id: string) => `${name} ${id} tests to rule on`,
+    technicalNote: "Technical note",
+    particularCases: "Particular cases",
+    glossary: "Terms the standard defines",
   },
 } as const;
 
@@ -570,11 +715,67 @@ export function renderAdjudicationReference(lang: Lang = "en"): string {
   return out.join("\n");
 }
 
-export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en"): string {
+// A criterion's tests refer constantly to normatively-defined terms
+// (`[alternative textuelle](#alternative-textuelle-image)`). The definitions live in the
+// pack's glossary — 119 entries for RGAA — which nothing used to read. Attaching the ones
+// THIS criterion's tests actually cite makes the item self-sufficient: the agent no longer
+// has to guess what the standard means by "image porteuse d'information".
+const GLOSSARY_REF = /\[[^\]]+\]\(#([^)]+)\)/g;
+const MAX_GLOSSARY_TERMS = 8;
+const MAX_GLOSSARY_CHARS = 600;
+
+/** The glossary anchors a criterion's tests / notes / particular cases refer to, in order. */
+export function glossaryAnchorsOf(crit: { tests?: Record<string, string[]>; technicalNote?: string[]; particularCases?: string[] } | undefined): string[] {
+  if (!crit) return [];
+  const texts = [...Object.values(crit.tests ?? {}).flat(), ...(crit.technicalNote ?? []), ...(crit.particularCases ?? [])];
+  const seen = new Set<string>();
+  for (const t of texts) {
+    GLOSSARY_REF.lastIndex = 0;
+    for (let m = GLOSSARY_REF.exec(t); m; m = GLOSSARY_REF.exec(t)) if (m[1]) seen.add(m[1]);
+  }
+  return [...seen];
+}
+
+function glossaryBlock(pack: StandardPack, crit: PackCriterion | undefined, lang: Lang): string[] {
+  const anchors = glossaryAnchorsOf(crit).slice(0, MAX_GLOSSARY_TERMS);
+  if (!anchors.length) return [];
   const s = T[lang];
+  const out: string[] = [`> **${s.glossary}**`, ""];
+  let any = false;
+  for (const a of anchors) {
+    const entry = resolveGlossary(pack.key, a);
+    if (!entry) continue;
+    any = true;
+    const body = entry.body.replace(/\s+/g, " ").trim();
+    out.push(`- **${entry.title}** — ${body.length > MAX_GLOSSARY_CHARS ? `${body.slice(0, MAX_GLOSSARY_CHARS)}…` : body}`);
+  }
+  out.push("");
+  return any ? out : [];
+}
+
+/** The pack's own implementation guidance for this criterion (before/after examples). Used by
+ *  `prd`/`auditor` for NC units only — a `manual` criterion never reached it, which is exactly
+ *  the criterion an adjudicator is looking at. */
+function packGuidanceBlock(standard: StandardId, criterionId: string, lang: Lang): string[] {
+  const entries = guidanceForCriterion(standard, criterionId);
+  if (!entries.length) return [];
+  return guidanceExampleBlock(entries, lang);
+}
+
+/** Strip a test's glossary cross-references down to their visible label:
+ *  `[alternative textuelle](#alternative-textuelle-image)` → `alternative textuelle`. The
+ *  definitions themselves are attached separately (see `glossaryBlock`). */
+function plainTest(s: string): string {
+  return s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
+}
+
+export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en", standard: StandardId = CORE): string {
+  const s = T[lang];
+  const pack = isCore(standard) ? undefined : loadPack(standard);
   const out: string[] = [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
+  if (pack) out.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
-    out.push(`## ${it.criteriaId}${it.title ? ` — ${it.title}` : ""}  _(${it.automatability})_`);
+    out.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` — ${it.title}` : ""}  _(${it.automatability})_`);
     out.push("", `> ${s.evidence} (${it.evidence.length}${it.evidenceTruncated ? ` / ${it.evidenceTruncated.total}` : ""}):`, "");
     if (!it.evidence.length) out.push(s.none, "");
     else {
@@ -591,12 +792,36 @@ export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en")
         out.push("");
       }
     }
-    // The techniques a NC on this criterion may legitimately cite. `verify --apply`
-    // rejects a normativeRef that does not resolve, so proposing the valid ones here is
-    // what keeps the agent from inventing one.
-    const refs = techniquesFor(it.criteriaId);
-    if (refs.length) {
-      out.push(`> ${s.refs}: ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` … (\`criteria ${it.criteriaId}\`)` : ""}`, "");
+    // The references a NC on this criterion may legitimately cite. `verify --apply` rejects
+    // a normativeRef that does not resolve, so what is proposed here MUST be what the gate
+    // accepts — under a pack that is the criterion's own numbered tests, never a W3C
+    // technique code (which the pack gate has always refused).
+    if (pack) {
+      const crit = getCriterion(pack, it.criteriaId);
+      const tests = crit?.tests ?? {};
+      const keys = Object.keys(tests);
+      if (keys.length) {
+        out.push(`> **${s.packTests(pack.name, it.criteriaId)}**`, "");
+        for (const k of keys) {
+          const lines = tests[k] ?? [];
+          // A RGAA test can carry sub-conditions ("… vérifie-t-il ces conditions ?" followed
+          // by the list). Number the test once and indent its conditions, rather than
+          // repeating the id and reading like N separate tests.
+          out.push(`- \`${it.criteriaId}.${k}\` ${plainTest(lines[0] ?? "")}`);
+          for (const line of lines.slice(1)) out.push(`  - ${plainTest(line)}`);
+        }
+        out.push("");
+      }
+      if (crit?.technicalNote?.length) out.push(`> **${s.technicalNote}** — ${crit.technicalNote.map(plainTest).join(" ")}`, "");
+      if (crit?.particularCases?.length) out.push(`> **${s.particularCases}** — ${crit.particularCases.map(plainTest).join(" ")}`, "");
+      out.push(...glossaryBlock(pack, crit, lang));
+      out.push(...packGuidanceBlock(standard, it.criteriaId, lang));
+      if (keys.length) out.push(`> ${s.refs}: ${keys.map((k) => `\`${it.criteriaId}.${k}\``).join(", ")}`, "");
+    } else {
+      const refs = techniquesFor(it.criteriaId);
+      if (refs.length) {
+        out.push(`> ${s.refs}: ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` … (\`criteria ${it.criteriaId}\`)` : ""}`, "");
+      }
     }
   }
   return out.join("\n");
@@ -625,6 +850,6 @@ export function writeAdjudication(
     items,
   };
   writeFileSync(todoPath, JSON.stringify(file, null, 2) + "\n");
-  writeFileSync(mdPath, formatAdjudication(items, opts.lang ?? "en"));
+  writeFileSync(mdPath, formatAdjudication(items, opts.lang ?? "en", opts.standard));
   return { todoPath, mdPath, count: items.length };
 }

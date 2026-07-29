@@ -38470,7 +38470,13 @@ var rgaa_default = {
         ]
       },
       techniques: ["G18", "G136", "G148", "G174", "G145", "C29"],
-      particularCases: ["Dans ces situations, les crit\xE8res sont non applicables pour ces \xE9l\xE9ments\xA0:", "[object Object]"],
+      particularCases: [
+        "Dans ces situations, les crit\xE8res sont non applicables pour ces \xE9l\xE9ments\xA0:",
+        "- Le texte fait partie d\u2019un logo ou d\u2019un nom de marque d\u2019un organisme ou d\u2019une soci\xE9t\xE9\xA0;",
+        "- Le texte ou l\u2019image de texte est purement d\xE9coratif\xA0;",
+        "- Le texte fait partie d\u2019une image v\xE9hiculant une information mais le texte lui-m\xEAme n\u2019apporte aucune information essentielle\xA0;",
+        "- Le texte ou l\u2019image de texte fait partie d\u2019un \xE9l\xE9ment d\u2019interface sur lequel aucune action n\u2019est possible (par exemple un bouton avec l\u2019attribut `disabled`)."
+      ],
       wcag: ["1.4.3"],
       appliesTo: {
         ruleIds: ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
@@ -38506,7 +38512,16 @@ var rgaa_default = {
         ]
       },
       techniques: ["G18", "G195", "G207", "G174", "G145", "G183", "F78"],
-      particularCases: ["Les cas suivants sont non applicables pour ce crit\xE8re\xA0:", "[object Object]"],
+      particularCases: [
+        "Les cas suivants sont non applicables pour ce crit\xE8re\xA0:",
+        "- Composant d\u2019interface inactif (par exemple, un bouton avec un attribut `disabled`) sur lequel aucune action n\u2019est possible\xA0;",
+        "- Composant d\u2019interface pour lequel l\u2019apparence est g\xE9r\xE9e par les styles natifs du navigateur sans aucune modification par l\u2019auteur (par exemple, le style au focus natif dans Chrome ou Firefox)\xA0;",
+        "- Composant d\u2019interface pour lequel la couleur n\u2019est pas n\xE9cessaire pour identifier le composant ou son \xE9tat (par exemple, un groupe de liens faisant office de navigation dont la position dans la page, la taille et la couleur du texte permettent de comprendre qu\u2019il s\u2019agit de liens m\xEAme si la couleur du soulignement des liens avec le fond blanc n\u2019a pas un ratio de 3:1 et que le texte lui a un ratio de 4.5:1)\xA0;",
+        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique non porteur d\u2019information ou ayant une alternative (description longue, informations identiques visibles dans la page)\xA0;",
+        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique faisant partie d\u2019un logo ou du nom de marque d\u2019un organisme ou d\u2019une soci\xE9t\xE9\xA0;",
+        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique dont la pr\xE9sentation est essentielle \xE0 l\u2019information v\xE9hicul\xE9e (par exemple, drapeaux, logotypes, photos de personnes ou de sc\xE8nes, captures d\u2019\xE9cran, diagrammes m\xE9dicaux, carte de chaleurs)\xA0;",
+        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique dynamiques dont le contraste au survol / focus est suffisant."
+      ],
       wcag: ["1.4.11"],
       appliesTo: {
         ruleIds: ["rendered-nontext-contrast"]
@@ -38547,7 +38562,13 @@ var rgaa_default = {
       techniques: ["G58", "G69", "G78", "G158", "G159", "G173", "G8", "G166", "H96", "SM6", "SM7"],
       particularCases: [
         "Il existe une gestion de cas particulier lorsque\xA0:",
-        "[object Object]",
+        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est utilis\xE9 \xE0 des fins d\xE9coratives (c\u2019est-\xE0-dire qu\u2019il n\u2019apporte aucune information)\xA0;",
+        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est lui-m\xEAme une alternative \xE0 un contenu de la page (une vid\xE9o en langue des signes ou la vocalisation d\u2019un texte, par exemple)\xA0;",
+        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est utilis\xE9 pour acc\xE9der \xE0 une version agrandie\xA0;",
+        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est utilis\xE9 comme un [CAPTCHA](#captcha)\xA0;",
+        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) fait partie d\u2019un test qui deviendrait inutile si la [transcription textuelle](#transcription-textuelle-media-temporel), les [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia) ou l\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) \xE9taient communiqu\xE9s\xA0;",
+        "- Pour les services de l\u2019\xC9tat, les collectivit\xE9s territoriales et leurs \xE9tablissements\xA0: si le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) a \xE9t\xE9 publi\xE9 entre le 23 septembre 2019 et le 23 septembre 2020 sur un site internet, intranet ou extranet cr\xE9\xE9 depuis le 23 septembre 2018, il est exempt\xE9 de l\u2019obligation d\u2019accessibilit\xE9\xA0;",
+        "- Pour les personnes de droit priv\xE9 mentionn\xE9es aux 2\xB0 \xE0 4\xB0 du I de l\u2019article 47 de la loi du 11 f\xE9vrier 2005\xA0: si le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) a \xE9t\xE9 publi\xE9 avant le 23 septembre 2020, il est exempt\xE9 de l\u2019obligation d\u2019accessibilit\xE9.",
         "Dans ces situations, le crit\xE8re est non applicable.",
         "Ce cas particulier s\u2019applique \xE9galement aux crit\xE8res 4.2, 4.3, 4.5."
       ],
@@ -38732,7 +38753,13 @@ var rgaa_default = {
         ]
       },
       techniques: ["H35", "H46"],
-      particularCases: ["Il existe une gestion de cas particulier lorsque\xA0:", "[object Object]", "Dans ces situations, le crit\xE8re est non applicable."],
+      particularCases: [
+        "Il existe une gestion de cas particulier lorsque\xA0:",
+        "- Le [m\xE9dia non temporel](#media-non-temporel) est utilis\xE9 \xE0 des fins d\xE9coratives (c\u2019est-\xE0-dire qu\u2019il n\u2019apporte aucune information)\xA0;",
+        "- Le [m\xE9dia non temporel](#media-non-temporel) est diffus\xE9 dans un [environnement ma\xEEtris\xE9](#environnement-maitrise)\xA0;",
+        "- Le [m\xE9dia non temporel](#media-non-temporel) est ins\xE9r\xE9 via JavaScript en v\xE9rifiant la pr\xE9sence et la version du plug-in, en remplacement d\u2019un [contenu alternatif](#contenu-alternatif) d\xE9j\xE0 pr\xE9sent.",
+        "Dans ces situations, le crit\xE8re est non applicable."
+      ],
       wcag: ["1.1.1"],
       appliesTo: {
         ruleIds: []
@@ -39113,14 +39140,18 @@ var rgaa_default = {
       techniques: ["H30", "H78", "H79", "H80", "H81", "G53", "G91", "F63", "F89", "ARIA7", "ARIA8"],
       technicalNote: [
         "Lorsque l\u2019intitul\xE9 visible est compl\xE9t\xE9 par une autre expression dans le nom accessible\xA0:",
-        "[object Object]",
+        "- WCAG insiste sur le placement de l\u2019intitul\xE9 visible au d\xE9but du nom accessible sans toutefois r\xE9server l\u2019exclusivit\xE9 de cet emplacement\xA0;",
+        "- WCAG consid\xE8re comme un cas d\u2019\xE9chec une correspondance non exacte de la cha\xEEne de caract\xE8res de l\u2019intitul\xE9 visible au sein du nom accessible.",
         "Par exemple, si l\u2019on consid\xE8re l\u2019intitul\xE9 visible \xAB\xA0Commander maintenant\xA0\xBB compl\xE9t\xE9 dans le nom accessible par l\u2019expression \xAB\xA0produit X\xA0\xBB, on peut avoir les diff\xE9rents cas suivants\xA0:",
-        "[object Object]"
+        "- \xAB\xA0Commander maintenant produit X\xA0\xBB est valide (bonne pratique)\xA0;",
+        "- \xAB\xA0Produit X : commander maintenant\xA0\xBB est valide\xA0;",
+        "- \xAB\xA0Commander produit X maintenant\xA0\xBB est non valide."
       ],
       particularCases: [
         "Il existe une gestion de cas particuliers pour les tests 6.1.1, 6.1.2, 6.1.3 et 6.1.4 lorsque le lien est [ambigu pour tout le monde](#ambigu-pour-tout-le-monde). Dans cette situation, o\xF9 il n\u2019est pas possible de rendre le lien explicite dans son contexte, le crit\xE8re est non applicable.",
         "Il existe une gestion de cas particuliers pour le test 6.1.5 lorsque\xA0:",
-        "[object Object]",
+        "- La ponctuation et les lettres majuscules sont pr\xE9sentes dans le texte de l\u2019[intitul\xE9 visible](#intitule-visible)\xA0: elles peuvent \xEAtre ignor\xE9es dans le nom accessible sans porter \xE0 cons\xE9quence\xA0;",
+        "- Le texte de l\u2019[intitul\xE9 visible](#intitule-visible) sert de symbole\xA0: le texte ne doit pas \xEAtre interpr\xE9t\xE9 litt\xE9ralement au niveau du nom accessible. Le nom doit exprimer la fonction v\xE9hicul\xE9e par le symbole (par exemple, \u201CB\u201D au niveau d\u2019un \xE9diteur de texte aura pour nom accessible \u201CMettre en gras\u201D, le signe \u201C>\u201D en fonction du contexte signifiera \u201CSuivant\u201D ou \u201CLancer la vid\xE9o\u201D). Le cas des symboles math\xE9matiques fait cependant exception (voir la note ci-dessous).",
         "Note\xA0: si l\u2019\xE9tiquette visible repr\xE9sente une expression math\xE9matique, les symboles math\xE9matiques peuvent \xEAtre repris litt\xE9ralement pour servir d\u2019\xE9tiquette au nom accessible (ex.\xA0: \u201CA>B\u201D). Il est laiss\xE9 \xE0 l\u2019utilisateur le soin d\u2019op\xE9rer la correspondance entre l\u2019expression et ce qu\u2019il doit \xE9peler compte tenu de la connaissance qu\u2019il a du fonctionnement de son logiciel de saisie vocale (\u201CA plus grand que B\u201D ou \u201CA sup\xE9rieur \xE0 B\u201D)."
       ],
       wcag: ["1.1.1", "2.4.4", "2.5.3"],
@@ -39184,7 +39215,8 @@ var rgaa_default = {
       ],
       particularCases: [
         "Il existe une gestion de cas particuliers pour le test 7.1.3 lorsque\xA0:",
-        "[object Object]",
+        "- La ponctuation et les lettres majuscules sont pr\xE9sentes dans le texte de l\u2019intitul\xE9 visible : elles peuvent \xEAtre ignor\xE9es dans le nom accessible sans porter \xE0 cons\xE9quence\xA0;",
+        "- Le texte de l\u2019intitul\xE9 visible sert de symbole : le texte ne doit pas \xEAtre interpr\xE9t\xE9 litt\xE9ralement au niveau du nom accessible. Le nom doit exprimer la fonction v\xE9hicul\xE9e par le symbole (par exemple, \u201CB\u201D au niveau d\u2019un \xE9diteur de texte aura pour nom accessible \u201CMettre en gras\u201D, le signe \u201C>\u201D en fonction du contexte signifiera \u201CSuivant\u201D ou \u201CLancer la vid\xE9o\u201D). Le cas des symboles math\xE9matiques fait cependant exception (voir la note ci-dessous).",
         "Note\xA0: si l\u2019\xE9tiquette visible repr\xE9sente une expression math\xE9matique, les symboles math\xE9matiques peuvent \xEAtre repris litt\xE9ralement pour servir d\u2019\xE9tiquette au nom accessible (ex.\xA0: \u201CA>B\u201D). Il est laiss\xE9 \xE0 l\u2019utilisateur le soin d\u2019op\xE9rer la correspondance entre l\u2019expression et ce qu\u2019il doit \xE9peler compte tenu de la connaissance qu\u2019il a du fonctionnement de son logiciel de saisie vocale (\u201CA plus grand que B\u201D ou \u201CA sup\xE9rieur \xE0 B\u201D)."
       ],
       wcag: ["2.5.3", "4.1.2"],
@@ -39314,7 +39346,9 @@ var rgaa_default = {
       techniques: ["ARIA19", "ARIA22", "ARIA23"],
       technicalNote: [
         "Les r\xF4les WAI-ARIA `log`, `status` et `alert` ont implicitement une valeur d\u2019attribut WAI-ARIA `aria-live` et `aria-atomic`. On pourra donc consid\xE9rer (conform\xE9ment \xE0 la sp\xE9cification WAI-ARIA 1.1) que\xA0:",
-        "[object Object]",
+        '- Un attribut WAI-ARIA `aria-live="polite"` associ\xE9 \xE0 un message de statut peut valoir pour un r\xF4le WAI-ARIA `log`\xA0;',
+        '- Un attribut WAI-ARIA `aria-live="polite"` et un attribut WAI-ARIA `aria-atomic="true"` associ\xE9s \xE0 un message de statut peuvent valoir pour un r\xF4le WAI-ARIA `status`\xA0;',
+        '- Un attribut WAI-ARIA `aria-live="assertive"` et un attribut WAI-ARIA `aria-atomic="true"` associ\xE9s \xE0 un message de statut peuvent valoir pour un r\xF4le WAI-ARIA `alert`.',
         "C\u2019est sous r\xE9serve que la nature du message de statut satisfasse bien \xE0 la correspondance implicitement \xE9tablie. Dans le cas d\u2019un message de statut indiquant la progression d\u2019un processus et mat\xE9rialis\xE9 graphiquement par une barre de progression, un r\xF4le WAI-ARIA `progressbar` explicite est n\xE9cessaire."
       ],
       wcag: ["4.1.3"],
@@ -39468,7 +39502,11 @@ var rgaa_default = {
       techniques: ["H58"],
       particularCases: [
         "Il y a une gestion de cas particuliers sur le changement de langue pour les cas suivants\xA0:",
-        "[object Object]",
+        "- Nom propre, le crit\xE8re est non applicable\xA0;",
+        "- Nom commun de langue \xE9trang\xE8re pr\xE9sent dans le dictionnaire officiel de la langue (voir note 1 ci-dessous) par d\xE9faut de la page web, le crit\xE8re est non applicable\xA0;",
+        "- Le terme de langue \xE9trang\xE8re soumis, via un [champ de formulaire](#champ-de-saisie-de-formulaire) et rappel\xE9 dans la page (par exemple comme indication du terme recherch\xE9 dans le cas d\u2019un moteur de recherche), le crit\xE8re est non applicable\xA0;",
+        "- Passage de texte dont la langue ne peut pas \xEAtre d\xE9termin\xE9e : le crit\xE8re est non applicable\xA0;",
+        "- Terme ou passage de texte issus d\u2019une langue morte ou imaginaire pour laquelle il n\u2019existe pas d\u2019interpr\xE9tation vocale : le crit\xE8re est non applicable.",
         "Note 1\xA0: le dictionnaire officiel est celui recommand\xE9 par l\u2019acad\xE9mie en charge de la langue en question. Pour la France, par exemple, le lien vers le dictionnaire officiel se trouve sur le site de l\u2019Acad\xE9mie fran\xE7aise \xE0 l\u2019adresse suivante\xA0: http://www.academie-francaise.fr/le-dictionnaire/la-9e-edition. Pour toute demande aupr\xE8s du service du dictionnaire de l\u2019Acad\xE9mie fran\xE7aise, utiliser le formulaire de contact du service du dictionnaire.",
         "Note 2\xA0: pour les noms communs de langue \xE9trang\xE8re, absents dans le dictionnaire officiel de la langue par d\xE9faut de la page web, et qui sont pass\xE9s dans le langage commun (exemple\xA0: newsletter)\xA0: le crit\xE8re est applicable, uniquement lorsque l\u2019absence d\u2019indication de langue peut provoquer une incompr\xE9hension pour la restitution."
       ],
@@ -39749,7 +39787,9 @@ var rgaa_default = {
       techniques: ["G146", "G179", "F69", "F80", "SCR34", "C12", "C13", "C14", "C17", "C28"],
       particularCases: [
         "Font exception \xE0 ce crit\xE8re, les contenus pour lesquels l\u2019utilisateur n\u2019a pas de possibilit\xE9 de personnalisation\xA0:",
-        "[object Object]"
+        "- Les sous-titres incrust\xE9s dans une vid\xE9o\xA0;",
+        "- Les textes en image\xA0;",
+        "- Le texte au sein d\u2019une balise `<canvas>`."
       ],
       wcag: ["1.4.4"],
       appliesTo: {
@@ -39935,7 +39975,11 @@ var rgaa_default = {
       particularCases: [
         "L'objectif de ce crit\xE8re est de garantir un d\xE9filement dans une unique direction pour une lecture facilit\xE9e selon le sens de l'\xE9criture.",
         "Font exception \xE0 ce crit\xE8re, les contenus dont l'agencement requiert deux dimensions pour \xEAtre compris ou utilis\xE9s comme\xA0:",
-        "[object Object]",
+        "- Les images, les graphiques ou les vid\xE9os\xA0;",
+        "- Les jeux (jeux de plateforme, par exemple)\xA0;",
+        "- Les pr\xE9sentations (type diaporama, par exemple)\xA0;",
+        "- Les tableaux de donn\xE9es\xA0;",
+        "- Les interfaces o\xF9 il est n\xE9cessaire d'avoir un ascenseur horizontal lors de la manipulation de l'interface.",
         "Note\xA0: la majorit\xE9 des navigateurs sur les syst\xE8mes d'exploitation sur mobile (Android, iOS) ne g\xE8re pas correctement la redistribution en cas de zoom. Dans ce contexte, le crit\xE8re sera consid\xE9r\xE9 comme non applicable sur ces environnements."
       ],
       wcag: ["1.4.10"],
@@ -39964,7 +40008,9 @@ var rgaa_default = {
       techniques: ["C8", "C21", "C35", "C36"],
       particularCases: [
         "Font exception \xE0 ce crit\xE8re, les contenus pour lesquels l\u2019utilisateur n\u2019a pas de possibilit\xE9 de personnalisation\xA0:",
-        "[object Object]"
+        "- Les sous-titres directement int\xE9gr\xE9s \xE0 une vid\xE9o\xA0;",
+        "- Les images texte\xA0;",
+        "- Le texte au sein d\u2019une balise `<canvas>`."
       ],
       wcag: ["1.4.12"],
       appliesTo: {
@@ -40117,7 +40163,8 @@ var rgaa_default = {
       techniques: ["G82", "G131", "H44", "H65", "ARIA6", "ARIA9", "ARIA14", "ARIA16"],
       particularCases: [
         "Il existe une gestion de cas particuliers pour le test 11.2.5 lorsque\xA0:",
-        "[object Object]",
+        "- La ponctuation et les lettres majuscules sont pr\xE9sentes dans le texte de l\u2019[intitul\xE9 visible](#intitule-visible) : elles peuvent \xEAtre ignor\xE9es dans le nom accessible sans porter \xE0 cons\xE9quence\xA0;",
+        "- Le texte de l\u2019[intitul\xE9 visible](#intitule-visible) sert de symbole\xA0: le texte ne doit pas \xEAtre interpr\xE9t\xE9 litt\xE9ralement au niveau du nom accessible. Le nom doit exprimer la fonction v\xE9hicul\xE9e par le symbole (par exemple, \u201CB\u201D au niveau d\u2019un \xE9diteur de texte aura pour nom accessible \u201CMettre en gras\u201D, le signe \u201C>\u201D en fonction du contexte signifiera \u201CSuivant\u201D ou \u201CLancer la vid\xE9o\u201D). Le cas des symboles math\xE9matiques fait cependant exception (voir la note ci-dessous).",
         "Note\xA0: si l\u2019\xE9tiquette visible repr\xE9sente une expression math\xE9matique, les symboles math\xE9matiques peuvent \xEAtre repris litt\xE9ralement pour servir d\u2019\xE9tiquette au nom accessible (ex.\xA0: \u201CA>B\u201D). Il est laiss\xE9 \xE0 l\u2019utilisateur le soin d\u2019op\xE9rer la correspondance entre l\u2019expression et ce qu\u2019il doit \xE9peler compte tenu de la connaissance qu\u2019il a du fonctionnement de son logiciel de saisie vocale (\u201CA plus grand que B\u201D ou \u201CA sup\xE9rieur \xE0 B\u201D).",
         "Ce cas particulier s\u2019applique \xE9galement au test 11.9.2."
       ],
@@ -40174,7 +40221,13 @@ var rgaa_default = {
         ]
       },
       techniques: ["G162"],
-      particularCases: ["Les tests 11.4.2 et 11.4.3 seront consid\xE9r\xE9s comme non applicables\xA0:", "[object Object]"],
+      particularCases: [
+        "Les tests 11.4.2 et 11.4.3 seront consid\xE9r\xE9s comme non applicables\xA0:",
+        "- Dans le cas o\xF9 l\u2019[\xE9tiquette](#etiquette-de-champ-de-formulaire) m\xE9lange une portion de texte qui se lit de droite \xE0 gauche avec une portion de texte qui se lit de gauche \xE0 droite\xA0;",
+        "- Dans le cas o\xF9 un formulaire contient des labels de plusieurs langues qui se liraient de droite \xE0 gauche et inversement. Par exemple, un formulaire de commande en arabe qui propose une liste de cases \xE0 cocher de produit en langue fran\xE7aise ou mixant des produits en langue arabe ou en langue fran\xE7aise\xA0;",
+        '- Dans le cas o\xF9 les champs de type `radio` ou `checkbox` et les balises ayant un attribut WAI-ARIA `role="checkbox"`, `role="radio"` ou `role="switch"` ne sont pas visuellement pr\xE9sent\xE9s sous forme de bouton radio ou de case \xE0 cocher\xA0;',
+        "- Dans le cas o\xF9 les champs seraient utilis\xE9s dans un contexte o\xF9 il pourrait \xEAtre l\xE9gitime, du point de vue de l\u2019exp\xE9rience utilisateur, de placer les \xE9tiquettes de mani\xE8re diff\xE9rente \xE0 celle requise dans les tests 11.4.2 et 11.4.3."
+      ],
       wcag: ["3.3.2"],
       appliesTo: {
         ruleIds: []
@@ -40368,11 +40421,14 @@ var rgaa_default = {
       ],
       technicalNote: [
         "Dans un long formulaire dont la majorit\xE9 des champs sont obligatoires, on pourrait constater que ce sont les quelques champs rest\xE9s facultatifs qui sont explicitement signal\xE9s comme tels. Dans ce cas, il faudrait s\u2019assurer que\xA0:",
-        "[object Object]"
+        "- Un message pr\xE9cise visuellement en haut de formulaire que \u201Ctous les champs sont obligatoires sauf ceux indiqu\xE9s comme \xE9tant facultatifs\u201D\xA0;",
+        "- Une mention \u201Cfacultatif\u201D est pr\xE9sente visuellement dans le libell\xE9 des champs facultatifs ou dans la l\xE9gende d\u2019un groupe de champs facultatifs\xA0;",
+        '- Un attribut `required` ou `aria-required="true"` reste associ\xE9 \xE0 chaque champ qui n\u2019est pas concern\xE9 par ce caract\xE8re facultatif.'
       ],
       particularCases: [
         "Le test 11.10.1 et le test 11.10.2 seront consid\xE9r\xE9s comme non applicables lorsque le formulaire comporte un seul [champ de formulaire](#champ-de-saisie-de-formulaire) ou qu\u2019il indique les champs optionnels de mani\xE8re\xA0:",
-        "[object Object]",
+        "- Visible\xA0;",
+        "- Dans la balise `<label>` ou dans la [l\xE9gende](#legende) associ\xE9e au champ.",
         "Dans le cas o\xF9 l\u2019ensemble des champs d\u2019un formulaire sont obligatoires, les tests 11.10.1 et 11.10.2 restent applicables."
       ],
       wcag: ["3.3.1", "3.3.2"],
@@ -40502,7 +40558,13 @@ var rgaa_default = {
         ]
       },
       techniques: ["G61", "F66"],
-      particularCases: ["Il existe une gestion de cas particuliers lorsque\xA0:", "[object Object]", "Dans ces situations, le crit\xE8re est non applicable."],
+      particularCases: [
+        "Il existe une gestion de cas particuliers lorsque\xA0:",
+        "- La page est la page d\u2019accueil\xA0;",
+        "- Le site web est constitu\xE9 d\u2019une seule page\xA0;",
+        "- Le changement fait suite \xE0 une modification initi\xE9e par l\u2019utilisateur.",
+        "Dans ces situations, le crit\xE8re est non applicable."
+      ],
       wcag: ["3.2.3"],
       appliesTo: {
         ruleIds: []
@@ -40805,7 +40867,11 @@ var rgaa_default = {
         ]
       },
       techniques: ["F15", "G10", "G135"],
-      particularCases: ["Il existe une gestion de cas particuliers\xA0:", "[object Object]", "Dans cette situation, le crit\xE8re est non applicable."],
+      particularCases: [
+        "Il existe une gestion de cas particuliers\xA0:",
+        "- Pour les personnes de droit priv\xE9 mentionn\xE9es aux 2\xB0 \xE0 4\xB0 du I de l\u2019article 47 de la loi du 11 f\xE9vrier 2005\xA0: si les fichiers bureautiques (ex\xA0: PDF, documents Microsoft ou LibreOffice, etc.) ont \xE9t\xE9 publi\xE9s avant le 23 septembre 2018 (sauf si ce sont des documents n\xE9cessaires pour accomplir une d\xE9marche administrative relevant des t\xE2ches effectu\xE9es par l\u2019organisme concern\xE9), ils sont exempt\xE9s de l\u2019obligation d\u2019accessibilit\xE9.",
+        "Dans cette situation, le crit\xE8re est non applicable."
+      ],
       wcag: ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
       appliesTo: {
         ruleIds: []
@@ -40985,7 +41051,11 @@ var rgaa_default = {
         ]
       },
       techniques: ["G215", "G216"],
-      particularCases: ["Il existe une gestion de cas particuliers dans deux types de situation\xA0:", "[object Object]"],
+      particularCases: [
+        "Il existe une gestion de cas particuliers dans deux types de situation\xA0:",
+        "- Le crit\xE8re ne s\u2019applique qu\u2019\xE0 des fonctionnalit\xE9s mises en place par l\u2019auteur du site. Il ne concerne donc pas les gestes requis par l\u2019agent utilisateur ou le syst\xE8me d\u2019exploitation\xA0;",
+        "- Le crit\xE8re ne s\u2019applique pas aux fonctionnalit\xE9s dont la r\xE9alisation d\u2019un geste complexe est essentielle (ex\xE9cuter le trac\xE9 d\u2019une signature, par exemple)."
+      ],
       wcag: ["2.5.1"],
       appliesTo: {
         ruleIds: []
@@ -41011,7 +41081,8 @@ var rgaa_default = {
       techniques: [],
       technicalNote: [
         "Deux exemples de m\xE9canisme mis en place pour annuler ou abandonner une action d\xE9clench\xE9e au moyen d\u2019un dispositif de pointage sur un point unique de l\u2019\xE9cran\xA0:",
-        "[object Object]"
+        "- Une fen\xEAtre modale permettant d\u2019annuler l\u2019action apr\xE8s son ach\xE8vement\xA0;",
+        "- Pour une fonction de glisser/d\xE9poser, le fait d\u2019abandonner l\u2019action si l\u2019utilisateur rel\xE2che l\u2019\xE9l\xE9ment en dehors de la zone cible."
       ],
       particularCases: [
         "Il existe une gestion de cas particulier lorsque la fonctionnalit\xE9 n\xE9cessite que le comportement attendu soit r\xE9alis\xE9 lors d\u2019un \xE9v\xE9nement descendant, par exemple, un \xE9mulateur de clavier dont les touches doivent s\u2019activer \xE0 la pression comme sur un clavier physique. Dans ces situations, le crit\xE8re est non applicable."
@@ -41042,7 +41113,11 @@ var rgaa_default = {
         ]
       },
       techniques: [],
-      particularCases: ["Il existe une gestion de cas particulier lorsque\xA0:", "[object Object]"],
+      particularCases: [
+        "Il existe une gestion de cas particulier lorsque\xA0:",
+        "- Le mouvement est essentiel \xE0 l\u2019accomplissement de la fonctionnalit\xE9 (ex. podom\xE8tre)\xA0;",
+        "- La d\xE9tection du mouvement est utilis\xE9e pour contr\xF4ler une fonctionnalit\xE9 au travers d\u2019une interface compatible avec l\u2019accessibilit\xE9."
+      ],
       wcag: ["2.5.4"],
       appliesTo: {
         ruleIds: []
@@ -41983,6 +42058,9 @@ function loadPack(key) {
 function getPack(key) {
   return registry.get(key)?.pack;
 }
+function packGlossary(key) {
+  return registry.get(key)?.glossary;
+}
 function listStandards() {
   return [CORE_KEY, ...registry.keys()];
 }
@@ -42780,6 +42858,9 @@ function title(pack, c2, lang) {
 function titlePlain(pack, c2, lang) {
   return localize(pack, c2.titlePlain, lang);
 }
+function resolveGlossary(packKey, anchor) {
+  return packGlossary(packKey)?.[anchor];
+}
 function neutralizeCaptureGroups(pattern) {
   let out2 = "";
   for (let i2 = 0; i2 < pattern.length; i2++) {
@@ -42879,7 +42960,20 @@ function derivePackResults(audit, packKey) {
   };
   const enabledSecondary = (pack.secondaryMappings ?? []).filter((m) => m.enabled === true);
   const secondarySources = enabledSecondary.length ? [...audit.criteria.flatMap((c2) => c2.findings), ...myPackFindings] : [];
+  const adjudicated = audit.packAdjudication?.standard === packKey ? new Map(audit.packAdjudication.criteria.map((c2) => [c2.id, c2])) : void 0;
   return pack.criteria.map((pc) => {
+    const decided = adjudicated?.get(pc.id);
+    if (decided) {
+      return {
+        id: pc.id,
+        theme: pc.theme,
+        status: decided.status,
+        findings: decided.findings,
+        scs: pc.wcag,
+        ...decided.justification ? { justification: decided.justification } : {},
+        decidedBy: "agent"
+      };
+    }
     const base = deriveBase(pc);
     return enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
   });
@@ -48303,43 +48397,85 @@ function docsForAudit(audit, cwd) {
   }
   return docs;
 }
+function blankItem(criteriaId, automatability, title2, harvested) {
+  const evidence = harvested.slice(0, ADJUDICATE_MAX_EVIDENCE);
+  return {
+    criteriaId,
+    automatability,
+    ...title2 ? { title: title2 } : {},
+    evidence,
+    ...harvested.length > ADJUDICATE_MAX_EVIDENCE ? { evidenceTruncated: { shown: evidence.length, total: harvested.length } } : {},
+    verdict: null,
+    justification: "",
+    reason: null,
+    findings: [],
+    recommendations: [],
+    decidedBy: "agent"
+  };
+}
+function packEvidence(scs, docs) {
+  const out2 = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const sc of scs) {
+    for (const e of HARVESTERS[sc]?.(docs) ?? []) {
+      const key = `${e.file}:${e.line}:${e.selector}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out2.push(e);
+    }
+  }
+  return out2;
+}
 function buildAdjudicationWorklist(audit, opts = {}) {
   const docs = docsForAudit(audit, opts.cwd);
-  return audit.residualRisks.map((r) => {
-    const harvested = HARVESTERS[r.criteriaId]?.(docs) ?? [];
-    const evidence = harvested.slice(0, ADJUDICATE_MAX_EVIDENCE);
-    return {
-      criteriaId: r.criteriaId,
-      automatability: r.automatability,
-      title: scTitle(r.criteriaId) ?? void 0,
-      evidence,
-      ...harvested.length > ADJUDICATE_MAX_EVIDENCE ? { evidenceTruncated: { shown: evidence.length, total: harvested.length } } : {},
-      verdict: null,
-      justification: "",
-      reason: null,
-      findings: [],
-      recommendations: [],
-      decidedBy: "agent"
-    };
-  });
+  const standard = opts.standard;
+  if (standard !== void 0 && !isCore(standard)) {
+    const pack = loadPack(standard);
+    return derivePackResults(audit, standard).filter((pc) => pc.status === "manual").map((pc) => {
+      const crit = getCriterion(pack, pc.id);
+      const scs = crit?.wcag ?? pc.scs;
+      const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a) => !!a);
+      const automatability = autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
+      return blankItem(pc.id, automatability, crit ? titlePlain(pack, crit, "fr") : void 0, packEvidence(scs, docs));
+    });
+  }
+  return audit.residualRisks.map(
+    (r) => blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? void 0, HARVESTERS[r.criteriaId]?.(docs) ?? [])
+  );
 }
 var NC_SEVERITY_DEFAULT = "majeur";
 var MANUAL_REASONS = /* @__PURE__ */ new Set(["needs-rendered-dom", "undecidable"]);
-function normativeRefResolves(ref, standard) {
+function normativeRefResolves(ref, standard, itemCriterionId) {
   const r = (ref ?? "").trim();
   if (!r) return false;
   if (isCore(standard)) return hasSC(r);
   const pack = loadPack(standard);
-  if (hasId(pack, r)) return true;
-  const dot = r.lastIndexOf(".");
-  if (dot <= 0) return false;
-  const crit = getCriterion(pack, r.slice(0, dot));
-  return !!crit?.tests && Object.hasOwn(crit.tests, r.slice(dot + 1));
+  let critId = hasId(pack, r) ? r : void 0;
+  let testKey;
+  if (critId === void 0) {
+    const dot = r.lastIndexOf(".");
+    if (dot <= 0) return false;
+    const head = r.slice(0, dot);
+    if (!hasId(pack, head)) return false;
+    critId = head;
+    testKey = r.slice(dot + 1);
+  }
+  const crit = getCriterion(pack, critId);
+  if (!crit) return false;
+  if (testKey !== void 0 && !(crit.tests && Object.hasOwn(crit.tests, testKey))) return false;
+  return itemCriterionId === void 0 || critId === itemCriterionId;
 }
 function applyAdjudication(audit, adj, opts = {}) {
   const issues = [];
   const byId2 = new Map(adj.items.map((it) => [it.criteriaId, it]));
-  for (const r of audit.residualRisks) if (!byId2.has(r.criteriaId)) issues.push(`criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+  const packMode = !isCore(adj.standard);
+  if (packMode) {
+    for (const pc of derivePackResults(audit, adj.standard)) {
+      if (pc.status === "manual" && !byId2.has(pc.id)) issues.push(`criterion ${pc.id}: missing from the adjudication (coverage gap)`);
+    }
+  } else {
+    for (const r of audit.residualRisks) if (!byId2.has(r.criteriaId)) issues.push(`criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+  }
   const groundInputs = [];
   for (const it of adj.items) {
     const v = it.verdict;
@@ -48352,8 +48488,10 @@ function applyAdjudication(audit, adj, opts = {}) {
       for (const f of it.findings ?? []) {
         if (!f.normativeRef || !f.normativeRef.trim()) {
           issues.push(`criterion ${it.criteriaId}: an NC finding requires a normativeRef citing the failed test of the active standard`);
-        } else if (!normativeRefResolves(f.normativeRef, adj.standard)) {
-          issues.push(`criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" does not resolve to a test of ${adj.standard} (fabricated?)`);
+        } else if (!normativeRefResolves(f.normativeRef, adj.standard, isCore(adj.standard) ? void 0 : it.criteriaId)) {
+          issues.push(
+            isCore(adj.standard) ? `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" does not resolve to a test of ${adj.standard} (fabricated?)` : `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" is not a test of ${adj.standard} ${it.criteriaId} \u2014 cite one of its own tests (e.g. "${it.criteriaId}.1"); a WCAG id looks alike but denotes an unrelated test`
+          );
         }
         groundInputs.push({ file: f.file, line: f.line, selector: f.selector, snippet: f.snippet });
       }
@@ -48375,6 +48513,38 @@ function applyAdjudication(audit, adj, opts = {}) {
   const newFindings = [];
   let applied = 0;
   let stillManual = 0;
+  if (packMode) {
+    const decided = [];
+    for (const it of adj.items) {
+      if (it.verdict === "manual") {
+        stillManual++;
+        decided.push({
+          id: it.criteriaId,
+          status: "manual",
+          reason: it.reason === "needs-rendered-dom" ? "needs-rendered-dom" : "undecidable",
+          justification: it.reason === "needs-rendered-dom" ? residualScanReason() : residualUndecidableReason(),
+          findings: [],
+          decidedBy: "agent"
+        });
+        continue;
+      }
+      applied++;
+      const fs2 = it.verdict === "NC" ? it.findings.map((f) => agentFinding(it.criteriaId, f)) : [];
+      const recs = (it.recommendations ?? []).map((rec) => agentFinding(it.criteriaId, rec, true));
+      newFindings.push(...fs2, ...recs);
+      decided.push({
+        id: it.criteriaId,
+        status: it.verdict,
+        ...it.verdict === "C" || it.verdict === "NA" ? { justification: it.justification.trim() } : {},
+        findings: [...fs2, ...recs],
+        decidedBy: "agent"
+      });
+    }
+    next.packAdjudication = { standard: adj.standard, criteria: decided };
+    next.findings = [...next.findings, ...newFindings];
+    next.adjudicated = { date: adj.auditDate, applied, stillManual };
+    return { ok: true, audit: next, issues, applied, stillManual, grounding };
+  }
   for (const it of adj.items) {
     const c2 = critById.get(it.criteriaId);
     if (!c2) continue;
@@ -48457,7 +48627,12 @@ var T2 = {
     questions: "\xC0 v\xE9rifier manuellement",
     decide: "R\xE8gle de d\xE9cision",
     na: "Non applicable si",
-    refs: "R\xE9f\xE9rences normatives mobilisables (techniques/\xE9checs W3C de ce crit\xE8re)"
+    refs: "R\xE9f\xE9rences normatives mobilisables (techniques/\xE9checs W3C de ce crit\xE8re)",
+    packIntro: (name2) => `R\xE9f\xE9rentiel actif : **${name2}**. Les items ci-dessous sont des crit\xE8res ${name2}, pas des crit\xE8res de succ\xE8s WCAG. Un \`normativeRef\` DOIT citer un test du crit\xE8re de l'item (par ex. \`11.2.1\`) \u2014 un id WCAG y ressemble mais d\xE9signe un tout autre test et sera rejet\xE9.`,
+    packTests: (name2, id) => `Tests ${name2} ${id} \xE0 trancher`,
+    technicalNote: "Note technique",
+    particularCases: "Cas particuliers",
+    glossary: "Termes d\xE9finis par le r\xE9f\xE9rentiel"
   },
   en: {
     title: "# Criteria adjudication (ultra11y)",
@@ -48475,16 +48650,60 @@ var T2 = {
     questions: "To verify manually",
     decide: "Decision rule",
     na: "Not applicable when",
-    refs: "Normative references you may cite (this criterion's W3C techniques/failures)"
+    refs: "Normative references you may cite (this criterion's W3C techniques/failures)",
+    packIntro: (name2) => `Active standard: **${name2}**. The items below are ${name2} criteria, not WCAG success criteria. A \`normativeRef\` MUST cite a test OF THE ITEM'S CRITERION (e.g. \`11.2.1\`) \u2014 a WCAG id looks alike but denotes an unrelated test and will be rejected.`,
+    packTests: (name2, id) => `${name2} ${id} tests to rule on`,
+    technicalNote: "Technical note",
+    particularCases: "Particular cases",
+    glossary: "Terms the standard defines"
   }
 };
 var ADJUDICATION = adjudication_default;
 var MAX_REFS = 12;
-function formatAdjudication(items, lang = "en") {
+var GLOSSARY_REF = /\[[^\]]+\]\(#([^)]+)\)/g;
+var MAX_GLOSSARY_TERMS = 8;
+var MAX_GLOSSARY_CHARS = 600;
+function glossaryAnchorsOf(crit) {
+  if (!crit) return [];
+  const texts = [...Object.values(crit.tests ?? {}).flat(), ...crit.technicalNote ?? [], ...crit.particularCases ?? []];
+  const seen = /* @__PURE__ */ new Set();
+  for (const t2 of texts) {
+    GLOSSARY_REF.lastIndex = 0;
+    for (let m = GLOSSARY_REF.exec(t2); m; m = GLOSSARY_REF.exec(t2)) if (m[1]) seen.add(m[1]);
+  }
+  return [...seen];
+}
+function glossaryBlock(pack, crit, lang) {
+  const anchors = glossaryAnchorsOf(crit).slice(0, MAX_GLOSSARY_TERMS);
+  if (!anchors.length) return [];
   const s = T2[lang];
+  const out2 = [`> **${s.glossary}**`, ""];
+  let any = false;
+  for (const a of anchors) {
+    const entry = resolveGlossary(pack.key, a);
+    if (!entry) continue;
+    any = true;
+    const body2 = entry.body.replace(/\s+/g, " ").trim();
+    out2.push(`- **${entry.title}** \u2014 ${body2.length > MAX_GLOSSARY_CHARS ? `${body2.slice(0, MAX_GLOSSARY_CHARS)}\u2026` : body2}`);
+  }
+  out2.push("");
+  return any ? out2 : [];
+}
+function packGuidanceBlock(standard, criterionId, lang) {
+  const entries = guidanceForCriterion(standard, criterionId);
+  if (!entries.length) return [];
+  return guidanceExampleBlock(entries, lang);
+}
+function plainTest(s) {
+  return s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
+}
+function formatAdjudication(items, lang = "en", standard = CORE2) {
+  const s = T2[lang];
+  const pack = isCore(standard) ? void 0 : loadPack(standard);
   const out2 = [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
+  if (pack) out2.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
-    out2.push(`## ${it.criteriaId}${it.title ? ` \u2014 ${it.title}` : ""}  _(${it.automatability})_`);
+    out2.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` \u2014 ${it.title}` : ""}  _(${it.automatability})_`);
     out2.push("", `> ${s.evidence} (${it.evidence.length}${it.evidenceTruncated ? ` / ${it.evidenceTruncated.total}` : ""}):`, "");
     if (!it.evidence.length) out2.push(s.none, "");
     else {
@@ -48501,9 +48720,29 @@ function formatAdjudication(items, lang = "en") {
         out2.push("");
       }
     }
-    const refs = techniquesFor(it.criteriaId);
-    if (refs.length) {
-      out2.push(`> ${s.refs}: ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` \u2026 (\`criteria ${it.criteriaId}\`)` : ""}`, "");
+    if (pack) {
+      const crit = getCriterion(pack, it.criteriaId);
+      const tests = crit?.tests ?? {};
+      const keys = Object.keys(tests);
+      if (keys.length) {
+        out2.push(`> **${s.packTests(pack.name, it.criteriaId)}**`, "");
+        for (const k of keys) {
+          const lines = tests[k] ?? [];
+          out2.push(`- \`${it.criteriaId}.${k}\` ${plainTest(lines[0] ?? "")}`);
+          for (const line of lines.slice(1)) out2.push(`  - ${plainTest(line)}`);
+        }
+        out2.push("");
+      }
+      if (crit?.technicalNote?.length) out2.push(`> **${s.technicalNote}** \u2014 ${crit.technicalNote.map(plainTest).join(" ")}`, "");
+      if (crit?.particularCases?.length) out2.push(`> **${s.particularCases}** \u2014 ${crit.particularCases.map(plainTest).join(" ")}`, "");
+      out2.push(...glossaryBlock(pack, crit, lang));
+      out2.push(...packGuidanceBlock(standard, it.criteriaId, lang));
+      if (keys.length) out2.push(`> ${s.refs}: ${keys.map((k) => `\`${it.criteriaId}.${k}\``).join(", ")}`, "");
+    } else {
+      const refs = techniquesFor(it.criteriaId);
+      if (refs.length) {
+        out2.push(`> ${s.refs}: ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` \u2026 (\`criteria ${it.criteriaId}\`)` : ""}`, "");
+      }
     }
   }
   return out2.join("\n");
@@ -48521,7 +48760,7 @@ function writeAdjudication(items, outDir, opts) {
     items
   };
   writeFileSync9(todoPath, JSON.stringify(file, null, 2) + "\n");
-  writeFileSync9(mdPath, formatAdjudication(items, opts.lang ?? "en"));
+  writeFileSync9(mdPath, formatAdjudication(items, opts.lang ?? "en", opts.standard));
   return { todoPath, mdPath, count: items.length };
 }
 

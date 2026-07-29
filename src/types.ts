@@ -344,6 +344,22 @@ export interface PageResult {
   conformancePct: number;
 }
 
+// ---- adjudication under a COUNTRY STANDARD ------------------------------------------------
+// An AuditResult is WCAG-keyed by construction and a pack is a derived projection. But 99 of
+// RGAA's 106 criteria can only ever derive `manual`, so almost the whole standard is settled
+// by the agent — at the PACK's granularity, which is finer than WCAG's (1.1.1 alone fans out
+// to 19 RGAA criteria). Folding those verdicts onto the WCAG criteria would make several RGAA
+// criteria overwrite one another on a shared success criterion, so they are recorded here
+// instead, and `derivePackResults` prefers them over its own derivation.
+export interface PackCriterionAdjudication {
+  id: string; // pack criterion id, e.g. RGAA "11.2"
+  status: Status;
+  justification?: string; // REQUIRED for C and NA
+  reason?: "needs-rendered-dom" | "undecidable"; // REQUIRED for a still-manual verdict
+  findings: Finding[]; // REQUIRED (≥1, groundable, each citing a test OF THIS CRITERION) for NC
+  decidedBy: "agent";
+}
+
 export interface GuidelineTally {
   key: string; // WCAG guideline number, e.g. "1.4"
   title: string;
@@ -429,6 +445,12 @@ export interface AuditResult {
   // left as an explicit residual (needs a rendered DOM → `scan`, or genuinely undecidable).
   // Optional/additive — absent on a plain engine audit.
   adjudicated?: { date: string; applied: number; stillManual: number };
+  // Set when the agent adjudicated at a COUNTRY STANDARD's granularity (`verify --manual
+  // --standard <pack>`). Kept SEPARATE from `criteria` so the WCAG core verdict is never
+  // touched by a pack decision — and so several pack criteria sharing one success criterion
+  // cannot overwrite each other. `derivePackResults` prefers these over its own derivation.
+  // Optional/additive (no SCHEMA_VERSION bump).
+  packAdjudication?: { standard: string; criteria: PackCriterionAdjudication[] };
 }
 
 // ---- optional dynamic tier (axe-core in a headless browser): Docker image, or a
