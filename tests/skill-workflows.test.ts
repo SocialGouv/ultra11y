@@ -133,7 +133,9 @@ describe("pages.md teaches page snapshots", () => {
     expect(t).toContain("rendered-link-colour-only");
     expect(t).toContain("10.6");
     expect(t).toMatch(/I don't know|I don’t know/i);
-    expect(t).toMatch(/44 of 106/);
+    expect(t).toMatch(/46 of 106/);
+    expect(t).toContain("rendered-nontext-contrast");
+    expect(t).toMatch(/could not look/i);
   });
   it("teaches the per-page grid and its two honesty rules", () => {
     expect(t).toMatch(/ultra11y\.mjs pages/);
@@ -158,6 +160,8 @@ describe("ci.md teaches the CI output formats", () => {
   });
   it("documents the shipped action, its permissions and the gate-runs-last ordering", () => {
     expect(t).toContain("maxgfr/ultra11y@");
+    // A moving branch would change under the reader with no version to blame.
+    expect(t).not.toMatch(/maxgfr\/ultra11y@(main|master|HEAD)\b/);
     expect(t).toContain("security-events: write");
     expect(t).toMatch(/gate\*\* runs last|gate runs last/i);
     expect(t).toContain("fail-on");

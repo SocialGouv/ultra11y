@@ -315,6 +315,49 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
     },
   },
 
+  "rendered-nontext-contrast": {
+    message: {
+      fr: (p) =>
+        `Limite du composant <${p.control}> non perceptible : ni son fond (${p.ratio}:1 avec l'environnement) ni sa bordure n'atteignent 3:1 — rien n'indique visuellement où commence le champ.`,
+      en: (p) =>
+        `The <${p.control}> boundary is not perceivable: neither its fill (${p.ratio}:1 against its surroundings) nor its border reaches 3:1 — nothing shows visually where the control begins.`,
+    },
+    remediation: {
+      fr: () =>
+        `Donnez au composant une bordure visible contrastant à 3:1 avec le fond environnant, ou un fond distinct du fond environnant à 3:1. Un box-shadow ou un outline visible conviennent aussi.`,
+      en: () =>
+        `Give the control a visible border at 3:1 against the surrounding background, or a fill distinct from it at 3:1. A visible box-shadow or outline also qualifies.`,
+    },
+  },
+  "rendered-focus-not-visible": {
+    message: {
+      fr: (p) =>
+        `La feuille de styles supprime l'indicateur de focus (\`${p.selector}\`) et aucune règle \`:focus\` ne le remplace — un utilisateur au clavier ne peut plus savoir où il se trouve.`,
+      en: (p) =>
+        `The stylesheet removes the focus indicator (\`${p.selector}\`) and no \`:focus\` rule puts one back — a keyboard user can no longer tell where they are.`,
+    },
+    remediation: {
+      fr: () =>
+        `Ne supprimez jamais outline sans remplacement. Si le style par défaut ne convient pas, remplacez-le : \`:focus-visible { outline: 2px solid <couleur contrastée>; outline-offset: 2px }\`.`,
+      en: () =>
+        `Never remove outline without a replacement. If the default does not fit, replace it: \`:focus-visible { outline: 2px solid <contrasting colour>; outline-offset: 2px }\`.`,
+    },
+  },
+  "rendered-orientation-lock": {
+    message: {
+      fr: (p) =>
+        `Le contenu est verrouillé dans une seule orientation : \`@media ${p.media}\` applique \`transform: ${p.transform}\` au document — l'utilisateur ne peut pas consulter la page dans l'orientation de son choix.`,
+      en: (p) =>
+        `Content is locked to a single orientation: \`@media ${p.media}\` applies \`transform: ${p.transform}\` to the document — the user cannot view the page in the orientation they need.`,
+    },
+    remediation: {
+      fr: () =>
+        `Supprimez la rotation et rendez la mise en page responsive dans les deux orientations. Un verrouillage n'est admis que si l'orientation est essentielle (piano, chèque bancaire).`,
+      en: () =>
+        `Remove the rotation and make the layout work in both orientations. Locking is only acceptable where the orientation is essential (a piano keyboard, a bank cheque).`,
+    },
+  },
+
   // ---- Theme 5 — Data tables (src/rules/tables.ts) ----------------------------
   "data-table-no-headers.no-th": {
     message: {

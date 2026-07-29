@@ -370,7 +370,7 @@
       "level": "AA",
       "addedIn": "2.1",
       "automatability": "needs-rendering",
-      "ruleIds": [],
+      "ruleIds": ["rendered-orientation-lock"],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/orientation.html"
     },
     {
@@ -473,7 +473,7 @@
       "level": "AA",
       "addedIn": "2.1",
       "automatability": "needs-rendering",
-      "ruleIds": [],
+      "ruleIds": ["rendered-nontext-contrast"],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
       "techniques": ["F78", "G145", "G174", "G18", "G183", "G195", "G207"]
     },
@@ -730,7 +730,7 @@
       "level": "AA",
       "addedIn": "2.0",
       "automatability": "needs-rendering",
-      "ruleIds": [],
+      "ruleIds": ["rendered-focus-not-visible"],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html",
       "techniques": ["C15", "F42", "F54", "F55", "F73", "F78", "G149", "G165", "G183", "G195", "G202", "G90", "SCR2", "SCR20", "SCR29", "SCR31", "SCR35"]
     },

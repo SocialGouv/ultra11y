@@ -261,3 +261,135 @@ describe("contrast measured on the screenshot (the gradient case)", () => {
     expect(ids(dom, { styles: styles(overImage), boxes })).not.toContain("rendered-contrast-pixel");
   });
 });
+
+// ---- 1.4.11 non-text contrast (RGAA 3.3) -------------------------------------------------
+
+describe("a control whose boundary cannot be seen (WCAG 1.4.11 → RGAA 3.3)", () => {
+  const form = PAGE('<form><label for="q">Q</label><input id="q" type="text"></form>');
+  const base: [string, Record<string, string>][] = [...HEAD, ["form", {}], ["label", {}]];
+  const input = (css: Record<string, string>) => styles([...base, ["input", css]]);
+  // White page, white field, no border: nothing marks where the field is.
+  const INVISIBLE = {
+    backgroundColor: "rgb(255, 255, 255)",
+    borderTopStyle: "none",
+    borderRightStyle: "none",
+    borderBottomStyle: "none",
+    borderLeftStyle: "none",
+  };
+
+  it("reports a borderless field that is the same colour as the page", () => {
+    expect(ids(form, { styles: input(INVISIBLE) })).toContain("rendered-nontext-contrast");
+  });
+
+  it("accepts a field with a contrasting border", () => {
+    const bordered = { ...INVISIBLE, borderTopStyle: "solid", borderTopWidth: "1px", borderTopColor: "rgb(80, 80, 80)" };
+    expect(ids(form, { styles: input(bordered) })).not.toContain("rendered-nontext-contrast");
+  });
+
+  it("accepts a field whose FILL contrasts with the page, with no border at all", () => {
+    expect(ids(form, { styles: input({ ...INVISIBLE, backgroundColor: "rgb(60, 60, 60)" }) })).not.toContain("rendered-nontext-contrast");
+  });
+
+  it("declines when a box-shadow may be drawing the boundary", () => {
+    expect(ids(form, { styles: input({ ...INVISIBLE, boxShadow: "0 0 0 1px rgb(0, 0, 0)" }) })).not.toContain("rendered-nontext-contrast");
+  });
+
+  it("declines when a visible outline may be drawing the boundary", () => {
+    const outlined = { ...INVISIBLE, outlineStyle: "solid", outlineWidth: "2px" };
+    expect(ids(form, { styles: input(outlined) })).not.toContain("rendered-nontext-contrast");
+  });
+
+  it("ignores a hidden input — it has no boundary to perceive", () => {
+    const hidden = PAGE('<form><input type="hidden" name="csrf"></form>');
+    const s = styles([...HEAD, ["form", {}], ["input", INVISIBLE]]);
+    expect(ids(hidden, { styles: s })).not.toContain("rendered-nontext-contrast");
+  });
+
+  it("declines when the surrounding background is unknown", () => {
+    const s = styles([
+      ["html", {}],
+      ["head", {}],
+      ["title", {}],
+      ["body", { backgroundColor: "rgba(0, 0, 0, 0)" }],
+      ["main", {}],
+      ["h1", {}],
+      ["form", {}],
+      ["label", {}],
+      ["input", INVISIBLE],
+    ]);
+    expect(ids(form, { styles: s })).not.toContain("rendered-nontext-contrast");
+  });
+
+  it("does not fire without signals", () => {
+    expect(runAudit({ inputs: ["tests/fixtures/non-conforming/bad.html"] }).findings.map((f) => f.ruleId)).not.toContain("rendered-nontext-contrast");
+  });
+});
+
+// ---- stylesheet-level criteria ------------------------------------------------------------
+
+const cssDigest = (rules: { selector: string; media?: string; decls: Record<string, string> }[], unreadable = 0) => ({ v: 1, rules, unreadable });
+
+describe("a focus indicator removed with nothing put back (WCAG 2.4.7 → RGAA 10.7)", () => {
+  const page = PAGE('<p><a href="/x">link</a></p>');
+
+  it("reports the classic reset", () => {
+    const css = cssDigest([{ selector: "*:focus", decls: { outline: "none" } }]);
+    expect(ids(page, { css })).toContain("rendered-focus-not-visible");
+  });
+
+  it("accepts a reset that replaces the indicator elsewhere", () => {
+    const css = cssDigest([
+      { selector: "*:focus", decls: { outline: "none" } },
+      { selector: "a:focus-visible", decls: { boxShadow: "0 0 0 3px rgb(0, 90, 200)" } },
+    ]);
+    expect(ids(page, { css })).not.toContain("rendered-focus-not-visible");
+  });
+
+  it("accepts a page that styles focus without removing anything", () => {
+    const css = cssDigest([{ selector: "a:focus", decls: { outlineStyle: "solid", outlineWidth: "2px" } }]);
+    expect(ids(page, { css })).not.toContain("rendered-focus-not-visible");
+  });
+
+  it("says nothing when the page has no focus styling at all — that is a manual question", () => {
+    expect(ids(page, { css: cssDigest([{ selector: "p", decls: { color: "rgb(0,0,0)" } }]) })).not.toContain("rendered-focus-not-visible");
+  });
+
+  it("DECLINES when a stylesheet could not be read — absence is then not evidence", () => {
+    const css = cssDigest([{ selector: "*:focus", decls: { outline: "none" } }], 1);
+    expect(ids(page, { css })).not.toContain("rendered-focus-not-visible");
+  });
+
+  it("says nothing on a page with nothing focusable", () => {
+    const css = cssDigest([{ selector: "*:focus", decls: { outline: "none" } }]);
+    expect(ids(PAGE("<p>just text</p>"), { css })).not.toContain("rendered-focus-not-visible");
+  });
+});
+
+describe("an orientation lock (WCAG 1.3.4 → RGAA 13.9)", () => {
+  const page = PAGE("<p>text</p>");
+
+  it("reports a quarter-turn forced on the document by an orientation media query", () => {
+    const css = cssDigest([{ selector: "html", media: "(orientation: portrait)", decls: { transform: "rotate(90deg)" } }]);
+    expect(ids(page, { css })).toContain("rendered-orientation-lock");
+  });
+
+  it("accepts a decorative element rotated in landscape — not a lock", () => {
+    const css = cssDigest([{ selector: ".badge", media: "(orientation: landscape)", decls: { transform: "rotate(90deg)" } }]);
+    expect(ids(page, { css })).not.toContain("rendered-orientation-lock");
+  });
+
+  it("accepts a rotation that is not a quarter turn", () => {
+    const css = cssDigest([{ selector: "body", media: "(orientation: portrait)", decls: { transform: "rotate(3deg)" } }]);
+    expect(ids(page, { css })).not.toContain("rendered-orientation-lock");
+  });
+
+  it("accepts an orientation media query that does not rotate anything", () => {
+    const css = cssDigest([{ selector: "body", media: "(orientation: portrait)", decls: { fontSize: "14px" } }]);
+    expect(ids(page, { css })).not.toContain("rendered-orientation-lock");
+  });
+
+  it("DECLINES when a stylesheet could not be read", () => {
+    const css = cssDigest([{ selector: "html", media: "(orientation: portrait)", decls: { transform: "rotate(90deg)" } }], 1);
+    expect(ids(page, { css })).not.toContain("rendered-orientation-lock");
+  });
+});

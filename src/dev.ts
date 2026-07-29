@@ -19,7 +19,7 @@ import { runAudit } from "./audit.js";
 import { resolveMessage } from "./messages.js";
 import { packCriteriaForFinding } from "./standards/derive.js";
 import { attributePages, derivePages, pageScopesFrom } from "./pages.js";
-import { readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type StyleDigest } from "./snapshot.js";
+import { readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
 import { CORE, type StandardId, isCore, loadPack, themeName } from "./standards/index.js";
 import { derivePackResults } from "./standards/index.js";
 import type { AuditResult, Finding, Lang, PageResult, Status } from "./types.js";
@@ -158,7 +158,7 @@ export function overlayJs(): string {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           meta: { v: 1, id: slug(location.pathname), name: document.title || location.pathname, url: location.href, runner: "dev" },
-          dom: collected.dom, styles: collected.styles, boxes: collected.boxes,
+          dom: collected.dom, styles: collected.styles, boxes: collected.boxes, css: collected.css,
         }),
       });
       const json = await res.json();
@@ -327,7 +327,7 @@ async function readBody(req: IncomingMessage, limit = 64 * 1024 * 1024): Promise
 /** Audit one collected page: persist it as a snapshot, then run the engine over its DOM. */
 export function auditCollected(
   root: string,
-  payload: { meta?: unknown; dom?: unknown; styles?: StyleDigest; boxes?: BoxDigest; axtree?: AxNode },
+  payload: { meta?: unknown; dom?: unknown; styles?: StyleDigest; boxes?: BoxDigest; axtree?: AxNode; css?: CssDigest },
 ): { ok: true; result: AuditResult } | { ok: false; error: string } {
   const v = validateSnapshotMeta(payload.meta);
   if (!v.ok || !v.meta) return { ok: false, error: v.issues.map((i) => `${i.path}: ${i.message}`).join("; ") };
@@ -338,6 +338,7 @@ export function auditCollected(
     ...(payload.styles ? { styles: payload.styles } : {}),
     ...(payload.boxes ? { boxes: payload.boxes } : {}),
     ...(payload.axtree ? { axtree: payload.axtree } : {}),
+    ...(payload.css ? { css: payload.css } : {}),
   });
   return { ok: true, result: runAudit({ inputs: [join(dir, "dom.html")] }) };
 }

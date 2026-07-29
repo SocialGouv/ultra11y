@@ -217,4 +217,163 @@ const renderedLinkColourOnly: Rule = {
   },
 };
 
-export const renderedRules: Rule[] = [renderedContrast, renderedContrastPixel, renderedLinkColourOnly];
+// ---- 1.4.11 non-text contrast: is a control's BOUNDARY perceivable? ----------------------
+
+// The controls whose boundary 1.4.11 (RGAA 3.3) is about. `input[type=hidden]` is excluded at
+// the call site; so is anything the browser is not painting.
+const BOUNDED_CONTROLS = new Set(["input", "select", "textarea", "button"]);
+const SIDES = ["Top", "Right", "Bottom", "Left"] as const;
+
+/** A visible border side's colour, for each side that is actually drawn. */
+function borderColours(css: Record<string, string>): RGBA[] {
+  const out: RGBA[] = [];
+  for (const s of SIDES) {
+    const style = css[`border${s}Style`];
+    const width = Number.parseFloat(css[`border${s}Width`] ?? "0");
+    if (!style || style === "none" || style === "hidden" || !(width > 0)) continue;
+    const c = parseColor(css[`border${s}Color`] ?? "");
+    if (c && c.a >= 1) out.push(c);
+  }
+  return out;
+}
+
+// WCAG 1.4.11 asks for 3:1 against ADJACENT colours. A control is distinguishable when its
+// FILL contrasts with the surroundings, or when a drawn border contrasts with either side of
+// itself. Three independent ways to pass — deliberately generous, because a false
+// "non-conforming" here is far more costly than a missed one, and the remaining failures (a
+// borderless input on a same-coloured background) are unambiguous.
+const renderedNonTextContrast: Rule = {
+  id: "rendered-nontext-contrast",
+  criteria: ["1.4.11"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    if (!doc.signals?.styles) return [];
+    const index = elementIndex(doc);
+    const out: RuleFinding[] = [];
+    for (const [el, i] of index) {
+      if (!BOUNDED_CONTROLS.has(el.tag)) continue;
+      const type = (el.attribs.type ?? "").toLowerCase();
+      if (el.tag === "input" && (type === "hidden" || type === "image")) continue;
+      const css = styleAt(doc, i)?.css;
+      if (!css || invisible(css)) continue;
+      // A shadow or an outline can BE the boundary, and neither is a colour we can compare
+      // simply. Decline rather than guess.
+      if (css.boxShadow && css.boxShadow !== "none") continue;
+      if ((css.outlineStyle ?? "none") !== "none" && Number.parseFloat(css.outlineWidth ?? "0") > 0) continue;
+      // The surrounding background: the nearest opaque ancestor colour, skipping the control.
+      const surrounding = el.parent ? backdropOf(doc, index, el.parent) : undefined;
+      if (!surrounding) continue; // unknown backdrop — not our call
+      const own = parseColor(css.backgroundColor ?? "");
+      // A transparent control is filled by whatever is behind it: the surroundings.
+      const fill = own && own.a >= 1 ? own : surrounding.color;
+      if (contrastRatio(fill, surrounding.color) >= 3) continue; // the fill draws the boundary
+      const borders = borderColours(css);
+      if (borders.some((b) => contrastRatio(b, surrounding.color) >= 3 || contrastRatio(b, fill) >= 3)) continue;
+      // No fill contrast and no contrasting border: nothing marks where the control is.
+      out.push({
+        criteriaId: "1.4.11",
+        el,
+        msgId: "rendered-nontext-contrast",
+        params: { ratio: contrastRatio(fill, surrounding.color).toFixed(2), control: el.tag },
+      });
+    }
+    return out;
+  },
+};
+
+// ---- stylesheet-level criteria ------------------------------------------------------------
+// Some criteria are properties of the STYLESHEET, not of any element's computed style. They
+// are only answerable from `signals.css`, and only when the browser let us read every sheet:
+// `unreadable > 0` means a cross-origin stylesheet was opaque to us, so the ABSENCE of a rule
+// proves nothing and both rules below decline.
+
+const FOCUS_SEL = /:focus(-visible|-within)?\b/;
+
+/** Does this declaration block remove the focus outline? */
+function killsOutline(d: Record<string, string>): boolean {
+  const o = (d.outline ?? "").trim();
+  if (o === "none" || /^0(px)?( |$)/.test(o) || /\bnone\b/.test(o)) return true;
+  if ((d.outlineStyle ?? "") === "none") return true;
+  return d.outlineWidth !== undefined && Number.parseFloat(d.outlineWidth) === 0;
+}
+
+/** Does it provide SOME visible focus affordance instead? */
+function restoresIndicator(d: Record<string, string>): boolean {
+  if (d.boxShadow && d.boxShadow !== "none") return true;
+  if (d.outlineStyle && d.outlineStyle !== "none" && Number.parseFloat(d.outlineWidth ?? "1") > 0) return true;
+  if (d.outline && !killsOutline(d)) return true;
+  if (d.textDecorationLine && d.textDecorationLine !== "none") return true;
+  for (const k of Object.keys(d)) {
+    if (/^border(Top|Right|Bottom|Left)?(Color|Width|Style)?$/.test(k) && d[k] && d[k] !== "none") return true;
+    if (/^background(Color|Image)?$/.test(k) && d[k] && d[k] !== "none" && d[k] !== "rgba(0, 0, 0, 0)") return true;
+  }
+  return d.filter !== undefined || d.transform !== undefined || d.color !== undefined;
+}
+
+// 2.4.7 / RGAA 10.7. The classic killer is a reset — `*:focus { outline: none }` — with
+// nothing put back. Reported ONLY when no `:focus` rule anywhere in the document restores an
+// affordance: a document-wide check, so a targeted `outline:none` that a sibling rule replaces
+// is never flagged. That leaves this unable to see a focus style applied by JS or by an
+// unreadable sheet — which is exactly why it declines in both cases rather than guessing.
+const renderedFocusNotVisible: Rule = {
+  id: "rendered-focus-not-visible",
+  criteria: ["2.4.7"],
+  severity: "majeur",
+  scope: "page",
+  run(doc: Doc): RuleFinding[] {
+    const css = doc.signals?.css;
+    if (!css || css.unreadable > 0 || css.truncated) return [];
+    const focusRules = css.rules.filter((r) => FOCUS_SEL.test(r.selector));
+    if (!focusRules.length) return []; // no focus styling at all is a different (manual) question
+    if (!focusRules.some((r) => killsOutline(r.decls))) return [];
+    if (focusRules.some((r) => restoresIndicator(r.decls))) return [];
+    // Only meaningful on a page that has something to focus.
+    const anchor = doc.elements.find((e) => ["a", "button", "input", "select", "textarea"].includes(e.tag));
+    if (!anchor) return [];
+    const killer = focusRules.find((r) => killsOutline(r.decls));
+    return [{ criteriaId: "2.4.7", el: doc.elements[0] ?? anchor, msgId: "rendered-focus-not-visible", params: { selector: killer?.selector ?? ":focus" } }];
+  },
+};
+
+// 1.3.4 / RGAA 13.9. The orientation lock: a media query on `orientation` that rotates the
+// whole document a quarter turn, forcing the user back to one orientation. Restricted to
+// document-level selectors (html/body/:root/*) and to rotations that are an odd multiple of
+// 90° — a decorative element rotated in landscape is legitimate and must not be flagged.
+const DOC_SEL = /^\s*(\*|:root|html|body)\s*$/i;
+
+function quarterTurn(transform: string): boolean {
+  const m = /rotate[ZY]?\(\s*(-?[\d.]+)deg\s*\)/i.exec(transform);
+  if (!m) return false;
+  const deg = Math.abs(Number.parseFloat(m[1] as string)) % 180;
+  return Math.abs(deg - 90) < 1;
+}
+
+const renderedOrientationLock: Rule = {
+  id: "rendered-orientation-lock",
+  criteria: ["1.3.4"],
+  severity: "majeur",
+  scope: "page",
+  run(doc: Doc): RuleFinding[] {
+    const css = doc.signals?.css;
+    if (!css || css.unreadable > 0) return [];
+    for (const r of css.rules) {
+      if (!r.media || !/orientation\s*:/i.test(r.media)) continue;
+      if (!r.selector.split(",").some((s) => DOC_SEL.test(s))) continue;
+      const t = r.decls.transform ?? "";
+      if (!quarterTurn(t)) continue;
+      const el = doc.elements[0];
+      if (!el) continue;
+      return [{ criteriaId: "1.3.4", el, msgId: "rendered-orientation-lock", params: { media: r.media, transform: t } }];
+    }
+    return [];
+  },
+};
+
+export const renderedRules: Rule[] = [
+  renderedContrast,
+  renderedContrastPixel,
+  renderedLinkColourOnly,
+  renderedNonTextContrast,
+  renderedFocusNotVisible,
+  renderedOrientationLock,
+];

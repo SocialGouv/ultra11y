@@ -18,7 +18,7 @@ const withRules = pack.criteria.filter((c) => (c.appliesTo?.ruleIds.length ?? 0)
 
 // Measured before the rendered tier landed: 43 of 106. Raise this line when coverage grows;
 // never lower it.
-const FLOOR = 44;
+const FLOOR = 46;
 
 describe("how much of RGAA the engine can evidence", () => {
   it(`maps at least ${FLOOR} of the ${pack.criteria.length} criteria onto an engine rule`, () => {

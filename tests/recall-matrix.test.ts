@@ -126,6 +126,23 @@ const SIGNAL_SEED: Record<string, SignalSeed> = {
       ["p", { color: "rgb(200, 200, 200)", fontSize: "16px" }],
     ],
   },
+  "rendered-nontext-contrast": {
+    html: `<!doctype html><html lang="en"><head><title>t</title></head><body><main><form><label for="q">Q</label><input id="q" type="text"></form></main></body></html>`,
+    styles: [
+      ["html", {}],
+      ["head", {}],
+      ["title", {}],
+      ["body", { backgroundColor: "rgb(255, 255, 255)" }],
+      ["main", {}],
+      ["form", {}],
+      ["label", {}],
+      // White field on a white page with no border: nothing shows where it is.
+      [
+        "input",
+        { backgroundColor: "rgb(255, 255, 255)", borderTopStyle: "none", borderRightStyle: "none", borderBottomStyle: "none", borderLeftStyle: "none" },
+      ],
+    ],
+  },
   "rendered-link-colour-only": {
     html: `<!doctype html><html lang="en"><head><title>t</title></head><body><main><p>see <a href="/x">here</a></p></main></body></html>`,
     styles: [
@@ -138,6 +155,24 @@ const SIGNAL_SEED: Record<string, SignalSeed> = {
       ["a", { color: "rgb(0, 0, 238)", textDecorationLine: "none", fontWeight: "400" }],
     ],
   },
+};
+
+// Stylesheet-level rules (2.4.7, 1.3.4): their evidence is a CSS rule, not an element style.
+const CSS_SEED: Record<string, { html: string; css: { selector: string; media?: string; decls: Record<string, string> }[] }> = {
+  "rendered-focus-not-visible": {
+    html: `<!doctype html><html lang="en"><head><title>t</title></head><body><main><a href="/x">go</a></main></body></html>`,
+    css: [{ selector: "*:focus", decls: { outline: "none" } }],
+  },
+  "rendered-orientation-lock": {
+    html: `<!doctype html><html lang="en"><head><title>t</title></head><body><main><p>x</p></main></body></html>`,
+    css: [{ selector: "html", media: "(orientation: portrait)", decls: { transform: "rotate(90deg)" } }],
+  },
+};
+
+const firesWithCss = (ruleId: string, seed: { html: string; css: { selector: string; media?: string; decls: Record<string, string> }[] }): boolean => {
+  const doc = parseSource(seed.html, `${ruleId}.html`);
+  doc.signals = { css: { v: 1, rules: seed.css, unreadable: 0 } };
+  return runRules(doc).some((f) => f.ruleId === ruleId);
 };
 
 // Seeded in tests/rendered-rules.test.ts instead: it needs a real PNG on disk, and this file
@@ -154,7 +189,7 @@ describe("recall matrix — every registered static rule catches its seeded defe
   const registered = ruleIds().filter((id) => !CROSS.has(id));
 
   it("seeds a defect fixture for every registered (non-cross) rule — no silent coverage gap", () => {
-    const seeded = new Set([...Object.keys(SEED), ...Object.keys(PAGE_SEED), ...Object.keys(SIGNAL_SEED), ...COVERED_ELSEWHERE]);
+    const seeded = new Set([...Object.keys(SEED), ...Object.keys(PAGE_SEED), ...Object.keys(SIGNAL_SEED), ...Object.keys(CSS_SEED), ...COVERED_ELSEWHERE]);
     const missing = registered.filter((id) => !seeded.has(id));
     expect(missing, `rules with no recall fixture: ${missing.join(", ")}`).toEqual([]);
   });
@@ -167,6 +202,9 @@ describe("recall matrix — every registered static rule catches its seeded defe
   }
   for (const [ruleId, seed] of Object.entries(SIGNAL_SEED)) {
     it(`catches ${ruleId} (rendered signals)`, () => expect(firesWithSignals(ruleId, seed), `${ruleId} did not fire on its seed`).toBe(true));
+  }
+  for (const [ruleId, seed] of Object.entries(CSS_SEED)) {
+    it(`catches ${ruleId} (stylesheet signals)`, () => expect(firesWithCss(ruleId, seed), `${ruleId} did not fire on its seed`).toBe(true));
   }
   it("declares, rather than hides, the rules seeded in another file", () => {
     for (const id of COVERED_ELSEWHERE) expect(registered).toContain(id);

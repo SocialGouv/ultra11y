@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
 import { hookScript, stagedHookScript, ciWorkflow, writeHook, writeCi } from "../src/init.js";
+import { VERSION } from "../src/types.js";
 
 const tmps: string[] = [];
 function tmp(): string {
@@ -72,6 +73,18 @@ describe("CI workflow", () => {
   it("consumes the shipped action, so a user gets the annotations and not just an exit code", () => {
     const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("maxgfr/ultra11y"));
     expect(step, "the workflow must use the ultra11y action").toBeDefined();
+  });
+
+  it("PINS the action to a tag that exists — never a moving branch", () => {
+    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("maxgfr/ultra11y"));
+    // `@main` would silently change under the user; the engine's own version always has a
+    // matching `v<version>` release tag, so pinning to it is both valid and reproducible.
+    expect(step?.uses).toBe(`maxgfr/ultra11y@v${VERSION}`);
+    expect(step?.uses).not.toContain("@main");
+  });
+
+  it("tells the reader the major alias exists, for those who want fixes automatically", () => {
+    expect(ciWorkflow("x", "bloquant")).toContain(`maxgfr/ultra11y@v${VERSION.split(".")[0]}`);
   });
 
   it("passes the regression gate through: diff vs the base ref, against the committed baseline", () => {

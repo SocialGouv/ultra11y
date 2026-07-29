@@ -35,7 +35,7 @@ import { repoRoot, writeHook, writeCi } from "./init.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
 import { toSarif } from "./sarif.js";
 import { annotations, stepSummary } from "./annotate.js";
-import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type StyleDigest } from "./snapshot.js";
+import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
 import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
 import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
@@ -941,7 +941,7 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
     console.error("ultra11y snapshot write: no payload on stdin (expected {meta, dom, styles?, boxes?, axtree?}).");
     return 2;
   }
-  let payload: { meta?: unknown; dom?: unknown; styles?: StyleDigest; boxes?: BoxDigest; axtree?: AxNode; screenshot?: unknown };
+  let payload: { meta?: unknown; dom?: unknown; styles?: StyleDigest; boxes?: BoxDigest; axtree?: AxNode; css?: CssDigest; screenshot?: unknown };
   try {
     payload = JSON.parse(raw);
   } catch {
@@ -966,6 +966,7 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
       ...(payload.styles ? { styles: payload.styles } : {}),
       ...(payload.boxes ? { boxes: payload.boxes } : {}),
       ...(payload.axtree ? { axtree: payload.axtree } : {}),
+      ...(payload.css ? { css: payload.css } : {}),
     });
   } catch (e) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);

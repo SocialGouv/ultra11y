@@ -133,6 +133,7 @@ export async function checkA11y(page, opts = {}) {
     dom: collected.dom,
     styles: collected.styles,
     boxes: collected.boxes,
+    css: collected.css,
     ...(shot ? { screenshot: shot } : {}),
   };
   const result = auditSnapshot(payload);
@@ -233,6 +234,7 @@ Cypress.Commands.add("ultra11y", (opts = {}) => {
       dom: collected.dom,
       styles: collected.styles,
       boxes: collected.boxes,
+      css: collected.css,
       failOn: opts.failOn,
     };
     return cy.task("ultra11ySnapshot", payload, { log: false }).then((res) => {

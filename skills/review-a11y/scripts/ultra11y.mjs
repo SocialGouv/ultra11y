@@ -385,7 +385,7 @@ var wcag_default = {
       level: "AA",
       addedIn: "2.1",
       automatability: "needs-rendering",
-      ruleIds: [],
+      ruleIds: ["rendered-orientation-lock"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/orientation.html"
     },
     {
@@ -488,7 +488,7 @@ var wcag_default = {
       level: "AA",
       addedIn: "2.1",
       automatability: "needs-rendering",
-      ruleIds: [],
+      ruleIds: ["rendered-nontext-contrast"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
       techniques: ["F78", "G145", "G174", "G18", "G183", "G195", "G207"]
     },
@@ -745,7 +745,7 @@ var wcag_default = {
       level: "AA",
       addedIn: "2.0",
       automatability: "needs-rendering",
-      ruleIds: [],
+      ruleIds: ["rendered-focus-not-visible"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html",
       techniques: ["C15", "F42", "F54", "F55", "F73", "F78", "G149", "G165", "G183", "G195", "G202", "G90", "SCR2", "SCR20", "SCR29", "SCR31", "SCR35"]
     },
@@ -32675,6 +32675,8 @@ ${snap.dom}
 `);
   if (snap.axtree) writeFileSync5(join21(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}
 `);
+  if (snap.css) writeFileSync5(join21(dir, "css.json"), `${JSON.stringify(snap.css)}
+`);
   return dir;
 }
 function readJson2(file) {
@@ -32698,6 +32700,7 @@ function readSnapshot(dir) {
   const styles = readJson2(join21(dir, "styles.json"));
   const boxes = readJson2(join21(dir, "boxes.json"));
   const axtree = readJson2(join21(dir, "axtree.json"));
+  const css = readJson2(join21(dir, "css.json"));
   const shot = join21(dir, "screen.png");
   return {
     meta: v.meta,
@@ -32705,6 +32708,7 @@ function readSnapshot(dir) {
     ...styles ? { styles } : {},
     ...boxes ? { boxes } : {},
     ...axtree ? { axtree } : {},
+    ...css ? { css } : {},
     ...existsSync9(shot) ? { screenshot: "screen.png" } : {}
   };
 }
@@ -32745,8 +32749,22 @@ var COLLECTED_CSS = [
   "outlineStyle",
   "outlineWidth",
   "outlineColor",
+  // All four borders + the box shadow: WCAG 1.4.11 asks whether a control's BOUNDARY is
+  // perceivable, and a boundary can be drawn by any side, by the fill, by an outline or by a
+  // shadow. Collecting only one side would manufacture non-conformities on the other three.
+  "borderTopStyle",
+  "borderRightStyle",
   "borderBottomStyle",
+  "borderLeftStyle",
+  "borderTopWidth",
+  "borderRightWidth",
   "borderBottomWidth",
+  "borderLeftWidth",
+  "borderTopColor",
+  "borderRightColor",
+  "borderBottomColor",
+  "borderLeftColor",
+  "boxShadow",
   "cursor"
 ];
 var COLLECT_MAX_ELEMENTS = 5e3;
@@ -32770,9 +32788,43 @@ var COLLECT_SNAPSHOT = `(() => {
     const r = el.getBoundingClientRect();
     boxes.push({ i: i, tag: tag, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
   }
+  // The page's own stylesheets. Some criteria are properties of the STYLESHEET rather than of
+  // any element's computed style \u2014 focus styling removed with no replacement (2.4.7), a media
+  // query that locks the orientation (1.3.4) \u2014 and this is the only place they exist.
+  // A cross-origin sheet throws on .cssRules: COUNT those instead of ignoring them, so a rule
+  // reading this digest can tell "nothing there" apart from "I could not look".
+  const cssRules = [];
+  let unreadable = 0;
+  const MAXR = 4000;
+  const camel = (p) => p.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  const walk = (list, media) => {
+    for (const r of list) {
+      if (cssRules.length >= MAXR) return;
+      if (typeof r.selectorText === 'string' && r.style) {
+        const decls = {};
+        for (let i = 0; i < r.style.length; i++) {
+          const prop = r.style[i];
+          decls[camel(prop)] = r.style.getPropertyValue(prop);
+        }
+        cssRules.push(media ? { selector: r.selectorText, media: media, decls: decls } : { selector: r.selectorText, decls: decls });
+      } else if (r.cssRules) {
+        const cond = r.conditionText || (r.media && r.media.mediaText) || media;
+        walk(r.cssRules, cond);
+      }
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try {
+      walk(sheet.cssRules, undefined);
+    } catch (e) {
+      unreadable++;
+    }
+  }
+
   const truncated = els.length > MAX;
   return {
     dom: document.documentElement.outerHTML,
+    css: { v: 1, rules: cssRules, unreadable: unreadable, truncated: cssRules.length >= MAXR },
     title: document.title,
     lang: document.documentElement.getAttribute('lang') || '',
     url: location.href,
@@ -32800,6 +32852,7 @@ function attachSignals(doc) {
   const styles = readJson2(join21(dir, "styles.json"));
   const boxes = readJson2(join21(dir, "boxes.json"));
   const axtree = readJson2(join21(dir, "axtree.json"));
+  const css = readJson2(join21(dir, "css.json"));
   const shot = join21(dir, "screen.png");
   const alignedStyleMap = styles ? align(doc, styles.entries) : null;
   const alignedBoxMap = boxes ? align(doc, boxes.entries) : null;
@@ -32808,6 +32861,8 @@ function attachSignals(doc) {
     ...alignedStyleMap ? { styles: alignedStyleMap } : {},
     ...alignedBoxMap ? { boxes: alignedBoxMap } : {},
     ...axtree ? { axtree } : {},
+    // Not element-indexed, so it needs no alignment — it is a property of the stylesheet.
+    ...css ? { css } : {},
     ...existsSync9(shot) ? { screenshot: shot } : {},
     ...truncated ? { truncated } : {}
   };
@@ -33090,6 +33145,36 @@ var MSG_CATALOG = {
     remediation: {
       fr: () => `Ajoutez un indice non chromatique : text-decoration: underline (le plus simple), une bordure basse, ou une graisse nettement sup\xE9rieure. \xC0 d\xE9faut, un contraste d'au moins 3:1 avec le texte environnant ET un indice au survol/focus.`,
       en: () => `Add a non-colour cue: text-decoration: underline (simplest), a bottom border, or a distinctly heavier weight. Failing that, at least 3:1 contrast with the surrounding text AND a cue on hover/focus.`
+    }
+  },
+  "rendered-nontext-contrast": {
+    message: {
+      fr: (p) => `Limite du composant <${p.control}> non perceptible : ni son fond (${p.ratio}:1 avec l'environnement) ni sa bordure n'atteignent 3:1 \u2014 rien n'indique visuellement o\xF9 commence le champ.`,
+      en: (p) => `The <${p.control}> boundary is not perceivable: neither its fill (${p.ratio}:1 against its surroundings) nor its border reaches 3:1 \u2014 nothing shows visually where the control begins.`
+    },
+    remediation: {
+      fr: () => `Donnez au composant une bordure visible contrastant \xE0 3:1 avec le fond environnant, ou un fond distinct du fond environnant \xE0 3:1. Un box-shadow ou un outline visible conviennent aussi.`,
+      en: () => `Give the control a visible border at 3:1 against the surrounding background, or a fill distinct from it at 3:1. A visible box-shadow or outline also qualifies.`
+    }
+  },
+  "rendered-focus-not-visible": {
+    message: {
+      fr: (p) => `La feuille de styles supprime l'indicateur de focus (\`${p.selector}\`) et aucune r\xE8gle \`:focus\` ne le remplace \u2014 un utilisateur au clavier ne peut plus savoir o\xF9 il se trouve.`,
+      en: (p) => `The stylesheet removes the focus indicator (\`${p.selector}\`) and no \`:focus\` rule puts one back \u2014 a keyboard user can no longer tell where they are.`
+    },
+    remediation: {
+      fr: () => `Ne supprimez jamais outline sans remplacement. Si le style par d\xE9faut ne convient pas, remplacez-le : \`:focus-visible { outline: 2px solid <couleur contrast\xE9e>; outline-offset: 2px }\`.`,
+      en: () => `Never remove outline without a replacement. If the default does not fit, replace it: \`:focus-visible { outline: 2px solid <contrasting colour>; outline-offset: 2px }\`.`
+    }
+  },
+  "rendered-orientation-lock": {
+    message: {
+      fr: (p) => `Le contenu est verrouill\xE9 dans une seule orientation : \`@media ${p.media}\` applique \`transform: ${p.transform}\` au document \u2014 l'utilisateur ne peut pas consulter la page dans l'orientation de son choix.`,
+      en: (p) => `Content is locked to a single orientation: \`@media ${p.media}\` applies \`transform: ${p.transform}\` to the document \u2014 the user cannot view the page in the orientation they need.`
+    },
+    remediation: {
+      fr: () => `Supprimez la rotation et rendez la mise en page responsive dans les deux orientations. Un verrouillage n'est admis que si l'orientation est essentielle (piano, ch\xE8que bancaire).`,
+      en: () => `Remove the rotation and make the layout work in both orientations. Locking is only acceptable where the orientation is essential (a piano keyboard, a bank cheque).`
     }
   },
   // ---- Theme 5 — Data tables (src/rules/tables.ts) ----------------------------
@@ -36851,7 +36936,123 @@ var renderedLinkColourOnly = {
     return out2;
   }
 };
-var renderedRules = [renderedContrast, renderedContrastPixel, renderedLinkColourOnly];
+var BOUNDED_CONTROLS = /* @__PURE__ */ new Set(["input", "select", "textarea", "button"]);
+var SIDES = ["Top", "Right", "Bottom", "Left"];
+function borderColours(css) {
+  const out2 = [];
+  for (const s of SIDES) {
+    const style = css[`border${s}Style`];
+    const width = Number.parseFloat(css[`border${s}Width`] ?? "0");
+    if (!style || style === "none" || style === "hidden" || !(width > 0)) continue;
+    const c2 = parseColor(css[`border${s}Color`] ?? "");
+    if (c2 && c2.a >= 1) out2.push(c2);
+  }
+  return out2;
+}
+var renderedNonTextContrast = {
+  id: "rendered-nontext-contrast",
+  criteria: ["1.4.11"],
+  severity: "majeur",
+  run(doc) {
+    if (!doc.signals?.styles) return [];
+    const index = elementIndex(doc);
+    const out2 = [];
+    for (const [el, i2] of index) {
+      if (!BOUNDED_CONTROLS.has(el.tag)) continue;
+      const type = (el.attribs.type ?? "").toLowerCase();
+      if (el.tag === "input" && (type === "hidden" || type === "image")) continue;
+      const css = styleAt(doc, i2)?.css;
+      if (!css || invisible(css)) continue;
+      if (css.boxShadow && css.boxShadow !== "none") continue;
+      if ((css.outlineStyle ?? "none") !== "none" && Number.parseFloat(css.outlineWidth ?? "0") > 0) continue;
+      const surrounding = el.parent ? backdropOf(doc, index, el.parent) : void 0;
+      if (!surrounding) continue;
+      const own = parseColor(css.backgroundColor ?? "");
+      const fill = own && own.a >= 1 ? own : surrounding.color;
+      if (contrastRatio(fill, surrounding.color) >= 3) continue;
+      const borders = borderColours(css);
+      if (borders.some((b) => contrastRatio(b, surrounding.color) >= 3 || contrastRatio(b, fill) >= 3)) continue;
+      out2.push({
+        criteriaId: "1.4.11",
+        el,
+        msgId: "rendered-nontext-contrast",
+        params: { ratio: contrastRatio(fill, surrounding.color).toFixed(2), control: el.tag }
+      });
+    }
+    return out2;
+  }
+};
+var FOCUS_SEL = /:focus(-visible|-within)?\b/;
+function killsOutline(d) {
+  const o = (d.outline ?? "").trim();
+  if (o === "none" || /^0(px)?( |$)/.test(o) || /\bnone\b/.test(o)) return true;
+  if ((d.outlineStyle ?? "") === "none") return true;
+  return d.outlineWidth !== void 0 && Number.parseFloat(d.outlineWidth) === 0;
+}
+function restoresIndicator(d) {
+  if (d.boxShadow && d.boxShadow !== "none") return true;
+  if (d.outlineStyle && d.outlineStyle !== "none" && Number.parseFloat(d.outlineWidth ?? "1") > 0) return true;
+  if (d.outline && !killsOutline(d)) return true;
+  if (d.textDecorationLine && d.textDecorationLine !== "none") return true;
+  for (const k of Object.keys(d)) {
+    if (/^border(Top|Right|Bottom|Left)?(Color|Width|Style)?$/.test(k) && d[k] && d[k] !== "none") return true;
+    if (/^background(Color|Image)?$/.test(k) && d[k] && d[k] !== "none" && d[k] !== "rgba(0, 0, 0, 0)") return true;
+  }
+  return d.filter !== void 0 || d.transform !== void 0 || d.color !== void 0;
+}
+var renderedFocusNotVisible = {
+  id: "rendered-focus-not-visible",
+  criteria: ["2.4.7"],
+  severity: "majeur",
+  scope: "page",
+  run(doc) {
+    const css = doc.signals?.css;
+    if (!css || css.unreadable > 0 || css.truncated) return [];
+    const focusRules = css.rules.filter((r) => FOCUS_SEL.test(r.selector));
+    if (!focusRules.length) return [];
+    if (!focusRules.some((r) => killsOutline(r.decls))) return [];
+    if (focusRules.some((r) => restoresIndicator(r.decls))) return [];
+    const anchor = doc.elements.find((e) => ["a", "button", "input", "select", "textarea"].includes(e.tag));
+    if (!anchor) return [];
+    const killer = focusRules.find((r) => killsOutline(r.decls));
+    return [{ criteriaId: "2.4.7", el: doc.elements[0] ?? anchor, msgId: "rendered-focus-not-visible", params: { selector: killer?.selector ?? ":focus" } }];
+  }
+};
+var DOC_SEL = /^\s*(\*|:root|html|body)\s*$/i;
+function quarterTurn(transform) {
+  const m = /rotate[ZY]?\(\s*(-?[\d.]+)deg\s*\)/i.exec(transform);
+  if (!m) return false;
+  const deg = Math.abs(Number.parseFloat(m[1])) % 180;
+  return Math.abs(deg - 90) < 1;
+}
+var renderedOrientationLock = {
+  id: "rendered-orientation-lock",
+  criteria: ["1.3.4"],
+  severity: "majeur",
+  scope: "page",
+  run(doc) {
+    const css = doc.signals?.css;
+    if (!css || css.unreadable > 0) return [];
+    for (const r of css.rules) {
+      if (!r.media || !/orientation\s*:/i.test(r.media)) continue;
+      if (!r.selector.split(",").some((s) => DOC_SEL.test(s))) continue;
+      const t2 = r.decls.transform ?? "";
+      if (!quarterTurn(t2)) continue;
+      const el = doc.elements[0];
+      if (!el) continue;
+      return [{ criteriaId: "1.3.4", el, msgId: "rendered-orientation-lock", params: { media: r.media, transform: t2 } }];
+    }
+    return [];
+  }
+};
+var renderedRules = [
+  renderedContrast,
+  renderedContrastPixel,
+  renderedLinkColourOnly,
+  renderedNonTextContrast,
+  renderedFocusNotVisible,
+  renderedOrientationLock
+];
 
 // src/rules/timing.ts
 var metaRefreshRedirect = {
@@ -38308,7 +38509,7 @@ var rgaa_default = {
       particularCases: ["Les cas suivants sont non applicables pour ce crit\xE8re\xA0:", "[object Object]"],
       wcag: ["1.4.11"],
       appliesTo: {
-        ruleIds: []
+        ruleIds: ["rendered-nontext-contrast"]
       }
     },
     {
@@ -39623,7 +39824,7 @@ var rgaa_default = {
       techniques: ["G149", "G165", "G183", "G195", "F73", "F78", "SCR31", "C15"],
       wcag: ["1.4.1", "2.4.7"],
       appliesTo: {
-        ruleIds: ["dyn-focus-visible"]
+        ruleIds: ["dyn-focus-visible", "rendered-focus-not-visible"]
       }
     },
     {
@@ -40763,7 +40964,7 @@ var rgaa_default = {
       ],
       wcag: ["1.3.4"],
       appliesTo: {
-        ruleIds: []
+        ruleIds: ["rendered-orientation-lock"]
       }
     },
     {
@@ -50076,6 +50277,10 @@ function ciWorkflow(enginePath, failOn) {
 # of code that caused it, and \`::error::\` annotations cover repositories without Advanced
 # Security. Set \`comment: 'true'\` to also get a sticky summary comment (needs
 # \`pull-requests: write\`), and \`standard: 'rgaa'\` to report against a country standard.
+#
+# The action is PINNED to the engine version that generated this file, so a CI run stays
+# reproducible. \`maxgfr/ultra11y@v${VERSION.split(".")[0]}\` also resolves (a moving major
+# tag) if you would rather track the major line and take fixes automatically.
 on:
   pull_request:
 
@@ -50091,7 +50296,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # the diff gate needs the base ref
-      - uses: maxgfr/ultra11y@main
+      - uses: maxgfr/ultra11y@v${VERSION}
         with:
           since: auto # the PR's base branch
           baseline: audits/baseline.json
@@ -50539,7 +50744,7 @@ function overlayJs() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           meta: { v: 1, id: slug(location.pathname), name: document.title || location.pathname, url: location.href, runner: "dev" },
-          dom: collected.dom, styles: collected.styles, boxes: collected.boxes,
+          dom: collected.dom, styles: collected.styles, boxes: collected.boxes, css: collected.css,
         }),
       });
       const json = await res.json();
@@ -50683,7 +50888,8 @@ function auditCollected(root, payload) {
     dom: payload.dom,
     ...payload.styles ? { styles: payload.styles } : {},
     ...payload.boxes ? { boxes: payload.boxes } : {},
-    ...payload.axtree ? { axtree: payload.axtree } : {}
+    ...payload.axtree ? { axtree: payload.axtree } : {},
+    ...payload.css ? { css: payload.css } : {}
   });
   return { ok: true, result: runAudit({ inputs: [join32(dir, "dom.html")] }) };
 }
@@ -50862,6 +51068,7 @@ export async function checkA11y(page, opts = {}) {
     dom: collected.dom,
     styles: collected.styles,
     boxes: collected.boxes,
+    css: collected.css,
     ...(shot ? { screenshot: shot } : {}),
   };
   const result = auditSnapshot(payload);
@@ -50958,6 +51165,7 @@ Cypress.Commands.add("ultra11y", (opts = {}) => {
       dom: collected.dom,
       styles: collected.styles,
       boxes: collected.boxes,
+      css: collected.css,
       failOn: opts.failOn,
     };
     return cy.task("ultra11ySnapshot", payload, { log: false }).then((res) => {
@@ -52373,7 +52581,8 @@ async function cmdSnapshot(p) {
       dom: payload.dom,
       ...payload.styles ? { styles: payload.styles } : {},
       ...payload.boxes ? { boxes: payload.boxes } : {},
-      ...payload.axtree ? { axtree: payload.axtree } : {}
+      ...payload.axtree ? { axtree: payload.axtree } : {},
+      ...payload.css ? { css: payload.css } : {}
     });
   } catch (e) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);

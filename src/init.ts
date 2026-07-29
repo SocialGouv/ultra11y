@@ -8,7 +8,7 @@
 import { writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import type { Severity } from "./types.js";
+import { VERSION, type Severity } from "./types.js";
 
 // English --fail-on token written into generated hooks/CI (the tool is English-first;
 // parseFailOn still accepts both fr and en).
@@ -89,6 +89,10 @@ export function ciWorkflow(enginePath: string, failOn: Severity): string {
 # of code that caused it, and \`::error::\` annotations cover repositories without Advanced
 # Security. Set \`comment: 'true'\` to also get a sticky summary comment (needs
 # \`pull-requests: write\`), and \`standard: 'rgaa'\` to report against a country standard.
+#
+# The action is PINNED to the engine version that generated this file, so a CI run stays
+# reproducible. \`maxgfr/ultra11y@v${VERSION.split(".")[0]}\` also resolves (a moving major
+# tag) if you would rather track the major line and take fixes automatically.
 on:
   pull_request:
 
@@ -104,7 +108,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # the diff gate needs the base ref
-      - uses: maxgfr/ultra11y@main
+      - uses: maxgfr/ultra11y@v${VERSION}
         with:
           since: auto # the PR's base branch
           baseline: audits/baseline.json

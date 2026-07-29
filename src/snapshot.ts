@@ -32,9 +32,9 @@ import { dirname, join } from "node:path";
 import { formatCaptureComment } from "./capture.js";
 import { parseHtml } from "./parse/html.js";
 import type { Doc } from "./parse/html.js";
-import type { AxNode, BoxDigest, BoxEntry, RenderSignals, StyleDigest, StyleEntry } from "./types.js";
+import type { AxNode, BoxDigest, BoxEntry, CssDigest, RenderSignals, StyleDigest, StyleEntry } from "./types.js";
 
-export type { AxNode, BoxDigest, BoxEntry, RenderSignals, StyleDigest, StyleEntry };
+export type { AxNode, BoxDigest, BoxEntry, CssDigest, RenderSignals, StyleDigest, StyleEntry };
 
 export const SNAPSHOT_VERSION = 1;
 export const PAGES_DIR = ".ultra11y/pages";
@@ -67,6 +67,7 @@ export interface Snapshot {
   styles?: StyleDigest;
   boxes?: BoxDigest;
   axtree?: AxNode;
+  css?: CssDigest;
   /** Path of the screenshot on disk, relative to the snapshot dir. Set when present. */
   screenshot?: string;
 }
@@ -179,6 +180,7 @@ export function writeSnapshot(root: string, snap: Snapshot): string {
   if (snap.styles) writeFileSync(join(dir, "styles.json"), `${JSON.stringify(snap.styles)}\n`);
   if (snap.boxes) writeFileSync(join(dir, "boxes.json"), `${JSON.stringify(snap.boxes)}\n`);
   if (snap.axtree) writeFileSync(join(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}\n`);
+  if (snap.css) writeFileSync(join(dir, "css.json"), `${JSON.stringify(snap.css)}\n`);
   return dir;
 }
 
@@ -206,6 +208,7 @@ export function readSnapshot(dir: string): Snapshot | null {
   const styles = readJson<StyleDigest>(join(dir, "styles.json"));
   const boxes = readJson<BoxDigest>(join(dir, "boxes.json"));
   const axtree = readJson<AxNode>(join(dir, "axtree.json"));
+  const css = readJson<CssDigest>(join(dir, "css.json"));
   const shot = join(dir, "screen.png");
   return {
     meta: v.meta,
@@ -213,6 +216,7 @@ export function readSnapshot(dir: string): Snapshot | null {
     ...(styles ? { styles } : {}),
     ...(boxes ? { boxes } : {}),
     ...(axtree ? { axtree } : {}),
+    ...(css ? { css } : {}),
     ...(existsSync(shot) ? { screenshot: "screen.png" } : {}),
   };
 }
@@ -293,8 +297,22 @@ export const COLLECTED_CSS: readonly string[] = [
   "outlineStyle",
   "outlineWidth",
   "outlineColor",
+  // All four borders + the box shadow: WCAG 1.4.11 asks whether a control's BOUNDARY is
+  // perceivable, and a boundary can be drawn by any side, by the fill, by an outline or by a
+  // shadow. Collecting only one side would manufacture non-conformities on the other three.
+  "borderTopStyle",
+  "borderRightStyle",
   "borderBottomStyle",
+  "borderLeftStyle",
+  "borderTopWidth",
+  "borderRightWidth",
   "borderBottomWidth",
+  "borderLeftWidth",
+  "borderTopColor",
+  "borderRightColor",
+  "borderBottomColor",
+  "borderLeftColor",
+  "boxShadow",
   "cursor",
 ];
 
@@ -325,9 +343,43 @@ export const COLLECT_SNAPSHOT = `(() => {
     const r = el.getBoundingClientRect();
     boxes.push({ i: i, tag: tag, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
   }
+  // The page's own stylesheets. Some criteria are properties of the STYLESHEET rather than of
+  // any element's computed style — focus styling removed with no replacement (2.4.7), a media
+  // query that locks the orientation (1.3.4) — and this is the only place they exist.
+  // A cross-origin sheet throws on .cssRules: COUNT those instead of ignoring them, so a rule
+  // reading this digest can tell "nothing there" apart from "I could not look".
+  const cssRules = [];
+  let unreadable = 0;
+  const MAXR = 4000;
+  const camel = (p) => p.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  const walk = (list, media) => {
+    for (const r of list) {
+      if (cssRules.length >= MAXR) return;
+      if (typeof r.selectorText === 'string' && r.style) {
+        const decls = {};
+        for (let i = 0; i < r.style.length; i++) {
+          const prop = r.style[i];
+          decls[camel(prop)] = r.style.getPropertyValue(prop);
+        }
+        cssRules.push(media ? { selector: r.selectorText, media: media, decls: decls } : { selector: r.selectorText, decls: decls });
+      } else if (r.cssRules) {
+        const cond = r.conditionText || (r.media && r.media.mediaText) || media;
+        walk(r.cssRules, cond);
+      }
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try {
+      walk(sheet.cssRules, undefined);
+    } catch (e) {
+      unreadable++;
+    }
+  }
+
   const truncated = els.length > MAX;
   return {
     dom: document.documentElement.outerHTML,
+    css: { v: 1, rules: cssRules, unreadable: unreadable, truncated: cssRules.length >= MAXR },
     title: document.title,
     lang: document.documentElement.getAttribute('lang') || '',
     url: location.href,
@@ -370,6 +422,7 @@ export function attachSignals(doc: Doc): void {
   const styles = readJson<StyleDigest>(join(dir, "styles.json"));
   const boxes = readJson<BoxDigest>(join(dir, "boxes.json"));
   const axtree = readJson<AxNode>(join(dir, "axtree.json"));
+  const css = readJson<CssDigest>(join(dir, "css.json"));
   const shot = join(dir, "screen.png");
 
   const alignedStyleMap = styles ? align(doc, styles.entries) : null;
@@ -380,6 +433,8 @@ export function attachSignals(doc: Doc): void {
     ...(alignedStyleMap ? { styles: alignedStyleMap } : {}),
     ...(alignedBoxMap ? { boxes: alignedBoxMap } : {}),
     ...(axtree ? { axtree } : {}),
+    // Not element-indexed, so it needs no alignment — it is a property of the stylesheet.
+    ...(css ? { css } : {}),
     ...(existsSync(shot) ? { screenshot: shot } : {}),
     ...(truncated ? { truncated } : {}),
   };

@@ -255,7 +255,30 @@ export interface BoxDigest {
   truncated?: boolean;
 }
 
-/** The accessibility tree as the browser computed it. Deliberately loose: producers differ. */
+/** One CSS rule as the browser parsed it. Some criteria are properties of the STYLESHEET, not
+ *  of any element's computed style: whether focus styling is removed, whether a media query
+ *  locks the orientation. Those are only answerable here. */
+export interface CssRuleEntry {
+  selector: string;
+  /** Enclosing @media condition, when the rule sits inside one. */
+  media?: string;
+  /** Declarations, keys in CSS camelCase to match `StyleEntry.css`. */
+  decls: Record<string, string>;
+}
+
+export interface CssDigest {
+  v: number;
+  rules: CssRuleEntry[];
+  // Stylesheets whose rules the browser refused to expose (cross-origin, no CORS). A rule's
+  // ABSENCE is then not evidence of anything, so the rules that read this digest decline to
+  // conclude when it is non-zero. Silence here means "I could not look", not "nothing there".
+  unreadable: number;
+  truncated?: boolean;
+}
+
+/** The accessibility tree as the browser computed it. Deliberately loose: producers differ.
+ *  Recorded when a producer supplies it; no rule consumes it yet — it rides along as evidence
+ *  for the agent's adjudication rather than driving an automated verdict. */
 export interface AxNode {
   role?: string;
   name?: string;
@@ -275,6 +298,8 @@ export interface RenderSignals {
   styles?: Map<number, StyleEntry>;
   boxes?: Map<number, BoxEntry>;
   axtree?: AxNode;
+  /** The page's own stylesheets. Not element-indexed — it needs no alignment. */
+  css?: CssDigest;
   /** Absolute path to the page screenshot, when one was captured. */
   screenshot?: string;
   /** The collector truncated: elements past the cap have NO signals and stay undecided. */

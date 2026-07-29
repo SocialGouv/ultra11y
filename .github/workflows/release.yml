@@ -48,8 +48,37 @@ jobs:
           pnpm test
           pnpm run check:build
 
+      # Fail EARLY and readably. @semantic-release/npm verifies the token in verifyConditions,
+      # so a missing secret already aborts before anything is tagged — but with a message that
+      # does not say what to do. This one does.
+      - name: Preflight — npm credentials
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NPM_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN is not set. ultra11y publishes to npm on release: add an npm automation token as the NPM_TOKEN repository secret (Settings → Secrets and variables → Actions), or drop @semantic-release/npm from .releaserc.json to keep GitHub-only releases."
+            exit 1
+          fi
+
       - name: Release (semantic-release)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm exec semantic-release
+
+      # `uses: maxgfr/ultra11y@v2` has to resolve to something. semantic-release only creates
+      # the exact `v<version>` tag, so move the major alias onto it. Idempotent: when no
+      # release happened, package.json still holds the previous version and the alias is
+      # already there. The generated workflow (`init --ci`) pins the exact version instead —
+      # this alias exists for users who prefer to track the major line.
+      - name: Move the major-version tag
+        run: |
+          v=$(node -p "require('./package.json').version")
+          major="v${v%%.*}"
+          if ! git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
+            echo "No tag v$v — no release was cut; leaving $major where it is."
+            exit 0
+          fi
+          git tag -f "$major" "v$v"
+          git push -f origin "refs/tags/$major"
+          echo "$major → v$v"

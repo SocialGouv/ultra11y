@@ -73,6 +73,21 @@ So the fixture knows nothing about the snapshot format, the provenance comment o
 it is a pipe. There is no second implementation to drift out of sync, and any other producer
 can use the same command.
 
+## One difference between the two runners
+
+The Playwright fixture also captures a **viewport screenshot** and sends it with the payload,
+which is what feeds the pixel tier (contrast over a gradient or a background image — the case
+computed styles cannot express). Pass `screenshot: false` to skip it.
+
+The Cypress command does **not**: `cy.screenshot()` writes to a path Cypress chooses and
+names, so wiring it back into the payload reliably is more machinery than it is worth. A
+Cypress-collected page therefore gets every rule except `rendered-contrast-pixel`, and that
+criterion simply stays undecided for it rather than being guessed. If you need the pixel tier,
+scan those pages separately (`scan <url>`), or capture them with Playwright.
+
+Everything else — the DOM, the computed styles, the boxes and the stylesheets — is identical
+between the two.
+
 ## Why the artefact matters more than the assertion
 
 A failing assertion tells one developer, once. The **snapshot** is the durable part:

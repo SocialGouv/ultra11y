@@ -15,7 +15,7 @@ permissions:
 steps:
   - uses: actions/checkout@v4
     with: { fetch-depth: 0 }        # the diff gate needs the base ref
-  - uses: maxgfr/ultra11y@main
+  - uses: maxgfr/ultra11y@v2      # or pin the exact version, as `init --ci` does
     with:
       since: auto                   # the PR's base branch
       standard: rgaa
@@ -27,7 +27,7 @@ steps:
 Page by page, with a real browser, in the same step:
 
 ```yaml
-  - uses: maxgfr/ultra11y@main
+  - uses: maxgfr/ultra11y@v2
     with:
       standard: rgaa
       start: npm run start
@@ -36,7 +36,10 @@ Page by page, with a real browser, in the same step:
       # …or `sample: 'true'` to scan the sample declared in .ultra11yrc.json
 ```
 
-`ultra11y init --ci` writes a workflow using it.
+`ultra11y init --ci` writes a workflow using it, **pinned to the exact engine version that
+generated the file** (`@v<that version>`) so a CI run stays reproducible. `@v2` is a moving major alias
+the release workflow keeps pointing at the latest release, for teams who would rather take
+fixes automatically. Never `@main`: it would change under you without a version to blame.
 
 **Order matters, and it is deliberate**: the audit runs first, then SARIF, annotations, the
 summary, the comment and the report — and the **gate runs last**. A failing audit has

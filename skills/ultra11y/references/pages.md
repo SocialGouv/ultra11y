@@ -13,8 +13,9 @@ That difference is not cosmetic. It is what makes a whole class of criteria deci
   dom.html      documentElement.outerHTML, prefixed with the usual capture comment
   styles.json   computed-style digest, joined to the DOM by document-order index
   boxes.json    bounding boxes, same join key
-  axtree.json   the accessibility tree as the browser computed it
-  screen.png    full-page screenshot (pixel tier)
+  css.json      the page's own stylesheets (rules + declarations), NOT element-indexed
+  axtree.json   the accessibility tree, when a producer supplies it (no rule reads it yet)
+  screen.png    viewport screenshot (pixel tier)
 ```
 
 `audit` ingests `.ultra11y/pages` automatically, exactly as it ingests `.ultra11y/captures`
@@ -75,11 +76,9 @@ digest simply leaves the rendering criteria `manual`, which is the honest outcom
 The collector is bounded (`COLLECT_MAX_ELEMENTS`); when it truncates, `truncated: true` is
 recorded so the tail reads as *unmeasured*, never as *clean*.
 
-## Producing snapshots
-
 ## The rendered tier — criteria only a browser can answer, decided offline
 
-A snapshot carries what a browser knows and source does not. Three rules read it, and they
+A snapshot carries what a browser knows and source does not. Six rules read it, and they
 run inside the ordinary `audit` — **no browser, no Docker, no running server**, from a
 committed artefact. That is the point: CI decides these without booting the app.
 
@@ -88,6 +87,9 @@ committed artefact. That is the point: CI decides these without booting the app.
 | `rendered-contrast` | 1.4.3 | **3.2 / 10.5** | computed `color` vs the nearest opaque ancestor background |
 | `rendered-contrast-pixel` | 1.4.3 | **3.2 / 10.5** | the screenshot, where the CSSOM cannot answer |
 | `rendered-link-colour-only` | 1.4.1 | **10.6** | computed styles of a link inside running text |
+| `rendered-nontext-contrast` | 1.4.11 | **3.3** | a control's computed fill and its four borders |
+| `rendered-focus-not-visible` | 2.4.7 | **10.7** | the stylesheet's `:focus` rules |
+| `rendered-orientation-lock` | 1.3.4 | **13.9** | `@media (orientation:…)` rules |
 
 **`rendered-contrast` beats the inline-literal rule** it sits beside: `contrast-literal` can
 only judge colours written inline in the markup, so it says nothing about a real stylesheet.
@@ -109,6 +111,26 @@ block*, which is where the criterion applies; a nav or button-styled link is out
 construction, and an underline, a bottom border, a background or a distinctly heavier weight
 all clear it.
 
+**`rendered-nontext-contrast` gives RGAA 3.3 its first rule.** A control is distinguishable
+when its fill contrasts with the surroundings, **or** when a drawn border contrasts with either
+side of itself — three independent ways to pass, deliberately generous. What remains is the
+unambiguous failure: a borderless field the same colour as the page. It declines outright when
+a `box-shadow` or a visible `outline` might be drawing the boundary instead.
+
+**Two criteria are properties of the STYLESHEET, not of any element's computed style**, and
+`css.json` is the only place they exist. `rendered-focus-not-visible` catches the classic
+`*:focus { outline: none }` reset — reported **only** when no `:focus` rule anywhere in the
+document restores an affordance, so a targeted reset that a sibling rule replaces is never
+flagged. `rendered-orientation-lock` catches a media query that turns the whole document a
+quarter turn; a decorative element rotated in landscape is legitimate and is not flagged.
+
+Both **decline when `unreadable > 0`** — a cross-origin stylesheet the browser would not let us
+read. Silence there means *"I could not look"*, not *"nothing there"*, and the difference is
+the whole point.
+
+RGAA 10.7 was already reachable through the live `scan` probe (`dyn-focus-visible`), which
+needs a browser and a running app. The CSSOM route decides it **offline**.
+
 ### What makes this tier trustworthy
 
 It can say "non-conforming" because it can also say **"I don't know"**. Each of these leaves
@@ -116,6 +138,8 @@ the criterion undecided rather than guessing:
 
 - no ancestor declares an opaque background, or the backdrop is an image → no CSSOM verdict;
 - the screenshot region is genuinely varied → no pixel verdict;
+- a stylesheet was cross-origin and unreadable → no stylesheet verdict;
+- a `box-shadow` or `outline` might be the boundary → no boundary verdict;
 - the element sits past the collector's cap (`truncated: true`) → no signals, no verdict;
 - the style digest does not verify against the DOM → the **whole** digest is refused.
 
@@ -124,7 +148,7 @@ adding this tier cannot change a single pre-existing verdict.
 
 ### How much of RGAA the engine can evidence
 
-`tests/rgaa-coverage.test.ts` pins the number and ratchets it: **44 of 106** criteria map onto
+`tests/rgaa-coverage.test.ts` pins the number and ratchets it: **46 of 106** criteria map onto
 an engine rule, up from 43 before this tier. It can only go up — a refactor that silently
 unmaps a criterion fails CI rather than quietly shrinking the audit. Criteria nothing can
 decide stay at zero *visibly*: RGAA 8.1 maps only to the removed WCAG 4.1.1, and 13.3 depends

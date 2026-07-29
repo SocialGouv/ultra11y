@@ -95,6 +95,7 @@ const RULE_SC = {
   "button-empty-name": ["4.1.2"], "canvas-fallback-missing": ["1.1.1"], "chart-no-accessible-name": ["1.1.1"],
   "clickable-noninteractive": ["4.1.2", "2.1.1"], "contrast-literal": ["1.4.3"], "control-label-missing": ["4.1.2"],
   "rendered-contrast": ["1.4.3"], "rendered-contrast-pixel": ["1.4.3"], "rendered-link-colour-only": ["1.4.1"],
+  "rendered-nontext-contrast": ["1.4.11"], "rendered-focus-not-visible": ["2.4.7"], "rendered-orientation-lock": ["1.3.4"],
   "css-generated-content-informative": ["1.3.1"], "date-fields-ungrouped": ["3.3.2"], "disabled-context-content": ["4.1.2"],
   "control-name-title-only": ["4.1.2"], "cross-icon-only-unnamed": ["4.1.2"],
   "cross-prop-drilled-name-lost": ["4.1.2"], "data-table-no-headers": ["1.3.1"],
@@ -133,6 +134,15 @@ const RULE_TO_CRITERIA = {
   // mapped to 3.1 (the general "information by colour alone"): 10.6 is RGAA's specific
   // criterion for links, and claiming both would count one defect twice.
   "rendered-link-colour-only": ["10.6"],
+  // 3.3 — the boundary of a form control, measured on the computed borders/fill. The
+  // only WCAG SC RGAA 3.3 maps to (1.4.11) had no rule at all before.
+  "rendered-nontext-contrast": ["3.3"],
+  // 10.7 — a focus indicator removed by the stylesheet with nothing put back. The live
+  // `scan` probe (dyn-focus-visible) already evidenced this; the CSSOM route decides it
+  // OFFLINE, with no browser and no running app.
+  "rendered-focus-not-visible": ["10.7"],
+  // 13.9 — orientation lock. Its SC (1.3.4) had no rule.
+  "rendered-orientation-lock": ["13.9"],
   // Theme 4 — multimedia (4.3 captions)
   "media-no-track": ["4.3"], "axe:audio-caption": ["4.3"], "axe:video-caption": ["4.3"],
   // Theme 5 — tables (5.4 title, 5.6/5.7 headers, 5.8 layout-table markup)

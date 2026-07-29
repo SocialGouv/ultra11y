@@ -36,11 +36,11 @@ inputs:
     required: false
     default: 'false'
   urls:
-    description: 'Space-separated URLs to scan with a real browser (computed contrast, focus, zoom, reflow). Requires the app to be running.'
+    description: 'Space-separated URLs to scan with a real browser (computed contrast, focus, zoom, reflow). Needs the app running (see `start`/`wait-on`) AND a browser tier: either @playwright/test + @axe-core/playwright installed in the repo, or Docker on the runner. Leave empty to audit the code only.'
     required: false
     default: ''
   sample:
-    description: 'Scan the normative page sample declared in .ultra11yrc.json instead of `urls`.'
+    description: 'Scan the normative page sample declared in .ultra11yrc.json instead of `urls`. Same browser-tier requirement as `urls`.'
     required: false
     default: 'false'
   start:

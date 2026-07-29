@@ -31,7 +31,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 | 1.3.1 | Info and Relationships | A | judgment | fieldset-legend-missing, data-table-no-headers, table-caption-missing, layout-table-data-markup, heading-order-skip, h1-missing, h1-multiple, list-structure, dl-structure, empty-heading, label-for-dangling, missing-main-landmark, multiple-main-landmark, sortable-header-no-aria-sort, nav-landmark-missing, nav-landmark-unnamed, aria-required-parent, headers-attr-dangling, th-no-data-cells, radio-checkbox-group-ungrouped, table-empty-data-cell, css-generated-content-informative | 3.1, 5.1, 5.2, 5.4, 5.5, 5.6, 5.7, 5.8, 7.3, 8.9, 9.1, 9.2, 9.3, 9.4, 10.1, 10.2, 11.1, 11.5, 11.6, 11.7, 11.8, 12.6, 13.3, 13.4 |
 | 1.3.2 | Meaningful Sequence | A | judgment | — | 5.3, 8.10, 10.1, 10.3, 10.8, 13.3, 13.4 |
 | 1.3.3 | Sensory Characteristics | A | judgment | — | 10.9, 10.10 |
-| 1.3.4 | Orientation | AA | needs-rendering | — | 13.9 |
+| 1.3.4 | Orientation | AA | needs-rendering | rendered-orientation-lock | 13.9 |
 | 1.3.5 | Identify Input Purpose | AA | judgment | field-purpose-incomplete, autocomplete-token-invalid | 11.13 |
 
 ## 1.4 Distinguishable
@@ -44,7 +44,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 | 1.4.4 | Resize Text | AA | needs-rendering | meta-viewport-zoom-block | 10.4 |
 | 1.4.5 | Images of Text | AA | needs-rendering | — | 1.8 |
 | 1.4.10 | Reflow | AA | needs-rendering | — | 10.11 |
-| 1.4.11 | Non-text Contrast | AA | needs-rendering | — | 3.3 |
+| 1.4.11 | Non-text Contrast | AA | needs-rendering | rendered-nontext-contrast | 3.3 |
 | 1.4.12 | Text Spacing | AA | needs-rendering | — | 10.12 |
 | 1.4.13 | Content on Hover or Focus | AA | needs-rendering | — | 10.13 |
 
@@ -79,7 +79,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 | 2.4.4 | Link Purpose (In Context) | A | judgment | link-empty-name, icon-only-control-unnamed | 6.1, 6.2 |
 | 2.4.5 | Multiple Ways | AA | judgment | — | 12.1, 12.3, 12.4 |
 | 2.4.6 | Headings and Labels | AA | judgment | — | 9.1, 11.1, 11.2 |
-| 2.4.7 | Focus Visible | AA | needs-rendering | — | 7.3, 10.7 |
+| 2.4.7 | Focus Visible | AA | needs-rendering | rendered-focus-not-visible | 7.3, 10.7 |
 | 2.4.11 | Focus Not Obscured (Minimum) | AA | needs-rendering | — | — |
 
 ## 2.5 Input Modalities
