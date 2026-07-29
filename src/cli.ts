@@ -44,6 +44,8 @@ import { loadRuntimeStandards, loadConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
 import { listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
 import { readStdin, readText } from "./util.js";
+import { runStdioServer } from "./mcp/stdio.js";
+import { startHttpServer } from "./mcp/http.js";
 
 const HELP = `ultra11y v${VERSION}
 Audit HTML/CSS/JSX against WCAG 2.2 AA and produce a dated compliance report, or
@@ -78,6 +80,7 @@ Usage:
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
+  ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
   ultra11y dev      [--port <n>] [--root <dir>] [--standard <pack>] [--lang auto|en|fr]   (dev side-car: live overlay + per-page dashboard)
   ultra11y dev      --next [--port <n>]        (write the Next overlay component, then wire one line into your layout)
 
@@ -212,6 +215,12 @@ Commands:
              --next writes the overlay component to wire into your layout — it
              renders NOTHING outside development. LOOPBACK ONLY: the server
              writes files, so it never binds beyond 127.0.0.1.
+  mcp        Serve the engine over the Model Context Protocol, so an MCP client
+             (Claude Code, an IDE) drives audit/report/criteria as tools instead of
+             shelling out. --transport stdio (default) speaks over stdin/stdout;
+             --transport http listens on 127.0.0.1 (--port, --bind), and stays
+             loopback-only unless you pass --allow-remote. Read-only by default:
+             --allow-write opts into the commands that touch files.
   pages      The per-page criterion grid — RGAA is a per-page norm, the engine's
              verdict is scope-wide, and this bridges the two. One row per criterion
              (the pack's own under --standard), one column per page. Rebuilt from a
@@ -268,7 +277,13 @@ Options:
   --e2e              render: write the Playwright/Cypress fixtures into .ultra11y/e2e/
   --runner <name>    render --e2e: force playwright|cypress instead of auto-detecting
   --root <dir>       snapshot: project root holding .ultra11y/pages (default: .)
-  --port <n>         dev: port for the side-car (default: 4111)
+  --port <n>         dev: port for the side-car (default: 4111); mcp: HTTP transport port
+  --transport <k>    mcp: stdio (default) or http
+  --bind <addr>      mcp --transport http: address to bind (default 127.0.0.1)
+  --allow-remote     mcp --transport http: accept non-loopback connections (off by default)
+  --allow-origin <o> mcp --transport http: an Origin allowed to call the server
+  --max-response-bytes <n>  mcp: cap a tool response's size
+  --allow-write      mcp: allow the tools that write files (read-only otherwise)
   --glossary [<t>]   criteria: look up a term the country standard defines (or list all)
   --next             dev: write the Next.js overlay component instead of serving
   --require-captures audit: gate — fail if any opaque/control component lacks a rendered capture (implies --graph)
@@ -356,6 +371,7 @@ const COMMANDS = [
   "snapshot",
   "pages",
   "dev",
+  "mcp",
   "fix",
   "init",
   "pack",
@@ -403,8 +419,15 @@ const VALUE_FLAGS = new Set([
   "phase",
   "root",
   "runner",
+  // Shared by `dev` (side-car port) and `mcp` (HTTP transport port) — one entry, both users.
   "port",
   "glossary",
+  // `mcp` only. The flag sets are global, so these are accepted (and warned
+  // about, never silently ignored) on every command — like --phase already is.
+  "transport",
+  "bind",
+  "allow-origin",
+  "max-response-bytes",
 ]);
 // `init` treats --baseline as a boolean selector ("write the baseline"), not a
 // path, so it must NOT consume the following token. audit/fix keep it as a value
@@ -459,6 +482,8 @@ const BOOLEAN_FLAGS = new Set([
   "eco",
   "help",
   "version",
+  "allow-remote",
+  "allow-write",
 ]);
 const KNOWN_FLAGS: ReadonlySet<string> = new Set<string>([...VALUE_FLAGS, ...BOOLEAN_FLAGS]);
 // Long flags whose repetition should accumulate (comma-joined) rather than last-wins,
@@ -2114,6 +2139,73 @@ function cmdPack(p: ParsedArgs): number {
   return 2;
 }
 
+// Serve the audit over the Model Context Protocol. Returns only when the server
+// stops, so main() does not fall through while it is still listening.
+async function cmdMcp(p: ParsedArgs): Promise<number> {
+  const transport = typeof p.flags.transport === "string" ? p.flags.transport : "stdio";
+  if (transport !== "stdio" && transport !== "http") {
+    console.error(`ultra11y: invalid --transport "${transport}" (expected: stdio, http)`);
+    return 2;
+  }
+  const maxRaw = typeof p.flags["max-response-bytes"] === "string" ? Number(p.flags["max-response-bytes"]) : undefined;
+  if (maxRaw !== undefined && (!Number.isFinite(maxRaw) || maxRaw <= 0)) {
+    console.error("ultra11y: invalid --max-response-bytes");
+    return 2;
+  }
+  const options = {
+    // A default project root makes `cwd` optional on every tool, for a server
+    // dedicated to one project.
+    defaultCwd: typeof p.flags.cwd === "string" ? p.flags.cwd : undefined,
+    allowWrite: p.flags["allow-write"] === true,
+    maxResponseBytes: maxRaw,
+  };
+
+  if (transport === "stdio") {
+    // Nothing is written to stdout here: from this point stdout carries
+    // JSON-RPC frames only, and runStdioServer guards that.
+    await runStdioServer(options);
+    return 0;
+  }
+
+  const port = typeof p.flags.port === "string" ? Number(p.flags.port) : 7341;
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    console.error("ultra11y: invalid --port");
+    return 2;
+  }
+  const originRaw = typeof p.flags["allow-origin"] === "string" ? p.flags["allow-origin"] : undefined;
+  const allowOrigin = originRaw
+    ? originRaw
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean)
+    : undefined;
+  let running: Awaited<ReturnType<typeof startHttpServer>>;
+  try {
+    running = await startHttpServer({
+      ...options,
+      port,
+      bind: typeof p.flags.bind === "string" ? p.flags.bind : undefined,
+      allowOrigin,
+      allowRemote: p.flags["allow-remote"] === true,
+    });
+  } catch (e) {
+    console.error(`ultra11y: ${(e as Error).message}`);
+    return 2;
+  }
+  // stderr, not stdout: an HTTP server's stdout is not a protocol stream, but
+  // keeping the two transports identical here means no one has to remember
+  // which is which.
+  console.error(`ultra11y: MCP server listening on ${running.url}`);
+  console.error(`  client: claude mcp add --transport http ultra11y ${running.url}`);
+  for (const sig of ["SIGINT", "SIGTERM"] as const) {
+    process.once(sig, () => {
+      void running.close().then(() => process.exit(0));
+    });
+  }
+  await new Promise<void>((res) => running.server.once("close", res));
+  return 0;
+}
+
 function cmdOrchestrate(p: ParsedArgs): number {
   const lang = resolveLang(p.flags, {});
   const runFlag = p.flags.run;
@@ -2265,6 +2357,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdPack(p);
     case "orchestrate":
       return cmdOrchestrate(p);
+    case "mcp":
+      return cmdMcp(p);
     default:
       console.error(`ultra11y: "${p.command}" is not implemented yet`);
       return 1;

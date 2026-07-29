@@ -28,17 +28,37 @@ Rules needing a rendered page (computed contrast, keyboard traps) or a human cal
 
 ## Install
 
+**As a CLI** — on npm, zero runtime dependencies (Node ≥ 22.18):
+
+```sh
+npx ultra11y --help          # no install
+npm i -D ultra11y            # or as a dev dependency
+```
+
+**As an agent skill** — the repository ships **two** (pick at the prompt, or pass the name):
+`ultra11y` for full audits, compliance reports, PRD backlogs and standards packs, and
+`review-a11y` for the fast loop that audits **exactly the code under change** (staged files,
+working diff, or branch vs merge-base) and reports like a code reviewer. Both bundle the same
+install-free engine.
+
 ```sh
 npx skills add maxgfr/ultra11y
 ```
 
-The repository ships **two skills** (pick at the prompt, or pass the skill name):
-`ultra11y` — full audits, compliance reports, PRD backlogs, standards packs — and
-`review-a11y` — the fast review loop that audits **exactly the code under change**
-(staged files, working diff, or branch vs merge-base) and reports like a code reviewer.
-Both bundle the same install-free engine.
+**As an MCP server** — so an agent drives the engine as tools instead of shelling out:
 
-Or clone and run the bundled engine directly (Node ≥ 22.18, zero dependencies):
+```sh
+claude mcp add ultra11y -- npx -y ultra11y mcp
+```
+
+**As a GitHub Action** — audits the PR diff and, optionally, the served pages:
+
+```yaml
+- uses: maxgfr/ultra11y@v2
+  with: { since: auto, standard: rgaa, fail-on: blocking }
+```
+
+Or clone and run the bundled engine straight from the repo:
 
 ```sh
 node scripts/ultra11y.mjs --help
@@ -66,9 +86,91 @@ ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
 ultra11y pack     check <pack.json> [--guidance <g.json>]  |  scaffold                 # gate an (AI-)authored standards pack
 ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--out <dir>] [--json]
 ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime …] [--merge <audit.json>] [--json]
+ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote]
 
 # global: --pack <paths> (load external standards pack(s) at runtime) · --override
 ```
+
+## Use it as an MCP server
+
+The skill shells out to the CLI and parses its output. An MCP server skips both:
+your agent calls ultra11y as typed tools, with JSON schemas in and structured
+results out. Same engine, same standards data, no wrapper.
+
+```bash
+# stdio — the default, and what Claude Code / Claude Desktop / Cursor expect
+claude mcp add ultra11y -- node /abs/path/to/scripts/ultra11y.mjs mcp
+
+# or over HTTP, on loopback
+node scripts/ultra11y.mjs mcp --transport http --port 7341
+claude mcp add --transport http ultra11y http://127.0.0.1:7341/mcp
+```
+
+```jsonc
+// Claude Desktop takes stdio servers only — a remote URL here will not work.
+{ "mcpServers": { "ultra11y": { "command": "node", "args": ["/abs/path/to/scripts/ultra11y.mjs", "mcp"] } } }
+// Cursor, HTTP:
+{ "mcpServers": { "ultra11y": { "url": "http://127.0.0.1:7341/mcp" } } }
+```
+
+It serves all three MCP primitives, because a skill is three things: the engine
+(**tools**), the method (**prompts**), and the documentation the method refers
+to (**resources**). A client given only the tools runs the audit, sees no
+errors, and reports the page as accessible — a false conformance claim, which is
+the one output an accessibility tool must never produce.
+
+### Tools
+
+Ten read tools. `ultra11y_audit` is the entry point:
+
+| Tool | What it does |
+|------|--------------|
+| `ultra11y_audit` | The static pass — findings keyed by success criterion |
+| `ultra11y_adjudicate` | The criteria the engine **cannot** decide, with their evidence |
+| `ultra11y_criteria` | The offline standards reference — look a criterion up, don't recall it |
+| `ultra11y_report` | The dated conformance report, WCAG or a country pack |
+| `ultra11y_prd` | Non-conformities → remediation units with effort |
+| `ultra11y_check` | The gate: nothing asserted conformant that was never tested |
+| `ultra11y_verify` | Claim↔evidence worklist |
+| `ultra11y_pack_check` | Validate a country standards pack against what it really ships |
+| `ultra11y_sample_check` | Lint the normative page sample |
+| `ultra11y_read` | A file, or a line range, from the project |
+
+`--allow-write` additionally exposes `ultra11y_fix` (safe codemods, dry-run by
+default) and `ultra11y_init` (hook/CI/baseline) — the tools that change **your**
+project. `ultra11y_scan` is declared but declines over MCP: it drives a headless
+browser and may pull a Docker image, which is not a subprocess lifecycle a
+long-lived server should own. It tells you to run it from the CLI and re-audit.
+
+Pass `--cwd <dir>` at startup to dedicate the server to one project — `cwd` then
+becomes optional on every tool.
+
+### Prompts — the workflow, not just the tools
+
+| Prompt | Arguments | What it drives |
+|--------|-----------|----------------|
+| `audit_wcag` | `cwd`, `globs?`, `standard?` | audit → adjudicate → rule on each → report → check, with the untested criteria named |
+| `adjudicate_criteria` | `cwd`, `standard?` | What alt-text relevance, link purpose, heading structure and reading order actually ask |
+| `review_diff_a11y` | `cwd`, `since?` | Audit exactly the diff, refute the false positives, state the residual risks |
+
+Each carries the coverage arithmetic: of the 55 WCAG 2.2 AA criteria the static
+engine decides a handful, a browser decides fourteen, and **thirty-eight are
+yours**.
+
+### Resources — the skill's own documentation
+
+`SKILL.md` and all 28 `references/*.md` are served under `skill://`, read off
+disk at request time — so a documentation fix reaches every client without a
+rebuild.
+
+Two things worth knowing:
+
+- **A criterion nobody tested is untested, never conformant.** Every tool
+  description and every prompt says so, because the failure mode here is not a
+  wrong answer — it is a confident silence.
+- **The HTTP transport binds `127.0.0.1` and refuses anything else** unless you
+  pass `--allow-remote`. This server reads local files; an exposed port is a
+  read-anything primitive for whoever finds it.
 
 ## Standards packs (RGAA France first; add your country)
 

@@ -75,6 +75,7 @@ const CLI_COMMANDS = new Set([
   "snapshot",
   "pages",
   "dev",
+  "mcp",
   "fix",
   "init",
   "pack",
