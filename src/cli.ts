@@ -35,7 +35,8 @@ import { repoRoot, writeHook, writeCi } from "./init.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
 import { toSarif } from "./sarif.js";
 import { annotations, stepSummary } from "./annotate.js";
-import { PAGES_DIR } from "./snapshot.js";
+import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type StyleDigest } from "./snapshot.js";
+import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
 import { resolveStandard, getPack, isCore, CORE, type StandardId } from "./standards/index.js";
 import { loadRuntimeStandards, loadConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
@@ -56,7 +57,7 @@ Usage:
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
-  ultra11y render   [<dir>] [--scaffold | --setup | --coverage | --storybook] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
+  ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
   ultra11y check    --report <md> [--standard <pack>] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
   ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
@@ -71,6 +72,8 @@ Usage:
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime …] [--cwd <dir>] [--merge <audit.json>] [--json]
   ultra11y scan     --clean        (remove the dynamic-tier Docker image + temp contexts)
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
+  ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
+  ultra11y snapshot list  [--root <dir>] [--json]
 
 Commands:
   audit      Run the static engine over the inputs (files/globs, or '-' for stdin)
@@ -106,7 +109,12 @@ Commands:
              react-dom/server SSR snapshot harness to fill in. --setup installs the
              zero-touch test-render capture harvester (one setupFiles line → every
              component your tests render is snapshotted to .ultra11y/captures and
-             audited). --coverage reports which components have a rendered capture vs
+             audited). --setup captures COMPONENTS from unit tests; --e2e wires the
+             audit into an existing Playwright/Cypress run instead, so a targeted PAGE
+             is checked during the tests you already have — each checked page is
+             persisted to .ultra11y/pages/<id>/ (DOM + computed styles + boxes) and can
+             be re-audited later, offline, with no browser.
+             --coverage reports which components have a rendered capture vs
              which are still opaque-source-only blind spots. --storybook attributes
              per-story HTML (via a storybook-static index) back to source components.
              Then audit the produced HTML, and use scan for the needs-rendering criteria.
@@ -176,6 +184,14 @@ Commands:
              page kinds (RGAA: accueil, contact, mentions légales, déclaration
              d'accessibilité, plan du site, aide, authentification, pages
              représentatives + éléments transverses) — advisory, never a gate.
+  snapshot   Persist a rendered PAGE (.ultra11y/pages/<id>/: documentElement DOM +
+             computed-style digest + boxes + a11y tree) and audit it. 'snapshot write'
+             reads the collected payload on stdin, so a browser-side producer (the
+             render --e2e fixtures, the dev overlay) needs to know nothing about the
+             on-disk format — one process per checked page. 'snapshot list' shows what
+             has been captured. Because a snapshot is a FULL document (a component
+             capture is a fragment), the page-scoped rules run on it: that is where
+             html lang (RGAA 8.3) and page title (8.5/8.6) become decidable.
 
 Options:
   --out <dir>        output dir (report/prd/scan default: audits); for audit, persist
@@ -219,6 +235,9 @@ Options:
   --storybook        render: attribute per-story HTML (via storybook-static index.json) into .ultra11y/captures (point the HTML dir with --captures)
   --captures <dir>   audit/render: rendered-capture dir to ingest (default: .ultra11y/captures)
   --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
+  --e2e              render: write the Playwright/Cypress fixtures into .ultra11y/e2e/
+  --runner <name>    render --e2e: force playwright|cypress instead of auto-detecting
+  --root <dir>       snapshot: project root holding .ultra11y/pages (default: .)
   --require-captures audit: gate — fail if any opaque/control component lacks a rendered capture (implies --graph)
   --write            fix: apply fixes to disk (default is a dry-run diff)
   --iterate          fix: with --write, re-audit + re-apply mechanical fixes until stable (bounded)
@@ -291,7 +310,22 @@ Options:
 
 Data: WCAG 2.2 © W3C (W3C Document License). RGAA 4.1.2 pack © DINUM, Licence Ouverte / Etalab 2.0 (see NOTICE).`;
 
-const COMMANDS = ["audit", "report", "prd", "render", "criteria", "check", "verify", "scan", "sample", "fix", "init", "pack", "orchestrate"] as const;
+const COMMANDS = [
+  "audit",
+  "report",
+  "prd",
+  "render",
+  "criteria",
+  "check",
+  "verify",
+  "scan",
+  "sample",
+  "snapshot",
+  "fix",
+  "init",
+  "pack",
+  "orchestrate",
+] as const;
 type Command = (typeof COMMANDS)[number];
 
 function isCommand(s: string | undefined): s is Command {
@@ -332,6 +366,8 @@ const VALUE_FLAGS = new Set([
   "captures",
   "run",
   "phase",
+  "root",
+  "runner",
 ]);
 // `init` treats --baseline as a boolean selector ("write the baseline"), not a
 // path, so it must NOT consume the following token. audit/fix keep it as a value
@@ -360,6 +396,7 @@ const BOOLEAN_FLAGS = new Set([
   "scaffold",
   "storybook",
   "setup",
+  "e2e",
   "coverage",
   "write",
   "dry-run",
@@ -712,6 +749,94 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   return failing.length || blindSpots.length ? 1 : 0;
 }
 
+// `snapshot write` — the single surface every browser-side producer writes through (the E2E
+// fixtures, the dev sidecar). It takes the collected payload on stdin, persists the snapshot
+// and audits it, so a producer needs to know NOTHING about the on-disk format, the
+// provenance comment or the audit. One process per checked page, not three.
+async function cmdSnapshot(p: ParsedArgs): Promise<number> {
+  const sub = p.positionals[0];
+  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+  const lang = resolveLang(p.flags, {});
+
+  if (sub === "list") {
+    const snaps = readSnapshots(root);
+    if (p.flags.json)
+      console.log(
+        JSON.stringify(
+          snaps.map((s) => s.meta),
+          null,
+          2,
+        ),
+      );
+    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantané dans ${join(root, PAGES_DIR)}.` : `No snapshot in ${join(root, PAGES_DIR)}.`);
+    else for (const s of snaps) console.log(`${s.meta.id}\t${s.meta.name}\t${s.meta.url}${s.meta.auth ? "\t[auth]" : ""}`);
+    return 0;
+  }
+
+  if (sub !== "write") {
+    console.error("ultra11y snapshot: expected `snapshot write` (payload on stdin) or `snapshot list`.");
+    return 2;
+  }
+
+  const raw = await readStdin();
+  if (!raw.trim()) {
+    console.error("ultra11y snapshot write: no payload on stdin (expected {meta, dom, styles?, boxes?, axtree?}).");
+    return 2;
+  }
+  let payload: { meta?: unknown; dom?: unknown; styles?: StyleDigest; boxes?: BoxDigest; axtree?: AxNode };
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    console.error("ultra11y snapshot write: stdin is not valid JSON.");
+    return 2;
+  }
+  const v = validateSnapshotMeta(payload.meta);
+  if (!v.ok || !v.meta) {
+    for (const i of v.issues) console.error(`ultra11y snapshot write: ${i.path} — ${i.message}`);
+    return 2;
+  }
+  if (typeof payload.dom !== "string" || !payload.dom.trim()) {
+    console.error("ultra11y snapshot write: `dom` must be the serialized documentElement.outerHTML.");
+    return 2;
+  }
+
+  let dir: string;
+  try {
+    dir = writeSnapshot(root, {
+      meta: v.meta,
+      dom: payload.dom,
+      ...(payload.styles ? { styles: payload.styles } : {}),
+      ...(payload.boxes ? { boxes: payload.boxes } : {}),
+      ...(payload.axtree ? { axtree: payload.axtree } : {}),
+    });
+  } catch (e) {
+    console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+
+  // Audit exactly this page's DOM — not the whole pages tree — so a producer checking one
+  // page is never failed by another page's backlog.
+  const result = runAudit({ inputs: [join(dir, "dom.html")], onWarn: (m) => console.error(m) });
+
+  // parseFailOn returns "bloquant" for an ABSENT flag (its "flag present, no value" default),
+  // so the gate must key on presence — otherwise a plain `snapshot write` would exit 1 on any
+  // page with a blocking finding, and a producer that only wants to RECORD would fail.
+  const failOnRaw = p.flags["fail-on"];
+  const failOnParsed = parseFailOn(failOnRaw);
+  if (failOnRaw !== undefined && failOnParsed === null) {
+    console.error(`ultra11y snapshot write: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
+    return 2;
+  }
+  const failing = failOnRaw !== undefined ? findingsAtOrAbove(result.findings, failOnParsed ?? "bloquant").filter((f) => !f.advisory) : [];
+
+  if (p.flags.json) console.log(JSON.stringify(result, null, 2));
+  else {
+    console.log(lang === "fr" ? `→ instantané écrit dans ${dir}` : `→ snapshot written to ${dir}`);
+    console.log(auditSummary(result, lang));
+  }
+  return failing.length ? 1 : 0;
+}
+
 function cmdInit(p: ParsedArgs): number {
   const root = repoRoot() ?? process.cwd();
   let engineRel = process.argv[1] ?? "scripts/ultra11y.mjs";
@@ -900,9 +1025,74 @@ async function cmdPrd(p: ParsedArgs): Promise<number> {
   return gh && gh.failed > 0 ? 1 : 0;
 }
 
+/** Merged dependencies of the package.json at `root` (empty when absent/unparseable — the
+ *  detectors then simply see no deps). Shared by every `render` detection mode. */
+function depsAt(root: string): Record<string, string> {
+  const pkgPath = join(root, "package.json");
+  if (!existsSync(pkgPath)) return {};
+  try {
+    const pkg = JSON.parse(readText(pkgPath)) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    return { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+  } catch {
+    return {};
+  }
+}
+
+/** The engine path to bake into a generated file: repo-relative when the engine lives inside
+ *  the repo, absolute otherwise. Same resolution `init` uses for the git hook. */
+function engineRefFor(root: string): string {
+  let ref = process.argv[1] ?? "scripts/ultra11y.mjs";
+  try {
+    const abs = realpathSync(ref);
+    ref = abs.startsWith(root + sep) ? relative(root, abs) : abs;
+  } catch {
+    /* keep as-is */
+  }
+  return ref;
+}
+
 function cmdRender(p: ParsedArgs): number {
   const root = p.positionals[0] ?? ".";
   const lang = resolveLang(p.flags, {}); // render has no --standard and no audit in hand
+
+  // `--e2e` — wire the audit into an EXISTING Cypress/Playwright run, so a targeted page is
+  // checked (and snapshotted) during the tests the project already has, rather than by a
+  // second browser afterwards. The fixtures are generated files, not a published library.
+  if (p.flags.e2e === true) {
+    const forced = typeof p.flags.runner === "string" ? p.flags.runner : undefined;
+    if (forced !== undefined && forced !== "playwright" && forced !== "cypress" && forced !== "auto") {
+      console.error(`ultra11y render: --runner must be playwright|cypress|auto (got "${forced}").`);
+      return 2;
+    }
+    const detected = detectE2eRunner(depsAt(root), (f) => existsSync(join(root, f)));
+    const runners: E2eRunner[] = forced && forced !== "auto" ? [forced] : detected;
+    if (!runners.length) {
+      console.error(e2eSetupPlan([], {}, lang));
+      return 1;
+    }
+    const engineRef = engineRefFor(root);
+    const dir = join(root, ".ultra11y", "e2e");
+    const paths: E2ePaths = {};
+    try {
+      mkdirSync(dir, { recursive: true });
+      if (runners.includes("playwright")) {
+        writeFileSync(join(dir, "playwright.mjs"), playwrightFixture(engineRef));
+        paths.playwright = ".ultra11y/e2e/playwright.mjs";
+      }
+      if (runners.includes("cypress")) {
+        writeFileSync(join(dir, "cypress-plugin.mjs"), cypressPlugin(engineRef));
+        writeFileSync(join(dir, "cypress-commands.mjs"), cypressCommands());
+        paths.cypressPlugin = ".ultra11y/e2e/cypress-plugin.mjs";
+        paths.cypressCommands = ".ultra11y/e2e/cypress-commands.mjs";
+      }
+    } catch (e) {
+      console.error(`ultra11y render: could not write the E2E fixtures: ${e instanceof Error ? e.message : String(e)}`);
+      return 1;
+    }
+    if (p.flags.json) console.log(JSON.stringify({ runners, paths }, null, 2));
+    else console.log(e2eSetupPlan(runners, paths, lang));
+    return 0;
+  }
   if (p.flags.scaffold === true) {
     const out = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "ultra11y-render.tsx";
     try {
@@ -1881,6 +2071,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdScan(p);
     case "sample":
       return cmdSample(p);
+    case "snapshot":
+      return cmdSnapshot(p);
     case "fix":
       return cmdFix(p);
     case "init":

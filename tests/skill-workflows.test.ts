@@ -93,6 +93,24 @@ describe("correction.md teaches the correction phase", () => {
   });
 });
 
+describe("e2e.md teaches the Playwright/Cypress integration", () => {
+  const t = read("e2e.md");
+  it("covers the command, both runners and their wiring points", () => {
+    expect(t).toContain("render --e2e");
+    expect(t).toContain("checkA11y");
+    expect(t).toContain("cy.ultra11y");
+    expect(t).toContain("setupNodeEvents");
+  });
+  it("documents failOn, including the record-without-failing mode", () => {
+    expect(t).toContain("failOn");
+    expect(t).toMatch(/failOn:\s*false/);
+  });
+  it("explains that the fixture pipes through the engine rather than reimplementing it", () => {
+    expect(t).toContain("snapshot write");
+    expect(t).toMatch(/drift/i);
+  });
+});
+
 describe("pages.md teaches page snapshots", () => {
   const t = read("pages.md");
   it("describes the on-disk shape and the automatic ingestion", () => {

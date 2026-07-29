@@ -53,7 +53,9 @@ ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]       
 ultra11y audit    [--format sarif|github]                                               # CI: code-scanning SARIF, or inline annotations + job summary
 ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
 ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
-ultra11y render   [<dir>] [--scaffold | --setup | --coverage | --storybook] [--captures <dir>] [--out <file>] [--json]
+ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress] [--captures <dir>] [--out <file>] [--json]
+ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   # payload on stdin → .ultra11y/pages/<id>/ + audit
+ultra11y snapshot list  [--root <dir>] [--json]
 ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
 ultra11y check    --report <md> [--standard <pack>] [--quiet] [--json]
 ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--json]
@@ -91,6 +93,15 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   auto-codemods, fill-in `TODO` placeholders for the agent to complete, and judgment-only
   proposals. `--dry-run` is the default; `--write` applies but only after a re-audit proves
   no new non-conformity, and never on lossy JSX/TSX. See `references/fix.md`.
+- **During your E2E run** — `render --e2e` writes Playwright/Cypress fixtures that audit a
+  targeted page **inside the test run you already have**, so the page is checked in the state
+  your test built (logged in, form filled, modal open) — state a separate `scan` run does not
+  have. Each checked page is persisted as a **snapshot** (`.ultra11y/pages/<id>/`: the whole
+  rendered document + computed styles + boxes), which is the durable half: the same page
+  re-audits **offline, with no browser**, so CI and the per-page report work from it. Because
+  a snapshot is a full document, the page-scoped rules finally run — RGAA **8.3** (`lang`),
+  **8.5/8.6** (`title`) — and every finding carries both its page and the source file that
+  rendered it. See `references/e2e.md` and `references/pages.md`.
 - **CI surfaces** — a red job says *that* the build broke, not *where*. `--format sarif` emits
   SARIF 2.1.0 for GitHub code scanning, so each finding lands as an **inline annotation on the
   causing line** of the PR; `--format github` does the same via `::error::` workflow commands

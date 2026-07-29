@@ -48266,7 +48266,122 @@ import { resolve as resolve6 } from "path";
 // src/snapshot.ts
 import { existsSync as existsSync15, mkdirSync as mkdirSync8, readFileSync as readFileSync14, readdirSync as readdirSync5, writeFileSync as writeFileSync10 } from "fs";
 import { join as join30 } from "path";
+var SNAPSHOT_VERSION = 1;
 var PAGES_DIR = ".ultra11y/pages";
+var ID_RE = /^[a-z0-9][a-z0-9-]*$/i;
+function validateSnapshotMeta(raw) {
+  const issues = [];
+  const err2 = (path, message) => {
+    issues.push({ path, message });
+  };
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    err2("meta", "meta must be an object { v, id, name, url, \u2026 }");
+    return { ok: false, issues };
+  }
+  const m = raw;
+  const v = typeof m.v === "number" ? m.v : Number.NaN;
+  if (!Number.isFinite(v) || v < 1) err2("meta.v", "v must be a positive integer snapshot-format version");
+  else if (v > SNAPSHOT_VERSION) err2("meta.v", `snapshot format v${v} is newer than this engine understands (v${SNAPSHOT_VERSION}) \u2014 upgrade ultra11y`);
+  if (typeof m.id !== "string" || !m.id.trim()) err2("meta.id", "id must be a non-empty string");
+  else if (!ID_RE.test(m.id)) err2("meta.id", `id "${m.id}" must match ${ID_RE} (it becomes a directory name)`);
+  if (typeof m.name !== "string" || !m.name.trim()) err2("meta.name", "name must be a non-empty string");
+  if (typeof m.url !== "string" || !m.url.trim()) err2("meta.url", "url must be a non-empty string");
+  if (m.auth !== void 0 && typeof m.auth !== "boolean") err2("meta.auth", "auth must be a boolean");
+  if (m.route !== void 0 && typeof m.route !== "string") err2("meta.route", "route must be a string");
+  if (m.notes !== void 0 && typeof m.notes !== "string") err2("meta.notes", "notes must be a string");
+  if (m.sources !== void 0 && (!Array.isArray(m.sources) || m.sources.some((s) => typeof s !== "string")))
+    err2("meta.sources", "sources must be an array of strings");
+  if (issues.length) return { ok: false, issues };
+  return {
+    ok: true,
+    issues,
+    meta: {
+      v,
+      id: m.id,
+      name: m.name,
+      url: m.url,
+      ...typeof m.route === "string" ? { route: m.route } : {},
+      ...typeof m.auth === "boolean" ? { auth: m.auth } : {},
+      ...m.viewport && typeof m.viewport === "object" ? { viewport: m.viewport } : {},
+      ...typeof m.capturedAt === "string" ? { capturedAt: m.capturedAt } : {},
+      ...typeof m.runner === "string" ? { runner: m.runner } : {},
+      ...Array.isArray(m.sources) ? { sources: m.sources } : {},
+      ...typeof m.notes === "string" ? { notes: m.notes } : {}
+    }
+  };
+}
+function snapshotDir(root, id) {
+  return join30(root, PAGES_DIR, id);
+}
+function writeSnapshot(root, snap) {
+  const dir = snapshotDir(root, snap.meta.id);
+  mkdirSync8(dir, { recursive: true });
+  writeFileSync10(join30(dir, "meta.json"), `${JSON.stringify(snap.meta, null, 2)}
+`);
+  const comment = formatCaptureComment({
+    v: 1,
+    page: snap.meta.id,
+    url: snap.meta.url,
+    ...snap.meta.sources?.[0] ? { sourceFile: snap.meta.sources[0] } : {},
+    name: snap.meta.name
+  });
+  writeFileSync10(join30(dir, "dom.html"), `${comment}
+${snap.dom}
+`);
+  if (snap.styles) writeFileSync10(join30(dir, "styles.json"), `${JSON.stringify(snap.styles)}
+`);
+  if (snap.boxes) writeFileSync10(join30(dir, "boxes.json"), `${JSON.stringify(snap.boxes)}
+`);
+  if (snap.axtree) writeFileSync10(join30(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}
+`);
+  return dir;
+}
+function readJson2(file) {
+  try {
+    return JSON.parse(readFileSync14(file, "utf8"));
+  } catch {
+    return void 0;
+  }
+}
+function readSnapshot(dir) {
+  const rawMeta = readJson2(join30(dir, "meta.json"));
+  if (rawMeta === void 0) return null;
+  const v = validateSnapshotMeta(rawMeta);
+  if (!v.ok || !v.meta) return null;
+  let dom;
+  try {
+    dom = readFileSync14(join30(dir, "dom.html"), "utf8");
+  } catch {
+    return null;
+  }
+  const styles = readJson2(join30(dir, "styles.json"));
+  const boxes = readJson2(join30(dir, "boxes.json"));
+  const axtree = readJson2(join30(dir, "axtree.json"));
+  const shot = join30(dir, "screen.png");
+  return {
+    meta: v.meta,
+    dom,
+    ...styles ? { styles } : {},
+    ...boxes ? { boxes } : {},
+    ...axtree ? { axtree } : {},
+    ...existsSync15(shot) ? { screenshot: "screen.png" } : {}
+  };
+}
+function readSnapshots(root) {
+  const base = join30(root, PAGES_DIR);
+  let dirs;
+  try {
+    dirs = readdirSync5(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+  } catch {
+    return [];
+  }
+  const out2 = [];
+  for (const d of dirs.sort()) {
+    const s = readSnapshot(join30(base, d));
+    if (s) out2.push(s);
+  }
+  return out2;
+}
 var COLLECTED_CSS = [
   "color",
   "backgroundColor",
@@ -49678,6 +49793,252 @@ function stepSummary(result, opts = {}) {
   return out2.join("\n");
 }
 
+// src/e2e.ts
+function detectE2eRunner(deps, has2) {
+  const dep = (n) => Object.hasOwn(deps, n);
+  const out2 = [];
+  if (dep("@playwright/test") || dep("playwright") || ["ts", "js", "mjs", "cjs"].some((e) => has2(`playwright.config.${e}`))) out2.push("playwright");
+  if (dep("cypress") || ["ts", "js", "mjs", "cjs"].some((e) => has2(`cypress.config.${e}`))) out2.push("cypress");
+  return out2;
+}
+function runnerCore(enginePath) {
+  return `import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+
+// Engine resolution, in order: the ULTRA11Y env override (same convention as the git hook),
+// then the path baked in when \`render --e2e\` generated this file.
+const ENGINE = process.env.ULTRA11Y || ${JSON.stringify(enginePath)};
+
+/** Persist a collected page as a snapshot and audit it. Returns the AuditResult. */
+export function auditSnapshot(payload) {
+  const res = spawnSync(process.execPath, [ENGINE, "snapshot", "write", "--json"], {
+    input: JSON.stringify(payload),
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (res.error) throw new Error("ultra11y: could not run the engine at " + ENGINE + " \u2014 " + res.error.message);
+  if (!res.stdout) throw new Error("ultra11y: the engine produced no output (exit " + res.status + ")\\n" + (res.stderr || ""));
+  try {
+    return JSON.parse(res.stdout);
+  } catch {
+    throw new Error("ultra11y: could not parse the engine output\\n" + res.stdout.slice(0, 500));
+  }
+}
+
+const RANK = { bloquant: 0, majeur: 1, mineur: 2 };
+const THRESHOLD = { blocking: 0, bloquant: 0, major: 1, majeur: 1, minor: 2, mineur: 2 };
+
+/** Findings at or above the threshold, ignoring non-normative recommendations. */
+export function failingFindings(result, failOn) {
+  const max = THRESHOLD[failOn];
+  if (max === undefined) throw new Error('ultra11y: failOn must be blocking|major|minor (got "' + failOn + '")');
+  return (result.findings || []).filter((f) => !f.advisory && RANK[f.severity] <= max);
+}
+
+export function formatFailure(pageName, failing) {
+  const lines = ["ultra11y: " + failing.length + " accessibility non-conformity(ies) on \\"" + pageName + "\\":"];
+  for (const f of failing.slice(0, 20)) {
+    lines.push("  [" + f.severity + "] " + f.ruleId + " (WCAG " + f.criteriaId + ") \u2014 " + (f.origin && f.origin.sourceFile ? f.origin.sourceFile : f.file) + " \u2014 " + f.message);
+  }
+  if (failing.length > 20) lines.push("  \u2026 and " + (failing.length - 20) + " more.");
+  lines.push("Full detail: .ultra11y/pages/ \u2014 re-audit offline with \`ultra11y audit\`.");
+  return lines.join("\\n");
+}
+`;
+}
+function playwrightFixture(enginePath) {
+  return `// ultra11y \u2014 Playwright integration. Generated by \`ultra11y render --e2e\`.
+//
+//   import { test, checkA11y } from "../.ultra11y/e2e/playwright.mjs";
+//
+//   test("home page is accessible", async ({ page, ultra11y }) => {
+//     await page.goto("/");
+//     await ultra11y({ as: "accueil" });          // via the fixture
+//   });
+//
+//   // \u2026or without the fixture:
+//   await checkA11y(page, { as: "accueil", failOn: "blocking" });
+//
+// Each checked page is persisted to .ultra11y/pages/<id>/ (DOM + computed styles + boxes),
+// so the SAME page can be re-audited later, offline, with no browser \u2014 that is what lets CI
+// and the RGAA report speak page by page. Commit the snapshots to gate on them.
+//
+// Options: { as?: string (page id), name?: string, failOn?: "blocking"|"major"|"minor"|false,
+//            auth?: boolean, sources?: string[], notes?: string }
+// \`failOn: false\` records the snapshot without ever failing the test.
+${runnerCore(enginePath)}
+const COLLECT = ${JSON.stringify(COLLECT_SNAPSHOT)};
+
+export async function checkA11y(page, opts = {}) {
+  const collected = await page.evaluate(COLLECT);
+  const url = collected.url || page.url();
+  const id = opts.as || slugify(url);
+  const payload = {
+    meta: {
+      v: 1,
+      id: id,
+      name: opts.name || collected.title || id,
+      url: url,
+      runner: "playwright",
+      viewport: collected.viewport,
+      capturedAt: new Date().toISOString(),
+      ...(opts.auth !== undefined ? { auth: opts.auth } : {}),
+      ...(opts.sources ? { sources: opts.sources } : {}),
+      ...(opts.notes ? { notes: opts.notes } : {}),
+    },
+    dom: collected.dom,
+    styles: collected.styles,
+    boxes: collected.boxes,
+  };
+  const result = auditSnapshot(payload);
+  const failOn = opts.failOn === undefined ? "blocking" : opts.failOn;
+  if (failOn !== false) {
+    const failing = failingFindings(result, failOn);
+    if (failing.length) throw new Error(formatFailure(payload.meta.name, failing));
+  }
+  return result;
+}
+
+// Same slug rule as the engine (src/snapshot.ts slugifyPageId): accent-folded URL path.
+function slugify(url) {
+  let path = url;
+  try {
+    path = new URL(url).pathname;
+  } catch {}
+  const slug = path.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || (path === "/" || path === "" ? "accueil" : "page");
+}
+
+// Optional fixture form. Import \`test\` from here instead of @playwright/test.
+// Playwright is resolved through createRequire (this file is ESM, so \`require\` does not
+// exist) and lazily, so the module still loads in a project that has not installed it.
+export const test = (() => {
+  try {
+    const base = createRequire(import.meta.url)("@playwright/test").test;
+    return base.extend({
+      ultra11y: async ({ page }, use) => {
+        await use((opts) => checkA11y(page, opts));
+      },
+    });
+  } catch {
+    return undefined;
+  }
+})();
+`;
+}
+function cypressPlugin(enginePath) {
+  return `// ultra11y \u2014 Cypress plugin (Node side). Generated by \`ultra11y render --e2e\`.
+//
+//   // cypress.config.js
+//   import ultra11y from "./.ultra11y/e2e/cypress-plugin.mjs";
+//   export default defineConfig({ e2e: { setupNodeEvents(on, config) { ultra11y(on); return config; } } });
+//
+// Cypress test code runs in the BROWSER and cannot write to disk, so the collected page
+// round-trips through this task. The browser half is cypress-commands.mjs.
+${runnerCore(enginePath)}
+export default function register(on) {
+  on("task", {
+    ultra11ySnapshot(payload) {
+      const result = auditSnapshot(payload);
+      const failOn = payload.failOn === undefined ? "blocking" : payload.failOn;
+      const failing = failOn === false ? [] : failingFindings(result, failOn);
+      // Return rather than throw: the browser half raises the assertion, so the failure is
+      // attributed to the test rather than to the plugin.
+      return { findings: result.findings || [], failing: failing, message: failing.length ? formatFailure(payload.meta.name, failing) : "" };
+    },
+  });
+}
+`;
+}
+function cypressCommands() {
+  return `// ultra11y \u2014 Cypress command (browser side). Generated by \`ultra11y render --e2e\`.
+//
+//   // cypress/support/e2e.js  (the supportFile)
+//   import "../../.ultra11y/e2e/cypress-commands.mjs";
+//
+//   cy.visit("/");
+//   cy.ultra11y({ as: "accueil" });
+//
+// Options: { as?, name?, failOn?: "blocking"|"major"|"minor"|false, auth?, sources?, notes? }
+const COLLECT = ${JSON.stringify(COLLECT_SNAPSHOT)};
+
+Cypress.Commands.add("ultra11y", (opts = {}) => {
+  cy.window({ log: false }).then((win) => {
+    // eslint-disable-next-line no-eval
+    const collected = win.eval(COLLECT);
+    const url = collected.url || win.location.href;
+    const id = opts.as || slugify(url);
+    const payload = {
+      meta: {
+        v: 1,
+        id: id,
+        name: opts.name || collected.title || id,
+        url: url,
+        runner: "cypress",
+        viewport: collected.viewport,
+        capturedAt: new Date().toISOString(),
+        ...(opts.auth !== undefined ? { auth: opts.auth } : {}),
+        ...(opts.sources ? { sources: opts.sources } : {}),
+        ...(opts.notes ? { notes: opts.notes } : {}),
+      },
+      dom: collected.dom,
+      styles: collected.styles,
+      boxes: collected.boxes,
+      failOn: opts.failOn,
+    };
+    return cy.task("ultra11ySnapshot", payload, { log: false }).then((res) => {
+      if (res && res.failing && res.failing.length) throw new Error(res.message);
+      return res;
+    });
+  });
+});
+
+function slugify(url) {
+  let path = url;
+  try {
+    path = new URL(url).pathname;
+  } catch (e) {}
+  const slug = path.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || (path === "/" || path === "" ? "accueil" : "page");
+}
+`;
+}
+function e2eSetupPlan(runners, paths, lang = "en") {
+  const fr = lang === "fr";
+  const out2 = [];
+  if (!runners.length) {
+    out2.push(
+      fr ? "Aucun runner E2E d\xE9tect\xE9 (ni Playwright, ni Cypress). Installez-en un, ou forcez l'\xE9criture avec --runner playwright|cypress." : "No E2E runner detected (neither Playwright nor Cypress). Install one, or force the files with --runner playwright|cypress."
+    );
+    return out2.join("\n");
+  }
+  if (paths.playwright) {
+    out2.push(fr ? `Fixture Playwright \xE9crite : ${paths.playwright}` : `Playwright fixture written: ${paths.playwright}`);
+    out2.push("");
+    out2.push(fr ? "Dans un test :" : "In a test:");
+    out2.push(`  import { test, checkA11y } from "${paths.playwright}";`);
+    out2.push(`  await page.goto("/");`);
+    out2.push(`  await checkA11y(page, { as: "accueil" });`);
+    out2.push("");
+  }
+  if (paths.cypressPlugin) {
+    out2.push(fr ? `Plugin Cypress \xE9crit : ${paths.cypressPlugin}` : `Cypress plugin written: ${paths.cypressPlugin}`);
+    if (paths.cypressCommands) out2.push(fr ? `Commande Cypress \xE9crite : ${paths.cypressCommands}` : `Cypress command written: ${paths.cypressCommands}`);
+    out2.push("");
+    out2.push(fr ? "Dans cypress.config.js (setupNodeEvents) :" : "In cypress.config.js (setupNodeEvents):");
+    out2.push(`  import ultra11y from "./${paths.cypressPlugin}";`);
+    out2.push(`  setupNodeEvents(on, config) { ultra11y(on); return config; }`);
+    out2.push(fr ? "Puis dans le supportFile :" : "Then in the supportFile:");
+    out2.push(`  import "${paths.cypressCommands ? `../../${paths.cypressCommands}` : ""}";`);
+    out2.push(fr ? "Dans un test : cy.visit('/'); cy.ultra11y({ as: 'accueil' });" : "In a test: cy.visit('/'); cy.ultra11y({ as: 'accueil' });");
+    out2.push("");
+  }
+  out2.push(
+    fr ? "Chaque page v\xE9rifi\xE9e est enregistr\xE9e dans .ultra11y/pages/<id>/ \u2014 committez-la pour auditer la vraie page hors ligne (CI, rapport page par page)." : "Every checked page is recorded in .ultra11y/pages/<id>/ \u2014 commit it to audit the real page offline (CI, per-page report)."
+  );
+  return out2.join("\n");
+}
+
 // src/config.ts
 import { existsSync as existsSync18, statSync as statSync9 } from "fs";
 import { join as join32, isAbsolute as isAbsolute2 } from "path";
@@ -50289,7 +50650,7 @@ Usage:
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
-  ultra11y render   [<dir>] [--scaffold | --setup | --coverage | --storybook] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
+  ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
   ultra11y check    --report <md> [--standard <pack>] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
   ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
@@ -50304,6 +50665,8 @@ Usage:
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime \u2026] [--cwd <dir>] [--merge <audit.json>] [--json]
   ultra11y scan     --clean        (remove the dynamic-tier Docker image + temp contexts)
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
+  ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin \u2192 .ultra11y/pages/<id>/ + audit it)
+  ultra11y snapshot list  [--root <dir>] [--json]
 
 Commands:
   audit      Run the static engine over the inputs (files/globs, or '-' for stdin)
@@ -50339,7 +50702,12 @@ Commands:
              react-dom/server SSR snapshot harness to fill in. --setup installs the
              zero-touch test-render capture harvester (one setupFiles line \u2192 every
              component your tests render is snapshotted to .ultra11y/captures and
-             audited). --coverage reports which components have a rendered capture vs
+             audited). --setup captures COMPONENTS from unit tests; --e2e wires the
+             audit into an existing Playwright/Cypress run instead, so a targeted PAGE
+             is checked during the tests you already have \u2014 each checked page is
+             persisted to .ultra11y/pages/<id>/ (DOM + computed styles + boxes) and can
+             be re-audited later, offline, with no browser.
+             --coverage reports which components have a rendered capture vs
              which are still opaque-source-only blind spots. --storybook attributes
              per-story HTML (via a storybook-static index) back to source components.
              Then audit the produced HTML, and use scan for the needs-rendering criteria.
@@ -50409,6 +50777,14 @@ Commands:
              page kinds (RGAA: accueil, contact, mentions l\xE9gales, d\xE9claration
              d'accessibilit\xE9, plan du site, aide, authentification, pages
              repr\xE9sentatives + \xE9l\xE9ments transverses) \u2014 advisory, never a gate.
+  snapshot   Persist a rendered PAGE (.ultra11y/pages/<id>/: documentElement DOM +
+             computed-style digest + boxes + a11y tree) and audit it. 'snapshot write'
+             reads the collected payload on stdin, so a browser-side producer (the
+             render --e2e fixtures, the dev overlay) needs to know nothing about the
+             on-disk format \u2014 one process per checked page. 'snapshot list' shows what
+             has been captured. Because a snapshot is a FULL document (a component
+             capture is a fragment), the page-scoped rules run on it: that is where
+             html lang (RGAA 8.3) and page title (8.5/8.6) become decidable.
 
 Options:
   --out <dir>        output dir (report/prd/scan default: audits); for audit, persist
@@ -50452,6 +50828,9 @@ Options:
   --storybook        render: attribute per-story HTML (via storybook-static index.json) into .ultra11y/captures (point the HTML dir with --captures)
   --captures <dir>   audit/render: rendered-capture dir to ingest (default: .ultra11y/captures)
   --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
+  --e2e              render: write the Playwright/Cypress fixtures into .ultra11y/e2e/
+  --runner <name>    render --e2e: force playwright|cypress instead of auto-detecting
+  --root <dir>       snapshot: project root holding .ultra11y/pages (default: .)
   --require-captures audit: gate \u2014 fail if any opaque/control component lacks a rendered capture (implies --graph)
   --write            fix: apply fixes to disk (default is a dry-run diff)
   --iterate          fix: with --write, re-audit + re-apply mechanical fixes until stable (bounded)
@@ -50523,7 +50902,22 @@ Options:
   -v, --version      print version
 
 Data: WCAG 2.2 \xA9 W3C (W3C Document License). RGAA 4.1.2 pack \xA9 DINUM, Licence Ouverte / Etalab 2.0 (see NOTICE).`;
-var COMMANDS = ["audit", "report", "prd", "render", "criteria", "check", "verify", "scan", "sample", "fix", "init", "pack", "orchestrate"];
+var COMMANDS = [
+  "audit",
+  "report",
+  "prd",
+  "render",
+  "criteria",
+  "check",
+  "verify",
+  "scan",
+  "sample",
+  "snapshot",
+  "fix",
+  "init",
+  "pack",
+  "orchestrate"
+];
 function isCommand(s) {
   return !!s && COMMANDS.includes(s);
 }
@@ -50560,7 +50954,9 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "storage-state",
   "captures",
   "run",
-  "phase"
+  "phase",
+  "root",
+  "runner"
 ]);
 var INIT_VALUE_FLAGS = new Set([...VALUE_FLAGS2].filter((f) => f !== "baseline"));
 function valueFlagsFor(command) {
@@ -50580,6 +50976,7 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "scaffold",
   "storybook",
   "setup",
+  "e2e",
   "coverage",
   "write",
   "dry-run",
@@ -50822,6 +51219,77 @@ async function cmdAudit(p) {
   if (!failOnSet && !requireCaptures) return 0;
   return failing.length || blindSpots.length ? 1 : 0;
 }
+async function cmdSnapshot(p) {
+  const sub = p.positionals[0];
+  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+  const lang = resolveLang(p.flags, {});
+  if (sub === "list") {
+    const snaps = readSnapshots(root);
+    if (p.flags.json)
+      console.log(
+        JSON.stringify(
+          snaps.map((s) => s.meta),
+          null,
+          2
+        )
+      );
+    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantan\xE9 dans ${join35(root, PAGES_DIR)}.` : `No snapshot in ${join35(root, PAGES_DIR)}.`);
+    else for (const s of snaps) console.log(`${s.meta.id}	${s.meta.name}	${s.meta.url}${s.meta.auth ? "	[auth]" : ""}`);
+    return 0;
+  }
+  if (sub !== "write") {
+    console.error("ultra11y snapshot: expected `snapshot write` (payload on stdin) or `snapshot list`.");
+    return 2;
+  }
+  const raw = await readStdin();
+  if (!raw.trim()) {
+    console.error("ultra11y snapshot write: no payload on stdin (expected {meta, dom, styles?, boxes?, axtree?}).");
+    return 2;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    console.error("ultra11y snapshot write: stdin is not valid JSON.");
+    return 2;
+  }
+  const v = validateSnapshotMeta(payload.meta);
+  if (!v.ok || !v.meta) {
+    for (const i2 of v.issues) console.error(`ultra11y snapshot write: ${i2.path} \u2014 ${i2.message}`);
+    return 2;
+  }
+  if (typeof payload.dom !== "string" || !payload.dom.trim()) {
+    console.error("ultra11y snapshot write: `dom` must be the serialized documentElement.outerHTML.");
+    return 2;
+  }
+  let dir;
+  try {
+    dir = writeSnapshot(root, {
+      meta: v.meta,
+      dom: payload.dom,
+      ...payload.styles ? { styles: payload.styles } : {},
+      ...payload.boxes ? { boxes: payload.boxes } : {},
+      ...payload.axtree ? { axtree: payload.axtree } : {}
+    });
+  } catch (e) {
+    console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+  const result = runAudit({ inputs: [join35(dir, "dom.html")], onWarn: (m) => console.error(m) });
+  const failOnRaw = p.flags["fail-on"];
+  const failOnParsed = parseFailOn(failOnRaw);
+  if (failOnRaw !== void 0 && failOnParsed === null) {
+    console.error(`ultra11y snapshot write: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
+    return 2;
+  }
+  const failing = failOnRaw !== void 0 ? findingsAtOrAbove(result.findings, failOnParsed ?? "bloquant").filter((f) => !f.advisory) : [];
+  if (p.flags.json) console.log(JSON.stringify(result, null, 2));
+  else {
+    console.log(lang === "fr" ? `\u2192 instantan\xE9 \xE9crit dans ${dir}` : `\u2192 snapshot written to ${dir}`);
+    console.log(auditSummary(result, lang));
+  }
+  return failing.length ? 1 : 0;
+}
 function cmdInit(p) {
   const root = repoRoot() ?? process.cwd();
   let engineRel = process.argv[1] ?? "scripts/ultra11y.mjs";
@@ -50981,9 +51449,63 @@ async function cmdPrd(p) {
   if (json) console.log(JSON.stringify({ paths, units: prdUnits(result, standard, lang), ...gh2 ? { gh: gh2 } : {} }, null, 2));
   return gh2 && gh2.failed > 0 ? 1 : 0;
 }
+function depsAt(root) {
+  const pkgPath = join35(root, "package.json");
+  if (!existsSync20(pkgPath)) return {};
+  try {
+    const pkg = JSON.parse(readText(pkgPath));
+    return { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
+  } catch {
+    return {};
+  }
+}
+function engineRefFor(root) {
+  let ref = process.argv[1] ?? "scripts/ultra11y.mjs";
+  try {
+    const abs = realpathSync2(ref);
+    ref = abs.startsWith(root + sep4) ? relative3(root, abs) : abs;
+  } catch {
+  }
+  return ref;
+}
 function cmdRender(p) {
   const root = p.positionals[0] ?? ".";
   const lang = resolveLang(p.flags, {});
+  if (p.flags.e2e === true) {
+    const forced = typeof p.flags.runner === "string" ? p.flags.runner : void 0;
+    if (forced !== void 0 && forced !== "playwright" && forced !== "cypress" && forced !== "auto") {
+      console.error(`ultra11y render: --runner must be playwright|cypress|auto (got "${forced}").`);
+      return 2;
+    }
+    const detected = detectE2eRunner(depsAt(root), (f) => existsSync20(join35(root, f)));
+    const runners = forced && forced !== "auto" ? [forced] : detected;
+    if (!runners.length) {
+      console.error(e2eSetupPlan([], {}, lang));
+      return 1;
+    }
+    const engineRef = engineRefFor(root);
+    const dir = join35(root, ".ultra11y", "e2e");
+    const paths = {};
+    try {
+      mkdirSync11(dir, { recursive: true });
+      if (runners.includes("playwright")) {
+        writeFileSync14(join35(dir, "playwright.mjs"), playwrightFixture(engineRef));
+        paths.playwright = ".ultra11y/e2e/playwright.mjs";
+      }
+      if (runners.includes("cypress")) {
+        writeFileSync14(join35(dir, "cypress-plugin.mjs"), cypressPlugin(engineRef));
+        writeFileSync14(join35(dir, "cypress-commands.mjs"), cypressCommands());
+        paths.cypressPlugin = ".ultra11y/e2e/cypress-plugin.mjs";
+        paths.cypressCommands = ".ultra11y/e2e/cypress-commands.mjs";
+      }
+    } catch (e) {
+      console.error(`ultra11y render: could not write the E2E fixtures: ${e instanceof Error ? e.message : String(e)}`);
+      return 1;
+    }
+    if (p.flags.json) console.log(JSON.stringify({ runners, paths }, null, 2));
+    else console.log(e2eSetupPlan(runners, paths, lang));
+    return 0;
+  }
   if (p.flags.scaffold === true) {
     const out2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "ultra11y-render.tsx";
     try {
@@ -51742,6 +52264,8 @@ async function main(argv) {
       return cmdScan(p);
     case "sample":
       return cmdSample(p);
+    case "snapshot":
+      return cmdSnapshot(p);
     case "fix":
       return cmdFix(p);
     case "init":

@@ -85,6 +85,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/rendered.md` · `references/automation.md` | Auditing produced HTML, captures, hooks and CI |
 | `references/ci.md` | `--format sarif\|github`: inline PR annotations, code scanning, job summary |
 | `references/pages.md` | Page snapshots: the rendered page on disk, page identity, the verified join |
+| `references/e2e.md` | `render --e2e`: auditing a page during your Playwright/Cypress run |
 | `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
 | `references/scale.md` | Focusing an audit on a large repository |
 | `references/fix.md` · `references/correction.md` | Applying fixes, by priority, without regressions |
@@ -155,6 +156,11 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   "block only NEW non-conformities" variant. For library/SFC code, commit rendered
   **captures** (`render --setup`) and stage them so the real semantic HTML is what's
   checked (`audit --require-captures`); read **`references/automation.md`**.
+- **"Check a page during our E2E tests"** → `render --e2e` writes Playwright/Cypress fixtures
+  that audit the page **as your test left it** (logged in, form filled, modal open) — state a
+  separate `scan` run does not have — and persist each checked page as a snapshot. `failOn`
+  gates the test; `failOn: false` records without failing, which is how you adopt it on an
+  existing backlog; read **`references/e2e.md`**.
 - **"Audit the real PAGE, not the component"** → a **page snapshot**
   (`.ultra11y/pages/<id>/`) is the whole rendered document plus the browser-only signals
   (computed styles, boxes, a11y tree, screenshot), ingested by `audit` automatically. Because
