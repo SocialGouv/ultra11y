@@ -1,8 +1,60 @@
-# CI surfaces — SARIF, annotations, job summary
+# CI — the shipped action, SARIF, annotations, job summary
 
-`init --ci` (see `references/automation.md`) gives you a **gate**: a green or red job. That is
-the floor, not the ceiling. A gate tells a developer *that* the build failed; it does not put
-the non-conformity **on the line of code that caused it**. These `--format` renderings do.
+## The action
+
+The whole surface in one step. The engine ships **inside** the action (one bundled `.mjs`,
+zero dependencies), so there is nothing to install, no `setup-node`, and no version that can
+drift from the action's own.
+
+```yaml
+permissions:
+  contents: read
+  security-events: write   # SARIF upload; without it the annotations still report
+  pull-requests: write     # only if you set `comment: 'true'`
+
+steps:
+  - uses: actions/checkout@v4
+    with: { fetch-depth: 0 }        # the diff gate needs the base ref
+  - uses: maxgfr/ultra11y@main
+    with:
+      since: auto                   # the PR's base branch
+      standard: rgaa
+      fail-on: blocking
+      baseline: audits/baseline.json
+      comment: 'true'
+```
+
+Page by page, with a real browser, in the same step:
+
+```yaml
+  - uses: maxgfr/ultra11y@main
+    with:
+      standard: rgaa
+      start: npm run start
+      wait-on: http://localhost:3000
+      urls: http://localhost:3000 http://localhost:3000/contact
+      # …or `sample: 'true'` to scan the sample declared in .ultra11yrc.json
+```
+
+`ultra11y init --ci` writes a workflow using it.
+
+**Order matters, and it is deliberate**: the audit runs first, then SARIF, annotations, the
+summary, the comment and the report — and the **gate runs last**. A failing audit has
+therefore already produced every surface, so a red job is never a dead end. `fail-on: ''`
+turns the gate off entirely (report-only), which is how you adopt this on an existing backlog;
+`baseline` is the other way — only NEW non-conformities can fail.
+
+The SARIF upload is `continue-on-error`: a repository without Advanced Security keeps its
+annotations instead of failing. Each upload carries `category: ultra11y-<standard>`, so a WCAG
+run and an RGAA run coexist rather than overwriting each other. The Markdown report goes
+through `check` before being uploaded, so CI cannot publish a report citing an invented
+criterion.
+
+# The `--format` renderings
+
+A gate tells a developer *that* the build failed; it does not put the non-conformity **on the
+line of code that caused it**. These two renderings do — they are what the action posts, and
+you can run them yourself outside it.
 
 Nothing new is measured here. Both are projections of the same `AuditResult`.
 
@@ -71,3 +123,17 @@ and the existing backlog stays out of the diff.
 Uploading two SARIF files in one workflow (a source audit and a page scan) is supported:
 each run carries a distinct `automationDetails.id` (`ultra11y/<standard>/`), so GitHub keeps
 them as separate analyses instead of one overwriting the other.
+
+## The sticky PR comment
+
+`ULTRA11Y_PR_COMMENT=1` (what the action's `comment: 'true'` sets) posts the job summary as a
+pull-request comment and **edits it in place** on every subsequent run — a CI job that appends
+a fresh comment on each push turns a busy PR into a wall of stale audits. The comment is keyed
+by an invisible marker that includes the standard, so a WCAG run and an RGAA run keep separate
+comments instead of overwriting each other, and a human's comment is never adopted (an edit is
+destructive, so the match has to be exact).
+
+It is best-effort, like issue creation: off a pull request, or with no `gh`/no auth, it
+reports `skipped` and the run carries on. A comment is never worth failing a build over. If
+listing the existing comments fails (permissions, rate limit) it creates a new one — a
+duplicate comment is a far smaller harm than dropping the report.

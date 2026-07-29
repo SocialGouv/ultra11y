@@ -149,6 +149,17 @@ describe("ci.md teaches the CI output formats", () => {
     expect(t).toMatch(/advisory/i);
     expect(t).toMatch(/no\s+\*\*?physical\*\*?\s*location|no\*\*? physical location|\*\*no\*\* physical location/i);
   });
+  it("documents the shipped action, its permissions and the gate-runs-last ordering", () => {
+    expect(t).toContain("maxgfr/ultra11y@");
+    expect(t).toContain("security-events: write");
+    expect(t).toMatch(/gate\*\* runs last|gate runs last/i);
+    expect(t).toContain("fail-on");
+  });
+  it("documents the sticky PR comment and its best-effort posture", () => {
+    expect(t).toContain("ULTRA11Y_PR_COMMENT");
+    expect(t).toMatch(/edits it in place|sticky/i);
+    expect(t).toMatch(/best-effort/i);
+  });
 });
 
 describe("verify.md teaches the verify gate", () => {

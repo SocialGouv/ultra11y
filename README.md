@@ -111,6 +111,12 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   only when something **says** so (else it is counted as unattributed, never spread across
   pages), and a criterion is conforming *by silence* only on a page whose real rendered DOM
   was audited. See `references/pages.md`.
+- **A shipped GitHub Action** — `uses: maxgfr/ultra11y@main` audits the **code** (PR diff) and,
+  optionally, the **pages** (it can start your app, wait for it, then scan real URLs or your
+  declared sample). The engine ships inside the action, so there is nothing to install and no
+  `setup-node`. The gate runs **last**, after SARIF, annotations, the summary, the sticky PR
+  comment and the report — a red job is never a dead end. `ultra11y init --ci` writes a
+  workflow using it. See `references/ci.md`.
 - **CI surfaces** — a red job says *that* the build broke, not *where*. `--format sarif` emits
   SARIF 2.1.0 for GitHub code scanning, so each finding lands as an **inline annotation on the
   causing line** of the PR; `--format github` does the same via `::error::` workflow commands

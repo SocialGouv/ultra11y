@@ -1,0 +1,240 @@
+name: ultra11y accessibility audit
+description: Audit a pull request for accessibility (WCAG 2.2 AA, RGAA…) at the level of the CODE and, optionally, page by page — with inline annotations, a job summary and a sticky PR comment.
+author: maxgfr
+
+branding:
+  icon: eye
+  color: purple
+
+inputs:
+  paths:
+    description: 'Files/globs to audit. Ignored in diff mode (see `since`).'
+    required: false
+    default: '.'
+  standard:
+    description: 'Country standard to report against (e.g. `rgaa`). Default `wcag` (the engine core).'
+    required: false
+    default: 'wcag'
+  fail-on:
+    description: 'Severity at which the job fails: blocking | major | minor. Empty = never fail (report only).'
+    required: false
+    default: 'blocking'
+  since:
+    description: 'Audit only the diff against this ref (e.g. `origin/main`). Empty = audit `paths` in full. On a pull_request, `auto` resolves to the base branch.'
+    required: false
+    default: 'auto'
+  baseline:
+    description: 'Committed baseline JSON. When set, only NEW non-conformities can fail the job — the existing backlog never blocks.'
+    required: false
+    default: ''
+  jsx:
+    description: 'Force JSX/TSX parsing for inputs of any extension.'
+    required: false
+    default: 'false'
+  graph:
+    description: 'Resolve imports and run the cross-file rules.'
+    required: false
+    default: 'false'
+  urls:
+    description: 'Space-separated URLs to scan with a real browser (computed contrast, focus, zoom, reflow). Requires the app to be running.'
+    required: false
+    default: ''
+  sample:
+    description: 'Scan the normative page sample declared in .ultra11yrc.json instead of `urls`.'
+    required: false
+    default: 'false'
+  start:
+    description: 'Command that starts the app before scanning (run in the background). Only used when `urls` or `sample` is set.'
+    required: false
+    default: ''
+  wait-on:
+    description: 'URL to poll until it answers, after `start`. Gives up after `wait-timeout` seconds.'
+    required: false
+    default: ''
+  wait-timeout:
+    description: 'Seconds to wait for `wait-on`.'
+    required: false
+    default: '60'
+  sarif:
+    description: 'Upload SARIF to GitHub code scanning, so findings appear inline on the diff. Needs `security-events: write`; silently skipped without it.'
+    required: false
+    default: 'true'
+  annotations:
+    description: 'Emit ::error:: workflow annotations. Works on every plan — the fallback when code scanning is unavailable.'
+    required: false
+    default: 'true'
+  comment:
+    description: 'Post a sticky comment on the pull request (edited in place on each run). Needs `pull-requests: write`.'
+    required: false
+    default: 'false'
+  report:
+    description: 'Also write the Markdown report and upload it as an artifact.'
+    required: false
+    default: 'true'
+  lang:
+    description: 'Report language: auto | en | fr.'
+    required: false
+    default: 'auto'
+  working-directory:
+    description: 'Directory to run in.'
+    required: false
+    default: '.'
+
+outputs:
+  findings:
+    description: 'Number of findings in the audit.'
+    value: ${{ steps.audit.outputs.findings }}
+  conformance:
+    description: 'Automatic pass rate (percent).'
+    value: ${{ steps.audit.outputs.conformance }}
+  report-path:
+    description: 'Path of the Markdown report, when `report` is enabled.'
+    value: ${{ steps.report.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    # The engine ships INSIDE this action (a single bundled .mjs, zero dependencies), so
+    # there is nothing to install and no version to drift from the action's own.
+    - name: Resolve the engine
+      id: engine
+      shell: bash
+      run: |
+        echo "path=$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" >> "$GITHUB_OUTPUT"
+        node "$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" --version
+
+    - name: Start the application
+      if: inputs.start != '' && (inputs.urls != '' || inputs.sample == 'true')
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        nohup ${{ inputs.start }} > /tmp/ultra11y-app.log 2>&1 &
+        echo "ultra11y: started the app (logs: /tmp/ultra11y-app.log)"
+
+    - name: Wait for the application
+      if: inputs.wait-on != '' && (inputs.urls != '' || inputs.sample == 'true')
+      shell: bash
+      run: |
+        deadline=$(( SECONDS + ${{ inputs.wait-timeout }} ))
+        until curl -sSf -o /dev/null "${{ inputs.wait-on }}"; do
+          if [ $SECONDS -ge $deadline ]; then
+            echo "::error::ultra11y: ${{ inputs.wait-on }} did not answer within ${{ inputs.wait-timeout }}s"
+            tail -50 /tmp/ultra11y-app.log || true
+            exit 1
+          fi
+          sleep 2
+        done
+        echo "ultra11y: ${{ inputs.wait-on }} is up"
+
+    # The STATIC audit — the code-level half. Always runs.
+    - name: Audit the code
+      id: audit
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        # NOTE: GitHub runs `shell: bash` with -e, so every conditional here is an `if`
+        # block. A `[ cond ] && cmd` one-liner whose condition is FALSE returns 1 and would
+        # abort the step — the flag would not merely be skipped, the whole job would die.
+        args=()
+        since='${{ inputs.since }}'
+        if [ "$since" = "auto" ]; then
+          if [ -n "${GITHUB_BASE_REF:-}" ]; then since="origin/$GITHUB_BASE_REF"; else since=""; fi
+        fi
+        if [ -n "$since" ]; then args+=(--since "$since"); else args+=(${{ inputs.paths }}); fi
+        if [ '${{ inputs.jsx }}' = 'true' ]; then args+=(--jsx); fi
+        if [ '${{ inputs.graph }}' = 'true' ]; then args+=(--graph); fi
+        if [ -n '${{ inputs.baseline }}' ]; then args+=(--baseline '${{ inputs.baseline }}'); fi
+        mkdir -p audits
+        # Always produce the full AuditResult first; gating happens at the end, so every
+        # surface (SARIF, annotations, comment, report) is emitted even on a failing run.
+        node "$ENGINE" audit "${args[@]}" --out audits --json > /dev/null
+        node -e '
+          const a = require("fs").readFileSync("audits/audit-latest.json", "utf8");
+          const j = JSON.parse(a);
+          const out = require("fs");
+          out.appendFileSync(process.env.GITHUB_OUTPUT, "findings=" + j.findings.length + "\n");
+          out.appendFileSync(process.env.GITHUB_OUTPUT, "conformance=" + j.conformancePct + "\n");
+        '
+
+    # The PAGE-level half — a real browser over the served app. Optional.
+    - name: Scan the pages
+      if: inputs.urls != '' || inputs.sample == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        if [ '${{ inputs.sample }}' = 'true' ]; then
+          node "$ENGINE" scan --sample --merge audits/audit-latest.json --out audits
+        else
+          node "$ENGINE" scan ${{ inputs.urls }} --merge audits/audit-latest.json --out audits
+        fi
+
+    - name: SARIF → code scanning
+      if: inputs.sarif == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: node "$ENGINE" report --in audits/audit-latest.json --standard '${{ inputs.standard }}' --format sarif > audits/ultra11y.sarif
+
+    - name: Upload SARIF
+      if: inputs.sarif == 'true'
+      continue-on-error: true # no Advanced Security / no security-events: write → annotations still cover it
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.working-directory }}/audits/ultra11y.sarif
+        category: ultra11y-${{ inputs.standard }}
+
+    # Annotations + the job summary (+ the sticky PR comment when asked). Works on every plan.
+    - name: Annotations, job summary and PR comment
+      if: inputs.annotations == 'true' || inputs.comment == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+        ULTRA11Y_PR_COMMENT: ${{ inputs.comment == 'true' && '1' || '0' }}
+        GH_TOKEN: ${{ github.token }}
+      run: node "$ENGINE" report --in audits/audit-latest.json --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}' --format github
+
+    - name: Markdown report
+      id: report
+      if: inputs.report == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        path=$(node "$ENGINE" report --in audits/audit-latest.json --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}' --out audits)
+        echo "path=$path" >> "$GITHUB_OUTPUT"
+        # The integrity gate: no invented criterion, no unjustified NA, coherent maths.
+        node "$ENGINE" check --report "$path" --standard '${{ inputs.standard }}' --quiet
+
+    - name: Upload the report
+      if: inputs.report == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ultra11y-${{ inputs.standard }}
+        path: ${{ inputs.working-directory }}/audits/
+        if-no-files-found: warn
+
+    # The gate runs LAST, so a failing audit has already produced every surface above.
+    - name: Gate
+      if: inputs.fail-on != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        args=()
+        since='${{ inputs.since }}'
+        if [ "$since" = "auto" ]; then
+          if [ -n "${GITHUB_BASE_REF:-}" ]; then since="origin/$GITHUB_BASE_REF"; else since=""; fi
+        fi
+        if [ -n "$since" ]; then args+=(--since "$since"); else args+=(${{ inputs.paths }}); fi
+        if [ '${{ inputs.jsx }}' = 'true' ]; then args+=(--jsx); fi
+        if [ '${{ inputs.graph }}' = 'true' ]; then args+=(--graph); fi
+        if [ -n '${{ inputs.baseline }}' ]; then args+=(--baseline '${{ inputs.baseline }}'); fi
+        node "$ENGINE" audit "${args[@]}" --fail-on '${{ inputs.fail-on }}'

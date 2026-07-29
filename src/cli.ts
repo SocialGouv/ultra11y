@@ -5,7 +5,7 @@ import { VERSION, type Lang, type AuditResult, type DynamicResult, type SampleCo
 import { runAudit } from "./audit.js";
 import { writeReport, untestedNeedsRendering, partialAuditBanner } from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
-import { ghAvailable, pushIssues, pushSingleIssue } from "./gh.js";
+import { ghAvailable, pushIssues, pushPrComment, pushSingleIssue } from "./gh.js";
 import {
   detectFrameworks,
   renderPlan,
@@ -600,6 +600,20 @@ function emitCiFormat(result: AuditResult, format: CiFormat, standard: StandardI
     }
   } else {
     console.error(md);
+  }
+  // Sticky pull-request comment — opt-in, and best-effort: off a PR, or with no `gh`/auth,
+  // it simply reports "skipped". A comment is never worth failing a build over.
+  if (process.env.ULTRA11Y_PR_COMMENT === "1") {
+    const c = pushPrComment(md, standard);
+    console.error(
+      c.ok
+        ? lang === "fr"
+          ? `ultra11y : commentaire de PR ${c.action === "updated" ? "mis à jour" : c.action === "created" ? "créé" : "ignoré"}${c.reason ? ` (${c.reason})` : ""}.`
+          : `ultra11y: PR comment ${c.action}${c.reason ? ` (${c.reason})` : ""}.`
+        : lang === "fr"
+          ? `ultra11y : commentaire de PR impossible${c.reason ? ` — ${c.reason}` : ""}.`
+          : `ultra11y: PR comment failed${c.reason ? ` — ${c.reason}` : ""}.`,
+    );
   }
 }
 

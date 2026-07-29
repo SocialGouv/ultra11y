@@ -54,14 +54,51 @@ describe("pre-commit hook", () => {
 });
 
 describe("CI workflow", () => {
-  it("is valid YAML with an ultra11y job running the gate", () => {
-    const d = tmp();
-    const path = writeCi(d, "scripts/ultra11y.mjs", "bloquant");
-    const doc = parse(readFileSync(path, "utf8")) as { jobs: { ultra11y: { steps: { run?: string }[] } } };
-    expect(doc.jobs.ultra11y).toBeDefined();
-    const run = doc.jobs.ultra11y.steps.map((s) => s.run ?? "").join("\n");
-    expect(run).toContain("--baseline audits/baseline.json");
-    expect(run).toContain("--fail-on blocking");
+  const doc = (failOn: "bloquant" | "majeur") => {
+    const path = writeCi(tmp(), "scripts/ultra11y.mjs", failOn);
+    return parse(readFileSync(path, "utf8")) as {
+      on: unknown;
+      permissions?: Record<string, string>;
+      jobs: { ultra11y: { steps: { uses?: string; with?: Record<string, string> }[] } };
+    };
+  };
+
+  it("is valid YAML with an ultra11y job, triggered on pull requests", () => {
+    const d = doc("bloquant");
+    expect(d.jobs.ultra11y).toBeDefined();
     expect(ciWorkflow("x", "bloquant")).toContain("pull_request");
+  });
+
+  it("consumes the shipped action, so a user gets the annotations and not just an exit code", () => {
+    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("maxgfr/ultra11y"));
+    expect(step, "the workflow must use the ultra11y action").toBeDefined();
+  });
+
+  it("passes the regression gate through: diff vs the base ref, against the committed baseline", () => {
+    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("maxgfr/ultra11y"));
+    expect(step?.with?.since).toBe("auto");
+    expect(step?.with?.baseline).toBe("audits/baseline.json");
+    expect(step?.with?.["fail-on"]).toBe("blocking");
+  });
+
+  it("carries the chosen severity through", () => {
+    const step = doc("majeur").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("maxgfr/ultra11y"));
+    expect(step?.with?.["fail-on"]).toBe("major");
+  });
+
+  it("checks out enough history for the diff gate to resolve the base ref", () => {
+    const checkout = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("actions/checkout"));
+    expect(String(checkout?.with?.["fetch-depth"])).toBe("0");
+  });
+
+  it("grants the permission SARIF upload needs, and no write it does not", () => {
+    const perms = doc("bloquant").permissions ?? {};
+    expect(perms["security-events"]).toBe("write");
+    expect(perms.contents).toBe("read");
+    expect(perms["pull-requests"]).toBeUndefined(); // opt-in, together with `comment`
+  });
+
+  it("still documents the vendored no-action route", () => {
+    expect(ciWorkflow("vendor/ultra11y.mjs", "bloquant")).toContain("vendor/ultra11y.mjs");
   });
 });
