@@ -114,6 +114,9 @@ export function toFinding(doc: Doc, ruleId: string, def: Severity, rf: RuleFindi
     // Capture findings are rendered ground truth (NOT preliminary): re-attribute them
     // to the source component recorded in the capture's provenance.
     ...(doc.capture ? { origin: { capture: doc.file, sourceFile: doc.capture.sourceFile, component: doc.capture.component } } : {}),
+    // A PAGE snapshot's capture carries which page it is; stamp it so the per-page grid can
+    // key on the finding directly (src/pages.ts). Component captures carry no page.
+    ...(doc.capture?.page ? { page: doc.capture.page } : {}),
     // Non-normative recommendation: the per-finding override (rf.advisory) wins over the
     // rule-level default (ruleAdvisory); only stamp the flag when it is actually true, so
     // a normative finding stays byte-identical (no `advisory: false` noise in the JSON).

@@ -84,6 +84,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/false-positives.md` | Where a finding may still be wrong, and how to refute it |
 | `references/rendered.md` · `references/automation.md` | Auditing produced HTML, captures, hooks and CI |
 | `references/ci.md` | `--format sarif\|github`: inline PR annotations, code scanning, job summary |
+| `references/pages.md` | Page snapshots: the rendered page on disk, page identity, the verified join |
 | `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
 | `references/scale.md` | Focusing an audit on a large repository |
 | `references/fix.md` · `references/correction.md` | Applying fixes, by priority, without regressions |
@@ -154,6 +155,11 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   "block only NEW non-conformities" variant. For library/SFC code, commit rendered
   **captures** (`render --setup`) and stage them so the real semantic HTML is what's
   checked (`audit --require-captures`); read **`references/automation.md`**.
+- **"Audit the real PAGE, not the component"** → a **page snapshot**
+  (`.ultra11y/pages/<id>/`) is the whole rendered document plus the browser-only signals
+  (computed styles, boxes, a11y tree, screenshot), ingested by `audit` automatically. Because
+  it is a FULL document, the page-scoped rules run on it — that is where RGAA 8.3 (lang),
+  8.5/8.6 (title) and 12.6 become decidable at all; read **`references/pages.md`**.
 - **"Show the findings ON the pull request, not just a red job"** → `--format sarif` (upload
   to code scanning → inline annotations at the right file:line) or `--format github`
   (`::error::` workflow commands + a `$GITHUB_STEP_SUMMARY` table) — from `report

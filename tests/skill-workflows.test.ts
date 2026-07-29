@@ -93,6 +93,25 @@ describe("correction.md teaches the correction phase", () => {
   });
 });
 
+describe("pages.md teaches page snapshots", () => {
+  const t = read("pages.md");
+  it("describes the on-disk shape and the automatic ingestion", () => {
+    expect(t).toContain(".ultra11y/pages");
+    expect(t).toContain("dom.html");
+    expect(t).toContain("styles.json");
+    expect(t).toMatch(/ultra11y\.mjs audit/);
+  });
+  it("states why a snapshot decides more than a component capture", () => {
+    expect(t).toContain("html-lang-missing");
+    expect(t).toContain("8.3");
+    expect(t).toMatch(/fragment/i);
+  });
+  it("states the verified join and its fail-closed refusal", () => {
+    expect(t).toMatch(/document-order/i);
+    expect(t).toMatch(/refused/i);
+  });
+});
+
 describe("ci.md teaches the CI output formats", () => {
   const t = read("ci.md");
   it("covers both formats, the upload step and the pack-keyed route", () => {

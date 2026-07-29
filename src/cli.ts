@@ -35,6 +35,7 @@ import { repoRoot, writeHook, writeCi } from "./init.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
 import { toSarif } from "./sarif.js";
 import { annotations, stepSummary } from "./annotate.js";
+import { PAGES_DIR } from "./snapshot.js";
 import { resolveStandard, getPack, isCore, CORE, type StandardId } from "./standards/index.js";
 import { loadRuntimeStandards, loadConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
@@ -51,7 +52,7 @@ non-conformities. RGAA (France) and other country standards are pluggable packs
 Usage:
   ultra11y audit    <globs… | -> [--out <dir>] [--include <glob>] [--exclude <glob>] [--ext <list>] [--jsx] [--graph] [--json] [--lang auto|en|fr] [--no-default-excludes]
   ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--baseline <file>] [--fail-on blocking|major|minor]
-  ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures: audit real HTML, gate blind-spot components)
+  ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures + .ultra11y/pages snapshots: audit real HTML)
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
@@ -217,7 +218,7 @@ Options:
   --coverage         render: report rendered-capture coverage (covered vs blind-spot components); with --json emits the coverage object
   --storybook        render: attribute per-story HTML (via storybook-static index.json) into .ultra11y/captures (point the HTML dir with --captures)
   --captures <dir>   audit/render: rendered-capture dir to ingest (default: .ultra11y/captures)
-  --no-captures      audit: do NOT auto-detect/ingest the .ultra11y/captures dir
+  --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
   --require-captures audit: gate — fail if any opaque/control component lacks a rendered capture (implies --graph)
   --write            fix: apply fixes to disk (default is a dry-run diff)
   --iterate          fix: with --write, re-audit + re-apply mechanical fixes until stable (bounded)
@@ -579,10 +580,20 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   const scopedToDiff = p.flags.changed === true || p.flags.staged === true || since !== undefined;
   const capturesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== undefined || existsSync(capturesDir));
   const useCaptures = capturesWanted && !scopedToDiff && !inputs.includes(capturesDir);
-  const auditInputs = useCaptures ? [...inputs, capturesDir] : inputs;
+  // PAGE SNAPSHOTS (.ultra11y/pages/<id>/dom.html) are captures too — full rendered
+  // documents carrying page identity — so the same ingestion applies. They are kept in a
+  // separate tree because a snapshot is a directory of signals (dom + styles + boxes +
+  // screenshot), not a lone .html. --no-captures opts out of both.
+  const pagesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && existsSync(PAGES_DIR);
+  const usePages = pagesWanted && !scopedToDiff && !inputs.includes(PAGES_DIR);
+  const auditInputs = [...inputs, ...(useCaptures ? [capturesDir] : []), ...(usePages ? [PAGES_DIR] : [])];
   if (useCaptures)
     console.error(
       lang === "fr" ? `ultra11y audit : captures rendues ingérées depuis ${capturesDir}.` : `ultra11y audit: ingesting rendered captures from ${capturesDir}.`,
+    );
+  if (usePages)
+    console.error(
+      lang === "fr" ? `ultra11y audit : instantanés de page ingérés depuis ${PAGES_DIR}.` : `ultra11y audit: ingesting page snapshots from ${PAGES_DIR}.`,
     );
 
   const result = runAudit({

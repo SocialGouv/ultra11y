@@ -161,6 +161,13 @@ export interface Finding {
   // still index the capture bytes (so `fix` and baseline diffing stay stable); origin
   // points back to the source. Optional/additive (no schemaVersion bump).
   origin?: { capture: string; sourceFile?: string; component?: string; sourceLine?: number };
+  // PAGE IDENTITY — the stable id of the page snapshot this finding was raised on
+  // (src/snapshot.ts). Set from the capture provenance for a snapshot-borne finding, and by
+  // the per-page attribution pass (src/pages.ts) for a source finding it can attribute. It
+  // is the join key of the per-page criterion grid; `sample.page` remains the human page
+  // NAME carried by a merged dynamic finding. Optional/additive (no SCHEMA_VERSION bump) —
+  // absent ⇒ the finding is not attributed to any one page.
+  page?: string;
   // NON-NORMATIVE recommendation: a good-practice signal NOT backed by a testable
   // criterion of the active standard (e.g. "one h1 per page", a best-practice-only axe
   // violation, an agent-noted UX improvement). An advisory finding can NEVER flip a

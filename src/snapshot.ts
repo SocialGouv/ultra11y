@@ -1,0 +1,378 @@
+// PAGE SNAPSHOT — the shared primitive the rendered tier is built on.
+//
+// The static engine sees SOURCE; `scan` drives its own browser and keeps only findings.
+// Neither leaves behind an artefact that (a) is a real rendered page, (b) knows WHICH page
+// it is, and (c) can be re-audited later, offline, with no browser. That artefact is a
+// snapshot, and it is what lets CI decide rendering criteria without a browser and lets a
+// report speak page by page.
+//
+//   .ultra11y/pages/<page-id>/
+//     meta.json     page identity + provenance (id, name, url, route, auth, sources…)
+//     dom.html      documentElement.outerHTML, prefixed with the usual capture comment
+//     styles.json   computed-style digest, joined to the DOM by document-order index
+//     boxes.json    bounding boxes, same join key
+//     axtree.json   accessibility tree as the browser computed it
+//     screen.png    full-page screenshot (pixel tier)
+//
+// `dom.html` is deliberately an ORDINARY capture: it carries the same
+// `<!-- ultra11y:capture … -->` provenance comment the unit-test harvester writes, so the
+// existing `audit` path ingests it with no special case. Two differences matter:
+//   • it is a FULL document (a component capture is a fragment), so `scope: "page"` rules —
+//     html-lang, title, viewport — actually run on it. That is where RGAA 8.3/8.5/8.6 and
+//     the theme-12 criteria become decidable at all.
+//   • its provenance carries `page` + `url`, which is what makes per-page attribution
+//     possible downstream.
+//
+// JOIN KEY. styles/boxes/axtree index elements by DOCUMENT-ORDER ORDINAL, not by selector:
+// a selector would have to survive serialization and re-parsing, an ordinal does not. Each
+// entry repeats its `tag` so the join can be VERIFIED (`alignedStyles`); on any mismatch the
+// whole digest is refused rather than silently mis-attributing a style to the wrong element.
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { formatCaptureComment } from "./capture.js";
+import { parseHtml } from "./parse/html.js";
+
+export const SNAPSHOT_VERSION = 1;
+export const PAGES_DIR = ".ultra11y/pages";
+
+export interface SnapshotViewport {
+  width: number;
+  height: number;
+}
+
+export interface SnapshotMeta {
+  v: number;
+  id: string; // stable slug — the page identity, and the directory name
+  name: string; // human page name, shown in the report
+  url: string;
+  route?: string; // framework route pattern when the producer knows it (e.g. /blog/[slug])
+  auth?: boolean; // the page sits behind authentication
+  viewport?: SnapshotViewport;
+  capturedAt?: string; // ISO timestamp SUPPLIED by the producer — never invented here
+  runner?: string; // "playwright" | "cypress" | "dev" | "scan"
+  // Repo source files that rendered this page, when the producer can attribute them
+  // (a Next route file, the components a test imported). Drives per-page attribution of
+  // SOURCE findings — see src/pages.ts.
+  sources?: string[];
+  notes?: string;
+}
+
+/** One element's computed style. `css` keys are CSS camelCase, values as the browser
+ *  serialized them (`rgb(0, 0, 0)`, `16px`) — never re-parsed here. */
+export interface StyleEntry {
+  i: number; // document-order index of the element
+  tag: string; // repeated so the join can be verified
+  css: Record<string, string>;
+}
+
+export interface StyleDigest {
+  v: number;
+  entries: StyleEntry[];
+  // Set when the collector hit its element cap. A truncated digest must never read as
+  // "nothing more to see" — the rendered rules degrade to `manual` for the tail.
+  truncated?: boolean;
+}
+
+export interface BoxEntry {
+  i: number;
+  tag: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface BoxDigest {
+  v: number;
+  entries: BoxEntry[];
+  truncated?: boolean;
+}
+
+/** The accessibility tree as the browser computed it — roles and names the engine would
+ *  otherwise have to infer from markup. Deliberately loose: producers differ. */
+export interface AxNode {
+  role?: string;
+  name?: string;
+  value?: string;
+  description?: string;
+  level?: number;
+  disabled?: boolean;
+  focusable?: boolean;
+  children?: AxNode[];
+}
+
+export interface Snapshot {
+  meta: SnapshotMeta;
+  dom: string;
+  styles?: StyleDigest;
+  boxes?: BoxDigest;
+  axtree?: AxNode;
+  /** Path of the screenshot on disk, relative to the snapshot dir. Set when present. */
+  screenshot?: string;
+}
+
+// ---- page identity --------------------------------------------------------------------
+
+/** A stable, filesystem-safe page id derived from a URL path. Accent-folded and
+ *  lowercased so `/Accès` and `/acces` land on one id. The root path is the home page. */
+export function slugifyPageId(input: string): string {
+  let path = input;
+  try {
+    path = new URL(input).pathname;
+  } catch {
+    /* not a URL — slugify the raw string */
+  }
+  const slug = path
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (slug) return slug;
+  return path === "/" || path === "" ? "accueil" : "page";
+}
+
+// ---- validation (a producer is untrusted input) -----------------------------------------
+
+export interface SnapshotIssue {
+  path: string;
+  message: string;
+}
+
+export interface SnapshotValidation {
+  ok: boolean;
+  issues: SnapshotIssue[];
+  meta?: SnapshotMeta;
+}
+
+// An id becomes a directory name, so it must not be able to traverse out of the pages dir.
+const ID_RE = /^[a-z0-9][a-z0-9-]*$/i;
+
+export function validateSnapshotMeta(raw: unknown): SnapshotValidation {
+  const issues: SnapshotIssue[] = [];
+  const err = (path: string, message: string): void => {
+    issues.push({ path, message });
+  };
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    err("meta", "meta must be an object { v, id, name, url, … }");
+    return { ok: false, issues };
+  }
+  const m = raw as Record<string, unknown>;
+
+  const v = typeof m.v === "number" ? m.v : Number.NaN;
+  if (!Number.isFinite(v) || v < 1) err("meta.v", "v must be a positive integer snapshot-format version");
+  // Refuse to READ a format from the future rather than misinterpreting fields we do not
+  // know — the same fail-closed posture the audit schema check takes.
+  else if (v > SNAPSHOT_VERSION) err("meta.v", `snapshot format v${v} is newer than this engine understands (v${SNAPSHOT_VERSION}) — upgrade ultra11y`);
+
+  if (typeof m.id !== "string" || !m.id.trim()) err("meta.id", "id must be a non-empty string");
+  else if (!ID_RE.test(m.id)) err("meta.id", `id "${m.id}" must match ${ID_RE} (it becomes a directory name)`);
+
+  if (typeof m.name !== "string" || !m.name.trim()) err("meta.name", "name must be a non-empty string");
+  if (typeof m.url !== "string" || !m.url.trim()) err("meta.url", "url must be a non-empty string");
+  if (m.auth !== undefined && typeof m.auth !== "boolean") err("meta.auth", "auth must be a boolean");
+  if (m.route !== undefined && typeof m.route !== "string") err("meta.route", "route must be a string");
+  if (m.notes !== undefined && typeof m.notes !== "string") err("meta.notes", "notes must be a string");
+  if (m.sources !== undefined && (!Array.isArray(m.sources) || m.sources.some((s) => typeof s !== "string")))
+    err("meta.sources", "sources must be an array of strings");
+
+  if (issues.length) return { ok: false, issues };
+  return {
+    ok: true,
+    issues,
+    meta: {
+      v,
+      id: m.id as string,
+      name: m.name as string,
+      url: m.url as string,
+      ...(typeof m.route === "string" ? { route: m.route } : {}),
+      ...(typeof m.auth === "boolean" ? { auth: m.auth } : {}),
+      ...(m.viewport && typeof m.viewport === "object" ? { viewport: m.viewport as SnapshotViewport } : {}),
+      ...(typeof m.capturedAt === "string" ? { capturedAt: m.capturedAt } : {}),
+      ...(typeof m.runner === "string" ? { runner: m.runner } : {}),
+      ...(Array.isArray(m.sources) ? { sources: m.sources as string[] } : {}),
+      ...(typeof m.notes === "string" ? { notes: m.notes } : {}),
+    },
+  };
+}
+
+// ---- IO ---------------------------------------------------------------------------------
+
+export function snapshotDir(root: string, id: string): string {
+  return join(root, PAGES_DIR, id);
+}
+
+/** Write a snapshot, returning its directory. The DOM is prefixed with the standard capture
+ *  provenance comment (carrying page + url) so `audit` ingests it as an ordinary capture. */
+export function writeSnapshot(root: string, snap: Snapshot): string {
+  const dir = snapshotDir(root, snap.meta.id);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "meta.json"), `${JSON.stringify(snap.meta, null, 2)}\n`);
+  const comment = formatCaptureComment({
+    v: 1,
+    page: snap.meta.id,
+    url: snap.meta.url,
+    ...(snap.meta.sources?.[0] ? { sourceFile: snap.meta.sources[0] } : {}),
+    name: snap.meta.name,
+  });
+  writeFileSync(join(dir, "dom.html"), `${comment}\n${snap.dom}\n`);
+  if (snap.styles) writeFileSync(join(dir, "styles.json"), `${JSON.stringify(snap.styles)}\n`);
+  if (snap.boxes) writeFileSync(join(dir, "boxes.json"), `${JSON.stringify(snap.boxes)}\n`);
+  if (snap.axtree) writeFileSync(join(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}\n`);
+  return dir;
+}
+
+function readJson<T>(file: string): T | undefined {
+  try {
+    return JSON.parse(readFileSync(file, "utf8")) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Read one snapshot directory. Returns null when it is not a valid snapshot — a malformed
+ *  producer output must degrade to "no snapshot", never to a half-read one. */
+export function readSnapshot(dir: string): Snapshot | null {
+  const rawMeta = readJson<unknown>(join(dir, "meta.json"));
+  if (rawMeta === undefined) return null;
+  const v = validateSnapshotMeta(rawMeta);
+  if (!v.ok || !v.meta) return null;
+  let dom: string;
+  try {
+    dom = readFileSync(join(dir, "dom.html"), "utf8");
+  } catch {
+    return null;
+  }
+  const styles = readJson<StyleDigest>(join(dir, "styles.json"));
+  const boxes = readJson<BoxDigest>(join(dir, "boxes.json"));
+  const axtree = readJson<AxNode>(join(dir, "axtree.json"));
+  const shot = join(dir, "screen.png");
+  return {
+    meta: v.meta,
+    dom,
+    ...(styles ? { styles } : {}),
+    ...(boxes ? { boxes } : {}),
+    ...(axtree ? { axtree } : {}),
+    ...(existsSync(shot) ? { screenshot: "screen.png" } : {}),
+  };
+}
+
+/** Every snapshot under `<root>/.ultra11y/pages`, id-sorted. Unreadable ones are skipped
+ *  (never fatal) — a single broken producer run must not blind the whole report. */
+export function readSnapshots(root: string): Snapshot[] {
+  const base = join(root, PAGES_DIR);
+  let dirs: string[];
+  try {
+    dirs = readdirSync(base, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+  } catch {
+    return [];
+  }
+  const out: Snapshot[] = [];
+  for (const d of dirs.sort()) {
+    const s = readSnapshot(join(base, d));
+    if (s) out.push(s);
+  }
+  return out;
+}
+
+// ---- the join, verified -----------------------------------------------------------------
+
+/** Index a style digest by document-order ordinal against the snapshot's own DOM, VERIFYING
+ *  each entry's tag. Returns null when anything is out of step — a digest collected from a
+ *  different DOM than the one serialized must be refused wholesale, because a silently
+ *  shifted index would attribute one element's colour to another and manufacture a
+ *  non-conformity out of nothing. */
+export function alignedStyles(dom: string, styles: StyleDigest): Map<number, StyleEntry> | null {
+  const doc = parseHtml(dom, "snapshot");
+  const out = new Map<number, StyleEntry>();
+  for (const e of styles.entries) {
+    const el = doc.elements[e.i];
+    if (!el || el.tag !== e.tag) return null;
+    out.set(e.i, e);
+  }
+  return out;
+}
+
+/** Same verified join for bounding boxes. */
+export function alignedBoxes(dom: string, boxes: BoxDigest): Map<number, BoxEntry> | null {
+  const doc = parseHtml(dom, "snapshot");
+  const out = new Map<number, BoxEntry>();
+  for (const e of boxes.entries) {
+    const el = doc.elements[e.i];
+    if (!el || el.tag !== e.tag) return null;
+    out.set(e.i, e);
+  }
+  return out;
+}
+
+// ---- the browser-side collector ----------------------------------------------------------
+
+// The computed declarations the rendered tier consumes. Kept as one list so the collector
+// and the rules that read it cannot drift. Extend here when a rendered rule needs a new one.
+export const COLLECTED_CSS: readonly string[] = [
+  "color",
+  "backgroundColor",
+  "backgroundImage",
+  "fontSize",
+  "fontWeight",
+  "fontStyle",
+  "textDecorationLine",
+  "textTransform",
+  "lineHeight",
+  "letterSpacing",
+  "wordSpacing",
+  "whiteSpace",
+  "display",
+  "visibility",
+  "opacity",
+  "position",
+  "overflowX",
+  "overflowY",
+  "outlineStyle",
+  "outlineWidth",
+  "outlineColor",
+  "borderBottomStyle",
+  "borderBottomWidth",
+  "cursor",
+];
+
+// Bound on elements measured. A 20k-element page would otherwise write a styles.json far
+// larger than the DOM itself. Truncation is RECORDED, never silent.
+export const COLLECT_MAX_ELEMENTS = 5000;
+
+// Browser-context source, evaluated as a STRING (the engine's tsconfig ships no DOM lib —
+// see src/scan-local.ts). Registered in probeSources() so a typo fails CI instead of being
+// swallowed at run time. Returns { dom, styles, boxes } for the CURRENT page.
+export const COLLECT_SNAPSHOT = `(() => {
+  const PROPS = ${JSON.stringify(COLLECTED_CSS)};
+  const MAX = ${COLLECT_MAX_ELEMENTS};
+  const els = document.querySelectorAll('*');
+  const styles = [];
+  const boxes = [];
+  const n = Math.min(els.length, MAX);
+  for (let i = 0; i < n; i++) {
+    const el = els[i];
+    const tag = el.tagName.toLowerCase();
+    const cs = getComputedStyle(el);
+    const css = {};
+    for (const p of PROPS) {
+      const v = cs[p];
+      if (v !== undefined && v !== null && v !== '') css[p] = String(v);
+    }
+    styles.push({ i: i, tag: tag, css: css });
+    const r = el.getBoundingClientRect();
+    boxes.push({ i: i, tag: tag, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
+  }
+  const truncated = els.length > MAX;
+  return {
+    dom: document.documentElement.outerHTML,
+    title: document.title,
+    lang: document.documentElement.getAttribute('lang') || '',
+    url: location.href,
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    styles: { v: 1, entries: styles, truncated: truncated },
+    boxes: { v: 1, entries: boxes, truncated: truncated }
+  };
+})()`;

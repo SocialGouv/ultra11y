@@ -44,6 +44,8 @@ export function formatCaptureComment(prov: CaptureProvenance): string {
   if (prov.component) attrs.push(`component="${escapeCommentValue(prov.component)}"`);
   if (prov.test) attrs.push(`test="${escapeCommentValue(prov.test)}"`);
   if (prov.name) attrs.push(`name="${escapeCommentValue(prov.name)}"`);
+  if (prov.page) attrs.push(`page="${escapeCommentValue(prov.page)}"`);
+  if (prov.url) attrs.push(`url="${escapeCommentValue(prov.url)}"`);
   return `<!-- ultra11y:capture ${attrs.join(" ")} -->`;
 }
 
@@ -73,6 +75,8 @@ export function parseCaptureProvenance(source: string): CaptureProvenance | unde
     ...(kv.has("component") ? { component: kv.get("component") } : {}),
     ...(kv.has("test") ? { test: kv.get("test") } : {}),
     ...(kv.has("name") ? { name: kv.get("name") } : {}),
+    ...(kv.has("page") ? { page: kv.get("page") } : {}),
+    ...(kv.has("url") ? { url: kv.get("url") } : {}),
   };
 }
 

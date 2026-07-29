@@ -14,6 +14,7 @@ import { resolve } from "node:path";
 import type { DynamicFinding, DynamicResult, Lang, SamplePage } from "./types.js";
 import { type DiscoverOpts, discoverUrls, type ProbeHit, type RunnerOutput, tagSampleFindings, toDynamicResult } from "./scan.js";
 import { sampleScope } from "./sample.js";
+import { COLLECT_SNAPSHOT } from "./snapshot.js";
 import { today } from "./util.js";
 
 export const LOCAL_ENGINE = "axe-core@playwright (local)";
@@ -664,6 +665,9 @@ export function probeSources(): Record<string, string> {
     CLOSE_DIALOGS_STEP,
     "liveRegionExpr(clicks)": liveRegionExpr(LIVE_REGION_DETAIL.en, true),
     "liveRegionExpr(noClicks)": liveRegionExpr(LIVE_REGION_DETAIL.fr, false),
+    // Page-snapshot collector (src/snapshot.ts) — evaluated in the browser by every snapshot
+    // producer (E2E fixtures, the dev sidecar), so it is syntax-gated here like the probes.
+    COLLECT_SNAPSHOT,
   };
 }
 

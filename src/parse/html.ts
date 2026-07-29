@@ -64,6 +64,11 @@ export interface CaptureProvenance {
   component?: string; // best-effort component name, e.g. "Button"
   test?: string; // originating test file, e.g. "src/Button.test.tsx"
   name?: string; // originating test title
+  // Set when the capture is a PAGE SNAPSHOT (src/snapshot.ts) rather than a component
+  // render: the page's stable id and the URL it was captured from. This is what carries
+  // page identity into `Finding.page`, and with it the per-page criterion grid.
+  page?: string;
+  url?: string;
 }
 
 const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
