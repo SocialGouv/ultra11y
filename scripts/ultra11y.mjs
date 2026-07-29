@@ -1770,6 +1770,9 @@ function scsByGuideline() {
 function techniques(id) {
   return byId.get(id)?.techniques ?? [];
 }
+function understanding(id) {
+  return byId.get(id)?.understanding;
+}
 function meta() {
   return {
     wcagVersion: data.wcagVersion,
@@ -10708,12 +10711,12 @@ var Tokenizer2 = class extends CommentsParser {
           continue;
         }
         ++this.state.pos;
-        const esc = this.readCodePoint(true);
-        if (esc !== null) {
-          if (!identifierCheck(esc)) {
+        const esc2 = this.readCodePoint(true);
+        if (esc2 !== null) {
+          if (!identifierCheck(esc2)) {
             this.raise(Errors.EscapedCharNotAnIdentifier, escStart);
           }
-          word += String.fromCodePoint(esc);
+          word += String.fromCodePoint(esc2);
         }
         chunkStart = this.state.pos;
       } else {
@@ -18793,6 +18796,15 @@ function readText(path) {
 }
 function ext(path) {
   return extname(path).toLowerCase();
+}
+function isUrlPath(file) {
+  return /^https?:\/\//i.test(file);
+}
+function repoRelative(file, baseDir) {
+  const posix3 = file.split("\\").join("/").replace(/^\.\//, "");
+  const base = baseDir.split("\\").join("/").replace(/\/+$/, "");
+  if (base && posix3.startsWith(`${base}/`)) return posix3.slice(base.length + 1);
+  return posix3;
 }
 async function readStdin() {
   const chunks = [];
@@ -48054,8 +48066,8 @@ function toDynamicResult(out2, target, lang = "en", engine = "axe-core@playwrigh
 }
 var DOCKER_TESTED_SCS = ["1.4.10"];
 function runScan(opts) {
-  const isUrl = /^https?:\/\//i.test(opts.target);
-  if (!isUrl && !existsSync14(opts.target)) {
+  const isUrl3 = /^https?:\/\//i.test(opts.target);
+  if (!isUrl3 && !existsSync14(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
   if (!dockerAvailable()) {
@@ -48063,7 +48075,7 @@ function runScan(opts) {
   }
   const tag = opts.tag ?? IMAGE_TAG;
   if (!imageExists(tag)) buildImage(tag);
-  const isFile = !isUrl && existsSync14(opts.target) && statSync7(opts.target).isFile();
+  const isFile = !isUrl3 && existsSync14(opts.target) && statSync7(opts.target).isFile();
   const out2 = runRunner(opts.target, isFile, tag);
   return { ...toDynamicResult(out2, opts.target), testedScs: [...DOCKER_TESTED_SCS] };
 }
@@ -48795,11 +48807,11 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
   }
 }
 async function runScanLocal(opts) {
-  const isUrl = /^https?:\/\//i.test(opts.target);
-  if (!isUrl && !existsSync15(opts.target)) {
+  const isUrl3 = /^https?:\/\//i.test(opts.target);
+  if (!isUrl3 && !existsSync15(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
-  const isFile = !isUrl && statSync8(opts.target).isFile();
+  const isFile = !isUrl3 && statSync8(opts.target).isFile();
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
@@ -49378,6 +49390,220 @@ function captureCoverageSummary(cov, lang) {
   if (cov.unattributed)
     lines.push(fr ? `${cov.unattributed} capture(s) sans provenance (non rattach\xE9e\xB7s).` : `${cov.unattributed} capture(s) without provenance (unattributed).`);
   return lines.join("\n");
+}
+
+// src/sarif.ts
+var INFO_URI = "https://github.com/maxgfr/ultra11y";
+var SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json";
+var FINGERPRINT_KEY = "ultra11yFindingId/v1";
+var LEVEL = { bloquant: "error", majeur: "warning", mineur: "note" };
+function levelFor(f) {
+  return f.advisory ? "note" : LEVEL[f.severity];
+}
+var toUri = repoRelative;
+var isUrl = isUrlPath;
+function physicalLocation(f, baseDir) {
+  if (isUrl(f.file)) return [];
+  return [
+    {
+      physicalLocation: {
+        artifactLocation: { uri: toUri(f.file, baseDir) },
+        region: {
+          // SARIF regions are 1-based. A merged dynamic finding can carry line 0 when the
+          // host-anchor resolver declined to guess (src/scan.ts resolveHostAnchor) — clamp
+          // rather than emit an invalid region.
+          startLine: Math.max(1, f.line),
+          startColumn: Math.max(1, f.col),
+          ...f.snippet ? { snippet: { text: f.snippet } } : {}
+        }
+      }
+    }
+  ];
+}
+function relatedLocations(f, baseDir) {
+  const r = f.related;
+  if (!r || isUrl(r.file)) return void 0;
+  return [
+    { physicalLocation: { artifactLocation: { uri: toUri(r.file, baseDir) }, region: { startLine: Math.max(1, r.line), startColumn: Math.max(1, r.col) } } }
+  ];
+}
+function criterionLabel(f, standard) {
+  if (isCore(standard)) return `WCAG ${f.criteriaId}`;
+  const pack = loadPack(standard);
+  const ids = packCriteriaForFinding(pack, f);
+  return ids.length ? `${pack.name} ${ids.join(", ")}` : `WCAG ${f.criteriaId}`;
+}
+function ruleFor(f, standard, lang) {
+  const sc = f.criteriaId;
+  const title2 = scTitle(sc, lang);
+  const tags = ["accessibility", `wcag:${sc}`];
+  if (!isCore(standard)) {
+    const pack = loadPack(standard);
+    for (const id of packCriteriaForFinding(pack, f)) tags.push(`${pack.key}:${id}`);
+  }
+  if (f.advisory) tags.push("recommendation");
+  const level = levelFor(f);
+  return {
+    id: f.ruleId,
+    shortDescription: { text: title2 ? `${f.ruleId} \u2014 WCAG ${sc} ${title2}` : `${f.ruleId} \u2014 WCAG ${sc}` },
+    fullDescription: { text: resolveRemediation(f, lang) },
+    ...understanding(sc) ? { helpUri: understanding(sc) } : {},
+    defaultConfiguration: { level },
+    properties: { tags, "problem.severity": level }
+  };
+}
+function toSarif(result, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const baseDir = opts.baseDir ?? process.cwd();
+  const rules = [];
+  const indexOf = /* @__PURE__ */ new Map();
+  const results = [];
+  for (const f of result.findings) {
+    let idx = indexOf.get(f.ruleId);
+    if (idx === void 0) {
+      idx = rules.length;
+      indexOf.set(f.ruleId, idx);
+      rules.push(ruleFor(f, standard, lang));
+    }
+    const related = relatedLocations(f, baseDir);
+    const page = f.sample?.page;
+    const properties = { criterion: criterionLabel(f, standard) };
+    if (isUrl(f.file)) properties.url = f.file;
+    if (page) properties.page = page;
+    if (f.advisory) properties.advisory = true;
+    if (f.preliminary) properties.preliminary = true;
+    results.push({
+      ruleId: f.ruleId,
+      ruleIndex: idx,
+      level: levelFor(f),
+      message: { text: `[${criterionLabel(f, standard)}] ${resolveMessage(f, lang)} \u2014 ${resolveRemediation(f, lang)}` },
+      locations: physicalLocation(f, baseDir),
+      ...related ? { relatedLocations: related } : {},
+      partialFingerprints: { [FINGERPRINT_KEY]: findingId(f) },
+      properties
+    });
+  }
+  return {
+    $schema: SCHEMA,
+    version: "2.1.0",
+    runs: [
+      {
+        tool: { driver: { name: "ultra11y", version: VERSION, informationUri: INFO_URI, rules } },
+        // Distinguishes concurrent uploads in one PR (source audit vs page scan) so
+        // GitHub keeps them as separate analyses instead of overwriting one another.
+        automationDetails: { id: `ultra11y/${standard}/` },
+        results
+      }
+    ]
+  };
+}
+
+// src/annotate.ts
+var LEVEL2 = { bloquant: "error", majeur: "warning", mineur: "notice" };
+var ICON6 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
+var SEV_ORDER5 = ["bloquant", "majeur", "mineur"];
+function esc(s) {
+  return s.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+}
+function escProp(s) {
+  return esc(s).replace(/:/g, "%3A").replace(/,/g, "%2C");
+}
+var isUrl2 = isUrlPath;
+function criterionLabel2(f, standard) {
+  if (isCore(standard)) return `WCAG ${f.criteriaId}`;
+  const pack = loadPack(standard);
+  const ids = packCriteriaForFinding(pack, f);
+  return ids.length ? `${pack.name} ${ids.join(", ")}` : `WCAG ${f.criteriaId}`;
+}
+function annotations(result, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const baseDir = opts.baseDir ?? process.cwd();
+  const scoped = opts.failOn ? findingsAtOrAbove(result.findings, opts.failOn) : result.findings;
+  const out2 = [];
+  for (const f of scoped) {
+    if (isUrl2(f.file)) continue;
+    const level = f.advisory ? "notice" : LEVEL2[f.severity];
+    const file = repoRelative(f.file, baseDir);
+    const title2 = `${criterionLabel2(f, standard)} \xB7 ${f.ruleId}`;
+    const body2 = `${resolveMessage(f, lang)}
+${resolveRemediation(f, lang)}`;
+    out2.push(`::${level} file=${escProp(file)},line=${Math.max(1, f.line)},col=${Math.max(1, f.col)},title=${escProp(title2)}::${esc(body2)}`);
+  }
+  return out2;
+}
+var S = {
+  fr: {
+    title: "Audit d'accessibilit\xE9 ultra11y",
+    files: "fichiers",
+    rate: "r\xE9ussite automatique",
+    none: "\u2705 Aucune non-conformit\xE9 d\xE9tect\xE9e par le moteur statique.",
+    findings: "Non-conformit\xE9s",
+    severity: "S\xE9v\xE9rit\xE9",
+    criterion: "Crit\xE8re",
+    where: "Emplacement",
+    what: "Constat",
+    more: (n) => `\u2026 et ${n} autre(s).`,
+    perPage: "Constats par page",
+    page: "Page",
+    count: "Constats",
+    unanchored: (n) => `${n} constat(s) rattach\xE9(s) \xE0 une URL, sans ligne de code \xE0 annoter \u2014 voir le rapport.`
+  },
+  en: {
+    title: "ultra11y accessibility audit",
+    files: "files",
+    rate: "automatic pass rate",
+    none: "\u2705 No non-conformity detected by the static engine.",
+    findings: "Non-conformities",
+    severity: "Severity",
+    criterion: "Criterion",
+    where: "Location",
+    what: "Finding",
+    more: (n) => `\u2026 and ${n} more.`,
+    perPage: "Findings per page",
+    page: "Page",
+    count: "Findings",
+    unanchored: (n) => `${n} finding(s) keyed to a URL, with no code line to annotate \u2014 see the report.`
+  }
+};
+var MAX_ROWS = 50;
+function stepSummary(result, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const s = S[lang];
+  const stdLabel = isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name;
+  const out2 = [];
+  out2.push(`## ${s.title} \u2014 ${stdLabel}`, "");
+  out2.push(`\`${result.date}\` \xB7 ${result.scope.files} ${s.files} \xB7 **${result.conformancePct}%** ${s.rate}`, "");
+  if (!result.findings.length) {
+    out2.push(s.none, "");
+    return out2.join("\n");
+  }
+  const baseDir = opts.baseDir ?? process.cwd();
+  const sorted = [...result.findings].sort((a, b) => SEV_ORDER5.indexOf(a.severity) - SEV_ORDER5.indexOf(b.severity));
+  out2.push(`### ${s.findings} (${sorted.length})`, "");
+  out2.push(`| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} |`, "| --- | --- | --- | --- |");
+  for (const f of sorted.slice(0, MAX_ROWS)) {
+    const where = isUrl2(f.file) ? f.file : `${repoRelative(f.file, baseDir)}:${Math.max(1, f.line)}`;
+    const msg = resolveMessage(f, lang).replace(/\|/g, "\\|");
+    out2.push(`| ${ICON6[f.severity]} ${f.severity} | ${criterionLabel2(f, standard)} | \`${where}\` | ${msg} |`);
+  }
+  if (sorted.length > MAX_ROWS) out2.push("", s.more(sorted.length - MAX_ROWS));
+  out2.push("");
+  const unanchored = result.findings.filter((f) => isUrl2(f.file)).length;
+  if (unanchored) out2.push(`> ${s.unanchored(unanchored)}`, "");
+  const pages = result.scope.sample?.pages ?? [];
+  if (pages.length) {
+    out2.push(`### ${s.perPage}`, "");
+    out2.push(`| ${s.page} | ${s.count} |`, "| --- | --- |");
+    for (const pg of pages) {
+      const n = result.findings.filter((f) => f.file === pg.url || f.sample?.page !== void 0 && f.sample.page === pg.name).length;
+      out2.push(`| ${pg.name} \u2014 \`${pg.url}\` | ${n} |`);
+    }
+    out2.push("");
+  }
+  return out2.join("\n");
 }
 
 // src/config.ts
@@ -49988,7 +50214,8 @@ Usage:
   ultra11y audit    <globs\u2026 | -> [--out <dir>] [--include <glob>] [--exclude <glob>] [--ext <list>] [--jsx] [--graph] [--json] [--lang auto|en|fr] [--no-default-excludes]
   ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--baseline <file>] [--fail-on blocking|major|minor]
   ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures: audit real HTML, gate blind-spot components)
-  ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--lang auto|en|fr]
+  ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
+  ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --coverage | --storybook] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
@@ -50013,12 +50240,19 @@ Commands:
              (default auto: repo <html lang> \u2192 the active standard's default locale
              \u2192 English). The engine decides the machine-detectable criteria; the AI
              agent adjudicates the judgment ones (verify --manual, gated) and the
-             scan tier decides the needs-rendering ones.
+             scan tier decides the needs-rendering ones. --format sarif|github emits
+             the CI rendering instead of the summary (in --baseline gate mode it
+             covers exactly the NEW findings, i.e. what the PR introduced).
   report     Render an AuditResult into a dated WCAG 2.2 AA compliance report
              (audits/wcag-YYYY-MM-DD.md): metadata, per-guideline synthesis table,
              non-conformities by priority, conforming + not-applicable lists.
              --standard <pack> writes a derived report for a country standard
              (e.g. --standard rgaa \u2192 audits/rgaa-YYYY-MM-DD.md).
+             --format renders the same result for CI instead of Markdown: 'sarif'
+             (SARIF 2.1.0 for GitHub code scanning, so findings land as inline PR
+             annotations) or 'github' (::error:: workflow commands on stdout plus a
+             job summary appended to $GITHUB_STEP_SUMMARY). Both honour --standard,
+             so this is how you get an RGAA-keyed SARIF \u2014 audit itself is WCAG-keyed.
   prd        Turn an AuditResult into an AUDITOR conformance backlog
              (audits/prd-YYYY-MM-DD.md), one entry per criterion rendered with the
              active standard's vocabulary (RGAA "Th\xE9matique/Crit\xE8re/Test", WCAG core
@@ -50378,6 +50612,30 @@ function peekMergeAudit(mergeIn) {
     return void 0;
   }
 }
+function parseCiFormat(v) {
+  if (v === void 0) return void 0;
+  if (v === "sarif") return "sarif";
+  if (v === "github") return "github";
+  return null;
+}
+function emitCiFormat(result, format, standard, lang, failOn) {
+  if (format === "sarif") {
+    console.log(JSON.stringify(toSarif(result, { standard, lang }), null, 2));
+    return;
+  }
+  for (const line of annotations(result, { standard, lang, failOn })) console.log(line);
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  const md = stepSummary(result, { standard, lang });
+  if (summaryPath) {
+    try {
+      appendFileSync(summaryPath, `${md}
+`);
+    } catch {
+    }
+  } else {
+    console.error(md);
+  }
+}
 async function cmdAudit(p) {
   const inputs = p.positionals.length ? p.positionals : ["."];
   if (inputs.length === 0) {
@@ -50436,6 +50694,11 @@ async function cmdAudit(p) {
     console.error(`ultra11y audit: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
     return 2;
   }
+  const ciFormat = parseCiFormat(p.flags.format);
+  if (ciFormat === null) {
+    console.error(`ultra11y audit: --format must be sarif|github (got "${String(p.flags.format)}").`);
+    return 2;
+  }
   const baselineFlag = p.flags.baseline;
   if (typeof baselineFlag === "string" && baselineFlag) {
     let baseline = null;
@@ -50453,7 +50716,8 @@ async function cmdAudit(p) {
     }
     const diff = diffAgainstBaseline(result, baseline, failOnParsed ?? "bloquant");
     const blindSpots2 = requireCaptures ? result.scope.captureCoverage?.blindSpots ?? [] : [];
-    if (p.flags.json)
+    if (ciFormat) emitCiFormat({ ...result, findings: diff.newFindings }, ciFormat, CORE2, lang, failOnParsed ?? "bloquant");
+    else if (p.flags.json)
       console.log(JSON.stringify(requireCaptures && result.scope.captureCoverage ? { ...diff, captureCoverage: result.scope.captureCoverage } : diff, null, 2));
     else {
       console.log(baselineSummary(diff, lang));
@@ -50465,7 +50729,8 @@ async function cmdAudit(p) {
   const failOn = failOnSet ? failOnParsed ?? "bloquant" : void 0;
   const failing = failOn ? findingsAtOrAbove(result.findings, failOn) : [];
   const blindSpots = requireCaptures ? result.scope.captureCoverage?.blindSpots ?? [] : [];
-  if (p.flags.json) console.log(JSON.stringify(result, null, 2));
+  if (ciFormat) emitCiFormat(result, ciFormat, CORE2, lang, failOn);
+  else if (p.flags.json) console.log(JSON.stringify(result, null, 2));
   else {
     console.log(auditSummary(result, lang));
     if (requireCaptures && result.scope.captureCoverage) console.error(captureCoverageSummary(result.scope.captureCoverage, lang));
@@ -50553,6 +50818,15 @@ async function cmdReport(p) {
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : "audits";
   const lang = resolveLang(p.flags, { audit: result, standard });
+  const ciFormat = parseCiFormat(p.flags.format);
+  if (ciFormat === null) {
+    console.error(`ultra11y report: --format must be sarif|github (got "${String(p.flags.format)}").`);
+    return 2;
+  }
+  if (ciFormat) {
+    emitCiFormat(result, ciFormat, standard, lang);
+    return 0;
+  }
   const path = writeReport(result, { out: out2, lang, standard });
   const untested = isCore(standard) ? [] : untestedNeedsRendering(result);
   const partial = untested.length > 0;

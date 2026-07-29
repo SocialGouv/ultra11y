@@ -50,7 +50,8 @@ node scripts/ultra11y.mjs --help
 ultra11y audit    <globs… | ->  [--out <dir>] [--include <glob>] [--exclude <glob>] [--ext <list>] [--jsx] [--graph] [--json] [--lang auto|en|fr] [--no-default-excludes]
 ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--baseline <file>] [--fail-on blocking|major|minor]
 ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]              # audit rendered-DOM captures alongside source
-ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--lang auto|en|fr]
+ultra11y audit    [--format sarif|github]                                               # CI: code-scanning SARIF, or inline annotations + job summary
+ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
 ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
 ultra11y render   [<dir>] [--scaffold | --setup | --coverage | --storybook] [--captures <dir>] [--out <file>] [--json]
 ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
@@ -90,6 +91,13 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   auto-codemods, fill-in `TODO` placeholders for the agent to complete, and judgment-only
   proposals. `--dry-run` is the default; `--write` applies but only after a re-audit proves
   no new non-conformity, and never on lossy JSX/TSX. See `references/fix.md`.
+- **CI surfaces** — a red job says *that* the build broke, not *where*. `--format sarif` emits
+  SARIF 2.1.0 for GitHub code scanning, so each finding lands as an **inline annotation on the
+  causing line** of the PR; `--format github` does the same via `::error::` workflow commands
+  plus a `$GITHUB_STEP_SUMMARY` table, for plans without code scanning. Alert identity reuses
+  the baseline's `findingId`, so an alert survives line drift; a URL-keyed finding gets **no**
+  location rather than a guessed one. Run it from `report --standard rgaa` for pack-keyed
+  output. See `references/ci.md`.
 - **Automation** — `init --hook` (default) wires a zero-dependency git pre-commit gate over the
   **strict staged snapshot**: it audits the exact index blobs, auto-applies the safe fixes and
   re-stages them, and blocks only on judgment issues. `init --baseline`/`--ci` is the opt-in

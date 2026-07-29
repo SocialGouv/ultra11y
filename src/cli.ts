@@ -1,7 +1,7 @@
 import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync } from "node:fs";
 import { join, relative, sep, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { VERSION, type Lang, type AuditResult, type DynamicResult, type SampleConfig } from "./types.js";
+import { VERSION, type Lang, type AuditResult, type DynamicResult, type SampleConfig, type Severity } from "./types.js";
 import { runAudit } from "./audit.js";
 import { writeReport, untestedNeedsRendering, partialAuditBanner } from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
@@ -33,7 +33,9 @@ import { runFix, fixSummary } from "./fix.js";
 import { diffAgainstBaseline, baselineSummary, parseFailOn, findingsAtOrAbove } from "./baseline.js";
 import { repoRoot, writeHook, writeCi } from "./init.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
-import { resolveStandard, getPack, isCore, type StandardId } from "./standards/index.js";
+import { toSarif } from "./sarif.js";
+import { annotations, stepSummary } from "./annotate.js";
+import { resolveStandard, getPack, isCore, CORE, type StandardId } from "./standards/index.js";
 import { loadRuntimeStandards, loadConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
 import { listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
@@ -50,7 +52,8 @@ Usage:
   ultra11y audit    <globs… | -> [--out <dir>] [--include <glob>] [--exclude <glob>] [--ext <list>] [--jsx] [--graph] [--json] [--lang auto|en|fr] [--no-default-excludes]
   ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--baseline <file>] [--fail-on blocking|major|minor]
   ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures: audit real HTML, gate blind-spot components)
-  ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--lang auto|en|fr]
+  ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
+  ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --coverage | --storybook] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
@@ -75,12 +78,19 @@ Commands:
              (default auto: repo <html lang> → the active standard's default locale
              → English). The engine decides the machine-detectable criteria; the AI
              agent adjudicates the judgment ones (verify --manual, gated) and the
-             scan tier decides the needs-rendering ones.
+             scan tier decides the needs-rendering ones. --format sarif|github emits
+             the CI rendering instead of the summary (in --baseline gate mode it
+             covers exactly the NEW findings, i.e. what the PR introduced).
   report     Render an AuditResult into a dated WCAG 2.2 AA compliance report
              (audits/wcag-YYYY-MM-DD.md): metadata, per-guideline synthesis table,
              non-conformities by priority, conforming + not-applicable lists.
              --standard <pack> writes a derived report for a country standard
              (e.g. --standard rgaa → audits/rgaa-YYYY-MM-DD.md).
+             --format renders the same result for CI instead of Markdown: 'sarif'
+             (SARIF 2.1.0 for GitHub code scanning, so findings land as inline PR
+             annotations) or 'github' (::error:: workflow commands on stdout plus a
+             job summary appended to $GITHUB_STEP_SUMMARY). Both honour --standard,
+             so this is how you get an RGAA-keyed SARIF — audit itself is WCAG-keyed.
   prd        Turn an AuditResult into an AUDITOR conformance backlog
              (audits/prd-YYYY-MM-DD.md), one entry per criterion rendered with the
              active standard's vocabulary (RGAA "Thématique/Critère/Test", WCAG core
@@ -507,6 +517,41 @@ function peekMergeAudit(mergeIn: string | boolean | undefined): AuditResult | un
   }
 }
 
+// ---- CI output formats (`--format`) --------------------------------------------------
+// `audit` and `report` can render the SAME AuditResult in a machine-readable CI shape
+// instead of their default output. Shared here so the two commands cannot drift.
+type CiFormat = "sarif" | "github";
+
+/** undefined = flag absent · null = unrecognized value (the caller reports and exits 2). */
+function parseCiFormat(v: string | boolean | undefined): CiFormat | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === "sarif") return "sarif";
+  if (v === "github") return "github";
+  return null;
+}
+
+/** Emit the CI rendering of an audit. Annotations go to STDOUT — GitHub only reads workflow
+ *  commands there — while the job summary is APPENDED to $GITHUB_STEP_SUMMARY when the
+ *  runner set it (else printed to stderr so a local run still shows it). */
+function emitCiFormat(result: AuditResult, format: CiFormat, standard: StandardId, lang: Lang, failOn?: Severity): void {
+  if (format === "sarif") {
+    console.log(JSON.stringify(toSarif(result, { standard, lang }), null, 2));
+    return;
+  }
+  for (const line of annotations(result, { standard, lang, failOn })) console.log(line);
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  const md = stepSummary(result, { standard, lang });
+  if (summaryPath) {
+    try {
+      appendFileSync(summaryPath, `${md}\n`);
+    } catch {
+      /* never fail a run because the job summary could not be written */
+    }
+  } else {
+    console.error(md);
+  }
+}
+
 async function cmdAudit(p: ParsedArgs): Promise<number> {
   const inputs = p.positionals.length ? p.positionals : ["."];
   if (inputs.length === 0) {
@@ -593,6 +638,14 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
     return 2;
   }
 
+  // CI rendering. `audit` is always WCAG-keyed (it takes no --standard by design), so a
+  // pack-tagged SARIF is produced by chaining `report --in … --standard rgaa --format sarif`.
+  const ciFormat = parseCiFormat(p.flags.format);
+  if (ciFormat === null) {
+    console.error(`ultra11y audit: --format must be sarif|github (got "${String(p.flags.format)}").`);
+    return 2;
+  }
+
   // Regression-gate mode (used by the init hook / CI): diff against a committed
   // baseline and exit non-zero only on NEW non-conformities at/above --fail-on.
   const baselineFlag = p.flags.baseline;
@@ -612,7 +665,10 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
     }
     const diff = diffAgainstBaseline(result, baseline, failOnParsed ?? "bloquant");
     const blindSpots = requireCaptures ? (result.scope.captureCoverage?.blindSpots ?? []) : [];
-    if (p.flags.json)
+    // In gate mode the subject is the REGRESSION, not the backlog: the CI rendering covers
+    // exactly the new findings, so a PR is annotated with what it introduced.
+    if (ciFormat) emitCiFormat({ ...result, findings: diff.newFindings }, ciFormat, CORE, lang, failOnParsed ?? "bloquant");
+    else if (p.flags.json)
       console.log(JSON.stringify(requireCaptures && result.scope.captureCoverage ? { ...diff, captureCoverage: result.scope.captureCoverage } : diff, null, 2));
     else {
       console.log(baselineSummary(diff, lang));
@@ -629,7 +685,8 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   const failing = failOn ? findingsAtOrAbove(result.findings, failOn) : [];
   const blindSpots = requireCaptures ? (result.scope.captureCoverage?.blindSpots ?? []) : [];
 
-  if (p.flags.json) console.log(JSON.stringify(result, null, 2));
+  if (ciFormat) emitCiFormat(result, ciFormat, CORE, lang, failOn);
+  else if (p.flags.json) console.log(JSON.stringify(result, null, 2));
   else {
     console.log(auditSummary(result, lang));
     if (requireCaptures && result.scope.captureCoverage) console.error(captureCoverageSummary(result.scope.captureCoverage, lang));
@@ -725,6 +782,19 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
   }
   const out = typeof p.flags.out === "string" ? (p.flags.out as string) : "audits";
   const lang = resolveLang(p.flags, { audit: result, standard });
+
+  // CI renderings of the same result — no Markdown file is written. This is the path that
+  // gives a pack-keyed (RGAA) SARIF, since `audit` itself never takes --standard.
+  const ciFormat = parseCiFormat(p.flags.format);
+  if (ciFormat === null) {
+    console.error(`ultra11y report: --format must be sarif|github (got "${String(p.flags.format)}").`);
+    return 2;
+  }
+  if (ciFormat) {
+    emitCiFormat(result, ciFormat, standard, lang);
+    return 0;
+  }
+
   const path = writeReport(result, { out, lang, standard });
   // Partial-audit advisory (owner decision): a pack (RGAA) report whose scan coverage
   // leaves needs-rendering criteria untested — warn prominently on the CLI, naming exactly

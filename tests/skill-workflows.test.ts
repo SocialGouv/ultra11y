@@ -93,6 +93,21 @@ describe("correction.md teaches the correction phase", () => {
   });
 });
 
+describe("ci.md teaches the CI output formats", () => {
+  const t = read("ci.md");
+  it("covers both formats, the upload step and the pack-keyed route", () => {
+    expect(t).toContain("--format sarif");
+    expect(t).toContain("--format github");
+    expect(t).toContain("upload-sarif");
+    expect(t).toContain("GITHUB_STEP_SUMMARY");
+    expect(t).toMatch(/--standard rgaa/);
+  });
+  it("states the two honesty guarantees: advisory is never an error, URL findings get no location", () => {
+    expect(t).toMatch(/advisory/i);
+    expect(t).toMatch(/no\s+\*\*?physical\*\*?\s*location|no\*\*? physical location|\*\*no\*\* physical location/i);
+  });
+});
+
 describe("verify.md teaches the verify gate", () => {
   const t = read("verify.md");
   it("covers the command, --semantic and the verdict tokens", () => {

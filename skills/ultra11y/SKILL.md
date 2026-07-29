@@ -83,6 +83,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/verify.md` | The `check`/`verify` gates |
 | `references/false-positives.md` | Where a finding may still be wrong, and how to refute it |
 | `references/rendered.md` · `references/automation.md` | Auditing produced HTML, captures, hooks and CI |
+| `references/ci.md` | `--format sarif\|github`: inline PR annotations, code scanning, job summary |
 | `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
 | `references/scale.md` | Focusing an audit on a large repository |
 | `references/fix.md` · `references/correction.md` | Applying fixes, by priority, without regressions |
@@ -153,6 +154,11 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   "block only NEW non-conformities" variant. For library/SFC code, commit rendered
   **captures** (`render --setup`) and stage them so the real semantic HTML is what's
   checked (`audit --require-captures`); read **`references/automation.md`**.
+- **"Show the findings ON the pull request, not just a red job"** → `--format sarif` (upload
+  to code scanning → inline annotations at the right file:line) or `--format github`
+  (`::error::` workflow commands + a `$GITHUB_STEP_SUMMARY` table) — from `report
+  --standard rgaa` when you want the pack's criteria rather than WCAG's; read
+  **`references/ci.md`**.
 - **"Make this code accessible / review it"** → audit the snippet
   (`audit - < component.html`) native-first; read **`references/authoring.md`** and
   **`references/forbidden-patterns.md`**.

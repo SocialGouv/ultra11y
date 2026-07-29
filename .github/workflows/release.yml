@@ -7,8 +7,10 @@ name: Release
 #   - computes the next version and syncs it across package.json / src/types.ts /
 #     SKILL.md / CHANGELOG.md and rebuilds the bundle (scripts/sync-version.mjs),
 #   - commits the bump back to `main` as `chore(release): <v> [skip ci]`,
-#   - tags `v<version>` and creates the GitHub release with auto notes + tarball.
-# No npm-registry publish (GitHub release only) — uses the built-in GITHUB_TOKEN.
+#   - tags `v<version>` and creates the GitHub release with auto notes + tarball,
+#   - publishes the `ultra11y` package to the npm registry.
+# The GitHub side uses the built-in GITHUB_TOKEN; the npm publish needs an NPM_TOKEN
+# repository secret (an npm automation token). Without it the publish step fails.
 on:
   push:
     branches: [main]
@@ -34,6 +36,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          registry-url: https://registry.npmjs.org # writes the .npmrc @semantic-release/npm authenticates against
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -48,4 +51,5 @@ jobs:
       - name: Release (semantic-release)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm exec semantic-release

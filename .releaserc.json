@@ -16,6 +16,7 @@
         "prepareCmd": "node scripts/sync-version.mjs ${nextRelease.version} && pnpm run build && pnpm pack"
       }
     ],
+    "@semantic-release/npm",
     [
       "@semantic-release/git",
       {
