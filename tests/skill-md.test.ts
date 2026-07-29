@@ -74,6 +74,7 @@ const CLI_COMMANDS = new Set([
   "sample",
   "snapshot",
   "pages",
+  "dev",
   "fix",
   "init",
   "pack",
@@ -129,7 +130,7 @@ describe("skill docs stay in sync with the CLI", () => {
 });
 
 describe("SKILL.md routes to the references (progressive disclosure)", () => {
-  it("ships exactly the thirty-one reference docs", () => {
+  it("ships exactly the thirty-two reference docs", () => {
     expect(refFiles.sort()).toEqual([
       "act.md",
       "adjudication.md",
@@ -140,6 +141,7 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "correction.md",
       "criteria.md",
       "cross-file.md",
+      "devtools.md",
       "dynamic.md",
       "e2e.md",
       "false-positives.md",

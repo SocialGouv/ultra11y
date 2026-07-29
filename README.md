@@ -57,6 +57,7 @@ ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybo
 ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   # payload on stdin → .ultra11y/pages/<id>/ + audit
 ultra11y snapshot list  [--root <dir>] [--json]
 ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   # the per-page criterion grid
+ultra11y dev      [--port <n>] [--standard <pack>]   |   dev --next                        # live overlay while you build + dashboard
 ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
 ultra11y check    --report <md> [--standard <pack>] [--quiet] [--json]
 ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--json]
@@ -103,6 +104,12 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   a snapshot is a full document, the page-scoped rules finally run — RGAA **8.3** (`lang`),
   **8.5/8.6** (`title`) — and every finding carries both its page and the source file that
   rendered it. See `references/e2e.md` and `references/pages.md`.
+- **While you build** — `dev --next` writes a one-line Next overlay component and `dev` starts
+  a loopback side-car: a floating panel lists the current page's non-conformities as you
+  browse, each linking to its `file:line` in your editor, and `http://127.0.0.1:4111` shows
+  the per-page grid accumulating. The overlay detaches itself before collecting — otherwise it
+  would audit itself and shift every element index — and renders nothing outside development.
+  See `references/devtools.md`.
 - **Rendered tier (offline)** — three rules read a snapshot's browser-only signals inside the
   ordinary `audit`: **no browser, no Docker, no running server**. `rendered-contrast` measures
   contrast on the *computed* styles (the inline-literal rule could only see colours written in

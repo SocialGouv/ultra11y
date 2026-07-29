@@ -37,6 +37,7 @@ import { toSarif } from "./sarif.js";
 import { annotations, stepSummary } from "./annotate.js";
 import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type StyleDigest } from "./snapshot.js";
 import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
+import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
 import { resolveStandard, getPack, isCore, CORE, type StandardId } from "./standards/index.js";
 import { loadRuntimeStandards, loadConfig } from "./config.js";
@@ -76,6 +77,8 @@ Usage:
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
+  ultra11y dev      [--port <n>] [--root <dir>] [--standard <pack>] [--lang auto|en|fr]   (dev side-car: live overlay + per-page dashboard)
+  ultra11y dev      --next [--port <n>]        (write the Next overlay component, then wire one line into your layout)
 
 Commands:
   audit      Run the static engine over the inputs (files/globs, or '-' for stdin)
@@ -194,6 +197,14 @@ Commands:
              has been captured. Because a snapshot is a FULL document (a component
              capture is a fragment), the page-scoped rules run on it: that is where
              html lang (RGAA 8.3) and page title (8.5/8.6) become decidable.
+  dev        Development side-car: see the defects on the page you are BUILDING,
+             while you build it. It serves a per-page dashboard on
+             http://127.0.0.1:4111 and an overlay the app loads; every page you
+             visit is snapshotted, audited and listed in a floating panel, each
+             finding linking to its file:line (Next's launch-editor endpoint).
+             --next writes the overlay component to wire into your layout — it
+             renders NOTHING outside development. LOOPBACK ONLY: the server
+             writes files, so it never binds beyond 127.0.0.1.
   pages      The per-page criterion grid — RGAA is a per-page norm, the engine's
              verdict is scope-wide, and this bridges the two. One row per criterion
              (the pack's own under --standard), one column per page. Rebuilt from a
@@ -250,6 +261,8 @@ Options:
   --e2e              render: write the Playwright/Cypress fixtures into .ultra11y/e2e/
   --runner <name>    render --e2e: force playwright|cypress instead of auto-detecting
   --root <dir>       snapshot: project root holding .ultra11y/pages (default: .)
+  --port <n>         dev: port for the side-car (default: 4111)
+  --next             dev: write the Next.js overlay component instead of serving
   --require-captures audit: gate — fail if any opaque/control component lacks a rendered capture (implies --graph)
   --write            fix: apply fixes to disk (default is a dry-run diff)
   --iterate          fix: with --write, re-audit + re-apply mechanical fixes until stable (bounded)
@@ -334,6 +347,7 @@ const COMMANDS = [
   "sample",
   "snapshot",
   "pages",
+  "dev",
   "fix",
   "init",
   "pack",
@@ -381,6 +395,7 @@ const VALUE_FLAGS = new Set([
   "phase",
   "root",
   "runner",
+  "port",
 ]);
 // `init` treats --baseline as a boolean selector ("write the baseline"), not a
 // path, so it must NOT consume the following token. audit/fix keep it as a value
@@ -410,6 +425,7 @@ const BOOLEAN_FLAGS = new Set([
   "storybook",
   "setup",
   "e2e",
+  "next",
   "coverage",
   "write",
   "dry-run",
@@ -784,6 +800,71 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   }
   if (!failOnSet && !requireCaptures) return 0;
   return failing.length || blindSpots.length ? 1 : 0;
+}
+
+// `dev` — the development side-car. Long-running by design: it holds the port until you stop
+// it, which is why nothing else in the CLI looks like this.
+async function cmdDev(p: ParsedArgs): Promise<number> {
+  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+  const standard = stdOf(p, "dev");
+  if (standard === null) return 2;
+  const lang = resolveLang(p.flags, { standard });
+  const portRaw = p.flags.port;
+  const port = typeof portRaw === "string" ? Number.parseInt(portRaw, 10) : DEV_DEFAULT_PORT;
+  if (!Number.isFinite(port) || port < 0 || port > 65535) {
+    console.error(`ultra11y dev: --port must be a number between 0 and 65535 (got "${String(portRaw)}").`);
+    return 2;
+  }
+
+  // `--next` writes the component and stops: wiring the app is the user's one-line edit, and
+  // doing it for them would mean rewriting their layout.
+  if (p.flags.next === true) {
+    const dir = join(root, ".ultra11y", "next");
+    const rel = ".ultra11y/next/overlay.jsx";
+    try {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "overlay.jsx"), nextOverlayComponent(port));
+    } catch (e) {
+      console.error(`ultra11y dev: could not write ${rel}: ${e instanceof Error ? e.message : String(e)}`);
+      return 1;
+    }
+    const fr = lang === "fr";
+    console.log(fr ? `Composant overlay écrit : ${rel}` : `Overlay component written: ${rel}`);
+    console.log("");
+    console.log(fr ? "Ajoutez-le à votre layout racine (app/layout.tsx) :" : "Add it to your root layout (app/layout.tsx):");
+    console.log(`  import { Ultra11yOverlay } from "../${rel.replace(/\.jsx$/, "")}";`);
+    console.log(`  <body>{children}<Ultra11yOverlay /></body>`);
+    console.log("");
+    console.log(
+      fr
+        ? `Puis lancez le side-car : ultra11y dev  (tableau de bord : http://127.0.0.1:${port})`
+        : `Then start the side-car: ultra11y dev  (dashboard: http://127.0.0.1:${port})`,
+    );
+    console.log(fr ? "Le composant ne rend RIEN hors développement." : "The component renders NOTHING outside development.");
+    return 0;
+  }
+
+  const fr = lang === "fr";
+  let server: DevServer;
+  try {
+    server = await startDevServer({ root, port, standard, lang, onLog: (m) => console.error(m) });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(
+      /EADDRINUSE/.test(msg) ? `ultra11y dev: port ${port} is already in use — pass --port <n>.` : `ultra11y dev: could not start the server: ${msg}`,
+    );
+    return 1;
+  }
+  console.error(fr ? `ultra11y dev : tableau de bord sur http://127.0.0.1:${server.port}` : `ultra11y dev: dashboard on http://127.0.0.1:${server.port}`);
+  console.error(fr ? "Boucle locale uniquement (l'outil écrit des fichiers). Ctrl-C pour arrêter." : "Loopback only (the tool writes files). Ctrl-C to stop.");
+  await new Promise<void>((resolve) => {
+    const stop = (): void => {
+      void server.close().then(resolve);
+    };
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
+  return 0;
 }
 
 // `pages` — the per-page criterion grid. RGAA is a per-page norm; the engine's verdict is
@@ -2163,6 +2244,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdSnapshot(p);
     case "pages":
       return cmdPages(p);
+    case "dev":
+      return cmdDev(p);
     case "fix":
       return cmdFix(p);
     case "init":

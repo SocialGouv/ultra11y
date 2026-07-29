@@ -179,3 +179,21 @@ describe("verify.md teaches the verify gate", () => {
     expect(t).toMatch(/unsupported/);
   });
 });
+
+describe("devtools.md teaches the dev side-car", () => {
+  const t = read("devtools.md");
+  it("covers both commands and the one-line wiring", () => {
+    expect(t).toMatch(/ultra11y\.mjs dev/);
+    expect(t).toContain("--next");
+    expect(t).toContain("Ultra11yOverlay");
+    expect(t).toContain("127.0.0.1:4111");
+  });
+  it("states the two safety properties: self-detachment and the loopback bind", () => {
+    expect(t).toMatch(/removes itself/i);
+    expect(t).toContain("loopback");
+    expect(t).toContain("0.0.0.0");
+  });
+  it("says what it does NOT decide, so a clean panel is not read as a pass", () => {
+    expect(t).toMatch(/does not adjudicate|never "this page is accessible"/i);
+  });
+});

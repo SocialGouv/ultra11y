@@ -86,6 +86,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/ci.md` | `--format sarif\|github`: inline PR annotations, code scanning, job summary |
 | `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), and its honesty rules |
 | `references/e2e.md` | `render --e2e`: auditing a page during your Playwright/Cypress run |
+| `references/devtools.md` | `dev`: the live overlay while you build, and the per-page dashboard |
 | `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
 | `references/scale.md` | Focusing an audit on a large repository |
 | `references/fix.md` · `references/correction.md` | Applying fixes, by priority, without regressions |
@@ -156,6 +157,11 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   "block only NEW non-conformities" variant. For library/SFC code, commit rendered
   **captures** (`render --setup`) and stage them so the real semantic HTML is what's
   checked (`audit --require-captures`); read **`references/automation.md`**.
+- **"Show me the problems while I build the page"** → `dev --next` writes a one-line overlay
+  component and `dev` starts a loopback side-car: a floating panel lists the current page's
+  non-conformities, each opening its `file:line` in your editor, and `http://127.0.0.1:4111`
+  accumulates the per-page grid as you browse. Renders nothing outside development; read
+  **`references/devtools.md`**.
 - **"Check a page during our E2E tests"** → `render --e2e` writes Playwright/Cypress fixtures
   that audit the page **as your test left it** (logged in, form filled, modal open) — state a
   separate `scan` run does not have — and persist each checked page as a snapshot. `failOn`
