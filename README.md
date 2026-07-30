@@ -159,7 +159,7 @@ yours**.
 
 ### Resources — the skill's own documentation
 
-`SKILL.md` and all 28 `references/*.md` are served under `skill://`, read off
+`SKILL.md` and all 32 `references/*.md` are served under `skill://`, read off
 disk at request time — so a documentation fix reaches every client without a
 rebuild.
 
