@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [2.26.0](https://github.com/maxgfr/ultra11y/compare/v2.25.0...v2.26.0) (2026-07-31)
+
+
+### Features
+
+* **plugin:** make the a11y review fire on its own before a commit, push or PR ([b7b2bce](https://github.com/maxgfr/ultra11y/commit/b7b2bce47565a8aafb8bb948a333bab0a326272d))
+
 # [2.25.0](https://github.com/maxgfr/ultra11y/compare/v2.24.0...v2.25.0) (2026-07-31)
 
 
