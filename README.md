@@ -1,5 +1,24 @@
 # ultra11y
 
+[![CI](https://github.com/maxgfr/ultra11y/actions/workflows/ci.yml/badge.svg)](https://github.com/maxgfr/ultra11y/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/ultra11y?logo=npm)](https://www.npmjs.com/package/ultra11y)
+[![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-6b46c1)](#add-to-claude-code)
+[![node](https://img.shields.io/node/v/ultra11y)](https://nodejs.org)
+[![license](https://img.shields.io/npm/l/ultra11y)](LICENSE)
+
+### Add to Claude Code
+
+Two lines, and the accessibility review runs **by itself** before every commit, push and
+pull request — you never type the skill's name:
+
+```
+/plugin marketplace add maxgfr/ultra11y
+/plugin install ultra11y@ultra11y
+```
+
+<sub>Prefer the skills only, without the automatic hook? `npx skills add maxgfr/ultra11y`.
+Full details, thresholds and off-switches under [Install](#install).</sub>
+
 > Audit HTML/CSS/JSX against **WCAG 2.2 AA** accessibility and produce a dated compliance report — or author/review accessible markup without regressions. A [skills.sh](https://skills.sh) agent skill: a deterministic, zero-dependency static engine **plus** the agent's judgment, with `check`/`verify` gates against hallucinated non-conformities. **The central deliverable is the auditor conformance block** — theme, criterion + official wording, test(s), WCAG mapping + level, finding, expected state, verification, `file:line` occurrences — rendered identically by the `report` (compliance doc), the `prd` backlog and the GitHub issues, in the active standard's vocabulary and **in your language** (`--lang auto` follows the conversation/repo). **WCAG is the worldwide core; country standards (RGAA, …) are pluggable in-repo packs.**
 
 ultra11y is built around an honest **division of labour**. Automated tools only catch a fraction of accessibility problems, so the engine does the *mechanical* work — 78 machine-detectable static checks tied to the WCAG 2.2 success criteria — and is explicit about everything it can't decide statically. What it can't, the **AI agent adjudicates** (statically, from the evidence, gated by `verify`/`check`) — not a deferral to a human:
