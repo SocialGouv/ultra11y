@@ -35,9 +35,19 @@ edit("src/types.ts", (s) => s.replace(/(export const VERSION = ")[^"]+(";)/, `$1
 // Each skill's SKILL.md — the indented `version:` under the `metadata:` block.
 // BOTH skills ship from this repo; forgetting one leaves its published
 // frontmatter (and, without the matching .releaserc asset, its bundle) stale.
+// NOTE: setVersionField rewrites the FIRST indented `version:` line, so any new
+// frontmatter key added above `metadata:` must not itself be an indented
+// `version:` — verify-skill-bundle.mjs also asserts the shape.
 edit("skills/ultra11y/SKILL.md", setVersionField);
 edit("skills/review-a11y/SKILL.md", setVersionField);
 
+// The Claude Code plugin manifests — what carries the automatic-review hook. A stale
+// version here is what makes an installed plugin report the wrong engine; both list it,
+// so both are rewritten (verify-skill-bundle.mjs fails the build if they drift).
+const setJsonVersion = (s) => s.replace(/("version":\s*")[^"]+(")/, `$1${version}$2`);
+edit(".claude-plugin/plugin.json", setJsonVersion);
+edit(".claude-plugin/marketplace.json", setJsonVersion);
+
 console.log(
-  `sync-version: set ${version} in package.json, src/types.ts, skills/ultra11y/SKILL.md, skills/review-a11y/SKILL.md`,
+  `sync-version: set ${version} in package.json, src/types.ts, skills/ultra11y/SKILL.md, skills/review-a11y/SKILL.md, .claude-plugin/plugin.json, .claude-plugin/marketplace.json`,
 );

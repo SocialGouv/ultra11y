@@ -10,6 +10,43 @@ node scripts/ultra11y.mjs init --ci            # .github/workflows/a11y.yml (PR 
 node scripts/ultra11y.mjs init --baseline …    # opt into the legacy regression gate (below)
 ```
 
+## Three gates, three different jobs
+
+| | what runs | when | who decides |
+|---|---|---|---|
+| `init --hook` | the engine, mechanically | every `git commit` | the engine's `--fail-on` |
+| `init --ci` | the engine, in CI | every pull request | the engine's `--fail-on` |
+| the **Claude Code plugin hook** | the `review-a11y` **skill** | a pending commit / push / PR, inside an agent session | the AI agent, adjudicating |
+
+The first two block on what a machine can decide. The third exists because most of WCAG is
+*judgment* — is this `alt` relevant, is this link's purpose clear — which no exit code
+settles. See below.
+
+## The Claude Code plugin hook — the agent review, unprompted
+
+Shipped by the plugin (`hooks/hooks.json` → `hooks/pre-tool-use.mjs` → `ultra11y hook
+--claude-code`), not by `init`. Claude Code has no git event, so it listens on `PreToolUse`
+for the Bash tool and recognises the commands that **publish** work — `git commit` (scoped
+to `--staged`), `git push` and `gh pr create` (scoped to `--since <default branch>`). When
+the change carries findings at or above the threshold it returns `permissionDecision:
+"deny"` with the findings attached, and the agent invokes `review-a11y` to adjudicate them.
+
+Two invariants make it liveable:
+
+- **It never fires twice for the same findings.** The finding set is fingerprinted per
+  session, so the retry after a review always goes through — a review that refutes
+  everything still lets the commit land.
+- **It never breaks a git flow.** Git's own `no-verify` bypass, a dry run, a cwd outside a
+  repository, an unresolvable base ref, an engine error or a timeout all resolve to silence,
+  never to an error the user has to work around.
+
+Threshold and off-switches: `ULTRA11Y_HOOK_FAIL_ON=blocking|major|minor|off` (env, wins),
+then `"hook": { "failOn": … }` in `.ultra11yrc.json`, else `blocking`. `SKIP_A11Y=1` (the
+same bypass as the pre-commit hook) and `ULTRA11Y_HOOK=off` disable it outright.
+
+A hook **cannot force** a skill invocation — it blocks and hands over the reason, the agent
+invokes. And a plugin's hooks are enabled by enabling the plugin, not by the install alone.
+
 ## Default: strict staged snapshot + safe auto-fix
 
 The default pre-commit hook operates on **exactly what is about to be committed** — the

@@ -31,6 +31,10 @@ export interface Ultra11yConfig {
   // `note`. Applied AFTER packs are registered (registry.enableSecondaryMapping): a pack
   // ships the mapping DISABLED; this flips it on (or appends a new enabled one).
   secondaryMappings?: Array<{ standard: string; ruleId: string; criterion: string; note?: LocaleString }>;
+  // The Claude Code PreToolUse hook (src/hook.ts), shipped by the plugin. `failOn` is the
+  // severity at which a pending commit/push/PR asks the agent for a11y review; "off"
+  // disables the hook for this repo. Absent ⇒ "blocking", matching `init --hook`.
+  hook?: { failOn?: string };
 }
 
 export interface LoadResult {

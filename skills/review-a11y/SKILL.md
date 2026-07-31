@@ -1,6 +1,8 @@
 ---
 name: review-a11y
 description: "Use to REVIEW code changes for accessibility — '/review-a11y', 'review my changes/PR/branch for a11y', 'accessibility review of this diff'. Scopes to exactly the code under change (staged files, working diff, or branch vs merge-base), runs the bundled install-free ultra11y engine (node scripts/ultra11y.mjs, no keys; static WCAG 2.2 AA checks tied to success criteria, cross-file JSX/TSX via --graph), then adds YOUR judgment: refute false positives (SFC/library-source findings are preliminary), decide alt relevance and link purpose, name the rendering criteria (contrast, focus, zoom) as residual risks — never invent a non-conformity. Output: a severity-ranked review (blocking → major → minor) with file:line, concrete fixes, residual risks and a one-line verdict, in the conversation's language (technical tokens stay in English). Companion of the ultra11y skill (full audits, reports, PRD, RGAA packs). Triggers: 'review a11y', 'a11y review', 'accessibility review'."
+when_to_use: "Invoke WITHOUT being asked whenever changed front-end code should be checked: the user just finished or modified a component, template, page or stylesheet; is about to commit, push or open a pull request; asks 'is this accessible?' or 'anything to fix before merge?'; a diff, branch or PR is under discussion; or a hook or CI reports accessibility findings on the change. NOT for a whole-repo audit, a dated conformance report, an RGAA/Section 508 deliverable or a PRD backlog — that is the `ultra11y` skill."
+allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs *), Read, Grep, Glob
 license: MIT
 metadata:
   version: 2.25.0
@@ -112,8 +114,12 @@ rendered DOM; residual risks listed above.
 - **Formal deliverables** (dated report, auditor conformance blocks, PRD backlog, GitHub
   issues, RGAA/country-standard vocabulary): that is the `ultra11y` skill — same engine,
   same findings (`report`, `prd`, `check`/`verify` gates).
-- **Make it automatic**: the `ultra11y` skill's `init --hook` installs a pre-commit gate
-  running this same staged review mechanically.
+- **Make it automatic**: installed as a **Claude Code plugin**, a `PreToolUse` hook stops a
+  pending `git commit` / `git push` / `gh pr create` that carries findings and hands them
+  over — that is what invokes this skill without anyone asking. It never fires twice for the
+  same findings, so a retry lands. For a gate that does not need an agent at all, the
+  `ultra11y` skill's `init --hook` installs a mechanical pre-commit run of this same staged
+  audit.
 
 ## Do not
 

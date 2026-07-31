@@ -45,6 +45,32 @@ install-free engine.
 npx skills add maxgfr/ultra11y
 ```
 
+**As a Claude Code plugin** — the same two skills, plus the hook that makes the review
+**automatic**. Installed this way, a pending `git commit`, `git push` or `gh pr create`
+that carries accessibility findings is stopped once and the agent is handed the findings,
+so `review-a11y` runs before the work goes out — you never type the skill's name.
+
+```
+/plugin marketplace add maxgfr/ultra11y
+/plugin install ultra11y@ultra11y
+```
+
+Three things worth knowing, because they bound what "automatic" means here:
+
+- A hook **cannot force** a skill to be invoked. It blocks the command and hands over the
+  reason and the findings; the agent is what invokes `review-a11y`. In practice a motivated
+  `deny` is enough — it is not a guarantee.
+- **Hooks do not enable themselves.** Installing the plugin is what turns them on.
+- Claude Code has **no git event** (no `PreCommit`, no `PRCreated`), which is why the hook
+  listens on `PreToolUse` for the Bash tool and recognises the commands that publish work.
+
+The gate never blocks twice for the same findings, so a retry always lands. It stays out of
+the way when git's own `no-verify` bypass is used, outside a repository, and whenever the
+engine cannot answer.
+Disable it per-repo with `"hook": { "failOn": "off" }` in `.ultra11yrc.json`, per-command
+with `SKIP_A11Y=1`, or per-session with `ULTRA11Y_HOOK=off`; raise or lower the bar with
+`ULTRA11Y_HOOK_FAIL_ON=blocking|major|minor` (default `blocking`).
+
 **As an MCP server** — so an agent drives the engine as tools instead of shelling out:
 
 ```sh

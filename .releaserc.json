@@ -25,6 +25,8 @@
           "src/types.ts",
           "skills/ultra11y/SKILL.md",
           "skills/review-a11y/SKILL.md",
+          ".claude-plugin/plugin.json",
+          ".claude-plugin/marketplace.json",
           "CHANGELOG.md",
           "scripts/ultra11y.mjs",
           "skills/ultra11y/scripts/ultra11y.mjs",

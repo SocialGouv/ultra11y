@@ -15,9 +15,47 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Claude Code matches skill descriptions at <=1024 chars; 1000 leaves a safety
-// margin so a future edit can't silently cross the cap.
-const DESC_MAX = 1000;
+// Claude Code truncates the COMBINED `description` + `when_to_use` text at 1536
+// chars in the skill listing — that listing is what the model matches a task
+// against, so anything past the cut is invisible and the skill silently stops
+// auto-invoking. 1500 leaves a safety margin. NOTE: the budget is shared, not
+// per-field: growing `description` eats into `when_to_use` and vice versa.
+const LISTING_MAX = 1500;
+
+// Frontmatter keys Claude Code understands, plus the two this repo carries
+// (`license`, `metadata`). An unknown key at the root is almost always a typo
+// — `when-to-use` for `when_to_use` costs the whole automatic trigger and
+// otherwise fails silently, so it is a hard error here.
+const KNOWN_KEYS = new Set([
+  "name",
+  "description",
+  "when_to_use",
+  "argument-hint",
+  "arguments",
+  "disable-model-invocation",
+  "user-invocable",
+  "allowed-tools",
+  "disallowed-tools",
+  "model",
+  "effort",
+  "context",
+  "agent",
+  "background",
+  "hooks",
+  "paths",
+  "shell",
+  "license",
+  "metadata",
+]);
+
+/** A single-line, optionally quoted frontmatter scalar. The frontmatter here is
+ *  deliberately kept single-line-per-key (no folded `>-` blocks) so this regex
+ *  read stays honest — `sync-version.mjs` relies on the same shape. */
+const scalar = (fm, key) =>
+  fm
+    .match(new RegExp(`^${key}:\\s*(.+)$`, "m"))?.[1]
+    ?.trim()
+    .replace(/^["']|["']$/g, "") ?? null;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
@@ -55,13 +93,24 @@ for (const name of skillNames) {
   if (!fm) bad(`skills/${name}/SKILL.md has no frontmatter block`);
   else {
     ok("packaged SKILL.md present with frontmatter");
-    const nameLine = fm[1].match(/^name:\s*(.+)$/m)?.[1]?.trim();
+    const nameLine = scalar(fm[1], "name");
     nameLine === name ? ok(`frontmatter name "${name}" matches its directory`) : bad(`frontmatter name "${nameLine}" != skill directory "${name}"`);
-    const desc = fm[1].match(/^description:\s*(.+)$/m)?.[1]?.trim();
+
+    // Only root-level keys: `metadata:`'s children are indented, so ^ under /m skips them.
+    const unknown = [...fm[1].matchAll(/^([A-Za-z][\w-]*):/gm)].map((m) => m[1]).filter((k) => !KNOWN_KEYS.has(k));
+    unknown.length === 0
+      ? ok("frontmatter keys are all recognised")
+      : bad(`skills/${name}: unknown frontmatter key(s) ${unknown.map((k) => `"${k}"`).join(", ")} — a typo here fails silently (e.g. "when-to-use" instead of "when_to_use")`);
+
+    const desc = scalar(fm[1], "description");
+    const when = scalar(fm[1], "when_to_use");
     if (!desc) bad(`skills/${name}: frontmatter has no description`);
     else {
-      const len = desc.replace(/^["']|["']$/g, "").length;
-      len <= DESC_MAX ? ok(`description ${len} chars (<= ${DESC_MAX} safety cap)`) : bad(`skills/${name}: description ${len} chars exceeds the ${DESC_MAX}-char safety cap (matcher limit is 1024)`);
+      const total = desc.length + (when?.length ?? 0);
+      const parts = `description ${desc.length}${when ? ` + when_to_use ${when.length}` : ""} = ${total}`;
+      total <= LISTING_MAX
+        ? ok(`${parts} chars (<= ${LISTING_MAX} safety cap)`)
+        : bad(`skills/${name}: ${parts} chars exceeds the ${LISTING_MAX}-char safety cap — Claude Code truncates the listing at 1536 and the tail stops matching`);
     }
   }
 
@@ -83,6 +132,54 @@ for (const name of skillNames) {
       ? ok(`embedded engine skills/${name}/${engine} is byte-identical to ${engine}`)
       : bad(`skills/${name}/${engine} differs from ${engine} — run \`node scripts/copy-bundle.mjs\` and commit`);
 }
+
+// 5. The Claude Code PLUGIN shape, which is what carries the hooks. `skills add`
+//    installs skills only; the automatic pre-PR review needs the plugin manifests
+//    and the hook guard to ship together, so their absence is a hard failure.
+console.log("plugin:");
+const readJson = (rel) => {
+  const p = join(root, rel);
+  if (!existsSync(p)) {
+    bad(`missing ${rel} — the plugin would not install (no hooks, so no automatic review)`);
+    return null;
+  }
+  try {
+    return JSON.parse(readFileSync(p, "utf8"));
+  } catch (e) {
+    bad(`${rel} is not valid JSON: ${e.message}`);
+    return null;
+  }
+};
+
+const plugin = readJson(".claude-plugin/plugin.json");
+if (plugin) {
+  plugin.name === pkg.name ? ok(`plugin.json name "${plugin.name}" matches the package`) : bad(`.claude-plugin/plugin.json name "${plugin.name}" != package name "${pkg.name}"`);
+  plugin.version === pkg.version
+    ? ok(`plugin.json version ${plugin.version} matches the package`)
+    : bad(`.claude-plugin/plugin.json version "${plugin.version}" != package version "${pkg.version}" — add it to scripts/sync-version.mjs`);
+  plugin.description ? ok("plugin.json has a description") : bad(".claude-plugin/plugin.json has no description (required)");
+}
+
+const marketplace = readJson(".claude-plugin/marketplace.json");
+if (marketplace) {
+  Array.isArray(marketplace.plugins) && marketplace.plugins.some((p) => p.name === pkg.name)
+    ? ok(`marketplace.json lists the "${pkg.name}" plugin`)
+    : bad(`.claude-plugin/marketplace.json does not list a plugin named "${pkg.name}"`);
+}
+
+const hooksJson = readJson("hooks/hooks.json");
+if (hooksJson) {
+  Array.isArray(hooksJson.hooks?.PreToolUse) && hooksJson.hooks.PreToolUse.length > 0
+    ? ok("hooks.json declares a PreToolUse hook")
+    : bad("hooks/hooks.json declares no PreToolUse hook — nothing would trigger the review before a commit/push/PR");
+}
+
+existsSync(join(root, "hooks/pre-tool-use.mjs"))
+  ? ok("hooks/pre-tool-use.mjs present")
+  : bad("missing hooks/pre-tool-use.mjs — hooks.json points at a guard that does not exist");
+
+for (const f of [".claude-plugin", "hooks"])
+  (pkg.files ?? []).includes(f) ? ok(`package.json files[] carries ${f}/`) : bad(`package.json "files" is missing "${f}" — the npm tarball would ship without it`);
 
 if (errors.length) {
   console.error(`\nverify-skill-bundle: ${errors.length} problem(s) — a published skill would not install correctly.`);

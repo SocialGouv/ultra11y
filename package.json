@@ -11,7 +11,9 @@
     "scripts",
     "src",
     "skills",
-    "docker"
+    "docker",
+    ".claude-plugin",
+    "hooks"
   ],
   "engines": {
     "node": ">=22.18.0"

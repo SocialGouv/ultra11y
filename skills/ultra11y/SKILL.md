@@ -1,6 +1,7 @@
 ---
 name: ultra11y
 description: "Use to AUDIT existing HTML/CSS/JSX against WCAG 2.2 AA accessibility and produce a dated auditor-conformance report, OR to AUTHOR/REVIEW accessible markup (native-HTML-first, ARIA last). An install-free engine (`node scripts/ultra11y.mjs`, no keys) runs 78 static checks tied to WCAG criteria — alt/lang/title, unlabeled fields, empty links/buttons, tables, headings, ARIA vocabulary, label-in-name, autocomplete — measured against the official W3C ACT corpus. The engine decides 3 of the 55 criteria; the AI agent adjudicates the 38 judgment ones from harvested evidence + a per-criterion decision protocol (`verify --manual`, gated, fannable via `orchestrate`), and the 14 rendering ones go to `scan` — never silently conforming. Library/SFC code is audited as RENDERED captures (`render --setup`); country standards are pluggable packs (`--standard rgaa`, `scan --sample`). check/verify reject invented non-conformities. Triggers: 'audit WCAG/a11y', 'make accessible', 'fix a11y', 'audit RGAA'."
+when_to_use: "Invoke when the user asks for an accessibility AUDIT or a formal deliverable: audit a repo, site or page against WCAG 2.2 AA or a country standard (RGAA, Section 508, EN 301 549); produce a dated conformance report, a criterion grid, a PRD remediation backlog or GitHub issues; author accessible markup from scratch; wire the repo gate (init --hook/--ci) or a rendered-DOM capture pipeline. For a review of the code UNDER CHANGE (diff, branch, PR), use the `review-a11y` skill instead."
 license: MIT
 metadata:
   version: 2.25.0
@@ -154,7 +155,9 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 - **"Automatic repo gate (hook / CI)"** → `init --hook` writes a git pre-commit gate over
   the **strict staged snapshot** (audits the exact index blobs, auto-applies safe fixes and
   re-stages them, blocks only on judgment issues); `init --baseline`/`--ci` is the opt-in
-  "block only NEW non-conformities" variant. For library/SFC code, commit rendered
+  "block only NEW non-conformities" variant. Installed as a **Claude Code plugin**, a third
+  gate runs the `review-a11y` *skill* (not just the engine) on a pending commit/push/PR —
+  that one is shipped by the plugin, not by `init`. For library/SFC code, commit rendered
   **captures** (`render --setup`) and stage them so the real semantic HTML is what's
   checked (`audit --require-captures`); read **`references/automation.md`**.
 - **"Show me the problems while I build the page"** → `dev --next` writes a one-line overlay

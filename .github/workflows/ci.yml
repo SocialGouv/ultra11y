@@ -87,6 +87,36 @@ jobs:
           node "$RDIR/scripts/ultra11y.mjs" --help > /dev/null || { echo "::error::review-a11y installed engine does not run"; exit 1; }
           echo "install-bundle: both skills installed whole and their engines run."
 
+      # The PLUGIN half — the manifests + the PreToolUse guard, which is what makes the
+      # review automatic. `skills add` never installs hooks, so nothing above covers it.
+      - name: End-to-end — the PreToolUse guard decides correctly
+        run: |
+          GUARD="$GITHUB_WORKSPACE/hooks/pre-tool-use.mjs"
+          WORK="$(mktemp -d)"; cd "$WORK"
+          git init -q . && git config user.email ci@ci && git config user.name ci
+
+          # A command that publishes nothing must be a silent no-op — this runs before
+          # EVERY Bash call, so any output here would be noise on every shell command.
+          payload() { printf '{"tool_name":"Bash","tool_input":{"command":"%s"},"cwd":"%s","session_id":"%s"}' "$1" "$WORK" "$2"; }
+          out="$(payload 'ls -la' ci1 | node "$GUARD")"
+          [ -z "$out" ] || { echo "::error::guard spoke on a non-git command: $out"; exit 1; }
+
+          # A commit carrying a blocking non-conformity must deny and name the skill.
+          printf '<!doctype html><html lang="en"><head><title>t</title></head><body><img src="a.png"></body></html>\n' > page.html
+          git add page.html
+          out="$(payload 'git commit -m wip' ci2 | node "$GUARD")"
+          echo "$out" | grep -q '"permissionDecision":"deny"' || { echo "::error::guard did not deny a commit with a blocking finding: $out"; exit 1; }
+          echo "$out" | grep -q 'review-a11y' || { echo "::error::guard did not point at the review-a11y skill: $out"; exit 1; }
+
+          # And it must NOT fire twice on the same findings, or the commit could never land.
+          out="$(payload 'git commit -m wip' ci2 | node "$GUARD")"
+          [ -z "$out" ] || { echo "::error::guard fired twice on the same change — a retry would loop: $out"; exit 1; }
+
+          # The documented escape hatch has to work, unconditionally.
+          out="$(payload 'git commit -m wip' ci3 | SKIP_A11Y=1 node "$GUARD")"
+          [ -z "$out" ] || { echo "::error::SKIP_A11Y=1 did not disable the guard: $out"; exit 1; }
+          echo "install-bundle: the PreToolUse guard denies, points at the skill, does not loop, and honours SKIP_A11Y."
+
   # The shipped scripts/ultra11y.mjs is an install-free bundle declaring
   # engines.node ">=22.18" (the floor @babel/parser 8 requires). This job runs ONLY
   # the committed bundle on that floor, with no install, to guarantee the published

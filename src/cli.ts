@@ -3,6 +3,7 @@ import { join, relative, sep, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { VERSION, type Lang, type AuditResult, type DynamicResult, type SampleConfig, type Severity } from "./types.js";
 import { runAudit } from "./audit.js";
+import { decide, type PreToolUsePayload } from "./hook.js";
 import { writeReport, untestedNeedsRendering, partialAuditBanner } from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
 import { ghAvailable, pushIssues, pushPrComment, pushSingleIssue } from "./gh.js";
@@ -81,6 +82,7 @@ Usage:
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
   ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
+  ultra11y hook     --claude-code                (internal: the plugin's PreToolUse hook; payload on stdin)
   ultra11y dev      [--port <n>] [--root <dir>] [--standard <pack>] [--lang auto|en|fr]   (dev side-car: live overlay + per-page dashboard)
   ultra11y dev      --next [--port <n>]        (write the Next overlay component, then wire one line into your layout)
 
@@ -221,6 +223,13 @@ Commands:
              --transport http listens on 127.0.0.1 (--port, --bind), and stays
              loopback-only unless you pass --allow-remote. Read-only by default:
              --allow-write opts into the commands that touch files.
+  hook       INTERNAL — the decision half of the Claude Code plugin's PreToolUse
+             hook. Reads the payload on stdin; when a pending 'git commit', 'git
+             push' or 'gh pr create' carries findings >= the threshold, prints the
+             hook JSON that gets the review-a11y skill invoked, and prints nothing
+             otherwise. Threshold: ULTRA11Y_HOOK_FAIL_ON, else hook.failOn in
+             .ultra11yrc.json, else blocking. Disable with ULTRA11Y_HOOK=off or
+             SKIP_A11Y=1. Called by hooks/pre-tool-use.mjs, not by hand.
   pages      The per-page criterion grid — RGAA is a per-page norm, the engine's
              verdict is scope-wide, and this bridges the two. One row per criterion
              (the pack's own under --standard), one column per page. Rebuilt from a
@@ -376,6 +385,7 @@ const COMMANDS = [
   "init",
   "pack",
   "orchestrate",
+  "hook",
 ] as const;
 type Command = (typeof COMMANDS)[number];
 
@@ -1076,6 +1086,25 @@ function cmdInit(p: ParsedArgs): number {
   for (const w of wrote) console.log(`ultra11y init: wrote ${w}`);
   if (want.baseline) console.log(`ultra11y init: done. Commit audits/baseline.json so the gate has a reference.`);
   else console.log(`ultra11y init: done. The pre-commit gate audits staged changes and auto-applies safe fixes (bypass once with SKIP_A11Y=1).`);
+  return 0;
+}
+
+/** `hook --claude-code` — the decision half of the plugin's PreToolUse hook. Reads the
+ *  payload on stdin, prints the hook JSON when the pending commit/push/PR should get an
+ *  accessibility review first, and prints NOTHING otherwise. Not meant to be run by hand:
+ *  `hooks/pre-tool-use.mjs` is what Claude Code calls, and it only reaches here once its
+ *  cheap prefilter has passed. Always exits 0 — see src/hook.ts for why. */
+async function cmdHook(p: ParsedArgs): Promise<number> {
+  if (p.flags["claude-code"] !== true) {
+    console.error("ultra11y hook: expected `hook --claude-code` (the payload is read on stdin).");
+    return 2;
+  }
+  try {
+    const decision = decide(JSON.parse(await readStdin()) as PreToolUsePayload);
+    if (decision) process.stdout.write(JSON.stringify(decision));
+  } catch {
+    /* unreadable payload, engine failure — stay silent rather than break a git flow */
+  }
   return 0;
 }
 
@@ -2359,6 +2388,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdOrchestrate(p);
     case "mcp":
       return cmdMcp(p);
+    case "hook":
+      return cmdHook(p);
     default:
       console.error(`ultra11y: "${p.command}" is not implemented yet`);
       return 1;
