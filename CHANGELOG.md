@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [2.28.0](https://github.com/maxgfr/ultra11y/compare/v2.27.0...v2.28.0) (2026-08-01)
+
+
+### Features
+
+* **harness:** run the automatic a11y review on Codex CLI and OpenCode ([d9775e0](https://github.com/maxgfr/ultra11y/commit/d9775e0c04deac552b689fe34f13ad025a2d7172))
+
 # [2.27.0](https://github.com/maxgfr/ultra11y/compare/v2.26.0...v2.27.0) (2026-08-01)
 
 
