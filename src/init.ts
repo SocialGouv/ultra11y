@@ -5,9 +5,9 @@
 // --write --safe`) and re-stages them, blocking only on issues that need judgment. The
 // legacy baseline regression gate (`audit --changed --baseline … --fail-on …`, blocking
 // only NEW findings) stays available via `init --baseline` and the CI workflow.
-import { writeFileSync, mkdirSync, chmodSync } from "node:fs";
+import { writeFileSync, mkdirSync, chmodSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { VERSION, type Severity } from "./types.js";
 
 // English --fail-on token written into generated hooks/CI (the tool is English-first;
@@ -20,6 +20,30 @@ export function repoRoot(): string | null {
   } catch {
     return null;
   }
+}
+
+/** Where the running engine lives, as a path to bake into a generated file. Relative to
+ *  `root` when the bundle sits inside it (so a committed git hook keeps working after a
+ *  clone), absolute otherwise. Callers that need a runnable COMMAND, not a path, should
+ *  use `engineInvocation`. */
+export function resolveEnginePath(root: string): string {
+  const argv1 = process.argv[1] ?? "scripts/ultra11y.mjs";
+  try {
+    const abs = realpathSync(argv1);
+    return abs.startsWith(root + sep) ? relative(root, abs) : abs;
+  } catch {
+    return argv1;
+  }
+}
+
+/** The command a human or an agent can paste to run the engine from `root`.
+ *  `node <relpath>` when the bundle is vendored in the repo (no install, no network),
+ *  `npx -y ultra11y` when it lives outside — where a bare path would break the moment the
+ *  reader is on another machine. Used by the AGENTS.md block, which is read by agents that
+ *  have no skill system and so cannot be handed a resolved path. */
+export function engineInvocation(root: string): string {
+  const p = resolveEnginePath(root);
+  return p.startsWith("/") || p.startsWith("..") ? "npx -y ultra11y" : `node ${p}`;
 }
 
 /** POSIX `sh` pre-commit hook (default, strict staged snapshot). Operates on EXACTLY the

@@ -27,6 +27,8 @@
           "skills/review-a11y/SKILL.md",
           ".claude-plugin/plugin.json",
           ".claude-plugin/marketplace.json",
+          ".codex-plugin/plugin.json",
+          ".opencode/plugins/ultra11y.js",
           "CHANGELOG.md",
           "scripts/ultra11y.mjs",
           "skills/ultra11y/scripts/ultra11y.mjs",

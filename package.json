@@ -13,6 +13,9 @@
     "skills",
     "docker",
     ".claude-plugin",
+    ".codex-plugin",
+    ".agents",
+    ".opencode",
     "hooks"
   ],
   "engines": {
@@ -75,5 +78,6 @@
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "main": ".opencode/plugins/ultra11y.js"
 }

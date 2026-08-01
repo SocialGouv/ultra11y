@@ -32,7 +32,9 @@ import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, 
 import { validateSample, lintSample, kindLabel } from "./sample.js";
 import { runFix, fixSummary } from "./fix.js";
 import { diffAgainstBaseline, baselineSummary, parseFailOn, findingsAtOrAbove } from "./baseline.js";
-import { repoRoot, writeHook, writeCi } from "./init.js";
+import { repoRoot, resolveEnginePath, writeHook, writeCi } from "./init.js";
+import { installForTargets, parseTargets, statusReport, uninstallForTargets } from "./install/index.js";
+import { agentsMdBlock } from "./install/agents-md.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
 import { toSarif } from "./sarif.js";
 import { annotations, stepSummary } from "./annotate.js";
@@ -82,7 +84,10 @@ Usage:
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
   ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
-  ultra11y hook     --claude-code                (internal: the plugin's PreToolUse hook; payload on stdin)
+  ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
+  ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
+  ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
+  ultra11y status   [--json] [--project]        (doctor: which agents will run the review by themselves)
   ultra11y dev      [--port <n>] [--root <dir>] [--standard <pack>] [--lang auto|en|fr]   (dev side-car: live overlay + per-page dashboard)
   ultra11y dev      --next [--port <n>]        (write the Next overlay component, then wire one line into your layout)
 
@@ -386,6 +391,9 @@ const COMMANDS = [
   "pack",
   "orchestrate",
   "hook",
+  "install",
+  "uninstall",
+  "status",
 ] as const;
 type Command = (typeof COMMANDS)[number];
 
@@ -494,6 +502,15 @@ const BOOLEAN_FLAGS = new Set([
   "version",
   "allow-remote",
   "allow-write",
+  // Harness selectors, shared by `hook` and `install`/`uninstall`/`status`. Without these
+  // the parser warned "unknown flag --claude-code" on stderr on EVERY guarded shell call.
+  "claude-code",
+  "codex",
+  "opencode",
+  "agents-md",
+  "all",
+  "project",
+  "no-skills",
 ]);
 const KNOWN_FLAGS: ReadonlySet<string> = new Set<string>([...VALUE_FLAGS, ...BOOLEAN_FLAGS]);
 // Long flags whose repetition should accumulate (comma-joined) rather than last-wins,
@@ -1053,13 +1070,7 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
 
 function cmdInit(p: ParsedArgs): number {
   const root = repoRoot() ?? process.cwd();
-  let engineRel = process.argv[1] ?? "scripts/ultra11y.mjs";
-  try {
-    const abs = realpathSync(engineRel);
-    engineRel = abs.startsWith(root + sep) ? relative(root, abs) : abs;
-  } catch {
-    /* keep as-is */
-  }
+  const engineRel = resolveEnginePath(root);
   const failOnParsed = parseFailOn(p.flags["fail-on"]);
   if (p.flags["fail-on"] !== undefined && failOnParsed === null) {
     console.error(`ultra11y init: --fail-on must be blocking|major|minor (got "${String(p.flags["fail-on"])}").`);
@@ -1089,21 +1100,103 @@ function cmdInit(p: ParsedArgs): number {
   return 0;
 }
 
-/** `hook --claude-code` — the decision half of the plugin's PreToolUse hook. Reads the
- *  payload on stdin, prints the hook JSON when the pending commit/push/PR should get an
- *  accessibility review first, and prints NOTHING otherwise. Not meant to be run by hand:
- *  `hooks/pre-tool-use.mjs` is what Claude Code calls, and it only reaches here once its
- *  cheap prefilter has passed. Always exits 0 — see src/hook.ts for why. */
+/** `hook --claude-code|--codex|--opencode` — the decision half of the PreToolUse hook.
+ *  Reads the payload on stdin, emits when the pending commit/push/PR should get an
+ *  accessibility review first, and emits NOTHING otherwise. Not meant to be run by hand:
+ *  `hooks/pre-tool-use.mjs` (Claude Code, Codex) and `.opencode/plugins/ultra11y.js`
+ *  (OpenCode) are what call it, and only once their cheap prefilter has passed. Always
+ *  exits 0 — see src/hook.ts for why.
+ *
+ *  Two output shapes:
+ *  - `--claude-code` / `--codex`: the `hookSpecificOutput` JSON envelope. Codex's PreToolUse
+ *    is a clone of Claude Code's and accepts exactly the one decision this emits (`deny`),
+ *    so the two are the same code path today. The flag is kept distinct anyway: it gives
+ *    `status` a marker to grep for, and it is where the branch goes the day they diverge.
+ *  - `--opencode`: plain text. OpenCode has no permission-decision channel — its plugin
+ *    blocks by throwing, with the message shown to the agent — so the message is assembled
+ *    here, in typed code, rather than in a committed .js file no type-checker covers. */
 async function cmdHook(p: ParsedArgs): Promise<number> {
-  if (p.flags["claude-code"] !== true) {
-    console.error("ultra11y hook: expected `hook --claude-code` (the payload is read on stdin).");
+  const opencode = p.flags.opencode === true;
+  if (!opencode && p.flags["claude-code"] !== true && p.flags.codex !== true) {
+    console.error("ultra11y hook: expected `hook --claude-code`, `--codex` or `--opencode` (the payload is read on stdin).");
     return 2;
   }
   try {
     const decision = decide(JSON.parse(await readStdin()) as PreToolUsePayload);
-    if (decision) process.stdout.write(JSON.stringify(decision));
+    if (!decision) return 0;
+    const out = decision.hookSpecificOutput;
+    process.stdout.write(opencode ? `${out.permissionDecisionReason}\n\n${out.additionalContext}` : JSON.stringify(decision));
   } catch {
     /* unreadable payload, engine failure — stay silent rather than break a git flow */
+  }
+  return 0;
+}
+
+const TARGET_FLAGS = "--claude-code | --codex | --opencode | --agents-md | --all";
+
+/** `install --<harness>` — wire the automatic review into an agent on this machine.
+ *
+ *  The native route is better where it exists (`/plugin install` on Claude Code,
+ *  `codex plugin add` on Codex): a plugin carries the skills and the hook together and
+ *  updates as one thing. This exists for what a plugin cannot do — wiring the gate for an
+ *  npm install, and the AGENTS.md fallback on harnesses with no plugin system at all. */
+function cmdInstall(p: ParsedArgs): number {
+  const targets = parseTargets(p.flags);
+  if (!targets) {
+    console.error(`ultra11y install: pick at least one target: ${TARGET_FLAGS}`);
+    console.error("  --all covers the agent harnesses; --agents-md is separate because it writes a tracked file into your repository.");
+    return 2;
+  }
+  const dryRun = p.flags["dry-run"] === true;
+  // --dry-run on the AGENTS.md target prints the block itself: it is the one output a user
+  // may want to paste elsewhere (CLAUDE.md, GEMINI.md, .cursor/rules) by hand.
+  if (dryRun && targets.includes("agents-md")) {
+    console.log(agentsMdBlock(repoRoot() ?? process.cwd()));
+    if (targets.length === 1) return 0;
+  }
+  const results = installForTargets({ targets, project: p.flags.project === true, dryRun, skills: p.flags["no-skills"] !== true });
+  return reportInstall(results, dryRun ? "would wire" : "wired");
+}
+
+function cmdUninstall(p: ParsedArgs): number {
+  const targets = parseTargets(p.flags);
+  if (!targets) {
+    console.error(`ultra11y uninstall: pick at least one target: ${TARGET_FLAGS}`);
+    return 2;
+  }
+  return reportInstall(uninstallForTargets({ targets, project: p.flags.project === true }), "removed");
+}
+
+/** Shared printer. Exit 0 when every target succeeded, 1 when some did not — so a script
+ *  can tell "wired three of three" from "wired two and one is broken". */
+function reportInstall(results: ReturnType<typeof installForTargets>, verb: string): number {
+  let failed = 0;
+  for (const r of results) {
+    if (r.error) {
+      failed++;
+      console.error(`ultra11y: ${r.error}`);
+      continue;
+    }
+    const changed = r.reports.filter((x) => x.changed);
+    if (changed.length === 0) console.log(`ultra11y ${r.target}: already ${verb} (nothing to do)`);
+    for (const x of changed) console.log(`ultra11y ${r.target}: ${verb} ${x.path}${x.backup ? ` (backed up to ${x.backup})` : ""}`);
+    for (const g of r.guidance) console.log(`  ${g}`);
+  }
+  return failed ? 1 : 0;
+}
+
+/** `status` — the doctor. Answers "is the automatic review actually going to fire?", which
+ *  is otherwise invisible until a commit that should have been stopped goes through. */
+function cmdStatus(p: ParsedArgs): number {
+  const rows = statusReport({ project: p.flags.project === true });
+  if (p.flags.json === true) {
+    console.log(JSON.stringify({ version: VERSION, targets: rows }, null, 2));
+    return 0;
+  }
+  console.log(`ultra11y ${VERSION}`);
+  for (const r of rows) {
+    console.log(`  ${r.target.padEnd(12)} ${r.wired ? "wired    " : "not wired"}  ${r.path}`);
+    if (r.note) console.log(`  ${"".padEnd(12)} ${r.note}`);
   }
   return 0;
 }
@@ -2390,6 +2483,12 @@ export async function main(argv: string[]): Promise<number> {
       return cmdMcp(p);
     case "hook":
       return cmdHook(p);
+    case "install":
+      return cmdInstall(p);
+    case "uninstall":
+      return cmdUninstall(p);
+    case "status":
+      return cmdStatus(p);
     default:
       console.error(`ultra11y: "${p.command}" is not implemented yet`);
       return 1;

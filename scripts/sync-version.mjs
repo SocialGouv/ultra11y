@@ -41,13 +41,21 @@ edit("src/types.ts", (s) => s.replace(/(export const VERSION = ")[^"]+(";)/, `$1
 edit("skills/ultra11y/SKILL.md", setVersionField);
 edit("skills/review-a11y/SKILL.md", setVersionField);
 
-// The Claude Code plugin manifests — what carries the automatic-review hook. A stale
-// version here is what makes an installed plugin report the wrong engine; both list it,
-// so both are rewritten (verify-skill-bundle.mjs fails the build if they drift).
+// The plugin manifests — what carries the automatic-review hook. A stale version here is
+// what makes an installed plugin report the wrong engine, so every harness's manifest is
+// rewritten (verify-skill-bundle.mjs fails the build if they drift). Codex resolves
+// .codex-plugin/plugin.json first and falls back to .claude-plugin/plugin.json, so the two
+// must agree. .agents/plugins/marketplace.json carries no version by design — it points at
+// the repo, and the plugin manifest inside it is the single source of the number.
 const setJsonVersion = (s) => s.replace(/("version":\s*")[^"]+(")/, `$1${version}$2`);
 edit(".claude-plugin/plugin.json", setJsonVersion);
 edit(".claude-plugin/marketplace.json", setJsonVersion);
+edit(".codex-plugin/plugin.json", setJsonVersion);
+
+// The OpenCode plugin is committed JS, not a manifest — its version lives in a constant the
+// installer and `status` read back. verify-skill-bundle.mjs fails the build if it drifts.
+edit(".opencode/plugins/ultra11y.js", (s) => s.replace(/(const ULTRA11Y_PLUGIN_VERSION = ")[^"]+(")/, `$1${version}$2`));
 
 console.log(
-  `sync-version: set ${version} in package.json, src/types.ts, skills/ultra11y/SKILL.md, skills/review-a11y/SKILL.md, .claude-plugin/plugin.json, .claude-plugin/marketplace.json`,
+  `sync-version: set ${version} in package.json, src/types.ts, skills/ultra11y/SKILL.md, skills/review-a11y/SKILL.md, .claude-plugin/plugin.json, .claude-plugin/marketplace.json, .codex-plugin/plugin.json`,
 );

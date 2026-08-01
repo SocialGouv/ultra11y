@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { decide, matchGitIntent, resolveBase, resolveThreshold, scopeFor, type GitIntent } from "../src/hook.js";
+import { commandOf, decide, isShellTool, matchGitIntent, resolveBase, resolveThreshold, scopeFor, type GitIntent } from "../src/hook.js";
 import type { AuditResult, Finding, Severity } from "../src/types.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -58,6 +58,48 @@ describe("matchGitIntent", () => {
       expect(matchGitIntent(command)).toBe(expected);
     });
   }
+});
+
+describe("isShellTool", () => {
+  // Exactly the shells, and NOTHING that merely contains one of their names: BashOutput
+  // and KillShell poll a background shell and fire on every tick, so matching them would
+  // spawn the 2.5 MB engine over and over for nothing.
+  const shells = ["Bash", "bash", "shell", "Shell", "exec", "exec_command", "local_shell", "localshell", "run_command"];
+  const others = ["BashOutput", "KillShell", "Read", "Grep", "Write", "", undefined];
+  for (const n of shells) it(`accepts ${JSON.stringify(n)}`, () => expect(isShellTool(n)).toBe(true));
+  for (const n of others) it(`rejects ${JSON.stringify(n)}`, () => expect(isShellTool(n)).toBe(false));
+});
+
+describe("commandOf", () => {
+  const cases: Array<[string, { command?: unknown } | undefined, string | null]> = [
+    ["a plain string (Claude Code)", { command: "git commit -m x" }, "git commit -m x"],
+    // The trap: joining this yields `bash -lc git commit -m x`, where `git` no longer sits
+    // at a command position, so matchGitIntent would refuse it and the gate would silently
+    // stop firing on Codex. The script argument IS the command.
+    ["a `bash -lc` wrapper (Codex)", { command: ["bash", "-lc", "git commit -m x"] }, "git commit -m x"],
+    ["an absolute `/bin/sh -c` wrapper", { command: ["/bin/sh", "-c", "git push"] }, "git push"],
+    ["a `zsh -ic` wrapper", { command: ["zsh", "-ic", "gh pr create"] }, "gh pr create"],
+    // A direct argv is the opposite case: joining is exactly right, it puts `git` at 0.
+    ["a direct argv", { command: ["git", "commit", "-m", "x"] }, "git commit -m x"],
+    ["a wrapper with no script argument", { command: ["bash", "-lc"] }, "bash -lc"],
+    ["an empty array", { command: [] }, null],
+    ["a missing command", {}, null],
+    ["a numeric command", { command: 42 }, null],
+    ["no tool_input at all", undefined, null],
+  ];
+  for (const [label, input, expected] of cases) {
+    it(`reads ${label}`, () => expect(commandOf(input as { command?: string | string[] })).toBe(expected));
+  }
+
+  it("keeps a non-publishing argv non-publishing", () => {
+    // `git log --oneline push` — OPTS only consumes `-`-prefixed tokens, so `log` breaks
+    // the git…push match. A join must not manufacture an intent that was never there.
+    expect(matchGitIntent(commandOf({ command: ["git", "log", "--oneline", "push"] }) as string)).toBeNull();
+  });
+
+  it("still honours --no-verify inside an argv array", () => {
+    expect(matchGitIntent(commandOf({ command: ["git", "commit", "--no-verify", "-m", "x"] }) as string)).toBeNull();
+  });
 });
 
 describe("scopeFor / resolveBase", () => {
@@ -195,6 +237,18 @@ describe("decide", () => {
     const d = tmpRepo();
     expect(decide(payload("git commit -m x", d), { env: {}, audit: () => null, seen: () => true })).toBeNull();
   });
+
+  it("decides identically for a Claude Code payload and the Codex payload that means the same", () => {
+    // Codex's PreToolUse is a clone of Claude Code's: same envelope, and the one decision
+    // this ever emits (`deny`) is the one Codex accepts. So the two must not merely both
+    // deny — they must produce the SAME object, or `hook --codex` needs its own branch.
+    const d = tmpRepo();
+    const deps = { env: {}, audit: auditWith([finding()]), seen: () => true };
+    const claude = decide({ tool_name: "Bash", tool_input: { command: "git commit -m x" }, cwd: d, session_id: d }, deps);
+    const codex = decide({ tool_name: "shell", tool_input: { command: ["bash", "-lc", "git commit -m x"] }, cwd: d, session_id: d }, deps);
+    expect(codex).toEqual(claude);
+    expect(codex).not.toBeNull();
+  });
 });
 
 // --- the guard ----------------------------------------------------------------------
@@ -221,6 +275,26 @@ describe("hooks/pre-tool-use.mjs", () => {
     const r = run(JSON.stringify({ ...payload("git push", repoRoot), tool_name: "Read" }));
     expect(r.status).toBe(0);
     expect(r.stdout.trim()).toBe("");
+  });
+
+  // BashOutput/KillShell poll a background shell and would otherwise fire on every tick.
+  for (const tool of ["BashOutput", "KillShell"]) {
+    it(`says nothing for ${tool}, whose name merely contains a shell's`, () => {
+      const r = run(JSON.stringify({ ...payload("git push", repoRoot), tool_name: tool }));
+      expect(r.status).toBe(0);
+      expect(r.stdout.trim()).toBe("");
+    });
+  }
+
+  it("denies a Codex-shaped payload — `shell` tool, argv array — end to end", () => {
+    const d = tmpRepo();
+    writeFileSync(join(d, "page.html"), '<!doctype html><html lang="en"><head><title>t</title></head><body><img src="a.png"></body></html>\n');
+    execFileSync("git", ["add", "page.html"], { cwd: d });
+    const r = run(JSON.stringify({ tool_name: "shell", tool_input: { command: ["bash", "-lc", "git commit -m wip"] }, cwd: d, session_id: d }));
+    expect(r.status).toBe(0);
+    const decision = JSON.parse(r.stdout);
+    expect(decision.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(decision.hookSpecificOutput.additionalContext).toContain("review-a11y");
   });
 
   it("denies a staged blocking finding, end to end through the real engine", () => {

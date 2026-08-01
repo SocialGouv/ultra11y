@@ -12,6 +12,7 @@
 //
 // Run by CI and by `pnpm run verify:bundle`. Pure Node, no deps, no network.
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -178,8 +179,140 @@ existsSync(join(root, "hooks/pre-tool-use.mjs"))
   ? ok("hooks/pre-tool-use.mjs present")
   : bad("missing hooks/pre-tool-use.mjs — hooks.json points at a guard that does not exist");
 
-for (const f of [".claude-plugin", "hooks"])
+for (const f of [".claude-plugin", ".codex-plugin", ".agents", "hooks"])
   (pkg.files ?? []).includes(f) ? ok(`package.json files[] carries ${f}/`) : bad(`package.json "files" is missing "${f}" — the npm tarball would ship without it`);
+
+// --- 6. the multi-harness shape -------------------------------------------------------
+// Codex resolves plugin manifests .codex-plugin/ -> .claude-plugin/ -> .cursor-plugin/, so
+// the Claude manifest already works there. .codex-plugin/plugin.json exists to add what
+// Codex alone reads (the `interface` block a marketplace renders), and its validator is
+// STRICTER than Claude Code's: it rejects any key outside this list, so a typo that would
+// merely be ignored on Claude Code makes the plugin uninstallable on Codex. These are the
+// exact allowlists read out of the codex 0.146.0 binary's own validator.
+console.log("codex plugin:");
+const CODEX_KNOWN_KEYS = new Set(["id", "name", "version", "description", "skills", "apps", "mcpServers", "interface", "author", "homepage", "repository", "license", "keywords"]);
+const CODEX_INTERFACE_KEYS = new Set([
+  "displayName",
+  "shortDescription",
+  "longDescription",
+  "developerName",
+  "category",
+  "capabilities",
+  "websiteURL",
+  "privacyPolicyURL",
+  "termsOfServiceURL",
+  "brandColor",
+  "composerIcon",
+  "logo",
+  "logoDark",
+  "screenshots",
+  "defaultPrompt",
+  "default_prompt",
+]);
+const CODEX_INTERFACE_REQUIRED = ["displayName", "shortDescription", "longDescription", "developerName", "category"];
+
+const codex = readJson(".codex-plugin/plugin.json");
+if (codex) {
+  const unknown = Object.keys(codex).filter((k) => !CODEX_KNOWN_KEYS.has(k));
+  unknown.length === 0 ? ok("plugin.json keys are all accepted by Codex's validator") : bad(`.codex-plugin/plugin.json has key(s) Codex rejects: ${unknown.join(", ")} — the plugin would not install`);
+
+  codex.name === pkg.name ? ok(`plugin.json name "${codex.name}" matches the package`) : bad(`.codex-plugin/plugin.json name "${codex.name}" != package name "${pkg.name}"`);
+  codex.version === pkg.version
+    ? ok(`plugin.json version ${codex.version} matches the package`)
+    : bad(`.codex-plugin/plugin.json version "${codex.version}" != package version "${pkg.version}" — add it to scripts/sync-version.mjs`);
+  /^\d+\.\d+\.\d+$/.test(codex.version ?? "") ? ok("plugin.json version is strict semver, as Codex requires") : bad(`.codex-plugin/plugin.json version "${codex.version}" is not strict semver — Codex rejects it`);
+
+  // One plugin, one description. Two manifests that describe it differently is a bug the
+  // moment a user compares the two marketplaces.
+  codex.description === plugin?.description ? ok("plugin.json description matches the Claude manifest") : bad(".codex-plugin/plugin.json description differs from .claude-plugin/plugin.json — they describe the same plugin");
+
+  // Codex pins these to fixed contract paths and rejects anything else.
+  codex.skills === undefined || codex.skills.replace(/^\.\//, "").replace(/\/$/, "") === "skills"
+    ? ok('plugin.json skills resolves to "skills", as Codex requires')
+    : bad(`.codex-plugin/plugin.json skills "${codex.skills}" must resolve to "skills"`);
+  if (codex.skills !== undefined)
+    existsSync(join(root, "skills")) ? ok("the declared skills/ directory exists") : bad(".codex-plugin/plugin.json declares skills/ but the directory is missing");
+
+  // `hooks` is deliberately ABSENT: it is not in Codex's allowlist, so declaring it makes
+  // the manifest invalid. Codex discovers hooks/hooks.json by convention at the plugin
+  // root and sets ${CLAUDE_PLUGIN_ROOT} for it, exactly as Claude Code does.
+  codex.hooks === undefined ? ok("plugin.json does not declare hooks (Codex rejects the key; discovery is by convention)") : bad(".codex-plugin/plugin.json declares `hooks`, which Codex's validator rejects — remove it, hooks/hooks.json is found by convention");
+
+  const iface = codex.interface;
+  if (!iface || typeof iface !== "object") bad(".codex-plugin/plugin.json has no `interface` object — Codex requires one");
+  else {
+    const unknownIface = Object.keys(iface).filter((k) => !CODEX_INTERFACE_KEYS.has(k));
+    unknownIface.length === 0 ? ok("plugin.json interface keys are all accepted") : bad(`.codex-plugin/plugin.json interface has key(s) Codex rejects: ${unknownIface.join(", ")}`);
+    const missing = CODEX_INTERFACE_REQUIRED.filter((k) => typeof iface[k] !== "string" || !iface[k].trim());
+    missing.length === 0 ? ok(`plugin.json interface carries ${CODEX_INTERFACE_REQUIRED.join(", ")}`) : bad(`.codex-plugin/plugin.json interface is missing required field(s): ${missing.join(", ")}`);
+    iface.defaultPrompt || iface.default_prompt ? ok("plugin.json interface has a defaultPrompt") : bad(".codex-plugin/plugin.json interface needs `defaultPrompt` (or `default_prompt`) — Codex requires it");
+    !iface.brandColor || /^#[0-9A-Fa-f]{6}$/.test(iface.brandColor) ? ok("plugin.json interface brandColor is well formed") : bad(`.codex-plugin/plugin.json interface.brandColor "${iface.brandColor}" must be #RRGGBB`);
+    !iface.capabilities || (Array.isArray(iface.capabilities) && iface.capabilities.every((c) => typeof c === "string" && c.trim()))
+      ? ok("plugin.json interface capabilities is a list of strings")
+      : bad(".codex-plugin/plugin.json interface.capabilities must be an array of non-empty strings");
+  }
+}
+
+// The file `codex plugin marketplace add <repo>` reads. Versionless by design: it points at
+// the repo, and the plugin manifest inside is the single source of the number.
+const codexMarket = readJson(".agents/plugins/marketplace.json");
+if (codexMarket) {
+  codexMarket.interface?.displayName ? ok("marketplace.json has interface.displayName") : bad(".agents/plugins/marketplace.json needs an `interface.displayName` object — Codex requires it");
+  const entry = Array.isArray(codexMarket.plugins) ? codexMarket.plugins.find((p) => p.name === pkg.name) : undefined;
+  entry ? ok(`marketplace.json lists the "${pkg.name}" plugin`) : bad(`.agents/plugins/marketplace.json does not list a plugin named "${pkg.name}"`);
+  if (entry) {
+    entry.source && typeof entry.source === "object" ? ok("marketplace.json entry has an object source") : bad(".agents/plugins/marketplace.json entry needs an object `source` (e.g. { source: \"url\", url: \"./\" })");
+    const inst = entry.policy?.installation;
+    !inst || ["NOT_AVAILABLE", "AVAILABLE", "INSTALLED_BY_DEFAULT"].includes(inst) ? ok("marketplace.json installation policy is valid") : bad(`.agents/plugins/marketplace.json installation policy "${inst}" is not one of NOT_AVAILABLE, AVAILABLE, INSTALLED_BY_DEFAULT`);
+    const auth = entry.policy?.authentication;
+    !auth || ["ON_INSTALL", "ON_USE"].includes(auth) ? ok("marketplace.json authentication policy is valid") : bad(`.agents/plugins/marketplace.json authentication policy "${auth}" is not one of ON_INSTALL, ON_USE`);
+  }
+}
+
+// --- 7. the OpenCode plugin -----------------------------------------------------------
+// Committed JavaScript that no type-checker covers and that OpenCode loads straight off
+// disk — from ~/.config/opencode/plugin/, where there is no node_modules to resolve a bare
+// import and no build step to catch a syntax error. Both failures are silent: the plugin
+// simply never loads and the gate never fires.
+console.log("opencode plugin:");
+const OC_REL = ".opencode/plugins/ultra11y.js";
+const ocPath = join(root, OC_REL);
+if (!existsSync(ocPath)) bad(`missing ${OC_REL} — OpenCode would have no plugin to load`);
+else {
+  const src = readFileSync(ocPath, "utf8");
+  src.includes("ULTRA11Y_OPENCODE_PLUGIN") ? ok("plugin carries the ownership marker") : bad(`${OC_REL} has no ULTRA11Y_OPENCODE_PLUGIN marker — the installer would refuse to manage it`);
+  src.includes('"tool.execute.before"') ? ok("plugin declares tool.execute.before") : bad(`${OC_REL} declares no "tool.execute.before" — nothing would gate a commit`);
+
+  const foreign = [...src.matchAll(/^import .*? from ["']([^"']+)["']/gm)].map((m) => m[1]).filter((s) => !s.startsWith("node:"));
+  foreign.length === 0 ? ok("plugin imports only node: builtins") : bad(`${OC_REL} imports ${foreign.join(", ")} — it must stay zero-dependency, it is loaded from outside any node_modules`);
+
+  const checked = spawnSync(process.execPath, ["--check", ocPath], { encoding: "utf8" });
+  checked.status === 0 ? ok("plugin parses on this Node") : bad(`${OC_REL} is not valid JavaScript: ${(checked.stderr ?? "").trim().split("\n")[0]}`);
+
+  const declared = /ULTRA11Y_PLUGIN_VERSION = "([^"]+)"/.exec(src)?.[1];
+  declared === pkg.version ? ok(`plugin version ${declared} matches the package`) : bad(`${OC_REL} declares version "${declared}" != package version "${pkg.version}" — add it to scripts/sync-version.mjs`);
+
+  // `main` is how an opencode.json npm pin resolves the plugin. Pointing it at a path that
+  // is not in files[] publishes a package whose pin route is broken.
+  pkg.main === OC_REL ? ok(`package.json main points at ${OC_REL}`) : bad(`package.json "main" is "${pkg.main ?? "unset"}" — it must be "${OC_REL}" or the opencode.json npm pin cannot resolve the plugin`);
+  existsSync(join(root, pkg.main ?? "")) ? ok("package.json main resolves on disk") : bad(`package.json "main" points at a file that does not exist`);
+  (pkg.files ?? []).includes(pkg.main?.split("/")[0]) ? ok("package.json files[] carries main's directory") : bad(`package.json "files" is missing "${pkg.main?.split("/")[0]}" — main would not be published`);
+
+  // Two prefilters that disagree mean one harness silently reviews less than the other.
+  const guardSrc = readFileSync(join(root, "hooks/pre-tool-use.mjs"), "utf8");
+  const PREFILTER = String.raw`/\bgit\b|\bgh\b/`;
+  src.includes(PREFILTER) && guardSrc.includes(PREFILTER)
+    ? ok("the OpenCode plugin and the Claude/Codex guard share one prefilter literal")
+    : bad(`${OC_REL} and hooks/pre-tool-use.mjs must both carry the literal ${PREFILTER} — they gate the same commands`);
+}
+
+// Codex's skill validator is looser than Claude Code's (it accepts unknown frontmatter
+// keys) but it does hard-fail on these three, so assert them rather than assume.
+for (const name of skillNames) {
+  const fm = readFileSync(join(root, "skills", name, "SKILL.md"), "utf8");
+  const dmi = /^disable[-_]model[-_]invocation:\s*(\S+)/m.exec(fm)?.[1];
+  !dmi || dmi === "false" ? ok(`${name}: disable-model-invocation is unset or false, as Codex requires`) : bad(`skills/${name}/SKILL.md sets disable-model-invocation: ${dmi} — Codex rejects anything but false`);
+}
 
 if (errors.length) {
   console.error(`\nverify-skill-bundle: ${errors.length} problem(s) — a published skill would not install correctly.`);

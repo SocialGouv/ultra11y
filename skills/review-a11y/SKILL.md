@@ -23,6 +23,10 @@ DOM to `scan`. A human is at most optional oversight.
 `scripts/ultra11y.mjs` lives **next to this SKILL.md** (the engine ships inside the skill;
 no install, no key). Run it with the reviewed project as the working directory. In the
 ultra11y repository itself, the repo root's `scripts/ultra11y.mjs` is the same file.
+On Claude Code that path is `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`; on Codex and
+OpenCode it is the skill directory the plugin installed. If neither resolves — a harness
+with no skill system — `npx -y ultra11y <command>` is the same engine. Per-harness deltas:
+`references/harnesses.md` in the `ultra11y` skill.
 
 > **Core rules** (shared with `ultra11y`):
 > 1. **Never invent a non-conformity**: report only what the engine found or what you can

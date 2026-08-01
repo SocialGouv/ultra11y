@@ -117,6 +117,53 @@ jobs:
           [ -z "$out" ] || { echo "::error::SKIP_A11Y=1 did not disable the guard: $out"; exit 1; }
           echo "install-bundle: the PreToolUse guard denies, points at the skill, does not loop, and honours SKIP_A11Y."
 
+          # The same four assertions in the CODEX shape: the tool is `shell`, not `Bash`,
+          # and the command is an argv ARRAY. Joining that array naively would put `git`
+          # off a command position and the gate would silently never fire on Codex — so
+          # this is the assertion that keeps that regression out. No Codex binary needed.
+          cx() { printf '{"tool_name":"shell","tool_input":{"command":["bash","-lc","%s"]},"cwd":"%s","session_id":"%s"}' "$1" "$WORK" "$2"; }
+          out="$(cx 'ls -la' cx1 | node "$GUARD")"
+          [ -z "$out" ] || { echo "::error::guard spoke on a non-git codex command: $out"; exit 1; }
+          out="$(cx 'git commit -m wip' cx2 | node "$GUARD")"
+          echo "$out" | grep -q '"permissionDecision":"deny"' || { echo "::error::guard did not deny a codex-shaped commit: $out"; exit 1; }
+          echo "$out" | grep -q 'review-a11y' || { echo "::error::codex-shaped denial did not name the skill: $out"; exit 1; }
+          out="$(cx 'git commit -m wip' cx2 | node "$GUARD")"
+          [ -z "$out" ] || { echo "::error::guard fired twice on the same codex-shaped change: $out"; exit 1; }
+          out="$(cx 'git commit -m wip' cx3 | SKIP_A11Y=1 node "$GUARD")"
+          [ -z "$out" ] || { echo "::error::SKIP_A11Y=1 did not disable the guard for codex: $out"; exit 1; }
+          # BashOutput/KillShell poll a background shell; matching them would spawn the
+          # 2.5 MB engine on every tick.
+          for t in BashOutput KillShell Read; do
+            out="$(printf '{"tool_name":"%s","tool_input":{"command":"git push"},"cwd":"%s","session_id":"cx4"}' "$t" "$WORK" | node "$GUARD")"
+            [ -z "$out" ] || { echo "::error::guard reached for the $t tool: $out"; exit 1; }
+          done
+          echo "install-bundle: the guard behaves identically on Codex-shaped payloads."
+
+      - name: The OpenCode plugin loads, and install --agents-md is idempotent
+        run: |
+          set -euo pipefail
+          # OpenCode loads this straight off disk, outside any node_modules: a syntax error
+          # or a bare import is a plugin that silently never loads.
+          node --check .opencode/plugins/ultra11y.js
+          node -e '
+            const {readFileSync} = require("node:fs");
+            const src = readFileSync(".opencode/plugins/ultra11y.js", "utf8");
+            const foreign = [...src.matchAll(/^import .*? from ["\x27]([^"\x27]+)["\x27]/gm)].map(m => m[1]).filter(s => !s.startsWith("node:"));
+            if (foreign.length) { console.error("::error::opencode plugin imports " + foreign.join(", ")); process.exit(1); }
+            const pkg = require("./package.json");
+            if (pkg.main !== ".opencode/plugins/ultra11y.js") { console.error("::error::package.json main must point at the opencode plugin"); process.exit(1); }
+          '
+          WORK="$(mktemp -d)"; cd "$WORK"
+          git init -q . && git config user.email ci@ci && git config user.name ci
+          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" install --agents-md
+          grep -q "BEGIN ultra11y" AGENTS.md || { echo "::error::install --agents-md wrote no managed block"; exit 1; }
+          cp AGENTS.md /tmp/first.md
+          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" install --agents-md
+          diff -q /tmp/first.md AGENTS.md || { echo "::error::install --agents-md is not idempotent"; exit 1; }
+          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" uninstall --agents-md
+          [ ! -f AGENTS.md ] || { echo "::error::uninstall --agents-md left the file behind"; exit 1; }
+          echo "install-bundle: the OpenCode plugin is loadable and install --agents-md round-trips."
+
   # The shipped scripts/ultra11y.mjs is an install-free bundle declaring
   # engines.node ">=22.18" (the floor @babel/parser 8 requires). This job runs ONLY
   # the committed bundle on that floor, with no install, to guarantee the published

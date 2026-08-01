@@ -2,21 +2,25 @@
 
 [![CI](https://github.com/maxgfr/ultra11y/actions/workflows/ci.yml/badge.svg)](https://github.com/maxgfr/ultra11y/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/ultra11y?logo=npm)](https://www.npmjs.com/package/ultra11y)
-[![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-6b46c1)](#add-to-claude-code)
+[![agent plugin](https://img.shields.io/badge/Claude_Code_·_Codex_·_OpenCode-plugin-6b46c1)](#add-to-your-coding-agent)
 [![node](https://img.shields.io/node/v/ultra11y)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/ultra11y)](LICENSE)
 
-### Add to Claude Code
+### Add to your coding agent
 
 Two lines, and the accessibility review runs **by itself** before every commit, push and
 pull request — you never type the skill's name:
 
-```
-/plugin marketplace add maxgfr/ultra11y
-/plugin install ultra11y@ultra11y
-```
+| | |
+|---|---|
+| **Claude Code** | `/plugin marketplace add maxgfr/ultra11y` then `/plugin install ultra11y@ultra11y` |
+| **OpenAI Codex CLI** | `codex plugin marketplace add maxgfr/ultra11y` then `codex plugin add ultra11y@ultra11y` |
+| **OpenCode** | `npx ultra11y install --opencode` — or pin `"plugin": ["ultra11y@latest"]` in `opencode.json` |
+| **Anything else** | `npx ultra11y install --agents-md` (no hook API: see the caveat below) |
 
-<sub>Prefer the skills only, without the automatic hook? `npx skills add maxgfr/ultra11y`.
+<sub>Prefer the skills only, without the automatic hook? `npx skills add maxgfr/ultra11y`
+(`--agent codex`, `--agent opencode`, …). Already on npm and just want the gate?
+`npx ultra11y install --all`, and `npx ultra11y status` to check what is actually wired.
 Full details, thresholds and off-switches under [Install](#install).</sub>
 
 > Audit HTML/CSS/JSX against **WCAG 2.2 AA** accessibility and produce a dated compliance report — or author/review accessible markup without regressions. A [skills.sh](https://skills.sh) agent skill: a deterministic, zero-dependency static engine **plus** the agent's judgment, with `check`/`verify` gates against hallucinated non-conformities. **The central deliverable is the auditor conformance block** — theme, criterion + official wording, test(s), WCAG mapping + level, finding, expected state, verification, `file:line` occurrences — rendered identically by the `report` (compliance doc), the `prd` backlog and the GitHub issues, in the active standard's vocabulary and **in your language** (`--lang auto` follows the conversation/repo). **WCAG is the worldwide core; country standards (RGAA, …) are pluggable in-repo packs.**
@@ -61,27 +65,41 @@ working diff, or branch vs merge-base) and reports like a code reviewer. Both bu
 install-free engine.
 
 ```sh
-npx skills add maxgfr/ultra11y
+npx skills add maxgfr/ultra11y                 # this agent
+npx skills add maxgfr/ultra11y --agent codex   # …or opencode, cursor, gemini, amp, zed…
 ```
 
-**As a Claude Code plugin** — the same two skills, plus the hook that makes the review
+**As an agent plugin** — the same two skills, plus the hook that makes the review
 **automatic**. Installed this way, a pending `git commit`, `git push` or `gh pr create`
 that carries accessibility findings is stopped once and the agent is handed the findings,
 so `review-a11y` runs before the work goes out — you never type the skill's name.
 
 ```
-/plugin marketplace add maxgfr/ultra11y
-/plugin install ultra11y@ultra11y
+/plugin marketplace add maxgfr/ultra11y          # Claude Code
+codex plugin marketplace add maxgfr/ultra11y     # Codex CLI
+npx ultra11y install --opencode                  # OpenCode
 ```
 
-Three things worth knowing, because they bound what "automatic" means here:
+Codex's hook engine is a near-clone of Claude Code's — same events, same envelope, and it
+exports `${CLAUDE_PLUGIN_ROOT}` too — so both harnesses share one `hooks/hooks.json`.
+OpenCode has no permission-decision channel, so there the gate surfaces as a **failed bash
+call whose error message carries the findings**. Per-harness deltas, the Codex feature flag
+and the trust prompt: [`skills/ultra11y/references/harnesses.md`](skills/ultra11y/references/harnesses.md).
+
+Four things worth knowing, because they bound what "automatic" means here:
 
 - A hook **cannot force** a skill to be invoked. It blocks the command and hands over the
   reason and the findings; the agent is what invokes `review-a11y`. In practice a motivated
   `deny` is enough — it is not a guarantee.
-- **Hooks do not enable themselves.** Installing the plugin is what turns them on.
-- Claude Code has **no git event** (no `PreCommit`, no `PRCreated`), which is why the hook
-  listens on `PreToolUse` for the Bash tool and recognises the commands that publish work.
+- **Hooks do not enable themselves.** Installing the plugin is what turns them on. On Codex
+  they also need `[features] hooks = true`, which `install --codex` sets for you; run
+  `npx ultra11y status` if you are not sure what is live.
+- **No harness has a git event** (no `PreCommit`, no `PRCreated`), which is why the hook
+  listens on `PreToolUse` for the shell tool — `Bash` on Claude Code, `shell` on Codex —
+  and recognises the commands that publish work.
+- On a harness with **no hook API at all** (Cursor, Amp, Zed, Gemini CLI…), nothing is
+  automatic. `npx ultra11y install --agents-md` makes the engine discoverable and hands the
+  agent the adjudication protocol; `init --hook` below is what actually enforces the gate.
 
 The gate never blocks twice for the same findings, so a retry always lands. It stays out of
 the way when git's own `no-verify` bypass is used, outside a repository, and whenever the

@@ -1,0 +1,12 @@
+{
+  "name": "ultra11y",
+  "interface": { "displayName": "ultra11y" },
+  "plugins": [
+    {
+      "name": "ultra11y",
+      "source": { "source": "url", "url": "./" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

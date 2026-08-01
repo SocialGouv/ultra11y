@@ -16,20 +16,25 @@ node scripts/ultra11y.mjs init --baseline …    # opt into the legacy regressio
 |---|---|---|---|
 | `init --hook` | the engine, mechanically | every `git commit` | the engine's `--fail-on` |
 | `init --ci` | the engine, in CI | every pull request | the engine's `--fail-on` |
-| the **Claude Code plugin hook** | the `review-a11y` **skill** | a pending commit / push / PR, inside an agent session | the AI agent, adjudicating |
+| the **agent-harness hook** | the `review-a11y` **skill** | a pending commit / push / PR, inside an agent session | the AI agent, adjudicating |
 
 The first two block on what a machine can decide. The third exists because most of WCAG is
 *judgment* — is this `alt` relevant, is this link's purpose clear — which no exit code
 settles. See below.
 
-## The Claude Code plugin hook — the agent review, unprompted
+## The agent-harness hook — the agent review, unprompted
 
 Shipped by the plugin (`hooks/hooks.json` → `hooks/pre-tool-use.mjs` → `ultra11y hook
---claude-code`), not by `init`. Claude Code has no git event, so it listens on `PreToolUse`
-for the Bash tool and recognises the commands that **publish** work — `git commit` (scoped
+--claude-code`), not by `init`. **No** harness has a git event, so it listens on `PreToolUse`
+for the shell tool and recognises the commands that **publish** work — `git commit` (scoped
 to `--staged`), `git push` and `gh pr create` (scoped to `--since <default branch>`). When
 the change carries findings at or above the threshold it returns `permissionDecision:
 "deny"` with the findings attached, and the agent invokes `review-a11y` to adjudicate them.
+
+The same file serves Claude Code and Codex (Codex exports `${CLAUDE_PLUGIN_ROOT}` and reads
+the same envelope); OpenCode has no decision channel, so there the gate throws and the
+findings arrive as the tool error. Per-harness install, deltas and off-switches:
+**`references/harnesses.md`**.
 
 Two invariants make it liveable:
 

@@ -151,6 +151,7 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "forbidden-patterns.md",
       "forms-and-errors.md",
       "guidance.md",
+      "harnesses.md",
       "judgment.md",
       "media-and-motion.md",
       "methodology.md",

@@ -1,0 +1,21 @@
+{
+  "name": "ultra11y",
+  "description": "Accessibility for WCAG 2.2 AA and country standards (RGAA…): an automatic review of the code under change before every commit, push and pull request, plus full audits and conformance deliverables on demand.",
+  "version": "2.27.0",
+  "author": { "name": "maxgfr", "url": "https://github.com/maxgfr" },
+  "homepage": "https://github.com/maxgfr/ultra11y",
+  "repository": "https://github.com/maxgfr/ultra11y",
+  "license": "MIT",
+  "keywords": ["accessibility", "a11y", "wcag", "rgaa", "code-review", "audit"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "ultra11y",
+    "shortDescription": "WCAG 2.2 AA review before you commit, push or open a PR.",
+    "longDescription": "Reviews exactly the code under change against WCAG 2.2 AA. A zero-dependency static engine — 78 checks tied to the success criteria, scored against the W3C ACT corpus — plus the agent's judgment on what a static pass cannot decide, with check/verify gates against invented non-conformities. Country standards (RGAA…) are pluggable in-repo packs.",
+    "developerName": "maxgfr",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/maxgfr/ultra11y",
+    "defaultPrompt": "Review my staged changes for accessibility."
+  }
+}
