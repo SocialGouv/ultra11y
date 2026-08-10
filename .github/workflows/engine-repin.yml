@@ -89,6 +89,26 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      # The graph snapshot is ENGINE OUTPUT: a newer engine sees more of the same
+      # fixture, so it moves on a bump. Letting `pnpm test` die on it is how a pin
+      # rots — ultrasec's sat seven releases behind for exactly that reason. So
+      # regenerate it first, and refuse only a LOSS.
+      #
+      # Filter BEFORE the flag: `vitest run -u <filter>` swallows the filter and
+      # updates EVERY snapshot, `orchestrate` included — which would rubber-stamp
+      # the artifacts that must stay a hard red.
+      - name: Regenerate the engine-output artifacts
+        if: steps.detect.outputs.repin == 'true'
+        run: pnpm vitest run tests/golden-graph.test.ts -u
+
+      # …but regenerating a regression gate on autopilot destroys the thing it
+      # guards, so the regenerated artifacts are compared against the committed
+      # ones: enrichment passes, anything that got SHORTER fails the run and
+      # nothing is pushed. Losing something stays a human decision.
+      - name: Guard — the regenerated artifacts lost nothing
+        if: steps.detect.outputs.repin == 'true'
+        run: node scripts/check-artifact-recall.mjs
+
       - name: Rebuild the bundle and stage build outputs
         # check:build's own `tsup && copy-bundle && git diff --exit-code` diffs the
         # working tree against the INDEX, not HEAD. Rebuild + stage here first so
