@@ -17,6 +17,7 @@ on:
 permissions:
   contents: write
   actions: write
+  issues: write
 
 concurrency: engine-repin
 
@@ -26,14 +27,14 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: true
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
@@ -41,37 +42,52 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Detect current pin vs latest codeindex release
+      # Driven by `sync-engine.mjs --list` rather than by a copy of the engine
+      # table kept here: adding an engine to the script is then the only edit
+      # needed, and the automation cannot drift from the list it is watching.
+      - name: Re-pin every engine that has a newer release
         id: detect
         run: |
           set -euo pipefail
-          PINNED=$(node -p "require('./src/vendor/engine.meta.json').tag")
-          # NOT releases/latest: the codeindex repo also carries the
-          # embed-model-v1 asset release, which /latest can resolve to.
-          LATEST=$(gh api repos/maxgfr/codeindex/releases --jq '[.[] | select(.tag_name | test("^v[0-9]")) | .tag_name] | first')
-          echo "pinned=$PINNED" >> "$GITHUB_OUTPUT"
-          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
-          if [ "$PINNED" = "$LATEST" ]; then
-            echo "up to date ($PINNED)"
-            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+          SUMMARY=""
+          while read -r NAME REPO PINNED; do
+            # NOT releases/latest: a repo may also publish non-engine asset
+            # releases (codeindex publishes embed-model-v1), which are not tags
+            # this can pin to.
+            LATEST=$(gh api "repos/${REPO}/releases" --jq '[.[] | select(.tag_name | test("^v[0-9]")) | .tag_name] | first')
+            if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
+              echo "::error::could not determine the latest ${NAME} release tag"
+              exit 1
+            fi
+            if [ "$PINNED" = "$LATEST" ]; then
+              echo "${NAME}: up to date (${PINNED})"
+              continue
+            fi
+            echo "${NAME}: ${PINNED} -> ${LATEST}"
+            node scripts/sync-engine.mjs --engine "$NAME" --ref "$LATEST"
+            SUMMARY="${SUMMARY}${NAME} ${PINNED} -> ${LATEST}"$'\n'
+          done < <(node scripts/sync-engine.mjs --list)
+
+          if [ -z "$SUMMARY" ]; then
+            echo "repin=false" >> "$GITHUB_OUTPUT"
           else
-            echo "pinned=$PINNED latest=$LATEST -> re-pin needed"
-            echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+            echo "repin=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "summary<<EOF"
+              printf '%s' "$SUMMARY"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Verify the vendored engines match their new pins
+        if: steps.detect.outputs.repin == 'true'
+        run: node scripts/sync-engine.mjs --check
+
       - name: Configure git identity
-        if: steps.detect.outputs.up_to_date == 'false'
+        if: steps.detect.outputs.repin == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Re-pin the vendored engine
-        if: steps.detect.outputs.up_to_date == 'false'
-        env:
-          LATEST: ${{ steps.detect.outputs.latest }}
-        run: |
-          node scripts/sync-engine.mjs --ref "$LATEST"
-          node scripts/sync-engine.mjs --check
 
       - name: Rebuild the bundle and stage build outputs
         # check:build's own `tsup && copy-bundle && git diff --exit-code` diffs the
@@ -79,25 +95,25 @@ jobs:
         # that when check:build rebuilds again below it reproduces byte-identical
         # output against what's already staged, instead of flagging the re-pin
         # itself as "bundle out of date".
-        if: steps.detect.outputs.up_to_date == 'false'
+        if: steps.detect.outputs.repin == 'true'
         run: |
           pnpm run build
           git add src/vendor/engine.meta.json src/vendor/codeindex-engine.mjs src/vendor/codeindex-engine.d.mts scripts/ultra11y.mjs skills/ultra11y/scripts/ultra11y.mjs skills/review-a11y/scripts/ultra11y.mjs
 
       - name: Typecheck
-        if: steps.detect.outputs.up_to_date == 'false'
+        if: steps.detect.outputs.repin == 'true'
         run: pnpm run typecheck
 
       - name: Lint
-        if: steps.detect.outputs.up_to_date == 'false'
+        if: steps.detect.outputs.repin == 'true'
         run: pnpm run lint
 
       - name: Build is reproducible (committed bundles up to date)
-        if: steps.detect.outputs.up_to_date == 'false'
+        if: steps.detect.outputs.repin == 'true'
         run: pnpm run check:build # tsup && copy-bundle && git diff --exit-code over both bundles, then verify:bundle + sync-engine --check
 
       - name: Test (with coverage)
-        if: steps.detect.outputs.up_to_date == 'false'
+        if: steps.detect.outputs.repin == 'true'
         shell: bash
         run: |
           set -o pipefail
@@ -107,25 +123,25 @@ jobs:
           # this job is allowed to paper over by regenerating goldens.
 
       - name: Smoke-run the committed bundle (offline, fixture)
-        if: steps.detect.outputs.up_to_date == 'false'
+        if: steps.detect.outputs.repin == 'true'
         run: pnpm run demo # audit -> report -> check -> criteria
 
       - name: Assert a report was produced
-        if: steps.detect.outputs.up_to_date == 'false'
+        if: steps.detect.outputs.repin == 'true'
         run: ls /tmp/ultra11y-demo/wcag-*.md
 
       - name: Commit and push the re-pin to main
-        if: steps.detect.outputs.up_to_date == 'false'
+        if: steps.detect.outputs.repin == 'true'
         id: push
         env:
-          LATEST: ${{ steps.detect.outputs.latest }}
+          ENGINES: ${{ steps.detect.outputs.summary }}
         run: |
           SUMMARY=$(sed -E 's/\x1b\[[0-9;]*m//g' /tmp/test-output.log | grep -E "Test Files|Tests" | tail -2 || true)
           git add src/vendor/engine.meta.json src/vendor/codeindex-engine.mjs src/vendor/codeindex-engine.d.mts scripts/ultra11y.mjs skills/ultra11y/scripts/ultra11y.mjs skills/review-a11y/scripts/ultra11y.mjs
           git commit \
-            -m "feat(engine): re-pin codeindex ${LATEST}" \
+            -m "feat(engine): re-pin vendored engines" \
             -m "automated re-pin, all gates green, goldens byte-identical" \
-            -m "${SUMMARY:-no test summary captured}"
+            -m "${ENGINES}${SUMMARY:-no test summary captured}"
           git pull --rebase origin main
           git push origin HEAD:main
           echo "pushed=true" >> "$GITHUB_OUTPUT"
@@ -134,7 +150,41 @@ jobs:
         # A push authenticated with GITHUB_TOKEN does not itself trigger other
         # workflows (a documented GitHub Actions guard against push loops) —
         # both must be started explicitly.
-        if: steps.detect.outputs.up_to_date == 'false'
+        if: steps.detect.outputs.repin == 'true'
         run: |
           gh workflow run release.yml --ref main
           gh workflow run ci.yml --ref main
+
+      # A red re-pin means this repo has stopped following the engine. Nothing
+      # used to carry that signal out of the Actions tab, so ultrasec failed
+      # three nights running in August before a human noticed. One open issue per
+      # repo, a comment on each further failure, closed by the first green run.
+      - name: Report the failure on the tracking issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          RUN="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh label create engine-repin --color B60205 --description "The automated engine re-pin needs a human" --force >/dev/null 2>&1 || true
+          NUM=$(gh issue list --state open --label engine-repin --limit 1 --json number --jq '.[0].number // empty')
+          # Built with printf rather than a multi-line literal: this file's own
+          # indentation would otherwise be carried into the body and render the
+          # whole message as a code block.
+          BODY=$(printf '%s\n\n%s\n' \
+            "The daily engine re-pin failed: ${RUN}" \
+            "Nothing was pushed, so main is not broken — the pin is simply frozen where it was, and this repo stays behind the engine until someone looks.")
+          if [ -n "$NUM" ]; then
+            gh issue comment "$NUM" --body "$BODY"
+          else
+            gh issue create --title "Engine re-pin is failing" --label engine-repin --body "$BODY"
+          fi
+
+      - name: Close the tracking issue once a run is green
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          NUM=$(gh issue list --state open --label engine-repin --limit 1 --json number --jq '.[0].number // empty')
+          if [ -z "$NUM" ]; then exit 0; fi
+          gh issue close "$NUM" --comment "Green again: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
