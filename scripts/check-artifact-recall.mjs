@@ -51,8 +51,12 @@ const TRACKED = [
   "tests/__snapshots__/golden-graph.test.ts.snap",
 ];
 
-// Arrays whose shrinking is an improvement, not a regression.
-const FEWER_IS_BETTER = new Set(["warnings", "errors", "todo", "todos", "unresolved", "skipped", "failures", "gaps"]);
+// Arrays whose shrinking is an improvement, not a regression. Matched as a
+// SUFFIX on the last path segment, case-insensitively: a repo calls them
+// `knownGaps`, `parseErrors` or `unresolvedRefs`, and a guard that only knew the
+// bare words would report every closed gap as a loss — a red on good news is a
+// red people learn to ignore.
+const FEWER_IS_BETTER = ["warning", "error", "todo", "unresolved", "skipped", "failure", "gap", "miss"];
 
 const refIdx = process.argv.indexOf("--ref");
 const ref = refIdx === -1 ? "HEAD" : (process.argv[refIdx + 1] ?? "HEAD");
@@ -96,18 +100,20 @@ function measureJson(text) {
   } catch {
     return null; // unparseable: fall back to lines rather than guess
   }
+  // ADD, never set: every element of an array shares one path (`cases[].sites`),
+  // so overwriting would keep only the last sibling's length and go blind to a
+  // loss in any of the others. Summing makes the key mean "sites across all
+  // cases", which is the number that must not go down.
+  const add = (path, n) => m.set(path, (m.get(path) ?? 0) + n);
   const visit = (node, path) => {
     if (Array.isArray(node)) {
-      m.set(path, node.length);
+      add(path, node.length);
       node.forEach((v) => visit(v, `${path}[]`));
       return;
     }
     if (node && typeof node === "object") for (const [k, v] of Object.entries(node)) visit(v, path ? `${path}.${k}` : k);
   };
   visit(data, "");
-  // `path[]` collapses every element of an array onto one key, so a nested
-  // array's counts add up across siblings — which is what we want: ten findings
-  // each losing one path step is a loss, even if no single array got shorter.
   return m;
 }
 
@@ -130,8 +136,8 @@ const measure = (rel, text) => {
 };
 
 const exempt = (what) => {
-  const last = what.split(/[.[]/).filter(Boolean).pop() ?? what;
-  return FEWER_IS_BETTER.has(last);
+  const last = (what.split(/[.[]/).filter(Boolean).pop() ?? what).toLowerCase().replace(/s$/, "");
+  return FEWER_IS_BETTER.some((w) => last.endsWith(w));
 };
 
 // ---------------------------------------------------------------------------
