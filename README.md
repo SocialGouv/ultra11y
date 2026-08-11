@@ -32,7 +32,7 @@ ultra11y is built around an honest **division of labour**. Automated tools only 
 - **Needs rendering (scan tier):** computed contrast, visible focus, zoom/reflow, content on hover — decided by `scan` (axe-core in a real browser); until then they stay **residual risks**, never silently "conforming".
 - **Advisory vs non-conformity:** a good practice with no failing normative test (an `advisory` pack rule, a best-practice-only axe violation, an agent recommendation) renders as « Recommandation (non normative) » — it never flips a criterion to `NC` nor enters the conformance rate. An NC always cites a `normativeRef`.
 - **Stateful scan probes:** the local runtime drives the page with bounded, non-navigating interactions (fill inputs then re-measure overflow; a live-region probe for status messages 4.1.3) — `--no-interact` opts out; `--interact-clicks` re-enables button clicks on authenticated scans (destructive-named buttons are never clicked).
-- **Normative page sample (échantillon):** a country-standard audit runs over a declared `sample.pages` set — `sample check` lints its coverage against the standard's required page kinds, `scan --sample` scans it, and an un-scanned `--standard rgaa` report is flagged **partial**.
+- **Normative page sample (échantillon):** a country-standard audit runs over a declared `sample.pages` set — **`pages discover --crawl|--sitemap --write` builds it for you** (names read from each page's `<title>`, existing entries never overwritten), `sample check` lints its coverage against the standard's required page kinds, `scan --sample` scans it, and an un-scanned `--standard rgaa` report is flagged **partial**.
 - **Pack-only detection (declarative):** a standards pack can ship its own `rules` (a bounded, ReDoS-guarded matcher DSL — no code) and normativity/severity `overrides`, projecting onto its criteria without forking the engine.
 
 ## Measured against a corpus it did not write
@@ -141,6 +141,7 @@ ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]
 ultra11y snapshot list  [--root <dir>] [--json]
 ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   # the per-page criterion grid
 ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        # the per-page report, with screenshots
+ultra11y pages    discover --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--write]   # build the page sample
 ultra11y dev      [--port <n>] [--standard <pack>]   |   dev --next                        # live overlay while you build + dashboard
 ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
 ultra11y check    --report <md> [--standard <pack>] [--quiet] [--json]

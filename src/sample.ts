@@ -13,6 +13,8 @@
 import { existsSync } from "node:fs";
 import type { SampleConfig, SamplePage, SampleScope } from "./types.js";
 import type { SampleMethodology, SampleRequiredKind } from "./standards/types.js";
+import { nameFromUrl } from "./crawl.js";
+import { slugifyPageId } from "./snapshot.js";
 
 export interface SampleIssue {
   path: string; // dotted path into the sample, e.g. "sample.pages[2].url"
@@ -166,6 +168,61 @@ export function lintSample(sample: SampleConfig, methodology: SampleMethodology)
     if (!covered) missing.push(kind);
   }
   return { missing };
+}
+
+// ---- proposing a sample from discovered URLs --------------------------------------------
+
+/** Turn discovered URLs into sample pages: a stable id from the URL path, a name from the
+ *  served `<title>` when one was read, else humanized from the path.
+ *
+ *  Ids must be unique inside a sample (`validateSample` rejects duplicates) and they become
+ *  snapshot directory names, so a collision — `/a/contact` and `/b/contact` both slugify to
+ *  `contact` — is disambiguated with a numeric suffix rather than dropped. Losing a page
+ *  silently is how a sample ends up smaller than the site it claims to cover. */
+export function proposeSamplePages(urls: string[], titles?: Map<string, string>): SamplePage[] {
+  const used = new Set<string>();
+  const out: SamplePage[] = [];
+  for (const url of urls) {
+    const base = slugifyPageId(url);
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+    used.add(id);
+    out.push({ id, name: titles?.get(url) ?? nameFromUrl(url), url });
+  }
+  return out;
+}
+
+export interface SampleMerge {
+  sample: SampleConfig;
+  added: SamplePage[];
+  kept: number;
+}
+
+/** Fold proposed pages into an existing sample WITHOUT touching what is already declared.
+ *
+ *  `auth`, `storageState` and `notes` are human work — someone worked out how to reach that
+ *  page. Re-running discovery must never overwrite it, so a page already present (by id or
+ *  by url) is kept verbatim and only genuinely new URLs are appended. */
+export function mergeSample(existing: SampleConfig | undefined, proposed: SamplePage[]): SampleMerge {
+  const pages = [...(existing?.pages ?? [])];
+  const ids = new Set(pages.map((p) => p.id));
+  const urls = new Set(pages.map((p) => p.url));
+  const added: SamplePage[] = [];
+  for (const p of proposed) {
+    if (urls.has(p.url)) continue;
+    let id = p.id;
+    for (let n = 2; ids.has(id); n++) id = `${p.id}-${n}`;
+    ids.add(id);
+    urls.add(p.url);
+    const page = { ...p, id };
+    pages.push(page);
+    added.push(page);
+  }
+  return {
+    sample: { pages, ...(existing?.transverse?.length ? { transverse: existing.transverse } : {}) },
+    added,
+    kept: pages.length - added.length,
+  };
 }
 
 /** Localized label for a required kind (default-locale-first fallback). */

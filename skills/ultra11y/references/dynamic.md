@@ -126,10 +126,33 @@ every loop is bounded; original state is always restored.
   destructive/submitting verb (delete, remove, send, submit, confirm, pay…) is **never**
   clicked, in either mode.
 
+## Build the sample from the site (`pages discover`)
+
+The crawler and the sitemap parser fed a scan and nothing else: no artefact was persisted, so
+the multi-page contract stayed a `sample.pages` block written by hand — which is the step that
+stops people auditing more than one page. `pages discover` writes it:
+
+```
+node scripts/ultra11y.mjs pages discover --crawl http://localhost:3000 --max 20      # print the proposal
+node scripts/ultra11y.mjs pages discover --sitemap https://example.com/sitemap.xml --write
+```
+
+Each page gets a stable id from its URL path and a **name read from the served `<title>`** —
+what a human reads in the report — falling back to a humanized path when the document has
+none. The crawl's own responses are memoized, so the titles cost no extra request.
+
+`--write` **merges**: a page already declared is kept verbatim, because `auth`,
+`storageState` and `notes` are human work — someone worked out how to reach that page — and
+re-running discovery must never destroy it. Only genuinely new URLs are appended, ids are
+suffixed rather than collided, and the result is validated *before* the file is written (a
+malformed block would break every later `scan --sample` with no hint of what caused it).
+
+A client-rendered SPA does not expose its routes in the served HTML; use a sitemap there.
+
 ## Scan a normative page sample (`scan --sample`)
 
 A real country-standard audit runs over a declared **page sample** (échantillon), not one
-URL. Declare it in `.ultra11yrc.json` under `sample.pages` (+ `transverse`), then:
+URL. Declare it by hand, or let `pages discover` above write it. Then:
 
 ```
 node scripts/ultra11y.mjs sample check                                   # lint the sample's coverage vs the standard's required kinds

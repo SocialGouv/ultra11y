@@ -40,6 +40,49 @@ export function extractLinks(html: string, baseUrl: string): string[] {
   return out;
 }
 
+/** The served page's `<title>`, collapsed and entity-decoded for the few entities a title
+ *  realistically carries. It is what a human reads in the sample and the report, so it is
+ *  worth taking from the page rather than inventing one from the URL — but a page without
+ *  one gets `undefined`, never a guess. */
+export function extractTitle(html: string): string | undefined {
+  const m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+  if (!m) return undefined;
+  const text = m[1]!
+    // Numeric references first: they cover any character, so a French title written
+    // `Caf&#233;` reads as "Café" instead of leaking markup into the report. `&amp;` is
+    // decoded LAST so `&amp;#233;` — a literal, escaped "&#233;" — is not double-decoded.
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(Number(dec)))
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text || undefined;
+}
+
+/** A readable page name derived from a URL path, for a page whose document carries no
+ *  `<title>`. `/nous-contacter` → "Nous contacter"; the root is the home page. */
+export function nameFromUrl(url: string): string {
+  let path = url;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+    /* not a URL — humanize the raw string */
+  }
+  const last = path.split("/").filter(Boolean).pop();
+  if (!last) return "Accueil";
+  const words = last
+    .replace(/\.x?html?$/i, "")
+    .replace(/[-_]+/g, " ")
+    .trim();
+  if (!words) return "Accueil";
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export interface CrawlOpts {
   fetchHtml: (url: string) => Promise<string>;
   depth?: number;

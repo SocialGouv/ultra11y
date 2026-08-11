@@ -29,7 +29,7 @@ import { groundItems } from "./grounding.js";
 import { buildAdjudicationWorklist, writeAdjudication, applyAdjudication, type AdjudicationFile } from "./adjudicate.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable } from "./scan-local.js";
-import { validateSample, lintSample, kindLabel } from "./sample.js";
+import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample } from "./sample.js";
 import { runFix, fixSummary } from "./fix.js";
 import { diffAgainstBaseline, baselineSummary, parseFailOn, findingsAtOrAbove } from "./baseline.js";
 import { repoRoot, resolveEnginePath, writeHook, writeCi } from "./init.js";
@@ -41,6 +41,7 @@ import { annotations, stepSummary } from "./annotate.js";
 import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
 import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
 import { renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
+import { crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
 import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
 import { resolveStandard, getPack, isCore, CORE, type StandardId } from "./standards/index.js";
@@ -85,6 +86,7 @@ Usage:
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
+  ultra11y pages    discover --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
   ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
@@ -360,6 +362,10 @@ Options:
                      a server mutation (delete/send) invisible to the location.href
                      assertion. Unauthenticated scans keep clicks on regardless; the
                      destructive-name skip above applies in every case
+  --write            pages discover: merge the discovered pages into .ultra11yrc.json
+                     (sample.pages). Without it the proposal is printed and nothing is
+                     written. Pages already declared are kept verbatim — auth, storageState
+                     and notes are human work and are never overwritten
   --sample           scan: scan the NORMATIVE page sample from .ultra11yrc.json (its
                      sample.pages), per-page storage-state overriding --storage-state,
                      aggregating one result with per-page provenance for the report
@@ -941,13 +947,140 @@ async function cmdDev(p: ParsedArgs): Promise<number> {
   return 0;
 }
 
+// `pages discover` — turn ONE entry point into the declared page sample.
+//
+// The crawler and the sitemap parser already existed, but they only ever fed a single scan:
+// nothing was persisted, so the multi-page contract stayed a `sample.pages` block written by
+// hand. That is the step that stops people auditing more than one page. This writes the block
+// for them — and then `sample check`, `scan --sample` and `pages` all work off it.
+//
+// The pages already declared are NEVER touched: `auth`, `storageState` and `notes` are human
+// work (someone worked out how to reach that page), so re-running discovery appends and
+// never overwrites.
+async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
+  const lang = resolveLang(p.flags, {});
+  const sitemap = typeof p.flags.sitemap === "string" ? (p.flags.sitemap as string) : undefined;
+  const crawl = typeof p.flags.crawl === "string" ? (p.flags.crawl as string) : undefined;
+  if (!sitemap && !crawl) {
+    console.error(
+      lang === "fr" ? "ultra11y pages discover : passez --sitemap <url> ou --crawl <url>." : "ultra11y pages discover: pass --sitemap <url> or --crawl <url>.",
+    );
+    return 2;
+  }
+  const depth = typeof p.flags.depth === "string" ? Number(p.flags.depth) : undefined;
+  const max = typeof p.flags.max === "string" ? Number(p.flags.max) : undefined;
+
+  // The crawl fetches every page it walks in order to read its links. Memoize those
+  // responses so the titles cost NOTHING extra — only the leaves (and every sitemap URL,
+  // which is never fetched during discovery) need a request of their own.
+  const cache = new Map<string, string>();
+  const fetchHtml = async (url: string): Promise<string> => {
+    const hit = cache.get(url);
+    if (hit !== undefined) return hit;
+    let html = "";
+    try {
+      const res = await fetch(url, { redirect: "follow" });
+      if (res.ok) html = await res.text();
+    } catch {
+      /* unreachable page — it still belongs in the sample, it simply gets no title */
+    }
+    cache.set(url, html);
+    return html;
+  };
+
+  let urls: string[];
+  try {
+    urls = sitemap ? parseSitemapUrls(await fetchHtml(sitemap)).slice(0, max ?? 50) : await crawlUrls(crawl!, { fetchHtml, depth: depth ?? 2, max });
+  } catch (e) {
+    console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+  if (!urls.length) {
+    console.error(
+      lang === "fr"
+        ? "ultra11y pages discover : aucune URL trouvée (sitemap vide/injoignable, ou page d'entrée sans lien de même origine). Note : un SPA rendu côté client n'expose pas ses routes dans le HTML servi — utilisez un sitemap."
+        : "ultra11y pages discover: no URL found (empty/unreachable sitemap, or entry page with no same-origin link). Note: a client-rendered SPA does not expose its routes in the served HTML — use a sitemap.",
+    );
+    return 1;
+  }
+
+  // Titles, bounded and best-effort: a page whose document has none keeps a name humanized
+  // from its path rather than an invented one.
+  const titles = new Map<string, string>();
+  const CONCURRENCY = 6;
+  const queue = [...urls];
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+      for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
+        const t = extractTitle(await fetchHtml(url));
+        if (t) titles.set(url, t);
+      }
+    }),
+  );
+
+  const proposed = proposeSamplePages(urls, titles);
+  let existing: SampleConfig | undefined;
+  try {
+    existing = loadConfig(process.cwd())?.sample;
+  } catch (e) {
+    console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  const merged = mergeSample(existing, proposed);
+
+  // Validate BEFORE writing: a malformed block would make every later `scan --sample` and
+  // `sample check` a hard error, and the user would have no idea this command caused it.
+  const v = validateSample(merged.sample);
+  if (!v.ok || !v.sample) {
+    console.error(lang === "fr" ? "ultra11y pages discover : échantillon proposé invalide :" : "ultra11y pages discover: the proposed sample is invalid:");
+    for (const i of v.issues) console.error(`  ✗ ${i.path ? `${i.path}: ` : ""}${i.message}`);
+    return 1;
+  }
+
+  if (p.flags.json) console.log(JSON.stringify({ sample: v.sample, added: merged.added, kept: merged.kept }, null, 2));
+
+  if (p.flags.write !== true) {
+    if (!p.flags.json) {
+      console.log(JSON.stringify({ sample: v.sample }, null, 2));
+      console.log(
+        lang === "fr"
+          ? `\n${urls.length} URL(s) découverte(s), ${merged.added.length} nouvelle(s). Rien n'a été écrit — relancez avec --write pour fusionner dans .ultra11yrc.json.`
+          : `\n${urls.length} URL(s) discovered, ${merged.added.length} new. Nothing was written — re-run with --write to merge into .ultra11yrc.json.`,
+      );
+    }
+    return 0;
+  }
+
+  const file = join(process.cwd(), ".ultra11yrc.json");
+  let doc: Record<string, unknown> = {};
+  if (existsSync(file)) {
+    try {
+      doc = JSON.parse(readText(file)) as Record<string, unknown>;
+    } catch {
+      console.error("ultra11y pages discover: .ultra11yrc.json is not valid JSON — refusing to overwrite it.");
+      return 2;
+    }
+  }
+  doc.sample = v.sample;
+  writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
+  if (!p.flags.json)
+    console.log(
+      lang === "fr"
+        ? `${merged.added.length} page(s) ajoutée(s), ${merged.kept} conservée(s) → ${file}\nVérifiez la couverture : \`ultra11y sample check --standard rgaa\`, puis scannez : \`ultra11y scan --sample\`.`
+        : `${merged.added.length} page(s) added, ${merged.kept} kept → ${file}\nLint the coverage: \`ultra11y sample check --standard rgaa\`, then scan: \`ultra11y scan --sample\`.`,
+    );
+  return 0;
+}
+
 // `pages` — the per-page criterion grid. RGAA is a per-page norm; the engine's verdict is
 // scope-wide. Everything needed to bridge the two is already on the AuditResult, so this
 // rebuilds the grid offline from a committed audit.json — no snapshots, no browser.
 async function cmdPages(p: ParsedArgs): Promise<number> {
+  // `pages discover` takes no audit — it BUILDS the sample the later commands read.
+  if (p.positionals[0] === "discover") return cmdPagesDiscover(p);
   const inFlag = p.flags.in;
   if (typeof inFlag !== "string" || !inFlag) {
-    console.error("ultra11y pages: --in <audit.json> is required ('-' for stdin).");
+    console.error("ultra11y pages: --in <audit.json> is required ('-' for stdin), or use `pages discover`.");
     return 2;
   }
   const standard = stdOf(p, "pages");

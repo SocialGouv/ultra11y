@@ -52289,6 +52289,24 @@ function extractLinks(html, baseUrl) {
   }
   return out2;
 }
+function extractTitle(html) {
+  const m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+  if (!m) return void 0;
+  const text = m[1].replace(/&#x([0-9a-f]+);/gi, (_, hex2) => String.fromCodePoint(Number.parseInt(hex2, 16))).replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec))).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  return text || void 0;
+}
+function nameFromUrl(url) {
+  let path = url;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+  }
+  const last = path.split("/").filter(Boolean).pop();
+  if (!last) return "Accueil";
+  const words = last.replace(/\.x?html?$/i, "").replace(/[-_]+/g, " ").trim();
+  if (!words) return "Accueil";
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 async function crawlUrls(start2, opts) {
   const depth = opts.depth ?? 1;
   const max = opts.max ?? 50;
@@ -52413,6 +52431,39 @@ function lintSample(sample, methodology) {
     if (!covered) missing.push(kind);
   }
   return { missing };
+}
+function proposeSamplePages(urls, titles) {
+  const used = /* @__PURE__ */ new Set();
+  const out2 = [];
+  for (const url of urls) {
+    const base = slugifyPageId(url);
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+    used.add(id);
+    out2.push({ id, name: titles?.get(url) ?? nameFromUrl(url), url });
+  }
+  return out2;
+}
+function mergeSample(existing, proposed) {
+  const pages = [...existing?.pages ?? []];
+  const ids = new Set(pages.map((p) => p.id));
+  const urls = new Set(pages.map((p) => p.url));
+  const added = [];
+  for (const p of proposed) {
+    if (urls.has(p.url)) continue;
+    let id = p.id;
+    for (let n = 2; ids.has(id); n++) id = `${p.id}-${n}`;
+    ids.add(id);
+    urls.add(p.url);
+    const page = { ...p, id };
+    pages.push(page);
+    added.push(page);
+  }
+  return {
+    sample: { pages, ...existing?.transverse?.length ? { transverse: existing.transverse } : {} },
+    added,
+    kept: pages.length - added.length
+  };
 }
 function kindLabel(kind, locale = "fr") {
   return kind.label[locale] ?? Object.values(kind.label)[0] ?? kind.id;
@@ -57026,6 +57077,7 @@ Usage:
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
+  ultra11y pages    discover --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
   ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
@@ -57301,6 +57353,10 @@ Options:
                      a server mutation (delete/send) invisible to the location.href
                      assertion. Unauthenticated scans keep clicks on regardless; the
                      destructive-name skip above applies in every case
+  --write            pages discover: merge the discovered pages into .ultra11yrc.json
+                     (sample.pages). Without it the proposal is printed and nothing is
+                     written. Pages already declared are kept verbatim \u2014 auth, storageState
+                     and notes are human work and are never overwritten
   --sample           scan: scan the NORMATIVE page sample from .ultra11yrc.json (its
                      sample.pages), per-page storage-state overriding --storage-state,
                      aggregating one result with per-page provenance for the report
@@ -57739,10 +57795,108 @@ async function cmdDev(p) {
   });
   return 0;
 }
+async function cmdPagesDiscover(p) {
+  const lang = resolveLang(p.flags, {});
+  const sitemap = typeof p.flags.sitemap === "string" ? p.flags.sitemap : void 0;
+  const crawl = typeof p.flags.crawl === "string" ? p.flags.crawl : void 0;
+  if (!sitemap && !crawl) {
+    console.error(
+      lang === "fr" ? "ultra11y pages discover : passez --sitemap <url> ou --crawl <url>." : "ultra11y pages discover: pass --sitemap <url> or --crawl <url>."
+    );
+    return 2;
+  }
+  const depth = typeof p.flags.depth === "string" ? Number(p.flags.depth) : void 0;
+  const max = typeof p.flags.max === "string" ? Number(p.flags.max) : void 0;
+  const cache = /* @__PURE__ */ new Map();
+  const fetchHtml2 = async (url) => {
+    const hit = cache.get(url);
+    if (hit !== void 0) return hit;
+    let html = "";
+    try {
+      const res = await fetch(url, { redirect: "follow" });
+      if (res.ok) html = await res.text();
+    } catch {
+    }
+    cache.set(url, html);
+    return html;
+  };
+  let urls;
+  try {
+    urls = sitemap ? parseSitemapUrls(await fetchHtml2(sitemap)).slice(0, max ?? 50) : await crawlUrls(crawl, { fetchHtml: fetchHtml2, depth: depth ?? 2, max });
+  } catch (e) {
+    console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+  if (!urls.length) {
+    console.error(
+      lang === "fr" ? "ultra11y pages discover : aucune URL trouv\xE9e (sitemap vide/injoignable, ou page d'entr\xE9e sans lien de m\xEAme origine). Note : un SPA rendu c\xF4t\xE9 client n'expose pas ses routes dans le HTML servi \u2014 utilisez un sitemap." : "ultra11y pages discover: no URL found (empty/unreachable sitemap, or entry page with no same-origin link). Note: a client-rendered SPA does not expose its routes in the served HTML \u2014 use a sitemap."
+    );
+    return 1;
+  }
+  const titles = /* @__PURE__ */ new Map();
+  const CONCURRENCY = 6;
+  const queue = [...urls];
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+      for (let url = queue.shift(); url !== void 0; url = queue.shift()) {
+        const t2 = extractTitle(await fetchHtml2(url));
+        if (t2) titles.set(url, t2);
+      }
+    })
+  );
+  const proposed = proposeSamplePages(urls, titles);
+  let existing;
+  try {
+    existing = loadConfig(process.cwd())?.sample;
+  } catch (e) {
+    console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  const merged = mergeSample(existing, proposed);
+  const v = validateSample(merged.sample);
+  if (!v.ok || !v.sample) {
+    console.error(lang === "fr" ? "ultra11y pages discover : \xE9chantillon propos\xE9 invalide :" : "ultra11y pages discover: the proposed sample is invalid:");
+    for (const i2 of v.issues) console.error(`  \u2717 ${i2.path ? `${i2.path}: ` : ""}${i2.message}`);
+    return 1;
+  }
+  if (p.flags.json) console.log(JSON.stringify({ sample: v.sample, added: merged.added, kept: merged.kept }, null, 2));
+  if (p.flags.write !== true) {
+    if (!p.flags.json) {
+      console.log(JSON.stringify({ sample: v.sample }, null, 2));
+      console.log(
+        lang === "fr" ? `
+${urls.length} URL(s) d\xE9couverte(s), ${merged.added.length} nouvelle(s). Rien n'a \xE9t\xE9 \xE9crit \u2014 relancez avec --write pour fusionner dans .ultra11yrc.json.` : `
+${urls.length} URL(s) discovered, ${merged.added.length} new. Nothing was written \u2014 re-run with --write to merge into .ultra11yrc.json.`
+      );
+    }
+    return 0;
+  }
+  const file = join45(process.cwd(), ".ultra11yrc.json");
+  let doc = {};
+  if (existsSync31(file)) {
+    try {
+      doc = JSON.parse(readText(file));
+    } catch {
+      console.error("ultra11y pages discover: .ultra11yrc.json is not valid JSON \u2014 refusing to overwrite it.");
+      return 2;
+    }
+  }
+  doc.sample = v.sample;
+  writeFileSync16(file, `${JSON.stringify(doc, null, 2)}
+`);
+  if (!p.flags.json)
+    console.log(
+      lang === "fr" ? `${merged.added.length} page(s) ajout\xE9e(s), ${merged.kept} conserv\xE9e(s) \u2192 ${file}
+V\xE9rifiez la couverture : \`ultra11y sample check --standard rgaa\`, puis scannez : \`ultra11y scan --sample\`.` : `${merged.added.length} page(s) added, ${merged.kept} kept \u2192 ${file}
+Lint the coverage: \`ultra11y sample check --standard rgaa\`, then scan: \`ultra11y scan --sample\`.`
+    );
+  return 0;
+}
 async function cmdPages(p) {
+  if (p.positionals[0] === "discover") return cmdPagesDiscover(p);
   const inFlag = p.flags.in;
   if (typeof inFlag !== "string" || !inFlag) {
-    console.error("ultra11y pages: --in <audit.json> is required ('-' for stdin).");
+    console.error("ultra11y pages: --in <audit.json> is required ('-' for stdin), or use `pages discover`.");
     return 2;
   }
   const standard = stdOf(p, "pages");
