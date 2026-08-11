@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [2.31.1](https://github.com/maxgfr/ultra11y/compare/v2.31.0...v2.31.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* close the gaps between what was asked for and what actually shipped ([98b4106](https://github.com/maxgfr/ultra11y/commit/98b41065816bdf52a6f4185f9ad4765d334c0514))
+
 # [2.31.0](https://github.com/maxgfr/ultra11y/compare/v2.30.0...v2.31.0) (2026-08-11)
 
 
