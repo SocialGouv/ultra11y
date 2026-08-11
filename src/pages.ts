@@ -215,7 +215,7 @@ interface Row {
  *  the report BY CONSTRUCTION — out-of-scope criteria (RGAA 8.1), scoped-out siblings, pack
  *  overrides, advisory handling and secondary mappings all come from the one implementation
  *  instead of a second, drifting copy here. */
-function pageView(result: AuditResult, page: PageResult): AuditResult {
+export function pageView(result: AuditResult, page: PageResult): AuditResult {
   return {
     ...result,
     criteria: page.criteria,

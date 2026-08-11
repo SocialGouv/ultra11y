@@ -4,14 +4,15 @@
 // WCAG-keyed result. Both keep the honest structure: per-guideline/theme synthesis,
 // non-conformities, conforming + not-applicable lists, and the manual worklist
 // (never silently C).
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import type { AuditResult, Finding, Lang, Severity, Status } from "./types.js";
 import { guidelineTitle, scTitle } from "./wcag.js";
 import { prdUnits, partitionUnits } from "./prd.js";
 import { renderAuditorUnit } from "./auditor.js";
 import { resolveMessage } from "./messages.js";
-import { pagesOf, renderPageGrid } from "./pages.js";
+import { attributePages, derivePages, pagesOf, renderPageGrid } from "./pages.js";
+import { PAGES_DIR } from "./snapshot.js";
 import {
   type StandardId,
   CORE,
@@ -89,6 +90,7 @@ const L = {
     authNo: "🌐 public",
     ncCount: "non-conformité(s)",
     advCount: "recommandation(s)",
+    screenshotAlt: (n: string) => `Capture d'écran de la page ${n}`,
   },
   en: {
     title: (std: string) => `Accessibility audit report — ${std}`,
@@ -148,6 +150,7 @@ const L = {
     authNo: "🌐 public",
     ncCount: "non-conformity(ies)",
     advCount: "recommendation(s)",
+    screenshotAlt: (n: string) => `Screenshot of the ${n} page`,
   },
 } as const;
 
@@ -213,6 +216,9 @@ function render(
     derivedOf?: string;
     partialAudit?: string[];
     headerRatePct?: number;
+    // Where this report will be WRITTEN. Only used to resolve the per-page screenshots
+    // relatively; absent ⇒ paths relative to the CWD, which is what stdout wants.
+    outDir?: string;
   },
 ): string {
   const s = L[lang];
@@ -289,26 +295,50 @@ function render(
   // the section an auditor actually reads. UNNUMBERED heading, like the per-page findings
   // below, so `check`'s §1–5 numbering gate and the packReportNcIds parser are untouched.
   const pageScope = pagesOf(r);
+  // Attribute the findings to their pages FIRST. Both page sections join on `Finding.page`,
+  // and a finding merged from a dynamic scan carries only the scanned URL in `file` until
+  // `attributePages` resolves it. `audit` and `scan` already do this when they write the
+  // JSON, but a report rendered from an audit produced any other way (a sample-only merge,
+  // a hand-assembled result) would otherwise show every page as empty — which reads as
+  // "clean", the one thing this tool must never say by accident. The call is an idempotent
+  // enrichment: it only fills `page` where something establishes it, and never overwrites.
+  if (pageScope.length) attributePages(r, pageScope);
   if (pageScope.length) out.push(renderPageGrid(r, pageScope, opts.standard, lang));
 
-  // « Constats par page » — Ara-style per-sample-page synthesis (name + URL + auth badge +
-  // NC/advisory counts, then the page's findings). Only when a page sample was recorded
-  // (scan --sample merged in). UNNUMBERED heading so the 1–5 section numbering `check`
-  // requires stays intact and the packReportNcIds parser (section 2) never sees it.
-  if (r.scope.sample?.pages.length) {
+  // « Constats par page » — per-page synthesis (name + URL + auth badge + NC/advisory
+  // counts, then the page's findings). UNNUMBERED heading so the 1–5 section numbering
+  // `check` requires stays intact and the packReportNcIds parser (section 2) never sees it.
+  //
+  // It keys on `pageScope`, not on `scope.sample`. A sample was once the only way a page
+  // reached the report, but a SNAPSHOT is now the better one (its findings were raised on
+  // the page's real DOM, and it is the only basis that can earn conformity). Keying on the
+  // sample alone meant every snapshotted page — the E2E fixtures, the dev side-car, and now
+  // `scan` itself — was missing from the section named after it.
+  if (pageScope.length) {
+    const derived = derivePages(r, pageScope);
     out.push(`## 📄 ${s.perPageTitle}`, "", `> ${s.perPageNote}`, "");
-    if (r.scope.sample.transverse?.length) out.push(`> ${s.transverseNote(r.scope.sample.transverse.join(", "))}`, "");
+    if (r.scope.sample?.transverse?.length) out.push(`> ${s.transverseNote(r.scope.sample.transverse.join(", "))}`, "");
     // Standard-aware per-finding label: a pack report (RGAA, …) speaks its own criteria
     // everywhere else, so this per-page line should too, rather than the raw WCAG SC id.
     // `loadPack` once, outside the finding loop — never per-finding.
     const pack = isCore(opts.standard) ? undefined : loadPack(opts.standard);
-    for (const pg of r.scope.sample.pages) {
-      const onPage = r.findings.filter((f) => f.file === pg.url || (f.sample?.page !== undefined && f.sample.page === pg.name));
-      const nc = onPage.filter((f) => !f.advisory);
-      const adv = onPage.filter((f) => f.advisory);
+    for (const pg of derived) {
+      const nc = pg.findings.filter((f) => !f.advisory);
+      const adv = pg.findings.filter((f) => f.advisory);
       out.push(`### ${pg.name} — \`${pg.url}\` — ${pg.auth ? s.authYes : s.authNo}`, "");
       out.push(`- ${nc.length} ${s.ncCount}${adv.length ? ` · ${adv.length} ${s.advCount}` : ""}`);
-      if (pg.notes) out.push(`- _${pg.notes}_`);
+      const notes = pageScope.find((x) => x.id === pg.id)?.notes;
+      if (notes) out.push(`- _${notes}_`);
+      // The screenshot the snapshot already holds. Referenced relative to the report's own
+      // directory — a copy would double the artefact's weight for no gain.
+      const shot = join(PAGES_DIR, pg.id, "screen.png");
+      if (existsSync(shot))
+        out.push(
+          "",
+          `![${s.screenshotAlt(pg.name)}](${relative(opts.outDir ?? ".", shot)
+            .split("\\")
+            .join("/")})`,
+        );
       for (const f of nc.slice(0, 30)) {
         const crits = pack ? packCriteriaForFinding(pack, f) : [];
         const label = crits.length ? crits.join(", ") : f.criteriaId; // graceful fallback to the WCAG SC
@@ -349,7 +379,7 @@ function render(
 }
 
 /** The canonical, gated WCAG 2.2 AA report. */
-export function renderReport(r: AuditResult, lang: Lang = "en"): string {
+export function renderReport(r: AuditResult, lang: Lang = "en", outDir?: string): string {
   const s = L[lang];
   const byGuideline = new Map<string, Row[]>();
   for (const c of r.criteria) {
@@ -361,11 +391,11 @@ export function renderReport(r: AuditResult, lang: Lang = "en"): string {
   // JSON back-compat); resolve the localized label from the guideline KEY instead so
   // `--lang fr` renders the French guideline name here too.
   const groups: Group[] = r.guidelines.map((g) => ({ key: g.key, title: guidelineTitle(g.key, lang) ?? g.title, rows: byGuideline.get(g.key) ?? [] }));
-  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups, standard: CORE });
+  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups, standard: CORE, outDir });
 }
 
 /** A derived report for a country standards pack (RGAA, …), projected from the WCAG audit. */
-export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang = "en"): string {
+export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang = "en", outDir?: string): string {
   const derived = derivePackResults(r, pack.key);
   const std = `${pack.name} ${pack.baseVersion}`;
   const s = L[lang];
@@ -417,7 +447,7 @@ export interface ReportOpts {
  *  (`wcag-<date>.md`); a pack report is a derived `<pack>-<date>.md`. */
 export function writeReport(r: AuditResult, opts: ReportOpts): string {
   const core = isCore(opts.standard);
-  const md = core ? renderReport(r, opts.lang) : renderPackReport(r, loadPack(opts.standard), opts.lang);
+  const md = core ? renderReport(r, opts.lang, opts.out) : renderPackReport(r, loadPack(opts.standard), opts.lang, opts.out);
   mkdirSync(opts.out, { recursive: true });
   const path = join(opts.out, `${core ? "wcag" : opts.standard}-${r.date}.md`);
   writeFileSync(path, md);

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { realpathSync as realpathSync6, writeFileSync as writeFileSync16, mkdirSync as mkdirSync14, existsSync as existsSync30, readFileSync as readFileSync26, appendFileSync } from "fs";
-import { join as join45, relative as relative4, sep as sep7, dirname as dirname13 } from "path";
+import { realpathSync as realpathSync6, writeFileSync as writeFileSync16, mkdirSync as mkdirSync14, existsSync as existsSync31, readFileSync as readFileSync26, appendFileSync } from "fs";
+import { join as join45, relative as relative5, sep as sep7, dirname as dirname13 } from "path";
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
@@ -25729,7 +25729,7 @@ var init_specs = __esm({
         defs: {},
         containers: /* @__PURE__ */ new Set(["source", "do_block", "call", "stab_clause"]),
         // `defp`/`defmacrop` are the private forms; everything else is public.
-        exported: (header3) => !/^\s*defp?macrop\b|^\s*defp\b/.test(header3),
+        exported: (header4) => !/^\s*defp?macrop\b|^\s*defp\b/.test(header4),
         calls: { call: "function" },
         kindFrom: {
           call: (node) => ELIXIR_DEFS[node.childForFieldName("target")?.text ?? node.namedChildren[0]?.text ?? ""]
@@ -25836,7 +25836,7 @@ var init_specs = __esm({
         containers: /* @__PURE__ */ new Set(["source_file", "contract_body", "struct_declaration", "enum_declaration", "enum_body"]),
         // Solidity states visibility on every member; `public`/`external` is the
         // contract's ABI, `internal`/`private` is not.
-        exported: (header3, name2) => /\b(public|external)\b/.test(header3) ? true : /\b(internal|private)\b/.test(header3) ? false : byCapital(header3, name2) || true,
+        exported: (header4, name2) => /\b(public|external)\b/.test(header4) ? true : /\b(internal|private)\b/.test(header4) ? false : byCapital(header4, name2) || true,
         calls: { call_expression: "function" },
         nameFrom: {
           // `uint256 public constant MAX = 5` leads with its TYPE, and `type_name`
@@ -26190,13 +26190,13 @@ function extractAst(rel2, ext2, content, opts = {}) {
         relations.push(r);
       }
     };
-    const visibilityOf = (node, header3, name2, ctx) => {
+    const visibilityOf = (node, header4, name2, ctx) => {
       if (ctx.inFunctionBody) return false;
       if (spec.privateMember?.(node) === true) return false;
       if (spec.publicMember?.(node) === true) return true;
       if (!ctx.sectionPublic) return false;
       if (ctx.forcePublic) return true;
-      return ctx.exported || spec.exported(header3, name2);
+      return ctx.exported || spec.exported(header4, name2);
     };
     const docOf = (node) => spec.docFrom?.(node) ?? (spec.docstring ? docstringFor(node) : void 0) ?? docCommentFor(node);
     const walkChildren = (container, ctx) => {
@@ -26225,7 +26225,7 @@ function extractAst(rel2, ext2, content, opts = {}) {
           continue;
         }
         for (const extra of spec.extraMembers?.(c2, { ownerKind: childCtx.ownerKind, inFunctionBody: childCtx.inFunctionBody }) ?? []) {
-          const header3 = declHeader(c2, content);
+          const header4 = declHeader(c2, content);
           const doc = docCommentFor(c2);
           emit2({
             name: extra.name,
@@ -26235,9 +26235,9 @@ function extractAst(rel2, ext2, content, opts = {}) {
             endLine: c2.endPosition.row + 1,
             ...childCtx.parent ? { parent: childCtx.parent } : {},
             ...childCtx.parentPath && childCtx.parentPath !== childCtx.parent ? { parentPath: childCtx.parentPath } : {},
-            signature: header3,
+            signature: header4,
             ...doc ? { doc } : {},
-            exported: visibilityOf(c2, header3, extra.name, childCtx),
+            exported: visibilityOf(c2, header4, extra.name, childCtx),
             lang: spec.lang
           });
         }
@@ -26378,7 +26378,7 @@ function extractAst(rel2, ext2, content, opts = {}) {
           const target = targets[i2];
           const value = values[i2];
           if (value.type !== "function_definition" || !/^[\w.:]+$/.test(target.text)) continue;
-          const header3 = declHeader(node, content);
+          const header4 = declHeader(node, content);
           const doc = docCommentFor(node);
           emit2({
             name: target.text,
@@ -26387,9 +26387,9 @@ function extractAst(rel2, ext2, content, opts = {}) {
             line: node.startPosition.row + 1,
             endLine: node.endPosition.row + 1,
             ...ctx.parent ? { parent: ctx.parent } : {},
-            signature: header3,
+            signature: header4,
             ...doc ? { doc } : {},
-            exported: visibilityOf(node, header3, target.text, { ...ctx, exported: nowExported }),
+            exported: visibilityOf(node, header4, target.text, { ...ctx, exported: nowExported }),
             lang: spec.lang
           });
         }
@@ -26403,7 +26403,7 @@ function extractAst(rel2, ext2, content, opts = {}) {
         const name2 = reader ? reader(node) : nameOf(node);
         const pattern = node.namedChildren.find((c2) => c2.type === "object_pattern" || c2.type === "array_pattern");
         if (pattern && !ctx.inFunctionBody) {
-          const header3 = declHeader(node, content);
+          const header4 = declHeader(node, content);
           const doc = docOf(node);
           for (const bound of boundNames(pattern)) {
             emit2({
@@ -26413,9 +26413,9 @@ function extractAst(rel2, ext2, content, opts = {}) {
               line: node.startPosition.row + 1,
               endLine: node.endPosition.row + 1,
               ...ctx.parent ? { parent: ctx.parent } : {},
-              signature: header3,
+              signature: header4,
               ...doc ? { doc } : {},
-              exported: visibilityOf(node, header3, bound, { ...ctx, exported: nowExported }),
+              exported: visibilityOf(node, header4, bound, { ...ctx, exported: nowExported }),
               lang: spec.lang
             });
           }
@@ -26423,7 +26423,7 @@ function extractAst(rel2, ext2, content, opts = {}) {
         }
         const declaresFunction = FUNCTION_KINDS.has(kind) || NESTED_TYPE_KINDS.has(kind) || spec.nestedDefs?.has(type) === true || FUNCTION_VALUE_TYPES.has(node.childForFieldName("value")?.type ?? "");
         if (name2 && (!ctx.inFunctionBody || declaresFunction)) {
-          const header3 = declHeader(node, content);
+          const header4 = declHeader(node, content);
           const doc = docOf(node);
           const parent = qualifier ?? ctx.parent;
           const parentPath = qualifier ?? ctx.parentPath;
@@ -26435,9 +26435,9 @@ function extractAst(rel2, ext2, content, opts = {}) {
             endLine: node.endPosition.row + 1,
             ...parent ? { parent } : {},
             ...parentPath && parentPath !== parent ? { parentPath } : {},
-            signature: header3,
+            signature: header4,
             ...doc ? { doc } : {},
-            exported: visibilityOf(node, header3, name2, { ...ctx, exported: nowExported }),
+            exported: visibilityOf(node, header4, name2, { ...ctx, exported: nowExported }),
             lang: spec.lang
           });
           collectRelations(node, name2);
@@ -30914,14 +30914,14 @@ function buildEmbeddingIndex(scan2, model) {
   return { embedVersion: EMBED_VERSION, modelId: model.modelId, dim: model.dim, records };
 }
 function serializeEmbeddings(index) {
-  const header3 = JSON.stringify({
+  const header4 = JSON.stringify({
     embedVersion: index.embedVersion,
     modelId: index.modelId,
     dim: index.dim,
     count: index.records.length,
     records: index.records.map((r) => ({ file: r.file, symbol: r.symbol ?? "", line: r.line ?? 0 }))
   });
-  const headerBuf = Buffer.from(header3, "utf8");
+  const headerBuf = Buffer.from(header4, "utf8");
   const body2 = Buffer.alloc(index.records.length * index.dim);
   let off = 0;
   for (const r of index.records) {
@@ -30940,10 +30940,10 @@ function deserializeEmbeddings(bytes) {
     throw new Error("embeddings.bin: bad magic (not a codeindex embeddings artifact)");
   }
   const headerLen = buf.readUInt32LE(4);
-  const header3 = JSON.parse(buf.toString("utf8", 8, 8 + headerLen));
+  const header4 = JSON.parse(buf.toString("utf8", 8, 8 + headerLen));
   const bodyOff = 8 + headerLen;
-  const { dim } = header3;
-  const records = header3.records.map((m, i2) => {
+  const { dim } = header4;
+  const records = header4.records.map((m, i2) => {
     const vec = new Int8Array(dim);
     for (let d = 0; d < dim; d++) vec[d] = buf.readInt8(bodyOff + i2 * dim + d);
     const rec = { file: m.file, vec };
@@ -30951,7 +30951,7 @@ function deserializeEmbeddings(bytes) {
     if (m.line) rec.line = m.line;
     return rec;
   });
-  return { embedVersion: header3.embedVersion, modelId: header3.modelId, dim, records };
+  return { embedVersion: header4.embedVersion, modelId: header4.modelId, dim, records };
 }
 var MAGIC;
 var init_embed = __esm({
@@ -31356,9 +31356,9 @@ function renderRepoMap(scan2, graph, opts = {}) {
   const maxSymbols = opts.maxSymbolsPerFile ?? 8;
   const ranked = [...graph.files].filter((f) => f.fileKind === "code").sort((a, b) => (b.pagerank ?? 0) - (a.pagerank ?? 0) || b.symbols - a.symbols || byStr(a.rel, b.rel));
   const records = new Map(scan2.files.map((f) => [f.rel, f]));
-  const header3 = `# repo map \u2014 ${graph.fileCount} files
+  const header4 = `# repo map \u2014 ${graph.fileCount} files
 `;
-  let out2 = header3;
+  let out2 = header4;
   let files = 0;
   for (const node of ranked) {
     const rec = records.get(node.rel);
@@ -45055,9 +45055,9 @@ function stagedContents(files) {
   for (const file of files) {
     const nl = buf.indexOf(10, pos);
     if (nl === -1) break;
-    const header3 = buf.toString("utf8", pos, nl);
+    const header4 = buf.toString("utf8", pos, nl);
     pos = nl + 1;
-    const m = /^[0-9a-f]{40,64} \w+ (\d+)$/.exec(header3);
+    const m = /^[0-9a-f]{40,64} \w+ (\d+)$/.exec(header4);
     if (!m) continue;
     const size = Number(m[1]);
     out2.set(file, buf.toString("utf8", pos, pos + size));
@@ -48346,8 +48346,8 @@ function decide(payload, deps = {}) {
 }
 
 // src/report.ts
-import { mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
-import { join as join29 } from "path";
+import { existsSync as existsSync16, mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
+import { join as join29, relative as relative3 } from "path";
 
 // src/prd.ts
 import { mkdirSync as mkdirSync6, writeFileSync as writeFileSync7 } from "fs";
@@ -48971,14 +48971,14 @@ function unitBlock(unit, lang, heading, standard) {
   out2.push("");
   return out2;
 }
-function header(r, lang, title2, note = L2[lang].note, ratePct) {
+function header(r, lang, title2, note = L2[lang].note, ratePct2) {
   const s = L2[lang];
   return [
     `# ${title2}`,
     "",
     `- **${s.date}** : ${r.date}`,
     `- **${s.scope}** : ${r.scope.files} ${s.files} \u2014 ${r.scope.inputs.join(", ")}`,
-    `- **${s.rate}** : ${ratePct ?? r.conformancePct}%`,
+    `- **${s.rate}** : ${ratePct2 ?? r.conformancePct}%`,
     "",
     `> ${note}`,
     ""
@@ -48987,8 +48987,8 @@ function header(r, lang, title2, note = L2[lang].note, ratePct) {
 function renderBacklog(r, lang = "en", standard = "wcag") {
   const s = L2[lang];
   const units = prdUnits(r, standard, lang);
-  const ratePct = isCore(standard) ? void 0 : packConformancePct(derivePackResults(r, standard));
-  const out2 = header(r, lang, s.title(standardLabel(standard)), void 0, ratePct);
+  const ratePct2 = isCore(standard) ? void 0 : packConformancePct(derivePackResults(r, standard));
+  const out2 = header(r, lang, s.title(standardLabel(standard)), void 0, ratePct2);
   if (!units.length) {
     out2.push(s.none, "");
     out2.push(...toRuleOnSection(r, standard, lang));
@@ -49004,9 +49004,9 @@ function renderBacklog(r, lang = "en", standard = "wcag") {
 }
 function renderPerCriterion(r, lang = "en", standard = "wcag") {
   const s = L2[lang];
-  const ratePct = isCore(standard) ? void 0 : packConformancePct(derivePackResults(r, standard));
+  const ratePct2 = isCore(standard) ? void 0 : packConformancePct(derivePackResults(r, standard));
   return prdUnits(r, standard, lang).map((u) => {
-    const out2 = header(r, lang, s.prdTitle(u.label), void 0, ratePct);
+    const out2 = header(r, lang, s.prdTitle(u.label), void 0, ratePct2);
     out2.push(...unitBlock(u, lang, "##", standard));
     return { name: `prd-${u.criteriaId}-${r.date}.md`, content: out2.join("\n") };
   });
@@ -49064,8 +49064,8 @@ function toRuleOnSection(r, standard, lang) {
 function renderPrdDoc(r, lang = "en", standard = "wcag") {
   const s = L2[lang];
   const units = prdUnits(r, standard, lang);
-  const ratePct = isCore(standard) ? void 0 : packConformancePct(derivePackResults(r, standard));
-  const out2 = header(r, lang, s.title(standardLabel(standard)), s.docNote, ratePct);
+  const ratePct2 = isCore(standard) ? void 0 : packConformancePct(derivePackResults(r, standard));
+  const out2 = header(r, lang, s.title(standardLabel(standard)), s.docNote, ratePct2);
   if (!units.length) {
     out2.push(s.none, "");
     return out2.join("\n");
@@ -49354,7 +49354,8 @@ var L4 = {
     authYes: "\u{1F512} authentification requise",
     authNo: "\u{1F310} public",
     ncCount: "non-conformit\xE9(s)",
-    advCount: "recommandation(s)"
+    advCount: "recommandation(s)",
+    screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`
   },
   en: {
     title: (std) => `Accessibility audit report \u2014 ${std}`,
@@ -49405,7 +49406,8 @@ var L4 = {
     authYes: "\u{1F512} authentication required",
     authNo: "\u{1F310} public",
     ncCount: "non-conformity(ies)",
-    advCount: "recommendation(s)"
+    advCount: "recommendation(s)",
+    screenshotAlt: (n) => `Screenshot of the ${n} page`
   }
 };
 var NEEDS_RENDERING = [
@@ -49478,18 +49480,26 @@ function render(r, lang, opts) {
     for (const u of advisoryUnits) out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###" }));
   }
   const pageScope = pagesOf(r);
+  if (pageScope.length) attributePages(r, pageScope);
   if (pageScope.length) out2.push(renderPageGrid(r, pageScope, opts.standard, lang));
-  if (r.scope.sample?.pages.length) {
+  if (pageScope.length) {
+    const derived = derivePages(r, pageScope);
     out2.push(`## \u{1F4C4} ${s.perPageTitle}`, "", `> ${s.perPageNote}`, "");
-    if (r.scope.sample.transverse?.length) out2.push(`> ${s.transverseNote(r.scope.sample.transverse.join(", "))}`, "");
+    if (r.scope.sample?.transverse?.length) out2.push(`> ${s.transverseNote(r.scope.sample.transverse.join(", "))}`, "");
     const pack = isCore(opts.standard) ? void 0 : loadPack(opts.standard);
-    for (const pg of r.scope.sample.pages) {
-      const onPage = r.findings.filter((f) => f.file === pg.url || f.sample?.page !== void 0 && f.sample.page === pg.name);
-      const nc = onPage.filter((f) => !f.advisory);
-      const adv = onPage.filter((f) => f.advisory);
+    for (const pg of derived) {
+      const nc = pg.findings.filter((f) => !f.advisory);
+      const adv = pg.findings.filter((f) => f.advisory);
       out2.push(`### ${pg.name} \u2014 \`${pg.url}\` \u2014 ${pg.auth ? s.authYes : s.authNo}`, "");
       out2.push(`- ${nc.length} ${s.ncCount}${adv.length ? ` \xB7 ${adv.length} ${s.advCount}` : ""}`);
-      if (pg.notes) out2.push(`- _${pg.notes}_`);
+      const notes = pageScope.find((x) => x.id === pg.id)?.notes;
+      if (notes) out2.push(`- _${notes}_`);
+      const shot = join29(PAGES_DIR, pg.id, "screen.png");
+      if (existsSync16(shot))
+        out2.push(
+          "",
+          `![${s.screenshotAlt(pg.name)}](${relative3(opts.outDir ?? ".", shot).split("\\").join("/")})`
+        );
       for (const f of nc.slice(0, 30)) {
         const crits = pack ? packCriteriaForFinding(pack, f) : [];
         const label = crits.length ? crits.join(", ") : f.criteriaId;
@@ -49518,7 +49528,7 @@ function render(r, lang, opts) {
   }
   return out2.join("\n");
 }
-function renderReport(r, lang = "en") {
+function renderReport(r, lang = "en", outDir) {
   const s = L4[lang];
   const byGuideline = /* @__PURE__ */ new Map();
   for (const c2 of r.criteria) {
@@ -49527,9 +49537,9 @@ function renderReport(r, lang = "en") {
     (byGuideline.get(c2.guideline) ?? byGuideline.set(c2.guideline, []).get(c2.guideline)).push(row);
   }
   const groups = r.guidelines.map((g) => ({ key: g.key, title: guidelineTitle(g.key, lang) ?? g.title, rows: byGuideline.get(g.key) ?? [] }));
-  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups, standard: CORE2 });
+  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups, standard: CORE2, outDir });
 }
-function renderPackReport(r, pack, lang = "en") {
+function renderPackReport(r, pack, lang = "en", outDir) {
   const derived = derivePackResults(r, pack.key);
   const std = `${pack.name} ${pack.baseVersion}`;
   const s = L4[lang];
@@ -49561,7 +49571,7 @@ function renderPackReport(r, pack, lang = "en") {
 }
 function writeReport(r, opts) {
   const core = isCore(opts.standard);
-  const md = core ? renderReport(r, opts.lang) : renderPackReport(r, loadPack(opts.standard), opts.lang);
+  const md = core ? renderReport(r, opts.lang, opts.out) : renderPackReport(r, loadPack(opts.standard), opts.lang, opts.out);
   mkdirSync7(opts.out, { recursive: true });
   const path = join29(opts.out, `${core ? "wcag" : opts.standard}-${r.date}.md`);
   writeFileSync8(path, md);
@@ -50163,7 +50173,7 @@ function renderCriteriaReference() {
 }
 
 // src/check.ts
-import { existsSync as existsSync17, readFileSync as readFileSync15 } from "fs";
+import { existsSync as existsSync18, readFileSync as readFileSync15 } from "fs";
 import { dirname as dirname9, join as join31 } from "path";
 
 // src/verify.ts
@@ -50206,10 +50216,10 @@ function legacyNcHeader(standard) {
 }
 function buildWorklistLegacy(reportMd, standard, max) {
   const items = [];
-  const header3 = legacyNcHeader(standard);
+  const header4 = legacyNcHeader(standard);
   const lines = reportMd.split("\n");
   for (let i2 = 0; i2 < lines.length && items.length < max; i2++) {
-    const h = header3.exec(lines[i2]);
+    const h = header4.exec(lines[i2]);
     if (!h) continue;
     let claim = h[2] ?? "";
     for (let j = i2 + 1; j < Math.min(i2 + 4, lines.length); j++) {
@@ -50351,7 +50361,7 @@ function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") 
 }
 
 // src/grounding.ts
-import { existsSync as existsSync16, readFileSync as readFileSync14 } from "fs";
+import { existsSync as existsSync17, readFileSync as readFileSync14 } from "fs";
 import { resolve as resolve4 } from "path";
 var WINDOW = 10;
 var norm2 = (s) => s.replace(/\s+/g, " ").trim();
@@ -50370,7 +50380,7 @@ function selectorProbes(selector) {
 function groundFinding(g, opts = {}) {
   if (isUnresolvable(g.file)) return { ok: true, moved: false };
   const path = resolve4(opts.cwd ?? process.cwd(), g.file);
-  if (!existsSync16(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
+  if (!existsSync17(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
   let text;
   try {
     text = readFileSync14(path, "utf8");
@@ -50413,6 +50423,209 @@ function groundItems(items, opts = {}) {
     }
   }
   return s;
+}
+
+// src/pages-report.ts
+var PAGES_REPORT_MARKER = "ultra11y:pages-report";
+function pagesReportMarker(standard) {
+  return `<!-- ${PAGES_REPORT_MARKER} v="1" standard="${standard}" -->`;
+}
+function isPagesReport(md) {
+  return md.slice(0, 400).includes(`<!-- ${PAGES_REPORT_MARKER}`);
+}
+var MARK2 = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
+var L6 = {
+  fr: {
+    docTitle: "Rapport d'accessibilit\xE9 page par page",
+    indexTitle: "Rapport page par page \u2014 index",
+    date: "Date",
+    standard: "R\xE9f\xE9rentiel",
+    pagesCount: "Pages",
+    page: "Page",
+    url: "URL",
+    basis: "Base",
+    snapshot: "instantan\xE9",
+    source: "source",
+    capturedAt: "Captur\xE9 le",
+    viewport: "Fen\xEAtre",
+    producer: "Producteur",
+    auth: "Authentification requise",
+    rate: "Taux de conformit\xE9",
+    rateNote: "sous-ensemble d\xE9cidable : C \xF7 (C + NC)",
+    tally: (c2, nc, na, m) => `${c2} conforme(s) \xB7 ${nc} non conforme(s) \xB7 ${na} non applicable(s) \xB7 ${m} \xE0 \xE9valuer`,
+    screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`,
+    noScreenshot: "Aucune capture d'\xE9cran pour cette page (le producteur n'en a pas fourni) \u2014 le tier pixel est donc inactif ici.",
+    gridTitle: "Grille des crit\xE8res",
+    gridNote: "`C` conforme \xB7 `NC` non conforme \xB7 `\u2014` non applicable \xB7 `?` \xE0 \xE9valuer.",
+    criterion: "Crit\xE8re",
+    status: "Statut",
+    ncTitle: "Non-conformit\xE9s",
+    recTitle: "Recommandations (non normatives)",
+    recNote: "Bonnes pratiques sans test normatif en \xE9chec : elles ne rendent aucun crit\xE8re non conforme et n'entrent pas dans le taux.",
+    noNc: "Aucune non-conformit\xE9 d\xE9tect\xE9e sur cette page par le moteur. Les crit\xE8res \xAB \xE0 \xE9valuer \xBB restent \xE0 trancher.",
+    sourceWarn: "Cette page n'a **pas** d'instantan\xE9 : ses constats proviennent du code. L'absence de constat n'y vaut donc PAS conformit\xE9 \u2014 les crit\xE8res non d\xE9cid\xE9s restent \xAB \xE0 \xE9valuer \xBB.",
+    manualWarn: "Un crit\xE8re \xAB \xE0 \xE9valuer \xBB n'est ni conforme ni non conforme : personne ne l'a encore tranch\xE9. Les crit\xE8res de jugement s'adjugent avec `verify --manual`, ceux \xAB \xE0 restituer \xBB avec `scan`.",
+    unattributed: (n) => `${n} constat(s) ne sont rattach\xE9s \xE0 aucune page (code partag\xE9, fichier hors routes). Ils sont compt\xE9s dans l'audit global et ne sont jamais r\xE9partis d'office sur les pages.`,
+    sheet: "Fiche",
+    blocking: "Bloquant",
+    major: "Majeur",
+    minor: "Mineur",
+    indexNote: "Une fiche par page. Le taux ne porte que sur les crit\xE8res d\xE9cid\xE9s \u2014 il ne dit rien des crit\xE8res restant \xE0 \xE9valuer."
+  },
+  en: {
+    docTitle: "Page-by-page accessibility report",
+    indexTitle: "Page-by-page report \u2014 index",
+    date: "Date",
+    standard: "Standard",
+    pagesCount: "Pages",
+    page: "Page",
+    url: "URL",
+    basis: "Basis",
+    snapshot: "snapshot",
+    source: "source",
+    capturedAt: "Captured at",
+    viewport: "Viewport",
+    producer: "Producer",
+    auth: "Authentication required",
+    rate: "Conformance rate",
+    rateNote: "decidable subset: C \xF7 (C + NC)",
+    tally: (c2, nc, na, m) => `${c2} conforming \xB7 ${nc} non-conforming \xB7 ${na} not applicable \xB7 ${m} to assess`,
+    screenshotAlt: (n) => `Screenshot of the ${n} page`,
+    noScreenshot: "No screenshot for this page (the producer supplied none) \u2014 the pixel tier is therefore inactive here.",
+    gridTitle: "Criteria grid",
+    gridNote: "`C` conforming \xB7 `NC` non-conforming \xB7 `\u2014` not applicable \xB7 `?` to assess.",
+    criterion: "Criterion",
+    status: "Status",
+    ncTitle: "Non-conformities",
+    recTitle: "Recommendations (non-normative)",
+    recNote: "Good practices with no failing normative test: they never make a criterion non-conforming and do not enter the rate.",
+    noNc: "No non-conformity detected on this page by the engine. The criteria left to assess are still open.",
+    sourceWarn: "This page has **no** snapshot: its findings come from the code. The absence of a finding therefore does NOT mean conforming \u2014 undecided criteria stay \u201Cto assess\u201D.",
+    manualWarn: "A criterion \u201Cto assess\u201D is neither conforming nor non-conforming: nobody has ruled on it yet. Judgment criteria are adjudicated with `verify --manual`, needs-rendering ones with `scan`.",
+    unattributed: (n) => `${n} finding(s) are attributed to no page (shared code, file outside any route). They are counted in the overall audit and are never spread across pages.`,
+    sheet: "Sheet",
+    blocking: "Blocking",
+    major: "Major",
+    minor: "Minor",
+    indexNote: "One sheet per page. The rate covers only the decided criteria \u2014 it says nothing about those left to assess."
+  }
+};
+function rowsFor(result, page, standard, lang) {
+  if (isCore(standard)) {
+    return [...page.criteria].sort((a, b) => compareSC(a.id, b.id)).map((c2) => ({ id: c2.id, label: `${c2.id} ${scTitle(c2.id, lang) ?? ""}`.trim(), group: c2.guideline, status: c2.status }));
+  }
+  const pack = loadPack(standard);
+  const byId2 = new Map(derivePackResults(pageView(result, page), standard).map((r) => [r.id, r.status]));
+  return pack.criteria.map((pc) => ({
+    id: pc.id,
+    label: `${pc.id} \u2014 ${titlePlain(pack, pc, lang)}`,
+    group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim(),
+    status: byId2.get(pc.id) ?? "manual"
+  }));
+}
+function tally(rows) {
+  return {
+    c: rows.filter((r) => r.status === "C").length,
+    nc: rows.filter((r) => r.status === "NC").length,
+    na: rows.filter((r) => r.status === "NA").length,
+    manual: rows.filter((r) => r.status === "manual").length
+  };
+}
+function ratePct(rows) {
+  const { c: c2, nc } = tally(rows);
+  return c2 + nc === 0 ? 100 : Math.round(c2 / (c2 + nc) * 100);
+}
+function renderPageReport(result, page, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const h = opts.heading ?? "##";
+  const s = L6[lang];
+  const out2 = [];
+  out2.push(`${h} ${page.name}${page.auth ? " \u{1F512}" : ""}`, "");
+  const meta2 = [];
+  meta2.push(`- **${s.url}** : \`${page.url}\``);
+  meta2.push(`- **${s.basis}** : ${page.basis === "snapshot" ? s.snapshot : s.source}`);
+  if (page.auth) meta2.push(`- **${s.auth}** : \u2705`);
+  out2.push(...meta2);
+  const rows = rowsFor(result, page, standard, lang);
+  const t2 = tally(rows);
+  out2.push(`- **${s.rate}** : **${ratePct(rows)} %** _(${s.rateNote})_`);
+  out2.push(`- ${s.tally(t2.c, t2.nc, t2.na, t2.manual)}`, "");
+  if (page.basis !== "snapshot") out2.push(`> \u26A0\uFE0F ${s.sourceWarn}`, "");
+  const shot = opts.screenshots?.get(page.id);
+  if (shot) out2.push(`![${s.screenshotAlt(page.name)}](${shot})`, "");
+  else out2.push(`_${s.noScreenshot}_`, "");
+  out2.push(`${h}# ${s.gridTitle}`, "", `> ${s.gridNote}`, "");
+  out2.push(`| ${s.criterion} | ${s.status} |`, "| --- | --- |");
+  let group = "";
+  for (const row of rows) {
+    if (row.group !== group) {
+      group = row.group;
+      out2.push(`| **${group}** | |`);
+    }
+    out2.push(`| ${row.label} | ${MARK2[row.status]} |`);
+  }
+  out2.push("", `> ${s.manualWarn}`, "");
+  const units = prdUnits(pageView(result, page), standard, lang);
+  const ncUnits = units.filter((u) => !u.advisory);
+  const advUnits = units.filter((u) => u.advisory);
+  out2.push(`${h}# ${s.ncTitle}`, "");
+  if (!ncUnits.length) out2.push(s.noNc, "");
+  else for (const u of ncUnits) out2.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##` }));
+  if (advUnits.length) {
+    out2.push(`${h}# \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
+    for (const u of advUnits) out2.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##` }));
+  }
+  return out2.join("\n");
+}
+function header2(result, pages, standard, lang, title2) {
+  const s = L6[lang];
+  return [
+    pagesReportMarker(standard),
+    "",
+    `# ${title2}`,
+    "",
+    `- **${s.date}** : ${result.date}`,
+    `- **${s.standard}** : ${isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name}`,
+    `- **${s.pagesCount}** : ${pages.length}`,
+    ""
+  ];
+}
+function renderPagesIndex(result, pages, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const s = L6[lang];
+  const out2 = header2(result, pages, standard, lang, s.indexTitle);
+  out2.push(`> ${s.indexNote}`, "");
+  out2.push(`| ${s.page} | ${s.url} | ${s.basis} | ${s.rate} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
+  out2.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
+  for (const p of pages) {
+    const rows = rowsFor(result, p, standard, lang);
+    const nc = p.findings.filter((f) => !f.advisory);
+    const href = opts.hrefs?.get(p.id);
+    out2.push(
+      `| ${p.name}${p.auth ? " \u{1F512}" : ""} | \`${p.url}\` | ${p.basis === "snapshot" ? s.snapshot : s.source} | ${ratePct(rows)} % | ${nc.filter((f) => f.severity === "bloquant").length} | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`
+    );
+  }
+  out2.push("");
+  const orphans = result.findings.filter((f) => !f.page);
+  if (orphans.length) out2.push(`> ${s.unattributed(orphans.length)}`, "");
+  return out2.join("\n");
+}
+function renderPagesDocument(result, pages, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const out2 = [renderPagesIndex(result, pages, { ...opts, standard, lang })];
+  for (const p of pages) out2.push(renderPageReport(result, p, { ...opts, standard, lang, heading: "##" }));
+  return out2.join("\n");
+}
+function renderPageDocument(result, page, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const s = L6[lang];
+  const out2 = [pagesReportMarker(standard), "", `# ${s.docTitle} \u2014 ${page.name}`, "", `- **${s.date}** : ${result.date}`, ""];
+  out2.push(renderPageReport(result, page, { ...opts, standard, lang, heading: "##" }));
+  return out2.join("\n");
 }
 
 // src/check.ts
@@ -50463,8 +50676,11 @@ function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
     // "**Success criterion** : <id>" / "**WCAG** : <id>"
   ];
   const naItem = core ? /^-\s+(?:[A-Za-z]+\s+)?(\d{1,2}(?:\.\d{1,2}){2})\s*—/ : new RegExp(`^-\\s+(?:[A-Za-z]+\\s+)?(${idCaptureSource(pack)})\\s*\u2014`);
-  for (let n = 1; n <= 5; n++) {
-    if (!new RegExp(`^##\\s+${n}\\.`, "m").test(md)) issues.push(s.section(n));
+  const perPage = isPagesReport(md);
+  if (!perPage) {
+    for (let n = 1; n <= 5; n++) {
+      if (!new RegExp(`^##\\s+${n}\\.`, "m").test(md)) issues.push(s.section(n));
+    }
   }
   const seen = /* @__PURE__ */ new Set();
   for (const critRef of critRefs) {
@@ -50484,11 +50700,11 @@ function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
   }
   const rateM = /^-\s+\*\*[^*\n]*\*\*\s*:\s*(\d+(?:[.,]\d+)?)\s*%/m.exec(md);
   if (!rateM) {
-    issues.push(s.rateMissing);
+    if (!perPage) issues.push(s.rateMissing);
   } else {
     const pct2 = parseFloat(rateM[1].replace(",", "."));
     if (pct2 < 0 || pct2 > 100) issues.push(s.rateRange(rateM[1]));
-    else if (core) {
+    else if (core && !perPage) {
       const totals = synthesisTotals(md);
       if (totals) {
         const { c: c2, nc } = totals;
@@ -50497,7 +50713,7 @@ function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
       }
     }
   }
-  if (!core && pack && opts.audit) {
+  if (!core && pack && opts.audit && !perPage) {
     const derivedNc = new Set(
       derivePackResults(opts.audit, standard).filter((r) => r.status === "NC").map((r) => r.id)
     );
@@ -50521,7 +50737,7 @@ function checkSemantic(md, opts) {
   const s = M[lang];
   const empty = { total: 0, grounded: 0, moved: 0, failed: 0 };
   const artifact = opts.verdictsPath ?? join31(dirname9(opts.reportPath), "VERIFY.todo.json");
-  if (!existsSync17(artifact)) return { ok: false, issues: [s.semanticMissing(artifact)], ...empty };
+  if (!existsSync18(artifact)) return { ok: false, issues: [s.semanticMissing(artifact)], ...empty };
   let items;
   try {
     const parsed = JSON.parse(readFileSync15(artifact, "utf8"));
@@ -51855,7 +52071,7 @@ function writeAdjudication(items, outDir, opts) {
 
 // src/scan.ts
 import { execFileSync as execFileSync4 } from "child_process";
-import { mkdtempSync as mkdtempSync2, writeFileSync as writeFileSync11, existsSync as existsSync19, statSync as statSync8, readdirSync as readdirSync5, rmSync as rmSync3, readFileSync as readFileSync16 } from "fs";
+import { mkdtempSync as mkdtempSync2, writeFileSync as writeFileSync11, existsSync as existsSync20, statSync as statSync8, readdirSync as readdirSync5, rmSync as rmSync3, readFileSync as readFileSync16 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
 import { join as join33, resolve as resolve5 } from "path";
 import { fileURLToPath as fileURLToPath3 } from "url";
@@ -52099,7 +52315,7 @@ async function crawlUrls(start2, opts) {
 }
 
 // src/sample.ts
-import { existsSync as existsSync18 } from "fs";
+import { existsSync as existsSync19 } from "fs";
 function looksLikeTarget(u) {
   return /^https?:\/\//i.test(u) || /^(\.\.?[/\\]|[/\\])/.test(u) || /\.x?html?$/i.test(u);
 }
@@ -52135,7 +52351,7 @@ function validateSample(raw) {
     if (p.auth !== void 0 && typeof p.auth !== "boolean") err2(`sample.pages[${i2}].auth`, "auth must be a boolean");
     if (p.storageState !== void 0 && (typeof p.storageState !== "string" || p.storageState.trim() === "")) {
       err2(`sample.pages[${i2}].storageState`, "storageState must be a non-empty file path string");
-    } else if (typeof p.storageState === "string" && p.storageState.trim() !== "" && !existsSync18(p.storageState)) {
+    } else if (typeof p.storageState === "string" && p.storageState.trim() !== "" && !existsSync19(p.storageState)) {
       warn(
         `sample.pages[${i2}].storageState`,
         `storageState path not found: "${p.storageState}" (resolved from the current directory) \u2014 the scan will not be able to load this session`
@@ -52435,7 +52651,7 @@ function toDynamicResult(out2, target, lang = "en", engine = "axe-core@playwrigh
 var DOCKER_TESTED_SCS = ["1.4.10"];
 function runScan(opts) {
   const isUrl3 = /^https?:\/\//i.test(opts.target);
-  if (!isUrl3 && !existsSync19(opts.target)) {
+  if (!isUrl3 && !existsSync20(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
   if (!dockerAvailable()) {
@@ -52443,7 +52659,7 @@ function runScan(opts) {
   }
   const tag = opts.tag ?? IMAGE_TAG;
   if (!imageExists(tag)) buildImage(tag);
-  const isFile = !isUrl3 && existsSync19(opts.target) && statSync8(opts.target).isFile();
+  const isFile = !isUrl3 && existsSync20(opts.target) && statSync8(opts.target).isFile();
   const out2 = runRunner(opts.target, isFile, tag, Boolean(opts.snapshotRoot));
   const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, opts.target) : void 0;
   return { ...toDynamicResult(out2, opts.target), testedScs: [...DOCKER_TESTED_SCS], ...id ? { snapshots: [id] } : {} };
@@ -52530,7 +52746,7 @@ async function runCrawlScan(opts) {
 var sevRank = { bloquant: 3, majeur: 2, mineur: 1 };
 function resolveHostAnchor(file, snippet2) {
   const s = snippet2?.trim();
-  if (!s || !existsSync19(file)) return null;
+  if (!s || !existsSync20(file)) return null;
   let source;
   try {
     source = readFileSync16(file, "utf8");
@@ -52659,7 +52875,7 @@ function mergeSnapshotAudit(base, snap) {
 }
 
 // src/scan-local.ts
-import { existsSync as existsSync20, statSync as statSync9 } from "fs";
+import { existsSync as existsSync21, statSync as statSync9 } from "fs";
 import { createRequire } from "module";
 import { resolve as resolve6 } from "path";
 var LOCAL_ENGINE = "axe-core@playwright (local)";
@@ -53230,7 +53446,7 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
 }
 async function runScanLocal(opts) {
   const isUrl3 = /^https?:\/\//i.test(opts.target);
-  if (!isUrl3 && !existsSync20(opts.target)) {
+  if (!isUrl3 && !existsSync21(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
   const isFile = !isUrl3 && statSync9(opts.target).isFile();
@@ -53455,9 +53671,9 @@ function unifiedDiff(file, before, after, ctx = 2) {
   if (before === after) return "";
   const a = before.split("\n");
   const b = after.split("\n");
-  const header3 = `--- a/${file}
+  const header4 = `--- a/${file}
 +++ b/${file}`;
-  if (a.length > 4e3 || b.length > 4e3) return `${header3}
+  if (a.length > 4e3 || b.length > 4e3) return `${header4}
 @@ diff omitted (large file): ${a.length} \u2192 ${b.length} lines @@`;
   const n = a.length;
   const m = b.length;
@@ -53491,7 +53707,7 @@ function unifiedDiff(file, before, after, ctx = 2) {
       for (let d = -ctx; d <= ctx; d++) if (k2 + d >= 0 && k2 + d < ops.length) show[k2 + d] = true;
     }
   }
-  const out2 = [header3];
+  const out2 = [header4];
   let k = 0;
   while (k < ops.length) {
     if (!show[k]) {
@@ -53628,7 +53844,7 @@ function fixSummary(r, lang = "fr", write = false) {
 // src/init.ts
 import { writeFileSync as writeFileSync13, mkdirSync as mkdirSync10, chmodSync, realpathSync as realpathSync2 } from "fs";
 import { execFileSync as execFileSync5 } from "child_process";
-import { join as join34, relative as relative3, sep as sep4 } from "path";
+import { join as join34, relative as relative4, sep as sep4 } from "path";
 var EN_SEV = { bloquant: "blocking", majeur: "major", mineur: "minor" };
 function repoRoot() {
   try {
@@ -53641,7 +53857,7 @@ function resolveEnginePath(root) {
   const argv1 = process.argv[1] ?? "scripts/ultra11y.mjs";
   try {
     const abs = realpathSync2(argv1);
-    return abs.startsWith(root + sep4) ? relative3(root, abs) : abs;
+    return abs.startsWith(root + sep4) ? relative4(root, abs) : abs;
   } catch {
     return argv1;
   }
@@ -53753,7 +53969,7 @@ function writeCi(root, enginePath, failOn) {
 }
 
 // src/install/json-edit.ts
-import { copyFileSync, existsSync as existsSync21, mkdirSync as mkdirSync11, readFileSync as readFileSync17, renameSync as renameSync2, rmSync as rmSync4, writeFileSync as writeFileSync14 } from "fs";
+import { copyFileSync, existsSync as existsSync22, mkdirSync as mkdirSync11, readFileSync as readFileSync17, renameSync as renameSync2, rmSync as rmSync4, writeFileSync as writeFileSync14 } from "fs";
 import { dirname as dirname10 } from "path";
 var SettingsParseError = class extends Error {
   constructor(path, cause) {
@@ -53767,10 +53983,10 @@ function stamp() {
   return (/* @__PURE__ */ new Date()).toISOString().replaceAll(/[:.]/g, "-");
 }
 function writeTextWithBackup(path, content, marker = "ultra11y") {
-  if (existsSync21(path) && readFileSync17(path, "utf8") === content) return { path, changed: false };
+  if (existsSync22(path) && readFileSync17(path, "utf8") === content) return { path, changed: false };
   mkdirSync11(dirname10(path), { recursive: true });
   let backup;
-  if (existsSync21(path)) {
+  if (existsSync22(path)) {
     backup = `${path}.${marker}-backup-${stamp()}`;
     copyFileSync(path, backup);
   }
@@ -53786,7 +54002,7 @@ function writeTextWithBackup(path, content, marker = "ultra11y") {
 }
 function editJsonFile(path, mutate) {
   let root = {};
-  if (existsSync21(path)) {
+  if (existsSync22(path)) {
     const raw = readFileSync17(path, "utf8");
     if (raw.trim()) {
       let parsed;
@@ -53803,7 +54019,7 @@ function editJsonFile(path, mutate) {
   }
   const before = JSON.stringify(root);
   mutate(root);
-  if (JSON.stringify(root) === before && existsSync21(path)) return { path, changed: false };
+  if (JSON.stringify(root) === before && existsSync22(path)) return { path, changed: false };
   return writeTextWithBackup(path, `${JSON.stringify(root, null, 2)}
 `);
 }
@@ -53850,7 +54066,7 @@ function claudeCodeWired(settingsPath) {
 }
 
 // src/install/text-edit.ts
-import { existsSync as existsSync22, readFileSync as readFileSync18, rmSync as rmSync5 } from "fs";
+import { existsSync as existsSync23, readFileSync as readFileSync18, rmSync as rmSync5 } from "fs";
 var BLOCK_BEGIN = "<!-- BEGIN ultra11y (managed by `ultra11y install --agents-md`; edit outside this block) -->";
 var BLOCK_END = "<!-- END ultra11y -->";
 var blockRe = () => new RegExp(`${escapeRe2(BLOCK_BEGIN)}[\\s\\S]*?${escapeRe2(BLOCK_END)}\\n?`);
@@ -53862,14 +54078,14 @@ function upsertManagedBlock(path, body2) {
 ${body2.trim()}
 ${BLOCK_END}
 `;
-  if (!existsSync22(path)) return writeTextWithBackup(path, block);
+  if (!existsSync23(path)) return writeTextWithBackup(path, block);
   const current = readFileSync18(path, "utf8");
   if (blockRe().test(current)) return writeTextWithBackup(path, current.replace(blockRe(), block));
   const sep8 = current.endsWith("\n\n") ? "" : current.endsWith("\n") ? "\n" : "\n\n";
   return writeTextWithBackup(path, `${current}${sep8}${block}`);
 }
 function removeManagedBlock(path) {
-  if (!existsSync22(path)) return { path, changed: false };
+  if (!existsSync23(path)) return { path, changed: false };
   const current = readFileSync18(path, "utf8");
   if (!blockRe().test(current)) return { path, changed: false };
   const rest = current.replace(blockRe(), "");
@@ -53880,7 +54096,7 @@ function removeManagedBlock(path) {
   return writeTextWithBackup(path, rest.replace(/\n+$/, "\n"));
 }
 function hasManagedBlock(path) {
-  return existsSync22(path) && blockRe().test(readFileSync18(path, "utf8"));
+  return existsSync23(path) && blockRe().test(readFileSync18(path, "utf8"));
 }
 
 // src/install/agents-md.ts
@@ -53941,11 +54157,11 @@ function agentsMdWired(root) {
 }
 
 // src/install/codex.ts
-import { existsSync as existsSync24, readFileSync as readFileSync20 } from "fs";
+import { existsSync as existsSync25, readFileSync as readFileSync20 } from "fs";
 import { join as join37 } from "path";
 
 // src/install/paths.ts
-import { copyFileSync as copyFileSync2, cpSync, existsSync as existsSync23, mkdirSync as mkdirSync12, readFileSync as readFileSync19, realpathSync as realpathSync3, statSync as statSync10 } from "fs";
+import { copyFileSync as copyFileSync2, cpSync, existsSync as existsSync24, mkdirSync as mkdirSync12, readFileSync as readFileSync19, realpathSync as realpathSync3, statSync as statSync10 } from "fs";
 import { homedir as homedir2 } from "os";
 import { dirname as dirname11, join as join36 } from "path";
 function codexHome() {
@@ -53987,7 +54203,7 @@ function packageRoot() {
     return null;
   }
   for (let i2 = 0; i2 < 6 && dir && dir !== "/"; i2++) {
-    if (existsSync23(join36(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
+    if (existsSync24(join36(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
     dir = dirname11(dir);
   }
   return null;
@@ -53995,24 +54211,24 @@ function packageRoot() {
 function bundledSkillsDir() {
   const root = packageRoot();
   const p = root ? join36(root, "skills") : null;
-  return p && existsSync23(p) ? p : null;
+  return p && existsSync24(p) ? p : null;
 }
 function bundledOpencodePlugin() {
   const root = packageRoot();
   const p = root ? join36(root, ".opencode", "plugins", "ultra11y.js") : null;
-  return p && existsSync23(p) ? p : null;
+  return p && existsSync24(p) ? p : null;
 }
 function copySkillsInto(source, dest) {
   const out2 = [];
   for (const name2 of ["ultra11y", "review-a11y"]) {
     const from = join36(source, name2);
-    if (!existsSync23(from)) continue;
+    if (!existsSync24(from)) continue;
     const to = join36(dest, name2);
     const same = ["SKILL.md", join36("scripts", "ultra11y.mjs")].every((f) => {
       const a = join36(from, f);
       const b = join36(to, f);
       try {
-        return existsSync23(b) && statSync10(a).size === statSync10(b).size && readFileSync19(a).equals(readFileSync19(b));
+        return existsSync24(b) && statSync10(a).size === statSync10(b).size && readFileSync19(a).equals(readFileSync19(b));
       } catch {
         return false;
       }
@@ -54071,7 +54287,7 @@ function installCodex({ codexDir, command, skillsSource }) {
     })
   );
   const configPath = join37(codexDir, "config.toml");
-  const current = existsSync24(configPath) ? readFileSync20(configPath, "utf8") : "";
+  const current = existsSync25(configPath) ? readFileSync20(configPath, "utf8") : "";
   const edit = enableHooksFeature(current);
   if (edit.changed) reports.push(writeTextWithBackup(configPath, edit.content));
   if (skillsSource) reports.push(...copySkillsInto(skillsSource, join37(codexDir, "skills")));
@@ -54090,7 +54306,7 @@ function installCodex({ codexDir, command, skillsSource }) {
 function uninstallCodex({ codexDir }) {
   const reports = [];
   const hooksPath = join37(codexDir, "hooks.json");
-  if (existsSync24(hooksPath)) {
+  if (existsSync25(hooksPath)) {
     reports.push(
       editJsonFile(hooksPath, (root) => {
         const hooks = root.hooks;
@@ -54112,11 +54328,11 @@ function codexWired(codexDir) {
 }
 function codexHooksEnabled(codexDir) {
   const p = join37(codexDir, "config.toml");
-  return existsSync24(p) && HOOKS_ON.test(featuresBody(readFileSync20(p, "utf8")));
+  return existsSync25(p) && HOOKS_ON.test(featuresBody(readFileSync20(p, "utf8")));
 }
 
 // src/install/opencode.ts
-import { existsSync as existsSync25, readFileSync as readFileSync21, rmSync as rmSync6 } from "fs";
+import { existsSync as existsSync26, readFileSync as readFileSync21, rmSync as rmSync6 } from "fs";
 import { join as join38 } from "path";
 var OPENCODE_MARKER = "ULTRA11Y_OPENCODE_PLUGIN";
 function pluginTarget(configDir) {
@@ -54124,11 +54340,11 @@ function pluginTarget(configDir) {
 }
 function installOpencode({ configDir, pluginSource, skillsSource, enginePath }) {
   const target = pluginTarget(configDir);
-  if (existsSync25(target) && !readFileSync21(target, "utf8").includes(OPENCODE_MARKER)) {
+  if (existsSync26(target) && !readFileSync21(target, "utf8").includes(OPENCODE_MARKER)) {
     throw new Error(`refusing to overwrite ${target}: it is not a file ultra11y wrote. Remove it manually if you want the plugin here.`);
   }
   const reports = [writeTextWithBackup(target, readFileSync21(pluginSource, "utf8"))];
-  if (enginePath && existsSync25(enginePath)) {
+  if (enginePath && existsSync26(enginePath)) {
     reports.push(writeTextWithBackup(join38(configDir, "plugin", "ultra11y.mjs"), readFileSync21(enginePath, "utf8")));
   }
   if (skillsSource) reports.push(...copySkillsInto(skillsSource, join38(configDir, "skills")));
@@ -54144,13 +54360,13 @@ function installOpencode({ configDir, pluginSource, skillsSource, enginePath }) 
 function uninstallOpencode({ configDir }) {
   const reports = [];
   const target = pluginTarget(configDir);
-  if (existsSync25(target) && readFileSync21(target, "utf8").includes(OPENCODE_MARKER)) {
+  if (existsSync26(target) && readFileSync21(target, "utf8").includes(OPENCODE_MARKER)) {
     rmSync6(target, { force: true });
     rmSync6(join38(configDir, "plugin", "ultra11y.mjs"), { force: true });
     reports.push({ path: target, changed: true });
   }
   const configPath = join38(configDir, "opencode.json");
-  if (existsSync25(configPath)) {
+  if (existsSync26(configPath)) {
     reports.push(
       editJsonFile(configPath, (root) => {
         if (!Array.isArray(root.plugin)) return;
@@ -54164,7 +54380,7 @@ function uninstallOpencode({ configDir }) {
 }
 function opencodeWired(configDir) {
   const target = pluginTarget(configDir);
-  if (existsSync25(target) && readFileSync21(target, "utf8").includes(OPENCODE_MARKER)) return true;
+  if (existsSync26(target) && readFileSync21(target, "utf8").includes(OPENCODE_MARKER)) return true;
   try {
     const cfg = JSON.parse(readFileSync21(join38(configDir, "opencode.json"), "utf8"));
     return Array.isArray(cfg.plugin) && cfg.plugin.some((p) => /^ultra11y(@|$)/.test(String(p)));
@@ -54174,7 +54390,7 @@ function opencodeWired(configDir) {
 }
 
 // src/install/index.ts
-import { existsSync as existsSync26 } from "fs";
+import { existsSync as existsSync27 } from "fs";
 import { join as join39 } from "path";
 var ALL_TARGETS = ["claude-code", "codex", "opencode"];
 function parseTargets(flags2) {
@@ -54225,12 +54441,12 @@ function installForTargets(opts) {
           }
           const configDir = opts.project === true ? join39(cwd, ".opencode") : opencodeConfigDir();
           if (!opts.dryRun) {
-            const engine = existsSync26(pinnedEnginePath()) ? pinnedEnginePath() : join39(packageRoot() ?? "", "scripts", "ultra11y.mjs");
+            const engine = existsSync27(pinnedEnginePath()) ? pinnedEnginePath() : join39(packageRoot() ?? "", "scripts", "ultra11y.mjs");
             const out3 = installOpencode({
               configDir,
               pluginSource: source,
               skillsSource: opts.skills === false ? null : bundledSkillsDir(),
-              enginePath: existsSync26(engine) ? engine : null
+              enginePath: existsSync27(engine) ? engine : null
             });
             r.reports.push(...out3.reports);
             r.guidance.push(...out3.guidance);
@@ -54780,7 +54996,7 @@ export function Ultra11yOverlay({ endpoint = "http://127.0.0.1:${port}" }) {
 export default Ultra11yOverlay;
 `;
 }
-var MARK2 = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
+var MARK3 = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
 var CLASS = { C: "c", NC: "nc", NA: "na", manual: "m" };
 function esc2(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -54837,7 +55053,7 @@ function dashboardHtml(result, pages, standard, lang) {
     }
     const cells = pages.map((p) => {
       const s = status.get(row.id)?.get(p.id) ?? "manual";
-      return `<td class="${CLASS[s]}">${MARK2[s]}</td>`;
+      return `<td class="${CLASS[s]}">${MARK3[s]}</td>`;
     });
     out2.push(`<tr><td>${esc2(row.label)}</td>${cells.join("")}</tr>`);
   }
@@ -55203,7 +55419,7 @@ function e2eSetupPlan(runners, paths, lang = "en") {
 }
 
 // src/orchestrate.ts
-import { existsSync as existsSync27, mkdirSync as mkdirSync13, readFileSync as readFileSync23, rmSync as rmSync7, writeFileSync as writeFileSync15 } from "fs";
+import { existsSync as existsSync28, mkdirSync as mkdirSync13, readFileSync as readFileSync23, rmSync as rmSync7, writeFileSync as writeFileSync15 } from "fs";
 import { join as join42, resolve as resolve7 } from "path";
 
 // src/orchestrate-templates.ts
@@ -55419,7 +55635,7 @@ function listPhases(runDir, engineAbs) {
   const adjPath = join42(run2, "ADJUDICATE.todo.json");
   let adjIds = [];
   let adjReady = false;
-  if (existsSync27(adjPath)) {
+  if (existsSync28(adjPath)) {
     try {
       const f = JSON.parse(readFileSync23(adjPath, "utf8"));
       if (f && f.kind === "adjudication" && Array.isArray(f.items)) {
@@ -55432,7 +55648,7 @@ function listPhases(runDir, engineAbs) {
   const verPath = join42(run2, "VERIFY.todo.json");
   let verIds = [];
   let verReady = false;
-  if (existsSync27(verPath)) {
+  if (existsSync28(verPath)) {
     try {
       const items = JSON.parse(readFileSync23(verPath, "utf8"));
       if (Array.isArray(items)) {
@@ -55463,7 +55679,7 @@ function listPhases(runDir, engineAbs) {
 }
 function orchestrateRun(runDir, engineAbs, opts = {}) {
   const run2 = resolve7(runDir);
-  if (!existsSync27(run2)) {
+  if (!existsSync28(run2)) {
     return { exitCode: 2, written: [], notices: [], errors: [`run dir not found: ${run2}`], phases: [] };
   }
   const phases = listPhases(run2, engineAbs);
@@ -55505,7 +55721,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
   for (const ph of phases) {
     if (emitted.has(ph.name)) continue;
     const stale = join42(orchDir, `${ph.name}.workflow.mjs`);
-    if (existsSync27(stale)) {
+    if (existsSync28(stale)) {
       rmSync7(stale, { force: true });
       notices.push(`phase "${ph.name}": stale workflow removed \u2014 its worklist ${ph.ready ? "is now empty" : "no longer exists"}.`);
     }
@@ -55534,7 +55750,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
 import { createInterface as createInterface2 } from "readline";
 
 // src/mcp/handlers.ts
-import { existsSync as existsSync28, readFileSync as readFileSync24, realpathSync as realpathSync4, statSync as statSync11 } from "fs";
+import { existsSync as existsSync29, readFileSync as readFileSync24, realpathSync as realpathSync4, statSync as statSync11 } from "fs";
 import { isAbsolute as isAbsolute3, join as join43, resolve as resolve8, sep as sep5 } from "path";
 
 // src/project-lock.ts
@@ -55583,7 +55799,7 @@ function requiredCwd(args2, defaults) {
   const cwd = str2(args2.cwd) ?? defaults.defaultCwd;
   if (!cwd) throw new ToolError("`cwd` is required: an absolute path to the project root.");
   const abs = resolve8(cwd);
-  if (!existsSync28(abs)) throw new ToolError(`project root not found: ${abs}`);
+  if (!existsSync29(abs)) throw new ToolError(`project root not found: ${abs}`);
   if (!statSync11(abs).isDirectory()) throw new ToolError(`\`cwd\` is not a directory: ${abs}`);
   return abs;
 }
@@ -55729,7 +55945,7 @@ function handlePackCheck(args2, cwd) {
 }
 function handleSampleCheck(cwd) {
   const file = join43(cwd, ".ultra11yrc.json");
-  if (!existsSync28(file)) {
+  if (!existsSync29(file)) {
     throw new ToolError(`no .ultra11yrc.json at ${cwd} \u2014 a page sample must be declared before it can be linted.`);
   }
   let raw;
@@ -55792,7 +56008,7 @@ function reportText(args2, tool) {
   if (inline) return inline;
   if (!file) throw new ToolError(`\`report_text\` is required \u2014 the report markdown for ultra11y_${tool} to work on.`);
   if (!isAbsolute3(file)) throw new ToolError("`report_file` must be an absolute path.");
-  if (!existsSync28(file)) throw new ToolError(`report file not found: ${file}`);
+  if (!existsSync29(file)) throw new ToolError(`report file not found: ${file}`);
   return readFileSync24(file, "utf8");
 }
 function handleCriteria(args2) {
@@ -56317,7 +56533,7 @@ function str3(v) {
 var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t2) => t2.name));
 
 // src/mcp/resources.ts
-import { existsSync as existsSync29, readdirSync as readdirSync6, readFileSync as readFileSync25, realpathSync as realpathSync5, statSync as statSync12 } from "fs";
+import { existsSync as existsSync30, readdirSync as readdirSync6, readFileSync as readFileSync25, realpathSync as realpathSync5, statSync as statSync12 } from "fs";
 import { basename as basename3, dirname as dirname12, join as join44, resolve as resolve9, sep as sep6 } from "path";
 import { fileURLToPath as fileURLToPath4 } from "url";
 var SKILL_NAME = "ultra11y";
@@ -56325,14 +56541,14 @@ var URI_SCHEME = "skill://";
 function resolveSkillRoot(moduleDir) {
   const here = moduleDir ?? dirname12(fileURLToPath4(import.meta.url));
   const candidates2 = [resolve9(here, ".."), resolve9(here, "..", "skills", SKILL_NAME), resolve9(here, "..", "..", "skills", SKILL_NAME)];
-  return candidates2.find((dir) => existsSync29(join44(dir, "SKILL.md")));
+  return candidates2.find((dir) => existsSync30(join44(dir, "SKILL.md")));
 }
 function listResources(moduleDir) {
   const root = resolveSkillRoot(moduleDir);
   if (!root) return [];
   const out2 = [describe(root, "SKILL.md", `${SKILL_NAME}: the skill`)];
   const refDir = join44(root, "references");
-  if (!existsSync29(refDir)) return out2;
+  if (!existsSync30(refDir)) return out2;
   for (const file of readdirSync6(refDir).sort()) {
     if (!file.endsWith(".md")) continue;
     out2.push(describe(root, join44("references", file), `${SKILL_NAME} reference: ${basename3(file, ".md")}`));
@@ -56649,7 +56865,7 @@ function startHttpServer(opts = {}) {
 }
 async function route(req, res, opts) {
   const path = (req.url ?? "").split("?")[0];
-  const origin = header2(req, "origin");
+  const origin = header3(req, "origin");
   if (!isOriginAllowed(origin, opts.allowOrigin)) {
     sendJson(res, 403, { error: "origin not allowed", origin });
     return;
@@ -56678,17 +56894,17 @@ async function route(req, res, opts) {
     res.end(JSON.stringify({ error: `${req.method} is not supported` }));
     return;
   }
-  const contentType = (header2(req, "content-type") ?? "").split(";")[0].trim().toLowerCase();
+  const contentType = (header3(req, "content-type") ?? "").split(";")[0].trim().toLowerCase();
   if (contentType && contentType !== "application/json") {
     sendJson(res, 415, { error: `unsupported content-type "${contentType}" \u2014 send application/json` }, origin);
     return;
   }
-  const accept = (header2(req, "accept") ?? "").toLowerCase();
+  const accept = (header3(req, "accept") ?? "").toLowerCase();
   if (accept && !/application\/json|text\/event-stream|\*\/\*/.test(accept)) {
     sendJson(res, 406, { error: "this endpoint replies with application/json" }, origin);
     return;
   }
-  const declared = header2(req, "mcp-protocol-version");
+  const declared = header3(req, "mcp-protocol-version");
   if (declared !== void 0 && !isProtocolVersion(declared)) {
     sendJson(res, 400, { error: `unsupported MCP-Protocol-Version: ${declared}` }, origin);
     return;
@@ -56725,7 +56941,7 @@ async function route(req, res, opts) {
   }
   sendJson(res, 200, Array.isArray(parsed) ? out2 : out2[0], origin);
 }
-function header2(req, name2) {
+function header3(req, name2) {
   const v = req.headers[name2];
   return Array.isArray(v) ? v[0] : v;
 }
@@ -56809,6 +57025,7 @@ Usage:
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin \u2192 .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
+  ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
@@ -57003,7 +57220,13 @@ Options:
                      the active standard's vocabulary) for the backlog AND GitHub issues;
                      'doc' emits a product-requirements document (epics, user stories,
                      Given/When/Then); 'remediation' emits the legacy dev fix backlog
+                     \xB7 pages: 'grid' (default) emits the criteria \xD7 pages matrix;
+                     'report' emits the per-page DOSSIER \u2014 one section per page with its
+                     screenshot, every criterion of the standard, and the auditor block
+                     for each non-conformity
   --split <mode>     prd: split the backlog \u2014 currently only 'criterion' (one file per criterion)
+                     \xB7 pages --format report: 'page' writes <out>/page-<id>.md per page
+                     plus <out>/index.md (recommended past 3\u20134 pages: RGAA is 106 criteria)
   --no-technical     prd (audit format): omit the technical ticket sections (Partie
                      technique + Contexte de reproduction) for a pure-auditor block
   --gh-issues        prd: also create one GitHub issue per criterion via the gh CLI (opt-in)
@@ -57353,9 +57576,9 @@ async function cmdAudit(p) {
   const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : void 0;
   const capturesDir = capturesFlag ?? ".ultra11y/captures";
   const scopedToDiff = p.flags.changed === true || p.flags.staged === true || since !== void 0;
-  const capturesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync30(capturesDir));
+  const capturesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync31(capturesDir));
   const useCaptures = capturesWanted && !scopedToDiff && !inputs.includes(capturesDir);
-  const pagesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && existsSync30(PAGES_DIR);
+  const pagesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && existsSync31(PAGES_DIR);
   const usePages = pagesWanted && !scopedToDiff && !inputs.includes(PAGES_DIR);
   const auditInputs = [...inputs, ...useCaptures ? [capturesDir] : [], ...usePages ? [PAGES_DIR] : []];
   if (useCaptures)
@@ -57418,7 +57641,7 @@ async function cmdAudit(p) {
   const baselineFlag = p.flags.baseline;
   if (typeof baselineFlag === "string" && baselineFlag) {
     let baseline = null;
-    if (existsSync30(baselineFlag)) {
+    if (existsSync31(baselineFlag)) {
       try {
         const parsed = JSON.parse(readText(baselineFlag));
         if (isCurrentAudit(parsed)) baseline = parsed;
@@ -57546,8 +57769,53 @@ async function cmdPages(p) {
     return 1;
   }
   attributePages(result, scope);
-  if (p.flags.json) console.log(JSON.stringify({ pages: derivePages(result, scope), unattributed: unattributedFindings(result).length }, null, 2));
-  else console.log(renderPageGrid(result, scope, standard, lang));
+  if (p.flags.json) {
+    console.log(JSON.stringify({ pages: derivePages(result, scope), unattributed: unattributedFindings(result).length }, null, 2));
+    return 0;
+  }
+  const format = typeof p.flags.format === "string" ? p.flags.format : "grid";
+  if (!["grid", "report"].includes(format)) {
+    console.error(`ultra11y pages: --format must be grid or report (got "${format}").`);
+    return 2;
+  }
+  if (format === "grid") {
+    console.log(renderPageGrid(result, scope, standard, lang));
+    return 0;
+  }
+  const derived = derivePages(result, scope);
+  const split = p.flags.split === "page";
+  const outDir = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : void 0;
+  const shotsFor = (fileDir) => {
+    const m = /* @__PURE__ */ new Map();
+    for (const pg of derived) {
+      const shot = join45(PAGES_DIR, pg.id, "screen.png");
+      if (existsSync31(shot)) m.set(pg.id, relative5(fileDir, shot).split("\\").join("/"));
+    }
+    return m;
+  };
+  if (!outDir) {
+    console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsFor(".") }));
+    return 0;
+  }
+  mkdirSync14(outDir, { recursive: true });
+  if (!split) {
+    const file = join45(outDir, `pages-${result.date}.md`);
+    writeFileSync16(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsFor(outDir) })}
+`);
+    console.log(file);
+    return 0;
+  }
+  const shots = shotsFor(outDir);
+  const sheet = (id) => `page-${id}.md`;
+  const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
+  for (const pg of derived) {
+    writeFileSync16(join45(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots })}
+`);
+  }
+  const index = join45(outDir, "index.md");
+  writeFileSync16(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
+`);
+  console.log(index);
   return 0;
 }
 async function cmdSnapshot(p) {
@@ -57852,7 +58120,7 @@ async function cmdPrd(p) {
 }
 function depsAt(root) {
   const pkgPath = join45(root, "package.json");
-  if (!existsSync30(pkgPath)) return {};
+  if (!existsSync31(pkgPath)) return {};
   try {
     const pkg = JSON.parse(readText(pkgPath));
     return { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
@@ -57864,7 +58132,7 @@ function engineRefFor(root) {
   let ref = process.argv[1] ?? "scripts/ultra11y.mjs";
   try {
     const abs = realpathSync6(ref);
-    ref = abs.startsWith(root + sep7) ? relative4(root, abs) : abs;
+    ref = abs.startsWith(root + sep7) ? relative5(root, abs) : abs;
   } catch {
   }
   return ref;
@@ -57878,7 +58146,7 @@ function cmdRender(p) {
       console.error(`ultra11y render: --runner must be playwright|cypress|auto (got "${forced}").`);
       return 2;
     }
-    const detected = detectE2eRunner(depsAt(root), (f) => existsSync30(join45(root, f)));
+    const detected = detectE2eRunner(depsAt(root), (f) => existsSync31(join45(root, f)));
     const runners = forced && forced !== "auto" ? [forced] : detected;
     if (!runners.length) {
       console.error(e2eSetupPlan([], {}, lang));
@@ -57934,19 +58202,19 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     }
     let setupDeps = {};
     const setupPkg = join45(root, "package.json");
-    if (existsSync30(setupPkg)) {
+    if (existsSync31(setupPkg)) {
       try {
         const pkg = JSON.parse(readText(setupPkg));
         setupDeps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
       } catch {
       }
     }
-    const tr = detectTestRunner(setupDeps, (f) => existsSync30(join45(root, f)));
+    const tr = detectTestRunner(setupDeps, (f) => existsSync31(join45(root, f)));
     console.log(captureSetupPlan(tr, rel2, lang));
     const gaLine = ".ultra11y/captures/*.html text eol=lf linguist-generated=true";
     const gaPath = join45(root, ".gitattributes");
     try {
-      const existing = existsSync30(gaPath) ? readFileSync26(gaPath, "utf8") : "";
+      const existing = existsSync31(gaPath) ? readFileSync26(gaPath, "utf8") : "";
       if (!existing.includes(".ultra11y/captures/")) {
         appendFileSync(gaPath, (existing && !existing.endsWith("\n") ? "\n" : "") + gaLine + "\n");
         console.log(lang === "fr" ? `.gitattributes : ajout\xE9 \xAB ${gaLine} \xBB` : `.gitattributes: added "${gaLine}"`);
@@ -57955,7 +58223,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     }
     try {
       const giPath = join45(root, ".gitignore");
-      if (existsSync30(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync26(giPath, "utf8")))
+      if (existsSync31(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync26(giPath, "utf8")))
         console.error(
           lang === "fr" ? "\u26A0\uFE0F .ultra11y semble ignor\xE9 par .gitignore \u2014 les captures doivent \xEAtre committ\xE9es pour le gate (ajoutez \xAB !.ultra11y/captures/ \xBB)." : '\u26A0\uFE0F .ultra11y appears gitignored \u2014 captures must be committed for the gate (add "!.ultra11y/captures/").'
         );
@@ -57965,8 +58233,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
   }
   if (p.flags.storybook === true || typeof p.flags.storybook === "string") {
     const sbDir = p.positionals[0] ?? "storybook-static";
-    const indexPath = existsSync30(join45(sbDir, "index.json")) ? join45(sbDir, "index.json") : join45(sbDir, "stories.json");
-    if (!existsSync30(indexPath)) {
+    const indexPath = existsSync31(join45(sbDir, "index.json")) ? join45(sbDir, "index.json") : join45(sbDir, "stories.json");
+    if (!existsSync31(indexPath)) {
       console.error(
         lang === "fr" ? `ultra11y render : aucun index Storybook (index.json/stories.json) dans ${sbDir}.` : `ultra11y render: no Storybook index (index.json/stories.json) in ${sbDir}.`
       );
@@ -57976,7 +58244,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const provById = new Map(stories.map((s) => [s.id, storyProvenance(s)]));
     const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : void 0;
     const htmlDir = capturesFlag ?? sbDir;
-    const htmlFiles = existsSync30(htmlDir) ? discover([htmlDir]).files.filter((f) => /\.html?$/i.test(f)) : [];
+    const htmlFiles = existsSync31(htmlDir) ? discover([htmlDir]).files.filter((f) => /\.html?$/i.test(f)) : [];
     const outDir = ".ultra11y/captures";
     let attributed = 0;
     let skipped = 0;
@@ -58025,7 +58293,7 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
     const graphExt = [...GRAPH_ONLY_EXT, ...asList(p.flags.ext) ?? []];
     const sourceFiles = discover([root], { include: asList(p.flags.include), exclude: asList(p.flags.exclude), ext: graphExt }).files;
     const graph = buildGraphStreaming(sourceFiles);
-    const capFiles = existsSync30(capturesDir) ? discover([capturesDir]).files : [];
+    const capFiles = existsSync31(capturesDir) ? discover([capturesDir]).files : [];
     const entries = capFiles.map((f) => ({ file: toPosix(f), provenance: parseCaptureProvenance(readText(f)) }));
     const cov = computeCaptureCoverage(graph, entries);
     if (p.flags.json) console.log(JSON.stringify(cov, null, 2));
@@ -58034,14 +58302,14 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
   }
   let deps = {};
   const pkgPath = join45(root, "package.json");
-  if (existsSync30(pkgPath)) {
+  if (existsSync31(pkgPath)) {
     try {
       const pkg = JSON.parse(readText(pkgPath));
       deps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
     } catch {
     }
   }
-  const detection = detectFrameworks(deps, (f) => existsSync30(join45(root, f)));
+  const detection = detectFrameworks(deps, (f) => existsSync31(join45(root, f)));
   if (p.flags.json) console.log(JSON.stringify(detection, null, 2));
   else console.log(renderPlan(detection, lang));
   return 0;
@@ -58312,7 +58580,7 @@ async function cmdScan(p) {
     return 0;
   }
   for (const target of p.positionals.filter((a) => a !== "-")) {
-    if (/^https?:\/\//i.test(target) || existsSync30(target)) continue;
+    if (/^https?:\/\//i.test(target) || existsSync31(target)) continue;
     console.error(
       lang === "fr" ? `ultra11y scan : fichier introuvable (file not found) : ${target}. Passez une URL http(s):// ou un fichier HTML existant.` : `ultra11y scan: File not found: ${target}. Pass an http(s):// URL or an existing HTML file.`
     );
@@ -58439,7 +58707,7 @@ async function cmdScan(p) {
     }
     let merged = mergeDynamic(audit2, dynamic, lang);
     if (dynamic.snapshots?.length) {
-      const doms = dynamic.snapshots.map((id) => join45(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f) => existsSync30(f));
+      const doms = dynamic.snapshots.map((id) => join45(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f) => existsSync31(f));
       if (doms.length) {
         const snapAudit = runAudit({ inputs: doms, onWarn: (m) => console.error(m) });
         merged = mergeSnapshotAudit(merged, snapAudit);
@@ -58646,7 +58914,7 @@ function cmdOrchestrate(p) {
   }
   const engineAbs = realpathSync6(fileURLToPath5(import.meta.url));
   if (p.flags.list === true) {
-    if (!existsSync30(runFlag)) {
+    if (!existsSync31(runFlag)) {
       console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
       return 2;
     }
@@ -58707,8 +58975,8 @@ async function main(argv) {
   const ENUM_FLAGS = {
     lang: ["auto", "en", "fr"],
     dedup: ["exact", "normalized", "off"],
-    format: ["audit", "doc", "remediation"],
-    split: ["criterion"],
+    format: ["audit", "doc", "remediation", "sarif", "github", "grid", "report"],
+    split: ["criterion", "page"],
     runtime: ["auto", "local", "docker"]
   };
   for (const [flag, allowed] of Object.entries(ENUM_FLAGS)) {

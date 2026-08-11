@@ -176,6 +176,46 @@ the very same projection the report uses (`derivePackResults`). Grid and report 
 agree by construction — out-of-scope criteria (RGAA 8.1), scoped-out siblings, pack overrides
 and advisory handling all come from one implementation, not from a second one that drifts.
 
+## The per-page REPORT (`pages --format report`)
+
+The grid answers *"which criteria fail, across the pages?"* — the right shape for a diff, the
+wrong one for a page owner: with 106 RGAA criteria over N pages nobody reads a column. The
+report answers *"what is the state of THIS page?"*.
+
+```
+node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --format report --out audits
+#   → audits/pages-<date>.md — the index, then one section per page
+
+node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --format report --split page --out audits/pages
+#   → audits/pages/index.md + audits/pages/page-<id>.md      (recommended past 3–4 pages)
+```
+
+Each page's sheet carries, in order: its identity (name, URL, auth badge, snapshot/source
+basis), **its screenshot**, its rate and C/NC/NA/to-assess tally, **every criterion of the
+active standard** with its status on that page, then each non-conformity as the ordinary
+**auditor conformance block**.
+
+Two things it deliberately does NOT do:
+
+- **It re-decides nothing.** Every status comes from `derivePages` and, under a pack, from
+  `derivePackResults(pageView(…))` — the very projection the grid and the report already use.
+  A second implementation would drift, and the first symptom of drift in an accessibility
+  report is a criterion silently declared conforming.
+- **It invents no format.** The non-conformities are rendered by `renderAuditorUnit`, so a
+  page sheet, the compliance report, the PRD and the GitHub issue are the same block — and
+  the occurrence lines stay parseable by `verify`.
+
+The screenshot is *referenced*, never copied: `.ultra11y/pages/<id>/screen.png` is already on
+disk, so the path is resolved relative to wherever the file lands. A page with no screenshot
+says so, rather than showing nothing.
+
+Sheets are named `page-<id>.md`: a page whose id is `index` — the ordinary id for an
+`index.html` target — would otherwise be written over the index itself.
+
+`check` recognizes these files (they carry an `ultra11y:pages-report` marker) and runs the
+gates that mean something here — above all **no invented criterion** — instead of demanding
+the §1–5 structure of a conformance document.
+
 ### Two honesty rules
 
 **1. A finding is attributed to a page only when something says so.** In order: the snapshot

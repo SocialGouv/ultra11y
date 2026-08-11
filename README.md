@@ -140,6 +140,7 @@ ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybo
 ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   # payload on stdin → .ultra11y/pages/<id>/ + audit
 ultra11y snapshot list  [--root <dir>] [--json]
 ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   # the per-page criterion grid
+ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        # the per-page report, with screenshots
 ultra11y dev      [--port <n>] [--standard <pack>]   |   dev --next                        # live overlay while you build + dashboard
 ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
 ultra11y check    --report <md> [--standard <pack>] [--quiet] [--json]
@@ -314,7 +315,12 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   and report agree by construction. Two rules hold the line: a finding is attributed to a page
   only when something **says** so (else it is counted as unattributed, never spread across
   pages), and a criterion is conforming *by silence* only on a page whose real rendered DOM
-  was audited. See `references/pages.md`.
+  was audited. And `pages --format report [--split page]` turns that into the **deliverable an
+  auditor hands over**: one dossier per page — identity, **screenshot**, rate, *every* criterion
+  of the standard with its status on that page, then each non-conformity as the ordinary auditor
+  block. It re-decides nothing and invents no format, so a page sheet and the compliance report
+  cannot disagree; `check` gates it against invented criteria like any other report.
+  See `references/pages.md`.
 - **A shipped GitHub Action** — `uses: maxgfr/ultra11y@main` audits the **code** (PR diff) and,
   optionally, the **pages** (it can start your app, wait for it, then scan real URLs or your
   declared sample). The engine ships inside the action, so there is nothing to install and no

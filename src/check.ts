@@ -12,6 +12,7 @@ import { hasSC } from "./wcag.js";
 import { type StandardId, isCore, loadPack, hasId, idCaptureSource, derivePackResults } from "./standards/index.js";
 import { buildWorklist, applyVerdicts, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
+import { isPagesReport } from "./pages-report.js";
 
 export interface CheckResult {
   ok: boolean;
@@ -88,9 +89,19 @@ export function checkReport(md: string, standard: StandardId = "wcag", lang: Lan
   ];
   const naItem = core ? /^-\s+(?:[A-Za-z]+\s+)?(\d{1,2}(?:\.\d{1,2}){2})\s*—/ : new RegExp(`^-\\s+(?:[A-Za-z]+\\s+)?(${idCaptureSource(pack!)})\\s*—`);
 
+  // A PER-PAGE report (`pages --format report`) is a different deliverable: one dossier per
+  // page, no §1–5 conformance structure and no single synthesis table. Gating it as a
+  // conformance report would emit five misleading "missing section" errors — a confusing
+  // refusal rather than an explicit one — so it runs a profile instead: the gates that still
+  // mean something here (no invented criterion, a sane rate) and not the ones that do not.
+  // The anti-hallucination gate is the point of `check`, and it is the one that is kept.
+  const perPage = isPagesReport(md);
+
   // 1. required sections (language-agnostic: "## 1." … "## 5.")
-  for (let n = 1; n <= 5; n++) {
-    if (!new RegExp(`^##\\s+${n}\\.`, "m").test(md)) issues.push(s.section(n));
+  if (!perPage) {
+    for (let n = 1; n <= 5; n++) {
+      if (!new RegExp(`^##\\s+${n}\\.`, "m").test(md)) issues.push(s.section(n));
+    }
   }
 
   // 2. every cited criterion id must resolve to a real criterion in the active standard
@@ -121,11 +132,15 @@ export function checkReport(md: string, standard: StandardId = "wcag", lang: Lan
   // report's header rate is the WCAG-derived pct, not its own theme table's C/NC.
   const rateM = /^-\s+\*\*[^*\n]*\*\*\s*:\s*(\d+(?:[.,]\d+)?)\s*%/m.exec(md);
   if (!rateM) {
-    issues.push(s.rateMissing);
+    // A per-page report carries one rate PER PAGE, inside each page's own block, and no
+    // document-level rate to find in a header. Its absence is the correct shape, not a lie.
+    if (!perPage) issues.push(s.rateMissing);
   } else {
     const pct = parseFloat(rateM[1]!.replace(",", "."));
     if (pct < 0 || pct > 100) issues.push(s.rateRange(rateM[1]!));
-    else if (core) {
+    // A per-page report has no single synthesis table to be consistent WITH: its rates are
+    // per page and each is computed from that page's own grid. Range still applies.
+    else if (core && !perPage) {
       const totals = synthesisTotals(md);
       if (totals) {
         const { c, nc } = totals;
@@ -139,7 +154,9 @@ export function checkReport(md: string, standard: StandardId = "wcag", lang: Lan
   // must EQUAL what the audit derives with applicability (src/standards/derive.ts). Catches
   // a hand-edited report that over-projects an NC onto an inapplicable criterion (RGAA R1),
   // or drops a real one. Only runs for a pack standard with an audit in hand.
-  if (!core && pack && opts.audit) {
+  // Skipped for a per-page report: its NC set is per page, so comparing it to the SCOPE-WIDE
+  // derivation would flag every criterion that fails on one page and not another.
+  if (!core && pack && opts.audit && !perPage) {
     const derivedNc = new Set(
       derivePackResults(opts.audit, standard)
         .filter((r) => r.status === "NC")

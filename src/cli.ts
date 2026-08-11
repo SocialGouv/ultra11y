@@ -40,6 +40,7 @@ import { toSarif } from "./sarif.js";
 import { annotations, stepSummary } from "./annotate.js";
 import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
 import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
+import { renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
 import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
 import { resolveStandard, getPack, isCore, CORE, type StandardId } from "./standards/index.js";
@@ -83,6 +84,7 @@ Usage:
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
+  ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
@@ -277,7 +279,13 @@ Options:
                      the active standard's vocabulary) for the backlog AND GitHub issues;
                      'doc' emits a product-requirements document (epics, user stories,
                      Given/When/Then); 'remediation' emits the legacy dev fix backlog
+                     · pages: 'grid' (default) emits the criteria × pages matrix;
+                     'report' emits the per-page DOSSIER — one section per page with its
+                     screenshot, every criterion of the standard, and the auditor block
+                     for each non-conformity
   --split <mode>     prd: split the backlog — currently only 'criterion' (one file per criterion)
+                     · pages --format report: 'page' writes <out>/page-<id>.md per page
+                     plus <out>/index.md (recommended past 3–4 pages: RGAA is 106 criteria)
   --no-technical     prd (audit format): omit the technical ticket sections (Partie
                      technique + Contexte de reproduction) for a pure-auditor block
   --gh-issues        prd: also create one GitHub issue per criterion via the gh CLI (opt-in)
@@ -968,8 +976,68 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
     return 1;
   }
   attributePages(result, scope);
-  if (p.flags.json) console.log(JSON.stringify({ pages: derivePages(result, scope), unattributed: unattributedFindings(result).length }, null, 2));
-  else console.log(renderPageGrid(result, scope, standard, lang));
+  if (p.flags.json) {
+    console.log(JSON.stringify({ pages: derivePages(result, scope), unattributed: unattributedFindings(result).length }, null, 2));
+    return 0;
+  }
+
+  const format = typeof p.flags.format === "string" ? (p.flags.format as string) : "grid";
+  if (!["grid", "report"].includes(format)) {
+    console.error(`ultra11y pages: --format must be grid or report (got "${format}").`);
+    return 2;
+  }
+  if (format === "grid") {
+    console.log(renderPageGrid(result, scope, standard, lang));
+    return 0;
+  }
+
+  // --format report — the per-page DOSSIER (issue #4052): one section per page with its
+  // screenshot, the standard's criteria in full, and every non-conformity as the shared
+  // auditor block. Nothing is re-decided here; see src/pages-report.ts.
+  const derived = derivePages(result, scope);
+  const split = p.flags.split === "page";
+  const outDir = typeof p.flags.out === "string" && p.flags.out ? (p.flags.out as string) : undefined;
+
+  // The screenshot lives beside the snapshot, on disk. Reference it relatively from wherever
+  // the file lands — a copy would double the repo's weight for no gain, and an absolute path
+  // would break the moment the report is read anywhere else.
+  const shotsFor = (fileDir: string): Map<string, string> => {
+    const m = new Map<string, string>();
+    for (const pg of derived) {
+      const shot = join(PAGES_DIR, pg.id, "screen.png");
+      if (existsSync(shot)) m.set(pg.id, relative(fileDir, shot).split("\\").join("/"));
+    }
+    return m;
+  };
+
+  if (!outDir) {
+    // No --out: stream the whole document to stdout. Screenshots are resolved against the
+    // CWD, which is where a reader piping this would sit.
+    console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsFor(".") }));
+    return 0;
+  }
+
+  mkdirSync(outDir, { recursive: true });
+  if (!split) {
+    const file = join(outDir, `pages-${result.date}.md`);
+    writeFileSync(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsFor(outDir) })}\n`);
+    console.log(file);
+    return 0;
+  }
+
+  const shots = shotsFor(outDir);
+  // Sheets are `page-<id>.md`, never `<id>.md`: a page whose id is `index` — the ordinary id
+  // for an `index.html` target — would otherwise be written to the same path as the index and
+  // one of the two would silently vanish. The prefix makes the collision impossible by
+  // construction rather than by hoping no page is called that.
+  const sheet = (id: string): string => `page-${id}.md`;
+  const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
+  for (const pg of derived) {
+    writeFileSync(join(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots })}\n`);
+  }
+  const index = join(outDir, "index.md");
+  writeFileSync(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}\n`);
+  console.log(index);
   return 0;
 }
 
@@ -2452,11 +2520,17 @@ export async function main(argv: string[]): Promise<number> {
 
   // Enum-valued flags: warn (never silently coerce) on an unsupported value so `--lang de`
   // or `--dedup fuzzy` is visible instead of quietly falling back to the default.
+  // This check runs BEFORE dispatch, so it cannot know which command owns the flag: the
+  // allowed set must be the UNION over every command that takes it. Listing only one
+  // command's values made the guard cry wolf on valid input — `report --format sarif` and
+  // `audit --format github` both warned "not one of audit|doc|remediation" while working
+  // perfectly, which teaches the reader to ignore the warning that is meant to catch a typo.
+  // Per-command validation is each cmdX's own job (parseCiFormat, cmdPages…), and stays strict.
   const ENUM_FLAGS: Record<string, readonly string[]> = {
     lang: ["auto", "en", "fr"],
     dedup: ["exact", "normalized", "off"],
-    format: ["audit", "doc", "remediation"],
-    split: ["criterion"],
+    format: ["audit", "doc", "remediation", "sarif", "github", "grid", "report"],
+    split: ["criterion", "page"],
     runtime: ["auto", "local", "docker"],
   };
   for (const [flag, allowed] of Object.entries(ENUM_FLAGS)) {
