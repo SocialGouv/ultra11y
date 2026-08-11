@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [2.31.2](https://github.com/maxgfr/ultra11y/compare/v2.31.1...v2.31.2) (2026-08-11)
+
+
+### Bug Fixes
+
+* **action:** let each invocation name its artifact, or the second one 409s ([65b7f58](https://github.com/maxgfr/ultra11y/commit/65b7f581c5723a1bc05a08d620d5136124034274))
+
 ## [2.31.1](https://github.com/maxgfr/ultra11y/compare/v2.31.0...v2.31.1) (2026-08-11)
 
 
