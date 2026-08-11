@@ -400,14 +400,19 @@ The skill (`skills/ultra11y/SKILL.md` + `references/`) teaches the agent when an
 pnpm install
 pnpm test               # vitest
 pnpm run typecheck
-pnpm run build          # tsup → scripts/ultra11y.mjs, mirrored into skills/ultra11y/scripts/
-pnpm run check:build    # asserts the committed bundle is reproducible
+pnpm run build          # tsup → scripts/ultra11y.mjs (engine) + dist/ (the e2e plugins)
+pnpm run check:build    # asserts every committed artefact is reproducible from its source
 pnpm run build:wcag     # re-derive src/data/wcag.json from the vendored W3C source
 pnpm run build:pack:rgaa # re-build the RGAA pack from the vendored DINUM source
 pnpm run build:criteria  # regenerate skills/ultra11y/references/criteria.md
+pnpm run build:icons     # re-generate the browser extension's icons from their source
 ```
 
-Releases are cut automatically by semantic-release on push to `main` (GitHub release + tarball, no npm publish).
+Releases are cut automatically by **semantic-release** on push to `main` (GitHub release +
+npm publish via OIDC trusted publishing, plus the moving `v2` major tag). The version bump is
+decided by **Conventional Commits**: a commit whose subject carries no `feat:`/`fix:` prefix
+is analysed as *no release*, so a change that must ship needs at least one conventional commit
+in the range — otherwise `@v2` and npm keep serving the previous version while `main` moves on.
 
 ## Data & licensing
 
