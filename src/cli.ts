@@ -399,7 +399,7 @@ Options:
 
 Data: WCAG 2.2 © W3C (W3C Document License). RGAA 4.1.2 pack © DINUM, Licence Ouverte / Etalab 2.0 (see NOTICE).`;
 
-const COMMANDS = [
+export const COMMANDS = [
   "audit",
   "report",
   "prd",

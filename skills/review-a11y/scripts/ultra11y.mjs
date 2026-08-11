@@ -59549,6 +59549,7 @@ if (isInvokedDirectly()) {
   );
 }
 export {
+  COMMANDS,
   main,
   parseArgs
 };

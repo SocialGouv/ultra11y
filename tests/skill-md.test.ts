@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { parse } from "yaml";
 import { VERSION } from "../src/types.js";
+import { COMMANDS } from "../src/cli.js";
 import { ALL_RULES } from "../src/rules/registry.js";
 
 // Guards that the published skills stay installable via `npx skills add` and
@@ -62,25 +63,11 @@ describe("the skills are installable", () => {
   });
 });
 
-const CLI_COMMANDS = new Set([
-  "audit",
-  "report",
-  "prd",
-  "render",
-  "criteria",
-  "check",
-  "verify",
-  "scan",
-  "sample",
-  "snapshot",
-  "pages",
-  "dev",
-  "mcp",
-  "fix",
-  "init",
-  "pack",
-  "orchestrate",
-]);
+// Derived from the CLI, never restated. A hardcoded copy is a second source of truth, and it
+// failed exactly the way a second source of truth fails: a new command was documented, the
+// oracle did not know it existed, and the "docs reference a real command" test rejected the
+// real command.
+const CLI_COMMANDS = new Set<string>(COMMANDS);
 
 // The user-facing docs the CLI reference must stay true to — SKILL.mds, references, AND the
 // top-level README + manual test plan (which drifted before this oracle covered them).
