@@ -92,12 +92,26 @@ describe("attributing findings to pages", () => {
 });
 
 describe("per-page criterion status", () => {
-  it("is NC on the page that has the finding and C on the page that does not", () => {
+  it("is NC on the page that has the finding, and C on the page that does not — for a criterion the engine DECIDES", () => {
+    // 2.4.2 Page Titled is `static`: an applicability predicate plus a rule, so a clean page
+    // really is conforming on it.
+    const nc = F({ page: "accueil", criteriaId: "2.4.2" });
+    const r = audit({ findings: [nc], criteria: [C("2.4.2", "NC", [nc])] });
+    const pages = derivePages(r, PAGES);
+    expect(pages.find((p) => p.id === "accueil")?.criteria.find((c) => c.id === "2.4.2")?.status).toBe("NC");
+    expect(pages.find((p) => p.id === "contact")?.criteria.find((c) => c.id === "2.4.2")?.status).toBe("C");
+  });
+
+  it("leaves a JUDGMENT criterion « to assess » on the page that has no finding — silence is not a verdict", () => {
+    // The third honesty rule. A scope-wide NC on 1.1.1 means one definite failure fired
+    // somewhere; on a page where it did not, alt RELEVANCE is still nobody's verdict. Before
+    // this, a page with no images at all scored C on "does each image have a relevant
+    // alternative?" — and 100% on a rate computed over criteria nobody had assessed.
     const nc = F({ page: "accueil", criteriaId: "1.1.1" });
     const r = audit({ findings: [nc], criteria: [C("1.1.1", "NC", [nc])] });
     const pages = derivePages(r, PAGES);
     expect(pages.find((p) => p.id === "accueil")?.criteria.find((c) => c.id === "1.1.1")?.status).toBe("NC");
-    expect(pages.find((p) => p.id === "contact")?.criteria.find((c) => c.id === "1.1.1")?.status).toBe("C");
+    expect(pages.find((p) => p.id === "contact")?.criteria.find((c) => c.id === "1.1.1")?.status).toBe("manual");
   });
 
   it("keeps a globally undecidable criterion `manual` on every page", () => {
@@ -111,23 +125,26 @@ describe("per-page criterion status", () => {
   });
 
   it("refuses to call a criterion conforming on a page with NO snapshot — absence of evidence is not evidence", () => {
+    // A criterion the engine DOES decide, so the only thing standing between it and `C` is
+    // the missing snapshot — otherwise the assertion would pass for the wrong reason.
     const attributed: PageScope[] = [{ id: "solo", name: "Solo", url: "https://x/s", sources: ["app/s.tsx"], basis: "attributed" }];
-    const r = audit({ criteria: [C("1.1.1", "C")] });
-    expect(derivePages(r, attributed)[0]?.criteria.find((c) => c.id === "1.1.1")?.status).toBe("manual");
+    const r = audit({ criteria: [C("2.4.2", "C")] });
+    expect(derivePages(r, attributed)[0]?.criteria.find((c) => c.id === "2.4.2")?.status).toBe("manual");
   });
 
   it("never lets a non-normative recommendation flip a page criterion to NC", () => {
-    const adv = F({ page: "accueil", criteriaId: "1.3.1", advisory: true });
-    const r = audit({ findings: [adv], criteria: [C("1.3.1", "C", [adv])] });
+    const adv = F({ page: "accueil", criteriaId: "2.4.2", advisory: true });
+    const r = audit({ findings: [adv], criteria: [C("2.4.2", "C", [adv])] });
     const page = derivePages(r, PAGES).find((p) => p.id === "accueil");
-    expect(page?.criteria.find((c) => c.id === "1.3.1")?.status).toBe("C");
+    expect(page?.criteria.find((c) => c.id === "2.4.2")?.status).toBe("C");
   });
 
   it("computes a per-page pass rate over that page's decided criteria only", () => {
-    const nc = F({ page: "accueil", criteriaId: "1.1.1" });
-    const r = audit({ findings: [nc], criteria: [C("1.1.1", "NC", [nc]), C("2.4.2", "C"), C("1.4.3", "manual")] });
+    const nc = F({ page: "accueil", criteriaId: "3.1.1" });
+    const r = audit({ findings: [nc], criteria: [C("3.1.1", "NC", [nc]), C("2.4.2", "C"), C("1.4.3", "manual")] });
     const pages = derivePages(r, PAGES);
-    // accueil: 1 C, 1 NC, 1 manual → 50%. contact: 2 C → 100%.
+    // Both 3.1.1 and 2.4.2 are `static`, so both are decided per page.
+    // accueil: 1 C (2.4.2), 1 NC (3.1.1), 1 manual → 50%. contact: 2 C → 100%.
     expect(pages.find((p) => p.id === "accueil")?.conformancePct).toBe(50);
     expect(pages.find((p) => p.id === "contact")?.conformancePct).toBe(100);
   });

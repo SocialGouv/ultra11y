@@ -4,7 +4,7 @@
 // derives the missing dimension from what the audit already knows, without measuring anything
 // a second time.
 //
-// Two honesty rules govern the whole file, and they are the reason it is not simply
+// Three honesty rules govern the whole file, and they are the reason it is not simply
 // "group findings by page":
 //
 //   1. A finding is attributed to a page only when something SAYS so — the snapshot it was
@@ -16,10 +16,15 @@
 //      audited (basis "snapshot"). For a page assembled purely by source attribution, absence
 //      of evidence is not evidence of absence, and the criterion stays `manual`. That is the
 //      same posture the engine takes everywhere else: never silently conforming.
+//
+//   3. Silence only decides what the engine CAN decide. A scope-wide `NC` on a judgment
+//      criterion means one definite failure fired somewhere — not that the engine can rule
+//      on that criterion. Reading it as `C` on every other page is how a page with no images
+//      scored 100% on "does each image have a relevant alternative?". See `pageStatus`.
 import { CORE, type StandardId, derivePackResults, isCore, loadPack, themeName } from "./standards/index.js";
 import type { AuditResult, CriterionResult, Finding, Lang, PageResult, PageScope, Status } from "./types.js";
 import { isUrlPath } from "./util.js";
-import { compareSC, scTitle } from "./wcag.js";
+import { automatability, compareSC, scTitle } from "./wcag.js";
 
 /** The page scope recorded on an AuditResult, from the snapshots that were ingested. A
  *  snapshot's presence IS what earns the page its "snapshot" basis. */
@@ -118,12 +123,28 @@ export function unattributedFindings(result: AuditResult): Finding[] {
   return result.findings.filter((f) => !f.page);
 }
 
-/** The status a criterion holds ON one page. See the two honesty rules at the top. */
+/** The status a criterion holds ON one page. See the two honesty rules at the top, and the
+ *  third one enforced here. */
 function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScope["basis"]): Status {
   // A non-normative recommendation can never flip a criterion to NC — same rule as core.
   if (pageFindings.some((f) => !f.advisory)) return "NC";
   if (c.status === "manual") return "manual"; // the engine cannot decide it anywhere
   if (c.status === "NA") return "NA"; // not applicable in scope ⇒ not applicable here
+
+  // 3. SILENCE ONLY DECIDES WHAT THE ENGINE CAN DECIDE.
+  //
+  // A scope-wide `NC` on a JUDGMENT criterion does not mean the engine can rule on it — it
+  // means one definite failure fired somewhere. On a page where that failure did not fire,
+  // the engine knows "no definite failure here", which is not the same as "conforming": alt
+  // relevance, link purpose and reading order are still nobody's verdict yet.
+  //
+  // Reading `NC` scope-wide as `C` on every other page is how a page with no images used to
+  // score 100% on « chaque image a-t-elle une alternative pertinente ? » — a rate computed
+  // over criteria nobody assessed. Only the criteria the engine genuinely decides (the
+  // `static` set: applicability predicate + rules, src/audit.ts APPLICABLE) earn a verdict
+  // by silence; every other criterion stays « à évaluer », which is what it is.
+  if (automatability(c.id) !== "static") return "manual";
+
   // Decidable, and clean on this page — but only a snapshot proves the rules actually ran
   // against THIS page's DOM.
   return basis === "snapshot" ? "C" : "manual";

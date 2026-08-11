@@ -54,7 +54,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "verify:bundle": "node scripts/verify-skill-bundle.mjs",
-    "check:build": "tsup && node scripts/copy-bundle.mjs && git diff --exit-code -- scripts/ultra11y.mjs skills/ultra11y/scripts/ultra11y.mjs skills/review-a11y/scripts/ultra11y.mjs dist && node scripts/verify-skill-bundle.mjs && node scripts/sync-engine.mjs --check",
+    "check:build": "tsup && node scripts/copy-bundle.mjs && git diff --exit-code -- scripts/ultra11y.mjs skills/ultra11y/scripts/ultra11y.mjs skills/review-a11y/scripts/ultra11y.mjs dist && node scripts/build-extension-icons.mjs --check && node scripts/verify-skill-bundle.mjs && node scripts/sync-engine.mjs --check",
     "build:wcag": "node scripts/build-standards.mjs",
     "build:pack:rgaa": "node scripts/build-pack-rgaa.mjs",
     "check:pack:rgaa": "node scripts/build-pack-rgaa.mjs --check",
@@ -64,7 +64,8 @@
     "build:adjudication": "node scripts/build-adjudication.mjs && UPDATE_ADJUDICATION_MD=1 vitest run tests/adjudication-md-sync.test.ts",
     "check:adjudication": "node scripts/build-adjudication.mjs --check",
     "demo": "node scripts/ultra11y.mjs audit tests/fixtures/non-conforming/bad.html --out /tmp/ultra11y-demo --json > /dev/null && node scripts/ultra11y.mjs report --in /tmp/ultra11y-demo/audit-latest.json --out /tmp/ultra11y-demo && node scripts/ultra11y.mjs check --report /tmp/ultra11y-demo/wcag-*.md && node scripts/ultra11y.mjs criteria --list",
-    "release": "semantic-release"
+    "release": "semantic-release",
+    "build:icons": "node scripts/build-extension-icons.mjs"
   },
   "license": "MIT",
   "author": "maxgfr",

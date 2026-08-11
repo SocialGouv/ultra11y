@@ -24,11 +24,29 @@ describe("the extension is a client, not a second engine", () => {
     permissions: string[];
     host_permissions: string[];
     background: { service_worker: string; type: string };
+    icons: Record<string, string>;
+    action: { default_icon: Record<string, string> };
   };
 
   it("ships every file its manifest points at", () => {
     for (const f of files) expect(existsSync(join(EXT, f)), f).toBe(true);
     expect(existsSync(join(EXT, manifest.background.service_worker))).toBe(true);
+    // Chrome refuses to load a manifest whose declared icon is missing.
+    for (const path of [...Object.values(manifest.icons), ...Object.values(manifest.action.default_icon)]) {
+      expect(existsSync(join(EXT, path)), path).toBe(true);
+    }
+  });
+
+  it("declares every icon size Chrome asks for, in both places", () => {
+    for (const set of [manifest.icons, manifest.action.default_icon]) {
+      expect(Object.keys(set).sort()).toEqual(["128", "16", "32", "48"]);
+    }
+  });
+
+  it("keeps the icons reproducible from their source, like every other committed artefact", () => {
+    // An icon is the one asset a reviewer cannot diff, so it is generated rather than drawn:
+    // `--check` proves the committed PNGs are exactly what the script produces.
+    expect(() => execFileSync(process.execPath, [join(ROOT, "scripts/build-extension-icons.mjs"), "--check"])).not.toThrow();
   });
 
   it("parses as JavaScript — a syntax error here only surfaces inside Chrome", () => {

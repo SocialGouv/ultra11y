@@ -216,7 +216,7 @@ Sheets are named `page-<id>.md`: a page whose id is `index` — the ordinary id 
 gates that mean something here — above all **no invented criterion** — instead of demanding
 the §1–5 structure of a conformance document.
 
-### Two honesty rules
+### Three honesty rules
 
 **1. A finding is attributed to a page only when something says so.** In order: the snapshot
 it was raised on, the scanned page URL, the `scan --sample` page name, then the page's own
@@ -229,6 +229,16 @@ with a snapshot earns `C` by silence, because the rules genuinely ran against it
 page assembled purely by source attribution (`basis: "attributed"` — e.g. a `scan --sample`
 page with no snapshot) keeps its undecided criteria `manual`: absence of evidence is not
 evidence of absence. The grid marks which is which, and warns when any page is source-only.
+
+**3. Silence only decides what the engine CAN decide.** A scope-wide `NC` on a judgment
+criterion means one definite failure fired *somewhere* — not that the engine can rule on that
+criterion. On a page where the failure did not fire, the engine knows "no definite failure
+here", which is not "conforming": alt relevance, link purpose and reading order are still
+nobody's verdict. So only the `static` criteria (the ones with an applicability predicate and
+rules, `src/audit.ts` `APPLICABLE`) earn `C` by silence — under RGAA that is 4.10 and
+8.3/8.4/8.5/8.6. Everything else stays « à évaluer » until `scan` or an adjudication decides
+it. Before this rule a page with no images scored 100% on « chaque image a-t-elle une
+alternative pertinente ? », a rate computed over criteria nobody had assessed.
 
 A non-normative recommendation never flips a page criterion to `NC`, exactly as in core.
 

@@ -1767,6 +1767,9 @@ function scsByGuideline() {
   for (const c2 of data.criteria) (m.get(c2.guideline) ?? m.set(c2.guideline, []).get(c2.guideline)).push(c2);
   return m;
 }
+function automatability(id) {
+  return byId.get(id)?.automatability;
+}
 function techniques(id) {
   return byId.get(id)?.techniques ?? [];
 }
@@ -45136,8 +45139,8 @@ var APPLICABLE = {
   "3.1.1": (d) => isFullDocument(d)
   // Language of Page — html-lang-missing / lang-invalid
 };
-function residualReason(automatability) {
-  return automatability === "needs-rendering" ? "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) \u2014 decide via `scan`." : "Judgement criterion \u2014 adjudicated by the agent from source/context (`verify --manual`, gated).";
+function residualReason(automatability2) {
+  return automatability2 === "needs-rendering" ? "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) \u2014 decide via `scan`." : "Judgement criterion \u2014 adjudicated by the agent from source/context (`verify --manual`, gated).";
 }
 var STATIC_PREDS = allSC().filter((c2) => c2.automatability === "static").map((c2) => [c2.sc, APPLICABLE[c2.sc] ?? isFullDocument]);
 function newAccum() {
@@ -49190,6 +49193,7 @@ function pageStatus(c2, pageFindings, basis) {
   if (pageFindings.some((f) => !f.advisory)) return "NC";
   if (c2.status === "manual") return "manual";
   if (c2.status === "NA") return "NA";
+  if (automatability(c2.id) !== "static") return "manual";
   return basis === "snapshot" ? "C" : "manual";
 }
 function pct(criteria) {
@@ -51710,11 +51714,11 @@ function docsForAudit(audit2, cwd) {
   }
   return docs;
 }
-function blankItem(criteriaId, automatability, title2, harvested) {
+function blankItem(criteriaId, automatability2, title2, harvested) {
   const evidence = harvested.slice(0, ADJUDICATE_MAX_EVIDENCE);
   return {
     criteriaId,
-    automatability,
+    automatability: automatability2,
     ...title2 ? { title: title2 } : {},
     evidence,
     ...harvested.length > ADJUDICATE_MAX_EVIDENCE ? { evidenceTruncated: { shown: evidence.length, total: harvested.length } } : {},
@@ -51748,8 +51752,8 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
       const crit = getCriterion(pack, pc.id);
       const scs = crit?.wcag ?? pc.scs;
       const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a) => !!a);
-      const automatability = autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
-      return blankItem(pc.id, automatability, crit ? titlePlain(pack, crit, "fr") : void 0, packEvidence(scs, docs));
+      const automatability2 = autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
+      return blankItem(pc.id, automatability2, crit ? titlePlain(pack, crit, "fr") : void 0, packEvidence(scs, docs));
     });
   }
   return audit2.residualRisks.map(
