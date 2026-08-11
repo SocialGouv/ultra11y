@@ -218,6 +218,7 @@ jobs:
           fail-on: ""
           sarif: "false"
           comment: "false"
+          artifact-name: action-e2e-code
 
       - name: It reports what it found, through its declared outputs
         env:
@@ -280,6 +281,7 @@ jobs:
           comment: "false"
           crawl: http://127.0.0.1:8931/
           crawl-max: "5"
+          artifact-name: action-e2e-pages
 
       - name: Every crawled page is a snapshot, and has its own dossier
         run: |

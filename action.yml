@@ -95,6 +95,10 @@ inputs:
     description: 'Also write the Markdown report and upload it as an artifact.'
     required: false
     default: 'true'
+  artifact-name:
+    description: 'Name of the uploaded artifact. Defaults to `ultra11y-<standard>`. Artifact names must be UNIQUE within a workflow run, so set this when the action runs more than once in one job (e.g. the code diff and then the served pages) — otherwise the second upload fails with a 409.'
+    required: false
+    default: ''
   lang:
     description: 'Report language: auto | en | fr.'
     required: false
@@ -260,11 +264,14 @@ runs:
         # The integrity gate: no invented criterion, no unjustified NA, coherent maths.
         node "$ENGINE" check --report "$path" --standard '${{ inputs.standard }}' --quiet
 
+    # Artifact names are unique per WORKFLOW RUN, not per step: a second invocation in the
+    # same job used to die on a 409 with the report already written but never uploaded.
+    # `artifact-name` is how you disambiguate; the default keeps the historical name.
     - name: Upload the report
       if: inputs.report == 'true'
       uses: actions/upload-artifact@v4
       with:
-        name: ultra11y-${{ inputs.standard }}
+        name: ${{ inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard) }}
         path: ${{ inputs.working-directory }}/audits/
         if-no-files-found: warn
 

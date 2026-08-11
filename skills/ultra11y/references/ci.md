@@ -211,7 +211,22 @@ per-page dossiers, asserting that each crawled page is snapshot-based and that t
 one page did not leak onto the clean one. Both run with `sarif: false`, so the job needs no
 `security-events: write` and works on a fork's pull request.
 
-One trap is worth naming because it was written here once: `[ cond ] && cmd` returns 1 when
-the condition is false, and `-e` turns that into a dead job. A test now forbids the form in
-`action.yml` **and** in every CI workflow.
+Two traps are worth naming, because running it is what found them.
+
+`[ cond ] && cmd` returns 1 when the condition is false, and `-e` turns that into a dead job.
+A test now forbids the form in `action.yml` **and** in every CI workflow.
+
+And **artifact names are unique per workflow RUN, not per step**. Using the action twice in
+one job — the code diff, then the served pages — died on a `409 Conflict`, with the report
+written and never uploaded. Pass `artifact-name` on each invocation:
+
+```yaml
+- uses: maxgfr/ultra11y@v2
+  with: { since: auto, artifact-name: a11y-code }
+- uses: maxgfr/ultra11y@v2
+  with: { crawl: http://localhost:3000, artifact-name: a11y-pages }
+```
+
+Left unset it keeps the historical `ultra11y-<standard>`, so a single-invocation workflow is
+unaffected.
 
