@@ -196,3 +196,22 @@ Two surfaces come out of it:
   standard with its status on that page, and each non-conformity as the ordinary auditor block.
 
 A run with no page in scope is not a failure: the report step says so and the job carries on.
+
+## The action is executed in ITS OWN CI, not just parsed
+
+`tests/action.test.ts` reads `action.yml` and gates its shape. That cannot prove the thing
+works: a composite action is bash — arrays, `set -e`, quoting — and the whole file could stay
+green while the action was broken for every consumer.
+
+So `ci.yml` has an `action` job that `uses: ./` for real, twice: report-only over a
+non-conforming fixture (asserting the declared outputs, the written report, and that the
+per-page step DEGRADES rather than failing when nothing was scanned), then the page-by-page
+path — a served two-page site, crawled, scanned, snapshotted, folded in and rendered as
+per-page dossiers, asserting that each crawled page is snapshot-based and that the finding on
+one page did not leak onto the clean one. Both run with `sarif: false`, so the job needs no
+`security-events: write` and works on a fork's pull request.
+
+One trap is worth naming because it was written here once: `[ cond ] && cmd` returns 1 when
+the condition is false, and `-e` turns that into a dead job. A test now forbids the form in
+`action.yml` **and** in every CI workflow.
+

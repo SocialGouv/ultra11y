@@ -181,3 +181,55 @@ describe("the standard", () => {
     expect(report?.run).toContain("check --report");
   });
 });
+
+describe("the action is EXECUTED by CI, not only parsed", () => {
+  // Everything above reads action.yml. But a composite action is bash — arrays, `set -e`,
+  // quoting — and none of that is provable by reading YAML. The `action` job uses the real
+  // thing end to end; without it, this whole file could stay green while the action was
+  // broken for every consumer.
+  const CI = parse(readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8")) as {
+    jobs: Record<string, { steps: { name?: string; uses?: string; run?: string; with?: Record<string, string> }[] }>;
+  };
+
+  const actionJob = (): { steps: { name?: string; uses?: string; run?: string; with?: Record<string, string> }[] } => {
+    const job = CI.jobs.action;
+    if (!job) throw new Error("ci.yml has no `action` job — the shipped action would be parsed but never executed");
+    return job;
+  };
+
+  it("has a job that runs `uses: ./`", () => {
+    expect(actionJob().steps.filter((s) => s.uses === "./").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("checks out before using the local action, or `uses: ./` resolves to nothing", () => {
+    const steps = actionJob().steps;
+    expect(steps[0]?.uses).toMatch(/^actions\/checkout@/);
+  });
+
+  it("exercises the page-by-page path, which no unit test can reach", () => {
+    const withs = actionJob()
+      .steps.filter((s) => s.uses === "./")
+      .map((s) => s.with ?? {});
+    expect(withs.some((w) => w.crawl || w.sitemap || w.urls || w.sample === "true")).toBe(true);
+  });
+
+  it("needs no `security-events: write`, so it runs on a fork's pull request", () => {
+    for (const w of actionJob()
+      .steps.filter((s) => s.uses === "./")
+      .map((s) => s.with ?? {})) {
+      expect(w.sarif).toBe("false");
+    }
+  });
+
+  it("uses no `[ … ] && …` statement anywhere in CI either — -e turns it into a job-killer", () => {
+    // The same trap action.yml is checked for. It is just as fatal in the workflow that
+    // proves the action works, and it was written here once before this test existed.
+    for (const [jobName, job] of Object.entries(CI.jobs)) {
+      for (const step of job.steps) {
+        for (const line of (step.run ?? "").split("\n")) {
+          expect(/^\s*\[[^\]]+\]\s*&&/.test(line), `${jobName} › ${step.name}: ${line.trim()}`).toBe(false);
+        }
+      }
+    }
+  });
+});

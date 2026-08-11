@@ -196,3 +196,118 @@ jobs:
           if node scripts/ultra11y.mjs check --report "$RUNNER_TEMP/bad.md"; then
             echo "expected non-zero exit for an invented criterion"; exit 1
           fi
+
+  # The shipped GitHub Action, EXECUTED. `tests/action.test.ts` parses action.yml and asserts
+  # its shape; nothing ever ran it. A composite action is bash — arrays, `set -e`, conditionals
+  # and heredoc-free quoting — and none of that is provable by reading the YAML. This job is to
+  # the Action what `install-bundle` is to the skills: use the real thing, end to end.
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Report-only over a fixture with known defects. `sarif: false` keeps the job free of
+      # `security-events: write`, so it runs on a fork's PR too.
+      - name: Run the action on a non-conforming fixture
+        id: audit
+        uses: ./
+        with:
+          paths: tests/fixtures/non-conforming/bad.html
+          standard: rgaa
+          since: ""
+          fail-on: ""
+          sarif: "false"
+          comment: "false"
+
+      - name: It reports what it found, through its declared outputs
+        env:
+          FINDINGS: ${{ steps.audit.outputs.findings }}
+          CONFORMANCE: ${{ steps.audit.outputs.conformance }}
+          REPORT: ${{ steps.audit.outputs.report-path }}
+        run: |
+          echo "findings=$FINDINGS conformance=$CONFORMANCE report=$REPORT"
+          [ "$FINDINGS" -gt 0 ] || { echo "::error::the action reported no finding on a fixture built to fail"; exit 1; }
+          [ -s "$REPORT" ] || { echo "::error::no report written at '$REPORT'"; exit 1; }
+          grep -q "RGAA" "$REPORT" || { echo "::error::the report is not keyed on the requested standard"; exit 1; }
+          # The per-page step must degrade, not fail, when nothing was scanned.
+          if [ -d audits/pages ]; then
+            echo "::error::per-page dossiers written with no page in scope"; exit 1
+          fi
+          echo "ok"
+
+      # The gate is the half a red build depends on, so prove it goes red — and that every
+      # surface above it was still produced first.
+      - name: The gate fails the job on a blocking finding
+        run: |
+          rm -rf audits
+          if node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" audit tests/fixtures/non-conforming/bad.html --fail-on blocking; then
+            echo "::error::the gate passed a fixture with blocking non-conformities"; exit 1
+          fi
+
+      # The page-by-page half: a real browser over a served page, snapshotted, folded into the
+      # audit and rendered as per-page dossiers. This is the path the whole feature exists for,
+      # and the one no unit test can reach.
+      # `scan --runtime auto` resolves Playwright from the working directory, so the browser
+      # tier has to live in THIS repo's tree. `--omit=dev` keeps npm from also pulling the
+      # whole devDependency tree (semantic-release, vitest, tsup…) that this job never uses.
+      - name: Install the browser tier
+        run: |
+          npm i --no-audit --no-fund --no-save --omit=dev @playwright/test @axe-core/playwright
+          npx playwright install --with-deps chromium
+
+      - name: Serve a two-page site
+        run: |
+          mkdir -p "$RUNNER_TEMP/site"
+          cat > "$RUNNER_TEMP/site/index.html" <<'HTML'
+          <!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Accueil</title></head>
+          <body><main><h1>Accueil</h1><a href="/contact.html">Contact</a></main></body></html>
+          HTML
+          cat > "$RUNNER_TEMP/site/contact.html" <<'HTML'
+          <!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Contact</title></head>
+          <body><main><h1>Contact</h1><img src="a.png"></main></body></html>
+          HTML
+          (cd "$RUNNER_TEMP/site" && nohup python3 -m http.server 8931 > /dev/null 2>&1 &)
+          for i in $(seq 1 30); do curl -sSf -o /dev/null http://127.0.0.1:8931/ && break; sleep 1; done
+
+      - name: Crawl, scan, snapshot and report page by page
+        uses: ./
+        with:
+          paths: tests/fixtures/conforming
+          standard: rgaa
+          since: ""
+          fail-on: ""
+          sarif: "false"
+          comment: "false"
+          crawl: http://127.0.0.1:8931/
+          crawl-max: "5"
+
+      - name: Every crawled page is a snapshot, and has its own dossier
+        run: |
+          ls .ultra11y/pages
+          for id in accueil contact-html; do
+            [ -f ".ultra11y/pages/$id/dom.html" ] || { echo "::error::no snapshot for $id"; exit 1; }
+            [ -f "audits/pages/page-$id.md" ] || { echo "::error::no per-page dossier for $id"; exit 1; }
+          done
+          # The point of snapshotting: the page-scoped rules run, so a page can be CONFORMING.
+          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" pages --in audits/audit-latest.json --standard rgaa --json > pages.json
+          node -e '
+            const p = require("./pages.json").pages;
+            if (p.length < 2) { console.error("::error::expected the crawled pages in scope, got " + p.length); process.exit(1); }
+            if (!p.every(x => x.basis === "snapshot")) { console.error("::error::a crawled page is not snapshot-based"); process.exit(1); }
+            const contact = p.find(x => x.id === "contact-html");
+            const accueil = p.find(x => x.id === "accueil");
+            if (!contact || !accueil) { console.error("::error::a crawled page is missing from the grid"); process.exit(1); }
+            if (contact.findings.length === 0) { console.error("::error::the alt-less image on /contact.html was not attributed to it"); process.exit(1); }
+            if (accueil.findings.length !== 0) { console.error("::error::a finding leaked onto the clean page"); process.exit(1); }
+            console.log("pages:", p.map(x => x.id + " " + x.conformancePct + "%").join(", "));
+          '
+
+      - name: Upload what the action produced
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: action-e2e
+          path: |
+            audits/
+            .ultra11y/pages/
+          if-no-files-found: warn
