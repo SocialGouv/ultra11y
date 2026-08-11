@@ -7,9 +7,30 @@
   "bin": {
     "ultra11y": "scripts/ultra11y.mjs"
   },
+  "exports": {
+    ".": "./.opencode/plugins/ultra11y.js",
+    "./playwright": {
+      "types": "./dist/playwright.d.ts",
+      "import": "./dist/playwright.mjs",
+      "default": "./dist/playwright.mjs"
+    },
+    "./cypress": {
+      "types": "./dist/cypress.d.ts",
+      "import": "./dist/cypress.mjs",
+      "default": "./dist/cypress.mjs"
+    },
+    "./cypress/plugin": {
+      "types": "./dist/cypress-plugin.d.ts",
+      "import": "./dist/cypress-plugin.mjs",
+      "default": "./dist/cypress-plugin.mjs"
+    },
+    "./scripts/ultra11y.mjs": "./scripts/ultra11y.mjs",
+    "./package.json": "./package.json"
+  },
   "files": [
     "scripts",
     "src",
+    "dist",
     "skills",
     "docker",
     ".claude-plugin",
@@ -33,7 +54,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "verify:bundle": "node scripts/verify-skill-bundle.mjs",
-    "check:build": "tsup && node scripts/copy-bundle.mjs && git diff --exit-code -- scripts/ultra11y.mjs skills/ultra11y/scripts/ultra11y.mjs skills/review-a11y/scripts/ultra11y.mjs && node scripts/verify-skill-bundle.mjs && node scripts/sync-engine.mjs --check",
+    "check:build": "tsup && node scripts/copy-bundle.mjs && git diff --exit-code -- scripts/ultra11y.mjs skills/ultra11y/scripts/ultra11y.mjs skills/review-a11y/scripts/ultra11y.mjs dist && node scripts/verify-skill-bundle.mjs && node scripts/sync-engine.mjs --check",
     "build:wcag": "node scripts/build-standards.mjs",
     "build:pack:rgaa": "node scripts/build-pack-rgaa.mjs",
     "check:pack:rgaa": "node scripts/build-pack-rgaa.mjs --check",

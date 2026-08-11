@@ -168,7 +168,11 @@ export function overlayJs(): string {
     }
   }
 
-  function slug(path) {
+  function slug(rawPath) {
+    // location.pathname is percent-encoded for non-ASCII, exactly like new URL().pathname —
+    // decode before folding so an accented route keeps a readable id.
+    let path = rawPath;
+    try { path = decodeURIComponent(rawPath); } catch (e) {}
     const s = path.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     return s || (path === "/" ? "accueil" : "page");
   }

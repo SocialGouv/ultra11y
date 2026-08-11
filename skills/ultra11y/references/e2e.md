@@ -5,13 +5,33 @@ none of the state your tests just built: no login, no filled form, no opened mod
 integration inverts it — the audit runs **inside the run you already have**, on the page as
 your test left it.
 
+It ships **two ways**, with one behaviour.
+
+**As published entry points** — when your repo already has `ultra11y` as a devDependency:
+
+```js
+import { test, checkA11y } from "ultra11y/playwright";
+import ultra11y from "ultra11y/cypress/plugin";   // cypress.config.js
+import "ultra11y/cypress";                         // cypress/support/e2e.js
+```
+
+Versioned, typed, and they resolve the engine that ships inside the very package you
+installed, so a project can never pipe to a different build than the one it depends on.
+
+**As install-free fixtures** — when it does not:
+
 ```
 node scripts/ultra11y.mjs render --e2e            # detects Playwright / Cypress, writes the fixtures
 node scripts/ultra11y.mjs render --e2e --runner cypress   # or force one
 ```
 
-Fixtures land in `.ultra11y/e2e/`. They are **generated files**, not a published library: no
-install, and they target the engine build that produced them (`ULTRA11Y=<path>` overrides).
+Fixtures land in `.ultra11y/e2e/`. They are **generated files**: no install, and they target
+the engine build that produced them (`ULTRA11Y=<path>` overrides).
+
+The two cannot drift: the fixtures interpolate the published module's severity tables rather
+than restating them, and a test evaluates the generated `failingFindings` alongside the real
+one over the same findings. A fixture that gated differently from the published plugin would
+fail two projects differently while claiming to be the same tool.
 
 ## Playwright
 
@@ -73,20 +93,31 @@ So the fixture knows nothing about the snapshot format, the provenance comment o
 it is a pipe. There is no second implementation to drift out of sync, and any other producer
 can use the same command.
 
-## One difference between the two runners
+## Both runners now feed the pixel tier
 
-The Playwright fixture also captures a **viewport screenshot** and sends it with the payload,
-which is what feeds the pixel tier (contrast over a gradient or a background image — the case
-computed styles cannot express). Pass `screenshot: false` to skip it.
+Playwright captures a **viewport screenshot** and sends it with the payload — that is what
+feeds `rendered-contrast-pixel` (contrast over a gradient or a background image, the one case
+computed styles cannot express). `screenshot: false` skips it.
 
-The Cypress command does **not**: `cy.screenshot()` writes to a path Cypress chooses and
-names, so wiring it back into the payload reliably is more machinery than it is worth. A
-Cypress-collected page therefore gets every rule except `rendered-contrast-pixel`, and that
-criterion simply stays undecided for it rather than being guessed. If you need the pixel tier,
-scan those pages separately (`scan <url>`), or capture them with Playwright.
+Cypress used to have none: `cy.screenshot()` writes to a path Cypress chooses and names, so
+the browser side never learns where the file went. The **`after:screenshot`** event is the
+missing link — it hands the Node plugin the real path of the file Cypress just wrote, which
+it reads back and attaches. So a Cypress-collected page gets every rule too.
+
+The screenshot is taken **before** the collection: `cy.screenshot()` toggles a class on the
+document while it captures, and serializing mid-capture would record that transient state as
+if it were the page. If the event never fires, the page is recorded without a screenshot —
+the criterion stays undecided, exactly as before, and is never guessed.
 
 Everything else — the DOM, the computed styles, the boxes and the stylesheets — is identical
 between the two.
+
+## A report straight out of the test run
+
+`checkA11y(page, { report: true })` (Playwright) writes the per-page report once the page is
+recorded — `audits/pages/index.md` plus one sheet per page, screenshots included. Off by
+default: a report per checked page would be wasteful in a suite, so turn it on in a final
+test, or run `pages --format report` yourself afterwards.
 
 ## Why the artefact matters more than the assertion
 

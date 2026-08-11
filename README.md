@@ -58,6 +58,14 @@ npx ultra11y --help          # no install
 npm i -D ultra11y            # or as a dev dependency
 ```
 
+**As a test-runner plugin** — audit a page inside your own E2E run, in the state your test
+built it:
+
+```js
+import { checkA11y } from "ultra11y/playwright";   // or "ultra11y/cypress" (+ "/plugin")
+await checkA11y(page, { as: "accueil" });
+```
+
 **As an agent skill** — the repository ships **two** (pick at the prompt, or pass the name):
 `ultra11y` for full audits, compliance reports, PRD backlogs and standards packs, and
 `review-a11y` for the fast loop that audits **exactly the code under change** (staged files,
@@ -262,8 +270,13 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   auto-codemods, fill-in `TODO` placeholders for the agent to complete, and judgment-only
   proposals. `--dry-run` is the default; `--write` applies but only after a re-audit proves
   no new non-conformity, and never on lossy JSX/TSX. See `references/fix.md`.
-- **During your E2E run** — `render --e2e` writes Playwright/Cypress fixtures that audit a
-  targeted page **inside the test run you already have**, so the page is checked in the state
+- **During your E2E run** — `import { checkA11y } from "ultra11y/playwright"` (or
+  `ultra11y/cypress` + `ultra11y/cypress/plugin`) audits a targeted page **inside the test run
+  you already have**; `render --e2e` still writes install-free fixtures for a repo that does
+  not depend on ultra11y, and the two cannot drift (the fixtures interpolate the published
+  module's tables, and a test gates both over the same findings). Cypress now feeds the pixel
+  tier too, via `after:screenshot`. `checkA11y(page, { report: true })` emits the per-page
+  report straight out of the run. The audit runs, so the page is checked in the state
   your test built (logged in, form filled, modal open) — state a separate `scan` run does not
   have. Each checked page is persisted as a **snapshot** (`.ultra11y/pages/<id>/`: the whole
   rendered document + computed styles + boxes), which is the durable half: the same page

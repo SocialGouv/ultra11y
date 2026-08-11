@@ -15,6 +15,7 @@
 // published library: zero install, and they work against whatever engine build produced them.
 import type { Lang } from "./types.js";
 import { COLLECT_SNAPSHOT } from "./snapshot.js";
+import { RANK, THRESHOLD } from "./integrations/payload.js";
 
 export type E2eRunner = "playwright" | "cypress";
 
@@ -55,8 +56,12 @@ export function auditSnapshot(payload) {
   }
 }
 
-const RANK = { bloquant: 0, majeur: 1, mineur: 2 };
-const THRESHOLD = { blocking: 0, bloquant: 0, major: 1, majeur: 1, minor: 2, mineur: 2 };
+// Interpolated from src/integrations/core.ts, never restated: a fixture whose severity
+// tables drifted from the published plugin's would gate two projects differently while
+// claiming to be the same tool. tests/e2e-core-sync.test.ts runs both over the same
+// findings to prove the glue around them agrees too.
+const RANK = ${JSON.stringify(RANK)};
+const THRESHOLD = ${JSON.stringify(THRESHOLD)};
 
 /** Findings at or above the threshold, ignoring non-normative recommendations. */
 export function failingFindings(result, failOn) {
@@ -149,7 +154,10 @@ export async function checkA11y(page, opts = {}) {
 function slugify(url) {
   let path = url;
   try {
+    // Percent-decode first: new URL() encodes non-ASCII, so /Accès would otherwise slugify
+    // to acc-c3-a8s — the raw UTF-8 bytes spelled out as a directory name.
     path = new URL(url).pathname;
+    try { path = decodeURIComponent(path); } catch {}
   } catch {}
   const slug = path.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return slug || (path === "/" || path === "" ? "accueil" : "page");
@@ -247,7 +255,10 @@ Cypress.Commands.add("ultra11y", (opts = {}) => {
 function slugify(url) {
   let path = url;
   try {
+    // Percent-decode first: new URL() encodes non-ASCII, so /Accès would otherwise slugify
+    // to acc-c3-a8s — the raw UTF-8 bytes spelled out as a directory name.
     path = new URL(url).pathname;
+    try { path = decodeURIComponent(path); } catch (e) {}
   } catch (e) {}
   const slug = path.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return slug || (path === "/" || path === "" ? "accueil" : "page");

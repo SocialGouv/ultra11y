@@ -745,7 +745,14 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   // separate tree because a snapshot is a directory of signals (dom + styles + boxes +
   // screenshot), not a lone .html. --no-captures opts out of both.
   const pagesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && existsSync(PAGES_DIR);
+  // `usePages` decides whether to APPEND the pages dir to the inputs — it must not fire when
+  // the caller already named it, or every snapshot would be audited twice.
   const usePages = pagesWanted && !scopedToDiff && !inputs.includes(PAGES_DIR);
+  // Whether the snapshots are IN the audit at all, however they got there. Recording the page
+  // scope keyed on `usePages` alone meant that naming the pages directory explicitly — the
+  // most page-centric thing a caller can do, and what the e2e plugins' report option does —
+  // silently produced an audit with no pages in scope, so `pages` then refused to render.
+  const pagesInScope = pagesWanted && !scopedToDiff;
   const auditInputs = [...inputs, ...(useCaptures ? [capturesDir] : []), ...(usePages ? [PAGES_DIR] : [])];
   if (useCaptures)
     console.error(
@@ -781,7 +788,7 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
 
   // Record the pages in scope + attribute the source findings to them, so the per-page grid
   // rebuilds later from this JSON alone (no snapshots on disk, no browser).
-  if (usePages) {
+  if (pagesInScope) {
     const scope = pageScopesFrom(readSnapshots("."));
     if (scope.length) {
       result.scope.pages = scope;

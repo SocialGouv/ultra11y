@@ -12,7 +12,8 @@
     "types": ["node"],
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src", "tests"],
   "exclude": ["node_modules", "scripts", "tests/fixtures"]
