@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ultra11y — options</title>
+    <style>
+      :root { color-scheme: light dark; --bg:#fff; --fg:#111; --line:#e3e3e6; --mut:#666; }
+      @media (prefers-color-scheme: dark) { :root { --bg:#141416; --fg:#f2f2f7; --line:#2c2c2e; --mut:#a1a1a6; } }
+      body { max-width: 42rem; margin: 0 auto; padding: 24px; background: var(--bg); color: var(--fg);
+             font: 14px/1.6 ui-sans-serif, system-ui, sans-serif; }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      p.sub { color: var(--mut); margin: 0 0 20px; }
+      label { display: block; margin: 14px 0 4px; font-weight: 600; }
+      input, select { font: inherit; width: 100%; box-sizing: border-box; padding: 7px 9px;
+                      border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; }
+      .hint { color: var(--mut); font-size: 13px; margin-top: 4px; }
+      button { font: inherit; margin-top: 18px; border: 1px solid #1c1c1e; border-radius: 8px;
+               padding: 8px 14px; background: #1c1c1e; color: #fff; cursor: pointer; }
+      @media (prefers-color-scheme: dark) { button { background: #f2f2f7; color: #111; border-color: #f2f2f7; } }
+      #saved { color: #0a7d33; margin-left: 10px; }
+    </style>
+  </head>
+  <body>
+    <h1>ultra11y</h1>
+    <p class="sub">
+      This extension does not audit anything by itself: it collects the page and hands it to
+      <code>ultra11y dev</code> running on your machine. The page's DOM goes to that local
+      process and nowhere else — the extension can only reach loopback.
+    </p>
+
+    <label for="port">Local server port</label>
+    <input id="port" type="number" min="1" max="65535" />
+    <p class="hint">The port <code>ultra11y dev</code> is listening on. Default 4111.</p>
+
+    <label for="standard">Standard</label>
+    <select id="standard">
+      <option value="wcag">WCAG 2.2 AA</option>
+      <option value="rgaa">RGAA 4.1.2</option>
+    </select>
+    <p class="hint">Set on the server with <code>ultra11y dev --standard rgaa</code>; shown here for reference.</p>
+
+    <label for="apiKey">Anthropic API key (optional)</label>
+    <input id="apiKey" type="password" autocomplete="off" placeholder="sk-ant-…" />
+    <p class="hint">
+      Only used by “Adjudicate with AI”, which rules on the criteria no static engine can decide.
+      It is kept in this browser's local extension storage, sent to your local server per request,
+      and never written to disk by it. Leave it empty to let the server use its own
+      <code>ANTHROPIC_API_KEY</code> instead. Everything else in ultra11y works with no key at all.
+    </p>
+
+    <button id="save">Save</button><span id="saved" hidden>Saved</span>
+    <script src="options.js" type="module"></script>
+  </body>
+</html>

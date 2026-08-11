@@ -65,3 +65,10 @@ It runs the same static engine as `audit`, plus the rendered tier when the page 
 signals. It does not adjudicate the judgment criteria — alt relevance, link purpose, reading
 order remain yours (`verify --manual`) — and a clean panel means "the engine found nothing
 here", never "this page is accessible".
+
+## The browser extension
+
+The same side-car also backs a Chrome extension (`extension/`), for auditing a page you are
+merely looking at — a staging build, a page behind a login you walked through by hand. It
+adds `GET /health`, `GET /collector.js` and `POST /judge` to this server and holds no copy of
+the engine. See `references/extension.md`.

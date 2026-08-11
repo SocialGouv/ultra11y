@@ -89,6 +89,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), and its honesty rules |
 | `references/e2e.md` | `render --e2e`: auditing a page during your Playwright/Cypress run |
 | `references/devtools.md` | `dev`: the live overlay while you build, and the per-page dashboard |
+| `references/extension.md` | The browser extension: audit the page you are looking at, through the side-car |
 | `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
 | `references/scale.md` | Focusing an audit on a large repository |
 | `references/fix.md` · `references/correction.md` | Applying fixes, by priority, without regressions |

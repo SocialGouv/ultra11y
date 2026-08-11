@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ultra11y</title>
+    <style>
+      :root { color-scheme: light dark; --bg:#fff; --fg:#111; --line:#e3e3e6; --mut:#666; }
+      @media (prefers-color-scheme: dark) { :root { --bg:#141416; --fg:#f2f2f7; --line:#2c2c2e; --mut:#a1a1a6; } }
+      body { width: 420px; margin: 0; padding: 14px; background: var(--bg); color: var(--fg);
+             font: 13px/1.5 ui-sans-serif, system-ui, sans-serif; }
+      h1 { font-size: 14px; margin: 0 0 2px; }
+      p.sub { color: var(--mut); margin: 0 0 12px; }
+      button { font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 7px 11px;
+               background: transparent; color: inherit; cursor: pointer; }
+      button.primary { background: #1c1c1e; color: #fff; border-color: #1c1c1e; }
+      @media (prefers-color-scheme: dark) { button.primary { background: #f2f2f7; color: #111; border-color: #f2f2f7; } }
+      button:disabled { opacity: .5; cursor: default; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+      ul { list-style: none; margin: 10px 0 0; padding: 0; max-height: 340px; overflow: auto; }
+      li { padding: 7px 0; border-top: 1px solid var(--line); }
+      .sev { font-weight: 700; margin-right: 6px; }
+      .b { color: #b3261e; } .m { color: #b06000; } .n { color: var(--mut); }
+      code { font: 11px/1.4 ui-monospace, monospace; color: var(--mut); }
+      .note { color: var(--mut); }
+      .err { color: #b3261e; }
+      a { color: inherit; }
+    </style>
+  </head>
+  <body>
+    <h1>ultra11y</h1>
+    <p class="sub" id="status">Checking the local server…</p>
+    <div class="row">
+      <button id="audit" class="primary" disabled>Audit this page</button>
+      <button id="judge" disabled title="Adjudicate the judgment criteria with a model">Adjudicate with AI</button>
+      <button id="grid" disabled>Page-by-page grid</button>
+    </div>
+    <div id="out"></div>
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>

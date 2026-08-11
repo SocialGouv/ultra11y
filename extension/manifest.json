@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "ultra11y",
+  "version": "1.0.0",
+  "description": "Audit the page you are looking at against WCAG 2.2 AA or RGAA, through your local ultra11y dev server.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "action": { "default_popup": "popup.html", "default_title": "ultra11y" },
+  "options_page": "options.html",
+  "background": { "service_worker": "background.js", "type": "module" },
+  "icons": {}
+}

@@ -14,15 +14,18 @@
 // is permissive on purpose (the app runs on a different port) but the loopback bind is what
 // actually contains it.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { runAudit } from "./audit.js";
 import { resolveMessage } from "./messages.js";
 import { packCriteriaForFinding } from "./standards/derive.js";
-import { attributePages, derivePages, pageScopesFrom } from "./pages.js";
+import { attributePages, derivePages, pageScopesFrom, pagesOf } from "./pages.js";
+import { applyAdjudication, buildAdjudicationWorklist, formatAdjudication } from "./adjudicate.js";
+import { BATCH_SIZE, applyRawVerdicts, judgeAll } from "./llm.js";
 import { readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
 import { CORE, type StandardId, isCore, loadPack, themeName } from "./standards/index.js";
 import { derivePackResults } from "./standards/index.js";
-import type { AuditResult, Finding, Lang, PageResult, Status } from "./types.js";
+import { SCHEMA_VERSION, VERSION, type AuditResult, type Finding, type Lang, type PageResult, type Status } from "./types.js";
 import { COLLECT_SNAPSHOT } from "./snapshot.js";
 
 export const DEV_DEFAULT_PORT = 4111;
@@ -347,7 +350,14 @@ export function auditCollected(
   return { ok: true, result: runAudit({ inputs: [join(dir, "dom.html")] }) };
 }
 
-/** The whole project's per-page view, rebuilt from the snapshots on disk. */
+/** The whole project's per-page view, rebuilt from the snapshots on disk.
+ *
+ *  The MEASUREMENT is always fresh — the rules re-run over every snapshot, so a page fixed a
+ *  moment ago shows as fixed. The DECISIONS are not a measurement: an adjudication of the
+ *  judgment criteria is a ruling that stays true until the page changes, so a previously
+ *  applied one is folded back on rather than thrown away. Without this the dashboard would
+ *  silently undo every `judge` run on the next page load, and the grid would disagree with
+ *  the report generated from the same directory. */
 export function projectPages(root: string): { result: AuditResult | null; pages: PageResult[] } {
   const snaps = readSnapshots(root);
   if (!snaps.length) return { result: null, pages: [] };
@@ -355,7 +365,33 @@ export function projectPages(root: string): { result: AuditResult | null; pages:
   const result = runAudit({ inputs: [join(root, ".ultra11y/pages")] });
   result.scope.pages = scope;
   attributePages(result, scope);
+  foldRecordedAdjudication(root, result);
   return { result, pages: derivePages(result, scope) };
+}
+
+/** Carry a previously applied adjudication onto a freshly measured audit. Only the agent's
+ *  own decisions move: a criterion the ENGINE decided this run keeps this run's verdict. */
+function foldRecordedAdjudication(root: string, fresh: AuditResult): void {
+  let prior: AuditResult;
+  try {
+    prior = JSON.parse(readFileSync(join(root, "audits", "audit-latest.json"), "utf8")) as AuditResult;
+  } catch {
+    return; // no prior run — nothing to carry
+  }
+  if (prior.packAdjudication) fresh.packAdjudication = prior.packAdjudication;
+  if (prior.adjudicated) fresh.adjudicated = prior.adjudicated;
+  const byId = new Map(fresh.criteria.map((c) => [c.id, c]));
+  for (const c of prior.criteria) {
+    if (c.decidedBy !== "agent") continue;
+    const target = byId.get(c.id);
+    // A criterion the fresh run decided by itself is authoritative: the page moved, and a
+    // stale ruling must never override a live measurement.
+    if (!target || target.status !== "manual") continue;
+    target.status = c.status;
+    target.decidedBy = "agent";
+    if (c.justification) target.justification = c.justification;
+  }
+  fresh.residualRisks = fresh.residualRisks.filter((r) => byId.get(r.criteriaId)?.status === "manual");
 }
 
 export interface DevServer {
@@ -376,6 +412,23 @@ export function startDevServer(opts: DevOptions): Promise<DevServer> {
     }
     if (url.pathname === "/overlay.js") {
       res.writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" }).end(overlayJs());
+      return;
+    }
+    // The browser extension asks for the collector rather than shipping a copy — same reason
+    // the overlay is served rather than pasted. One collector, one format, no drift.
+    if (url.pathname === "/collector.js") {
+      res
+        .writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" })
+        .end(`window.__ULTRA11Y_COLLECT__ = ${JSON.stringify(COLLECT_SNAPSHOT)};`);
+      return;
+    }
+    // A liveness probe, so a client can say "run `ultra11y dev`" instead of failing silently.
+    if (url.pathname === "/health") {
+      res
+        .writeHead(200, { "content-type": "application/json", "cache-control": "no-store" })
+        .end(
+          JSON.stringify({ ok: true, tool: "ultra11y", version: VERSION, standard: opts.standard, lang: opts.lang, pages: readSnapshots(opts.root).length }),
+        );
       return;
     }
     if (url.pathname === "/snapshot" && req.method === "POST") {
@@ -402,6 +455,80 @@ export function startDevServer(opts: DevOptions): Promise<DevServer> {
           res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ findings: r.result.findings }));
         } catch (e) {
           res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+        }
+      })();
+      return;
+    }
+    // Adjudicate the judgment criteria of the pages captured so far, for a client with no
+    // coding agent behind it (the browser extension).
+    //
+    // THE KEY. It arrives per request in `x-anthropic-key`, is used for the call, and is
+    // never written to disk, never logged, never echoed back. A server-side
+    // ANTHROPIC_API_KEY is the fallback for someone who would rather keep it out of the
+    // browser entirely. With neither, the endpoint says so — it never quietly does nothing.
+    if (url.pathname === "/judge" && req.method === "POST") {
+      void (async () => {
+        const key = (req.headers["x-anthropic-key"] as string | undefined)?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
+        if (!key) {
+          res.writeHead(400, { "content-type": "application/json" }).end(
+            JSON.stringify({
+              error:
+                "No API key. Set it in the extension's options, or start `ultra11y dev` with ANTHROPIC_API_KEY in its environment. This is the only part of ultra11y that takes one.",
+            }),
+          );
+          return;
+        }
+        try {
+          const { result } = projectPages(opts.root);
+          if (!result) {
+            res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({ error: "No page captured yet — audit a page first." }));
+            return;
+          }
+          const items = buildAdjudicationWorklist(result, { standard: opts.standard });
+          if (!items.length) {
+            res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ adjudicated: 0, remaining: 0, applied: false }));
+            return;
+          }
+          const batches: { items: typeof items; prompt: string }[] = [];
+          for (let i = 0; i < items.length; i += BATCH_SIZE) {
+            const slice = items.slice(i, i + BATCH_SIZE);
+            batches.push({ items: slice, prompt: formatAdjudication(slice, opts.lang, opts.standard) });
+          }
+          log(opts.lang === "fr" ? `ultra11y dev : adjudication de ${items.length} critère(s)…` : `ultra11y dev: adjudicating ${items.length} criterion(ia)…`);
+          const { verdicts, failures } = await judgeAll(batches, { apiKey: key });
+          applyRawVerdicts(items, verdicts);
+          // The SAME fail-closed gate an agent's verdicts pass. A model cannot assert a
+          // conformance here that it could not assert on the CLI.
+          const applied = applyAdjudication(result, {
+            tool: "ultra11y",
+            kind: "adjudication",
+            schemaVersion: SCHEMA_VERSION,
+            standard: opts.standard,
+            auditDate: result.date,
+            items,
+          });
+          // A gate-refused adjudication changes nothing on disk — that is the point of the
+          // gate. An ACCEPTED one is persisted, or the button would appear to work while
+          // leaving the dashboard, the report and the per-page grid exactly as they were.
+          let auditPath: string | undefined;
+          if (applied.ok) {
+            auditPath = join(opts.root, "audits", "audit-latest.json");
+            mkdirSync(dirname(auditPath), { recursive: true });
+            writeFileSync(auditPath, `${JSON.stringify(applied.audit, null, 2)}\n`);
+          }
+          res.writeHead(200, { "content-type": "application/json" }).end(
+            JSON.stringify({
+              adjudicated: verdicts.length,
+              total: items.length,
+              applied: applied.ok,
+              ...(auditPath ? { auditPath } : {}),
+              issues: applied.ok ? [] : applied.issues.slice(0, 20),
+              failures,
+              pages: applied.ok ? derivePages(applied.audit, pagesOf(applied.audit)).map((p) => ({ id: p.id, name: p.name, rate: p.conformancePct })) : [],
+            }),
+          );
+        } catch (e) {
+          res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
         }
       })();
       return;

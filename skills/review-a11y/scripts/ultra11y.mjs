@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { realpathSync as realpathSync6, writeFileSync as writeFileSync16, mkdirSync as mkdirSync14, existsSync as existsSync31, readFileSync as readFileSync26, appendFileSync } from "fs";
-import { join as join45, relative as relative5, sep as sep7, dirname as dirname13 } from "path";
+import { realpathSync as realpathSync6, writeFileSync as writeFileSync17, mkdirSync as mkdirSync15, existsSync as existsSync31, readFileSync as readFileSync27, appendFileSync } from "fs";
+import { join as join45, relative as relative5, sep as sep7, dirname as dirname14 } from "path";
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
@@ -55087,7 +55087,8 @@ function perPageTable(result, standard = CORE2, lang = "en") {
 
 // src/dev.ts
 import { createServer } from "http";
-import { join as join40 } from "path";
+import { mkdirSync as mkdirSync13, readFileSync as readFileSync23, writeFileSync as writeFileSync15 } from "fs";
+import { dirname as dirname12, join as join40 } from "path";
 var DEV_DEFAULT_PORT = 4111;
 function criterionLabel3(f, standard) {
   if (isCore(standard)) return `WCAG ${f.criteriaId}`;
@@ -55366,7 +55367,28 @@ function projectPages(root) {
   const result = runAudit({ inputs: [join40(root, ".ultra11y/pages")] });
   result.scope.pages = scope;
   attributePages(result, scope);
+  foldRecordedAdjudication(root, result);
   return { result, pages: derivePages(result, scope) };
+}
+function foldRecordedAdjudication(root, fresh) {
+  let prior;
+  try {
+    prior = JSON.parse(readFileSync23(join40(root, "audits", "audit-latest.json"), "utf8"));
+  } catch {
+    return;
+  }
+  if (prior.packAdjudication) fresh.packAdjudication = prior.packAdjudication;
+  if (prior.adjudicated) fresh.adjudicated = prior.adjudicated;
+  const byId2 = new Map(fresh.criteria.map((c2) => [c2.id, c2]));
+  for (const c2 of prior.criteria) {
+    if (c2.decidedBy !== "agent") continue;
+    const target = byId2.get(c2.id);
+    if (!target || target.status !== "manual") continue;
+    target.status = c2.status;
+    target.decidedBy = "agent";
+    if (c2.justification) target.justification = c2.justification;
+  }
+  fresh.residualRisks = fresh.residualRisks.filter((r) => byId2.get(r.criteriaId)?.status === "manual");
 }
 function startDevServer(opts) {
   const log = opts.onLog ?? (() => {
@@ -55380,6 +55402,16 @@ function startDevServer(opts) {
     }
     if (url.pathname === "/overlay.js") {
       res.writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" }).end(overlayJs());
+      return;
+    }
+    if (url.pathname === "/collector.js") {
+      res.writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" }).end(`window.__ULTRA11Y_COLLECT__ = ${JSON.stringify(COLLECT_SNAPSHOT)};`);
+      return;
+    }
+    if (url.pathname === "/health") {
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(
+        JSON.stringify({ ok: true, tool: "ultra11y", version: VERSION, standard: opts.standard, lang: opts.lang, pages: readSnapshots(opts.root).length })
+      );
       return;
     }
     if (url.pathname === "/snapshot" && req.method === "POST") {
@@ -55404,6 +55436,68 @@ function startDevServer(opts) {
           res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ findings: r.result.findings }));
         } catch (e) {
           res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+        }
+      })();
+      return;
+    }
+    if (url.pathname === "/judge" && req.method === "POST") {
+      void (async () => {
+        const key = req.headers["x-anthropic-key"]?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
+        if (!key) {
+          res.writeHead(400, { "content-type": "application/json" }).end(
+            JSON.stringify({
+              error: "No API key. Set it in the extension's options, or start `ultra11y dev` with ANTHROPIC_API_KEY in its environment. This is the only part of ultra11y that takes one."
+            })
+          );
+          return;
+        }
+        try {
+          const { result } = projectPages(opts.root);
+          if (!result) {
+            res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({ error: "No page captured yet \u2014 audit a page first." }));
+            return;
+          }
+          const items = buildAdjudicationWorklist(result, { standard: opts.standard });
+          if (!items.length) {
+            res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ adjudicated: 0, remaining: 0, applied: false }));
+            return;
+          }
+          const batches = [];
+          for (let i2 = 0; i2 < items.length; i2 += BATCH_SIZE) {
+            const slice = items.slice(i2, i2 + BATCH_SIZE);
+            batches.push({ items: slice, prompt: formatAdjudication(slice, opts.lang, opts.standard) });
+          }
+          log(opts.lang === "fr" ? `ultra11y dev : adjudication de ${items.length} crit\xE8re(s)\u2026` : `ultra11y dev: adjudicating ${items.length} criterion(ia)\u2026`);
+          const { verdicts, failures } = await judgeAll(batches, { apiKey: key });
+          applyRawVerdicts(items, verdicts);
+          const applied = applyAdjudication(result, {
+            tool: "ultra11y",
+            kind: "adjudication",
+            schemaVersion: SCHEMA_VERSION,
+            standard: opts.standard,
+            auditDate: result.date,
+            items
+          });
+          let auditPath;
+          if (applied.ok) {
+            auditPath = join40(opts.root, "audits", "audit-latest.json");
+            mkdirSync13(dirname12(auditPath), { recursive: true });
+            writeFileSync15(auditPath, `${JSON.stringify(applied.audit, null, 2)}
+`);
+          }
+          res.writeHead(200, { "content-type": "application/json" }).end(
+            JSON.stringify({
+              adjudicated: verdicts.length,
+              total: items.length,
+              applied: applied.ok,
+              ...auditPath ? { auditPath } : {},
+              issues: applied.ok ? [] : applied.issues.slice(0, 20),
+              failures,
+              pages: applied.ok ? derivePages(applied.audit, pagesOf(applied.audit)).map((p) => ({ id: p.id, name: p.name, rate: p.conformancePct })) : []
+            })
+          );
+        } catch (e) {
+          res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
         }
       })();
       return;
@@ -55702,7 +55796,7 @@ function e2eSetupPlan(runners, paths, lang = "en") {
 }
 
 // src/orchestrate.ts
-import { existsSync as existsSync28, mkdirSync as mkdirSync13, readFileSync as readFileSync23, rmSync as rmSync7, writeFileSync as writeFileSync15 } from "fs";
+import { existsSync as existsSync28, mkdirSync as mkdirSync14, readFileSync as readFileSync24, rmSync as rmSync7, writeFileSync as writeFileSync16 } from "fs";
 import { join as join42, resolve as resolve7 } from "path";
 
 // src/orchestrate-templates.ts
@@ -55920,7 +56014,7 @@ function listPhases(runDir, engineAbs) {
   let adjReady = false;
   if (existsSync28(adjPath)) {
     try {
-      const f = JSON.parse(readFileSync23(adjPath, "utf8"));
+      const f = JSON.parse(readFileSync24(adjPath, "utf8"));
       if (f && f.kind === "adjudication" && Array.isArray(f.items)) {
         adjReady = true;
         adjIds = f.items.map((i2) => i2.criteriaId);
@@ -55933,7 +56027,7 @@ function listPhases(runDir, engineAbs) {
   let verReady = false;
   if (existsSync28(verPath)) {
     try {
-      const items = JSON.parse(readFileSync23(verPath, "utf8"));
+      const items = JSON.parse(readFileSync24(verPath, "utf8"));
       if (Array.isArray(items)) {
         verReady = true;
         verIds = items.map((i2) => String(i2.n));
@@ -55991,13 +56085,13 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
   }
   const orchDir = join42(run2, "orchestration");
   const agentsDir = join42(orchDir, "agents");
-  mkdirSync13(join42(orchDir, "out"), { recursive: true });
-  mkdirSync13(agentsDir, { recursive: true });
+  mkdirSync14(join42(orchDir, "out"), { recursive: true });
+  mkdirSync14(agentsDir, { recursive: true });
   const written = [];
   const notices = [];
   for (const [name2, content] of Object.entries(agentContracts(run2, engineAbs))) {
     const p = join42(agentsDir, `${name2}.md`);
-    writeFileSync15(p, content);
+    writeFileSync16(p, content);
     written.push(p);
   }
   const emitted = new Set(opts.eco ? [] : selected.filter((p) => p.items > 0).map((p) => p.name));
@@ -56019,12 +56113,12 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
         notices.push(`phase "${ph.name}": only ${ph.items} item(s) \u2014 the sequential --eco path is equivalent and cheaper.`);
       }
       const p = join42(orchDir, `${ph.name}.workflow.mjs`);
-      writeFileSync15(p, phaseWorkflowScript(ph, run2, engineAbs, BATCH_SIZE2));
+      writeFileSync16(p, phaseWorkflowScript(ph, run2, engineAbs, BATCH_SIZE2));
       written.push(p);
     }
   }
   const rb = join42(orchDir, "RUNBOOK.md");
-  writeFileSync15(rb, runbookMd(phases, run2, engineAbs));
+  writeFileSync16(rb, runbookMd(phases, run2, engineAbs));
   written.push(rb);
   return { exitCode: 0, written, notices, errors: [], phases };
 }
@@ -56033,7 +56127,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
 import { createInterface as createInterface2 } from "readline";
 
 // src/mcp/handlers.ts
-import { existsSync as existsSync29, readFileSync as readFileSync24, realpathSync as realpathSync4, statSync as statSync11 } from "fs";
+import { existsSync as existsSync29, readFileSync as readFileSync25, realpathSync as realpathSync4, statSync as statSync11 } from "fs";
 import { isAbsolute as isAbsolute3, join as join43, resolve as resolve8, sep as sep5 } from "path";
 
 // src/project-lock.ts
@@ -56233,7 +56327,7 @@ function handleSampleCheck(cwd) {
   }
   let raw;
   try {
-    raw = JSON.parse(readFileSync24(file, "utf8"));
+    raw = JSON.parse(readFileSync25(file, "utf8"));
   } catch (e) {
     throw new ToolError(`.ultra11yrc.json is not valid JSON: ${e.message}`);
   }
@@ -56292,7 +56386,7 @@ function reportText(args2, tool) {
   if (!file) throw new ToolError(`\`report_text\` is required \u2014 the report markdown for ultra11y_${tool} to work on.`);
   if (!isAbsolute3(file)) throw new ToolError("`report_file` must be an absolute path.");
   if (!existsSync29(file)) throw new ToolError(`report file not found: ${file}`);
-  return readFileSync24(file, "utf8");
+  return readFileSync25(file, "utf8");
 }
 function handleCriteria(args2) {
   const lang = langOf(args2);
@@ -56321,7 +56415,7 @@ function handleRead(args2, cwd) {
   const st = statSync11(real);
   if (!st.isFile()) throw new ToolError(`not a file: ${raw}`);
   if (st.size > MAX_READ_BYTES) throw new ToolError(`file is too large to read (${st.size} bytes): ${raw}`);
-  const lines = readFileSync24(real, "utf8").split("\n");
+  const lines = readFileSync25(real, "utf8").split("\n");
   const total = lines.length;
   const start2 = Math.max(1, Math.floor(num2(args2.start_line) ?? 1));
   if (start2 > total) throw new ToolError(`start_line ${start2} is past the end of the file (${total} lines).`);
@@ -56816,13 +56910,13 @@ function str3(v) {
 var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t2) => t2.name));
 
 // src/mcp/resources.ts
-import { existsSync as existsSync30, readdirSync as readdirSync6, readFileSync as readFileSync25, realpathSync as realpathSync5, statSync as statSync12 } from "fs";
-import { basename as basename3, dirname as dirname12, join as join44, resolve as resolve9, sep as sep6 } from "path";
+import { existsSync as existsSync30, readdirSync as readdirSync6, readFileSync as readFileSync26, realpathSync as realpathSync5, statSync as statSync12 } from "fs";
+import { basename as basename3, dirname as dirname13, join as join44, resolve as resolve9, sep as sep6 } from "path";
 import { fileURLToPath as fileURLToPath4 } from "url";
 var SKILL_NAME = "ultra11y";
 var URI_SCHEME = "skill://";
 function resolveSkillRoot(moduleDir) {
-  const here = moduleDir ?? dirname12(fileURLToPath4(import.meta.url));
+  const here = moduleDir ?? dirname13(fileURLToPath4(import.meta.url));
   const candidates2 = [resolve9(here, ".."), resolve9(here, "..", "skills", SKILL_NAME), resolve9(here, "..", "..", "skills", SKILL_NAME)];
   return candidates2.find((dir) => existsSync30(join44(dir, "SKILL.md")));
 }
@@ -56858,7 +56952,7 @@ function readResource(uri, moduleDir) {
     throw new ResourceError(`resource path escapes the skill root: ${uri}`);
   }
   if (!statSync12(targetReal).isFile()) throw new ResourceError(`not a file: ${uri}`);
-  return { uri, mimeType: "text/markdown", text: readFileSync25(targetReal, "utf8") };
+  return { uri, mimeType: "text/markdown", text: readFileSync26(targetReal, "utf8") };
 }
 var ResourceError = class extends Error {
 };
@@ -56876,7 +56970,7 @@ function describe(root, rel2, fallbackTitle) {
 function firstProse(file) {
   let text;
   try {
-    text = readFileSync25(file, "utf8");
+    text = readFileSync26(file, "utf8");
   } catch {
     return void 0;
   }
@@ -57924,8 +58018,8 @@ async function cmdAudit(p) {
     const asFile = out2.toLowerCase().endsWith(".json");
     const target = asFile ? out2 : join45(out2, "audit-latest.json");
     try {
-      mkdirSync14(asFile ? dirname13(out2) : out2, { recursive: true });
-      writeFileSync16(target, JSON.stringify(result, null, 2) + "\n");
+      mkdirSync15(asFile ? dirname14(out2) : out2, { recursive: true });
+      writeFileSync17(target, JSON.stringify(result, null, 2) + "\n");
       console.error(lang === "fr" ? `\u2192 audit \xE9crit dans ${target}` : `\u2192 audit written to ${target}`);
     } catch {
     }
@@ -58001,8 +58095,8 @@ async function cmdDev(p) {
     const dir = join45(root, ".ultra11y", "next");
     const rel2 = ".ultra11y/next/overlay.jsx";
     try {
-      mkdirSync14(dir, { recursive: true });
-      writeFileSync16(join45(dir, "overlay.jsx"), nextOverlayComponent(port));
+      mkdirSync15(dir, { recursive: true });
+      writeFileSync17(join45(dir, "overlay.jsx"), nextOverlayComponent(port));
     } catch (e) {
       console.error(`ultra11y dev: could not write ${rel2}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
@@ -58129,7 +58223,7 @@ ${urls.length} URL(s) discovered, ${merged.added.length} new. Nothing was writte
     }
   }
   doc.sample = v.sample;
-  writeFileSync16(file, `${JSON.stringify(doc, null, 2)}
+  writeFileSync17(file, `${JSON.stringify(doc, null, 2)}
 `);
   if (!p.flags.json)
     console.log(
@@ -58198,10 +58292,10 @@ async function cmdPages(p) {
     console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsFor(".") }));
     return 0;
   }
-  mkdirSync14(outDir, { recursive: true });
+  mkdirSync15(outDir, { recursive: true });
   if (!split) {
     const file = join45(outDir, `pages-${result.date}.md`);
-    writeFileSync16(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsFor(outDir) })}
+    writeFileSync17(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsFor(outDir) })}
 `);
     console.log(file);
     return 0;
@@ -58210,11 +58304,11 @@ async function cmdPages(p) {
   const sheet = (id) => `page-${id}.md`;
   const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
   for (const pg of derived) {
-    writeFileSync16(join45(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots })}
+    writeFileSync17(join45(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots })}
 `);
   }
   const index = join45(outDir, "index.md");
-  writeFileSync16(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
+  writeFileSync17(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
 `);
   console.log(index);
   return 0;
@@ -58312,9 +58406,9 @@ function cmdInit(p) {
   if (want.baseline) {
     const inputs = p.positionals.length ? p.positionals : ["."];
     const result = runAudit({ inputs, onWarn: (m) => console.error(m) });
-    mkdirSync14(join45(root, "audits"), { recursive: true });
+    mkdirSync15(join45(root, "audits"), { recursive: true });
     const bp = join45(root, "audits", "baseline.json");
-    writeFileSync16(bp, JSON.stringify(result, null, 2) + "\n");
+    writeFileSync17(bp, JSON.stringify(result, null, 2) + "\n");
     wrote.push(bp);
   }
   if (want.hook) wrote.push(writeHook(root, engineRel, failOn, legacy ? "baseline" : "staged"));
@@ -58557,14 +58651,14 @@ function cmdRender(p) {
     const dir = join45(root, ".ultra11y", "e2e");
     const paths = {};
     try {
-      mkdirSync14(dir, { recursive: true });
+      mkdirSync15(dir, { recursive: true });
       if (runners.includes("playwright")) {
-        writeFileSync16(join45(dir, "playwright.mjs"), playwrightFixture(engineRef));
+        writeFileSync17(join45(dir, "playwright.mjs"), playwrightFixture(engineRef));
         paths.playwright = ".ultra11y/e2e/playwright.mjs";
       }
       if (runners.includes("cypress")) {
-        writeFileSync16(join45(dir, "cypress-plugin.mjs"), cypressPlugin(engineRef));
-        writeFileSync16(join45(dir, "cypress-commands.mjs"), cypressCommands());
+        writeFileSync17(join45(dir, "cypress-plugin.mjs"), cypressPlugin(engineRef));
+        writeFileSync17(join45(dir, "cypress-commands.mjs"), cypressCommands());
         paths.cypressPlugin = ".ultra11y/e2e/cypress-plugin.mjs";
         paths.cypressCommands = ".ultra11y/e2e/cypress-commands.mjs";
       }
@@ -58579,7 +58673,7 @@ function cmdRender(p) {
   if (p.flags.scaffold === true) {
     const out2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "ultra11y-render.tsx";
     try {
-      writeFileSync16(out2, ssrHarness());
+      writeFileSync17(out2, ssrHarness());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out2}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
@@ -58595,8 +58689,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const rel2 = ".ultra11y/capture-setup.mjs";
     const out2 = join45(root, rel2);
     try {
-      mkdirSync14(dirname13(out2), { recursive: true });
-      writeFileSync16(out2, captureSetup());
+      mkdirSync15(dirname14(out2), { recursive: true });
+      writeFileSync17(out2, captureSetup());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out2}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
@@ -58615,7 +58709,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const gaLine = ".ultra11y/captures/*.html text eol=lf linguist-generated=true";
     const gaPath = join45(root, ".gitattributes");
     try {
-      const existing = existsSync31(gaPath) ? readFileSync26(gaPath, "utf8") : "";
+      const existing = existsSync31(gaPath) ? readFileSync27(gaPath, "utf8") : "";
       if (!existing.includes(".ultra11y/captures/")) {
         appendFileSync(gaPath, (existing && !existing.endsWith("\n") ? "\n" : "") + gaLine + "\n");
         console.log(lang === "fr" ? `.gitattributes : ajout\xE9 \xAB ${gaLine} \xBB` : `.gitattributes: added "${gaLine}"`);
@@ -58624,7 +58718,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     }
     try {
       const giPath = join45(root, ".gitignore");
-      if (existsSync31(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync26(giPath, "utf8")))
+      if (existsSync31(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync27(giPath, "utf8")))
         console.error(
           lang === "fr" ? "\u26A0\uFE0F .ultra11y semble ignor\xE9 par .gitignore \u2014 les captures doivent \xEAtre committ\xE9es pour le gate (ajoutez \xAB !.ultra11y/captures/ \xBB)." : '\u26A0\uFE0F .ultra11y appears gitignored \u2014 captures must be committed for the gate (add "!.ultra11y/captures/").'
         );
@@ -58667,8 +58761,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
         continue;
       }
       try {
-        mkdirSync14(outDir, { recursive: true });
-        writeFileSync16(join45(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
+        mkdirSync15(outDir, { recursive: true });
+        writeFileSync17(join45(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
 ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
         attributed++;
       } catch {
@@ -58909,9 +59003,9 @@ function applyAdjudicationFile(p, adj, lang) {
     return 1;
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
-  mkdirSync14(out2, { recursive: true });
+  mkdirSync15(out2, { recursive: true });
   const auditPath = join45(out2, "audit-latest.json");
-  writeFileSync16(auditPath, JSON.stringify(r.audit, null, 2) + "\n");
+  writeFileSync17(auditPath, JSON.stringify(r.audit, null, 2) + "\n");
   if (p.flags.json) console.log(JSON.stringify({ ok: true, auditPath, applied: r.applied, stillManual: r.stillManual, grounding: r.grounding }, null, 2));
   else
     console.log(
@@ -58996,9 +59090,9 @@ async function cmdJudge(p) {
     if (r.issues.length > 40) console.error(`  \u2026 +${r.issues.length - 40}`);
     return 1;
   }
-  mkdirSync14(out2, { recursive: true });
+  mkdirSync15(out2, { recursive: true });
   const auditPath = join45(out2, "audit-latest.json");
-  writeFileSync16(auditPath, `${JSON.stringify(r.audit, null, 2)}
+  writeFileSync17(auditPath, `${JSON.stringify(r.audit, null, 2)}
 `);
   console.log(
     lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual \u2192 ${auditPath}`
@@ -59205,8 +59299,8 @@ async function cmdScan(p) {
         attributePages(merged, scope);
       }
     }
-    mkdirSync14(out2, { recursive: true });
-    writeFileSync16(join45(out2, "audit-latest.json"), JSON.stringify(merged, null, 2) + "\n");
+    mkdirSync15(out2, { recursive: true });
+    writeFileSync17(join45(out2, "audit-latest.json"), JSON.stringify(merged, null, 2) + "\n");
     if (p.flags.json) console.log(JSON.stringify(merged, null, 2));
     else {
       console.log(
