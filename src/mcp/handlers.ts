@@ -12,6 +12,13 @@ import { renderReport, renderPackReport } from "../report.js";
 import { buildWorklist, formatWorklist } from "../verify.js";
 import { allSC, getSC } from "../wcag.js";
 import { loadPack } from "../standards/index.js";
+import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "../pages.js";
+import { PAGES_DIR, readSnapshots } from "../snapshot.js";
+
+// The CLI's default capture directory (`--captures` overrides it there; the MCP surface has
+// no such flag, so the default is the contract).
+const CAPTURES_DIR = ".ultra11y/captures";
+import { renderPagesDocument } from "../pages-report.js";
 import { withProjectLock } from "../project-lock.js";
 import type { AuditResult, Lang } from "../types.js";
 import type { StandardId } from "../standards/index.js";
@@ -132,6 +139,8 @@ async function dispatch(name: string, args: Record<string, unknown>, cwd: string
       return handlePackCheck(args, cwd);
     case "ultra11y_sample_check":
       return handleSampleCheck(cwd);
+    case "ultra11y_pages":
+      return handlePages(args, cwd);
     case "ultra11y_read":
       return handleRead(args, cwd);
     case "ultra11y_fix":
@@ -161,8 +170,18 @@ function audit(args: Record<string, unknown>, cwd: string): AuditResult {
   const warnings: string[] = [];
   try {
     process.chdir(cwd);
-    return runAudit({
-      inputs: strArray(args.globs) ?? DEFAULT_GLOBS,
+    const inputs = strArray(args.globs) ?? DEFAULT_GLOBS;
+    const scopedToDiff = bool(args.changed) || bool(args.staged) || str(args.since) !== undefined;
+
+    // RENDERED ARTEFACTS. `cmdAudit` appends `.ultra11y/captures` and `.ultra11y/pages` to the
+    // inputs and records the page scope; this helper did not, so every MCP tool audited LESS
+    // than the same command on the CLI: no rendered tier, none of the page-scoped rules
+    // (lang, title, main landmark), and no page dimension at all. An agent driving the server
+    // was quietly getting a smaller audit than the one it would have run itself.
+    const extra = [CAPTURES_DIR, PAGES_DIR].filter((d) => !scopedToDiff && existsSync(d) && !inputs.includes(d));
+
+    const result = runAudit({
+      inputs: [...inputs, ...extra],
       include: strArray(args.include),
       exclude: strArray(args.exclude),
       forceJsx: bool(args.jsx),
@@ -173,6 +192,17 @@ function audit(args: Record<string, unknown>, cwd: string): AuditResult {
       maxFiles: positive(args.max_files, "max_files"),
       onWarn: (m) => warnings.push(m),
     });
+
+    // Record the pages in scope so the projection can rebuild from this result alone — the
+    // same step cmdAudit takes right after runAudit.
+    if (extra.includes(PAGES_DIR)) {
+      const scope = pageScopesFrom(readSnapshots("."));
+      if (scope.length) {
+        result.scope.pages = scope;
+        attributePages(result, scope);
+      }
+    }
+    return result;
   } finally {
     process.chdir(prev);
   }
@@ -269,6 +299,34 @@ function handleSampleCheck(cwd: string): unknown {
     throw new ToolError(`.ultra11yrc.json is not valid JSON: ${(e as Error).message}`);
   }
   return { cwd, config: raw, next: "Check the sample covers every page kind the methodology requires, not just the convenient ones." };
+}
+
+/** The page dimension. Everything it needs is already on the AuditResult, so it re-measures
+ *  nothing — the same projection the report and the CLI use. */
+function handlePages(args: Record<string, unknown>, cwd: string): unknown {
+  const standard = standardOf(args);
+  const lang = langOf(args);
+  const r = audit(args, cwd);
+  const scope = pagesOf(r);
+  if (!scope.length) {
+    throw new ToolError(
+      "no page in scope: this audit covers no snapshot (.ultra11y/pages) and no scanned sample. " +
+        "Capture pages with the E2E plugins, `ultra11y dev`, or `scan` (which snapshots every page it visits), then re-run.",
+    );
+  }
+  attributePages(r, scope);
+  const derived = derivePages(r, scope);
+  const format = typeof args.format === "string" ? args.format : "grid";
+  const markdown = format === "report" ? renderPagesDocument(r, derived, { standard, lang }) : renderPageGrid(r, scope, standard, lang);
+  return {
+    cwd,
+    standard,
+    lang,
+    markdown,
+    pages: derived.map((p) => ({ id: p.id, name: p.name, url: p.url, basis: p.basis, conformancePct: p.conformancePct, findings: p.findings.length })),
+    unattributed: unattributedFindings(r).length,
+    next: 'A page whose basis is "attributed" has no snapshot: absence of a finding there is NOT conformity. Its undecided criteria stay yours to adjudicate.',
+  };
 }
 
 function handleFix(args: Record<string, unknown>, cwd: string): unknown {

@@ -424,11 +424,17 @@ export function startDevServer(opts: DevOptions): Promise<DevServer> {
     }
     // A liveness probe, so a client can say "run `ultra11y dev`" instead of failing silently.
     if (url.pathname === "/health") {
-      res
-        .writeHead(200, { "content-type": "application/json", "cache-control": "no-store" })
-        .end(
-          JSON.stringify({ ok: true, tool: "ultra11y", version: VERSION, standard: opts.standard, lang: opts.lang, pages: readSnapshots(opts.root).length }),
-        );
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(
+        JSON.stringify({
+          ok: true,
+          tool: "ultra11y",
+          version: VERSION,
+          port: opts.port,
+          standard: opts.standard,
+          lang: opts.lang,
+          pages: readSnapshots(opts.root).length,
+        }),
+      );
       return;
     }
     if (url.pathname === "/snapshot" && req.method === "POST") {

@@ -18,7 +18,7 @@ node scripts/ultra11y.mjs dev --standard rgaa      # the side-car (loopback only
 |---|---|
 | **Audit this page** | collects the page with the engine's own collector, posts it to the side-car, which persists it as a snapshot and audits it — the findings come back and are listed |
 | **Adjudicate with AI** | asks the side-car to rule on the judgment criteria (see `judgment.md`) |
-| **Page-by-page grid** | opens the dashboard, where every page you audited accumulates |
+| **Page-by-page grid** | opens the dashboard, where every page you audited accumulates — on the port the server actually answered on, not a default |
 
 Because the page is persisted as an ordinary snapshot, everything else already works on it:
 `ultra11y audit` re-audits it offline, `pages --format report` writes its dossier, and it

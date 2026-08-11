@@ -189,6 +189,29 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   something SAYS so (else it is reported as unattributed, never spread), and `C` by silence is
   earned only by a page whose real DOM was audited — a source-only page keeps its undecided
   criteria « à évaluer »; read **`references/pages.md`**.
+- **"I want a report PER PAGE, not a matrix"** → `pages --in audits/audit-latest.json
+  --standard rgaa --format report --split page --out audits/pages`: one dossier per page —
+  identity, its screenshot, its rate, EVERY criterion of the standard with its status on that
+  page, then each non-conformity as the ordinary auditor block. Nothing is re-decided (the
+  same projection as the grid) and no format is invented (the same auditor block as the
+  report), so a page sheet and the compliance report cannot disagree. `check` gates it against
+  invented criteria like any other report; read **`references/pages.md`**.
+- **"Which pages should I even audit?"** → `pages discover --crawl http://localhost:3000
+  --write` (or `--sitemap <url>`) writes the `sample.pages` block for you, taking each page's
+  name from its served `<title>` and NEVER overwriting the auth/storageState/notes already
+  declared. Then `sample check` lints the coverage and `scan --sample` scans and snapshots it.
+  A client-rendered SPA exposes no routes in its served HTML — use a sitemap there; read
+  **`references/dynamic.md`**.
+- **"Audit these URLs page by page, in CI"** → the shipped Action takes `urls`, `sitemap`,
+  `crawl` or `sample`, snapshots every page it visits, writes the per-page dossiers into its
+  artifact and adds a per-page scoreboard to the job summary and the PR comment; read
+  **`references/ci.md`**.
+- **"Nobody is here to rule on the judgment criteria"** → `judge --in audits/audit-latest.json
+  --standard rgaa [--apply]` adjudicates them with a model, for a run with no coding agent in
+  the loop (CI, the extension, an E2E run). It is a CALLER, not a second judge: same worklist,
+  same evidence, same prompt, and the verdicts pass the same fail-closed gate yours do. The
+  only command that takes an API key — inside an agent, use `verify --manual` instead and rule
+  yourself; read **`references/judgment.md`**.
 - **"Show the findings ON the pull request, not just a red job"** → `--format sarif` (upload
   to code scanning → inline annotations at the right file:line) or `--format github`
   (`::error::` workflow commands + a `$GITHUB_STEP_SUMMARY` table) — from `report

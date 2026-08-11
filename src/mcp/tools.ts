@@ -179,6 +179,31 @@ export const TOOLS: ToolDecl[] = [
     inputSchema: { type: "object", properties: { cwd: cwdProp }, required: ["cwd"] },
   },
   {
+    name: "ultra11y_pages",
+    title: "The per-page view of the audit",
+    description:
+      "RGAA — like every country standard — is a PER-PAGE norm, but the engine's verdict is scope-wide. This projects the audit onto the pages it covers: " +
+      "the criterion × page grid, or the per-page report (one dossier per page, every criterion of the standard with its status on THAT page). " +
+      "Two rules make it trustworthy: a finding belongs to a page only when something says so — never spread across pages — and a criterion is conforming " +
+      "by silence only on a page whose real rendered DOM was audited, and only for the criteria the engine can actually decide. Everything else stays " +
+      "« to assess », which is what it is. Pages come from snapshots (.ultra11y/pages) or a scanned sample; with neither, there is nothing to project.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: cwdProp,
+        globs: globsProp,
+        standard: standardProp,
+        lang: langProp,
+        format: {
+          type: "string",
+          enum: ["grid", "report"],
+          description: "`grid` (default) is the criterion × page matrix; `report` is the per-page dossiers.",
+        },
+      },
+      required: ["cwd"],
+    },
+  },
+  {
     name: "ultra11y_read",
     title: "Read a file from the project",
     description:
@@ -283,6 +308,7 @@ export const TOOL_META: Record<string, { write?: boolean; destructive?: boolean;
   ultra11y_adjudicate: { openWorld: false },
   ultra11y_pack_check: { openWorld: false },
   ultra11y_sample_check: { openWorld: false },
+  ultra11y_pages: { openWorld: false },
   ultra11y_read: { openWorld: false },
   // Rewrites source files. Not destructive in the delete sense, and it verifies
   // its own work — but it is the user's code.

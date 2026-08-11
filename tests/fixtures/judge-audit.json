@@ -1,0 +1,786 @@
+{
+  "tool": "ultra11y",
+  "standard": "wcag",
+  "version": "2.30.0",
+  "schemaVersion": 2,
+  "date": "2026-08-11",
+  "scope": {
+    "inputs": [
+      "-"
+    ],
+    "files": 1,
+    "langs": [
+      "fr"
+    ]
+  },
+  "guidelines": [
+    {
+      "key": "1.1",
+      "title": "Text Alternatives",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 1
+    },
+    {
+      "key": "1.2",
+      "title": "Time-based Media",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 5
+    },
+    {
+      "key": "1.3",
+      "title": "Adaptable",
+      "c": 0,
+      "nc": 1,
+      "na": 0,
+      "manual": 4
+    },
+    {
+      "key": "1.4",
+      "title": "Distinguishable",
+      "c": 0,
+      "nc": 0,
+      "na": 1,
+      "manual": 8
+    },
+    {
+      "key": "2.1",
+      "title": "Keyboard Accessible",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 3
+    },
+    {
+      "key": "2.2",
+      "title": "Enough Time",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 2
+    },
+    {
+      "key": "2.3",
+      "title": "Seizures and Physical Reactions",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 1
+    },
+    {
+      "key": "2.4",
+      "title": "Navigable",
+      "c": 1,
+      "nc": 0,
+      "na": 0,
+      "manual": 7
+    },
+    {
+      "key": "2.5",
+      "title": "Input Modalities",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 6
+    },
+    {
+      "key": "3.1",
+      "title": "Readable",
+      "c": 1,
+      "nc": 0,
+      "na": 0,
+      "manual": 1
+    },
+    {
+      "key": "3.2",
+      "title": "Predictable",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 5
+    },
+    {
+      "key": "3.3",
+      "title": "Input Assistance",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 6
+    },
+    {
+      "key": "4.1",
+      "title": "Compatible",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 2
+    }
+  ],
+  "criteria": [
+    {
+      "id": "1.1.1",
+      "guideline": "1.1",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.2.1",
+      "guideline": "1.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.2.2",
+      "guideline": "1.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.2.3",
+      "guideline": "1.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.2.4",
+      "guideline": "1.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.2.5",
+      "guideline": "1.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.3.1",
+      "guideline": "1.3",
+      "status": "NC",
+      "findings": [
+        {
+          "ruleId": "missing-main-landmark",
+          "criteriaId": "1.3.1",
+          "file": "<stdin>",
+          "line": 1,
+          "col": 46,
+          "selectorHint": "body",
+          "severity": "majeur",
+          "message": "No <main> landmark in the page — the main content is not identified (and a skip link's target is missing).",
+          "remediation": "Wrap the main content in a <main id=\"content\"> (unique per page).",
+          "msg": {
+            "id": "missing-main-landmark"
+          },
+          "snippet": "<html lang=\"fr\"><head><title>t</title></head><body><img src=\"a.png\" alt=\"a\"><a href=\"/x\">x</a></body></html>",
+          "sourceStart": 45,
+          "sourceEnd": 100
+        },
+        {
+          "ruleId": "h1-missing",
+          "criteriaId": "1.3.1",
+          "file": "<stdin>",
+          "line": 1,
+          "col": 46,
+          "selectorHint": "body",
+          "severity": "mineur",
+          "message": "Recommendation: the page starts with no <h1>. An <h1> naming the main content aids orientation, but starting at h1 is not required by HTML, accessibility, or SEO.",
+          "remediation": "Consider adding an <h1> describing the page's main content; a heading hierarchy with no level skip stays the normative requirement.",
+          "msg": {
+            "id": "h1-missing"
+          },
+          "snippet": "<html lang=\"fr\"><head><title>t</title></head><body><img src=\"a.png\" alt=\"a\"><a href=\"/x\">x</a></body></html>",
+          "sourceStart": 45,
+          "sourceEnd": 100,
+          "advisory": true
+        }
+      ]
+    },
+    {
+      "id": "1.3.2",
+      "guideline": "1.3",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.3.3",
+      "guideline": "1.3",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.3.4",
+      "guideline": "1.3",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.3.5",
+      "guideline": "1.3",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.4.1",
+      "guideline": "1.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.4.2",
+      "guideline": "1.4",
+      "status": "NA",
+      "findings": [],
+      "justification": "No element in scope is concerned by this success criterion."
+    },
+    {
+      "id": "1.4.3",
+      "guideline": "1.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.4.4",
+      "guideline": "1.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.4.5",
+      "guideline": "1.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.4.10",
+      "guideline": "1.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.4.11",
+      "guideline": "1.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.4.12",
+      "guideline": "1.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "1.4.13",
+      "guideline": "1.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.1.1",
+      "guideline": "2.1",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.1.2",
+      "guideline": "2.1",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.1.4",
+      "guideline": "2.1",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.2.1",
+      "guideline": "2.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.2.2",
+      "guideline": "2.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.3.1",
+      "guideline": "2.3",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.4.1",
+      "guideline": "2.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.4.2",
+      "guideline": "2.4",
+      "status": "C",
+      "findings": []
+    },
+    {
+      "id": "2.4.3",
+      "guideline": "2.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.4.4",
+      "guideline": "2.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.4.5",
+      "guideline": "2.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.4.6",
+      "guideline": "2.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.4.7",
+      "guideline": "2.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.4.11",
+      "guideline": "2.4",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.5.1",
+      "guideline": "2.5",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.5.2",
+      "guideline": "2.5",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.5.3",
+      "guideline": "2.5",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.5.4",
+      "guideline": "2.5",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.5.7",
+      "guideline": "2.5",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "2.5.8",
+      "guideline": "2.5",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.1.1",
+      "guideline": "3.1",
+      "status": "C",
+      "findings": []
+    },
+    {
+      "id": "3.1.2",
+      "guideline": "3.1",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.2.1",
+      "guideline": "3.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.2.2",
+      "guideline": "3.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.2.3",
+      "guideline": "3.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.2.4",
+      "guideline": "3.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.2.6",
+      "guideline": "3.2",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.3.1",
+      "guideline": "3.3",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.3.2",
+      "guideline": "3.3",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.3.3",
+      "guideline": "3.3",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.3.4",
+      "guideline": "3.3",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.3.7",
+      "guideline": "3.3",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "3.3.8",
+      "guideline": "3.3",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "4.1.2",
+      "guideline": "4.1",
+      "status": "manual",
+      "findings": []
+    },
+    {
+      "id": "4.1.3",
+      "guideline": "4.1",
+      "status": "manual",
+      "findings": []
+    }
+  ],
+  "findings": [
+    {
+      "ruleId": "missing-main-landmark",
+      "criteriaId": "1.3.1",
+      "file": "<stdin>",
+      "line": 1,
+      "col": 46,
+      "selectorHint": "body",
+      "severity": "majeur",
+      "message": "No <main> landmark in the page — the main content is not identified (and a skip link's target is missing).",
+      "remediation": "Wrap the main content in a <main id=\"content\"> (unique per page).",
+      "msg": {
+        "id": "missing-main-landmark"
+      },
+      "snippet": "<html lang=\"fr\"><head><title>t</title></head><body><img src=\"a.png\" alt=\"a\"><a href=\"/x\">x</a></body></html>",
+      "sourceStart": 45,
+      "sourceEnd": 100
+    },
+    {
+      "ruleId": "h1-missing",
+      "criteriaId": "1.3.1",
+      "file": "<stdin>",
+      "line": 1,
+      "col": 46,
+      "selectorHint": "body",
+      "severity": "mineur",
+      "message": "Recommendation: the page starts with no <h1>. An <h1> naming the main content aids orientation, but starting at h1 is not required by HTML, accessibility, or SEO.",
+      "remediation": "Consider adding an <h1> describing the page's main content; a heading hierarchy with no level skip stays the normative requirement.",
+      "msg": {
+        "id": "h1-missing"
+      },
+      "snippet": "<html lang=\"fr\"><head><title>t</title></head><body><img src=\"a.png\" alt=\"a\"><a href=\"/x\">x</a></body></html>",
+      "sourceStart": 45,
+      "sourceEnd": 100,
+      "advisory": true
+    }
+  ],
+  "residualRisks": [
+    {
+      "criteriaId": "1.1.1",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.2.1",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.2.2",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.2.3",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.2.4",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.2.5",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.3.2",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.3.3",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.3.4",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "1.3.5",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.4.1",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "1.4.3",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "1.4.4",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "1.4.5",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "1.4.10",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "1.4.11",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "1.4.12",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "1.4.13",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "2.1.1",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.1.2",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "2.1.4",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.2.1",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.2.2",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.3.1",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "2.4.1",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.4.3",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.4.4",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.4.5",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.4.6",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.4.7",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "2.4.11",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "2.5.1",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.5.2",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.5.3",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.5.4",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.5.7",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.5.8",
+      "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+      "automatability": "needs-rendering"
+    },
+    {
+      "criteriaId": "3.1.2",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.2.1",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.2.2",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.2.3",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.2.4",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.2.6",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.3.1",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.3.2",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.3.3",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.3.4",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.3.7",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.3.8",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.1.2",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.1.3",
+      "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+      "automatability": "judgment"
+    }
+  ],
+  "conformancePct": 67
+}

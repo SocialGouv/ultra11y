@@ -114,10 +114,13 @@ between the two.
 
 ## A report straight out of the test run
 
-`checkA11y(page, { report: true })` (Playwright) writes the per-page report once the page is
-recorded — `audits/pages/index.md` plus one sheet per page, screenshots included. Off by
+`checkA11y(page, { report: true })` — and `cy.ultra11y({ report: true })` — writes the per-page
+report once the page is recorded — `audits/pages/index.md` plus one sheet per page, screenshots included. Off by
 default: a report per checked page would be wasteful in a suite, so turn it on in a final
-test, or run `pages --format report` yourself afterwards.
+test, or run `pages --format report` yourself afterwards. Cypress test code cannot write
+files, so there the option is declared in the browser and honoured by the Node plugin — same
+option, same behaviour, because a runner that silently ignored it would be worse than one
+that lacked it.
 
 ## Why the artefact matters more than the assertion
 

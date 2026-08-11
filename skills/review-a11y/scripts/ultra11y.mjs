@@ -55414,7 +55414,15 @@ function startDevServer(opts) {
     }
     if (url.pathname === "/health") {
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(
-        JSON.stringify({ ok: true, tool: "ultra11y", version: VERSION, standard: opts.standard, lang: opts.lang, pages: readSnapshots(opts.root).length })
+        JSON.stringify({
+          ok: true,
+          tool: "ultra11y",
+          version: VERSION,
+          port: opts.port,
+          standard: opts.standard,
+          lang: opts.lang,
+          pages: readSnapshots(opts.root).length
+        })
       );
       return;
     }
@@ -56150,6 +56158,7 @@ function noop() {
 }
 
 // src/mcp/handlers.ts
+var CAPTURES_DIR = ".ultra11y/captures";
 var ToolError = class extends Error {
 };
 var MAX_READ_LINES = 2e3;
@@ -56220,6 +56229,8 @@ async function dispatch(name2, args2, cwd) {
       return handlePackCheck(args2, cwd);
     case "ultra11y_sample_check":
       return handleSampleCheck(cwd);
+    case "ultra11y_pages":
+      return handlePages(args2, cwd);
     case "ultra11y_read":
       return handleRead(args2, cwd);
     case "ultra11y_fix":
@@ -56240,8 +56251,11 @@ function audit(args2, cwd) {
   const warnings = [];
   try {
     process.chdir(cwd);
-    return runAudit({
-      inputs: strArray2(args2.globs) ?? DEFAULT_GLOBS,
+    const inputs = strArray2(args2.globs) ?? DEFAULT_GLOBS;
+    const scopedToDiff = bool(args2.changed) || bool(args2.staged) || str2(args2.since) !== void 0;
+    const extra = [CAPTURES_DIR, PAGES_DIR].filter((d) => !scopedToDiff && existsSync29(d) && !inputs.includes(d));
+    const result = runAudit({
+      inputs: [...inputs, ...extra],
       include: strArray2(args2.include),
       exclude: strArray2(args2.exclude),
       forceJsx: bool(args2.jsx),
@@ -56252,6 +56266,14 @@ function audit(args2, cwd) {
       maxFiles: positive(args2.max_files, "max_files"),
       onWarn: (m) => warnings.push(m)
     });
+    if (extra.includes(PAGES_DIR)) {
+      const scope = pageScopesFrom(readSnapshots("."));
+      if (scope.length) {
+        result.scope.pages = scope;
+        attributePages(result, scope);
+      }
+    }
+    return result;
   } finally {
     process.chdir(prev);
   }
@@ -56336,6 +56358,30 @@ function handleSampleCheck(cwd) {
     throw new ToolError(`.ultra11yrc.json is not valid JSON: ${e.message}`);
   }
   return { cwd, config: raw, next: "Check the sample covers every page kind the methodology requires, not just the convenient ones." };
+}
+function handlePages(args2, cwd) {
+  const standard = standardOf(args2);
+  const lang = langOf(args2);
+  const r = audit(args2, cwd);
+  const scope = pagesOf(r);
+  if (!scope.length) {
+    throw new ToolError(
+      "no page in scope: this audit covers no snapshot (.ultra11y/pages) and no scanned sample. Capture pages with the E2E plugins, `ultra11y dev`, or `scan` (which snapshots every page it visits), then re-run."
+    );
+  }
+  attributePages(r, scope);
+  const derived = derivePages(r, scope);
+  const format = typeof args2.format === "string" ? args2.format : "grid";
+  const markdown = format === "report" ? renderPagesDocument(r, derived, { standard, lang }) : renderPageGrid(r, scope, standard, lang);
+  return {
+    cwd,
+    standard,
+    lang,
+    markdown,
+    pages: derived.map((p) => ({ id: p.id, name: p.name, url: p.url, basis: p.basis, conformancePct: p.conformancePct, findings: p.findings.length })),
+    unattributed: unattributedFindings(r).length,
+    next: 'A page whose basis is "attributed" has no snapshot: absence of a finding there is NOT conformity. Its undecided criteria stay yours to adjudicate.'
+  };
 }
 function handleFix(args2, cwd) {
   const prev = process.cwd();
@@ -56668,6 +56714,26 @@ var TOOLS2 = [
     inputSchema: { type: "object", properties: { cwd: cwdProp }, required: ["cwd"] }
   },
   {
+    name: "ultra11y_pages",
+    title: "The per-page view of the audit",
+    description: "RGAA \u2014 like every country standard \u2014 is a PER-PAGE norm, but the engine's verdict is scope-wide. This projects the audit onto the pages it covers: the criterion \xD7 page grid, or the per-page report (one dossier per page, every criterion of the standard with its status on THAT page). Two rules make it trustworthy: a finding belongs to a page only when something says so \u2014 never spread across pages \u2014 and a criterion is conforming by silence only on a page whose real rendered DOM was audited, and only for the criteria the engine can actually decide. Everything else stays \xAB to assess \xBB, which is what it is. Pages come from snapshots (.ultra11y/pages) or a scanned sample; with neither, there is nothing to project.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: cwdProp,
+        globs: globsProp,
+        standard: standardProp,
+        lang: langProp,
+        format: {
+          type: "string",
+          enum: ["grid", "report"],
+          description: "`grid` (default) is the criterion \xD7 page matrix; `report` is the per-page dossiers."
+        }
+      },
+      required: ["cwd"]
+    }
+  },
+  {
     name: "ultra11y_read",
     title: "Read a file from the project",
     description: "Read a file, or a line range of one, from the audited project. Use it to see the real markup behind a finding before judging it. Reads are confined to the project root; anything else is your own file tool's job.",
@@ -56754,6 +56820,7 @@ var TOOL_META2 = {
   ultra11y_adjudicate: { openWorld: false },
   ultra11y_pack_check: { openWorld: false },
   ultra11y_sample_check: { openWorld: false },
+  ultra11y_pages: { openWorld: false },
   ultra11y_read: { openWorld: false },
   // Rewrites source files. Not destructive in the delete sense, and it verifies
   // its own work — but it is the user's code.
@@ -59052,6 +59119,14 @@ async function cmdJudge(p) {
   }
   const max = typeof p.flags.max === "string" ? Number(p.flags.max) : void 0;
   const truncated = max !== void 0 && Number.isFinite(max) && max > 0 && items.length > max;
+  if (truncated && p.flags.apply === true) {
+    console.error(
+      lang === "fr" ? `ultra11y judge : --max ${max} ne couvre que ${max} des ${items.length} crit\xE8res, et --apply exige une adjudication COMPL\xC8TE (le gate refuse une couverture partielle).
+  Retirez --max pour tout adjuger, ou retirez --apply pour produire la worklist et l'appliquer plus tard.` : `ultra11y judge: --max ${max} covers only ${max} of ${items.length} criteria, and --apply requires a COMPLETE adjudication (the gate refuses partial coverage).
+  Drop --max to adjudicate everything, or drop --apply to produce the worklist and apply it later.`
+    );
+    return 2;
+  }
   if (truncated) items = items.slice(0, max);
   const batches = [];
   for (let i2 = 0; i2 < items.length; i2 += BATCH_SIZE) {

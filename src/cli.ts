@@ -2124,6 +2124,19 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   }
   const max = typeof p.flags.max === "string" ? Number(p.flags.max) : undefined;
   const truncated = max !== undefined && Number.isFinite(max) && max > 0 && items.length > max;
+  // `--max` bounds the spend; `--apply` folds the verdicts through a gate that REFUSES an
+  // incomplete adjudication. Together they can never succeed — so say so before spending
+  // anything, instead of billing a full run and failing on coverage at the end.
+  if (truncated && p.flags.apply === true) {
+    console.error(
+      lang === "fr"
+        ? `ultra11y judge : --max ${max} ne couvre que ${max} des ${items.length} critères, et --apply exige une adjudication COMPLÈTE (le gate refuse une couverture partielle).\n` +
+            "  Retirez --max pour tout adjuger, ou retirez --apply pour produire la worklist et l'appliquer plus tard."
+        : `ultra11y judge: --max ${max} covers only ${max} of ${items.length} criteria, and --apply requires a COMPLETE adjudication (the gate refuses partial coverage).\n` +
+            "  Drop --max to adjudicate everything, or drop --apply to produce the worklist and apply it later.",
+    );
+    return 2;
+  }
   if (truncated) items = items.slice(0, max);
 
   // Batch, and render EACH batch through the very worklist formatter the agent reads. There

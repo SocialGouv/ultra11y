@@ -149,5 +149,10 @@ gate refuses:
 A rejected adjudication leaves `audit-latest.json` untouched.
 
 **Strictly opt-in.** With no key the command explains itself and exits 2; nothing else in the
-engine changes. `--max` bounds the spend and says out loud which criteria it did not submit —
-and a bounded run then fails the coverage gate, which is the correct outcome.
+engine changes.
+
+`--max` bounds the spend and says out loud which criteria it did not submit. It is **refused
+together with `--apply`**, before any call is made: the gate rejects an incomplete
+adjudication by design, so the pair could only ever bill you for a guaranteed failure. Drop
+`--max` to adjudicate everything, or drop `--apply` to produce the worklist now and fold it
+in later.

@@ -5,6 +5,12 @@ interface TaskPayload extends SnapshotPayload {
     failOn?: string | false;
     /** The name `cy.screenshot()` was called with, when the browser half took one. */
     screenshotName?: string;
+    /** Forwarded from `cy.ultra11y({ report })` — the browser cannot write files, this side can. */
+    report?: boolean | {
+        out?: string;
+        standard?: string;
+        lang?: string;
+    };
 }
 interface TaskResult {
     findings: FindingLike[];

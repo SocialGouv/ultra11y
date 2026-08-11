@@ -154,6 +154,7 @@ function registerUltra11yCommand() {
       const payload = {
         ...buildPayload(collected, url, "cypress", opts),
         failOn: opts.failOn,
+        ...opts.report ? { report: opts.report } : {},
         ...shotName ? { screenshotName: shotName } : {}
       };
       return cy.task("ultra11ySnapshot", payload, { log: false }).then((res) => {

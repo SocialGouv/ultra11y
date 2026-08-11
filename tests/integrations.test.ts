@@ -196,3 +196,18 @@ describe("packaging", () => {
     expect(readFileSync(join(ROOT, "dist/cypress.mjs"), "utf8")).not.toContain("node:child_process");
   });
 });
+
+describe("the two runners offer the same options", () => {
+  // The ask was a plugin for Cypress AND Playwright that produces a report. An option that
+  // exists on one runner and is silently ignored on the other is worse than one that is
+  // missing: the test passes, the file never appears, and nobody looks.
+  it("both declare `report`, and Cypress forwards it to the half that can write files", () => {
+    const cy = readFileSync(join(ROOT, "src/integrations/cypress.ts"), "utf8");
+    const cyPlugin = readFileSync(join(ROOT, "src/integrations/cypress-plugin.ts"), "utf8");
+    const pw = readFileSync(join(ROOT, "src/integrations/playwright.ts"), "utf8");
+    expect(pw).toContain("writePagesReport");
+    expect(cy).toMatch(/report\?:/); // declared on the browser side…
+    expect(cy).toContain("opts.report"); // …forwarded in the payload…
+    expect(cyPlugin).toContain("writePagesReport"); // …and honoured by the Node side.
+  });
+});

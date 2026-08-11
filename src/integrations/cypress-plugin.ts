@@ -15,7 +15,7 @@
 // If that event never fires, the page is recorded without a screenshot — the criterion stays
 // undecided, exactly as before, and is never guessed.
 import { readFileSync } from "node:fs";
-import { type AuditLike, type FindingLike, type SnapshotPayload, auditSnapshot, failingFindings, formatFailure } from "./core.js";
+import { type AuditLike, type FindingLike, type SnapshotPayload, auditSnapshot, failingFindings, formatFailure, writePagesReport } from "./core.js";
 
 interface ScreenshotDetails {
   name?: string;
@@ -29,6 +29,8 @@ export interface TaskPayload extends SnapshotPayload {
   failOn?: string | false;
   /** The name `cy.screenshot()` was called with, when the browser half took one. */
   screenshotName?: string;
+  /** Forwarded from `cy.ultra11y({ report })` — the browser cannot write files, this side can. */
+  report?: boolean | { out?: string; standard?: string; lang?: string };
 }
 
 export interface TaskResult {
@@ -61,6 +63,7 @@ export default function register(on: On): void {
         }
       }
       const result: AuditLike = auditSnapshot(withShot);
+      if (payload.report) writePagesReport(typeof payload.report === "object" ? payload.report : {});
       const failOn = payload.failOn === undefined ? "blocking" : payload.failOn;
       const failing = failOn === false ? [] : failingFindings(result, failOn);
       // Return rather than throw: the browser half raises the assertion, so the failure is

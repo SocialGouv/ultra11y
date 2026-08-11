@@ -195,7 +195,7 @@ the one output an accessibility tool must never produce.
 
 ### Tools
 
-Ten read tools. `ultra11y_audit` is the entry point:
+Eleven read tools. `ultra11y_audit` is the entry point:
 
 | Tool | What it does |
 |------|--------------|
@@ -208,6 +208,7 @@ Ten read tools. `ultra11y_audit` is the entry point:
 | `ultra11y_verify` | Claim↔evidence worklist |
 | `ultra11y_pack_check` | Validate a country standards pack against what it really ships |
 | `ultra11y_sample_check` | Lint the normative page sample |
+| `ultra11y_pages` | The per-page view: the criterion × page grid, or one dossier per page |
 | `ultra11y_read` | A file, or a line range, from the project |
 
 `--allow-write` additionally exposes `ultra11y_fix` (safe codemods, dry-run by
@@ -215,6 +216,10 @@ default) and `ultra11y_init` (hook/CI/baseline) — the tools that change **your
 project. `ultra11y_scan` is declared but declines over MCP: it drives a headless
 browser and may pull a Docker image, which is not a subprocess lifecycle a
 long-lived server should own. It tells you to run it from the CLI and re-audit.
+
+Every tool audits exactly what the CLI would: the rendered captures and the page
+snapshots under `.ultra11y/` are ingested here too, so the server never reports a
+smaller audit than the same command run by hand.
 
 Pass `--cwd <dir>` at startup to dedicate the server to one project — `cwd` then
 becomes optional on every tool.

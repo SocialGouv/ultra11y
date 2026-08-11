@@ -57,7 +57,9 @@ async function refresh() {
   for (const id of ["audit", "judge", "grid"]) $(id).disabled = !ready;
   if (ready) {
     text($("status"), `Connected — ultra11y v${h.version}, standard ${h.standard}, ${h.pages} page(s) captured.`);
-    $("grid").onclick = () => chrome.tabs.create({ url: `http://127.0.0.1:${h.port ?? 4111}/` });
+    // The port comes from the server that answered, not from a default: a user on a custom
+    // port used to get the dashboard of a server that was not theirs, or a dead tab.
+    $("grid").onclick = () => chrome.tabs.create({ url: `http://127.0.0.1:${h.port}/` });
   } else {
     // Say what to do, not merely that something failed.
     text($("status"), "No local server. Run `ultra11y dev` in your project, then reopen this popup.", "err");

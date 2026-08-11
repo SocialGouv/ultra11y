@@ -48,6 +48,18 @@ ${res.stderr || ""}`);
 ${res.stdout.slice(0, 500)}`);
   }
 }
+function writePagesReport(opts = {}, engine = enginePath()) {
+  const args = [engine, "pages", "--in", "-", "--format", "report"];
+  if (opts.split !== false) args.push("--split", "page");
+  args.push("--out", opts.out ?? "audits/pages");
+  if (opts.standard) args.push("--standard", opts.standard);
+  if (opts.lang) args.push("--lang", opts.lang);
+  const audit = spawnSync(process.execPath, [engine, "audit", ".ultra11y/pages", "--json"], { encoding: "utf8", maxBuffer: 192 * 1024 * 1024 });
+  if (audit.error || !audit.stdout) return void 0;
+  const res = spawnSync(process.execPath, args, { input: audit.stdout, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  if (res.error || res.status !== 0) return void 0;
+  return res.stdout.trim() || void 0;
+}
 
 // src/integrations/cypress-plugin.ts
 function register(on) {
@@ -67,6 +79,7 @@ function register(on) {
         }
       }
       const result = auditSnapshot(withShot);
+      if (payload.report) writePagesReport(typeof payload.report === "object" ? payload.report : {});
       const failOn = payload.failOn === void 0 ? "blocking" : payload.failOn;
       const failing = failOn === false ? [] : failingFindings(result, failOn);
       return {

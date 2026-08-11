@@ -201,3 +201,57 @@ describe("a recorded adjudication survives a fresh measurement", () => {
     expect(after.residualRisks.some((r) => r.criteriaId === manual.id)).toBe(false);
   });
 });
+
+describe("what the CLI audits, the MCP server audits too", () => {
+  // The MCP `audit` helper never appended `.ultra11y/pages` nor recorded the page scope, so
+  // every tool on that surface saw LESS than the same command on the CLI: no rendered tier,
+  // none of the page-scoped rules, and no page dimension at all. An agent driving the server
+  // was quietly getting a smaller audit than the one it would have run itself.
+  const root = mkdtempSync(join(tmpdir(), "ultra11y-mcp-pages-"));
+  const dir = join(root, PAGES_DIR, "accueil");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, "dom.html"),
+    '<!-- ultra11y:capture v="1" page="accueil" url="https://exemple.fr/" -->\n<html lang="fr"><head><title>A</title></head><body><main><img src="a.png"></main></body></html>\n',
+  );
+  writeFileSync(join(dir, "meta.json"), JSON.stringify({ v: 1, id: "accueil", name: "Accueil", url: "https://exemple.fr/" }));
+
+  const call = (name: string, args: Record<string, unknown>): Record<string, unknown> => {
+    const engine = join(ROOT, "scripts/ultra11y.mjs");
+    const lines = [
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+      }),
+      JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+      JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name, arguments: args } }),
+    ].join("\n");
+    const out = execFileSync(process.execPath, [engine, "mcp", "--transport", "stdio"], { input: `${lines}\n`, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    const reply = out
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l) as { id?: number; result?: { content: { text: string }[]; isError?: boolean } })
+      .find((m) => m.id === 2)!;
+    const text = reply.result!.content[0]!.text;
+    // A tool error comes back as plain text in an isError result, not as JSON.
+    if (reply.result!.isError) throw new Error(text);
+    return JSON.parse(text) as Record<string, unknown>;
+  };
+
+  it("ingests the page snapshots and projects them, over real JSON-RPC", () => {
+    const r = call("ultra11y_pages", { cwd: root, standard: "rgaa", lang: "fr" });
+    const pages = r.pages as { id: string; basis: string }[];
+    expect(pages.map((p) => p.id)).toEqual(["accueil"]);
+    expect(pages[0]!.basis).toBe("snapshot");
+    // 8.3 (lang) is decidable ONLY on a full document — proof the snapshot was really audited.
+    expect(r.markdown as string).toMatch(/\| 8\.3 \| C \|/);
+  });
+
+  it("refuses to project when no page is in scope, instead of returning an empty grid", () => {
+    const empty = mkdtempSync(join(tmpdir(), "ultra11y-mcp-nopages-"));
+    writeFileSync(join(empty, "a.html"), "<html><body><p>x</p></body></html>");
+    expect(() => call("ultra11y_pages", { cwd: empty })).toThrow(/no page in scope/);
+  });
+});
