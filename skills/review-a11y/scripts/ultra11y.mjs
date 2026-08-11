@@ -54001,11 +54001,20 @@ jobs:
           # standard: rgaa
           # comment: 'true'
           #
-          # Page-by-page, with a real browser (computed contrast, focus, zoom, reflow):
+          # Page-by-page, with a real browser (computed contrast, focus, zoom, reflow).
+          # Every scanned page is also persisted to .ultra11y/pages/ and folded into the
+          # audit, which is what lets a page be CONFORMING at all \u2014 and the per-page
+          # dossiers (one sheet per page, with its screenshot) land in the artifact.
           # start: npm run start
           # wait-on: http://localhost:3000
           # urls: http://localhost:3000 http://localhost:3000/contact
-          # \u2026or \`sample: 'true'\` to scan the sample declared in .ultra11yrc.json.
+          #
+          # \u2026or let the page list come from the site itself:
+          # sitemap: http://localhost:3000/sitemap.xml
+          # crawl: http://localhost:3000     # crawl-depth / crawl-max bound it
+          #
+          # \u2026or \`sample: 'true'\` to scan the sample declared in .ultra11yrc.json
+          # (\`ultra11y pages discover --write\` builds that block for you).
 #
 # Vendored alternative \u2014 no marketplace action, just the bundle in this repo:
 #   - run: node "${enginePath}" audit --since "origin/\${{ github.base_ref }}" --baseline audits/baseline.json --fail-on ${EN_SEV[failOn]}
@@ -54817,10 +54826,16 @@ var S = {
     where: "Emplacement",
     what: "Constat",
     more: (n) => `\u2026 et ${n} autre(s).`,
-    perPage: "Constats par page",
+    perPage: "Bilan page par page",
     page: "Page",
     count: "Constats",
-    unanchored: (n) => `${n} constat(s) rattach\xE9(s) \xE0 une URL, sans ligne de code \xE0 annoter \u2014 voir le rapport.`
+    basis: "Base",
+    pageRate: "Taux",
+    snapshot: "instantan\xE9",
+    source: "source",
+    unanchored: (n) => `${n} constat(s) rattach\xE9(s) \xE0 une URL, sans ligne de code \xE0 annoter \u2014 voir le rapport.`,
+    unattributed: (n) => `${n} constat(s) ne sont rattach\xE9s \xE0 aucune page (code partag\xE9, fichier hors routes) \u2014 compt\xE9s dans l'audit global, jamais r\xE9partis d'office.`,
+    sourceBasis: "Une page marqu\xE9e \xAB source \xBB n'a pas d'instantan\xE9 : l'absence de constat n'y vaut PAS conformit\xE9, et son taux ne porte que sur ce que le moteur a pu d\xE9cider ailleurs."
   },
   en: {
     title: "ultra11y accessibility audit",
@@ -54833,10 +54848,16 @@ var S = {
     where: "Location",
     what: "Finding",
     more: (n) => `\u2026 and ${n} more.`,
-    perPage: "Findings per page",
+    perPage: "Page-by-page scoreboard",
     page: "Page",
     count: "Findings",
-    unanchored: (n) => `${n} finding(s) keyed to a URL, with no code line to annotate \u2014 see the report.`
+    basis: "Basis",
+    pageRate: "Rate",
+    snapshot: "snapshot",
+    source: "source",
+    unanchored: (n) => `${n} finding(s) keyed to a URL, with no code line to annotate \u2014 see the report.`,
+    unattributed: (n) => `${n} finding(s) are attributed to no page (shared code, file outside any route) \u2014 counted in the overall audit, never spread across pages.`,
+    sourceBasis: 'A page marked "source" has no snapshot: the absence of a finding there does NOT mean conforming, and its rate covers only what the engine could decide elsewhere.'
   }
 };
 var MAX_ROWS = 50;
@@ -54852,6 +54873,7 @@ function stepSummary(result, opts = {}) {
   const all = findingsForStandard(result, standard);
   if (!all.length) {
     out2.push(s.none, "");
+    out2.push(perPageTable(result, standard, lang));
     return out2.join("\n");
   }
   const sorted = [...all].sort((a, b) => SEV_ORDER5.indexOf(a.severity) - SEV_ORDER5.indexOf(b.severity));
@@ -54866,16 +54888,28 @@ function stepSummary(result, opts = {}) {
   out2.push("");
   const unanchored = all.filter((f) => isUrl2(f.file)).length;
   if (unanchored) out2.push(`> ${s.unanchored(unanchored)}`, "");
-  const pages = result.scope.sample?.pages ?? [];
-  if (pages.length) {
-    out2.push(`### ${s.perPage}`, "");
-    out2.push(`| ${s.page} | ${s.count} |`, "| --- | --- |");
-    for (const pg of pages) {
-      const n = all.filter((f) => f.file === pg.url || f.sample?.page !== void 0 && f.sample.page === pg.name).length;
-      out2.push(`| ${pg.name} \u2014 \`${pg.url}\` | ${n} |`);
-    }
-    out2.push("");
+  out2.push(perPageTable(result, standard, lang));
+  return out2.join("\n");
+}
+function perPageTable(result, standard = CORE2, lang = "en") {
+  const s = S[lang];
+  const scope = pagesOf(result);
+  if (!scope.length) return "";
+  attributePages(result, scope);
+  const derived = derivePages(result, scope);
+  const out2 = [`### ${s.perPage}`, ""];
+  out2.push(`| ${s.page} | ${s.basis} | ${s.pageRate} | \u{1F534} | \u{1F7E0} | \u{1F7E1} |`, "| --- | --- | ---: | ---: | ---: | ---: |");
+  for (const pg of derived) {
+    const nc = pg.findings.filter((f) => !f.advisory);
+    const n = (sev) => nc.filter((f) => f.severity === sev).length;
+    out2.push(
+      `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${pg.basis === "snapshot" ? s.snapshot : s.source} | ${pg.conformancePct}% | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
+    );
   }
+  out2.push("");
+  const orphans = result.findings.filter((f) => !f.page && !f.advisory).length;
+  if (orphans) out2.push(`> ${s.unattributed(orphans)}`, "");
+  if (derived.some((p) => p.basis !== "snapshot")) out2.push(`> ${s.sourceBasis}`, "");
   return out2.join("\n");
 }
 

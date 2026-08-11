@@ -140,11 +140,20 @@ jobs:
           # standard: rgaa
           # comment: 'true'
           #
-          # Page-by-page, with a real browser (computed contrast, focus, zoom, reflow):
+          # Page-by-page, with a real browser (computed contrast, focus, zoom, reflow).
+          # Every scanned page is also persisted to .ultra11y/pages/ and folded into the
+          # audit, which is what lets a page be CONFORMING at all — and the per-page
+          # dossiers (one sheet per page, with its screenshot) land in the artifact.
           # start: npm run start
           # wait-on: http://localhost:3000
           # urls: http://localhost:3000 http://localhost:3000/contact
-          # …or \`sample: 'true'\` to scan the sample declared in .ultra11yrc.json.
+          #
+          # …or let the page list come from the site itself:
+          # sitemap: http://localhost:3000/sitemap.xml
+          # crawl: http://localhost:3000     # crawl-depth / crawl-max bound it
+          #
+          # …or \`sample: 'true'\` to scan the sample declared in .ultra11yrc.json
+          # (\`ultra11y pages discover --write\` builds that block for you).
 #
 # Vendored alternative — no marketplace action, just the bundle in this repo:
 #   - run: node "${enginePath}" audit --since "origin/\${{ github.base_ref }}" --baseline audits/baseline.json --fail-on ${EN_SEV[failOn]}

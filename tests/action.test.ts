@@ -68,6 +68,37 @@ describe("it covers both halves of the ask: the code and the pages", () => {
     expect(names).toContain("Start the application");
     expect(names).toContain("Wait for the application");
   });
+
+  it("takes the page list from a sitemap or a crawl, not only from a hand-written list", () => {
+    const scan = ACTION.runs.steps.find((s) => s.name === "Scan the pages");
+    expect(scan?.if).toContain("inputs.sitemap");
+    expect(scan?.if).toContain("inputs.crawl");
+    expect(scan?.run).toContain("--sitemap");
+    expect(scan?.run).toContain("--crawl");
+  });
+
+  it("starts and waits for the app in the sitemap/crawl modes too — they need it served just as much", () => {
+    for (const name of ["Start the application", "Wait for the application"]) {
+      const step = ACTION.runs.steps.find((s) => s.name === name);
+      expect(step?.if, name).toContain("inputs.sitemap");
+      expect(step?.if, name).toContain("inputs.crawl");
+    }
+  });
+
+  it("snapshots every scanned page by default — without one a page can never be conforming", () => {
+    expect(ACTION.inputs.snapshot?.default).toBe("true");
+    const scan = ACTION.runs.steps.find((s) => s.name === "Scan the pages");
+    expect(scan?.run).toContain("--no-snapshot"); // only when explicitly turned off
+  });
+
+  it("writes the per-page dossiers into the uploaded artifact", () => {
+    const step = ACTION.runs.steps.find((s) => s.name === "Per-page report");
+    expect(step).toBeTruthy();
+    expect(step?.run).toContain("--format report");
+    expect(step?.run).toContain("--split page");
+    // A run with no page in scope is not a failure — it means nothing was scanned.
+    expect(step?.run).toContain("||");
+  });
 });
 
 describe("it surfaces findings three ways, and degrades instead of failing", () => {

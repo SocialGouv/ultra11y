@@ -125,7 +125,7 @@ describe("a scanned page becomes a real per-page verdict", () => {
 });
 
 describe("mergeSnapshotAudit", () => {
-  const base = (): AuditResult => runAudit({ inputs: [], stdin: "<div><img src=x></div>" });
+  const base = (): AuditResult => runAudit({ inputs: ["-"], stdin: "<div><img src=x></div>" });
 
   const snapAuditOf = (dom: string): AuditResult => {
     const root = tmp();

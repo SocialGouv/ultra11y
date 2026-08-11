@@ -15,6 +15,7 @@ import { findingsForStandard, packCriteriaForFinding } from "./standards/derive.
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
 import type { AuditResult, Finding, Lang, Severity } from "./types.js";
 import { isUrlPath, repoRelative } from "./util.js";
+import { attributePages, derivePages, pagesOf } from "./pages.js";
 
 export interface AnnotateOptions {
   standard?: StandardId;
@@ -80,10 +81,18 @@ const S = {
     where: "Emplacement",
     what: "Constat",
     more: (n: number) => `… et ${n} autre(s).`,
-    perPage: "Constats par page",
+    perPage: "Bilan page par page",
     page: "Page",
     count: "Constats",
+    basis: "Base",
+    pageRate: "Taux",
+    snapshot: "instantané",
+    source: "source",
     unanchored: (n: number) => `${n} constat(s) rattaché(s) à une URL, sans ligne de code à annoter — voir le rapport.`,
+    unattributed: (n: number) =>
+      `${n} constat(s) ne sont rattachés à aucune page (code partagé, fichier hors routes) — comptés dans l'audit global, jamais répartis d'office.`,
+    sourceBasis:
+      "Une page marquée « source » n'a pas d'instantané : l'absence de constat n'y vaut PAS conformité, et son taux ne porte que sur ce que le moteur a pu décider ailleurs.",
   },
   en: {
     title: "ultra11y accessibility audit",
@@ -96,10 +105,18 @@ const S = {
     where: "Location",
     what: "Finding",
     more: (n: number) => `… and ${n} more.`,
-    perPage: "Findings per page",
+    perPage: "Page-by-page scoreboard",
     page: "Page",
     count: "Findings",
+    basis: "Basis",
+    pageRate: "Rate",
+    snapshot: "snapshot",
+    source: "source",
     unanchored: (n: number) => `${n} finding(s) keyed to a URL, with no code line to annotate — see the report.`,
+    unattributed: (n: number) =>
+      `${n} finding(s) are attributed to no page (shared code, file outside any route) — counted in the overall audit, never spread across pages.`,
+    sourceBasis:
+      'A page marked "source" has no snapshot: the absence of a finding there does NOT mean conforming, and its rate covers only what the engine could decide elsewhere.',
   },
 } as const;
 
@@ -124,6 +141,9 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
 
   if (!all.length) {
     out.push(s.none, "");
+    // Still show the scoreboard: a clean run over five pages is exactly when a reviewer
+    // wants to see WHICH five, and how much of each was actually decided.
+    out.push(perPageTable(result, standard, lang));
     return out.join("\n");
   }
 
@@ -142,17 +162,37 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
   const unanchored = all.filter((f) => isUrl(f.file)).length;
   if (unanchored) out.push(`> ${s.unanchored(unanchored)}`, "");
 
-  // Per-page synthesis, when a page sample was scanned and merged in.
-  const pages = result.scope.sample?.pages ?? [];
-  if (pages.length) {
-    out.push(`### ${s.perPage}`, "");
-    out.push(`| ${s.page} | ${s.count} |`, "| --- | --- |");
-    for (const pg of pages) {
-      const n = all.filter((f) => f.file === pg.url || (f.sample?.page !== undefined && f.sample.page === pg.name)).length;
-      out.push(`| ${pg.name} — \`${pg.url}\` | ${n} |`);
-    }
-    out.push("");
-  }
+  out.push(perPageTable(result, standard, lang));
+  return out.join("\n");
+}
 
+/** The per-page scoreboard — the surface a reviewer actually scans on a PR, one row per page
+ *  with its rate and its findings by severity.
+ *
+ *  It keys on the pages IN SCOPE, not on `scope.sample`: a snapshot is the stronger basis
+ *  (its findings were raised on the page's real rendered DOM, and it is the only basis that
+ *  can earn a conforming verdict), and keying on the sample alone left every snapshotted page
+ *  — the e2e plugins', the dev side-car's, and `scan`'s own — out of the table named after
+ *  them. The `basis` column is not decoration: a source-attributed page cannot be conforming
+ *  by silence, so its rate means something weaker than a snapshot's. */
+export function perPageTable(result: AuditResult, standard: StandardId = CORE, lang: Lang = "en"): string {
+  const s = S[lang];
+  const scope = pagesOf(result);
+  if (!scope.length) return "";
+  attributePages(result, scope);
+  const derived = derivePages(result, scope);
+  const out: string[] = [`### ${s.perPage}`, ""];
+  out.push(`| ${s.page} | ${s.basis} | ${s.pageRate} | 🔴 | 🟠 | 🟡 |`, "| --- | --- | ---: | ---: | ---: | ---: |");
+  for (const pg of derived) {
+    const nc = pg.findings.filter((f) => !f.advisory);
+    const n = (sev: Severity): number => nc.filter((f) => f.severity === sev).length;
+    out.push(
+      `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${pg.basis === "snapshot" ? s.snapshot : s.source} | ${pg.conformancePct}% | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
+    );
+  }
+  out.push("");
+  const orphans = result.findings.filter((f) => !f.page && !f.advisory).length;
+  if (orphans) out.push(`> ${s.unattributed(orphans)}`, "");
+  if (derived.some((p) => p.basis !== "snapshot")) out.push(`> ${s.sourceBasis}`, "");
   return out.join("\n");
 }

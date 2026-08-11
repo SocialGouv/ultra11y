@@ -163,3 +163,36 @@ that is tokenless.
 
 If the exchange fails, `@semantic-release/npm` logs why and falls back to demanding a token —
 it does not publish unauthenticated.
+
+## Page by page in CI
+
+The action audits the **code** and, when you point it at a served app, the **pages**. The page
+list can come from three places, and none of them has to be written by hand:
+
+```yaml
+- uses: maxgfr/ultra11y@v2
+  with:
+    standard: rgaa
+    start: npm run start
+    wait-on: http://localhost:3000
+    sitemap: http://localhost:3000/sitemap.xml   # …or `crawl:` …or `urls:` …or `sample: 'true'`
+    crawl-max: '20'
+```
+
+Every scanned page is also **persisted as a snapshot** and folded into the audit
+(`snapshot: 'false'` opts out). That is not a nicety: a page known only by its URL cannot earn
+a conforming verdict — the static rules never ran against its DOM — so without it the per-page
+grid is almost empty and the job reports far less than it measured.
+
+Two surfaces come out of it:
+
+- **The scoreboard**, in the job summary and the sticky PR comment: one row per page with its
+  rate and its blocking/major/minor counts, plus a `basis` column. That column is not
+  decoration — a page marked *source* has no snapshot, so its silence is not conformity.
+  It appears on a clean run too, which is exactly when a reviewer wants to see *which* pages
+  passed.
+- **The per-page dossiers**, in the uploaded artifact (`pages-report: 'true'`, the default):
+  `audits/pages/index.md` plus one sheet per page — its screenshot, every criterion of the
+  standard with its status on that page, and each non-conformity as the ordinary auditor block.
+
+A run with no page in scope is not a failure: the report step says so and the job carries on.

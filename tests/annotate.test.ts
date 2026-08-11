@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { annotations, stepSummary } from "../src/annotate.js";
+import { annotations, perPageTable, stepSummary } from "../src/annotate.js";
+import { runAudit } from "../src/audit.js";
 import type { AuditResult, Finding } from "../src/types.js";
 
 const F = (over: Partial<Finding> = {}): Finding => ({
@@ -99,5 +100,54 @@ describe("job summary", () => {
     } as unknown as Partial<AuditResult>);
     const md = stepSummary(a, { lang: "fr" });
     expect(md).toContain("Accueil");
+  });
+});
+
+describe("the per-page scoreboard", () => {
+  // The surface a reviewer scans on a PR. It keys on the pages IN SCOPE, not on
+  // `scope.sample`: keying on the sample left every snapshotted page — the e2e plugins',
+  // the dev side-car's and `scan`'s own — out of the table named after them.
+  const withPages = (): AuditResult => {
+    const r = runAudit({ inputs: ["-"], stdin: "<div><img src=x></div>" });
+    r.scope.pages = [
+      { id: "accueil", name: "Accueil", url: "https://exemple.fr/", basis: "snapshot" },
+      { id: "compte", name: "Mon compte", url: "https://exemple.fr/compte", basis: "attributed", auth: true },
+    ];
+    for (const f of r.findings) f.page = "accueil";
+    return r;
+  };
+
+  it("renders one row per page with its rate and severity counts", () => {
+    const md = perPageTable(withPages(), "wcag", "fr");
+    expect(md).toContain("### Bilan page par page");
+    expect(md).toContain("| Accueil — `https://exemple.fr/` | instantané |");
+    expect(md).toContain("| Mon compte 🔒 — `https://exemple.fr/compte` | source |");
+  });
+
+  it("fires on snapshots alone, with no scanned sample declared", () => {
+    const r = withPages();
+    expect(r.scope.sample).toBeUndefined();
+    expect(perPageTable(r, "wcag", "en")).toContain("Page-by-page scoreboard");
+  });
+
+  it("says out loud that a source-only page's silence is not conformity", () => {
+    expect(perPageTable(withPages(), "wcag", "fr")).toContain("n'a pas d'instantané");
+  });
+
+  it("reports unattributed findings as a count rather than spreading them over the pages", () => {
+    const r = withPages();
+    for (const f of r.findings) f.page = undefined;
+    const md = perPageTable(r, "wcag", "fr");
+    expect(md).toMatch(/ne sont rattachés à aucune page/);
+  });
+
+  it("is empty — not a stray heading — when no page is in scope", () => {
+    expect(perPageTable(runAudit({ inputs: ["-"], stdin: "<div></div>" }), "wcag", "en")).toBe("");
+  });
+
+  it("still appears on a clean run, which is exactly when you want to see WHICH pages passed", () => {
+    const r = runAudit({ inputs: ["-"], stdin: "<div><p>ok</p></div>" });
+    r.scope.pages = [{ id: "accueil", name: "Accueil", url: "https://exemple.fr/", basis: "snapshot" }];
+    expect(stepSummary(r, { standard: "wcag", lang: "en" })).toContain("Page-by-page scoreboard");
   });
 });
