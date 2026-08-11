@@ -26,7 +26,8 @@ import { runCriteria, renderCriteriaReference } from "./criteria.js";
 import { checkReport, checkSemantic } from "./check.js";
 import { buildWorklist, writeWorklist, applyVerdicts, VERIFY_MAX, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
-import { buildAdjudicationWorklist, writeAdjudication, applyAdjudication, type AdjudicationFile } from "./adjudicate.js";
+import { buildAdjudicationWorklist, formatAdjudication, writeAdjudication, applyAdjudication, type AdjudicationFile } from "./adjudicate.js";
+import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample } from "./sample.js";
@@ -76,6 +77,7 @@ Usage:
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
   ultra11y fix      <globs… | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
+  ultra11y judge    --in <audit.json> [--standard <pack>] [--max <n>] [--model <id>] [--out <dir>] [--apply]   (adjudicate the manual criteria with a model — needs ANTHROPIC_API_KEY)
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
   ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--runtime …] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
@@ -374,6 +376,13 @@ Options:
                      without one the page can never be re-audited offline nor earn a
                      per-page verdict (its criteria stay « to assess » forever)
   --clean            scan: remove the dynamic-tier image + temp contexts, then exit
+  --api-key <key>    judge: the Anthropic API key. Defaults to $ANTHROPIC_API_KEY. This is
+                     the ONLY place in the tool that takes one — the engine needs no key
+  --model <id>       judge: the model to rule with (default $ULTRA11Y_LLM_MODEL, else
+                     claude-sonnet-5)
+  --apply            judge: fold the verdicts straight into the audit, through the SAME
+                     fail-closed gate an agent's verdicts pass (no unjustified C/NA, no
+                     ungroundable NC, no unadjudicated criterion)
   --semantic         verify: fold the support-check into one pass
                      check: engage the semantic gate — requires an adjudicated verdicts
                      artifact (fails closed when absent) and re-grounds every passing
@@ -407,6 +416,7 @@ const COMMANDS = [
   "fix",
   "init",
   "pack",
+  "judge",
   "orchestrate",
   "hook",
   "install",
@@ -444,6 +454,8 @@ const VALUE_FLAGS = new Set([
   "baseline",
   "fail-on",
   "split",
+  "api-key",
+  "model",
   "pack",
   "format",
   "guidance",
@@ -470,9 +482,16 @@ const VALUE_FLAGS = new Set([
 // flag (`--baseline <file>`). Without this split, `init --baseline --hook` swallows
 // --hook, and `init --baseline` never matches the `=== true` selector in cmdInit.
 const INIT_VALUE_FLAGS = new Set([...VALUE_FLAGS].filter((f) => f !== "baseline"));
+// `verify --apply <file>` takes the verdicts to fold; `judge --apply` is a BOOLEAN — it
+// already holds the verdicts it just produced. Left in VALUE_FLAGS it would swallow the next
+// token, so `judge --apply --out x` would silently apply nothing and write to the default
+// directory. Same reason `init` drops `baseline`.
+const JUDGE_VALUE_FLAGS = new Set([...VALUE_FLAGS].filter((f) => f !== "apply"));
 
 function valueFlagsFor(command: string): ReadonlySet<string> {
-  return command === "init" ? INIT_VALUE_FLAGS : VALUE_FLAGS;
+  if (command === "init") return INIT_VALUE_FLAGS;
+  if (command === "judge") return JUDGE_VALUE_FLAGS;
+  return VALUE_FLAGS;
 }
 
 // Boolean flags documented in HELP (every valid flag that is NOT a value flag).
@@ -2051,6 +2070,130 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
   return 0;
 }
 
+// `judge` — adjudicate the manual criteria with a model, for the runs where no coding agent
+// is in the loop (CI, a browser extension, an E2E run).
+//
+// It is a CALLER, not a second judge. The worklist, its harvested evidence, the decision
+// protocol and the prompt all come from `verify --manual`'s own machinery, and the verdicts
+// go through `applyAdjudication` unchanged — so a model cannot assert a conformance the gate
+// refuses: no null verdict, `C`/`NA` justified, an `NC` citing the criterion's OWN test, a
+// `manual` carrying a reason, and every `file:line` re-grounded against real source.
+//
+// Strictly opt-in: with no ANTHROPIC_API_KEY this command explains itself and exits, and no
+// other command is affected.
+async function cmdJudge(p: ParsedArgs): Promise<number> {
+  const standard = stdOf(p, "judge");
+  if (standard === null) return 2;
+  const inFlag = p.flags.in;
+  if (typeof inFlag !== "string" || !inFlag) {
+    console.error("ultra11y judge: --in <audit.json> is required.");
+    return 2;
+  }
+  let audit: AuditResult;
+  try {
+    const parsed = JSON.parse(inFlag === "-" ? await readStdin() : readText(inFlag)) as unknown;
+    if (!isCurrentAudit(parsed)) {
+      console.error("ultra11y judge: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+      return 2;
+    }
+    audit = parsed;
+  } catch {
+    console.error(`ultra11y judge: --in file not found or not valid JSON: ${inFlag}.`);
+    return 2;
+  }
+  const lang = resolveLang(p.flags, { audit, standard });
+
+  const key = typeof p.flags["api-key"] === "string" && p.flags["api-key"] ? (p.flags["api-key"] as string) : apiKeyFromEnv();
+  if (!key) {
+    console.error(
+      lang === "fr"
+        ? "ultra11y judge : aucune clé d'API. Exportez ANTHROPIC_API_KEY (ou passez --api-key).\n" +
+            "  C'est le SEUL point de l'outil qui en demande une : le moteur, lui, ne requiert ni clé ni installation.\n" +
+            "  Dans un agent de code, utilisez `verify --manual` — c'est l'agent qui tranche, gratuitement."
+        : "ultra11y judge: no API key. Export ANTHROPIC_API_KEY (or pass --api-key).\n" +
+            "  This is the ONLY place in the tool that asks for one: the engine itself needs no key and no install.\n" +
+            "  Inside a coding agent use `verify --manual` instead — the agent rules, at no cost.",
+    );
+    return 2;
+  }
+
+  let items = buildAdjudicationWorklist(audit, { standard });
+  if (!items.length) {
+    console.log(lang === "fr" ? "Aucun critère à adjuger — rien à faire." : "No criterion left to adjudicate — nothing to do.");
+    return 0;
+  }
+  const max = typeof p.flags.max === "string" ? Number(p.flags.max) : undefined;
+  const truncated = max !== undefined && Number.isFinite(max) && max > 0 && items.length > max;
+  if (truncated) items = items.slice(0, max);
+
+  // Batch, and render EACH batch through the very worklist formatter the agent reads. There
+  // is no second prompt to keep in step with the protocol.
+  const batches: { items: typeof items; prompt: string }[] = [];
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const slice = items.slice(i, i + BATCH_SIZE);
+    batches.push({ items: slice, prompt: formatAdjudication(slice, lang, standard) });
+  }
+  const model = typeof p.flags.model === "string" && p.flags.model ? (p.flags.model as string) : modelFromEnv();
+  console.error(
+    lang === "fr"
+      ? `ultra11y judge : ${items.length} critère(s) en ${batches.length} lot(s), modèle ${model}…`
+      : `ultra11y judge: ${items.length} criterion(ia) in ${batches.length} batch(es), model ${model}…`,
+  );
+
+  const { verdicts, failures } = await judgeAll(batches, {
+    apiKey: key,
+    model,
+    onProgress: (done, total) => console.error(`  ${done}/${total}`),
+  });
+  for (const f of failures) console.error(`⚠ ${f}`);
+  const filled = applyRawVerdicts(items, verdicts);
+
+  const out = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
+  const w = writeAdjudication(items, out, { standard, auditDate: audit.date, lang });
+  console.error(
+    lang === "fr" ? `${filled}/${items.length} verdict(s) rendu(s) → ${w.todoPath}` : `${filled}/${items.length} verdict(s) returned → ${w.todoPath}`,
+  );
+  // Say out loud what was NOT covered. A partial adjudication that reads as complete is the
+  // failure mode this whole tool exists to prevent.
+  if (truncated)
+    console.error(
+      lang === "fr"
+        ? `⚠ --max ${max} : les critères au-delà n'ont pas été soumis et restent à évaluer.`
+        : `⚠ --max ${max}: the criteria beyond it were not submitted and stay to assess.`,
+    );
+
+  if (p.flags.apply !== true) {
+    console.log(w.todoPath);
+    if (!p.flags.json)
+      console.log(
+        lang === "fr"
+          ? "Relisez les verdicts, puis appliquez-les : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json>`."
+          : "Review the verdicts, then apply them: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json>`.",
+      );
+    return 0;
+  }
+
+  // --apply runs the SAME gate an agent's verdicts go through. A truncated run cannot pass
+  // its coverage check, which is the correct outcome, not a bug.
+  const adj = JSON.parse(readText(w.todoPath)) as AdjudicationFile;
+  const r = applyAdjudication(audit, adj);
+  if (!r.ok) {
+    console.error(lang === "fr" ? `✗ Adjudication rejetée (${r.issues.length} problème(s)) :` : `✗ Adjudication rejected (${r.issues.length} issue(s)):`);
+    for (const i of r.issues.slice(0, 40)) console.error(`  ✗ ${i}`);
+    if (r.issues.length > 40) console.error(`  … +${r.issues.length - 40}`);
+    return 1;
+  }
+  mkdirSync(out, { recursive: true });
+  const auditPath = join(out, "audit-latest.json");
+  writeFileSync(auditPath, `${JSON.stringify(r.audit, null, 2)}\n`);
+  console.log(
+    lang === "fr"
+      ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel → ${auditPath}`
+      : `✓ ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual → ${auditPath}`,
+  );
+  return 0;
+}
+
 async function cmdFix(p: ParsedArgs): Promise<number> {
   const inputs = p.positionals.length ? p.positionals : ["."];
   const stdin = inputs.includes("-") ? await readStdin() : undefined;
@@ -2726,6 +2869,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdInit(p);
     case "pack":
       return cmdPack(p);
+    case "judge":
+      return cmdJudge(p);
     case "orchestrate":
       return cmdOrchestrate(p);
     case "mcp":

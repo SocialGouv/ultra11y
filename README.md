@@ -152,6 +152,7 @@ ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]
 ultra11y pages    discover --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--write]   # build the page sample
 ultra11y dev      [--port <n>] [--standard <pack>]   |   dev --next                        # live overlay while you build + dashboard
 ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
+ultra11y judge    --in <audit.json> [--standard <pack>] [--max <n>] [--model <id>] [--apply]   # adjudicate with a model (ANTHROPIC_API_KEY)
 ultra11y check    --report <md> [--standard <pack>] [--quiet] [--json]
 ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--json]
 ultra11y fix      <globs… | ->  [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--only <ids>] [--jsx] [--json]
@@ -353,6 +354,18 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   re-stages them, and blocks only on judgment issues. `init --baseline`/`--ci` is the opt-in
   regression variant (hook + committed baseline / GitHub Actions job) that fails only on **new**
   non-conformities, not the existing backlog. See `references/automation.md`.
+
+### Optional model tier (`judge`) — for the runs with no agent in the loop
+
+Inside a coding agent the judgment criteria are the agent's to rule on. Outside one — CI, a
+browser extension, an E2E run — nobody does, so they stay « à évaluer ». `judge` adjudicates
+them with a model, and is a **caller, not a second judge**: the worklist, the evidence and the
+prompt are `verify --manual`'s own, and the verdicts pass through the **same fail-closed gate**
+an agent's do. An unjustified `C`, an `NC` citing a line that does not resolve, a verdict for a
+criterion nobody asked about, or an incomplete run are all refused — and a rejected
+adjudication leaves the audit untouched. All-`manual` with reasons is accepted, because that is
+a correct answer. It is the **only** part of the tool that takes an API key; without one the
+command explains itself and exits, and nothing else changes.
 
 ### Optional dynamic tier (axe-core)
 

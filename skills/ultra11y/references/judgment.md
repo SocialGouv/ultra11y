@@ -113,3 +113,41 @@ rewrite the core verdict, and since WCAG 1.1.1 alone fans out to 19 RGAA criteri
 success criterion would let those criteria overwrite one another.
 
 Look a defined term up on its own with `criteria --standard rgaa --glossary <term>`.
+
+## When no agent is in the loop (`judge`)
+
+Inside a coding agent, the judgment criteria are adjudicated by the agent: `verify --manual`
+builds the worklist, the agent rules, `verify --apply` folds the verdicts through the gate.
+
+Outside one — a CI job, a browser extension, an E2E run — nobody rules on them, so they stay
+« à évaluer » forever. Honest, and unusable on its own. `judge` closes that:
+
+```
+export ANTHROPIC_API_KEY=…            # the ONLY place in the tool that takes a key
+node scripts/ultra11y.mjs judge --in audits/audit-latest.json --standard rgaa --out .
+node scripts/ultra11y.mjs judge --in audits/audit-latest.json --standard rgaa --apply
+```
+
+**It is a caller, not a second judge.** The items and their harvested evidence come from
+`buildAdjudicationWorklist`; the prompt is `formatAdjudication` — the same decision protocol,
+numbered tests, technical notes, particular cases and glossary the agent reads, so there is no
+second protocol to keep in step; and the verdicts go through `applyAdjudication` unchanged.
+
+That last point is what makes the tier trustworthy. A model cannot assert a conformance the
+gate refuses:
+
+| It returns | The gate does |
+|---|---|
+| `C`/`NA` with no justification | rejects the whole adjudication |
+| `NC` citing nothing, or a `file:line` that does not resolve against real source | rejects |
+| `NC` citing a `normativeRef` belonging to another criterion | rejects |
+| `manual` with no reason | rejects |
+| a verdict for a criterion nobody asked about | dropped before it reaches the gate |
+| fewer verdicts than criteria (a truncated `--max` run, a failed batch) | rejects on coverage |
+| all `manual` with reasons | **accepts** — that is a correct answer, not a failure |
+
+A rejected adjudication leaves `audit-latest.json` untouched.
+
+**Strictly opt-in.** With no key the command explains itself and exits 2; nothing else in the
+engine changes. `--max` bounds the spend and says out loud which criteria it did not submit —
+and a bounded run then fails the coverage gate, which is the correct outcome.

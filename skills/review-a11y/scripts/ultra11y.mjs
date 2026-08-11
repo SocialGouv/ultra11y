@@ -52077,6 +52077,178 @@ function writeAdjudication(items, outDir, opts) {
   return { todoPath, mdPath, count: items.length };
 }
 
+// src/llm.ts
+var DEFAULT_MODEL = "claude-sonnet-5";
+var API_VERSION = "2023-06-01";
+var DEFAULT_BASE_URL = "https://api.anthropic.com";
+var BATCH_SIZE = 8;
+var CONCURRENCY = 4;
+var MAX_ATTEMPTS = 4;
+var MAX_TOKENS = 16e3;
+function apiKeyFromEnv() {
+  const k = process.env.ANTHROPIC_API_KEY?.trim();
+  return k || void 0;
+}
+function modelFromEnv() {
+  return process.env.ULTRA11Y_LLM_MODEL?.trim() || DEFAULT_MODEL;
+}
+var VERDICT_TOOL = {
+  name: "record_verdicts",
+  description: "Record one verdict per criterion presented. Never invent a criterion that was not presented. A criterion you cannot decide from the evidence stays `manual` with a reason \u2014 that is a correct answer, not a failure.",
+  input_schema: {
+    type: "object",
+    properties: {
+      verdicts: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            criteriaId: { type: "string", description: "Exactly as presented." },
+            verdict: { type: "string", enum: ["C", "NC", "NA", "manual"] },
+            justification: {
+              type: "string",
+              description: "Required for C and NA: why the criterion is met, or why it does not apply. Cite what you saw."
+            },
+            reason: {
+              type: "string",
+              enum: ["needs-rendered-dom", "undecidable"],
+              description: "Required when the verdict is `manual`."
+            },
+            findings: {
+              type: "array",
+              description: "Required (at least one) when the verdict is NC. Each must cite a real file:line from the evidence.",
+              items: {
+                type: "object",
+                properties: {
+                  file: { type: "string" },
+                  line: { type: "number" },
+                  selector: { type: "string" },
+                  message: { type: "string" },
+                  snippet: { type: "string" },
+                  severity: { type: "string", enum: ["bloquant", "majeur", "mineur"] },
+                  normativeRef: { type: "string", description: "The criterion's OWN numbered test that fails." }
+                },
+                required: ["file", "line", "message", "normativeRef"]
+              }
+            },
+            recommendations: {
+              type: "array",
+              description: "Non-normative good practices. They never change a status.",
+              items: {
+                type: "object",
+                properties: {
+                  file: { type: "string" },
+                  line: { type: "number" },
+                  selector: { type: "string" },
+                  message: { type: "string" },
+                  snippet: { type: "string" }
+                },
+                required: ["file", "line", "message"]
+              }
+            }
+          },
+          required: ["criteriaId", "verdict"]
+        }
+      }
+    },
+    required: ["verdicts"]
+  }
+};
+var SYSTEM = `You are an accessibility auditor ruling on the criteria a static engine could not decide.
+
+Rules, in order of importance:
+1. NEVER assert conformity you did not verify. "manual" with a reason is always available and is a correct answer.
+2. An NC must cite a real file:line taken from the evidence you were given, and the criterion's OWN numbered test as normativeRef. A citation that does not resolve against the real source is rejected downstream and wastes the whole batch.
+3. C and NA require a justification that says what you saw, not that you checked.
+4. A criterion that needs a rendered page (computed contrast, visible focus, zoom, reflow) and was given only source evidence is "manual" with reason "needs-rendered-dom".
+5. Rule only on the criteria presented. Never introduce another.`;
+var sleep = (ms) => ms <= 0 ? Promise.resolve() : new Promise((r) => setTimeout(r, ms));
+var backoff = (opts, attempt) => opts.backoffMs?.(attempt) ?? 2 ** attempt * 500;
+async function callOnce(body2, opts) {
+  const f = opts.fetchImpl ?? fetch;
+  const url = `${opts.baseUrl ?? process.env.ANTHROPIC_BASE_URL ?? DEFAULT_BASE_URL}/v1/messages`;
+  let lastError = "";
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let res;
+    try {
+      res = await f(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-api-key": opts.apiKey, "anthropic-version": API_VERSION },
+        body: JSON.stringify(body2)
+      });
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      if (attempt === MAX_ATTEMPTS) break;
+      await sleep(backoff(opts, attempt));
+      continue;
+    }
+    if (res.ok) return await res.json();
+    const text = await res.text().catch(() => "");
+    lastError = `HTTP ${res.status} ${text.slice(0, 300)}`;
+    const retryable = res.status === 429 || res.status >= 500;
+    if (!retryable || attempt === MAX_ATTEMPTS) break;
+    const after = Number(res.headers.get("retry-after"));
+    await sleep(Number.isFinite(after) && after > 0 ? after * 1e3 : backoff(opts, attempt));
+  }
+  throw new Error(`ultra11y judge: the model API call failed \u2014 ${lastError}`);
+}
+function verdictsOf(res) {
+  const block = res.content?.find((c2) => c2.type === "tool_use" && c2.name === VERDICT_TOOL.name);
+  if (!block) throw new Error("ultra11y judge: the model did not return the verdicts tool call.");
+  const input = block.input;
+  if (!Array.isArray(input?.verdicts)) throw new Error("ultra11y judge: the model's tool call carried no verdicts array.");
+  return input.verdicts;
+}
+async function judgeBatch(items, prompt, opts) {
+  const res = await callOnce(
+    {
+      model: opts.model ?? modelFromEnv(),
+      max_tokens: MAX_TOKENS,
+      system: SYSTEM,
+      tools: [VERDICT_TOOL],
+      tool_choice: { type: "tool", name: VERDICT_TOOL.name },
+      messages: [{ role: "user", content: prompt }]
+    },
+    opts
+  );
+  const known = new Set(items.map((i2) => i2.criteriaId));
+  return verdictsOf(res).filter((v) => known.has(v.criteriaId));
+}
+async function judgeAll(batches, opts) {
+  const verdicts = [];
+  const failures = [];
+  let done = 0;
+  const queue = [...batches];
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+      for (let b = queue.shift(); b !== void 0; b = queue.shift()) {
+        try {
+          verdicts.push(...await judgeBatch(b.items, b.prompt, opts));
+        } catch (e) {
+          failures.push(e instanceof Error ? e.message : String(e));
+        }
+        opts.onProgress?.(++done, batches.length);
+      }
+    })
+  );
+  return { verdicts, failures };
+}
+function applyRawVerdicts(items, verdicts) {
+  const byId2 = new Map(verdicts.map((v) => [v.criteriaId, v]));
+  let filled = 0;
+  for (const item of items) {
+    const v = byId2.get(item.criteriaId);
+    if (!v) continue;
+    item.verdict = v.verdict;
+    item.justification = v.justification ?? "";
+    item.reason = v.verdict === "manual" ? v.reason ?? null : null;
+    item.findings = v.verdict === "NC" ? v.findings ?? [] : [];
+    if (v.recommendations?.length) item.recommendations = v.recommendations;
+    filled++;
+  }
+  return filled;
+}
+
 // src/scan.ts
 import { execFileSync as execFileSync4 } from "child_process";
 import { mkdtempSync as mkdtempSync2, writeFileSync as writeFileSync11, existsSync as existsSync20, statSync as statSync8, readdirSync as readdirSync5, rmSync as rmSync3, readFileSync as readFileSync16 } from "fs";
@@ -55740,7 +55912,7 @@ With subagents available, prefer the emitted workflows instead: \`orchestrate --
 // src/orchestrate.ts
 var PHASES = ["adjudicate", "verify-report"];
 var SMALL_WORKLIST = 3;
-var BATCH_SIZE = 8;
+var BATCH_SIZE2 = 8;
 function listPhases(runDir, engineAbs) {
   const run2 = resolve7(runDir);
   const adjPath = join42(run2, "ADJUDICATE.todo.json");
@@ -55847,7 +56019,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
         notices.push(`phase "${ph.name}": only ${ph.items} item(s) \u2014 the sequential --eco path is equivalent and cheaper.`);
       }
       const p = join42(orchDir, `${ph.name}.workflow.mjs`);
-      writeFileSync15(p, phaseWorkflowScript(ph, run2, engineAbs, BATCH_SIZE));
+      writeFileSync15(p, phaseWorkflowScript(ph, run2, engineAbs, BATCH_SIZE2));
       written.push(p);
     }
   }
@@ -57127,6 +57299,7 @@ Usage:
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
   ultra11y fix      <globs\u2026 | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
+  ultra11y judge    --in <audit.json> [--standard <pack>] [--max <n>] [--model <id>] [--out <dir>] [--apply]   (adjudicate the manual criteria with a model \u2014 needs ANTHROPIC_API_KEY)
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
   ultra11y scan     <url|file\u2026> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--runtime \u2026] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
@@ -57425,6 +57598,13 @@ Options:
                      without one the page can never be re-audited offline nor earn a
                      per-page verdict (its criteria stay \xAB to assess \xBB forever)
   --clean            scan: remove the dynamic-tier image + temp contexts, then exit
+  --api-key <key>    judge: the Anthropic API key. Defaults to $ANTHROPIC_API_KEY. This is
+                     the ONLY place in the tool that takes one \u2014 the engine needs no key
+  --model <id>       judge: the model to rule with (default $ULTRA11Y_LLM_MODEL, else
+                     claude-sonnet-5)
+  --apply            judge: fold the verdicts straight into the audit, through the SAME
+                     fail-closed gate an agent's verdicts pass (no unjustified C/NA, no
+                     ungroundable NC, no unadjudicated criterion)
   --semantic         verify: fold the support-check into one pass
                      check: engage the semantic gate \u2014 requires an adjudicated verdicts
                      artifact (fails closed when absent) and re-grounds every passing
@@ -57457,6 +57637,7 @@ var COMMANDS = [
   "fix",
   "init",
   "pack",
+  "judge",
   "orchestrate",
   "hook",
   "install",
@@ -57491,6 +57672,8 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "baseline",
   "fail-on",
   "split",
+  "api-key",
+  "model",
   "pack",
   "format",
   "guidance",
@@ -57513,8 +57696,11 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "max-response-bytes"
 ]);
 var INIT_VALUE_FLAGS = new Set([...VALUE_FLAGS2].filter((f) => f !== "baseline"));
+var JUDGE_VALUE_FLAGS = new Set([...VALUE_FLAGS2].filter((f) => f !== "apply"));
 function valueFlagsFor(command) {
-  return command === "init" ? INIT_VALUE_FLAGS : VALUE_FLAGS2;
+  if (command === "init") return INIT_VALUE_FLAGS;
+  if (command === "judge") return JUDGE_VALUE_FLAGS;
+  return VALUE_FLAGS2;
 }
 var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "changed",
@@ -57895,10 +58081,10 @@ async function cmdPagesDiscover(p) {
     return 1;
   }
   const titles = /* @__PURE__ */ new Map();
-  const CONCURRENCY = 6;
+  const CONCURRENCY2 = 6;
   const queue = [...urls];
   await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+    Array.from({ length: Math.min(CONCURRENCY2, queue.length) }, async () => {
       for (let url = queue.shift(); url !== void 0; url = queue.shift()) {
         const t2 = extractTitle(await fetchHtml2(url));
         if (t2) titles.set(url, t2);
@@ -58733,6 +58919,92 @@ function applyAdjudicationFile(p, adj, lang) {
     );
   return 0;
 }
+async function cmdJudge(p) {
+  const standard = stdOf(p, "judge");
+  if (standard === null) return 2;
+  const inFlag = p.flags.in;
+  if (typeof inFlag !== "string" || !inFlag) {
+    console.error("ultra11y judge: --in <audit.json> is required.");
+    return 2;
+  }
+  let audit2;
+  try {
+    const parsed = JSON.parse(inFlag === "-" ? await readStdin() : readText(inFlag));
+    if (!isCurrentAudit(parsed)) {
+      console.error("ultra11y judge: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+      return 2;
+    }
+    audit2 = parsed;
+  } catch {
+    console.error(`ultra11y judge: --in file not found or not valid JSON: ${inFlag}.`);
+    return 2;
+  }
+  const lang = resolveLang(p.flags, { audit: audit2, standard });
+  const key = typeof p.flags["api-key"] === "string" && p.flags["api-key"] ? p.flags["api-key"] : apiKeyFromEnv();
+  if (!key) {
+    console.error(
+      lang === "fr" ? "ultra11y judge : aucune cl\xE9 d'API. Exportez ANTHROPIC_API_KEY (ou passez --api-key).\n  C'est le SEUL point de l'outil qui en demande une : le moteur, lui, ne requiert ni cl\xE9 ni installation.\n  Dans un agent de code, utilisez `verify --manual` \u2014 c'est l'agent qui tranche, gratuitement." : "ultra11y judge: no API key. Export ANTHROPIC_API_KEY (or pass --api-key).\n  This is the ONLY place in the tool that asks for one: the engine itself needs no key and no install.\n  Inside a coding agent use `verify --manual` instead \u2014 the agent rules, at no cost."
+    );
+    return 2;
+  }
+  let items = buildAdjudicationWorklist(audit2, { standard });
+  if (!items.length) {
+    console.log(lang === "fr" ? "Aucun crit\xE8re \xE0 adjuger \u2014 rien \xE0 faire." : "No criterion left to adjudicate \u2014 nothing to do.");
+    return 0;
+  }
+  const max = typeof p.flags.max === "string" ? Number(p.flags.max) : void 0;
+  const truncated = max !== void 0 && Number.isFinite(max) && max > 0 && items.length > max;
+  if (truncated) items = items.slice(0, max);
+  const batches = [];
+  for (let i2 = 0; i2 < items.length; i2 += BATCH_SIZE) {
+    const slice = items.slice(i2, i2 + BATCH_SIZE);
+    batches.push({ items: slice, prompt: formatAdjudication(slice, lang, standard) });
+  }
+  const model = typeof p.flags.model === "string" && p.flags.model ? p.flags.model : modelFromEnv();
+  console.error(
+    lang === "fr" ? `ultra11y judge : ${items.length} crit\xE8re(s) en ${batches.length} lot(s), mod\xE8le ${model}\u2026` : `ultra11y judge: ${items.length} criterion(ia) in ${batches.length} batch(es), model ${model}\u2026`
+  );
+  const { verdicts, failures } = await judgeAll(batches, {
+    apiKey: key,
+    model,
+    onProgress: (done, total) => console.error(`  ${done}/${total}`)
+  });
+  for (const f of failures) console.error(`\u26A0 ${f}`);
+  const filled = applyRawVerdicts(items, verdicts);
+  const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
+  const w = writeAdjudication(items, out2, { standard, auditDate: audit2.date, lang });
+  console.error(
+    lang === "fr" ? `${filled}/${items.length} verdict(s) rendu(s) \u2192 ${w.todoPath}` : `${filled}/${items.length} verdict(s) returned \u2192 ${w.todoPath}`
+  );
+  if (truncated)
+    console.error(
+      lang === "fr" ? `\u26A0 --max ${max} : les crit\xE8res au-del\xE0 n'ont pas \xE9t\xE9 soumis et restent \xE0 \xE9valuer.` : `\u26A0 --max ${max}: the criteria beyond it were not submitted and stay to assess.`
+    );
+  if (p.flags.apply !== true) {
+    console.log(w.todoPath);
+    if (!p.flags.json)
+      console.log(
+        lang === "fr" ? "Relisez les verdicts, puis appliquez-les : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json>`." : "Review the verdicts, then apply them: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json>`."
+      );
+    return 0;
+  }
+  const adj = JSON.parse(readText(w.todoPath));
+  const r = applyAdjudication(audit2, adj);
+  if (!r.ok) {
+    console.error(lang === "fr" ? `\u2717 Adjudication rejet\xE9e (${r.issues.length} probl\xE8me(s)) :` : `\u2717 Adjudication rejected (${r.issues.length} issue(s)):`);
+    for (const i2 of r.issues.slice(0, 40)) console.error(`  \u2717 ${i2}`);
+    if (r.issues.length > 40) console.error(`  \u2026 +${r.issues.length - 40}`);
+    return 1;
+  }
+  mkdirSync14(out2, { recursive: true });
+  const auditPath = join45(out2, "audit-latest.json");
+  writeFileSync16(auditPath, `${JSON.stringify(r.audit, null, 2)}
+`);
+  console.log(
+    lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual \u2192 ${auditPath}`
+  );
+  return 0;
+}
 async function cmdFix(p) {
   const inputs = p.positionals.length ? p.positionals : ["."];
   const stdin = inputs.includes("-") ? await readStdin() : void 0;
@@ -59236,6 +59508,8 @@ async function main(argv) {
       return cmdInit(p);
     case "pack":
       return cmdPack(p);
+    case "judge":
+      return cmdJudge(p);
     case "orchestrate":
       return cmdOrchestrate(p);
     case "mcp":
