@@ -16,6 +16,7 @@ import { allGuidelines } from "./wcag.js";
 import { PROBE_SEVERITY, PROBE_WCAG, scForAxe, severityFromImpact, isAxeAdvisory } from "./axe-map.js";
 import { parseSitemapUrls, crawlUrls } from "./crawl.js";
 import { sampleScope } from "./sample.js";
+import { COLLECT_SNAPSHOT, SNAPSHOT_VERSION, slugifyPageId, validateSnapshotMeta, writeSnapshot, type CollectedPage, type SnapshotMeta } from "./snapshot.js";
 import { today } from "./util.js";
 
 export const IMAGE_TAG = "ultra11y-dyn:1";
@@ -28,10 +29,21 @@ export const RUNNER = `import { chromium } from "playwright";
 import axe from "axe-core";
 const target = process.argv[2];
 const isFile = target.startsWith("/work/");
+const SNAPSHOT = process.env.ULTRA11Y_SNAPSHOT !== "0";
+const COLLECT = ${JSON.stringify(COLLECT_SNAPSHOT)};
 const browser = await chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 try {
   const page = await browser.newPage();
   await page.goto(isFile ? "file://" + target : target, { waitUntil: "load", timeout: 45000 });
+  // Collected FIRST, on the pristine page: axe's injected source and the 320px reflow
+  // resize both come after, and a snapshot must be the page as the browser built it.
+  let snapshot;
+  if (SNAPSHOT) {
+    try {
+      snapshot = await page.evaluate(COLLECT);
+      try { snapshot.screenshot = (await page.screenshot({ fullPage: false })).toString("base64"); } catch {}
+    } catch {}
+  }
   await page.addScriptTag({ content: axe.source });
   const axeRes = await page.evaluate(async () => await window.axe.run(document, { resultTypes: ["violations"] }));
   await page.setViewportSize({ width: 320, height: 800 });
@@ -43,7 +55,7 @@ try {
     id: v.id, impact: v.impact, help: v.help, tags: v.tags,
     nodes: v.nodes.slice(0, 10).map((n) => ({ target: n.target, html: (n.html || "").slice(0, 200) })),
   }));
-  console.log(JSON.stringify({ url: target, violations, reflow }));
+  console.log(JSON.stringify({ url: target, violations, reflow, snapshot }));
 } finally {
   await browser.close();
 }
@@ -155,6 +167,66 @@ export interface RunnerOutput {
   inputOverflowZoom?: ProbeHit[];
   inputOverflowSpacing?: ProbeHit[];
   liveRegion?: ProbeHit[];
+  // The PRISTINE page as the browser built it (COLLECT_SNAPSHOT + a viewport screenshot,
+  // base64). Absent when snapshotting was off or the collection failed — in which case the
+  // page keeps its findings but earns no snapshot, and therefore no conforming-by-silence.
+  snapshot?: CollectedPage & { screenshot?: string };
+}
+
+/** The page id for a scanned target. A served URL slugifies from its PATH, which is the
+ *  identity a reader recognises (`/nous-contacter` → `nous-contacter`). A local HTML file
+ *  has no meaningful path — slugifying it would name the directory after the absolute path
+ *  on whoever's machine ran the scan — so it slugifies from the FILE NAME instead. */
+function pageIdFor(url: string): string {
+  const isUrl = /^https?:\/\//i.test(url);
+  if (isUrl) return slugifyPageId(url);
+  const base = url.split(/[\\/]/).pop() ?? url;
+  return slugifyPageId(base.replace(/\.x?html?$/i, "")) || "page";
+}
+
+/** Persist a runner's collected page as a snapshot under `<root>/.ultra11y/pages/<id>/`,
+ *  returning the page id — or undefined when there was nothing to write.
+ *
+ *  This is what turns `scan` from a findings-only pass into a producer of the durable
+ *  artefact: without it a URL-scanned page is `basis: "attributed"` (src/pages.ts), its
+ *  criteria can never leave `?`, and a whole sitemap-driven audit yields an empty per-page
+ *  grid. The browser is already on the page — collecting it costs one `evaluate`.
+ *
+ *  Nothing here is fatal: a page that cannot be persisted is simply not a snapshot. */
+export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: string, page?: SamplePage): string | undefined {
+  const collected = out.snapshot;
+  if (!collected?.dom) return undefined;
+  // Cite what a reader can open: the host path for a file scan, the served URL otherwise —
+  // the same mapping the findings get, so a page and its findings never disagree on where
+  // they are.
+  const url = page?.url ?? hostPageOf(out.url ?? collected.url, target);
+  const id = page?.id ?? pageIdFor(url);
+  const meta: SnapshotMeta = {
+    v: SNAPSHOT_VERSION,
+    id,
+    name: page?.name ?? collected.title ?? id,
+    url,
+    runner: "scan",
+    ...(collected.viewport ? { viewport: collected.viewport } : {}),
+    ...(page?.auth !== undefined ? { auth: page.auth } : {}),
+    ...(page?.notes ? { notes: page.notes } : {}),
+  };
+  // The producer is untrusted input even when it is us: a page id becomes a directory name.
+  const v = validateSnapshotMeta(meta);
+  if (!v.ok || !v.meta) return undefined;
+  try {
+    writeSnapshot(root, {
+      meta: v.meta,
+      dom: collected.dom,
+      ...(collected.styles ? { styles: collected.styles } : {}),
+      ...(collected.boxes ? { boxes: collected.boxes } : {}),
+      ...(collected.css ? { css: collected.css } : {}),
+      ...(collected.screenshot ? { screenshotBase64: collected.screenshot } : {}),
+    });
+  } catch {
+    return undefined;
+  }
+  return v.meta.id;
 }
 
 // RunnerOutput key ↔ probe engine, so a clean Docker output (no probe arrays) folds
@@ -170,8 +242,9 @@ const PROBE_FIELDS: { key: keyof RunnerOutput; engine: Exclude<DynamicEngine, "a
   { key: "liveRegion", engine: "live-region" },
 ];
 
-function runRunner(target: string, isFile: boolean, tag: string): RunnerOutput {
+function runRunner(target: string, isFile: boolean, tag: string, snapshot = true): RunnerOutput {
   const args = ["run", "--rm"];
+  if (!snapshot) args.push("-e", "ULTRA11Y_SNAPSHOT=0");
   if (isFile) args.push("-v", `${resolve(target)}:${MOUNT}:ro`);
   args.push(tag, isFile ? MOUNT : target);
   let stdout: string;
@@ -179,7 +252,11 @@ function runRunner(target: string, isFile: boolean, tag: string): RunnerOutput {
     // Pipe (not ignore) the container's stderr so a failed run surfaces the real
     // cause (e.g. ERR_NAME_NOT_RESOLVED / a navigation timeout) instead of a bare
     // "Command failed: docker run …".
-    stdout = execFileSync("docker", args, { encoding: "utf8", timeout: 240000, maxBuffer: 32 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+    // The buffer is sized for the SNAPSHOT, not the findings: one line now carries the
+    // serialized document, the computed-style digest, the boxes, the stylesheets and a
+    // base64 screenshot. Too small a buffer would kill the run with ENOBUFS on exactly the
+    // large pages that most need auditing.
+    stdout = execFileSync("docker", args, { encoding: "utf8", timeout: 240000, maxBuffer: 192 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
   } catch (e) {
     const err = e as { stderr?: Buffer | string; message?: string };
     const detail = (err.stderr ? String(err.stderr).trim() : "") || err.message || String(e);
@@ -280,6 +357,8 @@ export const DOCKER_TESTED_SCS: readonly string[] = ["1.4.10"];
 export interface ScanOpts {
   target: string;
   tag?: string;
+  /** Repo root under which to persist `.ultra11y/pages/<id>/`. Unset ⇒ no snapshot. */
+  snapshotRoot?: string;
 }
 
 /** Run the dynamic tier (builds the image on first use). Throws if Docker absent. */
@@ -297,8 +376,9 @@ export function runScan(opts: ScanOpts): DynamicResult {
   const tag = opts.tag ?? IMAGE_TAG;
   if (!imageExists(tag)) buildImage(tag);
   const isFile = !isUrl && existsSync(opts.target) && statSync(opts.target).isFile();
-  const out = runRunner(opts.target, isFile, tag);
-  return { ...toDynamicResult(out, opts.target), testedScs: [...DOCKER_TESTED_SCS] };
+  const out = runRunner(opts.target, isFile, tag, Boolean(opts.snapshotRoot));
+  const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, opts.target) : undefined;
+  return { ...toDynamicResult(out, opts.target), testedScs: [...DOCKER_TESTED_SCS], ...(id ? { snapshots: [id] } : {}) };
 }
 
 /** Fetch a URL's served HTML (zero-dep, Node global fetch). Empty string on error. */
@@ -334,15 +414,18 @@ export async function discoverUrls(opts: DiscoverOpts): Promise<string[]> {
 /** Run the dynamic tier over many URLs and aggregate into one DynamicResult.
  *  Each URL is one container run (browser per page); slow but reuses the proven
  *  single-page runner. Findings keep the page they came from. */
-export function runScanMany(urls: string[], tag = IMAGE_TAG): DynamicResult {
+export function runScanMany(urls: string[], tag = IMAGE_TAG, snapshotRoot?: string): DynamicResult {
   if (!dockerAvailable()) {
     throw new Error("Docker is not available. Start Docker, then re-run `scan`.");
   }
   if (!imageExists(tag)) buildImage(tag);
   const findings: DynamicFinding[] = [];
+  const snapshots: string[] = [];
   for (const url of urls) {
-    const out = runRunner(url, false, tag);
+    const out = runRunner(url, false, tag, Boolean(snapshotRoot));
     findings.push(...toDynamicResult(out, url).findings);
+    const id = snapshotRoot ? writeRunnerSnapshot(snapshotRoot, out, url) : undefined;
+    if (id) snapshots.push(id);
   }
   return {
     tool: "ultra11y",
@@ -351,6 +434,7 @@ export function runScanMany(urls: string[], tag = IMAGE_TAG): DynamicResult {
     date: today(),
     findings,
     testedScs: [...DOCKER_TESTED_SCS],
+    ...(snapshots.length ? { snapshots } : {}),
   };
 }
 
@@ -368,15 +452,20 @@ export function tagSampleFindings(findings: DynamicFinding[], page: SamplePage):
  *  DynamicResult. No storageState support (the Docker runner has no session mechanism) — the
  *  CLI requires the local runtime whenever any sample page carries auth. Each finding keeps
  *  its sample-page provenance; the sample itself is recorded on the result. */
-export function runSampleScan(pages: SamplePage[], tag = IMAGE_TAG): DynamicResult {
+export function runSampleScan(pages: SamplePage[], tag = IMAGE_TAG, snapshotRoot?: string): DynamicResult {
   if (!dockerAvailable()) {
     throw new Error("Docker is not available. Start Docker, then re-run `scan`.");
   }
   if (!imageExists(tag)) buildImage(tag);
   const findings: DynamicFinding[] = [];
+  const snapshots: string[] = [];
   for (const page of pages) {
-    const out = runRunner(page.url, false, tag);
+    const out = runRunner(page.url, false, tag, Boolean(snapshotRoot));
     findings.push(...tagSampleFindings(toDynamicResult(out, page.url).findings, page));
+    // The sample page's declared id/name/auth/notes win over anything derived from the URL:
+    // that identity is what the report and the per-page grid speak.
+    const id = snapshotRoot ? writeRunnerSnapshot(snapshotRoot, out, page.url, page) : undefined;
+    if (id) snapshots.push(id);
   }
   return {
     tool: "ultra11y",
@@ -386,16 +475,17 @@ export function runSampleScan(pages: SamplePage[], tag = IMAGE_TAG): DynamicResu
     findings,
     sample: sampleScope({ pages }),
     testedScs: [...DOCKER_TESTED_SCS],
+    ...(snapshots.length ? { snapshots } : {}),
   };
 }
 
 /** Discover URLs (sitemap/crawl) then scan them all through the dynamic tier. */
-export async function runCrawlScan(opts: DiscoverOpts & { tag?: string }): Promise<DynamicResult> {
+export async function runCrawlScan(opts: DiscoverOpts & { tag?: string; snapshotRoot?: string }): Promise<DynamicResult> {
   const urls = await discoverUrls(opts);
   if (urls.length === 0) {
     throw new Error("No URL to scan (empty/unreachable sitemap, or entry page with no same-origin link).");
   }
-  return runScanMany(urls, opts.tag ?? IMAGE_TAG);
+  return runScanMany(urls, opts.tag ?? IMAGE_TAG, opts.snapshotRoot);
 }
 
 const sevRank: Record<Severity, number> = { bloquant: 3, majeur: 2, mineur: 1 };
@@ -518,7 +608,14 @@ export function mergeDynamic(audit: AuditResult, dynamic: DynamicResult, lang: L
   const nowNc = new Set(dynamic.findings.filter((d) => !d.advisory).map((d) => d.criteriaId));
   merged.residualRisks = merged.residualRisks.filter((r) => !nowNc.has(r.criteriaId));
 
-  // recompute tallies + conformance (by WCAG guideline)
+  recomputeTallies(merged);
+  return merged;
+}
+
+/** Re-derive the per-guideline tallies and the automatic pass rate from the criteria, and
+ *  re-sort the findings by severity. Shared by every fold that can change a criterion's
+ *  status, so two merges can never disagree on the arithmetic `check` verifies. */
+export function recomputeTallies(merged: AuditResult): void {
   merged.guidelines = allGuidelines().map((g) => {
     const inG = merged.criteria.filter((c) => c.guideline === g.number);
     return {
@@ -534,5 +631,58 @@ export function mergeDynamic(audit: AuditResult, dynamic: DynamicResult, lang: L
   const conform = decided.filter((c) => c.status === "C").length;
   merged.conformancePct = decided.length === 0 ? 100 : Math.round((conform / decided.length) * 100);
   merged.findings.sort((a, b) => sevRank[b.severity] - sevRank[a.severity]);
+}
+
+/** Fold an audit of the PAGE SNAPSHOTS a scan just wrote into the scan's merged result.
+ *
+ *  Why this exists. `scan` persists each page it visited, but a snapshot only earns its
+ *  page a conforming-by-silence verdict once the STATIC rules have actually run against
+ *  that document (src/pages.ts, honesty rule 2). Recording the pages without auditing them
+ *  would hand every clean criterion a `C` nobody measured — the one output this tool must
+ *  never produce. So the caller audits the freshly written `dom.html` files and folds the
+ *  result here.
+ *
+ *  Re-running the whole audit instead is not an option: the original run's flags (`--jsx`,
+ *  `--graph`, `--exclude`, dedup, `--max-files`) are not recorded on the result, so
+ *  reconstructing it would silently shrink the audit.
+ *
+ *  Two fold rules, both mirroring what `finalize` already does across documents:
+ *   • a NON-ADVISORY finding on a snapshot makes its criterion NC — a defect on a real
+ *     rendered page is authoritative, exactly as a dynamic finding is;
+ *   • `NA` + `C` ⇒ `C`. NA means "no relevant element was in scope"; a full rendered
+ *     document puts one in scope and it passes. This is the same OR-fold of applicability
+ *     the engine performs over its own inputs — never the reverse (a snapshot can add
+ *     applicability, never remove it). */
+export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditResult {
+  const merged: AuditResult = JSON.parse(JSON.stringify(base)) as AuditResult;
+  const byId = new Map(merged.criteria.map((c) => [c.id, c]));
+  const snapById = new Map(snap.criteria.map((c) => [c.id, c]));
+
+  for (const f of snap.findings) {
+    const c = byId.get(f.criteriaId);
+    if (!c) continue;
+    c.findings.push(f);
+    merged.findings.push(f);
+    if (!f.advisory) {
+      c.status = "NC";
+      delete c.justification;
+    }
+  }
+  // Declarative pack-rule findings live outside the WCAG core verdict; they are carried over
+  // untouched so a pack projection sees the snapshot's hits too.
+  if (snap.packFindings?.length) merged.packFindings = [...(merged.packFindings ?? []), ...snap.packFindings];
+
+  for (const c of merged.criteria) {
+    if (c.status !== "NA") continue;
+    if (snapById.get(c.id)?.status === "C") {
+      c.status = "C";
+      delete c.justification; // the NA reason ("no relevant element") no longer holds
+    }
+  }
+
+  const nowNc = new Set(snap.findings.filter((f) => !f.advisory).map((f) => f.criteriaId));
+  merged.residualRisks = merged.residualRisks.filter((r) => !nowNc.has(r.criteriaId));
+
+  recomputeTallies(merged);
   return merged;
 }

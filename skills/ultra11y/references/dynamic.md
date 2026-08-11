@@ -144,6 +144,36 @@ it reports which required page kinds the sample lacks (a malformed `sample` bloc
 error, exit 2; a merely-incomplete one is guidance, exit 0). See `references/audit.md`
 (sample concept) and `references/packs.md` (`sampleMethodology`).
 
+## Every scanned page is also a SNAPSHOT
+
+`scan` does not only keep findings: each page it visits is persisted to
+`.ultra11y/pages/<id>/` (DOM + computed styles + boxes + stylesheets + a viewport
+screenshot). The browser is already on the page, so this costs one `evaluate`. `--no-snapshot`
+opts out.
+
+That artefact is not a convenience — it is what makes a URL a real per-page verdict:
+
+- **Without it a scanned page can never be conforming.** `src/pages.ts` grants `C` by silence
+  only to a page whose real DOM the static rules ran against (`basis: "snapshot"`); a page
+  known only by its URL stays `basis: "attributed"` and its criteria stay « à évaluer »
+  forever. A sitemap-driven audit produced an almost empty grid.
+- **The page-scoped rules finally run.** A snapshot is a full document, so RGAA **8.3**
+  (`lang`), **8.4**, **8.5/8.6** (`title`) and 12.6 (`main`) become decidable — none of them
+  can be judged from a component render, nor from source once a framework injects the
+  document shell.
+- **It captures what JavaScript built.** A link, a dialog or a nav injected at runtime exists
+  in no source file; it exists in the snapshot, and the ordinary static rules see it.
+- **It re-audits offline.** `audit` ingests `.ultra11y/pages` automatically, with no browser,
+  no Docker and no running server — which is how CI decides these without booting the app.
+
+The collection happens on the **pristine** page: before axe injects its source, before any
+probe fills an input, resizes the viewport to 320px or bolts on the text-spacing stylesheet.
+Collected later, the snapshot would record our own instrumentation instead of the site.
+
+With `--merge`, the freshly written snapshots are audited and folded into the result in the
+same run, and `scope.pages` is recorded — so `pages` and `report` speak page by page
+immediately, not on the next `audit`.
+
 ## Limits
 
 Even with the local probes, **reading order**, **alt relevance** and the other judgment criteria

@@ -68,8 +68,25 @@ export interface Snapshot {
   boxes?: BoxDigest;
   axtree?: AxNode;
   css?: CssDigest;
-  /** Path of the screenshot on disk, relative to the snapshot dir. Set when present. */
+  /** Path of the screenshot on disk, relative to the snapshot dir. Set on READ. */
   screenshot?: string;
+  /** The screenshot's bytes, base64, as a producer hands them over. Set on WRITE — a
+   *  producer holds bytes, not a path. `writeSnapshot` turns it into `screen.png`. */
+  screenshotBase64?: string;
+}
+
+/** What the browser-side collector (`COLLECT_SNAPSHOT`) returns. Every snapshot producer —
+ *  the E2E fixtures, the dev side-car, `scan` — evaluates that one string and gets this
+ *  shape back, so the format has exactly one definition and cannot drift per producer. */
+export interface CollectedPage {
+  dom: string;
+  styles?: StyleDigest;
+  boxes?: BoxDigest;
+  css?: CssDigest;
+  title?: string;
+  lang?: string;
+  url?: string;
+  viewport?: SnapshotViewport;
 }
 
 // ---- page identity --------------------------------------------------------------------
@@ -181,6 +198,17 @@ export function writeSnapshot(root: string, snap: Snapshot): string {
   if (snap.boxes) writeFileSync(join(dir, "boxes.json"), `${JSON.stringify(snap.boxes)}\n`);
   if (snap.axtree) writeFileSync(join(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}\n`);
   if (snap.css) writeFileSync(join(dir, "css.json"), `${JSON.stringify(snap.css)}\n`);
+  // The screenshot rides in as base64 (a producer has bytes, not a path). It powers the
+  // pixel tier — contrast over a gradient or a background image, where the CSSOM has no
+  // answer. A screenshot that cannot be decoded/written must NEVER fail the snapshot: the
+  // page is still fully auditable without it, the pixel rule simply declines.
+  if (snap.screenshotBase64) {
+    try {
+      writeFileSync(join(dir, "screen.png"), Buffer.from(snap.screenshotBase64, "base64"));
+    } catch {
+      /* pixel tier skipped for this page — every other rule still runs */
+    }
+  }
   return dir;
 }
 

@@ -197,8 +197,21 @@ A non-normative recommendation never flips a page criterion to `NC`, exactly as 
 Anything that drives a browser can write one — the format is the contract, not the producer.
 The engine ships a browser-side collector (`COLLECT_SNAPSHOT`) that returns the DOM, the
 style digest and the boxes for the current page in a single `page.evaluate`; a producer
-writes that alongside a `meta.json`. Snapshot producers wired into a project's E2E run and
-its dev server are covered by their own references.
+writes that alongside a `meta.json`.
+
+Three producers ship with the engine, and they all evaluate that one collector:
+
+| Producer | When it runs | Notes |
+|---|---|---|
+| `scan` | a URL, a sitemap, a crawl, or the declared sample | on by default (`--no-snapshot` opts out); collected on the **pristine** page, before axe and before any probe |
+| `render --e2e` fixtures | inside your Playwright/Cypress run | the page in the state your test built (logged in, modal open) |
+| `dev` side-car | as you browse in development | the overlay detaches itself before collecting |
+
+`scan` is the one that makes a **served site** auditable page by page: without a snapshot a
+scanned URL is `basis: "attributed"` and, by honesty rule 2 below, can never earn a
+conforming verdict. With one, the page-scoped rules run, the runtime-injected DOM is
+audited, and the page re-audits offline. `scan --merge` audits the snapshots it just wrote
+and folds them in, so the grid is populated in the same run.
 
 A malformed or unreadable snapshot is skipped, never fatal: one broken producer run must not
 blind the whole report. A snapshot whose `meta.v` is newer than the engine understands is

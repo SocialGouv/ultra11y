@@ -12,9 +12,9 @@ import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import type { DynamicFinding, DynamicResult, Lang, SamplePage } from "./types.js";
-import { type DiscoverOpts, discoverUrls, type ProbeHit, type RunnerOutput, tagSampleFindings, toDynamicResult } from "./scan.js";
+import { type DiscoverOpts, discoverUrls, type ProbeHit, type RunnerOutput, tagSampleFindings, toDynamicResult, writeRunnerSnapshot } from "./scan.js";
 import { sampleScope } from "./sample.js";
-import { COLLECT_SNAPSHOT } from "./snapshot.js";
+import { COLLECT_SNAPSHOT, type CollectedPage } from "./snapshot.js";
 import { today } from "./util.js";
 
 export const LOCAL_ENGINE = "axe-core@playwright (local)";
@@ -679,7 +679,7 @@ async function runOnPage(
   AxeBuilder: Any,
   target: string,
   isFile: boolean,
-  opts: { storageState?: string; interact: boolean; allowClicks: boolean; lang: Lang },
+  opts: { storageState?: string; interact: boolean; allowClicks: boolean; lang: Lang; snapshot?: boolean },
 ): Promise<RunnerOutput> {
   const context = await browser.newContext(opts.storageState ? { storageState: opts.storageState } : {});
   const page = await context.newPage();
@@ -692,6 +692,32 @@ async function runOnPage(
     // report false "no h1 / not in a landmark". Bounded networkidle + a short settle.
     await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
     await page.waitForTimeout(1200);
+
+    // THE SNAPSHOT IS COLLECTED FIRST, on the PRISTINE page — before axe injects its source,
+    // before any probe fills an input, resizes the viewport or bolts on the text-spacing
+    // stylesheet. A snapshot is meant to be "the page as the browser built it"; collected
+    // later it would carry a 320px layout, letter-spacing overrides in css.json, and values
+    // typed by the fill step, and the offline rendered tier would then measure OUR
+    // instrumentation instead of the site. The screenshot is taken at the same instant and at
+    // the same (normal) viewport, so it shares the coordinate system of boxes.json.
+    let snapshot: CollectedPage | undefined;
+    let screenshot: string | undefined;
+    if (opts.snapshot !== false) {
+      try {
+        snapshot = (await page.evaluate(COLLECT_SNAPSHOT)) as CollectedPage;
+      } catch {
+        // A collection failure must never cost us the findings: the page stays scannable,
+        // it simply earns no snapshot — and therefore no conforming-by-silence verdict.
+      }
+      if (snapshot) {
+        try {
+          screenshot = ((await page.screenshot({ fullPage: false })) as Buffer).toString("base64");
+        } catch {
+          /* pixel tier only — every other rendered rule still reads the digests */
+        }
+      }
+    }
+
     const axeRes = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
     const violations = (axeRes.violations as Any[]).map((v: Any) => ({
       id: v.id as string,
@@ -746,6 +772,7 @@ async function runOnPage(
       inputOverflowZoom,
       inputOverflowSpacing,
       liveRegion,
+      ...(snapshot ? { snapshot: { ...snapshot, ...(screenshot ? { screenshot } : {}) } } : {}),
     };
   } finally {
     await context.close();
@@ -765,6 +792,8 @@ export interface LocalScanOpts {
   // invisible to the href assertion; `scan --interact-clicks` opts in. Ignored (clicks
   // always on) when no storageState is loaded. See clicksAllowed().
   interactClicks?: boolean;
+  /** Repo root under which to persist `.ultra11y/pages/<id>/`. Unset ⇒ no snapshot. */
+  snapshotRoot?: string;
 }
 
 /** Run the dynamic tier locally over a single URL/file (no Docker). */
@@ -784,8 +813,10 @@ export async function runScanLocal(opts: LocalScanOpts): Promise<DynamicResult> 
       interact,
       allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
       lang,
+      snapshot: Boolean(opts.snapshotRoot),
     });
-    return { ...toDynamicResult(out, opts.target, lang, LOCAL_ENGINE), testedScs: localTestedScs(interact) };
+    const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, opts.target) : undefined;
+    return { ...toDynamicResult(out, opts.target, lang, LOCAL_ENGINE), testedScs: localTestedScs(interact), ...(id ? { snapshots: [id] } : {}) };
   } finally {
     await browser.close();
   }
@@ -797,6 +828,8 @@ export interface LocalManyOpts {
   lang?: Lang;
   interact?: boolean;
   interactClicks?: boolean; // see LocalScanOpts.interactClicks
+  /** Repo root under which to persist `.ultra11y/pages/<id>/`. Unset ⇒ no snapshot. */
+  snapshotRoot?: string;
 }
 
 /** Run the local dynamic tier over many URLs (one browser, one context per page). */
@@ -806,6 +839,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
   const browser = await launchChromium(chromium);
   const findings: DynamicFinding[] = [];
+  const snapshots: string[] = [];
   try {
     for (const url of urls) {
       const out = await runOnPage(browser, AxeBuilder, url, false, {
@@ -813,13 +847,24 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
         interact,
         allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
         lang,
+        snapshot: Boolean(opts.snapshotRoot),
       });
       findings.push(...toDynamicResult(out, url, lang, LOCAL_ENGINE).findings);
+      const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, url) : undefined;
+      if (id) snapshots.push(id);
     }
   } finally {
     await browser.close();
   }
-  return { tool: "ultra11y", engine: LOCAL_ENGINE, target: `${urls.length} page(s)`, date: today(), findings, testedScs: localTestedScs(interact) };
+  return {
+    tool: "ultra11y",
+    engine: LOCAL_ENGINE,
+    target: `${urls.length} page(s)`,
+    date: today(),
+    findings,
+    testedScs: localTestedScs(interact),
+    ...(snapshots.length ? { snapshots } : {}),
+  };
 }
 
 /** Run the local dynamic tier over a NORMATIVE page SAMPLE (one browser, one context per
@@ -834,6 +879,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
   const browser = await launchChromium(chromium);
   const findings: DynamicFinding[] = [];
+  const snapshots: string[] = [];
   try {
     for (const page of pages) {
       const storageState = page.storageState ?? opts.storageState; // per-page override
@@ -843,8 +889,13 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
         interact,
         allowClicks: clicksAllowed(storageState, opts.interactClicks),
         lang,
+        snapshot: Boolean(opts.snapshotRoot),
       });
       findings.push(...tagSampleFindings(toDynamicResult(out, page.url, lang, LOCAL_ENGINE).findings, page));
+      // The sample page's declared id/name/auth/notes win over anything derived from the
+      // URL: that identity is what the report and the per-page grid speak.
+      const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, page.url, page) : undefined;
+      if (id) snapshots.push(id);
     }
   } finally {
     await browser.close();
@@ -857,6 +908,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
     findings,
     sample: sampleScope({ pages }),
     testedScs: localTestedScs(interact),
+    ...(snapshots.length ? { snapshots } : {}),
   };
 }
 

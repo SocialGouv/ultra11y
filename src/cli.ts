@@ -27,7 +27,7 @@ import { checkReport, checkSemantic } from "./check.js";
 import { buildWorklist, writeWorklist, applyVerdicts, VERIFY_MAX, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import { buildAdjudicationWorklist, writeAdjudication, applyAdjudication, type AdjudicationFile } from "./adjudicate.js";
-import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, cleanDynamic, dockerAvailable } from "./scan.js";
+import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel } from "./sample.js";
 import { runFix, fixSummary } from "./fix.js";
@@ -75,7 +75,7 @@ Usage:
   ultra11y fix      <globs… | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
-  ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--merge <audit.json>] [--out <dir>] [--json]
+  ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--runtime …] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime …] [--cwd <dir>] [--merge <audit.json>] [--json]
   ultra11y scan     --clean        (remove the dynamic-tier Docker image + temp contexts)
@@ -355,6 +355,10 @@ Options:
   --sample           scan: scan the NORMATIVE page sample from .ultra11yrc.json (its
                      sample.pages), per-page storage-state overriding --storage-state,
                      aggregating one result with per-page provenance for the report
+  --no-snapshot      scan: do NOT persist each scanned page to .ultra11y/pages/<id>/.
+                     Snapshots are ON by default: the browser is already on the page, and
+                     without one the page can never be re-audited offline nor earn a
+                     per-page verdict (its criteria stay « to assess » forever)
   --clean            scan: remove the dynamic-tier image + temp contexts, then exit
   --semantic         verify: fold the support-check into one pass
                      check: engage the semantic gate — requires an adjudicated verdicts
@@ -495,6 +499,7 @@ const BOOLEAN_FLAGS = new Set([
   "docker",
   "no-interact",
   "interact-clicks",
+  "no-snapshot",
   "clean",
   "sample",
   "eco",
@@ -1028,21 +1033,14 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
       ...(payload.boxes ? { boxes: payload.boxes } : {}),
       ...(payload.axtree ? { axtree: payload.axtree } : {}),
       ...(payload.css ? { css: payload.css } : {}),
+      // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
+      // pixel tier. writeSnapshot owns the decoding, so every producer — this command, the
+      // dev side-car, `scan` — writes it the one same way.
+      ...(typeof payload.screenshot === "string" && payload.screenshot ? { screenshotBase64: payload.screenshot } : {}),
     });
   } catch (e) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
-  }
-
-  // The screenshot rides in as base64 (the producer has bytes, not a path). It powers the
-  // pixel tier — measuring contrast where the CSSOM cannot, i.e. text over a gradient or an
-  // image. A malformed one is dropped rather than fatal: the CSSOM rules still run.
-  if (typeof payload.screenshot === "string" && payload.screenshot) {
-    try {
-      writeFileSync(join(dir, "screen.png"), Buffer.from(payload.screenshot, "base64"));
-    } catch {
-      console.error("ultra11y snapshot write: the screenshot could not be written — the pixel tier will be skipped for this page.");
-    }
   }
 
   // Audit exactly this page's DOM — not the whole pages tree — so a producer checking one
@@ -1999,6 +1997,11 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
   const interactClicks = p.flags["interact-clicks"] === true;
   const sitemap = typeof p.flags.sitemap === "string" ? (p.flags.sitemap as string) : undefined;
   const crawl = typeof p.flags.crawl === "string" ? (p.flags.crawl as string) : undefined;
+  // Every scanned page is also PERSISTED as a snapshot (.ultra11y/pages/<id>/). The browser
+  // is already on the page, so this costs one `evaluate` — and it is what lets the page be
+  // re-audited offline and earn a real per-page verdict instead of staying "to assess"
+  // forever (src/pages.ts). `--no-snapshot` opts out.
+  const snapshotRoot = p.flags["no-snapshot"] === true ? undefined : process.cwd();
 
   // --sample: iterate the NORMATIVE page sample from `.ultra11yrc.json` (per-page
   // storageState overrides --storage-state). Loaded + validated here (hard error on a
@@ -2045,14 +2048,14 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
   try {
     if (useSample && sampleConfig) {
       dynamic = useLocal
-        ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks })
-        : runSampleScan(sampleConfig.pages);
+        ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot })
+        : runSampleScan(sampleConfig.pages, undefined, snapshotRoot);
     } else if (sitemap || crawl) {
       const depth = typeof p.flags.depth === "string" ? Number(p.flags.depth) : undefined;
       const max = typeof p.flags.max === "string" ? Number(p.flags.max) : undefined;
       dynamic = useLocal
-        ? await runCrawlScanLocal({ sitemap, crawl, depth, max, cwd, storageState, lang, interact, interactClicks })
-        : await runCrawlScan({ sitemap, crawl, depth, max });
+        ? await runCrawlScanLocal({ sitemap, crawl, depth, max, cwd, storageState, lang, interact, interactClicks, snapshotRoot })
+        : await runCrawlScan({ sitemap, crawl, depth, max, snapshotRoot });
     } else {
       const targets = p.positionals.filter((a) => a !== "-");
       if (targets.length === 0) {
@@ -2062,10 +2065,10 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       if (useLocal) {
         dynamic =
           targets.length === 1
-            ? await runScanLocal({ target: targets[0]!, cwd, storageState, lang, interact, interactClicks })
-            : await runScanManyLocal(targets, { cwd, storageState, lang, interact, interactClicks });
+            ? await runScanLocal({ target: targets[0]!, cwd, storageState, lang, interact, interactClicks, snapshotRoot })
+            : await runScanManyLocal(targets, { cwd, storageState, lang, interact, interactClicks, snapshotRoot });
       } else {
-        dynamic = targets.length === 1 ? runScan({ target: targets[0]! }) : runScanMany(targets);
+        dynamic = targets.length === 1 ? runScan({ target: targets[0]!, snapshotRoot }) : runScanMany(targets, undefined, snapshotRoot);
       }
     }
   } catch (e) {
@@ -2114,16 +2117,42 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       }
       audit = parsed;
     }
-    const merged = mergeDynamic(audit, dynamic, lang);
+    let merged = mergeDynamic(audit, dynamic, lang);
+    // Run the STATIC engine over the snapshots this scan just wrote, and fold the result in.
+    // Recording the pages without auditing them would grant every clean criterion a `C`
+    // nobody measured; auditing them is what makes a scanned page a real per-page verdict —
+    // and what finally lets the page-scoped rules (lang, title, main landmark) run at all.
+    if (dynamic.snapshots?.length) {
+      const doms = dynamic.snapshots.map((id) => join(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f) => existsSync(f));
+      if (doms.length) {
+        const snapAudit = runAudit({ inputs: doms, onWarn: (m) => console.error(m) });
+        merged = mergeSnapshotAudit(merged, snapAudit);
+      }
+      // Record the pages in scope so the per-page grid rebuilds from this JSON alone, and
+      // attribute the findings that can be attributed. `pageScopesFrom` is what stamps
+      // `basis: "snapshot"` — legitimate now, and only now, that the rules have run.
+      const scope = pageScopesFrom(readSnapshots(snapshotRoot ?? "."));
+      if (scope.length) {
+        merged.scope.pages = scope;
+        attributePages(merged, scope);
+      }
+    }
     mkdirSync(out, { recursive: true });
     writeFileSync(join(out, "audit-latest.json"), JSON.stringify(merged, null, 2) + "\n");
     if (p.flags.json) console.log(JSON.stringify(merged, null, 2));
-    else
+    else {
       console.log(
         lang === "fr"
           ? `Audit statique + dynamique fusionné → ${join(out, "audit-latest.json")} (${merged.conformancePct}% réussite, ${merged.findings.length} findings).`
           : `Static + dynamic audit merged → ${join(out, "audit-latest.json")} (${merged.conformancePct}% pass rate, ${merged.findings.length} findings).`,
       );
+      if (dynamic.snapshots?.length)
+        console.log(
+          lang === "fr"
+            ? `${dynamic.snapshots.length} instantané(s) de page écrit(s) dans ${PAGES_DIR}/ — committez-les pour auditer ces pages hors ligne (\`ultra11y pages\`).`
+            : `${dynamic.snapshots.length} page snapshot(s) written to ${PAGES_DIR}/ — commit them to audit those pages offline (\`ultra11y pages\`).`,
+        );
+    }
     return 0;
   }
   if (p.flags.json) console.log(JSON.stringify(dynamic, null, 2));
@@ -2134,6 +2163,12 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
         : `Dynamic audit (${dynamic.engine}) of ${dynamic.target} — ${dynamic.findings.length} non-conformity(ies):`,
     );
     for (const f of dynamic.findings.slice(0, 30)) console.log(`  [${f.criteriaId}] ${f.selector} — ${f.message}`);
+    if (dynamic.snapshots?.length)
+      console.log(
+        lang === "fr"
+          ? `\n${dynamic.snapshots.length} instantané(s) de page écrit(s) dans ${PAGES_DIR}/ — \`ultra11y audit\` les reprend automatiquement.`
+          : `\n${dynamic.snapshots.length} page snapshot(s) written to ${PAGES_DIR}/ — \`ultra11y audit\` picks them up automatically.`,
+      );
   }
   return 0;
 }

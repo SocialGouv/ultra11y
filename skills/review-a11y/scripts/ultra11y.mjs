@@ -35071,6 +35071,16 @@ import { existsSync as existsSync10, mkdirSync as mkdirSync4, readFileSync as re
 import { dirname as dirname5, join as join22 } from "path";
 var SNAPSHOT_VERSION = 1;
 var PAGES_DIR = ".ultra11y/pages";
+function slugifyPageId(input) {
+  let path = input;
+  try {
+    path = new URL(input).pathname;
+  } catch {
+  }
+  const slug = path.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (slug) return slug;
+  return path === "/" || path === "" ? "accueil" : "page";
+}
 var ID_RE = /^[a-z0-9][a-z0-9-]*$/i;
 function validateSnapshotMeta(raw) {
   const issues = [];
@@ -35139,6 +35149,12 @@ ${snap.dom}
 `);
   if (snap.css) writeFileSync5(join22(dir, "css.json"), `${JSON.stringify(snap.css)}
 `);
+  if (snap.screenshotBase64) {
+    try {
+      writeFileSync5(join22(dir, "screen.png"), Buffer.from(snap.screenshotBase64, "base64"));
+    } catch {
+    }
+  }
   return dir;
 }
 function readJson2(file) {
@@ -52193,10 +52209,21 @@ var RUNNER = `import { chromium } from "playwright";
 import axe from "axe-core";
 const target = process.argv[2];
 const isFile = target.startsWith("/work/");
+const SNAPSHOT = process.env.ULTRA11Y_SNAPSHOT !== "0";
+const COLLECT = ${JSON.stringify(COLLECT_SNAPSHOT)};
 const browser = await chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 try {
   const page = await browser.newPage();
   await page.goto(isFile ? "file://" + target : target, { waitUntil: "load", timeout: 45000 });
+  // Collected FIRST, on the pristine page: axe's injected source and the 320px reflow
+  // resize both come after, and a snapshot must be the page as the browser built it.
+  let snapshot;
+  if (SNAPSHOT) {
+    try {
+      snapshot = await page.evaluate(COLLECT);
+      try { snapshot.screenshot = (await page.screenshot({ fullPage: false })).toString("base64"); } catch {}
+    } catch {}
+  }
   await page.addScriptTag({ content: axe.source });
   const axeRes = await page.evaluate(async () => await window.axe.run(document, { resultTypes: ["violations"] }));
   await page.setViewportSize({ width: 320, height: 800 });
@@ -52208,7 +52235,7 @@ try {
     id: v.id, impact: v.impact, help: v.help, tags: v.tags,
     nodes: v.nodes.slice(0, 10).map((n) => ({ target: n.target, html: (n.html || "").slice(0, 200) })),
   }));
-  console.log(JSON.stringify({ url: target, violations, reflow }));
+  console.log(JSON.stringify({ url: target, violations, reflow, snapshot }));
 } finally {
   await browser.close();
 }
@@ -52275,6 +52302,43 @@ function cleanDynamic(tag = IMAGE_TAG) {
   }
   return { imageRemoved, tempContextsRemoved: cleanTempContexts() };
 }
+function pageIdFor(url) {
+  const isUrl3 = /^https?:\/\//i.test(url);
+  if (isUrl3) return slugifyPageId(url);
+  const base = url.split(/[\\/]/).pop() ?? url;
+  return slugifyPageId(base.replace(/\.x?html?$/i, "")) || "page";
+}
+function writeRunnerSnapshot(root, out2, target, page) {
+  const collected = out2.snapshot;
+  if (!collected?.dom) return void 0;
+  const url = page?.url ?? hostPageOf(out2.url ?? collected.url, target);
+  const id = page?.id ?? pageIdFor(url);
+  const meta2 = {
+    v: SNAPSHOT_VERSION,
+    id,
+    name: page?.name ?? collected.title ?? id,
+    url,
+    runner: "scan",
+    ...collected.viewport ? { viewport: collected.viewport } : {},
+    ...page?.auth !== void 0 ? { auth: page.auth } : {},
+    ...page?.notes ? { notes: page.notes } : {}
+  };
+  const v = validateSnapshotMeta(meta2);
+  if (!v.ok || !v.meta) return void 0;
+  try {
+    writeSnapshot(root, {
+      meta: v.meta,
+      dom: collected.dom,
+      ...collected.styles ? { styles: collected.styles } : {},
+      ...collected.boxes ? { boxes: collected.boxes } : {},
+      ...collected.css ? { css: collected.css } : {},
+      ...collected.screenshot ? { screenshotBase64: collected.screenshot } : {}
+    });
+  } catch {
+    return void 0;
+  }
+  return v.meta.id;
+}
 var PROBE_FIELDS = [
   { key: "focusVisible", engine: "focus-visible" },
   { key: "reflowZoom", engine: "reflow-zoom" },
@@ -52285,13 +52349,14 @@ var PROBE_FIELDS = [
   { key: "inputOverflowSpacing", engine: "input-overflow-spacing" },
   { key: "liveRegion", engine: "live-region" }
 ];
-function runRunner(target, isFile, tag) {
+function runRunner(target, isFile, tag, snapshot = true) {
   const args2 = ["run", "--rm"];
+  if (!snapshot) args2.push("-e", "ULTRA11Y_SNAPSHOT=0");
   if (isFile) args2.push("-v", `${resolve5(target)}:${MOUNT}:ro`);
   args2.push(tag, isFile ? MOUNT : target);
   let stdout;
   try {
-    stdout = execFileSync4("docker", args2, { encoding: "utf8", timeout: 24e4, maxBuffer: 32 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+    stdout = execFileSync4("docker", args2, { encoding: "utf8", timeout: 24e4, maxBuffer: 192 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
   } catch (e) {
     const err2 = e;
     const detail = (err2.stderr ? String(err2.stderr).trim() : "") || err2.message || String(e);
@@ -52379,8 +52444,9 @@ function runScan(opts) {
   const tag = opts.tag ?? IMAGE_TAG;
   if (!imageExists(tag)) buildImage(tag);
   const isFile = !isUrl3 && existsSync19(opts.target) && statSync8(opts.target).isFile();
-  const out2 = runRunner(opts.target, isFile, tag);
-  return { ...toDynamicResult(out2, opts.target), testedScs: [...DOCKER_TESTED_SCS] };
+  const out2 = runRunner(opts.target, isFile, tag, Boolean(opts.snapshotRoot));
+  const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, opts.target) : void 0;
+  return { ...toDynamicResult(out2, opts.target), testedScs: [...DOCKER_TESTED_SCS], ...id ? { snapshots: [id] } : {} };
 }
 async function fetchHtml(url) {
   try {
@@ -52401,15 +52467,18 @@ async function discoverUrls(opts) {
   }
   return [];
 }
-function runScanMany(urls, tag = IMAGE_TAG) {
+function runScanMany(urls, tag = IMAGE_TAG, snapshotRoot) {
   if (!dockerAvailable()) {
     throw new Error("Docker is not available. Start Docker, then re-run `scan`.");
   }
   if (!imageExists(tag)) buildImage(tag);
   const findings = [];
+  const snapshots = [];
   for (const url of urls) {
-    const out2 = runRunner(url, false, tag);
+    const out2 = runRunner(url, false, tag, Boolean(snapshotRoot));
     findings.push(...toDynamicResult(out2, url).findings);
+    const id = snapshotRoot ? writeRunnerSnapshot(snapshotRoot, out2, url) : void 0;
+    if (id) snapshots.push(id);
   }
   return {
     tool: "ultra11y",
@@ -52417,7 +52486,8 @@ function runScanMany(urls, tag = IMAGE_TAG) {
     target: `${urls.length} page(s)`,
     date: today(),
     findings,
-    testedScs: [...DOCKER_TESTED_SCS]
+    testedScs: [...DOCKER_TESTED_SCS],
+    ...snapshots.length ? { snapshots } : {}
   };
 }
 function tagSampleFindings(findings, page) {
@@ -52426,15 +52496,18 @@ function tagSampleFindings(findings, page) {
   }
   return findings;
 }
-function runSampleScan(pages, tag = IMAGE_TAG) {
+function runSampleScan(pages, tag = IMAGE_TAG, snapshotRoot) {
   if (!dockerAvailable()) {
     throw new Error("Docker is not available. Start Docker, then re-run `scan`.");
   }
   if (!imageExists(tag)) buildImage(tag);
   const findings = [];
+  const snapshots = [];
   for (const page of pages) {
-    const out2 = runRunner(page.url, false, tag);
+    const out2 = runRunner(page.url, false, tag, Boolean(snapshotRoot));
     findings.push(...tagSampleFindings(toDynamicResult(out2, page.url).findings, page));
+    const id = snapshotRoot ? writeRunnerSnapshot(snapshotRoot, out2, page.url, page) : void 0;
+    if (id) snapshots.push(id);
   }
   return {
     tool: "ultra11y",
@@ -52443,7 +52516,8 @@ function runSampleScan(pages, tag = IMAGE_TAG) {
     date: today(),
     findings,
     sample: sampleScope({ pages }),
-    testedScs: [...DOCKER_TESTED_SCS]
+    testedScs: [...DOCKER_TESTED_SCS],
+    ...snapshots.length ? { snapshots } : {}
   };
 }
 async function runCrawlScan(opts) {
@@ -52451,7 +52525,7 @@ async function runCrawlScan(opts) {
   if (urls.length === 0) {
     throw new Error("No URL to scan (empty/unreachable sitemap, or entry page with no same-origin link).");
   }
-  return runScanMany(urls, opts.tag ?? IMAGE_TAG);
+  return runScanMany(urls, opts.tag ?? IMAGE_TAG, opts.snapshotRoot);
 }
 var sevRank = { bloquant: 3, majeur: 2, mineur: 1 };
 function resolveHostAnchor(file, snippet2) {
@@ -52536,6 +52610,10 @@ function mergeDynamic(audit2, dynamic, lang = "en") {
   }
   const nowNc = new Set(dynamic.findings.filter((d) => !d.advisory).map((d) => d.criteriaId));
   merged.residualRisks = merged.residualRisks.filter((r) => !nowNc.has(r.criteriaId));
+  recomputeTallies2(merged);
+  return merged;
+}
+function recomputeTallies2(merged) {
   merged.guidelines = allGuidelines().map((g) => {
     const inG = merged.criteria.filter((c2) => c2.guideline === g.number);
     return {
@@ -52551,6 +52629,32 @@ function mergeDynamic(audit2, dynamic, lang = "en") {
   const conform = decided.filter((c2) => c2.status === "C").length;
   merged.conformancePct = decided.length === 0 ? 100 : Math.round(conform / decided.length * 100);
   merged.findings.sort((a, b) => sevRank[b.severity] - sevRank[a.severity]);
+}
+function mergeSnapshotAudit(base, snap) {
+  const merged = JSON.parse(JSON.stringify(base));
+  const byId2 = new Map(merged.criteria.map((c2) => [c2.id, c2]));
+  const snapById = new Map(snap.criteria.map((c2) => [c2.id, c2]));
+  for (const f of snap.findings) {
+    const c2 = byId2.get(f.criteriaId);
+    if (!c2) continue;
+    c2.findings.push(f);
+    merged.findings.push(f);
+    if (!f.advisory) {
+      c2.status = "NC";
+      delete c2.justification;
+    }
+  }
+  if (snap.packFindings?.length) merged.packFindings = [...merged.packFindings ?? [], ...snap.packFindings];
+  for (const c2 of merged.criteria) {
+    if (c2.status !== "NA") continue;
+    if (snapById.get(c2.id)?.status === "C") {
+      c2.status = "C";
+      delete c2.justification;
+    }
+  }
+  const nowNc = new Set(snap.findings.filter((f) => !f.advisory).map((f) => f.criteriaId));
+  merged.residualRisks = merged.residualRisks.filter((r) => !nowNc.has(r.criteriaId));
+  recomputeTallies2(merged);
   return merged;
 }
 
@@ -53063,6 +53167,20 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
     await page.waitForLoadState("networkidle", { timeout: 8e3 }).catch(() => {
     });
     await page.waitForTimeout(1200);
+    let snapshot;
+    let screenshot;
+    if (opts.snapshot !== false) {
+      try {
+        snapshot = await page.evaluate(COLLECT_SNAPSHOT);
+      } catch {
+      }
+      if (snapshot) {
+        try {
+          screenshot = (await page.screenshot({ fullPage: false })).toString("base64");
+        } catch {
+        }
+      }
+    }
     const axeRes = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
     const violations = axeRes.violations.map((v) => ({
       id: v.id,
@@ -53103,7 +53221,8 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
       inputOverflowReflow,
       inputOverflowZoom,
       inputOverflowSpacing,
-      liveRegion
+      liveRegion,
+      ...snapshot ? { snapshot: { ...snapshot, ...screenshot ? { screenshot } : {} } } : {}
     };
   } finally {
     await context.close();
@@ -53124,9 +53243,11 @@ async function runScanLocal(opts) {
       storageState: opts.storageState,
       interact,
       allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
-      lang
+      lang,
+      snapshot: Boolean(opts.snapshotRoot)
     });
-    return { ...toDynamicResult(out2, opts.target, lang, LOCAL_ENGINE), testedScs: localTestedScs(interact) };
+    const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, opts.target) : void 0;
+    return { ...toDynamicResult(out2, opts.target, lang, LOCAL_ENGINE), testedScs: localTestedScs(interact), ...id ? { snapshots: [id] } : {} };
   } finally {
     await browser.close();
   }
@@ -53137,20 +53258,32 @@ async function runScanManyLocal(urls, opts) {
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
   const browser = await launchChromium(chromium);
   const findings = [];
+  const snapshots = [];
   try {
     for (const url of urls) {
       const out2 = await runOnPage(browser, AxeBuilder, url, false, {
         storageState: opts.storageState,
         interact,
         allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
-        lang
+        lang,
+        snapshot: Boolean(opts.snapshotRoot)
       });
       findings.push(...toDynamicResult(out2, url, lang, LOCAL_ENGINE).findings);
+      const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, url) : void 0;
+      if (id) snapshots.push(id);
     }
   } finally {
     await browser.close();
   }
-  return { tool: "ultra11y", engine: LOCAL_ENGINE, target: `${urls.length} page(s)`, date: today(), findings, testedScs: localTestedScs(interact) };
+  return {
+    tool: "ultra11y",
+    engine: LOCAL_ENGINE,
+    target: `${urls.length} page(s)`,
+    date: today(),
+    findings,
+    testedScs: localTestedScs(interact),
+    ...snapshots.length ? { snapshots } : {}
+  };
 }
 async function runSampleScanLocal(pages, opts) {
   const lang = opts.lang ?? "en";
@@ -53158,6 +53291,7 @@ async function runSampleScanLocal(pages, opts) {
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
   const browser = await launchChromium(chromium);
   const findings = [];
+  const snapshots = [];
   try {
     for (const page of pages) {
       const storageState = page.storageState ?? opts.storageState;
@@ -53166,9 +53300,12 @@ async function runSampleScanLocal(pages, opts) {
         storageState,
         interact,
         allowClicks: clicksAllowed(storageState, opts.interactClicks),
-        lang
+        lang,
+        snapshot: Boolean(opts.snapshotRoot)
       });
       findings.push(...tagSampleFindings(toDynamicResult(out2, page.url, lang, LOCAL_ENGINE).findings, page));
+      const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, page.url, page) : void 0;
+      if (id) snapshots.push(id);
     }
   } finally {
     await browser.close();
@@ -53180,7 +53317,8 @@ async function runSampleScanLocal(pages, opts) {
     date: today(),
     findings,
     sample: sampleScope({ pages }),
-    testedScs: localTestedScs(interact)
+    testedScs: localTestedScs(interact),
+    ...snapshots.length ? { snapshots } : {}
   };
 }
 async function runCrawlScanLocal(opts) {
@@ -56663,7 +56801,7 @@ Usage:
   ultra11y fix      <globs\u2026 | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
-  ultra11y scan     <url|file\u2026> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--merge <audit.json>] [--out <dir>] [--json]
+  ultra11y scan     <url|file\u2026> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--runtime \u2026] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime \u2026] [--cwd <dir>] [--merge <audit.json>] [--json]
   ultra11y scan     --clean        (remove the dynamic-tier Docker image + temp contexts)
@@ -56943,6 +57081,10 @@ Options:
   --sample           scan: scan the NORMATIVE page sample from .ultra11yrc.json (its
                      sample.pages), per-page storage-state overriding --storage-state,
                      aggregating one result with per-page provenance for the report
+  --no-snapshot      scan: do NOT persist each scanned page to .ultra11y/pages/<id>/.
+                     Snapshots are ON by default: the browser is already on the page, and
+                     without one the page can never be re-audited offline nor earn a
+                     per-page verdict (its criteria stay \xAB to assess \xBB forever)
   --clean            scan: remove the dynamic-tier image + temp contexts, then exit
   --semantic         verify: fold the support-check into one pass
                      check: engage the semantic gate \u2014 requires an adjudicated verdicts
@@ -57070,6 +57212,7 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "docker",
   "no-interact",
   "interact-clicks",
+  "no-snapshot",
   "clean",
   "sample",
   "eco",
@@ -57458,18 +57601,15 @@ async function cmdSnapshot(p) {
       ...payload.styles ? { styles: payload.styles } : {},
       ...payload.boxes ? { boxes: payload.boxes } : {},
       ...payload.axtree ? { axtree: payload.axtree } : {},
-      ...payload.css ? { css: payload.css } : {}
+      ...payload.css ? { css: payload.css } : {},
+      // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
+      // pixel tier. writeSnapshot owns the decoding, so every producer — this command, the
+      // dev side-car, `scan` — writes it the one same way.
+      ...typeof payload.screenshot === "string" && payload.screenshot ? { screenshotBase64: payload.screenshot } : {}
     });
   } catch (e) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
-  }
-  if (typeof payload.screenshot === "string" && payload.screenshot) {
-    try {
-      writeFileSync16(join45(dir, "screen.png"), Buffer.from(payload.screenshot, "base64"));
-    } catch {
-      console.error("ultra11y snapshot write: the screenshot could not be written \u2014 the pixel tier will be skipped for this page.");
-    }
   }
   const result = runAudit({ inputs: [join45(dir, "dom.html")], onWarn: (m) => console.error(m) });
   const failOnRaw = p.flags["fail-on"];
@@ -58206,6 +58346,7 @@ async function cmdScan(p) {
   const interactClicks = p.flags["interact-clicks"] === true;
   const sitemap = typeof p.flags.sitemap === "string" ? p.flags.sitemap : void 0;
   const crawl = typeof p.flags.crawl === "string" ? p.flags.crawl : void 0;
+  const snapshotRoot = p.flags["no-snapshot"] === true ? void 0 : process.cwd();
   const useSample = p.flags.sample === true;
   let sampleConfig;
   if (useSample) {
@@ -58240,11 +58381,11 @@ async function cmdScan(p) {
   let dynamic;
   try {
     if (useSample && sampleConfig) {
-      dynamic = useLocal ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks }) : runSampleScan(sampleConfig.pages);
+      dynamic = useLocal ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot }) : runSampleScan(sampleConfig.pages, void 0, snapshotRoot);
     } else if (sitemap || crawl) {
       const depth = typeof p.flags.depth === "string" ? Number(p.flags.depth) : void 0;
       const max = typeof p.flags.max === "string" ? Number(p.flags.max) : void 0;
-      dynamic = useLocal ? await runCrawlScanLocal({ sitemap, crawl, depth, max, cwd, storageState, lang, interact, interactClicks }) : await runCrawlScan({ sitemap, crawl, depth, max });
+      dynamic = useLocal ? await runCrawlScanLocal({ sitemap, crawl, depth, max, cwd, storageState, lang, interact, interactClicks, snapshotRoot }) : await runCrawlScan({ sitemap, crawl, depth, max, snapshotRoot });
     } else {
       const targets = p.positionals.filter((a) => a !== "-");
       if (targets.length === 0) {
@@ -58252,9 +58393,9 @@ async function cmdScan(p) {
         return 2;
       }
       if (useLocal) {
-        dynamic = targets.length === 1 ? await runScanLocal({ target: targets[0], cwd, storageState, lang, interact, interactClicks }) : await runScanManyLocal(targets, { cwd, storageState, lang, interact, interactClicks });
+        dynamic = targets.length === 1 ? await runScanLocal({ target: targets[0], cwd, storageState, lang, interact, interactClicks, snapshotRoot }) : await runScanManyLocal(targets, { cwd, storageState, lang, interact, interactClicks, snapshotRoot });
       } else {
-        dynamic = targets.length === 1 ? runScan({ target: targets[0] }) : runScanMany(targets);
+        dynamic = targets.length === 1 ? runScan({ target: targets[0], snapshotRoot }) : runScanMany(targets, void 0, snapshotRoot);
       }
     }
   } catch (e) {
@@ -58296,14 +58437,31 @@ async function cmdScan(p) {
       }
       audit2 = parsed;
     }
-    const merged = mergeDynamic(audit2, dynamic, lang);
+    let merged = mergeDynamic(audit2, dynamic, lang);
+    if (dynamic.snapshots?.length) {
+      const doms = dynamic.snapshots.map((id) => join45(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f) => existsSync30(f));
+      if (doms.length) {
+        const snapAudit = runAudit({ inputs: doms, onWarn: (m) => console.error(m) });
+        merged = mergeSnapshotAudit(merged, snapAudit);
+      }
+      const scope = pageScopesFrom(readSnapshots(snapshotRoot ?? "."));
+      if (scope.length) {
+        merged.scope.pages = scope;
+        attributePages(merged, scope);
+      }
+    }
     mkdirSync14(out2, { recursive: true });
     writeFileSync16(join45(out2, "audit-latest.json"), JSON.stringify(merged, null, 2) + "\n");
     if (p.flags.json) console.log(JSON.stringify(merged, null, 2));
-    else
+    else {
       console.log(
         lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join45(out2, "audit-latest.json")} (${merged.conformancePct}% r\xE9ussite, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join45(out2, "audit-latest.json")} (${merged.conformancePct}% pass rate, ${merged.findings.length} findings).`
       );
+      if (dynamic.snapshots?.length)
+        console.log(
+          lang === "fr" ? `${dynamic.snapshots.length} instantan\xE9(s) de page \xE9crit(s) dans ${PAGES_DIR}/ \u2014 committez-les pour auditer ces pages hors ligne (\`ultra11y pages\`).` : `${dynamic.snapshots.length} page snapshot(s) written to ${PAGES_DIR}/ \u2014 commit them to audit those pages offline (\`ultra11y pages\`).`
+        );
+    }
     return 0;
   }
   if (p.flags.json) console.log(JSON.stringify(dynamic, null, 2));
@@ -58312,6 +58470,12 @@ async function cmdScan(p) {
       lang === "fr" ? `Audit dynamique (${dynamic.engine}) de ${dynamic.target} \u2014 ${dynamic.findings.length} non-conformit\xE9(s) :` : `Dynamic audit (${dynamic.engine}) of ${dynamic.target} \u2014 ${dynamic.findings.length} non-conformity(ies):`
     );
     for (const f of dynamic.findings.slice(0, 30)) console.log(`  [${f.criteriaId}] ${f.selector} \u2014 ${f.message}`);
+    if (dynamic.snapshots?.length)
+      console.log(
+        lang === "fr" ? `
+${dynamic.snapshots.length} instantan\xE9(s) de page \xE9crit(s) dans ${PAGES_DIR}/ \u2014 \`ultra11y audit\` les reprend automatiquement.` : `
+${dynamic.snapshots.length} page snapshot(s) written to ${PAGES_DIR}/ \u2014 \`ultra11y audit\` picks them up automatically.`
+      );
   }
   return 0;
 }

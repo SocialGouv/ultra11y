@@ -298,6 +298,15 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   rather than guessed, and without signals the rules do not fire, so no pre-existing verdict
   changes. `tests/rgaa-coverage.test.ts` ratchets the result: **48 of 106** RGAA criteria now
   map onto an engine rule, up from 43, and the number can only go up.
+- **Every scanned page is a snapshot** — `scan` no longer keeps only findings: each page it
+  visits is persisted to `.ultra11y/pages/<id>/` (`--no-snapshot` opts out). That is what turns
+  a URL into a real per-page verdict — a page known only by its URL can never be conforming by
+  silence, so a sitemap-driven audit used to produce an almost empty grid. With a snapshot the
+  page-scoped rules run (**RGAA 8.3 / 8.5 / 8.6**), the DOM **JavaScript built at runtime** is
+  audited like any other markup, and the page re-audits **offline, with no browser**. The
+  collection happens on the *pristine* page — before axe injects its source and before any probe
+  fills an input or resizes the viewport — otherwise the snapshot would record our own
+  instrumentation instead of the site.
 - **Page by page** — RGAA is a per-page norm; the engine's verdict is scope-wide. `pages`
   bridges the two: one row per criterion, one column per page, embedded in `report` and
   rebuilt from a committed `audit.json` alone. The per-page status is not recomputed — a

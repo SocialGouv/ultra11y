@@ -512,4 +512,10 @@ export interface DynamicResult {
   // local: + zoom / text spacing / focus / hover (+ live regions when interactions are
   // on). Merged into AuditResult.scope.scan by mergeDynamic. Optional/additive.
   testedScs?: string[];
+  // Page ids of the SNAPSHOTS this run persisted under `.ultra11y/pages/<id>/`. A scan
+  // already has the browser on the page, so it collects the document as well as the
+  // findings — otherwise a URL-scanned page could never earn a conforming verdict (the
+  // static rules never ran against its DOM, so src/pages.ts keeps it `manual` forever).
+  // Empty/absent when snapshotting was off or every collection failed. Optional/additive.
+  snapshots?: string[];
 }
