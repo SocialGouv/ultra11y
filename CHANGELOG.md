@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [2.31.0](https://github.com/maxgfr/ultra11y/compare/v2.30.0...v2.31.0) (2026-08-11)
+
+
+### Features
+
+* page-by-page auditing — snapshots, per-page report, e2e plugins, Action, judge, extension ([88da5ec](https://github.com/maxgfr/ultra11y/commit/88da5ec78bea1adbeafd9edaaf499988e3077bcb))
+
 # [2.30.0](https://github.com/maxgfr/ultra11y/compare/v2.29.0...v2.30.0) (2026-08-06)
 
 
