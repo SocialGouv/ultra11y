@@ -121,6 +121,17 @@ describe("renderAuditorUnit", () => {
     expect(md).toContain("- _rendered capture of `src/a.tsx` — source `captures/storybook-dump.html`_");
   });
 
+  it("says nothing rather than 'capture of X — X' when the provenance names no source", () => {
+    // A page snapshot whose producer wrote no provenance comment: identity is synthesized from
+    // the path, so origin carries the capture file and nothing else — and the finding's own file
+    // IS that capture. The line would be tautological.
+    const u = unit("1.1.1", "Non-text Content");
+    u.findings[0]!.file = ".ultra11y/pages/accueil/dom.html";
+    u.findings[0]!.origin = { capture: ".ultra11y/pages/accueil/dom.html" };
+    const md = renderAuditorUnit(u, "wcag", "en").join("\n");
+    expect(md).not.toContain("rendered capture of");
+  });
+
   it("appends the deviation note for a finding projected via a secondary crosswalk mapping", () => {
     const u = unit("1.1.1", "Non-text Content");
     u.findings[0]!.secondary = { note: "Relève aussi de ce critère selon le référentiel." };

@@ -78,6 +78,13 @@ export function crossToFinding(doc: Doc, ruleId: string, def: Severity, cf: Cros
     // regex transform), so its cross-file findings are provisional too — otherwise a cross
     // finding reads as definitive while the per-doc findings in the same file are preliminary.
     ...(doc.kind === "sfc" || doc.kind === "jsx-lossy" ? { preliminary: true } : {}),
+    // Capture provenance, exactly as src/rules/rule.ts does it. No cross rule can reach a page
+    // snapshot today (the two that raise findings resolve through the component graph, and a
+    // serialized DOM has no node in it), so this changes no current output — it is here so the
+    // three Finding constructors stay in step, and a cross rule that later does become reachable
+    // on a full document is attributed like everything else instead of silently orphaned.
+    ...(doc.capture ? { origin: { capture: doc.file, sourceFile: doc.capture.sourceFile, component: doc.capture.component } } : {}),
+    ...(doc.capture?.page ? { page: doc.capture.page } : {}),
     ...(cf.related ? { related: cf.related } : {}),
   };
 }

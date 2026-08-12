@@ -217,7 +217,14 @@ export function renderAuditorUnit(unit: PrdUnit, standard: StandardId, lang: Lan
       const comp = f.origin.component ?? f.origin.sourceFile ?? f.file;
       const srcFile = f.origin.sourceFile ?? f.origin.capture;
       const src = f.origin.sourceFile && f.origin.sourceLine !== undefined ? `${f.origin.sourceFile}:${f.origin.sourceLine}` : srcFile;
-      out.push(`  - _${s.captureOf(comp, src)}_`);
+      // Both halves collapsing to the same path means the line says "capture of X — X", which
+      // tells the reader nothing. That is what a PAGE SNAPSHOT looks like when its producer wrote
+      // no provenance comment: identity is synthesized from the path (src/audit.ts foldDoc), so
+      // `origin` carries the capture file and neither a source nor a component, and the finding's
+      // own file IS that capture. A Storybook dump, whose capture differs from the file it is
+      // attributed to, still says something and still renders. Suppressed HERE rather than by
+      // dropping `origin` from the Finding — six other consumers read that field.
+      if (comp !== src) out.push(`  - _${s.captureOf(comp, src)}_`);
     }
   }
   out.push("");

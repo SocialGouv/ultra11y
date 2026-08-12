@@ -4,10 +4,11 @@
 // a pack rule could be NC in the report and reach no cell of the grid, while the grid's own
 // docstring claimed the two agree "by construction".
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAudit } from "../src/audit.js";
+import { PAGES_DIR } from "../src/snapshot.js";
 import { attributePages, derivePages, renderPageGrid } from "../src/pages.js";
 import { toSarif } from "../src/sarif.js";
 import { annotations, stepSummary } from "../src/annotate.js";
@@ -160,6 +161,25 @@ describe("the work that is NOT a non-conformity is still shown", () => {
 
   it("adds nothing to the WCAG core PRD — this is a country-standard concern", () => {
     expect(renderPrdDoc(r(), "en")).not.toMatch(/Criteria to rule on/);
+  });
+
+  it("carries the page when raised on a snapshot, so the grid can see it", () => {
+    // Same regression as the module header, re-opened through the snapshot door: pack rules
+    // build their Finding without going through src/rules/rule.ts, so they used to skip capture
+    // provenance entirely and stay unattributed even when the DOM knew which page it was.
+    const snapRoot = mkdtempSync(join(tmpdir(), "u11y-packsnap-"));
+    const snapDir = join(snapRoot, PAGES_DIR, "docs");
+    mkdirSync(snapDir, { recursive: true });
+    writeFileSync(join(snapDir, "meta.json"), JSON.stringify({ v: 1, id: "docs", name: "Docs", url: "https://x/docs" }));
+    writeFileSync(
+      join(snapDir, "dom.html"),
+      `<!doctype html><html lang="fr"><head><title>Docs</title></head><body><main><h1>Docs</h1>
+<a href="/rapport.pdf">Rapport annuel</a></main></body></html>`,
+    );
+    const res = runAudit({ inputs: [join(snapRoot, PAGES_DIR)] });
+    const pack = res.packFindings ?? [];
+    expect(pack.length).toBeGreaterThan(0);
+    for (const f of pack) expect(f.page).toBe("docs");
   });
 
   it("never lets a manual criterion into the NON-CONFORMITY channel", () => {

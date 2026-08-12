@@ -89,6 +89,12 @@ function toFinding(doc: Doc, el: El, rule: PackRule, packKey: string): Finding {
       message: { en: rule.message.en, fr: rule.message.fr },
       remediation: { en: rule.remediation.en, fr: rule.remediation.fr },
     },
+    // Capture provenance, exactly as src/rules/rule.ts does it — keep the three constructors in
+    // step. A pack finding that skips this stays unattributed, so `pageView`'s
+    // `packFindings.filter(f => f.page === page.id)` (src/pages.ts) yields nothing and a pack rule
+    // can be NC in the report while reaching no cell of the per-page grid.
+    ...(doc.capture ? { origin: { capture: doc.file, sourceFile: doc.capture.sourceFile, component: doc.capture.component } } : {}),
+    ...(doc.capture?.page ? { page: doc.capture.page } : {}),
     ...(rule.advisory ? { advisory: true } : {}),
   };
 }

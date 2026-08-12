@@ -7,7 +7,7 @@
         "rule": "broken-image",
         "value": "<img>",
         "createdAt": "2026-08-12T13:38:12.635Z",
-        "reason": "test fixture: the string is audited MARKUP inside an ultra11y Finding.snippet, never a rendered image"
+        "reason": "test fixture: the snippet field of an a11y finding in ultra11y's own auditor tests — a bare <img> lacking alt IS the audited defect, not shipped UI"
       }
     ]
   }
