@@ -3,6 +3,7 @@ import { runAudit } from "../src/audit.js";
 import { derivePages, pageScopesFrom } from "../src/pages.js";
 import { renderPageDocument, renderPagesDocument, renderPagesIndex, renderPageReport, isPagesReport } from "../src/pages-report.js";
 import { checkReport } from "../src/check.js";
+import { AUDITOR_OCCURRENCE } from "../src/verify.js";
 import { renderPackReport, renderReport } from "../src/report.js";
 import { derivePackResults, loadPack, packTestIds } from "../src/standards/index.js";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
@@ -155,6 +156,34 @@ describe("the index", () => {
     // <img> with no alt + <button> with no name are both blocking.
     expect(contactRow).toMatch(/\| 2 \| 0 \| 0 \|/);
     expect(accueilRow).toMatch(/\| 0 \| 0 \| 0 \|/);
+  });
+
+  it("folds a page sheet's repeated occurrences without changing what it claims", () => {
+    // 12 links failing one DSFR rule with one selector is ONE defect to fix and twelve places to
+    // fix it. Listing twelve near-identical lines is what would trade an empty report for an
+    // unreadable one — but the count and the adjudicable items must not move.
+    const p = derived.find((x) => x.id === "contact")!;
+    const one = p.findings.find((f) => !f.advisory)!;
+    // Twelve occurrences of one rule on one selector, as a design-system defect produces. The
+    // clones must reach the CRITERION's own finding list — that is what prdUnits reads.
+    const clones = Array.from({ length: 11 }, (_, i) => ({ ...one, col: 40 + i }));
+    const many: PageResult = {
+      ...p,
+      findings: [...p.findings, ...clones],
+      criteria: p.criteria.map((c) => (c.id === one.criteriaId ? { ...c, findings: [...c.findings, ...clones] } : c)),
+    };
+    const sheet = renderPageReport(result, many, { standard: "rgaa", lang: "fr" });
+
+    // Folded for the reader: one counted header instead of twelve near-identical lines.
+    expect(sheet).toContain("· ×12");
+    // ...and untouched for the gate: every occurrence still has its own adjudicable line, the
+    // counted header excluded. Not an equality with the finding count — under a pack one finding
+    // legitimately projects onto several criteria, so the fan-out can exceed it; what must never
+    // happen is the fold REDUCING it.
+    const normative = many.findings.filter((f) => !f.advisory).length;
+    expect(sheet.split("\n").filter((l) => AUDITOR_OCCURRENCE.test(l)).length).toBeGreaterThanOrEqual(normative);
+    // ...and untouched for the reader's arithmetic: the block still claims the raw count.
+    expect(sheet).toContain("12 occurrence");
   });
 
   it("never prints a bare rate — every cell carries the denominator it was computed over", () => {

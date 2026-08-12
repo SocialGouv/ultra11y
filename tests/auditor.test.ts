@@ -2,7 +2,26 @@ import { describe, it, expect } from "vitest";
 import type { AuditResult } from "../src/types.js";
 import type { PrdUnit } from "../src/prd.js";
 import { renderAuditorUnit, renderAuditorBacklog, renderAuditorPerCriterion } from "../src/auditor.js";
+import { AUDITOR_OCCURRENCE } from "../src/verify.js";
 import { vocabularyFor } from "../src/standards/vocabulary.js";
+
+/** A repeated rendered-tier occurrence: one design-system defect, many routes. All of them are
+ *  anchored at the same line (a client-rendered DOM serializes onto one line), so `col` is what
+ *  distinguishes them — exactly the shape the per-page sheet has to fold. */
+function rep(selector: string, col: number) {
+  return {
+    ruleId: "rendered-link-colour-only",
+    criteriaId: "1.4.1",
+    file: ".ultra11y/pages/accueil/dom.html",
+    line: 2,
+    col,
+    selectorHint: selector,
+    severity: "majeur" as const,
+    message: "lien identifié par la couleur seule",
+    remediation: "Ajoutez un indice non coloré",
+    snippet: "<a>",
+  };
+}
 
 function unit(criteriaId: string, title: string, refs: string[] = []): PrdUnit {
   return {
@@ -119,6 +138,46 @@ describe("renderAuditorUnit", () => {
     u.findings[0]!.origin = { capture: "captures/storybook-dump.html" };
     const md = renderAuditorUnit(u, "wcag", "en").join("\n");
     expect(md).toContain("- _rendered capture of `src/a.tsx` — source `captures/storybook-dump.html`_");
+  });
+
+  it("does not collapse by default — every existing consumer keeps its exact output", () => {
+    const u = unit("1.4.1", "Use of Color");
+    u.findings = [rep("a.fr-link", 41), rep("a.fr-link", 88), rep("a.fr-link", 120)];
+    const md = renderAuditorUnit(u, "wcag", "en").join("\n");
+    expect(md).not.toContain("×3");
+    expect(md.split("\n").filter((l) => AUDITOR_OCCURRENCE.test(l))).toHaveLength(3);
+    // Flush, never indented, when nothing is folded.
+    expect(md).not.toMatch(/^ +- \[ \] /m);
+  });
+
+  it("folds repeated occurrences of one rule+selector under a counted header when asked", () => {
+    const u = unit("1.4.1", "Use of Color");
+    u.findings = [rep("a.fr-link", 41), rep("a.fr-link", 88), rep("a.fr-btn", 12)];
+    const md = renderAuditorUnit(u, "wcag", "en", { collapse: true }).join("\n");
+    expect(md).toContain("· ×2");
+    // The lone occurrence is not given a header, and stays flush.
+    expect(md).not.toContain("· ×1");
+  });
+
+  it("HONESTY: folding changes what is scanned, never what is claimed or adjudicated", () => {
+    const u = unit("1.4.1", "Use of Color");
+    u.findings = [rep("a.fr-link", 41), rep("a.fr-link", 88), rep("a.fr-link", 120), rep("a.fr-btn", 12)];
+    const md = renderAuditorUnit(u, "wcag", "en", { collapse: true }).join("\n");
+    // The block still announces the raw occurrence count...
+    expect(md).toContain("4 occurrence(s)");
+    // ...the group counts still sum to it...
+    const sum = [...md.matchAll(/· ×(\d+)/g)].reduce((n, m) => n + Number(m[1]), 0);
+    expect(sum + 1).toBe(4); // the ×3 group plus the ungrouped singleton
+    // ...and every occurrence still has its own parseable checkbox line.
+    expect(md.split("\n").filter((l) => AUDITOR_OCCURRENCE.test(l))).toHaveLength(4);
+  });
+
+  it("keeps a group HEADER out of the verify worklist — one item per finding, never per group", () => {
+    const u = unit("1.4.1", "Use of Color");
+    u.findings = [rep("a.fr-link", 41), rep("a.fr-link", 88)];
+    const md = renderAuditorUnit(u, "wcag", "en", { collapse: true }).join("\n");
+    const header = md.split("\n").find((l) => l.includes("· ×2"))!;
+    expect(AUDITOR_OCCURRENCE.test(header)).toBe(false);
   });
 
   it("says nothing rather than 'capture of X — X' when the provenance names no source", () => {

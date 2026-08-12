@@ -291,11 +291,11 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
 
   out.push(`${h}# ${s.ncTitle}`, "");
   if (!ncUnits.length) out.push(s.noNc, "");
-  else for (const u of ncUnits) out.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##` }));
+  else for (const u of ncUnits) out.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##`, collapse: true }));
 
   if (advUnits.length) {
     out.push(`${h}# 💡 ${s.recTitle}`, "", `> ${s.recNote}`, "");
-    for (const u of advUnits) out.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##` }));
+    for (const u of advUnits) out.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##`, collapse: true }));
   }
 
   return out.join("\n");

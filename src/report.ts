@@ -30,6 +30,12 @@ import {
 const ICON: Record<Severity, string> = { bloquant: "🔴", majeur: "🟠", mineur: "🟡" };
 const SEV_ORDER: Severity[] = ["bloquant", "majeur", "mineur"];
 
+/** How many findings the « Constats par page » summary lists for one page before it stops. The
+ *  section is a summary — the page's own sheet carries the full list — but a cap that stops
+ *  silently is indistinguishable from a page that simply had nothing more, so the stop is
+ *  announced. */
+const PER_PAGE_MAX = 30;
+
 const L = {
   fr: {
     title: (std: string) => `Rapport d'audit d'accessibilité — ${std}`,
@@ -93,6 +99,8 @@ const L = {
     authYes: "🔒 authentification requise",
     authNo: "🌐 public",
     ncCount: "non-conformité(s)",
+    perPageMore: (hidden: number, total: number) =>
+      `✂️ ${hidden} autre(s) constat(s) sur cette page ne sont pas listés ici (${total} au total) — voir la fiche de page.`,
     advCount: "recommandation(s)",
     screenshotAlt: (n: string) => `Capture d'écran de la page ${n}`,
   },
@@ -157,6 +165,7 @@ const L = {
     authYes: "🔒 authentication required",
     authNo: "🌐 public",
     ncCount: "non-conformity(ies)",
+    perPageMore: (hidden: number, total: number) => `✂️ ${hidden} further finding(s) on this page are not listed here (${total} in total) — see its page sheet.`,
     advCount: "recommendation(s)",
     screenshotAlt: (n: string) => `Screenshot of the ${n} page`,
   },
@@ -363,11 +372,16 @@ function render(
         }
         out.push("", `![${s.screenshotAlt(pg.name)}](${href})`);
       }
-      for (const f of nc.slice(0, 30)) {
+      // Kept as it was — the point of this change is to DECLARE the cap, not to raise it.
+      for (const f of nc.slice(0, PER_PAGE_MAX)) {
         const crits = pack ? packCriteriaForFinding(pack, f) : [];
         const label = crits.length ? crits.join(", ") : f.criteriaId; // graceful fallback to the WCAG SC
         out.push(`  - [${label}] \`${f.selectorHint}\` — ${resolveMessage(f, lang)}`);
       }
+      // A cap that says nothing reads as a complete list. Say what was left out, in the same
+      // house style as the other scope caveats above — the count is right there in the heading,
+      // so a reader who stops at the thirtieth bullet must be told there is a thirty-first.
+      if (nc.length > PER_PAGE_MAX) out.push(`  - _${s.perPageMore(nc.length - PER_PAGE_MAX, nc.length)}_`);
       out.push("");
     }
   }

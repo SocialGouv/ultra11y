@@ -47,7 +47,12 @@ function auditorCriterionLine(standard: StandardId): RegExp {
 // One checklist occurrence line under a criterion block. Exported so tests can pin the
 // shared renderer (src/auditor.ts `occurrenceLine`) to this parser directly, rather than
 // re-deriving the grammar — the two must never drift apart.
-export const AUDITOR_OCCURRENCE = /^-\s\[ \]\s+`([^`]+):(\d+)`\s+\(`([^`]*)`\)\s+—\s+(.*)$/;
+// Leading whitespace is allowed so an occurrence may sit INDENTED under a group header (the
+// per-page sheet folds repeated occurrences of one rule+selector — src/auditor.ts `collapse`).
+// The fold is visual only: every occurrence keeps a parseable line, so the worklist this builds
+// holds exactly as many items grouped as ungrouped, and no claimed non-conformity escapes
+// adjudication by being tucked under a heading.
+export const AUDITOR_OCCURRENCE = /^\s*-\s\[ \]\s+`([^`]+):(\d+)`\s+\(`([^`]*)`\)\s+—\s+(.*)$/;
 // Any markdown heading (##/###/####) — leaving one resets the "current criterion" so
 // an occurrence-shaped line elsewhere in the document can never be mis-attributed.
 const HEADING_LINE = /^#{2,4}\s/;
