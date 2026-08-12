@@ -1,0 +1,101 @@
+# The ADJUDICATION tier, exercised for real — the half `ci.yml` cannot prove.
+#
+# `ci.yml` proves the keyless path: with no ANTHROPIC_API_KEY the tier evaporates and the
+# audit still ships. It stops there on purpose, because the keyed path costs money on every
+# run (roughly $0.20 per WCAG run, $0.50 per RGAA one — the worklist is re-sent whole each
+# time, and no batch is large enough to earn prompt caching). Putting that on every push
+# would bill a fleet of PRs for a signal that changes rarely.
+#
+# So it is dispatched by hand, and it reports the number that actually separates the two
+# modes: how many criteria stayed `manual`. That is where the API mode decloses — it rules
+# from harvested evidence alone (capped at 30 items per criterion, snippets truncated), while
+# the agent mode can open the files, which is what "link purpose IN CONTEXT" really asks for.
+name: Adjudication (keyed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Adjudication mode to exercise'
+        type: choice
+        options: [api, agent, both]
+        default: both
+      standard:
+        description: 'Standard to report against'
+        type: choice
+        options: [wcag, rgaa]
+        default: rgaa
+
+permissions:
+  contents: read
+
+jobs:
+  adjudicate:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse early if the secret is missing
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::error::this workflow exists to exercise the KEYED path; set the ANTHROPIC_API_KEY secret"
+            exit 1
+          fi
+
+      # The baseline: what the deterministic engine alone leaves undecided. Every number
+      # below is read against this one.
+      - name: Measure the unruled criteria BEFORE adjudication
+        id: before
+        run: |
+          node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
+          node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
+            --standard '${{ inputs.standard }}' --out /tmp/before --json > /tmp/before.json
+          n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/before.json","utf8")).count')
+          echo "manual=$n" >> "$GITHUB_OUTPUT"
+          echo "unruled before: $n"
+
+      - name: Adjudicate with the API
+        if: inputs.mode == 'api' || inputs.mode == 'both'
+        uses: ./
+        with:
+          paths: tests/fixtures/realworld
+          standard: ${{ inputs.standard }}
+          since: ""
+          fail-on: ""
+          sarif: "false"
+          comment: "false"
+          adjudicate: api
+          artifact-name: adjudication-api
+
+      - name: Adjudicate with an agent
+        if: inputs.mode == 'agent' || inputs.mode == 'both'
+        uses: ./
+        with:
+          paths: tests/fixtures/realworld
+          standard: ${{ inputs.standard }}
+          since: ""
+          fail-on: ""
+          sarif: "false"
+          comment: "false"
+          adjudicate: agent
+          artifact-name: adjudication-agent
+
+      # The metric. A tier that ruled on nothing is a tier that cost money to change nothing,
+      # and it should be visible as such rather than buried in a green check.
+      - name: Report what the tier actually decided
+        run: |
+          node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
+            --standard '${{ inputs.standard }}' --out /tmp/after --json > /tmp/after.json
+          after=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/after.json","utf8")).count')
+          before='${{ steps.before.outputs.manual }}'
+          echo "### Adjudication (${{ inputs.mode }}, ${{ inputs.standard }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| | criteria left to assess |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | ---: |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| before | $before |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| after | $after |" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$after" -ge "$before" ]; then
+            echo "::warning::the adjudication decided nothing — $before criteria before, $after after"
+          fi

@@ -64,6 +64,13 @@ verdict with no justification, an NC with no resolvable `normativeRef`, a criter
 from the adjudication — each is refused by name, and the run stops. That is what keeps the
 final report defensible.
 
+**The shipped GitHub Action now runs this pipeline for you.** `adjudicate: agent` performs
+steps 2–4 — `verify --manual`, then `orchestrate --run audits --phase adjudicate --eco`, then a
+`claude-code-action` run pointed at the emitted `RUNBOOK.md`, then `verify --apply`. Reach for
+the raw pipeline above when your orchestrator is *not* GitHub Actions, or when you want to fan
+step 3 out across subagents rather than walk the eco path. Either way steps 1, 2, 4, 5 and 6
+stay deterministic, and only step 3 involves a model.
+
 ## The adjudication contract
 
 `ADJUDICATE.todo.json` declares what may be written into it, so the filler never has to read

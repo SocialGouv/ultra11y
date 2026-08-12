@@ -236,6 +236,37 @@ jobs:
           fi
           echo "ok"
 
+      # The adjudication tier, on the one path CI can prove for free: NO key in the
+      # environment. The tier must then evaporate — the job stays green and the report is
+      # still written, with the judgment criteria still « to assess ». That is not a corner
+      # case: it is exactly what a fork's pull request looks like, where secrets are never
+      # exposed. The keyed path costs money per run, so it lives in a dispatchable workflow
+      # (.github/workflows/adjudication.yml) instead of on every push.
+      - name: The adjudication tier degrades when no key is present
+        id: keyless
+        uses: ./
+        with:
+          paths: tests/fixtures/non-conforming/bad.html
+          since: ""
+          fail-on: ""
+          sarif: "false"
+          comment: "false"
+          adjudicate: api
+          artifact-name: action-e2e-keyless-adjudication
+
+      - name: It still produced its report rather than dying on a missing secret
+        env:
+          REPORT: ${{ steps.keyless.outputs.report-path }}
+          FINDINGS: ${{ steps.keyless.outputs.findings }}
+        run: |
+          if [ ! -s "$REPORT" ]; then
+            echo "::error::the keyless adjudication path swallowed the report"; exit 1
+          fi
+          if [ "$FINDINGS" -le 0 ]; then
+            echo "::error::the keyless adjudication path lost the findings"; exit 1
+          fi
+          echo "ok"
+
       # The gate is the half a red build depends on, so prove it goes red — and that every
       # surface above it was still produced first.
       - name: The gate fails the job on a blocking finding
