@@ -325,6 +325,35 @@ export function isSnapshotDom(file: string): boolean {
   return posix.endsWith("/dom.html") && posix.includes(`${PAGES_DIR}/`);
 }
 
+/** The page id a snapshot's `dom.html` path carries, or undefined when the path is not one.
+ *
+ *  THE PATH IS PROVENANCE. `writeSnapshot` puts the page id in the directory name and repeats it
+ *  in the DOM's capture comment; the comment is what normally carries identity into
+ *  `Finding.page`. But the comment is only written by THIS engine — the on-disk layout is a
+ *  published contract (skills/ultra11y/references/pages.md), so a producer may write `meta.json`
+ *  and a raw `dom.html` and never emit it — and a finding re-read from a committed audit.json has
+ *  no comment to consult at all, only the file path it was raised on. Recovering the id from the
+ *  path is therefore the one route that works in both cases.
+ *
+ *  Everything here is deliberately strict, because the id it returns becomes a page attribution:
+ *  the segment pair comes from PAGES_DIR rather than from literals (one definition, no drift), the
+ *  LAST occurrence wins (a repo may itself live under a path containing `.ultra11y/pages`), and
+ *  the candidate must satisfy the same `ID_RE` a producer's meta.json is held to — so a stray
+ *  directory can never invent a page. Callers must still check the id is in scope before
+ *  attributing: see honesty rule 1 in src/pages.ts. */
+export function snapshotPageId(file: string | undefined): string | undefined {
+  if (!file) return undefined;
+  const segs = file.split("\\").join("/").split("/");
+  const marker = PAGES_DIR.split("/"); // [".ultra11y", "pages"] — never spelled out here
+  // Layout is fixed: …/<marker…>/<id>/dom.html, so the tail is the only place to look.
+  if (segs.length < marker.length + 2) return undefined;
+  if (segs[segs.length - 1] !== "dom.html") return undefined;
+  const idAt = segs.length - 2;
+  for (let i = 0; i < marker.length; i++) if (segs[idAt - marker.length + i] !== marker[i]) return undefined;
+  const id = segs[idAt];
+  return id !== undefined && ID_RE.test(id) ? id : undefined;
+}
+
 /** Verify a digest's entries against a parsed document by document-order ordinal, returning
  *  the index or null. Shared by styles and boxes: the entry repeats its tag, so a digest
  *  collected from a DIFFERENT DOM than the one serialized is caught and refused WHOLESALE.

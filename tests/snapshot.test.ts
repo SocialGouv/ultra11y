@@ -11,6 +11,8 @@ import {
   readSnapshots,
   validateSnapshotMeta,
   alignedStyles,
+  isSnapshotDom,
+  snapshotPageId,
   COLLECT_SNAPSHOT,
   type Snapshot,
   type StyleDigest,
@@ -153,6 +155,58 @@ describe("a snapshot audits as a page (the whole point)", () => {
     expect(ids).not.toContain("title-missing-empty");
     for (const f of r.findings) expect(f.page).toBeUndefined();
   });
+
+  it("stamps the page even when the producer wrote no provenance comment — the path IS provenance", () => {
+    // The on-disk layout is a published contract, so a third-party producer may write meta.json
+    // plus a raw dom.html. Before the path fallback its findings were ALL unattributed, and the
+    // page earned `C` by silence: a sheet at 100% over an audit full of findings.
+    const dir = join(root, PAGES_DIR, "contact");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "meta.json"), JSON.stringify({ v: 1, id: "contact", name: "Contact", url: "https://example.com/contact" }));
+    writeFileSync(join(dir, "dom.html"), "<!doctype html><html><head></head><body><img src=a.png></body></html>\n");
+    const r = runAudit({ inputs: [join(root, PAGES_DIR)] });
+    expect(r.findings.length).toBeGreaterThan(0);
+    for (const f of r.findings) expect(f.page).toBe("contact");
+    // Synthesized identity carries no source component, so nothing pretends to know one.
+    for (const f of r.findings) expect(f.origin?.sourceFile).toBeUndefined();
+  });
+
+  it("keeps attributing under --jsx, which the CLI applies to snapshots the user never named", () => {
+    // `audit "src/**/*.tsx" --jsx` auto-appends .ultra11y/pages. Forcing the JSX parser on a real
+    // HTML document dropped its capture provenance entirely — the reported 700-finding audit.
+    writeSnapshot(root, {
+      meta: { v: SNAPSHOT_VERSION, id: "accueil", name: "Accueil", url: "https://example.com/", sources: ["app/page.tsx"] },
+      dom: "<!doctype html><html><head></head><body><img src=a.png></body></html>",
+    });
+    const r = runAudit({ inputs: [join(root, PAGES_DIR)], forceJsx: true });
+    expect(r.findings.map((f) => f.ruleId)).toContain("img-alt-missing");
+    for (const f of r.findings) {
+      expect(f.page).toBe("accueil");
+      // The snapshot is parsed as the HTML it is, so its source attribution survives too.
+      expect(f.origin?.sourceFile).toBe("app/page.tsx");
+      // ...and it is rendered ground truth, never a lossy-JSX guess.
+      expect(f.preliminary).toBeUndefined();
+    }
+  });
+
+  it("keeps --jsx honoured for the inputs the user actually named", () => {
+    // The flag exists to force JSX regardless of extension. Narrowing it must not reach past the
+    // artefacts the CLI ingested on the user's behalf — a .html the user PASSED still gets JSX.
+    //
+    // A full HTML document is not valid JSX (the doctype alone kills the Babel parse), so forcing
+    // the parser drops to the lossy regex fallback and flags every finding `preliminary`. That is
+    // the observable difference, and it is precisely the damage the narrowing prevents on the
+    // snapshots the CLI appends by itself.
+    const f = join(root, "Widget.html");
+    writeFileSync(f, "<!doctype html><html lang=fr><head><title>t</title></head><body><img src=a.png></body></html>\n");
+    const forced = runAudit({ inputs: [f], forceJsx: true });
+    expect(forced.findings.map((x) => x.ruleId)).toContain("img-alt-missing");
+    expect(forced.findings.every((x) => x.preliminary)).toBe(true);
+
+    const plain = runAudit({ inputs: [f] });
+    expect(plain.findings.map((x) => x.ruleId)).toContain("img-alt-missing");
+    expect(plain.findings.some((x) => x.preliminary)).toBe(false);
+  });
 });
 
 describe("meta validation (untrusted input from a producer)", () => {
@@ -228,5 +282,61 @@ describe("browser collector", () => {
   it("walks elements in document order so the ordinal index is the join key", () => {
     expect(COLLECT_SNAPSHOT).toContain("querySelectorAll");
     expect(COLLECT_SNAPSHOT).toContain("documentElement");
+  });
+});
+
+describe("snapshotPageId", () => {
+  it("recovers the id from the path the engine itself wrote", () => {
+    expect(snapshotPageId(`${PAGES_DIR}/accueil/dom.html`)).toBe("accueil");
+  });
+
+  it("recovers it from a relative, an absolute and a nested root alike", () => {
+    expect(snapshotPageId(`./${PAGES_DIR}/contact/dom.html`)).toBe("contact");
+    expect(snapshotPageId(`/Users/me/app/${PAGES_DIR}/contact/dom.html`)).toBe("contact");
+    expect(snapshotPageId(`packages/web/${PAGES_DIR}/contact/dom.html`)).toBe("contact");
+  });
+
+  it("recovers it from Windows separators — a snapshot audited on Windows is still a page", () => {
+    expect(snapshotPageId(".ultra11y\\pages\\parcours-etape-2\\dom.html")).toBe("parcours-etape-2");
+  });
+
+  it("takes the LAST marker, so a path that repeats it still resolves to the real page", () => {
+    expect(snapshotPageId(`${PAGES_DIR}/fixtures/${PAGES_DIR}/accueil/dom.html`)).toBe("accueil");
+  });
+
+  it("returns undefined for a sibling that is not the serialized DOM", () => {
+    expect(snapshotPageId(`${PAGES_DIR}/accueil/meta.json`)).toBeUndefined();
+    expect(snapshotPageId(`${PAGES_DIR}/accueil/styles.json`)).toBeUndefined();
+  });
+
+  it("returns undefined for an ordinary capture or source file", () => {
+    expect(snapshotPageId(".ultra11y/captures/Button.html")).toBeUndefined();
+    expect(snapshotPageId("src/app/page.tsx")).toBeUndefined();
+    expect(snapshotPageId("dom.html")).toBeUndefined();
+    expect(snapshotPageId(undefined)).toBeUndefined();
+  });
+
+  it("refuses a directory name that could not be a page id, rather than inventing one", () => {
+    // The same ID_RE validateSnapshotMeta holds a producer to: an id becomes a directory name,
+    // and a name nobody could legally have written must never become a page attribution.
+    expect(snapshotPageId(`${PAGES_DIR}/../dom.html`)).toBeUndefined();
+    expect(snapshotPageId(`${PAGES_DIR}/-leading-dash/dom.html`)).toBeUndefined();
+    expect(snapshotPageId(`${PAGES_DIR}/a b/dom.html`)).toBeUndefined();
+  });
+
+  it("agrees with isSnapshotDom on what a snapshot DOM is", () => {
+    const yes = `${PAGES_DIR}/accueil/dom.html`;
+    expect(isSnapshotDom(yes)).toBe(true);
+    expect(snapshotPageId(yes)).toBeDefined();
+    const no = ".ultra11y/captures/Button.html";
+    expect(isSnapshotDom(no)).toBe(false);
+    expect(snapshotPageId(no)).toBeUndefined();
+  });
+
+  it("round-trips every id writeSnapshot accepts", () => {
+    for (const id of ["accueil", "contact", "parcours-conformite-etape-2", "a1"]) {
+      const dir = writeSnapshot(root, { meta: { v: 1, id, name: id, url: `https://x.test/${id}` }, dom: "<html></html>" });
+      expect(snapshotPageId(join(dir, "dom.html"))).toBe(id);
+    }
   });
 });

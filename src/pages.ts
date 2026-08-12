@@ -21,6 +21,7 @@
 //      criterion means one definite failure fired somewhere — not that the engine can rule
 //      on that criterion. Reading it as `C` on every other page is how a page with no images
 //      scored 100% on "does each image have a relevant alternative?". See `pageStatus`.
+import { snapshotPageId } from "./snapshot.js";
 import { CORE, type StandardId, derivePackResults, isCore, loadPack, themeName } from "./standards/index.js";
 import type { AuditResult, CriterionResult, Finding, Lang, PageResult, PageScope, Status } from "./types.js";
 import { isUrlPath } from "./util.js";
@@ -82,6 +83,7 @@ export function attributePages(result: AuditResult, pages: PageScope[]): void {
   if (!pages.length) return;
   const byName = new Map(pages.map((p) => [p.name.toLowerCase(), p.id]));
   const byUrl = new Map(pages.map((p) => [p.url, p.id]));
+  const byId = new Set(pages.map((p) => p.id));
 
   // Declarative PACK-RULE findings are attributed exactly like core ones. They used to be
   // skipped here, which made `pageView`'s `packFindings.filter(f => f.page === page.id)`
@@ -89,6 +91,23 @@ export function attributePages(result: AuditResult, pages: PageScope[]): void {
   // the grid claimed to agree with the report "by construction".
   for (const f of [...result.findings, ...(result.packFindings ?? [])]) {
     if (f.page) continue; // the snapshot it was raised on already said which page it is
+
+    // THE PATH IS PROVENANCE, and it is the only provenance an already-written audit still has.
+    // A finding raised on `.ultra11y/pages/<id>/dom.html` knows its page from the file it cites,
+    // with no capture comment to consult and no dom.html needing to still exist on disk — which
+    // is what lets `pages` repair an audit.json produced before the stamp worked, or by a
+    // producer that never wrote the comment. Without it those findings are unrecoverable and
+    // every page earns `C` by silence: 700 findings, 0 attributed, every sheet at 100%.
+    //
+    // The `continue` is load-bearing: a snapshot path must never fall through to the `sources`
+    // suffix matcher below, where `.ultra11y/pages/x/dom.html` could suffix-match a sloppy
+    // sources entry and land on the wrong page. And an id no page in scope claims stays
+    // unattributed rather than conjuring a page — honesty rule 1.
+    const snapId = snapshotPageId(f.file) ?? snapshotPageId(f.origin?.capture);
+    if (snapId) {
+      if (byId.has(snapId)) f.page = snapId;
+      continue;
+    }
 
     // A merged dynamic finding keeps the scanned page URL as its `file`.
     if (isUrlPath(f.file)) {

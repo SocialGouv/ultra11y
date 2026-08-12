@@ -8,9 +8,9 @@ import type { AuditResult, CriterionResult, Finding, ResidualRisk, Status, Guide
 import { VERSION, SCHEMA_VERSION } from "./types.js";
 import { allSC, allGuidelines } from "./wcag.js";
 import { parseSource } from "./parse/source.js";
-import { attachSignals } from "./snapshot.js";
+import { attachSignals, isSnapshotDom, snapshotPageId } from "./snapshot.js";
 import { attr, elementsByTag, type Doc, type CaptureProvenance } from "./parse/html.js";
-import { computeCaptureCoverage, enrichCaptureOrigins, readCaptureDir, capturesForSources } from "./capture.js";
+import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir, readCaptureDir, capturesForSources } from "./capture.js";
 import { isFullDocument } from "./rules/rule.js";
 import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
@@ -121,6 +121,24 @@ function primarySubtag(lang: string): string | undefined {
  *  graph is supplied, cross-file findings are added and graph-proven false
  *  positives are suppressed (matched by ruleId + line on this same doc). */
 export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
+  // PAGE IDENTITY, SYNTHESIZED FROM THE PATH when the DOM does not carry it. Must happen BEFORE
+  // any rule runs: every finding constructor reads `doc.capture` at construction time.
+  //
+  // `writeSnapshot` stamps the page id into `dom.html`'s capture comment, and that is how a
+  // finding normally learns which page it is (src/rules/rule.ts). But the on-disk snapshot layout
+  // is a PUBLISHED CONTRACT (skills/ultra11y/references/pages.md): a producer may legitimately
+  // write `meta.json` plus a raw `dom.html` and never emit the comment. Without this, every
+  // finding on such a page is unattributed, the page earns `C` by silence, and its sheet reports
+  // 100% while the audit holds hundreds of findings.
+  //
+  // It lives in `foldDoc`, not beside `attachSignals`, because `buildAudit` folds already-parsed
+  // docs and its contract is that it produces the same result as `runAudit` — a synthesis only the
+  // streaming path performed would break that, and would make `scope.pagesAudited` (derived from
+  // `acc.captures`) disagree between the two entry points.
+  if (!doc.capture?.page) {
+    const id = snapshotPageId(doc.file);
+    if (id) doc.capture = { v: 1, ...(doc.capture ?? {}), page: id };
+  }
   let findings = runRules(doc);
   if (graph) {
     const cross = runCrossRules(doc, graph);
@@ -374,7 +392,16 @@ export function runAudit(opts: AuditInput): AuditResult {
       }
       seen.add(h);
     }
-    const doc = reused ?? parseSource(content, file, { forceJsx: opts.forceJsx });
+    // `--jsx` forces the JSX parser "for inputs of any extension" — meaning the user's OWN inputs.
+    // Captures and page snapshots are appended to the input list by the CLI, not asked for, and
+    // they are real serialized HTML. Forcing JSX on them costs the parse (a full document is not
+    // an expression, so it falls to the lossy regex path and every finding is flagged
+    // preliminary) AND their provenance: `parseSource` only reads the capture comment for
+    // `kind === "html"`, so `doc.capture` — and with it page identity and the source component —
+    // is silently dropped. `audit "src/**/*.tsx" --jsx --graph` over a repo with snapshots is
+    // exactly how 700 findings reached a report with none of them attributed to a page.
+    const ingested = isSnapshotDom(file) || isUnderDir(file, opts.captureDir ?? CAPTURES_DIR);
+    const doc = reused ?? parseSource(content, file, { forceJsx: opts.forceJsx && !ingested });
     // A page snapshot carries browser-only signals beside its dom.html (computed styles,
     // boxes, a11y tree, screenshot). Attaching them here — after the parse, where file IO
     // already lives — is what lets the rendered rules decide criteria the source cannot,
@@ -397,7 +424,7 @@ export function runAudit(opts: AuditInput): AuditResult {
     enrichCaptureOrigins(result.findings, graph); // anchor capture findings at the source component line
     // Coverage is a repo-wide property: read the FULL capture set from the captures dir,
     // not acc.captures (which is scoped to what THIS run audited — empty in --changed/--staged).
-    if (opts.captureCoverage) result.scope.captureCoverage = computeCaptureCoverage(graph, readCaptureDir(opts.captureDir ?? ".ultra11y/captures"));
+    if (opts.captureCoverage) result.scope.captureCoverage = computeCaptureCoverage(graph, readCaptureDir(opts.captureDir ?? CAPTURES_DIR));
   }
   return result;
 }

@@ -18,6 +18,19 @@ import type { Finding } from "./types.js";
 import { toPosix, expandInputs } from "./glob.js";
 import { readText } from "./util.js";
 
+/** Where the rendered-capture set lives by default — the sibling of PAGES_DIR (src/snapshot.ts).
+ *  Spelled once so the CLI default, the MCP surface and the audit loop cannot drift apart. */
+export const CAPTURES_DIR = ".ultra11y/captures";
+
+/** Is `file` inside `dir`? Path-only, separator-agnostic, no filesystem access — used to tell an
+ *  artefact the CLI ingested on the user's behalf from an input the user actually named. */
+export function isUnderDir(file: string, dir: string): boolean {
+  const d = toPosix(dir).replace(/\/+$/, "");
+  if (!d) return false;
+  const f = toPosix(file);
+  return f === d || f.startsWith(`${d}/`) || f.includes(`/${d}/`);
+}
+
 // A capture's provenance comment must contain no literal `"` (it would end an
 // attribute value early) and no `--` digraph (it would end the HTML comment early).
 // We entity-escape both — plus `& < >` — so the value round-trips and the surrounding

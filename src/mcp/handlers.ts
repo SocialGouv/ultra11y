@@ -19,7 +19,7 @@ import { PAGES_DIR, readSnapshots } from "../snapshot.js";
 
 // The CLI's default capture directory (`--captures` overrides it there; the MCP surface has
 // no such flag, so the default is the contract).
-const CAPTURES_DIR = ".ultra11y/captures";
+import { CAPTURES_DIR } from "../capture.js";
 import { renderPagesDocument } from "../pages-report.js";
 import { withProjectLock } from "../project-lock.js";
 import type { AuditResult, Lang } from "../types.js";

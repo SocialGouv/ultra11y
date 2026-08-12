@@ -22,7 +22,7 @@ import {
   storyProvenance,
   type Detection,
 } from "./render.js";
-import { computeCaptureCoverage, parseCaptureProvenance, formatCaptureComment, type CaptureEntry } from "./capture.js";
+import { CAPTURES_DIR, computeCaptureCoverage, parseCaptureProvenance, formatCaptureComment, type CaptureEntry } from "./capture.js";
 import { buildGraphStreaming } from "./graph/build.js";
 import { discover } from "./discover.js";
 import { toPosix, GRAPH_ONLY_EXT } from "./glob.js";
@@ -774,7 +774,7 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   // of both.
   const requireCaptures = p.flags["require-captures"] === true;
   const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : undefined;
-  const capturesDir = capturesFlag ?? ".ultra11y/captures";
+  const capturesDir = capturesFlag ?? CAPTURES_DIR;
   const scopedToDiff = p.flags.changed === true || p.flags.staged === true || since !== undefined;
   const capturesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== undefined || existsSync(capturesDir));
   const useCaptures = capturesWanted && !scopedToDiff && !inputs.includes(capturesDir);

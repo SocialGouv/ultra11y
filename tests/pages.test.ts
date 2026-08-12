@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { attributePages, derivePages, renderPageGrid, unattributedFindings } from "../src/pages.js";
+import { PAGES_DIR } from "../src/snapshot.js";
 import type { AuditResult, CriterionResult, Finding, PageScope } from "../src/types.js";
 
 const F = (over: Partial<Finding> = {}): Finding => ({
@@ -88,6 +89,56 @@ describe("attributing findings to pages", () => {
     const r = audit({ findings: [F({ file: "app/shared.tsx" })] });
     attributePages(r, shared);
     expect(r.findings[0]?.page).toBe("a");
+  });
+
+  it("attributes a finding raised on a snapshot's dom.html from the PATH alone", () => {
+    // No capture comment, no dom.html on disk — the state of an audit.json re-read by `pages`.
+    const r = audit({ findings: [F({ file: `${PAGES_DIR}/contact/dom.html`, line: 2 })] });
+    attributePages(r, PAGES);
+    expect(r.findings[0]?.page).toBe("contact");
+  });
+
+  it("attributes via origin.capture when the finding's file was re-anchored to the source", () => {
+    const r = audit({ findings: [F({ file: "app/contact/page.tsx", origin: { capture: `${PAGES_DIR}/accueil/dom.html` } })] });
+    attributePages(r, PAGES);
+    // The capture path wins over the sources matcher: it is direct evidence, not a heuristic.
+    expect(r.findings[0]?.page).toBe("accueil");
+  });
+
+  it("leaves a snapshot finding UNATTRIBUTED when its page is not in scope, rather than inventing one", () => {
+    const r = audit({ findings: [F({ file: `${PAGES_DIR}/mentions-legales/dom.html` })] });
+    attributePages(r, PAGES);
+    expect(r.findings[0]?.page).toBeUndefined();
+    expect(unattributedFindings(r).length).toBe(1);
+  });
+
+  it("never lets a snapshot path fall through to the sources suffix matcher", () => {
+    // A sloppy `sources` entry that a snapshot path would suffix-match. The `continue` after the
+    // path branch is what stops the finding landing on the wrong page.
+    const sloppy: PageScope[] = [{ id: "accueil", name: "Accueil", url: "https://x/", sources: ["dom.html"], basis: "snapshot" }];
+    const r = audit({ findings: [F({ file: `${PAGES_DIR}/contact/dom.html` })] });
+    attributePages(r, sloppy);
+    expect(r.findings[0]?.page).toBeUndefined();
+  });
+
+  it("attributes pack findings from the path too — the grid reads them, so they must be stamped", () => {
+    const r = audit({
+      findings: [],
+      packFindings: [F({ ruleId: "pack:rgaa:1.1", file: `${PAGES_DIR}/accueil/dom.html` })],
+    });
+    attributePages(r, PAGES);
+    expect(r.packFindings?.[0]?.page).toBe("accueil");
+  });
+
+  it("THE REGRESSION: an audit whose findings all sit on dom.html no longer reports every page clean", () => {
+    // The reported bug, in miniature: findings exist, no page claims them, so every sheet earns
+    // a verdict by silence. After attribution the pages carry their own findings.
+    const r = audit({
+      findings: [F({ file: `${PAGES_DIR}/accueil/dom.html` }), F({ file: `${PAGES_DIR}/contact/dom.html` })],
+    });
+    attributePages(r, PAGES);
+    expect(unattributedFindings(r).length).toBe(0);
+    expect(r.findings.map((f) => f.page)).toEqual(["accueil", "contact"]);
   });
 });
 
