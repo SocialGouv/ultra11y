@@ -249,7 +249,9 @@ export interface Crop {
 
 // The standard PNG CRC-32 (IEEE 802.3), table-driven because a screenshot's IDAT is megabytes
 // and the bit-at-a-time loop is measurably slower over that. Same polynomial, same output.
-const CRC_TABLE = (() => {
+// `@__PURE__` so a bundle that never encodes drops the table with the rest of the write side.
+// Without it esbuild must assume the IIFE has side effects and keeps 1 KB of dead constant.
+const CRC_TABLE = /* @__PURE__ */ (() => {
   const t = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
     let c = n;

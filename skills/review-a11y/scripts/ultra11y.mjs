@@ -39131,7 +39131,7 @@ var colorsRules = [contrastLiteral];
 import { readFileSync as readFileSync12 } from "fs";
 
 // src/pixel.ts
-import { inflateSync } from "zlib";
+import { deflateSync, inflateSync } from "zlib";
 var SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 function paeth(a, b, c2) {
   const p = a + b - c2;
