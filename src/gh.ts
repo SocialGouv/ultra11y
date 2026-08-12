@@ -3,7 +3,7 @@
 // Everything is best-effort: if gh is absent/unauthenticated, the caller still
 // wrote the markdown and we just report that issues were skipped. De-dupes by
 // issue title so re-running never creates duplicates.
-import { execFileSync } from "node:child_process";
+import { ghExec, ghErrorReason, ghAvailable } from "./gh-cli.js";
 import type { Lang, Severity } from "./types.js";
 import type { PrdUnit } from "./prd.js";
 import { type StandardId, isCore, loadPack } from "./standards/index.js";
@@ -32,37 +32,6 @@ function standardTag(standard: StandardId): { label: string; tag: string } {
       })();
 }
 
-function gh(args: string[], input?: string): string {
-  // Capture stderr (pipe, not ignore) so a failed `gh` call carries a surfaceable reason
-  // on the thrown error instead of vanishing.
-  return execFileSync("gh", args, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], ...(input !== undefined ? { input } : {}) });
-}
-
-/** Extract a concise, single-line failure reason from a thrown `gh` error — the first
- *  meaningful stderr line (where `gh` prints the API/auth error), else the error message. */
-function ghErrorReason(err: unknown): string | undefined {
-  if (!err || typeof err !== "object") return undefined;
-  const e = err as { stderr?: unknown; message?: unknown };
-  const stderr = typeof e.stderr === "string" ? e.stderr : Buffer.isBuffer(e.stderr) ? e.stderr.toString("utf8") : "";
-  const line = stderr
-    .split("\n")
-    .map((l) => l.trim())
-    .find(Boolean);
-  if (line) return line;
-  if (typeof e.message === "string" && e.message) return e.message.split("\n")[0]!.trim() || undefined;
-  return undefined;
-}
-
-/** Is the `gh` CLI installed AND authenticated here? */
-export function ghAvailable(): boolean {
-  try {
-    execFileSync("gh", ["auth", "status"], { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // Stable, language-neutral suffix marking a non-normative recommendation issue apart
 // from a non-conformity one. Part of the de-dupe grain, so it must never drift.
 export const RECOMMENDATION_SUFFIX = " (recommendation)";
@@ -77,7 +46,7 @@ export function issueTitle(unit: PrdUnit, label = "WCAG"): string {
 /** Titles of all existing issues (open + closed), for de-duplication. Empty on any failure. */
 export function existingIssueTitles(): Set<string> {
   try {
-    const raw = gh(["issue", "list", "--state", "all", "--limit", "1000", "--json", "title"]);
+    const raw = ghExec(["issue", "list", "--state", "all", "--limit", "1000", "--json", "title"]);
     const arr = JSON.parse(raw) as Array<{ title?: string }>;
     return new Set(arr.map((i) => i.title ?? "").filter(Boolean));
   } catch {
@@ -111,11 +80,11 @@ export interface CreateResult {
 export function createIssue(title: string, body: string, labels: string[]): CreateResult {
   const base = ["issue", "create", "--title", title, "--body-file", "-"];
   try {
-    gh([...base, "--label", labels.join(",")], body);
+    ghExec([...base, "--label", labels.join(",")], body);
     return { ok: true };
   } catch (labelledErr) {
     try {
-      gh(base, body);
+      ghExec(base, body);
       return { ok: true };
     } catch (err) {
       // Prefer the un-labelled attempt's reason (the real one); fall back to the labelled one.
@@ -213,74 +182,4 @@ export function pushSingleIssue(units: PrdUnit[], lang: Lang, standard: Standard
   return result;
 }
 
-// ---- sticky pull-request comment ---------------------------------------------------------
-// A CI run that appends a new comment every push turns a busy PR into a wall of stale audits.
-// This posts ONE comment and EDITS it on every subsequent run, keyed by an invisible marker.
-// The marker is per-standard, so a WCAG run and an RGAA run coexist instead of overwriting
-// one another (the same reason SARIF runs carry distinct automationDetails ids).
-
-/** The hidden key identifying this tool's comment for a given standard. */
-export function COMMENT_MARKER(standard: StandardId): string {
-  return `<!-- ultra11y:report standard="${standard}" -->`;
-}
-
-export function stickyBody(markdown: string, standard: StandardId): string {
-  return `${COMMENT_MARKER(standard)}\n${markdown}`;
-}
-
-/** The pull request to comment on: an explicit override, else the number GitHub Actions puts
- *  in GITHUB_REF on a pull_request event. Undefined off a PR — the caller then skips, rather
- *  than commenting on some unrelated issue. */
-export function prNumberFromEnv(env: Record<string, string | undefined> = process.env): number | undefined {
-  const explicit = Number.parseInt(env.ULTRA11Y_PR ?? "", 10);
-  if (Number.isFinite(explicit) && explicit > 0) return explicit;
-  const m = /^refs\/pull\/(\d+)\//.exec(env.GITHUB_REF ?? "");
-  const n = m ? Number.parseInt(m[1] as string, 10) : Number.NaN;
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-}
-
-export interface IssueComment {
-  id: number;
-  body?: string;
-}
-
-/** This tool's own previous comment for this standard, if any. Never adopts a human's comment
- *  nor another standard's — an edit is destructive, so the match must be exact. */
-export function pickExistingComment(comments: IssueComment[], marker: string): IssueComment | undefined {
-  return comments.find((c) => typeof c.body === "string" && c.body.includes(marker));
-}
-
-export interface CommentResult {
-  ok: boolean;
-  action: "created" | "updated" | "skipped";
-  reason?: string;
-}
-
-/** Post (or update) the audit summary on the current pull request. Best-effort, exactly like
- *  issue creation: with no `gh`, no auth or no PR, it reports `skipped` and the caller carries
- *  on — a comment is never worth failing a build over. */
-export function pushPrComment(markdown: string, standard: StandardId = "wcag"): CommentResult {
-  const pr = prNumberFromEnv();
-  if (pr === undefined) return { ok: true, action: "skipped", reason: "not a pull-request run" };
-  const marker = COMMENT_MARKER(standard);
-  const body = stickyBody(markdown, standard);
-  try {
-    const repo = gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).trim();
-    let existing: IssueComment | undefined;
-    try {
-      const raw = gh(["api", `repos/${repo}/issues/${pr}/comments`, "--paginate"]);
-      existing = pickExistingComment(JSON.parse(raw) as IssueComment[], marker);
-    } catch {
-      // Listing failed (permissions, rate limit) — fall through and CREATE. A duplicate
-      // comment is a far smaller harm than dropping the report entirely.
-    }
-    if (existing) {
-      gh(["api", "--method", "PATCH", `repos/${repo}/issues/comments/${existing.id}`, "-f", `body=${body}`]);
-      return { ok: true, action: "updated" };
-    }
-    gh(["api", "--method", "POST", `repos/${repo}/issues/${pr}/comments`, "-f", `body=${body}`]);
-    return { ok: true, action: "created" };
-  } catch (e) {
-    return { ok: false, action: "skipped", reason: ghErrorReason(e) };
-  }
-}
+export { ghAvailable };

@@ -6,7 +6,8 @@ import { runAudit } from "./audit.js";
 import { decide, type PreToolUsePayload } from "./hook.js";
 import { writeReport, untestedNeedsRendering, partialAuditBanner } from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
-import { ghAvailable, pushIssues, pushPrComment, pushSingleIssue } from "./gh.js";
+import { ghAvailable, pushIssues, pushSingleIssue } from "./gh.js";
+import { pushPrComment } from "./pr-comment.js";
 import {
   detectFrameworks,
   renderPlan,
