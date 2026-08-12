@@ -1643,6 +1643,31 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
     }
   }
 
+  // --- usage, before any I/O --------------------------------------------------------------
+  // Everything decidable from the argv alone is decided HERE, ahead of provider resolution.
+  // Resolving a provider spawns `git config --get remote.origin.url`, and an `auto`
+  // transport probes `gh`/`glab auth status` — which reaches the network. A mistyped
+  // `--grain` should never cost a subprocess, let alone a network round-trip, and the error
+  // the caller gets should name what they typed rather than a tracker they never mentioned.
+  //
+  // It was also a real flake: `tickets --grain nope` spent its whole 5s test budget in those
+  // probes on a loaded CI runner, and the release gate went red on a purely syntactic error.
+  const grainFlag = typeof p.flags.grain === "string" ? (p.flags.grain as string) : (config?.grain ?? "criterion");
+  if (!(ALL_GRAINS as readonly string[]).includes(grainFlag)) {
+    console.error(`ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`);
+    return 2;
+  }
+  const transportFlag = typeof p.flags.transport === "string" ? (p.flags.transport as string) : (config?.transport ?? "auto");
+  if (!["auto", "cli", "rest"].includes(transportFlag)) {
+    console.error(`ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`);
+    return 2;
+  }
+  const maxTickets = Number.parseInt(String(p.flags["max-tickets"] ?? config?.maxTickets ?? 200), 10);
+  if (!Number.isFinite(maxTickets) || maxTickets < 1) {
+    console.error("ultra11y tickets: --max-tickets must be a positive integer.");
+    return 2;
+  }
+
   // --- provider ---------------------------------------------------------------------------
   const providerFlag = typeof p.flags.provider === "string" ? (p.flags.provider as string) : "auto";
   const providerId = providerFlag === "auto" ? autoProvider(process.env, config?.provider) : isProviderId(providerFlag) ? providerFlag : undefined;
@@ -1655,19 +1680,9 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
     return 2;
   }
 
-  const transportFlag = typeof p.flags.transport === "string" ? (p.flags.transport as string) : (config?.transport ?? "auto");
-  if (!["auto", "cli", "rest"].includes(transportFlag)) {
-    console.error(`ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`);
-    return 2;
-  }
   const provider = createProvider(providerId, { transport: transportFlag as TransportMode });
 
   // --- the plan ---------------------------------------------------------------------------
-  const grainFlag = typeof p.flags.grain === "string" ? (p.flags.grain as string) : (config?.grain ?? "criterion");
-  if (!(ALL_GRAINS as readonly string[]).includes(grainFlag)) {
-    console.error(`ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`);
-    return 2;
-  }
   const format = p.flags.format === "remediation" ? "remediation" : "audit";
   const plan = buildTickets(result, {
     grain: grainFlag as TicketGrain,
@@ -1688,11 +1703,6 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
     return 1;
   }
 
-  const maxTickets = Number.parseInt(String(p.flags["max-tickets"] ?? config?.maxTickets ?? 200), 10);
-  if (!Number.isFinite(maxTickets) || maxTickets < 1) {
-    console.error("ultra11y tickets: --max-tickets must be a positive integer.");
-    return 2;
-  }
   // A creation is hard to undo, and `page-criterion` on a large audit runs to the hundreds.
   // Refuse rather than flood somebody's tracker; never silently truncate.
   if (plan.tickets.length > maxTickets) {
