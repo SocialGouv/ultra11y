@@ -225,6 +225,52 @@ export function mergeSample(existing: SampleConfig | undefined, proposed: Sample
   };
 }
 
+// ---- the OTHER inventory ------------------------------------------------------------------
+
+/** The sample a repo's page snapshots already constitute.
+ *
+ *  A project running the E2E producer maintains TWO inventories: `.ultra11yrc.json`, which the
+ *  sample linter reads, and the routes its test suite actually snapshots, which the report reads.
+ *  They drift, and nothing said so — a sample could be pronounced "complete" while omitting the
+ *  very URL a certifying audit was run on, because the linter never looked at the other list.
+ *
+ *  A snapshot carries everything `lintSample` needs (id, name, url, auth, notes), so no producer
+ *  change is required to see it. */
+export function sampleFromSnapshots(snapshots: { meta: { id: string; name: string; url: string; auth?: boolean; notes?: string } }[]): SamplePage[] {
+  return snapshots.map((s) => ({
+    id: s.meta.id,
+    name: s.meta.name,
+    url: s.meta.url,
+    ...(s.meta.auth !== undefined ? { auth: s.meta.auth } : {}),
+    ...(s.meta.notes ? { notes: s.meta.notes } : {}),
+  }));
+}
+
+export interface SampleUnion {
+  sample: SampleConfig; // declared ∪ snapshotted, the inventory the standard should be linted over
+  undeclared: SamplePage[]; // snapshotted but absent from .ultra11yrc.json
+  uncaptured: SamplePage[]; // declared but never snapshotted
+}
+
+/** Declared ∪ snapshotted, plus the two drift lists.
+ *
+ *  Dedupe on `id` ALONE, deliberately — not on url as `mergeSample` does. A state-reached page (a
+ *  modal, a funnel step behind a client-side transition) legitimately shares its base page's URL,
+ *  and a url-keyed union would silently swallow exactly the pages this exists to surface. The
+ *  DECLARED entry wins a collision: `auth`, `notes` and the human name are someone's work. */
+export function unionSample(declared: SampleConfig | undefined, snapshotted: SamplePage[]): SampleUnion {
+  const pages = [...(declared?.pages ?? [])];
+  const declaredIds = new Set(pages.map((p) => p.id));
+  const snapIds = new Set(snapshotted.map((p) => p.id));
+  const undeclared = snapshotted.filter((p) => !declaredIds.has(p.id));
+  const uncaptured = pages.filter((p) => !snapIds.has(p.id));
+  return {
+    sample: { pages: [...pages, ...undeclared], ...(declared?.transverse?.length ? { transverse: declared.transverse } : {}) },
+    undeclared,
+    uncaptured,
+  };
+}
+
 /** Localized label for a required kind (default-locale-first fallback). */
 export function kindLabel(kind: SampleRequiredKind, locale = "fr"): string {
   return kind.label[locale] ?? Object.values(kind.label)[0] ?? kind.id;

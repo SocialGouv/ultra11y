@@ -1,7 +1,7 @@
 import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync, copyFileSync } from "node:fs";
 import { join, relative, sep, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { VERSION, type Lang, type AuditResult, type DynamicResult, type SampleConfig, type Severity } from "./types.js";
+import { VERSION, type Lang, type AuditResult, type DynamicResult, type SampleConfig, type SamplePage, type Severity } from "./types.js";
 import { runAudit } from "./audit.js";
 import { decide, type PreToolUsePayload } from "./hook.js";
 import { writeReport, untestedNeedsRendering, partialAuditBanner } from "./report.js";
@@ -34,7 +34,7 @@ import { buildAdjudicationWorklist, formatAdjudication, writeAdjudication, apply
 import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable } from "./scan-local.js";
-import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample } from "./sample.js";
+import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
 import { runFix, fixSummary } from "./fix.js";
 import { diffAgainstBaseline, baselineSummary, parseFailOn, findingsAtOrAbove } from "./baseline.js";
 import { repoRoot, resolveEnginePath, writeHook, writeCi } from "./init.js";
@@ -94,7 +94,7 @@ Usage:
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
-  ultra11y pages    discover --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
+  ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
   ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
@@ -382,6 +382,8 @@ Options:
                      assertion. Unauthenticated scans keep clicks on regardless; the
                      destructive-name skip above applies in every case
   --write            pages discover: merge the discovered pages into .ultra11yrc.json
+  --from-snapshots   pages discover: build the sample from .ultra11y/pages instead of crawling —
+                     the only route that sees a state-reached page (a modal, a funnel step)
                      (sample.pages). Without it the proposal is printed and nothing is
                      written. Pages already declared are kept verbatim — auth, storageState
                      and notes are human work and are never overwritten
@@ -536,6 +538,9 @@ const BOOLEAN_FLAGS = new Set([
   "next",
   "coverage",
   "write",
+  // `pages discover`: build the sample from the snapshots the E2E producer already wrote,
+  // instead of crawling — the only route that can see a state-reached page.
+  "from-snapshots",
   "dry-run",
   "iterate",
   "safe",
@@ -1006,9 +1011,30 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
   const lang = resolveLang(p.flags, {});
   const sitemap = typeof p.flags.sitemap === "string" ? (p.flags.sitemap as string) : undefined;
   const crawl = typeof p.flags.crawl === "string" ? (p.flags.crawl as string) : undefined;
+
+  // FROM THE SNAPSHOTS the test suite already produces — no network, no crawl. This is the
+  // "one inventory" route: the E2E producer knows every route it captured, including the
+  // state-reached ones a URL crawl can never find (a modal, a funnel step behind a client-side
+  // transition), and this is what folds that knowledge back into the declared sample.
+  if (p.flags["from-snapshots"] === true) {
+    const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+    const snaps = sampleFromSnapshots(readSnapshots(root));
+    if (!snaps.length) {
+      console.error(
+        lang === "fr"
+          ? `ultra11y pages discover : aucun instantané sous ${join(root, PAGES_DIR)} — lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.`
+          : `ultra11y pages discover: no snapshot under ${join(root, PAGES_DIR)} — run your E2E tests with checkA11y first, or \`scan --sample\`.`,
+      );
+      return 1;
+    }
+    return writeDiscoveredSample(p, lang, snaps, snaps.length);
+  }
+
   if (!sitemap && !crawl) {
     console.error(
-      lang === "fr" ? "ultra11y pages discover : passez --sitemap <url> ou --crawl <url>." : "ultra11y pages discover: pass --sitemap <url> or --crawl <url>.",
+      lang === "fr"
+        ? "ultra11y pages discover : passez --sitemap <url>, --crawl <url> ou --from-snapshots."
+        : "ultra11y pages discover: pass --sitemap <url>, --crawl <url> or --from-snapshots.",
     );
     return 2;
   }
@@ -1063,7 +1089,13 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
     }),
   );
 
-  const proposed = proposeSamplePages(urls, titles);
+  return writeDiscoveredSample(p, lang, proposeSamplePages(urls, titles), urls.length);
+}
+
+/** Merge proposed pages into `.ultra11yrc.json` (or print them), shared by every discovery
+ *  route — sitemap, crawl and snapshots. `mergeSample` keeps what is already declared, so a
+ *  re-run never overwrites the human work of describing how a page is reached. */
+function writeDiscoveredSample(p: ParsedArgs, lang: Lang, proposed: SamplePage[], found: number): number {
   let existing: SampleConfig | undefined;
   try {
     existing = loadConfig(process.cwd())?.sample;
@@ -1089,8 +1121,8 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
       console.log(JSON.stringify({ sample: v.sample }, null, 2));
       console.log(
         lang === "fr"
-          ? `\n${urls.length} URL(s) découverte(s), ${merged.added.length} nouvelle(s). Rien n'a été écrit — relancez avec --write pour fusionner dans .ultra11yrc.json.`
-          : `\n${urls.length} URL(s) discovered, ${merged.added.length} new. Nothing was written — re-run with --write to merge into .ultra11yrc.json.`,
+          ? `\n${found} page(s) découverte(s), ${merged.added.length} nouvelle(s). Rien n'a été écrit — relancez avec --write pour fusionner dans .ultra11yrc.json.`
+          : `\n${found} page(s) discovered, ${merged.added.length} new. Nothing was written — re-run with --write to merge into .ultra11yrc.json.`,
       );
     }
     return 0;
@@ -2867,30 +2899,79 @@ function cmdSample(p: ParsedArgs): number {
       );
     return 0;
   }
-  const { missing } = lintSample(v.sample, methodology);
+  // BOTH INVENTORIES. Linting the declared list alone is how `sample check` pronounced an
+  // échantillon "complete" for a configuration that omitted the very URL the certifying audit
+  // was run on, while the test suite had been snapshotting that page all along. The union is
+  // what the standard is actually checked over; the drift is reported either way.
+  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+  const snapshotted = sampleFromSnapshots(readSnapshots(root));
+  const union = unionSample(v.sample, snapshotted);
+  const { missing } = lintSample(union.sample, methodology);
   const loc = pack?.defaultLocale ?? "fr";
+  const counts = {
+    declared: v.sample.pages.length,
+    snapshotted: snapshotted.length,
+    undeclared: union.undeclared.length,
+    uncaptured: union.uncaptured.length,
+  };
   if (p.flags.json) {
     console.log(
       JSON.stringify(
-        { ok: true, pages: v.sample.pages.length, missing: missing.map((k) => ({ id: k.id, label: kindLabel(k, loc) })), warnings: v.warnings },
+        {
+          ok: true,
+          pages: union.sample.pages.length,
+          ...counts,
+          undeclaredPages: union.undeclared.map((x) => ({ id: x.id, url: x.url })),
+          uncapturedPages: union.uncaptured.map((x) => ({ id: x.id, url: x.url })),
+          missing: missing.map((k) => ({ id: k.id, label: kindLabel(k, loc) })),
+          warnings: v.warnings,
+        },
         null,
         2,
       ),
     );
     return 0;
   }
-  if (missing.length === 0) {
+  // The census prints unconditionally and BEFORE the verdict, so the verdict can never be read
+  // as a statement about an inventory it did not see.
+  console.log(
+    lang === "fr"
+      ? `${counts.declared} déclarée(s) · ${counts.snapshotted} instantanée(s) · ${counts.undeclared} instantanée(s) non déclarée(s) · ${counts.uncaptured} déclarée(s) jamais capturée(s)`
+      : `${counts.declared} declared · ${counts.snapshotted} snapshotted · ${counts.undeclared} snapshotted but undeclared · ${counts.uncaptured} declared but never captured`,
+  );
+  if (missing.length) {
+    console.log(
+      (lang === "fr"
+        ? `⚠️ Échantillon incomplet (${union.sample.pages.length} page(s)) — types de page requis absents (${pack!.name}) :`
+        : `⚠️ Incomplete sample (${union.sample.pages.length} page(s)) — required page kinds missing (${pack!.name}):`) +
+        ` ${missing.map((k) => kindLabel(k, loc)).join(", ")}`,
+    );
+  } else if (counts.undeclared > 0) {
+    // Complete over the union, but the declared sample is NOT the audited surface. Saying
+    // "complete" flat here is the sentence the reporter's project acted on.
     console.log(
       lang === "fr"
-        ? `✓ Échantillon complet (${v.sample.pages.length} page(s)) — tous les types de page requis par ${pack!.name} sont couverts.`
-        : `✓ Sample complete (${v.sample.pages.length} page(s)) — every page kind ${pack!.name} requires is covered.`,
+        ? `⚠️ Types de page requis couverts, mais l'échantillon déclaré n'est pas la surface auditée : ${counts.undeclared} page(s) instantanée(s) n'y figurent pas (${union.undeclared
+            .slice(0, 5)
+            .map((x) => x.id)
+            .join(", ")}${counts.undeclared > 5 ? ", …" : ""}). Déclarez-les avec \`pages discover --from-snapshots --write\`.`
+        : `⚠️ Required page kinds covered, but the declared sample is not the audited surface: ${counts.undeclared} snapshotted page(s) are absent from it (${union.undeclared
+            .slice(0, 5)
+            .map((x) => x.id)
+            .join(", ")}${counts.undeclared > 5 ? ", …" : ""}). Declare them with \`pages discover --from-snapshots --write\`.`,
     );
   } else {
     console.log(
-      (lang === "fr"
-        ? `⚠️ Échantillon incomplet (${v.sample.pages.length} page(s)) — types de page requis absents (${pack!.name}) :`
-        : `⚠️ Incomplete sample (${v.sample.pages.length} page(s)) — required page kinds missing (${pack!.name}):`) +
-        ` ${missing.map((k) => kindLabel(k, loc)).join(", ")}`,
+      lang === "fr"
+        ? `✓ Échantillon complet (${union.sample.pages.length} page(s)) — tous les types de page requis par ${pack!.name} sont couverts.`
+        : `✓ Sample complete (${union.sample.pages.length} page(s)) — every page kind ${pack!.name} requires is covered.`,
+    );
+  }
+  if (counts.uncaptured > 0) {
+    console.log(
+      lang === "fr"
+        ? `ℹ️ ${counts.uncaptured} page(s) déclarée(s) n'ont aucun instantané — le rapport par page ne pourra rien conclure de leur silence.`
+        : `ℹ️ ${counts.uncaptured} declared page(s) have no snapshot — the per-page report can conclude nothing from their silence.`,
     );
   }
   return 0;

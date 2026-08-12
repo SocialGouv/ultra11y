@@ -2,7 +2,7 @@
 // storageState-dropping projection (sampleScope), plus the RGAA pack's normative
 // sampleMethodology emitted by scripts/build-pack-rgaa.mjs.
 import { describe, it, expect } from "vitest";
-import { lintSample, sampleScope, kindLabel } from "../src/sample.js";
+import { lintSample, sampleFromSnapshots, sampleScope, kindLabel, unionSample } from "../src/sample.js";
 import { loadPack } from "../src/standards/index.js";
 import type { SampleConfig } from "../src/types.js";
 
@@ -103,5 +103,68 @@ describe("sampleScope — the recorded shape drops the storageState PATH (never 
     expect(JSON.stringify(scope)).not.toContain("storageState");
     expect(JSON.stringify(scope)).not.toContain("session.json");
     expect(scope.transverse).toEqual(["header"]);
+  });
+});
+
+describe("the two inventories", () => {
+  const snap = (id: string, url: string, name = id) => ({ meta: { id, name, url } });
+
+  it("reads a sample straight out of the snapshots a test suite produced", () => {
+    const pages = sampleFromSnapshots([snap("accueil", "https://x.fr/", "Accueil"), snap("contact", "https://x.fr/contact", "Contact")]);
+    expect(pages).toEqual([
+      { id: "accueil", name: "Accueil", url: "https://x.fr/" },
+      { id: "contact", name: "Contact", url: "https://x.fr/contact" },
+    ]);
+  });
+
+  it("names the pages the test suite captures and the config never declared", () => {
+    // The reported drift: .ultra11yrc.json declared 17 pages, the Playwright specs snapshot 38.
+    const declared: SampleConfig = { pages: [{ id: "accueil", name: "Accueil", url: "https://x.fr/" }] };
+    const u = unionSample(declared, sampleFromSnapshots([snap("accueil", "https://x.fr/"), snap("etape-2", "https://x.fr/parcours/etape/2")]));
+    expect(u.undeclared.map((p) => p.id)).toEqual(["etape-2"]);
+    expect(u.uncaptured).toEqual([]);
+    expect(u.sample.pages).toHaveLength(2);
+  });
+
+  it("names the declared pages no snapshot ever covered", () => {
+    const declared: SampleConfig = { pages: [{ id: "aide", name: "Aide", url: "https://x.fr/aide" }] };
+    const u = unionSample(declared, sampleFromSnapshots([snap("accueil", "https://x.fr/")]));
+    expect(u.uncaptured.map((p) => p.id)).toEqual(["aide"]);
+    expect(u.undeclared.map((p) => p.id)).toEqual(["accueil"]);
+  });
+
+  it("dedupes on id ALONE, so a state-reached page sharing a URL is not swallowed", () => {
+    // A modal has no URL of its own. Keying the union on url — as mergeSample does for a crawl —
+    // would drop exactly the pages this exists to surface.
+    const declared: SampleConfig = { pages: [{ id: "compte", name: "Mon compte", url: "https://x.fr/compte" }] };
+    const u = unionSample(declared, sampleFromSnapshots([snap("compte-modale-infos", "https://x.fr/compte", "Modale mes informations")]));
+    expect(u.undeclared.map((p) => p.id)).toEqual(["compte-modale-infos"]);
+    expect(u.sample.pages).toHaveLength(2);
+  });
+
+  it("lets the DECLARED entry win a collision — auth, notes and the human name are someone's work", () => {
+    const declared: SampleConfig = {
+      pages: [{ id: "compte", name: "Mon compte", url: "https://x.fr/compte", auth: true, notes: "connecté en tant que testeur" }],
+    };
+    const u = unionSample(declared, sampleFromSnapshots([snap("compte", "https://x.fr/compte", "compte")]));
+    expect(u.sample.pages).toHaveLength(1);
+    expect(u.sample.pages[0]).toMatchObject({ name: "Mon compte", auth: true, notes: "connecté en tant que testeur" });
+  });
+
+  it("keeps the declared transverse elements, which no snapshot can carry", () => {
+    const declared: SampleConfig = { pages: [{ id: "a", name: "A", url: "https://x.fr/" }], transverse: ["header", "footer"] };
+    expect(unionSample(declared, []).sample.transverse).toEqual(["header", "footer"]);
+  });
+
+  it("lints over the UNION, so the linter stops describing an inventory it never read", () => {
+    // The audited surface covers a required kind the declared sample omits. Linting the declared
+    // list alone reports it missing; linting the union reports the truth, and the caller still
+    // learns about the drift from `undeclared`.
+    const declared: SampleConfig = { pages: [{ id: "accueil", name: "Accueil", url: "https://x.fr/" }] };
+    const snapshots = sampleFromSnapshots([snap("contact", "https://x.fr/contact", "Contact")]);
+    const before = lintSample(declared, methodology).missing.map((k) => k.id);
+    const after = lintSample(unionSample(declared, snapshots).sample, methodology).missing.map((k) => k.id);
+    expect(before).toContain("contact");
+    expect(after).not.toContain("contact");
   });
 });

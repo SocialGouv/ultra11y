@@ -13,7 +13,8 @@ import { buildTickets } from "../tickets/grain.js";
 import type { TicketGrain } from "../tickets/types.js";
 import { buildWorklist, formatWorklist } from "../verify.js";
 import { allSC, getSC } from "../wcag.js";
-import { loadPack } from "../standards/index.js";
+import { getPack, isCore, loadPack } from "../standards/index.js";
+import { kindLabel, lintSample, sampleFromSnapshots, unionSample, validateSample } from "../sample.js";
 import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "../pages.js";
 import { PAGES_DIR, readSnapshots } from "../snapshot.js";
 
@@ -142,7 +143,7 @@ async function dispatch(name: string, args: Record<string, unknown>, cwd: string
     case "ultra11y_pack_check":
       return handlePackCheck(args, cwd);
     case "ultra11y_sample_check":
-      return handleSampleCheck(cwd);
+      return handleSampleCheck(cwd, standardOf(args));
     case "ultra11y_pages":
       return handlePages(args, cwd);
     case "ultra11y_read":
@@ -315,7 +316,7 @@ function handlePackCheck(args: Record<string, unknown>, cwd: string): unknown {
   return { cwd, ...res };
 }
 
-function handleSampleCheck(cwd: string): unknown {
+function handleSampleCheck(cwd: string, standard: StandardId): unknown {
   const file = join(cwd, ".ultra11yrc.json");
   if (!existsSync(file)) {
     throw new ToolError(`no .ultra11yrc.json at ${cwd} — a page sample must be declared before it can be linted.`);
@@ -326,7 +327,33 @@ function handleSampleCheck(cwd: string): unknown {
   } catch (e) {
     throw new ToolError(`.ultra11yrc.json is not valid JSON: ${(e as Error).message}`);
   }
-  return { cwd, config: raw, next: "Check the sample covers every page kind the methodology requires, not just the convenient ones." };
+  // Actually LINT, rather than handing the caller the raw config and an instruction to check it
+  // themselves — an agent asked to eyeball a sample will agree with it. And lint the UNION with
+  // the snapshots on disk, so the verdict describes the surface that was audited rather than the
+  // list someone remembered to declare.
+  const v = validateSample((raw as { sample?: unknown })?.sample);
+  if (!v.ok || !v.sample) {
+    return { cwd, ok: false, issues: v.issues, next: "Fix the sample block before linting it." };
+  }
+  const snapshotted = sampleFromSnapshots(readSnapshots(cwd));
+  const union = unionSample(v.sample, snapshotted);
+  const methodology = isCore(standard) ? undefined : getPack(standard)?.sampleMethodology;
+  const missing = methodology ? lintSample(union.sample, methodology).missing : [];
+  return {
+    cwd,
+    standard,
+    ok: true,
+    declared: v.sample.pages.length,
+    snapshotted: snapshotted.length,
+    undeclared: union.undeclared.map((p) => ({ id: p.id, url: p.url })),
+    uncaptured: union.uncaptured.map((p) => ({ id: p.id, url: p.url })),
+    missing: missing.map((k) => ({ id: k.id, label: kindLabel(k, "fr") })),
+    warnings: v.warnings,
+    next:
+      union.undeclared.length > 0
+        ? "Snapshotted pages are missing from the declared sample: the declared list is not the audited surface. `pages discover --from-snapshots --write` folds them in."
+        : "The sample covers the required page kinds over the union of what is declared and what was captured.",
+  };
 }
 
 /** The page dimension. Everything it needs is already on the AuditResult, so it re-measures
