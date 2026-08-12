@@ -1,8 +1,19 @@
-// Optional GitHub issue creation for `prd --gh-issues`. Shells out to the `gh`
-// CLI (which handles its own auth) — NO npm dependency, no tokens in ultra11y.
-// Everything is best-effort: if gh is absent/unauthenticated, the caller still
-// wrote the markdown and we just report that issues were skipped. De-dupes by
-// issue title so re-running never creates duplicates.
+// The issue set an audit turns into, plus GitHub as one transport for it.
+//
+// The SET is tracker-agnostic — `issueSet()` renders one de-duplicated item per
+// criterion (title, body, labels, severity) and is what `prd --issues-json`
+// emits, so a board that is not GitHub (a native kanban, GitLab, Jira, Linear)
+// files the same items without shelling out to anything. `pushIssues` /
+// `pushSingleIssue` are the GitHub TRANSPORT for that set: they shell out to the
+// `gh` CLI (which handles its own auth) — NO npm dependency, no tokens in
+// ultra11y. Both paths build their titles, bodies and labels through the same
+// three functions, so the exported JSON and the filed GitHub issue can never
+// drift apart.
+//
+// Everything on the transport side is best-effort: if gh is absent or
+// unauthenticated, the caller still wrote the markdown and we just report that
+// issues were skipped. De-dupes by issue title so re-running never creates
+// duplicates.
 import { execFileSync } from "node:child_process";
 import type { Lang, Severity } from "./types.js";
 import type { PrdUnit } from "./prd.js";
@@ -99,6 +110,43 @@ export function issueBody(unit: PrdUnit, lang: Lang, standard: StandardId = "wca
   return lines.join("\n");
 }
 
+/** The labels an issue carries: `accessibility`, the active standard's tag, its severity —
+ *  plus `recommendation` when the unit is advisory, so a good practice is never triaged as a
+ *  non-conformity. Shared by the GitHub transport and the tracker-agnostic export. */
+export function issueLabels(unit: PrdUnit, standard: StandardId = "wcag"): string[] {
+  const { tag } = standardTag(standard);
+  return unit.advisory ? ["accessibility", tag, "recommendation", unit.severity] : ["accessibility", tag, unit.severity];
+}
+
+/** One issue, rendered for whatever tracker is going to file it. */
+export interface TrackerIssue {
+  criteriaId: string;
+  /** The de-dupe grain: stable across runs, so re-filing is a no-op on any tracker. */
+  title: string;
+  body: string;
+  labels: string[];
+  severity: Severity;
+  /** A non-normative good practice, not a non-conformity. Never counts toward conformance. */
+  advisory: boolean;
+  /** Occurrences behind this issue — a tracker that wants inline anchors reads them here. */
+  occurrences: { file: string; line: number; selector: string; message: string }[];
+}
+
+/** Render the audit's units as a tracker-agnostic issue set — the exact items `pushIssues`
+ *  would file, minus the transport. This is what `prd --issues-json` emits. */
+export function issueSet(units: PrdUnit[], lang: Lang, standard: StandardId = "wcag", format: IssueFormat = "audit"): TrackerIssue[] {
+  const { label } = standardTag(standard);
+  return units.map((u) => ({
+    criteriaId: u.criteriaId,
+    title: issueTitle(u, label),
+    body: issueBody(u, lang, standard, format),
+    labels: issueLabels(u, standard),
+    severity: u.severity,
+    advisory: u.advisory === true,
+    occurrences: u.findings.map((f) => ({ file: f.file, line: f.line, selector: f.selectorHint, message: resolveMessage(f, lang) })),
+  }));
+}
+
 export interface CreateResult {
   ok: boolean;
   /** Concise `gh` stderr reason when the creation failed (both attempts). */
@@ -141,7 +189,7 @@ function recordFailure(result: PushResult, reason?: string): void {
 
 /** Create a GitHub issue per unit, skipping titles that already exist. */
 export function pushIssues(units: PrdUnit[], lang: Lang, standard: StandardId = "wcag", format: IssueFormat = "audit"): PushResult {
-  const { label, tag } = standardTag(standard);
+  const { label } = standardTag(standard);
   const existing = existingIssueTitles();
   const result: PushResult = { created: 0, skipped: 0, failed: 0, createdTitles: [], errors: [] };
   for (const u of units) {
@@ -151,9 +199,8 @@ export function pushIssues(units: PrdUnit[], lang: Lang, standard: StandardId = 
       continue;
     }
     // Advisory units get the `recommendation` label so they can be triaged apart from
-    // real non-conformities (which they are not).
-    const labels = u.advisory ? ["accessibility", tag, "recommendation", u.severity] : ["accessibility", tag, u.severity];
-    const r = createIssue(title, issueBody(u, lang, standard, format), labels);
+    // real non-conformities (which they are not). Shared with the JSON export.
+    const r = createIssue(title, issueBody(u, lang, standard, format), issueLabels(u, standard));
     if (r.ok) {
       result.created++;
       result.createdTitles.push(title);

@@ -6,7 +6,7 @@ import { runAudit } from "./audit.js";
 import { decide, type PreToolUsePayload } from "./hook.js";
 import { writeReport, untestedNeedsRendering, partialAuditBanner } from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
-import { ghAvailable, pushIssues, pushPrComment, pushSingleIssue } from "./gh.js";
+import { ghAvailable, issueSet, pushIssues, pushPrComment, pushSingleIssue, type IssueFormat } from "./gh.js";
 import {
   detectFrameworks,
   renderPlan,
@@ -294,6 +294,9 @@ Options:
                      technique + Contexte de reproduction) for a pure-auditor block
   --gh-issues        prd: also create one GitHub issue per criterion via the gh CLI (opt-in)
   --gh-single        prd: file the whole audit as ONE consolidated GitHub issue (opt-in; wins over --gh-issues)
+  --issues-json      prd: write the issue set (one item per criterion: title, body, labels,
+                     severity, occurrences) to <out>/issues-<date>.json for a non-GitHub
+                     tracker to file — same items --gh-issues would create, no gh needed
   --scaffold         render: write an SSR-snapshot harness (default: ultra11y-render.tsx)
   --setup            render: install the zero-touch test-render capture harvester (.ultra11y/capture-setup.mjs) + print the runner wiring
   --coverage         render: report rendered-capture coverage (covered vs blind-spot components); with --json emits the coverage object
@@ -527,6 +530,7 @@ const BOOLEAN_FLAGS = new Set([
   "no-technical",
   "gh-issues",
   "gh-single",
+  "issues-json",
   "override",
   "local",
   "docker",
@@ -1557,6 +1561,23 @@ async function cmdPrd(p: ParsedArgs): Promise<number> {
   const json = p.flags.json === true;
   if (!json) for (const path of paths) console.log(path);
 
+  // Tracker-agnostic export: the same de-duplicated items `--gh-issues` files, as JSON, so a
+  // board that is not GitHub can file them itself. Written to a file (not stdout) so it
+  // composes with --json, and so an orchestrator reads one stable path instead of parsing
+  // a payload that also carries the markdown paths.
+  let issuesPath: string | undefined;
+  if (p.flags["issues-json"] === true) {
+    const issueFormat: IssueFormat = format === "remediation" ? "remediation" : "audit";
+    const issues = issueSet(prdUnits(result, standard, lang), lang, standard, issueFormat);
+    mkdirSync(out, { recursive: true });
+    issuesPath = join(out, `issues-${result.date}.json`);
+    writeFileSync(
+      issuesPath,
+      `${JSON.stringify({ tool: "ultra11y", kind: "issues", schemaVersion: 1, standard, date: result.date, count: issues.length, issues }, null, 2)}\n`,
+    );
+    if (!json) console.log(issuesPath);
+  }
+
   // GitHub: always-written markdown above; issues are opt-in + best-effort.
   // --gh-single → one consolidated issue; --gh-issues → one issue per criterion.
   const ghMode: "single" | "per-criterion" | null = p.flags["gh-single"] === true ? "single" : p.flags["gh-issues"] === true ? "per-criterion" : null;
@@ -1586,7 +1607,8 @@ async function cmdPrd(p: ParsedArgs): Promise<number> {
       }
     }
   }
-  if (json) console.log(JSON.stringify({ paths, units: prdUnits(result, standard, lang), ...(gh ? { gh } : {}) }, null, 2));
+  if (json)
+    console.log(JSON.stringify({ paths, ...(issuesPath ? { issuesPath } : {}), units: prdUnits(result, standard, lang), ...(gh ? { gh } : {}) }, null, 2));
   // Markdown was written above regardless; but if issue creation was attempted and had
   // any failures, exit non-zero so a CI step / caller sees the GitHub push did not fully
   // succeed (a total failure previously exited 0 and looked green).
@@ -2076,7 +2098,26 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
   mkdirSync(out, { recursive: true });
   const auditPath = join(out, "audit-latest.json");
   writeFileSync(auditPath, JSON.stringify(r.audit, null, 2) + "\n");
-  if (p.flags.json) console.log(JSON.stringify({ ok: true, auditPath, applied: r.applied, stillManual: r.stillManual, grounding: r.grounding }, null, 2));
+  // Carry the numbers the fold produced. The failure payload has always described its own
+  // outcome (`issues`); the success one described only the mechanics, so a caller that gates
+  // on the adjudicated result — a CI step, an orchestrator's tool node — had to re-read and
+  // re-parse the file it had just been handed the path to.
+  if (p.flags.json)
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          auditPath,
+          applied: r.applied,
+          stillManual: r.stillManual,
+          conformancePct: r.audit.conformancePct,
+          findings: r.audit.findings.length,
+          grounding: r.grounding,
+        },
+        null,
+        2,
+      ),
+    );
   else
     console.log(
       lang === "fr"

@@ -49698,6 +49698,22 @@ function issueBody(unit, lang, standard = "wcag", format = "audit") {
   }
   return lines.join("\n");
 }
+function issueLabels(unit, standard = "wcag") {
+  const { tag } = standardTag(standard);
+  return unit.advisory ? ["accessibility", tag, "recommendation", unit.severity] : ["accessibility", tag, unit.severity];
+}
+function issueSet(units, lang, standard = "wcag", format = "audit") {
+  const { label } = standardTag(standard);
+  return units.map((u) => ({
+    criteriaId: u.criteriaId,
+    title: issueTitle(u, label),
+    body: issueBody(u, lang, standard, format),
+    labels: issueLabels(u, standard),
+    severity: u.severity,
+    advisory: u.advisory === true,
+    occurrences: u.findings.map((f) => ({ file: f.file, line: f.line, selector: f.selectorHint, message: resolveMessage(f, lang) }))
+  }));
+}
 function createIssue(title2, body2, labels) {
   const base = ["issue", "create", "--title", title2, "--body-file", "-"];
   try {
@@ -49717,7 +49733,7 @@ function recordFailure(result, reason) {
   if (reason && !result.errors.includes(reason)) result.errors.push(reason);
 }
 function pushIssues(units, lang, standard = "wcag", format = "audit") {
-  const { label, tag } = standardTag(standard);
+  const { label } = standardTag(standard);
   const existing = existingIssueTitles();
   const result = { created: 0, skipped: 0, failed: 0, createdTitles: [], errors: [] };
   for (const u of units) {
@@ -49726,8 +49742,7 @@ function pushIssues(units, lang, standard = "wcag", format = "audit") {
       result.skipped++;
       continue;
     }
-    const labels = u.advisory ? ["accessibility", tag, "recommendation", u.severity] : ["accessibility", tag, u.severity];
-    const r = createIssue(title2, issueBody(u, lang, standard, format), labels);
+    const r = createIssue(title2, issueBody(u, lang, standard, format), issueLabels(u, standard));
     if (r.ok) {
       result.created++;
       result.createdTitles.push(title2);
@@ -51629,6 +51644,18 @@ var adjudication_default = {
 
 // src/adjudicate.ts
 var ADJUDICATE_MAX_EVIDENCE = 30;
+function adjudicationContract() {
+  return {
+    verdicts: [...VERDICTS],
+    manualReasons: [...MANUAL_REASON_VALUES],
+    requires: {
+      C: "a non-empty justification AND citations[] naming the harvested evidence it cleared (each anchor resolvable and drawn from this criterion's own evidence); a criterion with no harvested evidence cannot be C at all",
+      NA: "a non-empty justification",
+      NC: "at least one groundable finding, each citing a normativeRef that resolves against the active standard",
+      manual: `a reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`
+    }
+  };
+}
 var selectorFor = (el) => {
   const id = el.attribs.id ? `#${el.attribs.id}` : "";
   const cls = el.attribs.class ? `.${el.attribs.class.trim().split(/\s+/)[0]}` : "";
@@ -51830,6 +51857,31 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
 }
 var NC_SEVERITY_DEFAULT = "majeur";
 var MANUAL_REASONS = /* @__PURE__ */ new Set(["needs-rendered-dom", "undecidable"]);
+var VERDICTS = ["C", "NC", "NA", "manual"];
+var MANUAL_REASON_VALUES = ["needs-rendered-dom", "undecidable"];
+function normalizeVerdict2(v) {
+  if (typeof v !== "string") return void 0;
+  const k = v.trim().toLowerCase();
+  return VERDICTS.find((x) => x.toLowerCase() === k);
+}
+function normalizeManualReason(r) {
+  if (typeof r !== "string") return void 0;
+  const k = r.trim().toLowerCase();
+  return MANUAL_REASON_VALUES.find((x) => x === k);
+}
+function canonicalizeAdjudication(adj) {
+  for (const it of adj.items) {
+    if (it.verdict !== null) {
+      const v = normalizeVerdict2(it.verdict);
+      if (v !== void 0) it.verdict = v;
+    }
+    if (it.reason !== null && it.reason !== void 0) {
+      const r = normalizeManualReason(it.reason);
+      if (r !== void 0) it.reason = r;
+    }
+  }
+  return adj;
+}
 function normativeRefResolves(ref, standard, itemCriterionId) {
   const r = (ref ?? "").trim();
   if (!r) return false;
@@ -51852,6 +51904,7 @@ function normativeRefResolves(ref, standard, itemCriterionId) {
 }
 function applyAdjudication(audit2, adj, opts = {}) {
   const issues = [];
+  canonicalizeAdjudication(adj);
   const byId2 = new Map(adj.items.map((it) => [it.criteriaId, it]));
   const packMode = !isCore(adj.standard);
   const open = /* @__PURE__ */ new Set();
@@ -51913,9 +51966,9 @@ function applyAdjudication(audit2, adj, opts = {}) {
       }
     } else if (v === "manual") {
       if (!it.reason || !MANUAL_REASONS.has(it.reason))
-        issues.push(`criterion ${it.criteriaId}: a manual verdict requires reason \u2208 {needs-rendered-dom, undecidable}`);
+        issues.push(`criterion ${it.criteriaId}: a manual verdict requires reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`);
     } else {
-      issues.push(`criterion ${it.criteriaId}: unknown verdict "${String(v)}"`);
+      issues.push(`criterion ${it.criteriaId}: unknown verdict "${String(v)}" \u2014 expected one of ${VERDICTS.join(" | ")}`);
     }
     for (const rec of it.recommendations ?? []) groundInputs.push({ file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
   }
@@ -52173,6 +52226,7 @@ function writeAdjudication(items, outDir, opts) {
     schemaVersion: SCHEMA_VERSION,
     standard: opts.standard,
     auditDate: opts.auditDate,
+    contract: adjudicationContract(),
     items
   };
   writeFileSync10(todoPath, JSON.stringify(file, null, 2) + "\n");
@@ -57796,6 +57850,9 @@ Options:
                      technique + Contexte de reproduction) for a pure-auditor block
   --gh-issues        prd: also create one GitHub issue per criterion via the gh CLI (opt-in)
   --gh-single        prd: file the whole audit as ONE consolidated GitHub issue (opt-in; wins over --gh-issues)
+  --issues-json      prd: write the issue set (one item per criterion: title, body, labels,
+                     severity, occurrences) to <out>/issues-<date>.json for a non-GitHub
+                     tracker to file \u2014 same items --gh-issues would create, no gh needed
   --scaffold         render: write an SSR-snapshot harness (default: ultra11y-render.tsx)
   --setup            render: install the zero-touch test-render capture harvester (.ultra11y/capture-setup.mjs) + print the runner wiring
   --coverage         render: report rendered-capture coverage (covered vs blind-spot components); with --json emits the coverage object
@@ -58012,6 +58069,7 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "no-technical",
   "gh-issues",
   "gh-single",
+  "issues-json",
   "override",
   "local",
   "docker",
@@ -58785,6 +58843,19 @@ async function cmdPrd(p) {
   const paths = writePrd(result, { out: out2, lang, split, format, standard, technical });
   const json = p.flags.json === true;
   if (!json) for (const path of paths) console.log(path);
+  let issuesPath;
+  if (p.flags["issues-json"] === true) {
+    const issueFormat = format === "remediation" ? "remediation" : "audit";
+    const issues = issueSet(prdUnits(result, standard, lang), lang, standard, issueFormat);
+    mkdirSync15(out2, { recursive: true });
+    issuesPath = join45(out2, `issues-${result.date}.json`);
+    writeFileSync17(
+      issuesPath,
+      `${JSON.stringify({ tool: "ultra11y", kind: "issues", schemaVersion: 1, standard, date: result.date, count: issues.length, issues }, null, 2)}
+`
+    );
+    if (!json) console.log(issuesPath);
+  }
   const ghMode = p.flags["gh-single"] === true ? "single" : p.flags["gh-issues"] === true ? "per-criterion" : null;
   let gh2;
   if (ghMode) {
@@ -58808,7 +58879,8 @@ async function cmdPrd(p) {
       }
     }
   }
-  if (json) console.log(JSON.stringify({ paths, units: prdUnits(result, standard, lang), ...gh2 ? { gh: gh2 } : {} }, null, 2));
+  if (json)
+    console.log(JSON.stringify({ paths, ...issuesPath ? { issuesPath } : {}, units: prdUnits(result, standard, lang), ...gh2 ? { gh: gh2 } : {} }, null, 2));
   return gh2 && gh2.failed > 0 ? 1 : 0;
 }
 function depsAt(root) {
@@ -59204,7 +59276,22 @@ function applyAdjudicationFile(p, adj, lang) {
   mkdirSync15(out2, { recursive: true });
   const auditPath = join45(out2, "audit-latest.json");
   writeFileSync17(auditPath, JSON.stringify(r.audit, null, 2) + "\n");
-  if (p.flags.json) console.log(JSON.stringify({ ok: true, auditPath, applied: r.applied, stillManual: r.stillManual, grounding: r.grounding }, null, 2));
+  if (p.flags.json)
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          auditPath,
+          applied: r.applied,
+          stillManual: r.stillManual,
+          conformancePct: r.audit.conformancePct,
+          findings: r.audit.findings.length,
+          grounding: r.grounding
+        },
+        null,
+        2
+      )
+    );
   else
     console.log(
       lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual \u2192 ${auditPath}`
