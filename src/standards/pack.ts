@@ -41,6 +41,19 @@ export function titlePlain(pack: StandardPack, c: PackCriterion, lang: Lang): st
   return localize(pack, c.titlePlain, lang);
 }
 
+/** The criterion's own numbered test ids, in pack order: RGAA 11.1 → ["11.1.1", "11.1.2",
+ *  "11.1.3"]. These are what an auditor actually rules on, and what a `normativeRef` must
+ *  cite, so several surfaces render them (the auditor block, the report's to-rule-on list,
+ *  the PRD, the adjudication worklist, the per-page grid). Centralised here so the id shape
+ *  is defined once — it used to be re-derived inline at each call site.
+ *
+ *  Callers render these inside backticks, never followed by an em dash: `check`'s criterion
+ *  scanner matches `(\d+\.\d+)\s*—` and would capture "2.1" out of "6.2.1 — …". */
+export function packTestIds(pack: StandardPack, id: string): string[] {
+  const tests = getCriterion(pack, id)?.tests;
+  return tests ? Object.keys(tests).map((k) => `${id}.${k}`) : [];
+}
+
 export function resolveGlossary(packKey: string, anchor: string): GlossaryEntry | undefined {
   return packGlossary(packKey)?.[anchor];
 }

@@ -20,7 +20,7 @@
 // changes: the engine's "no keys, no install" promise holds everywhere else.
 //
 // Zero dependencies: global `fetch`, no SDK.
-import type { AdjudicationItem, AgentFinding, CriterionVerdict } from "./adjudicate.js";
+import type { AdjudicationItem, AgentFinding, CriterionVerdict, Evidence } from "./adjudicate.js";
 
 export const DEFAULT_MODEL = "claude-sonnet-5";
 const API_VERSION = "2023-06-01";
@@ -97,6 +97,21 @@ const VERDICT_TOOL = {
                 required: ["file", "line", "message", "normativeRef"],
               },
             },
+            citations: {
+              type: "array",
+              description:
+                "Required for C and NA when evidence was presented: the evidence items you cleared (or ruled out of scope). Copy `file`, `line` and `snippet` VERBATIM from the evidence list of this criterion — a citation that is not among them, or that no longer matches the source, is rejected.",
+              items: {
+                type: "object",
+                properties: {
+                  file: { type: "string" },
+                  line: { type: "number" },
+                  selector: { type: "string" },
+                  snippet: { type: "string" },
+                },
+                required: ["file", "line"],
+              },
+            },
             recommendations: {
               type: "array",
               description: "Non-normative good practices. They never change a status.",
@@ -126,7 +141,7 @@ const SYSTEM = `You are an accessibility auditor ruling on the criteria a static
 Rules, in order of importance:
 1. NEVER assert conformity you did not verify. "manual" with a reason is always available and is a correct answer.
 2. An NC must cite a real file:line taken from the evidence you were given, and the criterion's OWN numbered test as normativeRef. A citation that does not resolve against the real source is rejected downstream and wastes the whole batch.
-3. C and NA require a justification that says what you saw, not that you checked.
+3. C and NA require a justification that says what you saw, AND a "citations" array naming the evidence items you cleared — file and line copied verbatim from the evidence presented for that criterion. A criterion presented with NO evidence cannot be C: record "manual" (reason "undecidable"), or NA if nothing in scope is concerned.
 4. A criterion that needs a rendered page (computed contrast, visible focus, zoom, reflow) and was given only source evidence is "manual" with reason "needs-rendered-dom".
 5. Rule only on the criteria presented. Never introduce another.`;
 
@@ -146,6 +161,7 @@ export interface RawVerdict {
   justification?: string;
   reason?: string;
   findings?: AgentFinding[];
+  citations?: Evidence[];
   recommendations?: AgentFinding[];
 }
 
@@ -252,6 +268,11 @@ export function applyRawVerdicts(items: AdjudicationItem[], verdicts: RawVerdict
     item.justification = v.justification ?? "";
     item.reason = v.verdict === "manual" ? (v.reason ?? null) : null;
     item.findings = v.verdict === "NC" ? (v.findings ?? []) : [];
+    // Citations belong to the clearing verdicts, the way findings belong to NC. Dropping
+    // them here (as this function once dropped everything a non-NC verdict carried) would
+    // make every model-produced C fail the gate that now requires them.
+    if (v.verdict === "C" || v.verdict === "NA") item.citations = v.citations ?? [];
+    else delete item.citations;
     if (v.recommendations?.length) item.recommendations = v.recommendations;
     filled++;
   }

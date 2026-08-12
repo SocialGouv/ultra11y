@@ -11,7 +11,7 @@ import type { AuditResult, Finding, Lang, Severity } from "./types.js";
 import { prdUnits, partitionUnits, effortOf, guidanceFor, guidanceExampleBlock, acceptanceCriteria, type PrdUnit, type PrdFile } from "./prd.js";
 import { getSC, guidelineTitle, principleTitle, techniques as scTechniques } from "./wcag.js";
 import { resolveMessage, resolveRemediation, resolveNote } from "./messages.js";
-import { type StandardId, isCore, loadPack, standardLabel, themeName, vocabularyFor } from "./standards/index.js";
+import { type StandardId, isCore, loadPack, packTestIds, standardLabel, themeName, vocabularyFor } from "./standards/index.js";
 
 const SEV_ORDER: Severity[] = ["bloquant", "majeur", "mineur"];
 const ICON: Record<Severity, string> = { bloquant: "🔴", majeur: "🟠", mineur: "🟡" };
@@ -186,7 +186,7 @@ export function renderAuditorUnit(unit: PrdUnit, standard: StandardId, lang: Lan
     const pc = pack.criteria.find((c) => c.id === unit.criteriaId);
     if (pc) out.push(`**${v.theme}** : ${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trimEnd());
     out.push(`**${v.criterion}** : ${unit.criteriaId} — ${unit.title}`);
-    const testNums = pc?.tests ? Object.keys(pc.tests).map((k) => `${unit.criteriaId}.${k}`) : [];
+    const testNums = packTestIds(pack, unit.criteriaId);
     if (testNums.length) out.push(`**${v.test}(s)** : ${testNums.join(" · ")}`);
     if (unit.refs.length) out.push(`**WCAG** : ${unit.refs.map((sc) => `${sc}${scLevel(sc)}`).join(" · ")}`);
   }

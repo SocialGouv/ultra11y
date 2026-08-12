@@ -1258,7 +1258,8 @@
       "wcag": ["1.4.2"],
       "appliesTo": {
         "ruleIds": ["autoplay-media", "axe:no-autoplay-audio"]
-      }
+      },
+      "judgment": true
     },
     {
       "id": "4.11",
@@ -1897,7 +1898,8 @@
       "wcag": ["3.1.1"],
       "appliesTo": {
         "ruleIds": ["axe:html-lang-valid", "lang-invalid"]
-      }
+      },
+      "judgment": true
     },
     {
       "id": "8.5",
@@ -1933,7 +1935,8 @@
       "wcag": ["2.4.2"],
       "appliesTo": {
         "ruleIds": []
-      }
+      },
+      "judgment": true
     },
     {
       "id": "8.7",
@@ -3327,7 +3330,8 @@
       "wcag": ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
       "appliesTo": {
         "ruleIds": []
-      }
+      },
+      "judgment": true
     },
     {
       "id": "13.4",
@@ -3349,7 +3353,8 @@
       "wcag": ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
       "appliesTo": {
         "ruleIds": []
-      }
+      },
+      "judgment": true
     },
     {
       "id": "13.5",

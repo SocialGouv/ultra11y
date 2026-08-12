@@ -130,6 +130,29 @@ const RULE_SC = {
   "table-caption-missing": ["1.3.1"], "table-empty-data-cell": ["1.3.1"], "title-missing-empty": ["2.4.2"],
 };
 
+// ---- Judgment criteria: RGAA wordings that ask MORE than their WCAG mapping ----
+// A criterion derives its status from the WCAG SCs DINUM's own crosswalk cites, and the
+// projection returns `C` as soon as one mapped SC is `C`. That is right when the RGAA
+// question and the SC ask the same thing (8.3 "is a default language present?" ↔ 3.1.1),
+// and wrong when the RGAA wording adds a human judgment the SC never made: RGAA 8.6 asks
+// whether the page title is PERTINENT, WCAG 2.4.2 only that a title exists — so a page
+// titled "aaa" derived `C`. Worse, 13.3/13.4 (does each downloadable office document have
+// an accessible version?) map to a bag of seven SCs including 3.1.1, so they derived `C`
+// off a `lang` attribute, on pages carrying an unopened PDF — and on pages carrying no
+// document at all.
+//
+// Only 3 WCAG SCs are `static` (1.4.2, 2.4.2, 3.1.1), so only 7 RGAA criteria can ever
+// derive `C`; these are the ones among them whose question the engine has not answered.
+// Flagged criteria can still be NC (a real rule fired) or NA (nothing applicable) — they
+// simply never inherit a `C`, they go to the agent instead (src/standards/derive.ts).
+const JUDGMENT_CRITERIA = {
+  "4.10": "« contrôlable par l’utilisateur » — l’arrêt/le réglage du son se constate au rendu, 1.4.2 ne prouve que l’absence d’autoplay détectable.",
+  "8.4": "« le code de langue est-il pertinent ? » — 3.1.1 ne vérifie que la présence et la validité syntaxique de `lang`, pas sa cohérence avec la langue réelle du contenu.",
+  "8.6": "« ce titre est-il pertinent ? » — 2.4.2 ne vérifie que la présence d’un `<title>` non vide.",
+  "13.3": "« version accessible du document en téléchargement » — aucune règle moteur ne peut ouvrir le document ; les CS mappés ne portent que sur la page.",
+  "13.4": "« cette version offre-t-elle la même information ? » — comparaison de deux documents, hors de portée d’un audit de la page.",
+};
+
 // ruleId → RGAA criterion ids it evidences. Static rules + their axe:/dyn- equivalents so
 // the dynamic-tier merge keeps the same mapping (an axe:color-contrast NC still lands on
 // RGAA 3.2/10.5, not fanned out).
@@ -271,6 +294,14 @@ async function main() {
     }
   }
   for (const c of criteria) c.appliesTo = { ruleIds: [...(critRules[c.id] ?? [])].sort() };
+
+  // ---- Judgment flag: attach it, and refuse to ship a stale table. A flag naming a
+  // criterion that could never derive `C` anyway would be silently inert, and the whole
+  // point is that this list stays auditable. ----
+  for (const id of Object.keys(JUDGMENT_CRITERIA)) {
+    if (!wcagById.has(id)) throw new Error(`JUDGMENT_CRITERIA: unknown RGAA criterion "${id}"`);
+  }
+  for (const c of criteria) if (JUDGMENT_CRITERIA[c.id]) c.judgment = true;
 
   // ---- Declarative pack RULE (usage proof): an RGAA-only ADVISORY recommendation, run by
   // the bounded interpreter (src/standards/pack-rules.ts) AFTER the core engine rules. It

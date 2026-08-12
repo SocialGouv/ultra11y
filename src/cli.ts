@@ -1,4 +1,4 @@
-import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync } from "node:fs";
+import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync, copyFileSync } from "node:fs";
 import { join, relative, sep, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { VERSION, type Lang, type AuditResult, type DynamicResult, type SampleConfig, type Severity } from "./types.js";
@@ -1157,14 +1157,30 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   const split = p.flags.split === "page";
   const outDir = typeof p.flags.out === "string" && p.flags.out ? (p.flags.out as string) : undefined;
 
-  // The screenshot lives beside the snapshot, on disk. Reference it relatively from wherever
-  // the file lands — a copy would double the repo's weight for no gain, and an absolute path
-  // would break the moment the report is read anywhere else.
-  const shotsFor = (fileDir: string): Map<string, string> => {
+  // The screenshot lives beside the snapshot, in `.ultra11y/pages/`. Referencing it
+  // relatively is right when the report is read in place, and wrong the moment the report
+  // DIRECTORY travels on its own: CI uploads `audits/` as the artifact, and a
+  // `../../.ultra11y/…` link then points outside it — every image broken in the artifact
+  // the reviewer actually opens. So when writing to a directory we copy each screenshot
+  // into it (`assets/<page-id>.png`) and link that; stdout mode keeps the relative
+  // reference, since there is no output directory to be self-contained.
+  const shotOf = (id: string): string => join(PAGES_DIR, id, "screen.png");
+  const shotsRelative = (fileDir: string): Map<string, string> => {
     const m = new Map<string, string>();
     for (const pg of derived) {
-      const shot = join(PAGES_DIR, pg.id, "screen.png");
-      if (existsSync(shot)) m.set(pg.id, relative(fileDir, shot).split("\\").join("/"));
+      if (existsSync(shotOf(pg.id))) m.set(pg.id, relative(fileDir, shotOf(pg.id)).split("\\").join("/"));
+    }
+    return m;
+  };
+  const shotsCopiedInto = (dir: string): Map<string, string> => {
+    const m = new Map<string, string>();
+    const assets = join(dir, "assets");
+    for (const pg of derived) {
+      const src = shotOf(pg.id);
+      if (!existsSync(src)) continue;
+      mkdirSync(assets, { recursive: true });
+      copyFileSync(src, join(assets, `${pg.id}.png`));
+      m.set(pg.id, `./assets/${pg.id}.png`);
     }
     return m;
   };
@@ -1172,19 +1188,19 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   if (!outDir) {
     // No --out: stream the whole document to stdout. Screenshots are resolved against the
     // CWD, which is where a reader piping this would sit.
-    console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsFor(".") }));
+    console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsRelative(".") }));
     return 0;
   }
 
   mkdirSync(outDir, { recursive: true });
   if (!split) {
     const file = join(outDir, `pages-${result.date}.md`);
-    writeFileSync(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsFor(outDir) })}\n`);
+    writeFileSync(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir) })}\n`);
     console.log(file);
     return 0;
   }
 
-  const shots = shotsFor(outDir);
+  const shots = shotsCopiedInto(outDir);
   // Sheets are `page-<id>.md`, never `<id>.md`: a page whose id is `index` — the ordinary id
   // for an `index.html` target — would otherwise be written to the same path as the index and
   // one of the two would silently vanish. The prefix makes the collision impossible by

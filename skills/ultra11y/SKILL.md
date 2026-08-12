@@ -38,21 +38,26 @@ adjudicates. So the engine's clean run is a starting point, never a verdict — 
 > **Core rules:**
 > 1. **Never invent a non-conformity**: every `NC` cites a real, resolvable element (`check` verifies it).
 > 2. **Native HTML first, ARIA last**; never duplicate implicit semantics.
-> 3. **Residual is explicit, never silently conforming**: the AI agent *adjudicates* every
+> 3. **Never invent a conformity either**: a `C` is cited exactly like an `NC` — it names in
+>    `citations[]` the harvested evidence it cleared, each anchor resolvable and drawn from
+>    the evidence that criterion was actually shown. A criterion presented with *no* evidence
+>    cannot be `C` at all; it stays `manual`. And an adjudicated `C` is never merged with an
+>    engine-decided one: reports list it separately and keep it out of the automatic pass rate.
+> 4. **Residual is explicit, never silently conforming**: the AI agent *adjudicates* every
 >    *judgment* criterion itself (`verify --manual`, gated), and the *rendering* criteria go to
 >    `scan`; any criterion still unproven stays "to assess manually" — no status without a
 >    recorded, justified verdict.
-> 4. **The FINAL rendered semantic HTML must be correct.** The engine sees only source; a
+> 5. **The FINAL rendered semantic HTML must be correct.** The engine sees only source; a
 >    component library (DSFR/MUI…) or `.vue`/`.svelte`/`.astro` SFC hides the real markup, so
 >    a green source audit is not proof. Verify the produced semantic HTML — install the
 >    zero-touch **capture** harvester (`render --setup`) so every component your tests render
 >    is serialized to `.ultra11y/captures` and audited, with `audit --require-captures` gating
 >    the blind spots. See `references/automation.md` / `rendered.md`.
-> 5. **Language**: ALWAYS pass `--lang` matching the language of your conversation with
+> 6. **Language**: ALWAYS pass `--lang` matching the language of your conversation with
 >    the user; ask the user when ambiguous. Without the flag the CLI auto-detects (repo
 >    `<html lang>` → the active standard's default locale → English) — a scripted/CI
 >    fallback, not a substitute for passing `--lang` yourself.
-> 6. **Technical tokens stay in English, even in French prose.** In any French deliverable
+> 7. **Technical tokens stay in English, even in French prose.** In any French deliverable
 >    you write (report commentary, PRD, GitHub issues, judgment verdicts), attribute/
 >    element/role names and their values are code, not prose — never translate them:
 >    `aria-live` stays `aria-live` (never « région live »), same for `tabindex`, `alt`,
