@@ -341,7 +341,13 @@ export interface PageResult {
   basis: "snapshot" | "attributed";
   criteria: CriterionResult[];
   findings: Finding[];
-  conformancePct: number;
+  // NULL WHEN NOTHING WAS DECIDED. A rate over zero decided criteria is not a rate, and printing
+  // it as 100 is how 38 pages of an app with 16 known non-conformities each reported "100 %" —
+  // the denominator was empty, not the defect list. Readers must render `—`, never a number, and
+  // must show `decided/total` beside it so the figure can never be quoted without its basis.
+  conformancePct: number | null;
+  decided: number; // criteria this page actually decided (C + NC) — the rate's denominator
+  total: number; // criteria in scope for this page under the active standard
 }
 
 // ---- adjudication under a COUNTRY STANDARD ------------------------------------------------

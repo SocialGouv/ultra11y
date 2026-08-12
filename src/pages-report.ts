@@ -25,7 +25,7 @@
 // this module pure and testable.
 import { prdUnits } from "./prd.js";
 import { renderAuditorUnit } from "./auditor.js";
-import { pageView } from "./pages.js";
+import { formatRate, pageView } from "./pages.js";
 import { CORE, type StandardId, derivePackResults, isCore, loadPack, packTestIds, themeName, titlePlain } from "./standards/index.js";
 import type { AuditResult, Lang, PageResult, Status } from "./types.js";
 import { compareSC, scTitle } from "./wcag.js";
@@ -64,6 +64,10 @@ const L = {
     producer: "Producteur",
     auth: "Authentification requise",
     rate: "Taux de réussite automatique (vérifications statiques)",
+    // The index has its own, shorter header — the sheet's label is a full sentence and would
+    // wreck an eight-column table. Kept as a SEPARATE key: editing `rate` in place would
+    // silently reword the sheet bullet too.
+    rateShort: "Taux (critères décidés)",
     rateNote: "sous-ensemble décidable : C ÷ (C + NC)",
     tally: (c: number, nc: number, na: number, m: number) => `${c} conforme(s) · ${nc} non conforme(s) · ${na} non applicable(s) · ${m} à évaluer`,
     coverage: (decided: number, total: number) =>
@@ -90,7 +94,8 @@ const L = {
     blocking: "Bloquant",
     major: "Majeur",
     minor: "Mineur",
-    indexNote: "Une fiche par page. Le taux ne porte que sur les critères décidés — il ne dit rien des critères restant à évaluer.",
+    indexNote:
+      "Une fiche par page. `X % (d/t)` : le taux ne porte que sur les `d` critères décidés sur `t` — il ne dit rien des autres. `—` signifie qu'aucun critère n'a été décidé sur cette page, et ne vaut donc NI conformité NI non-conformité.",
   },
   en: {
     docTitle: "Page-by-page accessibility report",
@@ -108,6 +113,7 @@ const L = {
     producer: "Producer",
     auth: "Authentication required",
     rate: "Automatic static-check pass rate",
+    rateShort: "Rate (decided criteria)",
     rateNote: "decidable subset: C ÷ (C + NC)",
     tally: (c: number, nc: number, na: number, m: number) => `${c} conforming · ${nc} non-conforming · ${na} not applicable · ${m} to assess`,
     coverage: (decided: number, total: number) =>
@@ -134,7 +140,8 @@ const L = {
     blocking: "Blocking",
     major: "Major",
     minor: "Minor",
-    indexNote: "One sheet per page. The rate covers only the decided criteria — it says nothing about those left to assess.",
+    indexNote:
+      "One sheet per page. `X % (d/t)`: the rate covers only the `d` criteria decided out of `t` — it says nothing about the others. `—` means no criterion was decided on this page, so it is NEITHER conformity NOR non-conformity.",
   },
 } as const;
 
@@ -198,13 +205,23 @@ function tally(rows: Row[]): { c: number; nc: number; na: number; manual: number
   };
 }
 
-/** The rate over the criteria of the ACTIVE standard, decided ones only — same basis and
- *  same divide-by-zero convention as the core (`nothing decided ⇒ 100`). Under a pack this
- *  is the pack's own arithmetic, not the WCAG one, so the number agrees with the grid above
- *  it rather than with a different denominator. */
-function ratePct(rows: Row[]): number {
+/** The rate's denominator, extracted so the sheet's « Couverture » line and the index cell are
+ *  computed ONCE. They disagreed before: the sheet said 2/106 while the index printed a bare
+ *  100 %, and the index is the artefact people paste into a pull request. */
+function coverageOf(rows: Row[]): { decided: number; total: number } {
+  const t = tally(rows);
+  return { decided: t.c + t.nc, total: rows.length };
+}
+
+/** The rate over the criteria of the ACTIVE standard, decided ones only. Under a pack this is
+ *  the pack's own arithmetic, not the WCAG one, so the number agrees with the grid above it
+ *  rather than with a different denominator.
+ *
+ *  NULL when nothing was decided — see `pct` in src/pages.ts. Returning 100 there is what let a
+ *  page nobody had assessed be quoted as a page with nothing wrong. */
+function ratePct(rows: Row[]): number | null {
   const { c, nc } = tally(rows);
-  return c + nc === 0 ? 100 : Math.round((c / (c + nc)) * 100);
+  return c + nc === 0 ? null : Math.round((c / (c + nc)) * 100);
 }
 
 /** One page's dossier: identity, screenshot, rate, the full criteria grid, then every
@@ -226,11 +243,13 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
 
   const rows = rowsFor(result, page, standard, lang);
   const t = tally(rows);
-  out.push(`- **${s.rate}** : **${ratePct(rows)} %** _(${s.rateNote})_`);
+  const cov = coverageOf(rows);
+  const rate = ratePct(rows);
+  out.push(`- **${s.rate}** : **${rate === null ? "—" : `${rate} %`}** _(${s.rateNote})_`);
   out.push(`- ${s.tally(t.c, t.nc, t.na, t.manual)}`);
   // The rate alone reads as a verdict on the page. Naming the denominator next to it is
   // what stops "100 %" over six decided criteria from being quoted as a conformant page.
-  out.push(`- ${s.coverage(t.c + t.nc, rows.length)}`, "");
+  out.push(`- ${s.coverage(cov.decided, cov.total)}`, "");
 
   // A source-only page cannot earn conformity by silence. Say so ON THE PAGE, not only in a
   // legend the reader may never reach — this is the sentence that stops a clean-looking
@@ -303,14 +322,18 @@ export function renderPagesIndex(result: AuditResult, pages: PageResult[], opts:
   const s = L[lang];
   const out = header(result, pages, standard, lang, s.indexTitle);
   out.push(`> ${s.indexNote}`, "");
-  out.push(`| ${s.page} | ${s.url} | ${s.basis} | ${s.rate} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
+  out.push(`| ${s.page} | ${s.url} | ${s.basis} | ${s.rateShort} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
   out.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const p of pages) {
     const rows = rowsFor(result, p, standard, lang);
-    const nc = p.findings.filter((f) => !f.advisory);
+    const cov = coverageOf(rows);
+    // Severity counts must see the SAME findings the rate did. Under a pack the rate comes from
+    // `derivePackResults`, which reads packFindings; counting only `p.findings` printed
+    // "0 · 0 · 0" beside a rate that had already counted those non-conformities.
+    const nc = [...p.findings, ...(result.packFindings ?? []).filter((f) => f.page === p.id)].filter((f) => !f.advisory);
     const href = opts.hrefs?.get(p.id);
     out.push(
-      `| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${p.basis === "snapshot" ? s.snapshot : s.source} | ${ratePct(rows)} % | ${
+      `| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${p.basis === "snapshot" ? s.snapshot : s.source} | ${formatRate(ratePct(rows), cov.decided, cov.total)} | ${
         nc.filter((f) => f.severity === "bloquant").length
       } | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`,
     );

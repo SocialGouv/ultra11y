@@ -351,7 +351,19 @@ function handlePages(args: Record<string, unknown>, cwd: string): unknown {
     standard,
     lang,
     markdown,
-    pages: derived.map((p) => ({ id: p.id, name: p.name, url: p.url, basis: p.basis, conformancePct: p.conformancePct, findings: p.findings.length })),
+    // `conformancePct` is null when this page decided nothing — a machine consumer must be able
+    // to tell "no criterion was assessed" from "every assessed criterion passed", which a bare
+    // 100 conflates. `decided`/`total` are the denominator that makes the number quotable.
+    pages: derived.map((p) => ({
+      id: p.id,
+      name: p.name,
+      url: p.url,
+      basis: p.basis,
+      conformancePct: p.conformancePct,
+      decided: p.decided,
+      total: p.total,
+      findings: p.findings.length,
+    })),
     unattributed: unattributedFindings(r).length,
     next: 'A page whose basis is "attributed" has no snapshot: absence of a finding there is NOT conformity. Its undecided criteria stay yours to adjudicate.',
   };

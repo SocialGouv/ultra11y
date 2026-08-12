@@ -169,12 +169,18 @@ function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScop
   return basis === "snapshot" ? "C" : "manual";
 }
 
-/** Pass rate over the criteria this page actually decided — same C ÷ (C + NC) basis as core,
- *  and the same denominator-zero convention (nothing decided ⇒ 100, never a divide by zero). */
-function pct(criteria: CriterionResult[]): number {
+/** Pass rate over the criteria this page actually decided — same C ÷ (C + NC) basis as core.
+ *
+ *  NULL WHEN THE DENOMINATOR IS EMPTY, and that is the whole point. The old convention returned
+ *  100 for "nothing decided", which reads as a perfect page and is the mechanism behind a 38-row
+ *  table of « 100 % » for an app a human auditor had just found sixteen non-conformities in: the
+ *  criteria were all « à évaluer », so C + NC was zero, so the rate was 100. A rate over nothing
+ *  is not a good score, it is the absence of a score, and it must be rendered as such. */
+function pct(criteria: CriterionResult[]): { rate: number | null; decided: number; total: number } {
   const c = criteria.filter((x) => x.status === "C").length;
   const nc = criteria.filter((x) => x.status === "NC").length;
-  return c + nc === 0 ? 100 : Math.round((c / (c + nc)) * 100);
+  const decided = c + nc;
+  return { rate: decided === 0 ? null : Math.round((c / decided) * 100), decided, total: criteria.length };
 }
 
 /** Project the audit onto its pages. Pure: everything it needs is on the AuditResult, so the
@@ -195,6 +201,7 @@ export function derivePages(result: AuditResult, pages: PageScope[]): PageResult
         ...(c.decidedBy ? { decidedBy: c.decidedBy } : {}),
       };
     });
+    const { rate, decided, total } = pct(criteria);
     out.push({
       id: p.id,
       name: p.name,
@@ -203,7 +210,9 @@ export function derivePages(result: AuditResult, pages: PageScope[]): PageResult
       basis: p.basis,
       criteria,
       findings: own,
-      conformancePct: pct(criteria),
+      conformancePct: rate,
+      decided,
+      total,
     });
   }
   return out;
@@ -243,6 +252,17 @@ const L = {
     source: "source",
   },
 } as const;
+
+/** A page's rate, as the reader must see it: never a bare number.
+ *
+ *  `50 % (2/106)` when something was decided, `— (0/106)` when nothing was. The denominator is
+ *  not decoration — a rate quoted without it is how « 100 % » travelled out of an index and into
+ *  a PR while the sheet it came from said two criteria out of a hundred and six had been
+ *  assessed. Exported so the grid, the report index, the PR comment and the dev dashboard all
+ *  format it identically; a surface that prints its own is a surface that will drift. */
+export function formatRate(rate: number | null, decided: number, total: number): string {
+  return `${rate === null ? "—" : `${rate} %`} (${decided}/${total})`;
+}
 
 /** Honesty rule 2, as one sentence: a page with no snapshot cannot earn conformity by
  *  silence. Exported so the grid, the per-page report AND the page-grain ticket all say the
@@ -315,7 +335,7 @@ export function renderPageGrid(result: AuditResult, pages: PageScope[], standard
 
   const head = [isCore(standard) ? s.criterion : s.criterion, ...derived.map((p) => `${p.name}${p.auth ? " 🔒" : ""}`)];
   out.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
-  out.push(`| **${s.rate}** | ${derived.map((p) => `**${p.conformancePct}%**`).join(" | ")} |`);
+  out.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(p.conformancePct, p.decided, p.total)}**`).join(" | ")} |`);
   out.push(`| _${s.snapshot}?_ | ${derived.map((p) => (p.basis === "snapshot" ? `_${s.snapshot}_` : `_${s.source}_`)).join(" | ")} |`);
 
   const { rows, status } = gridOf(result, derived, standard, lang);

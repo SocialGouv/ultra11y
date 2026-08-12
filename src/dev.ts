@@ -19,7 +19,7 @@ import { dirname, join } from "node:path";
 import { runAudit } from "./audit.js";
 import { resolveMessage } from "./messages.js";
 import { packCriteriaForFinding } from "./standards/derive.js";
-import { attributePages, derivePages, pageScopesFrom, pagesOf } from "./pages.js";
+import { attributePages, derivePages, formatRate, pageScopesFrom, pagesOf } from "./pages.js";
 import { applyAdjudication, buildAdjudicationWorklist, formatAdjudication } from "./adjudicate.js";
 import { BATCH_SIZE, applyRawVerdicts, judgeAll } from "./llm.js";
 import { readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
@@ -286,7 +286,9 @@ export function dashboardHtml(result: AuditResult | null, pages: PageResult[], s
   out.push("<table><thead><tr><th></th>");
   for (const p of pages) out.push(`<th>${esc(p.name)}${p.auth ? " 🔒" : ""}<br><code>${esc(p.url)}</code></th>`);
   out.push("</tr></thead><tbody>");
-  out.push(`<tr><td>${fr ? "Taux" : "Rate"}</td>${pages.map((p) => `<td class="rate">${p.conformancePct}%</td>`).join("")}</tr>`);
+  out.push(
+    `<tr><td>${fr ? "Taux" : "Rate"}</td>${pages.map((p) => `<td class="rate">${esc(formatRate(p.conformancePct, p.decided, p.total))}</td>`).join("")}</tr>`,
+  );
   let group = "";
   for (const row of rows) {
     if (row.group !== group) {
@@ -367,6 +369,18 @@ export function projectPages(root: string): { result: AuditResult | null; pages:
   attributePages(result, scope);
   foldRecordedAdjudication(root, result);
   return { result, pages: derivePages(result, scope) };
+}
+
+/** The per-page rates the judge endpoint reports back to the dashboard.
+ *
+ *  It goes through `attributePages` for the same reason every other consumer does: deriving pages
+ *  from a result whose findings were never attributed gives each page an empty finding list, so
+ *  every page reports as though nothing were wrong with it. The endpoint used to skip that step
+ *  and reproduced the empty-grid artefact inside the dashboard alone. */
+function judgePages(result: AuditResult): { id: string; name: string; rate: number | null; decided: number; total: number }[] {
+  const scope = pagesOf(result);
+  attributePages(result, scope);
+  return derivePages(result, scope).map((p) => ({ id: p.id, name: p.name, rate: p.conformancePct, decided: p.decided, total: p.total }));
 }
 
 /** Carry a previously applied adjudication onto a freshly measured audit. Only the agent's
@@ -530,7 +544,7 @@ export function startDevServer(opts: DevOptions): Promise<DevServer> {
               ...(auditPath ? { auditPath } : {}),
               issues: applied.ok ? [] : applied.issues.slice(0, 20),
               failures,
-              pages: applied.ok ? derivePages(applied.audit, pagesOf(applied.audit)).map((p) => ({ id: p.id, name: p.name, rate: p.conformancePct })) : [],
+              pages: applied.ok ? judgePages(applied.audit) : [],
             }),
           );
         } catch (e) {

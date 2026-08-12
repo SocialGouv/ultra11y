@@ -15,7 +15,7 @@ import { findingsForStandard, packCriteriaForFinding } from "./standards/derive.
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
 import type { AuditResult, Finding, Lang, Severity } from "./types.js";
 import { isUrlPath, repoRelative } from "./util.js";
-import { attributePages, derivePages, pagesOf } from "./pages.js";
+import { attributePages, derivePages, formatRate, pagesOf } from "./pages.js";
 
 export interface AnnotateOptions {
   standard?: StandardId;
@@ -187,7 +187,7 @@ export function perPageTable(result: AuditResult, standard: StandardId = CORE, l
     const nc = pg.findings.filter((f) => !f.advisory);
     const n = (sev: Severity): number => nc.filter((f) => f.severity === sev).length;
     out.push(
-      `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${pg.basis === "snapshot" ? s.snapshot : s.source} | ${pg.conformancePct}% | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
+      `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${pg.basis === "snapshot" ? s.snapshot : s.source} | ${formatRate(pg.conformancePct, pg.decided, pg.total)} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
     );
   }
   out.push("");

@@ -237,6 +237,22 @@ describe("the rendered grid", () => {
     for (const token of ["NC", "C", "?"]) expect(md).toContain(token);
   });
 
+  it("prints the rate with its denominator, and `—` when nothing was decided", () => {
+    // A page whose criteria are all « à évaluer » decided nothing. The old arithmetic returned
+    // 100 for that empty denominator, which is the mechanism behind a whole table of « 100 % ».
+    const undecided = audit({ findings: [], criteria: [C("1.1.1", "manual"), C("1.4.3", "manual")] });
+    const md = renderPageGrid(undecided, PAGES, "wcag", "en");
+    expect(md).toContain("— (0/2)");
+    expect(md).not.toContain("100%");
+    expect(md).not.toContain("100 %");
+  });
+
+  it("still reports a real rate when criteria WERE decided", () => {
+    const decided = audit({ findings: [], criteria: [C("2.4.2", "C"), C("3.1.1", "C"), C("1.4.3", "manual")] });
+    const md = renderPageGrid(decided, PAGES, "wcag", "en");
+    expect(md).toContain("100 % (2/3)");
+  });
+
   it("reports the unattributed findings explicitly instead of dropping them", () => {
     const orphan = F({ file: "src/lib/util.ts", criteriaId: "1.1.1" });
     const r2 = audit({ findings: [orphan], criteria: [C("1.1.1", "NC", [orphan])] });

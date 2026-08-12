@@ -156,6 +156,47 @@ describe("the index", () => {
     expect(contactRow).toMatch(/\| 2 \| 0 \| 0 \|/);
     expect(accueilRow).toMatch(/\| 0 \| 0 \| 0 \|/);
   });
+
+  it("never prints a bare rate — every cell carries the denominator it was computed over", () => {
+    // The whole of issue #16 item 2: the index is the artefact people paste into a PR, and it
+    // printed `100 %` next to three zeroes while its own sheet said two criteria out of 106 had
+    // been assessed.
+    const rows = md.split("\n").filter((l) => l.startsWith("| Page d'accueil |") || l.startsWith("| Contact |"));
+    expect(rows.length).toBe(2);
+    for (const row of rows) expect(row).toMatch(/\| (?:\d+ %|—) \(\d+\/106\) \|/);
+  });
+
+  it("renders `—`, never a number, for a page on which nothing was decided", () => {
+    const nothingDecided = { ...derived[0]!, criteria: derived[0]!.criteria.map((c) => ({ ...c, status: "manual" as const })) };
+    const one = renderPagesIndex(result, [{ ...nothingDecided, conformancePct: null, decided: 0, total: nothingDecided.criteria.length }], {
+      standard: "rgaa",
+      lang: "fr",
+    });
+    const row = one.split("\n").find((l) => l.startsWith("| Page d'accueil |"))!;
+    expect(row).toContain("— (0/106)");
+    expect(row).not.toMatch(/\| 100 % /);
+  });
+
+  it("names the short rate column in both languages", () => {
+    expect(md).toContain("| Taux (critères décidés) |");
+    const en = renderPagesIndex(result, derived, { standard: "rgaa", lang: "en" });
+    expect(en).toContain("| Rate (decided criteria) |");
+    // ...and the eight-column shape is unchanged, so the separator row still lines up.
+    const header = md.split("\n").find((l) => l.startsWith("| Page |"))!;
+    expect(header.split("|").length - 2).toBe(8);
+  });
+
+  it("ANTI-DRIFT: the index cell and the sheet's coverage line report the same denominator", () => {
+    // These were computed in two places and disagreed — the sheet said 2/106, the index said
+    // 100 %. One extraction (`coverageOf`) now feeds both; this is what stops them parting again.
+    for (const p of derived) {
+      const sheet = renderPageReport(result, p, { standard: "rgaa", lang: "fr" });
+      const fromSheet = /Couverture : (\d+)\/(\d+) critère/.exec(sheet);
+      expect(fromSheet, `no coverage line on the ${p.id} sheet`).toBeTruthy();
+      const row = md.split("\n").find((l) => l.startsWith(`| ${p.name} |`))!;
+      expect(row).toContain(`(${fromSheet![1]}/${fromSheet![2]})`);
+    }
+  });
 });
 
 describe("`check` on a per-page report", () => {
