@@ -151,6 +151,14 @@ A rejected adjudication leaves `audit-latest.json` untouched.
 **Strictly opt-in.** With no key the command explains itself and exits 2; nothing else in the
 engine changes.
 
+**In the GitHub Action.** `adjudicate: api` runs exactly the command above; `adjudicate: agent`
+hands the same worklist — plus `orchestrate --eco`'s runbook and the adjudicator contract — to
+a `claude-code-action` run, then folds it with `verify --apply`. The agent mode exists because
+`judge` rules from the harvested evidence alone (30 items per criterion, snippets truncated)
+while an agent can open the cited files, which is what *link purpose in context* really needs.
+Both skip themselves when `ANTHROPIC_API_KEY` is absent from the job environment, and both
+absorb their own failure rather than taking the audit down with them. See `references/ci.md`.
+
 `--max` bounds the spend and says out loud which criteria it did not submit. It is **refused
 together with `--apply`**, before any call is made: the gate rejects an incomplete
 adjudication by design, so the pair could only ever bill you for a guaranteed failure. Drop

@@ -119,6 +119,18 @@ inputs:
     description: 'Print the ticket plan without creating anything. Use it on a pull request, and file for real only on the default branch.'
     required: false
     default: 'false'
+  adjudicate:
+    description: 'Rule on the judgment criteria the static engine cannot decide (alt relevance, link purpose in context, reading order): `api` sends the worklist to the Anthropic API in batches, `agent` hands it to a Claude Code run, `none` (default) leaves them « to assess ». Both non-`none` modes read ANTHROPIC_API_KEY from the JOB environment — never from an input — and skip themselves when it is absent, which is what makes them harmless on a fork pull request.'
+    required: false
+    default: 'none'
+  adjudicate-model:
+    description: 'Model id for `adjudicate: api`. Empty follows $ULTRA11Y_LLM_MODEL, then the engine default.'
+    required: false
+    default: ''
+  gate-adjudicated:
+    description: 'Gate on the ADJUDICATED audit instead of re-auditing the source, so a model-ruled non-conformity can fail the job. The trade is real: the red/green stops being reproducible run to run. Ignored when `adjudicate` is `none`.'
+    required: false
+    default: 'false'
   working-directory:
     description: 'Directory to run in.'
     required: false
@@ -226,6 +238,119 @@ runs:
           node "$ENGINE" scan ${{ inputs.urls }} "${args[@]}"
         fi
 
+    # THE ADJUDICATION TIER — the judgment criteria, ruled on when nobody is in the loop.
+    #
+    # Of the 55 WCAG 2.2 AA criteria, 38 are judgment calls; under RGAA, 81 of 106 can only
+    # ever derive `manual`. Inside a coding agent those are adjudicated by the agent itself.
+    # In CI nobody rules on them, so they stay « à évaluer » forever: honest, and an
+    # incomplete deliverable. These steps close that gap — strictly opt-in.
+    #
+    # They sit HERE, after `scan`, on purpose: the rendered tier has just decided the criteria
+    # that need a browser, so the model is never asked to rule on computed contrast — it would
+    # answer `needs-rendered-dom` and spend a batch saying nothing. And they sit BEFORE the
+    # per-page report, SARIF, annotations, the PR comment, tickets and the report, all of
+    # which read audits/audit-latest.json and so inherit the verdicts.
+    #
+    # The key is read from the JOB environment, never from an input: a composite action's
+    # steps inherit it, and a secret that never travels through an input is one fewer secret
+    # to leak into a log.
+    - name: Resolve the adjudication tier
+      id: adjudication
+      if: inputs.adjudicate != 'none'
+      shell: bash
+      run: |
+        if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+          echo "on=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::ultra11y: adjudicate=${{ inputs.adjudicate }} but ANTHROPIC_API_KEY is absent from the job environment — the judgment criteria stay to assess. Secrets are not exposed to a fork's pull request, so this is the expected path there."
+        else
+          echo "on=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    # MODE `api` — one Messages call per batch of 8 criteria. `judge` builds its own worklist,
+    # renders it through the very formatter the agent reads, and folds the verdicts through
+    # `applyAdjudication` unchanged: a model cannot assert a conformance the gate refuses.
+    - name: Adjudicate with the API
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'api'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        args=(--in audits/audit-latest.json --out audits --apply)
+        args+=(--standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}')
+        if [ -n '${{ inputs.adjudicate-model }}' ]; then args+=(--model '${{ inputs.adjudicate-model }}'); fi
+        # An adjudication that fails is not an audit that fails. The fold is fail-closed, so
+        # one rate-limited batch refuses the whole apply — absorb that and carry on with the
+        # criteria still to assess, exactly as if the tier had been off. The one exception is
+        # a caller who gated on these verdicts: there, staying quiet would gate on nothing.
+        if node "$ENGINE" judge "${args[@]}"; then
+          echo "ultra11y: adjudication applied."
+        elif [ '${{ inputs.gate-adjudicated }}' = 'true' ]; then
+          echo "::error::ultra11y: the adjudication failed and gate-adjudicated is on — refusing to gate on a partial adjudication."
+          exit 1
+        else
+          echo "::warning::ultra11y: the adjudication failed — the judgment criteria stay to assess."
+        fi
+
+    # MODE `agent` — the same worklist, handed to a harness that can OPEN THE FILES. That is
+    # the whole difference: `judge` rules from the harvested evidence alone (capped at 30
+    # items per criterion, snippets truncated), while an agent can read the surrounding
+    # source — which is exactly what "link purpose IN CONTEXT" asks for.
+    #
+    # `--eco` emits the sequential RUNBOOK + the dispatch contracts, not the *.workflow.mjs
+    # fan-out: the latter needs the harness to expose a Workflow tool, which is not part of
+    # claude-code-action's contract.
+    - name: Adjudicate with an agent — worklist and runbook
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        node "$ENGINE" verify --manual --in audits/audit-latest.json --out audits \
+          --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}'
+        node "$ENGINE" orchestrate --run audits --phase adjudicate --eco
+
+    # The version is pinned in the literal below because GitHub refuses an expression in
+    # `uses:` — it cannot be an input, so it is a dependency this action owns and bumps.
+    - name: Adjudicate with an agent — Claude Code
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent'
+      uses: anthropics/claude-code-action@v1
+      with:
+        anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
+        claude_args: '--allowedTools Read,Grep,Glob,Edit,Write'
+        prompt: |
+          You are running head-less in CI. Adjudicate an accessibility audit, and do nothing else.
+
+          Read ${{ inputs.working-directory }}/audits/orchestration/RUNBOOK.md and follow its
+          `adjudicate` phase sequentially. The dispatch contract you must obey VERBATIM is
+          ${{ inputs.working-directory }}/audits/orchestration/agents/adjudicator.md.
+
+          Your only write is to fill every item's verdict in
+          ${{ inputs.working-directory }}/audits/ADJUDICATE.todo.json. Do not edit any other
+          file, do not touch the audited source, do not commit, and do not comment on the PR.
+
+          A criterion you cannot decide from real evidence stays `manual` with its reason —
+          that is a correct answer, not a failure. Never assert a conformity you did not
+          verify: the fold downstream is fail-closed and re-grounds every file:line you cite.
+
+    - name: Adjudicate with an agent — fold the verdicts
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        # Same fail-closed gate, same degradation policy as the API mode above.
+        if node "$ENGINE" verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json --out audits; then
+          echo "ultra11y: adjudication applied."
+        elif [ '${{ inputs.gate-adjudicated }}' = 'true' ]; then
+          echo "::error::ultra11y: the adjudication was rejected and gate-adjudicated is on — refusing to gate on a partial adjudication."
+          exit 1
+        else
+          echo "::warning::ultra11y: the adjudication was rejected — the judgment criteria stay to assess."
+        fi
+
     # The per-page DOSSIERS — one sheet per page (its screenshot, every criterion of the
     # standard, each non-conformity), plus an index. Uploaded with the rest of audits/.
     - name: Per-page report
@@ -317,6 +442,18 @@ runs:
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
       run: |
+        # Two gates, one step — the gate must stay LAST, so this is a branch, not a new step.
+        #
+        # DEFAULT: re-audit the SOURCE. The red/green is then a pure function of the commit,
+        # whatever any model said about it. That reproducibility is the reason this is the
+        # default and not merely an option.
+        #
+        # gate-adjudicated: gate the ADJUDICATED audit instead, so a model-ruled
+        # non-conformity can fail the job. `exec` so the engine's exit code IS the step's.
+        if [ '${{ inputs.gate-adjudicated }}' = 'true' ] && [ '${{ steps.adjudication.outputs.on }}' = 'true' ]; then
+          echo "ultra11y: gating on the adjudicated audit — this run's verdict is not reproducible."
+          exec node "$ENGINE" audit --in audits/audit-latest.json --fail-on '${{ inputs.fail-on }}'
+        fi
         args=()
         since='${{ inputs.since }}'
         if [ "$since" = "auto" ]; then

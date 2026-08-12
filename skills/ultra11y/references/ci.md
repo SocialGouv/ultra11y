@@ -53,6 +53,69 @@ run and an RGAA run coexist rather than overwriting each other. The Markdown rep
 through `check` before being uploaded, so CI cannot publish a report citing an invented
 criterion.
 
+## Adjudicating the judgment criteria in CI (`adjudicate`)
+
+Of the 55 WCAG 2.2 AA criteria the engine decides a handful; **38 are judgment calls**, and
+under RGAA **81 of 106** can only ever derive `manual`. Inside a coding agent the agent rules
+on them. In CI nobody does, so they stay « à évaluer » and the published conformance rate is
+partial by construction. `adjudicate` closes that — opt-in, in two modes.
+
+```yaml
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # the job's env, never an input
+steps:
+  - uses: maxgfr/ultra11y@v2
+    with:
+      standard: rgaa
+      adjudicate: api          # or `agent`
+```
+
+| input | default | |
+|---|---|---|
+| `adjudicate` | `none` | `api` · `agent` · `none` |
+| `adjudicate-model` | *(empty)* | model id for `api`; else `$ULTRA11Y_LLM_MODEL`, else the engine default |
+| `gate-adjudicated` | `false` | let a model-ruled NC fail the job |
+
+**`api`** sends the worklist to the Messages API in batches of 8 and folds the verdicts back.
+**`agent`** emits the worklist plus `orchestrate --eco`'s runbook and hands them to a
+`claude-code-action` run, then folds the same way. Both end in the **same fail-closed gate** an
+agent's verdicts pass through, so neither can assert a conformance the engine refuses.
+
+The difference between them is **evidence, not trust**. `judge` rules from the harvested
+evidence alone — capped at 30 items per criterion, snippets truncated — while the agent can
+open the cited files and read around them, which is what *link purpose **in context*** actually
+asks for. Expect the API mode to answer `manual` more often; that is it being honest, not
+broken. The metric that separates them is the count of criteria left to assess.
+
+**Both modes read `ANTHROPIC_API_KEY` from the job environment, never from an input** — a
+composite action's steps inherit it, and a secret that never travels through an input is one
+fewer secret to leak into a log. When the key is absent the tier **skips itself**: the job stays
+green, the report is still written, and the criteria stay « à évaluer ». That is not an edge
+case — it is precisely what a **fork's pull request** looks like, where secrets are never
+exposed. An adjudication that fails mid-flight (a rate-limited batch refuses the whole fold) is
+absorbed the same way, because losing the verdicts must never cost you the audit.
+
+**Cost is per run and does not amortise.** Roughly $0.20 for a WCAG run and $0.50 for RGAA at
+Sonnet pricing — the worklist is re-sent whole each time and no batch is large enough to earn
+prompt caching. On a busy repository that is real money per push; this belongs on the default
+branch or a schedule far more often than on every PR.
+
+**`gate-adjudicated` trades reproducibility for reach.** By default the gate re-audits the
+**source**, so the red/green is a pure function of the commit whatever a model said about it.
+Turn it on and the gate evaluates the adjudicated audit instead (`audit --in`), letting a
+model-ruled non-conformity fail the job — and accepting that two runs on the same commit may
+now disagree. Default off, deliberately.
+
+```sh
+# The same re-gate, outside the action:
+node scripts/ultra11y.mjs audit --in audits/audit-latest.json --fail-on blocking
+```
+
+`--in` re-gates an audit that already exists rather than computing one, which is the only way
+to gate on verdicts a second detection pass would not see. It refuses every flag that would
+change *what* is audited (`--since`, `--baseline`, paths…): a gate that silently dropped your
+scoping would be a gate nobody could trust.
+
 # The `--format` renderings
 
 A gate tells a developer *that* the build failed; it does not put the non-conformity **on the
