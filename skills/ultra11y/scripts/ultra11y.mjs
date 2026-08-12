@@ -54819,7 +54819,7 @@ function sideOfExternal(a) {
   return { byPage, raw, comments };
 }
 var ruled = (s) => s !== void 0 && s !== "manual";
-function bucketOf(left, right, rightRaw) {
+function bucketOf(left, right) {
   if (left === null && right === null) return "unchanged";
   if (right === null) {
     return left === "NC" ? "not-retested" : "only-left";
@@ -54845,16 +54845,14 @@ function diffSides(left, right) {
   for (const page of pages) {
     const l = left.byPage.get(page);
     const r = right.byPage.get(page);
-    const criteria = [.../* @__PURE__ */ new Set([...l?.keys() ?? [], ...r?.keys() ?? []])].sort(
-      (a, b) => a.localeCompare(b, "en", { numeric: true })
-    );
+    const criteria = [.../* @__PURE__ */ new Set([...l?.keys() ?? [], ...r?.keys() ?? []])].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
     for (const criterion of criteria) {
       const lv = l?.get(criterion);
       const rv = r?.get(criterion);
       const leftStatus = ruled(lv) ? lv : null;
       const rightStatus = ruled(rv) ? rv : null;
       const rightRaw = right.raw?.get(page)?.get(criterion);
-      const bucket = bucketOf(leftStatus, rightStatus, rightRaw);
+      const bucket = bucketOf(leftStatus, rightStatus);
       if (leftStatus === null && rightStatus === null) continue;
       counts[bucket]++;
       rows.push({

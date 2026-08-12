@@ -135,7 +135,12 @@ stops people auditing more than one page. `pages discover` writes it:
 ```
 node scripts/ultra11y.mjs pages discover --crawl http://localhost:3000 --max 20      # print the proposal
 node scripts/ultra11y.mjs pages discover --sitemap https://example.com/sitemap.xml --write
+node scripts/ultra11y.mjs pages discover --from-snapshots --write                   # from what your tests already captured
 ```
+
+`--from-snapshots` reads `.ultra11y/pages` instead of the network, and it is the only route that
+can see a **state-reached** page: a modal or a funnel step behind a client-side transition has no
+URL to crawl to, but a Playwright test calling `checkA11y` has already been there.
 
 Each page gets a stable id from its URL path and a **name read from the served `<title>`** —
 what a human reads in the report — falling back to a humanized path when the document has
@@ -166,6 +171,25 @@ reproduction*), and `--merge`s them into the audit. `sample check` is an **advis
 it reports which required page kinds the sample lacks (a malformed `sample` block is a hard
 error, exit 2; a merely-incomplete one is guidance, exit 0). See `references/audit.md`
 (sample concept) and `references/packs.md` (`sampleMethodology`).
+
+**It lints BOTH inventories.** A project running the E2E producer keeps two: `.ultra11yrc.json`,
+and the routes its tests actually snapshot. They drift — and a linter reading only the declared
+list once pronounced a sample "complete" for a configuration that omitted the very URL a
+certifying audit had been run on. `sample check` now prints the census first, unconditionally:
+
+```
+17 déclarée(s) · 38 instantanée(s) · 22 instantanée(s) non déclarée(s) · 1 déclarée(s) jamais capturée(s)
+```
+
+The required kinds are checked over the **union**, and « Échantillon complet » is never printed
+bare while snapshotted pages are missing from the declared sample — so the verdict cannot be read
+as a statement about an inventory it did not see. `pages discover --from-snapshots --write` folds
+them in.
+
+The issue that prompted this also floated a `via` recipe on a sample page (auth profile, path,
+named interaction steps). It is deliberately **not** implemented: nothing in the engine could
+execute it — every browser path is `goto`-only — so a JSON step DSL would reimplement, worse,
+what a Playwright spec calling `checkA11y` already does.
 
 ## Every scanned page is also a SNAPSHOT
 

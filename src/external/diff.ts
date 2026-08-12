@@ -73,7 +73,7 @@ export function sideOfExternal(a: ExternalAudit): DiffSide {
  *  it as one is how "to assess" quietly becomes "agrees with you". */
 const ruled = (s: Status | undefined): s is Status => s !== undefined && s !== "manual";
 
-function bucketOf(left: Status | null, right: Status | null, rightRaw: string | undefined): DiffBucket {
+function bucketOf(left: Status | null, right: Status | null): DiffBucket {
   if (left === null && right === null) return "unchanged"; // neither ruled — nothing to say
   if (right === null) {
     // The left side found a non-conformity and the right never came back to it. That is the
@@ -116,7 +116,7 @@ export function diffSides(left: DiffSide, right: DiffSide): DiffResult {
       const leftStatus = ruled(lv) ? lv : null;
       const rightStatus = ruled(rv) ? rv : null;
       const rightRaw = right.raw?.get(page)?.get(criterion);
-      const bucket = bucketOf(leftStatus, rightStatus, rightRaw);
+      const bucket = bucketOf(leftStatus, rightStatus);
       // Two criteria neither side ruled on carry no information; keeping them would bury the
       // rows that do under a hundred rows of "à évaluer both sides".
       if (leftStatus === null && rightStatus === null) continue;

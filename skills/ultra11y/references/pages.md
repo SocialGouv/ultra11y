@@ -223,16 +223,43 @@ the §1–5 structure of a conformance document.
 ### Three honesty rules
 
 **1. A finding is attributed to a page only when something says so.** In order: the snapshot
-it was raised on, the scanned page URL, the `scan --sample` page name, then the page's own
-recorded `sources`. Anything else stays **unattributed** and is reported as a count —
-never spread across every page, which would invent non-conformities. A shared component
-matches the first page deterministically rather than being duplicated onto each.
+path it was raised on (`.ultra11y/pages/<id>/dom.html` — the id is *in the path*, which is what
+lets `pages` repair an audit produced before the stamp worked, with no `dom.html` left on disk),
+the scanned page URL, the `scan --sample` page name, then the page's own recorded `sources`.
+Anything else stays **unattributed** and is reported as a count — never spread across every
+page, which would invent non-conformities. A shared component matches the first page
+deterministically rather than being duplicated onto each. The count spans both channels: a pack
+finding no page claims is counted too.
 
-**2. "No finding here" means conforming only for a page whose real DOM was audited.** A page
-with a snapshot earns `C` by silence, because the rules genuinely ran against its document. A
-page assembled purely by source attribution (`basis: "attributed"` — e.g. a `scan --sample`
-page with no snapshot) keeps its undecided criteria `manual`: absence of evidence is not
-evidence of absence. The grid marks which is which, and warns when any page is source-only.
+**2. "No finding here" means conforming only for a page whose real DOM was audited.** Three
+bases, and only the first earns `C` by silence:
+
+| `basis` | What it means | Silence means |
+|---|---|---|
+| `snapshot` | this audit read the page's serialized DOM | conforming, for the `static` criteria |
+| `attributed` | no snapshot — only source findings were mapped onto it | nothing; the criteria stay `manual` |
+| `not-audited` | a snapshot exists, but **this** audit never read it | nothing; the criteria stay `manual` |
+
+For the last two, **absence of evidence is not evidence of absence**: no rule ran against that
+page's document, so its undecided criteria stay `manual` rather than earning a verdict by
+silence. The grid marks which is which, and warns when any page is not a snapshot.
+
+`not-audited` is a separate word on purpose. A source-only `audit` records every snapshot
+directory on disk as a page in scope while reading none of them, and calling those pages
+"source" would tell the reader they have no snapshot — a different false statement, not a
+smaller one. The evidence is `scope.pagesAudited`, written beside `scope.pages` on every audit
+(as `[]` when none: a guard that is absent whenever there is nothing to report is a guard that
+switches itself off exactly when it matters). An audit written before that field existed leaves
+it undefined, is read as "unknown", and keeps its recorded basis.
+
+**A rate over nothing is not a rate.** The per-page rate is `C ÷ (C + NC)` over the criteria
+that page actually decided, and it is **null** when that denominator is empty — rendered `—`,
+never a number, and always beside its denominator: `50 % (2/106)`, `— (0/106)`. Returning 100
+there is how thirty-eight sheets reported a perfect page for an app a human auditor had just
+found sixteen non-conformities in: the criteria were all « à évaluer », so nothing was decided,
+so the rate was 100. The index cell carries the same `(decided/total)` bracket as the sheet's
+« Couverture » line, from one shared computation, so the artefact people paste into a pull
+request can no longer say something its own sheet contradicts.
 
 **3. Silence only decides what the engine CAN decide.** A scope-wide `NC` on a judgment
 criterion means one definite failure fired *somewhere* — not that the engine can rule on that
@@ -245,6 +272,51 @@ it. Before this rule a page with no images scored 100% on « chaque image a-t-el
 alternative pertinente ? », a rate computed over criteria nobody had assessed.
 
 A non-normative recommendation never flips a page criterion to `NC`, exactly as in core.
+
+### Repeated occurrences, folded
+
+Per-page attribution surfaces design-system defects at their true multiplicity: one DSFR
+link-styling rule can be 472 findings over 38 pages from 7 distinct selectors. A page sheet
+therefore groups occurrences by `(file, ruleId, selectorHint)` under a counted header —
+`` **`a.fr-link`** — lien identifié par la couleur seule · ×12 ``.
+
+It is a **display** fold. The header is deliberately not checkbox-shaped, every occurrence keeps
+its own parseable line indented beneath it, and the block still announces the raw count — so
+`verify` builds exactly as many items grouped as ungrouped and no claimed non-conformity escapes
+adjudication by being tucked under a heading. `ruleId` is in the key because WCAG 1.4.3 carries
+both a CSSOM measurement and a screenshot measurement, and presenting those as one defect would
+be a lie. It is off everywhere else: the backlog, `prd --split criterion` and every tracker issue
+body are byte-identical to what they were.
+
+## Holding an external audit against the grid
+
+A human auditor's verdict is evidence, not a measurement this engine can redo. `import` reads one
+into a tool-neutral (page, criterion, status) model, and `pages --diff` compares it with the grid.
+
+```
+node scripts/ultra11y.mjs import --from file audit-rgaa.json --out audits
+node scripts/ultra11y.mjs import --from ara <report-id> --out audits    # writes the raw response too
+node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --diff audits/external-latest.json
+```
+
+A file is the primary route and the network a convenience: the engine is install-free and
+keyless, so a reproducible audit must not depend on a third party being up. `--from ara` writes
+the raw response to disk **before** parsing it, so what was imported is committable.
+
+The adapter refuses rather than guesses — an unrecognised status token, a criterion the pack does
+not define, a result naming an undeclared page are each reported, and nothing is written on a
+partial parse, because a partial import looks complete.
+
+The diff sorts each (page, criterion) pair into five buckets: **corrigé · inchangé ·
+partiellement corrigé · régressé · non retesté**. The last one is the one no report surfaces: a
+criterion that was non-conforming and was left untested in the counter-audit is neither confirmed
+fixed nor confirmed broken. Nothing is re-decided — both sides arrive decided — an undecided
+criterion is never read as agreement, and a page only one side ruled on is reported as a coverage
+gap, which is the check that says *"10.11 is NC on the funnel and your grid has nothing there"*
+on day one rather than after a ticket is filed against the wrong page.
+
+An imported audit is never merged into the engine's verdict and never written into
+`packAdjudication`. `src/external/` is a leaf.
 
 ## Producing snapshots
 
