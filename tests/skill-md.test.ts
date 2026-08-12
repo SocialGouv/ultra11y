@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { parse } from "yaml";
 import { VERSION } from "../src/types.js";
-import { COMMANDS } from "../src/cli.js";
+import { COMMANDS, REMOVED_FLAGS } from "../src/cli.js";
 import { ALL_RULES } from "../src/rules/registry.js";
 
 // Guards that the published skills stay installable via `npx skills add` and
@@ -99,7 +99,12 @@ describe("skill docs stay in sync with the CLI", () => {
     const help = execFileSync(process.execPath, [join(ROOT, "scripts/ultra11y.mjs"), "--help"], { encoding: "utf8" });
     const docText = [body, skills["review-a11y"]!.body, README, TESTPLAN, ...Object.values(refBodies)].join("\n");
     const flags = new Set(docText.match(/--[a-z][a-z-]+/g) ?? []);
+    // A REMOVED flag may legitimately appear in a migration note, and only there — so the
+    // exemption is DERIVED from the CLI's own table rather than restated here. A typo in a
+    // doc still fails, because a misspelling is not in the table either.
+    const removed = new Set(Object.keys(REMOVED_FLAGS).map((f) => `--${f}`));
     for (const f of flags) {
+      if (removed.has(f)) continue;
       expect(help.includes(f), `--help omits ${f}, which the docs document`).toBe(true);
     }
   });
@@ -118,7 +123,7 @@ describe("skill docs stay in sync with the CLI", () => {
 });
 
 describe("SKILL.md routes to the references (progressive disclosure)", () => {
-  it("ships exactly the thirty-three reference docs", () => {
+  it("ships exactly the thirty-five reference docs", () => {
     expect(refFiles.sort()).toEqual([
       "act.md",
       "adjudication.md",
@@ -152,6 +157,7 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "scale.md",
       "standards.md",
       "structure.md",
+      "tickets.md",
       "verify.md",
       "widgets.md",
     ]);

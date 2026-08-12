@@ -90,6 +90,28 @@ export const TOOLS: ToolDecl[] = [
     },
   },
   {
+    name: "ultra11y_tickets",
+    title: "Preview the tracker tickets an audit would file",
+    description:
+      "Show the GitHub/GitLab/Jira tickets this audit would open, at a granularity you choose: one per criterion (default), per page, per page+criterion, per " +
+      "file, or one consolidated. Returns the plan ONLY — it never creates anything; filing stays a deliberate `ultra11y tickets` run.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: cwdProp,
+        globs: globsProp,
+        standard: standardProp,
+        lang: langProp,
+        grain: {
+          type: "string",
+          enum: ["criterion", "page", "page-criterion", "single", "file"],
+          description: "What ONE ticket is. Default 'criterion'.",
+        },
+      },
+      required: ["cwd"],
+    },
+  },
+  {
     name: "ultra11y_criteria",
     title: "The offline standards reference",
     description:
@@ -302,6 +324,11 @@ export const TOOL_META: Record<string, { write?: boolean; destructive?: boolean;
   ultra11y_audit: { openWorld: false },
   ultra11y_report: { openWorld: false },
   ultra11y_prd: { openWorld: false },
+  // READ-ONLY and closed-world by construction: it returns the ticket PLAN and never files
+  // anything, so it neither touches the project nor reaches a tracker. Filing stays a
+  // deliberate `ultra11y tickets` run — an agent must not be able to open issues in
+  // somebody's tracker off the back of a prompt injection.
+  ultra11y_tickets: { openWorld: false },
   ultra11y_criteria: { openWorld: false },
   ultra11y_check: { openWorld: false },
   ultra11y_verify: { openWorld: false },

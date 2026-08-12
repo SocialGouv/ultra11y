@@ -42,7 +42,7 @@ non-conformity.
    → `audits/wcag-YYYY-MM-DD.md` (5 sections, see `references/methodology.md`); section 2
    renders one **auditor conformance block** per NC criterion (theme, criterion + official
    wording, test(s), WCAG mapping + level, finding, expected state, verification,
-   `file:line` occurrences), grouped by severity — the SAME block `prd` and `--gh-issues`
+   `file:line` occurrences), grouped by severity — the SAME block `prd` and `tickets`
    emit (see `references/prd.md`), so report and backlog never drift. For a country
    standard, add `--standard rgaa` (see `references/standards.md`). Pass `--lang` to match
    your conversation; without it, `auto` resolves the audit's `scope.langs` → the

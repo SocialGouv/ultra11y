@@ -49270,6 +49270,12 @@ var L3 = {
     source: "source"
   }
 };
+function pageBasisWarning(basis, lang) {
+  return basis === "snapshot" ? void 0 : L3[lang].basisNote;
+}
+function unattributedNote(n, lang) {
+  return L3[lang].unattributed(n);
+}
 function pageView(result, page) {
   return {
     ...result,
@@ -49637,22 +49643,9 @@ function writeReport(r, opts) {
   return path;
 }
 
-// src/gh.ts
+// src/gh-cli.ts
 import { execFileSync as execFileSync3 } from "child_process";
-var SEV_ORDER4 = ["bloquant", "majeur", "mineur"];
-var SEV_RANK2 = { bloquant: 0, majeur: 1, mineur: 2 };
-var ICON4 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
-var SEV_LABEL2 = {
-  fr: { bloquant: "Bloquant", majeur: "Majeur", mineur: "Mineur" },
-  en: { bloquant: "Blocking", majeur: "Major", mineur: "Minor" }
-};
-function standardTag(standard) {
-  return isCore(standard) ? { label: "WCAG", tag: "wcag" } : (() => {
-    const p = loadPack(standard);
-    return { label: p.name, tag: p.key };
-  })();
-}
-function gh(args2, input) {
+function ghExec(args2, input) {
   return execFileSync3("gh", args2, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], ...input !== void 0 ? { input } : {} });
 }
 function ghErrorReason(err2) {
@@ -49672,109 +49665,8 @@ function ghAvailable() {
     return false;
   }
 }
-var RECOMMENDATION_SUFFIX = " (recommendation)";
-function issueTitle(unit, label = "WCAG") {
-  return `[a11y] ${label} ${unit.criteriaId} \u2014 ${unit.title}${unit.advisory ? RECOMMENDATION_SUFFIX : ""}`;
-}
-function existingIssueTitles() {
-  try {
-    const raw = gh(["issue", "list", "--state", "all", "--limit", "1000", "--json", "title"]);
-    const arr = JSON.parse(raw);
-    return new Set(arr.map((i2) => i2.title ?? "").filter(Boolean));
-  } catch {
-    return /* @__PURE__ */ new Set();
-  }
-}
-function issueBody(unit, lang, standard = "wcag", format = "audit") {
-  if (format === "audit") return renderAuditorUnit(unit, standard, lang).join("\n").trimEnd();
-  const t2 = lang === "fr" ? { fix: "Correction", occ: "Occurrence(s)", def: "\u21B3 d\xE9finition" } : { fix: "Fix", occ: "Occurrence(s)", def: "\u21B3 definition" };
-  const lines = [];
-  if (unit.refs.length) lines.push(`**WCAG** : ${unit.refs.join(", ")}`, "");
-  for (const fx of [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))]) lines.push(`**${t2.fix}** : ${fx}`);
-  lines.push("", `**${t2.occ} (${unit.findings.length})**`, "");
-  for (const f of unit.findings) {
-    lines.push(`- [ ] \`${f.file}:${f.line}\` (\`${f.selectorHint}\`) \u2014 ${resolveMessage(f, lang)}`);
-    if (f.related) lines.push(`  - ${t2.def} : \`${f.related.file}:${f.related.line}\` (\`${f.related.selectorHint}\`)`);
-  }
-  return lines.join("\n");
-}
-function createIssue(title2, body2, labels) {
-  const base = ["issue", "create", "--title", title2, "--body-file", "-"];
-  try {
-    gh([...base, "--label", labels.join(",")], body2);
-    return { ok: true };
-  } catch (labelledErr) {
-    try {
-      gh(base, body2);
-      return { ok: true };
-    } catch (err2) {
-      return { ok: false, reason: ghErrorReason(err2) ?? ghErrorReason(labelledErr) };
-    }
-  }
-}
-function recordFailure(result, reason) {
-  result.failed++;
-  if (reason && !result.errors.includes(reason)) result.errors.push(reason);
-}
-function pushIssues(units, lang, standard = "wcag", format = "audit") {
-  const { label, tag } = standardTag(standard);
-  const existing = existingIssueTitles();
-  const result = { created: 0, skipped: 0, failed: 0, createdTitles: [], errors: [] };
-  for (const u of units) {
-    const title2 = issueTitle(u, label);
-    if (existing.has(title2)) {
-      result.skipped++;
-      continue;
-    }
-    const labels = u.advisory ? ["accessibility", tag, "recommendation", u.severity] : ["accessibility", tag, u.severity];
-    const r = createIssue(title2, issueBody(u, lang, standard, format), labels);
-    if (r.ok) {
-      result.created++;
-      result.createdTitles.push(title2);
-      existing.add(title2);
-    } else {
-      recordFailure(result, r.reason);
-    }
-  }
-  return result;
-}
-function singleIssueTitle(label = "WCAG") {
-  return `[a11y] ${label} \u2014 Accessibility audit`;
-}
-function singleIssueBody(units, lang, standard = "wcag", format = "audit") {
-  const { label } = standardTag(standard);
-  const intro = lang === "fr" ? `Audit d'accessibilit\xE9 ${label} \u2014 ${units.length} crit\xE8re(s) non conforme(s).` : `${label} accessibility audit \u2014 ${units.length} non-conforming criteria.`;
-  const lines = [intro, ""];
-  for (const sev of SEV_ORDER4) {
-    const group = units.filter((u) => u.severity === sev);
-    if (!group.length) continue;
-    lines.push(`## ${ICON4[sev]} ${SEV_LABEL2[lang][sev]} (${group.length})`, "");
-    for (const u of group) {
-      if (format === "audit") lines.push(...renderAuditorUnit(u, standard, lang, { heading: "###" }));
-      else lines.push(`### ${u.label}`, "", issueBody(u, lang, standard, format), "");
-    }
-  }
-  return lines.join("\n");
-}
-function pushSingleIssue(units, lang, standard = "wcag", format = "audit") {
-  const { label, tag } = standardTag(standard);
-  const result = { created: 0, skipped: 0, failed: 0, createdTitles: [], errors: [] };
-  if (!units.length) return result;
-  const title2 = singleIssueTitle(label);
-  if (existingIssueTitles().has(title2)) {
-    result.skipped = 1;
-    return result;
-  }
-  const severity = [...units].sort((a, b) => SEV_RANK2[a.severity] - SEV_RANK2[b.severity])[0].severity;
-  const r = createIssue(title2, singleIssueBody(units, lang, standard, format), ["accessibility", tag, severity]);
-  if (r.ok) {
-    result.created = 1;
-    result.createdTitles.push(title2);
-  } else {
-    recordFailure(result, r.reason);
-  }
-  return result;
-}
+
+// src/pr-comment.ts
 function COMMENT_MARKER(standard) {
   return `<!-- ultra11y:report standard="${standard}" -->`;
 }
@@ -49798,22 +49690,747 @@ function pushPrComment(markdown, standard = "wcag") {
   const marker = COMMENT_MARKER(standard);
   const body2 = stickyBody(markdown, standard);
   try {
-    const repo = gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).trim();
+    const repo = ghExec(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).trim();
     let existing;
     try {
-      const raw = gh(["api", `repos/${repo}/issues/${pr}/comments`, "--paginate"]);
+      const raw = ghExec(["api", `repos/${repo}/issues/${pr}/comments`, "--paginate"]);
       existing = pickExistingComment(JSON.parse(raw), marker);
     } catch {
     }
     if (existing) {
-      gh(["api", "--method", "PATCH", `repos/${repo}/issues/comments/${existing.id}`, "-f", `body=${body2}`]);
+      ghExec(["api", "--method", "PATCH", `repos/${repo}/issues/comments/${existing.id}`, "-f", `body=${body2}`]);
       return { ok: true, action: "updated" };
     }
-    gh(["api", "--method", "POST", `repos/${repo}/issues/${pr}/comments`, "-f", `body=${body2}`]);
+    ghExec(["api", "--method", "POST", `repos/${repo}/issues/${pr}/comments`, "-f", `body=${body2}`]);
     return { ok: true, action: "created" };
   } catch (e) {
     return { ok: false, action: "skipped", reason: ghErrorReason(e) };
   }
+}
+
+// src/tickets/types.ts
+var ALL_PROVIDERS = ["github", "gitlab", "jira"];
+var ALL_GRAINS = ["criterion", "page", "page-criterion", "single", "file"];
+var UNATTRIBUTED_ID = "unattributed";
+
+// src/tickets/render.ts
+var RECOMMENDATION_SUFFIX = " (recommendation)";
+var AUDIT_FRAME = "Accessibility audit";
+function standardTag(standard) {
+  return isCore(standard) ? { label: "WCAG", tag: "wcag" } : (() => {
+    const p = loadPack(standard);
+    return { label: p.name, tag: p.key };
+  })();
+}
+function criterionTitle(unit, label = "WCAG") {
+  return `[a11y] ${label} ${unit.criteriaId} \u2014 ${unit.title}${unit.advisory ? RECOMMENDATION_SUFFIX : ""}`;
+}
+function singleTitle(label = "WCAG") {
+  return `[a11y] ${label} \u2014 ${AUDIT_FRAME}`;
+}
+function pageTitle(pageId, label = "WCAG") {
+  return `[a11y] ${label} [page:${pageId}] \u2014 ${AUDIT_FRAME}`;
+}
+function pageCriterionTitle(pageId, unit, label = "WCAG") {
+  return `[a11y] ${label} [page:${pageId}] ${unit.criteriaId} \u2014 ${unit.title}${unit.advisory ? RECOMMENDATION_SUFFIX : ""}`;
+}
+function fileTitle(file, label = "WCAG") {
+  return `[a11y] ${label} [file:${file}] \u2014 ${AUDIT_FRAME}`;
+}
+function unattributedTitle(label = "WCAG") {
+  return `[a11y] ${label} [${UNATTRIBUTED_ID}] \u2014 ${AUDIT_FRAME}`;
+}
+function labelsFor(severity, advisory, tag) {
+  return advisory ? ["accessibility", tag, "recommendation", severity] : ["accessibility", tag, severity];
+}
+var L5 = {
+  fr: {
+    fix: "Correction",
+    occ: "Occurrence(s)",
+    def: "\u21B3 d\xE9finition",
+    page: "Page",
+    url: "URL",
+    auth: "Authentification requise",
+    yes: "oui",
+    file: "Fichier",
+    fileNote: "Ticket regroup\xE9 par fichier source. Un fichier n'est pas une page : il ne porte aucun taux de conformit\xE9 \u2014 seul le p\xE9rim\xE8tre global et la grille par page en portent un.",
+    truncated: (path) => `_\u2026 corps tronqu\xE9 : le ticket d\xE9passait la limite du tracker. Le d\xE9tail complet est dans \`${path}\`._`,
+    prdPath: "audits/prd-<date>.md"
+  },
+  en: {
+    fix: "Fix",
+    occ: "Occurrence(s)",
+    def: "\u21B3 definition",
+    page: "Page",
+    url: "URL",
+    auth: "Authentication required",
+    yes: "yes",
+    file: "File",
+    fileNote: "Ticket grouped by source file. A file is not a page: it carries no conformance rate \u2014 only the overall scope and the per-page grid do.",
+    truncated: (path) => `_\u2026 body truncated: the ticket exceeded the tracker's limit. The full detail is in \`${path}\`._`,
+    prdPath: "audits/prd-<date>.md"
+  }
+};
+function renderRemediationBody(unit, lang) {
+  const t2 = L5[lang];
+  const lines = [];
+  if (unit.refs.length) lines.push(`**WCAG** : ${unit.refs.join(", ")}`, "");
+  for (const fx of [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))]) lines.push(`**${t2.fix}** : ${fx}`);
+  lines.push("", `**${t2.occ} (${unit.findings.length})**`, "");
+  for (const f of unit.findings) {
+    lines.push(`- [ ] \`${f.file}:${f.line}\` (\`${f.selectorHint}\`) \u2014 ${resolveMessage(f, lang)}`);
+    if (f.related) lines.push(`  - ${t2.def} : \`${f.related.file}:${f.related.line}\` (\`${f.related.selectorHint}\`)`);
+  }
+  return lines.join("\n");
+}
+function renderCriterionBody(unit, standard, lang, opts = {}) {
+  if (opts.format === "remediation") return renderRemediationBody(unit, lang);
+  return renderAuditorUnit(unit, standard, lang, { ...opts.technical !== void 0 ? { technical: opts.technical } : {} }).join("\n").trimEnd();
+}
+function pagePreamble(page, lang, basisWarning) {
+  const t2 = L5[lang];
+  const out2 = [`**${t2.page}** : ${page.name}`, `**${t2.url}** : ${page.url}`];
+  if (page.auth) out2.push(`**${t2.auth}** : ${t2.yes}`);
+  out2.push("");
+  if (basisWarning) out2.push(`> \u26A0\uFE0F ${basisWarning}`, "");
+  return out2;
+}
+function filePreamble(file, lang) {
+  const t2 = L5[lang];
+  return [`**${t2.file}** : \`${file}\``, "", `> ${t2.fileNote}`, ""];
+}
+function clampBody(body2, limit, lang) {
+  if (body2.length <= limit) return body2;
+  const notice = `
+
+${L5[lang].truncated(L5[lang].prdPath)}`;
+  const budget = limit - notice.length;
+  const head = body2.slice(0, Math.max(0, budget));
+  const cut = head.lastIndexOf("\n## ");
+  return `${(cut > 0 ? head.slice(0, cut) : head).trimEnd()}${notice}`;
+}
+
+// src/tickets/grain.ts
+var SEV_RANK2 = { bloquant: 0, majeur: 1, mineur: 2 };
+function worstOf(items) {
+  return items.reduce((worst, x) => SEV_RANK2[x.severity] < SEV_RANK2[worst] ? x.severity : worst, "mineur");
+}
+function fileView(result, file, baseDir) {
+  const owns = (f) => sourceOf(f, baseDir) === file;
+  return {
+    ...result,
+    findings: result.findings.filter(owns),
+    ...result.packFindings ? { packFindings: result.packFindings.filter(owns) } : {}
+  };
+}
+function sourceOf(f, baseDir) {
+  return repoRelative(f.origin?.sourceFile ?? f.file, baseDir);
+}
+function buildTickets(result, opts) {
+  const { grain, standard, lang } = opts;
+  const { label, tag } = standardTag(standard);
+  const limit = opts.bodyLimit ?? Number.POSITIVE_INFINITY;
+  const bodyOpts = {
+    ...opts.format !== void 0 ? { format: opts.format } : {},
+    ...opts.technical !== void 0 ? { technical: opts.technical } : {}
+  };
+  const backlogOpts = opts.technical !== void 0 ? { technical: opts.technical } : {};
+  const baseDir = opts.baseDir ?? "";
+  const clamp2 = (body2) => clampBody(body2, limit, lang);
+  const ticketFromUnit = (unit, title2, scope2) => ({
+    title: title2,
+    body: clamp2(renderCriterionBody(unit, standard, lang, bodyOpts)),
+    labels: labelsFor(unit.severity, unit.advisory === true, tag),
+    severity: unit.severity,
+    advisory: unit.advisory === true,
+    scope: scope2
+  });
+  if (grain === "criterion") {
+    const tickets2 = prdUnits(result, standard, lang).map((u) => ticketFromUnit(u, criterionTitle(u, label), { grain: "criterion", criteriaId: u.criteriaId }));
+    return { tickets: tickets2, unattributed: 0 };
+  }
+  if (grain === "single") {
+    const units = prdUnits(result, standard, lang);
+    if (!units.length) return { tickets: [], unattributed: 0 };
+    return {
+      tickets: [
+        {
+          title: singleTitle(label),
+          // renderAuditorBacklog — not a second template. It also fixes a real inconsistency
+          // in the pre-v3 consolidated body, which sectioned advisory units AMONG the
+          // severity groups instead of isolating them in their own trailing section.
+          body: clamp2(renderAuditorBacklog(result, lang, standard, backlogOpts)),
+          labels: labelsFor(
+            worstOf(units),
+            units.every((u) => u.advisory === true),
+            tag
+          ),
+          severity: worstOf(units),
+          advisory: units.every((u) => u.advisory === true),
+          scope: { grain: "single" }
+        }
+      ],
+      unattributed: 0
+    };
+  }
+  if (grain === "file") {
+    const files = [...new Set(result.findings.map((f) => sourceOf(f, baseDir)))].sort();
+    const tickets2 = [];
+    for (const file of files) {
+      const view = fileView(result, file, baseDir);
+      const units = prdUnits(view, standard, lang);
+      if (!units.length) continue;
+      const advisory = units.every((u) => u.advisory === true);
+      tickets2.push({
+        title: fileTitle(file, label),
+        body: clamp2([...filePreamble(file, lang), renderAuditorBacklog(view, lang, standard, backlogOpts)].join("\n")),
+        labels: labelsFor(worstOf(units), advisory, tag),
+        severity: worstOf(units),
+        advisory,
+        scope: { grain: "file", file }
+      });
+    }
+    return { tickets: tickets2, unattributed: 0 };
+  }
+  const scope = pagesOf(result);
+  if (!scope.length) return { tickets: [], unattributed: 0, error: "no-pages" };
+  attributePages(result, scope);
+  const derived = derivePages(result, scope);
+  const orphans = unattributedFindings(result);
+  const tickets = [];
+  for (const page of derived) {
+    const view = pageView(result, page);
+    const units = prdUnits(view, standard, lang);
+    if (!units.length) continue;
+    const warning = pageBasisWarning(page.basis, lang);
+    const preamble = pagePreamble(page, lang, warning);
+    if (grain === "page") {
+      const advisory = units.every((u) => u.advisory === true);
+      tickets.push({
+        title: pageTitle(page.id, label),
+        body: clamp2([...preamble, renderAuditorBacklog(view, lang, standard, backlogOpts)].join("\n")),
+        labels: labelsFor(worstOf(units), advisory, tag),
+        severity: worstOf(units),
+        advisory,
+        scope: pageScopeOf(page)
+      });
+      continue;
+    }
+    for (const u of units) {
+      const t2 = ticketFromUnit(u, pageCriterionTitle(page.id, u, label), {
+        grain: "page-criterion",
+        pageId: page.id,
+        pageName: page.name,
+        url: page.url,
+        ...page.auth !== void 0 ? { auth: page.auth } : {},
+        basis: page.basis,
+        criteriaId: u.criteriaId
+      });
+      tickets.push({ ...t2, body: clamp2([...preamble, t2.body].join("\n")) });
+    }
+  }
+  if (orphans.length) {
+    const view = { ...result, findings: orphans, ...result.packFindings ? { packFindings: result.packFindings.filter((f) => !f.page) } : {} };
+    const units = prdUnits(view, standard, lang);
+    if (units.length) {
+      const advisory = units.every((u) => u.advisory === true);
+      tickets.push({
+        title: unattributedTitle(label),
+        body: clamp2([`> ${unattributedNote(orphans.length, lang)}`, "", renderAuditorBacklog(view, lang, standard, backlogOpts)].join("\n")),
+        labels: labelsFor(worstOf(units), advisory, tag),
+        severity: worstOf(units),
+        advisory,
+        scope: { grain: "page", pageId: UNATTRIBUTED_ID, pageName: UNATTRIBUTED_ID, url: "", basis: "none" }
+      });
+    }
+  }
+  return { tickets, unattributed: orphans.length };
+}
+function pageScopeOf(page) {
+  return {
+    grain: "page",
+    pageId: page.id,
+    pageName: page.name,
+    url: page.url,
+    ...page.auth !== void 0 ? { auth: page.auth } : {},
+    basis: page.basis
+  };
+}
+
+// src/tickets/push.ts
+function planPush(tickets, existing) {
+  const seen = new Set(existing.map((e) => e.title));
+  return tickets.map((ticket) => {
+    if (seen.has(ticket.title)) return { ticket, action: "skip" };
+    seen.add(ticket.title);
+    return { ticket, action: "create" };
+  });
+}
+function emptyResult() {
+  return { created: 0, skipped: 0, failed: 0, createdTitles: [], createdUrls: [], errors: [] };
+}
+function recordFailure(result, reason) {
+  result.failed++;
+  if (reason && !result.errors.includes(reason)) result.errors.push(reason);
+}
+async function pushTickets(tickets, provider, opts = {}) {
+  const result = emptyResult();
+  if (!tickets.length) return { plan: [], result, dedupeChecked: false };
+  let existing = [];
+  let dedupeChecked = false;
+  try {
+    existing = await provider.list();
+    dedupeChecked = true;
+  } catch {
+    dedupeChecked = false;
+  }
+  const plan = planPush(tickets, existing);
+  if (opts.dryRun) {
+    result.skipped = plan.filter((p) => p.action === "skip").length;
+    return { plan, result, dedupeChecked };
+  }
+  for (const { ticket, action } of plan) {
+    if (action === "skip") {
+      result.skipped++;
+      continue;
+    }
+    let outcome2;
+    try {
+      outcome2 = await provider.create(ticket);
+    } catch (e) {
+      outcome2 = { ok: false, reason: e instanceof Error ? e.message.split("\n")[0] : String(e) };
+    }
+    if (outcome2.ok) {
+      result.created++;
+      result.createdTitles.push(ticket.title);
+      if (outcome2.url) result.createdUrls.push(outcome2.url);
+    } else {
+      recordFailure(result, outcome2.reason);
+    }
+  }
+  return { plan, result, dedupeChecked };
+}
+
+// src/tickets/http.ts
+var USER_AGENT = `ultra11y/${VERSION}`;
+var SECRET_HEADERS = ["authorization", "private-token", "x-atlassian-token"];
+var HttpError = class extends Error {
+  constructor(status, detail, url) {
+    super(`HTTP ${status}: ${detail}`);
+    this.status = status;
+    this.detail = detail;
+    this.url = url;
+    this.name = "HttpError";
+  }
+  status;
+  detail;
+  url;
+};
+var defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function scrub(text, headers) {
+  let out2 = text;
+  for (const [k, v] of Object.entries(headers)) {
+    if (v && SECRET_HEADERS.includes(k.toLowerCase())) out2 = out2.split(v).join("<redacted>");
+  }
+  return out2;
+}
+function reasonFrom(detail) {
+  try {
+    const j = JSON.parse(detail);
+    if (Array.isArray(j.errorMessages) && typeof j.errorMessages[0] === "string") return j.errorMessages[0];
+    if (j.errors && typeof j.errors === "object" && !Array.isArray(j.errors)) {
+      const first = Object.entries(j.errors)[0];
+      if (first) return `${first[0]}: ${String(first[1])}`;
+    }
+    if (typeof j.message === "string") return j.message;
+    if (typeof j.error === "string") return j.error;
+  } catch {
+  }
+  return detail.split("\n")[0]?.slice(0, 300) ?? detail.slice(0, 300);
+}
+async function requestJson(url, opts = {}) {
+  const doFetch = opts.fetchImpl ?? fetch;
+  const sleep2 = opts.sleep ?? defaultSleep;
+  const retries = opts.retries ?? 2;
+  const headers = {
+    Accept: "application/json",
+    "User-Agent": USER_AGENT,
+    // GitHub REJECTS a request without one.
+    ...opts.body !== void 0 ? { "Content-Type": "application/json" } : {},
+    ...opts.headers
+  };
+  for (let attempt = 0; ; attempt++) {
+    const res = await doFetch(url, {
+      method: opts.method ?? "GET",
+      headers,
+      ...opts.body !== void 0 ? { body: JSON.stringify(opts.body) } : {}
+    });
+    if (res.ok) {
+      const text = await res.text();
+      return { data: text ? JSON.parse(text) : {}, headers: res.headers };
+    }
+    const detail = scrub(await res.text().catch(() => ""), headers);
+    const retryable = res.status === 429 || res.status === 503;
+    if (!retryable || attempt >= retries) throw new HttpError(res.status, detail, url);
+    const after = Number.parseInt(res.headers.get("retry-after") ?? "", 10);
+    await sleep2(Math.min(Number.isFinite(after) ? after * 1e3 : 1e3 * 2 ** attempt, 3e4));
+  }
+}
+
+// src/tickets/providers/remote.ts
+import { execFileSync as execFileSync4 } from "child_process";
+function originUrl() {
+  try {
+    const url = execFileSync4("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return url || void 0;
+  } catch {
+    return void 0;
+  }
+}
+function gitRemoteSlug(host) {
+  const url = originUrl();
+  if (!url) return void 0;
+  const m = /^(?:git@|ssh:\/\/git@|https?:\/\/)(?:[^@/]*@)?([^:/]+)[:/](.+?)(?:\.git)?\/?$/.exec(url);
+  if (!m) return void 0;
+  const [, remoteHost, path] = m;
+  if (!remoteHost || !path) return void 0;
+  const matches = host.endsWith(".") ? remoteHost.startsWith(host) : remoteHost === host || remoteHost.endsWith(`.${host}`);
+  return matches ? path : void 0;
+}
+function providerFromRemote() {
+  const url = originUrl();
+  if (!url) return void 0;
+  if (/github\.com|github\./i.test(url)) return "github";
+  if (/gitlab\.com|gitlab\./i.test(url)) return "gitlab";
+  return void 0;
+}
+
+// src/tickets/providers/github.ts
+var CAPABILITIES = { bodyLimit: 65536, labels: true };
+function resolve4(opts) {
+  const env = opts.env ?? process.env;
+  const mode = opts.transport ?? "auto";
+  const api = (env.GITHUB_API_URL || "https://api.github.com").replace(/\/+$/, "");
+  const token = env.GH_TOKEN || env.GITHUB_TOKEN;
+  const cliOk = (opts.cliAvailable ?? ghAvailable)();
+  if (mode === "cli") {
+    return cliOk ? { transport: "cli", api } : { transport: "cli", api, reason: "`gh` is not installed or not authenticated (run `gh auth login`)" };
+  }
+  const repo = env.ULTRA11Y_GITHUB_REPO || env.GITHUB_REPOSITORY || (mode === "rest" || !cliOk ? gitRemoteSlug("github.com") : void 0);
+  if (mode === "rest") {
+    if (!token) return { transport: "rest", api, reason: "no GitHub token \u2014 set GH_TOKEN or GITHUB_TOKEN" };
+    if (!repo) return { transport: "rest", api, token, reason: "no repository \u2014 set GITHUB_REPOSITORY (owner/name) or ULTRA11Y_GITHUB_REPO" };
+    return { transport: "rest", api, token, repo };
+  }
+  if (cliOk) return { transport: "cli", api };
+  if (token && repo) return { transport: "rest", api, token, repo };
+  const missing = [!token ? "a token (GH_TOKEN/GITHUB_TOKEN)" : "", !repo ? "a repository (GITHUB_REPOSITORY)" : ""].filter(Boolean);
+  return {
+    transport: "rest",
+    api,
+    ...token ? { token } : {},
+    ...repo ? { repo } : {},
+    reason: `\`gh\` is unavailable and REST is missing ${missing.join(" and ")}`
+  };
+}
+function createGithubProvider(opts = {}) {
+  const r = resolve4(opts);
+  const auth = { Authorization: `Bearer ${r.token ?? ""}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
+  const http = {
+    ...opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {},
+    ...opts.sleep ? { sleep: opts.sleep } : {}
+  };
+  async function listRest() {
+    const out2 = [];
+    for (let page = 1; page <= 10; page++) {
+      const url = `${r.api}/repos/${r.repo}/issues?state=all&per_page=100&page=${page}`;
+      const { data: data2 } = await requestJson(url, {
+        headers: auth,
+        ...http
+      });
+      if (!Array.isArray(data2) || data2.length === 0) break;
+      for (const i2 of data2) {
+        if (i2.pull_request) continue;
+        if (i2.title) out2.push({ title: i2.title, ...i2.number !== void 0 ? { id: String(i2.number) } : {}, ...i2.html_url ? { url: i2.html_url } : {} });
+      }
+      if (data2.length < 100) break;
+    }
+    return out2;
+  }
+  function listCli() {
+    const raw = ghExec(["issue", "list", "--state", "all", "--limit", "1000", "--json", "title"]);
+    return JSON.parse(raw).filter((i2) => i2.title).map((i2) => ({ title: i2.title }));
+  }
+  async function createRest(t2) {
+    const url = `${r.api}/repos/${r.repo}/issues`;
+    const post = async (labels) => requestJson(url, {
+      method: "POST",
+      headers: auth,
+      body: { title: t2.title, body: t2.body, ...labels ? { labels } : {} },
+      ...http
+    });
+    try {
+      const { data: data2 } = await post(t2.labels);
+      return { ok: true, ...data2.number !== void 0 ? { id: String(data2.number) } : {}, ...data2.html_url ? { url: data2.html_url } : {} };
+    } catch (e) {
+      if (e instanceof HttpError && e.status === 422) {
+        try {
+          const { data: data2 } = await post();
+          return { ok: true, ...data2.number !== void 0 ? { id: String(data2.number) } : {}, ...data2.html_url ? { url: data2.html_url } : {} };
+        } catch (retryErr) {
+          return { ok: false, reason: retryErr instanceof HttpError ? reasonFrom(retryErr.detail) : String(retryErr) };
+        }
+      }
+      return { ok: false, reason: e instanceof HttpError ? reasonFrom(e.detail) : e instanceof Error ? e.message : String(e) };
+    }
+  }
+  function createCli(t2) {
+    const base = ["issue", "create", "--title", t2.title, "--body-file", "-"];
+    try {
+      ghExec([...base, "--label", t2.labels.join(",")], t2.body);
+      return { ok: true };
+    } catch (labelledErr) {
+      try {
+        ghExec(base, t2.body);
+        return { ok: true };
+      } catch (err2) {
+        return { ok: false, reason: ghErrorReason(err2) ?? ghErrorReason(labelledErr) };
+      }
+    }
+  }
+  return {
+    id: "github",
+    transport: r.transport,
+    capabilities: CAPABILITIES,
+    available: () => r.reason === void 0,
+    unavailableReason: () => r.reason,
+    list: async () => {
+      try {
+        return r.transport === "cli" ? listCli() : await listRest();
+      } catch {
+        return [];
+      }
+    },
+    create: async (t2) => r.transport === "cli" ? createCli(t2) : createRest(t2)
+  };
+}
+
+// src/tickets/providers/gitlab.ts
+import { execFileSync as execFileSync5 } from "child_process";
+var CAPABILITIES2 = { bodyLimit: 1e6, labels: true };
+function glabExec(args2) {
+  return execFileSync5("glab", args2, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+}
+function glabAvailable() {
+  try {
+    execFileSync5("glab", ["auth", "status"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+function execReason(err2) {
+  if (!err2 || typeof err2 !== "object") return void 0;
+  const e = err2;
+  const stderr = typeof e.stderr === "string" ? e.stderr : Buffer.isBuffer(e.stderr) ? e.stderr.toString("utf8") : "";
+  const line = stderr.split("\n").map((l) => l.trim()).find(Boolean);
+  if (line) return line;
+  return typeof e.message === "string" ? e.message.split("\n")[0]?.trim() ?? void 0 : void 0;
+}
+function resolve5(opts) {
+  const env = opts.env ?? process.env;
+  const mode = opts.transport ?? "auto";
+  const api = (env.CI_API_V4_URL || "https://gitlab.com/api/v4").replace(/\/+$/, "");
+  const token = env.GITLAB_TOKEN || env.CI_JOB_TOKEN;
+  const jobToken = !env.GITLAB_TOKEN && !!env.CI_JOB_TOKEN;
+  const cliOk = (opts.cliAvailable ?? glabAvailable)();
+  if (mode === "cli") {
+    return cliOk ? { transport: "cli", api, jobToken } : { transport: "cli", api, jobToken, reason: "`glab` is not installed or not authenticated (run `glab auth login`)" };
+  }
+  const project = env.ULTRA11Y_GITLAB_PROJECT || env.CI_PROJECT_ID || gitRemoteSlug("gitlab.");
+  if (mode === "rest" || !cliOk) {
+    const base = { transport: "rest", api, jobToken, ...token ? { token } : {}, ...project ? { project } : {} };
+    if (!token) return { ...base, reason: `${mode === "auto" ? "`glab` is unavailable and REST has " : ""}no GitLab token \u2014 set GITLAB_TOKEN` };
+    if (!project) return { ...base, reason: "no project \u2014 set CI_PROJECT_ID or ULTRA11Y_GITLAB_PROJECT (id or group/project)" };
+    return base;
+  }
+  return { transport: "cli", api, jobToken };
+}
+function createGitlabProvider(opts = {}) {
+  const r = resolve5(opts);
+  const id = encodeURIComponent(r.project ?? "");
+  const auth = { "PRIVATE-TOKEN": r.token ?? "" };
+  const http = {
+    ...opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {},
+    ...opts.sleep ? { sleep: opts.sleep } : {}
+  };
+  const withTokenHint = (reason) => r.jobToken && /403|forbidden|unauthorized|401/i.test(reason) ? `${reason} \u2014 CI_JOB_TOKEN cannot create issues; use a project access token in GITLAB_TOKEN` : reason;
+  async function listRest() {
+    const out2 = [];
+    for (let page = 1; page <= 10; page++) {
+      const url = `${r.api}/projects/${id}/issues?state=all&per_page=100&page=${page}`;
+      const { data: data2, headers } = await requestJson(url, { headers: auth, ...http });
+      if (!Array.isArray(data2) || data2.length === 0) break;
+      for (const i2 of data2)
+        if (i2.title) out2.push({ title: i2.title, ...i2.iid !== void 0 ? { id: String(i2.iid) } : {}, ...i2.web_url ? { url: i2.web_url } : {} });
+      if (!headers.get("x-next-page")) break;
+    }
+    return out2;
+  }
+  function listCli() {
+    const raw = glabExec(["issue", "list", "--all", "--output", "json"]);
+    const parsed = JSON.parse(raw);
+    const rows = Array.isArray(parsed) ? parsed : parsed.issues ?? [];
+    return rows.filter((i2) => i2.title).map((i2) => ({ title: i2.title }));
+  }
+  async function createRest(t2) {
+    try {
+      const { data: data2 } = await requestJson(`${r.api}/projects/${id}/issues`, {
+        method: "POST",
+        headers: auth,
+        body: { title: t2.title, description: t2.body, labels: t2.labels.join(",") },
+        ...http
+      });
+      return { ok: true, ...data2.iid !== void 0 ? { id: String(data2.iid) } : {}, ...data2.web_url ? { url: data2.web_url } : {} };
+    } catch (e) {
+      const reason = e instanceof HttpError ? reasonFrom(e.detail) : e instanceof Error ? e.message : String(e);
+      return { ok: false, reason: withTokenHint(e instanceof HttpError ? `${e.status} ${reason}` : reason) };
+    }
+  }
+  function createCli(t2) {
+    try {
+      glabExec(["issue", "create", "--title", t2.title, "--description", t2.body, "--label", t2.labels.join(",")]);
+      return { ok: true };
+    } catch (err2) {
+      return { ok: false, reason: withTokenHint(execReason(err2) ?? "glab issue create failed") };
+    }
+  }
+  return {
+    id: "gitlab",
+    transport: r.transport,
+    capabilities: CAPABILITIES2,
+    available: () => r.reason === void 0,
+    unavailableReason: () => r.reason,
+    list: async () => {
+      try {
+        return r.transport === "cli" ? listCli() : await listRest();
+      } catch {
+        return [];
+      }
+    },
+    create: async (t2) => r.transport === "cli" ? createCli(t2) : createRest(t2)
+  };
+}
+
+// src/tickets/providers/jira.ts
+var CAPABILITIES3 = { bodyLimit: 32767, labels: true };
+var JIRA_SCOPE_LABEL = "ultra11y";
+var PRIORITY = { bloquant: "Highest", majeur: "High", mineur: "Low" };
+function resolve6(opts) {
+  const env = opts.env ?? process.env;
+  const issueType = env.ULTRA11Y_JIRA_ISSUE_TYPE || "Task";
+  const apiVersion = env.ULTRA11Y_JIRA_API === "2" ? "2" : "3";
+  const url = (env.ULTRA11Y_JIRA_URL || "").replace(/\/+$/, "");
+  const project = env.ULTRA11Y_JIRA_PROJECT;
+  const base = { issueType, apiVersion, ...url ? { url } : {}, ...project ? { project } : {} };
+  if (opts.transport === "cli") return { ...base, reason: "Jira has no CLI transport \u2014 use --transport rest (the default) with ULTRA11Y_JIRA_URL and a token" };
+  if (!url) return { ...base, reason: "no Jira site \u2014 set ULTRA11Y_JIRA_URL (e.g. https://acme.atlassian.net)" };
+  if (!project) return { ...base, reason: "no Jira project \u2014 set ULTRA11Y_JIRA_PROJECT (the project KEY)" };
+  if (env.JIRA_API_TOKEN && env.JIRA_EMAIL) return { ...base, auth: `Basic ${Buffer.from(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`).toString("base64")}` };
+  if (env.JIRA_TOKEN) return { ...base, auth: `Bearer ${env.JIRA_TOKEN}` };
+  return { ...base, reason: "no Jira credentials \u2014 set JIRA_EMAIL + JIRA_API_TOKEN (Cloud) or JIRA_TOKEN (Server/DC)" };
+}
+function toAdf(markdown) {
+  const content = markdown.split("\n").map((line) => line.trimEnd()).filter((line) => line.length > 0).map((line) => ({ type: "paragraph", content: [{ type: "text", text: line }] }));
+  return { type: "doc", version: 1, content: content.length ? content : [{ type: "paragraph", content: [] }] };
+}
+function createJiraProvider(opts = {}) {
+  const r = resolve6(opts);
+  const headers = { Authorization: r.auth ?? "" };
+  const http = {
+    ...opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {},
+    ...opts.sleep ? { sleep: opts.sleep } : {}
+  };
+  async function list() {
+    const out2 = [];
+    const jql = `project = "${r.project}" AND labels = "${JIRA_SCOPE_LABEL}" ORDER BY created DESC`;
+    for (let startAt = 0; startAt < 500; startAt += 100) {
+      const url = `${r.url}/rest/api/2/search?jql=${encodeURIComponent(jql)}&fields=summary&maxResults=100&startAt=${startAt}`;
+      const { data: data2 } = await requestJson(url, { headers, ...http });
+      const issues = data2.issues ?? [];
+      if (!issues.length) break;
+      for (const i2 of issues) if (i2.fields?.summary) out2.push({ title: i2.fields.summary, ...i2.key ? { id: i2.key, url: `${r.url}/browse/${i2.key}` } : {} });
+      if (issues.length < 100) break;
+    }
+    return out2;
+  }
+  function fields(t2, opt) {
+    return {
+      project: { key: r.project },
+      summary: t2.title,
+      description: r.apiVersion === "3" ? toAdf(t2.body) : t2.body,
+      issuetype: { name: r.issueType },
+      ...opt.labels ? { labels: [.../* @__PURE__ */ new Set([...t2.labels, JIRA_SCOPE_LABEL])].map((l) => l.replace(/\s+/g, "-")) } : {},
+      ...opt.priority ? { priority: { name: PRIORITY[t2.severity] } } : {}
+    };
+  }
+  async function post(t2, opt) {
+    return requestJson(`${r.url}/rest/api/${r.apiVersion}/issue`, { method: "POST", headers, body: { fields: fields(t2, opt) }, ...http });
+  }
+  async function create(t2) {
+    const attempts = [
+      { priority: true, labels: true },
+      { priority: false, labels: true },
+      { priority: false, labels: false }
+    ];
+    let last = "";
+    for (const opt of attempts) {
+      try {
+        const { data: data2 } = await post(t2, opt);
+        return { ok: true, ...data2.key ? { id: data2.key, url: `${r.url}/browse/${data2.key}` } : {} };
+      } catch (e) {
+        last = e instanceof HttpError ? reasonFrom(e.detail) : e instanceof Error ? e.message : String(e);
+        if (!(e instanceof HttpError) || e.status !== 400) return { ok: false, reason: last };
+      }
+    }
+    return { ok: false, reason: last };
+  }
+  return {
+    id: "jira",
+    transport: "rest",
+    capabilities: CAPABILITIES3,
+    available: () => r.reason === void 0,
+    unavailableReason: () => r.reason,
+    list: async () => {
+      try {
+        return await list();
+      } catch {
+        return [];
+      }
+    },
+    create
+  };
+}
+
+// src/tickets/registry.ts
+function isProviderId(v) {
+  return ALL_PROVIDERS.includes(v);
+}
+function createProvider(id, opts = {}) {
+  switch (id) {
+    case "github":
+      return createGithubProvider(opts);
+    case "gitlab":
+      return createGitlabProvider(opts);
+    case "jira":
+      return createJiraProvider(opts);
+  }
+}
+function autoProvider(env = process.env, configured) {
+  const fromEnv = env.ULTRA11Y_TICKET_PROVIDER;
+  if (fromEnv && isProviderId(fromEnv)) return fromEnv;
+  if (configured && isProviderId(configured)) return configured;
+  return providerFromRemote();
 }
 
 // src/render.ts
@@ -49845,7 +50462,7 @@ function detectFrameworks(deps, has2) {
   for (const [pkg, label] of Object.entries(KNOWN_LIBS)) if (dep(pkg)) componentLibraries.push(label);
   return { frameworks, componentLibraries };
 }
-var L5 = {
+var L6 = {
   fr: {
     title: "Obtenir du HTML rendu \xE0 auditer (render)",
     why: "Auditer les sources JSX d'une biblioth\xE8que de composants donne des faux n\xE9gatifs : il faut auditer le HTML r\xE9ellement produit.",
@@ -49876,7 +50493,7 @@ var L5 = {
   }
 };
 function renderPlan(d, lang = "fr") {
-  const s = L5[lang];
+  const s = L6[lang];
   const out2 = [`# ${s.title}`, "", `> ${s.why}`, ""];
   if (d.componentLibraries.length) out2.push(`> \u{1F9E9} ${s.libNote(d.componentLibraries.join(", "))}`, "");
   out2.push(`## ${s.detected}`, "");
@@ -50421,7 +51038,7 @@ function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") 
 
 // src/grounding.ts
 import { existsSync as existsSync17, readFileSync as readFileSync14 } from "fs";
-import { resolve as resolve4 } from "path";
+import { resolve as resolve7 } from "path";
 var WINDOW = 10;
 var norm2 = (s) => s.replace(/\s+/g, " ").trim();
 var isUnresolvable = (file) => !file || file === "-" || file === "<stdin>" || file === "stdin";
@@ -50438,7 +51055,7 @@ function selectorProbes(selector) {
 }
 function groundFinding(g, opts = {}) {
   if (isUnresolvable(g.file)) return { ok: true, moved: false };
-  const path = resolve4(opts.cwd ?? process.cwd(), g.file);
+  const path = resolve7(opts.cwd ?? process.cwd(), g.file);
   if (!existsSync17(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
   let text;
   try {
@@ -50493,7 +51110,7 @@ function isPagesReport(md) {
   return md.slice(0, 400).includes(`<!-- ${PAGES_REPORT_MARKER}`);
 }
 var MARK2 = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
-var L6 = {
+var L7 = {
   fr: {
     docTitle: "Rapport d'accessibilit\xE9 page par page",
     indexTitle: "Rapport page par page \u2014 index",
@@ -50613,7 +51230,7 @@ function renderPageReport(result, page, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
   const h = opts.heading ?? "##";
-  const s = L6[lang];
+  const s = L7[lang];
   const out2 = [];
   out2.push(`${h} ${page.name}${page.auth ? " \u{1F512}" : ""}`, "");
   const meta2 = [];
@@ -50659,7 +51276,7 @@ function renderPageReport(result, page, opts = {}) {
   return out2.join("\n");
 }
 function header2(result, pages, standard, lang, title2) {
-  const s = L6[lang];
+  const s = L7[lang];
   return [
     pagesReportMarker(standard),
     "",
@@ -50674,7 +51291,7 @@ function header2(result, pages, standard, lang, title2) {
 function renderPagesIndex(result, pages, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
-  const s = L6[lang];
+  const s = L7[lang];
   const out2 = header2(result, pages, standard, lang, s.indexTitle);
   out2.push(`> ${s.indexNote}`, "");
   out2.push(`| ${s.page} | ${s.url} | ${s.basis} | ${s.rate} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
@@ -50702,7 +51319,7 @@ function renderPagesDocument(result, pages, opts = {}) {
 function renderPageDocument(result, page, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
-  const s = L6[lang];
+  const s = L7[lang];
   const out2 = [pagesReportMarker(standard), "", `# ${s.docTitle} \u2014 ${page.name}`, "", `- **${s.date}** : ${result.date}`, ""];
   out2.push(renderPageReport(result, page, { ...opts, standard, lang, heading: "##" }));
   return out2.join("\n");
@@ -52369,10 +52986,10 @@ function applyRawVerdicts(items, verdicts) {
 }
 
 // src/scan.ts
-import { execFileSync as execFileSync4 } from "child_process";
+import { execFileSync as execFileSync6 } from "child_process";
 import { mkdtempSync as mkdtempSync2, writeFileSync as writeFileSync11, existsSync as existsSync20, statSync as statSync8, readdirSync as readdirSync5, rmSync as rmSync3, readFileSync as readFileSync16 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
-import { join as join33, resolve as resolve5 } from "path";
+import { join as join33, resolve as resolve8 } from "path";
 import { fileURLToPath as fileURLToPath3 } from "url";
 
 // src/axe-map.ts
@@ -52821,7 +53438,7 @@ ENTRYPOINT ["node", "/app/runner.mjs"]
 `;
 function dockerAvailable() {
   try {
-    execFileSync4("docker", ["info"], { stdio: "ignore", timeout: 1e4 });
+    execFileSync6("docker", ["info"], { stdio: "ignore", timeout: 1e4 });
     return true;
   } catch {
     return false;
@@ -52829,7 +53446,7 @@ function dockerAvailable() {
 }
 function imageExists(tag) {
   try {
-    execFileSync4("docker", ["image", "inspect", tag], { stdio: "ignore" });
+    execFileSync6("docker", ["image", "inspect", tag], { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -52842,7 +53459,7 @@ function buildImage(tag = IMAGE_TAG) {
     writeFileSync11(join33(ctx, "runner.mjs"), RUNNER);
     writeFileSync11(join33(ctx, "package.json"), PKG);
     writeFileSync11(join33(ctx, "Dockerfile"), DOCKERFILE);
-    execFileSync4("docker", ["build", "-t", tag, ctx], { stdio: "inherit", timeout: 9e5 });
+    execFileSync6("docker", ["build", "-t", tag, ctx], { stdio: "inherit", timeout: 9e5 });
   } finally {
     rmSync3(ctx, { recursive: true, force: true });
   }
@@ -52861,7 +53478,7 @@ function cleanDynamic(tag = IMAGE_TAG) {
   let imageRemoved = false;
   if (dockerAvailable() && imageExists(tag)) {
     try {
-      execFileSync4("docker", ["rmi", "-f", tag], { stdio: "ignore" });
+      execFileSync6("docker", ["rmi", "-f", tag], { stdio: "ignore" });
       imageRemoved = true;
     } catch {
     }
@@ -52918,11 +53535,11 @@ var PROBE_FIELDS = [
 function runRunner(target, isFile, tag, snapshot = true) {
   const args2 = ["run", "--rm"];
   if (!snapshot) args2.push("-e", "ULTRA11Y_SNAPSHOT=0");
-  if (isFile) args2.push("-v", `${resolve5(target)}:${MOUNT}:ro`);
+  if (isFile) args2.push("-v", `${resolve8(target)}:${MOUNT}:ro`);
   args2.push(tag, isFile ? MOUNT : target);
   let stdout;
   try {
-    stdout = execFileSync4("docker", args2, { encoding: "utf8", timeout: 24e4, maxBuffer: 192 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+    stdout = execFileSync6("docker", args2, { encoding: "utf8", timeout: 24e4, maxBuffer: 192 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
   } catch (e) {
     const err2 = e;
     const detail = (err2.stderr ? String(err2.stderr).trim() : "") || err2.message || String(e);
@@ -53227,7 +53844,7 @@ function mergeSnapshotAudit(base, snap) {
 // src/scan-local.ts
 import { existsSync as existsSync21, statSync as statSync9 } from "fs";
 import { createRequire } from "module";
-import { resolve as resolve6 } from "path";
+import { resolve as resolve9 } from "path";
 var LOCAL_ENGINE = "axe-core@playwright (local)";
 var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13"];
 function localTestedScs(interact) {
@@ -53237,7 +53854,7 @@ var PW_SPEC = "@playwright/test";
 var AXE_SPEC = "@axe-core/playwright";
 function localAvailable(cwd) {
   try {
-    const req = createRequire(resolve6(cwd, "package.json"));
+    const req = createRequire(resolve9(cwd, "package.json"));
     req.resolve(PW_SPEC);
     req.resolve(AXE_SPEC);
     return true;
@@ -53249,7 +53866,7 @@ function resolveLocalDeps(cwd) {
   let chromium;
   let AxeBuilder;
   try {
-    const req = createRequire(resolve6(cwd, "package.json"));
+    const req = createRequire(resolve9(cwd, "package.json"));
     const pw = req(PW_SPEC);
     const axeMod = req(AXE_SPEC);
     chromium = pw.chromium;
@@ -53728,7 +54345,7 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
   const page = await context.newPage();
   const empty = [];
   try {
-    const url = isFile ? "file://" + resolve6(target) : target;
+    const url = isFile ? "file://" + resolve9(target) : target;
     await page.goto(url, { waitUntil: "load", timeout: 45e3 });
     await page.waitForLoadState("networkidle", { timeout: 8e3 }).catch(() => {
     });
@@ -54193,12 +54810,12 @@ function fixSummary(r, lang = "fr", write = false) {
 
 // src/init.ts
 import { writeFileSync as writeFileSync13, mkdirSync as mkdirSync10, chmodSync, realpathSync as realpathSync2 } from "fs";
-import { execFileSync as execFileSync5 } from "child_process";
+import { execFileSync as execFileSync7 } from "child_process";
 import { join as join34, relative as relative4, sep as sep4 } from "path";
 var EN_SEV = { bloquant: "blocking", majeur: "major", mineur: "minor" };
 function repoRoot() {
   try {
-    return execFileSync5("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return execFileSync7("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return null;
   }
@@ -54916,7 +55533,7 @@ var STR = {
 function t(lang, key) {
   return STR[lang][key];
 }
-var ICON5 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
+var ICON4 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
 function auditSummary(r, lang) {
   const lines = [];
   lines.push(`${t(lang, "summaryTitle")} \u2014 ${r.date}`);
@@ -54933,7 +55550,7 @@ function auditSummary(r, lang) {
   } else {
     lines.push(`${t(lang, "findingsTitle")} (${r.findings.length}) :`);
     for (const f of r.findings.slice(0, 20)) {
-      lines.push(`  ${ICON5[f.severity]} [${f.criteriaId}] ${f.file}:${f.line}  ${resolveMessage(f, lang)}`);
+      lines.push(`  ${ICON4[f.severity]} [${f.criteriaId}] ${f.file}:${f.line}  ${resolveMessage(f, lang)}`);
     }
     if (r.findings.length > 20) lines.push(`  \u2026 (+${r.findings.length - 20})`);
   }
@@ -55072,8 +55689,8 @@ function toSarif(result, opts = {}) {
 
 // src/annotate.ts
 var LEVEL2 = { bloquant: "error", majeur: "warning", mineur: "notice" };
-var ICON6 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
-var SEV_ORDER5 = ["bloquant", "majeur", "mineur"];
+var ICON5 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
+var SEV_ORDER4 = ["bloquant", "majeur", "mineur"];
 function esc(s) {
   return s.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
 }
@@ -55167,13 +55784,13 @@ function stepSummary(result, opts = {}) {
     out2.push(perPageTable(result, standard, lang));
     return out2.join("\n");
   }
-  const sorted = [...all].sort((a, b) => SEV_ORDER5.indexOf(a.severity) - SEV_ORDER5.indexOf(b.severity));
+  const sorted = [...all].sort((a, b) => SEV_ORDER4.indexOf(a.severity) - SEV_ORDER4.indexOf(b.severity));
   out2.push(`### ${s.findings} (${sorted.length})`, "");
   out2.push(`| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} |`, "| --- | --- | --- | --- |");
   for (const f of sorted.slice(0, MAX_ROWS)) {
     const where = isUrl2(f.file) ? f.file : `${repoRelative(f.file, baseDir)}:${Math.max(1, f.line)}`;
     const msg = resolveMessage(f, lang).replace(/\|/g, "\\|");
-    out2.push(`| ${ICON6[f.severity]} ${f.severity} | ${criterionLabel2(f, standard)} | \`${where}\` | ${msg} |`);
+    out2.push(`| ${ICON5[f.severity]} ${f.severity} | ${criterionLabel2(f, standard)} | \`${where}\` | ${msg} |`);
   }
   if (sorted.length > MAX_ROWS) out2.push("", s.more(sorted.length - MAX_ROWS));
   out2.push("");
@@ -55636,10 +56253,10 @@ function startDevServer(opts) {
     }
     res.writeHead(404, { "content-type": "text/plain" }).end("not found");
   });
-  return new Promise((resolve10, reject) => {
+  return new Promise((resolve13, reject) => {
     server.once("error", reject);
     server.listen(opts.port, "127.0.0.1", () => {
-      resolve10({
+      resolve13({
         port: server.address().port,
         close: () => new Promise((r) => server.close(() => r()))
       });
@@ -55924,7 +56541,7 @@ function e2eSetupPlan(runners, paths, lang = "en") {
 
 // src/orchestrate.ts
 import { existsSync as existsSync28, mkdirSync as mkdirSync14, readFileSync as readFileSync24, rmSync as rmSync7, writeFileSync as writeFileSync16 } from "fs";
-import { join as join42, resolve as resolve7 } from "path";
+import { join as join42, resolve as resolve10 } from "path";
 
 // src/orchestrate-templates.ts
 import { join as join41 } from "path";
@@ -56135,7 +56752,7 @@ var PHASES = ["adjudicate", "verify-report"];
 var SMALL_WORKLIST = 3;
 var BATCH_SIZE2 = 8;
 function listPhases(runDir, engineAbs) {
-  const run2 = resolve7(runDir);
+  const run2 = resolve10(runDir);
   const adjPath = join42(run2, "ADJUDICATE.todo.json");
   let adjIds = [];
   let adjReady = false;
@@ -56182,7 +56799,7 @@ function listPhases(runDir, engineAbs) {
   ];
 }
 function orchestrateRun(runDir, engineAbs, opts = {}) {
-  const run2 = resolve7(runDir);
+  const run2 = resolve10(runDir);
   if (!existsSync28(run2)) {
     return { exitCode: 2, written: [], notices: [], errors: [`run dir not found: ${run2}`], phases: [] };
   }
@@ -56255,7 +56872,7 @@ import { createInterface as createInterface2 } from "readline";
 
 // src/mcp/handlers.ts
 import { existsSync as existsSync29, readFileSync as readFileSync25, realpathSync as realpathSync4, statSync as statSync11 } from "fs";
-import { isAbsolute as isAbsolute3, join as join43, resolve as resolve8, sep as sep5 } from "path";
+import { isAbsolute as isAbsolute3, join as join43, resolve as resolve11, sep as sep5 } from "path";
 
 // src/project-lock.ts
 var chains = /* @__PURE__ */ new Map();
@@ -56303,7 +56920,7 @@ function positive(v, key) {
 function requiredCwd(args2, defaults) {
   const cwd = str2(args2.cwd) ?? defaults.defaultCwd;
   if (!cwd) throw new ToolError("`cwd` is required: an absolute path to the project root.");
-  const abs = resolve8(cwd);
+  const abs = resolve11(cwd);
   if (!existsSync29(abs)) throw new ToolError(`project root not found: ${abs}`);
   if (!statSync11(abs).isDirectory()) throw new ToolError(`\`cwd\` is not a directory: ${abs}`);
   return abs;
@@ -56334,6 +56951,8 @@ async function dispatch(name2, args2, cwd) {
       return handleReport(args2, cwd);
     case "ultra11y_prd":
       return handlePrd(args2, cwd);
+    case "ultra11y_tickets":
+      return handleTickets(args2, cwd);
     case "ultra11y_check":
       return handleCheck(args2, cwd);
     case "ultra11y_verify":
@@ -56420,6 +57039,24 @@ function handlePrd(args2, cwd) {
     non_conformities: nc,
     advisory,
     ...str2(args2.split) === "criterion" ? { grouped_by: "criterion" } : {}
+  };
+}
+function handleTickets(args2, cwd) {
+  const standard = standardOf(args2);
+  const lang = langOf(args2);
+  const grain = str2(args2.grain) ?? "criterion";
+  const plan = buildTickets(audit(args2, cwd), { grain, standard, lang, baseDir: cwd });
+  if (plan.error === "no-pages") {
+    return { cwd, standard, grain, error: "no-pages", hint: "No page in scope \u2014 capture snapshots (render --e2e) or scan a sample (scan --sample) first." };
+  }
+  return {
+    cwd,
+    standard,
+    grain,
+    dry_run: true,
+    tickets: plan.tickets.map((t2) => ({ title: t2.title, labels: t2.labels, severity: t2.severity, advisory: t2.advisory, scope: t2.scope, body: t2.body })),
+    unattributed: plan.unattributed,
+    to_file_them: `ultra11y tickets --in <audit.json> --provider github|gitlab|jira --grain ${grain}`
   };
 }
 function handleCheck(args2, cwd) {
@@ -56527,7 +57164,7 @@ function handleInit(args2, cwd) {
     throw new ToolError(`\`fail_on\` must be one of: error, warning, notice (got "${failOnRaw}")`);
   }
   const failOn = failOnRaw;
-  const enginePath = resolve8("scripts/ultra11y.mjs");
+  const enginePath = resolve11("scripts/ultra11y.mjs");
   const written = [];
   if (bool(args2.hook)) written.push(writeHook(cwd, enginePath, failOn));
   if (bool(args2.ci)) written.push(join43(cwd, ".github/workflows/a11y.yml"));
@@ -56752,6 +57389,26 @@ var TOOLS2 = [
     }
   },
   {
+    name: "ultra11y_tickets",
+    title: "Preview the tracker tickets an audit would file",
+    description: "Show the GitHub/GitLab/Jira tickets this audit would open, at a granularity you choose: one per criterion (default), per page, per page+criterion, per file, or one consolidated. Returns the plan ONLY \u2014 it never creates anything; filing stays a deliberate `ultra11y tickets` run.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: cwdProp,
+        globs: globsProp,
+        standard: standardProp,
+        lang: langProp,
+        grain: {
+          type: "string",
+          enum: ["criterion", "page", "page-criterion", "single", "file"],
+          description: "What ONE ticket is. Default 'criterion'."
+        }
+      },
+      required: ["cwd"]
+    }
+  },
+  {
     name: "ultra11y_criteria",
     title: "The offline standards reference",
     description: "Look up what a success criterion actually requires \u2014 its exact wording, how it is tested, and what counts as a failure. Offline and authoritative; use it instead of recalling a criterion from memory, which is how invented non-conformities get written.",
@@ -56929,6 +57586,11 @@ var TOOL_META2 = {
   ultra11y_audit: { openWorld: false },
   ultra11y_report: { openWorld: false },
   ultra11y_prd: { openWorld: false },
+  // READ-ONLY and closed-world by construction: it returns the ticket PLAN and never files
+  // anything, so it neither touches the project nor reaches a tracker. Filing stays a
+  // deliberate `ultra11y tickets` run — an agent must not be able to open issues in
+  // somebody's tracker off the back of a prompt injection.
+  ultra11y_tickets: { openWorld: false },
   ultra11y_criteria: { openWorld: false },
   ultra11y_check: { openWorld: false },
   ultra11y_verify: { openWorld: false },
@@ -57097,13 +57759,13 @@ var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t2) => t2.name));
 
 // src/mcp/resources.ts
 import { existsSync as existsSync30, readdirSync as readdirSync6, readFileSync as readFileSync26, realpathSync as realpathSync5, statSync as statSync12 } from "fs";
-import { basename as basename3, dirname as dirname13, join as join44, resolve as resolve9, sep as sep6 } from "path";
+import { basename as basename3, dirname as dirname13, join as join44, resolve as resolve12, sep as sep6 } from "path";
 import { fileURLToPath as fileURLToPath4 } from "url";
 var SKILL_NAME = "ultra11y";
 var URI_SCHEME = "skill://";
 function resolveSkillRoot(moduleDir) {
   const here = moduleDir ?? dirname13(fileURLToPath4(import.meta.url));
-  const candidates2 = [resolve9(here, ".."), resolve9(here, "..", "skills", SKILL_NAME), resolve9(here, "..", "..", "skills", SKILL_NAME)];
+  const candidates2 = [resolve12(here, ".."), resolve12(here, "..", "skills", SKILL_NAME), resolve12(here, "..", "..", "skills", SKILL_NAME)];
   return candidates2.find((dir) => existsSync30(join44(dir, "SKILL.md")));
 }
 function listResources(moduleDir) {
@@ -57126,7 +57788,7 @@ function readResource(uri, moduleDir) {
   if (!root) throw new ResourceError("no skill payload found next to this build \u2014 nothing to read");
   const rel2 = uri.slice(URI_SCHEME.length);
   if (!rel2) throw new ResourceError("empty resource path");
-  const target = resolve9(root, rel2);
+  const target = resolve12(root, rel2);
   const rootReal = realpathSync5(root);
   let targetReal;
   try {
@@ -57407,14 +58069,14 @@ function startHttpServer(opts = {}) {
   server.requestTimeout = 0;
   server.headersTimeout = 6e4;
   server.keepAliveTimeout = 12e4;
-  return new Promise((resolve10, reject) => {
+  return new Promise((resolve13, reject) => {
     server.once("error", reject);
     server.listen(opts.port ?? 0, bind, () => {
       server.removeListener("error", reject);
       const addr2 = server.address();
       const port = typeof addr2 === "object" && addr2 ? addr2.port : opts.port ?? 0;
       const host = bind.includes(":") ? `[${bind}]` : bind;
-      resolve10({
+      resolve13({
         server,
         port,
         url: `http://${host}:${port}${MCP_PATH}`,
@@ -57523,7 +58185,7 @@ function sendJson(res, status, body2, origin, extra = {}) {
 }
 var DRAIN_LIMIT = MAX_BODY_BYTES * 8;
 function readBody2(req) {
-  return new Promise((resolve10, reject) => {
+  return new Promise((resolve13, reject) => {
     const chunks = [];
     let size = 0;
     let over = false;
@@ -57547,7 +58209,7 @@ function readBody2(req) {
     });
     req.on("end", () => {
       if (over) reject(new Error("too large"));
-      else resolve10(Buffer.concat(chunks).toString("utf8"));
+      else resolve13(Buffer.concat(chunks).toString("utf8"));
     });
     req.on("error", reject);
     req.on("aborted", () => reject(new Error("client aborted the request")));
@@ -57568,7 +58230,9 @@ Usage:
   ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures + .ultra11y/pages snapshots: audit real HTML)
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
-  ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
+  ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
+  ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
+  ultra11y tickets  [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
   ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES \u2014 its tests depend on them)
@@ -57624,9 +58288,14 @@ Commands:
              active standard's vocabulary (RGAA "Th\xE9matique/Crit\xE8re/Test", WCAG core
              "Principle\xB7Guideline/Success criterion/Technique") \u2014 theme, criterion +
              official wording, test(s), WCAG mapping + level, finding, expected state,
-             verification. --split criterion writes one file per criterion;
-             --gh-issues files one de-duplicated GitHub issue per criterion, or
-             --gh-single files the whole audit as a single issue (gh CLI).
+             verification. --split criterion writes one file per criterion.
+             It writes MARKDOWN only \u2014 filing tickets is the 'tickets' command.
+  tickets    File the audit as TRACKER TICKETS \u2014 GitHub, GitLab or Jira. Reads an
+             audit.json and pushes; it writes no markdown, exactly as prd/report
+             write markdown and push nothing. --grain chooses what ONE ticket is:
+             per criterion (default), per page, per page+criterion, per file, or one
+             consolidated. De-dupe is by exact title, so re-running never duplicates.
+             --dry-run prints the plan without creating anything.
   render     Get RENDERED HTML to audit (so component libraries like DSFR are
              checked as the HTML they emit, not their JSX sources): detect the
              framework and print the build\u2192audit recipe, or --scaffold a
@@ -57794,8 +58463,12 @@ Options:
                      plus <out>/index.md (recommended past 3\u20134 pages: RGAA is 106 criteria)
   --no-technical     prd (audit format): omit the technical ticket sections (Partie
                      technique + Contexte de reproduction) for a pure-auditor block
-  --gh-issues        prd: also create one GitHub issue per criterion via the gh CLI (opt-in)
-  --gh-single        prd: file the whole audit as ONE consolidated GitHub issue (opt-in; wins over --gh-issues)
+  --provider <id>    tickets: auto|github|gitlab|jira. 'auto' reads ULTRA11Y_TICKET_PROVIDER,
+                     then .ultra11yrc.json, then the git remote (Jira is never auto-detected)
+  --grain <mode>     tickets: what one ticket is \u2014 criterion (default) | page | page-criterion | single | file
+  --transport <t>    tickets: auto|cli|rest (mcp: stdio|http). 'auto' prefers the CLI (gh/glab),
+                     falling back to REST when only a token is available. Jira is REST-only
+  --max-tickets <n>  tickets: refuse to file more than n tickets in one run (default 200)
   --scaffold         render: write an SSR-snapshot harness (default: ultra11y-render.tsx)
   --setup            render: install the zero-touch test-render capture harvester (.ultra11y/capture-setup.mjs) + print the runner wiring
   --coverage         render: report rendered-capture coverage (covered vs blind-spot components); with --json emits the coverage object
@@ -57904,6 +58577,7 @@ var COMMANDS = [
   "audit",
   "report",
   "prd",
+  "tickets",
   "render",
   "criteria",
   "check",
@@ -57929,6 +58603,9 @@ function isCommand(s) {
 }
 var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "out",
+  "provider",
+  "grain",
+  "max-tickets",
   "in",
   "include",
   "exclude",
@@ -58010,8 +58687,6 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "semantic",
   "manual",
   "no-technical",
-  "gh-issues",
-  "gh-single",
   "override",
   "local",
   "docker",
@@ -58313,9 +58988,9 @@ async function cmdDev(p) {
   }
   console.error(fr ? `ultra11y dev : tableau de bord sur http://127.0.0.1:${server.port}` : `ultra11y dev: dashboard on http://127.0.0.1:${server.port}`);
   console.error(fr ? "Boucle locale uniquement (l'outil \xE9crit des fichiers). Ctrl-C pour arr\xEAter." : "Loopback only (the tool writes files). Ctrl-C to stop.");
-  await new Promise((resolve10) => {
+  await new Promise((resolve13) => {
     const stop2 = () => {
-      void server.close().then(resolve10);
+      void server.close().then(resolve13);
     };
     process.once("SIGINT", stop2);
     process.once("SIGTERM", stop2);
@@ -58785,31 +59460,182 @@ async function cmdPrd(p) {
   const paths = writePrd(result, { out: out2, lang, split, format, standard, technical });
   const json = p.flags.json === true;
   if (!json) for (const path of paths) console.log(path);
-  const ghMode = p.flags["gh-single"] === true ? "single" : p.flags["gh-issues"] === true ? "per-criterion" : null;
-  let gh2;
-  if (ghMode) {
-    const flag = ghMode === "single" ? "--gh-single" : "--gh-issues";
-    const units = prdUnits(result, standard, lang);
-    if (!ghAvailable()) {
-      if (!json)
-        console.error(`ultra11y prd: ${flag} skipped \u2014 \`gh\` is not installed or not authenticated (run \`gh auth login\`). Markdown was still written.`);
-    } else if (units.length === 0) {
-      if (!json) console.error(`ultra11y prd: ${flag} skipped \u2014 no findings to file.`);
-    } else {
-      const issueFormat = format === "remediation" ? "remediation" : "audit";
-      gh2 = ghMode === "single" ? pushSingleIssue(units, lang, standard, issueFormat) : pushIssues(units, lang, standard, issueFormat);
-      if (!json)
-        console.log(
-          lang === "fr" ? `ultra11y prd : issues GitHub \u2014 ${gh2.created} cr\xE9\xE9e(s), ${gh2.skipped} d\xE9j\xE0 existante(s)${gh2.failed ? `, ${gh2.failed} en \xE9chec` : ""}.` : `ultra11y prd: GitHub issues \u2014 ${gh2.created} created, ${gh2.skipped} already existed${gh2.failed ? `, ${gh2.failed} failed` : ""}.`
-        );
-      if (gh2.failed && !json) {
-        if (gh2.errors.length) for (const e of gh2.errors) console.error(lang === "fr" ? `ultra11y prd : gh a \xE9chou\xE9 \u2014 ${e}` : `ultra11y prd: gh failed \u2014 ${e}`);
-        else console.error(lang === "fr" ? `ultra11y prd : gh a \xE9chou\xE9 sans message d'erreur.` : `ultra11y prd: gh failed with no error output.`);
-      }
+  if (json) console.log(JSON.stringify({ paths, units: prdUnits(result, standard, lang) }, null, 2));
+  return 0;
+}
+var REMOVED_FLAGS = {
+  "gh-issues": "ultra11y tickets --in <audit.json> --provider github --grain criterion",
+  "gh-single": "ultra11y tickets --in <audit.json> --provider github --grain single"
+};
+var SECRET_CONFIG_KEYS = ["token", "apiToken", "api_token", "password", "secret"];
+async function cmdTickets(p) {
+  const standard = stdOf(p, "tickets");
+  if (standard === null) return 2;
+  const inFlag = p.flags.in;
+  if (typeof inFlag !== "string" || !inFlag) {
+    console.error("ultra11y tickets: --in <audit.json> is required ('-' for stdin). Run `audit --out` first.");
+    return 2;
+  }
+  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "tickets", "--in");
+  if (raw === null) return 2;
+  let result;
+  try {
+    result = JSON.parse(raw);
+  } catch {
+    console.error("ultra11y tickets: --in is not valid JSON (expected an AuditResult).");
+    return 2;
+  }
+  if (!isCurrentAudit(result)) {
+    console.error("ultra11y tickets: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+    return 2;
+  }
+  const lang = resolveLang(p.flags, { audit: result, standard });
+  const fr = lang === "fr";
+  const json = p.flags.json === true;
+  const dryRun = p.flags["dry-run"] === true;
+  let config;
+  try {
+    config = loadConfig(process.cwd())?.tickets;
+  } catch (e) {
+    console.error(`ultra11y tickets: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  for (const key of SECRET_CONFIG_KEYS) {
+    if (config && key in config) {
+      console.error(
+        `ultra11y tickets: .ultra11yrc.json must not carry a "${key}" \u2014 credentials belong in the environment (see references/tickets.md). Remove it and rotate that value.`
+      );
+      return 2;
     }
   }
-  if (json) console.log(JSON.stringify({ paths, units: prdUnits(result, standard, lang), ...gh2 ? { gh: gh2 } : {} }, null, 2));
-  return gh2 && gh2.failed > 0 ? 1 : 0;
+  const providerFlag = typeof p.flags.provider === "string" ? p.flags.provider : "auto";
+  const providerId = providerFlag === "auto" ? autoProvider(process.env, config?.provider) : isProviderId(providerFlag) ? providerFlag : void 0;
+  if (!providerId) {
+    console.error(
+      providerFlag === "auto" ? "ultra11y tickets: could not tell which tracker to file into \u2014 pass --provider github|gitlab|jira (Jira is never auto-detected: it owns no git remote)." : `ultra11y tickets: --provider "${providerFlag}" is not one of ${ALL_PROVIDERS.join("|")}.`
+    );
+    return 2;
+  }
+  const transportFlag = typeof p.flags.transport === "string" ? p.flags.transport : config?.transport ?? "auto";
+  if (!["auto", "cli", "rest"].includes(transportFlag)) {
+    console.error(`ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`);
+    return 2;
+  }
+  const provider = createProvider(providerId, { transport: transportFlag });
+  const grainFlag = typeof p.flags.grain === "string" ? p.flags.grain : config?.grain ?? "criterion";
+  if (!ALL_GRAINS.includes(grainFlag)) {
+    console.error(`ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`);
+    return 2;
+  }
+  const format = p.flags.format === "remediation" ? "remediation" : "audit";
+  const plan = buildTickets(result, {
+    grain: grainFlag,
+    standard,
+    lang,
+    format,
+    bodyLimit: provider.capabilities.bodyLimit,
+    baseDir: process.cwd(),
+    technical: p.flags["no-technical"] !== true
+  });
+  if (plan.error === "no-pages") {
+    console.error(
+      fr ? "ultra11y tickets : aucune page dans le p\xE9rim\xE8tre. Capturez des instantan\xE9s (render --e2e) ou scannez un \xE9chantillon (scan --sample) avant d'utiliser --grain page." : "ultra11y tickets: no page in scope. Capture snapshots (render --e2e) or scan a sample (scan --sample) before using --grain page."
+    );
+    return 1;
+  }
+  const maxTickets = Number.parseInt(String(p.flags["max-tickets"] ?? config?.maxTickets ?? 200), 10);
+  if (!Number.isFinite(maxTickets) || maxTickets < 1) {
+    console.error("ultra11y tickets: --max-tickets must be a positive integer.");
+    return 2;
+  }
+  if (plan.tickets.length > maxTickets) {
+    console.error(
+      fr ? `ultra11y tickets : ${plan.tickets.length} tickets pour --grain ${grainFlag}, au-del\xE0 de la limite de ${maxTickets}. Relancez avec --max-tickets ${plan.tickets.length}, un grain plus grossier, ou --dry-run pour inspecter.` : `ultra11y tickets: ${plan.tickets.length} tickets for --grain ${grainFlag}, past the limit of ${maxTickets}. Re-run with --max-tickets ${plan.tickets.length}, a coarser grain, or --dry-run to inspect.`
+    );
+    return 2;
+  }
+  if (!plan.tickets.length) {
+    if (!json)
+      console.log(
+        fr ? "ultra11y tickets : rien \xE0 d\xE9poser \u2014 l'audit ne rel\xE8ve aucune non-conformit\xE9." : "ultra11y tickets: nothing to file \u2014 the audit found no non-conformity."
+      );
+    if (json)
+      console.log(
+        JSON.stringify(
+          {
+            provider: providerId,
+            transport: provider.transport,
+            grain: grainFlag,
+            standard,
+            dryRun,
+            tickets: [],
+            unattributed: plan.unattributed,
+            result: { created: 0, skipped: 0, failed: 0, createdTitles: [], createdUrls: [], errors: [] }
+          },
+          null,
+          2
+        )
+      );
+    return 0;
+  }
+  if (!provider.available() && !dryRun) {
+    console.error(`ultra11y tickets: ${providerId} is not usable here \u2014 ${provider.unavailableReason()}.`);
+    return 1;
+  }
+  const { plan: planned, result: pushed, dedupeChecked } = await pushTickets(plan.tickets, provider, { dryRun: dryRun || !provider.available() });
+  if (json) {
+    console.log(
+      JSON.stringify(
+        {
+          provider: providerId,
+          transport: provider.transport,
+          grain: grainFlag,
+          standard,
+          dryRun,
+          dedupeChecked,
+          tickets: planned.map(({ ticket, action }) => ({
+            title: ticket.title,
+            labels: ticket.labels,
+            severity: ticket.severity,
+            advisory: ticket.advisory,
+            scope: ticket.scope,
+            bodyChars: ticket.body.length,
+            action,
+            // The body rides along ONLY under --dry-run: an agent inspecting the plan wants
+            // it, a 200-ticket push payload does not.
+            ...dryRun ? { body: ticket.body } : {}
+          })),
+          unattributed: plan.unattributed,
+          result: pushed
+        },
+        null,
+        2
+      )
+    );
+  } else if (dryRun || !provider.available()) {
+    const create = planned.filter((x) => x.action === "create").length;
+    console.log(
+      fr ? `ultra11y tickets : simulation (${providerId}/${provider.transport}, grain ${grainFlag}) \u2014 ${create} \xE0 cr\xE9er, ${pushed.skipped} d\xE9j\xE0 pr\xE9sent(s).` : `ultra11y tickets: dry run (${providerId}/${provider.transport}, grain ${grainFlag}) \u2014 ${create} to create, ${pushed.skipped} already there.`
+    );
+    for (const { ticket, action } of planned) console.log(`  ${action === "create" ? "+" : "="} ${ticket.title}`);
+    if (!dedupeChecked)
+      console.error(
+        fr ? "ultra11y tickets : l'existant n'a pas pu \xEAtre list\xE9 \u2014 le compte \xAB d\xE9j\xE0 pr\xE9sent \xBB n'est pas v\xE9rifi\xE9." : 'ultra11y tickets: could not list existing tickets \u2014 the "already there" count is unverified.'
+      );
+    if (!provider.available()) console.error(`ultra11y tickets: ${providerId} \u2014 ${provider.unavailableReason()}.`);
+  } else {
+    console.log(
+      fr ? `ultra11y tickets : ${providerId} \u2014 ${pushed.created} cr\xE9\xE9(s), ${pushed.skipped} d\xE9j\xE0 pr\xE9sent(s)${pushed.failed ? `, ${pushed.failed} en \xE9chec` : ""}.` : `ultra11y tickets: ${providerId} \u2014 ${pushed.created} created, ${pushed.skipped} already there${pushed.failed ? `, ${pushed.failed} failed` : ""}.`
+    );
+    for (const u of pushed.createdUrls) console.log(`  ${u}`);
+    for (const e of pushed.errors) console.error(fr ? `ultra11y tickets : \xE9chec \u2014 ${e}` : `ultra11y tickets: failed \u2014 ${e}`);
+    if (plan.unattributed) {
+      console.error(
+        fr ? `ultra11y tickets : ${plan.unattributed} constat(s) non rattach\xE9(s) \xE0 une page \u2014 d\xE9pos\xE9s dans leur propre ticket, jamais r\xE9partis d'office.` : `ultra11y tickets: ${plan.unattributed} finding(s) attributed to no page \u2014 filed as their own ticket, never spread.`
+      );
+    }
+  }
+  return pushed.failed > 0 ? 1 : 0;
 }
 function depsAt(root) {
   const pkgPath = join45(root, "package.json");
@@ -59758,13 +60584,25 @@ async function main(argv) {
     console.log(HELP2);
     return 0;
   }
+  for (const f of p.unknown) {
+    const replacement = REMOVED_FLAGS[f];
+    if (replacement) {
+      console.error(`ultra11y: --${f} was removed in v3 \u2014 ticket creation is now its own command. Use: ${replacement}`);
+      return 2;
+    }
+  }
   for (const f of p.unknown) console.error(`ultra11y: unknown flag --${f} (ignored). Run \`ultra11y --help\`.`);
   const ENUM_FLAGS = {
     lang: ["auto", "en", "fr"],
     dedup: ["exact", "normalized", "off"],
     format: ["audit", "doc", "remediation", "sarif", "github", "grid", "report"],
     split: ["criterion", "page"],
-    runtime: ["auto", "local", "docker"]
+    runtime: ["auto", "local", "docker"],
+    provider: ["auto", "github", "gitlab", "jira"],
+    grain: ["criterion", "page", "page-criterion", "single", "file"],
+    // The union over every command that takes it: `mcp` serves stdio|http, `tickets`
+    // picks cli|rest. Listing one command's values made the guard cry wolf on the other.
+    transport: ["stdio", "http", "auto", "cli", "rest"]
   };
   for (const [flag, allowed] of Object.entries(ENUM_FLAGS)) {
     const v = p.flags[flag];
@@ -59782,6 +60620,8 @@ async function main(argv) {
       return cmdAudit(p);
     case "report":
       return cmdReport(p);
+    case "tickets":
+      return cmdTickets(p);
     case "prd":
       return cmdPrd(p);
     case "render":
@@ -59850,6 +60690,7 @@ if (isInvokedDirectly()) {
 }
 export {
   COMMANDS,
+  REMOVED_FLAGS,
   main,
   parseArgs
 };

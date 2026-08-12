@@ -1,7 +1,7 @@
 ---
 name: ultra11y
 description: "Use to AUDIT existing HTML/CSS/JSX against WCAG 2.2 AA accessibility and produce a dated auditor-conformance report, OR to AUTHOR/REVIEW accessible markup (native-HTML-first, ARIA last). An install-free engine (`node scripts/ultra11y.mjs`, no keys) runs 78 static checks tied to WCAG criteria — alt/lang/title, unlabeled fields, empty links/buttons, tables, headings, ARIA vocabulary, label-in-name, autocomplete — measured against the official W3C ACT corpus. The engine decides 3 of the 55 criteria; the AI agent adjudicates the 38 judgment ones from harvested evidence + a per-criterion decision protocol (`verify --manual`, gated, fannable via `orchestrate`), and the 14 rendering ones go to `scan` — never silently conforming. Library/SFC code is audited as RENDERED captures (`render --setup`); country standards are pluggable packs (`--standard rgaa`, `scan --sample`). check/verify reject invented non-conformities. Triggers: 'audit WCAG/a11y', 'make accessible', 'fix a11y', 'audit RGAA'."
-when_to_use: "Invoke when the user asks for an accessibility AUDIT or a formal deliverable: audit a repo, site or page against WCAG 2.2 AA or a country standard (RGAA, Section 508, EN 301 549); produce a dated conformance report, a criterion grid, a PRD remediation backlog or GitHub issues; author accessible markup from scratch; wire the repo gate (init --hook/--ci) or a rendered-DOM capture pipeline. For a review of the code UNDER CHANGE (diff, branch, PR), use the `review-a11y` skill instead."
+when_to_use: "Invoke when the user asks for an accessibility AUDIT or a formal deliverable: audit a repo, site or page against WCAG 2.2 AA or a country standard (RGAA, Section 508, EN 301 549); produce a dated conformance report, a criterion grid, a PRD backlog, or tickets (GitHub/GitLab/Jira); author accessible markup from scratch; wire the repo gate (init --hook/--ci) or a rendered-DOM capture pipeline. For a review of the code UNDER CHANGE (diff, branch, PR), use the `review-a11y` skill instead."
 license: MIT
 metadata:
   version: 2.31.2
@@ -58,7 +58,7 @@ adjudicates. So the engine's clean run is a starting point, never a verdict — 
 >    `<html lang>` → the active standard's default locale → English) — a scripted/CI
 >    fallback, not a substitute for passing `--lang` yourself.
 > 7. **Technical tokens stay in English, even in French prose.** In any French deliverable
->    you write (report commentary, PRD, GitHub issues, judgment verdicts), attribute/
+>    you write (report commentary, PRD, tracker tickets, judgment verdicts), attribute/
 >    element/role names and their values are code, not prose — never translate them:
 >    `aria-live` stays `aria-live` (never « région live »), same for `tabindex`, `alt`,
 >    `role="alert"`, landmark role names. The engine's own fr catalog follows this; match
@@ -98,7 +98,8 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
 | `references/scale.md` | Focusing an audit on a large repository |
 | `references/fix.md` · `references/correction.md` | Applying fixes, by priority, without regressions |
-| `references/prd.md` | The auditor block as a backlog, and GitHub issues |
+| `references/prd.md` | The auditor block as a backlog (markdown) |
+| `references/tickets.md` | Filing that backlog as tickets: GitHub, GitLab, Jira, and at which granularity |
 | `references/standards.md` · `references/packs.md` · `references/guidance.md` | Country standards, authoring a pack, implementation guidance |
 | `references/methodology.md` | Statuses, pass rate, severities, report format |
 | `references/cross-file.md` | `--graph`: imports and cross-file rules |
@@ -108,7 +109,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 
 - **"Audit / compliance report"** → `node scripts/ultra11y.mjs audit … --json`, then
   `report` (synthesis table + one **auditor conformance block** per NC criterion — same
-  block `prd`/`--gh-issues` use), then `check`; read **`references/audit.md`**.
+  block `prd` and `tickets` use), then `check`; read **`references/audit.md`**.
 - **"Code rendered by a library (DSFR, MUI…) or a `.vue`/`.svelte`/`.astro` SFC / avoid
   false negatives"** → audit the **produced HTML**, not the source template. Easiest:
   install the zero-touch **capture** harvester (`render --setup`) so your tests serialize
@@ -127,13 +128,17 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   `audit --graph` resolves imports and applies cross-file rules (an icon-only component
   used without a name, an anchor target in another file…), no browser; read
   **`references/cross-file.md`**.
-- **"Generate the fix markdown / PRDs (→ GitHub issues)"** → `prd` (the SAME auditor
+- **"Generate the fix markdown / PRDs"** → `prd` (the SAME auditor
   conformance block `report`'s NC section renders — theme/criterion/test/WCAG+level/
   finding/expected/verification in the active standard's vocabulary — as a backlog);
   `--split criterion`, `--format doc` for a product-requirements doc, `--format remediation`
-  for the legacy dev backlog, `--gh-issues` for one issue per criterion (that block as the
-  body) or `--gh-single` for a single consolidated issue via the `gh` CLI); read
+  for the legacy dev backlog). It writes markdown only; read
   **`references/prd.md`**.
+- **"Open tickets / issues for this (GitHub · GitLab · Jira)"** → `tickets`, a separate
+  command that reads the audit and files it, writing no markdown. `--grain` picks what one
+  ticket is: per criterion (default), per page, per page+criterion, per file, or one
+  consolidated. De-dupe is by exact title, so re-running never duplicates. Always
+  `--dry-run` first; read **`references/tickets.md`**.
 - **"Plug or author a standards pack (RGAA & beyond), AI-ingest external rules"** →
   `--pack`/`.ultra11yrc.json` to load at runtime, `pack check` to gate it (the
   anti-hallucination guardrail), `pack scaffold` to start one; concrete before/after
@@ -272,7 +277,8 @@ node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --in audits/
 node scripts/ultra11y.mjs verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json --out audits
 node scripts/ultra11y.mjs orchestrate --run audits                           # fan the judgment phases out (--eco for the sequential path)
 node scripts/ultra11y.mjs report --in audits/audit-latest.json --out audits  # → audits/wcag-YYYY-MM-DD.md
-node scripts/ultra11y.mjs prd    --in audits/audit-latest.json --gh-issues   # the same auditor block as a backlog
+node scripts/ultra11y.mjs prd     --in audits/audit-latest.json              # the same auditor block as a backlog
+node scripts/ultra11y.mjs tickets --in audits/audit-latest.json --dry-run    # file it: GitHub/GitLab/Jira
 node scripts/ultra11y.mjs check  --report audits/wcag-YYYY-MM-DD.md          # integrity gate
 node scripts/ultra11y.mjs criteria 1.4.3                                     # one success criterion (--list for all)
 node scripts/ultra11y.mjs fix "src/**/*.html" --write --iterate               # apply the safe codemods to a fixpoint
@@ -311,7 +317,7 @@ drive the judgment and content stages:
 4. **Re-audit** (on the render where relevant) and repeat.
 5. **Deliver the auditor block.** `report` (compliance doc: synthesis + one auditor
    conformance block — theme/criterion/test/WCAG+level/finding/expected/verification —
-   per NC criterion) and `prd` (the same blocks as an actionable backlog, `--gh-issues`
+   per NC criterion) and `prd` (the same blocks as an actionable backlog; `tickets`
    filing one GitHub issue per criterion with that identical block) are two views of the
    ONE building block, in the language of this conversation (pass `--lang` explicitly —
    Core rule 5).

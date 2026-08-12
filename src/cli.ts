@@ -1585,7 +1585,7 @@ async function cmdPrd(p: ParsedArgs): Promise<number> {
 /** Flags that USED to exist, mapped to what replaces them. Checked before the generic
  *  unknown-flag warning so a removal is loud on the first run, not discovered later from an
  *  empty tracker. Reusable for the next removal — one table, one place. */
-const REMOVED_FLAGS: Record<string, string> = {
+export const REMOVED_FLAGS: Record<string, string> = {
   "gh-issues": "ultra11y tickets --in <audit.json> --provider github --grain criterion",
   "gh-single": "ultra11y tickets --in <audit.json> --provider github --grain single",
 };
@@ -1669,6 +1669,7 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
     lang,
     format,
     bodyLimit: provider.capabilities.bodyLimit,
+    baseDir: process.cwd(),
     technical: p.flags["no-technical"] !== true,
   });
 

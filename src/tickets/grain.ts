@@ -9,6 +9,7 @@
 // `scope.pages`, `packFindings` and `pageView`, all of which `prdUnits()` has already
 // discarded by the time it returns.
 import type { AuditResult, Finding, PageResult, Severity } from "../types.js";
+import { repoRelative } from "../util.js";
 import { type PrdUnit, prdUnits } from "../prd.js";
 import { renderAuditorBacklog } from "../auditor.js";
 import { attributePages, derivePages, pageBasisWarning, pageView, pagesOf, unattributedFindings, unattributedNote } from "../pages.js";
@@ -39,8 +40,8 @@ function worstOf(items: { severity: Severity }[]): Severity {
 /** A view of the audit restricted to one FILE. Deliberately does NOT touch `criteria`: a file
  *  is not a page and earns no conformance verdict. Kept private so nobody is tempted to
  *  compute a per-file rate from it. */
-function fileView(result: AuditResult, file: string): AuditResult {
-  const owns = (f: Finding): boolean => sourceOf(f) === file;
+function fileView(result: AuditResult, file: string, baseDir: string): AuditResult {
+  const owns = (f: Finding): boolean => sourceOf(f, baseDir) === file;
   return {
     ...result,
     findings: result.findings.filter(owns),
@@ -48,10 +49,12 @@ function fileView(result: AuditResult, file: string): AuditResult {
   };
 }
 
-/** The file a finding belongs to. A finding raised on a RENDERED capture is credited to the
- *  source component that produced it, not to the capture file nobody edits. */
-function sourceOf(f: Finding): string {
-  return f.origin?.sourceFile ?? f.file;
+/** The file a finding belongs to, REPO-RELATIVE. A finding raised on a RENDERED capture is
+ *  credited to the source component that produced it, not to the capture file nobody edits.
+ *  The path is relativised because it lands in the ticket TITLE, which is the de-dupe key: an
+ *  absolute path would make that key machine-specific and re-file everything from CI. */
+function sourceOf(f: Finding, baseDir: string): string {
+  return repoRelative(f.origin?.sourceFile ?? f.file, baseDir);
 }
 
 export function buildTickets(result: AuditResult, opts: GrainOptions): TicketPlan {
@@ -63,6 +66,7 @@ export function buildTickets(result: AuditResult, opts: GrainOptions): TicketPla
     ...(opts.technical !== undefined ? { technical: opts.technical } : {}),
   };
   const backlogOpts = opts.technical !== undefined ? { technical: opts.technical } : {};
+  const baseDir = opts.baseDir ?? "";
   const clamp = (body: string): string => clampBody(body, limit, lang);
 
   const ticketFromUnit = (unit: PrdUnit, title: string, scope: Ticket["scope"]): Ticket => ({
@@ -105,10 +109,10 @@ export function buildTickets(result: AuditResult, opts: GrainOptions): TicketPla
   }
 
   if (grain === "file") {
-    const files = [...new Set(result.findings.map(sourceOf))].sort();
+    const files = [...new Set(result.findings.map((f) => sourceOf(f, baseDir)))].sort();
     const tickets: Ticket[] = [];
     for (const file of files) {
-      const view = fileView(result, file);
+      const view = fileView(result, file, baseDir);
       const units = prdUnits(view, standard, lang);
       if (!units.length) continue;
       const advisory = units.every((u) => u.advisory === true);

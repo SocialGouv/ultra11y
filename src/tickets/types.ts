@@ -59,6 +59,11 @@ export interface GrainOptions {
   format?: "audit" | "remediation";
   /** Provider body budget in characters; bodies are clamped to it. */
   bodyLimit?: number;
+  /** Repo root, used to make `file`-grain paths repo-relative. It is passed IN rather than
+   *  read from process.cwd() so `buildTickets` stays pure — and it matters: an absolute path
+   *  in a title makes the de-dupe key machine-specific, so a CI checkout at another path
+   *  would re-file every ticket. */
+  baseDir?: string;
   /** Emit the technical ticket sections (Partie technique / Contexte de reproduction). */
   technical?: boolean;
 }

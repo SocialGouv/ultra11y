@@ -108,6 +108,22 @@ describe("title grammars", () => {
     expect(tickets.map((t) => t.title)).toContain("[a11y] WCAG [file:app/page.tsx] — Accessibility audit");
   });
 
+  // An absolute path in a title makes the de-dupe key machine-specific: a CI checkout at a
+  // different path would re-file every ticket.
+  it("relativises the file path, so the de-dupe key is not machine-specific", () => {
+    const f = F({ file: "/build/ci/workspace/src/a.html" });
+    const r2 = audit({ findings: [f], criteria: [C("1.1.1", "NC", [f])] });
+    const titles = buildTickets(r2, { ...opts("file"), baseDir: "/build/ci/workspace" }).tickets.map((t) => t.title);
+    expect(titles).toContain("[a11y] WCAG [file:src/a.html] — Accessibility audit");
+  });
+
+  it("leaves a path outside the repo alone rather than inventing one", () => {
+    const f = F({ file: "/elsewhere/x.html" });
+    const r2 = audit({ findings: [f], criteria: [C("1.1.1", "NC", [f])] });
+    const titles = buildTickets(r2, { ...opts("file"), baseDir: "/build/ci/workspace" }).tickets.map((t) => t.title);
+    expect(titles).toContain("[a11y] WCAG [file:/elsewhere/x.html] — Accessibility audit");
+  });
+
   it("credits a capture finding to its SOURCE component, not the capture file", () => {
     const f = F({ file: ".ultra11y/captures/x.html", origin: { capture: ".ultra11y/captures/x.html", sourceFile: "src/Button.tsx" } });
     const r2 = audit({ findings: [f], criteria: [C("1.1.1", "NC", [f])] });
