@@ -298,12 +298,17 @@ export function alignedStyles(dom: string, styles: StyleDigest): Map<number, Sty
   return out;
 }
 
-/** Same verified join for bounding boxes. */
-export function alignedBoxes(dom: string, boxes: BoxDigest): Map<number, BoxEntry> | null {
-  const doc = parseHtml(dom, "snapshot");
+/** Same verified join for bounding boxes.
+ *
+ *  `doc` is optional and purely an economy: a caller that has already parsed this very `dom`
+ *  passes it rather than paying for a second parse of a whole page (src/evidence.ts needs the
+ *  same tree to map source offsets to ordinals). The join itself has ONE definition either
+ *  way — that is the point of this function, and of `align` beside it. */
+export function alignedBoxes(dom: string, boxes: BoxDigest, doc?: Doc): Map<number, BoxEntry> | null {
+  const parsed = doc ?? parseHtml(dom, "snapshot");
   const out = new Map<number, BoxEntry>();
   for (const e of boxes.entries) {
-    const el = doc.elements[e.i];
+    const el = parsed.elements[e.i];
     if (!el || el.tag !== e.tag) return null;
     out.set(e.i, e);
   }
