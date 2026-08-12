@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [2.31.3](https://github.com/maxgfr/ultra11y/compare/v2.31.2...v2.31.3) (2026-08-12)
+
+
+### Bug Fixes
+
+* stop publishing a conformity nobody verified ([09c435a](https://github.com/maxgfr/ultra11y/commit/09c435a748df9788f004aaf1e393a324656c6bf2))
+
 ## [2.31.2](https://github.com/maxgfr/ultra11y/compare/v2.31.1...v2.31.2) (2026-08-11)
 
 
