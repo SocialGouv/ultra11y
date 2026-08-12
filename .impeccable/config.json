@@ -8,6 +8,15 @@
         "value": "<img>",
         "createdAt": "2026-08-12T13:38:12.635Z",
         "reason": "test fixture: the string is audited MARKUP inside an ultra11y Finding.snippet, never a rendered image"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "tests/cli.test.ts"
+        ],
+        "createdAt": "2026-08-12T17:15:29.325Z",
+        "reason": "Claude: fixture file for an a11y auditor — bare <img> with no alt is the deliberate defect the test asserts on (tests/cli.test.ts:500, pre-existing, only reindexed by this edit)"
       }
     ]
   }
