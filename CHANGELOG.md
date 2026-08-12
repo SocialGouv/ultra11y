@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [3.1.0](https://github.com/maxgfr/ultra11y/compare/v3.0.0...v3.1.0) (2026-08-12)
+
+
+### Features
+
+* **evidence:** a non-conformity, shown — annotated crops joined through sourceStart ([e7d89bb](https://github.com/maxgfr/ultra11y/commit/e7d89bb14da12b70a9380249e0678735cc51765e)), closes [#16](https://github.com/maxgfr/ultra11y/issues/16) [#16](https://github.com/maxgfr/ultra11y/issues/16)
+* **pixel:** the write side, so a non-conformity can be shown and not only cited ([53ca1bb](https://github.com/maxgfr/ultra11y/commit/53ca1bb4e5ea3a98ffcd14827225b21535d365f7))
+
 # [3.0.0](https://github.com/maxgfr/ultra11y/compare/v2.32.1...v3.0.0) (2026-08-12)
 
 
