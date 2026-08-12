@@ -34930,6 +34930,13 @@ function expandInputs(inputs, opts = {}) {
 }
 
 // src/capture.ts
+var CAPTURES_DIR = ".ultra11y/captures";
+function isUnderDir(file, dir) {
+  const d = toPosix(dir).replace(/\/+$/, "");
+  if (!d) return false;
+  const f = toPosix(file);
+  return f === d || f.startsWith(`${d}/`) || f.includes(`/${d}/`);
+}
 function escapeCommentValue(s) {
   return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/--/g, "&#45;&#45;");
 }
@@ -35325,6 +35332,17 @@ function readSnapshots(root) {
 function isSnapshotDom(file) {
   const posix3 = file.split("\\").join("/");
   return posix3.endsWith("/dom.html") && posix3.includes(`${PAGES_DIR}/`);
+}
+function snapshotPageId(file) {
+  if (!file) return void 0;
+  const segs = file.split("\\").join("/").split("/");
+  const marker = PAGES_DIR.split("/");
+  if (segs.length < marker.length + 2) return void 0;
+  if (segs[segs.length - 1] !== "dom.html") return void 0;
+  const idAt = segs.length - 2;
+  for (let i2 = 0; i2 < marker.length; i2++) if (segs[idAt - marker.length + i2] !== marker[i2]) return void 0;
+  const id = segs[idAt];
+  return id !== void 0 && ID_RE.test(id) ? id : void 0;
 }
 function align(doc, entries) {
   const out2 = /* @__PURE__ */ new Map();
@@ -39644,6 +39662,13 @@ function crossToFinding(doc, ruleId, def, cf) {
     // regex transform), so its cross-file findings are provisional too — otherwise a cross
     // finding reads as definitive while the per-doc findings in the same file are preliminary.
     ...doc.kind === "sfc" || doc.kind === "jsx-lossy" ? { preliminary: true } : {},
+    // Capture provenance, exactly as src/rules/rule.ts does it. No cross rule can reach a page
+    // snapshot today (the two that raise findings resolve through the component graph, and a
+    // serialized DOM has no node in it), so this changes no current output — it is here so the
+    // three Finding constructors stay in step, and a cross rule that later does become reachable
+    // on a full document is attributed like everything else instead of silently orphaned.
+    ...doc.capture ? { origin: { capture: doc.file, sourceFile: doc.capture.sourceFile, component: doc.capture.component } } : {},
+    ...doc.capture?.page ? { page: doc.capture.page } : {},
     ...cf.related ? { related: cf.related } : {}
   };
 }
@@ -44683,6 +44708,12 @@ function toFinding2(doc, el, rule, packKey) {
       message: { en: rule.message.en, fr: rule.message.fr },
       remediation: { en: rule.remediation.en, fr: rule.remediation.fr }
     },
+    // Capture provenance, exactly as src/rules/rule.ts does it — keep the three constructors in
+    // step. A pack finding that skips this stays unattributed, so `pageView`'s
+    // `packFindings.filter(f => f.page === page.id)` (src/pages.ts) yields nothing and a pack rule
+    // can be NC in the report while reaching no cell of the per-page grid.
+    ...doc.capture ? { origin: { capture: doc.file, sourceFile: doc.capture.sourceFile, component: doc.capture.component } } : {},
+    ...doc.capture?.page ? { page: doc.capture.page } : {},
     ...rule.advisory ? { advisory: true } : {}
   };
 }
@@ -45168,6 +45199,10 @@ function primarySubtag(lang) {
   return m ? m[0].toLowerCase() : void 0;
 }
 function foldDoc(acc, doc, graph) {
+  if (!doc.capture?.page) {
+    const id = snapshotPageId(doc.file);
+    if (id) doc.capture = { v: 1, ...doc.capture ?? {}, page: id };
+  }
   let findings = runRules(doc);
   if (graph) {
     const cross = runCrossRules(doc, graph);
@@ -45264,7 +45299,11 @@ function finalize(acc, inputs, extra = {}) {
           components: [...new Set(acc.captures.map((c2) => c2.provenance.component).filter((x) => !!x))].sort()
         }
       } : {},
-      ...acc.langCounts.size ? { langs: [...acc.langCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([lang]) => lang) } : {}
+      ...acc.langCounts.size ? { langs: [...acc.langCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([lang]) => lang) } : {},
+      // The pages this run genuinely read. Written UNCONDITIONALLY — `[]` is the whole point,
+      // because "this audit read no page" is exactly the claim a source-only run needs to make,
+      // and an omit-when-empty field would say nothing precisely then. See scope.pagesAudited.
+      pagesAudited: [...new Set(acc.captures.map((c2) => c2.provenance.page).filter((x) => !!x))].sort()
     },
     guidelines,
     criteria,
@@ -45351,7 +45390,8 @@ function runAudit(opts) {
       }
       seen.add(h);
     }
-    const doc = reused ?? parseSource(content, file, { forceJsx: opts.forceJsx });
+    const ingested = isSnapshotDom(file) || isUnderDir(file, opts.captureDir ?? CAPTURES_DIR);
+    const doc = reused ?? parseSource(content, file, { forceJsx: opts.forceJsx && !ingested });
     attachSignals(doc);
     foldDoc(acc, doc, graph);
   }
@@ -45365,7 +45405,7 @@ function runAudit(opts) {
   });
   if (graph) {
     enrichCaptureOrigins(result.findings, graph);
-    if (opts.captureCoverage) result.scope.captureCoverage = computeCaptureCoverage(graph, readCaptureDir(opts.captureDir ?? ".ultra11y/captures"));
+    if (opts.captureCoverage) result.scope.captureCoverage = computeCaptureCoverage(graph, readCaptureDir(opts.captureDir ?? CAPTURES_DIR));
   }
   return result;
 }
@@ -48626,6 +48666,27 @@ var L = {
   }
 };
 var uniq = (xs) => [...new Set(xs.filter(Boolean))];
+function groupOccurrences(findings, collapse2) {
+  if (!collapse2) return findings.map((f) => [f]);
+  const groups = /* @__PURE__ */ new Map();
+  for (const f of findings) {
+    const key = `${f.file}\0${f.ruleId}\0${f.selectorHint}`;
+    const g = groups.get(key);
+    if (g) g.push(f);
+    else groups.set(key, [f]);
+  }
+  return [...groups.values()];
+}
+function renderOccurrenceDetails(out2, f, lang, s, indent) {
+  if (f.secondary?.note) out2.push(`${indent}  - \u21B3 ${f.secondary.note}`);
+  if (f.related) out2.push(indent + relatedLine(f.related, lang, { selector: true }));
+  if (f.origin) {
+    const comp = f.origin.component ?? f.origin.sourceFile ?? f.file;
+    const srcFile = f.origin.sourceFile ?? f.origin.capture;
+    const src = f.origin.sourceFile && f.origin.sourceLine !== void 0 ? `${f.origin.sourceFile}:${f.origin.sourceLine}` : srcFile;
+    if (comp !== src) out2.push(`${indent}  - _${s.captureOf(comp, src)}_`);
+  }
+}
 var isUrlLocation = (file) => /^https?:\/\//i.test(file);
 function sampleMetaOf(f) {
   const meta2 = f.sample;
@@ -48681,15 +48742,12 @@ function renderAuditorUnit(unit, standard, lang, opts = {}) {
   out2.push(`**${s.finding} (${v.nonConformant})** : ${normative.length} ${s.occ} \u2014 ${messages.join(" ; ")}`);
   if (fixes.length) out2.push(`**${s.expected} (${v.conformant})** : ${fixes.join(" ; ")}`);
   out2.push(`**${s.verification}** : ${s.verify}`, "");
-  for (const f of normative) {
-    out2.push(occurrenceLine(f, lang, { marker: "checkbox" }));
-    if (f.secondary?.note) out2.push(`  - \u21B3 ${f.secondary.note}`);
-    if (f.related) out2.push(relatedLine(f.related, lang, { selector: true }));
-    if (f.origin) {
-      const comp = f.origin.component ?? f.origin.sourceFile ?? f.file;
-      const srcFile = f.origin.sourceFile ?? f.origin.capture;
-      const src = f.origin.sourceFile && f.origin.sourceLine !== void 0 ? `${f.origin.sourceFile}:${f.origin.sourceLine}` : srcFile;
-      out2.push(`  - _${s.captureOf(comp, src)}_`);
+  for (const group of groupOccurrences(normative, opts.collapse === true)) {
+    if (group.length > 1) out2.push(`- **\`${group[0].selectorHint}\`** \u2014 ${resolveMessage(group[0], lang)} \xB7 \xD7${group.length}`);
+    for (const f of group) {
+      const indent = group.length > 1 ? "  " : "";
+      out2.push(indent + occurrenceLine(f, lang, { marker: "checkbox" }));
+      renderOccurrenceDetails(out2, f, lang, s, indent);
     }
   }
   out2.push("");
@@ -49164,10 +49222,12 @@ function pageScopesFromSample(sample) {
 }
 function pagesOf(result) {
   const fromScope = result.scope.pages ?? [];
-  const ids = new Set(fromScope.map((p) => p.id));
-  const urls = new Set(fromScope.map((p) => p.url));
+  const audited = result.scope.pagesAudited;
+  const checked = audited === void 0 ? fromScope : fromScope.map((p) => p.basis === "snapshot" && !audited.includes(p.id) ? { ...p, basis: "not-audited" } : p);
+  const ids = new Set(checked.map((p) => p.id));
+  const urls = new Set(checked.map((p) => p.url));
   const extra = pageScopesFromSample(result.scope.sample).filter((p) => !ids.has(p.id) && !urls.has(p.url));
-  return [...fromScope, ...extra];
+  return [...checked, ...extra];
 }
 function pathMatch2(a, b) {
   const x = a.split("\\").join("/");
@@ -49178,8 +49238,14 @@ function attributePages(result, pages) {
   if (!pages.length) return;
   const byName = new Map(pages.map((p) => [p.name.toLowerCase(), p.id]));
   const byUrl = new Map(pages.map((p) => [p.url, p.id]));
+  const byId2 = new Set(pages.map((p) => p.id));
   for (const f of [...result.findings, ...result.packFindings ?? []]) {
     if (f.page) continue;
+    const snapId = snapshotPageId(f.file) ?? snapshotPageId(f.origin?.capture);
+    if (snapId) {
+      if (byId2.has(snapId)) f.page = snapId;
+      continue;
+    }
     if (isUrlPath(f.file)) {
       const hit = byUrl.get(f.file);
       if (hit) f.page = hit;
@@ -49200,7 +49266,7 @@ function attributePages(result, pages) {
   }
 }
 function unattributedFindings(result) {
-  return result.findings.filter((f) => !f.page);
+  return [...result.findings, ...result.packFindings ?? []].filter((f) => !f.page);
 }
 function pageStatus(c2, pageFindings, basis) {
   if (pageFindings.some((f) => !f.advisory)) return "NC";
@@ -49212,7 +49278,8 @@ function pageStatus(c2, pageFindings, basis) {
 function pct(criteria) {
   const c2 = criteria.filter((x) => x.status === "C").length;
   const nc = criteria.filter((x) => x.status === "NC").length;
-  return c2 + nc === 0 ? 100 : Math.round(c2 / (c2 + nc) * 100);
+  const decided = c2 + nc;
+  return { rate: decided === 0 ? null : Math.round(c2 / decided * 100), decided, total: criteria.length };
 }
 function derivePages(result, pages) {
   if (!pages.length) return [];
@@ -49230,6 +49297,7 @@ function derivePages(result, pages) {
         ...c2.decidedBy ? { decidedBy: c2.decidedBy } : {}
       };
     });
+    const { rate, decided, total } = pct(criteria);
     out2.push({
       id: p.id,
       name: p.name,
@@ -49238,7 +49306,9 @@ function derivePages(result, pages) {
       basis: p.basis,
       criteria,
       findings: own,
-      conformancePct: pct(criteria)
+      conformancePct: rate,
+      decided,
+      total
     });
   }
   return out2;
@@ -49255,7 +49325,9 @@ var L3 = {
     unattributed: (n) => `${n} constat(s) non rattach\xE9(s) \xE0 une page (code partag\xE9, fichier hors routes) \u2014 compt\xE9s dans l'audit global, jamais r\xE9partis d'office.`,
     rate: "Taux",
     snapshot: "instantan\xE9",
-    source: "source"
+    source: "source",
+    notAudited: "non audit\xE9",
+    notAuditedNote: "Une page marqu\xE9e \xAB non audit\xE9 \xBB a bien un instantan\xE9, mais CET audit ne l'a pas lu (il ne portait que sur les sources). L'absence de constat n'y vaut donc PAS conformit\xE9 \u2014 relancez l'audit en incluant `.ultra11y/pages`."
   },
   en: {
     title: "Per-page grid",
@@ -49267,11 +49339,21 @@ var L3 = {
     unattributed: (n) => `${n} unattributed finding(s) (shared code, file outside any route) \u2014 counted in the overall audit, never spread across pages.`,
     rate: "Rate",
     snapshot: "snapshot",
-    source: "source"
+    source: "source",
+    notAudited: "not audited",
+    notAuditedNote: 'A page marked "not audited" does have a snapshot, but THIS audit never read it (it covered sources only). Absence of a finding there does NOT mean conforming \u2014 re-run the audit with `.ultra11y/pages` in scope.'
   }
 };
+function formatRate(rate, decided, total) {
+  return `${rate === null ? "\u2014" : `${rate} %`} (${decided}/${total})`;
+}
 function pageBasisWarning(basis, lang) {
-  return basis === "snapshot" ? void 0 : L3[lang].basisNote;
+  if (basis === "snapshot") return void 0;
+  return basis === "not-audited" ? L3[lang].notAuditedNote : L3[lang].basisNote;
+}
+function basisLabel(basis, lang) {
+  const s = L3[lang];
+  return basis === "snapshot" ? s.snapshot : basis === "not-audited" ? s.notAudited : s.source;
 }
 function unattributedNote(n, lang) {
   return L3[lang].unattributed(n);
@@ -49314,8 +49396,8 @@ function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   if (derived.some((p) => p.basis === "attributed")) out2.push(`> \u26A0\uFE0F ${s.basisNote}`, "");
   const head = [isCore(standard) ? s.criterion : s.criterion, ...derived.map((p) => `${p.name}${p.auth ? " \u{1F512}" : ""}`)];
   out2.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
-  out2.push(`| **${s.rate}** | ${derived.map((p) => `**${p.conformancePct}%**`).join(" | ")} |`);
-  out2.push(`| _${s.snapshot}?_ | ${derived.map((p) => p.basis === "snapshot" ? `_${s.snapshot}_` : `_${s.source}_`).join(" | ")} |`);
+  out2.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(p.conformancePct, p.decided, p.total)}**`).join(" | ")} |`);
+  out2.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
   const { rows, status } = gridOf(result, derived, standard, lang);
   let group = "";
   for (const row of rows) {
@@ -49335,6 +49417,7 @@ function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
 // src/report.ts
 var ICON3 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
 var SEV_ORDER3 = ["bloquant", "majeur", "mineur"];
+var PER_PAGE_MAX = 30;
 var L4 = {
   fr: {
     title: (std) => `Rapport d'audit d'accessibilit\xE9 \u2014 ${std}`,
@@ -49388,6 +49471,7 @@ var L4 = {
     authYes: "\u{1F512} authentification requise",
     authNo: "\u{1F310} public",
     ncCount: "non-conformit\xE9(s)",
+    perPageMore: (hidden, total) => `\u2702\uFE0F ${hidden} autre(s) constat(s) sur cette page ne sont pas list\xE9s ici (${total} au total) \u2014 voir la fiche de page.`,
     advCount: "recommandation(s)",
     screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`
   },
@@ -49443,6 +49527,7 @@ var L4 = {
     authYes: "\u{1F512} authentication required",
     authNo: "\u{1F310} public",
     ncCount: "non-conformity(ies)",
+    perPageMore: (hidden, total) => `\u2702\uFE0F ${hidden} further finding(s) on this page are not listed here (${total} in total) \u2014 see its page sheet.`,
     advCount: "recommendation(s)",
     screenshotAlt: (n) => `Screenshot of the ${n} page`
   }
@@ -49544,11 +49629,12 @@ function render(r, lang, opts) {
         }
         out2.push("", `![${s.screenshotAlt(pg.name)}](${href})`);
       }
-      for (const f of nc.slice(0, 30)) {
+      for (const f of nc.slice(0, PER_PAGE_MAX)) {
         const crits = pack ? packCriteriaForFinding(pack, f) : [];
         const label = crits.length ? crits.join(", ") : f.criteriaId;
         out2.push(`  - [${label}] \`${f.selectorHint}\` \u2014 ${resolveMessage(f, lang)}`);
       }
+      if (nc.length > PER_PAGE_MAX) out2.push(`  - _${s.perPageMore(nc.length - PER_PAGE_MAX, nc.length)}_`);
       out2.push("");
     }
   }
@@ -49938,13 +50024,19 @@ function buildTickets(result, opts) {
     }
   }
   if (orphans.length) {
-    const view = { ...result, findings: orphans, ...result.packFindings ? { packFindings: result.packFindings.filter((f) => !f.page) } : {} };
+    const coreOrphans = result.findings.filter((f) => !f.page);
+    const view = {
+      ...result,
+      findings: coreOrphans,
+      ...result.packFindings ? { packFindings: result.packFindings.filter((f) => !f.page) } : {}
+    };
     const units = prdUnits(view, standard, lang);
     if (units.length) {
       const advisory = units.every((u) => u.advisory === true);
+      const announced = isCore(standard) ? coreOrphans.length : orphans.length;
       tickets.push({
         title: unattributedTitle(label),
-        body: clamp2([`> ${unattributedNote(orphans.length, lang)}`, "", renderAuditorBacklog(view, lang, standard, backlogOpts)].join("\n")),
+        body: clamp2([`> ${unattributedNote(announced, lang)}`, "", renderAuditorBacklog(view, lang, standard, backlogOpts)].join("\n")),
         labels: labelsFor(worstOf(units), advisory, tag),
         severity: worstOf(units),
         advisory,
@@ -50870,7 +50962,7 @@ function auditorCriterionLine(standard) {
   const id = isCore(standard) ? "\\d{1,2}(?:\\.\\d{1,2}){2}" : idCaptureSource(loadPack(standard));
   return new RegExp(`^\\*\\*[^*:]+\\*\\*\\s*:\\s*(${id})(?:\\s*\u2014.*)?\\s*$`);
 }
-var AUDITOR_OCCURRENCE = /^-\s\[ \]\s+`([^`]+):(\d+)`\s+\(`([^`]*)`\)\s+—\s+(.*)$/;
+var AUDITOR_OCCURRENCE = /^\s*-\s\[ \]\s+`([^`]+):(\d+)`\s+\(`([^`]*)`\)\s+—\s+(.*)$/;
 var HEADING_LINE = /^#{2,4}\s/;
 function buildWorklistFromAuditorBlocks(reportMd, standard, max) {
   const items = [];
@@ -51136,6 +51228,10 @@ var L7 = {
     producer: "Producteur",
     auth: "Authentification requise",
     rate: "Taux de r\xE9ussite automatique (v\xE9rifications statiques)",
+    // The index has its own, shorter header — the sheet's label is a full sentence and would
+    // wreck an eight-column table. Kept as a SEPARATE key: editing `rate` in place would
+    // silently reword the sheet bullet too.
+    rateShort: "Taux (crit\xE8res d\xE9cid\xE9s)",
     rateNote: "sous-ensemble d\xE9cidable : C \xF7 (C + NC)",
     tally: (c2, nc, na, m) => `${c2} conforme(s) \xB7 ${nc} non conforme(s) \xB7 ${na} non applicable(s) \xB7 ${m} \xE0 \xE9valuer`,
     coverage: (decided, total) => `Couverture : ${decided}/${total} crit\xE8re(s) \xE9valu\xE9(s) \u2014 le taux ci-dessus ne porte que sur eux, et ne dit rien des ${total - decided} autres.`,
@@ -51158,7 +51254,7 @@ var L7 = {
     blocking: "Bloquant",
     major: "Majeur",
     minor: "Mineur",
-    indexNote: "Une fiche par page. Le taux ne porte que sur les crit\xE8res d\xE9cid\xE9s \u2014 il ne dit rien des crit\xE8res restant \xE0 \xE9valuer."
+    indexNote: "Une fiche par page. `X % (d/t)` : le taux ne porte que sur les `d` crit\xE8res d\xE9cid\xE9s sur `t` \u2014 il ne dit rien des autres. `\u2014` signifie qu'aucun crit\xE8re n'a \xE9t\xE9 d\xE9cid\xE9 sur cette page, et ne vaut donc NI conformit\xE9 NI non-conformit\xE9."
   },
   en: {
     docTitle: "Page-by-page accessibility report",
@@ -51176,6 +51272,7 @@ var L7 = {
     producer: "Producer",
     auth: "Authentication required",
     rate: "Automatic static-check pass rate",
+    rateShort: "Rate (decided criteria)",
     rateNote: "decidable subset: C \xF7 (C + NC)",
     tally: (c2, nc, na, m) => `${c2} conforming \xB7 ${nc} non-conforming \xB7 ${na} not applicable \xB7 ${m} to assess`,
     coverage: (decided, total) => `Coverage: ${decided}/${total} criteria assessed \u2014 the rate above covers only those, and says nothing about the other ${total - decided}.`,
@@ -51198,7 +51295,7 @@ var L7 = {
     blocking: "Blocking",
     major: "Major",
     minor: "Minor",
-    indexNote: "One sheet per page. The rate covers only the decided criteria \u2014 it says nothing about those left to assess."
+    indexNote: "One sheet per page. `X % (d/t)`: the rate covers only the `d` criteria decided out of `t` \u2014 it says nothing about the others. `\u2014` means no criterion was decided on this page, so it is NEITHER conformity NOR non-conformity."
   }
 };
 function rowsFor(result, page, standard, lang) {
@@ -51231,9 +51328,13 @@ function tally(rows) {
     manual: rows.filter((r) => r.status === "manual").length
   };
 }
+function coverageOf(rows) {
+  const t2 = tally(rows);
+  return { decided: t2.c + t2.nc, total: rows.length };
+}
 function ratePct(rows) {
   const { c: c2, nc } = tally(rows);
-  return c2 + nc === 0 ? 100 : Math.round(c2 / (c2 + nc) * 100);
+  return c2 + nc === 0 ? null : Math.round(c2 / (c2 + nc) * 100);
 }
 function renderPageReport(result, page, opts = {}) {
   const standard = opts.standard ?? CORE2;
@@ -51244,14 +51345,16 @@ function renderPageReport(result, page, opts = {}) {
   out2.push(`${h} ${page.name}${page.auth ? " \u{1F512}" : ""}`, "");
   const meta2 = [];
   meta2.push(`- **${s.url}** : \`${page.url}\``);
-  meta2.push(`- **${s.basis}** : ${page.basis === "snapshot" ? s.snapshot : s.source}`);
+  meta2.push(`- **${s.basis}** : ${basisLabel(page.basis, lang)}`);
   if (page.auth) meta2.push(`- **${s.auth}** : \u2705`);
   out2.push(...meta2);
   const rows = rowsFor(result, page, standard, lang);
   const t2 = tally(rows);
-  out2.push(`- **${s.rate}** : **${ratePct(rows)} %** _(${s.rateNote})_`);
+  const cov = coverageOf(rows);
+  const rate = ratePct(rows);
+  out2.push(`- **${s.rate}** : **${rate === null ? "\u2014" : `${rate} %`}** _(${s.rateNote})_`);
   out2.push(`- ${s.tally(t2.c, t2.nc, t2.na, t2.manual)}`);
-  out2.push(`- ${s.coverage(t2.c + t2.nc, rows.length)}`, "");
+  out2.push(`- ${s.coverage(cov.decided, cov.total)}`, "");
   if (page.basis !== "snapshot") out2.push(`> \u26A0\uFE0F ${s.sourceWarn}`, "");
   const shot = opts.screenshots?.get(page.id);
   if (shot) out2.push(`![${s.screenshotAlt(page.name)}](${shot})`, "");
@@ -51277,10 +51380,10 @@ function renderPageReport(result, page, opts = {}) {
   const advUnits = units.filter((u) => u.advisory);
   out2.push(`${h}# ${s.ncTitle}`, "");
   if (!ncUnits.length) out2.push(s.noNc, "");
-  else for (const u of ncUnits) out2.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##` }));
+  else for (const u of ncUnits) out2.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##`, collapse: true }));
   if (advUnits.length) {
     out2.push(`${h}# \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
-    for (const u of advUnits) out2.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##` }));
+    for (const u of advUnits) out2.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##`, collapse: true }));
   }
   return out2.join("\n");
 }
@@ -51303,18 +51406,19 @@ function renderPagesIndex(result, pages, opts = {}) {
   const s = L7[lang];
   const out2 = header2(result, pages, standard, lang, s.indexTitle);
   out2.push(`> ${s.indexNote}`, "");
-  out2.push(`| ${s.page} | ${s.url} | ${s.basis} | ${s.rate} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
+  out2.push(`| ${s.page} | ${s.url} | ${s.basis} | ${s.rateShort} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
   out2.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const p of pages) {
     const rows = rowsFor(result, p, standard, lang);
-    const nc = p.findings.filter((f) => !f.advisory);
+    const cov = coverageOf(rows);
+    const nc = [...p.findings, ...(result.packFindings ?? []).filter((f) => f.page === p.id)].filter((f) => !f.advisory);
     const href = opts.hrefs?.get(p.id);
     out2.push(
-      `| ${p.name}${p.auth ? " \u{1F512}" : ""} | \`${p.url}\` | ${p.basis === "snapshot" ? s.snapshot : s.source} | ${ratePct(rows)} % | ${nc.filter((f) => f.severity === "bloquant").length} | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`
+      `| ${p.name}${p.auth ? " \u{1F512}" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(ratePct(rows), cov.decided, cov.total)} | ${nc.filter((f) => f.severity === "bloquant").length} | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`
     );
   }
   out2.push("");
-  const orphans = result.findings.filter((f) => !f.page);
+  const orphans = unattributedFindings(result);
   if (orphans.length) out2.push(`> ${s.unattributed(orphans.length)}`, "");
   return out2.join("\n");
 }
@@ -53429,6 +53533,27 @@ function mergeSample(existing, proposed) {
     kept: pages.length - added.length
   };
 }
+function sampleFromSnapshots(snapshots) {
+  return snapshots.map((s) => ({
+    id: s.meta.id,
+    name: s.meta.name,
+    url: s.meta.url,
+    ...s.meta.auth !== void 0 ? { auth: s.meta.auth } : {},
+    ...s.meta.notes ? { notes: s.meta.notes } : {}
+  }));
+}
+function unionSample(declared, snapshotted) {
+  const pages = [...declared?.pages ?? []];
+  const declaredIds = new Set(pages.map((p) => p.id));
+  const snapIds = new Set(snapshotted.map((p) => p.id));
+  const undeclared = snapshotted.filter((p) => !declaredIds.has(p.id));
+  const uncaptured = pages.filter((p) => !snapIds.has(p.id));
+  return {
+    sample: { pages: [...pages, ...undeclared], ...declared?.transverse?.length ? { transverse: declared.transverse } : {} },
+    undeclared,
+    uncaptured
+  };
+}
 function kindLabel(kind, locale = "fr") {
   return kind.label[locale] ?? Object.values(kind.label)[0] ?? kind.id;
 }
@@ -53863,6 +53988,7 @@ function recomputeTallies2(merged) {
 }
 function mergeSnapshotAudit(base, snap) {
   const merged = JSON.parse(JSON.stringify(base));
+  merged.scope.pagesAudited = [.../* @__PURE__ */ new Set([...base.scope.pagesAudited ?? [], ...snap.scope.pagesAudited ?? []])].sort();
   const byId2 = new Map(merged.criteria.map((c2) => [c2.id, c2]));
   const snapById = new Map(snap.criteria.map((c2) => [c2.id, c2]));
   for (const f of snap.findings) {
@@ -54558,6 +54684,197 @@ async function runCrawlScanLocal(opts) {
     throw new Error("No URL to scan (empty/unreachable sitemap, or entry page with no same-origin link).");
   }
   return runScanManyLocal(urls, opts);
+}
+
+// src/external/adapters/ara.ts
+var ARA_STATUS = {
+  COMPLIANT: "C",
+  NOT_COMPLIANT: "NC",
+  NOT_APPLICABLE: "NA",
+  // "the auditor did not test this criterion". `manual` is the honest mapping — undecided — and
+  // `rawStatus` is what lets a diff say « non retesté » rather than lumping it with the rest.
+  NOT_TESTED: "manual"
+};
+var isObj = (x) => typeof x === "object" && x !== null && !Array.isArray(x);
+function commentOf(r) {
+  const items = (r.notCompliantItems ?? []).map((i2) => [i2.title, i2.comment].filter(Boolean).join(" \u2014 ")).filter(Boolean);
+  const parts2 = [r.compliantComment, r.notApplicableComment, ...items].filter((x) => typeof x === "string" && x.trim() !== "");
+  return parts2.length ? parts2.join("\n\n") : void 0;
+}
+function impactOf2(r) {
+  const order = ["BLOCKING", "MAJOR", "MINOR"];
+  const found = (r.notCompliantItems ?? []).map((i2) => i2.userImpact).filter((x) => typeof x === "string");
+  for (const level of order) if (found.includes(level)) return level;
+  return void 0;
+}
+var araAdapter = {
+  id: "ara",
+  fetchUrl(id) {
+    return `https://ara.numerique.gouv.fr/api/reports/${encodeURIComponent(id)}`;
+  },
+  parse(raw, opts) {
+    const issues = [];
+    if (!isObj(raw)) return { ok: false, issues: ["the report is not a JSON object"] };
+    const context = isObj(raw.context) ? raw.context : {};
+    const samples = Array.isArray(context.samples) ? context.samples : [];
+    if (!samples.length) issues.push("context.samples is empty \u2014 the report declares no page, so no result can be located");
+    const seen = /* @__PURE__ */ new Set();
+    const pageById = /* @__PURE__ */ new Map();
+    for (const s of samples) {
+      if (typeof s?.id !== "number") {
+        issues.push(`a page in context.samples has no numeric id: ${JSON.stringify(s)}`);
+        continue;
+      }
+      const name2 = typeof s.name === "string" && s.name.trim() ? s.name : `page-${s.id}`;
+      const url = typeof s.url === "string" ? s.url : "";
+      let id = slugifyPageId(name2) || `page-${s.id}`;
+      for (let n = 2; seen.has(id); n++) id = `${slugifyPageId(name2)}-${n}`;
+      seen.add(id);
+      pageById.set(s.id, { id, name: name2, url });
+    }
+    const results = [];
+    const rawResults = Array.isArray(raw.results) ? raw.results : [];
+    if (!rawResults.length) issues.push("the report carries no `results` array");
+    const known = new Set(loadPack("rgaa").criteria.map((c2) => c2.id));
+    for (const r of rawResults) {
+      if (!isObj(r)) {
+        issues.push(`a result is not an object: ${JSON.stringify(r)}`);
+        continue;
+      }
+      const criterion = `${r.topic}.${r.criterium}`;
+      const page = pageById.get(r.pageId);
+      if (!page) {
+        issues.push(`result ${criterion} names pageId ${r.pageId}, which context.samples never declares`);
+        continue;
+      }
+      if (!known.has(criterion)) {
+        issues.push(`result names criterion ${criterion}, which the RGAA pack does not define`);
+        continue;
+      }
+      const status = ARA_STATUS[r.status];
+      if (status === void 0) {
+        issues.push(`result ${criterion} on ${page.id} carries status "${r.status}" \u2014 expected one of ${Object.keys(ARA_STATUS).join(", ")}`);
+        continue;
+      }
+      const comment = commentOf(r);
+      const userImpact = impactOf2(r);
+      results.push({
+        page: page.id,
+        criterion,
+        status,
+        rawStatus: r.status,
+        ...comment ? { comment } : {},
+        ...userImpact ? { userImpact } : {}
+      });
+    }
+    if (issues.length) return { ok: false, issues };
+    const date = typeof raw.publishDate === "string" ? raw.publishDate.slice(0, 10) : typeof raw.creationDate === "string" ? raw.creationDate.slice(0, 10) : void 0;
+    const audit2 = {
+      tool: "ultra11y",
+      kind: "external-audit",
+      schemaVersion: 1,
+      source: {
+        adapter: "ara",
+        ...typeof raw.consultUniqueId === "string" ? { id: raw.consultUniqueId } : {},
+        ...opts.url ? { url: opts.url } : {},
+        importedAt: opts.importedAt
+      },
+      standard: "rgaa",
+      ...date ? { date } : {},
+      ...typeof raw.procedureName === "string" ? { procedure: raw.procedureName } : {},
+      ...typeof context.auditorName === "string" ? { auditor: context.auditorName } : {},
+      pages: [...pageById.values()],
+      results
+    };
+    return { ok: true, audit: audit2 };
+  }
+};
+
+// src/external/registry.ts
+var EXTERNAL_SOURCES = ["ara"];
+function createAdapter(id) {
+  switch (id) {
+    case "ara":
+      return araAdapter;
+    default:
+      throw new Error(`unknown external audit source "${id}" \u2014 expected one of: ${EXTERNAL_SOURCES.join(", ")}`);
+  }
+}
+
+// src/external/diff.ts
+function sideOfExternal(a) {
+  const byPage = /* @__PURE__ */ new Map();
+  const raw = /* @__PURE__ */ new Map();
+  const comments = /* @__PURE__ */ new Map();
+  for (const r of a.results) {
+    const put = (m, v) => {
+      const inner = m.get(r.page) ?? /* @__PURE__ */ new Map();
+      inner.set(r.criterion, v);
+      m.set(r.page, inner);
+    };
+    put(byPage, r.status);
+    put(raw, r.rawStatus);
+    if (r.comment) put(comments, r.comment);
+  }
+  return { byPage, raw, comments };
+}
+var ruled = (s) => s !== void 0 && s !== "manual";
+function bucketOf(left, right, rightRaw) {
+  if (left === null && right === null) return "unchanged";
+  if (right === null) {
+    return left === "NC" ? "not-retested" : "only-left";
+  }
+  if (left === null) return "only-right";
+  if (left === right) return "unchanged";
+  if (left === "NC") return right === "C" ? "fixed" : "partially-fixed";
+  return right === "NC" ? "regressed" : "unchanged";
+}
+var EMPTY_COUNTS = () => ({
+  fixed: 0,
+  unchanged: 0,
+  "partially-fixed": 0,
+  regressed: 0,
+  "not-retested": 0,
+  "only-left": 0,
+  "only-right": 0
+});
+function diffSides(left, right) {
+  const pages = [.../* @__PURE__ */ new Set([...left.byPage.keys(), ...right.byPage.keys()])].sort();
+  const rows = [];
+  const counts = EMPTY_COUNTS();
+  for (const page of pages) {
+    const l = left.byPage.get(page);
+    const r = right.byPage.get(page);
+    const criteria = [.../* @__PURE__ */ new Set([...l?.keys() ?? [], ...r?.keys() ?? []])].sort(
+      (a, b) => a.localeCompare(b, "en", { numeric: true })
+    );
+    for (const criterion of criteria) {
+      const lv = l?.get(criterion);
+      const rv = r?.get(criterion);
+      const leftStatus = ruled(lv) ? lv : null;
+      const rightStatus = ruled(rv) ? rv : null;
+      const rightRaw = right.raw?.get(page)?.get(criterion);
+      const bucket = bucketOf(leftStatus, rightStatus, rightRaw);
+      if (leftStatus === null && rightStatus === null) continue;
+      counts[bucket]++;
+      rows.push({
+        page,
+        criterion,
+        left: leftStatus,
+        right: rightStatus,
+        ...left.raw?.get(page)?.get(criterion) ? { leftRaw: left.raw.get(page).get(criterion) } : {},
+        ...rightRaw ? { rightRaw } : {},
+        bucket,
+        ...right.comments?.get(page)?.get(criterion) ? { comment: right.comments.get(page).get(criterion) } : {}
+      });
+    }
+  }
+  return {
+    rows,
+    counts,
+    pagesOnlyLeft: [...left.byPage.keys()].filter((p) => !right.byPage.has(p)).sort(),
+    pagesOnlyRight: [...right.byPage.keys()].filter((p) => !left.byPage.has(p)).sort()
+  };
 }
 
 // src/fix.ts
@@ -55859,13 +56176,15 @@ function perPageTable(result, standard = CORE2, lang = "en") {
     const nc = pg.findings.filter((f) => !f.advisory);
     const n = (sev) => nc.filter((f) => f.severity === sev).length;
     out2.push(
-      `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${pg.basis === "snapshot" ? s.snapshot : s.source} | ${pg.conformancePct}% | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
+      `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${formatRate(pg.conformancePct, pg.decided, pg.total)} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
     );
   }
   out2.push("");
-  const orphans = result.findings.filter((f) => !f.page && !f.advisory).length;
+  const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
   if (orphans) out2.push(`> ${s.unattributed(orphans)}`, "");
-  if (derived.some((p) => p.basis !== "snapshot")) out2.push(`> ${s.sourceBasis}`, "");
+  if (derived.some((p) => p.basis === "attributed")) out2.push(`> ${s.sourceBasis}`, "");
+  const notAudited = pageBasisWarning("not-audited", lang);
+  if (notAudited && derived.some((p) => p.basis === "not-audited")) out2.push(`> ${notAudited}`, "");
   return out2.join("\n");
 }
 
@@ -56098,7 +56417,9 @@ function dashboardHtml(result, pages, standard, lang) {
   out2.push("<table><thead><tr><th></th>");
   for (const p of pages) out2.push(`<th>${esc2(p.name)}${p.auth ? " \u{1F512}" : ""}<br><code>${esc2(p.url)}</code></th>`);
   out2.push("</tr></thead><tbody>");
-  out2.push(`<tr><td>${fr ? "Taux" : "Rate"}</td>${pages.map((p) => `<td class="rate">${p.conformancePct}%</td>`).join("")}</tr>`);
+  out2.push(
+    `<tr><td>${fr ? "Taux" : "Rate"}</td>${pages.map((p) => `<td class="rate">${esc2(formatRate(p.conformancePct, p.decided, p.total))}</td>`).join("")}</tr>`
+  );
   let group = "";
   for (const row of rows) {
     if (row.group !== group) {
@@ -56153,6 +56474,11 @@ function projectPages(root) {
   attributePages(result, scope);
   foldRecordedAdjudication(root, result);
   return { result, pages: derivePages(result, scope) };
+}
+function judgePages(result) {
+  const scope = pagesOf(result);
+  attributePages(result, scope);
+  return derivePages(result, scope).map((p) => ({ id: p.id, name: p.name, rate: p.conformancePct, decided: p.decided, total: p.total }));
 }
 function foldRecordedAdjudication(root, fresh) {
   let prior;
@@ -56285,7 +56611,7 @@ function startDevServer(opts) {
               ...auditPath ? { auditPath } : {},
               issues: applied.ok ? [] : applied.issues.slice(0, 20),
               failures,
-              pages: applied.ok ? derivePages(applied.audit, pagesOf(applied.audit)).map((p) => ({ id: p.id, name: p.name, rate: p.conformancePct })) : []
+              pages: applied.ok ? judgePages(applied.audit) : []
             })
           );
         } catch (e) {
@@ -56938,7 +57264,6 @@ function noop() {
 }
 
 // src/mcp/handlers.ts
-var CAPTURES_DIR = ".ultra11y/captures";
 var ToolError = class extends Error {
 };
 var MAX_READ_LINES = 2e3;
@@ -57010,7 +57335,7 @@ async function dispatch(name2, args2, cwd) {
     case "ultra11y_pack_check":
       return handlePackCheck(args2, cwd);
     case "ultra11y_sample_check":
-      return handleSampleCheck(cwd);
+      return handleSampleCheck(cwd, standardOf(args2));
     case "ultra11y_pages":
       return handlePages(args2, cwd);
     case "ultra11y_read":
@@ -57146,7 +57471,7 @@ function handlePackCheck(args2, cwd) {
   const res = runPackCheck(pack, str2(args2.guidance));
   return { cwd, ...res };
 }
-function handleSampleCheck(cwd) {
+function handleSampleCheck(cwd, standard) {
   const file = join43(cwd, ".ultra11yrc.json");
   if (!existsSync29(file)) {
     throw new ToolError(`no .ultra11yrc.json at ${cwd} \u2014 a page sample must be declared before it can be linted.`);
@@ -57157,7 +57482,26 @@ function handleSampleCheck(cwd) {
   } catch (e) {
     throw new ToolError(`.ultra11yrc.json is not valid JSON: ${e.message}`);
   }
-  return { cwd, config: raw, next: "Check the sample covers every page kind the methodology requires, not just the convenient ones." };
+  const v = validateSample(raw?.sample);
+  if (!v.ok || !v.sample) {
+    return { cwd, ok: false, issues: v.issues, next: "Fix the sample block before linting it." };
+  }
+  const snapshotted = sampleFromSnapshots(readSnapshots(cwd));
+  const union = unionSample(v.sample, snapshotted);
+  const methodology = isCore(standard) ? void 0 : getPack(standard)?.sampleMethodology;
+  const missing = methodology ? lintSample(union.sample, methodology).missing : [];
+  return {
+    cwd,
+    standard,
+    ok: true,
+    declared: v.sample.pages.length,
+    snapshotted: snapshotted.length,
+    undeclared: union.undeclared.map((p) => ({ id: p.id, url: p.url })),
+    uncaptured: union.uncaptured.map((p) => ({ id: p.id, url: p.url })),
+    missing: missing.map((k) => ({ id: k.id, label: kindLabel(k, "fr") })),
+    warnings: v.warnings,
+    next: union.undeclared.length > 0 ? "Snapshotted pages are missing from the declared sample: the declared list is not the audited surface. `pages discover --from-snapshots --write` folds them in." : "The sample covers the required page kinds over the union of what is declared and what was captured."
+  };
 }
 function handlePages(args2, cwd) {
   const standard = standardOf(args2);
@@ -57178,7 +57522,19 @@ function handlePages(args2, cwd) {
     standard,
     lang,
     markdown,
-    pages: derived.map((p) => ({ id: p.id, name: p.name, url: p.url, basis: p.basis, conformancePct: p.conformancePct, findings: p.findings.length })),
+    // `conformancePct` is null when this page decided nothing — a machine consumer must be able
+    // to tell "no criterion was assessed" from "every assessed criterion passed", which a bare
+    // 100 conflates. `decided`/`total` are the denominator that makes the number quotable.
+    pages: derived.map((p) => ({
+      id: p.id,
+      name: p.name,
+      url: p.url,
+      basis: p.basis,
+      conformancePct: p.conformancePct,
+      decided: p.decided,
+      total: p.total,
+      findings: p.findings.length
+    })),
     unattributed: unattributedFindings(r).length,
     next: 'A page whose basis is "attributed" has no snapshot: absence of a finding there is NOT conformity. Its undecided criteria stay yours to adjudicate.'
   };
@@ -58302,7 +58658,9 @@ Usage:
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
-  ultra11y pages    discover --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
+  ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
+  ultra11y pages    --in <audit.json> --standard <pack> --diff <external.json>   (hold the grid against an audit someone else performed)
+  ultra11y import   --from file <report.json> | --from ara <id> [--source <adapter>] [--out <dir>] [--json]
   ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
@@ -58590,6 +58948,13 @@ Options:
                      assertion. Unauthenticated scans keep clicks on regardless; the
                      destructive-name skip above applies in every case
   --write            pages discover: merge the discovered pages into .ultra11yrc.json
+  --from-snapshots   pages discover: build the sample from .ultra11y/pages instead of crawling \u2014
+                     the only route that sees a state-reached page (a modal, a funnel step)
+  --from <src>       import: "file" (a report on disk, the primary route) or an adapter id ("ara",
+                     which fetches it and writes the raw response beside the parsed one)
+  --source <adapter> import --from file: which adapter reads it (default: ara)
+  --diff <file>      pages: compare the grid with an imported external audit \u2014 five buckets
+                     (fixed \xB7 unchanged \xB7 partially fixed \xB7 regressed \xB7 not retested)
                      (sample.pages). Without it the proposal is printed and nothing is
                      written. Pages already declared are kept verbatim \u2014 auth, storageState
                      and notes are human work and are never overwritten
@@ -58636,6 +59001,7 @@ var COMMANDS = [
   "sample",
   "snapshot",
   "pages",
+  "import",
   "dev",
   "mcp",
   "fix",
@@ -58671,6 +59037,11 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "crawl",
   "depth",
   "max",
+  // `import`: which external audit tool the report comes from, and (with `--from file`) which
+  // adapter should read it. `pages --diff`: the imported audit to hold the grid against.
+  "from",
+  "source",
+  "diff",
   "since",
   "max-files",
   "dedup",
@@ -58727,6 +59098,9 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "next",
   "coverage",
   "write",
+  // `pages discover`: build the sample from the snapshots the E2E producer already wrote,
+  // instead of crawling — the only route that can see a state-reached page.
+  "from-snapshots",
   "dry-run",
   "iterate",
   "safe",
@@ -58881,7 +59255,7 @@ async function cmdAudit(p) {
   let lang = resolveLang(p.flags, {});
   const requireCaptures = p.flags["require-captures"] === true;
   const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : void 0;
-  const capturesDir = capturesFlag ?? ".ultra11y/captures";
+  const capturesDir = capturesFlag ?? CAPTURES_DIR;
   const scopedToDiff = p.flags.changed === true || p.flags.staged === true || since !== void 0;
   const capturesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync31(capturesDir));
   const useCaptures = capturesWanted && !scopedToDiff && !inputs.includes(capturesDir);
@@ -59051,9 +59425,20 @@ async function cmdPagesDiscover(p) {
   const lang = resolveLang(p.flags, {});
   const sitemap = typeof p.flags.sitemap === "string" ? p.flags.sitemap : void 0;
   const crawl = typeof p.flags.crawl === "string" ? p.flags.crawl : void 0;
+  if (p.flags["from-snapshots"] === true) {
+    const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+    const snaps = sampleFromSnapshots(readSnapshots(root));
+    if (!snaps.length) {
+      console.error(
+        lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join45(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join45(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
+      );
+      return 1;
+    }
+    return writeDiscoveredSample(p, lang, snaps, snaps.length);
+  }
   if (!sitemap && !crawl) {
     console.error(
-      lang === "fr" ? "ultra11y pages discover : passez --sitemap <url> ou --crawl <url>." : "ultra11y pages discover: pass --sitemap <url> or --crawl <url>."
+      lang === "fr" ? "ultra11y pages discover : passez --sitemap <url>, --crawl <url> ou --from-snapshots." : "ultra11y pages discover: pass --sitemap <url>, --crawl <url> or --from-snapshots."
     );
     return 2;
   }
@@ -59096,7 +59481,9 @@ async function cmdPagesDiscover(p) {
       }
     })
   );
-  const proposed = proposeSamplePages(urls, titles);
+  return writeDiscoveredSample(p, lang, proposeSamplePages(urls, titles), urls.length);
+}
+function writeDiscoveredSample(p, lang, proposed, found) {
   let existing;
   try {
     existing = loadConfig(process.cwd())?.sample;
@@ -59117,8 +59504,8 @@ async function cmdPagesDiscover(p) {
       console.log(JSON.stringify({ sample: v.sample }, null, 2));
       console.log(
         lang === "fr" ? `
-${urls.length} URL(s) d\xE9couverte(s), ${merged.added.length} nouvelle(s). Rien n'a \xE9t\xE9 \xE9crit \u2014 relancez avec --write pour fusionner dans .ultra11yrc.json.` : `
-${urls.length} URL(s) discovered, ${merged.added.length} new. Nothing was written \u2014 re-run with --write to merge into .ultra11yrc.json.`
+${found} page(s) d\xE9couverte(s), ${merged.added.length} nouvelle(s). Rien n'a \xE9t\xE9 \xE9crit \u2014 relancez avec --write pour fusionner dans .ultra11yrc.json.` : `
+${found} page(s) discovered, ${merged.added.length} new. Nothing was written \u2014 re-run with --write to merge into .ultra11yrc.json.`
       );
     }
     return 0;
@@ -59175,6 +59562,9 @@ async function cmdPages(p) {
     return 1;
   }
   attributePages(result, scope);
+  if (typeof p.flags.diff === "string" && p.flags.diff) {
+    return diffAgainstExternal(p, result, scope, standard, lang, p.flags.diff);
+  }
   if (p.flags.json) {
     console.log(JSON.stringify({ pages: derivePages(result, scope), unattributed: unattributedFindings(result).length }, null, 2));
     return 0;
@@ -60501,27 +60891,221 @@ function cmdSample(p) {
       );
     return 0;
   }
-  const { missing } = lintSample(v.sample, methodology);
+  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+  const snapshotted = sampleFromSnapshots(readSnapshots(root));
+  const union = unionSample(v.sample, snapshotted);
+  const { missing } = lintSample(union.sample, methodology);
   const loc = pack?.defaultLocale ?? "fr";
+  const counts = {
+    declared: v.sample.pages.length,
+    snapshotted: snapshotted.length,
+    undeclared: union.undeclared.length,
+    uncaptured: union.uncaptured.length
+  };
   if (p.flags.json) {
     console.log(
       JSON.stringify(
-        { ok: true, pages: v.sample.pages.length, missing: missing.map((k) => ({ id: k.id, label: kindLabel(k, loc) })), warnings: v.warnings },
+        {
+          ok: true,
+          pages: union.sample.pages.length,
+          ...counts,
+          undeclaredPages: union.undeclared.map((x) => ({ id: x.id, url: x.url })),
+          uncapturedPages: union.uncaptured.map((x) => ({ id: x.id, url: x.url })),
+          missing: missing.map((k) => ({ id: k.id, label: kindLabel(k, loc) })),
+          warnings: v.warnings
+        },
         null,
         2
       )
     );
     return 0;
   }
-  if (missing.length === 0) {
+  console.log(
+    lang === "fr" ? `${counts.declared} d\xE9clar\xE9e(s) \xB7 ${counts.snapshotted} instantan\xE9e(s) \xB7 ${counts.undeclared} instantan\xE9e(s) non d\xE9clar\xE9e(s) \xB7 ${counts.uncaptured} d\xE9clar\xE9e(s) jamais captur\xE9e(s)` : `${counts.declared} declared \xB7 ${counts.snapshotted} snapshotted \xB7 ${counts.undeclared} snapshotted but undeclared \xB7 ${counts.uncaptured} declared but never captured`
+  );
+  if (missing.length) {
     console.log(
-      lang === "fr" ? `\u2713 \xC9chantillon complet (${v.sample.pages.length} page(s)) \u2014 tous les types de page requis par ${pack.name} sont couverts.` : `\u2713 Sample complete (${v.sample.pages.length} page(s)) \u2014 every page kind ${pack.name} requires is covered.`
+      (lang === "fr" ? `\u26A0\uFE0F \xC9chantillon incomplet (${union.sample.pages.length} page(s)) \u2014 types de page requis absents (${pack.name}) :` : `\u26A0\uFE0F Incomplete sample (${union.sample.pages.length} page(s)) \u2014 required page kinds missing (${pack.name}):`) + ` ${missing.map((k) => kindLabel(k, loc)).join(", ")}`
+    );
+  } else if (counts.undeclared > 0) {
+    console.log(
+      lang === "fr" ? `\u26A0\uFE0F Types de page requis couverts, mais l'\xE9chantillon d\xE9clar\xE9 n'est pas la surface audit\xE9e : ${counts.undeclared} page(s) instantan\xE9e(s) n'y figurent pas (${union.undeclared.slice(0, 5).map((x) => x.id).join(", ")}${counts.undeclared > 5 ? ", \u2026" : ""}). D\xE9clarez-les avec \`pages discover --from-snapshots --write\`.` : `\u26A0\uFE0F Required page kinds covered, but the declared sample is not the audited surface: ${counts.undeclared} snapshotted page(s) are absent from it (${union.undeclared.slice(0, 5).map((x) => x.id).join(", ")}${counts.undeclared > 5 ? ", \u2026" : ""}). Declare them with \`pages discover --from-snapshots --write\`.`
     );
   } else {
     console.log(
-      (lang === "fr" ? `\u26A0\uFE0F \xC9chantillon incomplet (${v.sample.pages.length} page(s)) \u2014 types de page requis absents (${pack.name}) :` : `\u26A0\uFE0F Incomplete sample (${v.sample.pages.length} page(s)) \u2014 required page kinds missing (${pack.name}):`) + ` ${missing.map((k) => kindLabel(k, loc)).join(", ")}`
+      lang === "fr" ? `\u2713 \xC9chantillon complet (${union.sample.pages.length} page(s)) \u2014 tous les types de page requis par ${pack.name} sont couverts.` : `\u2713 Sample complete (${union.sample.pages.length} page(s)) \u2014 every page kind ${pack.name} requires is covered.`
     );
   }
+  if (counts.uncaptured > 0) {
+    console.log(
+      lang === "fr" ? `\u2139\uFE0F ${counts.uncaptured} page(s) d\xE9clar\xE9e(s) n'ont aucun instantan\xE9 \u2014 le rapport par page ne pourra rien conclure de leur silence.` : `\u2139\uFE0F ${counts.uncaptured} declared page(s) have no snapshot \u2014 the per-page report can conclude nothing from their silence.`
+    );
+  }
+  return 0;
+}
+var DIFF_LABEL = {
+  fixed: { fr: "Corrig\xE9", en: "Fixed" },
+  unchanged: { fr: "Inchang\xE9", en: "Unchanged" },
+  "partially-fixed": { fr: "Partiellement corrig\xE9", en: "Partially fixed" },
+  regressed: { fr: "R\xE9gress\xE9", en: "Regressed" },
+  "not-retested": { fr: "Non retest\xE9", en: "Not retested" },
+  "only-left": { fr: "Nous seuls", en: "Ours only" },
+  "only-right": { fr: "Eux seuls", en: "Theirs only" }
+};
+function diffAgainstExternal(p, result, scope, standard, lang, file) {
+  let ext2;
+  try {
+    ext2 = JSON.parse(readText(file));
+  } catch (e) {
+    console.error(`ultra11y pages --diff: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+  if (ext2?.kind !== "external-audit") {
+    console.error(`ultra11y pages --diff: ${file} is not an imported external audit (run \`ultra11y import\` first).`);
+    return 2;
+  }
+  if (isCore(standard)) {
+    console.error("ultra11y pages --diff: pass --standard <pack> \u2014 an external audit is keyed by the standard's own criterion ids, not by WCAG SCs.");
+    return 2;
+  }
+  if (ext2.standard !== standard) {
+    console.error(`ultra11y pages --diff: the imported audit is keyed by "${ext2.standard}" but --standard is "${standard}".`);
+    return 2;
+  }
+  const ours = /* @__PURE__ */ new Map();
+  for (const page of derivePages(result, scope)) {
+    const m = /* @__PURE__ */ new Map();
+    for (const c2 of derivePackResults(pageView(result, page), standard)) m.set(c2.id, c2.status);
+    ours.set(page.id, m);
+  }
+  const d = diffSides({ byPage: ours }, sideOfExternal(ext2));
+  if (p.flags.json) {
+    console.log(JSON.stringify({ standard, external: ext2.source, ...d }, null, 2));
+    return 0;
+  }
+  const fr = lang === "fr";
+  console.log(fr ? `# \xC9cart avec l'audit externe (${ext2.source.adapter})` : `# Difference against the external audit (${ext2.source.adapter})`);
+  console.log("");
+  const order = ["regressed", "not-retested", "only-right", "partially-fixed", "fixed", "only-left", "unchanged"];
+  console.log(order.map((b) => `${DIFF_LABEL[b][fr ? "fr" : "en"]} : ${d.counts[b]}`).join(" \xB7 "));
+  console.log("");
+  if (d.pagesOnlyRight.length) {
+    console.log(
+      fr ? `> \u26A0\uFE0F ${d.pagesOnlyRight.length} page(s) audit\xE9e(s) par l'auditeur externe n'existent pas dans votre grille : ${d.pagesOnlyRight.join(", ")}. Ses constats sur ces pages n'ont rien \xE0 quoi se comparer.` : `> \u26A0\uFE0F ${d.pagesOnlyRight.length} page(s) the external auditor ruled on are absent from your grid: ${d.pagesOnlyRight.join(", ")}. Their findings there have nothing to compare against.`
+    );
+    console.log("");
+  }
+  if (d.pagesOnlyLeft.length) {
+    console.log(
+      fr ? `> \u2139\uFE0F ${d.pagesOnlyLeft.length} page(s) de votre grille ne figurent pas dans l'audit externe : ${d.pagesOnlyLeft.join(", ")}.` : `> \u2139\uFE0F ${d.pagesOnlyLeft.length} page(s) in your grid are absent from the external audit: ${d.pagesOnlyLeft.join(", ")}.`
+    );
+    console.log("");
+  }
+  const mark = (s) => s === null ? "?" : s === "manual" ? "?" : s === "NA" ? "\u2014" : s;
+  console.log(fr ? "| Page | Crit\xE8re | Nous | Eux | \xC9cart | Commentaire de l'auditeur |" : "| Page | Criterion | Ours | Theirs | Bucket | Auditor's comment |");
+  console.log("| --- | --- | --- | --- | --- | --- |");
+  for (const r of d.rows.filter((x) => x.bucket !== "unchanged")) {
+    const note = (r.comment ?? "").replace(/\s*\n+\s*/g, " ").slice(0, 160);
+    console.log(`| ${r.page} | ${r.criterion} | ${mark(r.left)} | ${mark(r.right)} | ${DIFF_LABEL[r.bucket][fr ? "fr" : "en"]} | ${note} |`);
+  }
+  return 0;
+}
+async function cmdImport(p) {
+  const lang = resolveLang(p.flags, {});
+  const from = typeof p.flags.from === "string" ? p.flags.from : void 0;
+  const arg = p.positionals[0];
+  if (!from || !arg) {
+    console.error(
+      lang === "fr" ? "ultra11y import : usage `import --from file <rapport.json>` ou `import --from ara <id>` (voir --help)." : "ultra11y import: usage `import --from file <report.json>` or `import --from ara <id>` (see --help)."
+    );
+    return 2;
+  }
+  const outDir = typeof p.flags.out === "string" ? p.flags.out : void 0;
+  let rawText;
+  let sourceUrl;
+  let adapterId;
+  if (from === "file") {
+    adapterId = typeof p.flags.source === "string" ? p.flags.source : "ara";
+    try {
+      rawText = arg === "-" ? await readStdin() : readText(arg);
+    } catch (e) {
+      console.error(`ultra11y import: ${e instanceof Error ? e.message : String(e)}`);
+      return 1;
+    }
+  } else {
+    adapterId = from;
+    let adapter2;
+    try {
+      adapter2 = createAdapter(adapterId);
+    } catch (e) {
+      console.error(`ultra11y import: ${e instanceof Error ? e.message : String(e)}`);
+      return 2;
+    }
+    if (!adapter2.fetchUrl) {
+      console.error(`ultra11y import: the "${adapterId}" adapter has no remote endpoint \u2014 use \`--from file <report.json>\`.`);
+      return 2;
+    }
+    sourceUrl = adapter2.fetchUrl(arg);
+    try {
+      const res = await fetch(sourceUrl, { redirect: "follow" });
+      if (!res.ok) {
+        console.error(`ultra11y import: ${sourceUrl} returned HTTP ${res.status}.`);
+        return 1;
+      }
+      rawText = await res.text();
+    } catch (e) {
+      console.error(`ultra11y import: could not reach ${sourceUrl} \u2014 ${e instanceof Error ? e.message : String(e)}`);
+      return 1;
+    }
+    if (outDir) {
+      mkdirSync15(outDir, { recursive: true });
+      const rawFile = join45(outDir, `external-${adapterId}-${arg}.raw.json`);
+      writeFileSync17(rawFile, rawText.endsWith("\n") ? rawText : `${rawText}
+`);
+      if (!p.flags.json) console.log(rawFile);
+    }
+  }
+  let raw;
+  try {
+    raw = JSON.parse(rawText);
+  } catch (e) {
+    console.error(`ultra11y import: the report is not valid JSON \u2014 ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+  let adapter;
+  try {
+    adapter = createAdapter(adapterId);
+  } catch (e) {
+    console.error(`ultra11y import: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  const parsed = adapter.parse(raw, { importedAt: (/* @__PURE__ */ new Date()).toISOString(), ...sourceUrl ? { url: sourceUrl } : {} });
+  if (!parsed.ok) {
+    console.error(
+      lang === "fr" ? `ultra11y import : le rapport n'a pas pu \xEAtre lu sans perte (${parsed.issues.length} probl\xE8me(s)) \u2014 rien n'est \xE9crit, plut\xF4t qu'un import partiel qui aurait l'air complet :` : `ultra11y import: the report could not be read without loss (${parsed.issues.length} issue(s)) \u2014 nothing is written, rather than a partial import that would look complete:`
+    );
+    for (const i2 of parsed.issues.slice(0, 20)) console.error(`  \u2717 ${i2}`);
+    if (parsed.issues.length > 20) console.error(`  \u2026 ${parsed.issues.length - 20} more`);
+    return 1;
+  }
+  const audit2 = parsed.audit;
+  if (p.flags.json) {
+    console.log(JSON.stringify(audit2, null, 2));
+    return 0;
+  }
+  if (outDir) {
+    mkdirSync15(outDir, { recursive: true });
+    const file = join45(outDir, "external-latest.json");
+    writeFileSync17(file, `${JSON.stringify(audit2, null, 2)}
+`);
+    console.log(file);
+  } else {
+    console.log(JSON.stringify(audit2, null, 2));
+  }
+  const decided = audit2.results.filter((r) => r.status !== "manual").length;
+  console.error(
+    lang === "fr" ? `${audit2.pages.length} page(s), ${audit2.results.length} r\xE9sultat(s) dont ${decided} tranch\xE9(s) \u2014 audit externe, jamais fusionn\xE9 dans le verdict du moteur. Comparez : \`pages --in <audit.json> --diff <ce fichier>\`.` : `${audit2.pages.length} page(s), ${audit2.results.length} result(s), ${decided} ruled \u2014 an external audit, never merged into the engine's own verdict. Compare with: \`pages --in <audit.json> --diff <this file>\`.`
+  );
   return 0;
 }
 function standardLabelSafe(standard) {
@@ -60726,6 +61310,8 @@ async function main(argv) {
       return cmdScan(p);
     case "sample":
       return cmdSample(p);
+    case "import":
+      return cmdImport(p);
     case "snapshot":
       return cmdSnapshot(p);
     case "pages":

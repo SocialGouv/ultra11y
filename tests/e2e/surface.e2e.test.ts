@@ -47,25 +47,36 @@ describe("e2e: tickets", () => {
     ULTRA11Y_JIRA_PROJECT: "",
   };
 
-  it("--dry-run emits a plan, creates nothing and exits 0", () => {
-    const dir = mkTmp();
-    const r = runCli(["tickets", "--in", auditTo(dir), "--provider", "github", "--dry-run", "--json"], { env: NO_CREDS });
-    expect(r.code).toBe(0);
-    const payload = JSON.parse(r.stdout);
-    expect(payload).toMatchObject({ provider: "github", grain: "criterion", dryRun: true });
-    expect(payload.tickets.length).toBeGreaterThan(0);
-    expect(payload.result.created).toBe(0);
-  });
+  // These two spawn several full CLI runs each (an audit, then one ticket build per grain), and
+  // the default 5s budget left them failing intermittently under a loaded machine — a timeout,
+  // never an assertion. Budgeted explicitly so a red suite means a real defect.
+  it(
+    "--dry-run emits a plan, creates nothing and exits 0",
+    () => {
+      const dir = mkTmp();
+      const r = runCli(["tickets", "--in", auditTo(dir), "--provider", "github", "--dry-run", "--json"], { env: NO_CREDS });
+      expect(r.code).toBe(0);
+      const payload = JSON.parse(r.stdout);
+      expect(payload).toMatchObject({ provider: "github", grain: "criterion", dryRun: true });
+      expect(payload.tickets.length).toBeGreaterThan(0);
+      expect(payload.result.created).toBe(0);
+    },
+    30_000,
+  );
 
-  it("keeps every grain producing a plan", () => {
-    const dir = mkTmp();
-    const audit = auditTo(dir);
-    for (const grain of ["criterion", "single", "file"]) {
-      const r = runCli(["tickets", "--in", audit, "--provider", "github", "--grain", grain, "--dry-run", "--json"], { env: NO_CREDS });
-      expect(r.code, `grain ${grain}`).toBe(0);
-      expect(JSON.parse(r.stdout).tickets.length, `grain ${grain}`).toBeGreaterThan(0);
-    }
-  });
+  it(
+    "keeps every grain producing a plan",
+    () => {
+      const dir = mkTmp();
+      const audit = auditTo(dir);
+      for (const grain of ["criterion", "single", "file"]) {
+        const r = runCli(["tickets", "--in", audit, "--provider", "github", "--grain", grain, "--dry-run", "--json"], { env: NO_CREDS });
+        expect(r.code, `grain ${grain}`).toBe(0);
+        expect(JSON.parse(r.stdout).tickets.length, `grain ${grain}`).toBeGreaterThan(0);
+      }
+    },
+    30_000,
+  );
 
   it("exits 1 on --grain page with no page in scope, instead of filing nothing in silence", () => {
     const dir = mkTmp();

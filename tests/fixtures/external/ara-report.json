@@ -1,0 +1,89 @@
+{
+  "consultUniqueId": "aBcDeF123456",
+  "procedureName": "Démarche de conformité",
+  "procedureUrl": "https://exemple.fr/",
+  "creationDate": "2026-03-02T10:00:00.000Z",
+  "publishDate": "2026-03-09T09:30:00.000Z",
+  "auditType": "FULL",
+  "accessibilityRate": 62,
+  "transverseElements": ["En-tête", "Pied de page"],
+  "context": {
+    "auditorName": "A. Auditrice",
+    "auditorEmail": null,
+    "auditorOrganisation": "Cabinet Exemple",
+    "technologies": ["HTML", "CSS", "JavaScript"],
+    "tools": ["NVDA", "Colour Contrast Analyser"],
+    "environments": [{ "platform": "Desktop", "operatingSystem": "Windows", "assistiveTechnology": "NVDA", "browser": "Firefox" }],
+    "samples": [
+      { "id": 234, "number": 1, "order": 1, "name": "Accueil", "url": "https://exemple.fr/" },
+      { "id": 235, "number": 2, "order": 2, "name": "Parcours conformité étape 2", "url": "https://exemple.fr/parcours-conformite/etape/2" }
+    ]
+  },
+  "criteriaCount": { "total": 106, "compliant": 30, "notCompliant": 4, "blocking": 2, "applicable": 76, "notApplicable": 30 },
+  "resultDistribution": {
+    "compliant": { "raw": 30, "percentage": 39.47 },
+    "notCompliant": { "raw": 4, "percentage": 5.26 },
+    "notApplicable": { "raw": 30, "percentage": 39.47 }
+  },
+  "pageDistributions": [],
+  "topicDistributions": [],
+  "results": [
+    {
+      "topic": 1,
+      "criterium": 1,
+      "pageId": 234,
+      "status": "COMPLIANT",
+      "compliantComment": "Toutes les images porteuses d'information ont une alternative.",
+      "notApplicableComment": null,
+      "notCompliantItems": [],
+      "exampleImages": []
+    },
+    {
+      "topic": 10,
+      "criterium": 11,
+      "pageId": 235,
+      "status": "NOT_COMPLIANT",
+      "compliantComment": null,
+      "notApplicableComment": null,
+      "notCompliantItems": [
+        {
+          "title": "Perte d'information à 320px",
+          "comment": "Champ rempli dont la valeur saisie est tronquée à 320px de large (champ situé dans une cellule de tableau).",
+          "userImpact": "BLOCKING",
+          "quickWin": false
+        }
+      ],
+      "exampleImages": []
+    },
+    {
+      "topic": 10,
+      "criterium": 12,
+      "pageId": 235,
+      "status": "NOT_COMPLIANT",
+      "compliantComment": null,
+      "notApplicableComment": null,
+      "notCompliantItems": [{ "title": null, "comment": "Espacement du texte non ajustable.", "userImpact": "MAJOR", "quickWin": true }],
+      "exampleImages": []
+    },
+    {
+      "topic": 3,
+      "criterium": 2,
+      "pageId": 234,
+      "status": "NOT_TESTED",
+      "compliantComment": null,
+      "notApplicableComment": null,
+      "notCompliantItems": [],
+      "exampleImages": []
+    },
+    {
+      "topic": 5,
+      "criterium": 1,
+      "pageId": 234,
+      "status": "NOT_APPLICABLE",
+      "compliantComment": null,
+      "notApplicableComment": "Aucun tableau de données sur cette page.",
+      "notCompliantItems": [],
+      "exampleImages": []
+    }
+  ]
+}

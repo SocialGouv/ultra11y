@@ -1,7 +1,17 @@
 import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync, copyFileSync } from "node:fs";
 import { join, relative, sep, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { VERSION, type Lang, type AuditResult, type DynamicResult, type SampleConfig, type SamplePage, type Severity } from "./types.js";
+import {
+  VERSION,
+  type Lang,
+  type AuditResult,
+  type DynamicResult,
+  type PageScope,
+  type SampleConfig,
+  type SamplePage,
+  type Severity,
+  type Status,
+} from "./types.js";
 import { runAudit } from "./audit.js";
 import { decide, type PreToolUsePayload } from "./hook.js";
 import { writeReport, untestedNeedsRendering, partialAuditBanner } from "./report.js";
@@ -35,6 +45,9 @@ import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv } f
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
+import { createAdapter } from "./external/registry.js";
+import { diffSides, sideOfExternal, type DiffBucket } from "./external/diff.js";
+import type { ExternalAdapter, ExternalAudit } from "./external/types.js";
 import { runFix, fixSummary } from "./fix.js";
 import { diffAgainstBaseline, baselineSummary, parseFailOn, findingsAtOrAbove } from "./baseline.js";
 import { repoRoot, resolveEnginePath, writeHook, writeCi } from "./init.js";
@@ -44,12 +57,12 @@ import { auditSummary, captureCoverageSummary } from "./output.js";
 import { toSarif } from "./sarif.js";
 import { annotations, stepSummary } from "./annotate.js";
 import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
-import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
+import { attributePages, derivePages, pageScopesFrom, pageView, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
 import { renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
 import { crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
 import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
-import { resolveStandard, getPack, isCore, CORE, type StandardId } from "./standards/index.js";
+import { resolveStandard, getPack, isCore, CORE, derivePackResults, type StandardId } from "./standards/index.js";
 import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
 import { listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
@@ -95,6 +108,8 @@ Usage:
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
+  ultra11y pages    --in <audit.json> --standard <pack> --diff <external.json>   (hold the grid against an audit someone else performed)
+  ultra11y import   --from file <report.json> | --from ara <id> [--source <adapter>] [--out <dir>] [--json]
   ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
@@ -384,6 +399,11 @@ Options:
   --write            pages discover: merge the discovered pages into .ultra11yrc.json
   --from-snapshots   pages discover: build the sample from .ultra11y/pages instead of crawling —
                      the only route that sees a state-reached page (a modal, a funnel step)
+  --from <src>       import: "file" (a report on disk, the primary route) or an adapter id ("ara",
+                     which fetches it and writes the raw response beside the parsed one)
+  --source <adapter> import --from file: which adapter reads it (default: ara)
+  --diff <file>      pages: compare the grid with an imported external audit — five buckets
+                     (fixed · unchanged · partially fixed · regressed · not retested)
                      (sample.pages). Without it the proposal is printed and nothing is
                      written. Pages already declared are kept verbatim — auth, storageState
                      and notes are human work and are never overwritten
@@ -431,6 +451,7 @@ export const COMMANDS = [
   "sample",
   "snapshot",
   "pages",
+  "import",
   "dev",
   "mcp",
   "fix",
@@ -469,6 +490,11 @@ const VALUE_FLAGS = new Set([
   "crawl",
   "depth",
   "max",
+  // `import`: which external audit tool the report comes from, and (with `--from file`) which
+  // adapter should read it. `pages --diff`: the imported audit to hold the grid against.
+  "from",
+  "source",
+  "diff",
   "since",
   "max-files",
   "dedup",
@@ -1186,6 +1212,12 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
     return 1;
   }
   attributePages(result, scope);
+  // --diff <external.json> — hold this grid against an audit someone else performed. NOTHING is
+  // re-decided: both sides arrive decided, `diffSides` only sorts the pairs. See src/external/.
+  if (typeof p.flags.diff === "string" && p.flags.diff) {
+    return diffAgainstExternal(p, result, scope, standard, lang, p.flags.diff);
+  }
+
   if (p.flags.json) {
     console.log(JSON.stringify({ pages: derivePages(result, scope), unattributed: unattributedFindings(result).length }, null, 2));
     return 0;
@@ -2977,6 +3009,213 @@ function cmdSample(p: ParsedArgs): number {
   return 0;
 }
 
+const DIFF_LABEL: Record<DiffBucket, { fr: string; en: string }> = {
+  fixed: { fr: "Corrigé", en: "Fixed" },
+  unchanged: { fr: "Inchangé", en: "Unchanged" },
+  "partially-fixed": { fr: "Partiellement corrigé", en: "Partially fixed" },
+  regressed: { fr: "Régressé", en: "Regressed" },
+  "not-retested": { fr: "Non retesté", en: "Not retested" },
+  "only-left": { fr: "Nous seuls", en: "Ours only" },
+  "only-right": { fr: "Eux seuls", en: "Theirs only" },
+};
+
+/** `pages --diff` — our per-page grid vs an imported external audit.
+ *
+ *  The LEFT side is `derivePackResults(pageView(...))`, the same projection the report and the
+ *  grid use; the RIGHT is the adapter's output. Neither is adjusted here. The output leads with
+ *  the pages one side rules on and the other does not, because that is the failure the reporter
+ *  actually hit: a criterion reported on the funnel, ticketed against the stats page, closed
+ *  without a fix. A count would not have caught it; a page-keyed disagreement would. */
+function diffAgainstExternal(p: ParsedArgs, result: AuditResult, scope: PageScope[], standard: StandardId, lang: Lang, file: string): number {
+  let ext: ExternalAudit;
+  try {
+    ext = JSON.parse(readText(file)) as ExternalAudit;
+  } catch (e) {
+    console.error(`ultra11y pages --diff: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+  if (ext?.kind !== "external-audit") {
+    console.error(`ultra11y pages --diff: ${file} is not an imported external audit (run \`ultra11y import\` first).`);
+    return 2;
+  }
+  if (isCore(standard)) {
+    console.error("ultra11y pages --diff: pass --standard <pack> — an external audit is keyed by the standard's own criterion ids, not by WCAG SCs.");
+    return 2;
+  }
+  if (ext.standard !== standard) {
+    console.error(`ultra11y pages --diff: the imported audit is keyed by "${ext.standard}" but --standard is "${standard}".`);
+    return 2;
+  }
+
+  // Our side, criterion-by-criterion and page-by-page, from the ONE projection.
+  const ours = new Map<string, Map<string, Status>>();
+  for (const page of derivePages(result, scope)) {
+    const m = new Map<string, Status>();
+    for (const c of derivePackResults(pageView(result, page), standard)) m.set(c.id, c.status);
+    ours.set(page.id, m);
+  }
+
+  const d = diffSides({ byPage: ours }, sideOfExternal(ext));
+  if (p.flags.json) {
+    console.log(JSON.stringify({ standard, external: ext.source, ...d }, null, 2));
+    return 0;
+  }
+
+  const fr = lang === "fr";
+  console.log(fr ? `# Écart avec l'audit externe (${ext.source.adapter})` : `# Difference against the external audit (${ext.source.adapter})`);
+  console.log("");
+  const order: DiffBucket[] = ["regressed", "not-retested", "only-right", "partially-fixed", "fixed", "only-left", "unchanged"];
+  console.log(order.map((b) => `${DIFF_LABEL[b][fr ? "fr" : "en"]} : ${d.counts[b]}`).join(" · "));
+  console.log("");
+  if (d.pagesOnlyRight.length) {
+    console.log(
+      fr
+        ? `> ⚠️ ${d.pagesOnlyRight.length} page(s) auditée(s) par l'auditeur externe n'existent pas dans votre grille : ${d.pagesOnlyRight.join(", ")}. Ses constats sur ces pages n'ont rien à quoi se comparer.`
+        : `> ⚠️ ${d.pagesOnlyRight.length} page(s) the external auditor ruled on are absent from your grid: ${d.pagesOnlyRight.join(", ")}. Their findings there have nothing to compare against.`,
+    );
+    console.log("");
+  }
+  if (d.pagesOnlyLeft.length) {
+    console.log(
+      fr
+        ? `> ℹ️ ${d.pagesOnlyLeft.length} page(s) de votre grille ne figurent pas dans l'audit externe : ${d.pagesOnlyLeft.join(", ")}.`
+        : `> ℹ️ ${d.pagesOnlyLeft.length} page(s) in your grid are absent from the external audit: ${d.pagesOnlyLeft.join(", ")}.`,
+    );
+    console.log("");
+  }
+  const mark = (s: Status | null): string => (s === null ? "?" : s === "manual" ? "?" : s === "NA" ? "—" : s);
+  console.log(fr ? "| Page | Critère | Nous | Eux | Écart | Commentaire de l'auditeur |" : "| Page | Criterion | Ours | Theirs | Bucket | Auditor's comment |");
+  console.log("| --- | --- | --- | --- | --- | --- |");
+  // Everything but `unchanged`: a reconciliation is about what moved. The count above still
+  // reports it, so nothing is hidden — only unlisted.
+  for (const r of d.rows.filter((x) => x.bucket !== "unchanged")) {
+    const note = (r.comment ?? "").replace(/\s*\n+\s*/g, " ").slice(0, 160);
+    console.log(`| ${r.page} | ${r.criterion} | ${mark(r.left)} | ${mark(r.right)} | ${DIFF_LABEL[r.bucket][fr ? "fr" : "en"]} | ${note} |`);
+  }
+  return 0;
+}
+
+/** `import` — read an audit someone else performed into the tool-neutral (page, criterion,
+ *  status) model, so it can be held against this engine's own grid.
+ *
+ *  A FILE is the primary interface and the network is a convenience, not the other way round.
+ *  The engine is advertised as install-free and keyless; an importer that only worked online
+ *  would make a reproducible audit depend on a third party being up. `--from ara <id>` therefore
+ *  writes the RAW response to disk BEFORE parsing it, so what was imported is committable and a
+ *  re-import needs no network at all. */
+async function cmdImport(p: ParsedArgs): Promise<number> {
+  const lang = resolveLang(p.flags, {});
+  const from = typeof p.flags.from === "string" ? p.flags.from : undefined;
+  const arg = p.positionals[0];
+  if (!from || !arg) {
+    console.error(
+      lang === "fr"
+        ? "ultra11y import : usage `import --from file <rapport.json>` ou `import --from ara <id>` (voir --help)."
+        : "ultra11y import: usage `import --from file <report.json>` or `import --from ara <id>` (see --help).",
+    );
+    return 2;
+  }
+
+  const outDir = typeof p.flags.out === "string" ? p.flags.out : undefined;
+  let rawText: string;
+  let sourceUrl: string | undefined;
+  let adapterId: string;
+
+  if (from === "file") {
+    // The source's own format, on disk. Which adapter reads it is the user's call — guessing
+    // would mean sniffing a schema, and a wrong guess is a confidently wrong crosswalk.
+    adapterId = typeof p.flags.source === "string" ? p.flags.source : "ara";
+    try {
+      rawText = arg === "-" ? await readStdin() : readText(arg);
+    } catch (e) {
+      console.error(`ultra11y import: ${e instanceof Error ? e.message : String(e)}`);
+      return 1;
+    }
+  } else {
+    adapterId = from;
+    let adapter: ExternalAdapter;
+    try {
+      adapter = createAdapter(adapterId);
+    } catch (e) {
+      console.error(`ultra11y import: ${e instanceof Error ? e.message : String(e)}`);
+      return 2;
+    }
+    if (!adapter.fetchUrl) {
+      console.error(`ultra11y import: the "${adapterId}" adapter has no remote endpoint — use \`--from file <report.json>\`.`);
+      return 2;
+    }
+    sourceUrl = adapter.fetchUrl(arg);
+    try {
+      const res = await fetch(sourceUrl, { redirect: "follow" });
+      if (!res.ok) {
+        console.error(`ultra11y import: ${sourceUrl} returned HTTP ${res.status}.`);
+        return 1;
+      }
+      rawText = await res.text();
+    } catch (e) {
+      console.error(`ultra11y import: could not reach ${sourceUrl} — ${e instanceof Error ? e.message : String(e)}`);
+      return 1;
+    }
+    // Commit the artefact before interpreting it: what was imported must be inspectable, and a
+    // re-import must not need the network again.
+    if (outDir) {
+      mkdirSync(outDir, { recursive: true });
+      const rawFile = join(outDir, `external-${adapterId}-${arg}.raw.json`);
+      writeFileSync(rawFile, rawText.endsWith("\n") ? rawText : `${rawText}\n`);
+      if (!p.flags.json) console.log(rawFile);
+    }
+  }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(rawText);
+  } catch (e) {
+    console.error(`ultra11y import: the report is not valid JSON — ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+
+  let adapter: ExternalAdapter;
+  try {
+    adapter = createAdapter(adapterId);
+  } catch (e) {
+    console.error(`ultra11y import: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+
+  const parsed = adapter.parse(raw, { importedAt: new Date().toISOString(), ...(sourceUrl ? { url: sourceUrl } : {}) });
+  if (!parsed.ok) {
+    console.error(
+      lang === "fr"
+        ? `ultra11y import : le rapport n'a pas pu être lu sans perte (${parsed.issues.length} problème(s)) — rien n'est écrit, plutôt qu'un import partiel qui aurait l'air complet :`
+        : `ultra11y import: the report could not be read without loss (${parsed.issues.length} issue(s)) — nothing is written, rather than a partial import that would look complete:`,
+    );
+    for (const i of parsed.issues.slice(0, 20)) console.error(`  ✗ ${i}`);
+    if (parsed.issues.length > 20) console.error(`  … ${parsed.issues.length - 20} more`);
+    return 1;
+  }
+
+  const audit = parsed.audit;
+  if (p.flags.json) {
+    console.log(JSON.stringify(audit, null, 2));
+    return 0;
+  }
+  if (outDir) {
+    mkdirSync(outDir, { recursive: true });
+    const file = join(outDir, "external-latest.json");
+    writeFileSync(file, `${JSON.stringify(audit, null, 2)}\n`);
+    console.log(file);
+  } else {
+    console.log(JSON.stringify(audit, null, 2));
+  }
+  const decided = audit.results.filter((r) => r.status !== "manual").length;
+  console.error(
+    lang === "fr"
+      ? `${audit.pages.length} page(s), ${audit.results.length} résultat(s) dont ${decided} tranché(s) — audit externe, jamais fusionné dans le verdict du moteur. Comparez : \`pages --in <audit.json> --diff <ce fichier>\`.`
+      : `${audit.pages.length} page(s), ${audit.results.length} result(s), ${decided} ruled — an external audit, never merged into the engine's own verdict. Compare with: \`pages --in <audit.json> --diff <this file>\`.`,
+  );
+  return 0;
+}
+
 /** standardLabel that never throws for the core (used in an advisory message). */
 function standardLabelSafe(standard: StandardId): string {
   return isCore(standard) ? "WCAG 2.2 AA" : (getPack(standard)?.name ?? standard);
@@ -3237,6 +3476,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdScan(p);
     case "sample":
       return cmdSample(p);
+    case "import":
+      return cmdImport(p);
     case "snapshot":
       return cmdSnapshot(p);
     case "pages":
