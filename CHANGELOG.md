@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [2.32.1](https://github.com/maxgfr/ultra11y/compare/v2.32.0...v2.32.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* **tickets:** decide usage from argv before touching the network ([#18](https://github.com/maxgfr/ultra11y/issues/18)) ([d7c81d7](https://github.com/maxgfr/ultra11y/commit/d7c81d70307a93f330865bf2d54e7563d220783f))
+
 # [2.32.0](https://github.com/maxgfr/ultra11y/compare/v2.31.3...v2.32.0) (2026-08-12)
 
 
