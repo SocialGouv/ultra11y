@@ -324,11 +324,16 @@ export interface PageScope {
   sources?: string[];
   notes?: string;
   // How much this page's verdict can be trusted:
-  //  • "snapshot"   — its real rendered DOM was audited, so absence of a finding for an
-  //                   engine-decidable criterion genuinely means conforming ON THIS PAGE;
-  //  • "attributed" — only source findings were mapped onto it, so absence of a finding
-  //                   proves nothing and every undecided criterion stays `manual`.
-  basis: "snapshot" | "attributed";
+  //  • "snapshot"    — its real rendered DOM was audited, so absence of a finding for an
+  //                    engine-decidable criterion genuinely means conforming ON THIS PAGE;
+  //  • "attributed"  — only source findings were mapped onto it, so absence of a finding
+  //                    proves nothing and every undecided criterion stays `manual`;
+  //  • "not-audited" — a snapshot for it EXISTS on disk, but this audit never read it. Same
+  //                    verdict strength as "attributed" (nothing may be concluded from
+  //                    silence) and deliberately NOT the same word: telling the reader a page
+  //                    has no snapshot when it has one is a different false statement, not a
+  //                    smaller one. See pagesOf().
+  basis: "snapshot" | "attributed" | "not-audited";
 }
 
 /** One page's projection of the audit. Derived, never stored on the AuditResult: the full
@@ -338,7 +343,7 @@ export interface PageResult {
   name: string;
   url: string;
   auth?: boolean;
-  basis: "snapshot" | "attributed";
+  basis: PageScope["basis"];
   criteria: CriterionResult[];
   findings: Finding[];
   // NULL WHEN NOTHING WAS DECIDED. A rate over zero decided criteria is not a rate, and printing
@@ -423,6 +428,14 @@ export interface AuditResult {
     // source files that rendered each. Recorded so the per-page grid can be rebuilt from this
     // JSON alone — offline, with no snapshots and no browser. Optional/additive.
     pages?: PageScope[];
+    // The page ids whose DOM this audit ACTUALLY read, always written alongside `pages` — as
+    // `[]` when none, never omitted. It is the evidence behind a page's `basis`, and evidence
+    // that is absent whenever there is none to report is a guard that switches itself off in
+    // exactly the run that needs it: a source-only `audit` records every snapshot directory on
+    // disk as a page in scope while auditing none of them, and that is the run whose sheets all
+    // read 100 %. An audit written before this field existed leaves it undefined, which is read
+    // as "unknown" and changes nothing — the distinction is undefined vs [], not empty vs unset.
+    pagesAudited?: string[];
     // Set when dynamic scan results were merged in: which needs-rendering SCs the scan's
     // engines/probes actually MEASURED (verdict coverage — independent of whether anything
     // was found). Docker runner: 320px reflow only; the local runtime adds zoom / text

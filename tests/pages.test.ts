@@ -130,6 +130,18 @@ describe("attributing findings to pages", () => {
     expect(r.packFindings?.[0]?.page).toBe("accueil");
   });
 
+  it("counts a pack orphan — attributePages stamps them, so the backstop must see them too", () => {
+    // Otherwise a pack finding no page claims is dropped from every page AND from the count whose
+    // whole job is to say something was dropped: reported nowhere, on every RGAA audit.
+    const r = audit({
+      findings: [],
+      packFindings: [F({ ruleId: "pack:rgaa:6.1", file: "src/lib/util.ts" })],
+    });
+    attributePages(r, PAGES);
+    expect(r.packFindings?.[0]?.page).toBeUndefined();
+    expect(unattributedFindings(r).length).toBe(1);
+  });
+
   it("THE REGRESSION: an audit whose findings all sit on dom.html no longer reports every page clean", () => {
     // The reported bug, in miniature: findings exist, no page claims them, so every sheet earns
     // a verdict by silence. After attribution the pages carry their own findings.

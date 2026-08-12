@@ -25,7 +25,7 @@
 // this module pure and testable.
 import { prdUnits } from "./prd.js";
 import { renderAuditorUnit } from "./auditor.js";
-import { formatRate, pageView } from "./pages.js";
+import { basisLabel, formatRate, pageView, unattributedFindings } from "./pages.js";
 import { CORE, type StandardId, derivePackResults, isCore, loadPack, packTestIds, themeName, titlePlain } from "./standards/index.js";
 import type { AuditResult, Lang, PageResult, Status } from "./types.js";
 import { compareSC, scTitle } from "./wcag.js";
@@ -237,7 +237,7 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
 
   const meta: string[] = [];
   meta.push(`- **${s.url}** : \`${page.url}\``);
-  meta.push(`- **${s.basis}** : ${page.basis === "snapshot" ? s.snapshot : s.source}`);
+  meta.push(`- **${s.basis}** : ${basisLabel(page.basis, lang)}`);
   if (page.auth) meta.push(`- **${s.auth}** : ✅`);
   out.push(...meta);
 
@@ -333,13 +333,13 @@ export function renderPagesIndex(result: AuditResult, pages: PageResult[], opts:
     const nc = [...p.findings, ...(result.packFindings ?? []).filter((f) => f.page === p.id)].filter((f) => !f.advisory);
     const href = opts.hrefs?.get(p.id);
     out.push(
-      `| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${p.basis === "snapshot" ? s.snapshot : s.source} | ${formatRate(ratePct(rows), cov.decided, cov.total)} | ${
+      `| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(ratePct(rows), cov.decided, cov.total)} | ${
         nc.filter((f) => f.severity === "bloquant").length
       } | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`,
     );
   }
   out.push("");
-  const orphans = result.findings.filter((f) => !f.page);
+  const orphans = unattributedFindings(result);
   if (orphans.length) out.push(`> ${s.unattributed(orphans.length)}`, "");
   return out.join("\n");
 }

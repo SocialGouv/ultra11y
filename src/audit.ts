@@ -262,6 +262,10 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
           }
         : {}),
       ...(acc.langCounts.size ? { langs: [...acc.langCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([lang]) => lang) } : {}),
+      // The pages this run genuinely read. Written UNCONDITIONALLY — `[]` is the whole point,
+      // because "this audit read no page" is exactly the claim a source-only run needs to make,
+      // and an omit-when-empty field would say nothing precisely then. See scope.pagesAudited.
+      pagesAudited: [...new Set(acc.captures.map((c) => c.provenance.page).filter((x): x is string => !!x))].sort(),
     },
     guidelines,
     criteria,

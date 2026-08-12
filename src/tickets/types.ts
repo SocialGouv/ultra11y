@@ -16,7 +16,7 @@
 //   2. THE INTERFACE STAYS NARROW. Jira's project key, issue type and priority are provider
 //      CONFIG, mapped inside src/tickets/providers/jira.ts. Widening TicketProvider for one
 //      tracker's field set is exactly the coupling this seam exists to prevent.
-import type { Lang, Severity } from "../types.js";
+import type { Lang, PageScope, Severity } from "../types.js";
 import type { StandardId } from "../standards/index.js";
 
 export type ProviderId = "github" | "gitlab" | "jira";
@@ -35,8 +35,10 @@ export const UNATTRIBUTED_ID = "unattributed";
 export type TicketScope =
   | { grain: "criterion"; criteriaId: string }
   | { grain: "single" }
-  | { grain: "page"; pageId: string; pageName: string; url: string; auth?: boolean; basis: "snapshot" | "attributed" | "none" }
-  | { grain: "page-criterion"; pageId: string; pageName: string; url: string; auth?: boolean; basis: "snapshot" | "attributed"; criteriaId: string }
+  // `basis` mirrors PageScope["basis"] (src/types.ts); "none" is the page-grain-only value for a
+  // ticket that stands for the findings no page could claim.
+  | { grain: "page"; pageId: string; pageName: string; url: string; auth?: boolean; basis: PageScope["basis"] | "none" }
+  | { grain: "page-criterion"; pageId: string; pageName: string; url: string; auth?: boolean; basis: PageScope["basis"]; criteriaId: string }
   | { grain: "file"; file: string };
 
 export interface Ticket {

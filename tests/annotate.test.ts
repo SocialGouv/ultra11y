@@ -113,6 +113,8 @@ describe("the per-page scoreboard", () => {
       { id: "accueil", name: "Accueil", url: "https://exemple.fr/", basis: "snapshot" },
       { id: "compte", name: "Mon compte", url: "https://exemple.fr/compte", basis: "attributed", auth: true },
     ];
+    // A claimed snapshot basis is only honoured when this audit says it read the page.
+    r.scope.pagesAudited = ["accueil"];
     for (const f of r.findings) f.page = "accueil";
     return r;
   };
@@ -132,6 +134,23 @@ describe("the per-page scoreboard", () => {
 
   it("says out loud that a source-only page's silence is not conformity", () => {
     expect(perPageTable(withPages(), "wcag", "fr")).toContain("n'a pas d'instantané");
+  });
+
+  it("refuses a snapshot basis this audit cannot back, without claiming the snapshot is missing", () => {
+    // A page whose DOM this run never read has no business earning conformity by silence. It is
+    // reported as « non audité » and NOT as « source »: the snapshot exists, and saying otherwise
+    // would be a different false statement rather than a smaller one.
+    const r = withPages();
+    r.scope.pagesAudited = [];
+    const md = perPageTable(r, "wcag", "fr");
+    expect(md).toContain("| Accueil — `https://exemple.fr/` | non audité |");
+    expect(md).not.toContain("| Accueil — `https://exemple.fr/` | instantané |");
+  });
+
+  it("leaves an audit written before the evidence field existed exactly as it was", () => {
+    const r = withPages();
+    r.scope.pagesAudited = undefined;
+    expect(perPageTable(r, "wcag", "fr")).toContain("| Accueil — `https://exemple.fr/` | instantané |");
   });
 
   it("reports unattributed findings as a count rather than spreading them over the pages", () => {

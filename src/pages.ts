@@ -59,13 +59,27 @@ export function pageScopesFromSample(sample: { pages: { id: string; name: string
 }
 
 /** Every page in scope for an AuditResult: the snapshots it recorded, plus any sample pages a
- *  merged dynamic scan added that no snapshot already covers. */
+ *  merged dynamic scan added that no snapshot already covers.
+ *
+ *  THE SINGLE FUNNEL, and therefore where a claimed basis is checked against the evidence.
+ *  `pageScopesFrom` grants `basis: "snapshot"` to every directory it finds under
+ *  `.ultra11y/pages`, which says only that a snapshot EXISTS — not that this run read it. A
+ *  source-only `audit` records all of them and audits none, and `pageStatus` then reads silence
+ *  on a "snapshot" page as conformity. That is the second half of the 100 % artefact, and it
+ *  survives any amount of attribution fixing. A page the audit did not read is downgraded here.
+ *
+ *  Only when `scope.pagesAudited` is present: an audit written before it existed reports
+ *  `undefined`, meaning "unknown", and keeps its recorded basis rather than being retroactively
+ *  accused. Present-and-empty is a real claim; absent is not. */
 export function pagesOf(result: AuditResult): PageScope[] {
   const fromScope = result.scope.pages ?? [];
-  const ids = new Set(fromScope.map((p) => p.id));
-  const urls = new Set(fromScope.map((p) => p.url));
+  const audited = result.scope.pagesAudited;
+  const checked =
+    audited === undefined ? fromScope : fromScope.map((p) => (p.basis === "snapshot" && !audited.includes(p.id) ? { ...p, basis: "not-audited" as const } : p));
+  const ids = new Set(checked.map((p) => p.id));
+  const urls = new Set(checked.map((p) => p.url));
   const extra = pageScopesFromSample(result.scope.sample).filter((p) => !ids.has(p.id) && !urls.has(p.url));
-  return [...fromScope, ...extra];
+  return [...checked, ...extra];
 }
 
 /** Capture provenance is repo-relative ("app/page.tsx"); a finding's file may be cwd-relative
@@ -139,7 +153,10 @@ export function attributePages(result: AuditResult, pages: PageScope[]): void {
 
 /** Findings no page could claim. Reported explicitly — never silently dropped, never spread. */
 export function unattributedFindings(result: AuditResult): Finding[] {
-  return result.findings.filter((f) => !f.page);
+  // Pack findings included: `attributePages` deliberately stamps them (see its loop), and
+  // `pageView` filters them per page, so a pack orphan is dropped from every page AND from the
+  // count that exists to say so — counted nowhere, on every RGAA audit.
+  return [...result.findings, ...(result.packFindings ?? [])].filter((f) => !f.page);
 }
 
 /** The status a criterion holds ON one page. See the two honesty rules at the top, and the
@@ -236,6 +253,9 @@ const L = {
     rate: "Taux",
     snapshot: "instantané",
     source: "source",
+    notAudited: "non audité",
+    notAuditedNote:
+      "Une page marquée « non audité » a bien un instantané, mais CET audit ne l'a pas lu (il ne portait que sur les sources). L'absence de constat n'y vaut donc PAS conformité — relancez l'audit en incluant `.ultra11y/pages`.",
   },
   en: {
     title: "Per-page grid",
@@ -250,6 +270,9 @@ const L = {
     rate: "Rate",
     snapshot: "snapshot",
     source: "source",
+    notAudited: "not audited",
+    notAuditedNote:
+      'A page marked "not audited" does have a snapshot, but THIS audit never read it (it covered sources only). Absence of a finding there does NOT mean conforming — re-run the audit with `.ultra11y/pages` in scope.',
   },
 } as const;
 
@@ -269,7 +292,15 @@ export function formatRate(rate: number | null, decided: number, total: number):
  *  SAME thing — one string, several readers, no drift. Undefined for a snapshot page, which
  *  needs no caveat. */
 export function pageBasisWarning(basis: PageScope["basis"], lang: Lang): string | undefined {
-  return basis === "snapshot" ? undefined : L[lang].basisNote;
+  if (basis === "snapshot") return undefined;
+  return basis === "not-audited" ? L[lang].notAuditedNote : L[lang].basisNote;
+}
+
+/** The one-word label for a page's basis, so no surface invents its own. A "not-audited" page
+ *  must NOT read as "source": it has a snapshot, and saying otherwise is a different untruth. */
+export function basisLabel(basis: PageScope["basis"], lang: Lang): string {
+  const s = L[lang];
+  return basis === "snapshot" ? s.snapshot : basis === "not-audited" ? s.notAudited : s.source;
 }
 
 /** Honesty rule 1, as one sentence: findings no page could claim are reported, never spread. */
@@ -336,7 +367,7 @@ export function renderPageGrid(result: AuditResult, pages: PageScope[], standard
   const head = [isCore(standard) ? s.criterion : s.criterion, ...derived.map((p) => `${p.name}${p.auth ? " 🔒" : ""}`)];
   out.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
   out.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(p.conformancePct, p.decided, p.total)}**`).join(" | ")} |`);
-  out.push(`| _${s.snapshot}?_ | ${derived.map((p) => (p.basis === "snapshot" ? `_${s.snapshot}_` : `_${s.source}_`)).join(" | ")} |`);
+  out.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
 
   const { rows, status } = gridOf(result, derived, standard, lang);
   let group = "";

@@ -15,7 +15,7 @@ import { findingsForStandard, packCriteriaForFinding } from "./standards/derive.
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
 import type { AuditResult, Finding, Lang, Severity } from "./types.js";
 import { isUrlPath, repoRelative } from "./util.js";
-import { attributePages, derivePages, formatRate, pagesOf } from "./pages.js";
+import { attributePages, basisLabel, derivePages, formatRate, pageBasisWarning, pagesOf, unattributedFindings } from "./pages.js";
 
 export interface AnnotateOptions {
   standard?: StandardId;
@@ -187,12 +187,16 @@ export function perPageTable(result: AuditResult, standard: StandardId = CORE, l
     const nc = pg.findings.filter((f) => !f.advisory);
     const n = (sev: Severity): number => nc.filter((f) => f.severity === sev).length;
     out.push(
-      `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${pg.basis === "snapshot" ? s.snapshot : s.source} | ${formatRate(pg.conformancePct, pg.decided, pg.total)} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
+      `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${formatRate(pg.conformancePct, pg.decided, pg.total)} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
     );
   }
   out.push("");
-  const orphans = result.findings.filter((f) => !f.page && !f.advisory).length;
+  const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
   if (orphans) out.push(`> ${s.unattributed(orphans)}`, "");
-  if (derived.some((p) => p.basis !== "snapshot")) out.push(`> ${s.sourceBasis}`, "");
+  // One caveat per basis actually present, from the shared sentences — a « non audité » page must
+  // not be explained by the note that asserts it has no snapshot.
+  if (derived.some((p) => p.basis === "attributed")) out.push(`> ${s.sourceBasis}`, "");
+  const notAudited = pageBasisWarning("not-audited", lang);
+  if (notAudited && derived.some((p) => p.basis === "not-audited")) out.push(`> ${notAudited}`, "");
   return out.join("\n");
 }

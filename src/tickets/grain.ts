@@ -14,6 +14,7 @@ import { repoRelative } from "../util.js";
 import { type PrdUnit, prdUnits } from "../prd.js";
 import { renderAuditorBacklog } from "../auditor.js";
 import { attributePages, derivePages, pageBasisWarning, pageView, pagesOf, unattributedFindings, unattributedNote } from "../pages.js";
+import { isCore } from "../standards/index.js";
 import { type GrainOptions, type Ticket, type TicketOccurrence, type TicketPlan, UNATTRIBUTED_ID } from "./types.js";
 import {
   clampBody,
@@ -187,13 +188,24 @@ export function buildTickets(result: AuditResult, opts: GrainOptions): TicketPla
   // hide non-conformities; spreading them across pages would invent them. Both grains emit
   // it, so the orphan backlog is never a casualty of the chosen granularity.
   if (orphans.length) {
-    const view: AuditResult = { ...result, findings: orphans, ...(result.packFindings ? { packFindings: result.packFindings.filter((f) => !f.page) } : {}) };
+    // `orphans` spans both channels; the view must keep them SEPARATE or the pack ones land in
+    // `findings` and again in `packFindings`, and the ticket counts each defect twice.
+    const coreOrphans = result.findings.filter((f) => !f.page);
+    const view: AuditResult = {
+      ...result,
+      findings: coreOrphans,
+      ...(result.packFindings ? { packFindings: result.packFindings.filter((f) => !f.page) } : {}),
+    };
     const units = prdUnits(view, standard, lang);
     if (units.length) {
       const advisory = units.every((u) => u.advisory === true);
+      // The number in the note must describe the list under it. Under the WCAG core the backlog
+      // never projects pack findings, so quoting the both-channel total there would announce
+      // orphans the ticket does not go on to show.
+      const announced = isCore(standard) ? coreOrphans.length : orphans.length;
       tickets.push({
         title: unattributedTitle(label),
-        body: clamp([`> ${unattributedNote(orphans.length, lang)}`, "", renderAuditorBacklog(view, lang, standard, backlogOpts)].join("\n")),
+        body: clamp([`> ${unattributedNote(announced, lang)}`, "", renderAuditorBacklog(view, lang, standard, backlogOpts)].join("\n")),
         labels: labelsFor(worstOf(units), advisory, tag),
         severity: worstOf(units),
         advisory,

@@ -655,6 +655,11 @@ export function recomputeTallies(merged: AuditResult): void {
  *     applicability, never remove it). */
 export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditResult {
   const merged: AuditResult = JSON.parse(JSON.stringify(base)) as AuditResult;
+  // The base was a SOURCE audit; the snapshot audit is the run that actually read the pages.
+  // Deep-copying only the base's scope would throw that evidence away and downgrade genuinely
+  // audited pages to "not-audited" — the inverse of the guard, and a false statement in the
+  // opposite direction. Union, so neither half can erase the other's.
+  merged.scope.pagesAudited = [...new Set([...(base.scope.pagesAudited ?? []), ...(snap.scope.pagesAudited ?? [])])].sort();
   const byId = new Map(merged.criteria.map((c) => [c.id, c]));
   const snapById = new Map(snap.criteria.map((c) => [c.id, c]));
 
