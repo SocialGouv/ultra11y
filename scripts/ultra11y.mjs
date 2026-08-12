@@ -59562,6 +59562,21 @@ async function cmdTickets(p) {
       return 2;
     }
   }
+  const grainFlag = typeof p.flags.grain === "string" ? p.flags.grain : config?.grain ?? "criterion";
+  if (!ALL_GRAINS.includes(grainFlag)) {
+    console.error(`ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`);
+    return 2;
+  }
+  const transportFlag = typeof p.flags.transport === "string" ? p.flags.transport : config?.transport ?? "auto";
+  if (!["auto", "cli", "rest"].includes(transportFlag)) {
+    console.error(`ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`);
+    return 2;
+  }
+  const maxTickets = Number.parseInt(String(p.flags["max-tickets"] ?? config?.maxTickets ?? 200), 10);
+  if (!Number.isFinite(maxTickets) || maxTickets < 1) {
+    console.error("ultra11y tickets: --max-tickets must be a positive integer.");
+    return 2;
+  }
   const providerFlag = typeof p.flags.provider === "string" ? p.flags.provider : "auto";
   const providerId = providerFlag === "auto" ? autoProvider(process.env, config?.provider) : isProviderId(providerFlag) ? providerFlag : void 0;
   if (!providerId) {
@@ -59570,17 +59585,7 @@ async function cmdTickets(p) {
     );
     return 2;
   }
-  const transportFlag = typeof p.flags.transport === "string" ? p.flags.transport : config?.transport ?? "auto";
-  if (!["auto", "cli", "rest"].includes(transportFlag)) {
-    console.error(`ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`);
-    return 2;
-  }
   const provider = createProvider(providerId, { transport: transportFlag });
-  const grainFlag = typeof p.flags.grain === "string" ? p.flags.grain : config?.grain ?? "criterion";
-  if (!ALL_GRAINS.includes(grainFlag)) {
-    console.error(`ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`);
-    return 2;
-  }
   const format = p.flags.format === "remediation" ? "remediation" : "audit";
   const plan = buildTickets(result, {
     grain: grainFlag,
@@ -59596,11 +59601,6 @@ async function cmdTickets(p) {
       fr ? "ultra11y tickets : aucune page dans le p\xE9rim\xE8tre. Capturez des instantan\xE9s (render --e2e) ou scannez un \xE9chantillon (scan --sample) avant d'utiliser --grain page." : "ultra11y tickets: no page in scope. Capture snapshots (render --e2e) or scan a sample (scan --sample) before using --grain page."
     );
     return 1;
-  }
-  const maxTickets = Number.parseInt(String(p.flags["max-tickets"] ?? config?.maxTickets ?? 200), 10);
-  if (!Number.isFinite(maxTickets) || maxTickets < 1) {
-    console.error("ultra11y tickets: --max-tickets must be a positive integer.");
-    return 2;
   }
   if (plan.tickets.length > maxTickets) {
     console.error(
