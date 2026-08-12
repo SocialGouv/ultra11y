@@ -144,10 +144,106 @@ describe("the bash is safe under `set -e`", () => {
   });
 });
 
+// The judgment criteria — 38 of the 55 WCAG ones, 81 of RGAA's 106 — that no static pass can
+// decide. In a coding agent the agent rules on them; in CI nobody does, so without this tier
+// they stay « à évaluer » forever and the published conformance rate is partial by
+// construction. Everything here is opt-in, and everything degrades.
+describe("the adjudication tier", () => {
+  const idx = (needle: string): number => ACTION.runs.steps.findIndex((s) => s.name?.includes(needle));
+  const adjudicationSteps = (): typeof ACTION.runs.steps => ACTION.runs.steps.filter((s) => s.name?.startsWith("Adjudicate"));
+
+  it("is off by default — an existing consumer gets no model, no key, no network", () => {
+    expect(ACTION.inputs.adjudicate?.default).toBe("none");
+    expect(ACTION.inputs["gate-adjudicated"]?.default).toBe("false");
+  });
+
+  it("NEVER takes the API key as an input — a composite step inherits the job env", () => {
+    for (const name of Object.keys(ACTION.inputs)) expect(name.toLowerCase()).not.toContain("api-key");
+    expect(RAW).not.toMatch(/^\s+anthropic-api-key:/m);
+    expect(RAW).toContain("ANTHROPIC_API_KEY");
+  });
+
+  it("offers both an API mode and an agent mode", () => {
+    expect(ACTION.inputs.adjudicate?.description).toContain("api");
+    expect(ACTION.inputs.adjudicate?.description).toContain("agent");
+    expect(adjudicationSteps().some((s) => s.run?.includes("judge"))).toBe(true);
+    expect(adjudicationSteps().some((s) => s.uses?.startsWith("anthropics/claude-code-action@"))).toBe(true);
+  });
+
+  it("runs AFTER the scan, so the model is never asked to rule on computed contrast", () => {
+    const scan = idx("Scan the pages");
+    const first = ACTION.runs.steps.findIndex((s) => s.name?.startsWith("Adjudicate") || s.name?.includes("Resolve the adjudication"));
+    expect(scan).toBeGreaterThan(-1);
+    expect(first).toBeGreaterThan(scan);
+  });
+
+  it("runs BEFORE every surface that reads audit-latest.json, or the verdicts reach nothing", () => {
+    const last = Math.max(...ACTION.runs.steps.map((s, i) => (s.name?.startsWith("Adjudicate") ? i : -1)));
+    expect(last).toBeGreaterThan(-1);
+    for (const consumer of ["Per-page report", "SARIF", "Annotations", "Markdown report"]) {
+      expect(idx(consumer), `no step matching "${consumer}"`).toBeGreaterThan(last);
+    }
+  });
+
+  // Secrets are not exposed to a fork's pull request. Without this guard the tier would not
+  // merely skip there — the step would run keyless and take the job down with it.
+  it("skips itself when the key is absent, which is exactly a fork's pull request", () => {
+    const resolve = ACTION.runs.steps.find((s) => s.id === "adjudication");
+    expect(resolve?.run).toContain("ANTHROPIC_API_KEY");
+    expect(resolve?.run).toContain("on=false");
+    for (const step of adjudicationSteps()) {
+      expect(step.if, `step "${step.name}" is not gated on the resolved tier`).toContain("steps.adjudication.outputs.on == 'true'");
+    }
+  });
+
+  it("absorbs an adjudication failure instead of killing the audit job", () => {
+    // The fold is fail-closed: one rate-limited batch refuses the whole apply. That must cost
+    // the verdicts, never the report that was already produced above.
+    const folding = adjudicationSteps().filter((s) => s.run?.includes("judge") || s.run?.includes("verify --apply"));
+    expect(folding.length).toBe(2);
+    for (const step of folding) {
+      expect(step.run, `step "${step.name}" propagates its failure`).toContain("::warning::");
+      expect(step.run, `step "${step.name}" ignores gate-adjudicated`).toContain("inputs.gate-adjudicated");
+    }
+  });
+
+  it("pins claude-code-action, because `uses:` cannot take an expression", () => {
+    const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
+    expect(agent?.uses).toMatch(/^anthropics\/claude-code-action@v\d+$/);
+    expect(agent?.uses).not.toContain("${{");
+  });
+
+  it("keeps the agent read-only over the source and pointed at the emitted runbook", () => {
+    const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
+    expect(agent?.with?.prompt).toContain("RUNBOOK.md");
+    expect(agent?.with?.prompt).toContain("ADJUDICATE.todo.json");
+    expect(agent?.with?.prompt).toMatch(/do not commit/i);
+  });
+});
+
 describe("the gate", () => {
   it("runs LAST, so a failing audit has still produced every surface above it", () => {
     const names = ACTION.runs.steps.map((s) => s.name);
     expect(names[names.length - 1]).toBe("Gate");
+  });
+
+  // Default: the red/green is a pure function of the commit. Opt-in: a model-ruled
+  // non-conformity can fail the job, and the caller has accepted a verdict that no longer
+  // reproduces run to run. Both live in the SAME step, because the gate must stay last.
+  it("re-audits the source by default, so two runs on one commit cannot disagree", () => {
+    const gate = ACTION.runs.steps[ACTION.runs.steps.length - 1];
+    expect(gate?.run).toMatch(/node "\$ENGINE" audit "\$\{args\[@\]\}" --fail-on/);
+  });
+
+  it("gates the adjudicated audit only when asked, and says so in the log", () => {
+    const gate = ACTION.runs.steps[ACTION.runs.steps.length - 1];
+    expect(gate?.run).toContain("inputs.gate-adjudicated");
+    expect(gate?.run).toContain("audit --in audits/audit-latest.json");
+    expect(gate?.run).toMatch(/not reproducible/i);
+  });
+
+  it("warns in the input's own description that it costs reproducibility", () => {
+    expect(ACTION.inputs["gate-adjudicated"]?.description).toMatch(/reproducible/i);
   });
 
   it("can be turned off entirely (report-only mode)", () => {

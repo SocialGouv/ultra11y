@@ -15,7 +15,7 @@ permissions:
 steps:
   - uses: actions/checkout@v4
     with: { fetch-depth: 0 }        # the diff gate needs the base ref
-  - uses: maxgfr/ultra11y@v2      # or pin the exact version, as `init --ci` does
+  - uses: maxgfr/ultra11y@v3      # or pin the exact version, as `init --ci` does
     with:
       since: auto                   # the PR's base branch
       standard: rgaa
@@ -27,7 +27,7 @@ steps:
 Page by page, with a real browser, in the same step:
 
 ```yaml
-  - uses: maxgfr/ultra11y@v2
+  - uses: maxgfr/ultra11y@v3
     with:
       standard: rgaa
       start: npm run start
@@ -37,9 +37,11 @@ Page by page, with a real browser, in the same step:
 ```
 
 `ultra11y init --ci` writes a workflow using it, **pinned to the exact engine version that
-generated the file** (`@v<that version>`) so a CI run stays reproducible. `@v2` is a moving major alias
-the release workflow keeps pointing at the latest release, for teams who would rather take
-fixes automatically. Never `@main`: it would change under you without a version to blame.
+generated the file** (`@v<that version>`) so a CI run stays reproducible. `@v<major>` — `@v3`
+today — is a moving alias the release workflow repoints at each release, for teams who would
+rather take fixes automatically. It moves **within** a major only: when a breaking change cuts
+the next one, the old alias freezes where it is, so a pipeline pinned to it keeps working and
+stops receiving features. Never `@main`: it would change under you with no version to blame.
 
 **Order matters, and it is deliberate**: the audit runs first, then SARIF, annotations, the
 summary, the comment and the report — and the **gate runs last**. A failing audit has
@@ -52,6 +54,69 @@ annotations instead of failing. Each upload carries `category: ultra11y-<standar
 run and an RGAA run coexist rather than overwriting each other. The Markdown report goes
 through `check` before being uploaded, so CI cannot publish a report citing an invented
 criterion.
+
+## Adjudicating the judgment criteria in CI (`adjudicate`)
+
+Of the 55 WCAG 2.2 AA criteria the engine decides a handful; **38 are judgment calls**, and
+under RGAA **81 of 106** can only ever derive `manual`. Inside a coding agent the agent rules
+on them. In CI nobody does, so they stay « à évaluer » and the published conformance rate is
+partial by construction. `adjudicate` closes that — opt-in, in two modes.
+
+```yaml
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # the job's env, never an input
+steps:
+  - uses: maxgfr/ultra11y@v3
+    with:
+      standard: rgaa
+      adjudicate: api          # or `agent`
+```
+
+| input | default | |
+|---|---|---|
+| `adjudicate` | `none` | `api` · `agent` · `none` |
+| `adjudicate-model` | *(empty)* | model id for `api`; else `$ULTRA11Y_LLM_MODEL`, else the engine default |
+| `gate-adjudicated` | `false` | let a model-ruled NC fail the job |
+
+**`api`** sends the worklist to the Messages API in batches of 8 and folds the verdicts back.
+**`agent`** emits the worklist plus `orchestrate --eco`'s runbook and hands them to a
+`claude-code-action` run, then folds the same way. Both end in the **same fail-closed gate** an
+agent's verdicts pass through, so neither can assert a conformance the engine refuses.
+
+The difference between them is **evidence, not trust**. `judge` rules from the harvested
+evidence alone — capped at 30 items per criterion, snippets truncated — while the agent can
+open the cited files and read around them, which is what *link purpose **in context*** actually
+asks for. Expect the API mode to answer `manual` more often; that is it being honest, not
+broken. The metric that separates them is the count of criteria left to assess.
+
+**Both modes read `ANTHROPIC_API_KEY` from the job environment, never from an input** — a
+composite action's steps inherit it, and a secret that never travels through an input is one
+fewer secret to leak into a log. When the key is absent the tier **skips itself**: the job stays
+green, the report is still written, and the criteria stay « à évaluer ». That is not an edge
+case — it is precisely what a **fork's pull request** looks like, where secrets are never
+exposed. An adjudication that fails mid-flight (a rate-limited batch refuses the whole fold) is
+absorbed the same way, because losing the verdicts must never cost you the audit.
+
+**Cost is per run and does not amortise.** Roughly $0.20 for a WCAG run and $0.50 for RGAA at
+Sonnet pricing — the worklist is re-sent whole each time and no batch is large enough to earn
+prompt caching. On a busy repository that is real money per push; this belongs on the default
+branch or a schedule far more often than on every PR.
+
+**`gate-adjudicated` trades reproducibility for reach.** By default the gate re-audits the
+**source**, so the red/green is a pure function of the commit whatever a model said about it.
+Turn it on and the gate evaluates the adjudicated audit instead (`audit --in`), letting a
+model-ruled non-conformity fail the job — and accepting that two runs on the same commit may
+now disagree. Default off, deliberately.
+
+```sh
+# The same re-gate, outside the action:
+node scripts/ultra11y.mjs audit --in audits/audit-latest.json --fail-on blocking
+```
+
+`--in` re-gates an audit that already exists rather than computing one, which is the only way
+to gate on verdicts a second detection pass would not see. It refuses every flag that would
+change *what* is audited (`--since`, `--baseline`, paths…): a gate that silently dropped your
+scoping would be a gate nobody could trust.
 
 # The `--format` renderings
 
@@ -170,7 +235,7 @@ The action audits the **code** and, when you point it at a served app, the **pag
 list can come from three places, and none of them has to be written by hand:
 
 ```yaml
-- uses: maxgfr/ultra11y@v2
+- uses: maxgfr/ultra11y@v3
   with:
     standard: rgaa
     start: npm run start
@@ -221,9 +286,9 @@ one job — the code diff, then the served pages — died on a `409 Conflict`, w
 written and never uploaded. Pass `artifact-name` on each invocation:
 
 ```yaml
-- uses: maxgfr/ultra11y@v2
+- uses: maxgfr/ultra11y@v3
   with: { since: auto, artifact-name: a11y-code }
-- uses: maxgfr/ultra11y@v2
+- uses: maxgfr/ultra11y@v3
   with: { crawl: http://localhost:3000, artifact-name: a11y-pages }
 ```
 

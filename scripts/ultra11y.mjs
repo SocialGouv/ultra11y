@@ -6,7 +6,7 @@ import { join as join45, relative as relative5, sep as sep7, dirname as dirname1
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
-var VERSION = "2.32.0";
+var VERSION = "3.0.0";
 var SCHEMA_VERSION = 2;
 
 // src/audit.ts
@@ -58631,6 +58631,7 @@ Usage:
   ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--baseline <file>] [--fail-on blocking|major|minor]
   ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures + .ultra11y/pages snapshots: audit real HTML)
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
+  ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor] [--format sarif|github]   (re-gate an audit already computed \u2014 e.g. one carrying adjudicated verdicts \u2014 without a second detection pass)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
@@ -59241,7 +59242,73 @@ function emitCiFormat(result, format, standard, lang, failOn) {
     );
   }
 }
+async function cmdAuditFromFile(p, inPath) {
+  const scoping = [
+    "since",
+    "changed",
+    "staged",
+    "baseline",
+    "graph",
+    "cross-file",
+    "jsx",
+    "include",
+    "exclude",
+    "ext",
+    "max-files",
+    "dedup",
+    "captures",
+    "no-captures",
+    "require-captures",
+    "no-default-excludes",
+    "out"
+  ];
+  const offenders = scoping.filter((f) => p.flags[f] !== void 0);
+  if (p.positionals.length) offenders.unshift("<paths>");
+  if (offenders.length) {
+    console.error(
+      `ultra11y audit: --in re-gates an audit that already exists, so these have nothing left to change: ${offenders.join(", ")}. Drop them, or run a fresh audit without --in.`
+    );
+    return 2;
+  }
+  let result;
+  try {
+    const parsed = JSON.parse(inPath === "-" ? await readStdin() : readText(inPath));
+    if (!isCurrentAudit(parsed)) {
+      console.error("ultra11y audit: --in is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+      return 2;
+    }
+    result = parsed;
+  } catch {
+    console.error(`ultra11y audit: --in file not found or not valid JSON: ${inPath}.`);
+    return 2;
+  }
+  const lang = resolveLang(p.flags, { audit: result });
+  const failOnRaw = p.flags["fail-on"];
+  const failOnParsed = parseFailOn(failOnRaw);
+  if (failOnRaw !== void 0 && failOnParsed === null) {
+    console.error(`ultra11y audit: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
+    return 2;
+  }
+  const ciFormat = parseCiFormat(p.flags.format);
+  if (ciFormat === null) {
+    console.error(`ultra11y audit: --format must be sarif|github (got "${String(p.flags.format)}").`);
+    return 2;
+  }
+  const failOnSet = failOnRaw !== void 0;
+  const failOn = failOnSet ? failOnParsed ?? "bloquant" : void 0;
+  const failing = failOn ? findingsAtOrAbove(result.findings, failOn) : [];
+  if (ciFormat) emitCiFormat(result, ciFormat, CORE2, lang, failOn);
+  else if (p.flags.json) console.log(JSON.stringify(result, null, 2));
+  else {
+    console.log(auditSummary(result, lang));
+    if (failOnSet && failing.length)
+      console.error(lang === "fr" ? `\u2717 ${failing.length} non-conformit\xE9(s) \u2265 ${failOn}.` : `\u2717 ${failing.length} non-conformity(ies) \u2265 ${failOn}.`);
+  }
+  return failing.length ? 1 : 0;
+}
 async function cmdAudit(p) {
+  const inFlag = p.flags.in;
+  if (typeof inFlag === "string" && inFlag) return cmdAuditFromFile(p, inFlag);
   const inputs = p.positionals.length ? p.positionals : ["."];
   if (inputs.length === 0) {
     console.error("ultra11y audit: provide files/globs, or '-' to read stdin.");
@@ -59950,6 +60017,21 @@ async function cmdTickets(p) {
       return 2;
     }
   }
+  const grainFlag = typeof p.flags.grain === "string" ? p.flags.grain : config?.grain ?? "criterion";
+  if (!ALL_GRAINS.includes(grainFlag)) {
+    console.error(`ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`);
+    return 2;
+  }
+  const transportFlag = typeof p.flags.transport === "string" ? p.flags.transport : config?.transport ?? "auto";
+  if (!["auto", "cli", "rest"].includes(transportFlag)) {
+    console.error(`ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`);
+    return 2;
+  }
+  const maxTickets = Number.parseInt(String(p.flags["max-tickets"] ?? config?.maxTickets ?? 200), 10);
+  if (!Number.isFinite(maxTickets) || maxTickets < 1) {
+    console.error("ultra11y tickets: --max-tickets must be a positive integer.");
+    return 2;
+  }
   const providerFlag = typeof p.flags.provider === "string" ? p.flags.provider : "auto";
   const providerId = providerFlag === "auto" ? autoProvider(process.env, config?.provider) : isProviderId(providerFlag) ? providerFlag : void 0;
   if (!providerId) {
@@ -59958,17 +60040,7 @@ async function cmdTickets(p) {
     );
     return 2;
   }
-  const transportFlag = typeof p.flags.transport === "string" ? p.flags.transport : config?.transport ?? "auto";
-  if (!["auto", "cli", "rest"].includes(transportFlag)) {
-    console.error(`ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`);
-    return 2;
-  }
   const provider = createProvider(providerId, { transport: transportFlag });
-  const grainFlag = typeof p.flags.grain === "string" ? p.flags.grain : config?.grain ?? "criterion";
-  if (!ALL_GRAINS.includes(grainFlag)) {
-    console.error(`ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`);
-    return 2;
-  }
   const format = p.flags.format === "remediation" ? "remediation" : "audit";
   const plan = buildTickets(result, {
     grain: grainFlag,
@@ -59984,11 +60056,6 @@ async function cmdTickets(p) {
       fr ? "ultra11y tickets : aucune page dans le p\xE9rim\xE8tre. Capturez des instantan\xE9s (render --e2e) ou scannez un \xE9chantillon (scan --sample) avant d'utiliser --grain page." : "ultra11y tickets: no page in scope. Capture snapshots (render --e2e) or scan a sample (scan --sample) before using --grain page."
     );
     return 1;
-  }
-  const maxTickets = Number.parseInt(String(p.flags["max-tickets"] ?? config?.maxTickets ?? 200), 10);
-  if (!Number.isFinite(maxTickets) || maxTickets < 1) {
-    console.error("ultra11y tickets: --max-tickets must be a positive integer.");
-    return 2;
   }
   if (plan.tickets.length > maxTickets) {
     console.error(

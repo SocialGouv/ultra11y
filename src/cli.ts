@@ -82,6 +82,7 @@ Usage:
   ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--baseline <file>] [--fail-on blocking|major|minor]
   ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures + .ultra11y/pages snapshots: audit real HTML)
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
+  ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor] [--format sarif|github]   (re-gate an audit already computed — e.g. one carrying adjudicated verdicts — without a second detection pass)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
@@ -782,7 +783,90 @@ function emitCiFormat(result: AuditResult, format: CiFormat, standard: StandardI
   }
 }
 
+// `audit --in <audit.json>` — RE-GATE an audit that was already computed, instead of
+// computing one. It exists for one caller: a pipeline that folded ADJUDICATED verdicts into
+// audit-latest.json and now wants the same severity gate applied to that result. Re-running
+// detection there would be wrong twice over — it would not see the verdicts, and it would
+// spend a second full pass to reach a conclusion the file already holds.
+//
+// Deliberately narrow: this path GATES and RENDERS, nothing else. Every flag that would
+// change what is audited is refused rather than ignored, because a gate that silently drops
+// your scoping is a gate nobody can trust. Re-running detection is what `audit <globs>` is
+// for.
+async function cmdAuditFromFile(p: ParsedArgs, inPath: string): Promise<number> {
+  const scoping = [
+    "since",
+    "changed",
+    "staged",
+    "baseline",
+    "graph",
+    "cross-file",
+    "jsx",
+    "include",
+    "exclude",
+    "ext",
+    "max-files",
+    "dedup",
+    "captures",
+    "no-captures",
+    "require-captures",
+    "no-default-excludes",
+    "out",
+  ];
+  const offenders = scoping.filter((f) => p.flags[f] !== undefined);
+  if (p.positionals.length) offenders.unshift("<paths>");
+  if (offenders.length) {
+    console.error(
+      `ultra11y audit: --in re-gates an audit that already exists, so these have nothing left to change: ${offenders.join(", ")}. Drop them, or run a fresh audit without --in.`,
+    );
+    return 2;
+  }
+
+  let result: AuditResult;
+  try {
+    const parsed = JSON.parse(inPath === "-" ? await readStdin() : readText(inPath)) as unknown;
+    if (!isCurrentAudit(parsed)) {
+      console.error("ultra11y audit: --in is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+      return 2;
+    }
+    result = parsed;
+  } catch {
+    console.error(`ultra11y audit: --in file not found or not valid JSON: ${inPath}.`);
+    return 2;
+  }
+
+  const lang = resolveLang(p.flags, { audit: result });
+
+  const failOnRaw = p.flags["fail-on"];
+  const failOnParsed = parseFailOn(failOnRaw);
+  if (failOnRaw !== undefined && failOnParsed === null) {
+    console.error(`ultra11y audit: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
+    return 2;
+  }
+  const ciFormat = parseCiFormat(p.flags.format);
+  if (ciFormat === null) {
+    console.error(`ultra11y audit: --format must be sarif|github (got "${String(p.flags.format)}").`);
+    return 2;
+  }
+
+  const failOnSet = failOnRaw !== undefined;
+  const failOn = failOnSet ? (failOnParsed ?? "bloquant") : undefined;
+  const failing = failOn ? findingsAtOrAbove(result.findings, failOn) : [];
+
+  if (ciFormat) emitCiFormat(result, ciFormat, CORE, lang, failOn);
+  else if (p.flags.json) console.log(JSON.stringify(result, null, 2));
+  else {
+    console.log(auditSummary(result, lang));
+    if (failOnSet && failing.length)
+      console.error(lang === "fr" ? `✗ ${failing.length} non-conformité(s) ≥ ${failOn}.` : `✗ ${failing.length} non-conformity(ies) ≥ ${failOn}.`);
+  }
+  return failing.length ? 1 : 0;
+}
+
 async function cmdAudit(p: ParsedArgs): Promise<number> {
+  const inFlag = p.flags.in;
+  if (typeof inFlag === "string" && inFlag) return cmdAuditFromFile(p, inFlag);
+
   const inputs = p.positionals.length ? p.positionals : ["."];
   if (inputs.length === 0) {
     console.error("ultra11y audit: provide files/globs, or '-' to read stdin.");
@@ -1707,6 +1791,31 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
     }
   }
 
+  // --- usage, before any I/O --------------------------------------------------------------
+  // Everything decidable from the argv alone is decided HERE, ahead of provider resolution.
+  // Resolving a provider spawns `git config --get remote.origin.url`, and an `auto`
+  // transport probes `gh`/`glab auth status` — which reaches the network. A mistyped
+  // `--grain` should never cost a subprocess, let alone a network round-trip, and the error
+  // the caller gets should name what they typed rather than a tracker they never mentioned.
+  //
+  // It was also a real flake: `tickets --grain nope` spent its whole 5s test budget in those
+  // probes on a loaded CI runner, and the release gate went red on a purely syntactic error.
+  const grainFlag = typeof p.flags.grain === "string" ? (p.flags.grain as string) : (config?.grain ?? "criterion");
+  if (!(ALL_GRAINS as readonly string[]).includes(grainFlag)) {
+    console.error(`ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`);
+    return 2;
+  }
+  const transportFlag = typeof p.flags.transport === "string" ? (p.flags.transport as string) : (config?.transport ?? "auto");
+  if (!["auto", "cli", "rest"].includes(transportFlag)) {
+    console.error(`ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`);
+    return 2;
+  }
+  const maxTickets = Number.parseInt(String(p.flags["max-tickets"] ?? config?.maxTickets ?? 200), 10);
+  if (!Number.isFinite(maxTickets) || maxTickets < 1) {
+    console.error("ultra11y tickets: --max-tickets must be a positive integer.");
+    return 2;
+  }
+
   // --- provider ---------------------------------------------------------------------------
   const providerFlag = typeof p.flags.provider === "string" ? (p.flags.provider as string) : "auto";
   const providerId = providerFlag === "auto" ? autoProvider(process.env, config?.provider) : isProviderId(providerFlag) ? providerFlag : undefined;
@@ -1719,19 +1828,9 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
     return 2;
   }
 
-  const transportFlag = typeof p.flags.transport === "string" ? (p.flags.transport as string) : (config?.transport ?? "auto");
-  if (!["auto", "cli", "rest"].includes(transportFlag)) {
-    console.error(`ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`);
-    return 2;
-  }
   const provider = createProvider(providerId, { transport: transportFlag as TransportMode });
 
   // --- the plan ---------------------------------------------------------------------------
-  const grainFlag = typeof p.flags.grain === "string" ? (p.flags.grain as string) : (config?.grain ?? "criterion");
-  if (!(ALL_GRAINS as readonly string[]).includes(grainFlag)) {
-    console.error(`ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`);
-    return 2;
-  }
   const format = p.flags.format === "remediation" ? "remediation" : "audit";
   const plan = buildTickets(result, {
     grain: grainFlag as TicketGrain,
@@ -1752,11 +1851,6 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
     return 1;
   }
 
-  const maxTickets = Number.parseInt(String(p.flags["max-tickets"] ?? config?.maxTickets ?? 200), 10);
-  if (!Number.isFinite(maxTickets) || maxTickets < 1) {
-    console.error("ultra11y tickets: --max-tickets must be a positive integer.");
-    return 2;
-  }
   // A creation is hard to undo, and `page-criterion` on a large audit runs to the hundreds.
   // Refuse rather than flood somebody's tracker; never silently truncate.
   if (plan.tickets.length > maxTickets) {

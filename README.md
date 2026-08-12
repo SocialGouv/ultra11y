@@ -125,7 +125,7 @@ claude mcp add ultra11y -- npx -y ultra11y mcp
 **As a GitHub Action** — audits the PR diff and, optionally, the served pages:
 
 ```yaml
-- uses: maxgfr/ultra11y@v2
+- uses: maxgfr/ultra11y@v3
   with: { since: auto, standard: rgaa, fail-on: blocking }
 ```
 
@@ -351,7 +351,9 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   optionally, the **pages** (it can start your app, wait for it, then scan real URLs or your
   declared sample). The engine ships inside the action, so there is nothing to install and no
   `setup-node`. The gate runs **last**, after SARIF, annotations, the summary, the sticky PR
-  comment and the report — a red job is never a dead end. `ultra11y init --ci` writes a
+  comment and the report — a red job is never a dead end. `adjudicate: api|agent` optionally
+  rules on the judgment criteria that would otherwise stay « à évaluer » in CI, reading its key
+  from the job environment and skipping itself without one. `ultra11y init --ci` writes a
   workflow using it. See `references/ci.md`.
 - **CI surfaces** — a red job says *that* the build broke, not *where*. `--format sarif` emits
   SARIF 2.1.0 for GitHub code scanning, so each finding lands as an **inline annotation on the
@@ -377,6 +379,15 @@ criterion nobody asked about, or an incomplete run are all refused — and a rej
 adjudication leaves the audit untouched. All-`manual` with reasons is accepted, because that is
 a correct answer. It is the **only** part of the tool that takes an API key; without one the
 command explains itself and exits, and nothing else changes.
+
+The GitHub Action wires this as `adjudicate: api`, and offers `adjudicate: agent` as the other
+half — the same worklist handed to a `claude-code-action` run, which can **open the cited files**
+instead of ruling from harvested evidence alone. Both end in the same fail-closed gate; they
+differ in evidence, not in trust. Both read `ANTHROPIC_API_KEY` from the **job environment**,
+never from an input, and **skip themselves when it is absent** — which is exactly what a fork's
+pull request looks like, so the job stays green and the criteria stay « à évaluer ». See
+`references/ci.md` for the cost per run and for `gate-adjudicated`, which lets a model-ruled
+non-conformity fail the build at the price of a red/green that no longer reproduces.
 
 ### Optional dynamic tier (axe-core)
 
@@ -418,7 +429,8 @@ Releases are cut automatically by **semantic-release** on push to `main` (GitHub
 npm publish via OIDC trusted publishing, plus the moving `v2` major tag). The version bump is
 decided by **Conventional Commits**: a commit whose subject carries no `feat:`/`fix:` prefix
 is analysed as *no release*, so a change that must ship needs at least one conventional commit
-in the range — otherwise `@v2` and npm keep serving the previous version while `main` moves on.
+in the range — otherwise the major alias and npm keep serving the previous version while `main`
+moves on.
 
 ## Data & licensing
 

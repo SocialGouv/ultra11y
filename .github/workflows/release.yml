@@ -74,7 +74,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm exec semantic-release
 
-      # `uses: maxgfr/ultra11y@v2` has to resolve to something. semantic-release only creates
+      # `uses: maxgfr/ultra11y@v<major>` has to resolve to something. semantic-release only creates
       # the exact `v<version>` tag, so move the major alias onto it. Idempotent: when no
       # release happened, package.json still holds the previous version and the alias is
       # already there. The generated workflow (`init --ci`) pins the exact version instead —

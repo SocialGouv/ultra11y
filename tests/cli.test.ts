@@ -286,6 +286,61 @@ describe("audit --fail-on gates a standalone audit (no --baseline)", () => {
   });
 });
 
+// `audit --in` exists so a pipeline that folded ADJUDICATED verdicts into audit-latest.json
+// can apply the SAME severity gate to that result. Re-running detection there would miss the
+// verdicts entirely, and hand-rolling the gate in bash would be a second implementation of
+// it — the kind that drifts until a criterion is silently declared conforming.
+describe("audit --in re-gates an audit that already exists", () => {
+  const DIR = mkdtempSync(join(tmpdir(), "u11y-regate-"));
+  const AUDIT = join(DIR, "audit-latest.json");
+
+  it("gates the file's findings instead of re-auditing the source", async () => {
+    expect((await run(["audit", `${FIX}non-conforming/bad.html`, "--out", DIR, "--json"])).code).toBe(0);
+    expect((await run(["audit", "--in", AUDIT, "--fail-on", "bloquant"])).code).toBe(1);
+  });
+
+  it("exits 0 without --fail-on — reading an audit is not gating it", async () => {
+    expect((await run(["audit", "--in", AUDIT])).code).toBe(0);
+  });
+
+  it("gates a CONFORMING audit green, so the path is not just 'always red'", async () => {
+    const clean = mkdtempSync(join(tmpdir(), "u11y-regate-ok-"));
+    await run(["audit", `${FIX}conforming/good.html`, "--out", clean, "--json"]);
+    expect((await run(["audit", "--in", join(clean, "audit-latest.json"), "--fail-on", "bloquant"])).code).toBe(0);
+  });
+
+  // The refusals are the load-bearing part: a gate that silently ignored your scoping would
+  // report on something other than what you asked it to report on.
+  it.each([
+    ["--since", "main"],
+    ["--baseline", "b.json"],
+    ["--out", "somewhere"],
+  ])("refuses %s, which cannot change an audit that is already computed", async (flag, value) => {
+    const r = await run(["audit", "--in", AUDIT, flag, value]);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("already exists");
+  });
+
+  it("refuses positional paths too — they name a scope it will not honour", async () => {
+    const r = await run(["audit", "--in", AUDIT, "src"]);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("already exists");
+  });
+
+  it("refuses a file that is not a current AuditResult", async () => {
+    const bogus = join(DIR, "bogus.json");
+    writeFileSync(bogus, JSON.stringify({ hello: "world" }));
+    const r = await run(["audit", "--in", bogus]);
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/not a current ultra11y AuditResult/);
+  });
+
+  it("refuses a missing file rather than gating an empty audit green", async () => {
+    const r = await run(["audit", "--in", join(DIR, "nope.json"), "--fail-on", "bloquant"]);
+    expect(r.code).toBe(2);
+  });
+});
+
 describe("rendered captures — flags, coverage gate & render --coverage", () => {
   const PROJ = `${FIX}capture-project`;
   const CAPS = `${PROJ}/.ultra11y/captures`;

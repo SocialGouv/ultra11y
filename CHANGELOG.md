@@ -2,6 +2,40 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [3.0.0](https://github.com/maxgfr/ultra11y/compare/v2.32.1...v3.0.0) (2026-08-12)
+
+
+* feat(tickets)!: the tickets command, and prd stops pushing ([4a6f6bd](https://github.com/maxgfr/ultra11y/commit/4a6f6bdac64fa720efaef9dc79521c2159c3dc61))
+
+
+### Features
+
+* **action:** adjudicate the judgment criteria in CI, by API or by agent ([2c3eaf9](https://github.com/maxgfr/ultra11y/commit/2c3eaf90c03e9fe47762ffd320ed0424f8e7771c))
+* **audit:** --in re-gates an audit that already exists ([955dd93](https://github.com/maxgfr/ultra11y/commit/955dd938e81c1726918a368c6a51166f85bcfa04))
+* **tickets:** config block, MCP preview tool, GitHub Action input, and the docs ([4400dd2](https://github.com/maxgfr/ultra11y/commit/4400dd2eae7cb93f02a6690b60e0aa792b89d841)), closes [--#issues](https://github.com/--/issues/issues)
+* **tickets:** GitHub, GitLab and Jira behind one provider interface ([30a4a33](https://github.com/maxgfr/ultra11y/commit/30a4a33a5a56ef67e05ba72fb204a8fd827f307b))
+* **tickets:** the grain — one pure function from an audit to a list of tickets ([ff9ee66](https://github.com/maxgfr/ultra11y/commit/ff9ee66cb899bc9d436823910ad90528f67663aa))
+
+
+### BREAKING CHANGES
+
+* prd --gh-issues and prd --gh-single are removed. Use
+`ultra11y tickets --provider github --grain criterion` (or --grain single).
+Both flags are listed in a REMOVED_FLAGS table that exits 2 and names the
+replacement, rather than falling through to the generic unknown-flag warning —
+a scripted CI must not keep reporting green while filing nothing.
+
+Two guards the old flags lacked: --max-tickets (default 200) refuses to file a
+flood rather than truncating it silently, and an unusable provider now exits 1
+instead of 0, because a push command that pushes nothing is a failure.
+
+## [2.32.1](https://github.com/maxgfr/ultra11y/compare/v2.32.0...v2.32.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* **tickets:** decide usage from argv before touching the network ([#18](https://github.com/maxgfr/ultra11y/issues/18)) ([d7c81d7](https://github.com/maxgfr/ultra11y/commit/d7c81d70307a93f330865bf2d54e7563d220783f))
+
 # [2.32.0](https://github.com/maxgfr/ultra11y/compare/v2.31.3...v2.32.0) (2026-08-12)
 
 
