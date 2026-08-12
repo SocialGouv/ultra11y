@@ -104,20 +104,26 @@ describe("verdict spelling is not a decision", () => {
   });
 
   it("a lower-case adjudication applies exactly like its canonical spelling", () => {
+    // The claim is an EQUIVALENCE: casing must not change the outcome. Asserting a
+    // specific outcome instead would couple this test to which criteria the fixture
+    // happens to leave residual — a fact that belongs to the audit, not to the
+    // spelling of a verdict.
     const audit = auditPage();
-    const lower = allManualExcept(audit, (i) =>
-      i.criteriaId === "2.4.4" ? ({ ...i, verdict: "c" as never, justification: "Every link text is self-describing in context." } as AdjudicationItem) : null,
-    );
-    // Same adjudication, written the canonical way.
-    const canonical = allManualExcept(audit, (i) =>
-      i.criteriaId === "2.4.4" ? ({ ...i, verdict: "C" as const, justification: "Every link text is self-describing in context." } as AdjudicationItem) : null,
-    );
-    const a = applyAdjudication(auditPage(), file(lower));
-    const b = applyAdjudication(auditPage(), file(canonical));
-    expect(a.ok).toBe(true);
-    expect(a.audit.criteria.find((c) => c.id === "2.4.4")!.status).toBe("C");
-    expect(a.audit.conformancePct).toBe(b.audit.conformancePct);
-    expect(a.applied).toBe(b.applied);
+    const JUSTIFICATION = "Every link text is self-describing in context.";
+    const written = (verdict: string) =>
+      allManualExcept(audit, (i) => (i.criteriaId === "2.4.4" ? ({ ...i, verdict, justification: JUSTIFICATION } as unknown as AdjudicationItem) : null));
+
+    const lower = applyAdjudication(auditPage(), file(written("c")));
+    const canonical = applyAdjudication(auditPage(), file(written("C")));
+
+    expect(lower.issues).toEqual(canonical.issues);
+    expect(lower.ok).toBe(canonical.ok);
+    expect(lower.applied).toBe(canonical.applied);
+    expect(lower.stillManual).toBe(canonical.stillManual);
+    expect(lower.audit.conformancePct).toBe(canonical.audit.conformancePct);
+    expect(lower.audit.criteria.find((c) => c.id === "2.4.4")?.status).toBe(canonical.audit.criteria.find((c) => c.id === "2.4.4")?.status);
+    // And the equivalence is not vacuous: "c" really was read as a verdict.
+    expect(normalizeVerdict("c")).toBe("C");
   });
 
   it("still fail-closes on a verdict outside the vocabulary — and names the vocabulary", () => {
