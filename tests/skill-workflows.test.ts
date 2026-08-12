@@ -53,12 +53,37 @@ describe("cross-file.md teaches audit --graph", () => {
   });
 });
 
-describe("prd.md teaches the fix backlog + GitHub issues", () => {
+describe("prd.md teaches the fix backlog", () => {
   const t = read("prd.md");
-  it("covers the prd command, --split criterion and --gh-issues", () => {
+  it("covers the prd command and --split criterion, and routes filing to tickets.md", () => {
     expect(t).toMatch(/ultra11y\.mjs prd/);
     expect(t).toContain("--split criterion");
+    expect(t).toContain("references/tickets.md");
+  });
+});
+
+describe("tickets.md teaches filing into a tracker", () => {
+  const t = read("tickets.md");
+  it("covers the command, every grain and all three providers", () => {
+    expect(t).toMatch(/ultra11y\.mjs tickets/);
+    for (const grain of ["criterion", "page-criterion", "single", "file"]) expect(t, `grain ${grain}`).toContain(grain);
+    for (const provider of ["github", "gitlab", "jira"]) expect(t, `provider ${provider}`).toContain(provider);
+  });
+
+  it("teaches the guards that stop a run from flooding a tracker", () => {
+    expect(t).toContain("--dry-run");
+    expect(t).toContain("--max-tickets");
+  });
+
+  // De-dupe is by exact title and nothing else; a reader who misses this files duplicates.
+  it("states that the title is the de-dupe key, and warns about --lang", () => {
+    expect(t).toMatch(/title.{0,20}(IS|is) the key/i);
+    expect(t).toContain("--lang");
+  });
+
+  it("carries the migration table off the removed flags", () => {
     expect(t).toContain("--gh-issues");
+    expect(t).toContain("--grain single");
   });
 });
 

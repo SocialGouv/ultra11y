@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { COMMENT_MARKER, prNumberFromEnv, stickyBody, pickExistingComment } from "../src/gh.js";
+import { COMMENT_MARKER, prNumberFromEnv, stickyBody, pickExistingComment } from "../src/pr-comment.js";
 
 describe("finding the pull request to comment on", () => {
   it("reads the number out of a pull_request ref", () => {

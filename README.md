@@ -143,7 +143,8 @@ ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--de
 ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]              # audit rendered-DOM captures alongside source
 ultra11y audit    [--format sarif|github]                                               # CI: code-scanning SARIF, or inline annotations + job summary
 ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
-ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
+ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--standard <pack>] [--lang auto|en|fr]
+ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest] [--max-tickets <n>] [--dry-run] [--json]
 ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress] [--captures <dir>] [--out <file>] [--json]
 ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   # payload on stdin → .ultra11y/pages/<id>/ + audit
 ultra11y snapshot list  [--root <dir>] [--json]

@@ -117,12 +117,25 @@ describe("main — command wiring", () => {
     expect(r.code).toBe(0);
     expect(r.out).toContain("prd-");
   });
-  it("parses audit --graph/--cross-file and prd --split/--gh-issues", () => {
+  it("parses audit --graph/--cross-file and prd --split", () => {
     expect(parseArgs(["audit", "src", "--graph"]).flags.graph).toBe(true);
     expect(parseArgs(["audit", "src", "--cross-file"]).flags["cross-file"]).toBe(true);
     expect(parseArgs(["prd", "--in", "a.json", "--split", "criterion"]).flags.split).toBe("criterion");
-    expect(parseArgs(["prd", "--in", "a.json", "--gh-issues"]).flags["gh-issues"]).toBe(true);
-    expect(parseArgs(["prd", "--in", "a.json", "--gh-single"]).flags["gh-single"]).toBe(true);
+  });
+
+  it("parses the tickets surface", () => {
+    const a = parseArgs(["tickets", "--in", "a.json", "--provider", "gitlab", "--grain", "page", "--transport", "rest", "--max-tickets", "5"]);
+    expect(a.command).toBe("tickets");
+    expect(a.flags).toMatchObject({ provider: "gitlab", grain: "page", transport: "rest", "max-tickets": "5" });
+    expect(a.unknown).toEqual([]);
+  });
+
+  // The removed flags must land in `unknown`, which is what the REMOVED_FLAGS guard reads to
+  // fail loudly instead of letting a scripted CI stay green while filing nothing.
+  it("treats the retired prd ticket flags as unknown", () => {
+    for (const f of ["--gh-issues", "--gh-single", "--issues-json"]) {
+      expect(parseArgs(["prd", "--in", "a.json", f]).unknown, f).toContain(f.slice(2));
+    }
   });
   it("parses prd --no-technical as a known boolean flag (not an unknown no-op)", () => {
     const a = parseArgs(["prd", "--in", "a.json", "--no-technical"]);

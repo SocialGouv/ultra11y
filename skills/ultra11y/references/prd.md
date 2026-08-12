@@ -1,4 +1,4 @@
-# Auditor backlog (`prd`) + GitHub issues
+# Auditor backlog (`prd`)
 
 `prd` turns an `AuditResult` into an **auditor-legible conformance backlog**, grouped by WCAG
 success criterion (or, with `--standard <pack>`, by a country standard's criteria). It is the
@@ -6,15 +6,15 @@ success criterion (or, with `--standard <pack>`, by a country standard's criteri
 similar, they render the literal **same auditor block** (`src/auditor.ts` `renderAuditorUnit`,
 fed by the same `prdUnits`): `report`'s "Non-conformities by priority" section (§2) IS one of
 these blocks per NC criterion, grouped by severity exactly like the `prd` backlog and the
-`--gh-issues`/`--gh-single` issue bodies. Change the block once, all four deliverables change
-together — there is no separate "report wording" to keep in sync.
+ticket bodies `tickets` files (`references/tickets.md`). Change the block once, all four
+deliverables change together — there is no separate "report wording" to keep in sync.
+
+`prd` writes MARKDOWN and files nothing. Filing tickets is `tickets`.
 
 ```
 node scripts/ultra11y.mjs audit "src/**/*.tsx" --graph --json > audit.json
 node scripts/ultra11y.mjs prd --in audit.json                      # auditor backlog (default)
 node scripts/ultra11y.mjs prd --in audit.json --split criterion    # one file per criterion
-node scripts/ultra11y.mjs prd --in audit.json --gh-issues          # + one GitHub issue per criterion
-node scripts/ultra11y.mjs prd --in audit.json --gh-single          # + ONE consolidated GitHub issue (whole audit)
 node scripts/ultra11y.mjs prd --in audit.json --standard rgaa --lang fr   # rendered with the RGAA (fr) vocabulary
 node scripts/ultra11y.mjs prd --in audit.json --format doc         # product-requirements doc (epics/stories/AC)
 node scripts/ultra11y.mjs prd --in audit.json --format remediation # legacy dev fix-backlog
@@ -60,9 +60,8 @@ node scripts/ultra11y.mjs prd --in audit.json --format remediation # legacy dev 
   grouped by theme, one **user story** per criterion, **Given/When/Then** acceptance criteria
   templated from the real SC title/techniques (anchored to W3C text), and the task list.
 - **`--split criterion`**: a `prd-<criterion>-YYYY-MM-DD.md` file per criterion (handy for batching).
-- The markdown is **always** written, even with `--gh-issues`.
 - **`--json`**: emits a machine-readable object instead of the file paths —
-  `{paths, units, gh?}` where `units` is the structured per-criterion backlog an agent can consume.
+  `{paths, units}` where `units` is the structured per-criterion backlog an agent can consume.
 
 ## Language of the prose (French deliverables)
 
@@ -72,33 +71,7 @@ attribute/element/role names and their values are code, not prose — `aria-live
 `aria-live` (never « région live »), same for `tabindex`, `alt`, `role="alert"`. Normative
 standard vocabulary (e.g. RGAA « lien d'évitement ») keeps its official French wording.
 
-## GitHub issues (`--gh-issues` / `--gh-single`, opt-in)
+## Filing these as tickets
 
-- Uses the **`gh` CLI** (which handles its own auth) — **no** npm dependency, no key in
-  ultra11y.
-- **`--gh-issues` → one issue per criterion** (regardless of `--split`), stable title
-  `"[a11y] WCAG <sc> — <title>"` (or `"[a11y] <PACK> <id> — …"` under `--standard`), labels
-  `accessibility`, `wcag` (or the pack key), severity. The body is the **auditor conformance
-  block** (theme, criterion + wording, test(s), WCAG + level, finding, expected, verification,
-  `file:line` occurrences + definition site) — same as the default backlog, in the active
-  standard's vocabulary. `--format remediation` files the legacy dev body instead.
-- **`--gh-single` → ONE consolidated issue** for the whole audit, stable title
-  `"[a11y] WCAG — Accessibility audit"` (or `"[a11y] <PACK> — Accessibility audit"`). The body
-  is the full backlog **sectioned by severity** (🔴 blocking → 🟠 major → 🟡 minor), each
-  criterion carrying the auditor block. Labelled by the **most severe** criterion.
-- `--gh-single` **wins** if both flags are passed.
-- **De-dupe by title**: an existing issue (open or closed) is skipped, so re-running never
-  creates duplicates. The consolidated title carries **no count or date**, so it stays stable
-  across re-runs.
-- **Caveat — `--lang` changes the title**: the issue title embeds the localized criterion/pack
-  title (e.g. `[a11y] WCAG 1.4.3 — Contrast (Minimum)` vs `[a11y] WCAG 1.4.3 — Contraste (minimum)`).
-  Since de-dupe matches on the **exact title string**, re-running `prd --gh-issues` with a
-  **different `--lang`** than a previous run does **not** match the earlier issue and creates a
-  new one instead of updating it. Keep `--lang` consistent across re-runs against the same
-  repo, or accept the duplicate and close the stale one manually.
-- **Graceful degradation**: if `gh` is absent / unauthenticated, the command says so and exits
-  `0` — the markdown was still produced.
-
-> `prd` reads the `AuditResult` produced by `audit` (ideally `--graph` for cross-file
-> coverage); it reuses the criterion titles, severities, messages, remediations and
-> `file:line` already computed.
+See **`references/tickets.md`**: `tickets` files the same auditor blocks into GitHub, GitLab
+or Jira, at a granularity you choose (per criterion, per page, per file, or one consolidated).

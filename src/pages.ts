@@ -225,6 +225,19 @@ const L = {
   },
 } as const;
 
+/** Honesty rule 2, as one sentence: a page with no snapshot cannot earn conformity by
+ *  silence. Exported so the grid, the per-page report AND the page-grain ticket all say the
+ *  SAME thing — one string, several readers, no drift. Undefined for a snapshot page, which
+ *  needs no caveat. */
+export function pageBasisWarning(basis: PageScope["basis"], lang: Lang): string | undefined {
+  return basis === "snapshot" ? undefined : L[lang].basisNote;
+}
+
+/** Honesty rule 1, as one sentence: findings no page could claim are reported, never spread. */
+export function unattributedNote(n: number, lang: Lang): string {
+  return L[lang].unattributed(n);
+}
+
 interface Row {
   id: string;
   label: string;

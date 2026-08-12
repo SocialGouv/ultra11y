@@ -31,6 +31,72 @@ describe("e2e: prd", () => {
   });
 });
 
+// `tickets` is the only command whose side effect lands in somebody else's system, so the
+// e2e surface exercises the guards and NEVER a real push: every case below is --dry-run or
+// an early exit, and none of them can reach a network (no token, no project in the env).
+describe("e2e: tickets", () => {
+  // Merged onto the real env (runCli REPLACES it wholesale, and node needs PATH). Blanking
+  // the credentials is what guarantees these cases can never reach a tracker.
+  const NO_CREDS = {
+    ...process.env,
+    GH_TOKEN: "",
+    GITHUB_TOKEN: "",
+    GITHUB_REPOSITORY: "",
+    ULTRA11Y_TICKET_PROVIDER: "",
+    ULTRA11Y_JIRA_URL: "",
+    ULTRA11Y_JIRA_PROJECT: "",
+  };
+
+  it("--dry-run emits a plan, creates nothing and exits 0", () => {
+    const dir = mkTmp();
+    const r = runCli(["tickets", "--in", auditTo(dir), "--provider", "github", "--dry-run", "--json"], { env: NO_CREDS });
+    expect(r.code).toBe(0);
+    const payload = JSON.parse(r.stdout);
+    expect(payload).toMatchObject({ provider: "github", grain: "criterion", dryRun: true });
+    expect(payload.tickets.length).toBeGreaterThan(0);
+    expect(payload.result.created).toBe(0);
+  });
+
+  it("keeps every grain producing a plan", () => {
+    const dir = mkTmp();
+    const audit = auditTo(dir);
+    for (const grain of ["criterion", "single", "file"]) {
+      const r = runCli(["tickets", "--in", audit, "--provider", "github", "--grain", grain, "--dry-run", "--json"], { env: NO_CREDS });
+      expect(r.code, `grain ${grain}`).toBe(0);
+      expect(JSON.parse(r.stdout).tickets.length, `grain ${grain}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("exits 1 on --grain page with no page in scope, instead of filing nothing in silence", () => {
+    const dir = mkTmp();
+    const r = runCli(["tickets", "--in", auditTo(dir), "--provider", "github", "--grain", "page", "--dry-run"], { env: NO_CREDS });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("no page in scope");
+  });
+
+  it("refuses past --max-tickets rather than flooding a tracker", () => {
+    const dir = mkTmp();
+    const r = runCli(["tickets", "--in", auditTo(dir), "--provider", "github", "--max-tickets", "1", "--dry-run"], { env: NO_CREDS });
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain("past the limit of 1");
+  });
+
+  it("names the missing Jira variable without ever printing a secret", () => {
+    const dir = mkTmp();
+    const r = runCli(["tickets", "--in", auditTo(dir), "--provider", "jira"], { env: { ...NO_CREDS, JIRA_TOKEN: "sup3rs3cret" } });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("ULTRA11Y_JIRA_URL");
+    expect(`${r.stdout}${r.stderr}`).not.toContain("sup3rs3cret");
+  });
+
+  it("exits 2 on the removed prd flags and names the replacement command", () => {
+    const dir = mkTmp();
+    const r = runCli(["prd", "--in", auditTo(dir), "--out", dir, "--gh-issues"]);
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain("ultra11y tickets");
+  });
+});
+
 describe("e2e: criteria", () => {
   it("--list prints the WCAG success criteria", () => {
     const r = runCli(["criteria", "--list"]);

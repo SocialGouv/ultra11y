@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "<img>",
+        "createdAt": "2026-08-12T13:38:12.635Z",
+        "reason": "test fixture: the string is audited MARKUP inside an ultra11y Finding.snippet, never a rendered image"
+      }
+    ]
+  }
+}

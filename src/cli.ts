@@ -6,7 +6,11 @@ import { runAudit } from "./audit.js";
 import { decide, type PreToolUsePayload } from "./hook.js";
 import { writeReport, untestedNeedsRendering, partialAuditBanner } from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
-import { ghAvailable, issueSet, pushIssues, pushPrComment, pushSingleIssue, type IssueFormat } from "./gh.js";
+import { pushPrComment } from "./pr-comment.js";
+import { buildTickets } from "./tickets/grain.js";
+import { pushTickets } from "./tickets/push.js";
+import { autoProvider, createProvider, isProviderId } from "./tickets/registry.js";
+import { ALL_GRAINS, ALL_PROVIDERS, TICKET_SET_SCHEMA_VERSION, type TicketGrain, type TicketSetFile, type TransportMode } from "./tickets/types.js";
 import {
   detectFrameworks,
   renderPlan,
@@ -46,7 +50,7 @@ import { crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
 import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
 import { resolveStandard, getPack, isCore, CORE, type StandardId } from "./standards/index.js";
-import { loadRuntimeStandards, loadConfig } from "./config.js";
+import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
 import { listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
 import { readStdin, readText } from "./util.js";
@@ -66,7 +70,9 @@ Usage:
   ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures + .ultra11y/pages snapshots: audit real HTML)
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
-  ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--gh-issues | --gh-single] [--lang auto|en|fr]
+  ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
+  ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
+  ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
   ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES — its tests depend on them)
@@ -122,9 +128,14 @@ Commands:
              active standard's vocabulary (RGAA "Thématique/Critère/Test", WCAG core
              "Principle·Guideline/Success criterion/Technique") — theme, criterion +
              official wording, test(s), WCAG mapping + level, finding, expected state,
-             verification. --split criterion writes one file per criterion;
-             --gh-issues files one de-duplicated GitHub issue per criterion, or
-             --gh-single files the whole audit as a single issue (gh CLI).
+             verification. --split criterion writes one file per criterion.
+             It writes MARKDOWN only — filing tickets is the 'tickets' command.
+  tickets    File the audit as TRACKER TICKETS — GitHub, GitLab or Jira. Reads an
+             audit.json and pushes; it writes no markdown, exactly as prd/report
+             write markdown and push nothing. --grain chooses what ONE ticket is:
+             per criterion (default), per page, per page+criterion, per file, or one
+             consolidated. De-dupe is by exact title, so re-running never duplicates.
+             --dry-run prints the plan without creating anything.
   render     Get RENDERED HTML to audit (so component libraries like DSFR are
              checked as the HTML they emit, not their JSX sources): detect the
              framework and print the build→audit recipe, or --scaffold a
@@ -292,11 +303,14 @@ Options:
                      plus <out>/index.md (recommended past 3–4 pages: RGAA is 106 criteria)
   --no-technical     prd (audit format): omit the technical ticket sections (Partie
                      technique + Contexte de reproduction) for a pure-auditor block
-  --gh-issues        prd: also create one GitHub issue per criterion via the gh CLI (opt-in)
-  --gh-single        prd: file the whole audit as ONE consolidated GitHub issue (opt-in; wins over --gh-issues)
-  --issues-json      prd: write the issue set (one item per criterion: title, body, labels,
-                     severity, occurrences) to <out>/issues-<date>.json for a non-GitHub
-                     tracker to file — same items --gh-issues would create, no gh needed
+  --provider <id>    tickets: auto|github|gitlab|jira. 'auto' reads ULTRA11Y_TICKET_PROVIDER,
+                     then .ultra11yrc.json, then the git remote (Jira is never auto-detected)
+  --grain <mode>     tickets: what one ticket is — criterion (default) | page | page-criterion | single | file
+  --transport <t>    tickets: auto|cli|rest (mcp: stdio|http). 'auto' prefers the CLI (gh/glab),
+                     falling back to REST when only a token is available. Jira is REST-only
+  --max-tickets <n>  tickets: refuse to file more than n tickets in one run (default 200)
+                     tickets --out <dir> also writes the tracker-agnostic set to
+                     <dir>/issues-<date>.json, for a workflow engine to file itself
   --scaffold         render: write an SSR-snapshot harness (default: ultra11y-render.tsx)
   --setup            render: install the zero-touch test-render capture harvester (.ultra11y/capture-setup.mjs) + print the runner wiring
   --coverage         render: report rendered-capture coverage (covered vs blind-spot components); with --json emits the coverage object
@@ -406,6 +420,7 @@ export const COMMANDS = [
   "audit",
   "report",
   "prd",
+  "tickets",
   "render",
   "criteria",
   "check",
@@ -434,6 +449,9 @@ function isCommand(s: string | undefined): s is Command {
 
 const VALUE_FLAGS = new Set([
   "out",
+  "provider",
+  "grain",
+  "max-tickets",
   "in",
   "include",
   "exclude",
@@ -528,9 +546,6 @@ const BOOLEAN_FLAGS = new Set([
   "semantic",
   "manual",
   "no-technical",
-  "gh-issues",
-  "gh-single",
-  "issues-json",
   "override",
   "local",
   "docker",
@@ -1561,58 +1576,255 @@ async function cmdPrd(p: ParsedArgs): Promise<number> {
   const json = p.flags.json === true;
   if (!json) for (const path of paths) console.log(path);
 
-  // Tracker-agnostic export: the same de-duplicated items `--gh-issues` files, as JSON, so a
-  // board that is not GitHub can file them itself. Written to a file (not stdout) so it
-  // composes with --json, and so an orchestrator reads one stable path instead of parsing
-  // a payload that also carries the markdown paths.
-  let issuesPath: string | undefined;
-  if (p.flags["issues-json"] === true) {
-    const issueFormat: IssueFormat = format === "remediation" ? "remediation" : "audit";
-    const issues = issueSet(prdUnits(result, standard, lang), lang, standard, issueFormat);
-    mkdirSync(out, { recursive: true });
-    issuesPath = join(out, `issues-${result.date}.json`);
-    writeFileSync(
-      issuesPath,
-      `${JSON.stringify({ tool: "ultra11y", kind: "issues", schemaVersion: 1, standard, date: result.date, count: issues.length, issues }, null, 2)}\n`,
-    );
-    if (!json) console.log(issuesPath);
-  }
+  // `prd` writes MARKDOWN. It files nothing: ticket creation is `ultra11y tickets`, which
+  // reads the same audit.json and writes no markdown. That split is deliberate — you could
+  // not previously push without also producing a document, nor produce a document without
+  // risking a push.
+  if (json) console.log(JSON.stringify({ paths, units: prdUnits(result, standard, lang) }, null, 2));
+  return 0;
+}
 
-  // GitHub: always-written markdown above; issues are opt-in + best-effort.
-  // --gh-single → one consolidated issue; --gh-issues → one issue per criterion.
-  const ghMode: "single" | "per-criterion" | null = p.flags["gh-single"] === true ? "single" : p.flags["gh-issues"] === true ? "per-criterion" : null;
-  let gh: { created: number; skipped: number; failed: number; errors: string[] } | undefined;
-  if (ghMode) {
-    const flag = ghMode === "single" ? "--gh-single" : "--gh-issues";
-    const units = prdUnits(result, standard, lang);
-    if (!ghAvailable()) {
-      if (!json)
-        console.error(`ultra11y prd: ${flag} skipped — \`gh\` is not installed or not authenticated (run \`gh auth login\`). Markdown was still written.`);
-    } else if (units.length === 0) {
-      if (!json) console.error(`ultra11y prd: ${flag} skipped — no findings to file.`);
-    } else {
-      const issueFormat = format === "remediation" ? "remediation" : "audit";
-      gh = ghMode === "single" ? pushSingleIssue(units, lang, standard, issueFormat) : pushIssues(units, lang, standard, issueFormat);
-      if (!json)
-        console.log(
-          lang === "fr"
-            ? `ultra11y prd : issues GitHub — ${gh.created} créée(s), ${gh.skipped} déjà existante(s)${gh.failed ? `, ${gh.failed} en échec` : ""}.`
-            : `ultra11y prd: GitHub issues — ${gh.created} created, ${gh.skipped} already existed${gh.failed ? `, ${gh.failed} failed` : ""}.`,
-        );
-      // Surface WHY gh failed (its stderr, previously swallowed) — always, even in --json
-      // mode the reasons ride along in the payload; here we print them for humans.
-      if (gh.failed && !json) {
-        if (gh.errors.length) for (const e of gh.errors) console.error(lang === "fr" ? `ultra11y prd : gh a échoué — ${e}` : `ultra11y prd: gh failed — ${e}`);
-        else console.error(lang === "fr" ? `ultra11y prd : gh a échoué sans message d'erreur.` : `ultra11y prd: gh failed with no error output.`);
-      }
+/** Flags that USED to exist, mapped to what replaces them. Checked before the generic
+ *  unknown-flag warning so a removal is loud on the first run, not discovered later from an
+ *  empty tracker. Reusable for the next removal — one table, one place. */
+export const REMOVED_FLAGS: Record<string, string> = {
+  "gh-issues": "ultra11y tickets --in <audit.json> --provider github --grain criterion",
+  "gh-single": "ultra11y tickets --in <audit.json> --provider github --grain single",
+  // The tracker-agnostic export moved WITH ticket filing: `tickets --out` writes the same
+  // envelope (and a superset of the payload) at any grain, so an orchestrator still reads
+  // one stable path — just not from the command that renders documents.
+  "issues-json": "ultra11y tickets --in <audit.json> --out <dir> --grain criterion",
+};
+
+/** Config keys that must NEVER appear in `.ultra11yrc.json` — a committed credential is a
+ *  leaked credential. Named explicitly rather than pattern-matched, so the error can say what
+ *  to do instead. */
+const SECRET_CONFIG_KEYS = ["token", "apiToken", "api_token", "password", "secret"];
+
+async function cmdTickets(p: ParsedArgs): Promise<number> {
+  const standard = stdOf(p, "tickets");
+  if (standard === null) return 2;
+  const inFlag = p.flags.in;
+  if (typeof inFlag !== "string" || !inFlag) {
+    console.error("ultra11y tickets: --in <audit.json> is required ('-' for stdin). Run `audit --out` first.");
+    return 2;
+  }
+  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "tickets", "--in");
+  if (raw === null) return 2;
+  let result: unknown;
+  try {
+    result = JSON.parse(raw);
+  } catch {
+    console.error("ultra11y tickets: --in is not valid JSON (expected an AuditResult).");
+    return 2;
+  }
+  if (!isCurrentAudit(result)) {
+    console.error("ultra11y tickets: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+    return 2;
+  }
+  const lang = resolveLang(p.flags, { audit: result, standard });
+  const fr = lang === "fr";
+  const json = p.flags.json === true;
+  const dryRun = p.flags["dry-run"] === true;
+
+  let config: Ultra11yConfig["tickets"];
+  try {
+    config = loadConfig(process.cwd())?.tickets;
+  } catch (e) {
+    console.error(`ultra11y tickets: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  for (const key of SECRET_CONFIG_KEYS) {
+    if (config && key in (config as Record<string, unknown>)) {
+      console.error(
+        `ultra11y tickets: .ultra11yrc.json must not carry a "${key}" — credentials belong in the environment (see references/tickets.md). Remove it and rotate that value.`,
+      );
+      return 2;
     }
   }
-  if (json)
-    console.log(JSON.stringify({ paths, ...(issuesPath ? { issuesPath } : {}), units: prdUnits(result, standard, lang), ...(gh ? { gh } : {}) }, null, 2));
-  // Markdown was written above regardless; but if issue creation was attempted and had
-  // any failures, exit non-zero so a CI step / caller sees the GitHub push did not fully
-  // succeed (a total failure previously exited 0 and looked green).
-  return gh && gh.failed > 0 ? 1 : 0;
+
+  // --- provider ---------------------------------------------------------------------------
+  const providerFlag = typeof p.flags.provider === "string" ? (p.flags.provider as string) : "auto";
+  const providerId = providerFlag === "auto" ? autoProvider(process.env, config?.provider) : isProviderId(providerFlag) ? providerFlag : undefined;
+  if (!providerId) {
+    console.error(
+      providerFlag === "auto"
+        ? "ultra11y tickets: could not tell which tracker to file into — pass --provider github|gitlab|jira (Jira is never auto-detected: it owns no git remote)."
+        : `ultra11y tickets: --provider "${providerFlag}" is not one of ${ALL_PROVIDERS.join("|")}.`,
+    );
+    return 2;
+  }
+
+  const transportFlag = typeof p.flags.transport === "string" ? (p.flags.transport as string) : (config?.transport ?? "auto");
+  if (!["auto", "cli", "rest"].includes(transportFlag)) {
+    console.error(`ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`);
+    return 2;
+  }
+  const provider = createProvider(providerId, { transport: transportFlag as TransportMode });
+
+  // --- the plan ---------------------------------------------------------------------------
+  const grainFlag = typeof p.flags.grain === "string" ? (p.flags.grain as string) : (config?.grain ?? "criterion");
+  if (!(ALL_GRAINS as readonly string[]).includes(grainFlag)) {
+    console.error(`ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`);
+    return 2;
+  }
+  const format = p.flags.format === "remediation" ? "remediation" : "audit";
+  const plan = buildTickets(result, {
+    grain: grainFlag as TicketGrain,
+    standard,
+    lang,
+    format,
+    bodyLimit: provider.capabilities.bodyLimit,
+    baseDir: process.cwd(),
+    technical: p.flags["no-technical"] !== true,
+  });
+
+  if (plan.error === "no-pages") {
+    console.error(
+      fr
+        ? "ultra11y tickets : aucune page dans le périmètre. Capturez des instantanés (render --e2e) ou scannez un échantillon (scan --sample) avant d'utiliser --grain page."
+        : "ultra11y tickets: no page in scope. Capture snapshots (render --e2e) or scan a sample (scan --sample) before using --grain page.",
+    );
+    return 1;
+  }
+
+  const maxTickets = Number.parseInt(String(p.flags["max-tickets"] ?? config?.maxTickets ?? 200), 10);
+  if (!Number.isFinite(maxTickets) || maxTickets < 1) {
+    console.error("ultra11y tickets: --max-tickets must be a positive integer.");
+    return 2;
+  }
+  // A creation is hard to undo, and `page-criterion` on a large audit runs to the hundreds.
+  // Refuse rather than flood somebody's tracker; never silently truncate.
+  if (plan.tickets.length > maxTickets) {
+    console.error(
+      fr
+        ? `ultra11y tickets : ${plan.tickets.length} tickets pour --grain ${grainFlag}, au-delà de la limite de ${maxTickets}. Relancez avec --max-tickets ${plan.tickets.length}, un grain plus grossier, ou --dry-run pour inspecter.`
+        : `ultra11y tickets: ${plan.tickets.length} tickets for --grain ${grainFlag}, past the limit of ${maxTickets}. Re-run with --max-tickets ${plan.tickets.length}, a coarser grain, or --dry-run to inspect.`,
+    );
+    return 2;
+  }
+
+  // `--out` writes the tracker-agnostic SET to a stable path, for a workflow engine that
+  // files the items itself. It is not a document — it is the ticket payload — which is why
+  // it lives here rather than on `prd`. Writing it never files anything.
+  const ticketsOut = typeof p.flags.out === "string" && p.flags.out ? (p.flags.out as string) : undefined;
+  let setPath: string | undefined;
+  if (ticketsOut) {
+    mkdirSync(ticketsOut, { recursive: true });
+    setPath = join(ticketsOut, `issues-${result.date}.json`);
+    const payload: TicketSetFile = {
+      tool: "ultra11y",
+      kind: "issues",
+      schemaVersion: TICKET_SET_SCHEMA_VERSION,
+      standard,
+      grain: grainFlag as TicketGrain,
+      date: result.date,
+      count: plan.tickets.length,
+      issues: plan.tickets,
+    };
+    writeFileSync(setPath, `${JSON.stringify(payload, null, 2)}\n`);
+    if (!json) console.log(setPath);
+  }
+
+  if (!plan.tickets.length) {
+    if (!json)
+      console.log(
+        fr
+          ? "ultra11y tickets : rien à déposer — l'audit ne relève aucune non-conformité."
+          : "ultra11y tickets: nothing to file — the audit found no non-conformity.",
+      );
+    if (json)
+      console.log(
+        JSON.stringify(
+          {
+            provider: providerId,
+            transport: provider.transport,
+            grain: grainFlag,
+            standard,
+            dryRun,
+            ...(setPath ? { setPath } : {}),
+            tickets: [],
+            unattributed: plan.unattributed,
+            result: { created: 0, skipped: 0, failed: 0, createdTitles: [], createdUrls: [], errors: [] },
+          },
+          null,
+          2,
+        ),
+      );
+    return 0;
+  }
+
+  // A push command that files nothing and reports green is a silent failure — unlike the old
+  // `prd --gh-issues`, whose push was an optional extra on top of a document.
+  if (!provider.available() && !dryRun) {
+    console.error(`ultra11y tickets: ${providerId} is not usable here — ${provider.unavailableReason()}.`);
+    return 1;
+  }
+
+  const { plan: planned, result: pushed, dedupeChecked } = await pushTickets(plan.tickets, provider, { dryRun: dryRun || !provider.available() });
+
+  if (json) {
+    console.log(
+      JSON.stringify(
+        {
+          provider: providerId,
+          transport: provider.transport,
+          grain: grainFlag,
+          standard,
+          dryRun,
+          ...(setPath ? { setPath } : {}),
+          dedupeChecked,
+          tickets: planned.map(({ ticket, action }) => ({
+            title: ticket.title,
+            labels: ticket.labels,
+            severity: ticket.severity,
+            advisory: ticket.advisory,
+            scope: ticket.scope,
+            bodyChars: ticket.body.length,
+            action,
+            // The body rides along ONLY under --dry-run: an agent inspecting the plan wants
+            // it, a 200-ticket push payload does not.
+            ...(dryRun ? { body: ticket.body } : {}),
+          })),
+          unattributed: plan.unattributed,
+          result: pushed,
+        },
+        null,
+        2,
+      ),
+    );
+  } else if (dryRun || !provider.available()) {
+    const create = planned.filter((x) => x.action === "create").length;
+    console.log(
+      fr
+        ? `ultra11y tickets : simulation (${providerId}/${provider.transport}, grain ${grainFlag}) — ${create} à créer, ${pushed.skipped} déjà présent(s).`
+        : `ultra11y tickets: dry run (${providerId}/${provider.transport}, grain ${grainFlag}) — ${create} to create, ${pushed.skipped} already there.`,
+    );
+    for (const { ticket, action } of planned) console.log(`  ${action === "create" ? "+" : "="} ${ticket.title}`);
+    if (!dedupeChecked)
+      console.error(
+        fr
+          ? "ultra11y tickets : l'existant n'a pas pu être listé — le compte « déjà présent » n'est pas vérifié."
+          : 'ultra11y tickets: could not list existing tickets — the "already there" count is unverified.',
+      );
+    if (!provider.available()) console.error(`ultra11y tickets: ${providerId} — ${provider.unavailableReason()}.`);
+  } else {
+    console.log(
+      fr
+        ? `ultra11y tickets : ${providerId} — ${pushed.created} créé(s), ${pushed.skipped} déjà présent(s)${pushed.failed ? `, ${pushed.failed} en échec` : ""}.`
+        : `ultra11y tickets: ${providerId} — ${pushed.created} created, ${pushed.skipped} already there${pushed.failed ? `, ${pushed.failed} failed` : ""}.`,
+    );
+    for (const u of pushed.createdUrls) console.log(`  ${u}`);
+    for (const e of pushed.errors) console.error(fr ? `ultra11y tickets : échec — ${e}` : `ultra11y tickets: failed — ${e}`);
+    if (plan.unattributed) {
+      console.error(
+        fr
+          ? `ultra11y tickets : ${plan.unattributed} constat(s) non rattaché(s) à une page — déposés dans leur propre ticket, jamais répartis d'office.`
+          : `ultra11y tickets: ${plan.unattributed} finding(s) attributed to no page — filed as their own ticket, never spread.`,
+      );
+    }
+  }
+  return pushed.failed > 0 ? 1 : 0;
 }
 
 /** Merged dependencies of the package.json at `root` (empty when absent/unparseable — the
@@ -2867,6 +3079,16 @@ export async function main(argv: string[]): Promise<number> {
     console.log(HELP);
     return 0;
   }
+  // A REMOVED flag must not fall through to the generic "unknown flag (ignored)" warning
+  // below: a scripted CI would keep exiting 0 while filing nothing at all — precisely the
+  // silent failure this release exists to end. Name the replacement and fail.
+  for (const f of p.unknown) {
+    const replacement = REMOVED_FLAGS[f];
+    if (replacement) {
+      console.error(`ultra11y: --${f} was removed in v3 — ticket creation is now its own command. Use: ${replacement}`);
+      return 2;
+    }
+  }
   // Warn (never silently ignore) on misspelled/unknown flags so `--grph` or
   // `--standrd rgaa` can't quietly leave cross-file/a standard disabled.
   for (const f of p.unknown) console.error(`ultra11y: unknown flag --${f} (ignored). Run \`ultra11y --help\`.`);
@@ -2885,6 +3107,11 @@ export async function main(argv: string[]): Promise<number> {
     format: ["audit", "doc", "remediation", "sarif", "github", "grid", "report"],
     split: ["criterion", "page"],
     runtime: ["auto", "local", "docker"],
+    provider: ["auto", "github", "gitlab", "jira"],
+    grain: ["criterion", "page", "page-criterion", "single", "file"],
+    // The union over every command that takes it: `mcp` serves stdio|http, `tickets`
+    // picks cli|rest. Listing one command's values made the guard cry wolf on the other.
+    transport: ["stdio", "http", "auto", "cli", "rest"],
   };
   for (const [flag, allowed] of Object.entries(ENUM_FLAGS)) {
     const v = p.flags[flag];
@@ -2913,6 +3140,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdAudit(p);
     case "report":
       return cmdReport(p);
+    case "tickets":
+      return cmdTickets(p);
     case "prd":
       return cmdPrd(p);
     case "render":

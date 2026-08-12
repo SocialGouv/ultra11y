@@ -9,6 +9,8 @@ import { writeHook, ciWorkflow } from "../init.js";
 import { runPackCheck } from "../pack.js";
 import { prdUnits, partitionUnits } from "../prd.js";
 import { renderReport, renderPackReport } from "../report.js";
+import { buildTickets } from "../tickets/grain.js";
+import type { TicketGrain } from "../tickets/types.js";
 import { buildWorklist, formatWorklist } from "../verify.js";
 import { allSC, getSC } from "../wcag.js";
 import { loadPack } from "../standards/index.js";
@@ -129,6 +131,8 @@ async function dispatch(name: string, args: Record<string, unknown>, cwd: string
       return handleReport(args, cwd);
     case "ultra11y_prd":
       return handlePrd(args, cwd);
+    case "ultra11y_tickets":
+      return handleTickets(args, cwd);
     case "ultra11y_check":
       return handleCheck(args, cwd);
     case "ultra11y_verify":
@@ -239,6 +243,30 @@ function handlePrd(args: Record<string, unknown>, cwd: string): unknown {
     non_conformities: nc,
     advisory,
     ...(str(args.split) === "criterion" ? { grouped_by: "criterion" } : {}),
+  };
+}
+
+/** `ultra11y_tickets` — the ticket PLAN, and only the plan. It never files anything.
+ *  Creating issues in somebody's tracker is an outward-facing, hard-to-undo side effect, and
+ *  a prompt-injected agent must not be able to trigger it: filing stays a deliberate human
+ *  `ultra11y tickets` invocation. This tool exists so an agent can SHOW the backlog it would
+ *  open, then hand the reader the exact command. */
+function handleTickets(args: Record<string, unknown>, cwd: string): unknown {
+  const standard = standardOf(args);
+  const lang = langOf(args);
+  const grain = (str(args.grain) ?? "criterion") as TicketGrain;
+  const plan = buildTickets(audit(args, cwd), { grain, standard, lang, baseDir: cwd });
+  if (plan.error === "no-pages") {
+    return { cwd, standard, grain, error: "no-pages", hint: "No page in scope — capture snapshots (render --e2e) or scan a sample (scan --sample) first." };
+  }
+  return {
+    cwd,
+    standard,
+    grain,
+    dry_run: true,
+    tickets: plan.tickets.map((t) => ({ title: t.title, labels: t.labels, severity: t.severity, advisory: t.advisory, scope: t.scope, body: t.body })),
+    unattributed: plan.unattributed,
+    to_file_them: `ultra11y tickets --in <audit.json> --provider github|gitlab|jira --grain ${grain}`,
   };
 }
 

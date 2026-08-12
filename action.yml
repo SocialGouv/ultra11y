@@ -103,6 +103,22 @@ inputs:
     description: 'Report language: auto | en | fr.'
     required: false
     default: 'auto'
+  tickets:
+    description: 'File the audit as tracker tickets: github | gitlab | jira. Empty (default) files nothing. Needs `issues: write` for GitHub; a GITLAB_TOKEN / Jira credentials in env for the others (see references/tickets.md). De-dupe is by exact title, so re-running never duplicates.'
+    required: false
+    default: ''
+  tickets-grain:
+    description: 'What ONE ticket is: criterion | page | page-criterion | single | file.'
+    required: false
+    default: 'criterion'
+  tickets-max:
+    description: 'Refuse to file more than this many tickets in one run. The step fails rather than flooding the tracker.'
+    required: false
+    default: '200'
+  tickets-dry-run:
+    description: 'Print the ticket plan without creating anything. Use it on a pull request, and file for real only on the default branch.'
+    required: false
+    default: 'false'
   working-directory:
     description: 'Directory to run in.'
     required: false
@@ -250,6 +266,24 @@ runs:
         ULTRA11Y_PR_COMMENT: ${{ inputs.comment == 'true' && '1' || '0' }}
         GH_TOKEN: ${{ github.token }}
       run: node "$ENGINE" report --in audits/audit-latest.json --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}' --format github
+
+    # Tickets. REST is why this works in a container job or on a self-hosted runner, where
+    # `gh` is absent: the engine falls back to GITHUB_TOKEN + GITHUB_REPOSITORY on its own.
+    - name: File tracker tickets
+      if: inputs.tickets != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+        GH_TOKEN: ${{ github.token }}
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        node "$ENGINE" tickets --in audits/audit-latest.json \
+          --provider '${{ inputs.tickets }}' \
+          --grain '${{ inputs.tickets-grain }}' \
+          --max-tickets '${{ inputs.tickets-max }}' \
+          --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}' \
+          ${{ inputs.tickets-dry-run == 'true' && '--dry-run' || '' }}
 
     - name: Markdown report
       id: report

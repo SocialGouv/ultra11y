@@ -102,34 +102,40 @@ the criterion in `residualRisks`, where the report declares it as a residual ris
 map an undecided criterion to `C`** — that is the one way to turn this pipeline back into
 the thing it replaces.
 
-## Filing findings on a tracker that is not GitHub
+## Filing findings on a tracker
 
-`--gh-issues` shells out to the `gh` CLI. For any other board, take the same items as JSON:
+`tickets` files into **GitHub, GitLab or Jira** directly (see `references/tickets.md`). For
+any other board — a native kanban, an internal tool — take the same items as JSON and file
+them yourself:
 
 ```sh
-$ENGINE prd --in "$RUN/audit-latest.json" --out "$RUN" --issues-json --lang en
-# → $RUN/issues-<date>.json
+$ENGINE tickets --in "$RUN/audit-latest.json" --out "$RUN" --lang en
+# → $RUN/issues-<date>.json   (writing the set files nothing; add --dry-run to be explicit)
 ```
+
+`--grain` decides what one item is: `criterion` (default), `page`, `page-criterion`,
+`single` or `file`. The envelope and the item shape are the same at every grain.
 
 ```jsonc
 {
   "tool": "ultra11y", "kind": "issues", "schemaVersion": 1,
-  "standard": "wcag", "date": "2026-08-12", "count": 4,
+  "standard": "wcag", "grain": "criterion", "date": "2026-08-12", "count": 4,
   "issues": [{
-    "criteriaId": "1.1.1",
     "title": "[a11y] WCAG 1.1.1 — Non-text Content",   // the de-dupe grain: stable across runs
     "body": "…",                                       // the auditor block, rendered
     "labels": ["accessibility", "wcag", "bloquant"],
     "severity": "bloquant",
     "advisory": false,                                 // true ⇒ a good practice, NOT a non-conformity
+    "scope": { "grain": "criterion", "criteriaId": "1.1.1" },
     "occurrences": [{ "file": "src/Page.tsx", "line": 4, "selector": "img", "message": "…" }]
   }]
 }
 ```
 
-One issue per criterion, not per occurrence — a missing `alt` on forty images is one item
-with forty `occurrences`, not forty tickets. De-dupe on `title` and re-running files nothing
-twice. `advisory: true` marks a non-normative recommendation: it must not be triaged as a
+At the default grain, one issue per criterion, not per occurrence — a missing `alt` on forty
+images is one item with forty `occurrences`, not forty tickets. **De-dupe is on `title`**, so
+re-running files nothing twice; keep `--lang` stable across runs, since a criterion's wording
+is part of its title. `advisory: true` marks a non-normative recommendation: it must not be triaged as a
 non-conformity, and it never enters the conformance rate.
 
 ## Where output lands
@@ -140,7 +146,8 @@ repo it does not own — write the run's intermediates out-of-tree and let only 
 dated report land in the project, if at all.
 
 `.ultra11y/pages/` is written only by the page-snapshot commands (`scan`, `snapshot`,
-`dev`); `--root` relocates it. `audit`, `report`, `prd`, `verify` and `check` never touch it.
+`dev`); `--root` relocates it. `audit`, `report`, `prd`, `tickets`, `verify` and `check`
+never touch it.
 
 ## Exit codes
 
@@ -149,7 +156,8 @@ dated report land in the project, if at all.
 | `audit` | reported (no `--fail-on`), or clean | findings ≥ `--fail-on` | usage / bad input |
 | `verify --apply` | folded | the adjudication was refused (see `issues[]`) | usage / bad input |
 | `check` | report is sound | integrity failure | report not found / bad input |
-| `prd` | written | `--gh-*` had failures | usage / bad input |
+| `prd` | written | — (it writes markdown and files nothing) | usage / bad input |
+| `tickets` | filed, skipped, or nothing to file | a creation failed, the provider is unusable, or no page in scope | usage / bad input / past `--max-tickets` |
 
 Read exit codes from the process, **not** from a pipeline — `cmd --json | head` reports
 `head`'s status, which is how a failing gate reads as a pass.

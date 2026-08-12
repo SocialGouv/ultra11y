@@ -35,6 +35,16 @@ export interface Ultra11yConfig {
   // severity at which a pending commit/push/PR asks the agent for a11y review; "off"
   // disables the hook for this repo. Absent ⇒ "blocking", matching `init --hook`.
   hook?: { failOn?: string };
+  // Defaults for `ultra11y tickets` (src/tickets/), so a repo declares its tracker once
+  // instead of repeating flags in every CI step. Flags always win, the same precedence
+  // `standard` has. CREDENTIALS ARE NOT ALLOWED HERE: this file is committed, so a token
+  // key in this block is a hard error — they belong in the environment.
+  tickets?: {
+    provider?: "github" | "gitlab" | "jira";
+    grain?: "criterion" | "page" | "page-criterion" | "single" | "file";
+    transport?: "auto" | "cli" | "rest";
+    maxTickets?: number;
+  };
 }
 
 export interface LoadResult {
