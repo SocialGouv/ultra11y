@@ -51649,7 +51649,7 @@ function adjudicationContract() {
     verdicts: [...VERDICTS],
     manualReasons: [...MANUAL_REASON_VALUES],
     requires: {
-      C: "a non-empty justification",
+      C: "a non-empty justification AND citations[] naming the harvested evidence it cleared (each anchor resolvable and drawn from this criterion's own evidence); a criterion with no harvested evidence cannot be C at all",
       NA: "a non-empty justification",
       NC: "at least one groundable finding, each citing a normativeRef that resolves against the active standard",
       manual: `a reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`

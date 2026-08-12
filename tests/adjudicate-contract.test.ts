@@ -56,10 +56,15 @@ describe("the worklist declares its own contract", () => {
     expect(c.verdicts).toEqual([...VERDICTS]);
     expect(c.manualReasons).toEqual([...MANUAL_REASON_VALUES]);
     // Every verdict in the vocabulary is described — a caller reading only the file learns
-    // that C/NA need a justification and NC needs a grounded, normatively-cited finding.
+    // what each one costs, without reading ultra11y's source.
     for (const v of VERDICTS) expect(c.requires[v]).toBeTruthy();
     expect(c.requires.NC).toMatch(/normativeRef/);
     expect(c.requires.manual).toContain("needs-rendered-dom");
+    // A clearing verdict is gated exactly like an accusing one, so the contract has to say
+    // so: a C that mentioned only its justification would under-describe the gate, and the
+    // caller would learn about `citations` from a rejection instead of from the file.
+    expect(c.requires.C).toMatch(/citations/);
+    expect(c.requires.C).toMatch(/justification/);
   });
 
   it("is advisory: the gate validates against its own constants, not the file's header", () => {

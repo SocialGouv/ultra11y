@@ -75,7 +75,7 @@ ultra11y's source:
     "verdicts": ["C", "NC", "NA", "manual"],
     "manualReasons": ["needs-rendered-dom", "undecidable"],
     "requires": {
-      "C":  "a non-empty justification",
+      "C":  "a non-empty justification AND citations[] naming the harvested evidence it cleared …",
       "NA": "a non-empty justification",
       "NC": "at least one groundable finding, each citing a normativeRef that resolves against the active standard",
       "manual": "a reason ∈ {needs-rendered-dom, undecidable}"
@@ -84,6 +84,11 @@ ultra11y's source:
   "items": [ /* one per criterion the engine could not decide; fill `verdict` */ ]
 }
 ```
+
+Note what `C` costs: a clearing verdict is gated exactly like an accusing one. It must
+name in `citations[]` the evidence it cleared, each anchor resolvable and drawn from that
+criterion's own harvested evidence — and a criterion presented with **no** evidence cannot
+be `C` at all. This is what stops "C everywhere with a plausible sentence" from passing.
 
 The header is **advisory**. `verify --apply` validates against its own constants, so editing
 the contract in the file widens nothing.
