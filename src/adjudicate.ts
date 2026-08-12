@@ -102,7 +102,35 @@ export interface AdjudicationFile {
   schemaVersion: number;
   standard: StandardId;
   auditDate: string;
+  // The contract, carried BY the worklist. Whoever fills this file — an agent in a coding
+  // harness, an orchestrator's tool node, a script — reads the file, not ultra11y's source,
+  // so the file has to say what a verdict may be and what each one additionally requires.
+  // Advisory to the reader, never read back by `applyAdjudication` (which validates against
+  // its own constants), so a hand-edited or stale header can never widen what is accepted.
+  contract?: AdjudicationContract;
   items: AdjudicationItem[];
+}
+
+/** What the filler of an adjudication file is allowed to write, stated in the file. */
+export interface AdjudicationContract {
+  verdicts: readonly string[];
+  manualReasons: readonly string[];
+  requires: Record<string, string>;
+}
+
+/** The contract as written into every worklist. Derived from the same constants the gate
+ *  validates against, so the two cannot drift. */
+export function adjudicationContract(): AdjudicationContract {
+  return {
+    verdicts: [...VERDICTS],
+    manualReasons: [...MANUAL_REASON_VALUES],
+    requires: {
+      C: "a non-empty justification",
+      NA: "a non-empty justification",
+      NC: "at least one groundable finding, each citing a normativeRef that resolves against the active standard",
+      manual: `a reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`,
+    },
+  };
 }
 
 // ---- evidence harvesters ----
@@ -390,6 +418,53 @@ export interface ApplyAdjudicationResult {
 const NC_SEVERITY_DEFAULT: Severity = "majeur";
 const MANUAL_REASONS = new Set(["needs-rendered-dom", "undecidable"]);
 
+/** The verdicts an adjudication may carry, in the exact spelling the file must use. Exported
+ *  because it is a CONTRACT, not an implementation detail: the worklist declares it in its own
+ *  header and the rejection message names it, so whoever fills the file never has to read this
+ *  source to learn what they are allowed to write. */
+export const VERDICTS = ["C", "NC", "NA", "manual"] as const;
+/** The reasons a still-`manual` verdict may cite — same contract, same reason to export it. */
+export const MANUAL_REASON_VALUES = ["needs-rendered-dom", "undecidable"] as const;
+
+/** Canonicalise a verdict written in any case ("na", "Nc", "MANUAL" → "NA", "NC", "manual").
+ *
+ *  Three of the four verdicts are upper-case and the fourth is not, which is exactly the kind
+ *  of detail an agent filling the worklist gets wrong — and it used to cost the entire run,
+ *  because `applyAdjudication` fail-closes on an unknown verdict. Case carries no meaning
+ *  here: "na" can only ever mean NA. What stays rejected is a verdict outside the vocabulary,
+ *  which is a real disagreement about the contract rather than a spelling accident. Returns
+ *  undefined when there is no match. */
+export function normalizeVerdict(v: unknown): Exclude<CriterionVerdict, null> | undefined {
+  if (typeof v !== "string") return undefined;
+  const k = v.trim().toLowerCase();
+  return VERDICTS.find((x) => x.toLowerCase() === k);
+}
+
+/** The same tolerance for a `manual` verdict's reason. */
+function normalizeManualReason(r: unknown): string | undefined {
+  if (typeof r !== "string") return undefined;
+  const k = r.trim().toLowerCase();
+  return MANUAL_REASON_VALUES.find((x) => x === k);
+}
+
+/** Rewrite an adjudication's verdicts and manual reasons into their canonical spelling, in
+ *  place. Anything unrecognised is left untouched, so the per-item validation below still
+ *  reports it as the contract violation it is — this normalises spelling, it never invents a
+ *  decision the file did not carry. */
+export function canonicalizeAdjudication(adj: AdjudicationFile): AdjudicationFile {
+  for (const it of adj.items) {
+    if (it.verdict !== null) {
+      const v = normalizeVerdict(it.verdict);
+      if (v !== undefined) it.verdict = v;
+    }
+    if (it.reason !== null && it.reason !== undefined) {
+      const r = normalizeManualReason(it.reason);
+      if (r !== undefined) it.reason = r;
+    }
+  }
+  return adj;
+}
+
 /** Does an NC finding's `normativeRef` resolve against the ACTIVE standard?
  *
  *  Core: a real success-criterion id (reuses `hasSC`).
@@ -433,6 +508,9 @@ function normativeRefResolves(ref: string | undefined, standard: StandardId, ite
  *  a shrunk residual set, and the `adjudicated` marker. */
 export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opts: { cwd?: string } = {}): ApplyAdjudicationResult {
   const issues: string[] = [];
+  // Spelling first, decisions second: "na" is NA, and rejecting the run over the case of a
+  // verdict taught the caller nothing about accessibility. Everything below stays fail-closed.
+  canonicalizeAdjudication(adj);
   const byId = new Map(adj.items.map((it) => [it.criteriaId, it]));
 
   // Coverage. Under the core that means every residual success criterion; under a pack it
@@ -520,9 +598,12 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
       }
     } else if (v === "manual") {
       if (!it.reason || !MANUAL_REASONS.has(it.reason))
-        issues.push(`criterion ${it.criteriaId}: a manual verdict requires reason ∈ {needs-rendered-dom, undecidable}`);
+        issues.push(`criterion ${it.criteriaId}: a manual verdict requires reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`);
     } else {
-      issues.push(`criterion ${it.criteriaId}: unknown verdict "${String(v)}"`);
+      // Name the vocabulary in the rejection. The caller is usually a model that has just
+      // spent a whole worklist filling this file; "unknown verdict" alone told it nothing
+      // about how to be right on the retry.
+      issues.push(`criterion ${it.criteriaId}: unknown verdict "${String(v)}" — expected one of ${VERDICTS.join(" | ")}`);
     }
     // Recommendations are independent of the verdict (a C criterion may still carry a good
     // practice) and are grounded exactly like an NC finding — no normativeRef required, as
@@ -912,6 +993,7 @@ export function writeAdjudication(
     schemaVersion: SCHEMA_VERSION,
     standard: opts.standard,
     auditDate: opts.auditDate,
+    contract: adjudicationContract(),
     items,
   };
   writeFileSync(todoPath, JSON.stringify(file, null, 2) + "\n");
