@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { realpathSync as realpathSync6, writeFileSync as writeFileSync17, mkdirSync as mkdirSync15, existsSync as existsSync31, readFileSync as readFileSync27, appendFileSync } from "fs";
+import { realpathSync as realpathSync6, writeFileSync as writeFileSync17, mkdirSync as mkdirSync15, existsSync as existsSync31, readFileSync as readFileSync27, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
 import { join as join45, relative as relative5, sep as sep7, dirname as dirname14 } from "path";
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
@@ -41345,7 +41345,8 @@ var rgaa_default = {
       wcag: ["1.4.2"],
       appliesTo: {
         ruleIds: ["autoplay-media", "axe:no-autoplay-audio"]
-      }
+      },
+      judgment: true
     },
     {
       id: "4.11",
@@ -41984,7 +41985,8 @@ var rgaa_default = {
       wcag: ["3.1.1"],
       appliesTo: {
         ruleIds: ["axe:html-lang-valid", "lang-invalid"]
-      }
+      },
+      judgment: true
     },
     {
       id: "8.5",
@@ -42020,7 +42022,8 @@ var rgaa_default = {
       wcag: ["2.4.2"],
       appliesTo: {
         ruleIds: []
-      }
+      },
+      judgment: true
     },
     {
       id: "8.7",
@@ -43414,7 +43417,8 @@ var rgaa_default = {
       wcag: ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
       appliesTo: {
         ruleIds: []
-      }
+      },
+      judgment: true
     },
     {
       id: "13.4",
@@ -43436,7 +43440,8 @@ var rgaa_default = {
       wcag: ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
       appliesTo: {
         ruleIds: []
-      }
+      },
+      judgment: true
     },
     {
       id: "13.5",
@@ -45443,6 +45448,10 @@ function title(pack, c2, lang) {
 }
 function titlePlain(pack, c2, lang) {
   return localize(pack, c2.titlePlain, lang);
+}
+function packTestIds(pack, id) {
+  const tests = getCriterion(pack, id)?.tests;
+  return tests ? Object.keys(tests).map((k) => `${id}.${k}`) : [];
 }
 function resolveGlossary(packKey, anchor) {
   return packGlossary(packKey)?.[anchor];
@@ -48357,7 +48366,7 @@ function decide(payload, deps = {}) {
 }
 
 // src/report.ts
-import { existsSync as existsSync16, mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
+import { copyFileSync, existsSync as existsSync16, mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
 import { join as join29, relative as relative3 } from "path";
 
 // src/prd.ts
@@ -48384,7 +48393,7 @@ function packCriteriaForFinding(pack, finding) {
   return pack.criteria.filter((pc) => pc.wcag.includes(finding.criteriaId) && (!pc.appliesTo || ruleMatches(finding.ruleId, pc.appliesTo.ruleIds))).map((pc) => pc.id);
 }
 function packConformancePct(derived) {
-  const c2 = derived.filter((d) => d.status === "C").length;
+  const c2 = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent").length;
   const nc = derived.filter((d) => d.status === "NC").length;
   return c2 + nc === 0 ? 100 : Math.round(c2 / (c2 + nc) * 100);
 }
@@ -48412,6 +48421,10 @@ function applySecondaryMappings(base, pc, enabled, sources, defaultLocale) {
   const findings = [...base.findings, ...added];
   if (added.some((f) => !f.advisory)) return { id: pc.id, theme: pc.theme, status: aggregate2([base.status, "NC"]), findings, scs: base.scs };
   return { ...base, findings };
+}
+function judgmentGuard(r, pc) {
+  if (!pc.judgment || r.status !== "C") return r;
+  return { ...r, status: "manual", judgment: true };
 }
 function derivePackResults(audit2, packKey) {
   const pack = loadPack(packKey);
@@ -48460,7 +48473,7 @@ function derivePackResults(audit2, packKey) {
         decidedBy: "agent"
       };
     }
-    const base = deriveBase(pc);
+    const base = judgmentGuard(deriveBase(pc), pc);
     return enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
   });
 }
@@ -48654,7 +48667,7 @@ function renderAuditorUnit(unit, standard, lang, opts = {}) {
     const pc = pack.criteria.find((c2) => c2.id === unit.criteriaId);
     if (pc) out2.push(`**${v.theme}** : ${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trimEnd());
     out2.push(`**${v.criterion}** : ${unit.criteriaId} \u2014 ${unit.title}`);
-    const testNums = pc?.tests ? Object.keys(pc.tests).map((k) => `${unit.criteriaId}.${k}`) : [];
+    const testNums = packTestIds(pack, unit.criteriaId);
     if (testNums.length) out2.push(`**${v.test}(s)** : ${testNums.join(" \xB7 ")}`);
     if (unit.refs.length) out2.push(`**WCAG** : ${unit.refs.map((sc) => `${sc}${scLevel(sc)}`).join(" \xB7 ")}`);
   }
@@ -49066,8 +49079,8 @@ function toRuleOnSection(r, standard, lang) {
   for (const pc of manual) {
     const crit = pack.criteria.find((c2) => c2.id === pc.id);
     const title2 = crit ? titlePlain(pack, crit, lang) : pc.id;
-    const tests = Object.keys(crit?.tests ?? {});
-    out2.push(`- [ ] **${pack.name} ${pc.id}** \u2014 ${title2}${tests.length ? `  \xB7  ${s.tests}: ${tests.map((k) => `\`${pc.id}.${k}\``).join(" ")}` : ""}`);
+    const tests = packTestIds(pack, pc.id);
+    out2.push(`- [ ] **${pack.name} ${pc.id}** \u2014 ${title2}${tests.length ? `  \xB7  ${s.tests}: ${tests.map((t2) => `\`${t2}\``).join(" ")}` : ""}`);
   }
   out2.push("");
   return out2;
@@ -49340,6 +49353,8 @@ var L4 = {
     sev: { bloquant: "Bloquant", majeur: "Majeur", mineur: "Mineur" },
     none: "Aucune non-conformit\xE9 d\xE9tect\xE9e par le moteur statique.",
     cTitle: "3. Crit\xE8res conformes (C)",
+    cAgentTitle: "Conformes par adjudication de l'agent (jugement, non prouv\xE9 par le moteur)",
+    cAgentNote: "Ces crit\xE8res ont \xE9t\xE9 tranch\xE9s par l'agent IA \xE0 partir des \xE9vidences cit\xE9es, non d\xE9cid\xE9s par le moteur d\xE9terministe. Ils sont gat\xE9s (chaque verdict cite une \xE9vidence r\xE9solvable) mais restent un jugement : ils ne sont pas compt\xE9s dans le taux de r\xE9ussite automatique ci-dessus.",
     naTitle: "4. Crit\xE8res non applicables (NA)",
     manualTitle: "5. Crit\xE8res \xE0 adjuger (jugement / rendu) \u2014 non d\xE9cid\xE9s par le moteur statique",
     manualWarn: "Adjugez-les avec `verify --manual` (l'agent d\xE9cide depuis la source, de fa\xE7on gat\xE9e) ; les crit\xE8res de rendu passent par `scan`. Aucun ne doit \xEAtre marqu\xE9 \xAB conforme \xBB sans justification enregistr\xE9e et gat\xE9e.",
@@ -49347,6 +49362,7 @@ var L4 = {
     manualHowTo: "G\xE9n\xE9rez la worklist : `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Chaque item y porte l'\xE9nonc\xE9 complet de ses tests, sa note technique, ses cas particuliers, sa guidance et les termes que le r\xE9f\xE9rentiel d\xE9finit.",
     outOfScope: "Hors p\xE9rim\xE8tre moteur \u2014 mapp\xE9 sur des SC hors WCAG 2.2 AA ; v\xE9rification manuelle.",
     scopedOut: "Les non-conformit\xE9s WCAG relev\xE9es concernent des \xE9l\xE9ments hors du p\xE9rim\xE8tre de ce crit\xE8re \u2014 \xE0 \xE9valuer s\xE9par\xE9ment.",
+    judgment: "L\u2019\xE9nonc\xE9 du crit\xE8re demande davantage que les CS WCAG auxquels il est rattach\xE9 \u2014 le moteur n\u2019y a pas r\xE9pondu, \xE0 trancher.",
     nothing: "Aucun.",
     dedup: "D\xE9dup",
     canonical: "fichier(s) canonique(s) audit\xE9(s)",
@@ -49392,6 +49408,8 @@ var L4 = {
     sev: { bloquant: "Blocking", majeur: "Major", mineur: "Minor" },
     none: "No non-conformity detected by the static engine.",
     cTitle: "3. Conforming criteria (C)",
+    cAgentTitle: "Conforming by agent adjudication (judgement, not proven by the engine)",
+    cAgentNote: "These criteria were ruled on by the AI agent from the evidence it cited, not decided by the deterministic engine. They are gated (every verdict cites resolvable evidence) but remain a judgement: they are not counted in the automatic pass rate above.",
     naTitle: "4. Not-applicable criteria (NA)",
     manualTitle: "5. Criteria to adjudicate (judgment / rendering) \u2014 not decided by the static engine",
     manualWarn: "Adjudicate these with `verify --manual` (the agent decides from source, gated); rendering criteria go to `scan`. None may be marked \u201Cconforming\u201D without a recorded, gated justification.",
@@ -49399,6 +49417,7 @@ var L4 = {
     manualHowTo: "Generate the worklist: `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Each item carries the full wording of its tests, its technical note, its particular cases, its guidance and the terms the standard defines.",
     outOfScope: "Out of engine scope \u2014 mapped to SCs outside WCAG 2.2 AA; manual verification.",
     scopedOut: "The WCAG failures found concern elements outside this criterion's scope \u2014 assess separately.",
+    judgment: "The criterion asks more than the WCAG SCs it maps to \u2014 the engine did not answer it; rule on it.",
     nothing: "None.",
     dedup: "Dedup",
     canonical: "canonical file(s) audited",
@@ -49507,11 +49526,18 @@ function render(r, lang, opts) {
       const notes = pageScope.find((x) => x.id === pg.id)?.notes;
       if (notes) out2.push(`- _${notes}_`);
       const shot = join29(PAGES_DIR, pg.id, "screen.png");
-      if (existsSync16(shot))
-        out2.push(
-          "",
-          `![${s.screenshotAlt(pg.name)}](${relative3(opts.outDir ?? ".", shot).split("\\").join("/")})`
-        );
+      if (existsSync16(shot)) {
+        let href = relative3(opts.outDir ?? ".", shot).split("\\").join("/");
+        if (opts.outDir) {
+          try {
+            mkdirSync7(join29(opts.outDir, "assets"), { recursive: true });
+            copyFileSync(shot, join29(opts.outDir, "assets", `${pg.id}.png`));
+            href = `./assets/${pg.id}.png`;
+          } catch {
+          }
+        }
+        out2.push("", `![${s.screenshotAlt(pg.name)}](${href})`);
+      }
       for (const f of nc.slice(0, 30)) {
         const crits = pack ? packCriteriaForFinding(pack, f) : [];
         const label = crits.length ? crits.join(", ") : f.criteriaId;
@@ -49522,7 +49548,16 @@ function render(r, lang, opts) {
   }
   out2.push(`## ${s.cTitle}`, "");
   const conform = rows.filter((x) => x.status === "C");
-  out2.push(conform.length ? conform.map((x) => `- ${x.label}`).join("\n") : s.nothing, "");
+  const byEngine = conform.filter((x) => x.decidedBy !== "agent");
+  const byAgent = conform.filter((x) => x.decidedBy === "agent");
+  if (!conform.length) out2.push(s.nothing, "");
+  else {
+    if (byEngine.length) out2.push(...byEngine.map((x) => `- ${x.label}`), "");
+    if (byAgent.length) {
+      out2.push(`### ${s.cAgentTitle}`, "", `> ${s.cAgentNote}`, "");
+      out2.push(...byAgent.map((x) => `- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}`), "");
+    }
+  }
   out2.push(`## ${s.naTitle}`, "");
   const na = rows.filter((x) => x.status === "NA");
   out2.push(na.length ? na.map((x) => `- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}`).join("\n") : s.nothing, "");
@@ -49532,8 +49567,8 @@ function render(r, lang, opts) {
   else {
     const pack5 = isCore(opts.standard) ? void 0 : loadPack(opts.standard);
     for (const x of manual) {
-      const tests = pack5 ? Object.keys(getCriterion(pack5, x.id)?.tests ?? {}) : [];
-      const testRef = tests.length ? ` \u2014 ${s.testsToRule}: ${tests.map((k) => `\`${x.id}.${k}\``).join(" \xB7 ")}` : "";
+      const tests = pack5 ? packTestIds(pack5, x.id) : [];
+      const testRef = tests.length ? ` \u2014 ${s.testsToRule}: ${tests.map((t2) => `\`${t2}\``).join(" \xB7 ")}` : "";
       out2.push(`- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}${testRef}`);
     }
     out2.push("", `> ${s.manualHowTo}`, "");
@@ -49545,7 +49580,14 @@ function renderReport(r, lang = "en", outDir) {
   const byGuideline = /* @__PURE__ */ new Map();
   for (const c2 of r.criteria) {
     const title2 = scTitle(c2.id, lang);
-    const row = { id: c2.id, label: title2 ? `${c2.id} \u2014 ${title2}` : c2.id, status: c2.status, findings: c2.findings, justification: c2.justification };
+    const row = {
+      id: c2.id,
+      label: title2 ? `${c2.id} \u2014 ${title2}` : c2.id,
+      status: c2.status,
+      findings: c2.findings,
+      justification: c2.justification,
+      decidedBy: c2.decidedBy
+    };
     (byGuideline.get(c2.guideline) ?? byGuideline.set(c2.guideline, []).get(c2.guideline)).push(row);
   }
   const groups = r.guidelines.map((g) => ({ key: g.key, title: guidelineTitle(g.key, lang) ?? g.title, rows: byGuideline.get(g.key) ?? [] }));
@@ -49564,9 +49606,10 @@ function renderPackReport(r, pack, lang = "en", outDir) {
       label: `${pack.name} ${pr.id} \u2014 ${title(pack, pc, lang)}`,
       status: pr.status,
       findings: pr.findings,
+      ...pr.decidedBy ? { decidedBy: pr.decidedBy } : {},
       // outOfScope / scopedOut criteria are "manual" (not NA) with their own dedicated
       // justification — never mixed with the ordinary NA reason (see the manual section above).
-      ...pr.outOfScope ? { justification: s.outOfScope } : pr.scopedOut ? { justification: s.scopedOut } : pr.status === "NA" ? { justification: naReason } : {}
+      ...pr.outOfScope ? { justification: s.outOfScope } : pr.scopedOut ? { justification: s.scopedOut } : pr.judgment ? { justification: s.judgment } : pr.status === "NA" ? { justification: naReason } : {}
     };
     (byTheme.get(pr.theme) ?? byTheme.set(pr.theme, []).get(pr.theme)).push(row);
   }
@@ -49578,7 +49621,11 @@ function renderPackReport(r, pack, lang = "en", outDir) {
     derivedOf: std,
     standard: pack.key,
     partialAudit: untestedNeedsRendering(r),
-    headerRatePct: packConformancePct(derived)
+    headerRatePct: packConformancePct(derived),
+    // Forwarded, unlike before: without it the per-page screenshots resolved against the
+    // CWD instead of the report's own directory, so a pack report written to `audits/`
+    // carried links that only worked when read from the repo root.
+    outDir
   });
 }
 function writeReport(r, opts) {
@@ -50462,9 +50509,12 @@ var L6 = {
     viewport: "Fen\xEAtre",
     producer: "Producteur",
     auth: "Authentification requise",
-    rate: "Taux de conformit\xE9",
+    rate: "Taux de r\xE9ussite automatique (v\xE9rifications statiques)",
     rateNote: "sous-ensemble d\xE9cidable : C \xF7 (C + NC)",
     tally: (c2, nc, na, m) => `${c2} conforme(s) \xB7 ${nc} non conforme(s) \xB7 ${na} non applicable(s) \xB7 ${m} \xE0 \xE9valuer`,
+    coverage: (decided, total) => `Couverture : ${decided}/${total} crit\xE8re(s) \xE9valu\xE9(s) \u2014 le taux ci-dessus ne porte que sur eux, et ne dit rien des ${total - decided} autres.`,
+    tests: "Tests",
+    agentMark: "`C*` : conformit\xE9 tranch\xE9e par l'agent IA \xE0 partir des \xE9vidences cit\xE9es (gat\xE9), et non prouv\xE9e par le moteur d\xE9terministe.",
     screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`,
     noScreenshot: "Aucune capture d'\xE9cran pour cette page (le producteur n'en a pas fourni) \u2014 le tier pixel est donc inactif ici.",
     gridTitle: "Grille des crit\xE8res",
@@ -50499,9 +50549,12 @@ var L6 = {
     viewport: "Viewport",
     producer: "Producer",
     auth: "Authentication required",
-    rate: "Conformance rate",
+    rate: "Automatic static-check pass rate",
     rateNote: "decidable subset: C \xF7 (C + NC)",
     tally: (c2, nc, na, m) => `${c2} conforming \xB7 ${nc} non-conforming \xB7 ${na} not applicable \xB7 ${m} to assess`,
+    coverage: (decided, total) => `Coverage: ${decided}/${total} criteria assessed \u2014 the rate above covers only those, and says nothing about the other ${total - decided}.`,
+    tests: "Tests",
+    agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
     screenshotAlt: (n) => `Screenshot of the ${n} page`,
     noScreenshot: "No screenshot for this page (the producer supplied none) \u2014 the pixel tier is therefore inactive here.",
     gridTitle: "Criteria grid",
@@ -50524,15 +50577,24 @@ var L6 = {
 };
 function rowsFor(result, page, standard, lang) {
   if (isCore(standard)) {
-    return [...page.criteria].sort((a, b) => compareSC(a.id, b.id)).map((c2) => ({ id: c2.id, label: `${c2.id} ${scTitle(c2.id, lang) ?? ""}`.trim(), group: c2.guideline, status: c2.status }));
+    return [...page.criteria].sort((a, b) => compareSC(a.id, b.id)).map((c2) => ({
+      id: c2.id,
+      label: `${c2.id} ${scTitle(c2.id, lang) ?? ""}`.trim(),
+      group: c2.guideline,
+      status: c2.status,
+      tests: [],
+      decidedBy: c2.decidedBy
+    }));
   }
   const pack = loadPack(standard);
-  const byId2 = new Map(derivePackResults(pageView(result, page), standard).map((r) => [r.id, r.status]));
+  const byId2 = new Map(derivePackResults(pageView(result, page), standard).map((r) => [r.id, r]));
   return pack.criteria.map((pc) => ({
     id: pc.id,
     label: `${pc.id} \u2014 ${titlePlain(pack, pc, lang)}`,
     group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim(),
-    status: byId2.get(pc.id) ?? "manual"
+    status: byId2.get(pc.id)?.status ?? "manual",
+    tests: packTestIds(pack, pc.id),
+    decidedBy: byId2.get(pc.id)?.decidedBy
   }));
 }
 function tally(rows) {
@@ -50562,22 +50624,28 @@ function renderPageReport(result, page, opts = {}) {
   const rows = rowsFor(result, page, standard, lang);
   const t2 = tally(rows);
   out2.push(`- **${s.rate}** : **${ratePct(rows)} %** _(${s.rateNote})_`);
-  out2.push(`- ${s.tally(t2.c, t2.nc, t2.na, t2.manual)}`, "");
+  out2.push(`- ${s.tally(t2.c, t2.nc, t2.na, t2.manual)}`);
+  out2.push(`- ${s.coverage(t2.c + t2.nc, rows.length)}`, "");
   if (page.basis !== "snapshot") out2.push(`> \u26A0\uFE0F ${s.sourceWarn}`, "");
   const shot = opts.screenshots?.get(page.id);
   if (shot) out2.push(`![${s.screenshotAlt(page.name)}](${shot})`, "");
   else out2.push(`_${s.noScreenshot}_`, "");
+  const withTests = rows.some((r) => r.tests.length);
   out2.push(`${h}# ${s.gridTitle}`, "", `> ${s.gridNote}`, "");
-  out2.push(`| ${s.criterion} | ${s.status} |`, "| --- | --- |");
+  out2.push(withTests ? `| ${s.criterion} | ${s.tests} | ${s.status} |` : `| ${s.criterion} | ${s.status} |`);
+  out2.push(withTests ? "| --- | --- | --- |" : "| --- | --- |");
   let group = "";
   for (const row of rows) {
     if (row.group !== group) {
       group = row.group;
-      out2.push(`| **${group}** | |`);
+      out2.push(withTests ? `| **${group}** | | |` : `| **${group}** | |`);
     }
-    out2.push(`| ${row.label} | ${MARK2[row.status]} |`);
+    const mark = row.decidedBy === "agent" && row.status === "C" ? `${MARK2[row.status]}*` : MARK2[row.status];
+    if (withTests) out2.push(`| ${row.label} | ${row.tests.map((t3) => `\`${t3}\``).join(" ")} | ${mark} |`);
+    else out2.push(`| ${row.label} | ${mark} |`);
   }
   out2.push("", `> ${s.manualWarn}`, "");
+  if (rows.some((r) => r.decidedBy === "agent" && r.status === "C")) out2.push(`> ${s.agentMark}`, "");
   const units = prdUnits(pageView(result, page), standard, lang);
   const ncUnits = units.filter((u) => !u.advisory);
   const advUnits = units.filter((u) => u.advisory);
@@ -51786,12 +51854,23 @@ function applyAdjudication(audit2, adj, opts = {}) {
   const issues = [];
   const byId2 = new Map(adj.items.map((it) => [it.criteriaId, it]));
   const packMode = !isCore(adj.standard);
+  const open = /* @__PURE__ */ new Set();
   if (packMode) {
     for (const pc of derivePackResults(audit2, adj.standard)) {
-      if (pc.status === "manual" && !byId2.has(pc.id)) issues.push(`criterion ${pc.id}: missing from the adjudication (coverage gap)`);
+      if (pc.status !== "manual") continue;
+      open.add(pc.id);
+      if (!byId2.has(pc.id)) issues.push(`criterion ${pc.id}: missing from the adjudication (coverage gap)`);
     }
   } else {
-    for (const r of audit2.residualRisks) if (!byId2.has(r.criteriaId)) issues.push(`criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+    for (const r of audit2.residualRisks) {
+      open.add(r.criteriaId);
+      if (!byId2.has(r.criteriaId)) issues.push(`criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+    }
+  }
+  for (const it of adj.items) {
+    if (!open.has(it.criteriaId)) {
+      issues.push(`criterion ${it.criteriaId}: not open for adjudication \u2014 the engine already decided it, or it is not part of ${adj.standard}`);
+    }
   }
   const groundInputs = [];
   for (const it of adj.items) {
@@ -51800,6 +51879,26 @@ function applyAdjudication(audit2, adj, opts = {}) {
       issues.push(`criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
     } else if (v === "C" || v === "NA") {
       if (!it.justification || !it.justification.trim()) issues.push(`criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
+      const cites = it.citations ?? [];
+      if (it.evidence.length === 0) {
+        if (v === "C") {
+          issues.push(
+            `criterion ${it.criteriaId}: a C verdict needs evidence to cite, and none was harvested for this criterion \u2014 record "manual" (reason "undecidable"), or "NA" if nothing in scope is concerned`
+          );
+        }
+      } else if (cites.length === 0) {
+        issues.push(
+          `criterion ${it.criteriaId}: a ${v} verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, \u2026}])`
+        );
+      } else {
+        const anchors = new Set(it.evidence.map((e) => `${e.file}:${e.line}`));
+        for (const c2 of cites) {
+          if (!anchors.has(`${c2.file}:${c2.line}`)) {
+            issues.push(`criterion ${it.criteriaId}: citation ${c2.file}:${c2.line} is not among this criterion's harvested evidence (fabricated?)`);
+          }
+          groundInputs.push({ file: c2.file, line: c2.line, selector: c2.selector, snippet: c2.snippet });
+        }
+      }
     } else if (v === "NC") {
       if (!it.findings || it.findings.length === 0) issues.push(`criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding`);
       for (const f of it.findings ?? []) {
@@ -51921,7 +52020,7 @@ function recomputeTallies(a) {
     g.na = inG.filter((c2) => c2.status === "NA").length;
     g.manual = inG.filter((c2) => c2.status === "manual").length;
   }
-  const decided = a.criteria.filter((c2) => c2.status === "C" || c2.status === "NC");
+  const decided = a.criteria.filter((c2) => c2.status === "NC" || c2.status === "C" && c2.decidedBy !== "agent");
   const conform = decided.filter((c2) => c2.status === "C").length;
   a.conformancePct = decided.length === 0 ? 100 : Math.round(conform / decided.length * 100);
 }
@@ -51932,13 +52031,13 @@ var T2 = {
     title: "# Adjudication des crit\xE8res \xE0 \xE9valuer (ultra11y)",
     intro: "Pour CHAQUE crit\xE8re, lisez les \xE9vidences ci-dessous (extraites de la source audit\xE9e) et attribuez un verdict dans `ADJUDICATE.todo.json` (champ `verdict`) :",
     verdicts: [
-      "- `C` \u2014 conforme (renseignez `justification`) ;",
+      "- `C` \u2014 conforme (renseignez `justification` ET `citations[]` : les \xE9vidences que vous avez lev\xE9es, `file`/`line` recopi\xE9s depuis la liste du crit\xE8re) ;",
       "- `NC` \u2014 non conforme (ajoutez au moins un `findings[]` : file/line/message, avec un `snippet` groundable ET un `normativeRef` citant le test pr\xE9cis \xE9chou\xE9) ;",
-      "- `NA` \u2014 non applicable (renseignez `justification`) ;",
+      "- `NA` \u2014 non applicable (renseignez `justification` ; si des \xE9vidences sont pr\xE9sent\xE9es, citez-les aussi dans `citations[]` pour dire lesquelles sortent du p\xE9rim\xE8tre) ;",
       "- `manual` \u2014 ind\xE9cidable statiquement (renseignez `reason` : `needs-rendered-dom` \u2192 `scan`, ou `undecidable`)."
     ],
-    rule: "> Ne signalez une NC que si un test pr\xE9cis du r\xE9f\xE9rentiel actif \xE9choue \u2014 citez-le (`normativeRef`). Une bonne pratique sans test normatif est une recommandation (`recommendations[]`, non normative). Une simple pr\xE9occupation UX n'est ni l'un ni l'autre.",
-    then: "Puis : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (\xE9choue si un verdict manque une justification/finding/reason).",
+    rule: "> Ne signalez une NC que si un test pr\xE9cis du r\xE9f\xE9rentiel actif \xE9choue \u2014 citez-le (`normativeRef`). Une bonne pratique sans test normatif est une recommandation (`recommendations[]`, non normative). Une simple pr\xE9occupation UX n'est ni l'un ni l'autre.\n>\n> Sym\xE9triquement, un `C` se cite comme une NC : il faut nommer dans `citations[]` les \xE9vidences lev\xE9es. **Un crit\xE8re pr\xE9sent\xE9 sans aucune \xE9vidence ne peut pas \xEAtre `C`** \u2014 c'est `manual` (`undecidable`), ou `NA` si rien n'est concern\xE9.",
+    then: "Puis : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (\xE9choue si un verdict manque sa justification, ses citations, son finding ou sa raison).",
     evidence: "\xC9vidences",
     none: "(aucune \xE9vidence automatique \u2014 d\xE9cidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "\xC0 v\xE9rifier manuellement",
@@ -51955,13 +52054,13 @@ var T2 = {
     title: "# Criteria adjudication (ultra11y)",
     intro: "For EACH criterion, read the evidence below (harvested from the audited source) and set a verdict in `ADJUDICATE.todo.json` (field `verdict`):",
     verdicts: [
-      "- `C` \u2014 conformant (fill `justification`);",
+      "- `C` \u2014 conformant (fill `justification` AND `citations[]`: the evidence you cleared, `file`/`line` copied from the criterion's own list);",
       "- `NC` \u2014 non-conformant (add at least one `findings[]`: file/line/message, with a groundable `snippet` AND a `normativeRef` citing the precise failed test);",
-      "- `NA` \u2014 not applicable (fill `justification`);",
+      "- `NA` \u2014 not applicable (fill `justification`; when evidence is presented, cite it too in `citations[]` to say which items are out of scope);",
       "- `manual` \u2014 not statically decidable (fill `reason`: `needs-rendered-dom` \u2192 `scan`, or `undecidable`)."
     ],
-    rule: "> Report NC only if a precise test of the active standard fails \u2014 cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative). A purely UX concern is neither.",
-    then: "Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (fails if any verdict lacks its justification/finding/reason).",
+    rule: "> Report NC only if a precise test of the active standard fails \u2014 cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative). A purely UX concern is neither.\n>\n> A `C` is cited the same way an NC is: name the evidence you cleared in `citations[]`. **A criterion presented with no evidence at all cannot be `C`** \u2014 record `manual` (`undecidable`), or `NA` if nothing in scope is concerned.",
+    then: "Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (fails if any verdict lacks its justification, citations, finding or reason).",
     evidence: "Evidence",
     none: "(no automatic evidence \u2014 decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
@@ -52135,6 +52234,20 @@ var VERDICT_TOOL = {
                 required: ["file", "line", "message", "normativeRef"]
               }
             },
+            citations: {
+              type: "array",
+              description: "Required for C and NA when evidence was presented: the evidence items you cleared (or ruled out of scope). Copy `file`, `line` and `snippet` VERBATIM from the evidence list of this criterion \u2014 a citation that is not among them, or that no longer matches the source, is rejected.",
+              items: {
+                type: "object",
+                properties: {
+                  file: { type: "string" },
+                  line: { type: "number" },
+                  selector: { type: "string" },
+                  snippet: { type: "string" }
+                },
+                required: ["file", "line"]
+              }
+            },
             recommendations: {
               type: "array",
               description: "Non-normative good practices. They never change a status.",
@@ -52163,7 +52276,7 @@ var SYSTEM = `You are an accessibility auditor ruling on the criteria a static e
 Rules, in order of importance:
 1. NEVER assert conformity you did not verify. "manual" with a reason is always available and is a correct answer.
 2. An NC must cite a real file:line taken from the evidence you were given, and the criterion's OWN numbered test as normativeRef. A citation that does not resolve against the real source is rejected downstream and wastes the whole batch.
-3. C and NA require a justification that says what you saw, not that you checked.
+3. C and NA require a justification that says what you saw, AND a "citations" array naming the evidence items you cleared \u2014 file and line copied verbatim from the evidence presented for that criterion. A criterion presented with NO evidence cannot be C: record "manual" (reason "undecidable"), or NA if nothing in scope is concerned.
 4. A criterion that needs a rendered page (computed contrast, visible focus, zoom, reflow) and was given only source evidence is "manual" with reason "needs-rendered-dom".
 5. Rule only on the criteria presented. Never introduce another.`;
 var sleep = (ms) => ms <= 0 ? Promise.resolve() : new Promise((r) => setTimeout(r, ms));
@@ -52247,6 +52360,8 @@ function applyRawVerdicts(items, verdicts) {
     item.justification = v.justification ?? "";
     item.reason = v.verdict === "manual" ? v.reason ?? null : null;
     item.findings = v.verdict === "NC" ? v.findings ?? [] : [];
+    if (v.verdict === "C" || v.verdict === "NA") item.citations = v.citations ?? [];
+    else delete item.citations;
     if (v.recommendations?.length) item.recommendations = v.recommendations;
     filled++;
   }
@@ -54213,7 +54328,7 @@ function writeCi(root, enginePath, failOn) {
 }
 
 // src/install/json-edit.ts
-import { copyFileSync, existsSync as existsSync22, mkdirSync as mkdirSync11, readFileSync as readFileSync17, renameSync as renameSync2, rmSync as rmSync4, writeFileSync as writeFileSync14 } from "fs";
+import { copyFileSync as copyFileSync2, existsSync as existsSync22, mkdirSync as mkdirSync11, readFileSync as readFileSync17, renameSync as renameSync2, rmSync as rmSync4, writeFileSync as writeFileSync14 } from "fs";
 import { dirname as dirname10 } from "path";
 var SettingsParseError = class extends Error {
   constructor(path, cause) {
@@ -54232,7 +54347,7 @@ function writeTextWithBackup(path, content, marker = "ultra11y") {
   let backup;
   if (existsSync22(path)) {
     backup = `${path}.${marker}-backup-${stamp()}`;
-    copyFileSync(path, backup);
+    copyFileSync2(path, backup);
   }
   const tmp = `${path}.${process.pid}.tmp`;
   try {
@@ -54405,7 +54520,7 @@ import { existsSync as existsSync25, readFileSync as readFileSync20 } from "fs";
 import { join as join37 } from "path";
 
 // src/install/paths.ts
-import { copyFileSync as copyFileSync2, cpSync, existsSync as existsSync24, mkdirSync as mkdirSync12, readFileSync as readFileSync19, realpathSync as realpathSync3, statSync as statSync10 } from "fs";
+import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync24, mkdirSync as mkdirSync12, readFileSync as readFileSync19, realpathSync as realpathSync3, statSync as statSync10 } from "fs";
 import { homedir as homedir2 } from "os";
 import { dirname as dirname11, join as join36 } from "path";
 function codexHome() {
@@ -54435,7 +54550,7 @@ function installedCliCommand() {
   const pin = pinnedEnginePath();
   if (source) {
     mkdirSync12(join36(pin, ".."), { recursive: true });
-    copyFileSync2(source, pin);
+    copyFileSync3(source, pin);
   }
   return `node ${JSON.stringify(pin)}`;
 }
@@ -58351,27 +58466,39 @@ async function cmdPages(p) {
   const derived = derivePages(result, scope);
   const split = p.flags.split === "page";
   const outDir = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : void 0;
-  const shotsFor = (fileDir) => {
+  const shotOf = (id) => join45(PAGES_DIR, id, "screen.png");
+  const shotsRelative = (fileDir) => {
     const m = /* @__PURE__ */ new Map();
     for (const pg of derived) {
-      const shot = join45(PAGES_DIR, pg.id, "screen.png");
-      if (existsSync31(shot)) m.set(pg.id, relative5(fileDir, shot).split("\\").join("/"));
+      if (existsSync31(shotOf(pg.id))) m.set(pg.id, relative5(fileDir, shotOf(pg.id)).split("\\").join("/"));
+    }
+    return m;
+  };
+  const shotsCopiedInto = (dir) => {
+    const m = /* @__PURE__ */ new Map();
+    const assets = join45(dir, "assets");
+    for (const pg of derived) {
+      const src = shotOf(pg.id);
+      if (!existsSync31(src)) continue;
+      mkdirSync15(assets, { recursive: true });
+      copyFileSync4(src, join45(assets, `${pg.id}.png`));
+      m.set(pg.id, `./assets/${pg.id}.png`);
     }
     return m;
   };
   if (!outDir) {
-    console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsFor(".") }));
+    console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsRelative(".") }));
     return 0;
   }
   mkdirSync15(outDir, { recursive: true });
   if (!split) {
     const file = join45(outDir, `pages-${result.date}.md`);
-    writeFileSync17(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsFor(outDir) })}
+    writeFileSync17(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir) })}
 `);
     console.log(file);
     return 0;
   }
-  const shots = shotsFor(outDir);
+  const shots = shotsCopiedInto(outDir);
   const sheet = (id) => `page-${id}.md`;
   const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
   for (const pg of derived) {

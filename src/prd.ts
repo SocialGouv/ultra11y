@@ -14,6 +14,7 @@ import {
   loadPack,
   derivePackResults,
   packConformancePct,
+  packTestIds,
   standardLabel,
   themeName,
   titlePlain as packTitlePlain,
@@ -363,8 +364,8 @@ export function toRuleOnSection(r: AuditResult, standard: StandardId, lang: Lang
   for (const pc of manual) {
     const crit = pack.criteria.find((c) => c.id === pc.id);
     const title = crit ? packTitlePlain(pack, crit, lang) : pc.id;
-    const tests = Object.keys(crit?.tests ?? {});
-    out.push(`- [ ] **${pack.name} ${pc.id}** — ${title}${tests.length ? `  ·  ${s.tests}: ${tests.map((k) => `\`${pc.id}.${k}\``).join(" ")}` : ""}`);
+    const tests = packTestIds(pack, pc.id);
+    out.push(`- [ ] **${pack.name} ${pc.id}** — ${title}${tests.length ? `  ·  ${s.tests}: ${tests.map((t) => `\`${t}\``).join(" ")}` : ""}`);
   }
   out.push("");
   return out;

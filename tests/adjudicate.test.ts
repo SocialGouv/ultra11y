@@ -96,13 +96,17 @@ describe("buildAdjudicationWorklist", () => {
   });
 });
 
+// A C verdict is now evidence-bound: it must cite the harvested evidence it cleared, and a
+// criterion with NO evidence cannot be C at all (it stays manual). These helpers build the
+// honest shape so the fixtures below exercise the gate rather than fight it.
+const clearWith = (i: AdjudicationItem, justification: string): AdjudicationItem =>
+  i.evidence.length ? { ...i, verdict: "C" as const, justification, citations: [i.evidence[0]!] } : { ...i, verdict: "manual" as const, reason: "undecidable" };
+
 describe("applyAdjudication — updates the audit + records provenance", () => {
   it("applies a C verdict with justification and records decidedBy:agent", () => {
     const audit = auditPage();
     const items = buildAdjudicationWorklist(audit).map((i) =>
-      i.criteriaId === "2.4.4"
-        ? { ...i, verdict: "C" as const, justification: "Every link text is self-describing in context." }
-        : { ...i, verdict: "manual" as const, reason: "undecidable" },
+      i.criteriaId === "2.4.4" ? clearWith(i, "Every link text is self-describing in context.") : { ...i, verdict: "manual" as const, reason: "undecidable" },
     );
     const r = applyAdjudication(audit, file(items));
     expect(r.ok).toBe(true);
@@ -142,26 +146,57 @@ describe("applyAdjudication — updates the audit + records provenance", () => {
     expect(wl.some((w) => w.criteriaId === "1.1.1")).toBe(true);
   });
 
-  it("recomputes conformancePct over the newly decided set", () => {
+  it("keeps an agent C out of the AUTOMATIC pass rate, and lets an agent NC into it", () => {
+    // `conformancePct` is labelled everywhere as the automatic static-check rate. An
+    // adjudicated conformity is a judgement, however well gated, so it must not inflate
+    // that number — otherwise one `judge` pass turns opinion into a machine-verified
+    // figure. A non-conformity is evidenced, and lowering the rate is the safe direction.
     const audit = auditPage();
     const before = audit.conformancePct;
-    const items = buildAdjudicationWorklist(audit).map((i) => ({ ...i, verdict: "C" as const, justification: "assessed conforming from source" }));
-    const r = applyAdjudication(audit, file(items));
-    expect(r.ok).toBe(true);
-    expect(r.audit.conformancePct).not.toBe(before); // many manual → C shifts the ratio
-    expect(r.audit.residualRisks.length).toBe(0);
+
+    const cleared = buildAdjudicationWorklist(audit).map((i) => clearWith(i, "assessed conforming from source"));
+    const rC = applyAdjudication(audit, file(cleared));
+    expect(rC.ok).toBe(true);
+    expect(rC.audit.criteria.some((c) => c.status === "C" && c.decidedBy === "agent")).toBe(true);
+    expect(rC.audit.conformancePct).toBe(before);
+
+    const accused = buildAdjudicationWorklist(audit).map((i) =>
+      i.criteriaId === "2.4.4"
+        ? {
+            ...i,
+            verdict: "NC" as const,
+            justification: "",
+            findings: [
+              {
+                file: PAGE,
+                line: 11,
+                selector: "a",
+                message: "Link text is not explicit out of context.",
+                snippet: '<a href="/pricing">Read more</a>',
+                normativeRef: "2.4.4",
+              },
+            ],
+          }
+        : { ...i, verdict: "manual" as const, reason: "undecidable" },
+    );
+    const rNC = applyAdjudication(audit, file(accused));
+    expect(rNC.ok).toBe(true);
+    expect(rNC.audit.conformancePct).toBeLessThan(before);
   });
 
   it("§5 shrinks to only still-manual items and keeps the '## 5.' heading", () => {
     const audit = auditPage();
     const items = buildAdjudicationWorklist(audit).map((i, idx) =>
-      idx === 0 ? { ...i, verdict: "manual" as const, reason: "needs-rendered-dom" } : { ...i, verdict: "C" as const, justification: "assessed from source" },
+      idx === 0 ? { ...i, verdict: "manual" as const, reason: "needs-rendered-dom" } : clearWith(i, "assessed from source"),
     );
     const r = applyAdjudication(audit, file(items));
     const report = renderReport(r.audit, "en");
     expect(report).toContain("## 5.");
+    // It SHRINKS — it does not empty: a criterion the harvester found no evidence for
+    // cannot be cleared, so it honestly stays manual instead of being waved through.
     const manualCount = r.audit.criteria.filter((c) => c.status === "manual").length;
-    expect(manualCount).toBe(1);
+    expect(manualCount).toBeLessThan(audit.residualRisks.length);
+    expect(r.audit.criteria.filter((c) => c.status === "C" && c.decidedBy === "agent").length).toBeGreaterThan(0);
   });
 });
 
@@ -177,6 +212,66 @@ describe("applyAdjudication — fail-closed validation", () => {
   it("fails on a null verdict (unadjudicated criterion)", () => {
     const items = baseItems(); // all verdict null
     expect(applyAdjudication(auditPage(), file(items)).ok).toBe(false);
+  });
+
+  // ---- The conforming side of the gate ----
+  // A clearing verdict used to be validated by one predicate: "the justification is a
+  // non-empty string". A model answering C to every criterion with the justification "x"
+  // therefore passed, and the report published dozens of conformities nobody had
+  // assessed — the one error this tool must not make. A C is now cited like an NC.
+
+  it("refuses a C whose justification is prose with no citation", () => {
+    const items = decideAll({ verdict: "C", justification: "Tout va bien, j'ai regardé." }, "2.4.4");
+    const r = applyAdjudication(auditPage(), file(items));
+    expect(r.ok).toBe(false);
+    expect(r.issues.join("\n")).toMatch(/2\.4\.4.*must cite at least one/s);
+  });
+
+  it("refuses a C on a criterion the harvester found no evidence for", () => {
+    // Nothing was presented, so nothing could have been read: the honest verdicts are
+    // `manual` or `NA`, and a `C` here would be conformity by silence.
+    const blind = baseItems().find((i) => i.evidence.length === 0);
+    expect(blind, "expected at least one criterion with no harvested evidence").toBeDefined();
+    const items = decideAll({ verdict: "C", justification: "conforme" }, blind!.criteriaId);
+    const r = applyAdjudication(auditPage(), file(items));
+    expect(r.ok).toBe(false);
+    expect(r.issues.join("\n")).toMatch(/needs evidence to cite/);
+  });
+
+  it("refuses a citation that is not among the evidence the criterion was shown", () => {
+    const src = baseItems().find((i) => i.criteriaId === "2.4.4")!;
+    const items = decideAll({ verdict: "C", justification: "ok", citations: [{ ...src.evidence[0]!, line: 9999 }] }, "2.4.4");
+    const r = applyAdjudication(auditPage(), file(items));
+    expect(r.ok).toBe(false);
+    expect(r.issues.join("\n")).toMatch(/not among this criterion's harvested evidence/);
+  });
+
+  it("accepts a C that cites the evidence it was shown", () => {
+    const src = baseItems().find((i) => i.criteriaId === "2.4.4")!;
+    const items = decideAll({ verdict: "C", justification: "Chaque intitulé est explicite.", citations: [src.evidence[0]!] }, "2.4.4");
+    const r = applyAdjudication(auditPage(), file(items));
+    expect(r.ok, r.issues.join(" | ")).toBe(true);
+    expect(r.audit.criteria.find((c) => c.id === "2.4.4")?.status).toBe("C");
+  });
+
+  it("refuses an item for a criterion the engine already decided", () => {
+    // The coverage check only proved every OPEN criterion was ruled on. Without the other
+    // direction, a surplus item overwrote an engine-decided verdict with an agent one.
+    const audit = auditPage();
+    const decided = audit.criteria.find((c) => c.status === "NC" || c.status === "C")!;
+    const surplus: AdjudicationItem = {
+      ...baseItems()[0]!,
+      criteriaId: decided.id,
+      evidence: [],
+      verdict: "C",
+      justification: "x",
+      reason: null,
+      findings: [],
+    };
+    const items = [...decideAll({}), surplus];
+    const r = applyAdjudication(audit, file(items));
+    expect(r.ok).toBe(false);
+    expect(r.issues.join("\n")).toMatch(/not open for adjudication/);
   });
 
   it("fails a C without a justification", () => {
@@ -312,6 +407,7 @@ describe("applyAdjudication — recommendations fold as advisory (status-neutral
             ...i,
             verdict: "C" as const,
             justification: "Every link text is self-describing.",
+            citations: [i.evidence[0]!],
             // A non-normative good practice noted alongside the conformant verdict.
             recommendations: [{ file: PAGE, line: 9, selector: "img", message: "Consider a more descriptive alt.", snippet: 'alt="chart"' }],
           }
@@ -334,6 +430,7 @@ describe("applyAdjudication — recommendations fold as advisory (status-neutral
             ...i,
             verdict: "C" as const,
             justification: "Links are fine.",
+            citations: [i.evidence[0]!],
             recommendations: [{ file: PAGE, line: 9, selector: "video", message: "bogus", snippet: "<video controls></video>" }],
           }
         : { ...i, verdict: "manual" as const, reason: "undecidable" },

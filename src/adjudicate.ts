@@ -77,6 +77,18 @@ export interface AdjudicationItem {
   justification: string; // REQUIRED for C and NA
   reason: string | null; // REQUIRED for a still-`manual` verdict ("needs-rendered-dom" | "undecidable")
   findings: AgentFinding[]; // REQUIRED (≥1, groundable, each with a normativeRef) for NC
+  // What the agent CLEARED, for a C (or ruled out of scope, for an NA). The mirror image of
+  // `findings`, and required for the same reason: without a slot to cite in, a conforming
+  // verdict was pure prose, and the gate could only ever check that the prose was non-empty
+  // — so a model answering "C" to everything with the justification "x" passed, and the
+  // report published 91 conformant criteria nobody had assessed.
+  //
+  // Each citation must ground (the file/line/snippet must resolve, exactly like an NC
+  // finding) AND match one of this item's own `evidence` anchors by file+line — that pairing
+  // is what turns "cite something real" into "cite the evidence you were shown". When the
+  // harvester found no evidence at all there is nothing to clear, and the honest verdicts
+  // are `manual` or `NA`, never `C`.
+  citations?: Evidence[];
   // Non-normative good practices the agent noted on this criterion — folded back into the
   // audit as ADVISORY findings (grounded exactly like an NC finding, but never affecting
   // status: they cannot flip the criterion to NC nor enter conformancePct). Optional.
@@ -427,12 +439,29 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
   // means every pack criterion that derives `manual` — the pack's own granularity, which is
   // what the worklist was built at.
   const packMode = !isCore(adj.standard);
+  const open = new Set<string>();
   if (packMode) {
     for (const pc of derivePackResults(audit, adj.standard)) {
-      if (pc.status === "manual" && !byId.has(pc.id)) issues.push(`criterion ${pc.id}: missing from the adjudication (coverage gap)`);
+      if (pc.status !== "manual") continue;
+      open.add(pc.id);
+      if (!byId.has(pc.id)) issues.push(`criterion ${pc.id}: missing from the adjudication (coverage gap)`);
     }
   } else {
-    for (const r of audit.residualRisks) if (!byId.has(r.criteriaId)) issues.push(`criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+    for (const r of audit.residualRisks) {
+      open.add(r.criteriaId);
+      if (!byId.has(r.criteriaId)) issues.push(`criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+    }
+  }
+
+  // …and the other direction. The coverage check above only proves every open criterion was
+  // ruled on; it says nothing about a SURPLUS item. That mattered: the fold resolved a
+  // criterion by id against the whole audit, so an extra `{criteriaId: "3.1.1", verdict:
+  // "C"}` overwrote a non-conformity the deterministic engine had decided — no finding, no
+  // citation, no normativeRef. Adjudication may only ever decide what the engine left open.
+  for (const it of adj.items) {
+    if (!open.has(it.criteriaId)) {
+      issues.push(`criterion ${it.criteriaId}: not open for adjudication — the engine already decided it, or it is not part of ${adj.standard}`);
+    }
   }
 
   // Per-item fail-closed validation.
@@ -443,6 +472,36 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
       issues.push(`criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
     } else if (v === "C" || v === "NA") {
       if (!it.justification || !it.justification.trim()) issues.push(`criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
+      // A clearing verdict is gated exactly like an accusing one. Before this, the only
+      // check was "the justification is a non-empty string", so `"x"` cleared a criterion —
+      // and a model answering C to everything published a conformance nobody had assessed.
+      const cites = it.citations ?? [];
+      if (it.evidence.length === 0) {
+        // Nothing was harvested for this criterion, so there is nothing the agent could have
+        // read to clear it. `NA` is still legitimate (the honest "no element in scope is
+        // concerned"); `C` is not — it must stay `manual` and be ruled on against the
+        // criterion's own tests, from a rendered capture or by hand.
+        if (v === "C") {
+          issues.push(
+            `criterion ${it.criteriaId}: a C verdict needs evidence to cite, and none was harvested for this criterion — record "manual" (reason "undecidable"), or "NA" if nothing in scope is concerned`,
+          );
+        }
+      } else if (cites.length === 0) {
+        issues.push(
+          `criterion ${it.criteriaId}: a ${v} verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, …}])`,
+        );
+      } else {
+        // Each citation must name evidence THIS item carried. Grounding alone would only
+        // prove the anchor exists somewhere in the tree; the pairing proves the agent ruled
+        // on what it was actually given.
+        const anchors = new Set(it.evidence.map((e) => `${e.file}:${e.line}`));
+        for (const c of cites) {
+          if (!anchors.has(`${c.file}:${c.line}`)) {
+            issues.push(`criterion ${it.criteriaId}: citation ${c.file}:${c.line} is not among this criterion's harvested evidence (fabricated?)`);
+          }
+          groundInputs.push({ file: c.file, line: c.line, selector: c.selector, snippet: c.snippet });
+        }
+      }
     } else if (v === "NC") {
       if (!it.findings || it.findings.length === 0) issues.push(`criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding`);
       for (const f of it.findings ?? []) {
@@ -471,7 +530,8 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
     for (const rec of it.recommendations ?? []) groundInputs.push({ file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
   }
 
-  // Content-level grounding of every agent NC finding + every recommendation.
+  // Content-level grounding of every agent NC finding, every C/NA citation, and every
+  // recommendation — the same check, whichever direction the verdict points.
   const grounding = groundItems(groundInputs, { cwd: opts.cwd });
   for (const gi of grounding.issues) issues.push(gi);
 
@@ -596,7 +656,12 @@ function recomputeTallies(a: AuditResult): void {
     g.na = inG.filter((c) => c.status === "NA").length;
     g.manual = inG.filter((c) => c.status === "manual").length;
   }
-  const decided = a.criteria.filter((c) => c.status === "C" || c.status === "NC");
+  // `conformancePct` is labelled everywhere as the AUTOMATIC static-check pass rate, so an
+  // agent's C must not enter it — otherwise one adjudication pass turns a judgement into a
+  // machine-verified number, which is exactly the claim the label denies. An agent NC does
+  // count: a non-conformity is evidenced (grounded finding + normativeRef) and reporting
+  // it lowers the rate, which is the safe direction.
+  const decided = a.criteria.filter((c) => c.status === "NC" || (c.status === "C" && c.decidedBy !== "agent"));
   const conform = decided.filter((c) => c.status === "C").length;
   a.conformancePct = decided.length === 0 ? 100 : Math.round((conform / decided.length) * 100);
 }
@@ -611,13 +676,13 @@ const T = {
     intro:
       "Pour CHAQUE critère, lisez les évidences ci-dessous (extraites de la source auditée) et attribuez un verdict dans `ADJUDICATE.todo.json` (champ `verdict`) :",
     verdicts: [
-      "- `C` — conforme (renseignez `justification`) ;",
+      "- `C` — conforme (renseignez `justification` ET `citations[]` : les évidences que vous avez levées, `file`/`line` recopiés depuis la liste du critère) ;",
       "- `NC` — non conforme (ajoutez au moins un `findings[]` : file/line/message, avec un `snippet` groundable ET un `normativeRef` citant le test précis échoué) ;",
-      "- `NA` — non applicable (renseignez `justification`) ;",
+      "- `NA` — non applicable (renseignez `justification` ; si des évidences sont présentées, citez-les aussi dans `citations[]` pour dire lesquelles sortent du périmètre) ;",
       "- `manual` — indécidable statiquement (renseignez `reason` : `needs-rendered-dom` → `scan`, ou `undecidable`).",
     ],
-    rule: "> Ne signalez une NC que si un test précis du référentiel actif échoue — citez-le (`normativeRef`). Une bonne pratique sans test normatif est une recommandation (`recommendations[]`, non normative). Une simple préoccupation UX n'est ni l'un ni l'autre.",
-    then: "Puis : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (échoue si un verdict manque une justification/finding/reason).",
+    rule: "> Ne signalez une NC que si un test précis du référentiel actif échoue — citez-le (`normativeRef`). Une bonne pratique sans test normatif est une recommandation (`recommendations[]`, non normative). Une simple préoccupation UX n'est ni l'un ni l'autre.\n>\n> Symétriquement, un `C` se cite comme une NC : il faut nommer dans `citations[]` les évidences levées. **Un critère présenté sans aucune évidence ne peut pas être `C`** — c'est `manual` (`undecidable`), ou `NA` si rien n'est concerné.",
+    then: "Puis : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (échoue si un verdict manque sa justification, ses citations, son finding ou sa raison).",
     evidence: "Évidences",
     none: "(aucune évidence automatique — décidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "À vérifier manuellement",
@@ -635,13 +700,13 @@ const T = {
     title: "# Criteria adjudication (ultra11y)",
     intro: "For EACH criterion, read the evidence below (harvested from the audited source) and set a verdict in `ADJUDICATE.todo.json` (field `verdict`):",
     verdicts: [
-      "- `C` — conformant (fill `justification`);",
+      "- `C` — conformant (fill `justification` AND `citations[]`: the evidence you cleared, `file`/`line` copied from the criterion's own list);",
       "- `NC` — non-conformant (add at least one `findings[]`: file/line/message, with a groundable `snippet` AND a `normativeRef` citing the precise failed test);",
-      "- `NA` — not applicable (fill `justification`);",
+      "- `NA` — not applicable (fill `justification`; when evidence is presented, cite it too in `citations[]` to say which items are out of scope);",
       "- `manual` — not statically decidable (fill `reason`: `needs-rendered-dom` → `scan`, or `undecidable`).",
     ],
-    rule: "> Report NC only if a precise test of the active standard fails — cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative). A purely UX concern is neither.",
-    then: "Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (fails if any verdict lacks its justification/finding/reason).",
+    rule: "> Report NC only if a precise test of the active standard fails — cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative). A purely UX concern is neither.\n>\n> A `C` is cited the same way an NC is: name the evidence you cleared in `citations[]`. **A criterion presented with no evidence at all cannot be `C`** — record `manual` (`undecidable`), or `NA` if nothing in scope is concerned.",
+    then: "Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (fails if any verdict lacks its justification, citations, finding or reason).",
     evidence: "Evidence",
     none: "(no automatic evidence — decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",

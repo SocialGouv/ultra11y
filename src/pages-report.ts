@@ -19,12 +19,14 @@
 //      `verify` (AUDITOR_OCCURRENCE, src/verify.ts).
 //
 // The screenshot is the one thing the page report has that no other output does. It is
-// referenced, never copied: `.ultra11y/pages/<id>/screen.png` is already on disk, so the
-// caller resolves a relative path and passes it in — this module stays pure and testable.
+// passed in as an href, never resolved here: `.ultra11y/pages/<id>/screen.png` is already
+// on disk, and the caller decides whether to reference it relatively or copy it beside the
+// report (it does copy, so an uploaded `audits/` artefact keeps its images), which keeps
+// this module pure and testable.
 import { prdUnits } from "./prd.js";
 import { renderAuditorUnit } from "./auditor.js";
 import { pageView } from "./pages.js";
-import { CORE, type StandardId, derivePackResults, isCore, loadPack, themeName, titlePlain } from "./standards/index.js";
+import { CORE, type StandardId, derivePackResults, isCore, loadPack, packTestIds, themeName, titlePlain } from "./standards/index.js";
 import type { AuditResult, Lang, PageResult, Status } from "./types.js";
 import { compareSC, scTitle } from "./wcag.js";
 
@@ -61,9 +63,13 @@ const L = {
     viewport: "Fenêtre",
     producer: "Producteur",
     auth: "Authentification requise",
-    rate: "Taux de conformité",
+    rate: "Taux de réussite automatique (vérifications statiques)",
     rateNote: "sous-ensemble décidable : C ÷ (C + NC)",
     tally: (c: number, nc: number, na: number, m: number) => `${c} conforme(s) · ${nc} non conforme(s) · ${na} non applicable(s) · ${m} à évaluer`,
+    coverage: (decided: number, total: number) =>
+      `Couverture : ${decided}/${total} critère(s) évalué(s) — le taux ci-dessus ne porte que sur eux, et ne dit rien des ${total - decided} autres.`,
+    tests: "Tests",
+    agentMark: "`C*` : conformité tranchée par l'agent IA à partir des évidences citées (gaté), et non prouvée par le moteur déterministe.",
     screenshotAlt: (n: string) => `Capture d'écran de la page ${n}`,
     noScreenshot: "Aucune capture d'écran pour cette page (le producteur n'en a pas fourni) — le tier pixel est donc inactif ici.",
     gridTitle: "Grille des critères",
@@ -101,9 +107,13 @@ const L = {
     viewport: "Viewport",
     producer: "Producer",
     auth: "Authentication required",
-    rate: "Conformance rate",
+    rate: "Automatic static-check pass rate",
     rateNote: "decidable subset: C ÷ (C + NC)",
     tally: (c: number, nc: number, na: number, m: number) => `${c} conforming · ${nc} non-conforming · ${na} not applicable · ${m} to assess`,
+    coverage: (decided: number, total: number) =>
+      `Coverage: ${decided}/${total} criteria assessed — the rate above covers only those, and says nothing about the other ${total - decided}.`,
+    tests: "Tests",
+    agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
     screenshotAlt: (n: string) => `Screenshot of the ${n} page`,
     noScreenshot: "No screenshot for this page (the producer supplied none) — the pixel tier is therefore inactive here.",
     gridTitle: "Criteria grid",
@@ -144,6 +154,12 @@ interface Row {
   label: string;
   group: string;
   status: Status;
+  // The criterion's own numbered tests (pack standards only — the WCAG core's analogue is
+  // its techniques, which are advisory rather than the thing you rule on). Rendered in the
+  // grid so a sheet says WHAT has to be checked for every criterion, not only for the ones
+  // that happened to trigger a non-conformity.
+  tests: string[];
+  decidedBy?: "engine" | "agent" | "scan";
 }
 
 /** The criterion rows for ONE page, in the active standard's own vocabulary and order.
@@ -152,15 +168,24 @@ function rowsFor(result: AuditResult, page: PageResult, standard: StandardId, la
   if (isCore(standard)) {
     return [...page.criteria]
       .sort((a, b) => compareSC(a.id, b.id))
-      .map((c) => ({ id: c.id, label: `${c.id} ${scTitle(c.id, lang) ?? ""}`.trim(), group: c.guideline, status: c.status }));
+      .map((c) => ({
+        id: c.id,
+        label: `${c.id} ${scTitle(c.id, lang) ?? ""}`.trim(),
+        group: c.guideline,
+        status: c.status,
+        tests: [],
+        decidedBy: c.decidedBy,
+      }));
   }
   const pack = loadPack(standard);
-  const byId = new Map(derivePackResults(pageView(result, page), standard).map((r) => [r.id, r.status]));
+  const byId = new Map(derivePackResults(pageView(result, page), standard).map((r) => [r.id, r]));
   return pack.criteria.map((pc) => ({
     id: pc.id,
     label: `${pc.id} — ${titlePlain(pack, pc, lang)}`,
     group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim(),
-    status: byId.get(pc.id) ?? "manual",
+    status: byId.get(pc.id)?.status ?? "manual",
+    tests: packTestIds(pack, pc.id),
+    decidedBy: byId.get(pc.id)?.decidedBy,
   }));
 }
 
@@ -202,7 +227,10 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
   const rows = rowsFor(result, page, standard, lang);
   const t = tally(rows);
   out.push(`- **${s.rate}** : **${ratePct(rows)} %** _(${s.rateNote})_`);
-  out.push(`- ${s.tally(t.c, t.nc, t.na, t.manual)}`, "");
+  out.push(`- ${s.tally(t.c, t.nc, t.na, t.manual)}`);
+  // The rate alone reads as a verdict on the page. Naming the denominator next to it is
+  // what stops "100 %" over six decided criteria from being quoted as a conformant page.
+  out.push(`- ${s.coverage(t.c + t.nc, rows.length)}`, "");
 
   // A source-only page cannot earn conformity by silence. Say so ON THE PAGE, not only in a
   // legend the reader may never reach — this is the sentence that stops a clean-looking
@@ -213,17 +241,28 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
   if (shot) out.push(`![${s.screenshotAlt(page.name)}](${shot})`, "");
   else out.push(`_${s.noScreenshot}_`, "");
 
+  // The grid carries the criterion's own numbered TESTS, not just its title and status:
+  // those tests are what has to be checked, and listing them only inside the
+  // non-conformity blocks meant a sheet said nothing about the work still to do on the
+  // ~99 criteria that never triggered. Test ids go in backticks and are never followed by
+  // an em dash — `check`'s criterion scanner matches `(\d+\.\d+)\s*—` and would capture
+  // "2.1" out of "6.2.1 — …".
+  const withTests = rows.some((r) => r.tests.length);
   out.push(`${h}# ${s.gridTitle}`, "", `> ${s.gridNote}`, "");
-  out.push(`| ${s.criterion} | ${s.status} |`, "| --- | --- |");
+  out.push(withTests ? `| ${s.criterion} | ${s.tests} | ${s.status} |` : `| ${s.criterion} | ${s.status} |`);
+  out.push(withTests ? "| --- | --- | --- |" : "| --- | --- |");
   let group = "";
   for (const row of rows) {
     if (row.group !== group) {
       group = row.group;
-      out.push(`| **${group}** | |`);
+      out.push(withTests ? `| **${group}** | | |` : `| **${group}** | |`);
     }
-    out.push(`| ${row.label} | ${MARK[row.status]} |`);
+    const mark = row.decidedBy === "agent" && row.status === "C" ? `${MARK[row.status]}*` : MARK[row.status];
+    if (withTests) out.push(`| ${row.label} | ${row.tests.map((t) => `\`${t}\``).join(" ")} | ${mark} |`);
+    else out.push(`| ${row.label} | ${mark} |`);
   }
   out.push("", `> ${s.manualWarn}`, "");
+  if (rows.some((r) => r.decidedBy === "agent" && r.status === "C")) out.push(`> ${s.agentMark}`, "");
 
   // The non-conformities, rendered by the ONE auditor block (invariant 2). Feeding
   // `prdUnits` the page view is what scopes them to this page without a second grouping.

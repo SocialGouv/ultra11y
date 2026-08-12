@@ -52,6 +52,25 @@ describe("RGAA applicability — an image-alt NC no longer over-projects", () =>
     }
   });
 
+  it("never lets a JUDGMENT criterion inherit a C from a weaker mapped SC", () => {
+    // The projection folds the SCs DINUM's crosswalk cites and returns C as soon as one is
+    // C. That answered the wrong question wherever the RGAA wording asks more: 8.6 wants a
+    // *pertinent* page title, WCAG 2.4.2 only a present one; 13.3 wants an accessible
+    // version of a downloaded document, and no mapped SC ever opened it — so a page whose
+    // only merit was a `lang` attribute derived C on both, and so did a page carrying no
+    // document at all. They now derive `manual` and go to the agent.
+    const pack = loadPack("rgaa");
+    for (const id of ["8.4", "8.6", "13.3", "13.4", "4.10"]) {
+      expect(pack.criteria.find((c) => c.id === id)?.judgment, `RGAA ${id} must be flagged judgment`).toBe(true);
+      expect(statusOf(rows, id), `RGAA ${id} must never be C`).not.toBe("C");
+    }
+    // The mechanical siblings are untouched: presence of a language / of a title really is
+    // what the engine checked, so they stay decidable.
+    for (const id of ["8.3", "8.5"]) {
+      expect(pack.criteria.find((c) => c.id === id)?.judgment, `RGAA ${id} must NOT be flagged judgment`).toBeUndefined();
+    }
+  });
+
   it("a criterion whose mapped SC failed on out-of-scope elements derives as manual with a scoped justification (never a foreign finding)", () => {
     const c14 = rows.find((r) => r.id === "1.4")!;
     expect(c14.status).toBe("manual");

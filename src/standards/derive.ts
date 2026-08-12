@@ -23,6 +23,16 @@ export interface PackCriterionResult {
   // sibling's failure. It derives as `manual` (assess separately) with a dedicated
   // scoped-out justification (see src/report.ts renderPackReport).
   scopedOut?: boolean;
+  // Set when the pack marks this criterion `judgment` and the projection WOULD have
+  // inherited a `C` from a mapped SC that never answered the criterion's own question
+  // (RGAA 8.6 "is the title pertinent?" off WCAG 2.4.2 "a title exists"). It derives
+  // `manual` instead — see `judgmentGuard` and src/report.ts for the justification.
+  judgment?: boolean;
+  // Recorded on the adjudicated branch below (an agent verdict at the pack's own
+  // granularity wins over the derivation). Declared here because renderings distinguish a
+  // conformity the engine PROVED from one an agent RULED — they are not the same claim.
+  justification?: string;
+  decidedBy?: "engine" | "agent" | "scan";
 }
 
 // NC dominates (a real failure anywhere fails the criterion); then a decided C; then
@@ -68,7 +78,11 @@ export function packCriteriaForFinding(pack: StandardPack, finding: Finding): st
  *  same as core. Exists so a pack report's header rate can't drift from its own table once
  *  pack overrides (advisory/severity flips) make the two diverge from core `conformancePct`. */
 export function packConformancePct(derived: PackCriterionResult[]): number {
-  const c = derived.filter((d) => d.status === "C").length;
+  // Agent-adjudicated conformities are deliberately excluded, mirroring the core
+  // (`recomputeTallies` in src/adjudicate.ts): this number is the AUTOMATIC pass rate, and
+  // a judgement — however well gated — is not an automatic verification. An agent NC still
+  // counts; lowering the rate off evidenced findings is the safe direction.
+  const c = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent").length;
   const nc = derived.filter((d) => d.status === "NC").length;
   return c + nc === 0 ? 100 : Math.round((c / (c + nc)) * 100);
 }
@@ -121,6 +135,23 @@ function applySecondaryMappings(
   // out-of-scope/scoped-out base verdict; an advisory-only one just rides along for display.
   if (added.some((f) => !f.advisory)) return { id: pc.id, theme: pc.theme, status: aggregate([base.status, "NC"]), findings, scs: base.scs };
   return { ...base, findings };
+}
+
+/** A criterion the pack marks `judgment` never INHERITS a `C` from its mapped WCAG SCs.
+ *
+ *  The projection folds the SCs DINUM's own crosswalk cites, and `aggregate` returns `C`
+ *  as soon as one of them is `C`. That is the right answer when the RGAA question and the
+ *  SC ask the same thing, and a fabricated conformity when the RGAA wording asks more:
+ *  RGAA 8.6 wants a *pertinent* page title, WCAG 2.4.2 only a present one; RGAA 13.3 wants
+ *  an accessible version of a downloaded document, and no mapped SC ever opened it. Those
+ *  derived `C`s were the one error this tool must not make, so they become `manual` and go
+ *  to the agent instead.
+ *
+ *  Only `C` is intercepted: an `NC` was evidenced by a rule that really fired on this
+ *  criterion, and an `NA` means nothing in scope is concerned — both stay. */
+function judgmentGuard(r: PackCriterionResult, pc: PackCriterion): PackCriterionResult {
+  if (!pc.judgment || r.status !== "C") return r;
+  return { ...r, status: "manual" as Status, judgment: true };
 }
 
 export function derivePackResults(audit: AuditResult, packKey: string): PackCriterionResult[] {
@@ -207,7 +238,7 @@ export function derivePackResults(audit: AuditResult, packKey: string): PackCrit
         decidedBy: "agent" as const,
       };
     }
-    const base = deriveBase(pc);
+    const base = judgmentGuard(deriveBase(pc), pc);
     return enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
   });
 }

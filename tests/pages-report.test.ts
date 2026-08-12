@@ -4,7 +4,7 @@ import { derivePages, pageScopesFrom } from "../src/pages.js";
 import { renderPageDocument, renderPagesDocument, renderPagesIndex, renderPageReport, isPagesReport } from "../src/pages-report.js";
 import { checkReport } from "../src/check.js";
 import { renderPackReport, renderReport } from "../src/report.js";
-import { derivePackResults, loadPack } from "../src/standards/index.js";
+import { derivePackResults, loadPack, packTestIds } from "../src/standards/index.js";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -54,13 +54,14 @@ describe("renderPageReport", () => {
   });
 
   it("groups the criteria by the standard's own themes", () => {
-    expect(md).toContain("| **1. Images** | |");
-    expect(md).toContain("| **8. Éléments obligatoires** | |");
+    // Three cells now: the grid carries the criterion's own numbered tests.
+    expect(md).toContain("| **1. Images** | | |");
+    expect(md).toContain("| **8. Éléments obligatoires** | | |");
   });
 
   it("marks the page's own status, which is not the scope-wide one", () => {
-    expect(md).toMatch(/\| 1\.1 —[^|]*\| NC \|/); // the image with no alt is on THIS page
-    expect(md).toMatch(/\| 8\.3 —[^|]*\| C \|/); // lang is declared on THIS page
+    expect(md).toMatch(/\| 1\.1 —[^|]*\|[^|]*\| NC \|/); // the image with no alt is on THIS page
+    expect(md).toMatch(/\| 8\.3 —[^|]*\|[^|]*\| C \|/); // lang is declared on THIS page
   });
 
   it("renders each non-conformity through the shared auditor block, occurrence line included", () => {
@@ -99,12 +100,26 @@ describe("renderPageReport", () => {
     expect(src).toContain("- **Base** : source");
   });
 
+  it("carries every criterion's own numbered tests, not only the ones that fired", () => {
+    // A sheet that lists 106 criteria but only says what to check for the handful that
+    // triggered tells the auditor nothing about the work left to do.
+    const pack = loadPack("rgaa");
+    for (const c of pack.criteria) {
+      const tests = packTestIds(pack, c.id);
+      if (!tests.length) continue;
+      const row = new RegExp(`\\| ${c.id.replace(".", "\\.")} —[^|]*\\|([^|]*)\\|`).exec(md);
+      expect(row, `criterion ${c.id} missing from the grid`).not.toBeNull();
+      for (const t of tests) expect(row![1], `criterion ${c.id}`).toContain(`\`${t}\``);
+    }
+  });
+
   it("re-decides nothing: every status equals the shared pack projection for that page", () => {
     // The whole point of invariant 1. Recompute independently and compare cell by cell.
     const viaProjection = derivePackResults({ ...result, criteria: contact.criteria, findings: contact.findings }, "rgaa");
     const MARK = { C: "C", NC: "NC", NA: "—", manual: "?" } as const;
     for (const pc of viaProjection) {
-      const row = new RegExp(`\\| ${pc.id.replace(".", "\\.")} —[^|]*\\| (\\S+) \\|`).exec(md);
+      // label | tests | status
+      const row = new RegExp(`\\| ${pc.id.replace(".", "\\.")} —[^|]*\\|[^|]*\\| (\\S+) \\|`).exec(md);
       expect(row, `criterion ${pc.id} missing from the grid`).not.toBeNull();
       expect(row![1], `criterion ${pc.id}`).toBe(MARK[pc.status]);
     }

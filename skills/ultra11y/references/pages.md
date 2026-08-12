@@ -205,9 +205,13 @@ Two things it deliberately does NOT do:
   page sheet, the compliance report, the PRD and the GitHub issue are the same block — and
   the occurrence lines stay parseable by `verify`.
 
-The screenshot is *referenced*, never copied: `.ultra11y/pages/<id>/screen.png` is already on
-disk, so the path is resolved relative to wherever the file lands. A page with no screenshot
-says so, rather than showing nothing.
+The screenshot is **copied next to the report** when you pass `--out`: each page's
+`.ultra11y/pages/<id>/screen.png` lands in `<out>/assets/<id>.png` and is linked relatively
+from there. That is what makes the output directory self-contained — CI uploads `audits/`
+alone as the artefact, and a `../../.ultra11y/…` reference would be a broken image in every
+sheet the reviewer opens. Without `--out` (streaming to stdout) the path stays relative,
+since there is no directory to keep intact. A page with no screenshot says so, rather than
+showing nothing.
 
 Sheets are named `page-<id>.md`: a page whose id is `index` — the ordinary id for an
 `index.html` target — would otherwise be written over the index itself.

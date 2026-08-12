@@ -37,6 +37,19 @@ export interface PackCriterion {
   // failure). Optional/additive: a pack WITHOUT `appliesTo` keeps the legacy fan-out
   // (every mapped SC's findings attach) so third-party packs are unaffected.
   appliesTo?: { ruleIds: string[] };
+  // The criterion's own wording asks MORE than the WCAG SCs it maps to, so a `C` on those
+  // SCs is not an answer to it. RGAA 8.6 asks whether the page title is *pertinent*; WCAG
+  // 2.4.2 only that a title exists. RGAA 13.3 asks whether a downloadable document has an
+  // accessible version; no mapped SC ever opened the document. Without this flag the
+  // projection returns `C` as soon as one mapped SC is `C` (see `aggregate` in derive.ts)
+  // and publishes a conformity nobody assessed.
+  //
+  // A flagged criterion can still derive `NC` (a rule actually fired on it) and `NA`
+  // (nothing applicable in scope); it simply never inherits a `C` — it derives `manual`
+  // and goes to the agent, who rules on it against the criterion's own numbered tests.
+  // `appliesTo` already carries the mirror-image promise for NC ("never NC from a
+  // sibling's failure"); this is the same guarantee on the conforming side.
+  judgment?: boolean;
 }
 
 // The localized DISPLAY vocabulary a standard uses when its audit is rendered for an

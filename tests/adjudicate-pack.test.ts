@@ -38,13 +38,16 @@ const adjFile = (items: AdjudicationItem[], standard = "rgaa"): AdjudicationFile
   items,
 });
 
-/** Adjudicate every item C so only the item under test can fail the run. */
+/** Clear every item so only the item under test can fail the run. A C is evidence-bound
+ *  (it must cite the harvested evidence it cleared), and a criterion the harvester found
+ *  nothing for cannot be cleared at all — it honestly stays manual. */
+const clear = (it: AdjudicationItem): AdjudicationItem =>
+  it.evidence.length
+    ? { ...it, verdict: "C" as const, justification: "vérifié sur la page", citations: [it.evidence[0]!] }
+    : { ...it, verdict: "manual" as const, reason: "undecidable" };
+
 const allConforming = (items: AdjudicationItem[], override?: Partial<AdjudicationItem> & { criteriaId: string }): AdjudicationItem[] =>
-  items.map((it) =>
-    it.criteriaId === override?.criteriaId
-      ? ({ ...it, ...override } as AdjudicationItem)
-      : { ...it, verdict: "C" as const, justification: "vérifié sur la page" },
-  );
+  items.map((it) => (it.criteriaId === override?.criteriaId ? ({ ...it, ...override } as AdjudicationItem) : clear(it)));
 
 describe("the worklist is keyed by the standard actually in play", () => {
   it("emits RGAA criteria, not WCAG success criteria", () => {
@@ -157,12 +160,22 @@ describe("folding a pack adjudication back", () => {
     const after = folded().audit;
     const derived = derivePackResults(after, "rgaa");
     expect(derived.find((c) => c.id === "11.2")?.status).toBe("C");
-    // and nothing is left manual that was adjudicated
-    expect(derived.filter((c) => c.status === "manual").length).toBeLessThan(10);
+    expect(derived.find((c) => c.id === "11.2")?.decidedBy).toBe("agent");
+    // Every criterion the agent CLEARED is now C in the projection — and the ones still
+    // manual are exactly the ones it could not clear (no harvested evidence to cite),
+    // which is the honest outcome, not a coverage failure.
+    const cleared = new Set(
+      allConforming(rgaaItems())
+        .filter((i) => i.verdict === "C")
+        .map((i) => i.criteriaId),
+    );
+    expect(cleared.size).toBeGreaterThan(0);
+    for (const id of cleared) expect(derived.find((c) => c.id === id)?.status, id).toBe("C");
+    for (const c of derived.filter((c) => c.status === "manual")) expect(cleared.has(c.id), c.id).toBe(false);
   });
 
   it("fails closed on an unadjudicated criterion (coverage gap)", () => {
-    const items = rgaaItems().map((it, i) => (i === 0 ? it : { ...it, verdict: "C" as const, justification: "ok" }));
+    const items = rgaaItems().map((it, i) => (i === 0 ? it : clear(it)));
     const r = applyAdjudication(audit(), adjFile(items));
     expect(r.ok).toBe(false);
     expect(r.issues.join(" ")).toMatch(/unadjudicated|verdict is null/i);

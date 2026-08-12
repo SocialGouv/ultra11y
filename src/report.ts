@@ -4,7 +4,7 @@
 // WCAG-keyed result. Both keep the honest structure: per-guideline/theme synthesis,
 // non-conformities, conforming + not-applicable lists, and the manual worklist
 // (never silently C).
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { AuditResult, Finding, Lang, Severity, Status } from "./types.js";
 import { guidelineTitle, scTitle } from "./wcag.js";
@@ -18,10 +18,10 @@ import {
   CORE,
   isCore,
   loadPack,
-  getCriterion as getPackCriterion,
   derivePackResults,
   packCriteriaForFinding,
   packConformancePct,
+  packTestIds,
   title as packTitle,
   themeName,
   type StandardPack,
@@ -56,6 +56,9 @@ const L = {
     sev: { bloquant: "Bloquant", majeur: "Majeur", mineur: "Mineur" } as Record<Severity, string>,
     none: "Aucune non-conformité détectée par le moteur statique.",
     cTitle: "3. Critères conformes (C)",
+    cAgentTitle: "Conformes par adjudication de l'agent (jugement, non prouvé par le moteur)",
+    cAgentNote:
+      "Ces critères ont été tranchés par l'agent IA à partir des évidences citées, non décidés par le moteur déterministe. Ils sont gatés (chaque verdict cite une évidence résolvable) mais restent un jugement : ils ne sont pas comptés dans le taux de réussite automatique ci-dessus.",
     naTitle: "4. Critères non applicables (NA)",
     manualTitle: "5. Critères à adjuger (jugement / rendu) — non décidés par le moteur statique",
     manualWarn:
@@ -65,6 +68,7 @@ const L = {
       "Générez la worklist : `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Chaque item y porte l'énoncé complet de ses tests, sa note technique, ses cas particuliers, sa guidance et les termes que le référentiel définit.",
     outOfScope: "Hors périmètre moteur — mappé sur des SC hors WCAG 2.2 AA ; vérification manuelle.",
     scopedOut: "Les non-conformités WCAG relevées concernent des éléments hors du périmètre de ce critère — à évaluer séparément.",
+    judgment: "L’énoncé du critère demande davantage que les CS WCAG auxquels il est rattaché — le moteur n’y a pas répondu, à trancher.",
     nothing: "Aucun.",
     dedup: "Dédup",
     canonical: "fichier(s) canonique(s) audité(s)",
@@ -117,6 +121,9 @@ const L = {
     sev: { bloquant: "Blocking", majeur: "Major", mineur: "Minor" } as Record<Severity, string>,
     none: "No non-conformity detected by the static engine.",
     cTitle: "3. Conforming criteria (C)",
+    cAgentTitle: "Conforming by agent adjudication (judgement, not proven by the engine)",
+    cAgentNote:
+      "These criteria were ruled on by the AI agent from the evidence it cited, not decided by the deterministic engine. They are gated (every verdict cites resolvable evidence) but remain a judgement: they are not counted in the automatic pass rate above.",
     naTitle: "4. Not-applicable criteria (NA)",
     manualTitle: "5. Criteria to adjudicate (judgment / rendering) — not decided by the static engine",
     manualWarn:
@@ -126,6 +133,7 @@ const L = {
       "Generate the worklist: `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Each item carries the full wording of its tests, its technical note, its particular cases, its guidance and the terms the standard defines.",
     outOfScope: "Out of engine scope — mapped to SCs outside WCAG 2.2 AA; manual verification.",
     scopedOut: "The WCAG failures found concern elements outside this criterion's scope — assess separately.",
+    judgment: "The criterion asks more than the WCAG SCs it maps to — the engine did not answer it; rule on it.",
     nothing: "None.",
     dedup: "Dedup",
     canonical: "canonical file(s) audited",
@@ -194,6 +202,11 @@ interface Row {
   status: Status;
   findings: Finding[];
   justification?: string;
+  // Who decided this criterion. Absent/"engine" = the deterministic engine; "agent" = an
+  // adjudication (gated, but a judgement call); "scan" = the rendered tier. Rendered so a
+  // conformity the engine PROVED is never presented as the same thing as one an agent
+  // RULED — see the split in section 3 and the header rate.
+  decidedBy?: "engine" | "agent" | "scan";
 }
 
 interface Group {
@@ -329,16 +342,27 @@ function render(
       out.push(`- ${nc.length} ${s.ncCount}${adv.length ? ` · ${adv.length} ${s.advCount}` : ""}`);
       const notes = pageScope.find((x) => x.id === pg.id)?.notes;
       if (notes) out.push(`- _${notes}_`);
-      // The screenshot the snapshot already holds. Referenced relative to the report's own
-      // directory — a copy would double the artefact's weight for no gain.
+      // The screenshot the snapshot already holds. Copied next to the report when there is
+      // an output directory, so the directory travels intact — CI uploads `audits/` alone,
+      // and a `../.ultra11y/…` reference is a broken image in the artifact the reviewer
+      // opens. Without an --out (stdout), stay relative: there is nothing to be
+      // self-contained about.
       const shot = join(PAGES_DIR, pg.id, "screen.png");
-      if (existsSync(shot))
-        out.push(
-          "",
-          `![${s.screenshotAlt(pg.name)}](${relative(opts.outDir ?? ".", shot)
-            .split("\\")
-            .join("/")})`,
-        );
+      if (existsSync(shot)) {
+        let href = relative(opts.outDir ?? ".", shot)
+          .split("\\")
+          .join("/");
+        if (opts.outDir) {
+          try {
+            mkdirSync(join(opts.outDir, "assets"), { recursive: true });
+            copyFileSync(shot, join(opts.outDir, "assets", `${pg.id}.png`));
+            href = `./assets/${pg.id}.png`;
+          } catch {
+            // Unwritable output dir: keep the relative reference rather than lose the image.
+          }
+        }
+        out.push("", `![${s.screenshotAlt(pg.name)}](${href})`);
+      }
       for (const f of nc.slice(0, 30)) {
         const crits = pack ? packCriteriaForFinding(pack, f) : [];
         const label = crits.length ? crits.join(", ") : f.criteriaId; // graceful fallback to the WCAG SC
@@ -348,10 +372,23 @@ function render(
     }
   }
 
-  // 3. conforming
+  // 3. conforming — split by PROVENANCE. A criterion the deterministic engine decided and
+  // one an agent ruled on are both "C", but they are not the same claim, and merging them
+  // into one list (and one headline rate) is how an adjudication pass could publish dozens
+  // of conformities nobody had verified. The gate makes an agent C evidence-bound; this
+  // keeps it legible as an agent's judgement all the way to the reader.
   out.push(`## ${s.cTitle}`, "");
   const conform = rows.filter((x) => x.status === "C");
-  out.push(conform.length ? conform.map((x) => `- ${x.label}`).join("\n") : s.nothing, "");
+  const byEngine = conform.filter((x) => x.decidedBy !== "agent");
+  const byAgent = conform.filter((x) => x.decidedBy === "agent");
+  if (!conform.length) out.push(s.nothing, "");
+  else {
+    if (byEngine.length) out.push(...byEngine.map((x) => `- ${x.label}`), "");
+    if (byAgent.length) {
+      out.push(`### ${s.cAgentTitle}`, "", `> ${s.cAgentNote}`, "");
+      out.push(...byAgent.map((x) => `- ${x.label}${x.justification ? ` — _${x.justification}_` : ""}`), "");
+    }
+  }
 
   // 4. not applicable
   out.push(`## ${s.naTitle}`, "");
@@ -368,8 +405,8 @@ function render(
   else {
     const pack5 = isCore(opts.standard) ? undefined : loadPack(opts.standard);
     for (const x of manual) {
-      const tests = pack5 ? Object.keys(getPackCriterion(pack5, x.id)?.tests ?? {}) : [];
-      const testRef = tests.length ? ` — ${s.testsToRule}: ${tests.map((k) => `\`${x.id}.${k}\``).join(" · ")}` : "";
+      const tests = pack5 ? packTestIds(pack5, x.id) : [];
+      const testRef = tests.length ? ` — ${s.testsToRule}: ${tests.map((t) => `\`${t}\``).join(" · ")}` : "";
       out.push(`- ${x.label}${x.justification ? ` — _${x.justification}_` : ""}${testRef}`);
     }
     out.push("", `> ${s.manualHowTo}`, "");
@@ -384,7 +421,14 @@ export function renderReport(r: AuditResult, lang: Lang = "en", outDir?: string)
   const byGuideline = new Map<string, Row[]>();
   for (const c of r.criteria) {
     const title = scTitle(c.id, lang);
-    const row: Row = { id: c.id, label: title ? `${c.id} — ${title}` : c.id, status: c.status, findings: c.findings, justification: c.justification };
+    const row: Row = {
+      id: c.id,
+      label: title ? `${c.id} — ${title}` : c.id,
+      status: c.status,
+      findings: c.findings,
+      justification: c.justification,
+      decidedBy: c.decidedBy,
+    };
     (byGuideline.get(c.guideline) ?? byGuideline.set(c.guideline, []).get(c.guideline)!).push(row);
   }
   // `g.title` on the AuditResult's GuidelineTally is the baked-in English title (kept for
@@ -409,15 +453,18 @@ export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang 
       label: `${pack.name} ${pr.id} — ${packTitle(pack, pc, lang)}`,
       status: pr.status,
       findings: pr.findings,
+      ...(pr.decidedBy ? { decidedBy: pr.decidedBy } : {}),
       // outOfScope / scopedOut criteria are "manual" (not NA) with their own dedicated
       // justification — never mixed with the ordinary NA reason (see the manual section above).
       ...(pr.outOfScope
         ? { justification: s.outOfScope }
         : pr.scopedOut
           ? { justification: s.scopedOut }
-          : pr.status === "NA"
-            ? { justification: naReason }
-            : {}),
+          : pr.judgment
+            ? { justification: s.judgment }
+            : pr.status === "NA"
+              ? { justification: naReason }
+              : {}),
     };
     (byTheme.get(pr.theme) ?? byTheme.set(pr.theme, []).get(pr.theme)!).push(row);
   }
@@ -434,6 +481,10 @@ export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang 
     standard: pack.key,
     partialAudit: untestedNeedsRendering(r),
     headerRatePct: packConformancePct(derived),
+    // Forwarded, unlike before: without it the per-page screenshots resolved against the
+    // CWD instead of the report's own directory, so a pack report written to `audits/`
+    // carried links that only worked when read from the repo root.
+    outDir,
   });
 }
 
