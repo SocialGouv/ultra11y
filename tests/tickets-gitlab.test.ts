@@ -16,6 +16,7 @@ const T = (): Ticket => ({
   severity: "bloquant",
   advisory: false,
   scope: { grain: "criterion", criteriaId: "1.1" },
+  occurrences: [],
 });
 
 const REST_ENV = { GITLAB_TOKEN: "gl-s3cret", CI_PROJECT_ID: "4242" };

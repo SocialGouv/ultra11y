@@ -11,6 +11,7 @@ const T = (title: string): Ticket => ({
   severity: "bloquant",
   advisory: false,
   scope: { grain: "criterion", criteriaId: "1.1.1" },
+  occurrences: [],
 });
 
 interface FakeOpts {

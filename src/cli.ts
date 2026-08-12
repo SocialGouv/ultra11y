@@ -10,7 +10,7 @@ import { pushPrComment } from "./pr-comment.js";
 import { buildTickets } from "./tickets/grain.js";
 import { pushTickets } from "./tickets/push.js";
 import { autoProvider, createProvider, isProviderId } from "./tickets/registry.js";
-import { ALL_GRAINS, ALL_PROVIDERS, type TicketGrain, type TransportMode } from "./tickets/types.js";
+import { ALL_GRAINS, ALL_PROVIDERS, TICKET_SET_SCHEMA_VERSION, type TicketGrain, type TicketSetFile, type TransportMode } from "./tickets/types.js";
 import {
   detectFrameworks,
   renderPlan,
@@ -72,7 +72,7 @@ Usage:
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
-  ultra11y tickets  [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
+  ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
   ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES — its tests depend on them)
@@ -309,6 +309,8 @@ Options:
   --transport <t>    tickets: auto|cli|rest (mcp: stdio|http). 'auto' prefers the CLI (gh/glab),
                      falling back to REST when only a token is available. Jira is REST-only
   --max-tickets <n>  tickets: refuse to file more than n tickets in one run (default 200)
+                     tickets --out <dir> also writes the tracker-agnostic set to
+                     <dir>/issues-<date>.json, for a workflow engine to file itself
   --scaffold         render: write an SSR-snapshot harness (default: ultra11y-render.tsx)
   --setup            render: install the zero-touch test-render capture harvester (.ultra11y/capture-setup.mjs) + print the runner wiring
   --coverage         render: report rendered-capture coverage (covered vs blind-spot components); with --json emits the coverage object
@@ -1588,6 +1590,10 @@ async function cmdPrd(p: ParsedArgs): Promise<number> {
 export const REMOVED_FLAGS: Record<string, string> = {
   "gh-issues": "ultra11y tickets --in <audit.json> --provider github --grain criterion",
   "gh-single": "ultra11y tickets --in <audit.json> --provider github --grain single",
+  // The tracker-agnostic export moved WITH ticket filing: `tickets --out` writes the same
+  // envelope (and a superset of the payload) at any grain, so an orchestrator still reads
+  // one stable path — just not from the command that renders documents.
+  "issues-json": "ultra11y tickets --in <audit.json> --out <dir> --grain criterion",
 };
 
 /** Config keys that must NEVER appear in `.ultra11yrc.json` — a committed credential is a
@@ -1698,6 +1704,28 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
     return 2;
   }
 
+  // `--out` writes the tracker-agnostic SET to a stable path, for a workflow engine that
+  // files the items itself. It is not a document — it is the ticket payload — which is why
+  // it lives here rather than on `prd`. Writing it never files anything.
+  const ticketsOut = typeof p.flags.out === "string" && p.flags.out ? (p.flags.out as string) : undefined;
+  let setPath: string | undefined;
+  if (ticketsOut) {
+    mkdirSync(ticketsOut, { recursive: true });
+    setPath = join(ticketsOut, `issues-${result.date}.json`);
+    const payload: TicketSetFile = {
+      tool: "ultra11y",
+      kind: "issues",
+      schemaVersion: TICKET_SET_SCHEMA_VERSION,
+      standard,
+      grain: grainFlag as TicketGrain,
+      date: result.date,
+      count: plan.tickets.length,
+      issues: plan.tickets,
+    };
+    writeFileSync(setPath, `${JSON.stringify(payload, null, 2)}\n`);
+    if (!json) console.log(setPath);
+  }
+
   if (!plan.tickets.length) {
     if (!json)
       console.log(
@@ -1714,6 +1742,7 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
             grain: grainFlag,
             standard,
             dryRun,
+            ...(setPath ? { setPath } : {}),
             tickets: [],
             unattributed: plan.unattributed,
             result: { created: 0, skipped: 0, failed: 0, createdTitles: [], createdUrls: [], errors: [] },
@@ -1743,6 +1772,7 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
           grain: grainFlag,
           standard,
           dryRun,
+          ...(setPath ? { setPath } : {}),
           dedupeChecked,
           tickets: planned.map(({ ticket, action }) => ({
             title: ticket.title,
@@ -2280,7 +2310,26 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
   mkdirSync(out, { recursive: true });
   const auditPath = join(out, "audit-latest.json");
   writeFileSync(auditPath, JSON.stringify(r.audit, null, 2) + "\n");
-  if (p.flags.json) console.log(JSON.stringify({ ok: true, auditPath, applied: r.applied, stillManual: r.stillManual, grounding: r.grounding }, null, 2));
+  // Carry the numbers the fold produced. The failure payload has always described its own
+  // outcome (`issues`); the success one described only the mechanics, so a caller that gates
+  // on the adjudicated result — a CI step, an orchestrator's tool node — had to re-read and
+  // re-parse the file it had just been handed the path to.
+  if (p.flags.json)
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          auditPath,
+          applied: r.applied,
+          stillManual: r.stillManual,
+          conformancePct: r.audit.conformancePct,
+          findings: r.audit.findings.length,
+          grounding: r.grounding,
+        },
+        null,
+        2,
+      ),
+    );
   else
     console.log(
       lang === "fr"

@@ -4,7 +4,7 @@ description: "Use to AUDIT existing HTML/CSS/JSX against WCAG 2.2 AA accessibili
 when_to_use: "Invoke when the user asks for an accessibility AUDIT or a formal deliverable: audit a repo, site or page against WCAG 2.2 AA or a country standard (RGAA, Section 508, EN 301 549); produce a dated conformance report, a criterion grid, a PRD backlog, or tickets (GitHub/GitLab/Jira); author accessible markup from scratch; wire the repo gate (init --hook/--ci) or a rendered-DOM capture pipeline. For a review of the code UNDER CHANGE (diff, branch, PR), use the `review-a11y` skill instead."
 license: MIT
 metadata:
-  version: 2.31.2
+  version: 2.32.0
 ---
 
 # ultra11y — audit WCAG 2.2 AA and write accessible markup
@@ -90,6 +90,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/false-positives.md` | Where a finding may still be wrong, and how to refute it |
 | `references/rendered.md` · `references/automation.md` | Auditing produced HTML, captures, hooks and CI |
 | `references/harnesses.md` | Where this runs: Claude Code, Codex CLI, OpenCode, and the AGENTS.md fallback |
+| `references/orchestrators.md` | Driving the engine from a workflow engine / non-GitHub CI: pinning, the six-step pipeline, exit codes, the ticket set as JSON for any tracker |
 | `references/ci.md` | `--format sarif\|github`: inline PR annotations, code scanning, job summary |
 | `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), and its honesty rules |
 | `references/e2e.md` | `render --e2e`: auditing a page during your Playwright/Cypress run |

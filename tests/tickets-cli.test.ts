@@ -1,7 +1,7 @@
 // `ultra11y tickets` end to end through main(), against a temp audit.json. The provider
 // layer is stubbed at the network boundary, so nothing here can reach a real tracker.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../src/cli.js";
@@ -165,6 +165,39 @@ describe("--dry-run", () => {
     stubFetch([{ body: [] }, { body: { number: 1, html_url: "u" } }]);
     expect(await main(["tickets", "--in", auditFile(dir), "--json"])).toBe(0);
     expect(JSON.parse(out.join("\n")).tickets[0].body).toBeUndefined();
+  });
+});
+
+// The contract `prd --issues-json` established, moved onto `tickets`: a workflow engine
+// reads ONE stable path instead of parsing a payload that also carries prose.
+describe("--out writes the tracker-agnostic set", () => {
+  it("writes issues-<date>.json with a pinnable envelope, and files nothing", async () => {
+    const calls = stubFetch([{ body: [] }]);
+    expect(await main(["tickets", "--in", auditFile(dir), "--out", dir, "--dry-run"])).toBe(0);
+    const p = join(dir, "issues-2026-08-12.json");
+    expect(existsSync(p)).toBe(true);
+    const set = JSON.parse(readFileSync(p, "utf8"));
+    expect(set).toMatchObject({ tool: "ultra11y", kind: "issues", schemaVersion: 1, standard: "wcag", grain: "criterion", count: 1 });
+    expect(calls.every((c) => (c.init.method ?? "GET") === "GET")).toBe(true);
+  });
+
+  it("carries the occurrences, so a board with inline anchors needs nothing else", async () => {
+    stubFetch([{ body: [] }]);
+    await main(["tickets", "--in", auditFile(dir), "--out", dir, "--dry-run"]);
+    const set = JSON.parse(readFileSync(join(dir, "issues-2026-08-12.json"), "utf8"));
+    expect(set.issues[0].occurrences).toEqual([{ file: "src/a.html", line: 1, selector: "img", message: "image sans alternative" }]);
+  });
+
+  it("keeps the envelope shape at every grain", async () => {
+    stubFetch([{ body: [] }, { body: [] }]);
+    await main(["tickets", "--in", auditFile(dir), "--out", dir, "--grain", "single", "--dry-run"]);
+    expect(JSON.parse(readFileSync(join(dir, "issues-2026-08-12.json"), "utf8")).grain).toBe("single");
+  });
+
+  it("reports the path in the --json payload", async () => {
+    stubFetch([{ body: [] }]);
+    await main(["tickets", "--in", auditFile(dir), "--out", dir, "--dry-run", "--json"]);
+    expect(JSON.parse(out.join("\n")).setPath).toContain("issues-2026-08-12.json");
   });
 });
 

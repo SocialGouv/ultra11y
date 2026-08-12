@@ -6,7 +6,7 @@ import { join as join45, relative as relative5, sep as sep7, dirname as dirname1
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
-var VERSION = "2.31.2";
+var VERSION = "2.32.0";
 var SCHEMA_VERSION = 2;
 
 // src/audit.ts
@@ -49712,6 +49712,7 @@ function pushPrComment(markdown, standard = "wcag") {
 var ALL_PROVIDERS = ["github", "gitlab", "jira"];
 var ALL_GRAINS = ["criterion", "page", "page-criterion", "single", "file"];
 var UNATTRIBUTED_ID = "unattributed";
+var TICKET_SET_SCHEMA_VERSION = 1;
 
 // src/tickets/render.ts
 var RECOMMENDATION_SUFFIX = " (recommendation)";
@@ -49823,6 +49824,9 @@ function fileView(result, file, baseDir) {
     ...result.packFindings ? { packFindings: result.packFindings.filter(owns) } : {}
   };
 }
+function occurrencesOf(units, lang) {
+  return units.flatMap((u) => u.findings.map((f) => ({ file: f.file, line: f.line, selector: f.selectorHint, message: resolveMessage(f, lang) })));
+}
 function sourceOf(f, baseDir) {
   return repoRelative(f.origin?.sourceFile ?? f.file, baseDir);
 }
@@ -49843,7 +49847,8 @@ function buildTickets(result, opts) {
     labels: labelsFor(unit.severity, unit.advisory === true, tag),
     severity: unit.severity,
     advisory: unit.advisory === true,
-    scope: scope2
+    scope: scope2,
+    occurrences: occurrencesOf([unit], lang)
   });
   if (grain === "criterion") {
     const tickets2 = prdUnits(result, standard, lang).map((u) => ticketFromUnit(u, criterionTitle(u, label), { grain: "criterion", criteriaId: u.criteriaId }));
@@ -49867,7 +49872,8 @@ function buildTickets(result, opts) {
           ),
           severity: worstOf(units),
           advisory: units.every((u) => u.advisory === true),
-          scope: { grain: "single" }
+          scope: { grain: "single" },
+          occurrences: occurrencesOf(units, lang)
         }
       ],
       unattributed: 0
@@ -49887,7 +49893,8 @@ function buildTickets(result, opts) {
         labels: labelsFor(worstOf(units), advisory, tag),
         severity: worstOf(units),
         advisory,
-        scope: { grain: "file", file }
+        scope: { grain: "file", file },
+        occurrences: occurrencesOf(units, lang)
       });
     }
     return { tickets: tickets2, unattributed: 0 };
@@ -49912,7 +49919,8 @@ function buildTickets(result, opts) {
         labels: labelsFor(worstOf(units), advisory, tag),
         severity: worstOf(units),
         advisory,
-        scope: pageScopeOf(page)
+        scope: pageScopeOf(page),
+        occurrences: occurrencesOf(units, lang)
       });
       continue;
     }
@@ -49940,7 +49948,8 @@ function buildTickets(result, opts) {
         labels: labelsFor(worstOf(units), advisory, tag),
         severity: worstOf(units),
         advisory,
-        scope: { grain: "page", pageId: UNATTRIBUTED_ID, pageName: UNATTRIBUTED_ID, url: "", basis: "none" }
+        scope: { grain: "page", pageId: UNATTRIBUTED_ID, pageName: UNATTRIBUTED_ID, url: "", basis: "none" },
+        occurrences: occurrencesOf(units, lang)
       });
     }
   }
@@ -52246,6 +52255,18 @@ var adjudication_default = {
 
 // src/adjudicate.ts
 var ADJUDICATE_MAX_EVIDENCE = 30;
+function adjudicationContract() {
+  return {
+    verdicts: [...VERDICTS],
+    manualReasons: [...MANUAL_REASON_VALUES],
+    requires: {
+      C: "a non-empty justification AND citations[] naming the harvested evidence it cleared (each anchor resolvable and drawn from this criterion's own evidence); a criterion with no harvested evidence cannot be C at all",
+      NA: "a non-empty justification",
+      NC: "at least one groundable finding, each citing a normativeRef that resolves against the active standard",
+      manual: `a reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`
+    }
+  };
+}
 var selectorFor = (el) => {
   const id = el.attribs.id ? `#${el.attribs.id}` : "";
   const cls = el.attribs.class ? `.${el.attribs.class.trim().split(/\s+/)[0]}` : "";
@@ -52447,6 +52468,31 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
 }
 var NC_SEVERITY_DEFAULT = "majeur";
 var MANUAL_REASONS = /* @__PURE__ */ new Set(["needs-rendered-dom", "undecidable"]);
+var VERDICTS = ["C", "NC", "NA", "manual"];
+var MANUAL_REASON_VALUES = ["needs-rendered-dom", "undecidable"];
+function normalizeVerdict2(v) {
+  if (typeof v !== "string") return void 0;
+  const k = v.trim().toLowerCase();
+  return VERDICTS.find((x) => x.toLowerCase() === k);
+}
+function normalizeManualReason(r) {
+  if (typeof r !== "string") return void 0;
+  const k = r.trim().toLowerCase();
+  return MANUAL_REASON_VALUES.find((x) => x === k);
+}
+function canonicalizeAdjudication(adj) {
+  for (const it of adj.items) {
+    if (it.verdict !== null) {
+      const v = normalizeVerdict2(it.verdict);
+      if (v !== void 0) it.verdict = v;
+    }
+    if (it.reason !== null && it.reason !== void 0) {
+      const r = normalizeManualReason(it.reason);
+      if (r !== void 0) it.reason = r;
+    }
+  }
+  return adj;
+}
 function normativeRefResolves(ref, standard, itemCriterionId) {
   const r = (ref ?? "").trim();
   if (!r) return false;
@@ -52469,6 +52515,7 @@ function normativeRefResolves(ref, standard, itemCriterionId) {
 }
 function applyAdjudication(audit2, adj, opts = {}) {
   const issues = [];
+  canonicalizeAdjudication(adj);
   const byId2 = new Map(adj.items.map((it) => [it.criteriaId, it]));
   const packMode = !isCore(adj.standard);
   const open = /* @__PURE__ */ new Set();
@@ -52530,9 +52577,9 @@ function applyAdjudication(audit2, adj, opts = {}) {
       }
     } else if (v === "manual") {
       if (!it.reason || !MANUAL_REASONS.has(it.reason))
-        issues.push(`criterion ${it.criteriaId}: a manual verdict requires reason \u2208 {needs-rendered-dom, undecidable}`);
+        issues.push(`criterion ${it.criteriaId}: a manual verdict requires reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`);
     } else {
-      issues.push(`criterion ${it.criteriaId}: unknown verdict "${String(v)}"`);
+      issues.push(`criterion ${it.criteriaId}: unknown verdict "${String(v)}" \u2014 expected one of ${VERDICTS.join(" | ")}`);
     }
     for (const rec of it.recommendations ?? []) groundInputs.push({ file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
   }
@@ -52790,6 +52837,7 @@ function writeAdjudication(items, outDir, opts) {
     schemaVersion: SCHEMA_VERSION,
     standard: opts.standard,
     auditDate: opts.auditDate,
+    contract: adjudicationContract(),
     items
   };
   writeFileSync10(todoPath, JSON.stringify(file, null, 2) + "\n");
@@ -58232,7 +58280,7 @@ Usage:
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
-  ultra11y tickets  [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
+  ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
   ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES \u2014 its tests depend on them)
@@ -58469,6 +58517,8 @@ Options:
   --transport <t>    tickets: auto|cli|rest (mcp: stdio|http). 'auto' prefers the CLI (gh/glab),
                      falling back to REST when only a token is available. Jira is REST-only
   --max-tickets <n>  tickets: refuse to file more than n tickets in one run (default 200)
+                     tickets --out <dir> also writes the tracker-agnostic set to
+                     <dir>/issues-<date>.json, for a workflow engine to file itself
   --scaffold         render: write an SSR-snapshot harness (default: ultra11y-render.tsx)
   --setup            render: install the zero-touch test-render capture harvester (.ultra11y/capture-setup.mjs) + print the runner wiring
   --coverage         render: report rendered-capture coverage (covered vs blind-spot components); with --json emits the coverage object
@@ -59465,7 +59515,11 @@ async function cmdPrd(p) {
 }
 var REMOVED_FLAGS = {
   "gh-issues": "ultra11y tickets --in <audit.json> --provider github --grain criterion",
-  "gh-single": "ultra11y tickets --in <audit.json> --provider github --grain single"
+  "gh-single": "ultra11y tickets --in <audit.json> --provider github --grain single",
+  // The tracker-agnostic export moved WITH ticket filing: `tickets --out` writes the same
+  // envelope (and a superset of the payload) at any grain, so an orchestrator still reads
+  // one stable path — just not from the command that renders documents.
+  "issues-json": "ultra11y tickets --in <audit.json> --out <dir> --grain criterion"
 };
 var SECRET_CONFIG_KEYS = ["token", "apiToken", "api_token", "password", "secret"];
 async function cmdTickets(p) {
@@ -59554,6 +59608,25 @@ async function cmdTickets(p) {
     );
     return 2;
   }
+  const ticketsOut = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : void 0;
+  let setPath;
+  if (ticketsOut) {
+    mkdirSync15(ticketsOut, { recursive: true });
+    setPath = join45(ticketsOut, `issues-${result.date}.json`);
+    const payload = {
+      tool: "ultra11y",
+      kind: "issues",
+      schemaVersion: TICKET_SET_SCHEMA_VERSION,
+      standard,
+      grain: grainFlag,
+      date: result.date,
+      count: plan.tickets.length,
+      issues: plan.tickets
+    };
+    writeFileSync17(setPath, `${JSON.stringify(payload, null, 2)}
+`);
+    if (!json) console.log(setPath);
+  }
   if (!plan.tickets.length) {
     if (!json)
       console.log(
@@ -59568,6 +59641,7 @@ async function cmdTickets(p) {
             grain: grainFlag,
             standard,
             dryRun,
+            ...setPath ? { setPath } : {},
             tickets: [],
             unattributed: plan.unattributed,
             result: { created: 0, skipped: 0, failed: 0, createdTitles: [], createdUrls: [], errors: [] }
@@ -59592,6 +59666,7 @@ async function cmdTickets(p) {
           grain: grainFlag,
           standard,
           dryRun,
+          ...setPath ? { setPath } : {},
           dedupeChecked,
           tickets: planned.map(({ ticket, action }) => ({
             title: ticket.title,
@@ -60030,7 +60105,22 @@ function applyAdjudicationFile(p, adj, lang) {
   mkdirSync15(out2, { recursive: true });
   const auditPath = join45(out2, "audit-latest.json");
   writeFileSync17(auditPath, JSON.stringify(r.audit, null, 2) + "\n");
-  if (p.flags.json) console.log(JSON.stringify({ ok: true, auditPath, applied: r.applied, stillManual: r.stillManual, grounding: r.grounding }, null, 2));
+  if (p.flags.json)
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          auditPath,
+          applied: r.applied,
+          stillManual: r.stillManual,
+          conformancePct: r.audit.conformancePct,
+          findings: r.audit.findings.length,
+          grounding: r.grounding
+        },
+        null,
+        2
+      )
+    );
   else
     console.log(
       lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual \u2192 ${auditPath}`

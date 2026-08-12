@@ -49,7 +49,34 @@ export interface Ticket {
    *  a non-conformity. Routed to the `recommendation` label, never the NC channel. */
   advisory: boolean;
   scope: TicketScope;
+  /** The occurrences behind this ticket, so a tracker that wants inline anchors — or an
+   *  orchestrator filing them itself — does not have to parse them back out of the body. */
+  occurrences: TicketOccurrence[];
 }
+
+export interface TicketOccurrence {
+  file: string;
+  line: number;
+  selector: string;
+  message: string;
+}
+
+/** The envelope `tickets --out` writes. A workflow engine reads ONE stable path instead of
+ *  parsing a payload that also carries prose — which is the contract `prd --issues-json`
+ *  established before ticket filing moved out of `prd`. `schemaVersion` is what lets a
+ *  consumer pin. */
+export interface TicketSetFile {
+  tool: "ultra11y";
+  kind: "issues";
+  schemaVersion: number;
+  standard: string;
+  grain: TicketGrain;
+  date: string;
+  count: number;
+  issues: Ticket[];
+}
+
+export const TICKET_SET_SCHEMA_VERSION = 1;
 
 export interface GrainOptions {
   grain: TicketGrain;

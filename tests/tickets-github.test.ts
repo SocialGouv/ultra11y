@@ -20,6 +20,7 @@ const T = (over: Partial<Ticket> = {}): Ticket => ({
   severity: "bloquant",
   advisory: false,
   scope: { grain: "criterion", criteriaId: "1.1.1" },
+  occurrences: [],
   ...over,
 });
 

@@ -17,7 +17,16 @@ node scripts/ultra11y.mjs tickets --in audit.json --grain file                  
 node scripts/ultra11y.mjs tickets --in audit.json --provider gitlab --standard rgaa --lang fr
 node scripts/ultra11y.mjs tickets --in audit.json --provider jira --max-tickets 20
 node scripts/ultra11y.mjs tickets --in audit.json --json                          # machine-readable plan + result
+node scripts/ultra11y.mjs tickets --in audit.json --out ./run                     # the ticket SET as JSON, for any other board
 ```
+
+## Filing on a tracker ultra11y does not speak
+
+`--out <dir>` writes the tracker-agnostic set to `<dir>/issues-<date>.json` — a stable path a
+workflow engine can read without parsing a payload that also carries prose. It works at every
+grain, carries `occurrences[]` so a board with inline anchors needs nothing else, and writing
+it **files nothing**. `schemaVersion` is what lets a consumer pin. See
+`references/orchestrators.md`.
 
 The ticket **body** is the same auditor block `report` §2 and the `prd` backlog render
 (`src/auditor.ts`). There is one audit truth; the tracker sees exactly what the document says.
@@ -141,6 +150,7 @@ is a silent failure.
 |---|---|
 | `prd --in a.json --gh-issues` | `tickets --in a.json --provider github --grain criterion` |
 | `prd --in a.json --gh-single` | `tickets --in a.json --provider github --grain single` |
+| `prd --in a.json --out d --issues-json` | `tickets --in a.json --out d --grain criterion` |
 
-Both old flags now exit `2` and print the replacement. `prd` still writes the same Markdown;
+All three old flags now exit `2` and print the replacement. `prd` still writes the same Markdown;
 its `--json` payload no longer carries a `gh` key.

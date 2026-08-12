@@ -8,12 +8,13 @@
 // It takes an AuditResult and NOT a PrdUnit[] on purpose: the page and file grains need
 // `scope.pages`, `packFindings` and `pageView`, all of which `prdUnits()` has already
 // discarded by the time it returns.
-import type { AuditResult, Finding, PageResult, Severity } from "../types.js";
+import type { AuditResult, Finding, Lang, PageResult, Severity } from "../types.js";
+import { resolveMessage } from "../messages.js";
 import { repoRelative } from "../util.js";
 import { type PrdUnit, prdUnits } from "../prd.js";
 import { renderAuditorBacklog } from "../auditor.js";
 import { attributePages, derivePages, pageBasisWarning, pageView, pagesOf, unattributedFindings, unattributedNote } from "../pages.js";
-import { type GrainOptions, type Ticket, type TicketPlan, UNATTRIBUTED_ID } from "./types.js";
+import { type GrainOptions, type Ticket, type TicketOccurrence, type TicketPlan, UNATTRIBUTED_ID } from "./types.js";
 import {
   clampBody,
   criterionTitle,
@@ -49,6 +50,12 @@ function fileView(result: AuditResult, file: string, baseDir: string): AuditResu
   };
 }
 
+/** The occurrences a ticket carries, so a consumer never has to parse them back out of the
+ *  rendered body. Advisory findings ride along: they are part of the unit, just never NC. */
+function occurrencesOf(units: PrdUnit[], lang: Lang): TicketOccurrence[] {
+  return units.flatMap((u) => u.findings.map((f) => ({ file: f.file, line: f.line, selector: f.selectorHint, message: resolveMessage(f, lang) })));
+}
+
 /** The file a finding belongs to, REPO-RELATIVE. A finding raised on a RENDERED capture is
  *  credited to the source component that produced it, not to the capture file nobody edits.
  *  The path is relativised because it lands in the ticket TITLE, which is the de-dupe key: an
@@ -76,6 +83,7 @@ export function buildTickets(result: AuditResult, opts: GrainOptions): TicketPla
     severity: unit.severity,
     advisory: unit.advisory === true,
     scope,
+    occurrences: occurrencesOf([unit], lang),
   });
 
   if (grain === "criterion") {
@@ -102,6 +110,7 @@ export function buildTickets(result: AuditResult, opts: GrainOptions): TicketPla
           severity: worstOf(units),
           advisory: units.every((u) => u.advisory === true),
           scope: { grain: "single" },
+          occurrences: occurrencesOf(units, lang),
         },
       ],
       unattributed: 0,
@@ -123,6 +132,7 @@ export function buildTickets(result: AuditResult, opts: GrainOptions): TicketPla
         severity: worstOf(units),
         advisory,
         scope: { grain: "file", file },
+        occurrences: occurrencesOf(units, lang),
       });
     }
     return { tickets, unattributed: 0 };
@@ -154,6 +164,7 @@ export function buildTickets(result: AuditResult, opts: GrainOptions): TicketPla
         severity: worstOf(units),
         advisory,
         scope: pageScopeOf(page),
+        occurrences: occurrencesOf(units, lang),
       });
       continue;
     }
@@ -187,6 +198,7 @@ export function buildTickets(result: AuditResult, opts: GrainOptions): TicketPla
         severity: worstOf(units),
         advisory,
         scope: { grain: "page", pageId: UNATTRIBUTED_ID, pageName: UNATTRIBUTED_ID, url: "", basis: "none" },
+        occurrences: occurrencesOf(units, lang),
       });
     }
   }
