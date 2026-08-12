@@ -125,7 +125,7 @@ claude mcp add ultra11y -- npx -y ultra11y mcp
 **As a GitHub Action** — audits the PR diff and, optionally, the served pages:
 
 ```yaml
-- uses: maxgfr/ultra11y@v2
+- uses: maxgfr/ultra11y@v3
   with: { since: auto, standard: rgaa, fail-on: blocking }
 ```
 
@@ -429,7 +429,8 @@ Releases are cut automatically by **semantic-release** on push to `main` (GitHub
 npm publish via OIDC trusted publishing, plus the moving `v2` major tag). The version bump is
 decided by **Conventional Commits**: a commit whose subject carries no `feat:`/`fix:` prefix
 is analysed as *no release*, so a change that must ship needs at least one conventional commit
-in the range — otherwise `@v2` and npm keep serving the previous version while `main` moves on.
+in the range — otherwise the major alias and npm keep serving the previous version while `main`
+moves on.
 
 ## Data & licensing
 

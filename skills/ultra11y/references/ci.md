@@ -15,7 +15,7 @@ permissions:
 steps:
   - uses: actions/checkout@v4
     with: { fetch-depth: 0 }        # the diff gate needs the base ref
-  - uses: maxgfr/ultra11y@v2      # or pin the exact version, as `init --ci` does
+  - uses: maxgfr/ultra11y@v3      # or pin the exact version, as `init --ci` does
     with:
       since: auto                   # the PR's base branch
       standard: rgaa
@@ -27,7 +27,7 @@ steps:
 Page by page, with a real browser, in the same step:
 
 ```yaml
-  - uses: maxgfr/ultra11y@v2
+  - uses: maxgfr/ultra11y@v3
     with:
       standard: rgaa
       start: npm run start
@@ -37,9 +37,11 @@ Page by page, with a real browser, in the same step:
 ```
 
 `ultra11y init --ci` writes a workflow using it, **pinned to the exact engine version that
-generated the file** (`@v<that version>`) so a CI run stays reproducible. `@v2` is a moving major alias
-the release workflow keeps pointing at the latest release, for teams who would rather take
-fixes automatically. Never `@main`: it would change under you without a version to blame.
+generated the file** (`@v<that version>`) so a CI run stays reproducible. `@v<major>` — `@v3`
+today — is a moving alias the release workflow repoints at each release, for teams who would
+rather take fixes automatically. It moves **within** a major only: when a breaking change cuts
+the next one, the old alias freezes where it is, so a pipeline pinned to it keeps working and
+stops receiving features. Never `@main`: it would change under you with no version to blame.
 
 **Order matters, and it is deliberate**: the audit runs first, then SARIF, annotations, the
 summary, the comment and the report — and the **gate runs last**. A failing audit has
@@ -64,7 +66,7 @@ partial by construction. `adjudicate` closes that — opt-in, in two modes.
 env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # the job's env, never an input
 steps:
-  - uses: maxgfr/ultra11y@v2
+  - uses: maxgfr/ultra11y@v3
     with:
       standard: rgaa
       adjudicate: api          # or `agent`
@@ -233,7 +235,7 @@ The action audits the **code** and, when you point it at a served app, the **pag
 list can come from three places, and none of them has to be written by hand:
 
 ```yaml
-- uses: maxgfr/ultra11y@v2
+- uses: maxgfr/ultra11y@v3
   with:
     standard: rgaa
     start: npm run start
@@ -284,9 +286,9 @@ one job — the code diff, then the served pages — died on a `409 Conflict`, w
 written and never uploaded. Pass `artifact-name` on each invocation:
 
 ```yaml
-- uses: maxgfr/ultra11y@v2
+- uses: maxgfr/ultra11y@v3
   with: { since: auto, artifact-name: a11y-code }
-- uses: maxgfr/ultra11y@v2
+- uses: maxgfr/ultra11y@v3
   with: { crawl: http://localhost:3000, artifact-name: a11y-pages }
 ```
 
