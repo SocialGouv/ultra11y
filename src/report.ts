@@ -205,7 +205,7 @@ export function partialAuditBanner(lang: Lang, untested: string[] = NEEDS_RENDER
 }
 
 // A normalized row the renderer is agnostic about: one labelled criterion + its status/findings.
-interface Row {
+export interface ReportRow {
   id: string;
   label: string; // "1.4.3 — Contrast (Minimum)" or "RGAA 1.1 — …"
   status: Status;
@@ -218,10 +218,49 @@ interface Row {
   decidedBy?: "engine" | "agent" | "scan";
 }
 
-interface Group {
+export interface ReportGroup {
   key: string;
   title: string;
-  rows: Row[];
+  rows: ReportRow[];
+}
+
+export interface ReportTally {
+  c: number;
+  nc: number;
+  na: number;
+  manual: number;
+}
+
+/** The §1 synthesis arithmetic over one group's rows. */
+export function tallyRows(rows: ReportRow[]): ReportTally {
+  return {
+    c: rows.filter((x) => x.status === "C").length,
+    nc: rows.filter((x) => x.status === "NC").length,
+    na: rows.filter((x) => x.status === "NA").length,
+    manual: rows.filter((x) => x.status === "manual").length,
+  };
+}
+
+/** The §1 « Total » row: the same arithmetic over every group. */
+export function reportTotals(groups: ReportGroup[]): ReportTally {
+  const tot: ReportTally = { c: 0, nc: 0, na: 0, manual: 0 };
+  for (const g of groups) {
+    const t = tallyRows(g.rows);
+    tot.c += t.c;
+    tot.nc += t.nc;
+    tot.na += t.na;
+    tot.manual += t.manual;
+  }
+  return tot;
+}
+
+/** The denominator the headline rate never carried. `conformancePct` is computed from the
+ *  decided set (src/audit.ts) and then thrown away, which is how « 100 % » reached a pull
+ *  request over two decided criteria out of a hundred and six. Every surface that prints the
+ *  run-wide rate resolves its `(decided/total)` here. */
+export function reportCoverage(groups: ReportGroup[]): { decided: number; total: number } {
+  const t = reportTotals(groups);
+  return { decided: t.c + t.nc, total: t.c + t.nc + t.na + t.manual };
 }
 
 // Shared renderer over normalized groups/rows — keeps the WCAG and pack reports identical
@@ -233,7 +272,7 @@ function render(
   opts: {
     std: string;
     groupHead: string;
-    groups: Group[];
+    groups: ReportGroup[];
     standard: StandardId;
     derivedOf?: string;
     partialAudit?: string[];
@@ -272,18 +311,11 @@ function render(
   out.push(`## ${s.synthTitle(opts.groupHead)}`, "");
   out.push(`| ${th.join(" | ")} |`);
   out.push(`|${"---|".repeat(th.length)}`);
-  const tot = { c: 0, nc: 0, na: 0, manual: 0 };
   for (const g of opts.groups) {
-    const c = g.rows.filter((x) => x.status === "C").length;
-    const nc = g.rows.filter((x) => x.status === "NC").length;
-    const na = g.rows.filter((x) => x.status === "NA").length;
-    const manual = g.rows.filter((x) => x.status === "manual").length;
-    out.push(`| ${g.key} ${g.title} | ${c} | ${nc} | ${na} | ${manual} |`);
-    tot.c += c;
-    tot.nc += nc;
-    tot.na += na;
-    tot.manual += manual;
+    const t = tallyRows(g.rows);
+    out.push(`| ${g.key} ${g.title} | ${t.c} | ${t.nc} | ${t.na} | ${t.manual} |`);
   }
+  const tot = reportTotals(opts.groups);
   out.push(`| **${s.total}** | **${tot.c}** | **${tot.nc}** | **${tot.na}** | **${tot.manual}** |`, "");
 
   // 2. non-conformities by priority — one auditor block per NC criterion (core or
@@ -430,12 +462,14 @@ function render(
 }
 
 /** The canonical, gated WCAG 2.2 AA report. */
-export function renderReport(r: AuditResult, lang: Lang = "en", outDir?: string): string {
-  const s = L[lang];
-  const byGuideline = new Map<string, Row[]>();
+/** The CORE report's criterion rows, grouped by WCAG guideline. Extracted from `renderReport`
+ *  so the HTML renderer and the CI digest project the SAME decisions the Markdown report
+ *  projects — they consume the model, never a second derivation of it. */
+export function reportGroups(r: AuditResult, lang: Lang = "en"): ReportGroup[] {
+  const byGuideline = new Map<string, ReportRow[]>();
   for (const c of r.criteria) {
     const title = scTitle(c.id, lang);
-    const row: Row = {
+    const row: ReportRow = {
       id: c.id,
       label: title ? `${c.id} — ${title}` : c.id,
       status: c.status,
@@ -448,21 +482,25 @@ export function renderReport(r: AuditResult, lang: Lang = "en", outDir?: string)
   // `g.title` on the AuditResult's GuidelineTally is the baked-in English title (kept for
   // JSON back-compat); resolve the localized label from the guideline KEY instead so
   // `--lang fr` renders the French guideline name here too.
-  const groups: Group[] = r.guidelines.map((g) => ({ key: g.key, title: guidelineTitle(g.key, lang) ?? g.title, rows: byGuideline.get(g.key) ?? [] }));
-  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups, standard: CORE, outDir });
+  return r.guidelines.map((g) => ({ key: g.key, title: guidelineTitle(g.key, lang) ?? g.title, rows: byGuideline.get(g.key) ?? [] }));
 }
 
-/** A derived report for a country standards pack (RGAA, …), projected from the WCAG audit. */
-export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang = "en", outDir?: string): string {
+export function renderReport(r: AuditResult, lang: Lang = "en", outDir?: string): string {
+  const s = L[lang];
+  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups: reportGroups(r, lang), standard: CORE, outDir });
+}
+
+/** A PACK report's criterion rows, grouped by theme. The pack twin of `reportGroups`, and
+ *  extracted for the same reason: one projection of a status, consumed by every surface. */
+export function packReportGroups(r: AuditResult, pack: StandardPack, lang: Lang = "en"): ReportGroup[] {
   const derived = derivePackResults(r, pack.key);
-  const std = `${pack.name} ${pack.baseVersion}`;
   const s = L[lang];
   const naReason =
     lang === "fr" ? "Aucun critère de succès WCAG mappé n'est applicable dans le périmètre." : "No mapped WCAG success criterion is applicable in scope.";
-  const byTheme = new Map<number, Row[]>();
+  const byTheme = new Map<number, ReportRow[]>();
   for (const pr of derived) {
     const pc = pack.criteria.find((c) => c.id === pr.id)!;
-    const row: Row = {
+    const row: ReportRow = {
       id: pr.id,
       label: `${pack.name} ${pr.id} — ${packTitle(pack, pc, lang)}`,
       status: pr.status,
@@ -482,7 +520,13 @@ export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang 
     };
     (byTheme.get(pr.theme) ?? byTheme.set(pr.theme, []).get(pr.theme)!).push(row);
   }
-  const groups: Group[] = pack.themes.map((t) => ({ key: `${t.number}.`, title: themeName(pack, t.number, lang) ?? "", rows: byTheme.get(t.number) ?? [] }));
+  return pack.themes.map((t) => ({ key: `${t.number}.`, title: themeName(pack, t.number, lang) ?? "", rows: byTheme.get(t.number) ?? [] }));
+}
+
+/** A derived report for a country standards pack (RGAA, …), projected from the WCAG audit. */
+export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang = "en", outDir?: string): string {
+  const derived = derivePackResults(r, pack.key);
+  const std = `${pack.name} ${pack.baseVersion}`;
   // Owner decision: a pack (RGAA) report is flagged PARTIAL while any needs-rendering
   // criterion lacks a dynamic verdict — the banner names exactly which ones (a Docker-only
   // scan covers reflow but not the local probes). The core WCAG report carries its own §5
@@ -490,7 +534,7 @@ export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang 
   return render(r, lang, {
     std,
     groupHead: L[lang].byTheme,
-    groups,
+    groups: packReportGroups(r, pack, lang),
     derivedOf: std,
     standard: pack.key,
     partialAudit: untestedNeedsRendering(r),

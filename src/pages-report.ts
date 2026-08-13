@@ -156,7 +156,10 @@ export interface PageReportOpts {
   heading?: string;
 }
 
-interface Row {
+/** One criterion's line on one page's sheet. Exported because the HTML renderer and the CI
+ *  digest must project the SAME decisions this sheet projects — a second computation of a
+ *  status is a second chance to disagree with the report. */
+export interface PageCriterionRow {
   id: string;
   label: string;
   group: string;
@@ -171,7 +174,7 @@ interface Row {
 
 /** The criterion rows for ONE page, in the active standard's own vocabulary and order.
  *  Delegates every status to the shared projection — see invariant 1 at the top. */
-function rowsFor(result: AuditResult, page: PageResult, standard: StandardId, lang: Lang): Row[] {
+export function pageCriterionRows(result: AuditResult, page: PageResult, standard: StandardId, lang: Lang): PageCriterionRow[] {
   if (isCore(standard)) {
     return [...page.criteria]
       .sort((a, b) => compareSC(a.id, b.id))
@@ -196,7 +199,7 @@ function rowsFor(result: AuditResult, page: PageResult, standard: StandardId, la
   }));
 }
 
-function tally(rows: Row[]): { c: number; nc: number; na: number; manual: number } {
+export function pageTally(rows: PageCriterionRow[]): { c: number; nc: number; na: number; manual: number } {
   return {
     c: rows.filter((r) => r.status === "C").length,
     nc: rows.filter((r) => r.status === "NC").length,
@@ -208,8 +211,8 @@ function tally(rows: Row[]): { c: number; nc: number; na: number; manual: number
 /** The rate's denominator, extracted so the sheet's « Couverture » line and the index cell are
  *  computed ONCE. They disagreed before: the sheet said 2/106 while the index printed a bare
  *  100 %, and the index is the artefact people paste into a pull request. */
-function coverageOf(rows: Row[]): { decided: number; total: number } {
-  const t = tally(rows);
+export function pageCoverage(rows: PageCriterionRow[]): { decided: number; total: number } {
+  const t = pageTally(rows);
   return { decided: t.c + t.nc, total: rows.length };
 }
 
@@ -219,8 +222,8 @@ function coverageOf(rows: Row[]): { decided: number; total: number } {
  *
  *  NULL when nothing was decided — see `pct` in src/pages.ts. Returning 100 there is what let a
  *  page nobody had assessed be quoted as a page with nothing wrong. */
-function ratePct(rows: Row[]): number | null {
-  const { c, nc } = tally(rows);
+export function pageRatePct(rows: PageCriterionRow[]): number | null {
+  const { c, nc } = pageTally(rows);
   return c + nc === 0 ? null : Math.round((c / (c + nc)) * 100);
 }
 
@@ -241,10 +244,10 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
   if (page.auth) meta.push(`- **${s.auth}** : ✅`);
   out.push(...meta);
 
-  const rows = rowsFor(result, page, standard, lang);
-  const t = tally(rows);
-  const cov = coverageOf(rows);
-  const rate = ratePct(rows);
+  const rows = pageCriterionRows(result, page, standard, lang);
+  const t = pageTally(rows);
+  const cov = pageCoverage(rows);
+  const rate = pageRatePct(rows);
   out.push(`- **${s.rate}** : **${rate === null ? "—" : `${rate} %`}** _(${s.rateNote})_`);
   out.push(`- ${s.tally(t.c, t.nc, t.na, t.manual)}`);
   // The rate alone reads as a verdict on the page. Naming the denominator next to it is
@@ -325,15 +328,15 @@ export function renderPagesIndex(result: AuditResult, pages: PageResult[], opts:
   out.push(`| ${s.page} | ${s.url} | ${s.basis} | ${s.rateShort} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
   out.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const p of pages) {
-    const rows = rowsFor(result, p, standard, lang);
-    const cov = coverageOf(rows);
+    const rows = pageCriterionRows(result, p, standard, lang);
+    const cov = pageCoverage(rows);
     // Severity counts must see the SAME findings the rate did. Under a pack the rate comes from
     // `derivePackResults`, which reads packFindings; counting only `p.findings` printed
     // "0 · 0 · 0" beside a rate that had already counted those non-conformities.
     const nc = [...p.findings, ...(result.packFindings ?? []).filter((f) => f.page === p.id)].filter((f) => !f.advisory);
     const href = opts.hrefs?.get(p.id);
     out.push(
-      `| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(ratePct(rows), cov.decided, cov.total)} | ${
+      `| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} | ${
         nc.filter((f) => f.severity === "bloquant").length
       } | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`,
     );

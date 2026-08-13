@@ -19,12 +19,11 @@ import { dirname, join } from "node:path";
 import { runAudit } from "./audit.js";
 import { resolveMessage } from "./messages.js";
 import { packCriteriaForFinding } from "./standards/derive.js";
-import { attributePages, derivePages, formatRate, pageScopesFrom, pagesOf } from "./pages.js";
+import { attributePages, derivePages, formatRate, pageGridModel, pageScopesFrom, pagesOf } from "./pages.js";
 import { applyAdjudication, buildAdjudicationWorklist, formatAdjudication } from "./adjudicate.js";
 import { BATCH_SIZE, applyRawVerdicts, judgeAll } from "./llm.js";
 import { readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
-import { CORE, type StandardId, isCore, loadPack, themeName } from "./standards/index.js";
-import { derivePackResults } from "./standards/index.js";
+import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
 import { SCHEMA_VERSION, VERSION, type AuditResult, type Finding, type Lang, type PageResult, type Status } from "./types.js";
 import { COLLECT_SNAPSHOT } from "./snapshot.js";
 
@@ -266,19 +265,11 @@ export function dashboardHtml(result: AuditResult | null, pages: PageResult[], s
     }</p></body></html>`;
   }
 
-  const rows: { id: string; label: string; group: string }[] = [];
-  const status = new Map<string, Map<string, Status>>();
-  if (isCore(standard)) {
-    for (const c of result.criteria) rows.push({ id: c.id, label: c.id, group: c.guideline });
-    for (const p of pages) for (const c of p.criteria) (status.get(c.id) ?? status.set(c.id, new Map()).get(c.id)!).set(p.id, c.status);
-  } else {
-    const pack = loadPack(standard);
-    for (const pc of pack.criteria) rows.push({ id: pc.id, label: pc.id, group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}` });
-    for (const p of pages) {
-      const view = { ...result, criteria: p.criteria, findings: p.findings } as AuditResult;
-      for (const pc of derivePackResults(view, standard)) (status.get(pc.id) ?? status.set(pc.id, new Map()).get(pc.id)!).set(p.id, pc.status);
-    }
-  }
+  // The SAME grid the Markdown `pages --format grid` renders. This used to be a second copy of
+  // the loop, and it had drifted three ways: unsorted core criteria, bare ids instead of titled
+  // labels, and a pack view that forgot to narrow `packFindings` to the page — so one page's
+  // pack finding coloured every other page's cell.
+  const { rows, status } = pageGridModel(result, pages, standard, lang);
 
   const out: string[] = [head];
   out.push(`<h1>ultra11y — ${esc(stdLabel)}</h1>`);

@@ -308,10 +308,19 @@ export function unattributedNote(n: number, lang: Lang): string {
   return L[lang].unattributed(n);
 }
 
-interface Row {
+/** One criterion's row in the cross-page grid: its id, its rendered label, and the group
+ *  heading it sits under (a WCAG guideline, or a pack theme). */
+export interface PageGridRow {
   id: string;
   label: string;
   group: string;
+}
+
+/** The criterion rows of the cross-page grid, and each page's status for each of them. */
+export interface PageGridModel {
+  rows: PageGridRow[];
+  /** rowId → pageId → status. Absent ⇒ `manual`; the renderer, not the model, picks the mark. */
+  status: Map<string, Map<string, Status>>;
 }
 
 /** A view of the audit restricted to ONE page: the same shape, with this page's criterion
@@ -328,8 +337,13 @@ export function pageView(result: AuditResult, page: PageResult): AuditResult {
   };
 }
 
-/** The criterion rows to render, and each page's status for them. */
-function gridOf(result: AuditResult, derived: PageResult[], standard: StandardId, lang: Lang): { rows: Row[]; status: Map<string, Map<string, Status>> } {
+/** The criterion rows to render, and each page's status for them.
+ *
+ *  Exported because the Markdown grid, the dev side-car dashboard and the HTML report all draw
+ *  the same table: three copies of this loop is three chances to disagree about what a page's
+ *  status IS. Every status still comes from `derivePackResults` over a `pageView`, never from a
+ *  local re-derivation. */
+export function pageGridModel(result: AuditResult, derived: PageResult[], standard: StandardId, lang: Lang): PageGridModel {
   const status = new Map<string, Map<string, Status>>(); // rowId → pageId → status
   const put = (rowId: string, pageId: string, s: Status): void => {
     const m = status.get(rowId) ?? new Map<string, Status>();
@@ -369,7 +383,7 @@ export function renderPageGrid(result: AuditResult, pages: PageScope[], standard
   out.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(p.conformancePct, p.decided, p.total)}**`).join(" | ")} |`);
   out.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
 
-  const { rows, status } = gridOf(result, derived, standard, lang);
+  const { rows, status } = pageGridModel(result, derived, standard, lang);
   let group = "";
   for (const row of rows) {
     if (row.group !== group) {

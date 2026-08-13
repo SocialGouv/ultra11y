@@ -106,6 +106,12 @@ const L = {
 
 const uniq = (xs: string[]): string[] => [...new Set(xs.filter(Boolean))];
 
+/** Resolves the annotated crop illustrating one occurrence, or nothing when the evidence tier
+ *  could not draw it. A LOOKUP rather than a manifest so this module stays ignorant of how a
+ *  finding is keyed (src/baseline.ts `findingId`) and of the evidence tier entirely — passing a
+ *  manifest would couple the auditor block to a key format it has no business knowing. */
+export type AuditorCropLookup = (f: Finding) => { href: string; alt: string } | undefined;
+
 export interface AuditorUnitOpts {
   heading?: string; // "###"/"##" → emit a criterion heading; omit for a bare issue body
   // Emit the technical ticket sections (Partie technique + Contexte de reproduction).
@@ -116,6 +122,9 @@ export interface AuditorUnitOpts {
   // only the per-page sheet turns it on, because that is where one design-system defect
   // multiplied by every route using it produces a page of near-identical lines.
   collapse?: boolean;
+  // Hang the annotated crop under each occurrence that has one. Absent ⇒ the block is
+  // byte-identical to what it was before evidence existed.
+  cropFor?: AuditorCropLookup;
 }
 
 /** Repeated occurrences of ONE (rule, selector) on one file, folded into groups.
@@ -146,10 +155,16 @@ function groupOccurrences(findings: Finding[], collapse: boolean): Finding[][] {
 /** The inert sub-bullets that hang off one occurrence: the crosswalk deviation note, the related
  *  occurrence, the capture provenance. Extracted so the grouped and ungrouped paths cannot drift,
  *  and so the indent is applied in exactly one place. */
-function renderOccurrenceDetails(out: string[], f: Finding, lang: Lang, s: (typeof L)[Lang], indent: string): void {
+function renderOccurrenceDetails(out: string[], f: Finding, lang: Lang, s: (typeof L)[Lang], indent: string, cropFor?: AuditorCropLookup): void {
   // A finding projected via an opt-in secondary crosswalk mapping carries a note explaining the
   // deviation from the SC-faithful projection — an inert (worklist-ignored) sub-bullet.
   if (f.secondary?.note) out.push(`${indent}  - ↳ ${f.secondary.note}`);
+  // THE ONLY PLACE a crop is hung off an occurrence. `report §2`, `prd`, every tracker issue
+  // body and every per-page sheet inherit it here, at once. The bullet carries no `[ ]`, which
+  // is what keeps it out of verify.ts's worklist — indentation alone would NOT, since
+  // AUDITOR_OCCURRENCE is anchored `^\s*-\s\[ \]` and tolerates leading space.
+  const crop = cropFor?.(f);
+  if (crop) out.push(`${indent}  - ![${crop.alt}](${crop.href})`);
   if (f.related) out.push(indent + relatedLine(f.related, lang, { selector: true }));
   if (f.origin) {
     const comp = f.origin.component ?? f.origin.sourceFile ?? f.file;
@@ -216,78 +231,135 @@ export function relatedLine(related: NonNullable<Finding["related"]>, lang: Lang
 export function renderAuditorUnit(unit: PrdUnit, standard: StandardId, lang: Lang, opts: AuditorUnitOpts = {}): string[] {
   const s = L[lang];
   if (unit.advisory) return renderAdvisoryUnit(unit, standard, lang, opts);
-  const v = vocabularyFor(standard, lang);
-  const technical = opts.technical ?? true;
+  const m = auditorUnitModel(unit, standard, lang, opts);
   const out: string[] = [];
-  if (opts.heading) out.push(`${opts.heading} ${ICON[unit.severity]} ${unit.label}`, "");
-  out.push(`> ${v.normativeNote ?? `${s.lead} — ${standardLabel(standard)}. ${s.tail}`}`, "");
+  if (opts.heading) out.push(`${opts.heading} ${m.icon} ${m.label}`, "");
+  out.push(`> ${m.normativeNote}`, "");
 
   // ---- 1. criterion block (unchanged) + the explicit Priorité line ----
-  if (isCore(standard)) {
-    const sc = getSC(unit.criteriaId);
-    if (sc) {
-      const pr = `${sc.principle} ${principleTitle(sc.principle, lang) ?? ""}`.trim();
-      const gl = `${sc.guideline} ${guidelineTitle(sc.guideline, lang) ?? ""}`.trim();
-      out.push(`**${v.theme}** : ${[pr, gl].filter(Boolean).join(" · ")}`);
-    }
-    out.push(`**${v.criterion}** : ${unit.criteriaId}${sc ? ` — ${unit.title}` : ""}`);
-    const techs = scTechniques(unit.criteriaId);
-    if (techs.length) out.push(`**${v.test}** : ${techs.join(", ")}`);
-    out.push(`**WCAG** : ${unit.criteriaId}${sc ? ` (${sc.level})` : ""}`);
-  } else {
-    const pack = loadPack(standard);
-    const pc = pack.criteria.find((c) => c.id === unit.criteriaId);
-    if (pc) out.push(`**${v.theme}** : ${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trimEnd());
-    out.push(`**${v.criterion}** : ${unit.criteriaId} — ${unit.title}`);
-    const testNums = packTestIds(pack, unit.criteriaId);
-    if (testNums.length) out.push(`**${v.test}(s)** : ${testNums.join(" · ")}`);
-    if (unit.refs.length) out.push(`**WCAG** : ${unit.refs.map((sc) => `${sc}${scLevel(sc)}`).join(" · ")}`);
-  }
-  out.push(`**${s.priority}** : ${ICON[unit.severity]} ${SEV_LABEL[lang][unit.severity]}`);
+  for (const f of m.fields) out.push(`**${f.label}** : ${f.value}`);
 
   // ---- 2. finding / expected / verification + the PARSEABLE occurrence checklist ----
   // Advisory findings riding along in a MIXED unit are excluded from the checklist (they are
   // recommendations, never non-conformities) and rendered below in a distinct, NON-parseable
   // sub-list — so verify.ts's worklist never captures a recommendation as an NC claim. Its
   // POSITION (before any newly-introduced heading) is load-bearing for the parser.
-  const normative = unit.findings.filter((f) => !f.advisory);
-  const advisories = unit.findings.filter((f) => f.advisory);
-  const ncView: PrdUnit = { ...unit, findings: normative };
-  const messages = uniq(normative.map((f) => resolveMessage(f, lang)));
-  const fixes = uniq(normative.map((f) => resolveRemediation(f, lang)));
   out.push("");
-  out.push(`**${s.finding} (${v.nonConformant})** : ${normative.length} ${s.occ} — ${messages.join(" ; ")}`);
-  if (fixes.length) out.push(`**${s.expected} (${v.conformant})** : ${fixes.join(" ; ")}`);
+  out.push(`**${s.finding} (${m.conformanceTerms.nonConformant})** : ${m.occurrences} ${s.occ} — ${m.messages.join(" ; ")}`);
+  if (m.fixes.length) out.push(`**${s.expected} (${m.conformanceTerms.conformant})** : ${m.fixes.join(" ; ")}`);
   out.push(`**${s.verification}** : ${s.verify}`, "");
-  for (const group of groupOccurrences(normative, opts.collapse === true)) {
+  for (const group of m.groups) {
     // A GROUP HEADER, when several occurrences share a rule and a selector. It is deliberately
     // NOT checkbox-shaped: `verify` must see one item per claimed non-conformity, not one per
     // group, so the fold changes what the reader scans and never what the gate adjudicates.
-    if (group.length > 1) out.push(`- **\`${group[0]!.selectorHint}\`** — ${resolveMessage(group[0]!, lang)} · ×${group.length}`);
-    for (const f of group) {
+    if (group.count > 1) out.push(`- **\`${group.lead.selectorHint}\`** — ${resolveMessage(group.lead, lang)} · ×${group.count}`);
+    for (const f of group.findings) {
       // Members of a real group are indented under it; a lone occurrence stays flush, so an
       // ungrouped block is byte-identical to what it was before collapsing existed.
-      const indent = group.length > 1 ? "  " : "";
+      const indent = group.count > 1 ? "  " : "";
       out.push(indent + occurrenceLine(f, lang, { marker: "checkbox" }));
-      renderOccurrenceDetails(out, f, lang, s, indent);
+      renderOccurrenceDetails(out, f, lang, s, indent, opts.cropFor);
     }
   }
   out.push("");
 
   // Associated recommendations (mixed unit only): a visually distinct, NON-parseable list —
   // the `- 💡` bullet deliberately avoids the `- [ ] \`file:line\`` checklist grammar.
-  if (advisories.length) {
+  if (m.advisories.length) {
     out.push(`_${s.associatedRec}_`, "");
-    for (const f of advisories) out.push(occurrenceLine(f, lang, { marker: "advisory" }));
+    for (const f of m.advisories) out.push(occurrenceLine(f, lang, { marker: "advisory" }));
     out.push("");
   }
 
   // ---- 3 + 4. technical ticket sections (opt-out via prd --no-technical) ----
-  if (technical) {
-    out.push(...renderTechnicalSection(ncView, unit, standard, lang, opts));
-    out.push(...renderReproductionContext(normative, lang));
+  if (opts.technical ?? true) {
+    out.push(...renderTechnicalSection({ ...unit, findings: m.normative }, unit, standard, lang, opts));
+    out.push(...renderReproductionContext(m.normative, lang));
   }
   return out;
+}
+
+/** One `**label** : value` line of the criterion block, before it is serialized. */
+export interface AuditorField {
+  label: string;
+  value: string;
+}
+
+/** Occurrences of one (file, rule, selector), as the block will present them. `count > 1` is
+ *  what earns a group header; a lone occurrence renders flush. */
+export interface AuditorOccurrenceGroup {
+  lead: Finding;
+  count: number;
+  findings: Finding[];
+}
+
+/** Everything `renderAuditorUnit` DECIDES, before anything is turned into Markdown.
+ *
+ *  The split exists so a second surface — the HTML report — can present the same criterion
+ *  without re-resolving the active standard's vocabulary, re-picking the theme line, or
+ *  re-deciding which findings are normative. `renderAuditorUnit` is now the Markdown
+ *  serializer of this model, and `tests/__snapshots__/auditor.test.ts.snap` pins that the
+ *  serialization did not move a byte. */
+export interface AuditorUnitModel {
+  severity: Severity;
+  icon: string;
+  label: string;
+  normativeNote: string;
+  fields: AuditorField[];
+  conformanceTerms: { conformant: string; nonConformant: string };
+  /** Normative findings only — an advisory can never be counted as a non-conformity. */
+  normative: Finding[];
+  advisories: Finding[];
+  occurrences: number;
+  messages: string[];
+  fixes: string[];
+  groups: AuditorOccurrenceGroup[];
+}
+
+export function auditorUnitModel(unit: PrdUnit, standard: StandardId, lang: Lang, opts: AuditorUnitOpts = {}): AuditorUnitModel {
+  const s = L[lang];
+  const v = vocabularyFor(standard, lang);
+  const fields: AuditorField[] = [];
+
+  if (isCore(standard)) {
+    const sc = getSC(unit.criteriaId);
+    if (sc) {
+      const pr = `${sc.principle} ${principleTitle(sc.principle, lang) ?? ""}`.trim();
+      const gl = `${sc.guideline} ${guidelineTitle(sc.guideline, lang) ?? ""}`.trim();
+      fields.push({ label: v.theme, value: [pr, gl].filter(Boolean).join(" · ") });
+    }
+    fields.push({ label: v.criterion, value: `${unit.criteriaId}${sc ? ` — ${unit.title}` : ""}` });
+    const techs = scTechniques(unit.criteriaId);
+    if (techs.length) fields.push({ label: v.test, value: techs.join(", ") });
+    fields.push({ label: "WCAG", value: `${unit.criteriaId}${sc ? ` (${sc.level})` : ""}` });
+  } else {
+    const pack = loadPack(standard);
+    const pc = pack.criteria.find((c) => c.id === unit.criteriaId);
+    // `.trimEnd()` on the VALUE, not on the rendered line: a pack whose theme has no localized
+    // name must not leave a trailing space behind the colon.
+    if (pc) fields.push({ label: v.theme, value: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trimEnd() });
+    fields.push({ label: v.criterion, value: `${unit.criteriaId} — ${unit.title}` });
+    const testNums = packTestIds(pack, unit.criteriaId);
+    if (testNums.length) fields.push({ label: `${v.test}(s)`, value: testNums.join(" · ") });
+    if (unit.refs.length) fields.push({ label: "WCAG", value: unit.refs.map((sc) => `${sc}${scLevel(sc)}`).join(" · ") });
+  }
+  fields.push({ label: s.priority, value: `${ICON[unit.severity]} ${SEV_LABEL[lang][unit.severity]}` });
+
+  const normative = unit.findings.filter((f) => !f.advisory);
+  return {
+    severity: unit.severity,
+    icon: ICON[unit.severity],
+    label: unit.label,
+    normativeNote: v.normativeNote ?? `${s.lead} — ${standardLabel(standard)}. ${s.tail}`,
+    fields,
+    conformanceTerms: { conformant: v.conformant, nonConformant: v.nonConformant },
+    normative,
+    advisories: unit.findings.filter((f) => f.advisory),
+    occurrences: normative.length,
+    messages: uniq(normative.map((f) => resolveMessage(f, lang))),
+    fixes: uniq(normative.map((f) => resolveRemediation(f, lang))),
+    groups: groupOccurrences(normative, opts.collapse === true).map((g) => ({ lead: g[0]!, count: g.length, findings: g })),
+  };
 }
 
 /** Section 3 — Partie technique: impacted files, impacted pages/URLs (with Task-5 sample

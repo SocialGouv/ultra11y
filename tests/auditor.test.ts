@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { AuditResult } from "../src/types.js";
 import type { PrdUnit } from "../src/prd.js";
-import { renderAuditorUnit, renderAuditorBacklog, renderAuditorPerCriterion } from "../src/auditor.js";
+import { auditorUnitModel, renderAuditorUnit, renderAuditorBacklog, renderAuditorPerCriterion } from "../src/auditor.js";
 import { AUDITOR_OCCURRENCE } from "../src/verify.js";
 import { vocabularyFor } from "../src/standards/vocabulary.js";
 
@@ -442,6 +442,78 @@ describe("renderAuditorUnit — reference bytes", () => {
         `${name}: a level-5+ heading`,
       ).toBe(false);
     }
+  });
+});
+
+describe("auditorUnitModel", () => {
+  it("carries the criterion block as decisions, in the order the Markdown serializes them", () => {
+    const m = auditorUnitModel(unit("1.4.3", "Contraste (minimum)"), "wcag", "fr");
+    expect(m.fields.map((f) => f.label)).toEqual(["Principe · Règle", "Critère de succès", "Technique", "WCAG", "Priorité"]);
+    expect(m.fields.find((f) => f.label === "WCAG")?.value).toBe("1.4.3 (AA)");
+    // The core's own terms — the parenthesized "(C)" / "(NC)" are RGAA's, not WCAG's.
+    expect(m.conformanceTerms).toEqual({ conformant: "Conforme", nonConformant: "Non conforme" });
+  });
+
+  it("resolves the pack's own vocabulary and test numbers under --standard rgaa", () => {
+    const m = auditorUnitModel(unit("11.6", "Légende", ["1.3.1"]), "rgaa", "fr");
+    expect(m.fields.map((f) => f.label)).toEqual(["Thématique", "Critère", "Test(s)", "WCAG", "Priorité"]);
+    expect(m.fields[0]!.value).toBe("11. Formulaires");
+    expect(m.conformanceTerms.nonConformant).toBe("Non conforme (NC)");
+  });
+
+  it("never counts an advisory as a non-conformity, and never folds unless asked", () => {
+    const u = unit("1.4.1", "Use of Color");
+    u.findings = [rep("a.fr-link", 41), rep("a.fr-link", 88), { ...rep("a.fr-btn", 12), advisory: true }];
+    expect(auditorUnitModel(u, "wcag", "en").occurrences).toBe(2);
+    expect(auditorUnitModel(u, "wcag", "en").advisories).toHaveLength(1);
+    expect(auditorUnitModel(u, "wcag", "en").groups.map((g) => g.count)).toEqual([1, 1]);
+    expect(auditorUnitModel(u, "wcag", "en", { collapse: true }).groups.map((g) => g.count)).toEqual([2]);
+  });
+});
+
+// The crop sub-bullet is emitted in ONE place (renderOccurrenceDetails), so report §2, prd,
+// every tracker issue body and every page sheet inherit it at once. What it must never do is
+// enter the verify worklist or the check criterion scanner.
+describe("renderAuditorUnit — the crop sub-bullet", () => {
+  const cropFor = (f: { line: number }) =>
+    f.line === 3 ? { href: "./assets/accueil/ab12cd34ef56.png", alt: "Capture recadrée : img sur Accueil" } : undefined;
+
+  it("hangs the crop under its occurrence, and only under the one that has it", () => {
+    const u = unit("1.1.1", "Non-text Content");
+    u.findings.push({ ...u.findings[0]!, file: "src/b.tsx", line: 9, selectorHint: "h1" });
+    const lines = renderAuditorUnit(u, "wcag", "fr", { cropFor });
+    const at = lines.findIndex((l) => l.includes("src/a.tsx:3"));
+    expect(lines[at + 1]).toBe("  - ![Capture recadrée : img sur Accueil](./assets/accueil/ab12cd34ef56.png)");
+    expect(lines.filter((l) => l.includes("!["))).toHaveLength(1);
+  });
+
+  it("indents under a folded group, so the crop follows its own occurrence and not the header", () => {
+    const u = unit("1.4.1", "Use of Color");
+    u.findings = [rep("a.fr-link", 41), rep("a.fr-link", 88)];
+    u.findings[0]!.line = 3;
+    const lines = renderAuditorUnit(u, "wcag", "en", { collapse: true, cropFor });
+    const at = lines.findIndex((l) => l.includes("!["));
+    expect(lines[at]).toMatch(/^ {4}- !\[/); // two for the group indent, two for the sub-bullet
+    expect(lines[at - 1]).toContain("- [ ] `.ultra11y/pages/accueil/dom.html:3`");
+  });
+
+  it("stays out of the verify worklist — no checkbox, whatever the indent", () => {
+    const u = unit("1.1.1", "Non-text Content");
+    const lines = renderAuditorUnit(u, "wcag", "en", { cropFor });
+    for (const l of lines.filter((x) => x.includes("!["))) expect(AUDITOR_OCCURRENCE.test(l)).toBe(false);
+  });
+
+  // src/check.ts scans the WHOLE document for "<id> —": an alt reading "1.1.1 — Non-text
+  // Content" would be counted as a criterion mention the report never made.
+  it("no alt this engine generates may look like a criterion mention", () => {
+    const u = unit("1.1.1", "Non-text Content");
+    const lines = renderAuditorUnit(u, "wcag", "fr", { cropFor });
+    for (const l of lines.filter((x) => x.includes("!["))) expect(l).not.toMatch(/\d+\.\d+\s*—/);
+  });
+
+  it("without a lookup the block is byte-identical — evidence is additive or it is nothing", () => {
+    const u = unit("1.1.1", "Non-text Content");
+    expect(renderAuditorUnit(u, "wcag", "fr", { cropFor: () => undefined })).toEqual(renderAuditorUnit(u, "wcag", "fr"));
   });
 });
 
