@@ -51,8 +51,10 @@ export interface EmitOpts {
 export interface EmitResult {
   /** The entry point — always written. */
   index: string;
-  /** The detachable, printable single file. */
-  composite: string;
+  /** The detachable, printable single file. Absent in the `pages` layout: that command's
+   *  deliverable is the index and its sheets, and writing a second composite beside them
+   *  would inline every crop a second time into the same artifact. */
+  composite?: string;
   /** The page site's sheets, when `pages` was asked for. */
   sheets: string[];
   inlinedBytes: number;
@@ -190,15 +192,23 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
   const up = flat ? "./" : "../";
 
   const compositeName = `ultra11y-${stdKey}-${result.date}.html`;
-  const nav = [
-    { href: "./index.html", text: flat ? t.pagesTitle : t.indexTitle },
-    { href: `./${compositeName}`, text: t.docTitle },
-    ...(opts.pages && !flat ? [{ href: "./pages/index.html", text: t.pagesTitle }] : []),
-  ];
-  const composite = compositeDoc(result, { standard, lang, crops: budgetedCrops, nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` })) });
-  if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
-  const compositePath = join(opts.outDir, compositeName);
-  writeFileSync(compositePath, renderHtmlDocument(composite));
+  const nav = flat
+    ? [{ href: "./index.html", text: t.pagesTitle }]
+    : [
+        { href: "./index.html", text: t.indexTitle },
+        { href: `./${compositeName}`, text: t.docTitle },
+        ...(opts.pages ? [{ href: "./pages/index.html", text: t.pagesTitle }] : []),
+      ];
+  // ONE composite per artifact. `report --html` owns it; `pages --html` writes the index and
+  // its sheets beside the Markdown they mirror. Emitting one from both would put two copies of
+  // every inlined crop into the same upload.
+  let compositePath: string | undefined;
+  if (!flat) {
+    const composite = compositeDoc(result, { standard, lang, crops: budgetedCrops, nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` })) });
+    if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
+    compositePath = join(opts.outDir, compositeName);
+    writeFileSync(compositePath, renderHtmlDocument(composite));
+  }
 
   // Images stay FILES on the sheets, so the same crop is not duplicated into every document
   // that shows it. Only the composite pays the base64 tax, because only it has to travel alone.
@@ -216,11 +226,13 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
   if (opts.pages) {
     const derived = derivePages(result, pagesOf(result));
     mkdirSync(sheetDir, { recursive: true });
-    const sheetNav = [
-      { href: `${up}index.html`, text: flat ? t.pagesTitle : t.indexTitle },
-      { href: `${up}${compositeName}`, text: t.docTitle },
-      ...(flat ? [] : [{ href: "./index.html", text: t.pagesTitle }]),
-    ];
+    const sheetNav = flat
+      ? [{ href: "./index.html", text: t.pagesTitle }]
+      : [
+          { href: `${up}index.html`, text: t.indexTitle },
+          { href: `${up}${compositeName}`, text: t.docTitle },
+          { href: "./index.html", text: t.pagesTitle },
+        ];
     // In the nested layout the page index is its own document; flat, `index.html` already is it.
     if (!flat) {
       writeFileSync(
@@ -252,7 +264,15 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
     }
   }
 
-  return { index: indexPath, composite: compositePath, sheets, inlinedBytes, degraded: rung.steps, imagesDropped: rung.steps.includes("none"), notices };
+  return {
+    index: indexPath,
+    ...(compositePath ? { composite: compositePath } : {}),
+    sheets,
+    inlinedBytes,
+    degraded: rung.steps,
+    imagesDropped: rung.steps.includes("none"),
+    notices,
+  };
 }
 
 function noticeRuns(notices: string[]): Run[] {

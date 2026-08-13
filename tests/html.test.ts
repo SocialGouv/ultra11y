@@ -230,7 +230,7 @@ describe("writing the artifact", () => {
 
   it("emits nothing that points outside the artifact, from any document", () => {
     const res = writeHtml(WITH_PAGES(), { outDir: out, lang: "fr", pages: true });
-    for (const p of [res.index, res.composite]) expect(externalReferences(readFileSync(p, "utf8"), 0)).toEqual([]);
+    for (const p of [res.index, res.composite!]) expect(externalReferences(readFileSync(p, "utf8"), 0)).toEqual([]);
     for (const p of res.sheets) expect(externalReferences(readFileSync(p, "utf8"), 1)).toEqual([]);
   });
 
@@ -267,7 +267,7 @@ describe("writing the artifact", () => {
       totals: { located: 1, imaged: 1, skipped: {} },
     } as unknown as Parameters<typeof writeHtml>[1]["evidence"];
     const res = writeHtml(r, { outDir: out, lang: "en", pages: true, evidence: manifest });
-    expect(readFileSync(res.composite, "utf8")).toContain("data:image/png;base64,");
+    expect(readFileSync(res.composite!, "utf8")).toContain("data:image/png;base64,");
     const sheet = readFileSync(join(out, "pages", "page-accueil.html"), "utf8");
     expect(sheet).toContain('src="../assets/accueil/abc123.png"');
     expect(sheet).not.toContain("data:image");
@@ -285,8 +285,8 @@ describe("writing the artifact", () => {
     const starved = writeHtml(r, { outDir: out, lang: "en", inlineBudget: 1 });
     expect(starved.notices.length).toBeGreaterThanOrEqual(0);
     // Whatever happened to the pictures, the non-conformities are all still there.
-    const before = (readFileSync(withCrops.composite, "utf8").match(/id="c-/g) ?? []).length;
-    const after = (readFileSync(starved.composite, "utf8").match(/id="c-/g) ?? []).length;
+    const before = (readFileSync(withCrops.composite!, "utf8").match(/id="c-/g) ?? []).length;
+    const after = (readFileSync(starved.composite!, "utf8").match(/id="c-/g) ?? []).length;
     expect(after).toBe(before);
     expect(before).toBeGreaterThan(0);
   });

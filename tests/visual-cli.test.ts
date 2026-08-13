@@ -130,6 +130,18 @@ describe("--html", () => {
     expect(existsSync(join(dir, "pages"))).toBe(false);
   });
 
+  // The action runs BOTH commands into one `audits/`. A composite from each would put two
+  // copies of every inlined crop in the same upload — at 200 crops that is megabytes of
+  // duplicated base64, and nothing else would notice.
+  it("writes ONE composite per artifact — `report` owns it, `pages` does not duplicate it", async () => {
+    const root = await tmpProject();
+    await run(["report", "--in", "out/audit-latest.json", "--html", "--out", "out/audits"], root);
+    await run(["pages", "--in", "out/audit-latest.json", "--format", "report", "--split", "page", "--html", "--out", "out/audits/pages"], root);
+    const composites = (dir: string) => readdirSync(join(root, dir)).filter((f) => f.startsWith("ultra11y-") && f.endsWith(".html"));
+    expect(composites("out/audits")).toHaveLength(1);
+    expect(composites("out/audits/pages")).toHaveLength(0);
+  });
+
   it("gives `report` an entry point and a detachable composite", async () => {
     const root = await tmpProject();
     const r = await run(["report", "--in", "out/audit-latest.json", "--html", "--out", "out/audits"], root);

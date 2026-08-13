@@ -57356,15 +57356,18 @@ function writeHtml(result, opts) {
   const sheetDir = flat ? opts.outDir : join41(opts.outDir, "pages");
   const up = flat ? "./" : "../";
   const compositeName = `ultra11y-${stdKey}-${result.date}.html`;
-  const nav = [
-    { href: "./index.html", text: flat ? t2.pagesTitle : t2.indexTitle },
+  const nav = flat ? [{ href: "./index.html", text: t2.pagesTitle }] : [
+    { href: "./index.html", text: t2.indexTitle },
     { href: `./${compositeName}`, text: t2.docTitle },
-    ...opts.pages && !flat ? [{ href: "./pages/index.html", text: t2.pagesTitle }] : []
+    ...opts.pages ? [{ href: "./pages/index.html", text: t2.pagesTitle }] : []
   ];
-  const composite = compositeDoc(result, { standard, lang, crops: budgetedCrops, nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` })) });
-  if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
-  const compositePath = join41(opts.outDir, compositeName);
-  writeFileSync16(compositePath, renderHtmlDocument(composite));
+  let compositePath;
+  if (!flat) {
+    const composite = compositeDoc(result, { standard, lang, crops: budgetedCrops, nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` })) });
+    if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
+    compositePath = join41(opts.outDir, compositeName);
+    writeFileSync16(compositePath, renderHtmlDocument(composite));
+  }
   const fileCrops = cropLookup(opts.evidence, lang, (_p, href) => href.replace(/^\.\//, up));
   const indexNav = nav.map((n) => ({ ...n, current: n.href === "./index.html" }));
   const index = flat ? pagesIndexDoc(result, { standard, lang, nav: indexNav, sheetHref: (id) => `./page-${id}.html` }) : indexDoc(result, { standard, lang, nav: indexNav, links: nav.filter((n) => n.href !== "./index.html") });
@@ -57374,10 +57377,10 @@ function writeHtml(result, opts) {
   if (opts.pages) {
     const derived = derivePages(result, pagesOf(result));
     mkdirSync14(sheetDir, { recursive: true });
-    const sheetNav = [
-      { href: `${up}index.html`, text: flat ? t2.pagesTitle : t2.indexTitle },
+    const sheetNav = flat ? [{ href: "./index.html", text: t2.pagesTitle }] : [
+      { href: `${up}index.html`, text: t2.indexTitle },
       { href: `${up}${compositeName}`, text: t2.docTitle },
-      ...flat ? [] : [{ href: "./index.html", text: t2.pagesTitle }]
+      { href: "./index.html", text: t2.pagesTitle }
     ];
     if (!flat) {
       writeFileSync16(
@@ -57408,7 +57411,15 @@ function writeHtml(result, opts) {
       sheets.push(path);
     }
   }
-  return { index: indexPath, composite: compositePath, sheets, inlinedBytes, degraded: rung.steps, imagesDropped: rung.steps.includes("none"), notices };
+  return {
+    index: indexPath,
+    ...compositePath ? { composite: compositePath } : {},
+    sheets,
+    inlinedBytes,
+    degraded: rung.steps,
+    imagesDropped: rung.steps.includes("none"),
+    notices
+  };
 }
 function noticeRuns(notices) {
   return notices.flatMap((n, i2) => i2 ? [{ text: " " }, { text: n }] : [{ text: n }]);
@@ -60961,7 +60972,7 @@ function emitHtml(result, opts) {
   const res = writeHtml(result, opts);
   for (const n of res.notices) console.error(`ultra11y: ${n}`);
   console.error(`ultra11y: ${res.index}`);
-  console.error(`ultra11y: ${res.composite}`);
+  if (res.composite) console.error(`ultra11y: ${res.composite}`);
   return res;
 }
 async function cmdSnapshot(p) {

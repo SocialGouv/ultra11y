@@ -1499,7 +1499,7 @@ function emitHtml(result: AuditResult, opts: Parameters<typeof writeHtml>[1]): R
   const res = writeHtml(result, opts);
   for (const n of res.notices) console.error(`ultra11y: ${n}`);
   console.error(`ultra11y: ${res.index}`);
-  console.error(`ultra11y: ${res.composite}`);
+  if (res.composite) console.error(`ultra11y: ${res.composite}`);
   return res;
 }
 
