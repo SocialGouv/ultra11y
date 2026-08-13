@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { parse } from "@babel/parser";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { auditCollected, dashboardHtml, nextOverlayComponent, overlayJs, projectPages, startDevServer, type DevServer } from "../src/dev.js";
+import { encodePng } from "../src/pixel.js";
 import { PAGES_DIR } from "../src/snapshot.js";
 
 let root: string;
@@ -88,6 +89,28 @@ describe("auditing a collected page", () => {
 
   it("refuses a payload with no DOM", () => {
     expect(auditCollected(root, { meta: PAGE.meta, dom: "" }).ok).toBe(false);
+  });
+
+  // The browser extension captures a viewport screenshot and posts it (extension/
+  // background.js). It was dropped here, so an extension-collected page never got a
+  // `screen.png` and the pixel tier declined on every one of them — silently, which is the
+  // one failure mode this engine refuses.
+  it("persists the screenshot the extension posts, so the pixel tier can run", () => {
+    const png = encodePng({ width: 2, height: 2, data: Buffer.alloc(16, 0x40) });
+    const r = auditCollected(root, { ...PAGE, screenshot: png.toString("base64") });
+    expect(r.ok).toBe(true);
+    const shot = join(root, PAGES_DIR, "accueil", "screen.png");
+    expect(existsSync(shot)).toBe(true);
+    expect(readFileSync(shot).equals(png)).toBe(true);
+  });
+
+  it("writes no screenshot when the producer sends none, or sends rubbish", () => {
+    auditCollected(root, PAGE);
+    expect(existsSync(join(root, PAGES_DIR, "accueil", "screen.png"))).toBe(false);
+    auditCollected(root, { ...PAGE, screenshot: "   " });
+    expect(existsSync(join(root, PAGES_DIR, "accueil", "screen.png"))).toBe(false);
+    auditCollected(root, { ...PAGE, screenshot: 42 });
+    expect(existsSync(join(root, PAGES_DIR, "accueil", "screen.png"))).toBe(false);
   });
 });
 

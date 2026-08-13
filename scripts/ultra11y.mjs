@@ -56453,13 +56453,15 @@ function auditCollected(root, payload) {
   const v = validateSnapshotMeta(payload.meta);
   if (!v.ok || !v.meta) return { ok: false, error: v.issues.map((i2) => `${i2.path}: ${i2.message}`).join("; ") };
   if (typeof payload.dom !== "string" || !payload.dom.trim()) return { ok: false, error: "dom is required" };
+  const shot = typeof payload.screenshot === "string" && payload.screenshot.trim() ? payload.screenshot : void 0;
   const dir = writeSnapshot(root, {
     meta: v.meta,
     dom: payload.dom,
     ...payload.styles ? { styles: payload.styles } : {},
     ...payload.boxes ? { boxes: payload.boxes } : {},
     ...payload.axtree ? { axtree: payload.axtree } : {},
-    ...payload.css ? { css: payload.css } : {}
+    ...payload.css ? { css: payload.css } : {},
+    ...shot ? { screenshotBase64: shot } : {}
   });
   return { ok: true, result: runAudit({ inputs: [join40(dir, "dom.html")] }) };
 }

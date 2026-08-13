@@ -336,11 +336,18 @@ async function readBody(req: IncomingMessage, limit = 64 * 1024 * 1024): Promise
 /** Audit one collected page: persist it as a snapshot, then run the engine over its DOM. */
 export function auditCollected(
   root: string,
-  payload: { meta?: unknown; dom?: unknown; styles?: StyleDigest; boxes?: BoxDigest; axtree?: AxNode; css?: CssDigest },
+  payload: { meta?: unknown; dom?: unknown; styles?: StyleDigest; boxes?: BoxDigest; axtree?: AxNode; css?: CssDigest; screenshot?: unknown },
 ): { ok: true; result: AuditResult } | { ok: false; error: string } {
   const v = validateSnapshotMeta(payload.meta);
   if (!v.ok || !v.meta) return { ok: false, error: v.issues.map((i) => `${i.path}: ${i.message}`).join("; ") };
   if (typeof payload.dom !== "string" || !payload.dom.trim()) return { ok: false, error: "dom is required" };
+  // The browser extension DOES capture a viewport screenshot and posts it here
+  // (extension/background.js). It used to be dropped on the floor: this signature had no
+  // `screenshot`, so `screen.png` was never written for an extension-collected page and the
+  // pixel tier — the only tier that can answer contrast over a gradient or an image — silently
+  // declined on every one of them. Typed `unknown` and checked, because a producer is
+  // untrusted input like any other field here.
+  const shot = typeof payload.screenshot === "string" && payload.screenshot.trim() ? payload.screenshot : undefined;
   const dir = writeSnapshot(root, {
     meta: v.meta,
     dom: payload.dom,
@@ -348,6 +355,7 @@ export function auditCollected(
     ...(payload.boxes ? { boxes: payload.boxes } : {}),
     ...(payload.axtree ? { axtree: payload.axtree } : {}),
     ...(payload.css ? { css: payload.css } : {}),
+    ...(shot ? { screenshotBase64: shot } : {}),
   });
   return { ok: true, result: runAudit({ inputs: [join(dir, "dom.html")] }) };
 }
