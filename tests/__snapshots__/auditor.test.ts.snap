@@ -1,0 +1,573 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderAuditorUnit — reference bytes > rgaa · en · heading 1`] = `
+"### 🔴 11.6 — Légende
+
+> Auditor view — RGAA 4.1.2. Normative mapping.
+
+**Thématique** : 11. Formulaires
+**Critère** : 11.6 — Légende
+**Test(s)** : 11.6.1
+**WCAG** : 1.3.1 (A) · 3.3.2 (A)
+**Priority** : 🔴 Blocking
+
+**Finding (Non conforme (NC))** : 1 occurrence(s) — image sans alternative
+**Expected (Conforme (C))** : Ajoutez alt
+**Verification** : check each occurrence below (inspector / screen reader), then re-run the audit (\`ultra11y\` / axe).
+
+- [ ] \`src/a.tsx:3\` (\`img\`) — image sans alternative
+
+#### Technical details
+
+**Impacted files**
+
+- \`src/a.tsx\`
+
+**Expected change**
+
+- Ajoutez alt
+
+**Example** — A <fieldset> without a <legend> is non-compliant: the group exists but has no announced title.
+
+_Avoid :_
+\`\`\`html
+<fieldset>
+  <input type="checkbox" id="cgu" name="cgu">
+  <label for="cgu">J'accepte les conditions</label>
+  <input type="checkbox" id="news" name="news">
+  <label for="news">Recevoir la newsletter</label>
+</fieldset>
+\`\`\`
+
+_Recommended :_
+\`\`\`html
+<fieldset>
+  <legend>Préférences du compte</legend>
+  <input type="checkbox" id="cgu" name="cgu">
+  <label for="cgu">J'accepte les conditions</label>
+  <input type="checkbox" id="news" name="news">
+  <label for="news">Recevoir la newsletter</label>
+</fieldset>
+\`\`\`
+
+**Acceptance criteria**
+
+- [ ] **Given** the affected \`img\` elements · **When** a user of assistive technology reaches them · **Then** « Info and Relationships » (WCAG 1.3.1).
+- [ ] **Given** the affected \`img\` elements · **When** a user of assistive technology reaches them · **Then** « Labels or Instructions » (WCAG 3.3.2).
+
+**Complexity** : S (3 pts)
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > rgaa · fr · heading 1`] = `
+"### 🔴 11.6 — Légende
+
+> Lecture auditeur — RGAA 4.1.2. Correspondance normative.
+
+**Thématique** : 11. Formulaires
+**Critère** : 11.6 — Légende
+**Test(s)** : 11.6.1
+**WCAG** : 1.3.1 (A) · 3.3.2 (A)
+**Priorité** : 🔴 Bloquant
+
+**Constat (Non conforme (NC))** : 1 occurrence(s) — image sans alternative
+**Attendu (Conforme (C))** : Ajoutez alt
+**Vérification** : contrôler chaque occurrence ci-dessous (inspecteur / lecteur d'écran), puis rejouer l'audit (\`ultra11y\` / axe).
+
+- [ ] \`src/a.tsx:3\` (\`img\`) — image sans alternative
+
+#### Partie technique
+
+**Fichiers impactés**
+
+- \`src/a.tsx\`
+
+**Changement attendu**
+
+- Ajoutez alt
+
+**Exemple** — Un <fieldset> sans <legend> n'est pas conforme : le groupe existe mais n'a pas de titre annoncé.
+
+_À éviter :_
+\`\`\`html
+<fieldset>
+  <input type="checkbox" id="cgu" name="cgu">
+  <label for="cgu">J'accepte les conditions</label>
+  <input type="checkbox" id="news" name="news">
+  <label for="news">Recevoir la newsletter</label>
+</fieldset>
+\`\`\`
+
+_Recommandé :_
+\`\`\`html
+<fieldset>
+  <legend>Préférences du compte</legend>
+  <input type="checkbox" id="cgu" name="cgu">
+  <label for="cgu">J'accepte les conditions</label>
+  <input type="checkbox" id="news" name="news">
+  <label for="news">Recevoir la newsletter</label>
+</fieldset>
+\`\`\`
+
+**Critères d'acceptation**
+
+- [ ] **Étant donné** les éléments \`img\` concernés · **Lorsque** un utilisateur de technologie d'assistance y accède · **Alors** « Information et relations » (WCAG 1.3.1).
+- [ ] **Étant donné** les éléments \`img\` concernés · **Lorsque** un utilisateur de technologie d'assistance y accède · **Alors** « Étiquettes ou instructions » (WCAG 3.3.2).
+
+**Complexité** : S (3 pts)
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > wcag · en · advisory unit 1`] = `
+"### 💡 1.3.1 — Info and Relationships
+
+> Recommendation (non-normative) — Good practice — no normative test of the active standard requires it. This is NOT a non-conformity.
+
+**Recommendation (non-normative)** — 1.3.1 · Info and Relationships
+
+**Observation** : 1 occurrence(s) — image sans alternative
+**Suggestion** : Ajoutez alt
+
+- [ ] \`src/a.tsx:3\` (\`img\`) — image sans alternative
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > wcag · en · bare (issue body) 1`] = `
+"> Auditor view — WCAG 2.2 AA. Normative mapping.
+
+**Principle · Guideline** : 1 Perceivable · 1.1 Text Alternatives
+**Success criterion** : 1.1.1 — Non-text Content
+**Technique** : ARIA10, ARIA4, ARIA6, ARIA7, ARIA8, ARIA9, C9, F15, F19, F20, F3, F30, F38, F39, F63, F65, F67, F70, F71, F72, F87, F89, G10, G100, G135, G136, G140, G143, G144, G196, G53, G68, G73, G74, G91, G92, G94, G95, H24, H30, H35, H36, H37, H45, H46, H53, H67, H78, H79, H80, H81, H86
+**WCAG** : 1.1.1 (A)
+**Priority** : 🔴 Blocking
+
+**Finding (Fail)** : 1 occurrence(s) — image sans alternative
+**Expected (Pass)** : Ajoutez alt
+**Verification** : check each occurrence below (inspector / screen reader), then re-run the audit (\`ultra11y\` / axe).
+
+- [ ] \`src/a.tsx:3\` (\`img\`) — image sans alternative
+
+### Technical details
+
+**Impacted files**
+
+- \`src/a.tsx\`
+
+**Expected change**
+
+- Ajoutez alt
+
+**Example** — The alternative conveys the meaning, not the file name.
+
+_Avoid :_
+\`\`\`html
+<img src="chart.png" alt="image">
+\`\`\`
+
+_Recommended :_
+\`\`\`html
+<img src="chart.png" alt="Ventes en hausse de 25 % au T3 2025">
+\`\`\`
+
+**Acceptance criteria**
+
+- [ ] **Given** the affected \`img\` elements · **When** a user of assistive technology reaches them · **Then** « Non-text Content » (WCAG 1.1.1).
+
+**Complexity** : S (3 pts)
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > wcag · en · collapsed occurrences 1`] = `
+"### 🔴 1.4.1 — Use of Color
+
+> Auditor view — WCAG 2.2 AA. Normative mapping.
+
+**Principle · Guideline** : 1 Perceivable · 1.4 Distinguishable
+**Success criterion** : 1.4.1 — Use of Color
+**Technique** : C15, F14, F26, F73, F78, G111, G117, G138, G14, G140, G149, G165, G182, G183, G195, G205, G96, SCR31
+**WCAG** : 1.4.1 (A)
+**Priority** : 🔴 Blocking
+
+**Finding (Fail)** : 4 occurrence(s) — lien identifié par la couleur seule
+**Expected (Pass)** : Ajoutez un indice non coloré
+**Verification** : check each occurrence below (inspector / screen reader), then re-run the audit (\`ultra11y\` / axe).
+
+- **\`a.fr-link\`** — lien identifié par la couleur seule · ×3
+  - [ ] \`.ultra11y/pages/accueil/dom.html:2\` (\`a.fr-link\`) — lien identifié par la couleur seule
+  - [ ] \`.ultra11y/pages/accueil/dom.html:2\` (\`a.fr-link\`) — lien identifié par la couleur seule
+  - [ ] \`.ultra11y/pages/accueil/dom.html:2\` (\`a.fr-link\`) — lien identifié par la couleur seule
+- [ ] \`.ultra11y/pages/accueil/dom.html:2\` (\`a.fr-btn\`) — lien identifié par la couleur seule
+
+#### Technical details
+
+**Impacted files**
+
+- \`.ultra11y/pages/accueil/dom.html\`
+
+**Expected change**
+
+- Ajoutez un indice non coloré
+
+**Example** — The error is no longer signalled by colour alone: an error text makes it perceivable by everyone.
+
+_Avoid :_
+\`\`\`html
+<label for="email">Adresse e-mail</label>
+<input id="email" type="email" style="border-color:#d00">
+\`\`\`
+
+_Recommended :_
+\`\`\`html
+<label for="email">Adresse e-mail</label>
+<input id="email" type="email" aria-invalid="true" aria-describedby="email-err">
+<p id="email-err">Erreur : saisissez une adresse e-mail valide.</p>
+\`\`\`
+
+**Acceptance criteria**
+
+- [ ] **Given** the affected \`a.fr-link\`, \`a.fr-btn\` elements · **When** a user of assistive technology reaches them · **Then** « Use of Color » (WCAG 1.4.1).
+
+**Complexity** : M (8 pts)
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > wcag · en · related + secondary + origin 1`] = `
+"### 🔴 1.1.1 — Non-text Content
+
+> Auditor view — WCAG 2.2 AA. Normative mapping.
+
+**Principle · Guideline** : 1 Perceivable · 1.1 Text Alternatives
+**Success criterion** : 1.1.1 — Non-text Content
+**Technique** : ARIA10, ARIA4, ARIA6, ARIA7, ARIA8, ARIA9, C9, F15, F19, F20, F3, F30, F38, F39, F63, F65, F67, F70, F71, F72, F87, F89, G10, G100, G135, G136, G140, G143, G144, G196, G53, G68, G73, G74, G91, G92, G94, G95, H24, H30, H35, H36, H37, H45, H46, H53, H67, H78, H79, H80, H81, H86
+**WCAG** : 1.1.1 (A)
+**Priority** : 🔴 Blocking
+
+**Finding (Fail)** : 1 occurrence(s) — image sans alternative
+**Expected (Pass)** : Ajoutez alt
+**Verification** : check each occurrence below (inspector / screen reader), then re-run the audit (\`ultra11y\` / axe).
+
+- [ ] \`src/a.tsx:3\` (\`img\`) — image sans alternative
+  - ↳ Relève aussi de ce critère selon le référentiel.
+  - ↳ Composant défini ici. : \`src/Icon.tsx:7\` (\`svg\`)
+  - _rendered capture of \`Button\` — source \`src/Button.tsx:12\`_
+
+#### Technical details
+
+**Impacted files**
+
+- \`src/a.tsx\`
+
+**Expected change**
+
+- Ajoutez alt
+
+**Example** — The alternative conveys the meaning, not the file name.
+
+_Avoid :_
+\`\`\`html
+<img src="chart.png" alt="image">
+\`\`\`
+
+_Recommended :_
+\`\`\`html
+<img src="chart.png" alt="Ventes en hausse de 25 % au T3 2025">
+\`\`\`
+
+**Acceptance criteria**
+
+- [ ] **Given** the affected \`img\` elements · **When** a user of assistive technology reaches them · **Then** « Non-text Content » (WCAG 1.1.1).
+
+**Complexity** : S (3 pts)
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > wcag · en · technical:false 1`] = `
+"### 🔴 1.1.1 — Non-text Content
+
+> Auditor view — WCAG 2.2 AA. Normative mapping.
+
+**Principle · Guideline** : 1 Perceivable · 1.1 Text Alternatives
+**Success criterion** : 1.1.1 — Non-text Content
+**Technique** : ARIA10, ARIA4, ARIA6, ARIA7, ARIA8, ARIA9, C9, F15, F19, F20, F3, F30, F38, F39, F63, F65, F67, F70, F71, F72, F87, F89, G10, G100, G135, G136, G140, G143, G144, G196, G53, G68, G73, G74, G91, G92, G94, G95, H24, H30, H35, H36, H37, H45, H46, H53, H67, H78, H79, H80, H81, H86
+**WCAG** : 1.1.1 (A)
+**Priority** : 🔴 Blocking
+
+**Finding (Fail)** : 1 occurrence(s) — image sans alternative
+**Expected (Pass)** : Ajoutez alt
+**Verification** : check each occurrence below (inspector / screen reader), then re-run the audit (\`ultra11y\` / axe).
+
+- [ ] \`src/a.tsx:3\` (\`img\`) — image sans alternative
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > wcag · en · uncollapsed occurrences 1`] = `
+"### 🔴 1.4.1 — Use of Color
+
+> Auditor view — WCAG 2.2 AA. Normative mapping.
+
+**Principle · Guideline** : 1 Perceivable · 1.4 Distinguishable
+**Success criterion** : 1.4.1 — Use of Color
+**Technique** : C15, F14, F26, F73, F78, G111, G117, G138, G14, G140, G149, G165, G182, G183, G195, G205, G96, SCR31
+**WCAG** : 1.4.1 (A)
+**Priority** : 🔴 Blocking
+
+**Finding (Fail)** : 4 occurrence(s) — lien identifié par la couleur seule
+**Expected (Pass)** : Ajoutez un indice non coloré
+**Verification** : check each occurrence below (inspector / screen reader), then re-run the audit (\`ultra11y\` / axe).
+
+- [ ] \`.ultra11y/pages/accueil/dom.html:2\` (\`a.fr-link\`) — lien identifié par la couleur seule
+- [ ] \`.ultra11y/pages/accueil/dom.html:2\` (\`a.fr-link\`) — lien identifié par la couleur seule
+- [ ] \`.ultra11y/pages/accueil/dom.html:2\` (\`a.fr-link\`) — lien identifié par la couleur seule
+- [ ] \`.ultra11y/pages/accueil/dom.html:2\` (\`a.fr-btn\`) — lien identifié par la couleur seule
+
+#### Technical details
+
+**Impacted files**
+
+- \`.ultra11y/pages/accueil/dom.html\`
+
+**Expected change**
+
+- Ajoutez un indice non coloré
+
+**Example** — The error is no longer signalled by colour alone: an error text makes it perceivable by everyone.
+
+_Avoid :_
+\`\`\`html
+<label for="email">Adresse e-mail</label>
+<input id="email" type="email" style="border-color:#d00">
+\`\`\`
+
+_Recommended :_
+\`\`\`html
+<label for="email">Adresse e-mail</label>
+<input id="email" type="email" aria-invalid="true" aria-describedby="email-err">
+<p id="email-err">Erreur : saisissez une adresse e-mail valide.</p>
+\`\`\`
+
+**Acceptance criteria**
+
+- [ ] **Given** the affected \`a.fr-link\`, \`a.fr-btn\` elements · **When** a user of assistive technology reaches them · **Then** « Use of Color » (WCAG 1.4.1).
+
+**Complexity** : M (8 pts)
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > wcag · fr · advisory unit 1`] = `
+"### 💡 1.3.1 — Structuration de l'information
+
+> Recommandation (non normative) — Bonne pratique — aucun test normatif du référentiel actif ne l'exige. Ce n'est PAS une non-conformité.
+
+**Recommandation (non normative)** — 1.3.1 · Structuration de l'information
+
+**Observation** : 1 occurrence(s) — image sans alternative
+**Suggestion** : Ajoutez alt
+
+- [ ] \`src/a.tsx:3\` (\`img\`) — image sans alternative
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > wcag · fr · heading 1`] = `
+"### 🔴 1.4.3 — Contraste (minimum)
+
+> Lecture auditeur — WCAG 2.2 AA. Correspondance normative.
+
+**Principe · Règle** : 1 Perceptible · 1.4 Distinguable
+**Critère de succès** : 1.4.3 — Contraste (minimum)
+**Technique** : C29, F24, G136, G145, G148, G174, G18
+**WCAG** : 1.4.3 (AA)
+**Priorité** : 🔴 Bloquant
+
+**Constat (Non conforme)** : 1 occurrence(s) — image sans alternative
+**Attendu (Conforme)** : Ajoutez alt
+**Vérification** : contrôler chaque occurrence ci-dessous (inspecteur / lecteur d'écran), puis rejouer l'audit (\`ultra11y\` / axe).
+
+- [ ] \`src/a.tsx:3\` (\`img\`) — image sans alternative
+
+#### Partie technique
+
+**Fichiers impactés**
+
+- \`src/a.tsx\`
+
+**Changement attendu**
+
+- Ajoutez alt
+
+**Exemple** — #999 sur blanc ≈ 2,85:1 (insuffisant) ; #595959 sur blanc ≈ 7:1, conforme pour du texte courant.
+
+_À éviter :_
+\`\`\`html
+<p style="color:#999999;background:#ffffff">Conditions générales d'utilisation</p>
+\`\`\`
+
+_Recommandé :_
+\`\`\`html
+<p style="color:#595959;background:#ffffff">Conditions générales d'utilisation</p>
+\`\`\`
+
+**Critères d'acceptation**
+
+- [ ] **Étant donné** les éléments \`img\` concernés · **Lorsque** un utilisateur de technologie d'assistance y accède · **Alors** « Contraste (minimum) » (WCAG 1.4.3).
+
+**Complexité** : S (3 pts)
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > wcag · fr · mixed unit (normative + advisory) 1`] = `
+"### 🔴 1.1.1 — Non-text Content
+
+> Lecture auditeur — WCAG 2.2 AA. Correspondance normative.
+
+**Principe · Règle** : 1 Perceptible · 1.1 Équivalents textuels
+**Critère de succès** : 1.1.1 — Non-text Content
+**Technique** : ARIA10, ARIA4, ARIA6, ARIA7, ARIA8, ARIA9, C9, F15, F19, F20, F3, F30, F38, F39, F63, F65, F67, F70, F71, F72, F87, F89, G10, G100, G135, G136, G140, G143, G144, G196, G53, G68, G73, G74, G91, G92, G94, G95, H24, H30, H35, H36, H37, H45, H46, H53, H67, H78, H79, H80, H81, H86
+**WCAG** : 1.1.1 (A)
+**Priorité** : 🔴 Bloquant
+
+**Constat (Non conforme)** : 1 occurrence(s) — image sans alternative
+**Attendu (Conforme)** : Ajoutez alt
+**Vérification** : contrôler chaque occurrence ci-dessous (inspecteur / lecteur d'écran), puis rejouer l'audit (\`ultra11y\` / axe).
+
+- [ ] \`src/a.tsx:3\` (\`img\`) — image sans alternative
+
+_Recommandations associées (non normatives)_
+
+- 💡 \`src/b.tsx:9\` (\`h1\`) — recommandation non normative
+
+#### Partie technique
+
+**Fichiers impactés**
+
+- \`src/a.tsx\`
+
+**Changement attendu**
+
+- Ajoutez alt
+
+**Exemple** — L'alternative décrit le sens, pas le nom de fichier.
+
+_À éviter :_
+\`\`\`html
+<img src="chart.png" alt="image">
+\`\`\`
+
+_Recommandé :_
+\`\`\`html
+<img src="chart.png" alt="Ventes en hausse de 25 % au T3 2025">
+\`\`\`
+
+**Critères d'acceptation**
+
+- [ ] **Étant donné** les éléments \`img\` concernés · **Lorsque** un utilisateur de technologie d'assistance y accède · **Alors** « Contenu non textuel » (WCAG 1.1.1).
+
+**Complexité** : S (3 pts)
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > wcag · fr · related + secondary + origin 1`] = `
+"### 🔴 1.1.1 — Non-text Content
+
+> Lecture auditeur — WCAG 2.2 AA. Correspondance normative.
+
+**Principe · Règle** : 1 Perceptible · 1.1 Équivalents textuels
+**Critère de succès** : 1.1.1 — Non-text Content
+**Technique** : ARIA10, ARIA4, ARIA6, ARIA7, ARIA8, ARIA9, C9, F15, F19, F20, F3, F30, F38, F39, F63, F65, F67, F70, F71, F72, F87, F89, G10, G100, G135, G136, G140, G143, G144, G196, G53, G68, G73, G74, G91, G92, G94, G95, H24, H30, H35, H36, H37, H45, H46, H53, H67, H78, H79, H80, H81, H86
+**WCAG** : 1.1.1 (A)
+**Priorité** : 🔴 Bloquant
+
+**Constat (Non conforme)** : 1 occurrence(s) — image sans alternative
+**Attendu (Conforme)** : Ajoutez alt
+**Vérification** : contrôler chaque occurrence ci-dessous (inspecteur / lecteur d'écran), puis rejouer l'audit (\`ultra11y\` / axe).
+
+- [ ] \`src/a.tsx:3\` (\`img\`) — image sans alternative
+  - ↳ Relève aussi de ce critère selon le référentiel.
+  - ↳ Composant défini ici. : \`src/Icon.tsx:7\` (\`svg\`)
+  - _capture rendue de \`Button\` — source \`src/Button.tsx:12\`_
+
+#### Partie technique
+
+**Fichiers impactés**
+
+- \`src/a.tsx\`
+
+**Changement attendu**
+
+- Ajoutez alt
+
+**Exemple** — L'alternative décrit le sens, pas le nom de fichier.
+
+_À éviter :_
+\`\`\`html
+<img src="chart.png" alt="image">
+\`\`\`
+
+_Recommandé :_
+\`\`\`html
+<img src="chart.png" alt="Ventes en hausse de 25 % au T3 2025">
+\`\`\`
+
+**Critères d'acceptation**
+
+- [ ] **Étant donné** les éléments \`img\` concernés · **Lorsque** un utilisateur de technologie d'assistance y accède · **Alors** « Contenu non textuel » (WCAG 1.1.1).
+
+**Complexité** : S (3 pts)
+"
+`;
+
+exports[`renderAuditorUnit — reference bytes > wcag · fr · served URL with sample provenance 1`] = `
+"### 🟠 1.4.10 — Reflow
+
+> Lecture auditeur — WCAG 2.2 AA. Correspondance normative.
+
+**Principe · Règle** : 1 Perceptible · 1.4 Distinguable
+**Critère de succès** : 1.4.10 — Reflow
+**Technique** : C34, C37
+**WCAG** : 1.4.10 (AA)
+**Priorité** : 🟠 Majeur
+
+**Constat (Non conforme)** : 1 occurrence(s) — reflow horizontal
+**Attendu (Conforme)** : Corrigez le reflow
+**Vérification** : contrôler chaque occurrence ci-dessous (inspecteur / lecteur d'écran), puis rejouer l'audit (\`ultra11y\` / axe).
+
+- [ ] \`https://exemple.fr/profil:0\` (\`document\`) — reflow horizontal
+
+#### Partie technique
+
+**Pages / URLs impactées**
+
+- \`https://exemple.fr/profil\` — Profil · authentification requise : oui
+
+**Changement attendu**
+
+- Corrigez le reflow
+
+**Exemple** — width:1200px force un défilement horizontal sur petit écran ; max-width:100% laisse le contenu se réagencer.
+
+_À éviter :_
+\`\`\`html
+<div style="width:1200px">
+  <p>Tableau de bord sur largeur fixe</p>
+</div>
+\`\`\`
+
+_Recommandé :_
+\`\`\`html
+<div style="max-width:100%;width:100%">
+  <p>Tableau de bord fluide</p>
+</div>
+\`\`\`
+
+**Critères d'acceptation**
+
+- [ ] **Étant donné** les éléments \`document\` concernés · **Lorsque** un utilisateur de technologie d'assistance y accède · **Alors** « Redistribution » (WCAG 1.4.10).
+
+**Complexité** : S (2 pts)
+
+**Contexte de reproduction**
+
+- **URL** : \`https://exemple.fr/profil\` — Profil · authentification requise : oui
+  - ↳ Se connecter puis ouvrir /profil.
+- _état requis / étapes pour reproduire_
+"
+`;

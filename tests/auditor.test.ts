@@ -327,6 +327,124 @@ describe("renderAuditorUnit — unified ticket template (Task 2)", () => {
   });
 });
 
+// THE BYTE NET. `renderAuditorUnit` is the single Markdown surface behind `report §2`, `prd`,
+// every tracker issue body and every per-page sheet, and three parsers read it back:
+// verify.ts's AUDITOR_OCCURRENCE, verify.ts's HEADING_LINE and check.ts's criterion scanner.
+// The behavioural tests above assert what a reader sees; these assert the BYTES, so that
+// splitting the renderer into a model + a serializer — or hanging a crop sub-bullet off an
+// occurrence — cannot move a character no test was watching.
+//
+// A failing snapshot here is not automatically a bug: it is a diff to READ. Accept it only
+// once you can name the byte that moved and why it had to.
+describe("renderAuditorUnit — reference bytes", () => {
+  /** The finding shapes that hang inert sub-bullets off an occurrence line, all at once. */
+  function rich(): PrdUnit {
+    const u = unit("1.1.1", "Non-text Content");
+    u.findings[0]!.related = { file: "src/Icon.tsx", line: 7, col: 2, selectorHint: "svg", note: "Composant défini ici." };
+    u.findings[0]!.secondary = { note: "Relève aussi de ce critère selon le référentiel." };
+    u.findings[0]!.origin = { capture: "captures/button-icon.html", sourceFile: "src/Button.tsx", component: "Button", sourceLine: 12 };
+    return u;
+  }
+
+  const CASES: Array<[string, () => string[]]> = [
+    ["wcag · en · bare (issue body)", () => renderAuditorUnit(unit("1.1.1", "Non-text Content"), "wcag", "en")],
+    ["wcag · fr · heading", () => renderAuditorUnit(unit("1.4.3", "Contraste (minimum)"), "wcag", "fr", { heading: "###" })],
+    ["rgaa · fr · heading", () => renderAuditorUnit(unit("11.6", "Légende", ["1.3.1", "3.3.2"]), "rgaa", "fr", { heading: "###" })],
+    ["rgaa · en · heading", () => renderAuditorUnit(unit("11.6", "Légende", ["1.3.1", "3.3.2"]), "rgaa", "en", { heading: "###" })],
+    ["wcag · fr · related + secondary + origin", () => renderAuditorUnit(rich(), "wcag", "fr", { heading: "###" })],
+    ["wcag · en · related + secondary + origin", () => renderAuditorUnit(rich(), "wcag", "en", { heading: "###" })],
+    [
+      "wcag · fr · advisory unit",
+      () => renderAuditorUnit({ ...unit("1.3.1", "Structuration de l'information"), advisory: true }, "wcag", "fr", { heading: "###" }),
+    ],
+    ["wcag · en · advisory unit", () => renderAuditorUnit({ ...unit("1.3.1", "Info and Relationships"), advisory: true }, "wcag", "en", { heading: "###" })],
+    [
+      "wcag · fr · mixed unit (normative + advisory)",
+      () => {
+        const u = unit("1.1.1", "Non-text Content");
+        u.findings.push({
+          ...u.findings[0]!,
+          file: "src/b.tsx",
+          line: 9,
+          selectorHint: "h1",
+          severity: "mineur",
+          message: "recommandation non normative",
+          remediation: "Ajoutez un h1",
+          advisory: true,
+        });
+        return renderAuditorUnit(u, "wcag", "fr", { heading: "###" });
+      },
+    ],
+    [
+      "wcag · en · collapsed occurrences",
+      () => {
+        const u = unit("1.4.1", "Use of Color");
+        u.findings = [rep("a.fr-link", 41), rep("a.fr-link", 88), rep("a.fr-link", 120), rep("a.fr-btn", 12)];
+        return renderAuditorUnit(u, "wcag", "en", { heading: "###", collapse: true });
+      },
+    ],
+    [
+      "wcag · en · uncollapsed occurrences",
+      () => {
+        const u = unit("1.4.1", "Use of Color");
+        u.findings = [rep("a.fr-link", 41), rep("a.fr-link", 88), rep("a.fr-link", 120), rep("a.fr-btn", 12)];
+        return renderAuditorUnit(u, "wcag", "en", { heading: "###" });
+      },
+    ],
+    ["wcag · en · technical:false", () => renderAuditorUnit(unit("1.1.1", "Non-text Content"), "wcag", "en", { heading: "###", technical: false })],
+    [
+      "wcag · fr · served URL with sample provenance",
+      () => {
+        const u: PrdUnit = {
+          criteriaId: "1.4.10",
+          title: "Reflow",
+          label: "1.4.10 — Reflow",
+          refs: [],
+          severity: "majeur",
+          findings: [
+            {
+              ruleId: "dyn-reflow",
+              criteriaId: "1.4.10",
+              file: "https://exemple.fr/profil",
+              line: 0,
+              col: 0,
+              selectorHint: "document",
+              severity: "majeur",
+              message: "reflow horizontal",
+              remediation: "Corrigez le reflow",
+              snippet: "",
+              sample: { page: "Profil", authRequired: true, notes: "Se connecter puis ouvrir /profil." },
+            },
+          ],
+        };
+        return renderAuditorUnit(u, "wcag", "fr", { heading: "###" });
+      },
+    ],
+  ];
+
+  it.each(CASES)("%s", (_name, render) => {
+    expect(render().join("\n")).toMatchSnapshot();
+  });
+
+  // The three grammars the bytes above have to keep feeding. Asserted here as well as in the
+  // snapshot, because a snapshot tells you a byte moved but not which contract it broke.
+  it("every occurrence of every case stays parseable, and no group header ever is", () => {
+    for (const [name, render] of CASES) {
+      const lines = render();
+      for (const line of lines) {
+        if (line.includes("· ×")) expect(AUDITOR_OCCURRENCE.test(line), `${name}: a group header entered the worklist`).toBe(false);
+        if (line.trimStart().startsWith("- 💡")) expect(AUDITOR_OCCURRENCE.test(line), `${name}: an advisory entered the worklist`).toBe(false);
+      }
+      // No line may open a heading deeper than #### — verify.ts's HEADING_LINE stops resetting
+      // the current criterion at level 5, and a technical-section line would leak into it.
+      expect(
+        lines.some((l) => /^#{5,}\s/.test(l)),
+        `${name}: a level-5+ heading`,
+      ).toBe(false);
+    }
+  });
+});
+
 describe("renderAuditorBacklog / renderAuditorPerCriterion", () => {
   it("titles the backlog with the standard's auditor heading and sections by severity", () => {
     const md = renderAuditorBacklog(AUDIT, "en", "wcag");
