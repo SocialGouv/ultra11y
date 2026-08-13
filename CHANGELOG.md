@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [4.0.0](https://github.com/maxgfr/ultra11y/compare/v3.1.0...v4.0.0) (2026-08-13)
+
+
+* fix(pages)!: a rate over nothing is not 100 %, it is no rate at all ([d5a2975](https://github.com/maxgfr/ultra11y/commit/d5a2975a481d6f51ba2bffd8634860c5ce71c170)), closes [#16](https://github.com/maxgfr/ultra11y/issues/16) [#16](https://github.com/maxgfr/ultra11y/issues/16)
+
+
+### Bug Fixes
+
+* **pages:** a page earns its basis from evidence, not from a directory ([c564b97](https://github.com/maxgfr/ultra11y/commit/c564b9774054b80f0998a7b538ae19bf2661ca3b)), closes [#16](https://github.com/maxgfr/ultra11y/issues/16)
+* **pages:** stamp the page on pack findings too ([1d8cf12](https://github.com/maxgfr/ultra11y/commit/1d8cf12349079a8b6bb67ef0338c333ca31104a2)), closes [#16](https://github.com/maxgfr/ultra11y/issues/16)
+* **pages:** stop losing the page a finding was raised on ([9cf0fdd](https://github.com/maxgfr/ultra11y/commit/9cf0fdd13b5c369721d07b176a7900fbd63b23c4)), closes [#16](https://github.com/maxgfr/ultra11y/issues/16)
+* **sample:** lint the surface that was audited, not the list someone declared ([c7b00d8](https://github.com/maxgfr/ultra11y/commit/c7b00d819f279e6dbfe30f3b4574335c425268f1)), closes [#16](https://github.com/maxgfr/ultra11y/issues/16)
+
+
+### Features
+
+* **external:** import an audit someone else performed, and diff it against the grid ([245cf9f](https://github.com/maxgfr/ultra11y/commit/245cf9f57adae84a6d19cb225cf81437edbdf366)), closes [#16](https://github.com/maxgfr/ultra11y/issues/16)
+* **pages:** fold a page sheet's repeated occurrences, without folding the count ([a13a8db](https://github.com/maxgfr/ultra11y/commit/a13a8dba2ec6116c2e59e5ebc0df8407e4afba49)), closes [#16](https://github.com/maxgfr/ultra11y/issues/16)
+
+
+### BREAKING CHANGES
+
+* PageResult.conformancePct is now `number | null`, and the JSON
+of `pages --json` and the MCP pages tool carries `decided`/`total` beside it. A
+consumer that formatted the number directly must handle null — that is the
+point: null and 100 were previously indistinguishable.
+
 # [3.1.0](https://github.com/maxgfr/ultra11y/compare/v3.0.0...v3.1.0) (2026-08-12)
 
 
