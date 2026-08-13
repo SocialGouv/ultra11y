@@ -24,7 +24,7 @@
 // report (it does copy, so an uploaded `audits/` artefact keeps its images), which keeps
 // this module pure and testable.
 import { prdUnits } from "./prd.js";
-import { renderAuditorUnit } from "./auditor.js";
+import { renderAuditorUnit, type AuditorCropLookup } from "./auditor.js";
 import { agentMarkNote, basisLabel, formatRate, pageView, unattributedFindings } from "./pages.js";
 import { CORE, type StandardId, derivePackResults, isCore, loadPack, packTestIds, themeName, titlePlain } from "./standards/index.js";
 import type { AuditResult, Lang, PageResult, Status } from "./types.js";
@@ -152,6 +152,13 @@ export interface PageReportOpts {
   /** Heading level of a page's own section. `##` inside a combined document, `#` when the
    *  page owns its file. */
   heading?: string;
+  /** The annotated crop illustrating one occurrence, when the evidence tier drew one. Passed
+   *  straight through to the auditor block, which owns the one place a crop is emitted. */
+  cropFor?: AuditorCropLookup;
+  /** What the evidence tier could NOT draw on this page, and why — already localized. Printed
+   *  under the screenshot so a reader is never left to infer that an absent image means an
+   *  absent defect. */
+  evidenceNotice?: string[];
 }
 
 /** One criterion's line on one page's sheet. Exported because the HTML renderer and the CI
@@ -261,6 +268,10 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
   if (shot) out.push(`![${s.screenshotAlt(page.name)}](${shot})`, "");
   else out.push(`_${s.noScreenshot}_`, "");
 
+  // What the evidence tier refused to draw, and why. An unillustrated occurrence must never
+  // read as an absent one — the whole posture of this engine is that nothing is cut silently.
+  if (opts.evidenceNotice?.length) out.push(...opts.evidenceNotice, "");
+
   // The grid carries the criterion's own numbered TESTS, not just its title and status:
   // those tests are what has to be checked, and listing them only inside the
   // non-conformity blocks meant a sheet said nothing about the work still to do on the
@@ -290,13 +301,14 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
   const ncUnits = units.filter((u) => !u.advisory);
   const advUnits = units.filter((u) => u.advisory);
 
+  const unit = { heading: `${h}##`, collapse: true, ...(opts.cropFor ? { cropFor: opts.cropFor } : {}) };
   out.push(`${h}# ${s.ncTitle}`, "");
   if (!ncUnits.length) out.push(s.noNc, "");
-  else for (const u of ncUnits) out.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##`, collapse: true }));
+  else for (const u of ncUnits) out.push(...renderAuditorUnit(u, standard, lang, unit));
 
   if (advUnits.length) {
     out.push(`${h}# 💡 ${s.recTitle}`, "", `> ${s.recNote}`, "");
-    for (const u of advUnits) out.push(...renderAuditorUnit(u, standard, lang, { heading: `${h}##`, collapse: true }));
+    for (const u of advUnits) out.push(...renderAuditorUnit(u, standard, lang, unit));
   }
 
   return out.join("\n");

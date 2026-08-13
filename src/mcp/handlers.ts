@@ -9,6 +9,8 @@ import { writeHook, ciWorkflow } from "../init.js";
 import { runPackCheck } from "../pack.js";
 import { prdUnits, partitionUnits } from "../prd.js";
 import { renderReport, renderPackReport } from "../report.js";
+import { renderHtmlDocument } from "../html.js";
+import { compositeDoc, pagesIndexDoc } from "../html-report.js";
 import { buildTickets } from "../tickets/grain.js";
 import type { TicketGrain } from "../tickets/types.js";
 import { buildWorklist, formatWorklist } from "../verify.js";
@@ -229,7 +231,14 @@ function handleReport(args: Record<string, unknown>, cwd: string): unknown {
   const lang = langOf(args);
   const r = audit(args, cwd);
   const md = standard === "wcag" ? renderReport(r, lang) : renderPackReport(r, loadPack(standard), lang);
-  return { cwd, standard, lang, report: md, next: "Validate it with ultra11y_check before presenting it." };
+  return {
+    cwd,
+    standard,
+    lang,
+    report: md,
+    ...(args.html === true ? { html: renderHtmlDocument(compositeDoc(r, { standard, lang })) } : {}),
+    next: "Validate it with ultra11y_check before presenting it.",
+  };
 }
 
 function handlePrd(args: Record<string, unknown>, cwd: string): unknown {
@@ -378,6 +387,7 @@ function handlePages(args: Record<string, unknown>, cwd: string): unknown {
     standard,
     lang,
     markdown,
+    ...(args.html === true ? { html: renderHtmlDocument(pagesIndexDoc(r, { standard, lang, sheetHref: (id) => `#page-${id}` })) } : {}),
     // `conformancePct` is null when this page decided nothing — a machine consumer must be able
     // to tell "no criterion was assessed" from "every assessed criterion passed", which a bare
     // 100 conflates. `decided`/`total` are the denominator that makes the number quotable.

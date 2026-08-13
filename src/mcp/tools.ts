@@ -25,6 +25,14 @@ const standardProp: JsonSchemaProp = {
   description: "Which standard to report against. Default: wcag (WCAG 2.2 AA).",
 };
 const langProp: JsonSchemaProp = { type: "string", enum: ["en", "fr"], description: "Language for the rendered prose. Default: en." };
+// A BOOLEAN, not a `format` value. On `report`, `format` names a CI channel (SARIF,
+// annotations); on `pages` it names which document. Widening either enum would make
+// `prd --format html` parse in silence.
+const htmlProp: JsonSchemaProp = {
+  type: "boolean",
+  description:
+    "Also return the report as a self-contained HTML page (no script, no external asset). Images are not embedded — this returns a string, not files.",
+};
 
 // The sentence that keeps this server honest. The engine decides 3 of the 55
 // WCAG 2.2 AA criteria on its own; `scan` decides 14 from a real browser; the
@@ -67,7 +75,7 @@ export const TOOLS: ToolDecl[] = [
       "which criteria were not tested, because a report silent about its own coverage reads as a clean bill of health.",
     inputSchema: {
       type: "object",
-      properties: { cwd: cwdProp, globs: globsProp, standard: standardProp, lang: langProp },
+      properties: { cwd: cwdProp, globs: globsProp, standard: standardProp, lang: langProp, html: htmlProp },
       required: ["cwd"],
     },
   },
@@ -221,6 +229,7 @@ export const TOOLS: ToolDecl[] = [
           enum: ["grid", "report"],
           description: "`grid` (default) is the criterion × page matrix; `report` is the per-page dossiers.",
         },
+        html: htmlProp,
       },
       required: ["cwd"],
     },

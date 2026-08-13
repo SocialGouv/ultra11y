@@ -37,8 +37,15 @@ export interface EmitOpts {
   screenshots?: Map<string, string>;
   /** Bytes of inlined image data the composite may carry. */
   inlineBudget?: number;
-  /** Also write the navigable page site (`index.html` + `page-<id>.html`). */
+  /** Also write the navigable page sheets. */
   pages?: boolean;
+  /** WHERE the sheets go, and what `index.html` is.
+   *
+   *  `report` (the default, for `report --html`): `index.html` is the dashboard and the sheets
+   *  sit in `pages/`. `pages` (for `pages --html`): `index.html` IS the page index and the
+   *  sheets sit beside it — mirroring exactly where that command already writes its Markdown,
+   *  so `--out audits/pages` does not produce `audits/pages/pages/`. */
+  layout?: "report" | "pages";
 }
 
 export interface EmitResult {
@@ -176,67 +183,76 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
     return drawn;
   };
 
+  // The two layouts differ in exactly two places: where a sheet is written, and what
+  // `index.html` is. Everything below reads `up` and `sheetDir`, so neither can drift.
+  const flat = opts.layout === "pages";
+  const sheetDir = flat ? opts.outDir : join(opts.outDir, "pages");
+  const up = flat ? "./" : "../";
+
   const compositeName = `ultra11y-${stdKey}-${result.date}.html`;
   const nav = [
-    { href: "./index.html", text: t.indexTitle },
+    { href: "./index.html", text: flat ? t.pagesTitle : t.indexTitle },
     { href: `./${compositeName}`, text: t.docTitle },
-    ...(opts.pages ? [{ href: "./pages/index.html", text: t.pagesTitle }] : []),
+    ...(opts.pages && !flat ? [{ href: "./pages/index.html", text: t.pagesTitle }] : []),
   ];
   const composite = compositeDoc(result, { standard, lang, crops: budgetedCrops, nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` })) });
   if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
   const compositePath = join(opts.outDir, compositeName);
   writeFileSync(compositePath, renderHtmlDocument(composite));
 
+  // Images stay FILES on the sheets, so the same crop is not duplicated into every document
+  // that shows it. Only the composite pays the base64 tax, because only it has to travel alone.
+  const fileCrops = cropLookup(opts.evidence, lang, (_p, href) => href.replace(/^\.\//, up));
+
   // ---- the entry point: links and numbers, never an image ----
-  const index = indexDoc(result, {
-    standard,
-    lang,
-    nav: nav.map((n) => ({ ...n, current: n.href === "./index.html" })),
-    links: nav.filter((n) => n.href !== "./index.html"),
-  });
+  const indexNav = nav.map((n) => ({ ...n, current: n.href === "./index.html" }));
+  const index = flat
+    ? pagesIndexDoc(result, { standard, lang, nav: indexNav, sheetHref: (id) => `./page-${id}.html` })
+    : indexDoc(result, { standard, lang, nav: indexNav, links: nav.filter((n) => n.href !== "./index.html") });
   const indexPath = join(opts.outDir, "index.html");
   writeFileSync(indexPath, renderHtmlDocument(index));
 
-  // ---- the site: images stay files, so nothing is duplicated into the markup ----
   const sheets: string[] = [];
   if (opts.pages) {
-    const scope = pagesOf(result);
-    const derived = derivePages(result, scope);
-    const dir = join(opts.outDir, "pages");
-    mkdirSync(dir, { recursive: true });
-    // `../` on purpose and once: the assets live beside the entry point, and a sheet that
-    // copied them would double the artifact. It still never leaves the artifact root — the
-    // manifest's href is `./assets/…`, seen from `pages/` that is `../assets/…`.
-    const fileCrops = cropLookup(opts.evidence, lang, (_p, href) => href.replace(/^\.\//, "../"));
-    const siteNav = [
-      { href: "../index.html", text: t.indexTitle },
-      { href: `../${compositeName}`, text: t.docTitle },
-      { href: "./index.html", text: t.pagesTitle, current: true },
+    const derived = derivePages(result, pagesOf(result));
+    mkdirSync(sheetDir, { recursive: true });
+    const sheetNav = [
+      { href: `${up}index.html`, text: flat ? t.pagesTitle : t.indexTitle },
+      { href: `${up}${compositeName}`, text: t.docTitle },
+      ...(flat ? [] : [{ href: "./index.html", text: t.pagesTitle }]),
     ];
-    writeFileSync(join(dir, "index.html"), renderHtmlDocument(pagesIndexDoc(result, { standard, lang, nav: siteNav, sheetHref: (id) => `./page-${id}.html` })));
-    sheets.push(join(dir, "index.html"));
+    // In the nested layout the page index is its own document; flat, `index.html` already is it.
+    if (!flat) {
+      writeFileSync(
+        join(sheetDir, "index.html"),
+        renderHtmlDocument(
+          pagesIndexDoc(result, {
+            standard,
+            lang,
+            nav: sheetNav.map((n) => ({ ...n, current: n.href === "./index.html" })),
+            sheetHref: (id) => `./page-${id}.html`,
+          }),
+        ),
+      );
+      sheets.push(join(sheetDir, "index.html"));
+    }
     for (const p of derived) {
-      const shot = opts.screenshots?.get(p.id);
       const doc = pageDoc(result, p, {
         standard,
         lang,
         crops: fileCrops,
-        nav: siteNav.map((n) => ({ ...n, current: false })),
-        ...(shot ? { screenshot: relativeShot(p.id) } : {}),
+        nav: sheetNav,
+        // Where `cmdPages`' screenshot copier already put the capture: `assets/<id>.png`,
+        // beside the entry point, seen from wherever this sheet sits.
+        ...(opts.screenshots?.has(p.id) ? { screenshot: `${up}assets/${p.id}.png` } : {}),
       });
-      const path = join(dir, `page-${p.id}.html`);
+      const path = join(sheetDir, `page-${p.id}.html`);
       writeFileSync(path, renderHtmlDocument(doc));
       sheets.push(path);
     }
   }
 
   return { index: indexPath, composite: compositePath, sheets, inlinedBytes, degraded: rung.steps, imagesDropped: rung.steps.includes("none"), notices };
-}
-
-/** Where `cmdPages`' screenshot copier already put the page capture, seen from a sheet in
- *  `pages/`. Kept as one function so the two halves of that convention cannot drift. */
-function relativeShot(pageId: string): string {
-  return `../assets/${pageId}.png`;
 }
 
 function noticeRuns(notices: string[]): Run[] {

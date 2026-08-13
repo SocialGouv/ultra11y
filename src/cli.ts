@@ -6,6 +6,8 @@ import {
   type Lang,
   type AuditResult,
   type DynamicResult,
+  type Finding,
+  type PageResult,
   type PageScope,
   type SampleConfig,
   type SamplePage,
@@ -49,13 +51,15 @@ import { createAdapter } from "./external/registry.js";
 import { diffSides, sideOfExternal, type DiffBucket } from "./external/diff.js";
 import type { ExternalAdapter, ExternalAudit } from "./external/types.js";
 import { runFix, fixSummary } from "./fix.js";
-import { diffAgainstBaseline, baselineSummary, parseFailOn, findingsAtOrAbove } from "./baseline.js";
+import { diffAgainstBaseline, baselineSummary, findingId, parseFailOn, findingsAtOrAbove } from "./baseline.js";
 import { repoRoot, resolveEnginePath, writeHook, writeCi } from "./init.js";
 import { installForTargets, parseTargets, statusReport, uninstallForTargets } from "./install/index.js";
 import { agentsMdBlock } from "./install/agents-md.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
 import { toSarif } from "./sarif.js";
 import { annotations, prComment, stepSummary } from "./annotate.js";
+import { evidenceNotice, writeEvidence } from "./evidence.js";
+import { writeHtml } from "./html-emit.js";
 import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
 import { attributePages, derivePages, pageScopesFrom, pageView, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
 import { renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
@@ -84,6 +88,7 @@ Usage:
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
   ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor] [--format sarif|github]   (re-gate an audit already computed — e.g. one carrying adjudicated verdicts — without a second detection pass)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
+  ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file; --evidence adds annotated crops)
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
@@ -108,6 +113,7 @@ Usage:
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
+  ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence] [--html]   (annotated crops of each non-conformity, and the HTML site)
   ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
   ultra11y pages    --in <audit.json> --standard <pack> --diff <external.json>   (hold the grid against an audit someone else performed)
   ultra11y import   --from file <report.json> | --from ara <id> [--source <adapter>] [--out <dir>] [--json]
@@ -508,6 +514,8 @@ const VALUE_FLAGS = new Set([
   "model",
   "pack",
   "format",
+  // Bytes of image data the single-file HTML report may carry inline (src/html-emit.ts).
+  "inline-budget",
   "guidance",
   "runtime",
   "cwd",
@@ -555,6 +563,10 @@ const BOOLEAN_FLAGS = new Set([
   "cross-file",
   "json",
   "quiet",
+  // The visual tier. Both must be declared here or `parseArgs` swallows the value that
+  // follows and the run prints "unknown flag (ignored)" for a flag that in fact works.
+  "html",
+  "evidence",
   "no-default-excludes",
   "no-captures",
   "require-captures",
@@ -1352,6 +1364,14 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
     }
     return m;
   };
+  // The screenshots that EXIST, as absolute-ish source paths. The HTML tier needs the bytes
+  // (to weigh them against the inline budget); the Markdown tier needs the href. Same set,
+  // two questions, so the membership test is written once.
+  const shotPaths = (pages: PageResult[]): Map<string, string> => {
+    const m = new Map<string, string>();
+    for (const pg of pages) if (existsSync(shotOf(pg.id))) m.set(pg.id, shotOf(pg.id));
+    return m;
+  };
   const shotsCopiedInto = (dir: string): Map<string, string> => {
     const m = new Map<string, string>();
     const assets = join(dir, "assets");
@@ -1365,19 +1385,67 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
     return m;
   };
 
+  const wantEvidence = p.flags.evidence === true;
+  const wantHtml = p.flags.html === true;
+
   if (!outDir) {
     // No --out: stream the whole document to stdout. Screenshots are resolved against the
     // CWD, which is where a reader piping this would sit.
+    if (wantEvidence || wantHtml) {
+      console.error(
+        lang === "fr"
+          ? "ultra11y pages : --evidence et --html demandent --out <dir>. Le mode stdout n'a pas de répertoire où écrire des images ni être auto-suffisant."
+          : "ultra11y pages: --evidence and --html require --out <dir>. Stdout mode has no directory to write images into, nor to be self-contained in.",
+      );
+      return 2;
+    }
     console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsRelative(".") }));
     return 0;
   }
 
   mkdirSync(outDir, { recursive: true });
+
+  // THE EVIDENCE TIER. Annotated crops, derived at render time from the snapshot the finding
+  // was raised on — never stamped on the finding, because a rectangle in pixels is a property
+  // of the image and goes silently wrong the moment the audit is re-rendered against another
+  // capture. `writeEvidence` reports what it could NOT draw, and that refusal is printed.
+  const manifest = wantEvidence ? writeEvidence(result, { outDir }) : undefined;
+  const cropFor = manifest
+    ? (f: Finding) => {
+        const c = manifest.crops.get(findingId(f));
+        return c ? { href: c.href, alt: c.alt[lang] } : undefined;
+      }
+    : undefined;
+  if (manifest) {
+    const total = evidenceNotice(manifest, null, lang);
+    console.error(
+      lang === "fr"
+        ? `ultra11y : ${manifest.totals.imaged} vignette(s) écrite(s) dans ${join(outDir, "assets")}.`
+        : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join(outDir, "assets")}.`,
+    );
+    for (const line of total) console.error(line);
+  }
+  const evidenceOpts = {
+    ...(cropFor ? { cropFor } : {}),
+  };
+
   if (!split) {
     const file = join(outDir, `pages-${result.date}.md`);
-    writeFileSync(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir) })}\n`);
+    writeFileSync(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir), ...evidenceOpts })}\n`);
+    const html = wantHtml
+      ? emitHtml(result, {
+          outDir,
+          standard,
+          lang,
+          layout: "pages",
+          pages: true,
+          screenshots: shotPaths(derived),
+          ...(manifest ? { evidence: manifest } : {}),
+          inlineBudget: budgetOf(p),
+        })
+      : undefined;
     console.log(file);
-    return 0;
+    return html?.imagesDropped ? 1 : 0;
   }
 
   const shots = shotsCopiedInto(outDir);
@@ -1388,12 +1456,51 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   const sheet = (id: string): string => `page-${id}.md`;
   const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
   for (const pg of derived) {
-    writeFileSync(join(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots })}\n`);
+    const notice = manifest ? evidenceNotice(manifest, pg.id, lang) : [];
+    writeFileSync(
+      join(outDir, sheet(pg.id)),
+      `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts, ...(notice.length ? { evidenceNotice: notice } : {}) })}\n`,
+    );
   }
   const index = join(outDir, "index.md");
   writeFileSync(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}\n`);
+  const html = wantHtml
+    ? emitHtml(result, {
+        outDir,
+        standard,
+        lang,
+        layout: "pages",
+        pages: true,
+        screenshots: shotPaths(derived),
+        ...(manifest ? { evidence: manifest } : {}),
+        inlineBudget: budgetOf(p),
+      })
+    : undefined;
   console.log(index);
-  return 0;
+  return html?.imagesDropped ? 1 : 0;
+}
+
+/** `--inline-budget` in bytes, or undefined for the module default. Rejected loudly rather
+ *  than coerced: silently falling back to 12 MB on a typo is how a run appears to honour a
+ *  budget it never read. */
+function budgetOf(p: ParsedArgs): number | undefined {
+  const raw = p.flags["inline-budget"];
+  if (typeof raw !== "string" || !raw) return undefined;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/** Write the HTML documents and report the budget ladder. Shared by `pages` and `report`, so
+ *  the two commands cannot degrade images differently.
+ *
+ *  It writes to STDERR only. Stdout carries one thing on these commands — the path the caller
+ *  captures (`action.yml` reads it into an output) — and a second line there would break it. */
+function emitHtml(result: AuditResult, opts: Parameters<typeof writeHtml>[1]): ReturnType<typeof writeHtml> {
+  const res = writeHtml(result, opts);
+  for (const n of res.notices) console.error(`ultra11y: ${n}`);
+  console.error(`ultra11y: ${res.index}`);
+  console.error(`ultra11y: ${res.composite}`);
+  return res;
 }
 
 // `snapshot write` — the single surface every browser-side producer writes through (the E2E
@@ -1674,12 +1781,38 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
     console.error(`ultra11y report: --format must be sarif|github (got "${String(p.flags.format)}").`);
     return 2;
   }
+  // `--format` on `report` names a CI CHANNEL (annotations, SARIF); `--html` names a
+  // DOCUMENT. Asking for both is asking for a file and a stream at once, so it is refused by
+  // name rather than resolved by precedence — a silent winner here is a missing deliverable.
+  if (ciFormat && p.flags.html === true) {
+    console.error(
+      lang === "fr"
+        ? `ultra11y report : --html et --format ${ciFormat} sont incompatibles. --format nomme un canal CI, --html un document ; choisissez l'un ou l'autre.`
+        : `ultra11y report: --html and --format ${ciFormat} are incompatible. --format names a CI channel, --html names a document; pick one.`,
+    );
+    return 2;
+  }
   if (ciFormat) {
     emitCiFormat(result, ciFormat, standard, lang);
     return 0;
   }
 
   const path = writeReport(result, { out, lang, standard });
+  // The HTML tier: the artifact's front door plus the detachable, printable composite. Written
+  // beside the Markdown, in the same `--out`, so the directory stays one self-contained root.
+  let html: ReturnType<typeof writeHtml> | undefined;
+  if (p.flags.html === true) {
+    const manifest = p.flags.evidence === true ? writeEvidence(result, { outDir: out }) : undefined;
+    if (manifest) for (const line of evidenceNotice(manifest, null, lang)) console.error(line);
+    html = emitHtml(result, { outDir: out, standard, lang, ...(manifest ? { evidence: manifest } : {}), inlineBudget: budgetOf(p) });
+  } else if (p.flags.evidence === true) {
+    console.error(
+      lang === "fr"
+        ? "ultra11y report : --evidence n'illustre que le rapport HTML. Ajoutez --html, ou utilisez `pages --format report --evidence` pour des fiches Markdown illustrées."
+        : "ultra11y report: --evidence only illustrates the HTML report. Add --html, or use `pages --format report --evidence` for illustrated Markdown sheets.",
+    );
+    return 2;
+  }
   // Partial-audit advisory (owner decision): a pack (RGAA) report whose scan coverage
   // leaves needs-rendering criteria untested — warn prominently on the CLI, naming exactly
   // which criteria lack a dynamic verdict (the report itself carries the matching banner).
@@ -1695,6 +1828,7 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
           conformancePct: result.conformancePct,
           date: result.date,
           standard: typeof p.flags.standard === "string" ? p.flags.standard : "wcag",
+          ...(html ? { htmlPath: html.index, htmlSinglePath: html.composite } : {}),
           ...(partial ? { partialAudit: true, untestedCriteria: untested } : {}),
         },
         null,
@@ -1702,7 +1836,10 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
       ),
     );
   else console.log(path);
-  return 0;
+  // Images degrade, non-conformities never — but a composite that could not carry ONE
+  // illustration is a degraded deliverable, and the caller is told with an exit code rather
+  // than a line it may not be reading.
+  return html?.imagesDropped ? 1 : 0;
 }
 
 async function cmdPrd(p: ParsedArgs): Promise<number> {
