@@ -19,12 +19,14 @@ import { dirname, join } from "node:path";
 import { runAudit } from "./audit.js";
 import { resolveMessage } from "./messages.js";
 import { packCriteriaForFinding } from "./standards/derive.js";
-import { attributePages, derivePages, formatRate, pageGridModel, pageScopesFrom, pagesOf } from "./pages.js";
+import { attributePages, derivePages, pageScopesFrom, pagesOf } from "./pages.js";
+import { renderHtmlDocument } from "./html.js";
+import { crossGridBlocks, scoreboardBlocks } from "./html-report.js";
 import { applyAdjudication, buildAdjudicationWorklist, formatAdjudication } from "./adjudicate.js";
 import { BATCH_SIZE, applyRawVerdicts, judgeAll } from "./llm.js";
 import { readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
-import { SCHEMA_VERSION, VERSION, type AuditResult, type Finding, type Lang, type PageResult, type Status } from "./types.js";
+import { SCHEMA_VERSION, VERSION, type AuditResult, type Finding, type Lang, type PageResult } from "./types.js";
 import { COLLECT_SNAPSHOT } from "./snapshot.js";
 
 export const DEV_DEFAULT_PORT = 4111;
@@ -227,73 +229,28 @@ export default Ultra11yOverlay;
 
 // ---- the dashboard -------------------------------------------------------------------------
 
-const MARK: Record<Status, string> = { C: "C", NC: "NC", NA: "—", manual: "?" };
-const CLASS: Record<Status, string> = { C: "c", NC: "nc", NA: "na", manual: "m" };
-
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-/** The per-page grid as a self-contained HTML page (no external asset, light and dark). */
+/** The per-page grid as a self-contained HTML page.
+ *
+ *  It used to carry its own `<head>`, its own escaper, its own stylesheet and its own copy of
+ *  the grid loop — four things to keep in step with the report, and all four had drifted. It
+ *  now builds the SAME `Doc` the HTML report builds and hands it to the same renderer, so the
+ *  side-car inherits the landmarks, the print sheet and the AA-corrected dark palette for
+ *  free, and the dashboard cannot disagree with the report about a page's status. */
 export function dashboardHtml(result: AuditResult | null, pages: PageResult[], standard: StandardId, lang: Lang): string {
   const fr = lang === "fr";
-  const stdLabel = isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name;
-  const head = `<!doctype html><html lang="${fr ? "fr" : "en"}"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ultra11y — ${esc(stdLabel)}</title>
-<style>
- :root { color-scheme: light dark; --bg:#fff; --fg:#111; --line:#e3e3e6; --mut:#666; }
- @media (prefers-color-scheme: dark) { :root { --bg:#141416; --fg:#f2f2f7; --line:#2c2c2e; --mut:#a1a1a6; } }
- body { margin:0; padding:24px; background:var(--bg); color:var(--fg); font:14px/1.5 ui-sans-serif,system-ui,sans-serif; }
- h1 { font-size:18px; margin:0 0 4px; } p.sub { color:var(--mut); margin:0 0 20px; }
- table { border-collapse:collapse; width:100%; } th,td { padding:5px 8px; border-bottom:1px solid var(--line); text-align:left; }
- th { position:sticky; top:0; background:var(--bg); }
- td.c,td.nc,td.na,td.m { text-align:center; font-weight:600; width:80px; }
- td.c{color:#0a7d33} td.nc{color:#b3261e} td.na{color:var(--mut)} td.m{color:#b06000}
- tr.theme td { font-weight:700; background:color-mix(in srgb, var(--fg) 6%, transparent); }
- .rate { font-size:22px; font-weight:700; }
- .empty { color:var(--mut); max-width:60ch; }
- code { font:12px ui-monospace,monospace; color:var(--mut); }
-</style></head><body>`;
-
+  const title = `ultra11y — ${isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name}`;
   if (!result || !pages.length) {
-    return `${head}<h1>ultra11y</h1>
-<p class="empty">${
-      fr
-        ? "Aucune page capturée pour l'instant. Ouvrez votre application avec l'overlay actif : chaque page visitée apparaîtra ici."
-        : "No page captured yet. Open your app with the overlay active: every page you visit shows up here."
-    }</p></body></html>`;
+    const empty = fr
+      ? "Aucune page capturée pour l'instant. Ouvrez votre application avec l'overlay actif : chaque page visitée apparaîtra ici."
+      : "No page captured yet. Open your app with the overlay active: every page you visit shows up here.";
+    return renderHtmlDocument({ lang, title, blocks: [{ kind: "para", runs: [{ text: empty }] }] });
   }
-
-  // The SAME grid the Markdown `pages --format grid` renders. This used to be a second copy of
-  // the loop, and it had drifted three ways: unsorted core criteria, bare ids instead of titled
-  // labels, and a pack view that forgot to narrow `packFindings` to the page — so one page's
-  // pack finding coloured every other page's cell.
-  const { rows, status } = pageGridModel(result, pages, standard, lang);
-
-  const out: string[] = [head];
-  out.push(`<h1>ultra11y — ${esc(stdLabel)}</h1>`);
-  out.push(`<p class="sub">${pages.length} ${fr ? "page(s) capturée(s)" : "page(s) captured"} · <code>${esc(result.date)}</code></p>`);
-  out.push("<table><thead><tr><th></th>");
-  for (const p of pages) out.push(`<th>${esc(p.name)}${p.auth ? " 🔒" : ""}<br><code>${esc(p.url)}</code></th>`);
-  out.push("</tr></thead><tbody>");
-  out.push(
-    `<tr><td>${fr ? "Taux" : "Rate"}</td>${pages.map((p) => `<td class="rate">${esc(formatRate(p.conformancePct, p.decided, p.total))}</td>`).join("")}</tr>`,
-  );
-  let group = "";
-  for (const row of rows) {
-    if (row.group !== group) {
-      group = row.group;
-      out.push(`<tr class="theme"><td colspan="${pages.length + 1}">${esc(group)}</td></tr>`);
-    }
-    const cells = pages.map((p) => {
-      const s = status.get(row.id)?.get(p.id) ?? "manual";
-      return `<td class="${CLASS[s]}">${MARK[s]}</td>`;
-    });
-    out.push(`<tr><td>${esc(row.label)}</td>${cells.join("")}</tr>`);
-  }
-  out.push("</tbody></table></body></html>");
-  return out.join("\n");
+  return renderHtmlDocument({
+    lang,
+    title,
+    subtitle: [{ text: `${pages.length} ${fr ? "page(s) capturée(s)" : "page(s) captured"} · ` }, { text: result.date, mono: true }],
+    blocks: [...scoreboardBlocks(result, standard, lang), ...crossGridBlocks(result, pages, standard, lang)],
+  });
 }
 
 // ---- the server -----------------------------------------------------------------------------
