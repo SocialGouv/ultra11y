@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [4.1.0](https://github.com/maxgfr/ultra11y/compare/v4.0.1...v4.1.0) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** a rate with its denominator, and one row per defect instead of per occurrence ([56d94e0](https://github.com/maxgfr/ultra11y/commit/56d94e0789f4b98740d2cfb9de54ee2a5ac2b69a)), closes [#16](https://github.com/maxgfr/ultra11y/issues/16) [#16](https://github.com/maxgfr/ultra11y/issues/16) [#16](https://github.com/maxgfr/ultra11y/issues/16)
+* **html:** one composite per artifact, not one per command ([023ae35](https://github.com/maxgfr/ultra11y/commit/023ae35df1508da136b8e59c77d201d74aa7c0c9))
+
+
+### Features
+
+* **action:** the artifact gets a front door, and CI proves it has one ([cf92d7f](https://github.com/maxgfr/ultra11y/commit/cf92d7f9174902ac1dbc8db86dbba971e9ae4a37))
+* **cli:** --evidence and --html, so the visual tier has a caller ([b74b72b](https://github.com/maxgfr/ultra11y/commit/b74b72b626edb50cce9e99ce8fcc2b3ebd883391))
+* **html:** the report as a page, and the page passes its own audit ([270e691](https://github.com/maxgfr/ultra11y/commit/270e6911149be5f005c32537603819ec1358444d)), closes [#0a7d33](https://github.com/maxgfr/ultra11y/issues/0a7d33) [#b3261e](https://github.com/maxgfr/ultra11y/issues/b3261e) [#b06000](https://github.com/maxgfr/ultra11y/issues/b06000)
+
 ## [4.0.1](https://github.com/maxgfr/ultra11y/compare/v4.0.0...v4.0.1) (2026-08-13)
 
 
