@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [4.0.1](https://github.com/maxgfr/ultra11y/compare/v4.0.0...v4.0.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **dev:** keep the screenshot the extension already captured ([c16782f](https://github.com/maxgfr/ultra11y/commit/c16782f250795ac8b35a8251f53097ce44910f31))
+
 # [4.0.0](https://github.com/maxgfr/ultra11y/compare/v3.1.0...v4.0.0) (2026-08-13)
 
 
