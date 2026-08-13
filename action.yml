@@ -95,8 +95,24 @@ inputs:
     description: 'Also write the Markdown report and upload it as an artifact.'
     required: false
     default: 'true'
+  html:
+    description: 'Also render the report as HTML, so the artifact has a front door: `index.html` (dashboard, opens instantly) plus a detachable single file that prints to PDF. Self-contained — no script, no external asset, nothing pointing outside the artifact.'
+    required: false
+    default: 'true'
+  evidence:
+    description: 'Illustrate each non-conformity with an annotated crop of the offending element, derived from the page snapshot. Needs snapshots (`snapshot: true`, the E2E plugins, or a `scan` that captured them); without them the report says per page and per criterion what it could not draw, and why.'
+    required: false
+    default: 'true'
+  evidence-max:
+    description: 'Hard cap on the number of crops produced in one run. Guards the artifact size when one design-system defect repeats across every route.'
+    required: false
+    default: '200'
   artifact-name:
     description: 'Name of the uploaded artifact. Defaults to `ultra11y-<standard>`. Artifact names must be UNIQUE within a workflow run, so set this when the action runs more than once in one job (e.g. the code diff and then the served pages) — otherwise the second upload fails with a 409.'
+    required: false
+    default: ''
+  artifact-retention-days:
+    description: 'How long GitHub keeps the uploaded artifact. Empty (default) follows the repository setting.'
     required: false
     default: ''
   lang:
@@ -146,6 +162,21 @@ outputs:
   report-path:
     description: 'Path of the Markdown report, when `report` is enabled.'
     value: ${{ steps.report.outputs.path }}
+  html-path:
+    description: "Path of the artifact's HTML entry point, when `html` is enabled."
+    value: ${{ steps.html.outputs.path }}
+  html-single-path:
+    description: 'Path of the detachable single-file HTML report (printable to PDF), when `html` is enabled.'
+    value: ${{ steps.html.outputs.single-path }}
+  artifact-name:
+    description: 'Name the report artifact was uploaded under — resolved, so a caller need not re-derive the default.'
+    value: ${{ inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard) }}
+  artifact-id:
+    description: 'Id of the uploaded artifact, from actions/upload-artifact. Empty when nothing was uploaded.'
+    value: ${{ steps.upload.outputs.artifact-id }}
+  artifact-url:
+    description: 'Download URL of the uploaded artifact. Empty when nothing was uploaded.'
+    value: ${{ steps.upload.outputs.artifact-url }}
 
 runs:
   using: composite
@@ -390,6 +421,11 @@ runs:
         ENGINE: ${{ steps.engine.outputs.path }}
         ULTRA11Y_PR_COMMENT: ${{ inputs.comment == 'true' && '1' || '0' }}
         GH_TOKEN: ${{ github.token }}
+        # The run URL is known before anything is produced and cannot 404, so the digest always
+        # links it. The artifact NAME is guarded by the same condition as the upload: naming an
+        # artifact that was never uploaded sends the reviewer to a page that does not exist.
+        ULTRA11Y_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        ULTRA11Y_ARTIFACT_NAME: ${{ (inputs.report == 'true' || inputs.html == 'true') && (inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard)) || '' }}
       run: node "$ENGINE" report --in audits/audit-latest.json --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}' --format github
 
     # Tickets. REST is why this works in a container job or on a self-hosted runner, where
@@ -423,16 +459,49 @@ runs:
         # The integrity gate: no invented criterion, no unjustified NA, coherent maths.
         node "$ENGINE" check --report "$path" --standard '${{ inputs.standard }}' --quiet
 
+    # The artifact's front door. AFTER the adjudication (so it carries the verdicts) and AFTER
+    # `check --quiet` (a report the integrity gate rejected has not earned a nice face), BEFORE
+    # the upload, and always before the Gate.
+    #
+    # It degrades to a ::warning:: on purpose: a rendering bug must never turn into a red
+    # accessibility gate. The compensating control is `ci.yml`, whose assertions about this
+    # output are NOT optional.
+    - name: HTML report
+      id: html
+      if: inputs.html == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        args=()
+        if [ '${{ inputs.evidence }}' = 'true' ]; then
+          args+=(--evidence)
+        fi
+        if ! node "$ENGINE" report --in audits/audit-latest.json --html "${args[@]}" \
+          --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}' --out audits >/dev/null; then
+          echo "::warning::ultra11y: the HTML report could not be rendered in full. The Markdown report and the JSON audit are unaffected."
+          exit 0
+        fi
+        echo "path=audits/index.html" >> "$GITHUB_OUTPUT"
+        single=$(ls audits/ultra11y-*-*.html 2>/dev/null | head -1 || true)
+        echo "single-path=$single" >> "$GITHUB_OUTPUT"
+
     # Artifact names are unique per WORKFLOW RUN, not per step: a second invocation in the
     # same job used to die on a 409 with the report already written but never uploaded.
     # `artifact-name` is how you disambiguate; the default keeps the historical name.
+    #
+    # The condition covers BOTH producers: rendering a front door and then not uploading it
+    # would be the one failure mode worse than not rendering it at all.
     - name: Upload the report
-      if: inputs.report == 'true'
+      id: upload
+      if: inputs.report == 'true' || inputs.html == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard) }}
         path: ${{ inputs.working-directory }}/audits/
         if-no-files-found: warn
+        retention-days: ${{ inputs.artifact-retention-days }}
 
     # The gate runs LAST, so a failing audit has already produced every surface above.
     - name: Gate

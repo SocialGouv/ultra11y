@@ -335,6 +335,53 @@ jobs:
             console.log("pages:", p.map(x => x.id + " " + x.conformancePct + "%").join(", "));
           '
 
+      # THE COMPENSATING CONTROL. The action's `HTML report` step degrades to a ::warning:: on
+      # purpose — a rendering bug must never become a red accessibility gate — which means
+      # nothing over there can catch a front door that stopped being produced. These
+      # assertions are therefore NOT optional.
+      - name: The artifact has a front door, and it is self-contained
+        run: |
+          [ -f audits/index.html ] || { echo "::error::no audits/index.html — the artifact has no entry point"; exit 1; }
+          ls audits/ultra11y-rgaa-*.html >/dev/null 2>&1 || { echo "::error::no detachable single-file report"; exit 1; }
+          # NOTHING may point outside the artifact: it is read after being unzipped somewhere
+          # else, so an absolute URL or a `../..` climb is a broken image for every reader. A
+          # grep would wave `https://` through on a bad anchor, so this is parsed properly.
+          node -e '
+            const { readdirSync, readFileSync } = require("fs");
+            let bad = 0;
+            for (const f of readdirSync("audits").filter((x) => x.endsWith(".html"))) {
+              const html = readFileSync("audits/" + f, "utf8");
+              if (/<script/i.test(html)) { console.error("::error::" + f + " carries a script"); bad = 1; }
+              for (const m of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
+                const ref = m[1];
+                if (ref.startsWith("#") || ref.startsWith("data:")) continue;
+                // At the artifact root, ANY climb escapes, and any scheme is remote.
+                if (/^[a-z][a-z0-9+.-]*:/i.test(ref) || ref.split("/").includes("..") || ref.startsWith("/")) {
+                  console.error("::error::" + f + " points outside the artifact: " + ref);
+                  bad = 1;
+                }
+              }
+            }
+            process.exit(bad);
+          '
+          echo "front door: $(wc -c < audits/index.html) bytes"
+
+      - name: Every non-conformity that could be shown, is
+        run: |
+          # /contact.html carries the alt-less image. It was snapshotted, so the pixel tier has
+          # a capture, a box digest and a byte offset — it must produce a crop.
+          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" pages --in audits/audit-latest.json \
+            --standard rgaa --format report --split page --evidence --html --out audits/pages
+          crops=$(find audits/pages/assets -name '*.png' -path '*/*/*' 2>/dev/null | wc -l)
+          [ "$crops" -gt 0 ] || { echo "::error::the evidence tier drew nothing on a snapshotted page with a real defect"; exit 1; }
+          echo "crops: $crops"
+          # The sheets illustrate their own occurrences, and the crop bullet never becomes one.
+          grep -qE '^ *- !\[' audits/pages/page-contact-html.md || { echo "::error::no crop hung off an occurrence"; exit 1; }
+          before=$(node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" verify --report audits/pages/page-contact-html.md --json | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).count')
+          echo "verify worklist with crops: $before items"
+
+      # An artifact is read AFTER being downloaded and unzipped, and `index.html` has to be at
+      # its root for that to be one double-click. Only a real round trip proves it.
       - name: Upload what the action produced
         if: always()
         uses: actions/upload-artifact@v4
@@ -344,3 +391,18 @@ jobs:
             audits/
             .ultra11y/pages/
           if-no-files-found: warn
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: action-e2e
+          path: ${{ runner.temp }}/dl
+      - name: index.html is at the root of the unzipped artifact
+        run: |
+          [ -f "$RUNNER_TEMP/dl/audits/index.html" ] || { echo "::error::index.html is not where a reader will look"; ls -R "$RUNNER_TEMP/dl" | head -40; exit 1; }
+          # The images it references survived the round trip.
+          missing=0
+          for src in $(grep -rhoE 'src="\./[^"]+"' "$RUNNER_TEMP/dl/audits/pages/"*.html | sed 's/src="\.\///;s/"$//' | sort -u); do
+            [ -f "$RUNNER_TEMP/dl/audits/pages/$src" ] || { echo "::error::missing after unzip: $src"; missing=1; }
+          done
+          [ "$missing" = 0 ] || exit 1
+          echo "the artifact opens, and its images are in it"

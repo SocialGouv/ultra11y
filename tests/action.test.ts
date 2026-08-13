@@ -16,6 +16,10 @@ const ACTION = parse(RAW) as {
   runs: { using: string; steps: { id?: string; name?: string; uses?: string; shell?: string; run?: string; if?: string; with?: Record<string, string> }[] };
 };
 
+/** The position of a step, by a distinctive fragment of its name. Module-scoped: several
+ *  describes reason about ORDER, and a per-describe copy is a copy that drifts. */
+const idx = (needle: string): number => ACTION.runs.steps.findIndex((s) => s.name?.includes(needle));
+
 describe("the action is well-formed", () => {
   it("is a composite action with a name and a description", () => {
     expect(ACTION.runs.using).toBe("composite");
@@ -149,7 +153,10 @@ describe("the bash is safe under `set -e`", () => {
 // they stay « à évaluer » forever and the published conformance rate is partial by
 // construction. Everything here is opt-in, and everything degrades.
 describe("the adjudication tier", () => {
-  const idx = (needle: string): number => ACTION.runs.steps.findIndex((s) => s.name?.includes(needle));
+  /** Every surface that RENDERS from the adjudicated audit. They must all run after the
+   *  verdicts are folded in, or the adjudication reaches nothing. */
+  const CONSUMERS = ["Per-page report", "SARIF", "Annotations", "File tracker tickets", "Markdown report", "HTML report"];
+
   const adjudicationSteps = (): typeof ACTION.runs.steps => ACTION.runs.steps.filter((s) => s.name?.startsWith("Adjudicate"));
 
   it("is off by default — an existing consumer gets no model, no key, no network", () => {
@@ -180,8 +187,29 @@ describe("the adjudication tier", () => {
   it("runs BEFORE every surface that reads audit-latest.json, or the verdicts reach nothing", () => {
     const last = Math.max(...ACTION.runs.steps.map((s, i) => (s.name?.startsWith("Adjudicate") ? i : -1)));
     expect(last).toBeGreaterThan(-1);
-    for (const consumer of ["Per-page report", "SARIF", "Annotations", "Markdown report"]) {
+    for (const consumer of CONSUMERS) {
       expect(idx(consumer), `no step matching "${consumer}"`).toBeGreaterThan(last);
+    }
+  });
+
+  // CONSUMERS is a LITERAL, so a new consumer stays invisible to the assertion above until
+  // someone remembers to add the name. This closes the loop from the other side — and adding
+  // "File tracker tickets" is what it caught: that step files the audit into a tracker and
+  // had never been checked against the adjudication order.
+  it("names every audit-latest.json reader in that list, so a new one cannot slip past it", () => {
+    // `--in <file>` is what a READER passes. The producers reach the same path other ways:
+    // `Audit the code` writes it with `--out`, `Scan the pages` folds into it with `--merge`,
+    // and the adjudication tier rewrites it with the verdicts.
+    const readers = ACTION.runs.steps.filter((s) => s.run?.includes("--in audits/audit-latest.json")).map((s) => s.name ?? "");
+    expect(readers.length).toBeGreaterThan(CONSUMERS.length);
+    for (const r of readers) {
+      // Gate re-reads it to decide red or green, not to render a surface, and is asserted last
+      // by its own test.
+      if (r.startsWith("Adjudicate") || r.startsWith("Gate")) continue;
+      expect(
+        CONSUMERS.some((d) => r.includes(d)),
+        `step "${r}" reads audit-latest.json but is not in CONSUMERS`,
+      ).toBe(true);
     }
   });
 
@@ -297,6 +325,88 @@ describe("the artifact upload", () => {
 
   it("warns about the uniqueness rule in the input's own description", () => {
     expect(ACTION.inputs["artifact-name"]?.description).toMatch(/uniq/i);
+  });
+
+  // Rendering a front door and then not uploading it is worse than not rendering one: the
+  // reviewer is told an artifact exists and finds nothing in it.
+  it("uploads when EITHER producer ran, not only the Markdown one", () => {
+    expect(upload.if).toContain("inputs.report == 'true'");
+    expect(upload.if).toContain("inputs.html == 'true'");
+  });
+
+  it("carries an id, so the run's own artifact url can be an output", () => {
+    expect(upload.id).toBe("upload");
+    expect(ACTION.outputs?.["artifact-url"]?.value).toContain("steps.upload.outputs.artifact-url");
+    expect(ACTION.outputs?.["artifact-id"]?.value).toContain("steps.upload.outputs.artifact-id");
+  });
+
+  it("honours a retention window, and defaults to the repository's own setting", () => {
+    expect(upload.with?.["retention-days"]).toContain("inputs.artifact-retention-days");
+    expect(ACTION.inputs["artifact-retention-days"]?.default).toBe("");
+  });
+
+  // `overwrite: true` would let a second invocation in one job silently replace the first
+  // one's artifact — the 409 is the signal that two runs share a name, and it must stay loud.
+  it("never overwrites, so a name collision stays a visible failure", () => {
+    expect(upload.with?.overwrite).toBeUndefined();
+  });
+
+  // There is exactly one upload-artifact step, and every assertion above found it by taking
+  // the FIRST match. A second one inserted earlier would make them all describe the wrong step.
+  it("has exactly one upload step for those assertions to be about", () => {
+    expect(ACTION.runs.steps.filter((s) => s.uses?.startsWith("actions/upload-artifact"))).toHaveLength(1);
+  });
+});
+
+describe("the HTML tier", () => {
+  const html = (): { name?: string; if?: string; run?: string } => {
+    const s = ACTION.runs.steps.find((x) => x.name === "HTML report");
+    if (!s) throw new Error("action.yml has no `HTML report` step");
+    return s;
+  };
+
+  it("is on by default, with both inputs documented", () => {
+    expect(ACTION.inputs.html?.default).toBe("true");
+    expect(ACTION.inputs.evidence?.default).toBe("true");
+    expect(ACTION.inputs.html?.description).toBeTruthy();
+    expect(ACTION.inputs.evidence?.description).toBeTruthy();
+  });
+
+  // A report the integrity gate rejected has not earned a nice face, and a report rendered
+  // before the upload is a report nobody downloads.
+  it("runs after the integrity check and before the upload", () => {
+    expect(idx("HTML report")).toBeGreaterThan(idx("Markdown report"));
+    expect(idx("HTML report")).toBeLessThan(ACTION.runs.steps.findIndex((s) => s.uses?.startsWith("actions/upload-artifact")));
+  });
+
+  // A rendering bug must never become a red accessibility gate. ci.yml is the compensating
+  // control, and its assertions are not optional.
+  it("degrades to a warning rather than failing the job", () => {
+    expect(html().run).toContain("::warning::");
+    expect(html().run).toContain("exit 0");
+  });
+
+  it("publishes both document paths as outputs", () => {
+    expect(ACTION.outputs?.["html-path"]?.value).toContain("steps.html.outputs.path");
+    expect(ACTION.outputs?.["html-single-path"]?.value).toContain("steps.html.outputs.single-path");
+  });
+});
+
+describe("the pull-request digest's links", () => {
+  const comment = (): { env?: Record<string, string> } => ACTION.runs.steps.find((s) => s.name?.includes("PR comment")) as { env?: Record<string, string> };
+
+  // The run URL is known before anything is produced and cannot 404.
+  it("always links the run", () => {
+    expect(comment().env?.ULTRA11Y_RUN_URL).toContain("github.run_id");
+  });
+
+  // The artifact name is NOT: the upload is conditional, and naming an artifact that was
+  // never uploaded sends the reviewer to a page that does not exist.
+  it("names the artifact only under the same condition as the upload", () => {
+    const name = comment().env?.ULTRA11Y_ARTIFACT_NAME ?? "";
+    expect(name).toContain("inputs.report == 'true'");
+    expect(name).toContain("inputs.html == 'true'");
+    expect(name).toContain("ultra11y-{0}");
   });
 });
 
