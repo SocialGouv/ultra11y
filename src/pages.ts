@@ -256,6 +256,7 @@ const L = {
     notAudited: "non audité",
     notAuditedNote:
       "Une page marquée « non audité » a bien un instantané, mais CET audit ne l'a pas lu (il ne portait que sur les sources). L'absence de constat n'y vaut donc PAS conformité — relancez l'audit en incluant `.ultra11y/pages`.",
+    agentMark: "`C*` : conformité tranchée par l'agent IA à partir des évidences citées (gaté), et non prouvée par le moteur déterministe.",
   },
   en: {
     title: "Per-page grid",
@@ -273,6 +274,7 @@ const L = {
     notAudited: "not audited",
     notAuditedNote:
       'A page marked "not audited" does have a snapshot, but THIS audit never read it (it covered sources only). Absence of a finding there does NOT mean conforming — re-run the audit with `.ultra11y/pages` in scope.',
+    agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
   },
 } as const;
 
@@ -285,6 +287,14 @@ const L = {
  *  format it identically; a surface that prints its own is a surface that will drift. */
 export function formatRate(rate: number | null, decided: number, total: number): string {
   return `${rate === null ? "—" : `${rate} %`} (${decided}/${total})`;
+}
+
+/** Honesty rule 3, as one sentence: a conformity an agent RULED is not a conformity the engine
+ *  PROVED. The rate counts both — excluding the ruled ones would put the CI surfaces at odds
+ *  with the report they summarize — so every surface that prints such a rate carries the `*`
+ *  and this legend. One string, four readers. */
+export function agentMarkNote(lang: Lang): string {
+  return L[lang].agentMark;
 }
 
 /** Honesty rule 2, as one sentence: a page with no snapshot cannot earn conformity by

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { annotations, perPageTable, stepSummary } from "../src/annotate.js";
+import { annotations, perPageTable, prComment, stepSummary } from "../src/annotate.js";
 import { runAudit } from "../src/audit.js";
 import type { AuditResult, Finding } from "../src/types.js";
 
@@ -70,12 +70,50 @@ describe("workflow-command annotations", () => {
   });
 });
 
+/** Criterion rows, so the headline rate has a denominator to be honest about. An audit whose
+ *  `criteria` is empty has decided nothing, and that is what the surfaces must say. */
+const CRITERIA = [
+  { id: "1.1.1", guideline: "1.1", status: "NC", findings: [] },
+  { id: "1.4.3", guideline: "1.4", status: "C", findings: [] },
+  { id: "2.4.7", guideline: "2.4", status: "C", findings: [] },
+  { id: "1.4.11", guideline: "1.4", status: "manual", findings: [] },
+  { id: "3.3.2", guideline: "3.3", status: "NA", findings: [] },
+] as unknown as AuditResult["criteria"];
+const GUIDELINES = [
+  { key: "1.1", title: "Text Alternatives", c: 0, nc: 1, na: 0, manual: 0 },
+  { key: "1.4", title: "Distinguishable", c: 1, nc: 0, na: 0, manual: 1 },
+  { key: "2.4", title: "Navigable", c: 1, nc: 0, na: 0, manual: 0 },
+  { key: "3.3", title: "Input Assistance", c: 0, nc: 0, na: 1, manual: 0 },
+] as unknown as AuditResult["guidelines"];
+const decided = (over: Partial<AuditResult> = {}): Partial<AuditResult> => ({ criteria: CRITERIA, guidelines: GUIDELINES, ...over });
+
 describe("job summary", () => {
   it("reports the headline rate and the finding count", () => {
-    const md = stepSummary(audit([F()]), { lang: "en" });
+    const md = stepSummary(audit([F()], decided()), { lang: "en" });
     expect(md).toContain("ultra11y");
-    expect(md).toContain("80%");
+    expect(md).toContain("80 % (3/5)");
     expect(md).toContain("1");
+  });
+
+  // THE #16 FAILURE, at the run grain. `conformancePct` is 80 on this fixture whatever the
+  // criteria say, and the headline used to print it naked. Three decided out of five is the
+  // fact a reviewer needs in order to know what the 80 % is a percentage OF.
+  it("never prints the rate without its denominator", () => {
+    expect(stepSummary(audit([F()], decided()), { lang: "en" })).toContain("**80 % (3/5)**");
+  });
+
+  // …and an audit that decided nothing has no rate at all, rather than a flattering one.
+  it("prints no rate when nothing was decided, instead of a number over an empty set", () => {
+    const md = stepSummary(audit([F()]), { lang: "en" });
+    expect(md).toContain("**— (0/0)**");
+    expect(md).not.toContain("80 %");
+  });
+
+  it("marks a conformity an agent RULED, so it is never read as one the engine proved", () => {
+    const ruled = CRITERIA.map((c, i) => (i === 1 ? { ...c, decidedBy: "agent" as const } : c));
+    const md = stepSummary(audit([F()], decided({ criteria: ruled })), { lang: "en" });
+    expect(md).toContain("**80 % (3/5)***");
+    expect(md).toContain("`C*`");
   });
 
   it("says so plainly when nothing was found", () => {
@@ -86,6 +124,18 @@ describe("job summary", () => {
     const md = stepSummary(audit([F(), F({ severity: "mineur", sourceStart: 50 })]), { lang: "en" });
     expect(md).toContain("| Severity |");
     expect(md).toContain("src/a.html:3");
+  });
+
+  // THE #16 FAILURE, at the finding grain: 472 occurrences of one rule across 38 routes, for
+  // seven distinct selectors. Listed one per row it is unreadable; cut at 50 rows it lies
+  // about the shape of the problem.
+  it("folds one design-system defect repeated across routes into a single row", () => {
+    const many = Array.from({ length: 40 }, (_, i) => F({ ruleId: "rendered-link-colour-only", selectorHint: "a.fr-link", file: `p${i}.html`, page: `p${i}` }));
+    const md = stepSummary(audit([...many, F({ selectorHint: "a.fr-btn" })]), { lang: "en" });
+    expect(md).toContain("2 distinct defect(s) · 41 occurrence(s)");
+    // One row for the 40, one for the singleton — and the count is not hidden by the fold.
+    expect(md.split("\n").filter((l) => l.startsWith("| 🔴 bloquant |"))).toHaveLength(2);
+    expect(md).toMatch(/\| 40 \| 40 \|/);
   });
 
   it("speaks the pack criterion when a standard is projected", () => {
@@ -100,6 +150,65 @@ describe("job summary", () => {
     } as unknown as Partial<AuditResult>);
     const md = stepSummary(a, { lang: "fr" });
     expect(md).toContain("Accueil");
+  });
+});
+
+// The pull-request digest is a DIFFERENT document from the job summary, not a truncation of
+// it. Nothing tested this surface before: `emitCiFormat` posted the summary string to both.
+describe("the pull-request digest", () => {
+  it("leads with a verdict a reviewer can act on without reading the table", () => {
+    expect(prComment(audit([F()], decided()), { lang: "en" })).toContain("🔴 1 blocking non-conformity(ies)");
+    expect(prComment(audit([F({ severity: "mineur" })], decided()), { lang: "en" })).toContain("🟠 No blocking non-conformity");
+    expect(prComment(audit([], decided()), { lang: "en" })).toContain("✅ No non-conformity");
+  });
+
+  it("carries the rate with its denominator, like every other surface", () => {
+    expect(prComment(audit([F()], decided()), { lang: "en" })).toContain("**80 % (3/5)**");
+  });
+
+  it("is a digest, not the job summary — ten groups at most, and it says how many it left out", () => {
+    const many = Array.from({ length: 25 }, (_, i) => F({ selectorHint: `sel-${i}`, file: `p${i}.html` }));
+    const md = prComment(audit(many, decided()), { lang: "en" });
+    expect(md.split("\n").filter((l) => l.startsWith("| 🔴 bloquant |"))).toHaveLength(10);
+    expect(md).toContain("… and 15 more group(s) — see the job summary.");
+    // The per-page scoreboard belongs to the long surface; the digest must not carry it.
+    expect(md).not.toContain("Page-by-page scoreboard");
+  });
+
+  it("links the run and names the artifact only when the caller says one exists", () => {
+    const withBoth = prComment(audit([F()], decided()), { lang: "en", runUrl: "https://gh/run/1", artifactName: "ultra11y-rgaa" });
+    expect(withBoth).toContain("[See the run and its job summary](https://gh/run/1)");
+    expect(withBoth).toContain("artifact **ultra11y-rgaa**");
+    // No artifact was uploaded ⇒ no dead reference to one.
+    const linkOnly = prComment(audit([F()], decided()), { lang: "en", runUrl: "https://gh/run/1" });
+    expect(linkOnly).not.toMatch(/artifact \*\*/);
+  });
+
+  // An artifact is not addressable by URL while its run is in flight, so an embedded crop
+  // renders as a broken image on every pull request. The comment links; it never shows.
+  it("never embeds an image", () => {
+    expect(prComment(audit([F()], decided()), { lang: "en" })).not.toContain("![");
+  });
+
+  // Ten rows of ordinary width fit easily; ten rows of a pathological rendered-DOM selector
+  // do not. Nothing clamped this path before, so such a run posted a body the API rejected
+  // with a 422 and the step reported "PR comment failed" with no idea why.
+  const pathological = () => Array.from({ length: 20 }, (_, i) => F({ selectorHint: `sel-${i}`, message: `${"m".repeat(9000)}-${i}`, file: `page-${i}.html` }));
+
+  it("stays under GitHub's 65 536-character body limit, and says what it dropped", () => {
+    const md = prComment(audit(pathological(), decided()), { lang: "en", runUrl: "https://gh/run/1" });
+    expect(md.length).toBeLessThanOrEqual(65_536);
+    expect(md).toContain("dropped from this comment to fit GitHub's limit");
+    // Whatever was dropped, the verdict and the way out survive.
+    expect(md).toContain("🔴");
+    expect(md).toContain("https://gh/run/1");
+  });
+
+  it("clamps by whole rows — the document never ends on a half-written table", () => {
+    const lines = prComment(audit(pathological(), decided()), { lang: "en" }).split("\n");
+    expect(lines[lines.length - 1]).not.toMatch(/^\|/);
+    // Every row that survived is a complete one: six cells, seven pipes.
+    for (const l of lines.filter((x) => x.startsWith("| 🔴"))) expect(l.split("|")).toHaveLength(8);
   });
 });
 

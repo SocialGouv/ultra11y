@@ -25,7 +25,7 @@
 // this module pure and testable.
 import { prdUnits } from "./prd.js";
 import { renderAuditorUnit } from "./auditor.js";
-import { basisLabel, formatRate, pageView, unattributedFindings } from "./pages.js";
+import { agentMarkNote, basisLabel, formatRate, pageView, unattributedFindings } from "./pages.js";
 import { CORE, type StandardId, derivePackResults, isCore, loadPack, packTestIds, themeName, titlePlain } from "./standards/index.js";
 import type { AuditResult, Lang, PageResult, Status } from "./types.js";
 import { compareSC, scTitle } from "./wcag.js";
@@ -73,7 +73,6 @@ const L = {
     coverage: (decided: number, total: number) =>
       `Couverture : ${decided}/${total} critère(s) évalué(s) — le taux ci-dessus ne porte que sur eux, et ne dit rien des ${total - decided} autres.`,
     tests: "Tests",
-    agentMark: "`C*` : conformité tranchée par l'agent IA à partir des évidences citées (gaté), et non prouvée par le moteur déterministe.",
     screenshotAlt: (n: string) => `Capture d'écran de la page ${n}`,
     noScreenshot: "Aucune capture d'écran pour cette page (le producteur n'en a pas fourni) — le tier pixel est donc inactif ici.",
     gridTitle: "Grille des critères",
@@ -119,7 +118,6 @@ const L = {
     coverage: (decided: number, total: number) =>
       `Coverage: ${decided}/${total} criteria assessed — the rate above covers only those, and says nothing about the other ${total - decided}.`,
     tests: "Tests",
-    agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
     screenshotAlt: (n: string) => `Screenshot of the ${n} page`,
     noScreenshot: "No screenshot for this page (the producer supplied none) — the pixel tier is therefore inactive here.",
     gridTitle: "Criteria grid",
@@ -284,7 +282,7 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
     else out.push(`| ${row.label} | ${mark} |`);
   }
   out.push("", `> ${s.manualWarn}`, "");
-  if (rows.some((r) => r.decidedBy === "agent" && r.status === "C")) out.push(`> ${s.agentMark}`, "");
+  if (rows.some((r) => r.decidedBy === "agent" && r.status === "C")) out.push(`> ${agentMarkNote(lang)}`, "");
 
   // The non-conformities, rendered by the ONE auditor block (invariant 2). Feeding
   // `prdUnits` the page view is what scopes them to this page without a second grouping.

@@ -55,7 +55,7 @@ import { installForTargets, parseTargets, statusReport, uninstallForTargets } fr
 import { agentsMdBlock } from "./install/agents-md.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
 import { toSarif } from "./sarif.js";
-import { annotations, stepSummary } from "./annotate.js";
+import { annotations, prComment, stepSummary } from "./annotate.js";
 import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
 import { attributePages, derivePages, pageScopesFrom, pageView, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
 import { renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
@@ -769,8 +769,21 @@ function emitCiFormat(result: AuditResult, format: CiFormat, standard: StandardI
   }
   // Sticky pull-request comment — opt-in, and best-effort: off a PR, or with no `gh`/auth,
   // it simply reports "skipped". A comment is never worth failing a build over.
+  //
+  // It gets its OWN document, not the summary above. The summary has a 1 MiB budget and a
+  // reader who went looking for it; a PR comment has 64 KiB and a reader scanning a diff.
+  // Posting one string to both is what turned a 700-finding audit into a wall on the PR.
   if (process.env.ULTRA11Y_PR_COMMENT === "1") {
-    const c = pushPrComment(md, standard);
+    const digest = prComment(result, {
+      standard,
+      lang,
+      // The run is known before the artifact exists, so the link is always safe. The artifact
+      // NAME is only set by the action when it actually uploads one — naming an artifact that
+      // was never uploaded sends the reader to a page that does not exist.
+      ...(process.env.ULTRA11Y_RUN_URL ? { runUrl: process.env.ULTRA11Y_RUN_URL } : {}),
+      ...(process.env.ULTRA11Y_ARTIFACT_NAME ? { artifactName: process.env.ULTRA11Y_ARTIFACT_NAME } : {}),
+    });
+    const c = pushPrComment(digest, standard);
     console.error(
       c.ok
         ? lang === "fr"
