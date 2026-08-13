@@ -377,8 +377,20 @@ jobs:
           echo "crops: $crops"
           # The sheets illustrate their own occurrences, and the crop bullet never becomes one.
           grep -qE '^ *- !\[' audits/pages/page-contact-html.md || { echo "::error::no crop hung off an occurrence"; exit 1; }
-          before=$(node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" verify --report audits/pages/page-contact-html.md --json | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).count')
-          echo "verify worklist with crops: $before items"
+          # THE CONTRACT: an illustrated sheet adjudicates EXACTLY like a bare one. The crop
+          # bullet carries no `[ ]`, so `verify` must not see one more item — nor one fewer,
+          # which is how an occurrence would escape adjudication by hiding under a picture.
+          # Both runs pass --standard, or the pack sheet is parsed against WCAG ids and both
+          # sides quietly collapse to a number that proves nothing.
+          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" pages --in audits/audit-latest.json \
+            --standard rgaa --format report --split page --out "$RUNNER_TEMP/bare"
+          count() { node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" verify --report "$1" --standard rgaa --json \
+            | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).count'; }
+          with=$(count audits/pages/page-contact-html.md)
+          without=$(count "$RUNNER_TEMP/bare/page-contact-html.md")
+          echo "verify worklist — illustrated: $with · bare: $without"
+          [ "$with" = "$without" ] || { echo "::error::the crop sub-bullet changed the verify worklist ($with vs $without)"; exit 1; }
+          [ "$with" -gt 0 ] || { echo "::error::the worklist is empty, so the comparison above proved nothing"; exit 1; }
 
       # An artifact is read AFTER being downloaded and unzipped, and `index.html` has to be at
       # its root for that to be one double-click. Only a real round trip proves it.
