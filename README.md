@@ -409,6 +409,28 @@ node scripts/ultra11y.mjs report --in audit.json --out audits      # audits/wcag
 node scripts/ultra11y.mjs check  --report audits/wcag-YYYY-MM-DD.md # integrity gate
 ```
 
+### A report someone will actually open
+
+`--html` turns the audit into a page: `audits/index.html` as the entry point, plus a
+detachable single file that prints to PDF. Self-contained — no script, no external asset,
+nothing pointing outside the directory — and it passes this engine's own accessibility audit,
+which is the least a tool like this owes.
+
+```sh
+node scripts/ultra11y.mjs report --in audit.json --html --evidence --out audits
+node scripts/ultra11y.mjs pages  --in audit.json --format report --split page \
+  --evidence --html --out audits/pages
+```
+
+`--evidence` illustrates each non-conformity with an **annotated crop of the offending
+element**, cut from the page snapshot: `selectorHint` is lossy, and a rendered-tier finding on
+a client-rendered page is anchored at `dom.html:2` whatever it is really about. It needs
+snapshots, and it says per page and per criterion what it could not draw and why — an
+occurrence with no picture must never read as an occurrence with no defect.
+
+In the GitHub Action both are **on by default**, so the uploaded artifact has a front door
+without changing a workflow. See `references/ci.md`.
+
 The skill (`skills/ultra11y/SKILL.md` + `references/`) teaches the agent when and how to run these, how to complete the manual criteria, and the native-first authoring doctrine.
 
 ## Development

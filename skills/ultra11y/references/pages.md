@@ -288,6 +288,63 @@ both a CSSOM measurement and a screenshot measurement, and presenting those as o
 be a lie. It is off everywhere else: the backlog, `prd --split criterion` and every tracker issue
 body are byte-identical to what they were.
 
+### Showing the defect, not only citing it (`--evidence`)
+
+`selectorHint` is lossy by construction — first class only, `href` truncated — and every
+rendered-tier finding on a client-rendered page is anchored at `dom.html:2`, the `<html>`
+element. What a non-technical reviewer receives is `` `.ultra11y/pages/accueil/dom.html:412`
+(`div.card`) ``, which locates nothing.
+
+```sh
+node scripts/ultra11y.mjs pages --in audits/audit-latest.json --format report \
+  --split page --evidence --out audits/pages
+```
+
+Each occurrence gains an inert sub-bullet with an annotated crop of the offending element,
+written to `assets/<page-id>/<hash>.png`:
+
+```md
+- [ ] `.ultra11y/pages/accueil/dom.html:412` (`div.card`) — <img> without an alt attribute…
+  - ![Cropped capture of the img element on the accueil page, outlined](./assets/accueil/c90959b13aa2.png)
+```
+
+**Derived at render time, never stamped on the finding.** A rectangle in pixels is a property
+of the image: a box written onto a `Finding` becomes silently wrong the moment the audit is
+re-rendered against another capture. The join goes `sourceStart` → document-order ordinal →
+`boxes.json`, through the same `alignedBoxes` the rendered tier uses — including its refusal
+to align a digest whose tags disagree. `Finding` gains no field.
+
+The mark is not monochrome: a white halo, a red ring, corner brackets whose shape says "here",
+and a dashed inner line that survives a monochrome print. This tool reports 1.4.1 failures; its
+own deliverable cannot commit one.
+
+**Nothing is cut in silence.** Twelve refusal reasons, each with its own sentence, counted per
+page and per criterion in the sheet itself:
+
+| Reason | What happened |
+|---|---|
+| `no-snapshot` · `no-screenshot` | the page has no capture to crop from |
+| `unreadable-image` · `no-boxes` · `truncated` | the capture or the box digest cannot be trusted |
+| `no-offsets` · `unjoinable` | the finding has no byte range, or it resolves to no element |
+| `page-scope` | the finding is about the document, not an element you can frame |
+| `zero-area` · `below-the-fold` | the element is invisible, or outside a viewport-only capture |
+| `unknown-scale` | the device pixel ratio could not be derived — a crop would be off-target |
+| `capped` | 6 per rule, 12 per page, 200 per run |
+
+An occurrence with no picture must never read as an occurrence with no defect, so the sheet
+says how many were not illustrated and why.
+
+Without `--evidence` the Markdown is **byte-identical** to what it was. The crop bullet carries
+no `[ ]`, so `verify` builds the same worklist with or without it — indentation alone would not
+be enough, since `AUDITOR_OCCURRENCE` is anchored `^\s*-\s\[ \]` and tolerates leading space.
+
+### The same, as a page (`--html`)
+
+`--html` writes `index.html` and one `page-<id>.html` beside the Markdown they mirror, plus a
+detachable single file that prints to PDF. Self-contained: no script, no external asset,
+nothing pointing outside the output directory. See `references/ci.md` for the artifact layout
+and the inline-size budget.
+
 ## Holding an external audit against the grid
 
 A human auditor's verdict is evidence, not a measurement this engine can redo. `import` reads one

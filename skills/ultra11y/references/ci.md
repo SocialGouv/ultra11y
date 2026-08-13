@@ -262,6 +262,93 @@ Two surfaces come out of it:
 
 A run with no page in scope is not a failure: the report step says so and the job carries on.
 
+## What the artifact looks like when you open it
+
+`audits/` used to hold JSON, SARIF and Markdown: everything a machine needs and nothing that
+opens. `html: 'true'` and `evidence: 'true'` are on by default, so it now has a front door.
+
+```
+audits/
+├── index.html                        ← the entry point: rate, synthesis, page scoreboard, links
+├── ultra11y-<std>-<date>.html        ← the whole audit in ONE file, printable to PDF
+├── <std>-<date>.md                   ← the Markdown report (unchanged)
+├── audit-latest.json                 ← the machine-readable audit (unchanged)
+├── assets/
+│   ├── <page-id>.png                 ← the page screenshot
+│   └── <page-id>/<hash>.png          ← one annotated crop per distinct defect on that page
+└── pages/
+    ├── index.md + page-<id>.md       ← the per-page dossiers (unchanged)
+    └── index.html + page-<id>.html   ← the same, navigable
+```
+
+Two conventions share `assets/` and that is deliberate: `<page-id>.png` is the whole page,
+`<page-id>/` holds the crops OF that page. Renaming either would break the Markdown sheets
+already published by earlier versions.
+
+**One artifact, not two.** The HTML is written into the same `audits/` the Markdown already
+travels in, and the upload now fires when EITHER producer ran. A separate artifact would mean
+a second name to keep unique, a second 409 to hit, and a reviewer choosing between two
+downloads.
+
+**Everything is self-contained.** No script (an artifact viewer will not run one), no external
+stylesheet or font, and no `src`/`href` that leaves `audits/` — the artifact is read after
+being unzipped somewhere else, so a `../..` climb is a broken image for every reader. `ci.yml`
+asserts this on a real `download-artifact` round trip, because the HTML step itself degrades
+to a `::warning::` and cannot catch its own regression.
+
+### The crops
+
+An occurrence in a sheet gains a sub-bullet showing the element, ringed:
+
+```md
+- [ ] `.ultra11y/pages/accueil/dom.html:412` (`div.card`) — <img> without an alt attribute…
+  - ![Cropped capture of the img element on the accueil page, outlined](./assets/accueil/c90959b13aa2.png)
+```
+
+They are derived AT RENDER TIME from the page snapshot, never stamped on the finding: a
+rectangle in pixels is a property of the image, and a stamped box goes silently wrong the
+moment the audit is re-rendered against a different capture. So `evidence` needs snapshots —
+`snapshot: 'true'` (the default), the E2E plugins, or `ultra11y dev`.
+
+The mark is **not monochrome**: a white halo, a red ring and corner brackets whose *shape*
+says "here". A tool that reports 1.4.1 failures cannot ship a deliverable that commits one.
+
+When a crop cannot be drawn, the report says so per page and per criterion, with the reason —
+`no-screenshot`, `below-the-fold`, `unknown-scale`, `capped`, and eight more. **An occurrence
+without a picture must never read as an occurrence without a defect.** Caps are 6 per rule, 12
+per page and `evidence-max` overall (200 by default), because one design-system defect
+multiplied by 38 routes is one defect, not 472 pictures.
+
+### Printing it
+
+The single file is the deliverable an auditor hands to a client: open
+`ultra11y-<std>-<date>.html`, print, *Save as PDF*. The print sheet keeps each criterion and
+its evidence on one sheet rather than splitting them across a page break.
+
+Its images travel inside it as `data:` URIs, and base64 costs a third more than the bytes it
+encodes — so there is a budget (`--inline-budget`, 12 MB) and a ladder. Over budget, page
+screenshots go first, then all but one crop per criterion, then the images entirely. Every
+rung is written **into the document** and onto stderr. Images degrade; the non-conformities
+never do.
+
+### Publishing it as a page (optional, and it costs something)
+
+An artifact needs a download and a login. If the report should be a URL, GitHub Pages will
+serve `audits/` as-is — it is already self-contained:
+
+```yaml
+- uses: actions/upload-pages-artifact@v3
+  with: { path: audits }
+- uses: actions/deploy-pages@v4
+```
+
+Know the trade before you take it: **a Pages site is public**, and this one names your
+non-conformities, your file paths and your routes, with screenshots. On a private repository
+that is a disclosure, not a convenience. It also needs `pages: write` and `id-token: write`,
+and it overwrites the previous deployment — there is no per-run history the way artifacts have
+one. Left alone, the artifact is the safer default, which is why this is a recipe here and not
+an input on the action.
+
 ## The action is executed in ITS OWN CI, not just parsed
 
 `tests/action.test.ts` reads `action.yml` and gates its shape. That cannot prove the thing
