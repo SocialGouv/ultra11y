@@ -3,6 +3,11 @@ name: Standards source refresh
 # Daily re-fetch of the upstream normative sources this repo vendors:
 #   - the WCAG 2.2 success-criterion universe and the W3C AUTHORIZED French titles
 #     (scripts/vendor/wcag-2.2-*.json -> src/data/wcag*.json)
+#   - the WCAG normative text + glossary, English and the authorized French translation
+#     (scripts/vendor/wcag-2.2-text.json, wcag-2.2-fr.json -> src/data/wcag.json)
+#   - the W3C Techniques + Understanding docs, from which the WCAG-keyed implementation
+#     guidance is generated (scripts/vendor/wcag-2.2-techniques.json ->
+#     src/data/guidance/wcag.json). Nothing in that dataset is hand-written.
 #   - the DINUM RGAA 4.1.2 source (scripts/vendor/rgaa/* -> src/data/standards/rgaa*.json)
 #
 # Without this, a normative dataset silently drifts from the standard it claims to
@@ -46,10 +51,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Re-fetch the vendored W3C sources (SC universe + authorized fr titles)
+      - name: Re-fetch the vendored W3C sources (SC universe, normative text, authorized fr, techniques)
         run: |
           node scripts/build-standards.mjs --refresh-universe
+          node scripts/build-standards.mjs --refresh-text
           node scripts/build-standards.mjs --refresh-fr
+          node scripts/build-guidance-wcag.mjs --refresh
 
       - name: Re-fetch the vendored DINUM RGAA source and rebuild the pack
         run: node scripts/build-pack-rgaa.mjs --fetch
@@ -57,6 +64,7 @@ jobs:
       - name: Rebuild every derived dataset and doc
         run: |
           node scripts/build-standards.mjs
+          pnpm run build:guidance:wcag
           pnpm run build:criteria
           pnpm run build:act
 
@@ -106,6 +114,10 @@ jobs:
       - name: RGAA pack is byte-reproducible from its source
         if: steps.detect.outputs.changed == 'true'
         run: pnpm run check:pack:rgaa
+
+      - name: WCAG guidance is byte-reproducible from the W3C techniques
+        if: steps.detect.outputs.changed == 'true'
+        run: pnpm run check:guidance:wcag
 
       - name: Build is reproducible (committed bundles up to date)
         if: steps.detect.outputs.changed == 'true'

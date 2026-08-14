@@ -14,13 +14,38 @@ import { getDataset, guidanceForWcag } from "../src/guidance/index.js";
 import { allSC } from "../src/wcag.js";
 
 describe("the WCAG-keyed dataset closes the gap no country pack can", () => {
-  it("covers exactly the AA criteria the RGAA dataset never reached", () => {
-    // Six of these were added in WCAG 2.2, after RGAA 4.1.2 (wcagVersion 2.1) froze. No
-    // amount of French guidance could supply them.
-    const ids = getDataset("wcag")!
-      .entries.map((e) => e.criterionId)
-      .sort();
-    expect(ids).toEqual(["1.2.4", "2.3.1", "2.4.11", "2.4.5", "2.5.7", "2.5.8", "3.2.6", "3.3.3", "3.3.7", "3.3.8"]);
+  it("covers every AA success criterion, generated from the W3C's own documents", () => {
+    // Not hand-written: scripts/build-guidance-wcag.mjs derives each entry from the
+    // Understanding "In brief" block and the Techniques' own code samples. That is why it
+    // spans all 55 rather than the ten gaps a person happened to notice.
+    const entries = getDataset("wcag")!.entries;
+    expect(entries).toHaveLength(55);
+    for (const sc of allSC())
+      expect(
+        entries.find((e) => e.criterionId === sc.sc),
+        sc.sc,
+      ).toBeTruthy();
+  });
+
+  it("carries the working group's own summary for every one of them", () => {
+    for (const e of getDataset("wcag")!.entries) expect(e.summary.en, e.criterionId).toBeTruthy();
+  });
+
+  it("names the technique each sample came from, so a reader can trace it upstream", () => {
+    for (const e of getDataset("wcag")!.entries) {
+      for (const x of e.examples) expect(x.note?.en, e.criterionId).toMatch(/\((?:ARIA|C|F|G|H|SCR|T|PDF)\d+\)/);
+    }
+  });
+
+  it("emits no example where the W3C ships no code sample, rather than inventing one", () => {
+    // 2.4.5 Multiple Ways and 2.5.7 Dragging Movements are site-structure and behavioural
+    // matters, documented in prose. An invented snippet would read as authoritative
+    // guidance nobody wrote — the reason this dataset stopped being hand-authored.
+    const entries = getDataset("wcag")!.entries;
+    const bare = entries.filter((e) => !e.examples.length).map((e) => e.criterionId);
+    expect(bare).toContain("2.4.5");
+    expect(bare).toContain("2.5.7");
+    for (const id of bare) expect(entries.find((e) => e.criterionId === id)!.summary.en, id).toBeTruthy();
   });
 
   it("leaves no AA success criterion without reachable guidance", () => {
@@ -30,13 +55,18 @@ describe("the WCAG-keyed dataset closes the gap no country pack can", () => {
     expect(uncovered).toEqual([]);
   });
 
-  it("keeps every entry bilingual, so neither UI language falls back to the other", () => {
+  it("is bilingual exactly as far as the W3C is, and no further", () => {
+    // Titles come from the authorized French translation, so both languages are real. The
+    // Understanding documents are English-only, so the summary is English-only — and
+    // `languagesAvailable` says so rather than a French translation nobody authorized.
     for (const e of getDataset("wcag")!.entries) {
       expect(e.title.en, e.id).toBeTruthy();
       expect(e.title.fr, e.id).toBeTruthy();
       expect(e.summary.en, e.id).toBeTruthy();
-      expect(e.summary.fr, e.id).toBeTruthy();
+      expect(e.summary.fr, e.id).toBeUndefined();
     }
+    const resolved = resolveGuidance("wcag", "2.4.5")[0]!;
+    expect(resolved.languagesAvailable).toEqual(["en", "fr"]);
   });
 
   it("records its own licence and attribution, as a redistributed source must", () => {
@@ -92,6 +122,6 @@ describe("a country pack that ships no guidance of its own", () => {
     const viaCrosswalk = resolveGuidance("rgaa", "E205.4", ["2.4.5"]);
     expect(viaCrosswalk.length).toBeGreaterThan(0);
     expect(viaCrosswalk.every((x) => x.inherited)).toBe(true);
-    expect(viaCrosswalk.map((x) => x.entry.id)).toContain("navigation-multiple-ways");
+    expect(viaCrosswalk.map((x) => x.entry.id)).toContain("wcag-multiple-ways");
   });
 });

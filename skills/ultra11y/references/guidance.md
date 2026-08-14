@@ -48,11 +48,39 @@ surface carries `inherited` / `via`, and each entry also carries `languagesAvail
 RGAA dataset is French-first, so an English caller must be told when an entry has no English
 text rather than handed French silently.
 
-`src/data/guidance/wcag.json` exists for the one thing no country dataset can supply: the
-**ten AA criteria RGAA 4.1.2 never covered** — `1.2.4`, `2.3.1`, `2.4.5`, `2.4.11`, `2.5.7`,
-`2.5.8`, `3.2.6`, `3.3.3`, `3.3.7`, `3.3.8`. Six were added in WCAG 2.2, after RGAA
-(`wcagVersion: 2.1`) froze. With it in place, **no AA success criterion is without reachable
-guidance**, for any pack.
+`src/data/guidance/wcag.json` covers **all 55 AA success criteria**, so no criterion is
+without reachable guidance for any pack — including the ten RGAA 4.1.2 never covered, six of
+them added in WCAG 2.2 after RGAA (`wcagVersion: 2.1`) froze.
+
+**It is generated, never hand-written** — `scripts/build-guidance-wcag.mjs`, from the W3C's
+own documents:
+
+| Field | Comes from |
+|---|---|
+| which techniques apply | `understanding/understanding.11tydata.js`, the W3C's machine-readable association map |
+| `summary` | the Understanding document's "In brief" block (Goal / What to do / Why), verbatim |
+| `good` | the first HTML or CSS code sample in a **sufficient technique** |
+| `bad` | the first one in a documented **failure** |
+| `note` | the technique's own title and id, so a reader can trace the sample upstream |
+
+Selection is one uniform rule, not a per-criterion choice: technologies are taken in a fixed
+order (html, css, aria, script, general) and within a technology the W3C's own listing order
+decides. Preferring HTML matters — for 1.1.1 the first technique listed with a sample is
+ARIA6, whose example is a navigation landmark; H2's `alt=""` on an image link actually
+illustrates a text alternative.
+
+Two consequences worth knowing:
+
+- **15 criteria carry a summary and no code sample.** 2.4.5 Multiple Ways and 2.5.7 Dragging
+  Movements are site-structure and behavioural matters the W3C documents in prose. An
+  invented snippet there would read as authoritative guidance nobody wrote.
+- **The summary is English-only.** Titles are bilingual (the authorized French translation
+  covers them) but the Understanding documents are not translated, and `languagesAvailable`
+  says so rather than shipping a French rendering nobody authorized.
+
+`pnpm run check:guidance:wcag` fails if the committed dataset does not reproduce from the
+vendored snapshot, and the daily `standards-refresh` workflow re-fetches the W3C source, so
+it cannot drift from the techniques it claims to reproduce.
 
 ## Honesty rule — guidance is NOT a free detector
 

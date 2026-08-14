@@ -83,7 +83,7 @@ describe("ultra11y_guidance", () => {
     for (const sc of ["2.4.11", "2.5.7", "2.5.8", "3.2.6", "3.3.7", "3.3.8"]) {
       const r = await j("ultra11y_guidance", { standard: "wcag", criterion: sc });
       expect(r.count, sc).toBeGreaterThan(0);
-      expect(r.entries[0].examples[0].good, sc).toBeTruthy();
+      expect(r.entries[0].summary, sc).toBeTruthy();
     }
   });
 

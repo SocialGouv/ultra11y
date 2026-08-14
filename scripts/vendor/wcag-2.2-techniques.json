@@ -1,0 +1,840 @@
+{
+  "source": "https://github.com/w3c/wcag",
+  "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/",
+  "license": "W3C Document License (code samples: W3C Software License)",
+  "fetchedAt": "2026-08-14",
+  "criteria": {
+    "1.1.1": {
+      "slug": "non-text-content",
+      "brief": {
+        "goal": "Non-text information is available to more people.",
+        "whattodo": "Create a text alternative for visual and auditory content.",
+        "whyitsimportant": "People who can’t fully see or hear content can understand it."
+      },
+      "good": {
+        "id": "H2",
+        "title": "Combining adjacent image and text links for the same resource",
+        "lang": "html",
+        "code": "<a href=\"products.html\">\n  <img src=\"icon.gif\" alt=\"\">Products page\n</a>",
+        "note": "The icon and text are contained in the same a element."
+      },
+      "bad": {
+        "id": "F3",
+        "title": "Failure of Success Criterion 1.1.1 due to conveying information exclusively using CSS background images",
+        "lang": "css",
+        "code": "ul#booklist li {\n   padding-left: 20px;\n }\n \n ul#booklist li.new {\n   background: transparent url(new.png) no-repeat top left; \n }\n                             \n ul#booklist li.limited {\n   background: transparent url(limited.png) no-repeat top left; \n }\n                             \n ul#booklist li.instock {\n   background: transparent url(instock.png) no-repeat top left; \n }\n \n ul#booklist li.outstock {\n   background: transparent url(outstock.png) no-repeat top left; \n }</code>\n</pre>\n         \n            <p>It is used in this excerpt: </p>\n         \n<pre><code class=\"language-html\"><ul id=\"booklist\">\n  <li class=\"new\">Some book</li>\n  <li class=\"instock\">Some other book</li>\n  <li class=\"limited\">A book we desperately want to get rid of</li>\n  ...\n  <li class=\"outstock\">A book you actually want </li>\n</ul>",
+        "note": "A book distributor uses background images to provide icons against a list of book titles to indicate whether they are new, limited, in-stock, or out of stock. The CSS contains:"
+      }
+    },
+    "1.2.1": {
+      "slug": "audio-only-and-video-only-prerecorded",
+      "brief": {
+        "goal": "Audio and video-only content can be understood by more people.",
+        "whattodo": "Provide an alternative when content is perceivable with only one sense.",
+        "whyitsimportant": "People who can’t fully see or hear content can understand it."
+      },
+      "good": {
+        "id": "G166",
+        "title": "Providing audio that describes the important video content and describing it as such",
+        "lang": "html",
+        "code": "<a href=\"../video/marslanding.mp4\">\n  <img src=\"../images/spaceship.jpg\" alt=\"Mars landing, video-only\"\n   width=\"193\" height=\"255\"/>\n</a>\n<p><a href=\"mars-landing-audio.mp3\">Audio description of \"Mars Landing\"</a></p>",
+        "note": "A web page has a link to a video-only presentation of a spaceship landing on Mars. The link to the video is a picture of a spaceship. Near the video is a link to an audio file of a person describing the video. This would look something like the following code example in HTML."
+      }
+    },
+    "1.2.2": {
+      "slug": "captions-prerecorded",
+      "brief": {
+        "goal": "Videos can be played with captions.",
+        "whattodo": "Provide synchronized text for audio content in existing videos.",
+        "whyitsimportant": "People who are deaf or hard of hearing can understand audio in videos."
+      },
+      "good": {
+        "id": "H95",
+        "title": "Using the track element to provide captions",
+        "lang": "html",
+        "code": "<video poster=\"myvideo.png\" controls>\n  <source src=\"myvideo.mp4\" srclang=\"en\" type=\"video/mp4\">\n  <track kind=\"captions\" label=\"English\" src=\"myvideo_en.vtt\" srclang=\"en\">\n</video>",
+        "note": "Captions in one language A video element for a video in the English language with an English caption track. The captions are provided in the WebVTT format."
+      }
+    },
+    "1.2.3": {
+      "slug": "audio-description-or-media-alternative-prerecorded",
+      "brief": {
+        "goal": "Prerecorded videos can be understood by more people.",
+        "whattodo": "Provide a description of the visual content in videos.",
+        "whyitsimportant": "People who are blind or who cannot understand the visual content can have it described."
+      },
+      "good": {
+        "id": "H53",
+        "title": "Using the body of the object element",
+        "lang": "html",
+        "code": "<object classid=\"https://www.example.com/analogclock.py\">\n  <p>Here is some text that describes the object and its operation.</p>\n</object>",
+        "note": "An object includes a long description that describes it"
+      }
+    },
+    "1.2.4": {
+      "slug": "captions-live",
+      "brief": {
+        "goal": "Live videos have captions.",
+        "whattodo": "Provide synchronized text for audio content in real-time videos.",
+        "whyitsimportant": "People who are deaf or hard of hearing can understand audio in real-time video content."
+      }
+    },
+    "1.2.5": {
+      "slug": "audio-description-prerecorded",
+      "brief": {
+        "goal": "Videos can be played with audio descriptions.",
+        "whattodo": "Provide a synchronized spoken description of the visual content in videos.",
+        "whyitsimportant": "People who cannot see or understand the visual content can hear about it while playing videos."
+      }
+    },
+    "1.3.1": {
+      "slug": "info-and-relationships",
+      "brief": {
+        "goal": "Information about content structure is available to more people.",
+        "whattodo": "Use code to reinforce relationships and information conveyed through presentation.",
+        "whyitsimportant": "People can adapt the presentation to suit their needs while preserving the original meaning."
+      },
+      "good": {
+        "id": "H49",
+        "title": "Using semantic markup to mark emphasized or special text",
+        "lang": "html",
+        "code": "... What she <em>really</em> meant to say was, &quot;This is not OK, \n it is <strong>excellent</strong>&quot;! ...",
+        "note": "Using the em and strong elements to emphasize text The em and strong elements are designed to indicate structural emphasis that may be rendered in a variety of ways (font style changes, speech inflection changes, etc.)."
+      },
+      "bad": {
+        "id": "F2",
+        "title": "Failure of Success Criterion 1.3.1 due to using changes in text presentation to convey information without using the appropriate markup or text",
+        "lang": "html",
+        "code": "<style>\n.heading1{\n  font-family: Times, serif;\n  font-size:200%;\n  font-weight:bold;\n}\n</style>",
+        "note": "Using CSS to style the p element to look like a heading The author intended to make a heading but didn't want the look of the default HTML heading. So they used CSS to style the P element to look like a heading and they called it a heading. But they failed to use the proper HTML heading element. Therefore, the Assistive Technology could not distinguish it as a heading."
+      }
+    },
+    "1.3.2": {
+      "slug": "meaningful-sequence",
+      "brief": {
+        "goal": "The order of content can be understood by more people.",
+        "whattodo": "Use code to preserve meaningful content order.",
+        "whyitsimportant": "Assistive technology can present content to users in the proper order."
+      },
+      "good": {
+        "id": "H56",
+        "title": "Using the dir attribute on an inline element to resolve problems with nested directional runs",
+        "lang": "html",
+        "code": "<p>The title says \"<span lang=\"he\" dir=\"rtl\">פעילות הבינאום, W3C</span>\" in Hebrew.</p>",
+        "note": "Defining the text direction of a nested, mixed-direction phrase, in Hebrew and English, to be right-to-left Because the whole quote is in Hebrew, and therefore runs right to left, the text \"W3C\" and the comma should appear to the left of (i.e., after) the Hebrew text, like this: The title is \" פעילות הבינאום, W3C \" in Hebrew. Visually-ordered ASCII version ( RTL text in uppercase, LTR in lower): the title is \"w3c ,YTIVITCA NOITAZILANOITANRETNI\" in Hebrew. The Unicode bidirectional algorithm alone is insufficient to achieve the right result, and leaves the text \"W3C\" on the right side of the quote: The title is \" פעילות הבינאום , W3C\" in Hebrew. Visually-ordered ASCII version: the title is \"YTIVITCA NOITAZILANOITANRETNI, w3c\" in hebrew. The following markup will produce the expected result:"
+      },
+      "bad": {
+        "id": "F32",
+        "title": "Failure of Success Criterion 1.3.2 due to using white space characters to control spacing within a word",
+        "lang": "html",
+        "code": "<h1>W e l c o m e</h1></code>\n</pre>\n\n            <p>&nbsp; can also be used to add white space, producing similar failures:</p>\n\n<pre><code class=\"language-html\"><h1>H&nbsp;E&nbsp;L&nbsp;L&nbsp;O</h1>",
+        "note": "Failure due to adding white space in the middle of a word This example has white spaces within a word to space out the letters in a heading. Screen readers may read each letter individually instead of the word \"Welcome.\""
+      }
+    },
+    "1.3.3": {
+      "slug": "sensory-characteristics",
+      "brief": {
+        "goal": "Instructions are understandable by more people.",
+        "whattodo": "Describe controls by name, not just by appearance or location.",
+        "whyitsimportant": "People who are blind or have low vision need non-visual instructions."
+      },
+      "good": {
+        "id": "G96",
+        "title": "Providing textual identification of items that otherwise rely only on sensory information to be understood",
+        "lang": "html",
+        "code": "<form class=\"wrapper\">\n  <h1>Sign up to our mailing list</h1>\n    <div role=\"note\">\n      Complete the form and then press the lower-right (<i>sign up</i>) button.\n    </div>\n  <div class=\"form-group\">\n    <label for=\"full-name\">Your name</label>\n    <input autocomplete=\"name\" id=\"full-name\" type=\"text\">\n  </div>\n  <div class=\"form-group\">\n    <label for=\"email\">Your email address</label>\n    <input autocomplete=\"email\" id=\"email\" type=\"text\">\n  </div>\n  <button type=\"reset\">Cancel</button>\n  <button type=\"submit\">Sign up</button>\n</form>",
+        "note": "Button referenced by position and accessible name The following layout places a button in the lower right corner and indicates it by position. An indication of the text label clarifies which button to use for users for which the position is not meaningful. The HTML"
+      }
+    },
+    "1.3.4": {
+      "slug": "orientation",
+      "brief": {
+        "goal": "Devices can be used in any orientation.",
+        "whattodo": "Don't lock content to either portrait or landscape presentation.",
+        "whyitsimportant": "Wheelchair users and others may have devices mounted in a fixed orientation."
+      },
+      "bad": {
+        "id": "F100",
+        "title": "Failure of Success Criterion 1.3.4 due to showing a message asking to reorient device",
+        "lang": "html",
+        "code": "<style>\n/* Orientation \"door slam\" Styling */\n\n@media all and (orientation: landscape) {\n  .rotate { display: block; }\n  .content { display: none; }\n}\n\n@media all and (orientation: portrait) {\n  .rotate { display: none; }\n  .content { display: block; }\n}\n\n.rotate {\n  text-align: center;\n  font-size: 2rem;\n  margin-top: 4rem;\n}\n</style>",
+        "note": "Block an orientation (\"door slam\") by using HTML and CSS The following example uses HTML and CSS to show a message asking to reorient the device if in landscape . The message will disappear if the orientation is changed to portrait . When the portrait property matches the viewport space defined via media queries, the message will disappear or vice versa. This particular example uses the CSS landscape , portrait media query properties."
+      }
+    },
+    "1.3.5": {
+      "slug": "identify-input-purpose",
+      "brief": {
+        "goal": "It is easier to fill out forms.",
+        "whattodo": "Use code to indicate the purpose of common inputs, where technology allows.",
+        "whyitsimportant": "Some people with cognitive disabilities may not understand the input's purpose from the label alone."
+      },
+      "good": {
+        "id": "H98",
+        "title": "Using HTML autocomplete attributes",
+        "lang": "html",
+        "code": "<form method=\"post\" action=\"step2\">\n  <div>\n    <label for=\"fname\">First Name</label>\n    <input autocomplete=\"given-name\" id=\"fname\" type=\"text\">\n  </div>\n  <div>\n    <label for=\"lname\">Last Name</label>\n    <input autocomplete=\"family-name\" id=\"lname\" type=\"text\">\n  </div>\n  <div>\n    <label for=\"cc-num\">Credit card number:</label>\n    <input autocomplete=\"cc-number\" id=\"cc-num\" type=\"text\">\n  </div>\n  <div>\n    <label for=\"exp-date\">Expiry Date:</label>\n    <input autocomplete=\"cc-exp\" id=\"exp-date\" type=\"month\">\n  </div>\n  <div>\n    <input type=\"submit\" value=\"Continue\">\n  </div>\n</form>",
+        "note": "A user's credit card information This is a simple form that collects contact and credit card information from the user."
+      }
+    },
+    "1.4.1": {
+      "slug": "use-of-color",
+      "brief": {
+        "goal": "Color is not the only way of distinguishing information.",
+        "whattodo": "Use information in addition to color, such as shape or text, to convey meaning.",
+        "whyitsimportant": "Not everyone sees colors or sees them the same way."
+      },
+      "good": {
+        "id": "G205",
+        "title": "Including a text cue for colored form control labels",
+        "lang": "html",
+        "code": "<style>\n  .required {\n    color:#ec0000;\n  }\n</style>\n<label for=\"lastname\" class=\"required\">Last name (required):</label>\n<input autocomplete=\"family-name\" id=\"lastname\" type=\"text\" value=\"\">",
+        "note": "Required fields in an HTML form The instructions for an online form say, \"Required fields are shown in red and marked with (required).\" The cue \"(required)\" is included within the label element."
+      },
+      "bad": {
+        "id": "F73",
+        "title": "Failure of Success Criterion 1.4.1 due to creating links that are not visually evident without color vision",
+        "lang": "html",
+        "code": "<head>\n  <style>\n    p a:link {text-decoration: none}\n    p a:visited {text-decoration: none}\n    p a:active {text-decoration: none}\n    p a:hover {text-decoration: underline; color: red;}\n  </style>\n</head>\n<body>\n  <p>There are many resources to find out more about the \n     <a href=\"rain-in-spain.html\">rain in Spain</a>.\n  </p>\n</body>",
+        "note": "Removing the underline from a link in a sentence or paragraph without providing another visual cue besides color"
+      }
+    },
+    "1.4.2": {
+      "slug": "audio-control",
+      "brief": {
+        "goal": "A page that plays music or sounds doesn't disrupt people.",
+        "whattodo": "If you play audio content automatically, let people turn it down or off.",
+        "whyitsimportant": "Sound distracts some people, and also interferes with screen readers."
+      }
+    },
+    "1.4.3": {
+      "slug": "contrast-minimum",
+      "brief": {
+        "goal": "Text can be seen by more people.",
+        "whattodo": "Provide sufficient contrast between text and its background.",
+        "whyitsimportant": "Some people cannot read faint text."
+      },
+      "bad": {
+        "id": "F24",
+        "title": "Failure of Success Criterion 1.4.3, 1.4.6 and 1.4.8 due to specifying foreground colors without specifying background colors or vice versa",
+        "lang": "html",
+        "code": "<!doctype>\n  <html lang=\"en\">\n  <head>\n    <title>Setting the canvas background</title>\n    <style>\n      body {background-color:white}\n    </style>\n  </head>\n  <body>\n    <p>My background is white.</p>\n  </body>\n</html>",
+        "note": "Specifying only background color with CSS In the example below the background color is defined on the CSS stylesheet, however the foreground color is not defined. Therefore, the example fails the Success Criterion."
+      }
+    },
+    "1.4.4": {
+      "slug": "resize-text",
+      "brief": {
+        "goal": "Text can be enlarged.",
+        "whattodo": "Ensure text can be doubled in size.",
+        "whyitsimportant": "Some people can only read text when it is bigger."
+      },
+      "good": {
+        "id": "C28",
+        "title": "Specifying the size of text containers using em units",
+        "lang": "css",
+        "code": "#nav_menu { width: 20em; height: 100em; }\n#nav_list { font-size: 100%; }",
+        "note": "em units for sizes for layout container containing text In this example, a div element, with id value of \"nav_menu\" , is used to position the navigation menu along the left-hand side of the main content area of the web page. The navigation menu consists of a list of text links, with id value of \"nav_list\" . The text size for the navigation links and the width of the container are specified in em units."
+      },
+      "bad": {
+        "id": "F69",
+        "title": "Failure of Success Criterion 1.4.4 when resizing visually rendered text up to 200 percent causes the text, image or controls to be clipped, truncated or obscured",
+        "lang": "html",
+        "code": "<div style=\"font-size:100%; width:120px; height:100px; border: thin solid gray;\"> \n  Now is the time for all good men to come to the aid of their country. \n</div>\n<p>The quick brown fox jumps over the lazy dog.</p>",
+        "note": "Overflowing text The font size is set in a scalable way, but the container is set to a fixed pixel size. A gray border shows the boundaries of the text container. When the text is resized, it spills out of its container, and obscures the next paragraph."
+      }
+    },
+    "1.4.5": {
+      "slug": "images-of-text",
+      "brief": {
+        "goal": "Users can adjust how text is presented.",
+        "whattodo": "Use text instead of pictures of text.",
+        "whyitsimportant": "People cannot alter how text looks in images."
+      },
+      "good": {
+        "id": "C22",
+        "title": "Using CSS to control visual presentation of text",
+        "lang": "html",
+        "code": "<p>The JavaScript method to convert a string to uppercase is <code>toUpperCase()</code>.</p>",
+        "note": "Using CSS font-family to control the font family for text The HTML component"
+      }
+    },
+    "1.4.10": {
+      "slug": "reflow",
+      "brief": {
+        "goal": "Content can be enlarged without increasing line length.",
+        "whattodo": "Make lines of text reflow within the viewport.",
+        "whyitsimportant": "People who need bigger text find it difficult if they must scroll to read long lines."
+      },
+      "good": {
+        "id": "C32",
+        "title": "Using media queries and grid CSS to reflow columns",
+        "lang": "html",
+        "code": "<!DOCTYPE html>\n    <html lang=\"en\">\n      <head>\n        <meta charset=\"UTF-8\">\n        <title>CSS: Using media queries and grid CSS to reflow columns</title>\n        <style>\n\n        /* Reflow Styling */\n        header { grid-area: header; }\n        main   { grid-area: main; }\n        aside  { grid-area: aside; }\n        footer { grid-area: footer; }\n\n        .grid,\n        .subgrid {\n          display: grid;\n          grid-template-columns: minmax(0, 1fr);\n        }\n\n        .grid {\n          grid-template-areas:\n          'header'\n          'main'\n          'aside'\n          'footer';\n          width: 100%;\n        }\n\n        .subgrid {\n          width: calc(100% + 2rem);\n          margin: 0 -1rem;\n        }\n\n        .grid-item,\n        .subgrid-item {\n          padding: 1rem;\n        }\n\n        @media all and (min-width: 576px) {\n          .subgrid {\n            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);\n            margin-bottom: 1rem;\n          }\n          .subgrid-item {\n            padding-bottom: 0.25rem;\n          }\n        }\n\n        @media all and (min-width: 992px) { \n          .grid {\n            grid-template-areas:\n              'header header header'\n              'main main aside'\n              'footer footer footer';\n            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);\n          }\n        }\n\n        </style>\n\n      </head>\n\n      <body class=\"grid\">\n\n        <header class=\"grid-item\">\n          ...\n        </header>\n\n        <main class=\"grid-item\">        \n          ...\n          ...\n          <div class=\"subgrid\">\n            <div class=\"subgrid-item\">\n              ...\n            </div>\n            <div class=\"subgrid-item\">\n              ...\n            </div>\n          </div>\n        </main>\n\n        <aside class=\"grid-item\">\n          ...\n        </aside>\n\n        <footer class=\"grid-item\">\n          ...\n        </footer>\n\n      </body>\n    </html>",
+        "note": "Grid layout in HTML and CSS - Medium complexity The following medium complexity example uses HTML and CSS to create a grid layout. The layout regions adjust their size as the viewport is adjusted. When the total viewport width matches the width defined via media queries, columns wrap to be positioned below, rather than beside each other or vice versa. The zoom level can be increased to 400% without requiring scrolling in more than one direction. This particular example uses fr units as a fraction of the free space of the grid container for the grid items by using the \"grid-template-columns\" property and are laid out in source order."
+      }
+    },
+    "1.4.11": {
+      "slug": "non-text-contrast",
+      "brief": {
+        "goal": "Important visual information meets the same minimum contrast required for larger text.",
+        "whattodo": "Ensure meaningful visual cues achieve 3:1 against the background.",
+        "whyitsimportant": "Some people cannot see elements with low contrast."
+      },
+      "good": {
+        "id": "C40",
+        "title": "Creating a two-color focus indicator to ensure sufficient contrast with all components",
+        "lang": "css",
+        "code": "*:focus {\n\t/* inner indicator */\n\toutline: 2px #F9F9F9 solid;\n\toutline-offset: 0;\n\t/* outer indicator */\n\tbox-shadow: 0 0 0 4px #193146;\n}",
+        "note": "A thick two-color indicator In this example, the indicator consists of two solid bands of color. Because each color band is 2 CSS pixels thick, either color band is large enough to meet the minimum indicator size requirement on its own. As long as one of the two colors has 3:1 change contrast with the pixels behind and around the focus indicator, the indicator will satisfy both the Focus Appearance and Non-Text Contrast success criteria."
+      },
+      "bad": {
+        "id": "F78",
+        "title": "Failure of Success Criterion 1.4.11, 2.4.7 and 2.4.13 due to styling element outlines and borders in a way that removes or renders non-visible the visual focus indicator",
+        "lang": "css",
+        "code": ":focus {outline: none}",
+        "note": "The focus indicator is turned off with CSS The following CSS example will remove the default focus indicator, which fails the requirement to provide a visible focus indicator."
+      }
+    },
+    "1.4.12": {
+      "slug": "text-spacing",
+      "brief": {
+        "goal": "Users can adjust text spacing to make it easier to read.",
+        "authortask": "Ensure content adapts to user-defined text settings.",
+        "whyitsimportant": "Some people need text with different spacing or font characteristics."
+      },
+      "good": {
+        "id": "C36",
+        "title": "Allowing for text spacing override",
+        "lang": "html",
+        "code": "<style>\n/* CSS: No height property is set.*/\n</style>",
+        "note": "A paragraph expands vertically within container The CSS"
+      },
+      "bad": {
+        "id": "F104",
+        "title": "Failure of Success Criterion 1.4.12 due to clipped or overlapped content when text spacing is adjusted",
+        "lang": "html",
+        "code": "<div style=\"font-size:100%; width:130px; height:125px; border: thin solid gray;\">\n  <p style=\"margin:0;\">Now is the time for all good men to come to \n   the aid of their country.</p>\n</div>\n<p style=\"margin:0;\">The quick brown fox jumps over the lazy dog.</p>",
+        "note": "Text inside a box overflows and overlaps text below it when text spacing is implemented. The code below is what is implemented in the DOM before the user implements any CSS test spacing overrides. The text renders correctly in the box and doesn't interfere with the next paragraph."
+      }
+    },
+    "1.4.13": {
+      "slug": "content-on-hover-or-focus",
+      "brief": {
+        "goal": "More users can perceive and dismiss non-persistent content.",
+        "whattodo": "If hover or focus causes content changes, ensure interaction is predictable.",
+        "whyitsimportant": "Unpredictable temporary content can be hard for some to consume and may disrupt others."
+      },
+      "good": {
+        "id": "SCR39",
+        "title": "Making content on focus or hover hoverable, dismissible, and persistent",
+        "lang": "html",
+        "code": "<p>This is the \n   <a class=\"a-and-tooltip\" id=\"parent\" href=\"index.html\">trigger\n   <span id=\"popup\" role=\"tooltip\">And this additional text \n    gives additional context on the trigger term\n   </span>\n  </a>.\n   Text and popup are <strong>in one link (a)</strong> element.\n</p>",
+        "note": "Content preview for links When hovering over or focusing on a link, a content preview for the link appears just above or below that link. Users can move the pointer over the additional content (pop-up) so that they can fully read the additional content. Pressing the Esc key dismisses (closes) the additional content. HTML of example 1"
+      }
+    },
+    "2.1.1": {
+      "slug": "keyboard",
+      "brief": {
+        "goal": "Everything can be done with a keyboard except freehand movements.",
+        "whattodo": "Ensure pointer actions have a keyboard equivalent.",
+        "whyitsimportant": "Many people rely on the keyboard interface, including blind and some mobility impaired people."
+      },
+      "good": {
+        "id": "H91",
+        "title": "Using HTML form controls and links",
+        "lang": "html",
+        "code": "<a href=\"https://example.com\">Example Site</a>",
+        "note": "Links User agents provide mechanisms to navigate to and select links. In each of the following examples, the role is \"link\" because the a element has an href attribute. An a element without an href isn't a link. The link's value is the URI in the href attribute. Link example A In example A, the name is the text inside the link, in this case \"Example Site\"."
+      },
+      "bad": {
+        "id": "F54",
+        "title": "Failure of Success Criterion 2.1.1 due to using only pointing-device-specific event handlers (including gesture) for a function",
+        "lang": "html",
+        "code": "<p><img onmousedown=\"nextPage();\" src=\"nextarrow.gif\" alt=\"Go to next page\"></p>",
+        "note": "An image that responds to a mouse click to go to another page This is a failure because the keyboard cannot be used to move to the next page."
+      }
+    },
+    "2.1.2": {
+      "slug": "no-keyboard-trap",
+      "brief": {
+        "goal": "Keyboard users don't get stuck.",
+        "whattodo": "Ensure users always know how to navigate away from components.",
+        "whyitsimportant": "People who rely on the keyboard often have no other means to navigate."
+      }
+    },
+    "2.1.4": {
+      "slug": "character-key-shortcuts",
+      "brief": {
+        "goal": "Reduce accidental activation of keyboard shortcuts.",
+        "whattodo": "Ensure character-only shortcut keys can be turned off or modified.",
+        "whyitsimportant": "Character-key shortcuts are easy to accidentally trigger, especially with speech input."
+      }
+    },
+    "2.2.1": {
+      "slug": "timing-adjustable",
+      "brief": {
+        "goal": "Users have adequate time to complete tasks.",
+        "whattodo": "Let users turn off, adjust, or extend time limits.",
+        "whyitsimportant": "People with disabilities may need more time to complete activities."
+      },
+      "good": {
+        "id": "SCR16",
+        "title": "Providing a script that warns the user a time limit is about to expire",
+        "lang": "html",
+        "code": "<!doctype html>\n<html lang=\"en\">\n<head>\n   <meta charset=\"utf-8\">\n   <title>Stock Market Quotes</title>\n   <script>\n     function timeControl() {\n     // set timer for 4 min 40 sec, then ask user to confirm.\n     setTimeout('userCheck()', 280000);\n     }\n\n     function userCheck() {\n     // set page refresh for 20 sec\n     var id=setTimeout('pageReload()', 20000);\n     // If user selects \"OK\" the timer is reset \n     // else the page will refresh from the server.\n     if (confirm(\"This page is set to refresh in 20 seconds. \n       Would you like more time?\"))\n       {\n          clearTimeout(id);\n          timeControl();\n       }\n     }\n\n     function pageReload() {\n       window.location.reload(true);\n     }\n\n    timeControl();\n  </script>\n</head>\n<body>\n   <h1>Stock Market Quotes</h1>\n   ...\n</body>\n</html>",
+        "note": "A page of stock market quotes uses script to refresh the page every five minutes in order to ensure the latest statistics remain available. 20 seconds before the five minute period expires, a confirm dialog appears asking if the user needs more time before the page refreshes. This allows the user to be aware of the impending refresh and to avoid it if desired."
+      },
+      "bad": {
+        "id": "F40",
+        "title": "Failure due to using meta redirect with a time limit",
+        "lang": "html",
+        "code": "<!doctype>\n<html lang=\"en\">\n<head>\n  <title>Do not use this!</title>     \n  <meta http-equiv=\"refresh\" content=\"5; url=https://www.example.com/newpage\">\n</head>   \n<body>     \n  <p>\n    If your browser supports Refresh, you'll be transported to our\n    <a href=\"https://www.example.com/newpage\">new site</a> in 5 seconds,\n    otherwise select the link manually.     \n  </p>   \n</body> \n</html>",
+        "note": "The page below is a failure because it will redirect to the URI https://www.example.com/newpage after a time limit of 5 seconds."
+      }
+    },
+    "2.2.2": {
+      "slug": "pause-stop-hide",
+      "brief": {
+        "goal": "Fewer users are distracted by content that updates or moves.",
+        "whattodo": "Let users control content changes that occur in parallel with other content.",
+        "whyitsimportant": "Some people with cognitive disabilities and attention deficits are distracted by continuous movement."
+      },
+      "good": {
+        "id": "SCR33",
+        "title": "Using script to scroll content, and providing a mechanism to pause it",
+        "lang": "html",
+        "code": "...\n<div id=\"scroller\">\n  <p id=\"tag\">This text will scroll and a Pause/Scroll link will be present \n  when JavaScript and CSS are supported and active.</p>\n</div>\n...",
+        "note": "In this example CSS and JavaScript are used to visually present some text in a scrolling format. A link is included to pause the scrolling movement. This implementation will display the full text and omit the link when JavaScript or CSS are unsupported or inactive. The HTML component"
+      },
+      "bad": {
+        "id": "F50",
+        "title": "Failure of Success Criterion 2.2.2 due to a script that causes a blink effect without a mechanism to stop the blinking at 5 seconds or less",
+        "lang": "html",
+        "code": "<script>\n  // blink \"on\" state\n  function show(){\n      document.getElementById(\"blink1\").style.visibility = \"visible\";\n      window.setTimeout(hide, 450);\n   }\n    \n   // blink \"off\" state\n   function hide(){\n      document.getElementById(\"blink1\").style.visibility = \"hidden\";\n      window.setTimeout(show, 450);\n   }\n\n   // kick it off\n   show();\n</script>",
+        "note": "The following example uses script to blink content, but the blink continues indefinitely rather than stopping after five seconds."
+      }
+    },
+    "2.3.1": {
+      "slug": "three-flashes-or-below-threshold",
+      "brief": {
+        "goal": "Content does not trigger seizures.",
+        "whattodo": "Avoid content that flashes, or keep it under thresholds.",
+        "whyitsimportant": "Flashing content can cause migraines, dizziness, nausea, and seizures."
+      }
+    },
+    "2.4.1": {
+      "slug": "bypass-blocks",
+      "brief": {
+        "goal": "Users can more easily navigate by keyboard.",
+        "whattodo": "Provide a means of skipping repeating content.",
+        "whyitsimportant": "Users reliant on the keyboard interface can move around pages efficiently."
+      },
+      "good": {
+        "id": "H69",
+        "title": "Providing heading elements at the beginning of each section of content",
+        "lang": "html",
+        "code": "<h1>Search Technical Periodicals</h1>\n <h2>Search</h2>\n <form action=\"/search\" role=\"search\">\n  <label for=\"searchInput\">Enter search topic:</label>\n  <input id=\"searchInput\" type=\"text\">\n  <input type=\"submit\" value=\"Search\">\n </form>\n <section>\n   <h2>Available Periodicals</h2>\n   <ul>\n     <li><a href=\"https://example.com/pcoder\">Professional Coder</a></li>\n     <li><a href=\"https://example.com/algo\">Algorithms</a></li>\n     <li><a href=\"https://example.com/jse\">Journal of Software Engineering</a></li>\n   </ul>\n </section>\n <section>\n   <h2>Search Results</h2>\n   ... search results are returned in this section ...\n </section>",
+        "note": "Organizing the sections of a search page This example marks up each section heading using h2 elements."
+      }
+    },
+    "2.4.2": {
+      "slug": "page-titled",
+      "brief": {
+        "goal": "Each web page has a meaningful title.",
+        "whattodo": "Provide a descriptive page title using appropriate technology.",
+        "whyitsimportant": "Page titles help users identify and distinguish different pages."
+      },
+      "good": {
+        "id": "H25",
+        "title": "Providing a title using the title element",
+        "lang": "html",
+        "code": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <title>The World Wide Web Consortium</title>     \n  </head>\n  <body>\n      ...   \n  </body> \n</html>",
+        "note": "This example defines a document's title."
+      }
+    },
+    "2.4.3": {
+      "slug": "focus-order",
+      "brief": {
+        "goal": "Keyboard users navigate content in a correct order.",
+        "whattodo": "Elements receive focus in an order that preserves meaning.",
+        "whyitsimportant": "Navigating a site or application with only the keyboard will make sense."
+      },
+      "good": {
+        "id": "H102",
+        "title": "Creating modal dialogs with the HTML dialog element",
+        "lang": "html",
+        "code": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width,\n     initial-scale=1, shrink-to-fit=no\">\n    <title>Turbo Encabulator News</title>\n  </head>\n  <body>\n    <main>\n      <h1>All The News About Turbo Encabulators</h1>\n      <button class=\"open-modal\" type=\"button\">Sign up to our mailing list!</button>\n    </main>\n    <dialog aria-labelledby=\"dialog-heading\" id=\"mailing-list-dialog\">\n      <h1 id=\"dialog-heading\" tabindex=\"-1\">Sign up to our mailing list</h1>\n      <form>\n        <p class=\"req-note\">All form fields are required.</p>\n        <div>\n          <label for=\"fname\">First Name</label>\n          <input aria-required=\"true\" autocomplete=\"given-name\" id=\"fname\" type=\"text\">\n        </div>\n        <div>\n          <label for=\"lname\">Last Name</label>\n          <input aria-required=\"true\" autocomplete=\"family-name\" id=\"lname\" type=\"text\">\n        </div>\n        <div>\n          <label for=\"email\">Email address</label>\n          <input aria-required=\"true\" autocomplete=\"email\" id=\"email\" type=\"text\">\n        </div>\n        <button class=\"sign-up\" type=\"submit\">Sign up</button>\n      </form>\n     <form method=\"dialog\">\n        <button aria-label=\"close\" class=\"close-modal\">&times;</button>\n      </form>\n    </dialog>\n  </body>\n</html>",
+        "note": "A dialog to sign up to a mailing list This is an example of using a modal dialog element to show a mailing-list sign-up form to a user. The main part of the page contains a button element that, when activated, invokes the modal dialog . The button uses the type attribute to tell the browser that this isn't a submit button . When the modal dialog is opened, the browser will treat all content outside of the modal dialog as inert, rendering it inoperable and hiding the content from assistive technology. For example, a screen reader will not be able to reach or announce any of the inert content. Additionally, because the page content is inert, keyboard focus will only be able to reach focusable elements within the dialog element, and the browser's controls. When invoked, the browser automatically sets focus to the first focusable element in the dialog's DOM . In this example the h1 element will receive focus because it has a tabindex=\"-1\" attribute. Note that, although the dialog 's close button is visibly before the h1 , it is the last item in the dialog 's DOM. If the button was first, it would receive focus when dialog was opened. The HTML"
+      },
+      "bad": {
+        "id": "F44",
+        "title": "Failure of Success Criterion 2.4.3 due to using tabindex to create a tab order that does not preserve meaning and operability",
+        "lang": "html",
+        "code": "<ol>\n  <li><a href=\"main.html\" tabindex=\"1\">Homepage</a></li>\n  <li><a href=\"chapter1.html\" tabindex=\"4\">Chapter 1</a></li>\n  <li><a href=\"chapter2.html\" tabindex=\"3\">Chapter 2</a></li>\n  <li><a href=\"chapter3.html\" tabindex=\"2\">Chapter 3</a></li>\n</ol>",
+        "note": "The following example incorrectly uses tabindex to specify an alternative tab order:"
+      }
+    },
+    "2.4.4": {
+      "slug": "link-purpose-in-context",
+      "brief": {
+        "goal": "Users understand what each link will do.",
+        "whattodo": "Provide descriptive names or context for all links.",
+        "whyitsimportant": "People with visual and cognitive disabilities can navigate more easily."
+      },
+      "good": {
+        "id": "H30",
+        "title": "Providing link text that describes the purpose of a link for anchor elements",
+        "lang": "html",
+        "code": "<a href=\"routes.html\">\n  Current routes at Boulders Climbing Gym\n</a>",
+        "note": "Describing the purpose of a link in HTML in the text content of the a element."
+      },
+      "bad": {
+        "id": "F63",
+        "title": "Failure of Success Criterion 2.4.4 due to providing link context only in content that is not related to the link",
+        "lang": "html",
+        "code": "<p>A British businessman has racked up 2 million flyer miles and plans to \n   travel on the world's first commercial tourism flights to space.</p>\n<p><a href=\"ff.html\">Read More...</a></p>",
+        "note": "A Link in an Adjacent Paragraph A news service lists the first few sentences of an article in a paragraph. The next paragraph contains the link \"Read More...\". Because the link is not in the same paragraph as the lead sentence, the user cannot easily discover what the link will let the user read more about."
+      }
+    },
+    "2.4.5": {
+      "slug": "multiple-ways",
+      "brief": {
+        "goal": "Users can get to content in multiple ways.",
+        "whattodo": "Provide at least two options for reaching the same content.",
+        "whyitsimportant": "Not everyone can navigate content in the same way."
+      }
+    },
+    "2.4.6": {
+      "slug": "headings-and-labels",
+      "brief": {
+        "goal": "A page's content is described in headings and labels",
+        "whattodo": "Provide descriptive headings and labels",
+        "whyitsimportant": "People can orient themselves, especially those with cognitive or visual disabilities."
+      },
+      "good": {
+        "id": "G130",
+        "title": "Providing descriptive headings",
+        "lang": "html",
+        "code": "<h1>Disaster preparation</h1>\n<h2>Flood preparation</h2>\n<h2>Fire preparation</h2>",
+        "note": "An HTML page that describes the range of tasks for disaster preparation"
+      }
+    },
+    "2.4.7": {
+      "slug": "focus-visible",
+      "brief": {
+        "goal": "Users know which element has keyboard focus.",
+        "whattodo": "Ensure each item receiving focus has a visible indicator.",
+        "whyitsimportant": "Without a focus indicator, sighted keyboard users cannot operate the page."
+      },
+      "good": {
+        "id": "C15",
+        "title": "Using CSS to change the presentation of a user interface component when it receives focus",
+        "lang": "html",
+        "code": "<nav id=\"main-nav\">\n  <ul>\n    <li>Home</li>\n    <li><a href=\"/services\">Services</a></li>\n    <li><a href=\"/projects\">Projects</a></li>\n    <li><a href=\"/demos\">Demos</a></li>\n    <li><a href=\"/about-us\">About us</a></li>\n    <li><a href=\"/contact-us\">Contact us</a></li>\n    <li><a href=\"/links\">Links</a></li>\n  </ul>\n<nav>",
+        "note": "Link elements In this example, mouse and keyboard focus indicators have been applied to the link elements. CSS has been used to apply a background color when the link elements receive focus. Here is the content to be displayed:"
+      },
+      "bad": {
+        "id": "F55",
+        "title": "Failure of Success Criteria 2.1.1, 2.4.7, 2.4.13, and 3.2.1 due to using script to remove focus when focus is received",
+        "lang": "html",
+        "code": "<input type=\"submit\" onFocus=\"this.blur();\">",
+        "note": ""
+      }
+    },
+    "2.4.11": {
+      "slug": "focus-not-obscured-minimum",
+      "brief": {
+        "goal": "Keep the focused item visible.",
+        "whattodo": "Ensure when an item gets keyboard focus, it is at least partially visible.",
+        "whyitsimportant": "People who can't use a mouse need to see what has keyboard focus."
+      },
+      "good": {
+        "id": "C43",
+        "title": "Using CSS scroll-padding to un-obscure content",
+        "lang": "html",
+        "code": "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">\n  <title>Using CSS scroll-padding to un-obscure content</title>\n  <style>\n    ...\n\n    :root{\n      --height-dialog: 400px;\n      --breathing-room: 20px;\n      --scroll-padding: calc(var(--height-dialog) + var(--breathing-room));      \n    }\n\n    .wrapper {\n      display:grid;\n      gap:1rem;\n      grid-template-columns:repeat(9, 1fr);\n      grid-template-rows:8rem auto minmax(10rem, max-content);\n      min-block-size: 100vh;\n    }\n\n    .wrapper > * {\n      border:1px solid var(--black);\n      padding:1rem;\n    }\n\n    header {\n      grid-column:1 / -1;\n      grid-row:1;\n    }\n\n    main {\n      grid-column:1 / 8;\n    }\n\n    aside {\n      grid-column:8 / 10;\n    }\n\n    footer {\n      grid-column:1 / -1;\n    }\n\n    @media (max-width:50rem) {\n      main {\n       grid-column:1 / -1;\n      }\n\n      aside {\n        grid-column:1 / -1;\n      }\n    }\n\n    .fixed-position-banner {\n      background:var(--banner-background);\n      border:3px solid var(--banner-border);\n      margin-block-end:0.5rem;\n      padding:1rem 1rem 5rem;\n      position:relative;\n      width:calc(100vw - 1rem);\n    }\n\n    @media (min-width: 50rem) {\n      html {\n        padding-bottom:var(--height-dialog);\n        scroll-padding-bottom:var(--scroll-padding);\n      }\n\n     .fixed-position-banner {\n        margin-block-end:0;\n        position:fixed;\n        inset:auto 0 0 0;\n      }\n    } \n    ...\n  </style>\n</head>\n<body>\n  <dialog class=\"fixed-position-banner\">\n    <h2 tabindex=\"-1\">Fixed-Position Banner</h2>\n    <button aria-label=\"close fixed-position banner\" class=\"close-banner\" type=\"button\">\n      ...\n    </button>\n  </dialog>\n  <div class=\"wrapper\">\n    <header>\n      <p>Header Content</p>\n    </header>\n    <main>\n      <h1>Main Content</h1>\n    </main>\n    <aside>\n      <h2>Sidebar Content</h2>\n      <p><a href=\"https://example.com\">Here's an example link in the sidebar</a>.</p>\n    </aside>\n    <footer>\n      <h2>Footer Content</h2>\n      <p><a href=\"https://example.com\">Here's an example link in the footer</a>.</p>\n    </footer>\n  </div>\n  <script>\n    window.addEventListener('DOMContentLoaded', () => {\n      const elFixedBanner = document.querySelector('dialog');\n      const elCloseBannerBtn = document.querySelector(\".close-banner\");\n\n      elFixedBanner.show();\n\n      const getDialogHeight = () => {\n        const height = elFixedBanner.offsetHeight;\n        document.documentElement.style.setProperty('--height-dialog', `${height}px`);\n        document.documentElement.style.setProperty('--breathing-room', `${height ? 20 : 0}px`);\n      }\n\n      const observer = new ResizeObserver(getDialogHeight);\n      observer.observe(elFixedBanner);\n\n      elCloseBannerBtn.addEventListener(\"click\", function(e){\n        elFixedBanner.close();\n      }, false);\n    });\n  </script>\t\n</body>\n</html>",
+        "note": "Using CSS scroll-padding to un-obscure content This example shows a situation where there is a fixed-position banner at the bottom of the screen that is covering up the site footer, which contains a link. This type of fixed-position banner is a common design for cookie-consent banners. This example demonstrates a technique to un-obscure content underneath a fixed-position banner. To prevent the page becoming unusable at smaller screen sizes, the banner becomes un-fixed. To observe the scroll-padding effect you will need to use a viewport over 800px wide. Working example: Using CSS scroll-padding to un-obscure content ."
+      }
+    },
+    "2.5.1": {
+      "slug": "pointer-gestures",
+      "brief": {
+        "goal": "Let users operate touchscreens with one finger and reduced gestures.",
+        "whattodo": "Provide single-point operation for all functions.",
+        "whyitsimportant": "Not everyone can perform complex and multi-touch gestures."
+      }
+    },
+    "2.5.2": {
+      "slug": "pointer-cancellation",
+      "brief": {
+        "goal": "Reduce accidental activation of controls by mouse or touch.",
+        "whattodo": "Make pointer cancellation predictable and consistent.",
+        "whyitsimportant": "Make it easier for anyone to recover from something they didn’t mean to do."
+      },
+      "bad": {
+        "id": "F101",
+        "title": "Failure of Success Criterion 2.5.2 due to activating a control on the down-event",
+        "lang": "html",
+        "code": "<!-- modal dialog with a form -->\n...\n<button id=\"close\" type=\"button\">Close</button>\n...",
+        "note": "A close button that triggers on down-events A modal dialog contains a lengthy form that a user needs to complete. The modal provides a simple \"Close\" control that closes the dialog and loses all information the user may already have entered in the form. However, instead of simply listening to the click event - which in most user agents is triggered on the up-event - the author decided to close the dialog on the down-event. This may lead to the user accidentally closing the dialog and losing all the data they entered into the form up to that point."
+      }
+    },
+    "2.5.3": {
+      "slug": "label-in-name",
+      "brief": {
+        "goal": "The visual label for controls is a trigger for speech activation.",
+        "whattodo": "Where practical, make the control’s text label and name match.",
+        "whyitsimportant": "People who operate with voice interaction use the visible labels in their commands."
+      },
+      "good": {
+        "id": "G211",
+        "title": "Matching the accessible name to the visible label",
+        "lang": "html",
+        "code": "<p>Go to our <a href=\"url-to-page-about-code.html\">Code of conduct</a></p>",
+        "note": "Anchor text provides both the link's label and its accessible name Using conventional HTML, the text between the a element's tags provides both the link's visible text and the accessible name \"Code of conduct\":"
+      },
+      "bad": {
+        "id": "F96",
+        "title": "Failure due to the accessible name not containing the visible label text",
+        "lang": "html",
+        "code": "<button id=\"sitesearch\" aria-label=\"Find in this site\">Go</button>",
+        "note": "Mismatch of visible button text and accessible name supplied via aria-label The text in a search button reads \"Go\" but the accessible name provided in an aria-label attribute is \"Find in this site\""
+      }
+    },
+    "2.5.4": {
+      "slug": "motion-actuation",
+      "brief": {
+        "goal": "Content is not dependent on a user's ability to move a device.",
+        "whattodo": "Don't rely solely on device motion to control page content.",
+        "whyitsimportant": "Some people cannot hold or move a device steadily."
+      }
+    },
+    "2.5.7": {
+      "slug": "dragging-movements",
+      "brief": {
+        "goal": "Don’t rely on dragging for user actions.",
+        "whattodo": "For any action that involves dragging, provide a simple pointer alternative.",
+        "whyitsimportant": "Some people cannot use a mouse to drag items."
+      }
+    },
+    "2.5.8": {
+      "slug": "target-size-minimum",
+      "brief": {
+        "goal": "Make controls easier to activate.",
+        "whattodo": "Ensure targets meet a minimum size or have sufficient spacing around them.",
+        "whyitsimportant": "Some people with physical impairments cannot click small buttons that are close together."
+      },
+      "good": {
+        "id": "C42",
+        "title": "Using min-height and min-width on target container to ensure sufficient target spacing",
+        "lang": "html",
+        "code": "<nav aria-label=\"pagination\">\n  <ol>\n    <li><a class=\"previous\">previous</a></li>\n    <li><a aria-current=\"page\">1</li>\n    <li><a href=\"/page-2\">2</a></li>\n    <li><a href=\"/page-3\">3</a></li>\n    <li><a href=\"/page-4\">4</a></li>\n    <li><a href=\"/page-5\">5</a></li>\n    <li><a href=\"/pages-6-10\">next</a></li>\n  </ol>\n</nav>",
+        "note": "Using a display value of flex with min-height and min-width This example uses min-height and min-width on the list items containing the pagination links. The links don't meet the 24 by 24 CSS pixels size requirement, but centering the links inside containers that are at least 24 by 24 CSS pixels ensures sufficient spacing. The links' 24 CSS pixel diameter circles will each be completely within their containing list items, so they won't intersect each other. Example of using CSS to ensure enough spacing around targets The HTML"
+      }
+    },
+    "3.1.1": {
+      "slug": "language-of-page",
+      "brief": {
+        "goal": "Assistive technology can determine the language of a page.",
+        "whattodo": "Indicate the predominant language on a page.",
+        "whyitsimportant": "People using assistive technology get information in the correct language."
+      },
+      "good": {
+        "id": "H57",
+        "title": "Using the language attribute on the HTML element",
+        "lang": "html",
+        "code": "<!doctype html>\n<html lang=\"fr\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>document écrit en français</title>\n</head>\n<body>\n  ... document écrit en français ...\n</body>\n</html>",
+        "note": "Defining the content of an HTML document to be in French"
+      }
+    },
+    "3.1.2": {
+      "slug": "language-of-parts",
+      "brief": {
+        "goal": "Assistive technology can identify the languages used within a page.",
+        "whattodo": "Indicate when words are in a different language.",
+        "whyitsimportant": "People using assistive technology get information in the correct language."
+      }
+    },
+    "3.2.1": {
+      "slug": "on-focus",
+      "brief": {
+        "goal": "Content can be navigated more predictably.",
+        "whattodo": "Do not change a user's context when items get focus.",
+        "whyitsimportant": "Content that behaves predictably is especially important to people with disabilities."
+      },
+      "bad": {
+        "id": "F55",
+        "title": "Failure of Success Criteria 2.1.1, 2.4.7, 2.4.13, and 3.2.1 due to using script to remove focus when focus is received",
+        "lang": "html",
+        "code": "<input type=\"submit\" onFocus=\"this.blur();\">",
+        "note": ""
+      }
+    },
+    "3.2.2": {
+      "slug": "on-input",
+      "brief": {
+        "goal": "Content can be operated more predictably.",
+        "whattodo": "Forewarn users if their context will change based on their input.",
+        "whyitsimportant": "Content that behaves predictably is especially important to people with disabilities."
+      },
+      "good": {
+        "id": "H32",
+        "title": "Providing submit buttons",
+        "lang": "html",
+        "code": "<form action=\"/subscribe\" method=\"post\">\n <p>Enter your email address to subscribe to our mailing list.</p>\n <label for=\"address\">Your email address:</label>\n <input autocomplete=\"email\" id=\"address\" name=\"address\" type=\"text\"> \n <input type=\"submit\" value=\"Subscribe\">\n</form>",
+        "note": "A basic example of a form with a submit button"
+      },
+      "bad": {
+        "id": "F36",
+        "title": "Failure of Success Criterion 3.2.2 due to automatically submitting a form and presenting new content without prior warning when the last field in the form is given a value",
+        "lang": "html",
+        "code": "<form method=\"get\" id=\"form1\">\n   <input type=\"text\" name=\"text1\" size=\"3\" maxlength=\"3\"> - \n   <input type=\"text\" name=\"text2\" size=\"3\" maxlength=\"3\"> - \n   <input type=\"text\" name=\"text3\" size=\"4\" maxlength=\"4\" onchange=\"form1.submit();\">\n </form>",
+        "note": "This failure example submits a form when the user leaves the last field of a three-field telephone number form. The form will submit if the user leaves the field after editing it, even navigating backwards in the tab order. Developers should not use this method to submit a form, and should instead use a submit button, or rely on the form's default behavior of submitting when the user hits enter in a text field."
+      }
+    },
+    "3.2.3": {
+      "slug": "consistent-navigation",
+      "brief": {
+        "goal": "Content can be navigated more predictably.",
+        "whattodo": "Consistently order navigation that repeats across multiple pages.",
+        "whyitsimportant": "Content that behaves predictably is especially important to people with disabilities."
+      },
+      "bad": {
+        "id": "F66",
+        "title": "Failure of Success Criterion 3.2.3 due to presenting navigation links in a different relative order on different pages",
+        "lang": "html",
+        "code": "<nav>\n  <ul>\n    <li><a href=\"brazil.html\">Brazil</a></li>\n    <li><a href=\"canada.html\">Canada</a></li>\n    <li><a href=\"germany.html\">Germany</a></li>\n    <li><a href=\"poland.html\">Poland</a></li>\n  </ul>\n</nav>",
+        "note": "Navigation presenting a series of links that are in a different relative order on two different pages Examples of a navigation mechanism that presents links in a different order. Page 1 navigation"
+      }
+    },
+    "3.2.4": {
+      "slug": "consistent-identification",
+      "brief": {
+        "goal": "Actions are more predictable across pages.",
+        "whattodo": "Identify repeating functions consistently.",
+        "whyitsimportant": "Consistently identified actions are especially important to people with disabilities."
+      }
+    },
+    "3.2.6": {
+      "slug": "consistent-help",
+      "brief": {
+        "goal": "Make it easier to find help and support.",
+        "whattodo": "Put help in the same place when it is on multiple pages.",
+        "whyitsimportant": "People who need help can find it more easily if it's in the same place."
+      }
+    },
+    "3.3.1": {
+      "slug": "error-identification",
+      "brief": {
+        "goal": "Users know an error exists and what is wrong.",
+        "whattodo": "Provide descriptive notification of errors.",
+        "whyitsimportant": "Flagging errors helps people with reduced sight and cognitive disabilities resolve them."
+      },
+      "good": {
+        "id": "ARIA21",
+        "title": "Using aria-invalid to Indicate An Error Field",
+        "lang": "html",
+        "code": "<form name=\"signup\" id=\"signup\" method=\"post\" action=\"\">\n  <p id=\"errors\" aria-live=\"assertive\"></p>\n  <div>\n    <label for=\"first\">First Name (required)</label>\n    <input aria-invalid=\"false\" autocomplete=\"given-name\" id=\"first\" name=\"first\" type=\"text\">\n  </div>\n  <div>\n    <label for=\"last\">Last Name (required)</label>\n    <input aria-invalid=\"false\" autocomplete=\"family-name\" id=\"last\" name=\"last\" type=\"text\">\n  </div>\n  <div>\n    <label for=\"email\">Email (required)</label>\n    <input aria-invalid=\"false\" autocomplete=\"email\" id=\"email\" name=\"email\" type=\"text\">\n  </div>\n  <div>\n    <button id=\"button\" type=\"submit\">Sign Up</button>\n  </div>\n</form>",
+        "note": "Using aria-invalid on required fields The aria-invalid attribute is used on required fields that are empty when the form is submitted. A message above the form tells the user that there are form fields that need to be completed. HTML:"
+      }
+    },
+    "3.3.2": {
+      "slug": "labels-or-instructions",
+      "brief": {
+        "goal": "Users know what information to enter.",
+        "whattodo": "Provide labels or instructions for inputs.",
+        "whyitsimportant": "Everyone, especially those with cognitive disabilities, will know how to respond."
+      },
+      "good": {
+        "id": "H90",
+        "title": "Indicating required form controls using label or legend",
+        "lang": "html",
+        "code": "<label for=\"firstname\">First name (required):</label> \n<input id=\"firstname\" name=\"firstname\" type=\"text\">",
+        "note": "Using text to indicate required state The text field in the example below has the explicit label of \"First name (required):\". The label element's for attribute matches the id attribute of the input element and the label text indicates that the control is required."
+      }
+    },
+    "3.3.3": {
+      "slug": "error-suggestion",
+      "brief": {
+        "goal": "Users get suggestions on how to resolve errors.",
+        "whattodo": "Where errors are detected, suggest known ways to correct them.",
+        "whyitsimportant": "People can address errors faster and with reduced effort."
+      },
+      "good": {
+        "id": "ARIA18",
+        "title": "Using aria-alertdialog to Identify Errors",
+        "lang": "html",
+        "code": "<dialog aria-labelledby=\"alert-heading\" id=\"date-alert\" role=\"alertdialog\">\n  <h1 id=\"alert-heading\">Error</h1>\n  <p>Employee's Birth Date is after their hire date. Please verify the birth date and hire date.</p>\n  <button command=\"close\" commandfor=\"date-alert\" type=\"button\">Return to page and correct error</button>\n</dialog>",
+        "note": "Alert dialog This example shows how a notification using role=\"alertdialog\" can be used to notify someone they have entered invalid information."
+      }
+    },
+    "3.3.4": {
+      "slug": "error-prevention-legal-financial-data",
+      "brief": {
+        "goal": "Users can avoid submitting incorrect important information.",
+        "whattodo": "Provide ways for users to confirm, correct, or reverse important submissions.",
+        "whyitsimportant": "People with disabilities may be more likely to make mistakes, or not notice them."
+      }
+    },
+    "3.3.7": {
+      "slug": "redundant-entry",
+      "brief": {
+        "goal": "Make it easier for users to complete multi-step processes.",
+        "whattodo": "Don't ask for the same information twice in the same activity.",
+        "whyitsimportant": "Some people with cognitive disabilities have difficulty remembering what they entered before."
+      }
+    },
+    "3.3.8": {
+      "slug": "accessible-authentication-minimum",
+      "brief": {
+        "goal": "Make logins possible with less mental effort.",
+        "whattodo": "Don't make people solve, recall, or transcribe something to log in.",
+        "whyitsimportant": "Some people with cognitive disabilities cannot solve puzzles, memorize a username and password, or retype one-time passcodes."
+      },
+      "good": {
+        "id": "H100",
+        "title": "Providing properly marked up email and password inputs",
+        "lang": "html",
+        "code": "<form method=\"post\" action=\"login\">\n  <div>\n    <label for=\"email\">Email</label>\n    <input autocomplete=\"email\" id=\"email\" type=\"email\" ...>\n  </div>\n  <div>\n    <label for=\"password\">Password</label>\n    <input autocomplete=\"current-password\" id=\"password\" type=\"password\" ...>\n  </div>\n    <input type=\"submit\" value=\"Login\">\n  </div>\n</form>",
+        "note": "properly marked up email and password inputs A secure website has an email and password based login form."
+      }
+    },
+    "4.1.2": {
+      "slug": "name-role-value",
+      "brief": {
+        "goal": "People using assistive technology understand all components.",
+        "whattodo": "Give components correct names, roles, states, and values.",
+        "whyitsimportant": "Assistive technology only works well when code is done properly."
+      },
+      "good": {
+        "id": "H91",
+        "title": "Using HTML form controls and links",
+        "lang": "html",
+        "code": "<a href=\"https://example.com\">Example Site</a>",
+        "note": "Links User agents provide mechanisms to navigate to and select links. In each of the following examples, the role is \"link\" because the a element has an href attribute. An a element without an href isn't a link. The link's value is the URI in the href attribute. Link example A In example A, the name is the text inside the link, in this case \"Example Site\"."
+      },
+      "bad": {
+        "id": "F59",
+        "title": "Failure of Success Criterion 4.1.2 due to using script to make div or span a user interface control in HTML without providing a role for the control",
+        "lang": "html",
+        "code": "<p> \n   <span onclick=\"toggleCheckbox('chkbox')\"> \n     <img src=\"unchecked.gif\" id=\"chkbox\" alt=\"\"> Include Signature \n   </span> \n</p>",
+        "note": "The following example fails because it creates a checkbox using a span and an image."
+      }
+    },
+    "4.1.3": {
+      "slug": "status-messages",
+      "brief": {
+        "goal": "Make users aware of important changes in content.",
+        "whattodo": "Let assistive technology notify users about status changes that don't take focus.",
+        "whyitsimportant": "People who do not see messages need to be informed about them."
+      },
+      "good": {
+        "id": "ARIA23",
+        "title": "Using role=log to identify sequential information updates",
+        "lang": "html",
+        "code": "<div id=\"activityLog\" role=\"log\">\n  <h4 id=\"logHeading\">Recent activity</h4>\n  <ul id=\"logentries\"\">\n    <li>08:03 UserX logged off</li>\n  </ul>\n</div>",
+        "note": "Updating the log of a server An application log records time-stamped activities. The log is exposed in the app as a view, with the region marked with role=\"log\" so that the new additions are announced by the ATs. When each new log entry is added, a screen reader announces it."
+      }
+    }
+  }
+}

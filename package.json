@@ -58,6 +58,8 @@
     "build:wcag": "node scripts/build-standards.mjs",
     "build:pack:rgaa": "node scripts/build-pack-rgaa.mjs",
     "check:pack:rgaa": "node scripts/build-pack-rgaa.mjs --check",
+    "build:guidance:wcag": "node scripts/build-guidance-wcag.mjs",
+    "check:guidance:wcag": "node scripts/build-guidance-wcag.mjs --check",
     "build:criteria": "node scripts/ultra11y.mjs criteria --generate > skills/ultra11y/references/criteria.md",
     "build:act": "UPDATE_ACT_MATRIX=1 vitest run tests/act-matrix-sync.test.ts",
     "build:act:refresh": "node scripts/build-act-corpus.mjs --refresh",
