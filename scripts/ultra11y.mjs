@@ -2,7 +2,7 @@
 
 // src/cli.ts
 import { realpathSync as realpathSync6, writeFileSync as writeFileSync19, mkdirSync as mkdirSync17, existsSync as existsSync34, readFileSync as readFileSync32, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
-import { join as join50, relative as relative5, sep as sep7, dirname as dirname14 } from "path";
+import { join as join50, relative as relative5, resolve as resolve15, sep as sep7, dirname as dirname14 } from "path";
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
@@ -180,7 +180,20 @@ var wcag_default = {
         "H80",
         "H81",
         "H86"
-      ]
+      ],
+      text: "All non-text content that is presented to the user has a text alternative that serves the equivalent purpose, except for the situations listed below.\nControls, Input:\nIf non-text content is a control or accepts user input, then it has a name that describes its purpose. (Refer to Success Criterion 4.1.2 for additional requirements for controls and content that accepts user input.)\nTime-Based Media:\nIf non-text content is time-based media, then text alternatives at least provide descriptive identification of the non-text content. (Refer to Guideline 1.2 for additional requirements for media.)\nTest:\nIf non-text content is a test or exercise that would be invalid if presented in text, then text alternatives at least provide descriptive identification of the non-text content.\nSensory:\nIf non-text content is primarily intended to create a specific sensory experience, then text alternatives at least provide descriptive identification of the non-text content.\nCAPTCHA:\nIf the purpose of non-text content is to confirm that content is being accessed by a person rather than a computer, then text alternatives that identify and describe the purpose of the non-text content are provided, and alternative forms of CAPTCHA using output modes for different types of sensory perception are provided to accommodate different disabilities.\nDecoration, Formatting, Invisible:\nIf non-text content is pure decoration, is used only for visual formatting, or is not presented to users, then it is implemented in a way that it can be ignored by assistive technology.",
+      textFr: "Tout contenu non textuel pr\xE9sent\xE9 \xE0 l\u2019utilisateur a un \xE9quivalent textuel qui remplit une fonction \xE9quivalente sauf dans les situations \xE9num\xE9r\xE9es ci-dessous.\nComposant d\u2019interface ou de saisie:\nsi le contenu non textuel est un composant d\u2019interface ou s\u2019il permet la saisie d\u2019informations par l\u2019utilisateur, alors il a un nom qui d\xE9crit sa fonction. (Se r\xE9f\xE9rer au Crit\xE8re de succ\xE8s 4.1.2 pour des exigences suppl\xE9mentaires \xE0 propos des composants d\u2019interfaces utilisateur ou des contenus qui permettent la saisie d\u2019informations par l\u2019utilisateur.)\nM\xE9dia temporel:\nsi le contenu non textuel est un m\xE9dia temporel, alors l\u2019\xE9quivalent textuel fournit au moins une identification descriptive du contenu non textuel. (Se r\xE9f\xE9rer \xE0 la R\xE8gle 1.2 pour des exigences suppl\xE9mentaires concernant les m\xE9dias temporels.)\nTest:\nsi le contenu non textuel est un test ou un exercice qui serait invalide s\u2019il \xE9tait pr\xE9sent\xE9 en texte, alors l\u2019\xE9quivalent textuel fournit au moins une identification descriptive du contenu non textuel.\nContenu sensoriel:\nsi le contenu non textuel vise d\u2019abord \xE0 cr\xE9er une exp\xE9rience sensorielle sp\xE9cifique, l\u2019\xE9quivalent textuel fournit au moins une identification descriptive de ce contenu non textuel.\nCAPTCHA:\nsi ce contenu non textuel vise \xE0 confirmer que le contenu est consult\xE9 par une personne plut\xF4t que par un ordinateur, alors un \xE9quivalent textuel est fourni pour identifier et d\xE9crire la fonction du contenu non textuel, et des formes alternatives du CAPTCHA sont propos\xE9es pour diff\xE9rents types de perception sensorielle afin d\u2019accommoder diff\xE9rents types de limitations fonctionnelles.\nD\xE9coration, formatage, invisibilit\xE9:\nsi le contenu non textuel est purement d\xE9coratif, s\u2019il est utilis\xE9 seulement pour un formatage visuel ou s\u2019il n\u2019est pas pr\xE9sent\xE9 \xE0 l\u2019utilisateur, alors il est impl\xE9ment\xE9 de mani\xE8re \xE0 \xEAtre ignor\xE9 par les technologies d\u2019assistance.",
+      termsFr: [
+        "non-text-content",
+        "text-alternative",
+        "name",
+        "text",
+        "specific-sensory-experience",
+        "captcha",
+        "pure-decoration",
+        "assistive-technologies"
+      ],
+      terms: ["non-text-content", "text-alternative", "name", "text", "specific-sensory-experience", "captcha", "pure-decoration", "assistive-technology"]
     },
     {
       sc: "1.2.1",
@@ -193,7 +206,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/audio-only-and-video-only-prerecorded.html",
-      techniques: ["F30", "F67", "G158", "G159", "G166", "G173", "G58", "G69", "G78", "G8", "H96", "SM6", "SM7"]
+      techniques: ["F30", "F67", "G158", "G159", "G166", "G173", "G58", "G69", "G78", "G8", "H96", "SM6", "SM7"],
+      text: "For prerecorded audio-only and prerecorded video-only media, the following are true, except when the audio or video is a media alternative for text and is clearly labeled as such:\nPrerecorded Audio-only:\nAn alternative for time-based media is provided that presents equivalent information for prerecorded audio-only content.\nPrerecorded Video-only:\nEither an alternative for time-based media or an audio track is provided that presents equivalent information for prerecorded video-only content.",
+      textFr: "Pour des m\xE9dias pr\xE9-enregistr\xE9s seulement audio et pr\xE9-enregistr\xE9s seulement vid\xE9o, sauf si l\u2019audio ou la vid\xE9o sont un m\xE9dia de remplacement pour un texte et qu\u2019ils sont clairement identifi\xE9s comme tels, les points suivants sont vrais :\nContenu pr\xE9-enregistr\xE9 seulement audio:\nfournir une version de remplacement pour un m\xE9dia temporel, pr\xE9sentant une information \xE9quivalente au contenu seulement audio.\nContenu pr\xE9-enregistr\xE9 seulement vid\xE9o:\nfournir, soit une version de remplacement pour un m\xE9dia temporel, soit une piste audio (pr\xE9sentant une information \xE9quivalente) pour un contenu pr\xE9-enregistr\xE9 seulement vid\xE9o.",
+      termsFr: ["prerecorded", "audio-only", "video-only", "media-alternative-for-text", "alternative-for-time-based-media"],
+      terms: ["prerecorded", "audio-only", "video-only", "media-alternative-for-text", "alternative-for-time-based-media"]
     },
     {
       sc: "1.2.2",
@@ -206,7 +223,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: ["media-no-track"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/captions-prerecorded.html",
-      techniques: ["F74", "F75", "F8", "G58", "G87", "G93", "H95", "SM11", "SM12"]
+      techniques: ["F74", "F75", "F8", "G58", "G87", "G93", "H95", "SM11", "SM12"],
+      text: "Captions are provided for all prerecorded audio content in synchronized media, except when the media is a media alternative for text and is clearly labeled as such.",
+      textFr: "Fournir des sous-titres pour tout contenu audio pr\xE9-enregistr\xE9 dans un m\xE9dia synchronis\xE9, except\xE9 lorsque le m\xE9dia est un m\xE9dia de remplacement pour un texte et qu\u2019il est clairement identifi\xE9 comme tel.",
+      termsFr: ["captions", "audio", "prerecorded", "synchronized-media", "media-alternative-for-text"],
+      terms: ["captions", "prerecorded", "audio", "synchronized-media", "media-alternative-for-text"]
     },
     {
       sc: "1.2.3",
@@ -219,7 +240,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/audio-description-or-media-alternative-prerecorded.html",
-      techniques: ["F30", "F67", "G158", "G159", "G166", "G173", "G58", "G69", "G78", "G8", "H96", "SM6", "SM7"]
+      techniques: ["F30", "F67", "G158", "G159", "G166", "G173", "G58", "G69", "G78", "G8", "H96", "SM6", "SM7"],
+      text: "An alternative for time-based media or audio description of the prerecorded video content is provided for synchronized media, except when the media is a media alternative for text and is clearly labeled as such.",
+      textFr: "Fournir une version de remplacement pour un m\xE9dia temporel ou une audio-description du contenu vid\xE9o pr\xE9-enregistr\xE9 pour un m\xE9dia synchronis\xE9, except\xE9 quand le m\xE9dia est un m\xE9dia de remplacement pour un texte et qu\u2019il est clairement identifi\xE9 comme tel.",
+      termsFr: ["alternative-for-time-based-media", "audio-descriptions", "video", "prerecorded", "synchronized-media", "media-alternative-for-text"],
+      terms: ["alternative-for-time-based-media", "audio-description", "prerecorded", "video", "synchronized-media", "media-alternative-for-text"]
     },
     {
       sc: "1.2.4",
@@ -231,7 +256,11 @@ var wcag_default = {
       addedIn: "2.0",
       automatability: "judgment",
       ruleIds: [],
-      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/captions-live.html"
+      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/captions-live.html",
+      text: "Captions are provided for all live audio content in synchronized media.",
+      textFr: "Fournir des sous-titres pour tout contenu audio en direct, sous forme de m\xE9dia synchronis\xE9.",
+      termsFr: ["captions", "audio", "live", "synchronized-media"],
+      terms: ["captions", "live", "audio", "synchronized-media"]
     },
     {
       sc: "1.2.5",
@@ -244,7 +273,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/audio-description-prerecorded.html",
-      techniques: ["G173", "G58", "G78", "G8", "H96", "SM1", "SM2", "SM6", "SM7"]
+      techniques: ["G173", "G58", "G78", "G8", "H96", "SM1", "SM2", "SM6", "SM7"],
+      text: "Audio description is provided for all prerecorded video content in synchronized media.",
+      textFr: "Fournir une audio-description pour tout contenu vid\xE9o pr\xE9-enregistr\xE9, sous forme de m\xE9dia synchronis\xE9.",
+      termsFr: ["audio-descriptions", "video", "prerecorded", "synchronized-media"],
+      terms: ["audio-description", "prerecorded", "video", "synchronized-media"]
     },
     {
       sc: "1.3.1",
@@ -348,7 +381,11 @@ var wcag_default = {
         "SCR20",
         "SCR29",
         "SCR35"
-      ]
+      ],
+      text: "Information, structure, and relationships conveyed through presentation can be programmatically determined or are available in text.",
+      textFr: "L\u2019information, la structure, et les relations v\xE9hicul\xE9es par la pr\xE9sentation peuvent \xEAtre d\xE9termin\xE9es par un programme informatique ou sont disponibles sous forme de texte.",
+      termsFr: ["structure", "relationships", "presentation", "programmatically-determinable"],
+      terms: ["structure", "relationships", "presentation", "programmatically-determined"]
     },
     {
       sc: "1.3.2",
@@ -361,7 +398,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/meaningful-sequence.html",
-      techniques: ["ARIA4", "C18", "C22", "C6", "C8", "F1", "F15", "F32", "F33", "F34", "F48", "F49", "G10", "G135", "G140", "G57", "G59", "H56"]
+      techniques: ["ARIA4", "C18", "C22", "C6", "C8", "F1", "F15", "F32", "F33", "F34", "F48", "F49", "G10", "G135", "G140", "G57", "G59", "H56"],
+      text: "When the sequence in which content is presented affects its meaning, a correct reading sequence can be programmatically determined.",
+      textFr: "Lorsque l\u2019ordre de pr\xE9sentation du contenu affecte sa signification, un ordre de lecture correct peut \xEAtre d\xE9termin\xE9 par un programme informatique.",
+      termsFr: ["correct-reading-sequence", "programmatically-determinable"],
+      terms: ["correct-reading-sequence", "programmatically-determined"]
     },
     {
       sc: "1.3.3",
@@ -374,7 +415,9 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/sensory-characteristics.html",
-      techniques: ["F14", "F26", "G140", "G96"]
+      techniques: ["F14", "F26", "G140", "G96"],
+      text: "Instructions provided for understanding and operating content do not rely solely on sensory characteristics of components such as shape, color, size, visual location, orientation, or sound.\nNote: For requirements related to color, refer to Guideline 1.4.",
+      textFr: "Les instructions donn\xE9es pour la compr\xE9hension et l\u2019utilisation du contenu ne doivent pas reposer uniquement sur les caract\xE9ristiques sensorielles des \xE9l\xE9ments comme la forme, la couleur, la taille, l\u2019emplacement visuel, l\u2019orientation ou le son.\nNote : Pour les exigences li\xE9es \xE0 la couleur, se r\xE9f\xE9rer \xE0 la R\xE8gle 1.4."
     },
     {
       sc: "1.3.4",
@@ -386,7 +429,11 @@ var wcag_default = {
       addedIn: "2.1",
       automatability: "needs-rendering",
       ruleIds: ["rendered-orientation-lock"],
-      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/orientation.html"
+      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/orientation.html",
+      text: "Content does not restrict its view and operation to a single display orientation, such as portrait or landscape, unless a specific display orientation is essential.\nNote: Examples where a particular display orientation may be essential are a bank check, a piano application, slides for a projector or television, or virtual reality content where parts of the image (for instance, a status bar or heads-up display) always remain at a fixed orientation relative to the headset screens (and the user's eyes) regardless of the physical orientation of the headset.",
+      textFr: "La consultation et le fonctionnement du contenu ne sont pas limit\xE9s \xE0 une seule orientation de l\u2019affichage, comme le portrait ou le paysage, \xE0 moins qu\u2019une orientation sp\xE9cifique de l\u2019affichage ne soit essentielle.\nNote : On compte parmi les exemples o\xF9 une orientation sp\xE9cifique de l\u2019affichage peut \xEAtre essentielle : un ch\xE8que de banque, une application de piano, des diapositives pour un projecteur ou une t\xE9l\xE9vision, ou un contenu de r\xE9alit\xE9 virtuelle qui n\u2019est pas n\xE9cessairement limit\xE9 \xE0 une orientation d\u2019affichage en mode paysage ou portrait.",
+      termsFr: ["essential"],
+      terms: ["essential"]
     },
     {
       sc: "1.3.5",
@@ -399,7 +446,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: ["field-purpose-incomplete", "autocomplete-token-invalid"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/identify-input-purpose.html",
-      techniques: ["H98"]
+      techniques: ["H98"],
+      text: "The purpose of each input field collecting information about the user can be programmatically determined when:\n\u2022 The input field serves a purpose identified in the Input Purposes for user interface components section; and\n\u2022 The content is implemented using technologies with support for identifying the expected meaning for form input data.",
+      textFr: "La finalit\xE9 de chaque champ de saisie recueillant des informations sur l\u2019utilisateur peut \xEAtre d\xE9termin\xE9e par un programme informatique lorsque :\n\u2022 Le champ de saisie r\xE9pond \xE0 une finalit\xE9 identifi\xE9e dans la section Finalit\xE9s de saisie des composants d\u2019interface utilisateur ; et\n\u2022 Le contenu est impl\xE9ment\xE9 via des technologies permettant d\u2019identifier la finalit\xE9 de la saisie attendue pour le champ.",
+      termsFr: ["programmatically-determinable"],
+      terms: ["programmatically-determined"]
     },
     {
       sc: "1.4.1",
@@ -412,7 +463,9 @@ var wcag_default = {
       automatability: "needs-rendering",
       ruleIds: ["rendered-link-colour-only"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html",
-      techniques: ["C15", "F14", "F26", "F73", "F78", "G111", "G117", "G138", "G14", "G140", "G149", "G165", "G182", "G183", "G195", "G205", "G96", "SCR31"]
+      techniques: ["C15", "F14", "F26", "F73", "F78", "G111", "G117", "G138", "G14", "G140", "G149", "G165", "G182", "G183", "G195", "G205", "G96", "SCR31"],
+      text: "Color is not used as the only visual means of conveying information, indicating an action, prompting a response, or distinguishing a visual element.\nNote: This success criterion addresses color perception specifically. Other forms of perception are covered in Guideline 1.3 including programmatic access to color and other visual presentation coding.",
+      textFr: "La couleur n\u2019est pas utilis\xE9e comme la seule fa\xE7on de v\xE9hiculer de l\u2019information, d\u2019indiquer une action, de solliciter une r\xE9ponse ou de distinguer un \xE9l\xE9ment visuel.\nNote : Ce crit\xE8re de succ\xE8s traite sp\xE9cifiquement de la perception des couleurs. Les autres formes de perception sont trait\xE9es \xE0 la r\xE8gle 1.3 comme l\u2019acc\xE8s \xE0 la couleur par programme informatique et les autres formes de codage de la pr\xE9sentation visuelle."
     },
     {
       sc: "1.4.2",
@@ -425,7 +478,11 @@ var wcag_default = {
       automatability: "static",
       ruleIds: ["autoplay-media"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/audio-control.html",
-      techniques: ["F23", "F93", "G170", "G171", "G60"]
+      techniques: ["F23", "F93", "G170", "G171", "G60"],
+      text: "If any audio on a web page plays automatically for more than 3 seconds, either a mechanism is available to pause or stop the audio, or a mechanism is available to control audio volume independently from the overall system volume level.\nNote: Since any content that does not meet this success criterion can interfere with a user's ability to use the whole page, all content on the web page (whether or not it is used to meet other success criteria) must meet this success criterion. See Conformance Requirement 5: Non-Interference.",
+      textFr: "Si du son sur une page Web est audible automatiquement pendant plus de 3 secondes, un m\xE9canisme est disponible pour le mettre en pause, l\u2019arr\xEAter ou pour en contr\xF4ler le volume de fa\xE7on ind\xE9pendante du niveau de volume du syst\xE8me g\xE9n\xE9ral.\nNote : Puisque tout contenu ne satisfaisant pas \xE0 ce crit\xE8re de succ\xE8s peut interf\xE9rer avec la capacit\xE9 de l\u2019utilisateur \xE0 exploiter la page enti\xE8re, tout le contenu pr\xE9sent dans la page Web (qu\u2019il soit utilis\xE9 pour satisfaire \xE0 d\u2019autres crit\xE8res de succ\xE8s ou non) doit satisfaire \xE0 ce crit\xE8re de succ\xE8s. Voir l\u2019exigence de conformit\xE9 5 : Non-interf\xE9rence.",
+      termsFr: ["mechanism"],
+      terms: ["mechanism", "paused"]
     },
     {
       sc: "1.4.3",
@@ -438,7 +495,11 @@ var wcag_default = {
       automatability: "needs-rendering",
       ruleIds: ["contrast-literal", "rendered-contrast", "rendered-contrast-pixel"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
-      techniques: ["C29", "F24", "G136", "G145", "G148", "G174", "G18"]
+      techniques: ["C29", "F24", "G136", "G145", "G148", "G174", "G18"],
+      text: "The visual presentation of text and images of text has a contrast ratio of at least 4.5:1, except for the following:\nLarge Text:\nLarge-scale text and images of large-scale text have a contrast ratio of at least 3:1;\nIncidental:\nText or images of text that are part of an inactive user interface component, that are pure decoration, that are not visible to anyone, or that are part of a picture that contains significant other visual content, have no contrast requirement.\nLogotypes:\nText that is part of a logo or brand name has no contrast requirement.",
+      textFr: "La pr\xE9sentation visuelle du texte et du texte sous forme d\u2019image a un rapport de contraste d\u2019au moins 4,5:1, sauf dans les cas suivants :\nTexte agrandi:\nle texte agrandi et le texte agrandi sous forme d\u2019image ont un rapport de contraste d\u2019au moins 3:1.\nTexte d\xE9coratif:\naucune exigence de contraste pour le texte ou le texte sous forme d\u2019image qui fait partie d\u2019un composant d\u2019interface utilisateur inactif, qui est purement d\xE9coratif, qui est invisible pour tous ou qui est une partie d\u2019une image contenant un autre contenu significatif.\nLogotypes:\naucune exigence de contraste pour le texte faisant partie d\u2019un logo ou d\u2019un nom de marque.",
+      termsFr: ["text", "images-of-text", "contrast-ratio", "large-scale", "user-interface-components", "pure-decoration"],
+      terms: ["text", "image-of-text", "contrast-ratio", "large-scale", "user-interface-component", "pure-decoration"]
     },
     {
       sc: "1.4.4",
@@ -451,7 +512,11 @@ var wcag_default = {
       automatability: "needs-rendering",
       ruleIds: ["meta-viewport-zoom-block"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html",
-      techniques: ["C12", "C13", "C14", "C17", "C28", "F69", "F80", "G146", "G179", "SCR34"]
+      techniques: ["C12", "C13", "C14", "C17", "C28", "F69", "F80", "G146", "G179", "SCR34"],
+      text: "Except for captions and images of text, text can be resized without assistive technology up to 200 percent without loss of content or functionality.",
+      textFr: "\xC0 l\u2019exception des sous-titres et du texte sous forme d\u2019image, le texte peut \xEAtre redimensionn\xE9 jusqu\u2019\xE0 200 pour cent sans l\u2019aide d\u2019une technologie d\u2019assistance et sans perte de contenu ou de fonctionnalit\xE9.",
+      termsFr: ["captions", "images-of-text", "text", "assistive-technologies"],
+      terms: ["captions", "image-of-text", "text", "assistive-technology"]
     },
     {
       sc: "1.4.5",
@@ -464,7 +529,11 @@ var wcag_default = {
       automatability: "needs-rendering",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/images-of-text.html",
-      techniques: ["C22", "C30", "G136", "G140"]
+      techniques: ["C22", "C30", "G136", "G140"],
+      text: "If the technologies being used can achieve the visual presentation, text is used to convey information rather than images of text except for the following:\nCustomizable:\nThe image of text can be visually customized to the user's requirements;\nEssential:\nA particular presentation of text is essential to the information being conveyed.\nNote: Logotypes (text that is part of a logo or brand name) are considered essential.",
+      textFr: "Si les technologies utilis\xE9es peuvent r\xE9aliser la pr\xE9sentation visuelle, du texte est utilis\xE9 pour v\xE9hiculer l\u2019information plut\xF4t que du texte sous forme d\u2019image sauf dans les cas suivants :\nPersonnalisable:\nle texte sous forme d\u2019image peut \xEAtre personnalis\xE9 visuellement selon les exigences de l\u2019utilisateur ;\nEssentielle:\nune pr\xE9sentation sp\xE9cifique du texte est essentielle \xE0 l\u2019information v\xE9hicul\xE9e.\nNote : Les logotypes sont consid\xE9r\xE9s comme essentiels (le texte qui fait partie d\u2019un logo ou d\u2019un nom de marque).",
+      termsFr: ["text", "images-of-text", "visually-customized", "essential"],
+      terms: ["text", "image-of-text", "visually-customized", "essential"]
     },
     {
       sc: "1.4.10",
@@ -477,7 +546,11 @@ var wcag_default = {
       automatability: "needs-rendering",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/reflow.html",
-      techniques: ["C34", "C37"]
+      techniques: ["C34", "C37"],
+      text: "Content can be presented without loss of information or functionality, and without requiring scrolling in two dimensions for:\n\u2022 Vertical scrolling content at a width equivalent to 320 CSS pixels;\n\u2022 Horizontal scrolling content at a height equivalent to 256 CSS pixels.\nExcept for parts of the content which require two-dimensional layout for usage or meaning.\nNote: 320 CSS pixels is equivalent to a starting viewport width of 1280 CSS pixels wide at 400% zoom. For web content which is designed to scroll horizontally (e.g., with vertical text), 256 CSS pixels is equivalent to a starting viewport height of 1024 CSS pixels at 400% zoom.\nNote: Examples of content which requires two-dimensional layout are images required for understanding (such as maps and diagrams), video, games, presentations, data tables (not individual cells), and interfaces where it is necessary to keep toolbars in view while manipulating content. It is acceptable to provide two-dimensional scrolling for such parts of the content.",
+      textFr: "Le contenu peut \xEAtre pr\xE9sent\xE9 sans perte d\u2019information ou de fonctionnalit\xE9 et sans n\xE9cessit\xE9 de d\xE9filement dans les deux dimensions pour :\n\u2022 un contenu \xE0 d\xE9filement vertical avec une largeur \xE9quivalente \xE0 320 pixels CSS ;\n\u2022 un contenu \xE0 d\xE9filement horizontal avec une hauteur \xE9quivalente \xE0 256 pixels CSS.\nSauf pour les parties du contenu dont l\u2019utilisation ou la compr\xE9hension n\xE9cessite une mise en page en deux dimensions.\nNote : 320 pixels CSS \xE9quivaut \xE0 une largeur d\u2019affichage initiale de 1280 pixels CSS avec un zoom de 400 %. Pour un contenu Web con\xE7u pour d\xE9filer horizontalement (par exemple, avec du texte vertical), la valeur de 256 pixels CSS \xE9quivaut \xE0 une hauteur d\u2019affichage initiale de 1024 pixels CSS avec un zoom de 400 %.\nNote : On compte parmi les exemples de contenu n\xE9cessitant une mise en page en deux dimensions les images n\xE9cessaires \xE0 la compr\xE9hension (comme les cartes ou les diagrammes), les vid\xE9os, les jeux, les pr\xE9sentations, les tableaux de donn\xE9es (non pas les cellules individuelles), et les interfaces o\xF9 il est n\xE9cessaire de garder les barres d\u2019outils visibles pendant la manipulation du contenu. Un d\xE9filement bidimensionnel pour ces parties du contenu est acceptable.",
+      termsFr: ["css-pixels"],
+      terms: ["css-pixel", "viewport"]
     },
     {
       sc: "1.4.11",
@@ -490,7 +563,11 @@ var wcag_default = {
       automatability: "needs-rendering",
       ruleIds: ["rendered-nontext-contrast"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
-      techniques: ["F78", "G145", "G174", "G18", "G183", "G195", "G207"]
+      techniques: ["F78", "G145", "G174", "G18", "G183", "G195", "G207"],
+      text: "The visual presentation of the following have a contrast ratio of at least 3:1 against adjacent color(s):\nUser Interface Components: Visual information required to identify user interface components and states, except for inactive components or where the appearance of the component is determined by the user agent and not modified by the author;\nGraphical Objects: Parts of graphics required to understand the content, except when a particular presentation of graphics is essential to the information being conveyed.",
+      textFr: "La pr\xE9sentation visuelle des \xE9l\xE9ments suivants a un rapport de contraste d\u2019au moins 3:1 avec la ou les couleurs adjacentes :\nComposants d\u2019interface utilisateur: informations visuelles n\xE9cessaires \xE0 l\u2019identification des composants et des \xE9tats de l\u2019interface utilisateur, \xE0 l\u2019exception des composants inactifs ou lorsque l\u2019apparence du composant est d\xE9termin\xE9e par l\u2019agent utilisateur et non modifi\xE9e par l\u2019auteur ;\nObjets graphiques: parties d\u2019\xE9l\xE9ments graphiques n\xE9cessaires \xE0 la compr\xE9hension du contenu, sauf si une pr\xE9sentation sp\xE9cifique de ces \xE9l\xE9ments est essentielle \xE0 l\u2019information transmise.",
+      termsFr: ["presentation", "contrast-ratio", "user-interface-components", "states", "essential"],
+      terms: ["presentation", "contrast-ratio", "user-interface-component", "state", "user-agent", "essential"]
     },
     {
       sc: "1.4.12",
@@ -503,7 +580,11 @@ var wcag_default = {
       automatability: "needs-rendering",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html",
-      techniques: ["C21", "C35", "C36", "C8"]
+      techniques: ["C21", "C35", "C36", "C8"],
+      text: "In content implemented using markup languages that support the following text style properties, no loss of content or functionality occurs by setting all of the following and by changing no other style property:\n\u2022 Line height (line spacing) to at least 1.5 times the font size;\n\u2022 Spacing following paragraphs to at least 2 times the font size;\n\u2022 Letter spacing (tracking) to at least 0.12 times the font size;\n\u2022 Word spacing to at least 0.16 times the font size.\nException: Human languages and scripts that do not make use of one or more of these text style properties in written text can conform using only the properties that exist for that combination of language and script.\nNote: Content is not required to use these text spacing values. The requirement is to ensure that when a user overrides the authored text spacing, content or functionality is not lost.\nNote: Writing systems for some languages use different text spacing settings, such as paragraph start indent. Authors are encouraged to follow locally available guidance for improving readability and legibility of text in their writing system.",
+      textFr: "Dans un contenu impl\xE9ment\xE9 via un langage de balisage qui prend en charge les propri\xE9t\xE9s de style de texte suivantes, il n\u2019y a aucune perte de contenu ou de fonctionnalit\xE9 lorsqu\u2019on applique toutes les valeurs ci-dessous sans modifier aucune autre propri\xE9t\xE9 de style :\n\u2022 La hauteur de ligne (interlignage) d\xE9finie \xE0 au moins 1,5 fois la taille de la police ;\n\u2022 L\u2019espacement entre les paragraphes cons\xE9cutifs d\xE9fini \xE0 au moins 2 fois la taille de la police ;\n\u2022 L\u2019espacement des lettres (interlettrage) d\xE9fini \xE0 au moins 0,12 fois la taille de la police ;\n\u2022 L\u2019espacement entre les mots d\xE9fini \xE0 au moins 0,16 fois la taille de la police.\nException : les langues et syst\xE8mes d\u2019\xE9critures qui n\u2019utilisent pas une ou plusieurs de ces propri\xE9t\xE9s de style de texte pour le texte \xE9crit peuvent \xEAtre conformes en utilisant uniquement les propri\xE9t\xE9s qui existent pour cette combinaison de langue et de syst\xE8me d\u2019\xE9criture.\nNote : Il n\u2019est pas obligatoire d\u2019utiliser ces valeurs d\u2019espacement du texte. L\u2019exigence consiste \xE0 s\u2019assurer que, lorsqu\u2019un utilisateur modifie l\u2019espacement du texte d\xE9fini par l\u2019auteur, le contenu ou la fonctionnalit\xE9 ne soient pas perdus.\nNote : Dans certaines langues, les syst\xE8mes d\u2019\xE9criture utilisent des param\xE8tres d\u2019espacement de texte diff\xE9rents, tels que l\u2019indentation au d\xE9but des paragraphes. Les auteurs sont encourag\xE9s \xE0 suivre les recommandations disponibles \xE0 l\u2019\xE9chelle locale pour am\xE9liorer la lisibilit\xE9 et la clart\xE9 du texte dans leur propre syst\xE8me d\u2019\xE9criture.",
+      termsFr: ["style-properties", "text"],
+      terms: ["text", "style-property", "human-language"]
     },
     {
       sc: "1.4.13",
@@ -516,7 +597,11 @@ var wcag_default = {
       automatability: "needs-rendering",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus.html",
-      techniques: ["F95"]
+      techniques: ["F95"],
+      text: "Where receiving and then removing pointer hover or keyboard focus triggers additional content to become visible and then hidden, all of the following are true:\nDismissible: A mechanism is available to dismiss the additional content without moving pointer hover or keyboard focus, unless the additional content communicates an input error or does not obscure or replace other content;\nHoverable: If pointer hover can trigger the additional content, then the pointer can be moved over the additional content without the additional content disappearing;\nPersistent: The additional content remains visible until the hover or focus trigger is removed, the user dismisses it, or its information is no longer valid.\nException: The visual presentation of the additional content is controlled by the user agent and is not modified by the author.\nNote: Examples of additional content controlled by the user agent include browser tooltips created through use of the HTML title attribute [[HTML]].\nNote: Custom tooltips, sub-menus, and other nonmodal popups that display on hover and focus are examples of additional content covered by this criterion.\nNote: This criterion applies to content that appears in addition to the triggering component itself. Since hidden components that are made visible on keyboard focus (such as links used to skip to another part of a page) do not present additional content they are not covered by this criterion.",
+      textFr: "Lorsque la r\xE9ception puis le retrait du survol du pointeur ou du focus du clavier d\xE9clenche l\u2019affichage puis le masquage d\u2019un contenu additionnel, les \xE9l\xE9ments suivants sont vrais :\nMasquable: il existe un m\xE9canisme permettant de masquer le contenu additionnel sans d\xE9placer le pointeur ou le focus du clavier, \xE0 moins que le contenu additionnel ne communique une erreur de saisie ou ne masque ni ne remplace un autre contenu ;\nSurvolable: si le survol du pointeur peut d\xE9clencher le contenu additionnel, alors le pointeur peut \xEAtre d\xE9plac\xE9 sur le contenu additionnel sans que celui-ci disparaisse ;\nPersistant: le contenu additionnel reste visible jusqu\u2019\xE0 ce que le survol ou le focus soit retir\xE9, que l\u2019utilisateur le masque ou que ses informations ne soient plus valables.\nException : la pr\xE9sentation visuelle du contenu additionnel est contr\xF4l\xE9e par l\u2019agent utilisateur et n\u2019est pas modifi\xE9e par l\u2019auteur.\nNote : Parmi les exemples de contenu additionnel contr\xF4l\xE9 par l\u2019agent utilisateur figurent les infobulles du navigateur cr\xE9\xE9es \xE0 l\u2019aide de l\u2019attribut HTML title [HTML].\nNote : Les infobulles personnalis\xE9es, les sous-menus et autres fen\xEAtres non modales qui s\u2019affichent au survol et \xE0 la prise de focus sont des exemples de contenu additionnel couvert par ce crit\xE8re.\nNote : Ce crit\xE8re s\u2019applique au contenu qui appara\xEEt en plus du composant d\xE9clencheur lui-m\xEAme. \xC9tant donn\xE9 que les composants cach\xE9s qui deviennent visibles au focus du clavier (comme les liens d\u2019acc\xE8s rapide \xE0 une autre partie d\u2019une page) ne pr\xE9sentent pas de contenu additionnel, ils ne sont pas couverts par ce crit\xE8re.",
+      termsFr: ["mechanism", "input-error"],
+      terms: ["mechanism", "input-error", "user-agent"]
     },
     {
       sc: "2.1.1",
@@ -529,7 +614,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: ["clickable-noninteractive"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html",
-      techniques: ["F10", "F42", "F54", "F55", "G202", "G21", "G4", "G90", "H91", "SCR2", "SCR20", "SCR29", "SCR35"]
+      techniques: ["F10", "F42", "F54", "F55", "G202", "G21", "G4", "G90", "H91", "SCR2", "SCR20", "SCR29", "SCR35"],
+      text: "All functionality of the content is operable through a keyboard interface without requiring specific timings for individual keystrokes, except where the underlying function requires input that depends on the path of the user's movement and not just the endpoints.\nNote: This exception relates to the underlying function, not the input technique. For example, if using handwriting to enter text, the input technique (handwriting) requires path-dependent input but the underlying function (text input) does not.\nNote: This does not forbid and should not discourage providing mouse input or other input methods in addition to keyboard operation.",
+      textFr: "Toutes les fonctionnalit\xE9s du contenu sont utilisables \xE0 l\u2019aide d\u2019une interface clavier sans exiger un rythme de frappe propre \xE0 l\u2019utilisateur, sauf lorsque la fonction sous-jacente n\xE9cessite une saisie qui d\xE9pend du trac\xE9 du mouvement effectu\xE9 par l\u2019utilisateur et pas seulement des points de d\xE9part et d\u2019arriv\xE9e de ce trac\xE9.\nNote : Cette exception ne concerne que la fonction sous-jacente et non la technique de saisie. Par exemple, lorsqu\u2019on utilise l\u2019\xE9criture manuscrite pour saisir du texte, la technique de saisie (l\u2019\xE9criture manuscrite) n\xE9cessite une saisie qui d\xE9pend d\u2019un trac\xE9, mais la fonction sous-jacente (la saisie de texte) ne le requiert pas.\nNote : Cela n\u2019interdit pas et ne devrait pas d\xE9courager l\u2019utilisation de la souris ou de toute autre m\xE9thode de saisie en plus de l\u2019utilisation du clavier.",
+      termsFr: ["functionality", "keyboard-interface"],
+      terms: ["functionality", "keyboard-interface"]
     },
     {
       sc: "2.1.2",
@@ -542,7 +631,11 @@ var wcag_default = {
       automatability: "needs-rendering",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html",
-      techniques: ["F10", "G202", "G21", "G4", "G90", "H91"]
+      techniques: ["F10", "G202", "G21", "G4", "G90", "H91"],
+      text: "If keyboard focus can be moved to a component of the page using a keyboard interface, then focus can be moved away from that component using only a keyboard interface, and, if it requires more than unmodified arrow or tab keys or other standard exit methods, the user is advised of the method for moving focus away.\nNote: Since any content that does not meet this success criterion can interfere with a user's ability to use the whole page, all content on the web page (whether it is used to meet other success criteria or not) must meet this success criterion. See Conformance Requirement 5: Non-Interference.",
+      textFr: "Si le focus du clavier peut \xEAtre positionn\xE9 sur un \xE9l\xE9ment de la page \xE0 l\u2019aide d\u2019une interface clavier, r\xE9ciproquement, il peut \xEAtre d\xE9plac\xE9 hors de ce m\xEAme composant simplement \xE0 l\u2019aide d\u2019une interface clavier et, si ce d\xE9placement exige plus que l\u2019utilisation d\u2019une simple touche fl\xE8che ou tabulation ou toute autre m\xE9thode standard de sortie, l\u2019utilisateur est inform\xE9 de la m\xE9thode permettant de d\xE9placer le focus hors de ce composant.\nNote : Puisque tout contenu ne satisfaisant pas \xE0 ce crit\xE8re de succ\xE8s peut interf\xE9rer avec la capacit\xE9 de l\u2019utilisateur \xE0 exploiter la page enti\xE8re, tout le contenu pr\xE9sent dans la page Web (qu\u2019il soit utilis\xE9 pour satisfaire \xE0 d\u2019autres crit\xE8res de succ\xE8s ou non) doit satisfaire \xE0 ce crit\xE8re de succ\xE8s. Voir l\u2019exigence de conformit\xE9 5 : Non-interf\xE9rence.",
+      termsFr: ["keyboard-interface"],
+      terms: ["keyboard-interface"]
     },
     {
       sc: "2.1.4",
@@ -555,7 +648,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/character-key-shortcuts.html",
-      techniques: ["F99", "G217"]
+      techniques: ["F99", "G217"],
+      text: "If a keyboard shortcut is implemented in content using only letter (including upper- and lower-case letters), punctuation, number, or symbol characters, then at least one of the following is true:\nTurn off: A mechanism is available to turn the shortcut off;\nRemap: A mechanism is available to remap the shortcut to include one or more non-printable keyboard keys (e.g., Ctrl, Alt);\nActive only on focus: The keyboard shortcut for a user interface component is only active when that component has focus.",
+      textFr: "Si un raccourci clavier est impl\xE9ment\xE9 dans du contenu en utilisant uniquement des caract\xE8res de type lettres (y compris les majuscules et les minuscules), des signes de ponctuation, des chiffres ou des symboles, alors au moins l\u2019une des conditions suivantes est vraie :\nD\xE9sactivation: un m\xE9canisme est disponible pour d\xE9sactiver le raccourci ;\nR\xE9assignation: un m\xE9canisme est disponible pour r\xE9assigner le raccourci afin d\u2019inclure une ou plusieurs touches non imprimables du clavier (par exemple, Ctrl, Alt) ;\nActif uniquement au focus: le raccourci clavier pour un composant d\u2019interface utilisateur n\u2019est actif que lorsque ce composant a le focus.",
+      termsFr: ["keyboard-shortcuts", "mechanism", "user-interface-components"],
+      terms: ["keyboard-shortcut", "mechanism", "user-interface-component"]
     },
     {
       sc: "2.2.1",
@@ -599,7 +696,11 @@ var wcag_default = {
         "SM11",
         "SM12",
         "SVR1"
-      ]
+      ],
+      text: 'For each time limit that is set by the content, at least one of the following is true:\nTurn off:\nThe user is allowed to turn off the time limit before encountering it; or\nAdjust:\nThe user is allowed to adjust the time limit before encountering it over a wide range that is at least ten times the length of the default setting; or\nExtend:\nThe user is warned before time expires and given at least 20 seconds to extend the time limit with a simple action (for example, "press the space bar"), and the user is allowed to extend the time limit at least ten times; or\nReal-time Exception:\nThe time limit is a required part of a real-time event (for example, an auction), and no alternative to the time limit is possible; or\nEssential Exception:\nThe time limit is essential and extending it would invalidate the activity; or\n20 Hour Exception:\nThe time limit is longer than 20 hours.\nNote: This success criterion helps ensure that users can complete tasks without unexpected changes in content or context that are a result of a time limit. This success criterion should be considered in conjunction with Success Criterion 3.2.1, which puts limits on changes of content or context as a result of user action.',
+      textFr: "Pour chaque limite de temps fix\xE9e par le contenu, au moins l\u2019un des points suivants est vrai :\nSuppression:\nl\u2019utilisateur a la possibilit\xE9 de supprimer la limite de temps avant de la rencontrer ; ou\nAjustement:\nl\u2019utilisateur a la possibilit\xE9 d\u2019ajuster la limite de temps avant de la rencontrer dans un intervalle d\u2019au moins dix fois la dur\xE9e param\xE9tr\xE9e par d\xE9faut ; ou\nExtension:\nl\u2019utilisateur est averti avant que la limite de temps n\u2019expire et il lui est accord\xE9 au moins 20 secondes pour \xE9tendre cette limite par une action simple (par exemple, \xAB appuyer sur la barre d\u2019espace \xBB) et l\u2019utilisateur a la possibilit\xE9 d\u2019\xE9tendre la limite de temps au moins dix fois ; ou\nL\u2019exception du temps r\xE9el:\nla limite de temps est une partie constitutive d\u2019un \xE9v\xE9nement en temps r\xE9el (par exemple, une ench\xE8re) et aucune alternative n\u2019est possible ; ou\nL\u2019exception de la limite essentielle:\nla limite de temps est essentielle et l\u2019\xE9tendre invaliderait alors l\u2019activit\xE9 ; ou\nL\u2019exception des 20 heures:\nla limite de temps est sup\xE9rieure \xE0 20 heures.\nNote : Ce crit\xE8re de succ\xE8s permet de s\u2019assurer que les utilisateurs peuvent compl\xE9ter leurs t\xE2ches sans changement inattendu de contenu ou de contexte r\xE9sultant de la limite de temps. Il devrait \xEAtre consid\xE9r\xE9 conjointement avec le crit\xE8re de succ\xE8s 3.2.1, qui pose des limites aux changements de contenu ou de contexte r\xE9sultant d\u2019une action de l\u2019utilisateur.",
+      termsFr: ["essential"],
+      terms: ["real-time-event", "essential"]
     },
     {
       sc: "2.2.2",
@@ -643,7 +744,11 @@ var wcag_default = {
         "SM11",
         "SM12",
         "SVR1"
-      ]
+      ],
+      text: "For moving, blinking, scrolling, or auto-updating information, all of the following are true:\nMoving, blinking, scrolling:\nFor any moving, blinking or scrolling information that (1) starts automatically, (2) lasts more than five seconds, and (3) is presented in parallel with other content, there is a mechanism for the user to pause, stop, or hide it unless the movement, blinking, or scrolling is part of an activity where it is essential; and\nAuto-updating:\nFor any auto-updating information that (1) starts automatically and (2) is presented in parallel with other content, there is a mechanism for the user to pause, stop, or hide it or to control the frequency of the update unless the auto-updating is part of an activity where it is essential.\nNote: For requirements related to flickering or flashing content, refer to Guideline 2.3.\nNote: Since any content that does not meet this success criterion can interfere with a user's ability to use the whole page, all content on the web page (whether it is used to meet other success criteria or not) must meet this success criterion. See Conformance Requirement 5: Non-Interference.\nNote: Content that is updated periodically by software or that is streamed to the user agent is not required to preserve or present information that is generated or received between the initiation of the pause and resuming presentation, as this may not be technically possible, and in many situations could be misleading to do so.\nNote: An animation that occurs as part of a preload phase or similar situation can be considered essential if interaction cannot occur during that phase for all users and if not indicating progress could confuse users or cause them to think that content was frozen or broken.",
+      textFr: "Pour toute information en mouvement, clignotante, d\xE9filante ou mise \xE0 jour automatiquement, tous les points suivants sont vrais :\nD\xE9placement, clignotement, d\xE9filement:\npour toute information en mouvement, clignotante ou d\xE9filante qui (1) d\xE9marre automatiquement, (2) dure plus de cinq secondes et (3) est pr\xE9sent\xE9e conjointement avec un autre contenu, il y a un m\xE9canisme \xE0 la disposition de l\u2019utilisateur pour la mettre en pause, l\u2019arr\xEAter ou la masquer, \xE0 moins que le mouvement, le clignotement ou le d\xE9filement s\u2019av\xE8re un \xE9l\xE9ment essentiel au bon d\xE9roulement de l\u2019activit\xE9; et\nMise \xE0 jour automatique:\npour toute information mise \xE0 jour automatiquement qui (1) d\xE9marre automatiquement (2) et est pr\xE9sent\xE9e conjointement avec un autre contenu, il y a un m\xE9canisme \xE0 la disposition de l\u2019utilisateur pour la mettre en pause, l\u2019arr\xEAter ou pour en contr\xF4ler la fr\xE9quence des mises \xE0 jour \xE0 moins que la mise \xE0 jour automatique s\u2019av\xE8re essentielle au bon d\xE9roulement de l\u2019activit\xE9.\nNote : Pour les exigences relatives au contenu scintillant ou flashant, se r\xE9f\xE9rer \xE0 la r\xE8gle 2.3.\nNote : Puisque tout contenu ne satisfaisant pas \xE0 ce crit\xE8re de succ\xE8s peut interf\xE9rer avec la capacit\xE9 de l\u2019utilisateur \xE0 exploiter la page enti\xE8re, tout le contenu pr\xE9sent dans la page Web (qu\u2019il soit utilis\xE9 pour satisfaire \xE0 d\u2019autres crit\xE8res de succ\xE8s ou non) doit satisfaire \xE0 ce crit\xE8re de succ\xE8s. Lire Exigence de conformit\xE9 5 : Non-interf\xE9rence.\nNote : Il n\u2019est pas exig\xE9 que le contenu mis \xE0 jour p\xE9riodiquement par logiciel ou diffus\xE9 en flux \xE0 l\u2019agent utilisateur conserve ou pr\xE9sente l\u2019information g\xE9n\xE9r\xE9e ou re\xE7ue entre la mise en pause et la reprise de la pr\xE9sentation, puisque cela peut ne pas \xEAtre techniquement possible et s\u2019av\xE9rer trompeur dans beaucoup de situations.\nNote : Une animation survenant dans une phase de pr\xE9-chargement ou dans une situation similaire peut \xEAtre consid\xE9r\xE9e comme essentielle si aucune interaction n\u2019est permise \xE0 tous les utilisateurs durant cette phase et si l\u2019absence d\u2019indication de progression est susceptible de perturber les utilisateurs ou de leur faire croire que le contenu est fig\xE9 ou d\xE9fectueux.",
+      termsFr: ["blinking", "pause", "essential"],
+      terms: ["blinking", "mechanism", "paused", "essential"]
     },
     {
       sc: "2.3.1",
@@ -656,7 +761,11 @@ var wcag_default = {
       automatability: "needs-rendering",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/three-flashes-or-below-threshold.html",
-      techniques: ["G15", "G176", "G19"]
+      techniques: ["G15", "G176", "G19"],
+      text: "Web pages do not contain anything that flashes more than three times in any one second period, or the flash is below the general flash and red flash thresholds.\nNote: Since any content that does not meet this success criterion can interfere with a user's ability to use the whole page, all content on the web page (whether it is used to meet other success criteria or not) must meet this success criterion. See Conformance Requirement 5: Non-Interference.",
+      textFr: "Une page Web doit \xEAtre exempte de tout \xE9l\xE9ment qui flashe plus de trois fois dans n\u2019importe quel intervalle d\u2019une seconde ou ce flash doit se situer sous le seuil de flash g\xE9n\xE9rique et le seuil de flash rouge.\nNote : Puisque tout contenu ne satisfaisant pas \xE0 ce crit\xE8re de succ\xE8s peut interf\xE9rer avec la capacit\xE9 de l\u2019utilisateur \xE0 exploiter la page enti\xE8re, tout le contenu pr\xE9sent dans la page Web (qu\u2019il soit utilis\xE9 pour satisfaire \xE0 d\u2019autres crit\xE8res de succ\xE8s ou non) doit satisfaire \xE0 ce crit\xE8re de succ\xE8s. Voir l\u2019exigence de conformit\xE9 5 : Non-interf\xE9rence.",
+      termsFr: ["web-page-s", "flashes", "general-flash-and-red-flash-thresholds"],
+      terms: ["web-page", "flash", "general-flash-and-red-flash-thresholds"]
     },
     {
       sc: "2.4.1",
@@ -669,7 +778,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: ["skip-link-target-missing"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/bypass-blocks.html",
-      techniques: ["ARIA11", "ARIA12", "ARIA4", "F15", "F66", "G1", "G10", "G115", "G123", "G124", "G130", "G135", "G141", "G59", "H42", "H69", "SCR28"]
+      techniques: ["ARIA11", "ARIA12", "ARIA4", "F15", "F66", "G1", "G10", "G115", "G123", "G124", "G130", "G135", "G141", "G59", "H42", "H69", "SCR28"],
+      text: "A mechanism is available to bypass blocks of content that are repeated on multiple web pages.",
+      textFr: "Un m\xE9canisme permet de contourner les blocs de contenu qui sont r\xE9p\xE9t\xE9s sur plusieurs pages Web.",
+      termsFr: ["mechanism", "web-page-s"],
+      terms: ["mechanism", "web-page"]
     },
     {
       sc: "2.4.2",
@@ -682,7 +795,11 @@ var wcag_default = {
       automatability: "static",
       ruleIds: ["title-missing-empty"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/page-titled.html",
-      techniques: ["G127", "G88", "H25"]
+      techniques: ["G127", "G88", "H25"],
+      text: "Web pages have titles that describe topic or purpose.",
+      textFr: "Les pages Web pr\xE9sentent un titre qui d\xE9crit leur sujet ou leur but.",
+      termsFr: ["web-page-s"],
+      terms: ["web-page"]
     },
     {
       sc: "2.4.3",
@@ -695,7 +812,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: ["positive-tabindex"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/focus-order.html",
-      techniques: ["C27", "F1", "F15", "F44", "F66", "F85", "G1", "G10", "G123", "G124", "G135", "G140", "G59", "H4", "SCR26", "SCR27", "SCR28", "SCR37"]
+      techniques: ["C27", "F1", "F15", "F44", "F66", "F85", "G1", "G10", "G123", "G124", "G135", "G140", "G59", "H4", "SCR26", "SCR27", "SCR28", "SCR37"],
+      text: "If a web page can be navigated sequentially and the navigation sequences affect meaning or operation, focusable components receive focus in an order that preserves meaning and operability.",
+      textFr: "Si une page Web peut \xEAtre parcourue de fa\xE7on s\xE9quentielle et que les s\xE9quences de navigation affectent la signification ou l\u2019action, les \xE9l\xE9ments re\xE7oivent le focus dans un ordre qui pr\xE9serve la signification et l\u2019op\xE9rabilit\xE9.",
+      termsFr: ["web-page-s", "navigated-sequentially"],
+      terms: ["web-page", "navigated-sequentially"]
     },
     {
       sc: "2.4.4",
@@ -708,7 +829,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: ["link-empty-name", "icon-only-control-unnamed"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/link-purpose-in-context.html",
-      techniques: ["ARIA7", "ARIA8", "F63", "F89", "G53", "G91", "H30", "H78", "H79", "H80", "H81"]
+      techniques: ["ARIA7", "ARIA8", "F63", "F89", "G53", "G91", "H30", "H78", "H79", "H80", "H81"],
+      text: "The purpose of each link can be determined from the link text alone or from the link text together with its programmatically determined link context, except where the purpose of the link would be ambiguous to users in general.",
+      textFr: "La fonction de chaque lien est d\xE9termin\xE9e par le texte du lien seul ou par le texte du lien associ\xE9 \xE0 un contexte du lien d\xE9termin\xE9 par un programme informatique, sauf si la fonction du lien est ambigu\xEB pour tout utilisateur.",
+      termsFr: ["purpose-of-each-link", "programmatically-determined-link-context", "ambiguous-to-users-in-general"],
+      terms: ["link-purpose", "programmatically-determined-link-context", "ambiguous-to-users-in-general"]
     },
     {
       sc: "2.4.5",
@@ -721,7 +846,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/multiple-ways.html",
-      techniques: ["G161", "G61", "G63", "G64"]
+      techniques: ["G161", "G61", "G63", "G64"],
+      text: "More than one way is available to locate a web page within a set of web pages except where the web page is the result of, or a step in, a process.",
+      textFr: "Une page Web peut \xEAtre situ\xE9e par plus d\u2019un moyen dans un ensemble de pages Web sauf si cette page est le r\xE9sultat ou une \xE9tape d\u2019un processus.",
+      termsFr: ["web-page-s", "set-of-web-pages", "processes"],
+      terms: ["web-page", "set-of-web-pages", "process"]
     },
     {
       sc: "2.4.6",
@@ -734,7 +863,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/headings-and-labels.html",
-      techniques: ["ARIA12", "ARIA14", "ARIA16", "ARIA4", "ARIA6", "ARIA9", "F68", "F82", "F86", "G115", "G130", "G131", "G141", "G82", "H42", "H44", "H65"]
+      techniques: ["ARIA12", "ARIA14", "ARIA16", "ARIA4", "ARIA6", "ARIA9", "F68", "F82", "F86", "G115", "G130", "G131", "G141", "G82", "H42", "H44", "H65"],
+      text: "Headings and labels describe topic or purpose.",
+      textFr: "Les en-t\xEAtes et les \xE9tiquettes d\xE9crivent le sujet ou le but.",
+      termsFr: ["labels"],
+      terms: ["label"]
     },
     {
       sc: "2.4.7",
@@ -747,7 +880,10 @@ var wcag_default = {
       automatability: "needs-rendering",
       ruleIds: ["rendered-focus-not-visible"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html",
-      techniques: ["C15", "F42", "F54", "F55", "F73", "F78", "G149", "G165", "G183", "G195", "G202", "G90", "SCR2", "SCR20", "SCR29", "SCR31", "SCR35"]
+      techniques: ["C15", "F42", "F54", "F55", "F73", "F78", "G149", "G165", "G183", "G195", "G202", "G90", "SCR2", "SCR20", "SCR29", "SCR31", "SCR35"],
+      text: "Any keyboard operable user interface has a mode of operation where the keyboard focus indicator is visible.",
+      textFr: "Toute interface utilisable au clavier comporte un mode de fonctionnement o\xF9 le focus est visible.",
+      terms: ["focus-indicator"]
     },
     {
       sc: "2.4.11",
@@ -759,7 +895,11 @@ var wcag_default = {
       addedIn: "2.2",
       automatability: "needs-rendering",
       ruleIds: [],
-      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html"
+      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html",
+      text: "When a user interface component receives keyboard focus, the component is not entirely hidden due to author-created content.\nNote: Where content in a configurable interface can be repositioned by the user, then only the initial positions of user-movable content are considered for testing and conformance of this success criterion.\nNote: Content opened by the user may obscure the component receiving focus. If the user can reveal the focused component without advancing the keyboard focus, the component with focus is not considered visually hidden due to author-created content.",
+      textFr: "Lorsqu\u2019un composant d\u2019interface utilisateur re\xE7oit le focus du clavier, ce composant n\u2019est pas enti\xE8rement masqu\xE9 par du contenu cr\xE9\xE9 par l\u2019auteur.\nNote : Lorsqu\u2019un contenu d\u2019une interface configurable peut \xEAtre repositionn\xE9 par l\u2019utilisateur, alors seules les positions initiales du contenu d\xE9pla\xE7able sont prises en compte pour les tests et la conformit\xE9 \xE0 ce crit\xE8re de succ\xE8s.\nNote : Il arrive que du contenu ouvert par l\u2019utilisateur masque le composant qui re\xE7oit le focus. Si l\u2019utilisateur peut r\xE9v\xE9ler le composant ayant le focus sans d\xE9placer le focus du clavier, alors le composant ayant le focus n\u2019est pas consid\xE9r\xE9 comme masqu\xE9 par du contenu cr\xE9\xE9 par l\u2019auteur.",
+      termsFr: ["user-interface-components"],
+      terms: ["user-interface-component"]
     },
     {
       sc: "2.5.1",
@@ -772,7 +912,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/pointer-gestures.html",
-      techniques: ["G215", "G216"]
+      techniques: ["G215", "G216"],
+      text: "All functionality that uses multipoint or path-based gestures for operation can be operated with a single pointer without a path-based gesture, unless a multipoint or path-based gesture is essential.\nNote: This requirement applies to web content that interprets pointer actions (i.e., this does not apply to actions that are required to operate the user agent or assistive technology).",
+      textFr: "Toutes les fonctionnalit\xE9s qui utilisent des gestes multipoints ou bas\xE9s sur un trac\xE9 peuvent \xEAtre utilis\xE9es avec un pointage \xE0 contact unique sans geste bas\xE9 sur un trac\xE9, \xE0 moins qu\u2019un geste multipoint ou bas\xE9 sur un trac\xE9 ne soit essentiel.\nNote : Cette exigence s\u2019applique aux contenus Web qui interpr\xE8tent les actions du pointeur (elle ne s\u2019applique donc pas aux actions n\xE9cessaires \xE0 l\u2019utilisation d\u2019un agent utilisateur ou d\u2019une technologie d\u2019assistance).",
+      termsFr: ["functionality", "single-pointer", "essential"],
+      terms: ["functionality", "single-pointer", "essential"]
     },
     {
       sc: "2.5.2",
@@ -784,7 +928,11 @@ var wcag_default = {
       addedIn: "2.1",
       automatability: "judgment",
       ruleIds: [],
-      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/pointer-cancellation.html"
+      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/pointer-cancellation.html",
+      text: "For functionality that can be operated using a single pointer, at least one of the following is true:\nNo Down-Event: The down-event of the pointer is not used to execute any part of the function;\nAbort or Undo: Completion of the function is on the up-event, and a mechanism is available to abort the function before completion or to undo the function after completion;\nUp Reversal: The up-event reverses any outcome of the preceding down-event;\nEssential: Completing the function on the down-event is essential.\nNote: Functions that emulate a keyboard or numeric keypad key press are considered essential.\nNote: This requirement applies to web content that interprets pointer actions (i.e., this does not apply to actions that are required to operate the user agent or assistive technology).",
+      textFr: "Pour une fonctionnalit\xE9 qui peut \xEAtre activ\xE9e avec un dispositif de pointage \xE0 contact unique, au moins une des conditions suivantes est vraie :\nAucun \xE9v\xE9nement descendant: l\u2019\xE9v\xE9nement descendant (down-event) du pointeur n\u2019est pas utilis\xE9 pour ex\xE9cuter une partie ou la totalit\xE9 de la fonction ;\nAbandon ou annulation: l\u2019ach\xE8vement de la fonction se fait sur l\u2019\xE9v\xE9nement ascendant (up-event), et un m\xE9canisme est disponible pour interrompre la fonction avant l\u2019ach\xE8vement ou pour annuler la fonction apr\xE8s l\u2019ach\xE8vement ;\nInversion sur l\u2019\xE9v\xE9nement ascendant: l\u2019\xE9v\xE9nement ascendant inverse tout r\xE9sultat de l\u2019\xE9v\xE9nement descendant pr\xE9c\xE9dent ;\nEssentiel: l\u2019ach\xE8vement de la fonction lors de l\u2019\xE9v\xE9nement descendant est essentiel.\nNote : Les fonctions qui \xE9mulent l\u2019appui d\u2019une touche du clavier ou du pav\xE9 num\xE9rique sont consid\xE9r\xE9es comme essentielles.\nNote : Cette exigence s\u2019applique aux contenus Web qui interpr\xE8tent les actions du pointeur (elle ne s\u2019applique donc pas aux actions n\xE9cessaires \xE0 l\u2019utilisation d\u2019un agent utilisateur ou d\u2019une technologie d\u2019assistance).",
+      termsFr: ["functionality", "single-pointer", "down-event", "up-event", "mechanism", "essential"],
+      terms: ["functionality", "single-pointer", "down-event", "up-event", "mechanism", "essential"]
     },
     {
       sc: "2.5.3",
@@ -833,7 +981,11 @@ var wcag_default = {
         "H81",
         "H91",
         "SCR21"
-      ]
+      ],
+      text: "For user interface components with labels that include text or images of text, the name contains the text that is presented visually.\nNote: A best practice is to have the text of the label at the start of the name.",
+      textFr: "Pour les composants d\u2019interface utilisateur dont les \xE9tiquettes contiennent du texte ou du texte sous forme d\u2019image, le nom contient le texte qui est pr\xE9sent\xE9 visuellement.\nNote : Une bonne pratique consiste \xE0 placer le texte de l\u2019\xE9tiquette au d\xE9but du nom.",
+      termsFr: ["user-interface-components", "labels", "text", "images-of-text", "name"],
+      terms: ["user-interface-component", "label", "text", "image-of-text", "name"]
     },
     {
       sc: "2.5.4",
@@ -845,7 +997,11 @@ var wcag_default = {
       addedIn: "2.1",
       automatability: "judgment",
       ruleIds: [],
-      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/motion-actuation.html"
+      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/motion-actuation.html",
+      text: "Functionality that can be operated by device motion or user motion can also be operated by user interface components and responding to the motion can be disabled to prevent accidental actuation, except when:\nSupported Interface: The motion is used to operate functionality through an accessibility supported interface;\nEssential: The motion is essential for the function and doing so would invalidate the activity.",
+      textFr: "Les fonctionnalit\xE9s qui peuvent \xEAtre activ\xE9es par un mouvement de l\u2019appareil ou un mouvement de l\u2019utilisateur peuvent \xE9galement \xEAtre activ\xE9es par des composants d\u2019interface utilisateur et la r\xE9ponse au mouvement peut \xEAtre d\xE9sactiv\xE9e pour \xE9viter une activation accidentelle, sauf dans les cas suivants :\nInterface compatible : le mouvement est utilis\xE9 pour activer la fonctionnalit\xE9 par l\u2019interm\xE9diaire d\u2019une interface compatible avec l\u2019accessibilit\xE9 ;\nEssentiel : le mouvement est essentiel \xE0 la fonction et le d\xE9sactiver invaliderait l\u2019activit\xE9.",
+      termsFr: ["functionality", "user-interface-components", "accessibility-supported", "essential"],
+      terms: ["functionality", "user-interface-component", "accessibility-supported", "essential"]
     },
     {
       sc: "2.5.7",
@@ -857,7 +1013,11 @@ var wcag_default = {
       addedIn: "2.2",
       automatability: "judgment",
       ruleIds: [],
-      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html"
+      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html",
+      text: "All functionality that uses a dragging movement for operation can be achieved by a single pointer without dragging, unless dragging is essential or the functionality is determined by the user agent and not modified by the author.\nNote: This requirement applies to web content that interprets pointer actions (i.e., this does not apply to actions that are required to operate the user agent or assistive technology).",
+      textFr: "Toutes les fonctionnalit\xE9s qui utilisent un mouvement de glissement peuvent \xEAtre r\xE9alis\xE9es par un pointage \xE0 contact unique sans glissement, sauf si le glissement est essentiel ou que la fonctionnalit\xE9 est d\xE9termin\xE9e par l\u2019agent utilisateur et non modifi\xE9e par l\u2019auteur.\nNote : Cette exigence s\u2019applique aux contenus Web qui interpr\xE8tent les actions du pointeur (c\u2019est-\xE0-dire qu\u2019elle ne s\u2019applique pas aux actions n\xE9cessaires pour faire fonctionner l\u2019agent utilisateur ou la technologie d\u2019assistance).",
+      termsFr: ["functionality", "dragging-movements", "single-pointer", "essential", "user-agents"],
+      terms: ["functionality", "dragging-movement", "single-pointer", "essential", "user-agent"]
     },
     {
       sc: "2.5.8",
@@ -869,7 +1029,11 @@ var wcag_default = {
       addedIn: "2.2",
       automatability: "needs-rendering",
       ruleIds: [],
-      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html"
+      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html",
+      text: "The size of the target for pointer inputs is at least 24 by 24 CSS pixels, except when:\nSpacing: Undersized targets (those less than 24 by 24 CSS pixels) are positioned so that if a 24 CSS pixel diameter circle is centered on the bounding box of each, the circles do not intersect another target or the circle for another undersized target;\nEquivalent: The function can be achieved through a different control on the same page that meets this criterion;\nInline: The target is in a sentence or its size is otherwise constrained by the line-height of non-target text;\nUser Agent Control: The size of the target is determined by the user agent and is not modified by the author;\nEssential: A particular presentation of the target is essential or is legally required for the information being conveyed.\nNote: Targets that allow for values to be selected spatially based on position within the target are considered one target for the purpose of the success criterion. Examples include sliders, color pickers displaying a gradient of colors, or editable areas where you position the cursor.\nNote: For inline targets the line-height should be interpreted as perpendicular to the flow of text. For example, in a language displayed vertically, the line-height would be horizontal.",
+      textFr: "La taille de la cible pour les entr\xE9es de pointeur est d\u2019au moins 24 par 24 pixels CSS, sauf dans les cas suivants :\n\u2022 Espacement : les cibles de taille r\xE9duite (de moins de 24 par 24 pixels CSS) sont positionn\xE9es de telle sorte que si un cercle de 24 pixels CSS de diam\xE8tre est centr\xE9 sur la bo\xEEte de d\xE9limitation de chacune d\u2019elles, les cercles ne croisent pas d\u2019autre cible ni le cercle d\u2019une autre cible de taille r\xE9duite ;\n\u2022 \xC9quivalence : la fonction peut \xEAtre r\xE9alis\xE9e gr\xE2ce \xE0 un \xE9l\xE9ment de contr\xF4le diff\xE9rent sur la m\xEAme page, et qui satisfait \xE0 ce crit\xE8re ;\n\u2022 En ligne : la cible se trouve dans une phrase, ou bien sa taille est limit\xE9e par la hauteur de ligne du texte non cibl\xE9 ;\n\u2022 Contr\xF4le par l\u2019agent utilisateur : la taille de la cible est d\xE9termin\xE9e par l\u2019agent utilisateur et n\u2019est pas modifi\xE9e par l\u2019auteur ;\n\u2022 Essentiel : une pr\xE9sentation sp\xE9cifique de la cible est essentielle ou est l\xE9galement requise pour transmettre l\u2019information.\nNote : Pour ce crit\xE8re de succ\xE8s, les cibles qui permettent de s\xE9lectionner des valeurs en fonction de leur position dans la cible sont consid\xE9r\xE9es comme une seule cible. Cela inclut par exemple les curseurs (slider), les s\xE9lecteurs de couleurs affichant un d\xE9grad\xE9 de couleurs, ou les zones \xE9ditables o\xF9 l\u2019on positionne le curseur.\nNote : Pour les cibles en ligne, la hauteur de ligne doit \xEAtre interpr\xE9t\xE9e comme \xE9tant perpendiculaire au flux de texte. Par exemple, dans une langue affich\xE9e verticalement, la hauteur de ligne serait horizontale.",
+      termsFr: ["targets", "pointer-inputs", "css-pixels", "bounding-boxes", "user-agents", "presentation", "essential"],
+      terms: ["target", "pointer-input", "css-pixel", "minimum-bounding-box", "user-agent", "presentation", "essential"]
     },
     {
       sc: "3.1.1",
@@ -882,7 +1046,11 @@ var wcag_default = {
       automatability: "static",
       ruleIds: ["html-lang-missing", "lang-invalid"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/language-of-page.html",
-      techniques: ["F15", "G10", "G135", "H57"]
+      techniques: ["F15", "G10", "G135", "H57"],
+      text: "The default human language of each web page can be programmatically determined.",
+      textFr: "La langue par d\xE9faut de chaque page Web peut \xEAtre d\xE9termin\xE9e par un programme informatique.",
+      termsFr: ["human-language-s", "web-page-s", "programmatically-determinable"],
+      terms: ["human-language", "web-page", "programmatically-determined"]
     },
     {
       sc: "3.1.2",
@@ -895,7 +1063,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: ["inline-lang-change-missing", "lang-invalid"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/language-of-parts.html",
-      techniques: ["H58"]
+      techniques: ["H58"],
+      text: "The human language of each passage or phrase in the content can be programmatically determined except for proper names, technical terms, words of indeterminate language, and words or phrases that have become part of the vernacular of the immediately surrounding text.",
+      textFr: "La langue de chaque passage ou expression du contenu peut \xEAtre d\xE9termin\xE9e par un programme informatique sauf pour un nom propre, pour un terme technique, pour un mot dont la langue est ind\xE9termin\xE9e ou pour un mot ou une expression faisant partie du langage courant de la langue utilis\xE9e dans le contexte imm\xE9diat.",
+      termsFr: ["human-language-s", "programmatically-determinable"],
+      terms: ["human-language", "programmatically-determined", "text"]
     },
     {
       sc: "3.2.1",
@@ -908,7 +1080,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/on-focus.html",
-      techniques: ["F22", "F36", "F37", "F41", "F55", "F9", "G107", "G13", "G76", "G80", "H32", "H84", "SCR19"]
+      techniques: ["F22", "F36", "F37", "F41", "F55", "F9", "G107", "G13", "G76", "G80", "H32", "H84", "SCR19"],
+      text: "When any user interface component receives focus, it does not initiate a change of context.",
+      textFr: "Quand un composant d\u2019interface utilisateur re\xE7oit le focus, il ne doit pas initier de changement de contexte.",
+      termsFr: ["user-interface-components", "change-of-context"],
+      terms: ["user-interface-component", "changes-of-context"]
     },
     {
       sc: "3.2.2",
@@ -921,7 +1097,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: ["on-input-context-change"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/on-input.html",
-      techniques: ["F22", "F36", "F37", "F41", "F9", "G107", "G13", "G76", "G80", "H32", "H84", "SCR19"]
+      techniques: ["F22", "F36", "F37", "F41", "F9", "G107", "G13", "G76", "G80", "H32", "H84", "SCR19"],
+      text: "Changing the setting of any user interface component does not automatically cause a change of context unless the user has been advised of the behavior before using the component.",
+      textFr: "Le changement de param\xE8tre d\u2019un composant d\u2019interface utilisateur ne doit pas initier de changement de contexte \xE0 moins que l\u2019utilisateur n\u2019ait \xE9t\xE9 avis\xE9 de ce comportement avant d\u2019utiliser le composant.",
+      termsFr: ["user-interface-components", "change-of-context"],
+      terms: ["user-interface-component", "changes-of-context"]
     },
     {
       sc: "3.2.3",
@@ -934,7 +1114,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/consistent-navigation.html",
-      techniques: ["F66", "G1", "G123", "G124", "G59", "G61", "G63", "SCR28"]
+      techniques: ["F66", "G1", "G123", "G124", "G59", "G61", "G63", "SCR28"],
+      text: "Navigational mechanisms that are repeated on multiple web pages within a set of web pages occur in the same relative order each time they are repeated, unless a change is initiated by the user.",
+      textFr: "Dans un ensemble de pages, les m\xE9canismes de navigation qui se r\xE9p\xE8tent sur plusieurs pages Web se pr\xE9sentent dans le m\xEAme ordre relatif chaque fois qu\u2019ils sont r\xE9p\xE9t\xE9s, \xE0 moins qu\u2019un changement soit initi\xE9 par l\u2019utilisateur.",
+      termsFr: ["set-of-web-pages", "web-page-s", "same-relative-order"],
+      terms: ["web-page", "set-of-web-pages", "same-relative-order"]
     },
     {
       sc: "3.2.4",
@@ -947,7 +1131,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/consistent-identification.html",
-      techniques: ["F31"]
+      techniques: ["F31"],
+      text: "Components that have the same functionality within a set of web pages are identified consistently.",
+      textFr: "Dans un ensemble de pages les composants qui ont la m\xEAme fonctionnalit\xE9 sont identifi\xE9s de la m\xEAme fa\xE7on.",
+      termsFr: ["set-of-web-pages", "same-functionality"],
+      terms: ["same-functionality", "set-of-web-pages"]
     },
     {
       sc: "3.2.6",
@@ -959,7 +1147,17 @@ var wcag_default = {
       addedIn: "2.2",
       automatability: "judgment",
       ruleIds: [],
-      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/consistent-help.html"
+      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/consistent-help.html",
+      text: `If a web page contains any of the following help mechanisms, and those mechanisms are repeated on multiple web pages within a set of web pages, they occur in the same order relative to other page content, unless a change is initiated by the user:
+\u2022 Human contact details;
+\u2022 Human contact mechanism;
+\u2022 Self-help option;
+\u2022 A fully automated contact mechanism.
+Note: Help mechanisms may be provided directly on the page, or may be provided via a direct link to a different page containing the information.
+Note: For this success criterion, "the same order relative to other page content" can be thought of as how the content is ordered when the page is serialized. The visual position of a help mechanism is likely to be consistent across pages for the same page variation (e.g., CSS breakpoint). The user can initiate a change, such as changing the page's zoom or orientation, which may trigger a different page variation. This criterion is concerned with relative order across pages displayed in the same page variation (e.g., same zoom level and orientation).`,
+      textFr: "Si une page Web contient l\u2019un des m\xE9canismes d\u2019aide suivants et que ces m\xE9canismes sont r\xE9p\xE9t\xE9s sur plusieurs pages d\u2019un ensemble de pages, alors ils se pr\xE9sentent dans le m\xEAme ordre relativement aux autres contenus de la page ; \xE0 moins qu\u2019un changement soit initi\xE9 par l\u2019utilisateur :\n\u2022 des coordonn\xE9es de personnes ;\n\u2022 un m\xE9canisme pour contacter une personne ;\n\u2022 une option d\u2019auto-assistance ;\n\u2022 un m\xE9canisme de contact enti\xE8rement automatis\xE9.\nNote : Les m\xE9canismes d\u2019aide peuvent \xEAtre fournis directement sur la page, ou \xEAtre fournis gr\xE2ce \xE0 un lien direct vers une page distincte contenant les informations.\nNote : Pour ce crit\xE8re de succ\xE8s, \xAB le m\xEAme ordre relativement aux autres contenus de la page \xBB peut \xEAtre consid\xE9r\xE9 comme la mani\xE8re dont le contenu est ordonn\xE9 lorsque la page est lin\xE9aris\xE9e. La position visuelle d\u2019un m\xE9canisme d\u2019aide sera probablement coh\xE9rente d\u2019une page \xE0 l\u2019autre pour la m\xEAme variante de page (par exemple, un point de rupture CSS). L\u2019utilisateur peut initier un changement, comme modifier le zoom de la page ou son orientation, ce qui peut d\xE9clencher l\u2019affichage d\u2019une variante diff\xE9rente de la page. Ce crit\xE8re s\u2019int\xE9resse \xE0 l\u2019ordre relatif dans des pages affich\xE9es avec la m\xEAme variante de page (par exemple, le m\xEAme niveau de zoom et la m\xEAme orientation).",
+      termsFr: ["web-page-s", "mechanism", "set-of-web-pages"],
+      terms: ["web-page", "mechanism", "set-of-web-pages"]
     },
     {
       sc: "3.3.1",
@@ -991,7 +1189,11 @@ var wcag_default = {
         "H90",
         "SCR18",
         "SCR32"
-      ]
+      ],
+      text: "If an input error is automatically detected, the item that is in error is identified and the error is described to the user in text.",
+      textFr: "Si une erreur de saisie est d\xE9tect\xE9e automatiquement, l\u2019\xE9l\xE9ment en erreur est identifi\xE9 et l\u2019erreur est d\xE9crite \xE0 l\u2019utilisateur sous forme de texte.",
+      termsFr: ["input-error"],
+      terms: ["input-error"]
     },
     {
       sc: "3.3.2",
@@ -1033,7 +1235,11 @@ var wcag_default = {
         "H90",
         "SCR18",
         "SCR32"
-      ]
+      ],
+      text: "Labels or instructions are provided when content requires user input.",
+      textFr: "Des \xE9tiquettes sont pr\xE9sent\xE9es ou des instructions sont fournies quand un contenu requiert une saisie utilisateur.",
+      termsFr: ["labels"],
+      terms: ["label"]
     },
     {
       sc: "3.3.3",
@@ -1046,7 +1252,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/error-suggestion.html",
-      techniques: ["G177", "G84", "G85", "G89", "H89"]
+      techniques: ["G177", "G84", "G85", "G89", "H89"],
+      text: "If an input error is automatically detected and suggestions for correction are known, then the suggestions are provided to the user, unless it would jeopardize the security or purpose of the content.",
+      textFr: "Si une erreur de saisie est automatiquement d\xE9tect\xE9e et que des suggestions de corrections sont connues, ces suggestions sont alors propos\xE9es \xE0 l\u2019utilisateur \xE0 moins que cela puisse compromettre la s\xE9curit\xE9 ou la finalit\xE9 du contenu.",
+      termsFr: ["input-error"],
+      terms: ["input-error"]
     },
     {
       sc: "3.3.4",
@@ -1059,7 +1269,11 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/error-prevention-legal-financial-data.html",
-      techniques: ["G155", "G164", "G168", "G98", "G99"]
+      techniques: ["G155", "G164", "G168", "G98", "G99"],
+      text: "For web pages that cause legal commitments or financial transactions for the user to occur, that modify or delete user-controllable data in data storage systems, or that submit user test responses, at least one of the following is true:\nReversible: Submissions are reversible.\nChecked: Data entered by the user is checked for input errors and the user is provided an opportunity to correct them.\nConfirmed: A mechanism is available for reviewing, confirming, and correcting information before finalizing the submission.",
+      textFr: "Pour les pages Web qui entra\xEEnent des engagements juridiques ou des transactions financi\xE8res de la part de l\u2019utilisateur, qui modifient ou effacent des donn\xE9es contr\xF4lables par l\u2019utilisateur dans des syst\xE8mes de stockages de donn\xE9es, qui enregistrent les r\xE9ponses de l\u2019utilisateur \xE0 un test ou un examen, au moins l\u2019une des conditions suivantes est vraie :\nR\xE9versible: les actions d\u2019envoi sont r\xE9versibles.\nV\xE9rifi\xE9e: les donn\xE9es saisies par l\u2019utilisateur sont v\xE9rifi\xE9es au niveau des erreurs de saisie et la possibilit\xE9 est donn\xE9e \xE0 l\u2019utilisateur de les corriger.\nConfirm\xE9e: un m\xE9canisme est disponible pour revoir, confirmer et corriger les informations avant leur soumission finale.",
+      termsFr: ["web-page-s", "legal-commitments", "user-controllable"],
+      terms: ["web-page", "legal-commitments", "user-controllable", "input-error", "mechanism"]
     },
     {
       sc: "3.3.7",
@@ -1071,7 +1285,11 @@ var wcag_default = {
       addedIn: "2.2",
       automatability: "judgment",
       ruleIds: [],
-      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/redundant-entry.html"
+      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/redundant-entry.html",
+      text: "Information previously entered by or provided to the user that is required to be entered again in the same process is either:\n\u2022 auto-populated, or\n\u2022 available for the user to select.\nExcept when:\n\u2022 re-entering the information is essential,\n\u2022 the information is required to ensure the security of the content, or\n\u2022 previously entered information is no longer valid.",
+      textFr: "Les informations pr\xE9c\xE9demment saisies par l\u2019utilisateur ou fournies \xE0 l\u2019utilisateur, et qui doivent \xEAtre \xE0 nouveau saisies dans le m\xEAme processus sont soit :\n\u2022 pr\xE9remplies, ou\n\u2022 disponibles pour \xEAtre s\xE9lectionn\xE9es par l\u2019utilisateur.\nSauf dans les cas suivants :\n\u2022 il est essentiel de ressaisir les informations soi-m\xEAme,\n\u2022 les informations sont requises pour assurer la s\xE9curit\xE9 du contenu, ou\n\u2022 les informations pr\xE9c\xE9demment saisies ne sont plus valides.",
+      termsFr: ["processes", "essential"],
+      terms: ["process", "essential"]
     },
     {
       sc: "3.3.8",
@@ -1083,7 +1301,11 @@ var wcag_default = {
       addedIn: "2.2",
       automatability: "judgment",
       ruleIds: ["credential-entry-blocked"],
-      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/accessible-authentication-minimum.html"
+      understanding: "https://www.w3.org/WAI/WCAG22/Understanding/accessible-authentication-minimum.html",
+      text: 'A cognitive function test (such as remembering a password or solving a puzzle) is not required for any step in an authentication process unless that step provides at least one of the following:\nAlternative: Another authentication method that does not rely on a cognitive function test.\nMechanism: A mechanism is available to assist the user in completing the cognitive function test.\nObject Recognition: The cognitive function test is to recognize objects.\nPersonal Content: The cognitive function test is to identify non-text content the user provided to the website.\nNote: "Object recognition" and "Personal content" may be represented by images, video, or audio.\nExamples of mechanisms that satisfy this criterion include:\n\u2022 support for password entry by password managers to reduce memory need, and\n\u2022 copy and paste to reduce the cognitive burden of re-typing.',
+      textFr: "Aucune \xE9tape d\u2019un processus d\u2019authentification ne requiert de test cognitif (comme la m\xE9morisation d\u2019un mot de passe ou la r\xE9solution d\u2019une \xE9nigme), \xE0 moins que cette \xE9tape ne fournisse au moins l\u2019un des \xE9l\xE9ments suivants :\nAlternative: une autre m\xE9thode d\u2019authentification, qui ne repose pas sur un test cognitif.\nM\xE9canisme: un m\xE9canisme est disponible pour aider l\u2019utilisateur \xE0 compl\xE9ter le test cognitif.\nReconnaissance d\u2019objets: le test cognitif consiste \xE0 reconna\xEEtre des objets.\nContenu personnel: le test cognitif consiste \xE0 identifier un contenu non textuel que l\u2019utilisateur a fourni au site web.\nNote : La \xAB reconnaissance d\u2019objets \xBB et le \xAB contenu personnel \xBB peuvent \xEAtre repr\xE9sent\xE9s par des images, des vid\xE9os ou de l\u2019audio.\nNote :\nDes exemples de m\xE9canismes qui satisfont \xE0 ce crit\xE8re comprennent :\n\u2022 la possibilit\xE9 de saisir un mot de passe par l\u2019interm\xE9diaire d\u2019un gestionnaire de mots de passe afin de r\xE9duire l\u2019effort de m\xE9morisation, et\n\u2022 la fonction copier-coller pour r\xE9duire la charge cognitive due \xE0 une saisie r\xE9p\xE9titive.",
+      termsFr: ["processes", "cognitive-function-test", "mechanism", "non-text-content"],
+      terms: ["cognitive-function-test", "process", "mechanism", "non-text-content"]
     },
     {
       sc: "4.1.2",
@@ -1174,6 +1396,27 @@ var wcag_default = {
         "H93",
         "H94",
         "SCR21"
+      ],
+      text: "For all user interface components (including but not limited to: form elements, links and components generated by scripts), the name and role can be programmatically determined; states, properties, and values that can be set by the user can be programmatically set; and notification of changes to these items is available to user agents, including assistive technologies.\nNote: This success criterion is primarily for web authors who develop or script their own user interface components. For example, standard HTML controls already meet this success criterion when used according to specification.",
+      textFr: "Pour tout composant d\u2019interface utilisateur (comprenant mais n\u2019\xE9tant pas limit\xE9 aux \xE9l\xE9ments de formulaire, liens et composants g\xE9n\xE9r\xE9s par des scripts), le nom et le r\xF4le peuvent \xEAtre d\xE9termin\xE9s par un programme informatique ; les \xE9tats, les propri\xE9t\xE9s et les valeurs qui peuvent \xEAtre param\xE9tr\xE9s par l\u2019utilisateur peuvent \xEAtre d\xE9finis par programmation; et la notification des changements de ces \xE9l\xE9ments est disponible aux agents utilisateurs, incluant les technologies d\u2019assistance.\nNote : Ce crit\xE8re de succ\xE8s s\u2019adresse d\u2019abord aux auteurs qui d\xE9veloppent ou programment leurs propres composants d\u2019interface utilisateur. Toutefois, les contr\xF4les HTML standards se conforment d\xE9j\xE0 \xE0 ce crit\xE8re de succ\xE8s lorsqu\u2019ils sont utilis\xE9s conform\xE9ment \xE0 la sp\xE9cification.",
+      termsFr: [
+        "user-interface-components",
+        "name",
+        "role",
+        "programmatically-determinable",
+        "programmatically-set",
+        "user-agents",
+        "assistive-technologies"
+      ],
+      terms: [
+        "user-interface-component",
+        "name",
+        "role",
+        "programmatically-determined",
+        "state",
+        "programmatically-set",
+        "user-agent",
+        "assistive-technology"
       ]
     },
     {
@@ -1187,9 +1430,858 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: ["live-region-conflict", "status-message-not-assertive"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html",
-      techniques: ["ARIA19", "ARIA22", "ARIA23"]
+      techniques: ["ARIA19", "ARIA22", "ARIA23"],
+      text: "In content implemented using markup languages, status messages can be programmatically determined through role or properties such that they can be presented to the user by assistive technologies without receiving focus.",
+      textFr: "Dans un contenu impl\xE9ment\xE9 via un langage de balisage, les messages d\u2019\xE9tat peuvent \xEAtre d\xE9termin\xE9s par un programme informatique gr\xE2ce \xE0 un r\xF4le ou des propri\xE9t\xE9s afin qu\u2019ils puissent \xEAtre pr\xE9sent\xE9s \xE0 l\u2019utilisateur par des technologies d\u2019assistance sans recevoir le focus.",
+      termsFr: ["status-messages", "programmatically-determinable", "role", "assistive-technologies"],
+      terms: ["status-message", "programmatically-determined", "role", "assistive-technology"]
     }
-  ]
+  ],
+  glossary: {
+    abbreviation: {
+      title: "abbreviation",
+      body: "shortened form of a word, phrase, or name where the abbreviation has not become part of the language\nThis includes initialisms and acronyms where:\n\u2022\ninitialisms are shortened forms of a name or phrase made from the initial letters of words or syllables contained in that name or phrase\nNote: Not defined in all languages.\nExample:\nSNCF is a French initialism that contains the initial letters of the Soci\xE9t\xE9 Nationale des Chemins de Fer, the French national railroad.\nExample:\nESP is an initialism for extrasensory perception.\n\u2022\nacronyms are abbreviated forms made from the initial letters or parts of other words (in a name or phrase) which may be pronounced as a word\nExample:\nNOAA is an acronym made from the initial letters of the National Oceanic and Atmospheric Administration in the United States.\nNote: Some companies have adopted what used to be an initialism as their company name. In these cases, the new name of the company is the letters (for example, Ecma) and the word is no longer considered an abbreviation."
+    },
+    "accessibility-supported": {
+      title: "accessibility supported",
+      body: `supported by users' assistive technologies as well as the accessibility features in browsers and other user agents
+To qualify as an accessibility-supported use of a web content technology (or feature of a technology), both 1 and 2 must be satisfied for a web content technology (or feature):
+\u2022
+The way that the web content technology is used must be supported by users' assistive technology (AT). This means that the way that the technology is used has been tested for interoperability with users' assistive technology in the human language(s) of the content,
+AND
+\u2022
+The web content technology must have accessibility-supported user agents that are available to users. This means that at least one of the following four statements is true:
+\u2022
+The technology is supported natively in widely-distributed user agents that are also accessibility supported (such as HTML and CSS);
+OR
+\u2022
+The technology is supported in a widely-distributed plug-in that is also accessibility supported;
+OR
+\u2022
+The content is available in a closed environment, such as a university or corporate network, where the user agent required by the technology and used by the organization is also accessibility supported;
+OR
+\u2022
+The user agent(s) that support the technology are accessibility supported and are available for download or purchase in a way that:
+\u2022 does not cost a person with a disability any more than a person without a disability and
+\u2022 is as easy to find and obtain for a person with a disability as it is for a person without disabilities.
+Note: The Accessibility Guidelines Working Group and the W3C do not specify which or how much support by assistive technologies there must be for a particular use of a web technology in order for it to be classified as accessibility supported. (See Level of Assistive Technology Support Needed for "Accessibility Support".)
+Note: Web technologies can be used in ways that are not accessibility supported as long as they are not relied upon and the page as a whole meets the conformance requirements, including Conformance Requirement 4 and Conformance Requirement 5.
+Note: When a web technology is used in a way that is "accessibility supported," it does not imply that the entire technology or all uses of the technology are supported. Most technologies, including HTML, lack support for at least one feature or use. Pages conform to WCAG only if the uses of the technology that are accessibility supported can be relied upon to meet WCAG requirements.
+Note: When citing web content technologies that have multiple versions, the version(s) supported should be specified.
+Note: One way for authors to locate uses of a technology that are accessibility supported would be to consult compilations of uses that are documented to be accessibility supported. (See Understanding Accessibility-Supported Web Technology Uses.) Authors, companies, technology vendors, or others may document accessibility-supported ways of using web content technologies. However, all ways of using technologies in the documentation would need to meet the definition of accessibility-supported web content technologies above.`
+    },
+    "alternative-for-time-based-media": {
+      title: "alternative for time-based media",
+      body: "document including correctly sequenced text descriptions of time-based visual and auditory information and providing a means for achieving the outcomes of any time-based interaction\nNote: A screenplay used to create the synchronized media content would meet this definition only if it was corrected to accurately represent the final synchronized media after editing."
+    },
+    "ambiguous-to-users-in-general": {
+      title: "ambiguous to users in general",
+      body: 'the purpose cannot be determined from the link and all information of the web page presented to the user simultaneously with the link (i.e., readers without disabilities would not know what a link would do until they activated it)\nExample:\nThe word guava in the following sentence "One of the notable exports is guava" is a link. The link could lead to a definition of guava, a chart listing the quantity of guava exported or a photograph of people harvesting guava. Until the link is activated, all readers are unsure and the person with a disability is not at any disadvantage.'
+    },
+    "ascii-art": {
+      title: "ASCII art",
+      body: "picture created by a spatial arrangement of characters or glyphs (typically from the 95 printable characters defined by ASCII)"
+    },
+    "assistive-technology": {
+      title: "assistive technology",
+      body: "hardware and/or software that acts as a user agent, or along with a mainstream user agent, to provide functionality to meet the requirements of users with disabilities that go beyond those offered by mainstream user agents\nNote: Functionality provided by assistive technology includes alternative presentations (e.g., as synthesized speech or magnified content), alternative input methods (e.g., voice), additional navigation or orientation mechanisms, and content transformations (e.g., to make tables more accessible).\nNote: Assistive technologies often communicate data and messages with mainstream user agents by using and monitoring APIs.\nNote: The distinction between mainstream user agents and assistive technologies is not absolute. Many mainstream user agents provide some features to assist individuals with disabilities. The basic difference is that mainstream user agents target broad and diverse audiences that usually include people with and without disabilities. Assistive technologies target narrowly defined populations of users with specific disabilities. The assistance provided by an assistive technology is more specific and appropriate to the needs of its target users. The mainstream user agent may provide important functionality to assistive technologies like retrieving web content from program objects or parsing markup into identifiable bundles.\nExample:\nAssistive technologies that are important in the context of this document include the following:\n\u2022 screen magnifiers, and other visual reading assistants, which are used by people with visual, perceptual and physical print disabilities to change text font, size, spacing, color, synchronization with speech, etc. in order to improve the visual readability of rendered text and images;\n\u2022 screen readers, which are used by people who are blind to read textual information through synthesized speech or braille;\n\u2022 text-to-speech software, which is used by some people with cognitive, language, and learning disabilities to convert text into synthetic speech;\n\u2022 speech recognition software, which may be used by people who have some physical disabilities;\n\u2022 alternative keyboards, which are used by people with certain physical disabilities to simulate the keyboard (including alternate keyboards that use head pointers, single switches, sip/puff and other special input devices.);\n\u2022 alternative pointing devices, which are used by people with certain physical disabilities to simulate mouse pointing and button activations."
+    },
+    "audio-description": {
+      title: "audio description",
+      body: 'narration added to the soundtrack to describe important visual details that cannot be understood from the main soundtrack alone\nNote: Audio description of video provides information about actions, characters, scene changes, on-screen text, and other visual content.\nNote: In standard audio description, narration is added during existing pauses in dialogue. (See also extended audio description.)\nNote: Where all of the important video information is already provided in existing audio, no additional audio description is necessary.\nNote: Also called "video description" and "descriptive narration."'
+    },
+    "audio-only": {
+      title: "audio-only",
+      body: "a time-based presentation that contains only audio (no video and no interaction)"
+    },
+    audio: {
+      title: "audio",
+      body: "the technology of sound reproduction\nNote: Audio can be created synthetically (including speech synthesis), recorded from real world sounds, or both."
+    },
+    blinking: {
+      title: "blinking",
+      body: "switch back and forth between two visual states in a way that is meant to draw attention\nNote: See also flash. It is possible for something to be large enough and blink brightly enough at the right frequency to be also classified as a flash."
+    },
+    "blocks-of-text": {
+      title: "blocks of text",
+      body: "more than one sentence of text"
+    },
+    captcha: {
+      title: "CAPTCHA",
+      body: 'initialism for "Completely Automated Public Turing test to tell Computers and Humans Apart"\nNote: CAPTCHA tests often involve asking the user to type in text that is displayed in an obscured image or audio file.\nNote: A Turing test is any system of tests designed to differentiate a human from a computer. It is named after famed computer scientist Alan Turing. The term was coined by researchers at Carnegie Mellon University.'
+    },
+    captions: {
+      title: "captions",
+      body: "synchronized visual and/or text alternative for both speech and non-speech audio information needed to understand the media content\nNote: Captions are similar to dialogue-only subtitles except captions convey not only the content of spoken dialogue, but also equivalents for non-dialogue audio information needed to understand the program content, including sound effects, music, laughter, speaker identification and location.\nNote: Closed Captions are equivalents that can be turned on and off with some players.\nNote: Open Captions are any captions that cannot be turned off. For example, if the captions are visual equivalent images of text embedded in video.\nNote: Captions should not obscure or obstruct relevant information in the video.\nNote: In some countries, captions are called subtitles.\nNote: Audio descriptions can be, but do not need to be, captioned since they are descriptions of information that is already presented visually."
+    },
+    "changes-of-context": {
+      title: "changes of context",
+      body: "major changes that, if made without user awareness, can disorient users who are not able to view the entire page simultaneously\nChanges in context include changes of:\n\u2022 user agent;\n\u2022 viewport;\n\u2022 focus;\n\u2022 content that changes the meaning of the web page\nNote: A change of content is not always a change of context. Changes in content, such as an expanding outline, dynamic menu, or a tab control do not necessarily change the context, unless they also change one of the above (e.g., focus).\nExample:\nOpening a new window, moving focus to a different component, going to a new page (including anything that would look to a user as if they had moved to a new page) or significantly re-arranging the content of a page are examples of changes of context."
+    },
+    conformance: {
+      title: "conformance",
+      body: "satisfying all the requirements of a given standard, guideline or specification"
+    },
+    "conforming-alternate-version": {
+      title: "conforming alternate version",
+      body: 'version that\n\u2022 conforms at the designated level, and\n\u2022 provides all of the same information and functionality in the same human language, and\n\u2022 is as up to date as the non-conforming content, and\n\u2022\nfor which at least one of the following is true:\n\u2022 the conforming version can be reached from the non-conforming page via an accessibility-supported mechanism, or\n\u2022 the non-conforming version can only be reached from the conforming version, or\n\u2022 the non-conforming version can only be reached from a conforming page that also provides a mechanism to reach the conforming version\nNote: In this definition, "can only be reached" means that there is some mechanism, such as a conditional redirect, that prevents a user from "reaching" (loading) the non-conforming page unless the user had just come from the conforming version.\nNote: The alternate version does not need to be matched page for page with the original (e.g., the conforming alternate version may consist of multiple pages).\nNote: If multiple language versions are available, then conforming alternate versions are required for each language offered.\nNote: Alternate versions may be provided to accommodate different technology environments or user groups. Each version should be as conformant as possible. One version would need to be fully conformant in order to meet conformance requirement 1.\nNote: The conforming alternative version does not need to reside within the scope of conformance, or even on the same website, as long as it is as freely available as the non-conforming version.\nNote: Alternate versions should not be confused with supplementary content, which support the original page and enhance comprehension.\nNote: Setting user preferences within the content to produce a conforming version is an acceptable mechanism for reaching another version as long as the method used to set the preferences is accessibility supported.\nSee Understanding Conforming Alternate Versions'
+    },
+    content: {
+      title: "content",
+      body: "information and sensory experience to be communicated to the user by means of a user agent, including code or markup that defines the content's structure, presentation, and interactions"
+    },
+    "context-sensitive-help": {
+      title: "context-sensitive help",
+      body: "help text that provides information related to the function currently being performed\nNote: Clear labels can act as context-sensitive help."
+    },
+    "contrast-ratio": {
+      title: "contrast ratio",
+      body: "(L1 + 0.05) / (L2 + 0.05), where\n\u2022 L1 is the relative luminance of the lighter of the colors, and\n\u2022 L2 is the relative luminance of the darker of the colors.\nNote: Contrast ratios can range from 1 to 21 (commonly written 1:1 to 21:1).\nNote: Because authors do not have control over user settings as to how text is rendered (for example font smoothing or anti-aliasing), the contrast ratio for text can be evaluated with anti-aliasing turned off.\nNote: For the purpose of Success Criteria 1.4.3 and 1.4.6, contrast is measured with respect to the specified background over which the text is rendered in normal usage. If no background color is specified, then white is assumed.\nNote: Background color is the specified color of content over which the text is to be rendered in normal usage. It is a failure if no background color is specified when the text color is specified, because the user's default background color is unknown and cannot be evaluated for sufficient contrast. For the same reason, it is a failure if no text color is specified when a background color is specified.\nNote: When there is a border around the letter, the border can add contrast and would be used in calculating the contrast between the letter and its background. A narrow border around the letter would be used as the letter. A wide border around the letter that fills in the inner details of the letters acts as a halo and would be considered background.\nNote: WCAG conformance should be evaluated for color pairs specified in the content that an author would expect to appear adjacent in typical presentation. Authors need not consider unusual presentations, such as color changes made by the user agent, except where caused by authors' code."
+    },
+    "correct-reading-sequence": {
+      title: "correct reading sequence",
+      body: "any sequence where words and paragraphs are presented in an order that does not change the meaning of the content"
+    },
+    emergency: {
+      title: "emergency",
+      body: "a sudden, unexpected situation or occurrence that requires immediate action to preserve health, safety, or property"
+    },
+    essential: {
+      title: "essential",
+      body: "if removed, would fundamentally change the information or functionality of the content, and information and functionality cannot be achieved in another way that would conform"
+    },
+    "extended-audio-description": {
+      title: "extended audio description",
+      body: "audio description that is added to an audiovisual presentation by pausing the video so that there is time to add additional description\nNote: This technique is only used when the sense of the video would be lost without the additional audio description and the pauses between dialogue/narration are too short."
+    },
+    flash: {
+      title: "flash",
+      body: "a pair of opposing changes in relative luminance that can cause seizures in some people if it is large enough and in the right frequency range\nNote: See general flash and red flash thresholds for information about types of flash that are not allowed.\nNote: See also blinking."
+    },
+    functionality: {
+      title: "functionality",
+      body: "processes and outcomes achievable through user action"
+    },
+    "general-flash-and-red-flash-thresholds": {
+      title: "general flash and red flash thresholds",
+      body: 'a flash or rapidly changing image sequence is below the threshold (i.e., content passes) if any of the following are true:\n\u2022 there are no more than three general flashes and / or no more than three red flashes within any one-second period; or\n\u2022 the combined area of flashes occurring concurrently occupies no more than a total of .006 steradians within any 10 degree visual field on the screen (25% of any 10 degree visual field on the screen) at typical viewing distance\nwhere:\n\u2022 A general flash is defined as a pair of opposing changes in relative luminance of 10% or more of the maximum relative luminance (1.0) where the relative luminance of the darker image is below 0.80; and where "a pair of opposing changes" is an increase followed by a decrease, or a decrease followed by an increase, and\n\u2022 A red flash is defined as any pair of opposing transitions involving a saturated red\nException: Flashing that is a fine, balanced, pattern such as white noise or an alternating checkerboard pattern with "squares" smaller than 0.1 degree (of visual field at typical viewing distance) on a side does not violate the thresholds.\nNote: For general software or web content, using a 341 x 256 pixel rectangle anywhere on the displayed screen area when the content is viewed at 1024 x 768 pixels will provide a good estimate of a 10 degree visual field for standard screen sizes and viewing distances (e.g., 15-17 inch screen at 22-26 inches). This resolution of 75 - 85 ppi is known to be lower, and thus more conservative than the nominal CSS pixel resolution of 96 ppi in CSS specifications. Higher resolutions displays showing the same rendering of the content yield smaller and safer images so it is lower resolutions that are used to define the thresholds.\nNote: A transition is the change in relative luminance (or relative luminance/color for red flashing) between adjacent peaks and valleys in a plot of relative luminance (or relative luminance/color for red flashing) measurement against time. A flash consists of two opposing transitions.\nNote: The new working definition in the field for "pair of opposing transitions involving a saturated red" (from WCAG 2.2) is a pair of opposing transitions where, one transition is either to or from a state with a value R/(R + G + B) that is greater than or equal to 0.8, and the difference between states is more than 0.2 (unitless) in the CIE 1976 UCS chromaticity diagram. [[ISO_9241-391]]\nNote: Tools are available that will carry out analysis from video screen capture. However, no tool is necessary to evaluate for this condition if flashing is less than or equal to 3 flashes in any one second. Content automatically passes (see #1 and #2 above).'
+    },
+    "human-language": {
+      title: "human language",
+      body: "language that is spoken, written or signed (through visual or tactile means) to communicate with humans\nNote: See also sign language."
+    },
+    idiom: {
+      title: "idiom",
+      body: 'phrase whose meaning cannot be deduced from the meaning of the individual words and the specific words cannot be changed without losing the meaning\nNote: Idioms cannot be translated directly, word for word, without losing their (cultural or language-dependent) meaning.\nExample:\nIn English, "spilling the beans" means "revealing a secret." However, "knocking over the beans" or "spilling the vegetables" does not mean the same thing.\nExample:\nIn Japanese, the phrase "\u3055\u3058\u3092\u6295\u3052\u308B" literally translates into "he throws a spoon," but it means that there is nothing he can do and finally he gives up.\nExample:\nIn Dutch, "Hij ging met de kippen op stok" literally translates into "He went to roost with the chickens," but it means that he went to bed early.'
+    },
+    "image-of-text": {
+      title: "image of text",
+      body: "text that has been rendered in a non-text form (e.g., an image) in order to achieve a particular visual effect\nNote: This does not include text that is part of a picture that contains significant other visual content.\nExample:\nA person's name on a nametag in a photograph."
+    },
+    informative: {
+      title: "informative",
+      body: 'for information purposes and not required for conformance\nNote: Content required for conformance is referred to as "normative."'
+    },
+    "input-error": {
+      title: "input error",
+      body: "information provided by the user that is not accepted\nThis includes:\n\u2022 Information that is required by the web page but omitted by the user\n\u2022 Information that is provided by the user but that falls outside the required data format or values"
+    },
+    jargon: {
+      title: "jargon",
+      body: "words used in a particular way by people in a particular field\nExample:\nThe word StickyKeys is jargon from the field of assistive technology/accessibility."
+    },
+    "keyboard-interface": {
+      title: "keyboard interface",
+      body: 'interface used by software to obtain keystroke input\nA keyboard interface allows users to provide keystroke input to programs even if the native technology does not contain a keyboard.\nExample:\nA touchscreen PDA has a keyboard interface built into its operating system as well as a connector for external keyboards. Applications on the PDA can use the interface to obtain keyboard input either from an external keyboard or from other applications that provide simulated keyboard output, such as handwriting interpreters or speech-to-text applications with "keyboard emulation" functionality.\nNote: Operation of the application (or parts of the application) through a keyboard-operated mouse emulator, such as MouseKeys, does not qualify as operation through a keyboard interface because operation of the program is through its pointing device interface, not through its keyboard interface.'
+    },
+    label: {
+      title: "label",
+      body: "text or other component with a text alternative that is presented to a user to identify a component within web content\nNote: A label is presented to all users whereas the name may be hidden and only exposed by assistive technology. In many (but not all) cases the name and the label are the same.\nNote: The term label is not limited to the label element in HTML."
+    },
+    "large-scale": {
+      title: "large scale",
+      body: `with at least 18 point or 14 point bold or font size that would yield equivalent size for Chinese, Japanese and Korean (CJK) fonts
+Note: Fonts with extraordinarily thin strokes or unusual features and characteristics that reduce the familiarity of their letter forms are harder to read, especially at lower contrast levels.
+Note: Font size is the size when the content is delivered. It does not include resizing that may be done by a user.
+Note: The actual size of the character that a user sees is dependent both on the author-defined size and the user's display or user agent settings. For many mainstream body text fonts, 14 and 18 point is roughly equivalent to 1.2 and 1.5 em or to 120% or 150% of the default size for body text (assuming that the body font is 100%), but authors would need to check this for the particular fonts in use. When fonts are defined in relative units, the actual point size is calculated by the user agent for display. The point size should be obtained from the user agent, or calculated based on font metrics as the user agent does, when evaluating this success criterion. Users who have low vision would be responsible for choosing appropriate settings.
+Note: When using text without specifying the font size, the smallest font size used on major browsers for unspecified text would be a reasonable size to assume for the font. If a level 1 heading is rendered in 14pt bold or higher on major browsers, then it would be reasonable to assume it is large text. Relative scaling can be calculated from the default sizes in a similar fashion.
+Note: The 18 and 14 point sizes for roman texts are taken from the minimum size for large print (14pt) and the larger standard font size (18pt). For other fonts such as CJK languages, the "equivalent" sizes would be the minimum large print size used for those languages and the next larger standard large print size.`
+    },
+    "legal-commitments": {
+      title: "legal commitments",
+      body: "transactions where the person incurs a legally binding obligation or benefit\nExample:\nA marriage license, a stock trade (financial and legal), a will, a loan, adoption, signing up for the army, a contract of any type, etc."
+    },
+    "link-purpose": {
+      title: "link purpose",
+      body: "nature of the result obtained by activating a hyperlink"
+    },
+    live: {
+      title: "live",
+      body: "information captured from a real-world event and transmitted to the receiver with no more than a broadcast delay\nNote: A broadcast delay is a short (usually automated) delay, for example used in order to give the broadcaster time to cue or censor the audio (or video) feed, but not sufficient to allow significant editing.\nNote: If information is completely computer generated, it is not live."
+    },
+    "lower-secondary-education-level": {
+      title: "lower secondary education level",
+      body: "the two or three year period of education that begins after completion of six years of school and ends nine years after the beginning of primary education\nNote: This definition is based on the International Standard Classification of Education [[UNESCO]]."
+    },
+    mechanism: {
+      title: "mechanism",
+      body: "process or technique for achieving a result\nNote: The mechanism may be explicitly provided in the content, or may be relied upon to be provided by either the platform or by user agents, including assistive technologies.\nNote: The mechanism needs to meet all success criteria for the conformance level claimed."
+    },
+    "media-alternative-for-text": {
+      title: "media alternative for text",
+      body: "media that presents no more information than is already presented in text (directly or via text alternatives)\nNote: A media alternative for text is provided for those who benefit from alternate representations of text. Media alternatives for text may be audio-only, video-only (including sign-language video), or audio-video."
+    },
+    name: {
+      title: "name",
+      body: "text by which software can identify a component within web content to the user\nNote: The name may be hidden and only exposed by assistive technology, whereas a label is presented to all users. In many (but not all) cases, the label and the name are the same.\nNote: This is unrelated to the name attribute in HTML."
+    },
+    "navigated-sequentially": {
+      title: "navigated sequentially",
+      body: "navigated in the order defined for advancing focus (from one element to the next) using a keyboard interface"
+    },
+    "non-text-content": {
+      title: "non-text content",
+      body: "any content that is not a sequence of characters that can be programmatically determined or where the sequence is not expressing something in human language\nNote: This includes ASCII art (which is a pattern of characters), emoticons, leetspeak (which uses character substitution), and images representing text"
+    },
+    normative: {
+      title: "normative",
+      body: 'required for conformance\nNote: One may conform in a variety of well-defined ways to this document.\nNote: Content identified as "informative" or "non-normative" is never required for conformance.'
+    },
+    "on-a-full-screen-window": {
+      title: "on a full-screen window",
+      body: "on the most common sized desktop/laptop display with the viewport maximized\nNote: Since people generally keep their computers for several years, it is best not to rely on the latest desktop/laptop display resolutions but to consider the common desktop/laptop display resolutions over the course of several years when making this evaluation."
+    },
+    paused: {
+      title: "paused",
+      body: "stopped by user request and not resumed until requested by user"
+    },
+    prerecorded: {
+      title: "prerecorded",
+      body: "information that is not live"
+    },
+    presentation: {
+      title: "presentation",
+      body: "rendering of the content in a form to be perceived by users"
+    },
+    "primary-education-level": {
+      title: "primary education level",
+      body: "six year time period that begins between the ages of five and seven, possibly without any previous education\nNote: This definition is based on the International Standard Classification of Education [[UNESCO]]."
+    },
+    process: {
+      title: "process",
+      body: "series of user actions where each action is required in order to complete an activity\nExample:\nSuccessful use of a series of web pages on a shopping site requires users to view alternative products, prices and offers, select products, submit an order, provide shipping information and provide payment information.\nExample:\nAn account registration page requires successful completion of a Turing test before the registration form can be accessed."
+    },
+    "programmatically-determined-link-context": {
+      title: "programmatically determined link context",
+      body: "additional information that can be programmatically determined from relationships with a link, combined with the link text, and presented to users in different modalities\nExample:\nIn HTML, information that is programmatically determinable from a link in English includes text that is in the same paragraph, list item, or table cell as the link or in a table header cell that is associated with the table cell that contains the link.\nNote: Since screen readers interpret punctuation, they can also provide the context from the current sentence, when the focus is on a link in that sentence."
+    },
+    "programmatically-determined": {
+      title: "programmatically determined",
+      body: "determined by software from author-supplied data provided in a way that different user agents, including assistive technologies, can extract and present this information to users in different modalities\nExample:\nDetermined in a markup language from elements and attributes that are accessed directly by commonly available assistive technology.\nExample:\nDetermined from technology-specific data structures in a non-markup language and exposed to assistive technology via an accessibility API that is supported by commonly available assistive technology."
+    },
+    "programmatically-set": {
+      title: "programmatically set",
+      body: "set by software using methods that are supported by user agents, including assistive technologies"
+    },
+    "pure-decoration": {
+      title: "pure decoration",
+      body: "serving only an aesthetic purpose, providing no information, and having no functionality\nNote: Text is only purely decorative if the words can be rearranged or substituted without changing their purpose.\nExample:\nThe cover page of a dictionary has random words in very light text in the background."
+    },
+    "real-time-event": {
+      title: "real-time event",
+      body: "event that a) occurs at the same time as the viewing and b) is not completely generated by the content\nExample:\nA Webcast of a live performance (occurs at the same time as the viewing and is not prerecorded).\nExample:\nAn on-line auction with people bidding (occurs at the same time as the viewing).\nExample:\nLive humans interacting in a virtual world using avatars (is not completely generated by the content and occurs at the same time as the viewing)."
+    },
+    relationships: {
+      title: "relationships",
+      body: "meaningful associations between distinct pieces of content"
+    },
+    "relative-luminance": {
+      title: "relative luminance",
+      body: 'the relative brightness of any point in a colorspace, normalized to 0 for darkest black and 1 for lightest white\nFor the sRGB colorspace, the relative luminance of a color is defined as L = 0.2126 * R + 0.7152 * G + 0.0722 * B where R, G and B are defined as:\n\u2022 if RsRGB <= 0.04045 then R = RsRGB/12.92 else R = ((RsRGB+0.055)/1.055) ^ 2.4\n\u2022 if GsRGB <= 0.04045 then G = GsRGB/12.92 else G = ((GsRGB+0.055)/1.055) ^ 2.4\n\u2022 if BsRGB <= 0.04045 then B = BsRGB/12.92 else B = ((BsRGB+0.055)/1.055) ^ 2.4\nand RsRGB, GsRGB, and BsRGB are defined as:\n\u2022 RsRGB = R8bit/255\n\u2022 GsRGB = G8bit/255\n\u2022 BsRGB = B8bit/255\nThe "^" character is the exponentiation operator. (Formula taken from [[SRGB]].)\nNote: Before May 2021 the value of 0.04045 in the definition was different (0.03928). It was taken from an older version of the specification and has been updated. It has no practical effect on the calculations in the context of these guidelines.\nNote: Almost all systems used today to view web content assume sRGB encoding. Unless it is known that another color space will be used to process and display the content, authors should evaluate using sRGB colorspace. If using other color spaces, see Understanding Success Criterion 1.4.3.\nNote: If dithering occurs after delivery, then the source color value is used. For colors that are dithered at the source, the average values of the colors that are dithered should be used (average R, average G, and average B).\nNote: Tools are available that automatically do the calculations when testing contrast and flash.\nNote: A separate page giving the relative luminance definition using MathML to display the formulas is available.'
+    },
+    "relied-upon": {
+      title: "relied upon",
+      body: "the content would not conform if that technology is turned off or is not supported"
+    },
+    role: {
+      title: "role",
+      body: "text or number by which software can identify the function of a component within web content\nExample:\nA number that indicates whether an image functions as a hyperlink, command button, or check box."
+    },
+    "same-functionality": {
+      title: "same functionality",
+      body: 'same result when used\nExample:\nA submit "search" button on one web page and a "find" button on another web page may both have a field to enter a term and list topics in the website related to the term submitted. In this case, they would have the same functionality but would not be labeled consistently.'
+    },
+    "same-relative-order": {
+      title: "same relative order",
+      body: "same position relative to other items\nNote: Items are considered to be in the same relative order even if other items are inserted or removed from the original order. For example, expanding navigation menus may insert an additional level of detail or a secondary navigation section may be inserted into the reading order."
+    },
+    "satisfies-a-success-criterion": {
+      title: "satisfies a success criterion",
+      body: "the success criterion does not evaluate to 'false' when applied to the page"
+    },
+    section: {
+      title: "section",
+      body: "a self-contained portion of written content that deals with one or more related topics or thoughts\nNote: A section may consist of one or more paragraphs and include graphics, tables, lists and sub-sections."
+    },
+    "set-of-web-pages": {
+      title: "set of web pages",
+      body: "collection of web pages that share a common purpose and that are created by the same author, group or organization\nExample:\nExamples include:\n\u2022 a publication which is split across multiple web pages, where each page contains one chapter or other significant section of the work. The publication is logically a single contiguous unit, and contains navigation features that enable access to the full set of pages.\n\u2022 an e-commerce website shows products in a set of web pages that all share the same navigation and identification. However, when progressing to the checkout process, the template changes; the navigation and other elements are removed, so the pages in that process are functionally and visually different. The checkout pages are not part of the set of product pages.\n\u2022 a blog on a sub-domain (e.g. blog.example.com) which has a different navigation and is authored by a distinct set of people from the pages on the primary domain (example.com).\nNote: Different language versions would be considered different sets of web pages."
+    },
+    "sign-language-interpretation": {
+      title: "sign language interpretation",
+      body: "translation of one language, generally a spoken language, into a sign language\nNote: True sign languages are independent languages that are unrelated to the spoken language(s) of the same country or region."
+    },
+    "sign-language": {
+      title: "sign language",
+      body: "a language using combinations of movements of the hands and arms, facial expressions, or body positions to convey meaning"
+    },
+    "specific-sensory-experience": {
+      title: "specific sensory experience",
+      body: "a sensory experience that is not purely decorative and does not primarily convey important information or perform a function\nExample:\nExamples include a performance of a flute solo, works of visual art etc."
+    },
+    structure: {
+      title: "structure",
+      body: "\u2022 The way the parts of a web page are organized in relation to each other; and\n\u2022 The way a collection of web pages is organized"
+    },
+    "supplemental-content": {
+      title: "supplemental content",
+      body: "additional content that illustrates or clarifies the primary content\nExample:\nAn audio version of a web page.\nExample:\nAn illustration of a complex process.\nExample:\nA paragraph summarizing the major outcomes and recommendations made in a research study."
+    },
+    "synchronized-media": {
+      title: "synchronized media",
+      body: "audio or video synchronized with another format for presenting information and/or with time-based interactive components, unless the media is a media alternative for text that is clearly labeled as such"
+    },
+    technology: {
+      title: "technology",
+      body: 'mechanism for encoding instructions to be rendered, played or executed by user agents\nNote: As used in these guidelines "web technology" and the word "technology" (when used alone) both refer to web content technologies.\nNote: Web content technologies may include markup languages, data formats, or programming languages that authors may use alone or in combination to create end-user experiences that range from static web pages to synchronized media presentations to dynamic web applications.\nExample:\nSome common examples of web content technologies include HTML, CSS, SVG, PNG, PDF, Flash, and JavaScript.'
+    },
+    "text-alternative": {
+      title: "text alternative",
+      body: "Text that is programmatically associated with non-text content or referred to from text that is programmatically associated with non-text content. Programmatically associated text is text whose location can be programmatically determined from the non-text content.\nExample:\nAn image of a chart is described in text in the paragraph after the chart. The short text alternative for the chart indicates that a description follows.\nNote: Refer to Understanding Text Alternatives for more information."
+    },
+    text: {
+      title: "text",
+      body: "sequence of characters that can be programmatically determined, where the sequence is expressing something in human language"
+    },
+    "used-in-an-unusual-or-restricted-way": {
+      title: "used in an unusual or restricted way",
+      body: 'words used in such a way that requires users to know exactly which definition to apply in order to understand the content correctly\nExample:\nThe term "gig" means something different if it occurs in a discussion of music concerts than it does in article about computer hard drive space, but the appropriate definition can be determined from context. By contrast, the word "text" is used in a very specific way in WCAG 2, so a definition is supplied in the glossary.'
+    },
+    "user-agent": {
+      title: "user agent",
+      body: "any software that retrieves and presents web content for users\nExample:\nWeb browsers, media players, plug-ins, and other programs \u2014 including assistive technologies \u2014 that help in retrieving, rendering, and interacting with web content."
+    },
+    "user-controllable": {
+      title: "user-controllable",
+      body: "data that is intended to be accessed by users\nNote: This does not refer to such things as Internet logs and search engine monitoring data.\nExample:\nName and address fields for a user's account."
+    },
+    "user-interface-component": {
+      title: "user interface component",
+      body: 'a part of the content that is perceived by users as a single control for a distinct function\nNote: Multiple user interface components may be implemented as a single programmatic element. "Components" here is not tied to programming techniques, but rather to what the user perceives as separate controls.\nNote: User interface components include form elements and links as well as components generated by scripts.\nNote: What is meant by "component" or "user interface component" here is also sometimes called "user interface element".\nExample:\nAn applet has a "control" that can be used to move through content by line or page or random access. Since each of these would need to have a name and be settable independently, they would each be a "user interface component."'
+    },
+    "video-only": {
+      title: "video-only",
+      body: "a time-based presentation that contains only video (no audio and no interaction)"
+    },
+    video: {
+      title: "video",
+      body: "the technology of moving or sequenced pictures or images\nNote: Video can be made up of animated or photographic images, or both."
+    },
+    viewport: {
+      title: "viewport",
+      body: "object in which the user agent presents content\nNote: The user agent presents content through one or more viewports. Viewports include windows, frames, loudspeakers, and virtual magnifying glasses. A viewport may contain another viewport (e.g., nested frames). Interface components created by the user agent such as prompts, menus, and alerts are not viewports.\nNote: This definition is based on User Agent Accessibility Guidelines 1.0 Glossary [[UAAG10]]."
+    },
+    "visually-customized": {
+      title: "visually customized",
+      body: "the font, size, color, and background can be set"
+    },
+    "web-page": {
+      title: "web page",
+      body: 'a non-embedded resource obtained from a single URI using HTTP plus any other resources that are used in the rendering or intended to be rendered together with it by a user agent\nNote: Although any "other resources" would be rendered together with the primary resource, they would not necessarily be rendered simultaneously with each other.\nNote: For the purposes of conformance with these guidelines, a resource must be "non-embedded" within the scope of conformance to be considered a web page.\nExample:\nA web resource including all embedded images and media.\nExample:\nA web mail program built using Asynchronous JavaScript and XML (AJAX). The program lives entirely at http://example.com/mail, but includes an inbox, a contacts area and a calendar. Links or buttons are provided that cause the inbox, contacts, or calendar to display, but do not change the URI of the page as a whole.\nExample:\nA customizable portal site, where users can choose content to display from a set of different content modules.\nExample:\nWhen you enter "http://shopping.example.com/" in your browser, you enter a movie-like interactive shopping environment where you visually move around in a store dragging products off of the shelves around you and into a visual shopping cart in front of you. Clicking on a product causes it to be demonstrated with a specification sheet floating alongside. This might be a single-page website or just one page within a website.'
+    },
+    "css-pixel": {
+      title: "CSS pixel",
+      body: "visual angle of about 0.0213 degrees\nA CSS pixel is the canonical unit of measure for all lengths and measurements in CSS. This unit is density-independent, and distinct from actual hardware pixels present in a display. User agents and operating systems should ensure that a CSS pixel is set as closely as possible to the CSS Values and Units Module Level 3 reference pixel [[css3-values]], which takes into account the physical dimensions of the display and the assumed viewing distance (factors that cannot be determined by content authors)."
+    },
+    "down-event": {
+      title: "down-event",
+      body: 'platform event that occurs when the trigger stimulus of a pointer is depressed\nThe down-event may have different names on different platforms, such as "touchstart" or "mousedown".'
+    },
+    "keyboard-shortcut": {
+      title: "keyboard shortcut",
+      body: "alternative means of triggering an action by the pressing of one or more keys"
+    },
+    "motion-animation": {
+      title: "motion animation",
+      body: "addition of steps between conditions to create the illusion of movement or to give a sense of a smooth transition\nExample:\nFor example, an element which moves into place or changes size while appearing is considered to be animated. An element which appears or changes instantly, without transition/animation steps, is not using animation.\nMotion animation does not include changes \u2013 such as changes of color or opacity \u2013 that do not alter the perceived size, shape, position, or distance/depth of the element to the viewer."
+    },
+    "pointer-input": {
+      title: "pointer input",
+      body: 'input from a device that can target a specific coordinate (or set of coordinates) on a screen, such as a mouse, pen, or touch contact\nNote: See the Pointer Events definition for "pointer" [[pointerevents]].'
+    },
+    region: {
+      title: "region",
+      body: "perceivable, programmatically determined section of content\nNote: In HTML, any area designated with a landmark role would be a region."
+    },
+    "single-pointer": {
+      title: "single pointer",
+      body: "an input modality that only targets a single point on the page/screen at a time \u2013 such as a mouse, single finger on a touch screen, or stylus\nNote: Single pointer interactions include clicks, double clicks, taps, dragging motions, and single-finger swipe gestures. In contrast, multipoint interactions involve the use of two or more pointers at the same time, such as two-finger interactions on a touchscreen, or the simultaneous use of a mouse and stylus."
+    },
+    state: {
+      title: "state",
+      body: "dynamic property expressing characteristics of a user interface component that may change in response to user action or automated processes\nStates do not affect the nature of the component, but represent data associated with the component or user interaction possibilities. Examples include focus, hover, select, press, check, visited/unvisited, and expand/collapse."
+    },
+    "status-message": {
+      title: "status message",
+      body: "change in content that is not a change of context, and that provides information to the user on the success or results of an action, on the waiting state of an application, on the progress of a process, or on the existence of errors"
+    },
+    "style-property": {
+      title: "style property",
+      body: "property whose value determines the presentation (e.g. font, color, size, location, padding, volume, synthesized speech prosody) of content elements as they are rendered (e.g. onscreen, via loudspeaker, via braille display) by user agents\nStyle properties can have several origins:\n\u2022 User agent default styles: The default style property values applied in the absence of any author or user styles. Some web content technologies specify a default rendering, others do not;\n\u2022 Author styles: Style property values that are set by the author as part of the content (e.g. in-line styles, author style sheets);\n\u2022 User styles: Style property values that are set by the user (e.g. via user agent interface settings, user style sheets)"
+    },
+    target: {
+      title: "target",
+      body: "region of the display that will accept a pointer action, such as the interactive area of a user interface component\nNote: If two or more targets are overlapping, the overlapping area should not be included in the measurement of the target size, except when the overlapping targets perform the same action or open the same page."
+    },
+    "up-event": {
+      title: "up-event",
+      body: 'platform event that occurs when the trigger stimulus of a pointer is released\nThe up-event may have different names on different platforms, such as "touchend" or "mouseup".'
+    },
+    "user-inactivity": {
+      title: "user inactivity",
+      body: "any continuous period of time where no user actions occur\nThe method of tracking will be determined by the website or application."
+    },
+    "cognitive-function-test": {
+      title: "cognitive function test",
+      body: "cognitive function test\nA task that requires the user to remember, manipulate, or transcribe information. Examples include, but are not limited to:\n\u2022 memorization, such as remembering a username, password, set of characters, images, or patterns. The common identifiers name, email, and phone number are not considered cognitive function tests as they are personal to the user and consistent across websites;\n\u2022 transcription, such as typing in characters;\n\u2022 use of correct spelling;\n\u2022 performance of calculations;\n\u2022 solving of puzzles."
+    },
+    "dragging-movement": {
+      title: "dragging movement",
+      body: "dragging movement\nan operation where the pointer engages with an element on the down-event and the element (or a representation of its position) follows the pointer until an up-event\nNote: Examples of draggable elements include list items, text elements, and images."
+    },
+    "focus-indicator": {
+      title: "focus indicator",
+      body: "focus indicator\npixels that are changed to visually indicate when a user interface component is in a focused state"
+    },
+    "minimum-bounding-box": {
+      title: "minimum bounding box",
+      body: "minimum bounding box\nthe smallest enclosing rectangle aligned to the horizontal axis within which all the points of a shape lie. For components which wrap onto multiple lines as part of a sentence or block of text (such as hypertext links), the bounding box is based on how the component would appear on a single line."
+    },
+    perimeter: {
+      title: "perimeter",
+      body: "perimeter\ncontinuous line forming the boundary of a shape not including shared pixels, or the minimum bounding box, whichever is shortest\nExample:\nThe perimeter calculation for a 2 CSS pixel perimeter around a rectangle is 4h+4w, where h is the height and w is the width. For a 2 CSS pixel perimeter around a circle it is 4\u{1D70B}r."
+    }
+  },
+  glossaryFr: {
+    abbreviations: {
+      title: "abr\xE9viation",
+      body: "forme abr\xE9g\xE9e d\u2019un mot, d\u2019une expression ou d\u2019un nom lorsque l\u2019abr\xE9viation ne fait pas encore partie de la langue courante\nNote : Ceci comprend les sigles et les acronymes form\xE9s \xE0 partir des initiales des mots o\xF9 :\n\u2022\nles sigles sont une forme abr\xE9g\xE9e d\u2019un nom ou d\u2019une expression constitu\xE9e des lettres initiales des mots ou des syllabes contenues dans ce nom ou cette expression.\nNote : Ne sont pas d\xE9finies dans toutes les langues.\nExemple 1\nSNCF est le sigle de la Soci\xE9t\xE9 nationale des chemins de fer fran\xE7ais.\nExemple 2\nESP est le sigle, en anglais, de extrasensory perception, la perception extrasensorielle.\n\u2022\nles acronymes sont des abr\xE9viations form\xE9es \xE0 partir des premi\xE8res lettres ou des parties d\u2019autres mots (dans un nom ou une expression) et qui peuvent \xEAtre prononc\xE9s comme un mot.\nExemple 3\nONU est un acronyme constitu\xE9 des premi\xE8res lettres de Organisation des Nations unies.\nNote : Quelques soci\xE9t\xE9s ont adopt\xE9 ce qui constituait un sigle ou un acronyme comme nom de leur soci\xE9t\xE9. Dans un tel cas, le nouveau nom de la soci\xE9t\xE9 est constitu\xE9 des lettres (par exemple, Ecma) et le mot n\u2019est plus alors consid\xE9r\xE9 comme une abr\xE9viation."
+    },
+    "user-agents": {
+      title: "agent utilisateur",
+      body: "tout logiciel qui r\xE9cup\xE8re et pr\xE9sente le contenu Web aux utilisateurs\nExemple\nLes navigateurs Web, les lecteurs de m\xE9dia, les modules d\u2019extensions et les autres programmes \u2014 dont les technologies d\u2019assistance \u2014 qui aident \xE0 r\xE9cup\xE9rer, restituer et interagir avec le contenu Web."
+    },
+    "large-scale": {
+      title: "(texte) agrandi",
+      body: "avec au minimum 18 points ou 14 points gras ou une taille de caract\xE8re \xE9quivalente pour les polices chinoises, japonaises ou cor\xE9ennes (CJK)\nNote : Les polices avec des traits extraordinairement fins ou des aspects et des caract\xE9ristiques inhabituels qui r\xE9duisent la reconnaissance de la forme des lettres sont plus difficiles \xE0 lire, sp\xE9cialement \xE0 des niveaux de contrastes bas.\nNote : La taille de caract\xE8re est la taille lorsque le contenu est affich\xE9. Cela n\u2019inclut pas le redimensionnement qui pourrait \xEAtre fait par l\u2019utilisateur.\nNote : La taille r\xE9elle des caract\xE8res qu\u2019un utilisateur voit est d\xE9pendante \xE0 la fois de la d\xE9finition de la taille faite par l\u2019auteur, du p\xE9riph\xE9rique de restitution de l\u2019utilisateur ou du param\xE9trage de l\u2019agent utilisateur. Pour la majorit\xE9 des polices de corps de texte, 14 et 18 points est sensiblement \xE9quivalent \xE0 1,2 et 1,5 em ou \xE0 120% et 150% de la taille par d\xE9faut du corps de texte (en consid\xE9rant que la police de corps est \xE0 100%), mais les auteurs seraient tenus de v\xE9rifier cela pour les polices particuli\xE8res qui seraient utilis\xE9es. Quand les polices sont d\xE9finies en unit\xE9s relatives, la taille r\xE9elle du point est mesur\xE9e par l\u2019agent utilisateur pour l\u2019affichage. La taille d\u2019un point doit \xEAtre obtenue aupr\xE8s de l\u2019agent utilisateur ou calcul\xE9e sur la m\xEAme base de mesure que celle de l\u2019agent utilisateur, lors de l\u2019\xE9valuation de ce crit\xE8re de succ\xE8s. Les utilisateurs qui ont une basse vision auront \xE0 choisir les param\xE8tres appropri\xE9s.\nNote : Lors de l\u2019utilisation de texte sans sp\xE9cification de taille de caract\xE8re, la taille la plus petite utilis\xE9e dans les principaux navigateurs pour le texte dont la taille n\u2019est pas sp\xE9cifi\xE9e serait consid\xE9r\xE9e comme une taille raisonnable pour la police. Si un titre de niveau 1 est restitu\xE9 en 14pt gras ou plus sur les principaux navigateurs, alors il est raisonnable de consid\xE9rer qu\u2019il s\u2019agit de texte agrandi. Le redimensionnement relatif peut \xEAtre calcul\xE9 de mani\xE8re identique \xE0 partir de la taille par d\xE9faut.\nNote : La taille 18 ou 14 points pour les textes en alphabet latin est d\xE9finie \xE0 partir de la taille minimum pour les grands caract\xE8res (14pt) et de la taille standard plus grande (18pt). Pour les autres polices telles que les langues CJK, les tailles \xAB \xE9quivalentes \xBB seraient la taille de grand caract\xE8re minimum utilis\xE9e pour ces langues et la taille de grands caract\xE8res plus grande suivante."
+    },
+    "context-sensitive-help": {
+      title: "aide contextuelle",
+      body: "texte d\u2019aide qui fournit des informations relatives \xE0 la fonction actuellement utilis\xE9e\nNote : Des \xE9tiquettes claires peuvent jouer le r\xF4le d\u2019aide contextuelle."
+    },
+    "ambiguous-to-users-in-general": {
+      title: "ambigu pour tout utilisateur",
+      body: "l\u2019intention ne peut \xEAtre d\xE9termin\xE9e \xE0 partir du lien et de toute l\u2019information de la page Web pr\xE9sent\xE9e \xE0 l\u2019utilisateur en m\xEAme temps que ce lien (c\u2019est-\xE0-dire qu\u2019un lecteur sans limitations fonctionnelles ne conna\xEEtrait pas la fonction d\u2019un lien avant de l\u2019activer)\nExemple\nLe mot goyave dans la phrase suivante utilis\xE9 comme lien : \xAB L\u2019une des exportations importantes est la goyave \xBB. Ce lien pourrait conduire \xE0 une d\xE9finition de la goyave, \xE0 un graphe pr\xE9sentant une liste des quantit\xE9s de goyave export\xE9es ou \xE0 une photo de gens r\xE9coltant la goyave. Jusqu\u2019\xE0 ce que le lien soit activ\xE9, tout utilisateur est dans l\u2019incertitude et une personne handicap\xE9e n\u2019est donc pas d\xE9savantag\xE9e."
+    },
+    "motion-animation": {
+      title: "animation bas\xE9e sur le mouvement",
+      body: "ajout d\u2019\xE9tapes entre des \xE9tats pour cr\xE9er l\u2019illusion de mouvement ou pour donner l\u2019impression d\u2019une transition fluide\nExemple\nPar exemple, un \xE9l\xE9ment qui se d\xE9place ou change de taille lors de son apparition est consid\xE9r\xE9 comme anim\xE9. Un \xE9l\xE9ment qui appara\xEEt instantan\xE9ment sans transition n\u2019est pas consid\xE9r\xE9 comme anim\xE9. L\u2019animation bas\xE9e sur le mouvement ne comprend pas les changements de couleur, d\u2019effet de flou ou d\u2019opacit\xE9 qui ne modifient pas la taille, la forme ou la position per\xE7ues de l\u2019\xE9l\xE9ment."
+    },
+    "ascii-art": {
+      title: "art ASCII",
+      body: "dessin cr\xE9\xE9 par une disposition spatiale de caract\xE8res ou glyphes (habituellement \xE0 partir des 95 caract\xE8res imprimables d\xE9finis en ASCII)"
+    },
+    audio: {
+      title: "audio",
+      body: "la technologie de reproduction des sons\nNote : Le son peut \xEAtre cr\xE9\xE9 de fa\xE7on synth\xE9tique (y compris la synth\xE8se vocale), \xEAtre enregistr\xE9 \xE0 partir de sons r\xE9els ou les deux."
+    },
+    "audio-descriptions": {
+      title: "audio-description",
+      body: "narration ajout\xE9e \xE0 une piste sonore pour d\xE9crire les d\xE9tails visuels importants qui ne peuvent \xEAtre compris \xE0 partir de la piste sonore principale seulement\nNote : L\u2019audio-description d\u2019une vid\xE9o fournit de l\u2019information \xE0 propos des actions, des personnages, des changements de sc\xE8nes, du texte apparaissant \xE0 l\u2019\xE9cran et d\u2019autres contenus visuels.\nNote : Dans une audio-description standard, la narration est ajout\xE9e durant les pauses qui existent dans le dialogue. (Voir aussi audio-description \xE9tendue.)\nNote : Lorsque toute l\u2019information de la vid\xE9o est d\xE9j\xE0 donn\xE9e dans la piste audio, aucune audio-description suppl\xE9mentaire n\u2019est requise.\nNote : Aussi nomm\xE9e \xAB vid\xE9o-description \xBB et \xAB narration descriptive \xBB."
+    },
+    "extended-audio-description": {
+      title: "audio-description \xE9tendue",
+      body: "audio-description ajout\xE9e \xE0 une pr\xE9sentation audiovisuelle en mettant en pause la vid\xE9o de mani\xE8re \xE0 avoir le temps d\u2019ajouter des descriptions suppl\xE9mentaires\nNote : cette technique est \xE0 utiliser seulement si le sens de la vid\xE9o est perdu sans audio-description suppl\xE9mentaire et que les pauses entre les dialogues ou la narration sont trop courtes."
+    },
+    "blocks-of-text": {
+      title: "blocs de texte",
+      body: "plus d\u2019une phrase de texte"
+    },
+    "bounding-boxes": {
+      title: "bo\xEEte de d\xE9limitation minimale",
+      body: "le plus petit rectangle englobant align\xE9 sur l\u2019axe horizontal \xE0 l\u2019int\xE9rieur duquel se trouvent tous les points d\u2019une forme. Pour les composants qui s\u2019\xE9tendent sur plusieurs lignes dans le cadre d\u2019une phrase ou d\u2019un bloc de texte (comme les liens hypertextes), la bo\xEEte de d\xE9limitation est d\xE9termin\xE9e par la fa\xE7on dont le composant appara\xEEtrait sur une seule ligne."
+    },
+    captcha: {
+      title: "CAPTCHA",
+      body: "sigle de \xAB Completely Automated Public Turing test to tell Computers and Humans Apart \xBB (test public de Turing enti\xE8rement automatique ayant pour but de distinguer les humains des ordinateurs)\nNote : Les tests de type CAPTCHA demandent souvent \xE0 l\u2019utilisateur de taper un texte pr\xE9sent\xE9 dans une image ou un extrait audio d\xE9form\xE9s.\nNote : Un test de Turing est tout syst\xE8me de tests con\xE7u pour distinguer un humain d\u2019un ordinateur. Il est nomm\xE9 en l\u2019honneur du c\xE9l\xE8bre informaticien Alan Turing. Ce terme a \xE9t\xE9 popularis\xE9 par les chercheurs de l\u2019Universit\xE9 Carnegie Mellon."
+    },
+    "change-of-context": {
+      title: "changements de contexte",
+      body: "changements majeurs qui, s\u2019ils sont faits sans que l\u2019utilisateur en soit conscient, peuvent d\xE9sorienter les utilisateurs qui ne peuvent voir l\u2019ensemble de la page en m\xEAme temps\nLes changements de contexte comprennent les changements de :\n\u2022 agent utilisateur ;\n\u2022 espace de restitution ;\n\u2022 focus ;\n\u2022 contenu qui modifie la signification de la page Web.\nNote : Un changement de contenu n\u2019est pas toujours un changement de contexte. Un changement dans le contenu comme le d\xE9ploiement d\u2019une arborescence, un menu dynamique ou un d\xE9placement de tabulation ne change pas n\xE9cessairement le contexte \xE0 moins qu\u2019il ne change aussi l\u2019un des \xE9l\xE9ments \xE9num\xE9r\xE9s ci-dessus (par exemple le focus).\nExemple\nL\u2019ouverture d\u2019une nouvelle fen\xEAtre, le d\xE9placement du focus sur un composant diff\xE9rent, le d\xE9placement vers une nouvelle page (y compris tout ce qui, pour l\u2019utilisateur, aurait l\u2019air d\u2019un d\xE9placement vers une autre page) ou la r\xE9organisation significative du contenu d\u2019une page sont autant d\u2019exemples d\u2019un changement de contexte."
+    },
+    targets: {
+      title: "cible",
+      body: "zone du dispositif d\u2019affichage qui re\xE7oit l\u2019action d\u2019un pointeur, telle que la zone interactive d\u2019un composant d\u2019interface utilisateur\nNote : Si deux cibles ou plus se chevauchent, la zone de chevauchement ne devrait pas \xEAtre incluse dans la mesure de la taille de la cible, sauf si les cibles qui se chevauchent ex\xE9cutent la m\xEAme action ou ouvrent la m\xEAme page."
+    },
+    blinking: {
+      title: "clignotement",
+      body: "alternance entre deux \xE9tats visuels d\u2019une fa\xE7on qui veut attirer l\u2019attention\nNote : Voir aussi flash. Il est possible que quelque chose soit suffisamment gros et clignote de fa\xE7on suffisamment lumineuse \xE0 la fr\xE9quence appropri\xE9e pour \xEAtre aussi consid\xE9r\xE9 comme un flash."
+    },
+    "accessibility-supported": {
+      title: "compatible avec l\u2019accessibilit\xE9",
+      body: "compatible avec les technologies d\u2019assistance des utilisateurs ainsi qu\u2019avec les fonctions d\u2019accessibilit\xE9 des navigateurs et des autres agents utilisateurs\nPour que l\u2019utilisation d\u2019une technologie Web (ou d\u2019une fonctionnalit\xE9 d\u2019une technologie) soit consid\xE9r\xE9e comme compatible avec l\u2019accessibilit\xE9, les conditions 1 et 2 doivent toutes deux \xEAtre respect\xE9es pour une technologie Web (ou pour une fonctionnalit\xE9 d\u2019une technologie) :\n\u2022\nLa fa\xE7on dont la technologie Web est utilis\xE9e doit \xEAtre compatible avec les technologies d\u2019assistance des utilisateurs. Cela signifie que la fa\xE7on dont la technologie est utilis\xE9e a \xE9t\xE9 test\xE9e dans une perspective d\u2019interop\xE9rabilit\xE9 avec des utilisateurs des technologies d\u2019assistance dans la ou les langues du contenu ;\nET\n\u2022\nLa technologie Web doit fonctionner avec des agents utilisateurs qui sont compatibles avec l\u2019accessibilit\xE9 et qui sont \xE0 la disposition des utilisateurs. Cela signifie qu\u2019au moins une des quatre affirmations suivantes est vraie :\n\u2022\nLa technologie fonctionne de fa\xE7on native dans des agents utilisateurs largement distribu\xE9s qui sont eux-m\xEAmes compatibles avec l\u2019accessibilit\xE9 (comme HTML et CSS) ;\nOU\n\u2022\nLa technologie fonctionne avec un module d\u2019extension largement distribu\xE9 et qui est lui-m\xEAme compatible avec l\u2019accessibilit\xE9 ;\nOU\n\u2022\nLe contenu est disponible dans un environnement ferm\xE9 comme le r\xE9seau d\u2019une universit\xE9 ou d\u2019une entreprise o\xF9 l\u2019agent utilisateur requis par la technologie et utilis\xE9 par l\u2019organisation est lui-m\xEAme compatible avec l\u2019accessibilit\xE9 ;\nOU\n\u2022\nLes agents utilisateurs avec lesquels fonctionne la technologie sont compatibles avec l\u2019accessibilit\xE9 et sont disponibles en t\xE9l\xE9chargement ou \xE0 l\u2019achat d\u2019une fa\xE7on qui :\n\u2022 ne co\xFBte pas plus cher \xE0 une personne handicap\xE9e qu\u2019\xE0 une personne sans limitations fonctionnelles et\n\u2022 est aussi facile \xE0 trouver et \xE0 obtenir par une personne handicap\xE9e qu\u2019elle l\u2019est pour une personne sans limitations fonctionnelles.\nNote : Le groupe de travail sur les r\xE8gles d\u2019accessibilit\xE9 (AG WG) et le W3C ne pr\xE9cisent pas quel niveau de compatibilit\xE9 avec les technologies d\u2019assistance une technologie Web particuli\xE8re doit avoir pour \xEAtre consid\xE9r\xE9e comme compatible avec l\u2019accessibilit\xE9. Voir le niveau de compatibilit\xE9 avec les technologies d\u2019assistance n\xE9cessaire \xE0 la \xAB compatibilit\xE9 avec l\u2019accessibilit\xE9 \xBB (en anglais).\nNote : Les technologies Web peuvent \xEAtre utilis\xE9es d\u2019une mani\xE8re qui n\u2019est pas compatible avec l\u2019accessibilit\xE9 tant que l\u2019utilisation du contenu n\u2019en d\xE9pend pas et que la page dans son ensemble satisfait aux exigences de conformit\xE9, incluant l\u2019exigence de conformit\xE9 4 et l\u2019exigence de conformit\xE9 5.\nNote : Quand une technologie Web est utilis\xE9e d\u2019une mani\xE8re qui est \xAB compatible avec l\u2019accessibilit\xE9 \xBB, cela n\u2019implique pas que toute la technologie ou que tous les usages de cette technologie sont compatibles. La plupart des technologies, y compris HTML, comportent une fonction ou un usage qui n\u2019est pas compatible. Les pages sont conformes aux WCAG seulement si les usages de la technologie qui sont compatibles avec l\u2019accessibilit\xE9 sont les seuls dont d\xE9pend l\u2019utilisation du contenu et que ces usages permettent de satisfaire aux exigences des WCAG.\nNote : Lorsqu\u2019une technologie Web est cit\xE9e et qu\u2019elle se pr\xE9sente en plusieurs versions, la ou les versions compatibles devraient \xEAtre sp\xE9cifi\xE9es.\nNote : Pour les auteurs, une fa\xE7on de rep\xE9rer les usages d\u2019une technologie qui sont compatibles avec l\u2019accessibilit\xE9 consisterait \xE0 consulter la compilation des usages qui sont document\xE9s comme compatibles avec l\u2019accessibilit\xE9. Voir Comprendre les usages des technologies compatibles avec l\u2019accessibilit\xE9 (en anglais). Les auteurs, les soci\xE9t\xE9s, les vendeurs de technologies ou n\u2019importe qui d\u2019autre peuvent documenter les usages des technologies qui sont compatibles avec l\u2019accessibilit\xE9. Toutefois, tous les usages des technologies document\xE9s devraient satisfaire \xE0 la d\xE9finition des technologies Web compatibles avec l\u2019accessibilit\xE9 telle qu\u2019elle est \xE9nonc\xE9e ci-dessus."
+    },
+    "user-interface-components": {
+      title: "composant d\u2019interface utilisateur",
+      body: "partie du contenu qui est per\xE7ue par les utilisateurs comme un \xE9l\xE9ment de contr\xF4le unique pour une fonction distincte\nNote : Plusieurs composants d\u2019interface utilisateur peuvent \xEAtre impl\xE9ment\xE9s au sein d\u2019un seul programme. La notion de composant n\u2019est pas li\xE9e ici aux techniques de programmation, mais plut\xF4t \xE0 ce que les utilisateurs per\xE7oivent comme des \xE9l\xE9ments de contr\xF4le distincts.\nNote : Les composants d\u2019interface utilisateur incluent les \xE9l\xE9ments de formulaire et les liens aussi bien que des composants g\xE9n\xE9r\xE9s par scripts.\nNote : Les termes \xAB composant \xBB ou \xAB composant d\u2019interface utilisateur \xBB sont aussi parfois d\xE9sign\xE9s par \xAB \xE9l\xE9ment d\u2019interface utilisateur \xBB.\nExemple\nUn microprogramme (applet) dispose d\u2019un \xAB \xE9l\xE9ment de contr\xF4le \xBB permettant de se d\xE9placer dans le contenu ligne par ligne, page par page ou au hasard. Puisque chacune de ces fonctions devrait avoir un nom et fonctionner ind\xE9pendamment, elles constitueraient chacune un \xAB composant d\u2019interface utilisateur \xBB."
+    },
+    conform: {
+      title: "conformit\xE9",
+      body: "satisfaire \xE0 toutes les exigences d\u2019une norme ou d\u2019un standard donn\xE9, d\u2019une r\xE8gle ou d\u2019une sp\xE9cification"
+    },
+    "supplementary-content": {
+      title: "contenu additionnel",
+      body: "contenu suppl\xE9mentaire illustrant ou clarifiant le contenu primaire\nExemple 1\nLa version audio d\u2019une page Web.\nExemple 2\nL\u2019illustration d\u2019un processus complexe.\nExemple 3\nUn paragraphe r\xE9sumant les principales conclusions et recommandations d\u2019un rapport de recherche."
+    },
+    "non-text-content": {
+      title: "contenu non textuel",
+      body: "tout contenu qui n\u2019est pas une suite de caract\xE8res d\xE9termin\xE9e par un programme informatique ou suite de caract\xE8res sans signification dans aucune langue\nNote : Ceci inclut l\u2019art ASCII (qui est un dessin \xE0 base de caract\xE8res), les \xE9motic\xF4nes, l\u2019\xE9criture \xAB leetspeak \xBB (qui utilise la substitution de caract\xE8res) et les images repr\xE9sentant du texte."
+    },
+    content: {
+      title: "contenu (contenu Web)",
+      body: "information et exp\xE9rience sensorielle \xE0 communiquer \xE0 l\u2019utilisateur au moyen d\u2019un agent utilisateur, y compris le code ou le balisage qui d\xE9finit la structure, la pr\xE9sentation et les interactions du contenu"
+    },
+    "programmatically-determined-link-context": {
+      title: "contexte du lien d\xE9termin\xE9 par un programme informatique",
+      body: "information suppl\xE9mentaire qui peut \xEAtre d\xE9termin\xE9e par un programme informatique \xE0 partir des relations avec un lien, combin\xE9e avec le texte du lien et pr\xE9sent\xE9e aux utilisateurs sous diff\xE9rentes formes\nExemple\nEn HTML, l\u2019information qui est d\xE9termin\xE9e par un programme informatique \xE0 partir d\u2019un lien en fran\xE7ais, y compris le texte qui est dans le m\xEAme paragraphe, la m\xEAme liste ou la m\xEAme cellule de tableau que le lien, ou une cellule d\u2019en-t\xEAte de tableau associ\xE9e avec la cellule contenant le lien.\nNote :\nPuisque les lecteurs d\u2019\xE9cran interpr\xE8tent la ponctuation, ils peuvent aussi fournir le contexte de la phrase en cours, lorsque le focus est sur le lien contenu dans cette phrase."
+    },
+    "user-controllable": {
+      title: "contr\xF4lable par l\u2019utilisateur",
+      body: "donn\xE9es auxquelles les utilisateurs ont acc\xE8s\nNote : Ceci ne concerne pas les journaux de connexions (logs) Internet et les donn\xE9es de supervision des moteurs de recherche.\nExemple\nLes champs nom et adresse d\u2019un compte utilisateur."
+    },
+    "on-a-full-screen-window": {
+      title: "dans une fen\xEAtre plein \xE9cran",
+      body: "sur les \xE9crans d\u2019ordinateur de bureau ou portable de taille courante dont l\u2019espace de restitution est maximis\xE9\nNote : Du fait que les gens gardent leurs ordinateurs pendant plusieurs ann\xE9es, il est conseill\xE9 de ne pas se baser sur les derni\xE8res r\xE9solutions d\u2019\xE9crans des ordinateurs de bureau ou portable, mais de prendre en consid\xE9ration la plus repr\xE9sentative des r\xE9solutions d\u2019\xE9crans durant une p\xE9riode de plusieurs ann\xE9es pr\xE9c\xE9dant cette \xE9valuation."
+    },
+    "programmatically-set": {
+      title: "d\xE9fini par programmation",
+      body: "d\xE9fini par un logiciel utilisant des m\xE9thodes qui fonctionnent avec les agents utilisateurs, y compris les technologies d\u2019assistance"
+    },
+    "relied-upon": {
+      title: "d\xE9pendre",
+      body: "(technologies)\nle contenu ne serait pas conforme si cette technologie est inactiv\xE9e ou si elle n\u2019est pas compatible"
+    },
+    "programmatically-determinable": {
+      title: "d\xE9termin\xE9 (d\xE9terminable) par un programme informatique",
+      body: "d\xE9termin\xE9 par un programme \xE0 partir de donn\xE9es fournies par l\u2019auteur d\u2019une mani\xE8re qui permet aux agents utilisateurs, y compris les technologies d\u2019assistance, d\u2019extraire et de pr\xE9senter cette information aux utilisateurs sous diff\xE9rentes formes\nExemple 1\nD\xE9termin\xE9 dans un langage de balisage \xE0 partir d\u2019\xE9l\xE9ments et d\u2019attributs auxquels on acc\xE8de gr\xE2ce aux technologies d\u2019assistance couramment disponibles.\nExemple 2\nD\xE9termin\xE9 gr\xE2ce \xE0 des structures de donn\xE9es sp\xE9cifiques d\u2019une technologie pour un langage non-balis\xE9 et expos\xE9e aux technologies d\u2019assistance via une API d\u2019accessibilit\xE9 aux technologies d\u2019assistance couramment disponibles."
+    },
+    live: {
+      title: "en direct",
+      body: "information capt\xE9e depuis un \xE9v\xE9nement du monde r\xE9el et transmise \xE0 un r\xE9cepteur sans autre d\xE9lai que celui de la diffusion\nNote : Le d\xE9lai de diffusion est un court d\xE9lai souvent automatis\xE9, utilis\xE9 par exemple pour permettre aux diffuseurs de mettre en liste d\u2019attente ou de censurer le flux sonore (ou vid\xE9o), mais insuffisant pour permettre un montage significatif.\nNote : Si l\u2019information est totalement g\xE9n\xE9r\xE9e par ordinateur il ne s\u2019agit pas d\u2019information en direct."
+    },
+    "legal-commitments": {
+      title: "engagements juridiques",
+      body: "transactions par lesquelles la personne contracte une obligation ou re\xE7oit un b\xE9n\xE9fice de nature juridique\nExemple\nUn contrat de mariage, un \xE9change d\u2019actions (financier et juridique), un legs, un pr\xEAt, une adoption, un enr\xF4lement dans l\u2019arm\xE9e, un contrat de tout type, etc."
+    },
+    enclose: {
+      title: "englobe",
+      body: "d\xE9limite ou entoure compl\xE8tement"
+    },
+    "primary-education": {
+      title: "enseignement primaire",
+      body: "p\xE9riode de six ans qui commence entre l\u2019\xE2ge de 5 et 7 ans, sans forc\xE9ment d\u2019ant\xE9c\xE9dents d\u2019\xE9ducation\nNote : Cette d\xE9finition se fonde sur la norme de Classification internationale type de l\u2019\xE9ducation de l\u2019[UNESCO]."
+    },
+    "set-of-web-pages": {
+      title: "ensemble de pages Web",
+      body: "groupe de pages Web partageant un objectif commun et cr\xE9\xE9es par le m\xEAme auteur, groupe ou organisation\nExemple\nCela inclut, par exemple :\n\u2022 une publication r\xE9partie sur plusieurs pages Web et dans laquelle chaque page contient un chapitre ou une autre section importante de l\u2019ouvrage. La publication constitue une seule unit\xE9 logique, contigu\xEB, et contient des \xE9l\xE9ments de navigation qui permettent d\u2019acc\xE9der \xE0 l\u2019ensemble des pages.\n\u2022 un site web de commerce \xE9lectronique pr\xE9sente des produits dans un ensemble de pages Web qui partagent toutes la m\xEAme navigation et la m\xEAme identification. Toutefois, lors du processus de paiement, le mod\xE8le change ; la navigation et d\u2019autres \xE9l\xE9ments sont retir\xE9s, de sorte que les pages de ce processus sont fonctionnellement et visuellement diff\xE9rentes. Les pages de paiement ne font pas partie de l\u2019ensemble des pages de produits.\n\u2022 un blog sur un sous-domaine (par exemple blog.example.com) dont la navigation est diff\xE9rente et dont les contenus sont produits par des auteurs distincts des pages du domaine principal (example.com).\nNote : Diff\xE9rentes versions linguistiques seraient consid\xE9r\xE9es comme des ensembles de pages Web distincts."
+    },
+    "pointer-inputs": {
+      title: "entr\xE9e de pointeur",
+      body: "entr\xE9e effectu\xE9e par un dispositif pouvant cibler une coordonn\xE9e sp\xE9cifique (ou un ensemble de coordonn\xE9es) sur un \xE9cran, tel qu\u2019une souris, un stylet ou un contact tactile\nNote : Voir la d\xE9finition de \xAB pointeur \xBB dans Pointer Events (en anglais) [pointerevents]."
+    },
+    "text-alternative": {
+      title: "\xE9quivalent textuel",
+      body: "texte associ\xE9 par programmation \xE0 un contenu non textuel ou dont il est fait mention depuis un texte associ\xE9 par programmation \xE0 un contenu non textuel. Un texte associ\xE9 par programmation est un texte dont l\u2019emplacement peut \xEAtre d\xE9termin\xE9 par programmation depuis le contenu non textuel.\nExemple\nL\u2019image d\u2019un graphique est d\xE9crite textuellement dans le paragraphe suivant le graphique. Le bref \xE9quivalent textuel du graphique indique que la description suit celui-ci.\nNote : Se r\xE9f\xE9rer \xE0 Comprendre les \xE9quivalents textuels (en anglais) pour plus d\u2019informations."
+    },
+    "input-error": {
+      title: "erreur de saisie",
+      body: "information fournie par l\u2019utilisateur qui n\u2019est pas accept\xE9e\nNote :\nCela inclut :\n\u2022 L\u2019information qui est demand\xE9e par la page Web mais oubli\xE9e par l\u2019utilisateur.\n\u2022 L\u2019information qui est fournie par l\u2019utilisateur mais qui ne correspond pas au format ou aux valeurs des donn\xE9es attendus."
+    },
+    viewport: {
+      title: "espace de restitution",
+      body: "objet au sein duquel l\u2019agent utilisateur pr\xE9sente du contenu\nNote : L\u2019agent utilisateur pr\xE9sente le contenu au travers d\u2019un ou plusieurs espaces de restitution. Les espaces de restitution peuvent \xEAtre des fen\xEAtres, des cadres, des haut-parleurs et des loupes virtuelles. Un espace de restitution peut contenir lui-m\xEAme un autre espace de restitution (par exemple, des cadres imbriqu\xE9s). Les composants d\u2019interface cr\xE9\xE9s par l\u2019agent utilisateur, tels que des invites de commandes, des menus et des alertes ne sont pas des espaces de restitution.\nNote : Cette d\xE9finition est fond\xE9e sur le Glossaire des r\xE8gles pour l\u2019accessibilit\xE9 des agents utilisateurs 1.0 (en anglais) [UAAG10]."
+    },
+    essential: {
+      title: "essentiel",
+      body: "(essentielle)\n\xE9l\xE9ment qui changerait fondamentalement les informations ou les fonctionnalit\xE9s du contenu s\u2019il \xE9tait supprim\xE9 et informations et fonctionnalit\xE9s qui ne pourraient \xEAtre restitu\xE9es autrement d\u2019une mani\xE8re conforme"
+    },
+    states: {
+      title: "\xE9tat",
+      body: "propri\xE9t\xE9 dynamique repr\xE9sentant les caract\xE9ristiques d\u2019un composant d\u2019interface utilisateur qui peut changer en r\xE9ponse \xE0 une action de l\u2019utilisateur ou \xE0 des processus automatis\xE9s\nLes \xE9tats n\u2019affectent pas la nature du composant, mais repr\xE9sentent des donn\xE9es associ\xE9es au composant ou aux possibilit\xE9s d\u2019interaction par l\u2019utilisateur. Il s\u2019agit par exemple des \xE9tats focus, survol\xE9, s\xE9lectionn\xE9, press\xE9, coch\xE9, visit\xE9/non visit\xE9, et d\xE9velopp\xE9/r\xE9duit."
+    },
+    labels: {
+      title: "\xE9tiquette",
+      body: "texte ou autre composant avec un \xE9quivalent textuel qui est restitu\xE9 \xE0 l\u2019utilisateur pour permettre d\u2019identifier un composant dans un contenu Web.\nNote : Une \xE9tiquette est pr\xE9sent\xE9e \xE0 tous les utilisateurs alors que le nom peut \xEAtre masqu\xE9 et seulement restitu\xE9 par une technologie d\u2019assistance. Dans de nombreux cas (mais pas tous) le nom et l\u2019\xE9tiquette sont identiques.\nNote : Le terme \xE9tiquette n\u2019est pas limit\xE9 \xE0 l\u2019\xE9l\xE9ment label en HTML."
+    },
+    "up-event": {
+      title: "\xE9v\xE9nement ascendant (up-event)",
+      body: "\xE9v\xE9nement de la plateforme qui se produit lorsque le m\xE9canisme de d\xE9clenchement d\u2019un pointeur est rel\xE2ch\xE9\nL\u2019\xE9v\xE9nement ascendant peut avoir des noms diff\xE9rents selon les plateformes, comme \xAB touchend \xBB ou \xAB mouseup \xBB."
+    },
+    "down-event": {
+      title: "\xE9v\xE9nement descendant (down-event)",
+      body: "\xE9v\xE9nement de la plateforme qui se produit lorsque le m\xE9canisme de d\xE9clenchement d\u2019un pointeur est enfonc\xE9\nL\u2019\xE9v\xE9nement descendant peut avoir des noms diff\xE9rents selon les plateformes, comme \xAB touchstart \xBB ou \xAB mousedown \xBB."
+    },
+    "real-time-events": {
+      title: "\xE9v\xE9nement en temps r\xE9el",
+      body: "\xE9v\xE9nement qui a) se produit en m\xEAme temps que la visualisation et b) n\u2019est pas enti\xE8rement g\xE9n\xE9r\xE9 par le contenu\nExemple 1\nUne diffusion Web d\u2019une repr\xE9sentation en direct (qui se produit en m\xEAme temps que la visualisation et qui n\u2019est pas pr\xE9-enregistr\xE9e).\nExemple 2\nDes ench\xE8res en ligne avec des gens qui ench\xE9rissent (avec une visualisation en direct).\nExemple 3\nDes humains interagissant dans un monde virtuel gr\xE2ce \xE0 des avatars (qui ne sont pas enti\xE8rement g\xE9n\xE9r\xE9s par le contenu et qui se produisent en m\xEAme temps que la visualisation)."
+    },
+    "specific-sensory-experience": {
+      title: "exp\xE9rience sensorielle sp\xE9cifique",
+      body: "une exp\xE9rience sensorielle qui n\u2019est pas purement d\xE9corative et dont l\u2019objectif premier n\u2019est pas de transmettre une information importante ou d\u2019accomplir une fonction\nExemple\nOn compte parmi les exemples un morceau de fl\xFBte solo, des \u0153uvres d\u2019art visuel, etc."
+    },
+    idioms: {
+      title: "expression idiomatique",
+      body: "phrase dont le sens ne peut \xEAtre d\xE9duit du sens des mots qui la composent et dont les mots sp\xE9cifiques ne peuvent \xEAtre chang\xE9s sans en perdre le sens\nNote : Les expressions idiomatiques ne peuvent \xEAtre traduites litt\xE9ralement sans perdre leur sens (culturel ou linguistique).\nExemple 1\nEn anglais, \xAB spilling the beans \xBB signifie \xAB r\xE9v\xE9ler un secret \xBB. Cependant, \xAB knocking over the beans \xBB ou \xAB spilling the vegetable \xBB ne signifie pas la m\xEAme chose.\nExemple 2\nEn japonais, la phrase \xAB \u3055\u3058\u3092\u6295\u3052\u308B \xBB se traduit litt\xE9ralement par \xAB il jette une cuill\xE8re \xBB mais cela signifie qu\u2019il n\u2019y a rien qu\u2019il puisse faire et que finalement il abandonne.\nExemple 3\nEn n\xE9erlandais, \xAB Hij ging met de kippen op stok \xBB se traduit litt\xE9ralement par \xAB il est all\xE9 r\xF4tir avec les poulets \xBB mais cela signifie qu\u2019il est all\xE9 au lit t\xF4t."
+    },
+    flashes: {
+      title: "flash",
+      body: "alternance de luminance relative qui peut causer des crises chez certaines personnes si leur taille est suffisamment importante dans une gamme de fr\xE9quences sp\xE9cifiques\nNote : Voir seuil de flash g\xE9n\xE9rique et seuil de flash rouge pour plus d\u2019informations sur les types de flashs qui ne sont pas autoris\xE9s.\nNote : Voir aussi clignotement."
+    },
+    "purpose-of-each-link": {
+      title: "fonction du lien",
+      body: "nature d\u2019un r\xE9sultat obtenu par l\u2019activation d\u2019un lien"
+    },
+    functionality: {
+      title: "fonctionnalit\xE9",
+      body: "processus et r\xE9sultats atteignables par une action de l\u2019utilisateur"
+    },
+    "same-functionality": {
+      title: "fonctionnalit\xE9 similaire",
+      body: "produit le m\xEAme r\xE9sultat \xE0 l\u2019utilisation\nExemple\nUn bouton \xAB rechercher \xBB sur une page Web et un bouton \xAB trouver \xBB sur une autre peuvent tous les deux proposer un champ pour saisir un terme et lister les sujets pr\xE9sents dans le site et pertinents par rapport au terme soumis. Dans ce cas, ils offrent la m\xEAme fonctionnalit\xE9 mais ne sont pas nomm\xE9s \xE0 l\u2019identique."
+    },
+    "user-inactivity": {
+      title: "inactivit\xE9 de l\u2019utilisateur",
+      body: "intervalle de temps continu pendant lequel l\u2019utilisateur n\u2019effectue aucune action\nLa m\xE9thode de d\xE9tection sera d\xE9termin\xE9e par le site Web ou l\u2019application."
+    },
+    "focus-indicator": {
+      title: "indicateur de focus",
+      body: "pixels qui sont modifi\xE9s pour indiquer visuellement qu\u2019un composant d\u2019interface utilisateur est dans un \xE9tat focalis\xE9"
+    },
+    informative: {
+      title: "informatif, informative",
+      body: "dans un but d\u2019informations compl\xE9mentaires et non exig\xE9 pour la conformit\xE9\nNote : Le contenu exig\xE9 pour la conformit\xE9 est indiqu\xE9 comme \xAB normatif \xBB."
+    },
+    "keyboard-interface": {
+      title: "interface clavier",
+      body: "interface utilis\xE9e par un logiciel pour obtenir une saisie au clavier\nNote :\nUne interface clavier permet aux utilisateurs de fournir aux programmes une saisie au clavier m\xEAme si la technologie native ne comporte pas de clavier.\nExemple\nUn assistant num\xE9rique personnel (PDA) \xE0 \xE9cran tactile poss\xE8de une interface clavier int\xE9gr\xE9e \xE0 son syst\xE8me d\u2019exploitation et un connecteur pour des claviers externes. Les applications dans le PDA peuvent utiliser l\u2019interface pour obtenir une saisie au clavier externe ou par d\u2019autres applications qui simulent une sortie clavier comme les interpr\xE9teurs d\u2019\xE9criture manuscrite ou les applications de transcription vocale en texte avec des fonctionnalit\xE9s \xAB d\u2019\xE9mulation clavier \xBB.\nNote :\nL\u2019utilisation d\u2019une application (ou de parties d\u2019une application) \xE0 travers un pointeur souris dirig\xE9 au clavier, comme MouseKeys, ne constitue pas une op\xE9ration r\xE9alis\xE9e au travers d\u2019une interface clavier car l\u2019utilisation du programme passe par l\u2019interface de pointage et non pas par l\u2019interface clavier."
+    },
+    "sign-language-interpretation": {
+      title: "interpr\xE9tation en langue des signes",
+      body: "traduction d\u2019une langue, g\xE9n\xE9ralement parl\xE9e, en langue des signes\nNote : Les v\xE9ritables langues des signes sont des langues ind\xE9pendantes qui ne sont pas attach\xE9es \xE0 la langue parl\xE9e de la m\xEAme r\xE9gion ou du m\xEAme pays."
+    },
+    jargon: {
+      title: "jargon",
+      body: "termes utilis\xE9s par les personnes d\u2019une fa\xE7on particuli\xE8re dans un domaine particulier\nExemple\nLes termes \xAB touches r\xE9manentes \xBB sont du jargon du domaine des technologies d\u2019assistance."
+    },
+    "human-language-s": {
+      title: "langue",
+      body: "langue qui est parl\xE9e, \xE9crite ou sign\xE9e (\xE0 l\u2019aide des signes visuels ou tactiles) pour communiquer avec les humains\nNote : Voir aussi langue des signes."
+    },
+    "sign-language": {
+      title: "langue des signes",
+      body: "un langage employant des combinaisons de mouvements des mains et des bras, des expressions faciales ou des positions corporelles pour transmettre du sens"
+    },
+    "relative-luminance": {
+      title: "luminance relative",
+      body: 'luminance relative d\u2019un quelconque point de l\u2019espace colorim\xE9trique normalis\xE9 \xE0 0 pour le noir le plus fonc\xE9 et \xE0 1 pour le blanc le plus clair\nNote :\nPour l\u2019espace colorim\xE9trique de couleur sRGB, la luminance relative d\u2019une couleur est d\xE9finie par L = 0,2126 * R + 0,7152 * G + 0,0722 * B o\xF9 R, G et B sont d\xE9finis par :\n\u2022 si RsRGB <= 0,04045 alors R = RsRGB/12,92 sinon R = ((RsRGB+0,055)/1,055) ^ 2,4\n\u2022 si GsRGB <= 0,04045 alors G = GsRGB/12,92 sinon G = ((GsRGB+0,055)/1,055) ^ 2,4\n\u2022 si BsRGB <= 0,04045 alors B = BsRGB/12,92 sinon B = ((BsRGB+0,055)/1,055) ^ 2,4\net RsRGB, GsRGB, et BsRGB sont d\xE9finis par :\n\u2022 RsRGB = R8bit/255\n\u2022 GsRGB = G8bit/255\n\u2022 BsRGB = B8bit/255\nLe caract\xE8re "^" est l\u2019op\xE9rateur exponentiel. (formule tir\xE9e de [SRGB]).\nNote : Avant mai 2021, la valeur de 0,04045 dans la d\xE9finition \xE9tait diff\xE9rente (0,03928). Elle provenait d\u2019une version pr\xE9c\xE9dente de la sp\xE9cification et a \xE9t\xE9 mise \xE0 jour. Cela n\u2019a aucun effet pratique sur les calculs dans le contexte de ces r\xE8gles.\nNote : La plupart des syst\xE8mes utilis\xE9s aujourd\u2019hui pour afficher le contenu Web adoptent l\u2019encodage sRGB. \xC0 moins que l\u2019on sache qu\u2019un autre espace colorim\xE9trique va \xEAtre utilis\xE9 pour traiter et afficher le contenu, les auteurs devraient l\u2019\xE9valuer en utilisant l\u2019espace colorim\xE9trique sRGB. Si l\u2019on utilise d\u2019autres espaces colorim\xE9triques, voir Comprendre le crit\xE8re de succ\xE8s 1.4.3 (en anglais).\nNote : Si un tramage est effectu\xE9 apr\xE8s l\u2019affichage, alors la valeur source de la couleur est utilis\xE9e. Pour les couleurs tram\xE9es \xE0 la source, les valeurs moyennes des couleurs qui sont tram\xE9es devraient \xEAtre utilis\xE9es (R moyen, G moyen, B moyen).\nNote : Il existe des outils qui effectuent automatiquement les calculs lors des tests de contraste et de flash.\nNote : Une page distincte donnant la d\xE9finition de la luminance relative en utilisant MathML pour afficher les formules est disponible.'
+    },
+    mechanism: {
+      title: "m\xE9canisme",
+      body: "processus ou technique pour obtenir un r\xE9sultat\nNote : Le m\xE9canisme peut \xEAtre explicitement fourni par le contenu ou d\xE9pendre de la plateforme ou de l\u2019agent utilisateur, y compris les technologies d\u2019assistance.\nNote : Le m\xE9canisme doit satisfaire \xE0 tous les crit\xE8res de succ\xE8s (d\u2019un niveau donn\xE9) pour d\xE9clarer un niveau de conformit\xE9."
+    },
+    "media-alternative-for-text": {
+      title: "m\xE9dia de remplacement pour un texte",
+      body: "m\xE9dia qui ne donne pas plus d\u2019information que ce que donne le texte (directement ou via un \xE9quivalent textuel)\nNote : Une version de remplacement pour un texte est fournie \xE0 ceux qui b\xE9n\xE9ficient de repr\xE9sentations \xE9quivalentes du texte. Les versions de remplacement de texte peuvent n\u2019\xEAtre que seulement audio, que seulement vid\xE9o (y compris la vid\xE9o en langue des signes) ou audio-vid\xE9o."
+    },
+    "synchronized-media": {
+      title: "m\xE9dia synchronis\xE9",
+      body: "flux audio ou vid\xE9o synchronis\xE9 avec un autre format pour pr\xE9senter de l\u2019information et/ou comportant des composants temporels interactifs, \xE0 moins que le m\xE9dia soit un m\xE9dia de remplacement pour un texte clairement identifi\xE9 comme tel"
+    },
+    "same-relative-order": {
+      title: "m\xEAme ordre relatif",
+      body: "m\xEAme position relativement aux autres \xE9l\xE9ments\nNote : Plusieurs \xE9l\xE9ments sont consid\xE9r\xE9s \xEAtre dans le m\xEAme ordre relatif m\xEAme si d\u2019autres \xE9l\xE9ments sont ins\xE9r\xE9s ou retir\xE9s de l\u2019ordre original. Par exemple, des menus de navigation extensibles peuvent int\xE9grer un niveau de d\xE9tail additionnel, une section de navigation secondaire peut \xEAtre ins\xE9r\xE9e dans l\u2019ordre de lecture."
+    },
+    "status-messages": {
+      title: "message d\u2019\xE9tat",
+      body: "changement dans le contenu qui n\u2019est pas un changement de contexte et qui fournit des informations \xE0 l\u2019utilisateur sur le succ\xE8s ou les r\xE9sultats d\u2019une action, sur l\u2019\xE9tat d\u2019attente d\u2019une application, sur la progression d\u2019un processus ou sur l\u2019existence d\u2019erreurs"
+    },
+    pause: {
+      title: "mis en pause",
+      body: "arr\xEAt\xE9 par une action de l\u2019utilisateur et relanc\xE9 seulement sur demande de l\u2019utilisateur"
+    },
+    "dragging-movements": {
+      title: "mouvement de glissement",
+      body: "une action o\xF9 un \xE9l\xE9ment est saisi par le pointeur lors de l\u2019\xE9v\xE9nement descendant (down-event) et pendant laquelle l\u2019\xE9l\xE9ment (ou une repr\xE9sentation de sa position) suit le pointeur jusqu\u2019\xE0 l\u2019\xE9v\xE9nement ascendant (up-event).\nNote : Les \xE9l\xE9ments de liste, de texte et les images sont des exemples d\u2019\xE9l\xE9ments pouvant \xEAtre d\xE9plac\xE9s par glissement."
+    },
+    name: {
+      title: "nom",
+      body: "texte gr\xE2ce auquel un logiciel peut identifier pour l\u2019utilisateur un composant du contenu Web\nNote : Le nom peut \xEAtre cach\xE9 et pr\xE9sent\xE9 seulement aux technologies d\u2019assistance, alors qu\u2019une \xE9tiquette est pr\xE9sent\xE9e \xE0 tous les utilisateurs. Dans de nombreux cas (mais pas dans tous), l\u2019\xE9tiquette et le nom sont identiques.\nNote : Celui-ci n\u2019a pas de lien avec l\u2019attribut HTML name."
+    },
+    normative: {
+      title: "normatif",
+      body: "exig\xE9 pour la conformit\xE9\nNote : Il est possible d\u2019\xEAtre en conformit\xE9 stricte avec ce document de nombreuses mani\xE8res bien d\xE9finies.\nNote : Le contenu identifi\xE9 comme \xAB informatif \xBB ou \xAB non normatif \xBB n\u2019est jamais exig\xE9 pour la conformit\xE9."
+    },
+    "correct-reading-sequence": {
+      title: "ordre de lecture correct",
+      body: "tout ordre s\xE9quentiel o\xF9 les mots et les paragraphes sont pr\xE9sent\xE9s dans un ordre qui ne modifie pas la signification du contenu"
+    },
+    "web-page-s": {
+      title: "page Web",
+      body: "une ressource autonome obtenue depuis un URI unique gr\xE2ce au protocole HTTP, accompagn\xE9e de toutes les autres ressources utilis\xE9es dans la restitution ou con\xE7ues pour \xEAtre restitu\xE9es simultan\xE9ment par un agent utilisateur\nNote : Bien que toutes les \xAB autres ressources \xBB seraient restitu\xE9es avec la ressource primaire, elles ne sont pas n\xE9cessairement restitu\xE9es simultan\xE9ment.\nNote : \xC0 des fins de conformit\xE9 avec ces r\xE8gles, une ressource doit \xEAtre autonome \xE0 l\u2019int\xE9rieur du p\xE9rim\xE8tre de conformit\xE9 pour \xEAtre consid\xE9r\xE9e comme une page Web.\nExemple 1\nUne ressource Web incluant toutes les images et m\xE9dias li\xE9s.\nExemple 2\nUn programme Web de courrier \xE9lectronique (Webmail) d\xE9velopp\xE9 \xE0 l\u2019aide d\u2019AJAX (Asynchronous JavaScript and XML, JavaScript asynchrone et XML). Le programme r\xE9side int\xE9gralement \xE0 l\u2019adresse http://exemple.com/mail, mais comprend une bo\xEEte de r\xE9ception, un carnet d\u2019adresses et un calendrier. Des liens et des boutons permettent d\u2019afficher la bo\xEEte de r\xE9ception, les contacts ou le calendrier, mais ne changent pas globalement l\u2019URI de la page.\nExemple 3\nUn site portail personnalisable, dans lequel les utilisateurs peuvent choisir le contenu \xE0 afficher \xE0 partir d\u2019un ensemble de modules de contenu.\nExemple 4\nQuand on saisit \xAB http://shopping.exemple.com/ \xBB dans son navigateur, on entre dans un environnement commercial anim\xE9 et interactif dans lequel on se d\xE9place visuellement dans une boutique, retirant les produits directement depuis les rayons pour les placer dans un panier d\u2019achat face \xE0 soi. Cliquer sur un produit d\xE9clenche une d\xE9monstration avec la fiche technique juste \xE0 c\xF4t\xE9. Cela peut \xEAtre un site Web \xE0 page unique ou simplement une page \xE0 l\u2019int\xE9rieur d\u2019un site Web."
+    },
+    "navigated-sequentially": {
+      title: "parcouru de fa\xE7on s\xE9quentielle",
+      body: "parcouru dans l\u2019ordre d\xE9fini par le d\xE9placement du focus (d\u2019un \xE9l\xE9ment \xE0 l\u2019autre) en utilisant une interface clavier"
+    },
+    perimeter: {
+      title: "p\xE9rim\xE8tre",
+      body: "ligne la plus courte entre la ligne continue d\xE9limitant une forme, en excluant les pixels partag\xE9s, et la ligne continue d\xE9limitant sa bo\xEEte de d\xE9limitation minimale\nExemple\nLe calcul de l\u2019aire d\u2019un p\xE9rim\xE8tre de 2 pixels CSS autour d\u2019un rectangle est 4h+4l, o\xF9 h est la hauteur et l est la largeur. Pour un p\xE9rim\xE8tre de 2 pixels CSS autour d\u2019un cercle, il s\u2019agit de 4\u{1D70B}r."
+    },
+    "visually-customized": {
+      title: "personnalis\xE9 visuellement",
+      body: "la police, la taille, la couleur et le fond sont param\xE9trables"
+    },
+    "css-pixels": {
+      title: "pixel CSS",
+      body: "angle visuel d\u2019environ 0,0213 degr\xE9\nUn pixel CSS est l\u2019unit\xE9 de mesure canonique pour toutes les longueurs et mesures en CSS. Cette unit\xE9 est ind\xE9pendante de la densit\xE9 et diff\xE9rente des pixels mat\xE9riels r\xE9els pr\xE9sents sur un \xE9cran. Les agents utilisateurs et les syst\xE8mes d\u2019exploitation devraient garantir qu\u2019un pixel CSS repr\xE9sente la meilleure approximation du pixel de r\xE9f\xE9rence d\xE9fini dans le module CSS Values and Units de niveau 3 (en anglais) [css3-values], qui tient compte des dimensions physiques de l\u2019\xE9cran et de la distance de visualisation suppos\xE9e (facteurs qui ne peuvent \xEAtre d\xE9termin\xE9s par les auteurs de contenu)."
+    },
+    "single-pointer": {
+      title: "pointage \xE0 contact unique",
+      body: "action de pointage qui fonctionne au moyen d\u2019un seul point de contact avec l\u2019\xE9cran, y compris les appuis courts et les simples clics, les doubles appuis et les doubles clics, les appuis longs et les gestes bas\xE9s sur un trac\xE9."
+    },
+    prerecorded: {
+      title: "pr\xE9-enregistr\xE9",
+      body: "information qui n\u2019est pas diffus\xE9e en direct"
+    },
+    "lower-secondary-education-level": {
+      title: "premier cycle de l\u2019enseignement secondaire",
+      body: "les deux ou trois ann\xE9es de scolarit\xE9 qui commencent apr\xE8s six ans environ d\u2019enseignement primaire et qui se terminent apr\xE8s neuf ans environ de scolarisation depuis le d\xE9but de l\u2019enseignement primaire\nNote : Cette d\xE9finition se fonde sur la norme de Classification internationale type de l\u2019\xE9ducation de l\u2019[UNESCO]."
+    },
+    presentation: {
+      title: "pr\xE9sentation",
+      body: "rendu du contenu sous une forme perceptible par l\u2019utilisateur"
+    },
+    processes: {
+      title: "processus",
+      body: "s\xE9rie d\u2019actions de l\u2019utilisateur dont l\u2019encha\xEEnement est n\xE9cessaire \xE0 l\u2019accomplissement d\u2019une t\xE2che\nExemple 1\nUtilisation r\xE9ussie par l\u2019utilisateur, sur un site de vente, d\u2019un encha\xEEnement de pages Web permettant de voir diff\xE9rents produits, des prix et des offres, de s\xE9lectionner des produits, de soumettre une commande, de fournir les informations d\u2019envoi et de paiement.\nExemple 2\nUne page permettant de cr\xE9er un compte utilisateur n\xE9cessitant l\u2019accomplissement d\u2019un test de Turing avant de pouvoir acc\xE9der \xE0 cette page de formulaire de cr\xE9ation de compte."
+    },
+    "style-properties": {
+      title: "propri\xE9t\xE9 de style",
+      body: "propri\xE9t\xE9 dont la valeur d\xE9termine la pr\xE9sentation (par exemple, la police, la couleur, la taille, l\u2019emplacement, les marges int\xE9rieures (padding), le volume, la prosodie de la synth\xE8se vocale) des \xE9l\xE9ments de contenu lorsqu\u2019ils sont restitu\xE9s (par exemple, \xE0 l\u2019\xE9cran, par un haut-parleur, sur une plage braille) par les agents utilisateurs.\nLes propri\xE9t\xE9s de style peuvent avoir plusieurs origines :\n\u2022 Les styles par d\xE9faut de l\u2019agent utilisateur : les valeurs des propri\xE9t\xE9s de style par d\xE9faut appliqu\xE9es en l\u2019absence de tout style d\u2019auteur ou d\u2019utilisateur. Certaines technologies Web sp\xE9cifient un rendu par d\xE9faut, d\u2019autres non ;\n\u2022 Styles d\u2019auteur : les valeurs des propri\xE9t\xE9s de style qui sont d\xE9finies par l\u2019auteur dans le cadre du contenu (par exemple, les styles en ligne, les feuilles de style de l\u2019auteur) ;\n\u2022 Styles de l\u2019utilisateur : les valeurs des propri\xE9t\xE9s de style qui sont d\xE9finies par l\u2019utilisateur (par exemple, via les param\xE8tres de l\u2019interface de l\u2019agent utilisateur, les feuilles de style de l\u2019utilisateur)."
+    },
+    "pure-decoration": {
+      title: "purement d\xE9coratif",
+      body: "utilis\xE9 seulement dans un but esth\xE9tique, ne fournissant aucune information et n\u2019ayant aucune fonctionnalit\xE9\nNote : Un texte est purement d\xE9coratif si les mots peuvent \xEAtre r\xE9arrang\xE9s ou remplac\xE9s sans changer leur raison d\u2019\xEAtre.\nExemple\nLa page de couverture d\u2019un dictionnaire pr\xE9sente un arri\xE8re-plan estomp\xE9 et constitu\xE9 de mots choisis au hasard."
+    },
+    "keyboard-shortcuts": {
+      title: "raccourci clavier",
+      body: "moyen alternatif pour d\xE9clencher une action par l\u2019appui d\u2019une ou plusieurs touches"
+    },
+    "contrast-ratio": {
+      title: "rapport de contraste",
+      body: "(L1 + 0,05) / (L2 + 0,05), o\xF9\n\u2022 L1 est la luminance relative de la couleur la plus claire et\n\u2022 L2 est la luminance relative de la couleur la plus sombre.\nNote : Le rapport de contraste peut varier de 1 \xE0 21 (commun\xE9ment \xE9crit 1:1, 1 pour 1, \xE0 21:1, 21 pour 1).\nNote : \xC9tant donn\xE9 que les auteurs ne contr\xF4lent pas la configuration de l\u2019utilisateur concernant le rendu du texte (par exemple le lissage de police ou l\u2019anti-cr\xE9nelage), le rapport de contraste du texte peut \xEAtre \xE9valu\xE9 en d\xE9sactivant l\u2019anti-cr\xE9nelage.\nNote : En ce qui concerne les crit\xE8res de succ\xE8s 1.4.3 et 1.4.6, le contraste est mesur\xE9 en tenant compte de l\u2019arri\xE8re-plan sur lequel le texte est normalement affich\xE9. Si aucune couleur d\u2019arri\xE8re-plan n\u2019est sp\xE9cifi\xE9e, il est consid\xE9r\xE9 comme blanc.\nNote : La couleur d\u2019arri\xE8re-plan est la couleur sp\xE9cifi\xE9e du contenu sur lequel le texte est normalement affich\xE9. Il est consid\xE9r\xE9 comme une erreur de ne pas d\xE9finir une couleur d\u2019arri\xE8re-plan lorsque la couleur du texte est sp\xE9cifi\xE9e, parce que la couleur d\u2019arri\xE8re-plan de l\u2019utilisateur est inconnue et ne peut donc pas \xEAtre \xE9valu\xE9e pour v\xE9rifier si le contraste est suffisant. Pour la m\xEAme raison, il est aussi consid\xE9r\xE9 comme une erreur de ne pas d\xE9finir la couleur du texte lorsqu\u2019une couleur d\u2019arri\xE8re-plan est sp\xE9cifi\xE9e.\nNote : Lorsqu\u2019il y a une bordure autour de la lettre, la bordure peut augmenter le contraste et serait utilis\xE9e dans le calcul du contraste entre la lettre et son arri\xE8re-plan. La couleur d\u2019une bordure \xE9troite autour de la lettre serait utilis\xE9e \xE0 la place de la lettre. Une bordure large autour de la lettre qui remplit l\u2019espace dans lequel se d\xE9coupe le d\xE9tail de la lettre agit comme un halo et serait consid\xE9r\xE9e comme un arri\xE8re-plan.\nNote : La conformit\xE9 aux WCAG devrait \xEAtre \xE9valu\xE9e pour les paires de couleurs sp\xE9cifi\xE9es dans le contenu qu\u2019un auteur s\u2019attendrait \xE0 voir appara\xEEtre de fa\xE7on adjacente dans une pr\xE9sentation habituelle. Les auteurs n\u2019ont pas besoin de prendre en consid\xE9ration les pr\xE9sentations inhabituelles comme les changements de couleurs faits par l\u2019agent utilisateur sauf si ces changements sont provoqu\xE9s par le code de l\u2019auteur."
+    },
+    regions: {
+      title: "r\xE9gion",
+      body: "section de contenu perceptible, d\xE9termin\xE9e par un programme informatique\nNote : En HTML, toute zone identifi\xE9e avec un r\xF4le de rep\xE8re (landmark) serait consid\xE9r\xE9e comme une r\xE9gion."
+    },
+    relationships: {
+      title: "relations",
+      body: "associations significatives entre des parties distinctes du contenu"
+    },
+    role: {
+      title: "r\xF4le",
+      body: "texte ou nombre par lequel un logiciel peut identifier la fonction d\u2019un composant dans du contenu Web\nExemple\nUn nombre qui indique si une image sert d\u2019hyperlien, de bouton de commande ou de case \xE0 cocher."
+    },
+    satisfies: {
+      title: "satisfait \xE0 un crit\xE8re de succ\xE8s",
+      body: "le crit\xE8re de succ\xE8s ne se r\xE9v\xE8le pas \xAB faux \xBB lors de l\u2019\xE9valuation de la page"
+    },
+    section: {
+      title: "section",
+      body: "une portion autonome de contenu \xE9crit qui traite d\u2019un ou plusieurs sujets ou id\xE9es li\xE9s entre eux\nNote : Une section peut consister en un ou plusieurs paragraphes et inclure des graphiques, des tableaux, des listes et des sous-sections."
+    },
+    "general-flash-and-red-flash-thresholds": {
+      title: "seuil de flash g\xE9n\xE9rique et seuil de flash rouge",
+      body: "un flash ou une s\xE9quence d\u2019images changeant rapidement est en dessous du seuil de flash (c\u2019est-\xE0-dire que le contenu est conforme) si l\u2019une des conditions suivantes est satisfaite :\n\u2022 il n\u2019y a pas plus de trois flashs g\xE9n\xE9riques et pas plus de trois flashs rouges par seconde ; ou\n\u2022 la surface d\u2019affichage combin\xE9e des flashs simultan\xE9s ne repr\xE9sente pas plus de 0,006 st\xE9radian dans chaque champ visuel de 10 degr\xE9s sur l\u2019\xE9cran (soit 25% de chaque champ visuel de 10 degr\xE9s sur l\u2019\xE9cran) \xE0 une distance habituelle de visualisation\no\xF9 :\n\u2022 un flash g\xE9n\xE9rique est d\xE9fini comme une alternance de luminance relative de 10% ou plus par rapport \xE0 la luminance relative maximum (1.0), o\xF9 la luminance relative de l\u2019image la plus sombre est en dessous de 0,80 et o\xF9 \xAB une alternance \xBB est d\xE9finie comme \xE9tant une augmentation suivie d\u2019une diminution ou une diminution suivie d\u2019une augmentation, et\n\u2022 un flash rouge est d\xE9fini comme toute alternance de transition impliquant un rouge satur\xE9.\nException : Le flash qui suit un mod\xE8le pr\xE9cis et \xE9quilibr\xE9 comme du bruit blanc ou un mod\xE8le de damier altern\xE9 avec des \xAB carr\xE9s \xBB dont les c\xF4t\xE9s font moins de 0,1 degr\xE9 (du champ visuel \xE0 une distance habituelle de visualisation) ne d\xE9passe pas le seuil de flash.\nNote : Pour les logiciels ou le contenu Web, un rectangle de 341 x 256 pixels n\u2019importe o\xF9 sur la surface d\u2019affichage de l\u2019\xE9cran, quand la r\xE9solution est \xE0 1024 x 768 pixels, fournit une bonne estimation de ce que repr\xE9sente 10 degr\xE9s du champ visuel sur l\u2019\xE9cran pour un \xE9cran et une distance habituelle de visualisation. Par exemple des \xE9crans de 38 \xE0 43 centim\xE8tres (15 \xE0 17 pouces) \xE0 une distance de 55 \xE0 65 centim\xE8tres (22-26 pouces). Cette r\xE9solution de 75 \xE0 85 ppp est connue pour \xEAtre plus basse, et donc plus conservatrice que la r\xE9solution nominale du pixel CSS de 96 ppp dans les sp\xE9cifications CSS. Un affichage \xE0 une r\xE9solution sup\xE9rieure du m\xEAme contenu produirait des images plus petites et plus s\xFBres, c\u2019est pourquoi des r\xE9solutions inf\xE9rieures sont utilis\xE9es pour d\xE9finir le seuil.\nNote : Une transition est le changement, dans un temps donn\xE9, de luminance relative (ou de luminance relative ou de couleur pour le flash rouge) entre les pics et les creux adjacents dans un ensemble de mesures de luminance relative (ou de luminance relative ou de couleur pour le flash rouge). Un flash est constitu\xE9 de deux transitions oppos\xE9es.\nNote : La nouvelle d\xE9finition utilis\xE9e dans le domaine pour \xAB deux transitions oppos\xE9es de rouge satur\xE9 \xBB (provenant des WCAG 2.2) est : une paire de transitions oppos\xE9es o\xF9 une transition depuis ou vers un \xE9tat avec une valeur R/(R + G + B) qui est sup\xE9rieure ou \xE9gale \xE0 0,8, et la diff\xE9rence entre les \xE9tats est de plus de 0,2 (sans unit\xE9) sur le diagramme de chromaticit\xE9 CIE 1976 UCS. [ISO_9241-391]\nNote : Des outils sont disponibles pour effectuer l\u2019analyse depuis des captures vid\xE9os. Cependant, aucun outil n\u2019est n\xE9cessaire pour \xE9valuer cette condition si le flash est inf\xE9rieur ou \xE9gal \xE0 3 flashs par seconde. Le contenu est automatiquement conforme (voir #1 et #2 ci-dessus)."
+    },
+    "audio-only": {
+      title: "seulement audio",
+      body: "une pr\xE9sentation temporelle qui contient seulement de l\u2019audio (sans vid\xE9o ni interaction)"
+    },
+    "video-only": {
+      title: "seulement vid\xE9o",
+      body: "une pr\xE9sentation temporelle qui ne contient que de la vid\xE9o (aucun flux audio ni aucune interaction)"
+    },
+    captions: {
+      title: "sous-titres",
+      body: "visuel synchronis\xE9 ou \xE9quivalent textuel pour l\u2019information audio avec ou sans parole n\xE9cessaire \xE0 la compr\xE9hension du contenu d\u2019un m\xE9dia\nNote : Les sous-titres (en anglais captions) sont similaires \xE0 ceux qui sont utilis\xE9s seulement pour les dialogues (en anglais subtitles) sauf que les sous-titres ne communiquent pas seulement le contenu des dialogues parl\xE9s mais aussi des \xE9quivalents pour les informations audio autres que le dialogue et n\xE9cessaires \xE0 la compr\xE9hension du contenu du programme, y compris les effets sonores, la musique, les rires, l\u2019identification et le positionnement des interlocuteurs.\nNote : Les sous-titres cod\xE9s sont de la m\xEAme esp\xE8ce mais peuvent \xEAtre activ\xE9s ou d\xE9sactiv\xE9s dans certains lecteurs multim\xE9dia.\nNote : Les sous-titres visibles sont des sous-titres qui ne peuvent \xEAtre d\xE9sactiv\xE9s. Par exemple, si les sous-titres sont un \xE9quivalent visuel en texte sous forme d\u2019image int\xE9gr\xE9 \xE0 la vid\xE9o.\nNote : Les sous-titres ne devraient pas masquer l\u2019information pertinente de la vid\xE9o, m\xEAme partiellement.\nNote : Dans certaines langues comme l\u2019anglais on distingue entre caption et subtitles, le terme caption \xE9tant parfois traduit en fran\xE7ais par sous-titres pour malentendants.\nNote : L\u2019audio-description peut aussi \xEAtre sous-titr\xE9e, mais n\u2019a pas besoin de l\u2019\xEAtre, \xE9tant donn\xE9 qu\u2019il s\u2019agit d\u2019une description d\u2019information qui est d\xE9j\xE0 pr\xE9sent\xE9e visuellement."
+    },
+    structure: {
+      title: "structure",
+      body: "\u2022 La mani\xE8re dont les parties d\u2019une page Web sont organis\xE9es entre elles ; et\n\u2022 La mani\xE8re dont un groupe de pages Web est organis\xE9"
+    },
+    "assistive-technologies": {
+      title: "technologie d\u2019assistance",
+      body: "(tel qu\u2019utilis\xE9 dans ce document)\nmat\xE9riel ou logiciel qui agit comme agent utilisateur ou simultan\xE9ment avec un agent utilisateur usuel afin de fournir des fonctionnalit\xE9s r\xE9pondant aux besoins des utilisateurs ayant des limitations fonctionnelles, fonctionnalit\xE9s qui vont au-del\xE0 de celles qui sont offertes par les agents utilisateurs usuels\nNote : Les fonctionnalit\xE9s fournies par les technologies d\u2019assistance comprennent des pr\xE9sentations de remplacement (par exemple de la synth\xE8se vocale ou du contenu agrandi), des m\xE9thodes de saisie alternatives (par exemple la voix), des m\xE9canismes de navigation ou d\u2019orientation suppl\xE9mentaires et des transformations de contenu (par exemple pour rendre un tableau plus accessible).\nNote : Les technologies d\u2019assistance communiquent souvent les donn\xE9es et les messages aux agents utilisateurs usuels en utilisant et en surveillant le fonctionnement d\u2019une API (interface de programmation).\nNote : La distinction entre agents utilisateurs usuels et technologies d\u2019assistance n\u2019est pas absolue. Plusieurs agents utilisateurs usuels comportent des fonctions d\u2019assistance aux utilisateurs ayant des limitations fonctionnelles. La principale diff\xE9rence est que ces agents utilisateurs usuels visent un public large et diversifi\xE9 qui comprend des personnes avec et sans limitations fonctionnelles. Les technologies d\u2019assistance visent des populations plus restreintes d\u2019utilisateurs ayant des limitations fonctionnelles particuli\xE8res. L\u2019assistance fournie par une technologie d\u2019assistance est plus sp\xE9cifique et appropri\xE9e aux besoins des utilisateurs vis\xE9s. Un agent utilisateur usuel peut comporter des fonctionnalit\xE9s importantes pour les technologies d\u2019assistance comme l\u2019extraction du contenu Web \xE0 partir d\u2019objets de programmation ou l\u2019analyse syntaxique du balisage par paquets identifiables.\nExemple\nLes technologies d\u2019assistance qui sont importantes dans le contexte du pr\xE9sent document comprennent les technologies suivantes :\n\u2022 les agrandisseurs d\u2019\xE9cran et les autres assistants de lecture visuelle qui sont utilis\xE9s par les personnes ayant des limitations de la vision, de la perception ou d\u2019acc\xE8s physique \xE0 l\u2019imprim\xE9 pour modifier la police de caract\xE8res, la taille, l\u2019espacement, la couleur, la synchronisation avec la synth\xE8se vocale, etc. dans le but d\u2019am\xE9liorer la lisibilit\xE9 visuelle du rendu des textes et des images ;\n\u2022 les lecteurs d\u2019\xE9cran qui sont utilis\xE9s par les personnes aveugles pour lire l\u2019information textuelle en synth\xE8se vocale ou en braille ;\n\u2022 les logiciels de conversion du texte en parole qui sont utilis\xE9s par certaines personnes ayant des limitations cognitives, des limitations du langage et des difficult\xE9s d\u2019apprentissage pour convertir le texte en synth\xE8se vocale ;\n\u2022 les logiciels de reconnaissance vocale qui peuvent \xEAtre utilis\xE9s par les personnes ayant certaines limitations motrices ;\n\u2022 des claviers de remplacement qui sont utilis\xE9s par des personnes ayant certaines limitations motrices pour simuler le clavier (y compris des claviers de remplacement qui utilisent des pointeurs de t\xEAte, des commutateurs simples, des dispositifs d\u2019aspiration/expiration et d\u2019autres dispositifs sp\xE9ciaux d\u2019aide \xE0 la saisie.) ;\n\u2022 des dispositifs de pointage adapt\xE9s qui sont utilis\xE9s par des personnes ayant certaines limitations motrices pour simuler le pointeur de la souris et l\u2019activation des boutons."
+    },
+    technologies: {
+      title: "technologie Web",
+      body: "m\xE9canisme pour encoder les instructions devant \xEAtre restitu\xE9es, jou\xE9es ou ex\xE9cut\xE9es par les agents utilisateurs\nNote : Tels qu\u2019employ\xE9s dans ces r\xE8gles, l\u2019expression \xAB technologie Web \xBB et le mot \xAB technologie \xBB (utilis\xE9 seul) d\xE9signent les technologies relatives aux contenus Web.\nNote : Les technologies relatives aux contenus Web comprennent les langages de balisage, les formats de donn\xE9es ou les langages de programmation que les auteurs sont amen\xE9s \xE0 utiliser seuls ou combin\xE9s pour cr\xE9er des exp\xE9riences pour l\u2019utilisateur final qui vont de pages Web statiques jusqu\u2019\xE0 des pr\xE9sentations multim\xE9dia synchronis\xE9es, en passant par des applications Web dynamiques.\nExemple\nOn compte parmi les exemples les plus fr\xE9quents de technologies Web : HTML, CSS, SVG, PNG, PDF, Flash et JavaScript."
+    },
+    "cognitive-function-test": {
+      title: "test cognitif",
+      body: "Une t\xE2che qui demande \xE0 l\u2019utilisateur de m\xE9moriser, manipuler ou retranscrire une information. Des exemples comprennent, mais ne se limitent pas \xE0 :\n\u2022 la m\xE9morisation, par exemple se souvenir d\u2019un identifiant, d\u2019un mot de passe, d\u2019un ensemble de caract\xE8res, d\u2019images ou de motifs. Les identifiants courants tels que le nom, l\u2019adresse de courrier \xE9lectronique et le num\xE9ro de t\xE9l\xE9phone ne sont pas consid\xE9r\xE9s comme des tests cognitifs, car ils sont propres \xE0 l\u2019utilisateur et constants d\u2019un site Web \xE0 l\u2019autre ;\n\u2022 la transcription, comme la saisie de caract\xE8res ;\n\u2022 l\u2019utilisation d\u2019une orthographe correcte ;\n\u2022 l\u2019ex\xE9cution de calculs ;\n\u2022 la r\xE9solution d\u2019\xE9nigmes."
+    },
+    text: {
+      title: "texte",
+      body: "s\xE9quence de caract\xE8res pouvant \xEAtre d\xE9termin\xE9e par un programme informatique et exprimant quelque chose dans une langue donn\xE9e."
+    },
+    "images-of-text": {
+      title: "texte sous forme d\u2019image",
+      body: "texte qui est restitu\xE9 sous une forme non textuelle (par exemple une image) dans le but de permettre un effet visuel particulier\nNote : Cela n\u2019inclut pas le texte qui est une partie d\u2019une image qui contient d\u2019autres contenus visuels signifiants.\nExemple\nLe nom d\u2019une personne sur un badge dans une photographie."
+    },
+    emergency: {
+      title: "urgence",
+      body: "un \xE9v\xE9nement ou une situation soudaine et impr\xE9vue qui exige une action imm\xE9diate afin de pr\xE9server la sant\xE9, la s\xE9curit\xE9 ou la propri\xE9t\xE9"
+    },
+    "used-in-an-unusual-or-restricted-way": {
+      title: "utilis\xE9 de mani\xE8re inhabituelle ou de fa\xE7on limit\xE9e",
+      body: "mots employ\xE9s de telle mani\xE8re qu\u2019ils obligent les utilisateurs \xE0 savoir exactement quelle d\xE9finition appliquer afin de comprendre correctement le contenu\nExemple\nLe terme \xAB m\xE9moire \xBB poss\xE8de une signification diff\xE9rente dans une conversation universitaire de celle qu\u2019il peut avoir dans un article consacr\xE9 au stockage informatique, mais la d\xE9finition pertinente peut \xEAtre d\xE9duite du contexte. \xC0 l\u2019inverse, le mot \xAB texte \xBB est utilis\xE9 de mani\xE8re tr\xE8s sp\xE9cifique dans les WCAG 2.1, \xE0 tel point qu\u2019une d\xE9finition figure dans le glossaire."
+    },
+    "conforming-alternate-versions": {
+      title: "version de remplacement conforme",
+      body: "version qui\n\u2022 se conforme au niveau d\xE9termin\xE9 et\n\u2022 fournit toutes les informations similaires et les m\xEAmes fonctionnalit\xE9s dans la m\xEAme langue et\n\u2022 est aussi \xE0 jour que le contenu non conforme et\n\u2022\npour laquelle au moins l\u2019une des affirmations suivantes est vraie :\n\u2022 la version conforme peut \xEAtre atteinte \xE0 partir de la page non conforme via un m\xE9canisme compatible avec l\u2019accessibilit\xE9 ou\n\u2022 la version non conforme peut \xEAtre atteinte seulement \xE0 partir de la version conforme ou\n\u2022 la version non conforme peut \xEAtre atteinte seulement \xE0 partir d\u2019une page conforme qui fournit aussi un m\xE9canisme pour atteindre la version conforme.\nNote : Dans cette d\xE9finition, \xAB peut \xEAtre atteinte seulement \xBB signifie qu\u2019il y a un m\xE9canisme comme une redirection conditionnelle, qui emp\xEAche un utilisateur \xAB d\u2019atteindre \xBB (de charger) la page non conforme \xE0 moins que l\u2019utilisateur ne vienne justement de la version conforme de cette m\xEAme page.\nNote : La version de remplacement n\u2019a pas besoin d\u2019\xEAtre appari\xE9e page par page avec la version originale (par exemple la version de remplacement conforme peut se pr\xE9senter en plusieurs pages).\nNote : Si des versions sont propos\xE9es dans plusieurs langues, une version de remplacement conforme est donc requise pour chacune de ces langues.\nNote : Des versions de remplacement peuvent aussi \xEAtre fournies afin d\u2019accommoder diff\xE9rents environnements technologiques ou diff\xE9rents groupes d\u2019utilisateurs. Chaque version devrait \xEAtre aussi conforme que possible. Une version devrait \xEAtre enti\xE8rement conforme afin de satisfaire \xE0 l\u2019exigence de conformit\xE9 1.\nNote : La version de remplacement conforme n\u2019a pas besoin d\u2019\xEAtre situ\xE9e dans le p\xE9rim\xE8tre de conformit\xE9 ni m\xEAme sur le m\xEAme site Web tant qu\u2019elle est aussi librement disponible que la version non conforme.\nNote : Une version de remplacement ne devrait pas \xEAtre confondue avec un contenu additionnel qui s\u2019ajoute \xE0 la page originale pour en am\xE9liorer la compr\xE9hension.\nNote : Permettre la configuration des pr\xE9f\xE9rences de l\u2019utilisateur \xE0 l\u2019int\xE9rieur du contenu afin de produire une version conforme est un m\xE9canisme acceptable pour atteindre une autre version tant que la m\xE9thode utilis\xE9e pour configurer les pr\xE9f\xE9rences est compatible avec l\u2019accessibilit\xE9.\nVoir Comprendre Version de remplacement conforme (en anglais)"
+    },
+    "alternative-for-time-based-media": {
+      title: "version de remplacement pour un m\xE9dia temporel",
+      body: "document renfermant dans un ordre correct une description des contenus visuels et sonores d\u2019un m\xE9dia temporel et fournissant un moyen de r\xE9aliser les effets de toute interaction temporelle\nNote : Un sc\xE9nario utilis\xE9 pour cr\xE9er le contenu d\u2019un m\xE9dia synchronis\xE9 serait conforme \xE0 cette d\xE9finition seulement s\u2019il a \xE9t\xE9 corrig\xE9 afin de repr\xE9senter fid\xE8lement la version finale du m\xE9dia synchronis\xE9 apr\xE8s \xE9dition."
+    },
+    video: {
+      title: "vid\xE9o",
+      body: "vid\xE9o la technologie des images ou photos en mouvement ou en s\xE9quence\nNote : Une vid\xE9o peut \xEAtre constitu\xE9e d\u2019images fixes ou anim\xE9es ou des deux."
+    }
+  }
 };
 
 // src/data/wcag-universe.json
@@ -1741,6 +2833,10 @@ function hasSC(id) {
 function knownScStatus(id) {
   return universeById.get(id)?.status;
 }
+function coreGlossary(lang = "en") {
+  const fr = data.glossaryFr;
+  return (lang === "fr" && fr && Object.keys(fr).length ? fr : data.glossary) ?? {};
+}
 function allPrinciples() {
   return data.principles;
 }
@@ -1756,6 +2852,11 @@ function guidelineTitle(n, lang = "en") {
   const g = data.guidelines.find((g2) => g2.number === n);
   if (!g) return void 0;
   return lang === "fr" ? g.titleFr ?? g.title : g.title;
+}
+function scText(id, lang = "en") {
+  const sc = byId.get(id);
+  if (!sc) return void 0;
+  return lang === "fr" ? sc.textFr ?? sc.text : sc.text;
 }
 function scTitle(id, lang = "en") {
   const sc = byId.get(id);
@@ -6240,7 +7341,7 @@ var flow = (superClass) => class FlowParserMixin extends superClass {
       node.id = this.parseIdentifier();
     }
     const bodyNode = this.startNode();
-    const body2 = bodyNode.body = [];
+    const body3 = bodyNode.body = [];
     this.expect(2);
     while (!this.match(4)) {
       const bodyNode2 = this.startNode();
@@ -6249,10 +7350,10 @@ var flow = (superClass) => class FlowParserMixin extends superClass {
         if (!this.isContextual(126) && !this.match(83)) {
           this.raise(FlowErrors.InvalidNonTypeImportInDeclareModule, this.state.lastTokStartLoc);
         }
-        body2.push(super.parseImport(bodyNode2));
+        body3.push(super.parseImport(bodyNode2));
       } else {
         this.expectContextual(121, FlowErrors.UnsupportedStatementInDeclareModule);
-        body2.push(this.flowParseDeclare(bodyNode2, true));
+        body3.push(this.flowParseDeclare(bodyNode2, true));
       }
     }
     this.scope.exit();
@@ -6260,7 +7361,7 @@ var flow = (superClass) => class FlowParserMixin extends superClass {
     node.body = this.finishNode(bodyNode, "BlockStatement");
     let kind = null;
     let hasModuleExport = false;
-    body2.forEach((bodyElement) => {
+    body3.forEach((bodyElement) => {
       if (isEsModuleType(bodyElement)) {
         if (kind === "CommonJS") {
           this.raise(FlowErrors.AmbiguousDeclareModuleKind, bodyElement);
@@ -12088,17 +13189,17 @@ var ExpressionParser = class extends LValParser {
     const {
       startLoc
     } = this.state;
-    const body2 = this.parseMaybeAssign();
-    const requiredParentheses = UnparenthesizedPipeBodyDescriptions.has(body2.type);
-    if (requiredParentheses && !body2.extra?.parenthesized) {
+    const body3 = this.parseMaybeAssign();
+    const requiredParentheses = UnparenthesizedPipeBodyDescriptions.has(body3.type);
+    if (requiredParentheses && !body3.extra?.parenthesized) {
       this.raise(Errors.PipeUnparenthesizedBody, startLoc, {
-        type: body2.type
+        type: body3.type
       });
     }
     if (!this.topicReferenceWasUsedInCurrentContext()) {
       this.raise(Errors.PipeTopicUnused, startLoc);
     }
-    return body2;
+    return body3;
   }
   checkExponentialAfterUnary(node) {
     if (this.match(53)) {
@@ -14172,11 +15273,11 @@ var StatementParser = class extends ExpressionParser {
     return stmt.type === "ExpressionStatement" && stmt.expression.type === "StringLiteral" && !stmt.expression.extra.parenthesized;
   }
   parseBlockBody(node, allowDirectives, topLevel, end, afterBlockParse) {
-    const body2 = node.body = [];
+    const body3 = node.body = [];
     const directives = node.directives = [];
-    this.parseBlockOrModuleBlockBody(body2, allowDirectives ? directives : void 0, topLevel, end, afterBlockParse);
+    this.parseBlockOrModuleBlockBody(body3, allowDirectives ? directives : void 0, topLevel, end, afterBlockParse);
   }
-  parseBlockOrModuleBlockBody(body2, directives, topLevel, end, afterBlockParse) {
+  parseBlockOrModuleBlockBody(body3, directives, topLevel, end, afterBlockParse) {
     const oldStrict = this.state.strict;
     let hasStrictModeDirective = false;
     let parsedNonDirective = false;
@@ -14195,7 +15296,7 @@ var StatementParser = class extends ExpressionParser {
         parsedNonDirective = true;
         this.state.strictErrors.clear();
       }
-      body2.push(stmt);
+      body3.push(stmt);
     }
     afterBlockParse?.call(this, hasStrictModeDirective);
     if (!oldStrict) {
@@ -14552,8 +15653,8 @@ var StatementParser = class extends ExpressionParser {
     const oldLabels = this.state.labels;
     this.state.labels = [];
     this.prodParam.enter(0);
-    const body2 = member.body = [];
-    this.parseBlockOrModuleBlockBody(body2, void 0, false, 4);
+    const body3 = member.body = [];
+    this.parseBlockOrModuleBlockBody(body3, void 0, false, 4);
     this.prodParam.exit();
     this.scope.exit();
     this.state.labels = oldLabels;
@@ -16398,9 +17499,9 @@ var typescript = (superClass) => class TypeScriptParserMixin extends superClass 
     if (this.eat(77)) {
       node.extends = this.tsParseHeritageClause("extends");
     }
-    const body2 = this.startNode();
-    body2.body = this.tsInType(this.tsParseObjectTypeMembers.bind(this));
-    node.body = this.finishNode(body2, "TSInterfaceBody");
+    const body3 = this.startNode();
+    body3.body = this.tsInType(this.tsParseObjectTypeMembers.bind(this));
+    node.body = this.finishNode(body3, "TSInterfaceBody");
     return this.finishNode(node, "TSInterfaceDeclaration");
   }
   tsParseTypeAliasDeclaration(node) {
@@ -18772,8 +19873,8 @@ function isLibrarySpecifier(spec) {
 }
 function opaqueLibrarySpecifiers(ast, elements) {
   const importSrc = /* @__PURE__ */ new Map();
-  const body2 = asNodes2((asNode2(ast.program) ?? ast).body);
-  for (const stmt of body2) {
+  const body3 = asNodes2((asNode2(ast.program) ?? ast).body);
+  for (const stmt of body3) {
     if (stmt.type !== "ImportDeclaration") continue;
     const source = asNode2(stmt.source);
     const spec = source && typeof source.value === "string" ? source.value : "";
@@ -19157,22 +20258,22 @@ function patternToRegExpSource(pattern) {
       re += "[^/]";
     } else if (c2 === "[") {
       let j = i2 + 1;
-      let body2 = "";
+      let body22 = "";
       if (pattern[j] === "!") {
-        body2 += "^";
+        body22 += "^";
         j++;
       }
       if (pattern[j] === "]") {
-        body2 += "\\]";
+        body22 += "\\]";
         j++;
       }
       while (j < pattern.length && pattern[j] !== "]") {
         const ch = pattern[j];
-        body2 += ch === "\\" || ch === "^" ? "\\" + ch : ch;
+        body22 += ch === "\\" || ch === "^" ? "\\" + ch : ch;
         j++;
       }
-      if (j < pattern.length && body2 !== "" && body2 !== "^") {
-        re += `[${body2}]`;
+      if (j < pattern.length && body22 !== "" && body22 !== "^") {
+        re += `[${body22}]`;
         i2 = j;
       } else {
         re += "\\[";
@@ -19202,8 +20303,8 @@ function parseGitignore(content, baseRel) {
     if (!line) continue;
     const anchored = line.includes("/");
     if (line.startsWith("/")) line = line.slice(1);
-    const body2 = patternToRegExpSource(line);
-    const source = anchored ? `^${prefix2}${body2}$` : `^${prefix2}(?:[^/]+/)*${body2}$`;
+    const body22 = patternToRegExpSource(line);
+    const source = anchored ? `^${prefix2}${body22}$` : `^${prefix2}(?:[^/]+/)*${body22}$`;
     try {
       rules.push({ re: new RegExp(source), negated, dirOnly });
     } catch {
@@ -20520,15 +21621,15 @@ function isBoilerplate(s) {
   return /^(all notable changes to this project|in the interest of fostering|this project adheres to|we as members and leaders|table of contents)\b/i.test(s);
 }
 function extractMarkdown(content) {
-  let body2 = content;
+  let body22 = content;
   let frontTitle;
-  const fm = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(body2);
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(body22);
   if (fm) {
     const t2 = /(^|\n)title:\s*["']?(.+?)["']?\s*(\n|$)/i.exec(fm[1]);
     if (t2) frontTitle = t2[2].trim();
-    body2 = body2.slice(fm[0].length);
+    body22 = body22.slice(fm[0].length);
   }
-  const scan2 = stripFences(body2);
+  const scan2 = stripFences(body22);
   const lines = scan2.split(/\r?\n/);
   const headings2 = [];
   let title2 = frontTitle;
@@ -23938,10 +25039,10 @@ var init_web_tree_sitter = __esm({
         } else {
           const response = await fetch(input);
           if (!response.ok) {
-            const body2 = await response.text();
+            const body22 = await response.text();
             throw new Error(`Language.load failed with status ${response.status}.
 
-${body2}`);
+${body22}`);
           }
           const retryResp = response.clone();
           try {
@@ -26018,8 +27119,8 @@ function docCommentFor(node) {
   return void 0;
 }
 function docstringFor(node) {
-  const body2 = node.childForFieldName("body");
-  const first = body2?.namedChildren[0];
+  const body22 = node.childForFieldName("body");
+  const first = body22?.namedChildren[0];
   if (!first) return void 0;
   const str22 = first.type === "string" ? first : first.type === "expression_statement" ? first.namedChildren[0] : void 0;
   if (!str22 || str22.type !== "string") return void 0;
@@ -26830,8 +27931,8 @@ function collectTermsRegex(content) {
       line = line.slice(0, lineComment.index);
     }
     for (const m of line.matchAll(/(['"`])((?:\\.|(?!\1)[^\\])*)\1/g)) {
-      const body2 = m[2];
-      if (body2.length && body2.length <= MAX_LITERAL_LEN3) add2(body2);
+      const body22 = m[2];
+      if (body22.length && body22.length <= MAX_LITERAL_LEN3) add2(body22);
     }
   }
   return [...found].sort();
@@ -29165,8 +30266,8 @@ function symbolComplexity(scan2, rel2, top = 50) {
     for (const s of f.symbols) {
       if (s.kind === "reexport" || s.kind === "reexport-all") continue;
       const end = s.endLine ?? s.line;
-      const body2 = lines.slice(s.line - 1, end).join("\n");
-      const entry = { file: f.rel, name: s.name, line: s.line, complexity: complexityOfSource(body2) };
+      const body22 = lines.slice(s.line - 1, end).join("\n");
+      const entry = { file: f.rel, name: s.name, line: s.line, complexity: complexityOfSource(body22) };
       if (s.endLine !== void 0) entry.endLine = s.endLine;
       out2.push(entry);
     }
@@ -29598,21 +30699,21 @@ function resolveUniqueSymbol(scan2, namePath, file) {
 function readLines(abs) {
   return readFileSync6(abs, "utf8").split("\n");
 }
-function replaceSymbolBody(scan2, namePath, body2, file) {
+function replaceSymbolBody(scan2, namePath, body22, file) {
   const sym = resolveUniqueSymbol(scan2, namePath, file);
   const end = sym.endLine ?? sym.line;
   const abs = join12(scan2.root, sym.file);
   const lines = readLines(abs);
-  const newLines = body2.replace(/^\n+|\n+$/g, "").split("\n");
+  const newLines = body22.replace(/^\n+|\n+$/g, "").split("\n");
   lines.splice(sym.line - 1, end - sym.line + 1, ...newLines);
   writeFileSync2(abs, lines.join("\n"));
   return { file: sym.file, startLine: sym.line, endLine: sym.line + newLines.length - 1, lines: newLines.length };
 }
-function insertAt(scan2, sym, body2, index, blankBefore, blankAfter) {
+function insertAt(scan2, sym, body22, index, blankBefore, blankAfter) {
   const abs = join12(scan2.root, sym.file);
   const lines = readLines(abs);
   const minGap = SEPARATED_KINDS.has(sym.kind) ? 1 : 0;
-  const newLines = body2.replace(/^\n+|\n+$/g, "").split("\n");
+  const newLines = body22.replace(/^\n+|\n+$/g, "").split("\n");
   const block = [];
   if (blankBefore && minGap && lines[index - 1]?.trim() !== "") block.push("");
   block.push(...newLines);
@@ -29621,14 +30722,14 @@ function insertAt(scan2, sym, body2, index, blankBefore, blankAfter) {
   writeFileSync2(abs, lines.join("\n"));
   return { file: sym.file, startLine: index + 1, endLine: index + block.length, lines: block.length };
 }
-function insertAfterSymbol(scan2, namePath, body2, file) {
+function insertAfterSymbol(scan2, namePath, body22, file) {
   const sym = resolveUniqueSymbol(scan2, namePath, file);
   const end = sym.endLine ?? sym.line;
-  return insertAt(scan2, sym, body2, end, true, true);
+  return insertAt(scan2, sym, body22, end, true, true);
 }
-function insertBeforeSymbol(scan2, namePath, body2, file) {
+function insertBeforeSymbol(scan2, namePath, body22, file) {
   const sym = resolveUniqueSymbol(scan2, namePath, file);
-  return insertAt(scan2, sym, body2, sym.line - 1, true, true);
+  return insertAt(scan2, sym, body22, sym.line - 1, true, true);
 }
 var SEPARATED_KINDS;
 var init_edit = __esm({
@@ -29722,13 +30823,13 @@ function tomlSectionBody(toml, section) {
   const m = toml.match(re);
   return m ? m[1] : null;
 }
-function tomlStringArray(body2, key) {
-  const m = body2.match(new RegExp(`${escapeRegExp(key)}\\s*=\\s*\\[([^\\]]*)\\]`));
+function tomlStringArray(body22, key) {
+  const m = body22.match(new RegExp(`${escapeRegExp(key)}\\s*=\\s*\\[([^\\]]*)\\]`));
   if (!m) return [];
   return m[1].split(/\r?\n/).map((line) => line.replace(/#.*$/, "")).join("\n").split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
 }
-function tomlString(body2, key) {
-  return body2?.match(new RegExp(`^\\s*${escapeRegExp(key)}\\s*=\\s*["']([^"']+)["']`, "m"))?.[1];
+function tomlString(body22, key) {
+  return body22?.match(new RegExp(`^\\s*${escapeRegExp(key)}\\s*=\\s*["']([^"']+)["']`, "m"))?.[1];
 }
 function wsGlobToRegExp(pat) {
   let re = "";
@@ -29767,14 +30868,14 @@ function probeNodePkg(root, dir, kind, warnings) {
 function probeCargo(root, dir) {
   const path = join14(root, dir, "Cargo.toml");
   if (!existsSync5(path)) return void 0;
-  const body2 = tomlSectionBody(readText2(path), "package");
+  const body22 = tomlSectionBody(readText2(path), "package");
   const out2 = {
-    name: tomlString(body2, "name") ?? dir,
+    name: tomlString(body22, "name") ?? dir,
     dir,
     kind: "cargo",
     manifest: `${dir}/Cargo.toml`
   };
-  const description = tomlString(body2, "description");
+  const description = tomlString(body22, "description");
   if (description) out2.description = description;
   return out2;
 }
@@ -29975,11 +31076,11 @@ function fallbackNpmPatterns(root, warnings) {
 function detectCargoMembers(root, found, warnings) {
   const toml = readText2(join14(root, "Cargo.toml"));
   if (!toml) return;
-  const body2 = tomlSectionBody(toml, "workspace");
-  if (!body2) return;
-  const members = tomlStringArray(body2, "members");
+  const body22 = tomlSectionBody(toml, "workspace");
+  if (!body22) return;
+  const members = tomlStringArray(body22, "members");
   if (!members.length) return;
-  const excludes = tomlStringArray(body2, "exclude").map(wsGlobToRegExp);
+  const excludes = tomlStringArray(body22, "exclude").map(wsGlobToRegExp);
   const candidates2 = /* @__PURE__ */ new Map();
   for (const pat of members) expandPattern(root, pat, candidates2, "cargo", warnings);
   for (const [dir, pkg] of candidates2) {
@@ -30015,11 +31116,11 @@ function detectMavenModules(root, found, warnings) {
 function detectUvMembers(root, found, warnings) {
   const toml = readText2(join14(root, "pyproject.toml"));
   if (!toml) return;
-  const body2 = tomlSectionBody(toml, "tool.uv.workspace");
-  if (!body2) return;
-  const members = tomlStringArray(body2, "members");
+  const body22 = tomlSectionBody(toml, "tool.uv.workspace");
+  if (!body22) return;
+  const members = tomlStringArray(body22, "members");
   if (!members.length) return;
-  const excludes = tomlStringArray(body2, "exclude").map(wsGlobToRegExp);
+  const excludes = tomlStringArray(body22, "exclude").map(wsGlobToRegExp);
   const candidates2 = /* @__PURE__ */ new Map();
   for (const pat of members) expandPattern(root, pat, candidates2, "uv", warnings);
   for (const [dir, pkg] of candidates2) {
@@ -30078,9 +31179,9 @@ function cargoEdges(root, pkg, byName, byDir) {
   if (!toml) return [];
   const edges = /* @__PURE__ */ new Set();
   for (const section of ["dependencies", "dev-dependencies", "build-dependencies"]) {
-    const body2 = tomlSectionBody(toml, section);
-    if (!body2) continue;
-    for (const line of body2.split(/\r?\n/)) {
+    const body22 = tomlSectionBody(toml, section);
+    if (!body22) continue;
+    for (const line of body22.split(/\r?\n/)) {
       const kv = line.match(/^\s*([A-Za-z0-9_-]+)\s*=\s*(.+)$/);
       if (!kv) continue;
       const dep = kv[1];
@@ -30669,10 +31770,10 @@ function groupFamilies(dups) {
   return families;
 }
 function pathPrefix(value) {
-  const body2 = value.startsWith("/") ? value.slice(1) : value;
-  const cut = body2.search(/[/:]/);
+  const body22 = value.startsWith("/") ? value.slice(1) : value;
+  const cut = body22.search(/[/:]/);
   if (cut <= 0) return void 0;
-  const prefix2 = (value.startsWith("/") ? "/" : "") + body2.slice(0, cut);
+  const prefix2 = (value.startsWith("/") ? "/" : "") + body22.slice(0, cut);
   return prefix2.length >= FAMILY_MIN_PREFIX ? prefix2 : void 0;
 }
 var LITERAL_DUPLICATION_CAP;
@@ -30876,14 +31977,14 @@ function resolveEmbedPullUrl() {
 async function fetchEmbedModel(url, expectedSha256) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
-  const body2 = await res.text();
+  const body22 = await res.text();
   if (expectedSha256) {
-    const got = createHash3("sha256").update(body2).digest("hex");
+    const got = createHash3("sha256").update(body22).digest("hex");
     if (got !== expectedSha256) {
       throw new Error(`sha256 mismatch: expected ${expectedSha256}, got ${got}`);
     }
   }
-  return body2;
+  return body22;
 }
 var EMBED_VERSION;
 var DEFAULT_EMBED_DIRNAME;
@@ -31027,16 +32128,16 @@ function serializeEmbeddings(index) {
     records: index.records.map((r) => ({ file: r.file, symbol: r.symbol ?? "", line: r.line ?? 0 }))
   });
   const headerBuf = Buffer.from(header4, "utf8");
-  const body2 = Buffer.alloc(index.records.length * index.dim);
+  const body22 = Buffer.alloc(index.records.length * index.dim);
   let off = 0;
   for (const r of index.records) {
-    for (let d = 0; d < index.dim; d++) body2.writeInt8(r.vec[d] ?? 0, off++);
+    for (let d = 0; d < index.dim; d++) body22.writeInt8(r.vec[d] ?? 0, off++);
   }
-  const out2 = Buffer.alloc(8 + headerBuf.length + body2.length);
+  const out2 = Buffer.alloc(8 + headerBuf.length + body22.length);
   out2.write(MAGIC, 0, "ascii");
   out2.writeUInt32LE(headerBuf.length, 4);
   headerBuf.copy(out2, 8);
-  body2.copy(out2, 8 + headerBuf.length);
+  body22.copy(out2, 8 + headerBuf.length);
   return out2;
 }
 function deserializeEmbeddings(bytes) {
@@ -31364,8 +32465,8 @@ var init_onboard = __esm({
   }
 });
 function encodeMessage(msg) {
-  const body2 = JSON.stringify(msg);
-  return `Content-Length: ${byteLength(body2)}${HEADER_END}${body2}`;
+  const body22 = JSON.stringify(msg);
+  return `Content-Length: ${byteLength(body22)}${HEADER_END}${body22}`;
 }
 function byteLength(s) {
   return new TextEncoder().encode(s).byteLength;
@@ -31406,10 +32507,10 @@ function createFramer() {
         }
         const start2 = end + 4;
         if (buffer.length < start2 + length) return out2;
-        const body2 = decoder.decode(buffer.subarray(start2, start2 + length));
+        const body22 = decoder.decode(buffer.subarray(start2, start2 + length));
         buffer = buffer.subarray(start2 + length);
         try {
-          out2.push(JSON.parse(body2));
+          out2.push(JSON.parse(body22));
         } catch {
         }
       }
@@ -33169,19 +34270,19 @@ async function callTool(name2, args2, defaultRepo) {
   }
   if (name2 === "symbols") {
     const { symbols } = getArtifacts(repo, scanOpts, walked);
-    const lookup = str(args2.name);
-    if (lookup) {
-      return JSON.stringify({ name: lookup, defs: symbols.defs[lookup] ?? [], refs: symbols.refs[lookup] ?? [] }, null, 2);
+    const lookup2 = str(args2.name);
+    if (lookup2) {
+      return JSON.stringify({ name: lookup2, defs: symbols.defs[lookup2] ?? [], refs: symbols.refs[lookup2] ?? [] }, null, 2);
     }
     return JSON.stringify(symbols, null, 2);
   }
   if (name2 === "callers") {
     const scan2 = getScan(repo, scanOpts, walked);
     const index = args2.recall === true ? buildCallerIndex(scan2, void 0, { recall: true }) : callerIndexFor(scan2);
-    const lookup = str(args2.name);
-    if (lookup) {
-      const entry = index.get(lookup);
-      return JSON.stringify(entry ?? { error: `no tracked callers for "${lookup}"` }, null, 2);
+    const lookup2 = str(args2.name);
+    if (lookup2) {
+      const entry = index.get(lookup2);
+      return JSON.stringify(entry ?? { error: `no tracked callers for "${lookup2}"` }, null, 2);
     }
     const obj = {};
     for (const [k, v] of index) obj[k] = v;
@@ -33226,11 +34327,11 @@ async function callTool(name2, args2, defaultRepo) {
   }
   if (name2 === "replace_symbol_body" || name2 === "insert_after_symbol" || name2 === "insert_before_symbol") {
     const namePath = str(args2.namePath);
-    const body2 = typeof args2.body === "string" ? args2.body : void 0;
-    if (!namePath || body2 === void 0) throw new Error("`namePath` and `body` are required");
+    const body22 = typeof args2.body === "string" ? args2.body : void 0;
+    if (!namePath || body22 === void 0) throw new Error("`namePath` and `body` are required");
     const scan2 = getScan(repo, scanOpts, walked);
     const fn = name2 === "replace_symbol_body" ? replaceSymbolBody : name2 === "insert_after_symbol" ? insertAfterSymbol : insertBeforeSymbol;
-    const result = fn(scan2, namePath, body2, str(args2.file));
+    const result = fn(scan2, namePath, body22, str(args2.file));
     sessionClear();
     return JSON.stringify(result, null, 2);
   }
@@ -35607,9 +36708,9 @@ async function runCli(rawArgv) {
       mkdirSync3(destDir, { recursive: true });
       process.stderr.write(`codeindex: fetching model from ${url} \u2192 ${join23(destDir, "model.json")}
 `);
-      let body2;
+      let body22;
       try {
-        body2 = await fetchEmbedModel(url, sha256);
+        body22 = await fetchEmbedModel(url, sha256);
       } catch (e) {
         process.stderr.write(`codeindex: pull failed \u2014 ${e instanceof Error ? e.message : String(e)} (nothing written)
 `);
@@ -35617,7 +36718,7 @@ async function runCli(rawArgv) {
         return;
       }
       try {
-        parseEmbedModel(JSON.parse(body2), url);
+        parseEmbedModel(JSON.parse(body22), url);
       } catch (e) {
         process.stderr.write(
           `codeindex: pull failed \u2014 response is not a valid model.json (${e instanceof Error ? e.message : String(e)}) (nothing written)
@@ -35626,7 +36727,7 @@ async function runCli(rawArgv) {
         process.exitCode = 1;
         return;
       }
-      writeFileSync4(join23(destDir, "model.json"), body2);
+      writeFileSync4(join23(destDir, "model.json"), body22);
       process.stderr.write(`codeindex: model written to ${join23(destDir, "model.json")}
 `);
     } else {
@@ -35904,10 +37005,10 @@ function parseCaptureProvenance(source) {
   const head = source.length > SCAN_LIMIT ? source.slice(0, SCAN_LIMIT) : source;
   const m = MARKER.exec(head);
   if (!m) return void 0;
-  const body2 = m[1] ?? "";
+  const body3 = m[1] ?? "";
   const kv = /* @__PURE__ */ new Map();
   PAIR.lastIndex = 0;
-  for (let p = PAIR.exec(body2); p; p = PAIR.exec(body2)) {
+  for (let p = PAIR.exec(body3); p; p = PAIR.exec(body3)) {
     kv.set(p[1], unescapeCommentValue(p[2]));
   }
   const vRaw = kv.get("v");
@@ -39078,18 +40179,18 @@ var labelInNameMismatch = {
       const ariaLabel = (attr(el, "aria-label") ?? "").trim();
       if (!ariaLabel || ariaLabel.includes("{")) continue;
       if (hasAttr(el, "aria-labelledby")) continue;
-      const visible = visibleText(el).trim();
-      if (!visible || visible.includes("{")) continue;
-      if (visible.length < 3) continue;
+      const visible2 = visibleText(el).trim();
+      if (!visible2 || visible2.includes("{")) continue;
+      if (visible2.length < 3) continue;
       if (mayInjectContent(el)) continue;
       const name2 = normalizeName(ariaLabel);
-      const label = normalizeName(visible);
+      const label = normalizeName(visible2);
       if (!label || !name2 || name2.includes(label)) continue;
       out2.push({
         criteriaId: "2.5.3",
         el,
         msgId: "label-in-name-mismatch",
-        params: { visible, name: ariaLabel }
+        params: { visible: visible2, name: ariaLabel }
       });
     }
     return out2;
@@ -40259,10 +41360,10 @@ function crc32(buf) {
 function chunk(type, data2) {
   const len = Buffer.alloc(4);
   len.writeUInt32BE(data2.length);
-  const body2 = Buffer.concat([Buffer.from(type, "latin1"), data2]);
+  const body3 = Buffer.concat([Buffer.from(type, "latin1"), data2]);
   const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(body2));
-  return Buffer.concat([len, body2, crc]);
+  crc.writeUInt32BE(crc32(body3));
+  return Buffer.concat([len, body3, crc]);
 }
 function encodePng(r) {
   const expected = r.width * r.height * 4;
@@ -41168,6 +42269,9 @@ function runCrossRules(doc, graph) {
   findings.sort((a, b) => a.line - b.line || a.col - b.col || SEVERITY_ORDER2[a.severity] - SEVERITY_ORDER2[b.severity]);
   return { findings, suppress };
 }
+
+// src/standards/registry.ts
+import { AsyncLocalStorage } from "async_hooks";
 
 // src/data/standards/rgaa.json
 var rgaa_default = {
@@ -45652,6 +46756,57 @@ function formatIssues(issues) {
 // src/standards/registry.ts
 var CORE_KEY = "wcag";
 var registry = /* @__PURE__ */ new Map();
+var overlays = /* @__PURE__ */ new Map();
+var scopeStore = new AsyncLocalStorage();
+function currentOverlay() {
+  const scope = scopeStore.getStore();
+  return scope === void 0 ? void 0 : overlays.get(scope);
+}
+function lookup(key) {
+  return currentOverlay()?.get(key) ?? registry.get(key);
+}
+function visible() {
+  const overlay = currentOverlay();
+  if (!overlay?.size) return registry;
+  const merged = new Map(registry);
+  for (const [key, entry] of overlay) merged.set(key, entry);
+  return merged;
+}
+function withScope(scope, fn) {
+  return scope === void 0 ? fn() : scopeStore.run(scope, fn);
+}
+function registerScoped(scope, raw, glossary = {}, opts = {}) {
+  const overlay = ensureScope(scope);
+  const known = /* @__PURE__ */ new Set([CORE_KEY, ...registry.keys(), ...overlay.keys()]);
+  const v = validatePack(raw, { knownKeys: known, allowOverride: opts.override });
+  if (v.ok && v.pack) overlay.set(v.pack.key, { pack: v.pack, glossary });
+  return v;
+}
+function packForMutation(key) {
+  const overlay = currentOverlay();
+  if (!overlay) return loadPack(key);
+  const own = overlay.get(key);
+  if (own) return own.pack;
+  const shared = registry.get(key);
+  if (!shared) return loadPack(key);
+  const copy = { pack: structuredClone(shared.pack), glossary: shared.glossary };
+  overlay.set(key, copy);
+  return copy.pack;
+}
+function ensureScope(scope) {
+  let overlay = overlays.get(scope);
+  if (!overlay) {
+    overlay = /* @__PURE__ */ new Map();
+    overlays.set(scope, overlay);
+  }
+  return overlay;
+}
+function scopeLoaded(scope) {
+  return overlays.has(scope);
+}
+function dropScope(scope) {
+  overlays.delete(scope);
+}
 function register(pack, glossary) {
   if (pack.key === CORE_KEY) throw new Error(`pack key "${CORE_KEY}" is reserved for the WCAG core`);
   registry.set(pack.key, { pack, glossary });
@@ -45663,7 +46818,7 @@ function registerRuntimePack(raw, glossary = {}, opts = {}) {
   return v;
 }
 function enableSecondaryMapping(packKey, m) {
-  const pack = loadPack(packKey);
+  const pack = packForMutation(packKey);
   const list = pack.secondaryMappings ??= [];
   const existing = list.find((x) => x.ruleId === m.ruleId && x.criterion === m.criterion);
   if (existing) {
@@ -45677,28 +46832,28 @@ function isCore(key) {
   return key === CORE_KEY;
 }
 function hasStandard(key) {
-  return key === CORE_KEY || registry.has(key);
+  return key === CORE_KEY || lookup(key) !== void 0;
 }
 function loadPack(key) {
-  const r = registry.get(key);
-  if (!r) throw new Error(`unknown standards pack "${key}" (known packs: ${[...registry.keys()].join(", ") || "none"})`);
+  const r = lookup(key);
+  if (!r) throw new Error(`unknown standards pack "${key}" (known packs: ${[...visible().keys()].join(", ") || "none"})`);
   return r.pack;
 }
 function getPack(key) {
-  return registry.get(key)?.pack;
+  return lookup(key)?.pack;
 }
 function packGlossary(key) {
-  return registry.get(key)?.glossary;
+  return lookup(key)?.glossary;
 }
 function listStandards() {
-  return [CORE_KEY, ...registry.keys()];
+  return [CORE_KEY, ...visible().keys()];
 }
 function listPacks() {
-  return [...registry.values()].map((r) => r.pack);
+  return [...visible().values()].map((r) => r.pack);
 }
 function packsForSc(sc) {
   const out2 = [];
-  for (const { pack } of registry.values()) {
+  for (const { pack } of visible().values()) {
     const ids = pack.criteria.filter((c2) => c2.wcag.includes(sc)).map((c2) => c2.id);
     if (ids.length) out2.push({ key: pack.key, ids });
   }
@@ -45974,11 +47129,11 @@ function extractGraphNode(ast, doc, file, opts = {}) {
     return { file: posix3, imports, components, definesIds, providesHtmlLang, starReexports, opaqueComponents };
   };
   if (!ast) return finish();
-  const body2 = asNodes((asNode(ast.program) ?? ast).body);
+  const body3 = asNodes((asNode(ast.program) ?? ast).body);
   const register2 = (def) => {
     if (!components.has(def.name)) components.set(def.name, def);
   };
-  for (const stmt of body2) {
+  for (const stmt of body3) {
     if (stmt.type === "ImportDeclaration") {
       const source = asNode(stmt.source);
       const spec = source && typeof source.value === "string" ? source.value : "";
@@ -46530,6 +47685,9 @@ function localize(pack, s, lang) {
   if (!s) return "";
   return s[lang] ?? s[pack.defaultLocale] ?? s.en ?? Object.values(s)[0] ?? "";
 }
+function allCriteria(pack) {
+  return pack.criteria;
+}
 function getCriterion(pack, id) {
   return pack.criteria.find((c2) => c2.id === id);
 }
@@ -46555,6 +47713,17 @@ function packTestIds(pack, id) {
 }
 function resolveGlossary(packKey, anchor) {
   return packGlossary(packKey)?.[anchor];
+}
+var GLOSSARY_REF = /\[[^\]]+\]\(#([^)]+)\)/g;
+function glossaryAnchorsOf(crit) {
+  if (!crit) return [];
+  const texts = [...Object.values(crit.tests ?? {}).flat(), ...crit.technicalNote ?? [], ...crit.particularCases ?? []];
+  const seen = /* @__PURE__ */ new Set();
+  for (const t2 of texts) {
+    GLOSSARY_REF.lastIndex = 0;
+    for (let m = GLOSSARY_REF.exec(t2); m; m = GLOSSARY_REF.exec(t2)) if (m[1]) seen.add(m[1]);
+  }
+  return [...seen];
 }
 function neutralizeCaptureGroups(pattern) {
   let out2 = "";
@@ -49162,11 +50331,282 @@ var rgaa_default2 = {
   ]
 };
 
+// src/data/guidance/wcag.json
+var wcag_default2 = {
+  pack: "wcag",
+  source: "https://www.w3.org/WAI/WCAG22/Understanding/",
+  license: "W3C Document License",
+  attribution: "Derived from the W3C Understanding WCAG 2.2 documents. WCAG 2.2 \xA9 W3C. Short derived summaries and minimal illustrative examples only, not verbatim prose \u2014 see NOTICE.",
+  entries: [
+    {
+      id: "media-live-captions",
+      criterionId: "1.2.4",
+      wcag: ["1.2.4"],
+      title: {
+        en: "Live synchronized media is captioned",
+        fr: "Le m\xE9dia synchronis\xE9 en direct est sous-titr\xE9"
+      },
+      summary: {
+        en: "Live audio in synchronized media needs real-time captions. A player with no caption track leaves deaf and hard-of-hearing users with nothing, and a pre-recorded transcript published afterwards does not satisfy a live criterion.",
+        fr: "L'audio en direct d'un m\xE9dia synchronis\xE9 exige des sous-titres en temps r\xE9el. Un lecteur sans piste de sous-titres ne laisse rien aux personnes sourdes ou malentendantes, et une transcription publi\xE9e apr\xE8s coup ne satisfait pas un crit\xE8re \xAB en direct \xBB."
+      },
+      impact: "high",
+      examples: [
+        {
+          lang: "html",
+          bad: '<video src="/live/stream.m3u8" controls></video>',
+          good: '<video src="/live/stream.m3u8" controls>\n  <track kind="captions" srclang="en" label="English (live)" src="/live/captions.vtt" default>\n</video>',
+          note: {
+            en: "The caption track must be fed in real time (a live captioner or a live ASR service). Publishing a transcript after the broadcast is a different criterion.",
+            fr: "La piste doit \xEAtre aliment\xE9e en temps r\xE9el (sous-titrage humain ou reconnaissance vocale en direct). Publier une transcription apr\xE8s la diffusion rel\xE8ve d'un autre crit\xE8re."
+          }
+        }
+      ],
+      reference: "https://www.w3.org/WAI/WCAG22/Understanding/captions-live.html"
+    },
+    {
+      id: "motion-three-flashes",
+      criterionId: "2.3.1",
+      wcag: ["2.3.1"],
+      title: {
+        en: "Nothing flashes more than three times a second",
+        fr: "Rien ne clignote plus de trois fois par seconde"
+      },
+      summary: {
+        en: "Content that flashes more than three times in any one second can trigger a seizure. This is the one accessibility failure that can cause physical harm, so it is not a matter of preference: slow the flash below the threshold, or remove it.",
+        fr: "Un contenu qui clignote plus de trois fois par seconde peut d\xE9clencher une crise d'\xE9pilepsie. C'est le seul d\xE9faut d'accessibilit\xE9 qui peut causer un dommage physique : il faut ralentir le clignotement sous le seuil, ou le supprimer."
+      },
+      impact: "high",
+      examples: [
+        {
+          lang: "css",
+          bad: ".alert {\n  animation: flash 0.15s steps(1) infinite;\n}",
+          good: ".alert {\n  animation: flash 1s steps(1) infinite;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .alert {\n    animation: none;\n  }\n}",
+          note: {
+            en: "A 0.15s cycle flashes about seven times a second. Honouring prefers-reduced-motion is good practice but does not by itself satisfy this criterion \u2014 the default must already be safe.",
+            fr: "Un cycle de 0,15 s clignote environ sept fois par seconde. Respecter prefers-reduced-motion est une bonne pratique mais ne suffit pas : le comportement par d\xE9faut doit d\xE9j\xE0 \xEAtre s\xFBr."
+          }
+        }
+      ],
+      reference: "https://www.w3.org/WAI/WCAG22/Understanding/three-flashes-or-below-threshold.html"
+    },
+    {
+      id: "navigation-multiple-ways",
+      criterionId: "2.4.5",
+      wcag: ["2.4.5"],
+      title: {
+        en: "More than one way to reach a page",
+        fr: "Plus d'un moyen d'atteindre une page"
+      },
+      summary: {
+        en: "A site offers at least two ways to locate a page \u2014 for example a menu plus a search, or a sitemap. Users who find hierarchical menus hard to navigate need another route; the exception is a page that is a step in a process.",
+        fr: "Un site propose au moins deux moyens d'atteindre une page \u2014 par exemple un menu et une recherche, ou un plan du site. Les personnes pour qui la navigation hi\xE9rarchique est difficile ont besoin d'une autre voie ; l'exception est une page qui constitue une \xE9tape d'un processus."
+      },
+      impact: "medium",
+      examples: [
+        {
+          lang: "html",
+          bad: '<nav aria-label="Main">\n  <a href="/products">Products</a>\n  <a href="/support">Support</a>\n</nav>',
+          good: '<nav aria-label="Main">\n  <a href="/products">Products</a>\n  <a href="/support">Support</a>\n</nav>\n<form role="search" action="/search">\n  <label for="q">Search the site</label>\n  <input id="q" name="q" type="search">\n  <button type="submit">Search</button>\n</form>\n<a href="/sitemap">Sitemap</a>',
+          note: {
+            en: "Two mechanisms, not two links to the same menu. A search and a sitemap are each a second way; a duplicated navigation bar is not.",
+            fr: "Deux m\xE9canismes, pas deux liens vers le m\xEAme menu. Une recherche et un plan du site sont chacun un second moyen ; une barre de navigation dupliqu\xE9e non."
+          }
+        }
+      ],
+      reference: "https://www.w3.org/WAI/WCAG22/Understanding/multiple-ways.html"
+    },
+    {
+      id: "focus-not-obscured",
+      criterionId: "2.4.11",
+      wcag: ["2.4.11"],
+      title: {
+        en: "The focused element is not hidden behind sticky content",
+        fr: "L'\xE9l\xE9ment qui a le focus n'est pas masqu\xE9 par un contenu collant"
+      },
+      summary: {
+        en: "When a component takes keyboard focus it must not be entirely covered by author content such as a sticky header, footer or cookie banner. A keyboard user who cannot see where focus went has lost the page.",
+        fr: "Quand un composant re\xE7oit le focus clavier, il ne doit pas \xEAtre enti\xE8rement recouvert par un contenu de l'auteur : en-t\xEAte ou pied de page collant, bandeau cookies. Une personne naviguant au clavier qui ne voit plus o\xF9 est le focus a perdu la page."
+      },
+      impact: "high",
+      examples: [
+        {
+          lang: "css",
+          bad: ".site-footer {\n  position: fixed;\n  bottom: 0;\n  height: 5rem;\n}",
+          good: ".site-footer {\n  position: fixed;\n  bottom: 0;\n  height: 5rem;\n}\n\n:target,\n:focus {\n  scroll-margin-bottom: 6rem;\n}",
+          note: {
+            en: "scroll-margin keeps the browser from scrolling the focused element flush against the sticky bar. Verify it by tabbing through the page, not by reading the stylesheet \u2014 this criterion is decided on the render.",
+            fr: "scroll-margin emp\xEAche le navigateur de coller l'\xE9l\xE9ment focalis\xE9 contre la barre fixe. \xC0 v\xE9rifier en tabulant r\xE9ellement dans la page, pas en lisant la feuille de styles : ce crit\xE8re se tranche au rendu."
+          }
+        }
+      ],
+      reference: "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html"
+    },
+    {
+      id: "pointer-dragging-alternative",
+      criterionId: "2.5.7",
+      wcag: ["2.5.7"],
+      title: {
+        en: "Anything you can drag, you can also do without dragging",
+        fr: "Tout ce qui se fait par glissement se fait aussi autrement"
+      },
+      summary: {
+        en: "A function operated by a dragging movement also works with a single pointer action \u2014 a button, a menu, a form field. Dragging needs sustained precision that users with tremor, limited dexterity or a head pointer may not have.",
+        fr: "Une fonctionnalit\xE9 actionn\xE9e par glissement doit aussi fonctionner par une action de pointeur simple : un bouton, un menu, un champ. Le glissement exige une pr\xE9cision continue dont ne disposent pas les personnes avec tremblements, dext\xE9rit\xE9 r\xE9duite ou pointeur de t\xEAte."
+      },
+      impact: "high",
+      examples: [
+        {
+          lang: "html",
+          bad: '<ul id="queue" data-sortable="drag">\n  <li draggable="true">First task</li>\n  <li draggable="true">Second task</li>\n</ul>',
+          good: '<ul id="queue" data-sortable="drag">\n  <li draggable="true">\n    First task\n    <button type="button" data-move="up">Move up</button>\n    <button type="button" data-move="down">Move down</button>\n  </li>\n</ul>',
+          note: {
+            en: "The drag stays; a single-pointer path is added beside it. The exception is when dragging is essential to the function, such as freehand drawing.",
+            fr: "Le glissement reste ; un chemin en pointeur simple est ajout\xE9 \xE0 c\xF4t\xE9. L'exception est le cas o\xF9 le glissement est essentiel \xE0 la fonction, comme le dessin \xE0 main lev\xE9e."
+          }
+        }
+      ],
+      reference: "https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html"
+    },
+    {
+      id: "pointer-target-size",
+      criterionId: "2.5.8",
+      wcag: ["2.5.8"],
+      title: {
+        en: "Pointer targets are at least 24 by 24 CSS pixels",
+        fr: "Les cibles de pointeur mesurent au moins 24 sur 24 pixels CSS"
+      },
+      summary: {
+        en: "A target smaller than 24\xD724 CSS pixels needs enough spacing that a 24-pixel circle centred on it touches no other target. Small, tightly packed controls are hard to hit for anyone with a tremor or using a touchscreen one-handed.",
+        fr: "Une cible de moins de 24\xD724 pixels CSS doit \xEAtre assez espac\xE9e pour qu'un cercle de 24 pixels centr\xE9 dessus ne touche aucune autre cible. Des contr\xF4les petits et serr\xE9s sont difficiles \xE0 atteindre en cas de tremblement ou d'usage \xE0 une main sur \xE9cran tactile."
+      },
+      impact: "medium",
+      examples: [
+        {
+          lang: "css",
+          bad: ".icon-button {\n  width: 16px;\n  height: 16px;\n  padding: 0;\n}",
+          good: ".icon-button {\n  min-width: 24px;\n  min-height: 24px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n}",
+          note: {
+            en: "The 24px is the target, not the icon: padding counts. Inline links in a sentence are excepted, as are targets whose size is set by the user agent.",
+            fr: "Les 24 px concernent la cible, pas l'ic\xF4ne : le padding compte. Les liens en ligne dans une phrase sont except\xE9s, comme les cibles dimensionn\xE9es par le navigateur."
+          }
+        }
+      ],
+      reference: "https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html"
+    },
+    {
+      id: "navigation-consistent-help",
+      criterionId: "3.2.6",
+      wcag: ["3.2.6"],
+      title: {
+        en: "Help is in the same place on every page",
+        fr: "L'aide se trouve au m\xEAme endroit sur chaque page"
+      },
+      summary: {
+        en: "If a set of pages offers help \u2014 a contact link, a phone number, a chat widget \u2014 it appears in the same relative order on each of them. Users who rely on spatial memory should not have to re-find it page by page.",
+        fr: "Si un ensemble de pages propose une aide \u2014 lien de contact, num\xE9ro de t\xE9l\xE9phone, widget de discussion \u2014 elle appara\xEEt dans le m\xEAme ordre relatif sur chacune. Les personnes qui s'appuient sur la m\xE9moire spatiale ne devraient pas avoir \xE0 la rechercher page par page."
+      },
+      impact: "low",
+      examples: [
+        {
+          lang: "html",
+          bad: '<header>\n  <a href="/contact">Contact us</a>\n  <nav>...</nav>\n</header>',
+          good: '<header>\n  <nav>...</nav>\n  <a href="/contact">Contact us</a>\n</header>',
+          note: {
+            en: "Same relative order, not identical pixels \u2014 a responsive layout may move it. The criterion is about where it falls in the page, consistently.",
+            fr: "M\xEAme ordre relatif, pas les m\xEAmes pixels : une mise en page responsive peut le d\xE9placer. Le crit\xE8re porte sur sa position dans la page, de fa\xE7on constante."
+          }
+        }
+      ],
+      reference: "https://www.w3.org/WAI/WCAG22/Understanding/consistent-help.html"
+    },
+    {
+      id: "forms-error-suggestion",
+      criterionId: "3.3.3",
+      wcag: ["3.3.3"],
+      title: {
+        en: "An error message says how to fix it",
+        fr: "Un message d'erreur indique comment corriger"
+      },
+      summary: {
+        en: 'When input is rejected and a correction is known, the message names it. "Invalid" tells the user only that they failed; the expected format, or the nearest valid value, tells them what to do next.',
+        fr: "Quand une saisie est refus\xE9e et qu'une correction est connue, le message l'indique. \xAB Invalide \xBB n'apprend \xE0 l'utilisateur que son \xE9chec ; le format attendu, ou la valeur valide la plus proche, lui dit quoi faire."
+      },
+      impact: "high",
+      examples: [
+        {
+          lang: "html",
+          bad: '<input id="born" name="born" aria-describedby="born-err">\n<p id="born-err">Invalid input.</p>',
+          good: '<label for="born">Date of birth</label>\n<input id="born" name="born" aria-describedby="born-err" aria-invalid="true">\n<p id="born-err">Enter the date as DD/MM/YYYY, for example 21/03/1994.</p>',
+          note: {
+            en: "The suggestion must be programmatically associated with the field, not merely nearby \u2014 aria-describedby is what makes a screen reader announce it with the input.",
+            fr: "La suggestion doit \xEAtre associ\xE9e programmatiquement au champ, pas seulement plac\xE9e \xE0 c\xF4t\xE9 : c'est aria-describedby qui la fait annoncer avec la saisie."
+          }
+        }
+      ],
+      reference: "https://www.w3.org/WAI/WCAG22/Understanding/error-suggestion.html"
+    },
+    {
+      id: "forms-redundant-entry",
+      criterionId: "3.3.7",
+      wcag: ["3.3.7"],
+      title: {
+        en: "Information already entered is not asked for again",
+        fr: "Une information d\xE9j\xE0 saisie n'est pas redemand\xE9e"
+      },
+      summary: {
+        en: "Within a process, information the user already gave is auto-populated or offered for selection rather than retyped. Re-entry is a real barrier for users with memory impairments and for anyone typing with difficulty.",
+        fr: "Au sein d'un processus, une information d\xE9j\xE0 fournie est pr\xE9-remplie ou propos\xE9e \xE0 la s\xE9lection plut\xF4t que ressaisie. La ressaisie est un obstacle r\xE9el en cas de troubles de la m\xE9moire et pour toute personne dont la saisie est difficile."
+      },
+      impact: "medium",
+      examples: [
+        {
+          lang: "html",
+          bad: '<fieldset>\n  <legend>Delivery address</legend>\n  <label for="d-street">Street</label>\n  <input id="d-street" name="d-street">\n</fieldset>',
+          good: '<fieldset>\n  <legend>Delivery address</legend>\n  <label for="same">\n    <input type="checkbox" id="same" name="same" checked>\n    Same as my billing address\n  </label>\n  <label for="d-street">Street</label>\n  <input id="d-street" name="d-street" value="12 Rue de Rivoli">\n</fieldset>',
+          note: {
+            en: "Exceptions exist where re-entry is essential \u2014 confirming a password, or a memory test. Convenience is not one of them.",
+            fr: "Des exceptions existent quand la ressaisie est essentielle : confirmation de mot de passe, test de m\xE9moire. La commodit\xE9 n'en fait pas partie."
+          }
+        }
+      ],
+      reference: "https://www.w3.org/WAI/WCAG22/Understanding/redundant-entry.html"
+    },
+    {
+      id: "forms-accessible-authentication",
+      criterionId: "3.3.8",
+      wcag: ["3.3.8"],
+      title: {
+        en: "Signing in does not require a cognitive test",
+        fr: "La connexion n'exige pas un test cognitif"
+      },
+      summary: {
+        en: "No step of authentication may depend on remembering, transcribing or solving a puzzle unless an alternative exists. Blocking paste into a password field is the most common way sites fail this: it breaks every password manager.",
+        fr: "Aucune \xE9tape d'authentification ne doit reposer sur la m\xE9morisation, la transcription ou la r\xE9solution d'une \xE9nigme, sauf alternative. Bloquer le collage dans un champ de mot de passe est l'\xE9chec le plus courant : cela casse tous les gestionnaires de mots de passe."
+      },
+      impact: "high",
+      examples: [
+        {
+          lang: "html",
+          bad: '<input type="password" id="pw" name="pw" onpaste="return false" autocomplete="off">',
+          good: '<label for="pw">Password</label>\n<input type="password" id="pw" name="pw" autocomplete="current-password">',
+          note: {
+            en: 'autocomplete="current-password" lets a password manager fill the field, which is the documented way to satisfy this criterion. A puzzle CAPTCHA needs a non-cognitive alternative beside it.',
+            fr: 'autocomplete="current-password" permet \xE0 un gestionnaire de remplir le champ, ce qui est la fa\xE7on document\xE9e de satisfaire ce crit\xE8re. Un CAPTCHA \xE0 \xE9nigme exige une alternative non cognitive \xE0 c\xF4t\xE9.'
+          }
+        }
+      ],
+      reference: "https://www.w3.org/WAI/WCAG22/Understanding/accessible-authentication-minimum.html"
+    }
+  ]
+};
+
 // src/guidance/index.ts
 var datasets = /* @__PURE__ */ new Map();
 function add(ds) {
   datasets.set(ds.pack, ds);
 }
+add(wcag_default2);
 add(rgaa_default2);
 function registerRuntimeGuidance(ds) {
   add(ds);
@@ -49181,6 +50621,9 @@ function guidanceForCriterion(packKey, criterionId) {
 }
 function hasGuidance(packKey) {
   return datasets.has(packKey);
+}
+function getDataset(packKey) {
+  return datasets.get(packKey);
 }
 
 // src/config.ts
@@ -49214,7 +50657,11 @@ function packPaths(path) {
   }
   return { pack: path };
 }
-function loadRuntimeStandards(cwd, packFlags, onWarn, override = false) {
+function loadRuntimeStandards(cwd, packFlags, onWarn, override = false, opts = {}) {
+  return withScope(opts.scope, () => loadStandardsInto(cwd, packFlags, onWarn, override, opts));
+}
+function loadStandardsInto(cwd, packFlags, onWarn, override, opts) {
+  if (opts.scope) ensureScope(opts.scope);
   const result = { errors: [], loadedPacks: [], loadedGuidance: [] };
   let config = null;
   try {
@@ -49245,7 +50692,7 @@ function loadRuntimeStandards(cwd, packFlags, onWarn, override = false) {
         onWarn(`ultra11y: ${paths.glossary} is not valid JSON \u2014 ignoring glossary.`);
       }
     }
-    const v = registerRuntimePack(packObj, glossary, { override });
+    const v = opts.scope ? registerScoped(opts.scope, packObj, glossary, { override }) : registerRuntimePack(packObj, glossary, { override });
     for (const issue of v.issues) if (issue.severity === "warn") onWarn(`ultra11y: ${raw}: ${issue.path ? `${issue.path}: ` : ""}${issue.message}`);
     if (!v.ok || !v.pack) {
       result.errors.push(`--pack ${paths.pack}: invalid pack
@@ -49624,6 +51071,153 @@ function vocabularyFor(standard, lang) {
   };
 }
 
+// src/standards/coverage.ts
+var TIER_ORDER = ["source", "cross-file", "rendered-page", "browser"];
+var STATIC_RULE_IDS = new Set(ALL_RULES.map((r) => r.id));
+var CROSS_RULE_IDS = new Set(CROSS_RULES.map((r) => r.id));
+function ruleTier(ruleId, pack) {
+  if (ruleId.startsWith("pack:")) return "source";
+  if (ruleId.startsWith("agent:")) return "judgment";
+  if (ruleId.startsWith("axe:") || ruleId.startsWith("dyn-")) return "browser";
+  if (ruleId.startsWith("rendered-")) return "rendered-page";
+  if (CROSS_RULE_IDS.has(ruleId)) return "cross-file";
+  if (STATIC_RULE_IDS.has(ruleId)) return "source";
+  if (pack && ruleId.endsWith("*")) return "source";
+  return "source";
+}
+function cheapest(tiers) {
+  for (const t2 of TIER_ORDER) if (tiers.includes(t2)) return t2;
+  return void 0;
+}
+function dedupe(tiers) {
+  return TIER_ORDER.filter((t2) => tiers.includes(t2));
+}
+function coreCoverage(sc) {
+  const c2 = getSC(sc);
+  if (!c2) return void 0;
+  const engineRules = [...c2.ruleIds];
+  const tiers = engineRules.map((r) => ruleTier(r));
+  if (c2.automatability === "judgment") {
+    return {
+      tier: "judgment",
+      sourceIsEnough: false,
+      canFailFrom: dedupe(tiers),
+      alsoNeeds: [],
+      engineRules,
+      applicabilityDeclared: true,
+      why: "WCAG automatability class `judgment`: the evidence can be gathered, but the verdict is a reading of meaning."
+    };
+  }
+  if (c2.automatability === "needs-rendering") {
+    const tier2 = tiers.includes("rendered-page") ? "rendered-page" : "browser";
+    return {
+      tier: tier2,
+      sourceIsEnough: false,
+      canFailFrom: dedupe(tiers),
+      alsoNeeds: dedupe(tiers).filter((t2) => t2 !== tier2),
+      engineRules,
+      applicabilityDeclared: true,
+      why: tier2 === "rendered-page" ? "WCAG automatability class `needs-rendering`, and a rendered-* rule covers it: a captured page snapshot is enough, no live browser." : "WCAG automatability class `needs-rendering`: only a real browser produces this evidence."
+    };
+  }
+  const tier = cheapest(tiers) ?? "source";
+  return {
+    tier,
+    sourceIsEnough: tier === "source",
+    canFailFrom: dedupe(tiers),
+    alsoNeeds: dedupe(tiers).filter((t2) => t2 !== tier),
+    engineRules,
+    applicabilityDeclared: true,
+    why: "WCAG automatability class `static`: an engine rule decides it from the source tree."
+  };
+}
+function outOfCore(pc) {
+  return pc.wcag.every((sc) => {
+    const s = knownScStatus(sc);
+    return s === "out-of-core" || s === "removed";
+  });
+}
+function packCoverage(pack, pc) {
+  if (outOfCore(pc)) {
+    return {
+      tier: "out-of-scope",
+      sourceIsEnough: false,
+      canFailFrom: [],
+      alsoNeeds: [],
+      engineRules: [],
+      applicabilityDeclared: true,
+      why: `every WCAG success criterion this maps to (${pc.wcag.join(", ")}) is outside the engine's 2.2 AA core \u2014 AAA or removed. Declare it out of scope; never claim conformity.`
+    };
+  }
+  const declared = pc.appliesTo?.ruleIds;
+  if (declared === void 0) {
+    const tiers2 = pc.wcag.map((sc) => coreCoverage(sc)?.tier).filter((t2) => t2 !== void 0);
+    const tier2 = tiers2.includes("judgment") ? "judgment" : cheapest(tiers2) ?? "judgment";
+    return {
+      tier: tier2,
+      sourceIsEnough: tier2 === "source",
+      canFailFrom: dedupe(tiers2),
+      alsoNeeds: dedupe(tiers2).filter((t2) => t2 !== tier2),
+      engineRules: [],
+      applicabilityDeclared: false,
+      why: "the pack declares no rule applicability, so this is inferred from the WCAG success criteria it maps to."
+    };
+  }
+  const engineRules = [...declared];
+  const tiers = engineRules.map((r) => ruleTier(r, pack));
+  if (pc.judgment) {
+    return {
+      tier: "judgment",
+      sourceIsEnough: false,
+      canFailFrom: dedupe(tiers),
+      alsoNeeds: [],
+      engineRules,
+      applicabilityDeclared: true,
+      why: "the standard flags this criterion as judgment: it asks more than its mapped success criteria, so it never inherits a Conforming verdict \u2014 though an engine rule can still fail it."
+    };
+  }
+  if (!engineRules.length) {
+    return {
+      tier: "judgment",
+      sourceIsEnough: false,
+      canFailFrom: [],
+      alsoNeeds: [],
+      engineRules,
+      applicabilityDeclared: true,
+      why: "the standard declares that no engine rule can evidence this criterion \u2014 it is yours to rule on."
+    };
+  }
+  const tier = cheapest(tiers) ?? "judgment";
+  return {
+    tier,
+    sourceIsEnough: tier === "source",
+    canFailFrom: dedupe(tiers),
+    alsoNeeds: dedupe(tiers).filter((t2) => t2 !== tier),
+    engineRules,
+    applicabilityDeclared: true,
+    why: `the standard declares ${engineRules.length} applicable engine rule${engineRules.length === 1 ? "" : "s"}; the cheapest evidence tier among them is \`${tier}\`.`
+  };
+}
+function criterionCoverage(standard, id) {
+  if (isCore(standard)) return coreCoverage(id);
+  const pack = loadPack(standard);
+  const pc = getCriterion(pack, id);
+  return pc ? packCoverage(pack, pc) : void 0;
+}
+function standardCoverage(standard) {
+  const out2 = /* @__PURE__ */ new Map();
+  if (isCore(standard)) {
+    for (const c2 of allSC()) {
+      const cov = coreCoverage(c2.sc);
+      if (cov) out2.set(c2.sc, cov);
+    }
+    return out2;
+  }
+  const pack = loadPack(standard);
+  for (const pc of allCriteria(pack)) out2.set(pc.id, packCoverage(pack, pc));
+  return out2;
+}
+
 // src/standards/index.ts
 var CORE2 = CORE_KEY;
 function resolveStandard(flag) {
@@ -49638,6 +51232,34 @@ function standardLabel(standard) {
   if (isCore(standard)) return "WCAG 2.2 AA";
   const p = loadPack(standard);
   return `${p.name} ${p.baseVersion}`;
+}
+
+// src/guidance/resolve.ts
+var LANGS = ["en", "fr"];
+function languagesOf(e) {
+  return LANGS.filter((l) => e.title?.[l] || e.summary?.[l]);
+}
+function resolveGuidance(standard, criterionId, wcagRefs) {
+  const seen = /* @__PURE__ */ new Set();
+  const out2 = [];
+  const push = (entries, via, inherited) => {
+    for (const entry of entries) {
+      if (seen.has(entry.id)) continue;
+      seen.add(entry.id);
+      out2.push({ entry, via, inherited, languagesAvailable: languagesOf(entry) });
+    }
+  };
+  if (isCore(standard)) {
+    push(guidanceForWcag(criterionId), `wcag:${criterionId}`, false);
+    return out2;
+  }
+  push(guidanceForCriterion(standard, criterionId), "pack", false);
+  const refs = wcagRefs ?? getCriterion(getPack(standard), criterionId)?.wcag ?? [];
+  for (const sc of refs) push(guidanceForWcag(sc), `wcag:${sc}`, true);
+  return out2;
+}
+function guidanceEntriesFor(standard, criterionId, wcagRefs) {
+  return resolveGuidance(standard, criterionId, wcagRefs).map((r) => r.entry);
 }
 
 // src/auditor.ts
@@ -50083,21 +51705,7 @@ function effortOf(unit) {
   return { bucket: points <= 4 ? "S" : points <= 12 ? "M" : "L", points };
 }
 function guidanceFor(unit, standard) {
-  const seen = /* @__PURE__ */ new Set();
-  const out2 = [];
-  const push = (es) => {
-    for (const e of es) {
-      if (seen.has(e.id)) continue;
-      seen.add(e.id);
-      out2.push(e);
-    }
-  };
-  if (isCore(standard)) push(guidanceForWcag(unit.criteriaId));
-  else {
-    push(guidanceForCriterion(standard, unit.criteriaId));
-    for (const sc of unit.refs) push(guidanceForWcag(sc));
-  }
-  return out2;
+  return guidanceEntriesFor(standard, unit.criteriaId, unit.refs);
 }
 function guidanceExampleBlock(entries, lang) {
   const s = L2[lang];
@@ -50879,7 +52487,7 @@ function pushPrComment(markdown, standard = "wcag") {
   const pr = prNumberFromEnv();
   if (pr === void 0) return { ok: true, action: "skipped", reason: "not a pull-request run" };
   const marker = COMMENT_MARKER(standard);
-  const body2 = stickyBody(markdown, standard);
+  const body3 = stickyBody(markdown, standard);
   try {
     const repo = ghExec(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).trim();
     let existing;
@@ -50889,10 +52497,10 @@ function pushPrComment(markdown, standard = "wcag") {
     } catch {
     }
     if (existing) {
-      ghExec(["api", "--method", "PATCH", `repos/${repo}/issues/comments/${existing.id}`, "-f", `body=${body2}`]);
+      ghExec(["api", "--method", "PATCH", `repos/${repo}/issues/comments/${existing.id}`, "-f", `body=${body3}`]);
       return { ok: true, action: "updated" };
     }
-    ghExec(["api", "--method", "POST", `repos/${repo}/issues/${pr}/comments`, "-f", `body=${body2}`]);
+    ghExec(["api", "--method", "POST", `repos/${repo}/issues/${pr}/comments`, "-f", `body=${body3}`]);
     return { ok: true, action: "created" };
   } catch (e) {
     return { ok: false, action: "skipped", reason: ghErrorReason(e) };
@@ -50991,13 +52599,13 @@ function filePreamble(file, lang) {
   const t2 = L5[lang];
   return [`**${t2.file}** : \`${file}\``, "", `> ${t2.fileNote}`, ""];
 }
-function clampBody(body2, limit, lang) {
-  if (body2.length <= limit) return body2;
+function clampBody(body3, limit, lang) {
+  if (body3.length <= limit) return body3;
   const notice = `
 
 ${L5[lang].truncated(L5[lang].prdPath)}`;
   const budget = limit - notice.length;
-  const head = body2.slice(0, Math.max(0, budget));
+  const head = body3.slice(0, Math.max(0, budget));
   const cut = head.lastIndexOf("\n## ");
   return `${(cut > 0 ? head.slice(0, cut) : head).trimEnd()}${notice}`;
 }
@@ -51031,7 +52639,7 @@ function buildTickets(result, opts) {
   };
   const backlogOpts = opts.technical !== void 0 ? { technical: opts.technical } : {};
   const baseDir = opts.baseDir ?? "";
-  const clamp2 = (body2) => clampBody(body2, limit, lang);
+  const clamp2 = (body3) => clampBody(body3, limit, lang);
   const ticketFromUnit = (unit, title2, scope2) => ({
     title: title2,
     body: clamp2(renderCriterionBody(unit, standard, lang, bodyOpts)),
@@ -51897,6 +53505,8 @@ function formatSC(c2, lang = "en") {
   out2.push(
     `${lang === "fr" ? "R\xE8gle" : "Guideline"} ${c2.guideline} (${gl}) \xB7 ${lang === "fr" ? "principe" : "principle"} ${c2.principle} (${pr}) \xB7 ${lang === "fr" ? "automatisabilit\xE9" : "automatability"} : ${auto}${c2.ruleIds.length ? ` \xB7 ${lang === "fr" ? "r\xE8gles" : "rules"} : ${c2.ruleIds.join(", ")}` : ""}`
   );
+  const body3 = scText(c2.sc, lang);
+  if (body3) out2.push("", body3, "");
   out2.push(`${lang === "fr" ? "Comprendre" : "Understanding"} : ${c2.understanding}`);
   if (c2.techniques?.length) out2.push(`Techniques : ${c2.techniques.join(", ")}`);
   const packs = packsForSc(c2.sc);
@@ -51964,11 +53574,11 @@ function runWcag(opts) {
 }
 var foldTerm = (s) => s.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 function runGlossary(opts) {
-  const pack = loadPack(opts.standard);
-  const glossary = packGlossary(opts.standard) ?? {};
+  const label = isCore(opts.standard) ? "WCAG 2.2" : loadPack(opts.standard).name;
+  const glossary = isCore(opts.standard) ? coreGlossary(opts.lang) : packGlossary(opts.standard) ?? {};
   const anchors = Object.keys(glossary);
   if (!anchors.length) {
-    console.error(`ultra11y criteria: ${pack.name} ships no glossary.`);
+    console.error(`ultra11y criteria: ${label} ships no glossary in this build.`);
     return 2;
   }
   const term = typeof opts.glossary === "string" ? opts.glossary.trim() : "";
@@ -51981,13 +53591,13 @@ function runGlossary(opts) {
   const hit = anchors.find((a) => a === term) ?? anchors.find((a) => foldTerm(a) === want) ?? anchors.find((a) => foldTerm(glossary[a]?.title ?? "") === want) ?? anchors.find((a) => foldTerm(a).startsWith(want));
   if (!hit) {
     const near = anchors.filter((a) => foldTerm(a).includes(want) || foldTerm(glossary[a]?.title ?? "").includes(want)).slice(0, 8);
-    console.error(`ultra11y criteria: no ${pack.name} glossary term matching "${term}".${near.length ? ` Did you mean: ${near.join(", ")}?` : ""}`);
+    console.error(`ultra11y criteria: no ${label} glossary term matching "${term}".${near.length ? ` Did you mean: ${near.join(", ")}?` : ""}`);
     return 2;
   }
   const entry = glossary[hit];
   if (opts.json) console.log(JSON.stringify({ anchor: hit, ...entry }, null, 2));
   else {
-    console.log(`${pack.name} \u2014 ${entry.title}  (#${hit})`);
+    console.log(`${label} \u2014 ${entry.title}  (#${hit})`);
     console.log("");
     console.log(entry.body);
   }
@@ -51995,7 +53605,6 @@ function runGlossary(opts) {
 }
 function runPack(opts) {
   const pack = loadPack(opts.standard);
-  if (opts.glossary !== void 0 && opts.glossary !== false) return runGlossary(opts);
   if (opts.id) {
     const c2 = getCriterion(pack, opts.id);
     if (!c2) {
@@ -52019,10 +53628,7 @@ function runPack(opts) {
   return 0;
 }
 function runCriteria(opts) {
-  if (opts.glossary !== void 0 && opts.glossary !== false && isCore(opts.standard)) {
-    console.error("ultra11y criteria: --glossary needs a country standard (e.g. --standard rgaa); WCAG ships no glossary here.");
-    return 2;
-  }
+  if (opts.glossary !== void 0 && opts.glossary !== false) return runGlossary(opts);
   return isCore(opts.standard) ? runWcag(opts) : runPack(opts);
 }
 function renderCriteriaReference() {
@@ -52560,7 +54166,8 @@ var M = {
     semanticMissing: (p) => `Gate s\xE9mantique : aucun artefact de verdicts trouv\xE9 (${p}). G\xE9n\xE9rez la worklist (\`verify --report <md>\`), statuez, puis relancez \u2014 ou passez \`--verdicts <fichier>\`.`,
     semanticUnreadable: (p) => `Gate s\xE9mantique : artefact de verdicts illisible ou JSON invalide : ${p}.`,
     semanticGate: (failed2, total) => `Gate s\xE9mantique : ${failed2}/${total} verdict(s) en \xE9chec (non statu\xE9, r\xE9fut\xE9, non \xE9tay\xE9 ou non couvert).`,
-    semanticGround: (issue) => `Gate s\xE9mantique : ${issue}`
+    semanticGround: (issue) => `Gate s\xE9mantique : ${issue}`,
+    unevidenced: (id, tier, tool) => `Conformit\xE9 non \xE9tay\xE9e : ${id} est d\xE9clar\xE9 conforme, mais ce crit\xE8re se tranche au ${tier} et cet audit n'a produit aucune preuve de ce type. Lancez ${tool}, puis r\xE9-auditez \u2014 ou laissez le crit\xE8re \xAB \xE0 \xE9valuer \xBB.`
   },
   en: {
     section: (n) => `Section ${n} missing from the report.`,
@@ -52574,7 +54181,8 @@ var M = {
     semanticMissing: (p) => `Semantic gate: no verdicts artifact found (${p}). Generate the worklist (\`verify --report <md>\`), adjudicate it, then re-run \u2014 or pass \`--verdicts <file>\`.`,
     semanticUnreadable: (p) => `Semantic gate: verdicts artifact unreadable or invalid JSON: ${p}.`,
     semanticGate: (failed2, total) => `Semantic gate: ${failed2}/${total} verdict(s) failing (unadjudicated, refuted, unsupported or uncovered).`,
-    semanticGround: (issue) => `Semantic gate: ${issue}`
+    semanticGround: (issue) => `Semantic gate: ${issue}`,
+    unevidenced: (id, tier, tool) => `Unevidenced conformity: ${id} is declared conformant, but this criterion is decided on the ${tier} and this audit produced no evidence of that kind. Run ${tool}, then re-audit \u2014 or leave the criterion "to assess".`
   }
 };
 function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
@@ -52639,14 +54247,39 @@ function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
     for (const id of reportNc) if (!derivedNc.has(id)) issues.push(s.overProject(id));
     for (const id of derivedNc) if (!reportNc.has(id)) issues.push(s.underProject(id));
   }
+  if (opts.audit) {
+    const engineC = sectionBody(md, 3).split(/^###\s/m)[0] ?? "";
+    const cItem = new RegExp(`^-\\s+(?:[A-Za-z]+\\s+)?(${idGrammar})\\s*\u2014`, "gm");
+    const scanned = hasScanEvidence(opts.audit);
+    const rendered = hasRenderedEvidence(opts.audit);
+    const claimed = /* @__PURE__ */ new Set();
+    let m;
+    while (m = cItem.exec(engineC)) claimed.add(m[1]);
+    for (const id of claimed) {
+      const tier = criterionCoverage(standard, id)?.tier;
+      if (tier === "browser" && !scanned) issues.push(s.unevidenced(id, core ? "browser" : "navigateur", "`ultra11y scan <target> --merge`"));
+      else if (tier === "rendered-page" && rendered === false && !scanned) {
+        issues.push(s.unevidenced(id, core ? "rendered page" : "rendu de page", "`ultra11y render` (or an E2E capture)"));
+      }
+    }
+  }
   return { ok: issues.length === 0, issues };
 }
+function hasScanEvidence(r) {
+  if ((r.scope.scan?.testedScs ?? []).length > 0) return true;
+  return r.findings.some((f) => f.ruleId.startsWith("dyn-") || f.ruleId.startsWith("axe:"));
+}
+function hasRenderedEvidence(r) {
+  if (r.findings.some((f) => f.ruleId.startsWith("rendered-"))) return true;
+  const audited = r.scope.pagesAudited;
+  return audited === void 0 ? void 0 : audited.length > 0;
+}
 function packReportNcIds(md, idGrammar) {
-  const body2 = sectionBody(md, 2);
+  const body3 = sectionBody(md, 2);
   const re = new RegExp(`^\\*\\*[^*\\n]+\\*\\*\\s*:\\s*(${idGrammar})\\s*\u2014`, "gm");
   const ids = /* @__PURE__ */ new Set();
   let m;
-  while (m = re.exec(body2)) ids.add(m[1]);
+  while (m = re.exec(body3)) ids.add(m[1]);
   return ids;
 }
 function checkSemantic(md, opts) {
@@ -53465,6 +55098,18 @@ var adjudication_default = {
   }
 };
 
+// src/adjudication-data.ts
+var ADJUDICATION = adjudication_default;
+function adjudicationText(sc, lang) {
+  const p = ADJUDICATION[sc];
+  if (!p) return void 0;
+  return {
+    decide: p.decide[lang],
+    ...p.na ? { na: p.na[lang] } : {},
+    questions: p.questions.map((q) => q[lang])
+  };
+}
+
 // src/adjudicate.ts
 var ADJUDICATE_MAX_EVIDENCE = 30;
 function adjudicationContract() {
@@ -53950,21 +55595,9 @@ var T2 = {
     glossary: "Terms the standard defines"
   }
 };
-var ADJUDICATION = adjudication_default;
 var MAX_REFS = 12;
-var GLOSSARY_REF = /\[[^\]]+\]\(#([^)]+)\)/g;
 var MAX_GLOSSARY_TERMS = 8;
 var MAX_GLOSSARY_CHARS = 600;
-function glossaryAnchorsOf(crit) {
-  if (!crit) return [];
-  const texts = [...Object.values(crit.tests ?? {}).flat(), ...crit.technicalNote ?? [], ...crit.particularCases ?? []];
-  const seen = /* @__PURE__ */ new Set();
-  for (const t2 of texts) {
-    GLOSSARY_REF.lastIndex = 0;
-    for (let m = GLOSSARY_REF.exec(t2); m; m = GLOSSARY_REF.exec(t2)) if (m[1]) seen.add(m[1]);
-  }
-  return [...seen];
-}
 function glossaryBlock(pack, crit, lang) {
   const anchors = glossaryAnchorsOf(crit).slice(0, MAX_GLOSSARY_TERMS);
   if (!anchors.length) return [];
@@ -53975,8 +55608,8 @@ function glossaryBlock(pack, crit, lang) {
     const entry = resolveGlossary(pack.key, a);
     if (!entry) continue;
     any = true;
-    const body2 = entry.body.replace(/\s+/g, " ").trim();
-    out2.push(`- **${entry.title}** \u2014 ${body2.length > MAX_GLOSSARY_CHARS ? `${body2.slice(0, MAX_GLOSSARY_CHARS)}\u2026` : body2}`);
+    const body3 = entry.body.replace(/\s+/g, " ").trim();
+    out2.push(`- **${entry.title}** \u2014 ${body3.length > MAX_GLOSSARY_CHARS ? `${body3.slice(0, MAX_GLOSSARY_CHARS)}\u2026` : body3}`);
   }
   out2.push("");
   return any ? out2 : [];
@@ -54158,7 +55791,7 @@ Rules, in order of importance:
 5. Rule only on the criteria presented. Never introduce another.`;
 var sleep = (ms) => ms <= 0 ? Promise.resolve() : new Promise((r) => setTimeout(r, ms));
 var backoff = (opts, attempt) => opts.backoffMs?.(attempt) ?? 2 ** attempt * 500;
-async function callOnce(body2, opts) {
+async function callOnce(body3, opts) {
   const f = opts.fetchImpl ?? fetch;
   const url = `${opts.baseUrl ?? process.env.ANTHROPIC_BASE_URL ?? DEFAULT_BASE_URL}/v1/messages`;
   let lastError = "";
@@ -54168,7 +55801,7 @@ async function callOnce(body2, opts) {
       res = await f(url, {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": opts.apiKey, "anthropic-version": API_VERSION },
-        body: JSON.stringify(body2)
+        body: JSON.stringify(body3)
       });
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
@@ -56520,9 +58153,9 @@ var blockRe = () => new RegExp(`${escapeRe2(BLOCK_BEGIN)}[\\s\\S]*?${escapeRe2(B
 function escapeRe2(s) {
   return s.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-function upsertManagedBlock(path, body2) {
+function upsertManagedBlock(path, body3) {
   const block = `${BLOCK_BEGIN}
-${body2.trim()}
+${body3.trim()}
 ${BLOCK_END}
 `;
   if (!existsSync25(path)) return writeTextWithBackup(path, block);
@@ -56699,9 +58332,9 @@ function withoutOurs2(groups) {
 }
 function enableHooksFeature(content) {
   if (HOOKS_ON.test(featuresBody(content))) return { content, changed: false };
-  const body2 = featuresBody(content);
-  if (HOOKS_ANY.test(body2)) {
-    return { content: content.replace(body2, body2.replace(HOOKS_ANY, "hooks = true")), changed: true };
+  const body3 = featuresBody(content);
+  if (HOOKS_ANY.test(body3)) {
+    return { content: content.replace(body3, body3.replace(HOOKS_ANY, "hooks = true")), changed: true };
   }
   if (FEATURES_HEADER.test(content)) {
     return { content: content.replace(FEATURES_HEADER, "$&\nhooks = true"), changed: true };
@@ -57187,9 +58820,9 @@ function annotations(result, opts = {}) {
     const level = f.advisory ? "notice" : LEVEL2[f.severity];
     const file = repoRelative(f.file, baseDir);
     const title2 = `${criterionLabel2(f, standard)} \xB7 ${f.ruleId}`;
-    const body2 = `${resolveMessage(f, lang)}
+    const body3 = `${resolveMessage(f, lang)}
 ${resolveRemediation(f, lang)}`;
-    out2.push(`::${level} file=${escProp(file)},line=${Math.max(1, f.line)},col=${Math.max(1, f.col)},title=${escProp(title2)}::${esc(body2)}`);
+    out2.push(`::${level} file=${escProp(file)},line=${Math.max(1, f.line)},col=${Math.max(1, f.col)},title=${escProp(title2)}::${esc(body3)}`);
   }
   return out2;
 }
@@ -57355,14 +58988,14 @@ function prComment(result, opts = {}) {
   if (opts.artifactName) tail.push(s.artifact(opts.artifactName), "");
   if (opts.runUrl) tail.push(s.runLink(opts.runUrl), "");
   const assemble = (rows2) => {
-    const body2 = [];
+    const body3 = [];
     if (grouped.length) {
-      body2.push(s.grouped(grouped.length, all.length), "");
-      body2.push(...groupTable(grouped.slice(0, rows2), s), "");
+      body3.push(s.grouped(grouped.length, all.length), "");
+      body3.push(...groupTable(grouped.slice(0, rows2), s), "");
       const omitted = grouped.length - rows2;
-      if (omitted > 0) body2.push(rows2 < COMMENT_ROWS ? s.clamped(omitted) : s.moreGroups(omitted), "");
+      if (omitted > 0) body3.push(rows2 < COMMENT_ROWS ? s.clamped(omitted) : s.moreGroups(omitted), "");
     }
-    return [...head, ...body2, ...tail].join("\n").trimEnd();
+    return [...head, ...body3, ...tail].join("\n").trimEnd();
   };
   let rows = Math.min(COMMENT_ROWS, grouped.length);
   while (rows > 0 && assemble(rows).length > COMMENT_LIMIT) rows--;
@@ -58697,8 +60330,8 @@ function startDevServer(opts) {
     if (url.pathname === "/snapshot" && req.method === "POST") {
       void (async () => {
         try {
-          const body2 = await readBody(req);
-          const payload = JSON.parse(body2);
+          const body3 = await readBody(req);
+          const payload = JSON.parse(body3);
           const r = auditCollected(opts.root, payload);
           if (!r.ok) {
             res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({ error: r.error }));
@@ -58789,10 +60422,10 @@ function startDevServer(opts) {
     }
     res.writeHead(404, { "content-type": "text/plain" }).end("not found");
   });
-  return new Promise((resolve15, reject) => {
+  return new Promise((resolve16, reject) => {
     server.once("error", reject);
     server.listen(opts.port, "127.0.0.1", () => {
-      resolve15({
+      resolve16({
         port: server.address().port,
         close: () => new Promise((r) => server.close(() => r()))
       });
@@ -59410,6 +61043,435 @@ import { createInterface as createInterface2 } from "readline";
 import { existsSync as existsSync32, readFileSync as readFileSync30, realpathSync as realpathSync4, statSync as statSync12 } from "fs";
 import { isAbsolute as isAbsolute3, join as join48, resolve as resolve13, sep as sep5 } from "path";
 
+// src/criteria-view.ts
+var CriteriaLookupError = class extends Error {
+  suggestions;
+  constructor(message, suggestions = []) {
+    super(message);
+    this.suggestions = suggestions;
+  }
+};
+function guidanceView(r, lang) {
+  const e = r.entry;
+  return {
+    id: e.id,
+    ...e.title?.[lang] ? { title: e.title[lang] } : {},
+    ...e.summary?.[lang] ? { summary: e.summary[lang] } : {},
+    ...e.impact ? { impact: e.impact } : {},
+    reference: e.reference,
+    wcag: e.wcag,
+    via: r.via,
+    inherited: r.inherited,
+    languagesAvailable: r.languagesAvailable,
+    examples: (e.examples ?? []).map((x) => ({
+      lang: x.lang,
+      ...x.bad ? { bad: x.bad } : {},
+      ...x.good ? { good: x.good } : {},
+      ...x.note?.[lang] ? { note: x.note[lang] } : {}
+    }))
+  };
+}
+function glossaryViews(pack, c2) {
+  const out2 = [];
+  for (const anchor of glossaryAnchorsOf(c2)) {
+    const entry = resolveGlossary(pack.key, anchor);
+    if (entry) out2.push({ anchor, title: entry.title, body: entry.body });
+  }
+  return out2;
+}
+function scView(id, lang, includeGuidance) {
+  const c2 = getSC(id);
+  if (!c2) return void 0;
+  const localized = scTitle(c2.sc, lang);
+  return {
+    kind: "wcag",
+    sc: c2.sc,
+    title: c2.title,
+    ...localized && localized !== c2.title ? { titleLocalized: localized } : {},
+    ...scText(c2.sc, lang) ? { text: scText(c2.sc, lang) } : {},
+    // The terms the wording links to. WCAG's definitions are normative in exactly the way
+    // a pack's are: "large scale" and "pure decoration" mean what the glossary says.
+    glossary: ((lang === "fr" ? c2.termsFr : c2.terms) ?? []).flatMap((slug) => {
+      const entry = coreGlossary(lang)[slug];
+      return entry ? [{ anchor: slug, title: entry.title, body: entry.body }] : [];
+    }),
+    level: c2.level,
+    addedIn: c2.addedIn,
+    principle: { number: c2.principle, ...principleTitle(c2.principle, lang) ? { title: principleTitle(c2.principle, lang) } : {} },
+    guideline: { number: c2.guideline, ...guidelineTitle(c2.guideline, lang) ? { title: guidelineTitle(c2.guideline, lang) } : {} },
+    automatability: c2.automatability,
+    coverage: criterionCoverage("wcag", c2.sc),
+    techniques: techniquesFor(c2.sc),
+    understanding: c2.understanding,
+    // The decision protocol stands in for the Understanding prose this repo deliberately
+    // does not vendor: what makes it Conforming, when NA is legitimate, what to ask.
+    ...adjudicationText(c2.sc, lang) ? { adjudication: adjudicationText(c2.sc, lang) } : {},
+    mappedBy: packsForSc(c2.sc).map((p) => ({ standard: p.key, criteria: p.ids })),
+    guidance: includeGuidance ? resolveGuidance("wcag", c2.sc).map((r) => guidanceView(r, lang)) : []
+  };
+}
+function packCriterionView(pack, c2, lang, includeGuidance) {
+  const plain2 = titlePlain(pack, c2, lang);
+  const raw = c2.title?.[lang] ?? c2.title?.[pack.defaultLocale];
+  const adjudication = [];
+  for (const sc of c2.wcag) {
+    const p = adjudicationText(sc, lang);
+    if (p) adjudication.push({ sc, ...p });
+  }
+  return {
+    kind: "pack",
+    id: c2.id,
+    theme: { number: c2.theme, ...themeName(pack, c2.theme, lang) ? { name: themeName(pack, c2.theme, lang) } : {} },
+    title: plain2,
+    // The markup is kept, not stripped: `[terme](#ancre)` is what points at the normative
+    // glossary definitions attached below.
+    ...raw && raw !== plain2 ? { titleRaw: raw } : {},
+    tests: Object.entries(c2.tests ?? {}).map(([k, lines]) => ({ id: `${c2.id}.${k}`, lines })),
+    techniques: c2.techniques ?? [],
+    wcag: c2.wcag.map((sc) => {
+      const core = getSC(sc);
+      return {
+        sc,
+        ...core ? { title: scTitle(sc, lang) ?? core.title, level: core.level, automatability: core.automatability } : {},
+        inCore: core !== void 0
+      };
+    }),
+    technicalNote: c2.technicalNote ?? [],
+    particularCases: c2.particularCases ?? [],
+    judgment: c2.judgment === true,
+    appliesTo: c2.appliesTo?.ruleIds ?? [],
+    coverage: criterionCoverage(pack.key, c2.id),
+    glossary: glossaryViews(pack, c2),
+    adjudication,
+    guidance: includeGuidance ? resolveGuidance(pack.key, c2.id).map((r) => guidanceView(r, lang)) : []
+  };
+}
+function criterionView(standard, id, lang, includeGuidance = false) {
+  const base = { standard, standardLabel: standardLabel(standard), lang, kind: "criterion", id };
+  if (isCore(standard)) {
+    const view = scView(id, lang, includeGuidance);
+    if (!view) throw new CriteriaLookupError(`no such success criterion: ${id}. List them all by omitting \`sc\`.`);
+    return { ...base, criterion: view, text: formatSC(getSC(id), lang) };
+  }
+  const pack = loadPack(standard);
+  const c2 = getCriterion(pack, id);
+  if (!c2) throw new CriteriaLookupError(`no such ${pack.name} criterion: ${id}. List them all by omitting \`sc\`.`);
+  return { ...base, criterion: packCriterionView(pack, c2, lang, includeGuidance), text: formatPackCriterion(pack, c2, lang) };
+}
+function tierCensus(standard, ids) {
+  const by = {};
+  for (const id of ids) {
+    const t2 = criterionCoverage(standard, id)?.tier;
+    if (t2) by[t2] = (by[t2] ?? 0) + 1;
+  }
+  return by;
+}
+function criteriaIndex(standard, lang) {
+  const base = { standard, standardLabel: standardLabel(standard), lang, kind: "index" };
+  if (isCore(standard)) {
+    const scs = allSC();
+    const byGuideline = scsByGuideline();
+    const byAuto = {};
+    for (const c2 of scs) byAuto[c2.automatability] = (byAuto[c2.automatability] ?? 0) + 1;
+    return {
+      ...base,
+      meta: { ...meta() },
+      counts: { criteria: scs.length, ...byAuto },
+      byTier: tierCensus(
+        "wcag",
+        scs.map((c2) => c2.sc)
+      ),
+      groups: allGuidelines().map((g) => ({
+        number: g.number,
+        ...guidelineTitle(g.number, lang) ? { name: guidelineTitle(g.number, lang) } : {},
+        count: byGuideline.get(g.number)?.length ?? 0
+      })),
+      criteria: scs.map((c2) => {
+        const cov = criterionCoverage("wcag", c2.sc);
+        return {
+          id: c2.sc,
+          title: scTitle(c2.sc, lang) ?? c2.title,
+          group: c2.guideline,
+          level: c2.level,
+          tier: cov.tier,
+          sourceIsEnough: cov.sourceIsEnough
+        };
+      })
+    };
+  }
+  const pack = loadPack(standard);
+  const criteria = allCriteria(pack);
+  const tests = criteria.reduce((n, c2) => n + Object.keys(c2.tests ?? {}).length, 0);
+  return {
+    ...base,
+    pack: {
+      key: pack.key,
+      name: pack.name,
+      fullName: pack.fullName,
+      org: pack.org,
+      country: pack.country,
+      baseVersion: pack.baseVersion,
+      wcagVersion: pack.wcagVersion,
+      locales: pack.locales,
+      defaultLocale: pack.defaultLocale,
+      license: pack.license,
+      source: pack.source,
+      attribution: pack.attribution
+    },
+    counts: {
+      themes: pack.themes.length,
+      criteria: criteria.length,
+      tests,
+      judgment: criteria.filter((c2) => c2.judgment).length,
+      noEngineRule: criteria.filter((c2) => c2.appliesTo?.ruleIds?.length === 0).length
+    },
+    byTier: tierCensus(
+      pack.key,
+      criteria.map((c2) => c2.id)
+    ),
+    groups: pack.themes.map((t2) => ({
+      number: String(t2.number),
+      ...themeName(pack, t2.number, lang) ? { name: themeName(pack, t2.number, lang) } : {},
+      count: t2.count
+    })),
+    criteria: criteria.map((c2) => {
+      const cov = criterionCoverage(pack.key, c2.id);
+      return {
+        id: c2.id,
+        title: titlePlain(pack, c2, lang),
+        group: String(c2.theme),
+        wcag: c2.wcag,
+        tier: cov.tier,
+        sourceIsEnough: cov.sourceIsEnough,
+        judgment: c2.judgment === true
+      };
+    })
+  };
+}
+function themeView(standard, n, lang) {
+  if (isCore(standard)) {
+    throw new CriteriaLookupError("WCAG has no themes \u2014 it groups criteria by guideline. Omit `theme`, or pass a country standard.");
+  }
+  const pack = loadPack(standard);
+  const criteria = listTheme(pack, n);
+  if (!criteria.length) throw new CriteriaLookupError(`no such ${pack.name} theme: ${n}.`);
+  return {
+    standard,
+    standardLabel: standardLabel(standard),
+    lang,
+    kind: "theme",
+    theme: { number: n, ...themeName(pack, n, lang) ? { name: themeName(pack, n, lang) } : {}, count: criteria.length },
+    criteria: criteria.map((c2) => {
+      const cov = criterionCoverage(pack.key, c2.id);
+      return {
+        id: c2.id,
+        title: titlePlain(pack, c2, lang),
+        wcag: c2.wcag,
+        tier: cov.tier,
+        sourceIsEnough: cov.sourceIsEnough,
+        judgment: c2.judgment === true
+      };
+    })
+  };
+}
+function foldTerm2(s) {
+  return s.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+function citedBy(pack, anchor) {
+  return allCriteria(pack).filter((c2) => glossaryAnchorsOf(c2).includes(anchor)).map((c2) => c2.id);
+}
+function glossaryOf(standard, lang) {
+  if (isCore(standard)) return { glossary: coreGlossary(lang), label: standardLabel(standard) };
+  return { glossary: packGlossary(standard) ?? {}, label: loadPack(standard).name };
+}
+function glossaryView(standard, term, lang = "en") {
+  const { glossary, label } = glossaryOf(standard, lang);
+  const anchors = Object.keys(glossary).sort();
+  if (!anchors.length) throw new CriteriaLookupError(`${label} ships no glossary in this build.`);
+  const wanted = term?.trim();
+  if (!wanted) {
+    return {
+      standard,
+      standardLabel: standardLabel(standard),
+      kind: "glossary-index",
+      count: anchors.length,
+      terms: anchors.map((a) => ({ anchor: a, title: glossary[a]?.title ?? "" }))
+    };
+  }
+  const want = foldTerm2(wanted);
+  const hit = anchors.find((a) => a === wanted) ?? anchors.find((a) => foldTerm2(a) === want) ?? anchors.find((a) => foldTerm2(glossary[a]?.title ?? "") === want) ?? anchors.find((a) => foldTerm2(a).startsWith(want));
+  if (!hit) {
+    const near = anchors.filter((a) => foldTerm2(a).includes(want) || foldTerm2(glossary[a]?.title ?? "").includes(want)).slice(0, 8);
+    throw new CriteriaLookupError(`no ${label} glossary term matching "${wanted}".`, near);
+  }
+  const entry = glossary[hit];
+  return {
+    standard,
+    standardLabel: standardLabel(standard),
+    kind: "glossary-term",
+    anchor: hit,
+    title: entry.title,
+    body: entry.body,
+    // Which criteria this definition actually governs — the reason it is normative.
+    citedBy: isCore(standard) ? [] : citedBy(loadPack(standard), hit)
+  };
+}
+
+// src/method-view.ts
+function tierCensus2(standard, ids) {
+  const by = {};
+  for (const id of ids) {
+    const t2 = criterionCoverage(standard, id)?.tier;
+    if (t2) by[t2] = (by[t2] ?? 0) + 1;
+  }
+  return by;
+}
+function summarize(key) {
+  if (isCore(key)) {
+    const scs = allSC();
+    const byAuto = {};
+    for (const c2 of scs) byAuto[c2.automatability] = (byAuto[c2.automatability] ?? 0) + 1;
+    return {
+      key,
+      core: true,
+      label: standardLabel(key),
+      ...meta(),
+      counts: { criteria: scs.length, ...byAuto },
+      byTier: tierCensus2(
+        key,
+        scs.map((c2) => c2.sc)
+      ),
+      // The core keeps its terms in wcag.json, not in a pack glossary — it defines "large
+      // scale" and "pure decoration" itself, and those definitions decide its verdicts.
+      glossary: Object.keys(coreGlossary()).length,
+      guidance: getDataset(key)?.entries.length ?? 0
+    };
+  }
+  const pack = loadPack(key);
+  const criteria = allCriteria(pack);
+  return {
+    key,
+    core: false,
+    label: standardLabel(key),
+    name: pack.name,
+    fullName: pack.fullName,
+    org: pack.org,
+    country: pack.country,
+    baseVersion: pack.baseVersion,
+    wcagVersion: pack.wcagVersion,
+    locales: pack.locales,
+    defaultLocale: pack.defaultLocale,
+    license: pack.license,
+    source: pack.source,
+    attribution: pack.attribution,
+    counts: {
+      themes: pack.themes.length,
+      criteria: criteria.length,
+      tests: criteria.reduce((n, c2) => n + Object.keys(c2.tests ?? {}).length, 0),
+      judgment: criteria.filter((c2) => c2.judgment).length,
+      noEngineRule: criteria.filter((c2) => c2.appliesTo?.ruleIds?.length === 0).length,
+      declarativeRules: pack.rules?.length ?? 0
+    },
+    byTier: tierCensus2(
+      key,
+      criteria.map((c2) => c2.id)
+    ),
+    glossary: Object.keys(packGlossary(key) ?? {}).length,
+    guidance: hasGuidance(key) ? getDataset(key)?.entries.length ?? 0 : 0,
+    ...pack.sampleMethodology ? { sampleKinds: pack.sampleMethodology.requiredKinds.length } : {}
+  };
+}
+function standardsInventory() {
+  const keys = listStandards();
+  return {
+    default: "wcag",
+    count: keys.length,
+    standards: keys.map(summarize),
+    // Nothing here is a claim about the project's conformance — it is what the project
+    // COULD be audited against.
+    next: "ultra11y_method for the work plan of one of these; ultra11y_criteria to read a criterion.",
+    builtIn: listPacks().map((p) => p.key)
+  };
+}
+var TIER_GUIDE = {
+  source: {
+    tool: "ultra11y_audit",
+    how: "Run ultra11y_audit over the project's markup. An engine rule decides these: on a file that WAS audited, the absence of a finding is a real pass."
+  },
+  "cross-file": {
+    tool: "ultra11y_audit (graph: true)",
+    how: "Statically decidable, but only across the dependency graph \u2014 a label defined in another file. Re-run the audit with graph: true."
+  },
+  "rendered-page": {
+    tool: "ultra11y render / dev / the Playwright or Cypress plugin",
+    how: "Capture a page snapshot into .ultra11y/pages first, then audit again. These rules read computed styles, laid-out boxes and the screenshot \u2014 a captured page, but no live browser."
+  },
+  browser: {
+    tool: "ultra11y scan (CLI)",
+    how: "Needs a live rendered DOM. This server does not drive a browser: run `ultra11y scan <target> --merge` from the CLI, then audit again."
+  },
+  judgment: {
+    tool: "ultra11y_adjudicate",
+    how: "The evidence can be gathered but the verdict is a reading of meaning \u2014 is this alt text relevant, is this link's purpose clear in context. ultra11y_adjudicate hands you the evidence and the decision rule; you rule, citing the criterion's own numbered test."
+  },
+  "out-of-scope": {
+    tool: "\u2014",
+    how: "Every WCAG success criterion this maps to is outside the engine's 2.2 AA core (AAA, or removed). Declare it out of scope. Never claim conformity."
+  }
+};
+var TIERS = ["source", "cross-file", "rendered-page", "browser", "judgment", "out-of-scope"];
+function titleOf(standard, id, lang) {
+  if (isCore(standard)) {
+    const t2 = scTitle(id, lang);
+    return t2 ?? id;
+  }
+  const pack = loadPack(standard);
+  const c2 = allCriteria(pack).find((x) => x.id === id);
+  return c2 ? titlePlain(pack, c2, lang) : id;
+}
+function methodView(standard, lang, opts = {}) {
+  const coverage = standardCoverage(standard);
+  const detail = opts.detail ?? "summary";
+  const buckets = TIERS.map((tier) => {
+    const entries = [...coverage].filter(([, c2]) => c2.tier === tier);
+    return {
+      tier,
+      count: entries.length,
+      sourceIsEnough: tier === "source",
+      ...TIER_GUIDE[tier],
+      criteria: entries.map(
+        ([id, c2]) => detail === "full" ? { id, title: titleOf(standard, id, lang), rules: c2.engineRules, alsoNeeds: c2.alsoNeeds, canFailFrom: c2.canFailFrom, why: c2.why } : { id }
+      )
+    };
+  }).filter((b) => opts.tier ? b.tier === opts.tier : b.count > 0);
+  const sourceIds = [...coverage].filter(([, c2]) => c2.sourceIsEnough).map(([id]) => id);
+  const failableFromSource = [...coverage].filter(([, c2]) => !c2.sourceIsEnough && c2.canFailFrom.includes("source")).map(([id]) => id);
+  const pack = isCore(standard) ? void 0 : getPack(standard);
+  return {
+    standard,
+    standardLabel: standardLabel(standard),
+    lang,
+    total: coverage.size,
+    detail,
+    buckets,
+    sourceIsEnough: { count: sourceIds.length, ids: sourceIds },
+    needsMore: { count: coverage.size - sourceIds.length },
+    canFailFromSource: {
+      count: failableFromSource.length,
+      ids: failableFromSource,
+      note: "These cannot be PROVEN conformant from source, but an engine rule can still fail them outright."
+    },
+    ...pack?.sampleMethodology ? {
+      sample: {
+        requiredKinds: pack.sampleMethodology.requiredKinds.map((k) => ({ id: k.id, label: k.label[lang] ?? k.label[pack.defaultLocale] })),
+        note: "This standard is a PER-PAGE norm: the plan above applies to each page of the declared sample. Lint the sample with ultra11y_sample_check."
+      }
+    } : {},
+    coverageNote: "A criterion nobody tested is untested, never conformant. Every count above is derived from this engine's own rule applicability and the WCAG automatability classes \u2014 not from reading the wording of a test.",
+    next: "ultra11y_audit to settle the `source` tier, then ultra11y_adjudicate for the judgment ones."
+  };
+}
+
 // src/project-lock.ts
 var chains = /* @__PURE__ */ new Map();
 function withProjectLock(dir, fn) {
@@ -59432,6 +61494,7 @@ var MAX_READ_LINES = 2e3;
 var MAX_READ_BYTES = 8 * 1024 * 1024;
 var DEFAULT_GLOBS = ["**/*.html", "**/*.htm", "**/*.jsx", "**/*.tsx", "**/*.vue", "**/*.svelte"];
 var WRITE_TOOL_NAMES = /* @__PURE__ */ new Set(["ultra11y_fix", "ultra11y_scan", "ultra11y_init"]);
+var REFERENCE_TOOL_NAMES = /* @__PURE__ */ new Set(["ultra11y_criteria", "ultra11y_standards", "ultra11y_glossary", "ultra11y_guidance", "ultra11y_method"]);
 function str2(v) {
   return typeof v === "string" && v.trim() !== "" ? v : void 0;
 }
@@ -59460,10 +61523,18 @@ function requiredCwd(args2, defaults) {
   if (!statSync12(abs).isDirectory()) throw new ToolError(`\`cwd\` is not a directory: ${abs}`);
   return abs;
 }
+function optionalCwd(args2, defaults) {
+  if (str2(args2.cwd) === void 0 && defaults.defaultCwd === void 0) return void 0;
+  return requiredCwd(args2, defaults);
+}
 function standardOf(args2) {
-  const s = str2(args2.standard) ?? "wcag";
-  if (s !== "wcag" && s !== "rgaa") throw new ToolError(`\`standard\` must be one of: wcag, rgaa (got "${s}")`);
-  return s;
+  const s = str2(args2.standard);
+  if (s === void 0) return CORE2;
+  try {
+    return resolveStandard(s);
+  } catch (e) {
+    throw new ToolError(e instanceof Error ? e.message : String(e));
+  }
 }
 function langOf(args2) {
   const l = str2(args2.lang) ?? "en";
@@ -59474,9 +61545,46 @@ async function callTool2(name2, args2, defaults = {}) {
   if (WRITE_TOOL_NAMES.has(name2) && !defaults.allowWrite) {
     throw new ToolError(`${name2} changes files in your project and is disabled \u2014 start the server with --allow-write to enable it.`);
   }
-  if (name2 === "ultra11y_criteria") return outcome(handleCriteria(args2));
+  if (REFERENCE_TOOL_NAMES.has(name2)) {
+    const scope = optionalCwd(args2, defaults);
+    return withStandards(scope, () => outcome(handleReference(name2, args2)));
+  }
   const cwd = requiredCwd(args2, defaults);
-  return await withProjectLock(cwd, async () => outcome(await dispatch(name2, args2, cwd)));
+  return await withProjectLock(cwd, async () => withStandards(cwd, async () => outcome(await dispatch(name2, args2, cwd))));
+}
+function withStandards(scope, fn) {
+  if (scope === void 0) return fn();
+  if (!scopeLoaded(scope)) {
+    const warnings = [];
+    let errors;
+    try {
+      errors = loadRuntimeStandards(scope, [], (m) => warnings.push(m), false, { scope }).errors;
+    } catch (e) {
+      dropScope(scope);
+      throw new ToolError(`${scope}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (errors.length) {
+      dropScope(scope);
+      throw new ToolError(`${scope}: ${errors.join("\n")}`);
+    }
+  }
+  return withScope(scope, fn);
+}
+function handleReference(name2, args2) {
+  switch (name2) {
+    case "ultra11y_criteria":
+      return handleCriteria(args2);
+    case "ultra11y_standards":
+      return handleStandards(args2);
+    case "ultra11y_glossary":
+      return handleGlossary(args2);
+    case "ultra11y_guidance":
+      return handleGuidance(args2);
+    case "ultra11y_method":
+      return handleMethod(args2);
+    default:
+      throw new ToolError(`unknown tool: ${name2}`);
+  }
 }
 async function dispatch(name2, args2, cwd) {
   switch (name2) {
@@ -59766,13 +61874,65 @@ function reportText(args2, tool) {
 }
 function handleCriteria(args2) {
   const lang = langOf(args2);
-  const id = str2(args2.sc);
-  if (!id) {
-    return { standard: standardOf(args2), criteria: allSC().map((c2) => ({ sc: c2.sc, title: c2.title })) };
+  const standard = standardOf(args2);
+  const includeGuidance = bool(args2.include_guidance);
+  const id = str2(args2.criterion) ?? str2(args2.sc);
+  const glossary = args2.glossary;
+  const theme = num2(args2.theme);
+  try {
+    if (glossary !== void 0 && glossary !== false) {
+      return glossaryView(standard, typeof glossary === "string" ? glossary : void 0, lang);
+    }
+    if (id) {
+      const view = criterionView(standard, id, lang, includeGuidance);
+      return isCore(standard) ? { ...view, sc: id } : view;
+    }
+    if (theme !== void 0) return themeView(standard, theme, lang);
+    return criteriaIndex(standard, lang);
+  } catch (e) {
+    if (e instanceof CriteriaLookupError) {
+      throw new ToolError(e.suggestions.length ? `${e.message} Did you mean: ${e.suggestions.join(", ")}?` : e.message);
+    }
+    throw e;
   }
-  const sc = getSC(id);
-  if (!sc) throw new ToolError(`no such success criterion: ${id}. List them all by omitting \`sc\`.`);
-  return { standard: standardOf(args2), sc: id, text: formatSC(sc, lang) };
+}
+function handleStandards(_args) {
+  return standardsInventory();
+}
+function handleGlossary(args2) {
+  const standard = standardOf(args2);
+  try {
+    return glossaryView(standard, str2(args2.term), langOf(args2));
+  } catch (e) {
+    if (e instanceof CriteriaLookupError) {
+      throw new ToolError(e.suggestions.length ? `${e.message} Did you mean: ${e.suggestions.join(", ")}?` : e.message);
+    }
+    throw e;
+  }
+}
+function handleGuidance(args2) {
+  const standard = standardOf(args2);
+  const lang = langOf(args2);
+  const id = str2(args2.criterion) ?? str2(args2.sc);
+  if (!id) throw new ToolError("`criterion` is required: the criterion id to fetch guidance for.");
+  const view = criterionView(standard, id, lang, true);
+  const guidance = view.criterion.guidance;
+  return {
+    standard,
+    standardLabel: view.standardLabel,
+    criterion: id,
+    lang,
+    count: guidance.length,
+    entries: guidance,
+    note: guidance.length ? "Guidance illustrates how to implement a criterion. It never decides a verdict, and an entry marked `inherited` comes from the WCAG mapping, not from this standard's own doctrine." : "No guidance is registered for this criterion, in this standard or through its WCAG mapping. That is not a pass \u2014 it means no example was written."
+  };
+}
+function handleMethod(args2) {
+  const standard = standardOf(args2);
+  const lang = langOf(args2);
+  const tier = str2(args2.tier);
+  const detail = str2(args2.detail) === "full" ? "full" : "summary";
+  return methodView(standard, lang, { ...tier ? { tier } : {}, detail });
 }
 function handleRead(args2, cwd) {
   const raw = str2(args2.path);
@@ -59909,7 +62069,6 @@ var globsProp = {
 };
 var standardProp = {
   type: "string",
-  enum: ["wcag", "rgaa"],
   description: "Which standard to report against. Default: wcag (WCAG 2.2 AA)."
 };
 var langProp = { type: "string", enum: ["en", "fr"], description: "Language for the rendered prose. Default: en." };
@@ -59989,11 +62148,25 @@ var TOOLS2 = [
   {
     name: "ultra11y_criteria",
     title: "The offline standards reference",
-    description: "Look up what a success criterion actually requires \u2014 its exact wording, how it is tested, and what counts as a failure. Offline and authoritative; use it instead of recalling a criterion from memory, which is how invented non-conformities get written.",
+    description: "Look up what a criterion actually requires \u2014 its exact wording, its numbered tests, the terms the standard defines for it, and what it takes to decide it. Works for WCAG success criteria AND for any country standard's own criteria (RGAA 8.3, and whatever packs this project loads). Offline and authoritative; use it instead of recalling a criterion from memory, which is how invented non-conformities get written.",
     inputSchema: {
       type: "object",
       properties: {
-        sc: { type: "string", description: "A success criterion number (e.g. '1.1.1'). Omit to list them all." },
+        cwd: {
+          type: "string",
+          description: "Absolute path to the project root. Optional \u2014 it decides which standards packs are loaded, not which files are read."
+        },
+        sc: { type: "string", description: "A criterion id: a WCAG success criterion ('1.1.1') or a pack criterion ('8.3'). Omit to list them all." },
+        criterion: { type: "string", description: "Alias for `sc`, for a standard whose criteria are not WCAG success criteria." },
+        theme: { type: "number", description: "List one theme of a country standard (e.g. 8). Not applicable to WCAG, which groups by guideline." },
+        glossary: {
+          type: "string",
+          description: "Look up a term the standard normatively DEFINES. Pass a term, or an empty string to list every term."
+        },
+        include_guidance: {
+          type: "boolean",
+          description: "Also attach before/after implementation examples for the criterion. Default false \u2014 they are large."
+        },
         standard: standardProp,
         lang: langProp
       },
@@ -60161,6 +62334,77 @@ var WRITE_TOOLS = [
     }
   }
 ];
+var referenceCwdProp = {
+  type: "string",
+  description: "Absolute path to the project root. Optional \u2014 it decides which standards packs are loaded, not which files are read."
+};
+var REFERENCE_TOOLS = [
+  {
+    name: "ultra11y_standards",
+    title: "The standards this project can be audited against",
+    description: "List every standard available here: the WCAG 2.2 AA core, the country packs built into this build, and any pack the project's .ultra11yrc.json or --pack loaded. Each carries its own coverage arithmetic \u2014 how many criteria it has, and how many of them any engine could ever decide. Standards are per-project: a pack another project declares is not yours. Call this before assuming a standard exists.",
+    inputSchema: {
+      type: "object",
+      properties: { cwd: referenceCwdProp, lang: langProp },
+      required: []
+    }
+  },
+  {
+    name: "ultra11y_glossary",
+    title: "The terms a standard normatively defines",
+    description: "A standard's tests lean constantly on terms it defines itself \u2014 'informative image', 'relevant', 'if necessary'. Those definitions are normative: they decide the verdict, and the everyday meaning of the word is not what is being asked. Look one up rather than assuming, and see which criteria it governs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        standard: standardProp,
+        term: { type: "string", description: "A term or its anchor. Omit to list every term the standard defines." },
+        cwd: referenceCwdProp,
+        lang: langProp
+      },
+      required: ["standard"]
+    }
+  },
+  {
+    name: "ultra11y_guidance",
+    title: "Before/after implementation guidance for a criterion",
+    description: "The concrete how-to-implement rule for a criterion: a non-compliant snippet, the compliant fix, and the note explaining the difference. A country criterion with no guidance of its own inherits what is keyed to the WCAG success criteria it maps to, marked as inherited. Guidance ILLUSTRATES \u2014 it never decides a verdict and never turns into a non-conformity.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        standard: standardProp,
+        criterion: { type: "string", description: "The criterion id to fetch guidance for (a WCAG SC, or a pack criterion like '1.2')." },
+        sc: { type: "string", description: "Alias for `criterion`." },
+        cwd: referenceCwdProp,
+        lang: langProp
+      },
+      required: []
+    }
+  },
+  {
+    name: "ultra11y_method",
+    title: "The audit work plan for a standard",
+    description: "Get the plan before auditing anything: which of this standard's criteria the static engine decides from source alone, which need a captured page or a real browser, and which are judgment calls only you can make \u2014 each with the evidence to gather and the tool that produces it. Derived from this engine's own per-criterion rule applicability and WCAG automatability data, not from guessing at the wording of a test. A criterion nobody tested is untested, never conformant.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        standard: standardProp,
+        cwd: referenceCwdProp,
+        lang: langProp,
+        tier: {
+          type: "string",
+          enum: ["source", "cross-file", "rendered-page", "browser", "judgment", "out-of-scope"],
+          description: "Return only the criteria in this evidence tier."
+        },
+        detail: {
+          type: "string",
+          enum: ["summary", "full"],
+          description: "'summary' (default) is counts plus criterion ids; 'full' adds each criterion's title, rules and reason."
+        }
+      },
+      required: []
+    }
+  }
+];
 var TOOL_META2 = {
   ultra11y_audit: { openWorld: false },
   ultra11y_report: { openWorld: false },
@@ -60171,6 +62415,11 @@ var TOOL_META2 = {
   // somebody's tracker off the back of a prompt injection.
   ultra11y_tickets: { openWorld: false },
   ultra11y_criteria: { openWorld: false },
+  // The reference block: they read the vendored standard and nothing else.
+  ultra11y_standards: { openWorld: false },
+  ultra11y_glossary: { openWorld: false },
+  ultra11y_guidance: { openWorld: false },
+  ultra11y_method: { openWorld: false },
   ultra11y_check: { openWorld: false },
   ultra11y_verify: { openWorld: false },
   ultra11y_adjudicate: { openWorld: false },
@@ -60195,14 +62444,14 @@ function annotationsFor2(name2) {
   };
 }
 function toolsFor2(protocolVersion, opts = {}) {
-  const base = opts.allowWrite ? [...TOOLS2, ...WRITE_TOOLS] : TOOLS2;
+  const base = opts.allowWrite ? [...TOOLS2, ...REFERENCE_TOOLS, ...WRITE_TOOLS] : [...TOOLS2, ...REFERENCE_TOOLS];
   const withAnnotations = protocolVersion >= ANNOTATIONS_SINCE2;
   const withRich = protocolVersion >= RICH_TOOLS_SINCE2;
   return base.map((t2) => {
     const decl = {
       name: t2.name,
       description: t2.description,
-      inputSchema: applyDefaultCwd(t2.inputSchema, opts.defaultCwd)
+      inputSchema: applyStandards(applyDefaultCwd(t2.inputSchema, opts.defaultCwd), opts.standards)
     };
     if (withRich && t2.title) decl.title = t2.title;
     if (withRich && t2.outputSchema) decl.outputSchema = t2.outputSchema;
@@ -60212,6 +62461,15 @@ function toolsFor2(protocolVersion, opts = {}) {
     }
     return decl;
   });
+}
+function applyStandards(schema, standards) {
+  const existing = schema.properties.standard;
+  if (!existing?.description || !standards?.length) return schema;
+  const standard = {
+    ...existing,
+    description: `${existing.description} Loaded here: ${standards.join(", ")}. A project's own packs load with it \u2014 call ultra11y_standards to list them.`
+  };
+  return { ...schema, properties: { ...schema.properties, standard } };
 }
 function applyDefaultCwd(schema, defaultCwd) {
   const existing = schema.properties.cwd;
@@ -60238,14 +62496,25 @@ var PROMPTS = [
     arguments: [
       cwdArg,
       { name: "globs", description: "What to audit, comma-separated (default: the project's markup).", required: false },
-      { name: "standard", description: "wcag (default) or rgaa.", required: false }
+      {
+        name: "standard",
+        description: "The standard key to report against \u2014 `ultra11y_standards` lists what this project has. Default: wcag.",
+        required: false
+      }
     ]
   },
   {
     name: "adjudicate_criteria",
     title: "Decide the criteria the engine cannot",
     description: "The judgment workflow: work the adjudication queue \u2014 alt-text relevance, link purpose in context, heading structure, reading order \u2014 by reading the real markup, not by pattern-matching the element.",
-    arguments: [cwdArg, { name: "standard", description: "wcag (default) or rgaa.", required: false }]
+    arguments: [
+      cwdArg,
+      {
+        name: "standard",
+        description: "The standard key to adjudicate against \u2014 `ultra11y_standards` lists what this project has. Default: wcag.",
+        required: false
+      }
+    ]
   },
   {
     name: "review_diff_a11y",
@@ -60401,14 +62670,141 @@ function firstProse(file) {
   } catch {
     return void 0;
   }
-  const body2 = text.startsWith("---\n") ? text.slice(text.indexOf("\n---", 3) + 4) : text;
-  for (const block of body2.split(/\n\s*\n/)) {
+  const body3 = text.startsWith("---\n") ? text.slice(text.indexOf("\n---", 3) + 4) : text;
+  for (const block of body3.split(/\n\s*\n/)) {
     const line = block.trim();
     if (!line || line.startsWith("#") || line.startsWith(">") || line.startsWith("|") || line.startsWith("```")) continue;
     const flat = line.replace(/\s+/g, " ").replace(/[*`]/g, "");
     return flat.length > 300 ? `${flat.slice(0, 297)}\u2026` : flat;
   }
   return void 0;
+}
+
+// src/mcp/standards-resources.ts
+var SCHEME = "std://";
+var MIME = "application/json";
+function hasGlossary(key) {
+  return Object.keys(isCore(key) ? coreGlossary() : packGlossary(key) ?? {}).length > 0;
+}
+function listStandardResources() {
+  const out2 = [];
+  for (const key of listStandards()) {
+    const label = standardLabel(key);
+    out2.push({
+      uri: `${SCHEME}${key}/criteria`,
+      name: `${key}/criteria`,
+      title: `${label}: every criterion`,
+      description: `The full criterion index for ${label}, with the evidence tier each one needs.`,
+      mimeType: MIME
+    });
+    out2.push({
+      uri: `${SCHEME}${key}/method`,
+      name: `${key}/method`,
+      title: `${label}: the audit work plan`,
+      description: `Which ${label} criteria the engine decides from source, which need a rendered page or a browser, and which are judgment calls.`,
+      mimeType: MIME
+    });
+    if (hasGlossary(key)) {
+      out2.push({
+        uri: `${SCHEME}${key}/glossary`,
+        name: `${key}/glossary`,
+        title: `${label}: the terms it defines`,
+        description: `The terms ${label} defines normatively \u2014 the definitions that decide its verdicts.`,
+        mimeType: MIME
+      });
+    }
+    if (!isCore(key)) {
+      out2.push({
+        uri: `${SCHEME}${key}/pack.json`,
+        name: `${key}/pack.json`,
+        title: `${label}: the standards pack`,
+        description: `The whole ${label} pack as ultra11y loads it, including its licence and attribution.`,
+        mimeType: MIME
+      });
+    }
+  }
+  return out2;
+}
+function listStandardResourceTemplates() {
+  return [
+    {
+      uriTemplate: `${SCHEME}{standard}/criteria/{id}`,
+      name: "criterion",
+      title: "One criterion of one standard",
+      description: "A criterion in full: its wording, its numbered tests, the terms it leans on, and what it takes to decide it.",
+      mimeType: MIME
+    },
+    {
+      uriTemplate: `${SCHEME}{standard}/themes/{number}`,
+      name: "theme",
+      title: "One theme of a country standard",
+      description: "The criteria grouped under one theme of a country standard. WCAG groups by guideline instead.",
+      mimeType: MIME
+    },
+    {
+      uriTemplate: `${SCHEME}{standard}/glossary/{term}`,
+      name: "glossary-term",
+      title: "A term a standard normatively defines",
+      description: "The normative definition of a term, and the criteria it governs.",
+      mimeType: MIME
+    },
+    {
+      uriTemplate: `${SCHEME}{standard}/guidance/{criterion}`,
+      name: "guidance",
+      title: "Implementation guidance for a criterion",
+      description: "Before/after examples for a criterion, including those inherited through its WCAG mapping.",
+      mimeType: MIME
+    }
+  ];
+}
+function isStandardUri(uri) {
+  return uri.startsWith(SCHEME);
+}
+function body2(value) {
+  return JSON.stringify(value, null, 2);
+}
+function readStandardResource(uri, lang = "en") {
+  const rest = uri.slice(SCHEME.length);
+  const parts2 = rest.split("/").filter(Boolean);
+  const standard = parts2[0];
+  if (!standard) throw new ResourceError(`no standard named in "${uri}" (expected ${SCHEME}<standard>/\u2026)`);
+  if (!listStandards().includes(standard)) {
+    throw new ResourceError(`unknown standard "${standard}" (known: ${listStandards().join(", ")})`);
+  }
+  const decode = (s) => {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  };
+  try {
+    const [, section, ...tail] = parts2;
+    const key = tail.length ? decode(tail.join("/")) : void 0;
+    if (section === void 0) return { uri, mimeType: MIME, text: body2(criteriaIndex(standard, lang)) };
+    if (section === "criteria") {
+      return { uri, mimeType: MIME, text: body2(key ? criterionView(standard, key, lang, true) : criteriaIndex(standard, lang)) };
+    }
+    if (section === "themes") {
+      if (!key) throw new ResourceError(`no theme named in "${uri}"`);
+      return { uri, mimeType: MIME, text: body2(themeView(standard, Number(key), lang)) };
+    }
+    if (section === "glossary") return { uri, mimeType: MIME, text: body2(glossaryView(standard, key, lang)) };
+    if (section === "guidance") {
+      if (!key) throw new ResourceError(`no criterion named in "${uri}"`);
+      const view = criterionView(standard, key, lang, true);
+      return { uri, mimeType: MIME, text: body2({ standard, criterion: key, entries: view.criterion.guidance }) };
+    }
+    if (section === "method") return { uri, mimeType: MIME, text: body2(methodView(standard, lang)) };
+    if (section === "pack.json") {
+      if (isCore(standard)) throw new ResourceError("the WCAG core is not a standards pack \u2014 read std://wcag/criteria instead");
+      return { uri, mimeType: MIME, text: body2(loadPack(standard)) };
+    }
+    throw new ResourceError(`unknown standards resource: ${uri}`);
+  } catch (e) {
+    if (e instanceof CriteriaLookupError) throw new ResourceError(e.message);
+    throw e;
+  }
 }
 
 // src/mcp/server.ts
@@ -60422,7 +62818,7 @@ function createServer2(opts = {}) {
   let protocol = LATEST_PROTOCOL2;
   const cancelled = /* @__PURE__ */ new Set();
   const CANCELLED_MAX = 1024;
-  const listTools = () => toolsFor2(protocol, { defaultCwd: opts.defaultCwd, allowWrite: opts.allowWrite });
+  const listTools = () => toolsFor2(protocol, { defaultCwd: opts.defaultCwd, allowWrite: opts.allowWrite, standards: listStandards() });
   async function handle2(msg, send) {
     if (msg === null || typeof msg !== "object" || Array.isArray(msg)) {
       send({ jsonrpc: "2.0", id: null, error: { code: ERR_INVALID_REQUEST, message: "invalid request: expected a JSON-RPC object" } });
@@ -60474,7 +62870,10 @@ function createServer2(opts = {}) {
           await handleToolCall(msg, reply);
           return;
         case "resources/list":
-          reply({ result: { resources: listResources(opts.skillDir) } });
+          reply({ result: { resources: withStandards(opts.defaultCwd, () => [...listResources(opts.skillDir), ...listStandardResources()]) } });
+          return;
+        case "resources/templates/list":
+          reply({ result: { resourceTemplates: listStandardResourceTemplates() } });
           return;
         case "resources/read": {
           const uri = typeof msg.params?.uri === "string" ? msg.params.uri : "";
@@ -60483,7 +62882,8 @@ function createServer2(opts = {}) {
             return;
           }
           try {
-            reply({ result: { contents: [readResource(uri, opts.skillDir)] } });
+            const contents = isStandardUri(uri) ? withStandards(opts.defaultCwd, () => readStandardResource(uri)) : readResource(uri, opts.skillDir);
+            reply({ result: { contents: [contents] } });
           } catch (e) {
             if (e instanceof ResourceError) reply({ error: { code: ERR_INVALID_PARAMS, message: e.message } });
             else reply({ error: { code: ERR_INTERNAL, message: errMessage2(e) } });
@@ -60648,14 +63048,14 @@ function startHttpServer(opts = {}) {
   server.requestTimeout = 0;
   server.headersTimeout = 6e4;
   server.keepAliveTimeout = 12e4;
-  return new Promise((resolve15, reject) => {
+  return new Promise((resolve16, reject) => {
     server.once("error", reject);
     server.listen(opts.port ?? 0, bind, () => {
       server.removeListener("error", reject);
       const addr2 = server.address();
       const port = typeof addr2 === "object" && addr2 ? addr2.port : opts.port ?? 0;
       const host = bind.includes(":") ? `[${bind}]` : bind;
-      resolve15({
+      resolve16({
         server,
         port,
         url: `http://${host}:${port}${MCP_PATH}`,
@@ -60752,8 +63152,8 @@ function header3(req, name2) {
 function corsHeaders(origin) {
   return origin ? { "access-control-allow-origin": origin, vary: "origin" } : {};
 }
-function sendJson(res, status, body2, origin, extra = {}) {
-  const text = JSON.stringify(body2);
+function sendJson(res, status, body3, origin, extra = {}) {
+  const text = JSON.stringify(body3);
   res.writeHead(status, {
     "content-type": "application/json",
     "content-length": String(Buffer.byteLength(text, "utf8")),
@@ -60764,7 +63164,7 @@ function sendJson(res, status, body2, origin, extra = {}) {
 }
 var DRAIN_LIMIT = MAX_BODY_BYTES * 8;
 function readBody2(req) {
-  return new Promise((resolve15, reject) => {
+  return new Promise((resolve16, reject) => {
     const chunks = [];
     let size = 0;
     let over = false;
@@ -60788,7 +63188,7 @@ function readBody2(req) {
     });
     req.on("end", () => {
       if (over) reject(new Error("too large"));
-      else resolve15(Buffer.concat(chunks).toString("utf8"));
+      else resolve16(Buffer.concat(chunks).toString("utf8"));
     });
     req.on("error", reject);
     req.on("aborted", () => reject(new Error("client aborted the request")));
@@ -61674,9 +64074,9 @@ async function cmdDev(p) {
   }
   console.error(fr ? `ultra11y dev : tableau de bord sur http://127.0.0.1:${server.port}` : `ultra11y dev: dashboard on http://127.0.0.1:${server.port}`);
   console.error(fr ? "Boucle locale uniquement (l'outil \xE9crit des fichiers). Ctrl-C pour arr\xEAter." : "Loopback only (the tool writes files). Ctrl-C to stop.");
-  await new Promise((resolve15) => {
+  await new Promise((resolve16) => {
     const stop2 = () => {
-      void server.close().then(resolve15);
+      void server.close().then(resolve16);
     };
     process.once("SIGINT", stop2);
     process.once("SIGTERM", stop2);
@@ -63635,7 +66035,8 @@ async function main(argv) {
     if (typeof v === "string" && v && !allowed.includes(v)) console.error(`ultra11y: --${flag} "${v}" is not one of ${allowed.join("|")} \u2014 using the default.`);
   }
   const packList = typeof p.flags.pack === "string" ? p.flags.pack.split(",").map((s) => s.trim()).filter(Boolean) : [];
-  const loaded2 = loadRuntimeStandards(process.cwd(), packList, (m) => console.error(m), p.flags.override === true);
+  const configRoot = p.command === "mcp" && typeof p.flags.cwd === "string" && p.flags.cwd ? resolve15(p.flags.cwd) : process.cwd();
+  const loaded2 = loadRuntimeStandards(configRoot, packList, (m) => console.error(m), p.flags.override === true);
   if (loaded2.errors.length) {
     for (const e of loaded2.errors) console.error(`ultra11y: ${e}`);
     return 2;

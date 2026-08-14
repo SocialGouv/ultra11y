@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { TOOLS, WRITE_TOOLS, TOOL_META, annotationsFor, toolsFor } from "../src/mcp/tools.js";
+import { TOOLS, REFERENCE_TOOLS, WRITE_TOOLS, TOOL_META, annotationsFor, toolsFor } from "../src/mcp/tools.js";
 import { validateArgs } from "../src/mcp/protocol.js";
 
-const ALL = [...TOOLS, ...WRITE_TOOLS];
+const ALL = [...TOOLS, ...REFERENCE_TOOLS, ...WRITE_TOOLS];
 
 describe("tool declarations", () => {
   it("names every tool consistently and uniquely", () => {
@@ -31,13 +31,28 @@ describe("tool declarations", () => {
     }
   });
 
-  it("keeps the standard and lang enums to what the engine actually loads", () => {
+  it("keeps the lang enum closed, and leaves `standard` open", () => {
+    // `lang` is the UI frame — the `Lang` union, two values, closed for good.
+    //
+    // `standard` is NOT closed: a country pack arrives with a project, and a tool call names
+    // its project by `cwd`. An enum pinned at tools/list time would reject a pack that is
+    // perfectly valid for the project being asked about. The handler validates it instead,
+    // against the registry, naming what it knows.
     for (const t of ALL) {
       const std = t.inputSchema.properties.standard;
-      if (std) expect([...std.enum!].sort(), t.name).toEqual(["rgaa", "wcag"]);
+      if (std) expect(std.enum, `${t.name}.standard must stay open`).toBeUndefined();
       const lang = t.inputSchema.properties.lang;
       if (lang) expect([...lang.enum!].sort(), t.name).toEqual(["en", "fr"]);
     }
+  });
+
+  it("names the loaded standards in the `standard` description, so a client can still discover them", () => {
+    const decls = toolsFor("2025-06-18", { standards: ["wcag", "rgaa", "section508"] });
+    const report = decls.find((t) => t.name === "ultra11y_report")!;
+    const std = report.inputSchema.properties.standard!;
+    expect(std.enum).toBeUndefined();
+    expect(std.description).toContain("wcag, rgaa, section508");
+    expect(std.description).toContain("ultra11y_standards");
   });
 
   it("states the coverage limit on the tool a client reaches for first", () => {
@@ -70,6 +85,10 @@ describe("annotations", () => {
     ultra11y_prd: { readOnlyHint: true, openWorldHint: false },
     ultra11y_tickets: { readOnlyHint: true, openWorldHint: false },
     ultra11y_criteria: { readOnlyHint: true, openWorldHint: false },
+    ultra11y_standards: { readOnlyHint: true, openWorldHint: false },
+    ultra11y_glossary: { readOnlyHint: true, openWorldHint: false },
+    ultra11y_guidance: { readOnlyHint: true, openWorldHint: false },
+    ultra11y_method: { readOnlyHint: true, openWorldHint: false },
     ultra11y_check: { readOnlyHint: true, openWorldHint: false },
     ultra11y_verify: { readOnlyHint: true, openWorldHint: false },
     ultra11y_adjudicate: { readOnlyHint: true, openWorldHint: false },
@@ -131,6 +150,10 @@ describe("declared schemas accept what the handlers expect", () => {
       ultra11y_audit: { cwd: "/p", globs: ["src/**/*.tsx"], graph: true, max_files: 50 },
       ultra11y_report: { cwd: "/p", standard: "rgaa", lang: "fr" },
       ultra11y_prd: { cwd: "/p", split: "criterion" },
+      ultra11y_standards: {},
+      ultra11y_glossary: { standard: "rgaa", term: "lien" },
+      ultra11y_guidance: { standard: "rgaa", criterion: "13.2" },
+      ultra11y_method: { standard: "rgaa", tier: "judgment", detail: "full" },
       ultra11y_tickets: { cwd: "/p", grain: "page-criterion" },
       ultra11y_criteria: { sc: "1.1.1", lang: "fr" },
       ultra11y_check: { cwd: "/p", report_text: "# report" },
@@ -153,7 +176,11 @@ describe("declared schemas accept what the handlers expect", () => {
     const packCheck = TOOLS.find((t) => t.name === "ultra11y_pack_check")!;
     expect(validateArgs(packCheck.inputSchema, { cwd: "/p" })).toMatch(/`pack` is required/);
     const report = TOOLS.find((t) => t.name === "ultra11y_report")!;
-    expect(validateArgs(report.inputSchema, { cwd: "/p", standard: "en301549" })).toMatch(/standard/);
+    // `lang` is the closed one: the UI frame has exactly two values.
+    expect(validateArgs(report.inputSchema, { cwd: "/p", lang: "de" })).toMatch(/lang/);
+    // `standard` deliberately is NOT: which standards exist is a fact about the project,
+    // not about the protocol, so the schema lets it through and the handler rules on it.
+    expect(validateArgs(report.inputSchema, { cwd: "/p", standard: "en301549" })).toBeUndefined();
   });
 
   it("lets ultra11y_criteria be called with no arguments at all", () => {

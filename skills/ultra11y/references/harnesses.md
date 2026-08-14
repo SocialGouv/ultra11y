@@ -91,7 +91,17 @@ every `references/*.md` are exposed as `skill://` resources, plus three prompts
 
 ```
 claude mcp add ultra11y -- npx -y ultra11y mcp
+
+# better: dedicate it to one project, so `cwd` is optional on every tool AND that
+# project's own standards packs (.ultra11yrc.json) are loaded at startup
+claude mcp add ultra11y -- npx -y ultra11y mcp --cwd /abs/path/to/project
 ```
+
+It also carries the **standards themselves** — the reference block (`ultra11y_standards`,
+`ultra11y_criteria`, `ultra11y_glossary`, `ultra11y_guidance`, `ultra11y_method`) and the
+`std://` resources. That is the half that turns the server into a rule engine rather than a
+linter: an agent can read a criterion's numbered tests and the terms it defines instead of
+recalling them. See `references/mcp.md`.
 
 On a harness with no skill system at all, **reading `SKILL.md` directly with the file-read
 tool is the blessed path**, not a workaround. Discover what exists by listing

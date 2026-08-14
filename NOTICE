@@ -12,10 +12,47 @@ Source: https://github.com/w3c/wcag  (guidelines/ success-criterion fragments)
 Spec:   https://www.w3.org/TR/WCAG22/
 
 WCAG 2.2 is © W3C and is reused here under the W3C Document License
-(https://www.w3.org/copyright/document-license/). ultra11y reproduces only the
+(https://www.w3.org/copyright/document-license/). ultra11y reproduces the
 success-criterion ids, titles and conformance levels (the Level A + AA subset),
-adding its own engine-specific fields (rule coverage, automatability class). It
-does not reproduce the normative prose. Attribution: « WCAG 2.2 — W3C ».
+adding its own engine-specific fields (rule coverage, automatability class).
+Attribution: « WCAG 2.2 — W3C ».
+
+It ALSO reproduces, since the normative-text vendoring, the success criteria's
+own wording and the terms WCAG defines — see the next section.
+
+================================================================================
+Bundled WCAG 2.2 normative text and glossary
+================================================================================
+
+The `text` and `terms` fields on each criterion in src/data/wcag.json, and its
+`glossary` map (vendored at scripts/vendor/wcag-2.2-text.json), are derived from
+the W3C source: the success-criterion fragments under guidelines/sc/ and the
+term definitions under guidelines/terms/.
+
+Source: https://github.com/w3c/wcag
+Spec:   https://www.w3.org/TR/WCAG22/
+
+These are a DERIVATIVE work: the HTML fragments are converted to plain text
+(markup stripped, notes and exception labels kept as labelled lines, the
+fragment's own title/conformance-level/change chrome removed). No wording is
+paraphrased, summarised, translated or reordered.
+
+The W3C Document License permits this for software and its documentation:
+
+  "To facilitate implementation of the technical specifications set forth in
+   this document, anyone may prepare and distribute derivative works and
+   portions of this document in software, in supporting materials accompanying
+   software, and in documentation of software, PROVIDED that all such works
+   include the notice below. HOWEVER, the publication of derivative works of
+   this document for use as a technical specification is expressly prohibited."
+
+ultra11y is software; it ships this text as an offline reference an auditor
+looks a criterion up in, NOT as a republication of WCAG as a technical
+specification. The required notice:
+
+  Copyright © 2023 W3C®. This software or document includes material copied
+  from or derived from "Web Content Accessibility Guidelines (WCAG) 2.2",
+  https://www.w3.org/TR/WCAG22/.
 
 ================================================================================
 Bundled French WCAG 2.2 titles (W3C authorized translation)
@@ -30,8 +67,11 @@ Source: https://www.w3.org/Translations/WCAG22-fr/
 Like the English source, WCAG 2.2 (and its authorized translations) is © W3C and is
 reused here under the W3C Document License
 (https://www.w3.org/copyright/document-license/). ultra11y reproduces only the
-principle/guideline/success-criterion TITLES, verbatim, resolved at render time by
-`--lang fr`; it does not reproduce the normative prose. Attribution: « WCAG 2.2 — W3C
+principle/guideline/success-criterion TITLES, the success criteria's own NORMATIVE WORDING
+and the glossary of defined terms, verbatim, resolved at render time by `--lang fr`. As with
+the English source these are a derivative work (HTML converted to plain text, nothing
+paraphrased, summarised or reordered), distributed in software under the same W3C Document
+License clause quoted above, with the same required notice. Attribution: « WCAG 2.2 — W3C
 (traduction française autorisée) ».
 
 ================================================================================
@@ -73,6 +113,22 @@ examples, not verbatim prose. When ingesting another rule source, record its own
 license and attribution in the dataset header and in this NOTICE before
 redistributing any of its text. Attribution: « RGAA 4.1.2 — DINUM ; patterns adaptés
 de SocialGouv/skills ».
+
+================================================================================
+Bundled WCAG implementation guidance
+================================================================================
+
+The file src/data/guidance/wcag.json is an implementation-guidance dataset keyed
+directly to WCAG success criteria, so a country standards pack that ships no
+guidance of its own inherits examples through its WCAG mapping. It covers the ten
+Level A/AA criteria the RGAA dataset never reached — six of them added in WCAG
+2.2, after RGAA 4.1.2 (wcagVersion 2.1) froze.
+
+Source: https://www.w3.org/WAI/WCAG22/Understanding/
+
+The summaries are written for ultra11y and the code examples are original,
+informed by the W3C Understanding documents; no Understanding prose is
+reproduced. WCAG 2.2 is © W3C (above). Attribution: « WCAG 2.2 — W3C ».
 
 ================================================================================
 Inspiration

@@ -50,7 +50,11 @@ export const PROMPTS: PromptDecl[] = [
     arguments: [
       cwdArg,
       { name: "globs", description: "What to audit, comma-separated (default: the project's markup).", required: false },
-      { name: "standard", description: "wcag (default) or rgaa.", required: false },
+      {
+        name: "standard",
+        description: "The standard key to report against — `ultra11y_standards` lists what this project has. Default: wcag.",
+        required: false,
+      },
     ],
   },
   {
@@ -59,7 +63,14 @@ export const PROMPTS: PromptDecl[] = [
     description:
       "The judgment workflow: work the adjudication queue — alt-text relevance, link purpose in context, heading structure, reading order — by reading the " +
       "real markup, not by pattern-matching the element.",
-    arguments: [cwdArg, { name: "standard", description: "wcag (default) or rgaa.", required: false }],
+    arguments: [
+      cwdArg,
+      {
+        name: "standard",
+        description: "The standard key to adjudicate against — `ultra11y_standards` lists what this project has. Default: wcag.",
+        required: false,
+      },
+    ],
   },
   {
     name: "review_diff_a11y",

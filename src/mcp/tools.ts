@@ -19,9 +19,12 @@ const globsProp: JsonSchemaProp = {
   items: { type: "string" },
   description: "Files or globs to audit (e.g. ['src/**/*.tsx']). Relative to the project root.",
 };
+// Declared WITHOUT an enum. The set of standards is not a constant: `rgaa` ships built in,
+// but a country pack loaded from `--pack` or a project's `.ultra11yrc.json` is just as real
+// a standard. `toolsFor` pins the enum when — and only when — the server knows the set is
+// closed (see `applyStandards`).
 const standardProp: JsonSchemaProp = {
   type: "string",
-  enum: ["wcag", "rgaa"],
   description: "Which standard to report against. Default: wcag (WCAG 2.2 AA).",
 };
 const langProp: JsonSchemaProp = { type: "string", enum: ["en", "fr"], description: "Language for the rendered prose. Default: en." };
@@ -123,12 +126,27 @@ export const TOOLS: ToolDecl[] = [
     name: "ultra11y_criteria",
     title: "The offline standards reference",
     description:
-      "Look up what a success criterion actually requires — its exact wording, how it is tested, and what counts as a failure. Offline and authoritative; " +
-      "use it instead of recalling a criterion from memory, which is how invented non-conformities get written.",
+      "Look up what a criterion actually requires — its exact wording, its numbered tests, the terms the standard defines for it, and what it takes to " +
+      "decide it. Works for WCAG success criteria AND for any country standard's own criteria (RGAA 8.3, and whatever packs this project loads). " +
+      "Offline and authoritative; use it instead of recalling a criterion from memory, which is how invented non-conformities get written.",
     inputSchema: {
       type: "object",
       properties: {
-        sc: { type: "string", description: "A success criterion number (e.g. '1.1.1'). Omit to list them all." },
+        cwd: {
+          type: "string",
+          description: "Absolute path to the project root. Optional — it decides which standards packs are loaded, not which files are read.",
+        },
+        sc: { type: "string", description: "A criterion id: a WCAG success criterion ('1.1.1') or a pack criterion ('8.3'). Omit to list them all." },
+        criterion: { type: "string", description: "Alias for `sc`, for a standard whose criteria are not WCAG success criteria." },
+        theme: { type: "number", description: "List one theme of a country standard (e.g. 8). Not applicable to WCAG, which groups by guideline." },
+        glossary: {
+          type: "string",
+          description: "Look up a term the standard normatively DEFINES. Pass a term, or an empty string to list every term.",
+        },
+        include_guidance: {
+          type: "boolean",
+          description: "Also attach before/after implementation examples for the criterion. Default false — they are large.",
+        },
         standard: standardProp,
         lang: langProp,
       },
@@ -325,6 +343,95 @@ export const WRITE_TOOLS: ToolDecl[] = [
   },
 ];
 
+// The reference-tool block. These answer from the vendored standard, not the project tree,
+// so `cwd` is optional on all four — it decides which standards packs are loaded, nothing
+// more. Declared after WRITE_TOOLS so the read/write split above stays readable.
+const referenceCwdProp: JsonSchemaProp = {
+  type: "string",
+  description: "Absolute path to the project root. Optional — it decides which standards packs are loaded, not which files are read.",
+};
+
+export const REFERENCE_TOOLS: ToolDecl[] = [
+  {
+    name: "ultra11y_standards",
+    title: "The standards this project can be audited against",
+    description:
+      "List every standard available here: the WCAG 2.2 AA core, the country packs built into this build, and any pack the project's .ultra11yrc.json or " +
+      "--pack loaded. Each carries its own coverage arithmetic — how many criteria it has, and how many of them any engine could ever decide. Standards " +
+      "are per-project: a pack another project declares is not yours. Call this before assuming a standard exists.",
+    inputSchema: {
+      type: "object",
+      properties: { cwd: referenceCwdProp, lang: langProp },
+      required: [],
+    },
+  },
+  {
+    name: "ultra11y_glossary",
+    title: "The terms a standard normatively defines",
+    description:
+      "A standard's tests lean constantly on terms it defines itself — 'informative image', 'relevant', 'if necessary'. Those definitions are normative: " +
+      "they decide the verdict, and the everyday meaning of the word is not what is being asked. Look one up rather than assuming, and see which criteria " +
+      "it governs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        standard: standardProp,
+        term: { type: "string", description: "A term or its anchor. Omit to list every term the standard defines." },
+        cwd: referenceCwdProp,
+        lang: langProp,
+      },
+      required: ["standard"],
+    },
+  },
+  {
+    name: "ultra11y_guidance",
+    title: "Before/after implementation guidance for a criterion",
+    description:
+      "The concrete how-to-implement rule for a criterion: a non-compliant snippet, the compliant fix, and the note explaining the difference. A country " +
+      "criterion with no guidance of its own inherits what is keyed to the WCAG success criteria it maps to, marked as inherited. Guidance ILLUSTRATES — " +
+      "it never decides a verdict and never turns into a non-conformity.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        standard: standardProp,
+        criterion: { type: "string", description: "The criterion id to fetch guidance for (a WCAG SC, or a pack criterion like '1.2')." },
+        sc: { type: "string", description: "Alias for `criterion`." },
+        cwd: referenceCwdProp,
+        lang: langProp,
+      },
+      required: [],
+    },
+  },
+  {
+    name: "ultra11y_method",
+    title: "The audit work plan for a standard",
+    description:
+      "Get the plan before auditing anything: which of this standard's criteria the static engine decides from source alone, which need a captured page or " +
+      "a real browser, and which are judgment calls only you can make — each with the evidence to gather and the tool that produces it. Derived from this " +
+      "engine's own per-criterion rule applicability and WCAG automatability data, not from guessing at the wording of a test. A criterion nobody tested is " +
+      "untested, never conformant.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        standard: standardProp,
+        cwd: referenceCwdProp,
+        lang: langProp,
+        tier: {
+          type: "string",
+          enum: ["source", "cross-file", "rendered-page", "browser", "judgment", "out-of-scope"],
+          description: "Return only the criteria in this evidence tier.",
+        },
+        detail: {
+          type: "string",
+          enum: ["summary", "full"],
+          description: "'summary' (default) is counts plus criterion ids; 'full' adds each criterion's title, rules and reason.",
+        },
+      },
+      required: [],
+    },
+  },
+];
+
 // Behavioural hints clients use to decide what needs a confirmation prompt.
 //
 // The read-only line is drawn at the USER'S project. Every tool in TOOLS reads
@@ -339,6 +446,11 @@ export const TOOL_META: Record<string, { write?: boolean; destructive?: boolean;
   // somebody's tracker off the back of a prompt injection.
   ultra11y_tickets: { openWorld: false },
   ultra11y_criteria: { openWorld: false },
+  // The reference block: they read the vendored standard and nothing else.
+  ultra11y_standards: { openWorld: false },
+  ultra11y_glossary: { openWorld: false },
+  ultra11y_guidance: { openWorld: false },
+  ultra11y_method: { openWorld: false },
   ultra11y_check: { openWorld: false },
   ultra11y_verify: { openWorld: false },
   ultra11y_adjudicate: { openWorld: false },
@@ -367,12 +479,14 @@ export function annotationsFor(name: string): Record<string, boolean> | undefine
 export interface ToolsForOptions {
   defaultCwd?: string;
   allowWrite?: boolean;
+  /** The standards registered at startup, named in the `standard` description. */
+  standards?: string[];
 }
 
 // The tool list as one client should see it: gated on what the server was
 // started with, and on how new the negotiated protocol is.
 export function toolsFor(protocolVersion: ProtocolVersion, opts: ToolsForOptions = {}): ToolDecl[] {
-  const base = opts.allowWrite ? [...TOOLS, ...WRITE_TOOLS] : TOOLS;
+  const base = opts.allowWrite ? [...TOOLS, ...REFERENCE_TOOLS, ...WRITE_TOOLS] : [...TOOLS, ...REFERENCE_TOOLS];
   const withAnnotations = protocolVersion >= ANNOTATIONS_SINCE;
   const withRich = protocolVersion >= RICH_TOOLS_SINCE;
 
@@ -380,7 +494,7 @@ export function toolsFor(protocolVersion: ProtocolVersion, opts: ToolsForOptions
     const decl: ToolDecl = {
       name: t.name,
       description: t.description,
-      inputSchema: applyDefaultCwd(t.inputSchema, opts.defaultCwd),
+      inputSchema: applyStandards(applyDefaultCwd(t.inputSchema, opts.defaultCwd), opts.standards),
     };
     if (withRich && t.title) decl.title = t.title;
     if (withRich && t.outputSchema) decl.outputSchema = t.outputSchema;
@@ -390,6 +504,26 @@ export function toolsFor(protocolVersion: ProtocolVersion, opts: ToolsForOptions
     }
     return decl;
   });
+}
+
+// Name the standards this server has loaded SO FAR, in the description — never as an enum.
+//
+// An enum here would have to be closed at `tools/list` time, and this set is not: a country
+// pack arrives with a project, and a tool call names its project by `cwd`. Pinning the enum
+// at startup would make the schema reject a pack that is perfectly valid for the project
+// being asked about — a wrong refusal, which is worse than no autocomplete. The server also
+// declares `tools: { listChanged: false }` and has no server→client notification path, so an
+// enum it outgrew could not be retracted.
+//
+// `standardOf` refuses an unknown key at the handler instead, naming the ones in scope.
+function applyStandards(schema: JsonSchema, standards?: string[]): JsonSchema {
+  const existing = schema.properties.standard;
+  if (!existing?.description || !standards?.length) return schema;
+  const standard: JsonSchemaProp = {
+    ...existing,
+    description: `${existing.description} Loaded here: ${standards.join(", ")}. A project's own packs load with it — call ultra11y_standards to list them.`,
+  };
+  return { ...schema, properties: { ...schema.properties, standard } };
 }
 
 // With a server-level default project root, `cwd` stops being required and its

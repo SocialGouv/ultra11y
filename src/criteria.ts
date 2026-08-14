@@ -4,7 +4,7 @@
 // (`criteria --standard rgaa 8.3`), a pack theme (`--theme N`), or the theme list.
 // Also generates references/criteria.md (never hand-edited).
 import type { Lang, Sc } from "./types.js";
-import { allSC, allGuidelines, allPrinciples, getSC, scsByGuideline, principleTitle, guidelineTitle, scTitle, meta } from "./wcag.js";
+import { allSC, allGuidelines, allPrinciples, coreGlossary, getSC, scsByGuideline, principleTitle, guidelineTitle, scText, scTitle, meta } from "./wcag.js";
 import {
   type StandardId,
   isCore,
@@ -37,6 +37,11 @@ export function formatSC(c: Sc, lang: Lang = "en"): string {
   out.push(
     `${lang === "fr" ? "Règle" : "Guideline"} ${c.guideline} (${gl}) · ${lang === "fr" ? "principe" : "principle"} ${c.principle} (${pr}) · ${lang === "fr" ? "automatisabilité" : "automatability"} : ${auto}${c.ruleIds.length ? ` · ${lang === "fr" ? "règles" : "rules"} : ${c.ruleIds.join(", ")}` : ""}`,
   );
+  // The normative wording, verbatim from the W3C source. Printed BEFORE the metadata an
+  // auditor scans past: the requirement is the point of looking a criterion up, and
+  // recalling it from memory is how invented non-conformities get written.
+  const body = scText(c.sc, lang);
+  if (body) out.push("", body, "");
   out.push(`${lang === "fr" ? "Comprendre" : "Understanding"} : ${c.understanding}`);
   if (c.techniques?.length) out.push(`Techniques : ${c.techniques.join(", ")}`);
   const packs = packsForSc(c.sc);
@@ -138,11 +143,13 @@ const foldTerm = (s: string): string =>
     .replace(/^-+|-+$/g, "");
 
 function runGlossary(opts: CriteriaOpts): number {
-  const pack = loadPack(opts.standard);
-  const glossary = packGlossary(opts.standard) ?? {};
+  // WCAG defines its own terms ("large scale", "pure decoration") and they are normative in
+  // exactly the way a country pack's are, so `--glossary` works for every standard.
+  const label = isCore(opts.standard) ? "WCAG 2.2" : loadPack(opts.standard).name;
+  const glossary = isCore(opts.standard) ? coreGlossary(opts.lang) : (packGlossary(opts.standard) ?? {});
   const anchors = Object.keys(glossary);
   if (!anchors.length) {
-    console.error(`ultra11y criteria: ${pack.name} ships no glossary.`);
+    console.error(`ultra11y criteria: ${label} ships no glossary in this build.`);
     return 2;
   }
   const term = typeof opts.glossary === "string" ? opts.glossary.trim() : "";
@@ -161,13 +168,13 @@ function runGlossary(opts: CriteriaOpts): number {
     anchors.find((a) => foldTerm(a).startsWith(want));
   if (!hit) {
     const near = anchors.filter((a) => foldTerm(a).includes(want) || foldTerm(glossary[a]?.title ?? "").includes(want)).slice(0, 8);
-    console.error(`ultra11y criteria: no ${pack.name} glossary term matching "${term}".${near.length ? ` Did you mean: ${near.join(", ")}?` : ""}`);
+    console.error(`ultra11y criteria: no ${label} glossary term matching "${term}".${near.length ? ` Did you mean: ${near.join(", ")}?` : ""}`);
     return 2;
   }
   const entry = glossary[hit]!;
   if (opts.json) console.log(JSON.stringify({ anchor: hit, ...entry }, null, 2));
   else {
-    console.log(`${pack.name} — ${entry.title}  (#${hit})`);
+    console.log(`${label} — ${entry.title}  (#${hit})`);
     console.log("");
     console.log(entry.body);
   }
@@ -176,7 +183,6 @@ function runGlossary(opts: CriteriaOpts): number {
 
 function runPack(opts: CriteriaOpts): number {
   const pack = loadPack(opts.standard);
-  if (opts.glossary !== undefined && opts.glossary !== false) return runGlossary(opts);
   if (opts.id) {
     const c = getPackCriterion(pack, opts.id);
     if (!c) {
@@ -201,10 +207,7 @@ function runPack(opts: CriteriaOpts): number {
 }
 
 export function runCriteria(opts: CriteriaOpts): number {
-  if (opts.glossary !== undefined && opts.glossary !== false && isCore(opts.standard)) {
-    console.error("ultra11y criteria: --glossary needs a country standard (e.g. --standard rgaa); WCAG ships no glossary here.");
-    return 2;
-  }
+  if (opts.glossary !== undefined && opts.glossary !== false) return runGlossary(opts);
   return isCore(opts.standard) ? runWcag(opts) : runPack(opts);
 }
 

@@ -14,6 +14,7 @@
 //   node scripts/build-standards.mjs --refresh <dir> # re-derive the vendored AA snapshot from a w3c/wcag checkout
 //   node scripts/build-standards.mjs --refresh-universe # re-fetch (network) the vendored FULL SC universe (all levels + removed 4.1.1)
 //   node scripts/build-standards.mjs --refresh-fr    # re-fetch (network) the vendored French SC/guideline/principle titles
+//   node scripts/build-standards.mjs --refresh-text  # re-fetch (network) the vendored NORMATIVE SC text + the WCAG glossary
 import { writeFileSync, readFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
@@ -24,6 +25,7 @@ const DATA = join(root, "src", "data");
 const VENDOR = join(root, "scripts", "vendor", "wcag-2.2-sc.json");
 const VENDOR_UNIVERSE = join(root, "scripts", "vendor", "wcag-2.2-sc-universe.json");
 const VENDOR_FR = join(root, "scripts", "vendor", "wcag-2.2-fr.json");
+const VENDOR_TEXT = join(root, "scripts", "vendor", "wcag-2.2-text.json");
 const PACKS_DIR = join(DATA, "standards");
 const BIOME = join(root, "node_modules", ".bin", "biome");
 
@@ -235,6 +237,88 @@ function deHtmlFr(s) {
     .trim();
 }
 
+// The French page's own chrome, normalized to the shapes `deHtmlText` already knows.
+//
+// The single-page translation wraps a note or an example in
+// `<div class="note"><div role="heading">…Note 1…</div><p>…</p></div>`, where the English
+// fragments use a flat `<p class="note">`. Collapsing the heading AND the paragraph opener
+// that follows keeps the label on the same line as the text it labels — "Note : …", not a
+// bare "Note :" followed by an orphaned sentence.
+function deHtmlFrBody(html, opts) {
+  let s = html;
+  s = s.replace(/<a class="self-link"[\s\S]*?<\/a>/gi, "");
+  s = s.replace(/<div class="doclinks">[\s\S]*?<\/div>/gi, "");
+  s = s.replace(/<div class="(note|example)"[^>]*>\s*<div role="heading"[^>]*>([\s\S]*?)<\/div>\s*(?:<p[^>]*>)?/gi, (_, _kind, heading) => {
+    // "Note 1" / "Note 2" are numbered per document; the number is noise in a lookup.
+    const label = heading
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\s*\d+$/, "");
+    return ` ${label} : `;
+  });
+  return deHtmlText(s, opts);
+}
+
+/** The criterion bodies and the glossary, off the French single-page translation. */
+function deriveFrBodies(html, snap) {
+  // Every numbered heading, in document order: an SC's body is what sits between its own
+  // heading and the next one. The page numbers headings exactly like the English source.
+  const HEAD = /<h([234])[^>]*>\s*<bdi class="secno">([^<]*)<\/bdi>([\s\S]*?)<\/h\1>/g;
+  const heads = [];
+  let m;
+  while ((m = HEAD.exec(html))) {
+    const id = (m[2].match(/(\d+(?:\.\d+)*)/) || [])[1];
+    heads.push({ level: Number(m[1]), id, end: m.index + m[0].length, start: m.index });
+  }
+
+  const criteriaText = {};
+  const criteriaTerms = {};
+  for (let i = 0; i < heads.length; i++) {
+    const h = heads[i];
+    if (h.level !== 4 || !h.id || h.id.split(".").length !== 3) continue;
+    const slice = html.slice(h.end, heads[i + 1]?.start ?? html.length);
+    const body = deHtmlFrBody(slice);
+    if (body) criteriaText[h.id] = body;
+    // The FR page names its definitions with its OWN slugs — often the plural
+    // ("user-agents" where the English source file is "user-agent"), sometimes a different
+    // phrase entirely ("purpose-of-each-link" for "link-purpose"). Mapping one onto the
+    // other would be a guess, so each language keeps its own term list and its own
+    // glossary keys, and neither has to know about the other.
+    const cited = [...new Set([...slice.matchAll(/href="#dfn-([a-z0-9-]+)"/g)].map((x) => x[1]))];
+    if (cited.length) criteriaTerms[h.id] = cited;
+  }
+
+  // The glossary: `<dfn id="dfn-<slug>">title</dfn></dt>` then the definition up to the
+  // next term. The slugs are the SAME as the English source's file names, so the two
+  // languages key identically and a criterion's term links resolve in either.
+  // Attribute order is not guaranteed: the FR page writes `data-lt` before `id`.
+  const DFN = /<dfn\b[^>]*\bid="dfn-([a-z0-9-]+)"[^>]*>([\s\S]*?)<\/dfn>/g;
+  const glossary = {};
+  while ((m = DFN.exec(html))) {
+    const title = m[2]
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const after = html.slice(m.index + m[0].length);
+    const stop = after.search(/<dt[\s>]|<\/dl>/i);
+    const body = deHtmlFrBody(after.slice(0, stop === -1 ? 8000 : stop));
+    if (title && body) glossary[m[1]] = { title, body };
+  }
+
+  // Same completeness rule as the titles: every SHIPPED criterion carries its French body
+  // or the build refuses. A half-translated reference is worse than a known-absent one,
+  // because the reader cannot tell which criteria they are missing.
+  const missing = snap.criteria.filter((c) => !criteriaText[c.sc]).map((c) => c.sc);
+  if (missing.length) {
+    console.error(
+      `build-standards --refresh-fr: no French body found on ${FR_SOURCE} for SC: ${missing.join(", ")}. Nothing invented — refusing to vendor a partial set.`,
+    );
+    process.exit(1);
+  }
+  return { criteriaText, criteriaTerms, glossary };
+}
+
 async function deriveFr() {
   if (!existsSync(VENDOR)) {
     console.error(`build-standards --refresh-fr: missing vendored English snapshot ${VENDOR}. Run: node scripts/build-standards.mjs --refresh <w3c/wcag checkout> first.`);
@@ -290,18 +374,175 @@ async function deriveFr() {
     process.exit(1);
   }
 
+  // The same page carries each criterion's NORMATIVE BODY and the glossary, not just the
+  // titles. Vendoring only the titles left `--lang fr` rendering a French heading over
+  // English requirement prose — the jarring half-translation an RGAA auditor reads first.
+  const { criteriaText, criteriaTerms, glossary } = deriveFrBodies(html, snap);
+
   const out = {
     source: FR_SOURCE,
     fetchedAt: new Date().toISOString().slice(0, 10),
     principles,
     guidelines,
     criteria,
+    criteriaText,
+    criteriaTerms,
+    glossary,
   };
   mkdirSync(dirname(VENDOR_FR), { recursive: true });
   writeFileSync(VENDOR_FR, JSON.stringify(out, null, 2) + "\n");
   console.log(
-    `build-standards --refresh-fr: ${Object.keys(criteria).length} SC + ${Object.keys(guidelines).length} guideline + ${Object.keys(principles).length} principle French titles → ${VENDOR_FR}`,
+    `build-standards --refresh-fr: ${Object.keys(criteria).length} SC + ${Object.keys(guidelines).length} guideline + ${Object.keys(principles).length} principle French titles, ` +
+      `${Object.keys(criteriaText).length} SC bodies, ${Object.keys(glossary).length} glossary terms → ${VENDOR_FR}`,
   );
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Text mode: the NORMATIVE WORDING of every shipped success criterion, plus the terms
+// WCAG itself defines.
+//
+// The dataset used to carry only ids, titles and an Understanding URL — so an offline
+// agent could name a criterion but not read it, and had to recall the requirement from
+// memory. That is exactly how invented non-conformities get written. The RGAA pack ships
+// its full criterion text and a 119-entry glossary; the worldwide core shipped neither.
+//
+// Nothing new is fetched: `deriveUniverse` already downloads these very fragments and
+// keeps only the <h4> and the conformance level. WCAG 2.2 © W3C, reused under the W3C
+// Document License; see NOTICE.
+//
+//   node scripts/build-standards.mjs --refresh-text
+// ---------------------------------------------------------------------------
+const ENTITIES = {
+  "&nbsp;": " ",
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&apos;": "'",
+  "&rsquo;": "’",
+  "&lsquo;": "‘",
+  "&ldquo;": "“",
+  "&rdquo;": "”",
+  "&mdash;": "—",
+  "&ndash;": "–",
+  "&hellip;": "…",
+  "&times;": "×",
+};
+
+function decodeEntities(s) {
+  return s
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(Number.parseInt(h, 16)))
+    .replace(/&[a-z]+;/gi, (m) => ENTITIES[m] ?? m);
+}
+
+// W3C fragment → normative plaintext. Structure that CHANGES THE READING is kept as its
+// own labelled line — an exception's name ("Large Text:") decides whether the exception
+// applies, and a note is not normative the way the sentence above it is. Everything else
+// is flattened, because the source wraps mid-sentence.
+function deHtmlText(html, { dropDfn = false } = {}) {
+  const SEP = " ";
+  let s = html;
+  s = s.replace(/<!--[\s\S]*?-->/g, "");
+  // The fragment's own chrome: title, conformance level, the 2.2 "New"/"Updated" marker.
+  s = s.replace(/<h4>[\s\S]*?<\/h4>/gi, "");
+  s = s.replace(/<p class="conformance-level">[\s\S]*?<\/p>/gi, "");
+  s = s.replace(/<p class="change">[\s\S]*?<\/p>/gi, "");
+  if (dropDfn) s = s.replace(/<dt>[\s\S]*?<\/dt>/i, "");
+  s = s.replace(/<p class="note">/gi, `${SEP}Note: `);
+  s = s.replace(/<aside class="example">/gi, `${SEP}Example: `);
+  s = s.replace(/<dt>([\s\S]*?)<\/dt>\s*<dd>/gi, (_, t) => `${SEP}${t.replace(/<[^>]+>/g, "").trim()}: `);
+  s = s.replace(/<li>/gi, `${SEP}• `);
+  s = s.replace(/<\/(p|dd|li|dl|ul|ol|aside|section|div|blockquote)>/gi, SEP);
+  s = s.replace(/<(p|dd|aside|div|blockquote)\b[^>]*>/gi, SEP);
+  s = s.replace(/<[^>]+>/g, "");
+  s = decodeEntities(s);
+  return s
+    .split(SEP)
+    .map((block) => block.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+const VER_OF = { "2.0": "20", "2.1": "21", "2.2": "22" };
+
+async function fetchJson(url) {
+  const r = await fetch(url, { headers: { accept: "application/vnd.github+json" } });
+  if (!r.ok) throw new Error(`build-standards --refresh-text: GET ${url} → HTTP ${r.status}`);
+  return r.json();
+}
+
+async function deriveText() {
+  if (!existsSync(VENDOR)) {
+    console.error(`build-standards --refresh-text: missing vendored snapshot ${VENDOR}. Run --refresh first.`);
+    process.exit(1);
+  }
+  const snap = JSON.parse(readFileSync(VENDOR, "utf8"));
+
+  // The terms WCAG defines, across all three version directories. Built FIRST, because a
+  // criterion's wording links to them and those links are what makes the definitions
+  // findable from the criterion.
+  const glossary = {};
+  const bySurface = new Map();
+  const fold = (s) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  for (const ver of ["20", "21", "22"]) {
+    const listing = await fetchJson(`https://api.github.com/repos/w3c/wcag/contents/guidelines/terms/${ver}`);
+    for (const file of listing) {
+      if (file.type !== "file" || !file.name.endsWith(".html")) continue;
+      const html = await fetchText(`guidelines/terms/${ver}/${file.name}`);
+      const dfn = html.match(/<dfn([^>]*)>([\s\S]*?)<\/dfn>/);
+      const title = dfn?.[2]?.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+      const body = deHtmlText(html, { dropDfn: true });
+      if (!title || !body) {
+        console.error(`build-standards --refresh-text: terms/${ver}/${file.name} has no <dfn> title or no body — refusing to vendor a partial glossary.`);
+        process.exit(1);
+      }
+      // Keyed by the W3C's own dfn slug, so a criterion's prose can point at it.
+      const slug = file.name.replace(/\.html$/, "");
+      glossary[slug] = { title, body };
+      // `data-lt` lists the other surface forms the spec links this term by ("accessibility
+      // support" → accessibility-supported), so a link in a criterion resolves either way.
+      const lt = (dfn?.[1]?.match(/data-lt="([^"]*)"/) || [])[1];
+      for (const surface of [title, ...(lt ? lt.split("|") : [])]) bySurface.set(fold(surface), slug);
+    }
+  }
+
+  const criteria = {};
+  const terms = {};
+  for (const c of snap.criteria) {
+    const ver = VER_OF[c.addedIn];
+    if (!ver) throw new Error(`build-standards --refresh-text: unknown addedIn "${c.addedIn}" for SC ${c.sc}`);
+    const html = await fetchText(`guidelines/sc/${ver}/${c.slug}.html`);
+    const text = deHtmlText(html);
+    if (!text) throw new Error(`build-standards --refresh-text: empty normative text for SC ${c.sc} (${c.slug})`);
+    criteria[c.sc] = text;
+    // A bare `<a>` with no href IS a glossary reference in the W3C source — that is how the
+    // spec marks a defined term. Resolved here rather than by matching prose, so a term is
+    // attached because the criterion cites it, never because a word happened to appear.
+    const cited = new Set();
+    for (const m of html.matchAll(/<a>([\s\S]*?)<\/a>/g)) {
+      const slug = bySurface.get(fold(m[1].replace(/<[^>]+>/g, "")));
+      if (slug) cited.add(slug);
+    }
+    if (cited.size) terms[c.sc] = [...cited];
+  }
+
+  const out = {
+    source: "https://github.com/w3c/wcag",
+    license: "W3C Document License",
+    fetchedAt: new Date().toISOString().slice(0, 10),
+    criteria,
+    terms,
+    glossary,
+  };
+  mkdirSync(dirname(VENDOR_TEXT), { recursive: true });
+  writeFileSync(VENDOR_TEXT, JSON.stringify(out, null, 2) + "\n");
+  console.log(`build-standards --refresh-text: ${Object.keys(criteria).length} SC texts + ${Object.keys(glossary).length} glossary terms → ${VENDOR_TEXT}`);
   return out;
 }
 
@@ -453,8 +694,13 @@ function build() {
     console.error(`build-standards: missing vendored French titles ${VENDOR_FR}. Run: node scripts/build-standards.mjs --refresh-fr`);
     process.exit(1);
   }
+  if (!existsSync(VENDOR_TEXT)) {
+    console.error(`build-standards: missing vendored normative text ${VENDOR_TEXT}. Run: node scripts/build-standards.mjs --refresh-text`);
+    process.exit(1);
+  }
   const snap = JSON.parse(readFileSync(VENDOR, "utf8"));
   const fr = JSON.parse(readFileSync(VENDOR_FR, "utf8"));
+  const text = JSON.parse(readFileSync(VENDOR_TEXT, "utf8"));
   const { techniques, sources } = seedFromPacks();
 
   // Completeness guard: every shipped core-AA SC/guideline/principle MUST carry a French
@@ -467,6 +713,9 @@ function build() {
   const frPrinciples = fr.principles ?? {};
   const frGuidelines = fr.guidelines ?? {};
   const frCriteria = fr.criteria ?? {};
+  const frText = fr.criteriaText ?? {};
+  const frTerms = fr.criteriaTerms ?? {};
+  const frGlossary = fr.glossary ?? {};
   const missingFr = [
     ...snap.principles.filter((p) => !frPrinciples[String(p.number)]).map((p) => `principle ${p.number}`),
     ...snap.guidelines.filter((g) => !frGuidelines[g.number]).map((g) => `guideline ${g.number}`),
@@ -494,8 +743,43 @@ function build() {
       understanding: `https://www.w3.org/WAI/WCAG22/Understanding/${c.slug}.html`,
     };
     if (techniques[c.sc]?.length) sc.techniques = techniques[c.sc];
+    if (text.criteria?.[c.sc]) sc.text = text.criteria[c.sc];
+    if (frText[c.sc]) sc.textFr = frText[c.sc];
+    if (frTerms[c.sc]?.length) sc.termsFr = frTerms[c.sc];
+    if (text.terms?.[c.sc]?.length) sc.terms = text.terms[c.sc];
     return sc;
   });
+
+  // Same completeness rule as the French titles: a shipped criterion either carries its
+  // normative wording or the build fails. Half a reference is worse than a known-absent
+  // one, because a reader cannot tell which criteria they are missing.
+  const missingText = snap.criteria.filter((c) => !text.criteria?.[c.sc]).map((c) => `SC ${c.sc}`);
+  if (missingText.length) {
+    console.error(`build-standards: ${VENDOR_TEXT} is missing the normative text for: ${missingText.join(", ")}. Re-run: node scripts/build-standards.mjs --refresh-text`);
+    process.exit(1);
+  }
+  // The French body is held to the same rule as the French title: complete, or the build
+  // fails. `--lang fr` must never fall back to English prose under a French heading.
+  const missingFrText = snap.criteria.filter((c) => !frText[c.sc]).map((c) => `SC ${c.sc}`);
+  if (missingFrText.length) {
+    console.error(`build-standards: ${VENDOR_FR} is missing the French body for: ${missingFrText.join(", ")}. Re-run: node scripts/build-standards.mjs --refresh-fr`);
+    process.exit(1);
+  }
+
+  // Every term a criterion CITES must resolve in the glossary of its own language — the
+  // two pages use different slugs, so a cross-language mix-up would silently drop
+  // definitions rather than fail. Caught here instead.
+  for (const c of criteria) {
+    for (const [slug, set, which] of [
+      ...(c.terms ?? []).map((t) => [t, text.glossary ?? {}, "en"]),
+      ...(c.termsFr ?? []).map((t) => [t, frGlossary, "fr"]),
+    ]) {
+      if (!set[slug]) {
+        console.error(`build-standards: SC ${c.sc} cites the ${which} term "${slug}", which that language's glossary does not define.`);
+        process.exit(1);
+      }
+    }
+  }
 
   const out = {
     wcagVersion: snap.wcagVersion,
@@ -506,6 +790,10 @@ function build() {
     principles,
     guidelines,
     criteria,
+    glossary: text.glossary ?? {},
+    // Keyed by the SAME dfn slugs as the English glossary, so a criterion's term links
+    // resolve in either language off one list.
+    glossaryFr: frGlossary,
   };
   mkdirSync(DATA, { recursive: true });
   writeFileSync(join(DATA, "wcag.json"), biomeFormat(JSON.stringify(out, null, 2) + "\n", "src/data/wcag.json"));
@@ -543,6 +831,7 @@ async function main() {
   if (refreshIdx !== -1) deriveSnapshot(process.argv[refreshIdx + 1]);
   if (process.argv.includes("--refresh-universe")) await deriveUniverse();
   if (process.argv.includes("--refresh-fr")) await deriveFr();
+  if (process.argv.includes("--refresh-text")) await deriveText();
   build();
 }
 

@@ -47,17 +47,25 @@ adjudicates. So the engine's clean run is a starting point, never a verdict — 
 >    *judgment* criterion itself (`verify --manual`, gated), and the *rendering* criteria go to
 >    `scan`; any criterion still unproven stays "to assess manually" — no status without a
 >    recorded, justified verdict.
-> 5. **The FINAL rendered semantic HTML must be correct.** The engine sees only source; a
+> 5. **Look the criterion up; never recall it.** `criteria [--standard <pack>] <id>` — or
+>    `ultra11y_criteria` over MCP — returns the criterion's own wording, its **numbered
+>    tests**, and the glossary definitions those tests cite. RGAA 8.3 is not "the page needs a
+>    `lang` attribute"; it is test `8.3.1` with two alternative conditions, and the glossary
+>    decides what its terms mean. An auditor block that cites `8.3.1` after reading it is
+>    grounded; one that cites it from memory is a guess wearing a reference. Before auditing
+>    against a country standard, run the plan (`ultra11y_method`): it tells you how many of its
+>    criteria no tool will decide for you — for RGAA, **58 of 106**. See `references/mcp.md`.
+> 6. **The FINAL rendered semantic HTML must be correct.** The engine sees only source; a
 >    component library (DSFR/MUI…) or `.vue`/`.svelte`/`.astro` SFC hides the real markup, so
 >    a green source audit is not proof. Verify the produced semantic HTML — install the
 >    zero-touch **capture** harvester (`render --setup`) so every component your tests render
 >    is serialized to `.ultra11y/captures` and audited, with `audit --require-captures` gating
 >    the blind spots. See `references/automation.md` / `rendered.md`.
-> 6. **Language**: ALWAYS pass `--lang` matching the language of your conversation with
+> 7. **Language**: ALWAYS pass `--lang` matching the language of your conversation with
 >    the user; ask the user when ambiguous. Without the flag the CLI auto-detects (repo
 >    `<html lang>` → the active standard's default locale → English) — a scripted/CI
 >    fallback, not a substitute for passing `--lang` yourself.
-> 7. **Technical tokens stay in English, even in French prose.** In any French deliverable
+> 8. **Technical tokens stay in English, even in French prose.** In any French deliverable
 >    you write (report commentary, PRD, tracker tickets, judgment verdicts), attribute/
 >    element/role names and their values are code, not prose — never translate them:
 >    `aria-live` stays `aria-live` (never « région live »), same for `tabindex`, `alt`,
@@ -102,6 +110,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/prd.md` | The auditor block as a backlog (markdown) |
 | `references/tickets.md` | Filing that backlog as tickets: GitHub, GitLab, Jira, and at which granularity |
 | `references/standards.md` · `references/packs.md` · `references/guidance.md` | Country standards, authoring a pack, implementation guidance |
+| `references/mcp.md` | **The standards as a rule engine**: look a criterion up instead of recalling it — its numbered tests, the terms it defines, the fix, and the work plan. As MCP tools and `std://` resources, or the same data on the CLI |
 | `references/methodology.md` | Statuses, pass rate, severities, report format |
 | `references/cross-file.md` | `--graph`: imports and cross-file rules |
 | `references/orchestration.md` | Fanning the judgment phases out across subagents |

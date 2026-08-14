@@ -5,7 +5,7 @@
 // their criteria onto these SCs — see src/standards/.
 import wcagJson from "./data/wcag.json";
 import wcagUniverseJson from "./data/wcag-universe.json";
-import type { WcagData, Sc, WcagPrinciple, WcagGuideline, Automatability, WcagUniverseData, ScStatus, Lang } from "./types.js";
+import type { WcagData, Sc, WcagPrinciple, WcagGuideline, Automatability, WcagUniverseData, ScStatus, Lang, Glossary } from "./types.js";
 
 const data = wcagJson as unknown as WcagData;
 const universe = wcagUniverseJson as unknown as WcagUniverseData;
@@ -34,6 +34,18 @@ export function knownScStatus(id: string): ScStatus | undefined {
   return universeById.get(id)?.status;
 }
 
+/**
+ * The terms WCAG normatively defines. Same contract as a pack's glossary, so one lookup
+ * serves every standard — a country pack's tests and WCAG's own text both lean on defined
+ * terms, and in both cases the definition is what decides the verdict.
+ */
+export function coreGlossary(lang: Lang = "en"): Glossary {
+  const fr = data.glossaryFr;
+  // Fall back to English only if a French set was never vendored (an older snapshot) —
+  // never per-term, which would interleave the two languages in one lookup.
+  return (lang === "fr" && fr && Object.keys(fr).length ? fr : data.glossary) ?? {};
+}
+
 export function allPrinciples(): WcagPrinciple[] {
   return data.principles;
 }
@@ -57,6 +69,14 @@ export function guidelineTitle(n: string, lang: Lang = "en"): string | undefined
   const g = data.guidelines.find((g) => g.number === n);
   if (!g) return undefined;
   return lang === "fr" ? (g.titleFr ?? g.title) : g.title;
+}
+
+/** The criterion's normative wording in the requested language, verbatim from the W3C
+ *  source (English) or its authorized French translation. */
+export function scText(id: string, lang: Lang = "en"): string | undefined {
+  const sc = byId.get(id);
+  if (!sc) return undefined;
+  return lang === "fr" ? (sc.textFr ?? sc.text) : sc.text;
 }
 
 /** Localized success-criterion title. `getSC(id)?.title` stays the raw English record;

@@ -18,6 +18,14 @@ node scripts/ultra11y.mjs report --in audit.json --standard section508 --pack ./
 / `guidance.json`), or a comma-separated list. Or declare it once in a `.ultra11yrc.json`
 at the project root:
 
+A pack loaded this way is a **first-class standard everywhere**, not just on the CLI: the
+MCP server resolves each project's packs from its own `.ultra11yrc.json`, so
+`ultra11y_criteria { standard: "<yourpack>" }`, `ultra11y_method`, `ultra11y_glossary` and
+the `std://<yourpack>/…` resources all work the moment it validates. Two projects may define
+different packs under the same key without either shadowing the other, and a project's
+`secondaryMappings` are applied to a *copy* of a built-in pack, never to the shared one. See
+`references/mcp.md`.
+
 ```json
 { "packs": ["./packs/section508.json"], "guidance": ["./packs/section508.guidance.json"], "standard": "section508" }
 ```

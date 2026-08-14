@@ -5,6 +5,7 @@
 // so the report/PRD can attach concrete before/after examples without touching the
 // canonical AuditResult.
 import rgaaGuidance from "../data/guidance/rgaa.json";
+import wcagGuidance from "../data/guidance/wcag.json";
 import type { GuidanceDataset, GuidanceEntry } from "./types.js";
 
 const datasets = new Map<string, GuidanceDataset>();
@@ -13,6 +14,16 @@ function add(ds: GuidanceDataset): void {
   datasets.set(ds.pack, ds);
 }
 
+// The WCAG-keyed dataset goes in FIRST, so a pack's own entry always sorts ahead of an
+// inherited one (`resolveGuidance` keeps first-seen per criterion, and the pack is queried
+// before the crosswalk anyway — this only fixes the order among inherited entries).
+//
+// Its reason to exist: every guidance entry declares the success criteria it implements,
+// and `guidanceForWcag` walks EVERY dataset, so the RGAA entries are already reachable from
+// any pack that maps to the same SC. What no French-authored dataset can supply is the ten
+// AA criteria RGAA 4.1.2 never covered — six of them added in WCAG 2.2, after it froze. A
+// pack for any other country inherits those from here.
+add(wcagGuidance as unknown as GuidanceDataset);
 add(rgaaGuidance as unknown as GuidanceDataset);
 
 /** Register an external guidance dataset at runtime (from --pack / .ultra11yrc.json). */

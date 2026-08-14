@@ -166,12 +166,20 @@ describe("guardrails", () => {
     expect(await errorText("ultra11y_audit", { cwd: "/nope/not/here" })).toMatch(/project root not found/);
   });
 
-  it("rejects an unsupported standard and lang at the schema, before any work starts", async () => {
-    // The declared enums catch these, so they come back as protocol errors
-    // rather than tool results — which is right: the client sent something the
-    // schema it was given forbids.
-    expect((await call("ultra11y_report", { cwd: PROJECT, standard: "en301549" })).error).toMatchObject({ code: -32602 });
+  it("rejects an unsupported lang at the schema, before any work starts", async () => {
+    // The declared enum catches this, so it comes back as a protocol error rather than a
+    // tool result — which is right: the client sent something the schema it was given
+    // forbids, and the UI frame really is closed at two values.
     expect((await call("ultra11y_report", { cwd: PROJECT, lang: "de" })).error).toMatchObject({ code: -32602 });
+  });
+
+  it("rejects an unknown standard at the handler, naming the ones it does know", async () => {
+    // NOT a schema rejection. Which standards exist depends on the project — a country pack
+    // arrives with a `--pack` flag or an `.ultra11yrc.json` — so an enum pinned at
+    // tools/list time would refuse packs that are perfectly valid. The registry rules.
+    const msg = await errorText("ultra11y_report", { cwd: PROJECT, standard: "en301549" });
+    expect(msg).toMatch(/unknown standard "en301549"/);
+    expect(msg).toMatch(/known: wcag, rgaa/);
   });
 
   it("refuses report_text and report_file together", async () => {

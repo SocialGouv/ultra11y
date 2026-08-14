@@ -3,7 +3,6 @@ import { isAbsolute, join, resolve, sep } from "node:path";
 import { runAudit } from "../audit.js";
 import { buildAdjudicationWorklist, formatAdjudication } from "../adjudicate.js";
 import { checkReport } from "../check.js";
-import { formatSC } from "../criteria.js";
 import { runFix, fixSummary } from "../fix.js";
 import { writeHook, ciWorkflow } from "../init.js";
 import { runPackCheck } from "../pack.js";
@@ -14,8 +13,10 @@ import { compositeDoc, pagesIndexDoc } from "../html-report.js";
 import { buildTickets } from "../tickets/grain.js";
 import type { TicketGrain } from "../tickets/types.js";
 import { buildWorklist, formatWorklist } from "../verify.js";
-import { allSC, getSC } from "../wcag.js";
-import { getPack, isCore, loadPack } from "../standards/index.js";
+import { criteriaIndex, criterionView, CriteriaLookupError, glossaryView, themeView } from "../criteria-view.js";
+import { methodView, standardsInventory } from "../method-view.js";
+import { CORE, dropScope, getPack, isCore, loadPack, resolveStandard, scopeLoaded, withScope, type Tier } from "../standards/index.js";
+import { loadRuntimeStandards } from "../config.js";
 import { kindLabel, lintSample, sampleFromSnapshots, unionSample, validateSample } from "../sample.js";
 import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "../pages.js";
 import { PAGES_DIR, readSnapshots } from "../snapshot.js";
@@ -56,6 +57,10 @@ const DEFAULT_GLOBS = ["**/*.html", "**/*.htm", "**/*.jsx", "**/*.tsx", "**/*.vu
 
 const WRITE_TOOL_NAMES = new Set(["ultra11y_fix", "ultra11y_scan", "ultra11y_init"]);
 
+// Tools that answer from the vendored standard alone — no project tree to walk, so `cwd`
+// is optional rather than required.
+const REFERENCE_TOOL_NAMES = new Set(["ultra11y_criteria", "ultra11y_standards", "ultra11y_glossary", "ultra11y_guidance", "ultra11y_method"]);
+
 // --------------------------------------------------------------------------
 // Argument coercion
 // --------------------------------------------------------------------------
@@ -94,10 +99,24 @@ function requiredCwd(args: Record<string, unknown>, defaults: HandlerDefaults): 
   return abs;
 }
 
+/** `cwd` where it is optional: absent is fine, present must still be a real project root. */
+function optionalCwd(args: Record<string, unknown>, defaults: HandlerDefaults): string | undefined {
+  if (str(args.cwd) === undefined && defaults.defaultCwd === undefined) return undefined;
+  return requiredCwd(args, defaults);
+}
+
+// The registry decides what a standard is — never a list hardcoded here. A pack loaded
+// from `--pack` or the project's `.ultra11yrc.json` is a first-class standard the moment
+// it validates, and `resolveStandard` already refuses an unknown key by name, listing the
+// ones it does know.
 function standardOf(args: Record<string, unknown>): StandardId {
-  const s = str(args.standard) ?? "wcag";
-  if (s !== "wcag" && s !== "rgaa") throw new ToolError(`\`standard\` must be one of: wcag, rgaa (got "${s}")`);
-  return s as StandardId;
+  const s = str(args.standard);
+  if (s === undefined) return CORE;
+  try {
+    return resolveStandard(s);
+  } catch (e) {
+    throw new ToolError(e instanceof Error ? e.message : String(e));
+  }
 }
 
 function langOf(args: Record<string, unknown>): Lang {
@@ -115,15 +134,70 @@ export async function callTool(name: string, args: Record<string, unknown>, defa
     throw new ToolError(`${name} changes files in your project and is disabled — start the server with --allow-write to enable it.`);
   }
 
-  // The only tool that needs no project at all: it reads the vendored standard.
-  if (name === "ultra11y_criteria") return outcome(handleCriteria(args));
+  // The reference tools read the vendored standard, not the project tree, so `cwd` stays
+  // optional on them. It is still MEANINGFUL when given: a standards pack is per-project
+  // configuration, so which criteria exist at all depends on whose project is asking.
+  if (REFERENCE_TOOL_NAMES.has(name)) {
+    const scope = optionalCwd(args, defaults);
+    return withStandards(scope, () => outcome(handleReference(name, args)));
+  }
 
   const cwd = requiredCwd(args, defaults);
 
   // Serialized per project root. `fix --write` rewrites source files and then
   // re-audits them; an audit running concurrently would read a half-written
   // tree. Different projects stay fully parallel.
-  return await withProjectLock(cwd, async () => outcome(await dispatch(name, args, cwd)));
+  return await withProjectLock(cwd, async () => withStandards(cwd, async () => outcome(await dispatch(name, args, cwd))));
+}
+
+/**
+ * Run `fn` with this project's standards packs registered and visible.
+ *
+ * Exported because the RESOURCE layer needs it too: `resources/read` carries no `cwd`, so a
+ * `std://` read resolves against the server's own project root. Without this, a server
+ * dedicated to a project would serve that project's packs as tools and deny they exist as
+ * resources.
+ */
+export function withStandards<T>(scope: string | undefined, fn: () => T): T {
+  if (scope === undefined) return fn();
+  // Resolving a project's `.ultra11yrc.json` is a filesystem read; memoize it per root so a
+  // long-lived server does it once, not once per tool call.
+  if (!scopeLoaded(scope)) {
+    const warnings: string[] = [];
+    let errors: string[];
+    try {
+      errors = loadRuntimeStandards(scope, [], (m) => warnings.push(m), false, { scope }).errors;
+    } catch (e) {
+      dropScope(scope);
+      throw new ToolError(`${scope}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    // A pack that does not validate is a hard error, never a silent fallback to WCAG: the
+    // caller asked to be audited against a standard, and quietly using a different one is
+    // exactly the false conformance claim this tool exists to prevent. Drop the scope so a
+    // fixed config is picked up on the next call instead of being memoized as broken.
+    if (errors.length) {
+      dropScope(scope);
+      throw new ToolError(`${scope}: ${errors.join("\n")}`);
+    }
+  }
+  return withScope(scope, fn);
+}
+
+function handleReference(name: string, args: Record<string, unknown>): unknown {
+  switch (name) {
+    case "ultra11y_criteria":
+      return handleCriteria(args);
+    case "ultra11y_standards":
+      return handleStandards(args);
+    case "ultra11y_glossary":
+      return handleGlossary(args);
+    case "ultra11y_guidance":
+      return handleGuidance(args);
+    case "ultra11y_method":
+      return handleMethod(args);
+    default:
+      throw new ToolError(`unknown tool: ${name}`);
+  }
 }
 
 async function dispatch(name: string, args: Record<string, unknown>, cwd: string): Promise<unknown> {
@@ -471,15 +545,86 @@ function reportText(args: Record<string, unknown>, tool: string): string {
   return readFileSync(file, "utf8");
 }
 
+// The offline reference, for ANY registered standard.
+//
+// This used to call the WCAG core unconditionally and echo `standard` back untouched, so
+// `{ standard: "rgaa", sc: "8.3" }` answered a question about RGAA with "no such success
+// criterion". Everything now goes through the same query layer the CLI printer uses.
 function handleCriteria(args: Record<string, unknown>): unknown {
   const lang = langOf(args);
-  const id = str(args.sc);
-  if (!id) {
-    return { standard: standardOf(args), criteria: allSC().map((c) => ({ sc: c.sc, title: c.title })) };
+  const standard = standardOf(args);
+  const includeGuidance = bool(args.include_guidance);
+
+  // `sc` and `criterion` are aliases. "8.3" is not a *success criterion*, and a worldwide
+  // tool should not force a country criterion to be named one — but `sc` is what the
+  // shipped bundle and every existing client send.
+  const id = str(args.criterion) ?? str(args.sc);
+  const glossary = args.glossary;
+  const theme = num(args.theme);
+
+  try {
+    if (glossary !== undefined && glossary !== false) {
+      return glossaryView(standard, typeof glossary === "string" ? glossary : undefined, lang);
+    }
+    if (id) {
+      const view = criterionView(standard, id, lang, includeGuidance);
+      // `sc` is kept alongside `id` so a client written against the old shape still reads.
+      return isCore(standard) ? { ...view, sc: id } : view;
+    }
+    if (theme !== undefined) return themeView(standard, theme, lang);
+    return criteriaIndex(standard, lang);
+  } catch (e) {
+    if (e instanceof CriteriaLookupError) {
+      throw new ToolError(e.suggestions.length ? `${e.message} Did you mean: ${e.suggestions.join(", ")}?` : e.message);
+    }
+    throw e;
   }
-  const sc = getSC(id);
-  if (!sc) throw new ToolError(`no such success criterion: ${id}. List them all by omitting \`sc\`.`);
-  return { standard: standardOf(args), sc: id, text: formatSC(sc, lang) };
+}
+
+function handleStandards(_args: Record<string, unknown>): unknown {
+  return standardsInventory();
+}
+
+function handleGlossary(args: Record<string, unknown>): unknown {
+  const standard = standardOf(args);
+  try {
+    return glossaryView(standard, str(args.term), langOf(args));
+  } catch (e) {
+    if (e instanceof CriteriaLookupError) {
+      throw new ToolError(e.suggestions.length ? `${e.message} Did you mean: ${e.suggestions.join(", ")}?` : e.message);
+    }
+    throw e;
+  }
+}
+
+function handleGuidance(args: Record<string, unknown>): unknown {
+  const standard = standardOf(args);
+  const lang = langOf(args);
+  const id = str(args.criterion) ?? str(args.sc);
+  if (!id) throw new ToolError("`criterion` is required: the criterion id to fetch guidance for.");
+  // Reuses the criterion lookup so an id the standard does not define fails the same way
+  // here as it does everywhere else, rather than returning a silent empty list.
+  const view = criterionView(standard, id, lang, true);
+  const guidance = (view.criterion as { guidance: unknown[] }).guidance;
+  return {
+    standard,
+    standardLabel: view.standardLabel,
+    criterion: id,
+    lang,
+    count: guidance.length,
+    entries: guidance,
+    note: guidance.length
+      ? "Guidance illustrates how to implement a criterion. It never decides a verdict, and an entry marked `inherited` comes from the WCAG mapping, not from this standard's own doctrine."
+      : "No guidance is registered for this criterion, in this standard or through its WCAG mapping. That is not a pass — it means no example was written.",
+  };
+}
+
+function handleMethod(args: Record<string, unknown>): unknown {
+  const standard = standardOf(args);
+  const lang = langOf(args);
+  const tier = str(args.tier) as Tier | undefined;
+  const detail = str(args.detail) === "full" ? "full" : "summary";
+  return methodView(standard, lang, { ...(tier ? { tier } : {}), detail });
 }
 
 function handleRead(args: Record<string, unknown>, cwd: string): unknown {

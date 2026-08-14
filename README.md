@@ -196,21 +196,43 @@ the one output an accessibility tool must never produce.
 
 ### Tools
 
-Eleven read tools. `ultra11y_audit` is the entry point:
+Sixteen read tools, in two blocks. **The audit block** tells you what the page does:
 
 | Tool | What it does |
 |------|--------------|
 | `ultra11y_audit` | The static pass — findings keyed by success criterion |
 | `ultra11y_adjudicate` | The criteria the engine **cannot** decide, with their evidence |
-| `ultra11y_criteria` | The offline standards reference — look a criterion up, don't recall it |
 | `ultra11y_report` | The dated conformance report, WCAG or a country pack |
 | `ultra11y_prd` | Non-conformities → remediation units with effort |
+| `ultra11y_tickets` | The same backlog as a ticket plan — dry-run, files nothing |
 | `ultra11y_check` | The gate: nothing asserted conformant that was never tested |
 | `ultra11y_verify` | Claim↔evidence worklist |
 | `ultra11y_pack_check` | Validate a country standards pack against what it really ships |
 | `ultra11y_sample_check` | Lint the normative page sample |
 | `ultra11y_pages` | The per-page view: the criterion × page grid, or one dossier per page |
 | `ultra11y_read` | A file, or a line range, from the project |
+
+**The reference block** tells you what the standard requires — the half that keeps an agent
+from auditing out of memory. `cwd` is optional on all five; it selects whose packs are visible:
+
+| Tool | What it does |
+|------|--------------|
+| `ultra11y_standards` | Which standards exist here, and how much of each any engine can decide |
+| `ultra11y_criteria` | One criterion in full — wording, **numbered tests**, techniques, mapping, defined terms — or the index, or one theme |
+| `ultra11y_glossary` | What a term the standard **defines** means, and which criteria it governs |
+| `ultra11y_guidance` | The before/after implementation pattern, inherited through the WCAG mapping when the pack has none |
+| `ultra11y_method` | The work plan: what the engine settles, what needs a render, what is yours |
+
+`ultra11y_method` is the one to call first. It partitions the standard into evidence tiers —
+`source`, `cross-file`, `rendered-page`, `browser`, `judgment`, `out-of-scope` — from the
+engine's own per-criterion rule applicability, never from guessing at the wording of a test.
+For RGAA it reports that **58 of 106 criteria declare that no engine rule can evidence them**.
+That is the standard saying they are yours, and a plan that hides it reads as coverage that
+does not exist.
+
+`standard` carries no enum, deliberately: a country pack arrives with a project, so an enum
+pinned when the tool list was built would reject a pack that is perfectly valid for the
+project being asked about. The handler validates against the registry and names what it knows.
 
 `--allow-write` additionally exposes `ultra11y_fix` (safe codemods, dry-run by
 default) and `ultra11y_init` (hook/CI/baseline) — the tools that change **your**
@@ -237,11 +259,25 @@ Each carries the coverage arithmetic: of the 55 WCAG 2.2 AA criteria the static
 engine decides a handful, a browser decides fourteen, and **thirty-eight are
 yours**.
 
-### Resources — the skill's own documentation
+### Resources — the documentation, and the standards themselves
 
-`SKILL.md` and all 32 `references/*.md` are served under `skill://`, read off
+`SKILL.md` and all 37 `references/*.md` are served under `skill://`, read off
 disk at request time — so a documentation fix reaches every client without a
 rebuild.
+
+The standards are served too, under `std://`, because in MCP documentation is a
+*resource*, not a tool call:
+
+```
+std://rgaa/criteria/8.3      std://rgaa/glossary/lien      std://rgaa/method
+std://rgaa/themes/8          std://rgaa/guidance/13.2      std://rgaa/pack.json
+std://wcag/criteria/1.4.3    std://wcag/glossary           std://wcag/method
+```
+
+`resources/list` carries a bounded index per standard; the per-item URIs are
+**templates** (`resources/templates/list`), because enumerating RGAA's 106
+criteria and 119 glossary terms would bloat every client's listing and go stale
+the moment a project's own pack registers.
 
 Two things worth knowing:
 

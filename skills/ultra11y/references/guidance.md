@@ -12,7 +12,8 @@ Guidance is looked up at **render time** by criterion / WCAG SC, so the canonica
 
 - **`prd`** — each backlog item gains a before/after example and an effort estimate; the
   `--format doc` PRD weaves it into the user stories and acceptance criteria.
-- **`criteria`** lookups for a pack criterion.
+- **`ultra11y_guidance`** over MCP — the direct lookup, by criterion.
+- **`ultra11y_criteria`** with `include_guidance: true`, attached to the criterion.
 
 Because attachment is presentation-only, guidance never marks anything conforming and
 never invents a non-conformity — it is illustration, not detection.
@@ -21,12 +22,37 @@ never invents a non-conformity — it is illustration, not detection.
 
 A guidance dataset is JSON: `{ pack, source, license, attribution, entries[] }`, where
 each entry is `{ id, criterionId, wcag[], title, summary, impact?, examples[], reference }`
-and an example is `{ lang: "html"|"jsx"|"css", bad?, good?, note? }`. The built-in RGAA
-guidance ships at `src/data/guidance/rgaa.json` (its entry ids mirror the SocialGouv rule
-files). Load external guidance with `--pack <dir>` (a `guidance.json` beside `pack.json`)
-or a `.ultra11yrc.json` `guidance` list. `pack check --guidance` validates that every
-entry resolves to a real criterion, maps to recognized WCAG SCs, and that every example
-parses.
+and an example is `{ lang: "html"|"jsx"|"css", bad?, good?, note? }`. Two ship built in:
+`src/data/guidance/rgaa.json` (93 entries, ids mirroring the SocialGouv rule files) and
+`src/data/guidance/wcag.json` (the WCAG-keyed set). Load external guidance with
+`--pack <dir>` (a `guidance.json` beside `pack.json`) or a `.ultra11yrc.json` `guidance`
+list. `pack check --guidance` validates that every entry resolves to a real criterion,
+maps to recognized WCAG SCs, and that every example parses.
+
+## Inheritance — why a new country pack is useful on day one
+
+Every entry declares the WCAG success criteria it implements, and a lookup walks **every**
+registered dataset. So a pack that ships no guidance of its own still gets examples, through
+the criteria it maps onto — a freshly authored Section 508 or EN 301 549 pack inherits the
+whole corpus the moment its `wcag[]` mappings exist.
+
+Resolution order (first wins, deduped by entry id):
+
+1. the pack's own entry for that criterion → `via: "pack"`, `inherited: false`
+2. every entry keyed to each WCAG SC the criterion maps to, in the pack's own SC order →
+   `via: "wcag:<sc>"`, `inherited: true`
+
+**The marking is the point.** An inherited example is not the national standard's own
+doctrine, and a report that presented it as one would be making a claim nobody wrote. Every
+surface carries `inherited` / `via`, and each entry also carries `languagesAvailable` — the
+RGAA dataset is French-first, so an English caller must be told when an entry has no English
+text rather than handed French silently.
+
+`src/data/guidance/wcag.json` exists for the one thing no country dataset can supply: the
+**ten AA criteria RGAA 4.1.2 never covered** — `1.2.4`, `2.3.1`, `2.4.5`, `2.4.11`, `2.5.7`,
+`2.5.8`, `3.2.6`, `3.3.3`, `3.3.7`, `3.3.8`. Six were added in WCAG 2.2, after RGAA
+(`wcagVersion: 2.1`) froze. With it in place, **no AA success criterion is without reachable
+guidance**, for any pack.
 
 ## Honesty rule — guidance is NOT a free detector
 

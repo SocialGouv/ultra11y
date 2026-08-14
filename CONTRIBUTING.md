@@ -157,6 +157,19 @@ rule source (e.g. the RGAA SocialGouv/etalab rule packs), have it draft the pack
 pattern that is statically decidable **and** maps to an SC in the WCAG 2.2 AA core;
 everything else is guidance + residual risk, never silently conforming.
 
+**You do not have to write guidance to get guidance.** Every guidance entry declares the
+WCAG success criteria it implements, and a lookup walks every registered dataset — so the
+moment your criteria carry their `wcag[]` mappings, they inherit the whole shipped corpus
+(the RGAA patterns plus the WCAG-keyed set that covers what RGAA never reached). Inherited
+entries are marked `inherited: true` / `via: "wcag:<sc>"` wherever they surface, so an
+example borrowed through the crosswalk is never presented as your standard's own doctrine.
+Write your own entries only where your standard genuinely differs.
+
+Your pack also reaches the **MCP reference surface** for free: `ultra11y_criteria`,
+`ultra11y_glossary`, `ultra11y_guidance`, `ultra11y_method` and the `std://<key>/…`
+resources all resolve it, with no extra registration. See
+`skills/ultra11y/references/mcp.md`.
+
 ## PR checklist
 
 - [ ] Pack JSON validates; ids match `idPattern`; every in-core SC resolves.

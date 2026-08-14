@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AuditResult, Lang } from "./types.js";
 import { hasSC } from "./wcag.js";
-import { type StandardId, isCore, loadPack, hasId, idCaptureSource, derivePackResults } from "./standards/index.js";
+import { type StandardId, criterionCoverage, isCore, loadPack, hasId, idCaptureSource, derivePackResults } from "./standards/index.js";
 import { buildWorklist, applyVerdicts, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import { isPagesReport } from "./pages-report.js";
@@ -36,6 +36,8 @@ const M = {
     semanticUnreadable: (p: string) => `Gate sémantique : artefact de verdicts illisible ou JSON invalide : ${p}.`,
     semanticGate: (failed: number, total: number) => `Gate sémantique : ${failed}/${total} verdict(s) en échec (non statué, réfuté, non étayé ou non couvert).`,
     semanticGround: (issue: string) => `Gate sémantique : ${issue}`,
+    unevidenced: (id: string, tier: string, tool: string) =>
+      `Conformité non étayée : ${id} est déclaré conforme, mais ce critère se tranche au ${tier} et cet audit n'a produit aucune preuve de ce type. Lancez ${tool}, puis ré-auditez — ou laissez le critère « à évaluer ».`,
   },
   en: {
     section: (n: number) => `Section ${n} missing from the report.`,
@@ -53,6 +55,8 @@ const M = {
     semanticUnreadable: (p: string) => `Semantic gate: verdicts artifact unreadable or invalid JSON: ${p}.`,
     semanticGate: (failed: number, total: number) => `Semantic gate: ${failed}/${total} verdict(s) failing (unadjudicated, refuted, unsupported or uncovered).`,
     semanticGround: (issue: string) => `Semantic gate: ${issue}`,
+    unevidenced: (id: string, tier: string, tool: string) =>
+      `Unevidenced conformity: ${id} is declared conformant, but this criterion is decided on the ${tier} and this audit produced no evidence of that kind. Run ${tool}, then re-audit — or leave the criterion "to assess".`,
   },
 } as const;
 
@@ -167,7 +171,53 @@ export function checkReport(md: string, standard: StandardId = "wcag", lang: Lan
     for (const id of derivedNc) if (!reportNc.has(id)) issues.push(s.underProject(id));
   }
 
+  // 6. evidence gate: a criterion the report declares CONFORMANT whose verdict can only
+  // come from a tier this audit never ran.
+  //
+  // Contrast, focus visibility and reflow are not decided by reading source — they are
+  // measured on a render. An audit that never rendered anything and still publishes them
+  // as conformant is making the one claim this tool must never make: a pass nobody tested.
+  //
+  // Scoped deliberately tight, so it refuses only what is unambiguously wrong:
+  //   · needs `opts.audit` — without it there is no way to know what evidence exists;
+  //   · reads only the ENGINE-decided half of section 3. An agent that rules a rendering
+  //     criterion conformant has looked at something this audit cannot see, and section 3
+  //     already separates that claim under its own heading;
+  //   · treats an ABSENT `pagesAudited` as unknown, never as zero — an audit written
+  //     before that field existed must not start failing.
+  if (opts.audit) {
+    const engineC = sectionBody(md, 3).split(/^###\s/m)[0] ?? "";
+    const cItem = new RegExp(`^-\\s+(?:[A-Za-z]+\\s+)?(${idGrammar})\\s*—`, "gm");
+    const scanned = hasScanEvidence(opts.audit);
+    const rendered = hasRenderedEvidence(opts.audit);
+    const claimed = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = cItem.exec(engineC))) claimed.add(m[1]!);
+    for (const id of claimed) {
+      const tier = criterionCoverage(standard, id)?.tier;
+      if (tier === "browser" && !scanned) issues.push(s.unevidenced(id, core ? "browser" : "navigateur", "`ultra11y scan <target> --merge`"));
+      else if (tier === "rendered-page" && rendered === false && !scanned) {
+        issues.push(s.unevidenced(id, core ? "rendered page" : "rendu de page", "`ultra11y render` (or an E2E capture)"));
+      }
+    }
+  }
+
   return { ok: issues.length === 0, issues };
+}
+
+/** Did a dynamic scan actually run? Either it recorded which SCs it measured, or its
+ *  engines left findings behind. Same signal `untestedNeedsRendering` reads. */
+function hasScanEvidence(r: AuditResult): boolean {
+  if ((r.scope.scan?.testedScs ?? []).length > 0) return true;
+  return r.findings.some((f) => f.ruleId.startsWith("dyn-") || f.ruleId.startsWith("axe:"));
+}
+
+/** Was a page snapshot audited? `undefined` means UNKNOWN (an audit predating the field),
+ *  and unknown must never be read as "no" — that would fail an old report on a technicality. */
+function hasRenderedEvidence(r: AuditResult): boolean | undefined {
+  if (r.findings.some((f) => f.ruleId.startsWith("rendered-"))) return true;
+  const audited = r.scope.pagesAudited;
+  return audited === undefined ? undefined : audited.length > 0;
 }
 
 /** The set of criterion ids the report presents as non-conformant — parsed from the

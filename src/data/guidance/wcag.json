@@ -1,0 +1,268 @@
+{
+  "pack": "wcag",
+  "source": "https://www.w3.org/WAI/WCAG22/Understanding/",
+  "license": "W3C Document License",
+  "attribution": "Derived from the W3C Understanding WCAG 2.2 documents. WCAG 2.2 © W3C. Short derived summaries and minimal illustrative examples only, not verbatim prose — see NOTICE.",
+  "entries": [
+    {
+      "id": "media-live-captions",
+      "criterionId": "1.2.4",
+      "wcag": ["1.2.4"],
+      "title": {
+        "en": "Live synchronized media is captioned",
+        "fr": "Le média synchronisé en direct est sous-titré"
+      },
+      "summary": {
+        "en": "Live audio in synchronized media needs real-time captions. A player with no caption track leaves deaf and hard-of-hearing users with nothing, and a pre-recorded transcript published afterwards does not satisfy a live criterion.",
+        "fr": "L'audio en direct d'un média synchronisé exige des sous-titres en temps réel. Un lecteur sans piste de sous-titres ne laisse rien aux personnes sourdes ou malentendantes, et une transcription publiée après coup ne satisfait pas un critère « en direct »."
+      },
+      "impact": "high",
+      "examples": [
+        {
+          "lang": "html",
+          "bad": "<video src=\"/live/stream.m3u8\" controls></video>",
+          "good": "<video src=\"/live/stream.m3u8\" controls>\n  <track kind=\"captions\" srclang=\"en\" label=\"English (live)\" src=\"/live/captions.vtt\" default>\n</video>",
+          "note": {
+            "en": "The caption track must be fed in real time (a live captioner or a live ASR service). Publishing a transcript after the broadcast is a different criterion.",
+            "fr": "La piste doit être alimentée en temps réel (sous-titrage humain ou reconnaissance vocale en direct). Publier une transcription après la diffusion relève d'un autre critère."
+          }
+        }
+      ],
+      "reference": "https://www.w3.org/WAI/WCAG22/Understanding/captions-live.html"
+    },
+    {
+      "id": "motion-three-flashes",
+      "criterionId": "2.3.1",
+      "wcag": ["2.3.1"],
+      "title": {
+        "en": "Nothing flashes more than three times a second",
+        "fr": "Rien ne clignote plus de trois fois par seconde"
+      },
+      "summary": {
+        "en": "Content that flashes more than three times in any one second can trigger a seizure. This is the one accessibility failure that can cause physical harm, so it is not a matter of preference: slow the flash below the threshold, or remove it.",
+        "fr": "Un contenu qui clignote plus de trois fois par seconde peut déclencher une crise d'épilepsie. C'est le seul défaut d'accessibilité qui peut causer un dommage physique : il faut ralentir le clignotement sous le seuil, ou le supprimer."
+      },
+      "impact": "high",
+      "examples": [
+        {
+          "lang": "css",
+          "bad": ".alert {\n  animation: flash 0.15s steps(1) infinite;\n}",
+          "good": ".alert {\n  animation: flash 1s steps(1) infinite;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .alert {\n    animation: none;\n  }\n}",
+          "note": {
+            "en": "A 0.15s cycle flashes about seven times a second. Honouring prefers-reduced-motion is good practice but does not by itself satisfy this criterion — the default must already be safe.",
+            "fr": "Un cycle de 0,15 s clignote environ sept fois par seconde. Respecter prefers-reduced-motion est une bonne pratique mais ne suffit pas : le comportement par défaut doit déjà être sûr."
+          }
+        }
+      ],
+      "reference": "https://www.w3.org/WAI/WCAG22/Understanding/three-flashes-or-below-threshold.html"
+    },
+    {
+      "id": "navigation-multiple-ways",
+      "criterionId": "2.4.5",
+      "wcag": ["2.4.5"],
+      "title": {
+        "en": "More than one way to reach a page",
+        "fr": "Plus d'un moyen d'atteindre une page"
+      },
+      "summary": {
+        "en": "A site offers at least two ways to locate a page — for example a menu plus a search, or a sitemap. Users who find hierarchical menus hard to navigate need another route; the exception is a page that is a step in a process.",
+        "fr": "Un site propose au moins deux moyens d'atteindre une page — par exemple un menu et une recherche, ou un plan du site. Les personnes pour qui la navigation hiérarchique est difficile ont besoin d'une autre voie ; l'exception est une page qui constitue une étape d'un processus."
+      },
+      "impact": "medium",
+      "examples": [
+        {
+          "lang": "html",
+          "bad": "<nav aria-label=\"Main\">\n  <a href=\"/products\">Products</a>\n  <a href=\"/support\">Support</a>\n</nav>",
+          "good": "<nav aria-label=\"Main\">\n  <a href=\"/products\">Products</a>\n  <a href=\"/support\">Support</a>\n</nav>\n<form role=\"search\" action=\"/search\">\n  <label for=\"q\">Search the site</label>\n  <input id=\"q\" name=\"q\" type=\"search\">\n  <button type=\"submit\">Search</button>\n</form>\n<a href=\"/sitemap\">Sitemap</a>",
+          "note": {
+            "en": "Two mechanisms, not two links to the same menu. A search and a sitemap are each a second way; a duplicated navigation bar is not.",
+            "fr": "Deux mécanismes, pas deux liens vers le même menu. Une recherche et un plan du site sont chacun un second moyen ; une barre de navigation dupliquée non."
+          }
+        }
+      ],
+      "reference": "https://www.w3.org/WAI/WCAG22/Understanding/multiple-ways.html"
+    },
+    {
+      "id": "focus-not-obscured",
+      "criterionId": "2.4.11",
+      "wcag": ["2.4.11"],
+      "title": {
+        "en": "The focused element is not hidden behind sticky content",
+        "fr": "L'élément qui a le focus n'est pas masqué par un contenu collant"
+      },
+      "summary": {
+        "en": "When a component takes keyboard focus it must not be entirely covered by author content such as a sticky header, footer or cookie banner. A keyboard user who cannot see where focus went has lost the page.",
+        "fr": "Quand un composant reçoit le focus clavier, il ne doit pas être entièrement recouvert par un contenu de l'auteur : en-tête ou pied de page collant, bandeau cookies. Une personne naviguant au clavier qui ne voit plus où est le focus a perdu la page."
+      },
+      "impact": "high",
+      "examples": [
+        {
+          "lang": "css",
+          "bad": ".site-footer {\n  position: fixed;\n  bottom: 0;\n  height: 5rem;\n}",
+          "good": ".site-footer {\n  position: fixed;\n  bottom: 0;\n  height: 5rem;\n}\n\n:target,\n:focus {\n  scroll-margin-bottom: 6rem;\n}",
+          "note": {
+            "en": "scroll-margin keeps the browser from scrolling the focused element flush against the sticky bar. Verify it by tabbing through the page, not by reading the stylesheet — this criterion is decided on the render.",
+            "fr": "scroll-margin empêche le navigateur de coller l'élément focalisé contre la barre fixe. À vérifier en tabulant réellement dans la page, pas en lisant la feuille de styles : ce critère se tranche au rendu."
+          }
+        }
+      ],
+      "reference": "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html"
+    },
+    {
+      "id": "pointer-dragging-alternative",
+      "criterionId": "2.5.7",
+      "wcag": ["2.5.7"],
+      "title": {
+        "en": "Anything you can drag, you can also do without dragging",
+        "fr": "Tout ce qui se fait par glissement se fait aussi autrement"
+      },
+      "summary": {
+        "en": "A function operated by a dragging movement also works with a single pointer action — a button, a menu, a form field. Dragging needs sustained precision that users with tremor, limited dexterity or a head pointer may not have.",
+        "fr": "Une fonctionnalité actionnée par glissement doit aussi fonctionner par une action de pointeur simple : un bouton, un menu, un champ. Le glissement exige une précision continue dont ne disposent pas les personnes avec tremblements, dextérité réduite ou pointeur de tête."
+      },
+      "impact": "high",
+      "examples": [
+        {
+          "lang": "html",
+          "bad": "<ul id=\"queue\" data-sortable=\"drag\">\n  <li draggable=\"true\">First task</li>\n  <li draggable=\"true\">Second task</li>\n</ul>",
+          "good": "<ul id=\"queue\" data-sortable=\"drag\">\n  <li draggable=\"true\">\n    First task\n    <button type=\"button\" data-move=\"up\">Move up</button>\n    <button type=\"button\" data-move=\"down\">Move down</button>\n  </li>\n</ul>",
+          "note": {
+            "en": "The drag stays; a single-pointer path is added beside it. The exception is when dragging is essential to the function, such as freehand drawing.",
+            "fr": "Le glissement reste ; un chemin en pointeur simple est ajouté à côté. L'exception est le cas où le glissement est essentiel à la fonction, comme le dessin à main levée."
+          }
+        }
+      ],
+      "reference": "https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html"
+    },
+    {
+      "id": "pointer-target-size",
+      "criterionId": "2.5.8",
+      "wcag": ["2.5.8"],
+      "title": {
+        "en": "Pointer targets are at least 24 by 24 CSS pixels",
+        "fr": "Les cibles de pointeur mesurent au moins 24 sur 24 pixels CSS"
+      },
+      "summary": {
+        "en": "A target smaller than 24×24 CSS pixels needs enough spacing that a 24-pixel circle centred on it touches no other target. Small, tightly packed controls are hard to hit for anyone with a tremor or using a touchscreen one-handed.",
+        "fr": "Une cible de moins de 24×24 pixels CSS doit être assez espacée pour qu'un cercle de 24 pixels centré dessus ne touche aucune autre cible. Des contrôles petits et serrés sont difficiles à atteindre en cas de tremblement ou d'usage à une main sur écran tactile."
+      },
+      "impact": "medium",
+      "examples": [
+        {
+          "lang": "css",
+          "bad": ".icon-button {\n  width: 16px;\n  height: 16px;\n  padding: 0;\n}",
+          "good": ".icon-button {\n  min-width: 24px;\n  min-height: 24px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n}",
+          "note": {
+            "en": "The 24px is the target, not the icon: padding counts. Inline links in a sentence are excepted, as are targets whose size is set by the user agent.",
+            "fr": "Les 24 px concernent la cible, pas l'icône : le padding compte. Les liens en ligne dans une phrase sont exceptés, comme les cibles dimensionnées par le navigateur."
+          }
+        }
+      ],
+      "reference": "https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html"
+    },
+    {
+      "id": "navigation-consistent-help",
+      "criterionId": "3.2.6",
+      "wcag": ["3.2.6"],
+      "title": {
+        "en": "Help is in the same place on every page",
+        "fr": "L'aide se trouve au même endroit sur chaque page"
+      },
+      "summary": {
+        "en": "If a set of pages offers help — a contact link, a phone number, a chat widget — it appears in the same relative order on each of them. Users who rely on spatial memory should not have to re-find it page by page.",
+        "fr": "Si un ensemble de pages propose une aide — lien de contact, numéro de téléphone, widget de discussion — elle apparaît dans le même ordre relatif sur chacune. Les personnes qui s'appuient sur la mémoire spatiale ne devraient pas avoir à la rechercher page par page."
+      },
+      "impact": "low",
+      "examples": [
+        {
+          "lang": "html",
+          "bad": "<header>\n  <a href=\"/contact\">Contact us</a>\n  <nav>...</nav>\n</header>",
+          "good": "<header>\n  <nav>...</nav>\n  <a href=\"/contact\">Contact us</a>\n</header>",
+          "note": {
+            "en": "Same relative order, not identical pixels — a responsive layout may move it. The criterion is about where it falls in the page, consistently.",
+            "fr": "Même ordre relatif, pas les mêmes pixels : une mise en page responsive peut le déplacer. Le critère porte sur sa position dans la page, de façon constante."
+          }
+        }
+      ],
+      "reference": "https://www.w3.org/WAI/WCAG22/Understanding/consistent-help.html"
+    },
+    {
+      "id": "forms-error-suggestion",
+      "criterionId": "3.3.3",
+      "wcag": ["3.3.3"],
+      "title": {
+        "en": "An error message says how to fix it",
+        "fr": "Un message d'erreur indique comment corriger"
+      },
+      "summary": {
+        "en": "When input is rejected and a correction is known, the message names it. \"Invalid\" tells the user only that they failed; the expected format, or the nearest valid value, tells them what to do next.",
+        "fr": "Quand une saisie est refusée et qu'une correction est connue, le message l'indique. « Invalide » n'apprend à l'utilisateur que son échec ; le format attendu, ou la valeur valide la plus proche, lui dit quoi faire."
+      },
+      "impact": "high",
+      "examples": [
+        {
+          "lang": "html",
+          "bad": "<input id=\"born\" name=\"born\" aria-describedby=\"born-err\">\n<p id=\"born-err\">Invalid input.</p>",
+          "good": "<label for=\"born\">Date of birth</label>\n<input id=\"born\" name=\"born\" aria-describedby=\"born-err\" aria-invalid=\"true\">\n<p id=\"born-err\">Enter the date as DD/MM/YYYY, for example 21/03/1994.</p>",
+          "note": {
+            "en": "The suggestion must be programmatically associated with the field, not merely nearby — aria-describedby is what makes a screen reader announce it with the input.",
+            "fr": "La suggestion doit être associée programmatiquement au champ, pas seulement placée à côté : c'est aria-describedby qui la fait annoncer avec la saisie."
+          }
+        }
+      ],
+      "reference": "https://www.w3.org/WAI/WCAG22/Understanding/error-suggestion.html"
+    },
+    {
+      "id": "forms-redundant-entry",
+      "criterionId": "3.3.7",
+      "wcag": ["3.3.7"],
+      "title": {
+        "en": "Information already entered is not asked for again",
+        "fr": "Une information déjà saisie n'est pas redemandée"
+      },
+      "summary": {
+        "en": "Within a process, information the user already gave is auto-populated or offered for selection rather than retyped. Re-entry is a real barrier for users with memory impairments and for anyone typing with difficulty.",
+        "fr": "Au sein d'un processus, une information déjà fournie est pré-remplie ou proposée à la sélection plutôt que ressaisie. La ressaisie est un obstacle réel en cas de troubles de la mémoire et pour toute personne dont la saisie est difficile."
+      },
+      "impact": "medium",
+      "examples": [
+        {
+          "lang": "html",
+          "bad": "<fieldset>\n  <legend>Delivery address</legend>\n  <label for=\"d-street\">Street</label>\n  <input id=\"d-street\" name=\"d-street\">\n</fieldset>",
+          "good": "<fieldset>\n  <legend>Delivery address</legend>\n  <label for=\"same\">\n    <input type=\"checkbox\" id=\"same\" name=\"same\" checked>\n    Same as my billing address\n  </label>\n  <label for=\"d-street\">Street</label>\n  <input id=\"d-street\" name=\"d-street\" value=\"12 Rue de Rivoli\">\n</fieldset>",
+          "note": {
+            "en": "Exceptions exist where re-entry is essential — confirming a password, or a memory test. Convenience is not one of them.",
+            "fr": "Des exceptions existent quand la ressaisie est essentielle : confirmation de mot de passe, test de mémoire. La commodité n'en fait pas partie."
+          }
+        }
+      ],
+      "reference": "https://www.w3.org/WAI/WCAG22/Understanding/redundant-entry.html"
+    },
+    {
+      "id": "forms-accessible-authentication",
+      "criterionId": "3.3.8",
+      "wcag": ["3.3.8"],
+      "title": {
+        "en": "Signing in does not require a cognitive test",
+        "fr": "La connexion n'exige pas un test cognitif"
+      },
+      "summary": {
+        "en": "No step of authentication may depend on remembering, transcribing or solving a puzzle unless an alternative exists. Blocking paste into a password field is the most common way sites fail this: it breaks every password manager.",
+        "fr": "Aucune étape d'authentification ne doit reposer sur la mémorisation, la transcription ou la résolution d'une énigme, sauf alternative. Bloquer le collage dans un champ de mot de passe est l'échec le plus courant : cela casse tous les gestionnaires de mots de passe."
+      },
+      "impact": "high",
+      "examples": [
+        {
+          "lang": "html",
+          "bad": "<input type=\"password\" id=\"pw\" name=\"pw\" onpaste=\"return false\" autocomplete=\"off\">",
+          "good": "<label for=\"pw\">Password</label>\n<input type=\"password\" id=\"pw\" name=\"pw\" autocomplete=\"current-password\">",
+          "note": {
+            "en": "autocomplete=\"current-password\" lets a password manager fill the field, which is the documented way to satisfy this criterion. A puzzle CAPTCHA needs a non-cognitive alternative beside it.",
+            "fr": "autocomplete=\"current-password\" permet à un gestionnaire de remplir le champ, ce qui est la façon documentée de satisfaire ce critère. Un CAPTCHA à énigme exige une alternative non cognitive à côté."
+          }
+        }
+      ],
+      "reference": "https://www.w3.org/WAI/WCAG22/Understanding/accessible-authentication-minimum.html"
+    }
+  ]
+}

@@ -67,10 +67,18 @@ describe("it refuses to guess", () => {
     expect(r.code === 0 || /Did you mean/.test(r.err)).toBe(true);
   });
 
-  it("says so plainly when the standard has no glossary", () => {
-    const r = look("anything", "wcag");
+  it("serves the WCAG core's own glossary too, not just a country pack's", () => {
+    // WCAG defines "large scale", "pure decoration", "text alternative" and 98 more, and
+    // those definitions are normative in exactly the way RGAA's are: 1.4.3's 3:1 threshold
+    // applies to "large scale" text, and what counts as large scale is the glossary's call.
+    const r = look("large scale", "wcag");
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/18 point/);
+  });
+
+  it("still refuses to guess on a WCAG term it does not have", () => {
+    const r = look("zzzz-not-a-term", "wcag");
     expect(r.code).toBe(2);
-    expect(r.err).toMatch(/country standard/i);
   });
 });
 

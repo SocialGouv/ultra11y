@@ -58,6 +58,25 @@ export function resolveGlossary(packKey: string, anchor: string): GlossaryEntry 
   return packGlossary(packKey)?.[anchor];
 }
 
+// A criterion's tests refer constantly to normatively-defined terms
+// (`[alternative textuelle](#alternative-textuelle-image)`). The definitions live in the
+// pack's glossary — 119 entries for RGAA — and they are normative: "relevant" and "if
+// necessary" mean what the glossary says they mean. Attaching the ones THIS criterion's
+// tests actually cite makes a criterion lookup self-sufficient.
+const GLOSSARY_REF = /\[[^\]]+\]\(#([^)]+)\)/g;
+
+/** The glossary anchors a criterion's tests / notes / particular cases refer to, in order. */
+export function glossaryAnchorsOf(crit: { tests?: Record<string, string[]>; technicalNote?: string[]; particularCases?: string[] } | undefined): string[] {
+  if (!crit) return [];
+  const texts = [...Object.values(crit.tests ?? {}).flat(), ...(crit.technicalNote ?? []), ...(crit.particularCases ?? [])];
+  const seen = new Set<string>();
+  for (const t of texts) {
+    GLOSSARY_REF.lastIndex = 0;
+    for (let m = GLOSSARY_REF.exec(t); m; m = GLOSSARY_REF.exec(t)) if (m[1]) seen.add(m[1]);
+  }
+  return [...seen];
+}
+
 /** Replace every unescaped `(` that does NOT open a special construct with a
  *  non-capturing `(?:` — i.e. neutralize the pattern's OWN capturing groups.
  *  Leaves alone: an escaped literal (`\(`) and any `(?...` construct (`(?:`, `(?=`,

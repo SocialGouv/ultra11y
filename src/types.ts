@@ -69,6 +69,23 @@ export interface Sc {
   ruleIds: string[]; // engine rules contributing to this SC
   understanding: string; // W3C Understanding doc URL (manual-check grounding)
   techniques?: string[]; // language-neutral W3C technique codes
+  // The criterion's NORMATIVE wording, verbatim from the W3C source, with its exceptions
+  // and notes as labelled lines. Optional only so an older wcag.json snapshot still
+  // parses — a freshly built dataset carries it for every criterion or the build fails.
+  text?: string;
+  // The same wording from the W3C AUTHORIZED French translation. Held to the same
+  // completeness rule as `titleFr`: the build fails rather than let `--lang fr` render a
+  // French heading over English requirement prose.
+  textFr?: string;
+  // The glossary slugs this criterion's wording LINKS to in the W3C source — the defined
+  // terms it actually cites, not words that happen to appear in it.
+  terms?: string[];
+  // The same, for the French translation. The two pages do NOT share slugs — the FR page
+  // names several definitions in the plural ("user-agents" where the English source file is
+  // "user-agent") and a few differently outright ("purpose-of-each-link" for "link-purpose").
+  // Mapping one onto the other would be a guess, so each language keeps its own list and
+  // resolves against its own glossary.
+  termsFr?: string[];
   tests?: string[]; // optional manual-check lines
   notes?: string;
 }
@@ -93,6 +110,12 @@ export interface WcagData {
   principles: WcagPrinciple[];
   guidelines: WcagGuideline[];
   criteria: Sc[];
+  // The terms WCAG itself normatively defines ("text alternative", "programmatically
+  // determined"…), keyed by the W3C's own dfn slug. Optional so an older wcag.json
+  // snapshot still parses; see src/wcag.ts `coreGlossary`.
+  glossary?: Glossary;
+  // The same terms from the W3C authorized French translation, under the SAME slugs.
+  glossaryFr?: Glossary;
 }
 
 // ---- WCAG SC universe (src/data/wcag-universe.json, produced by

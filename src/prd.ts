@@ -19,7 +19,7 @@ import {
   themeName,
   titlePlain as packTitlePlain,
 } from "./standards/index.js";
-import { guidanceForWcag, guidanceForCriterion } from "./guidance/index.js";
+import { guidanceEntriesFor } from "./guidance/resolve.js";
 import type { GuidanceEntry } from "./guidance/types.js";
 import { renderAuditorBacklog, renderAuditorPerCriterion, occurrenceLine, relatedLine } from "./auditor.js";
 
@@ -186,21 +186,10 @@ export function effortOf(unit: PrdUnit): { bucket: "S" | "M" | "L"; points: numb
  *  falling back to the unit's WCAG refs so a pack criterion with no direct entry still
  *  surfaces its SCs' guidance. Stable order, deduped by id. */
 export function guidanceFor(unit: PrdUnit, standard: StandardId): GuidanceEntry[] {
-  const seen = new Set<string>();
-  const out: GuidanceEntry[] = [];
-  const push = (es: GuidanceEntry[]) => {
-    for (const e of es) {
-      if (seen.has(e.id)) continue;
-      seen.add(e.id);
-      out.push(e);
-    }
-  };
-  if (isCore(standard)) push(guidanceForWcag(unit.criteriaId));
-  else {
-    push(guidanceForCriterion(standard, unit.criteriaId));
-    for (const sc of unit.refs) push(guidanceForWcag(sc));
-  }
-  return out;
+  // Same order, same dedup — the chain now lives in guidance/resolve.ts so the MCP
+  // reference tools and the criteria lookup can use it too, instead of the PRD being the
+  // only surface that can reach a criterion's guidance.
+  return guidanceEntriesFor(standard, unit.criteriaId, unit.refs);
 }
 
 /** The first guidance example (before/after) for a unit, rendered as fenced code.

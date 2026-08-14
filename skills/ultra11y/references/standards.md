@@ -40,9 +40,27 @@ node scripts/ultra11y.mjs report   --in audits/audit-latest.json --standard rgaa
 node scripts/ultra11y.mjs criteria --standard rgaa --theme 1                       # a pack theme
 node scripts/ultra11y.mjs criteria --standard rgaa 8.3                             # one pack criterion (shows its WCAG SCs)
 node scripts/ultra11y.mjs check    --report audits/rgaa-YYYY-MM-DD.md --standard rgaa
+node scripts/ultra11y.mjs criteria --standard rgaa --glossary lien                 # a term the standard DEFINES
+node scripts/ultra11y.mjs criteria --standard wcag --glossary "large scale"        # the core defines its own terms too
 ```
 
 An unknown `--standard` value errors out (never a silent fallback to WCAG).
+
+**The core carries its own text, in both languages.** Each WCAG success criterion ships its
+normative wording verbatim (exceptions and notes kept as labelled lines), the terms WCAG
+defines, and the terms each criterion's wording links to. So `criteria 1.4.3` shows the
+4.5:1 requirement and its three exceptions rather than only naming the criterion — the same
+fidelity the RGAA pack has always had for its own criteria.
+
+`--lang fr` resolves the **W3C authorized French translation** throughout: the title, the
+requirement prose, and the glossary. There is no half-translated state where a French
+heading sits over English requirements — the build fails rather than ship one. The two W3C
+pages do not share definition slugs (the French page pluralizes many, and renames a few), so
+each language keeps its own term list and its own glossary keys; a build guard rejects any
+citation that does not resolve in its own language.
+
+Over MCP the same data is `ultra11y_criteria` and `std://wcag/criteria/1.4.3`; see
+`references/mcp.md`.
 
 ## Auditor vocabulary
 

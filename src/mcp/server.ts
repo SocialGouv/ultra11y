@@ -1,8 +1,10 @@
 import { VERSION } from "../types.js";
-import { callTool, ToolError, type HandlerDefaults } from "./handlers.js";
+import { callTool, ToolError, withStandards, type HandlerDefaults } from "./handlers.js";
 import { getPrompt, PROMPTS, PromptError } from "./prompts.js";
 import { listResources, readResource, ResourceError } from "./resources.js";
+import { isStandardUri, listStandardResources, listStandardResourceTemplates, readStandardResource } from "./standards-resources.js";
 import { toolsFor, type ToolDecl } from "./tools.js";
+import { listStandards } from "../standards/index.js";
 import {
   DEFAULT_MAX_RESPONSE_BYTES,
   LATEST_PROTOCOL,
@@ -66,7 +68,9 @@ export function createServer(opts: ServerOptions = {}): McpServer {
   const cancelled = new Set<string>();
   const CANCELLED_MAX = 1024;
 
-  const listTools = () => toolsFor(protocol, { defaultCwd: opts.defaultCwd, allowWrite: opts.allowWrite });
+  // `listStandards()` is read per call, not captured: a pack registered after startup (a
+  // project's own, resolved on first touch) shows up in the next `tools/list`.
+  const listTools = () => toolsFor(protocol, { defaultCwd: opts.defaultCwd, allowWrite: opts.allowWrite, standards: listStandards() });
 
   async function handle(msg: JsonRpcMessage, send: (out: JsonRpcMessage) => void): Promise<void> {
     if (msg === null || typeof msg !== "object" || Array.isArray(msg)) {
@@ -125,7 +129,13 @@ export function createServer(opts: ServerOptions = {}): McpServer {
           await handleToolCall(msg, reply);
           return;
         case "resources/list":
-          reply({ result: { resources: listResources(opts.skillDir) } });
+          // The skill's own documentation, then a bounded index per standard. The ~280
+          // per-criterion and per-term URIs are templates, not entries — see
+          // standards-resources.ts.
+          reply({ result: { resources: withStandards(opts.defaultCwd, () => [...listResources(opts.skillDir), ...listStandardResources()]) } });
+          return;
+        case "resources/templates/list":
+          reply({ result: { resourceTemplates: listStandardResourceTemplates() } });
           return;
         case "resources/read": {
           const uri = typeof msg.params?.uri === "string" ? msg.params.uri : "";
@@ -134,7 +144,11 @@ export function createServer(opts: ServerOptions = {}): McpServer {
             return;
           }
           try {
-            reply({ result: { contents: [readResource(uri, opts.skillDir)] } });
+            // A `std://` read has no `cwd` of its own, so it resolves against the server's
+            // project root — the same packs its tools serve. Without a default project it
+            // sees only the built-ins, which is what `ultra11y_standards` reports.
+            const contents = isStandardUri(uri) ? withStandards(opts.defaultCwd, () => readStandardResource(uri)) : readResource(uri, opts.skillDir);
+            reply({ result: { contents: [contents] } });
           } catch (e) {
             // A resource the client named wrongly is a client bug, the same as
             // an unknown tool — not a read that failed on its own terms.

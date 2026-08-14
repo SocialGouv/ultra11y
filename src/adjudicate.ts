@@ -18,7 +18,7 @@ import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
 import { type Doc, type El, elementsByTag, attr, textContent, ancestors, snippet as elSnippet } from "./parse/html.js";
 import { parseInlineStyle } from "./color.js";
-import adjudicationJson from "./data/adjudication.json";
+import { ADJUDICATION } from "./adjudication-data.js";
 import { scTitle, getSC, hasSC, techniquesFor, allSC, guidelineTitle } from "./wcag.js";
 import { groundItems, type GroundingSummary } from "./grounding.js";
 import {
@@ -29,6 +29,7 @@ import {
   hasId,
   getCriterion,
   derivePackResults,
+  glossaryAnchorsOf,
   resolveGlossary,
   titlePlain as packTitlePlain,
   type StandardPack,
@@ -808,8 +809,8 @@ const T = {
 // rule that decides Conforming vs Non-conforming, when NA is legitimate, and the concrete
 // questions that get you there. Rendered per residual item in both languages — a criterion
 // handed to the agent with no stated decision rule is where an audit turns into an opinion.
-type LocaleText = { fr: string; en: string };
-const ADJUDICATION = adjudicationJson as Record<string, { decide: LocaleText; na?: LocaleText; questions: LocaleText[] }>;
+// The dataset itself lives in src/adjudication-data.ts, so a criterion lookup can read the
+// decision protocol without importing this module's engine dependencies.
 
 /** Cap on techniques listed per criterion: 1.1.1 alone carries 52, which would bury the
  *  decision rule under a wall of ids. The full list stays in `criteria <sc>`. */
@@ -866,21 +867,14 @@ export function renderAdjudicationReference(lang: Lang = "en"): string {
 // pack's glossary — 119 entries for RGAA — which nothing used to read. Attaching the ones
 // THIS criterion's tests actually cite makes the item self-sufficient: the agent no longer
 // has to guess what the standard means by "image porteuse d'information".
-const GLOSSARY_REF = /\[[^\]]+\]\(#([^)]+)\)/g;
 const MAX_GLOSSARY_TERMS = 8;
 const MAX_GLOSSARY_CHARS = 600;
 
-/** The glossary anchors a criterion's tests / notes / particular cases refer to, in order. */
-export function glossaryAnchorsOf(crit: { tests?: Record<string, string[]>; technicalNote?: string[]; particularCases?: string[] } | undefined): string[] {
-  if (!crit) return [];
-  const texts = [...Object.values(crit.tests ?? {}).flat(), ...(crit.technicalNote ?? []), ...(crit.particularCases ?? [])];
-  const seen = new Set<string>();
-  for (const t of texts) {
-    GLOSSARY_REF.lastIndex = 0;
-    for (let m = GLOSSARY_REF.exec(t); m; m = GLOSSARY_REF.exec(t)) if (m[1]) seen.add(m[1]);
-  }
-  return [...seen];
-}
+// `glossaryAnchorsOf` now lives in src/standards/pack.ts, next to the glossary it reads —
+// the criteria lookup and the MCP reference tools need it too, and none of them should
+// have to import the adjudication engine to get at a pure function over a criterion.
+// Re-exported here because it was part of this module's surface.
+export { glossaryAnchorsOf };
 
 function glossaryBlock(pack: StandardPack, crit: PackCriterion | undefined, lang: Lang): string[] {
   const anchors = glossaryAnchorsOf(crit).slice(0, MAX_GLOSSARY_TERMS);

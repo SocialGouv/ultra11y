@@ -29,3 +29,4 @@ export * from "./registry.js";
 export * from "./pack.js";
 export * from "./derive.js";
 export * from "./vocabulary.js";
+export * from "./coverage.js";

@@ -78,5 +78,949 @@
     "3.3.8": "Authentification accessible (minimum)",
     "4.1.2": "Nom, rôle et valeur",
     "4.1.3": "Messages d’état"
+  },
+  "criteriaText": {
+    "1.1.1": "Tout contenu non textuel présenté à l’utilisateur a un équivalent textuel qui remplit une fonction équivalente sauf dans les situations énumérées ci-dessous.\nComposant d’interface ou de saisie:\nsi le contenu non textuel est un composant d’interface ou s’il permet la saisie d’informations par l’utilisateur, alors il a un nom qui décrit sa fonction. (Se référer au Critère de succès 4.1.2 pour des exigences supplémentaires à propos des composants d’interfaces utilisateur ou des contenus qui permettent la saisie d’informations par l’utilisateur.)\nMédia temporel:\nsi le contenu non textuel est un média temporel, alors l’équivalent textuel fournit au moins une identification descriptive du contenu non textuel. (Se référer à la Règle 1.2 pour des exigences supplémentaires concernant les médias temporels.)\nTest:\nsi le contenu non textuel est un test ou un exercice qui serait invalide s’il était présenté en texte, alors l’équivalent textuel fournit au moins une identification descriptive du contenu non textuel.\nContenu sensoriel:\nsi le contenu non textuel vise d’abord à créer une expérience sensorielle spécifique, l’équivalent textuel fournit au moins une identification descriptive de ce contenu non textuel.\nCAPTCHA:\nsi ce contenu non textuel vise à confirmer que le contenu est consulté par une personne plutôt que par un ordinateur, alors un équivalent textuel est fourni pour identifier et décrire la fonction du contenu non textuel, et des formes alternatives du CAPTCHA sont proposées pour différents types de perception sensorielle afin d’accommoder différents types de limitations fonctionnelles.\nDécoration, formatage, invisibilité:\nsi le contenu non textuel est purement décoratif, s’il est utilisé seulement pour un formatage visuel ou s’il n’est pas présenté à l’utilisateur, alors il est implémenté de manière à être ignoré par les technologies d’assistance.",
+    "1.2.1": "Pour des médias pré-enregistrés seulement audio et pré-enregistrés seulement vidéo, sauf si l’audio ou la vidéo sont un média de remplacement pour un texte et qu’ils sont clairement identifiés comme tels, les points suivants sont vrais :\nContenu pré-enregistré seulement audio:\nfournir une version de remplacement pour un média temporel, présentant une information équivalente au contenu seulement audio.\nContenu pré-enregistré seulement vidéo:\nfournir, soit une version de remplacement pour un média temporel, soit une piste audio (présentant une information équivalente) pour un contenu pré-enregistré seulement vidéo.",
+    "1.2.2": "Fournir des sous-titres pour tout contenu audio pré-enregistré dans un média synchronisé, excepté lorsque le média est un média de remplacement pour un texte et qu’il est clairement identifié comme tel.",
+    "1.2.3": "Fournir une version de remplacement pour un média temporel ou une audio-description du contenu vidéo pré-enregistré pour un média synchronisé, excepté quand le média est un média de remplacement pour un texte et qu’il est clairement identifié comme tel.",
+    "1.2.4": "Fournir des sous-titres pour tout contenu audio en direct, sous forme de média synchronisé.",
+    "1.2.5": "Fournir une audio-description pour tout contenu vidéo pré-enregistré, sous forme de média synchronisé.",
+    "1.2.6": "Fournir une interprétation en langue des signes pour tout contenu audio pré-enregistré, sous forme de média synchronisé.",
+    "1.2.7": "Lorsque les blancs présents dans le fond sonore ne sont pas suffisants pour permettre à l’audio-description de transmettre le sens de la vidéo, fournir une audio-description étendue pour tout contenu vidéo pré-enregistré sous la forme de média synchronisé.",
+    "1.2.8": "Fournir une version de remplacement pour un média temporel, pour tout contenu de type média synchronisé pré-enregistré et pour tout média pré-enregistré seulement vidéo.",
+    "1.2.9": "Fournir une version de remplacement pour un média temporel, donnant une information équivalente pour un contenu seulement audio en direct.",
+    "1.3.1": "L’information, la structure, et les relations véhiculées par la présentation peuvent être déterminées par un programme informatique ou sont disponibles sous forme de texte.",
+    "1.3.2": "Lorsque l’ordre de présentation du contenu affecte sa signification, un ordre de lecture correct peut être déterminé par un programme informatique.",
+    "1.3.3": "Les instructions données pour la compréhension et l’utilisation du contenu ne doivent pas reposer uniquement sur les caractéristiques sensorielles des éléments comme la forme, la couleur, la taille, l’emplacement visuel, l’orientation ou le son.\nNote : Pour les exigences liées à la couleur, se référer à la Règle 1.4.",
+    "1.3.4": "La consultation et le fonctionnement du contenu ne sont pas limités à une seule orientation de l’affichage, comme le portrait ou le paysage, à moins qu’une orientation spécifique de l’affichage ne soit essentielle.\nNote : On compte parmi les exemples où une orientation spécifique de l’affichage peut être essentielle : un chèque de banque, une application de piano, des diapositives pour un projecteur ou une télévision, ou un contenu de réalité virtuelle qui n’est pas nécessairement limité à une orientation d’affichage en mode paysage ou portrait.",
+    "1.3.5": "La finalité de chaque champ de saisie recueillant des informations sur l’utilisateur peut être déterminée par un programme informatique lorsque :\n• Le champ de saisie répond à une finalité identifiée dans la section Finalités de saisie des composants d’interface utilisateur ; et\n• Le contenu est implémenté via des technologies permettant d’identifier la finalité de la saisie attendue pour le champ.",
+    "1.3.6": "Dans un contenu implémenté via un langage de balisage, la fonction des composants d’interface utilisateur, des icônes et des régions peut être déterminée par un programme informatique.",
+    "1.4.1": "La couleur n’est pas utilisée comme la seule façon de véhiculer de l’information, d’indiquer une action, de solliciter une réponse ou de distinguer un élément visuel.\nNote : Ce critère de succès traite spécifiquement de la perception des couleurs. Les autres formes de perception sont traitées à la règle 1.3 comme l’accès à la couleur par programme informatique et les autres formes de codage de la présentation visuelle.",
+    "1.4.2": "Si du son sur une page Web est audible automatiquement pendant plus de 3 secondes, un mécanisme est disponible pour le mettre en pause, l’arrêter ou pour en contrôler le volume de façon indépendante du niveau de volume du système général.\nNote : Puisque tout contenu ne satisfaisant pas à ce critère de succès peut interférer avec la capacité de l’utilisateur à exploiter la page entière, tout le contenu présent dans la page Web (qu’il soit utilisé pour satisfaire à d’autres critères de succès ou non) doit satisfaire à ce critère de succès. Voir l’exigence de conformité 5 : Non-interférence.",
+    "1.4.3": "La présentation visuelle du texte et du texte sous forme d’image a un rapport de contraste d’au moins 4,5:1, sauf dans les cas suivants :\nTexte agrandi:\nle texte agrandi et le texte agrandi sous forme d’image ont un rapport de contraste d’au moins 3:1.\nTexte décoratif:\naucune exigence de contraste pour le texte ou le texte sous forme d’image qui fait partie d’un composant d’interface utilisateur inactif, qui est purement décoratif, qui est invisible pour tous ou qui est une partie d’une image contenant un autre contenu significatif.\nLogotypes:\naucune exigence de contraste pour le texte faisant partie d’un logo ou d’un nom de marque.",
+    "1.4.4": "À l’exception des sous-titres et du texte sous forme d’image, le texte peut être redimensionné jusqu’à 200 pour cent sans l’aide d’une technologie d’assistance et sans perte de contenu ou de fonctionnalité.",
+    "1.4.5": "Si les technologies utilisées peuvent réaliser la présentation visuelle, du texte est utilisé pour véhiculer l’information plutôt que du texte sous forme d’image sauf dans les cas suivants :\nPersonnalisable:\nle texte sous forme d’image peut être personnalisé visuellement selon les exigences de l’utilisateur ;\nEssentielle:\nune présentation spécifique du texte est essentielle à l’information véhiculée.\nNote : Les logotypes sont considérés comme essentiels (le texte qui fait partie d’un logo ou d’un nom de marque).",
+    "1.4.6": "La présentation visuelle du texte et du texte sous forme d’image a un rapport de contraste d’au moins 7:1, sauf dans les cas suivants :\nTexte agrandi:\nle texte agrandi et le texte agrandi sous forme d’image ont un rapport de contraste d’au moins 4,5:1 ;\nTexte décoratif:\naucune exigence de contraste pour le texte ou le texte sous forme d’image qui fait partie d’un composant d’interface utilisateur inactif, qui est purement décoratif, qui est invisible pour tous ou qui est une partie d’une image contenant un autre contenu significatif.\nLogotypes:\naucune exigence de contraste pour le texte faisant partie d’un logo ou d’un nom de marque.",
+    "1.4.7": "Pour un contenu seulement audio pré-enregistré qui (1) contient principalement de la parole au premier plan, (2) n’est pas un CAPTCHA ou un logo sonore et (3) qui n’est pas une vocalisation dont l’intention est principalement d’être musicale comme une chanson ou un rap, au moins l’une des conditions suivantes est vraie :\nSans arrière-plan:\nle contenu audio ne contient pas d’arrière-plan sonore.\nDésactivation:\nl’arrière-plan sonore peut être désactivé.\n20 dB:\nl’arrière-plan sonore est au moins 20 décibels plus faible que le contenu parlé au premier plan sauf pour certains effets sonores occasionnels durant seulement une ou deux secondes.\nNote : Par la définition du « décibel », le volume de l’arrière-plan sonore correspondant à cette exigence est approximativement quatre fois plus faible que le contenu parlé au premier plan.",
+    "1.4.8": "Pour la présentation visuelle des blocs de texte, un mécanisme est disponible permettant de réaliser ce qui suit :\n• Les couleurs de premier plan et d’arrière-plan peuvent être choisies par l’utilisateur.\n• La largeur n’excède pas 80 caractères ou glyphes (40 si CJK).\n• Le texte n’est pas justifié (aligné simultanément à droite et à gauche).\n• L’espacement entre les lignes (interlignage) est d’une valeur d’au moins 1,5 dans les paragraphes et l’espacement entre les paragraphes est au moins 1,5 fois plus grand que la valeur de l’interligne.\n• La taille du texte peut être redimensionnée jusqu’à 200 pour cent sans l’aide d’une technologie d’assistance et sans que l’utilisateur soit obligé de faire défiler le texte horizontalement pour lire une ligne complète dans une fenêtre plein écran.\nNote : Le contenu n’est pas tenu d’utiliser ces valeurs. L’exigence est qu’il existe un mécanisme permettant aux utilisateurs de modifier ces aspects de la présentation. Ce mécanisme peut être fourni par le navigateur ou un autre agent utilisateur. Le contenu n’est pas tenu de fournir ce mécanisme.\nNote : Les systèmes d’écriture de certaines langues utilisent des aspects de présentation différents pour améliorer la lisibilité visuelle et textuelle. Si un aspect de présentation de ce critère de succès n’est pas utilisé dans un système d’écriture, le contenu n’a pas besoin d’utiliser ce paramètre et peut être conforme sans lui. Les auteurs sont encouragés à suivre les conseils pour améliorer la lisibilité visuelle et textuelle dans leur système d’écriture.",
+    "1.4.9": "Le texte sous forme d’image est utilisé seulement pour du texte purement décoratif ou lorsqu’une présentation spécifique du texte est essentielle à l’information véhiculée.\nNote : Les logotypes (le texte qui fait partie d’un logo ou d’un nom de marque) sont considérés comme essentiels.",
+    "1.4.10": "Le contenu peut être présenté sans perte d’information ou de fonctionnalité et sans nécessité de défilement dans les deux dimensions pour :\n• un contenu à défilement vertical avec une largeur équivalente à 320 pixels CSS ;\n• un contenu à défilement horizontal avec une hauteur équivalente à 256 pixels CSS.\nSauf pour les parties du contenu dont l’utilisation ou la compréhension nécessite une mise en page en deux dimensions.\nNote : 320 pixels CSS équivaut à une largeur d’affichage initiale de 1280 pixels CSS avec un zoom de 400 %. Pour un contenu Web conçu pour défiler horizontalement (par exemple, avec du texte vertical), la valeur de 256 pixels CSS équivaut à une hauteur d’affichage initiale de 1024 pixels CSS avec un zoom de 400 %.\nNote : On compte parmi les exemples de contenu nécessitant une mise en page en deux dimensions les images nécessaires à la compréhension (comme les cartes ou les diagrammes), les vidéos, les jeux, les présentations, les tableaux de données (non pas les cellules individuelles), et les interfaces où il est nécessaire de garder les barres d’outils visibles pendant la manipulation du contenu. Un défilement bidimensionnel pour ces parties du contenu est acceptable.",
+    "1.4.11": "La présentation visuelle des éléments suivants a un rapport de contraste d’au moins 3:1 avec la ou les couleurs adjacentes :\nComposants d’interface utilisateur: informations visuelles nécessaires à l’identification des composants et des états de l’interface utilisateur, à l’exception des composants inactifs ou lorsque l’apparence du composant est déterminée par l’agent utilisateur et non modifiée par l’auteur ;\nObjets graphiques: parties d’éléments graphiques nécessaires à la compréhension du contenu, sauf si une présentation spécifique de ces éléments est essentielle à l’information transmise.",
+    "1.4.12": "Dans un contenu implémenté via un langage de balisage qui prend en charge les propriétés de style de texte suivantes, il n’y a aucune perte de contenu ou de fonctionnalité lorsqu’on applique toutes les valeurs ci-dessous sans modifier aucune autre propriété de style :\n• La hauteur de ligne (interlignage) définie à au moins 1,5 fois la taille de la police ;\n• L’espacement entre les paragraphes consécutifs défini à au moins 2 fois la taille de la police ;\n• L’espacement des lettres (interlettrage) défini à au moins 0,12 fois la taille de la police ;\n• L’espacement entre les mots défini à au moins 0,16 fois la taille de la police.\nException : les langues et systèmes d’écritures qui n’utilisent pas une ou plusieurs de ces propriétés de style de texte pour le texte écrit peuvent être conformes en utilisant uniquement les propriétés qui existent pour cette combinaison de langue et de système d’écriture.\nNote : Il n’est pas obligatoire d’utiliser ces valeurs d’espacement du texte. L’exigence consiste à s’assurer que, lorsqu’un utilisateur modifie l’espacement du texte défini par l’auteur, le contenu ou la fonctionnalité ne soient pas perdus.\nNote : Dans certaines langues, les systèmes d’écriture utilisent des paramètres d’espacement de texte différents, tels que l’indentation au début des paragraphes. Les auteurs sont encouragés à suivre les recommandations disponibles à l’échelle locale pour améliorer la lisibilité et la clarté du texte dans leur propre système d’écriture.",
+    "1.4.13": "Lorsque la réception puis le retrait du survol du pointeur ou du focus du clavier déclenche l’affichage puis le masquage d’un contenu additionnel, les éléments suivants sont vrais :\nMasquable: il existe un mécanisme permettant de masquer le contenu additionnel sans déplacer le pointeur ou le focus du clavier, à moins que le contenu additionnel ne communique une erreur de saisie ou ne masque ni ne remplace un autre contenu ;\nSurvolable: si le survol du pointeur peut déclencher le contenu additionnel, alors le pointeur peut être déplacé sur le contenu additionnel sans que celui-ci disparaisse ;\nPersistant: le contenu additionnel reste visible jusqu’à ce que le survol ou le focus soit retiré, que l’utilisateur le masque ou que ses informations ne soient plus valables.\nException : la présentation visuelle du contenu additionnel est contrôlée par l’agent utilisateur et n’est pas modifiée par l’auteur.\nNote : Parmi les exemples de contenu additionnel contrôlé par l’agent utilisateur figurent les infobulles du navigateur créées à l’aide de l’attribut HTML title [HTML].\nNote : Les infobulles personnalisées, les sous-menus et autres fenêtres non modales qui s’affichent au survol et à la prise de focus sont des exemples de contenu additionnel couvert par ce critère.\nNote : Ce critère s’applique au contenu qui apparaît en plus du composant déclencheur lui-même. Étant donné que les composants cachés qui deviennent visibles au focus du clavier (comme les liens d’accès rapide à une autre partie d’une page) ne présentent pas de contenu additionnel, ils ne sont pas couverts par ce critère.",
+    "2.1.1": "Toutes les fonctionnalités du contenu sont utilisables à l’aide d’une interface clavier sans exiger un rythme de frappe propre à l’utilisateur, sauf lorsque la fonction sous-jacente nécessite une saisie qui dépend du tracé du mouvement effectué par l’utilisateur et pas seulement des points de départ et d’arrivée de ce tracé.\nNote : Cette exception ne concerne que la fonction sous-jacente et non la technique de saisie. Par exemple, lorsqu’on utilise l’écriture manuscrite pour saisir du texte, la technique de saisie (l’écriture manuscrite) nécessite une saisie qui dépend d’un tracé, mais la fonction sous-jacente (la saisie de texte) ne le requiert pas.\nNote : Cela n’interdit pas et ne devrait pas décourager l’utilisation de la souris ou de toute autre méthode de saisie en plus de l’utilisation du clavier.",
+    "2.1.2": "Si le focus du clavier peut être positionné sur un élément de la page à l’aide d’une interface clavier, réciproquement, il peut être déplacé hors de ce même composant simplement à l’aide d’une interface clavier et, si ce déplacement exige plus que l’utilisation d’une simple touche flèche ou tabulation ou toute autre méthode standard de sortie, l’utilisateur est informé de la méthode permettant de déplacer le focus hors de ce composant.\nNote : Puisque tout contenu ne satisfaisant pas à ce critère de succès peut interférer avec la capacité de l’utilisateur à exploiter la page entière, tout le contenu présent dans la page Web (qu’il soit utilisé pour satisfaire à d’autres critères de succès ou non) doit satisfaire à ce critère de succès. Voir l’exigence de conformité 5 : Non-interférence.",
+    "2.1.3": "Toutes les fonctionnalités du contenu sont utilisables à l’aide d’une interface clavier sans exiger un rythme de frappe propre à l’utilisateur.",
+    "2.1.4": "Si un raccourci clavier est implémenté dans du contenu en utilisant uniquement des caractères de type lettres (y compris les majuscules et les minuscules), des signes de ponctuation, des chiffres ou des symboles, alors au moins l’une des conditions suivantes est vraie :\nDésactivation: un mécanisme est disponible pour désactiver le raccourci ;\nRéassignation: un mécanisme est disponible pour réassigner le raccourci afin d’inclure une ou plusieurs touches non imprimables du clavier (par exemple, Ctrl, Alt) ;\nActif uniquement au focus: le raccourci clavier pour un composant d’interface utilisateur n’est actif que lorsque ce composant a le focus.",
+    "2.2.1": "Pour chaque limite de temps fixée par le contenu, au moins l’un des points suivants est vrai :\nSuppression:\nl’utilisateur a la possibilité de supprimer la limite de temps avant de la rencontrer ; ou\nAjustement:\nl’utilisateur a la possibilité d’ajuster la limite de temps avant de la rencontrer dans un intervalle d’au moins dix fois la durée paramétrée par défaut ; ou\nExtension:\nl’utilisateur est averti avant que la limite de temps n’expire et il lui est accordé au moins 20 secondes pour étendre cette limite par une action simple (par exemple, « appuyer sur la barre d’espace ») et l’utilisateur a la possibilité d’étendre la limite de temps au moins dix fois ; ou\nL’exception du temps réel:\nla limite de temps est une partie constitutive d’un événement en temps réel (par exemple, une enchère) et aucune alternative n’est possible ; ou\nL’exception de la limite essentielle:\nla limite de temps est essentielle et l’étendre invaliderait alors l’activité ; ou\nL’exception des 20 heures:\nla limite de temps est supérieure à 20 heures.\nNote : Ce critère de succès permet de s’assurer que les utilisateurs peuvent compléter leurs tâches sans changement inattendu de contenu ou de contexte résultant de la limite de temps. Il devrait être considéré conjointement avec le critère de succès 3.2.1, qui pose des limites aux changements de contenu ou de contexte résultant d’une action de l’utilisateur.",
+    "2.2.2": "Pour toute information en mouvement, clignotante, défilante ou mise à jour automatiquement, tous les points suivants sont vrais :\nDéplacement, clignotement, défilement:\npour toute information en mouvement, clignotante ou défilante qui (1) démarre automatiquement, (2) dure plus de cinq secondes et (3) est présentée conjointement avec un autre contenu, il y a un mécanisme à la disposition de l’utilisateur pour la mettre en pause, l’arrêter ou la masquer, à moins que le mouvement, le clignotement ou le défilement s’avère un élément essentiel au bon déroulement de l’activité; et\nMise à jour automatique:\npour toute information mise à jour automatiquement qui (1) démarre automatiquement (2) et est présentée conjointement avec un autre contenu, il y a un mécanisme à la disposition de l’utilisateur pour la mettre en pause, l’arrêter ou pour en contrôler la fréquence des mises à jour à moins que la mise à jour automatique s’avère essentielle au bon déroulement de l’activité.\nNote : Pour les exigences relatives au contenu scintillant ou flashant, se référer à la règle 2.3.\nNote : Puisque tout contenu ne satisfaisant pas à ce critère de succès peut interférer avec la capacité de l’utilisateur à exploiter la page entière, tout le contenu présent dans la page Web (qu’il soit utilisé pour satisfaire à d’autres critères de succès ou non) doit satisfaire à ce critère de succès. Lire Exigence de conformité 5 : Non-interférence.\nNote : Il n’est pas exigé que le contenu mis à jour périodiquement par logiciel ou diffusé en flux à l’agent utilisateur conserve ou présente l’information générée ou reçue entre la mise en pause et la reprise de la présentation, puisque cela peut ne pas être techniquement possible et s’avérer trompeur dans beaucoup de situations.\nNote : Une animation survenant dans une phase de pré-chargement ou dans une situation similaire peut être considérée comme essentielle si aucune interaction n’est permise à tous les utilisateurs durant cette phase et si l’absence d’indication de progression est susceptible de perturber les utilisateurs ou de leur faire croire que le contenu est figé ou défectueux.",
+    "2.2.3": "Le temps n’est pas un facteur essentiel dans le déroulement de l’événement ou de l’activité, à l’exception des médias synchronisés non interactifs et des événements en temps réel.",
+    "2.2.4": "Les interruptions peuvent être reportées ou supprimées par l’utilisateur, à l’exception des interruptions impliquant une urgence.",
+    "2.2.5": "Quand une session authentifiée expire, l’utilisateur peut poursuivre son activité sans perte de données après une nouvelle authentification.",
+    "2.2.6": "Les utilisateurs sont avertis de la durée de leur inactivité qui pourrait entraîner une perte de données, à moins que les données ne soient conservées pendant plus de 20 heures lorsque l’utilisateur n’effectue aucune action.\nNote : Les réglementations relatives à la protection de la vie privée peuvent exiger le consentement explicite de l’utilisateur avant qu’il ait été authentifié et avant que ses données soient conservées. Dans la plupart des juridictions, pays ou régions, le consentement explicite d’une personne mineure ne peut pas être sollicité. Lorsque la conservation des données est envisagée comme une méthode pour satisfaire à ce critère de succès, il est conseillé de consulter des professionnels de la protection de la vie privée et un conseiller juridique.",
+    "2.3.1": "Une page Web doit être exempte de tout élément qui flashe plus de trois fois dans n’importe quel intervalle d’une seconde ou ce flash doit se situer sous le seuil de flash générique et le seuil de flash rouge.\nNote : Puisque tout contenu ne satisfaisant pas à ce critère de succès peut interférer avec la capacité de l’utilisateur à exploiter la page entière, tout le contenu présent dans la page Web (qu’il soit utilisé pour satisfaire à d’autres critères de succès ou non) doit satisfaire à ce critère de succès. Voir l’exigence de conformité 5 : Non-interférence.",
+    "2.3.2": "Une page Web doit être exempte de tout élément qui flashe plus de trois fois dans n’importe quel intervalle d’une seconde.",
+    "2.3.3": "L’animation basée sur le mouvement, déclenchée par une interaction, peut être désactivée sauf si l’animation est essentielle à la fonctionnalité ou à l’information transmise.",
+    "2.4.1": "Un mécanisme permet de contourner les blocs de contenu qui sont répétés sur plusieurs pages Web.",
+    "2.4.2": "Les pages Web présentent un titre qui décrit leur sujet ou leur but.",
+    "2.4.3": "Si une page Web peut être parcourue de façon séquentielle et que les séquences de navigation affectent la signification ou l’action, les éléments reçoivent le focus dans un ordre qui préserve la signification et l’opérabilité.",
+    "2.4.4": "La fonction de chaque lien est déterminée par le texte du lien seul ou par le texte du lien associé à un contexte du lien déterminé par un programme informatique, sauf si la fonction du lien est ambiguë pour tout utilisateur.",
+    "2.4.5": "Une page Web peut être située par plus d’un moyen dans un ensemble de pages Web sauf si cette page est le résultat ou une étape d’un processus.",
+    "2.4.6": "Les en-têtes et les étiquettes décrivent le sujet ou le but.",
+    "2.4.7": "Toute interface utilisable au clavier comporte un mode de fonctionnement où le focus est visible.",
+    "2.4.8": "L’utilisateur dispose d’informations pour se situer dans un ensemble de pages Web.",
+    "2.4.9": "Un mécanisme permet de déterminer la fonction de chaque lien par le texte du lien uniquement, sauf si la fonction du lien est ambiguë pour tout utilisateur.",
+    "2.4.10": "Les en-têtes de section sont utilisés pour organiser le contenu.\nNote : « En-tête » est utilisé dans le sens général et comprend les titres et autres moyens de structurer les différents types de contenus.\nNote : Ce critère de succès concerne les contenus de sections et non les composants d’interface utilisateur. Les composants d’interface utilisateur sont traités par le critère de succès 4.1.2.",
+    "2.4.11": "Lorsqu’un composant d’interface utilisateur reçoit le focus du clavier, ce composant n’est pas entièrement masqué par du contenu créé par l’auteur.\nNote : Lorsqu’un contenu d’une interface configurable peut être repositionné par l’utilisateur, alors seules les positions initiales du contenu déplaçable sont prises en compte pour les tests et la conformité à ce critère de succès.\nNote : Il arrive que du contenu ouvert par l’utilisateur masque le composant qui reçoit le focus. Si l’utilisateur peut révéler le composant ayant le focus sans déplacer le focus du clavier, alors le composant ayant le focus n’est pas considéré comme masqué par du contenu créé par l’auteur.",
+    "2.4.12": "Lorsqu’un composant d’interface utilisateur reçoit le focus du clavier, aucune partie de ce composant n’est masquée par du contenu créé par l’auteur.",
+    "2.4.13": "Lorsque le focus est visible, une partie de l’indicateur de focus satisfait à toutes les exigences suivantes :\n• elle est au moins aussi grande que la surface d’un périmètre de 2 pixels CSS d’épaisseur du composant ou du sous-composant à l’état non focalisé, et\n• le rapport de contraste est d’au moins 3:1 entre l’état focalisé et non focalisé de chacun des pixels.\nExceptions :\n• L’indicateur de focus est déterminé par l’agent utilisateur et ne peut pas être ajusté par l’auteur, ou\n• L’indicateur de focus et sa couleur d’arrière-plan ne sont pas modifiés par l’auteur.\nNote : Ce qui est perçu comme le composant ou sous-composant d’interface utilisateur (pour déterminer le contour ou la taille) dépend de sa présentation visuelle. La présentation visuelle inclut le contenu visible du composant, la bordure et l’arrière-plan spécifique au composant. Elle n’inclut pas les effets d’ombre et de brillance à l’extérieur du contenu, de l’arrière-plan ou de la bordure du composant.\nNote : Des exemples de sous-composants qui peuvent recevoir le focus sont les éléments de menu dans un menu déroulant ouvert, ou les cellules focalisables dans une grille.\nNote : Les calculs de contraste peuvent être basés sur les couleurs définies au niveau de la technologie (comme HTML, CSS et SVG). Les pixels modifiés par les améliorations de résolution de l’agent utilisateur et l’anti-crénelage peuvent être ignorés.",
+    "2.5.1": "Toutes les fonctionnalités qui utilisent des gestes multipoints ou basés sur un tracé peuvent être utilisées avec un pointage à contact unique sans geste basé sur un tracé, à moins qu’un geste multipoint ou basé sur un tracé ne soit essentiel.\nNote : Cette exigence s’applique aux contenus Web qui interprètent les actions du pointeur (elle ne s’applique donc pas aux actions nécessaires à l’utilisation d’un agent utilisateur ou d’une technologie d’assistance).",
+    "2.5.2": "Pour une fonctionnalité qui peut être activée avec un dispositif de pointage à contact unique, au moins une des conditions suivantes est vraie :\nAucun événement descendant: l’événement descendant (down-event) du pointeur n’est pas utilisé pour exécuter une partie ou la totalité de la fonction ;\nAbandon ou annulation: l’achèvement de la fonction se fait sur l’événement ascendant (up-event), et un mécanisme est disponible pour interrompre la fonction avant l’achèvement ou pour annuler la fonction après l’achèvement ;\nInversion sur l’événement ascendant: l’événement ascendant inverse tout résultat de l’événement descendant précédent ;\nEssentiel: l’achèvement de la fonction lors de l’événement descendant est essentiel.\nNote : Les fonctions qui émulent l’appui d’une touche du clavier ou du pavé numérique sont considérées comme essentielles.\nNote : Cette exigence s’applique aux contenus Web qui interprètent les actions du pointeur (elle ne s’applique donc pas aux actions nécessaires à l’utilisation d’un agent utilisateur ou d’une technologie d’assistance).",
+    "2.5.3": "Pour les composants d’interface utilisateur dont les étiquettes contiennent du texte ou du texte sous forme d’image, le nom contient le texte qui est présenté visuellement.\nNote : Une bonne pratique consiste à placer le texte de l’étiquette au début du nom.",
+    "2.5.4": "Les fonctionnalités qui peuvent être activées par un mouvement de l’appareil ou un mouvement de l’utilisateur peuvent également être activées par des composants d’interface utilisateur et la réponse au mouvement peut être désactivée pour éviter une activation accidentelle, sauf dans les cas suivants :\nInterface compatible : le mouvement est utilisé pour activer la fonctionnalité par l’intermédiaire d’une interface compatible avec l’accessibilité ;\nEssentiel : le mouvement est essentiel à la fonction et le désactiver invaliderait l’activité.",
+    "2.5.5": "La taille de la cible pour les entrées de pointeur est d’au moins 44 par 44 pixels CSS, sauf quand :\nÉquivalence : la cible est disponible depuis un lien ou un contrôle équivalent sur la même page qui mesure au moins 44 par 44 pixels CSS ;\nEn ligne : la cible se trouve dans une phrase ou un bloc de texte ;\nContrôle par l’agent utilisateur : la taille de la cible est déterminée par l’agent utilisateur et n’est pas modifiée par l’auteur ;\nEssentiel : une présentation spécifique de la cible est essentielle pour transmettre l’information.",
+    "2.5.6": "Le contenu Web ne restreint pas l’utilisation des modalités d’entrée disponibles sur une plateforme, sauf si la restriction est essentielle, nécessaire pour garantir la sécurité du contenu ou nécessaire pour respecter les paramètres de l’utilisateur.",
+    "2.5.7": "Toutes les fonctionnalités qui utilisent un mouvement de glissement peuvent être réalisées par un pointage à contact unique sans glissement, sauf si le glissement est essentiel ou que la fonctionnalité est déterminée par l’agent utilisateur et non modifiée par l’auteur.\nNote : Cette exigence s’applique aux contenus Web qui interprètent les actions du pointeur (c’est-à-dire qu’elle ne s’applique pas aux actions nécessaires pour faire fonctionner l’agent utilisateur ou la technologie d’assistance).",
+    "2.5.8": "La taille de la cible pour les entrées de pointeur est d’au moins 24 par 24 pixels CSS, sauf dans les cas suivants :\n• Espacement : les cibles de taille réduite (de moins de 24 par 24 pixels CSS) sont positionnées de telle sorte que si un cercle de 24 pixels CSS de diamètre est centré sur la boîte de délimitation de chacune d’elles, les cercles ne croisent pas d’autre cible ni le cercle d’une autre cible de taille réduite ;\n• Équivalence : la fonction peut être réalisée grâce à un élément de contrôle différent sur la même page, et qui satisfait à ce critère ;\n• En ligne : la cible se trouve dans une phrase, ou bien sa taille est limitée par la hauteur de ligne du texte non ciblé ;\n• Contrôle par l’agent utilisateur : la taille de la cible est déterminée par l’agent utilisateur et n’est pas modifiée par l’auteur ;\n• Essentiel : une présentation spécifique de la cible est essentielle ou est légalement requise pour transmettre l’information.\nNote : Pour ce critère de succès, les cibles qui permettent de sélectionner des valeurs en fonction de leur position dans la cible sont considérées comme une seule cible. Cela inclut par exemple les curseurs (slider), les sélecteurs de couleurs affichant un dégradé de couleurs, ou les zones éditables où l’on positionne le curseur.\nNote : Pour les cibles en ligne, la hauteur de ligne doit être interprétée comme étant perpendiculaire au flux de texte. Par exemple, dans une langue affichée verticalement, la hauteur de ligne serait horizontale.",
+    "3.1.1": "La langue par défaut de chaque page Web peut être déterminée par un programme informatique.",
+    "3.1.2": "La langue de chaque passage ou expression du contenu peut être déterminée par un programme informatique sauf pour un nom propre, pour un terme technique, pour un mot dont la langue est indéterminée ou pour un mot ou une expression faisant partie du langage courant de la langue utilisée dans le contexte immédiat.",
+    "3.1.3": "Un mécanisme est disponible pour identifier la définition spécifique des mots ou expressions utilisés de manière inhabituelle ou de façon limitée, y compris les expressions idiomatiques et le jargon.",
+    "3.1.4": "Un mécanisme est disponible pour identifier la forme complète ou la signification d’une abréviation.",
+    "3.1.5": "Lorsqu’un texte nécessite une capacité de lecture plus avancée que le premier cycle de l’enseignement secondaire après la suppression des noms propres et des titres, un contenu additionnel, ou une version qui ne requiert pas de capacité de lecture supérieure au premier cycle de l’enseignement secondaire est disponible.",
+    "3.1.6": "Un mécanisme permet d’identifier la prononciation spécifique des mots dont la signification est ambiguë dans le contexte si leur prononciation n’est pas connue.",
+    "3.2.1": "Quand un composant d’interface utilisateur reçoit le focus, il ne doit pas initier de changement de contexte.",
+    "3.2.2": "Le changement de paramètre d’un composant d’interface utilisateur ne doit pas initier de changement de contexte à moins que l’utilisateur n’ait été avisé de ce comportement avant d’utiliser le composant.",
+    "3.2.3": "Dans un ensemble de pages, les mécanismes de navigation qui se répètent sur plusieurs pages Web se présentent dans le même ordre relatif chaque fois qu’ils sont répétés, à moins qu’un changement soit initié par l’utilisateur.",
+    "3.2.4": "Dans un ensemble de pages les composants qui ont la même fonctionnalité sont identifiés de la même façon.",
+    "3.2.5": "Un changement de contexte est initié uniquement sur demande de l’utilisateur ou un mécanisme est disponible pour désactiver un tel changement.",
+    "3.2.6": "Si une page Web contient l’un des mécanismes d’aide suivants et que ces mécanismes sont répétés sur plusieurs pages d’un ensemble de pages, alors ils se présentent dans le même ordre relativement aux autres contenus de la page ; à moins qu’un changement soit initié par l’utilisateur :\n• des coordonnées de personnes ;\n• un mécanisme pour contacter une personne ;\n• une option d’auto-assistance ;\n• un mécanisme de contact entièrement automatisé.\nNote : Les mécanismes d’aide peuvent être fournis directement sur la page, ou être fournis grâce à un lien direct vers une page distincte contenant les informations.\nNote : Pour ce critère de succès, « le même ordre relativement aux autres contenus de la page » peut être considéré comme la manière dont le contenu est ordonné lorsque la page est linéarisée. La position visuelle d’un mécanisme d’aide sera probablement cohérente d’une page à l’autre pour la même variante de page (par exemple, un point de rupture CSS). L’utilisateur peut initier un changement, comme modifier le zoom de la page ou son orientation, ce qui peut déclencher l’affichage d’une variante différente de la page. Ce critère s’intéresse à l’ordre relatif dans des pages affichées avec la même variante de page (par exemple, le même niveau de zoom et la même orientation).",
+    "3.3.1": "Si une erreur de saisie est détectée automatiquement, l’élément en erreur est identifié et l’erreur est décrite à l’utilisateur sous forme de texte.",
+    "3.3.2": "Des étiquettes sont présentées ou des instructions sont fournies quand un contenu requiert une saisie utilisateur.",
+    "3.3.3": "Si une erreur de saisie est automatiquement détectée et que des suggestions de corrections sont connues, ces suggestions sont alors proposées à l’utilisateur à moins que cela puisse compromettre la sécurité ou la finalité du contenu.",
+    "3.3.4": "Pour les pages Web qui entraînent des engagements juridiques ou des transactions financières de la part de l’utilisateur, qui modifient ou effacent des données contrôlables par l’utilisateur dans des systèmes de stockages de données, qui enregistrent les réponses de l’utilisateur à un test ou un examen, au moins l’une des conditions suivantes est vraie :\nRéversible: les actions d’envoi sont réversibles.\nVérifiée: les données saisies par l’utilisateur sont vérifiées au niveau des erreurs de saisie et la possibilité est donnée à l’utilisateur de les corriger.\nConfirmée: un mécanisme est disponible pour revoir, confirmer et corriger les informations avant leur soumission finale.",
+    "3.3.5": "Une aide contextuelle est disponible.",
+    "3.3.6": "Pour des pages Web demandant à l’utilisateur de soumettre des informations, au moins l’une des conditions suivantes est vraie :\nRéversible: les actions d’envoi sont réversibles.\nVérifiée: les données saisies par l’utilisateur sont vérifiées au niveau des erreurs de saisie et la possibilité est donnée à l’utilisateur de les corriger.\nConfirmée: un mécanisme est disponible pour revoir, confirmer et corriger les informations avant leur soumission finale.",
+    "3.3.7": "Les informations précédemment saisies par l’utilisateur ou fournies à l’utilisateur, et qui doivent être à nouveau saisies dans le même processus sont soit :\n• préremplies, ou\n• disponibles pour être sélectionnées par l’utilisateur.\nSauf dans les cas suivants :\n• il est essentiel de ressaisir les informations soi-même,\n• les informations sont requises pour assurer la sécurité du contenu, ou\n• les informations précédemment saisies ne sont plus valides.",
+    "3.3.8": "Aucune étape d’un processus d’authentification ne requiert de test cognitif (comme la mémorisation d’un mot de passe ou la résolution d’une énigme), à moins que cette étape ne fournisse au moins l’un des éléments suivants :\nAlternative: une autre méthode d’authentification, qui ne repose pas sur un test cognitif.\nMécanisme: un mécanisme est disponible pour aider l’utilisateur à compléter le test cognitif.\nReconnaissance d’objets: le test cognitif consiste à reconnaître des objets.\nContenu personnel: le test cognitif consiste à identifier un contenu non textuel que l’utilisateur a fourni au site web.\nNote : La « reconnaissance d’objets » et le « contenu personnel » peuvent être représentés par des images, des vidéos ou de l’audio.\nNote :\nDes exemples de mécanismes qui satisfont à ce critère comprennent :\n• la possibilité de saisir un mot de passe par l’intermédiaire d’un gestionnaire de mots de passe afin de réduire l’effort de mémorisation, et\n• la fonction copier-coller pour réduire la charge cognitive due à une saisie répétitive.",
+    "3.3.9": "Aucune étape d’un processus d’authentification ne requiert de test cognitif (comme la mémorisation d’un mot de passe ou la résolution d’une énigme), à moins que cette étape ne fournisse au moins l’un des éléments suivants :\nAlternative: une autre méthode d’authentification, qui ne repose pas sur un test cognitif.\nMécanisme: un mécanisme est disponible pour aider l’utilisateur à compléter le test cognitif.",
+    "4.1.1": "Note : Ce critère a été initialement adopté pour résoudre les problèmes que les technologies d’assistance rencontraient lors de l’analyse directe du HTML. Les technologies d’assistance n’ont plus besoin d’analyser directement le HTML. Par conséquent, ces problèmes n’existent plus ou sont traités par d’autres critères. Ce critère n’a plus d’utilité et est supprimé.",
+    "4.1.2": "Pour tout composant d’interface utilisateur (comprenant mais n’étant pas limité aux éléments de formulaire, liens et composants générés par des scripts), le nom et le rôle peuvent être déterminés par un programme informatique ; les états, les propriétés et les valeurs qui peuvent être paramétrés par l’utilisateur peuvent être définis par programmation; et la notification des changements de ces éléments est disponible aux agents utilisateurs, incluant les technologies d’assistance.\nNote : Ce critère de succès s’adresse d’abord aux auteurs qui développent ou programment leurs propres composants d’interface utilisateur. Toutefois, les contrôles HTML standards se conforment déjà à ce critère de succès lorsqu’ils sont utilisés conformément à la spécification.",
+    "4.1.3": "Dans un contenu implémenté via un langage de balisage, les messages d’état peuvent être déterminés par un programme informatique grâce à un rôle ou des propriétés afin qu’ils puissent être présentés à l’utilisateur par des technologies d’assistance sans recevoir le focus.",
+    "5.2.1": "L’un des niveaux de conformité suivants est atteint par le respect de la totalité de ses critères de succès.\nPour une conformité de niveau A (le niveau minimal de conformité), la page Web satisfait à tous les critères de succès de niveau A ou une version de remplacement conforme est fournie.\nPour une conformité de niveau AA, la page Web remplit tous les critères de succès de niveau A et AA ou une version de remplacement conforme au niveau AA est fournie.\nPour une conformité de niveau AAA, la page Web remplit tous les critères de succès de niveau A, AA et AAA ou une version de remplacement conforme au niveau AAA est fournie.\nNote : Bien que la conformité se définisse par paliers, les auteurs sont invités à mentionner (dans leur déclaration) tous les critères de succès satisfaits au-delà du niveau de conformité atteint.\nNote : Il n’est pas recommandé de se fixer le niveau AAA comme objectif à l’échelle de sites entiers car il n’est pas possible de satisfaire à tous les critères de succès du niveau AAA pour certains contenus.",
+    "5.2.2": "La conformité (et le niveau de conformité) s’entend uniquement pour des pages Web complètes et ne peut être atteinte si une partie de la page Web est exclue.\nNote : Dans le but de déterminer la conformité, les versions de remplacement à une partie du contenu de la page sont considérées comme une partie de la page quand les versions de remplacement peuvent être obtenues directement depuis la page, comme par exemple, une description longue ou la présentation de remplacement d’une vidéo.\nNote : Les auteurs de pages Web qui ne peuvent être considérées comme conformes en raison d’un contenu qui n’est pas sous le contrôle de l’auteur peuvent envisager d’utiliser une déclaration de conformité partielle.\nNote : Une page complète comprend toutes les variations de cette page automatiquement présentées dans les différentes tailles d’écran (par exemple, les variations dans une page Web responsive). Chacune de ces variations doit être conforme (ou doit avoir une version alternative conforme) pour que la page complète soit conforme.",
+    "5.2.3": "Quand une page Web fait partie d’un ensemble représentant un processus (comme une succession d’étapes devant être complétées afin d’accomplir une activité), toutes les pages Web du processus sont conformes au moins au niveau spécifié. (La conformité à un certain niveau est impossible s’il existe une page de ce processus qui n’atteint pas au moins ce niveau.)\nExemple\nUne boutique en ligne présente une série de pages permettant de sélectionner et d’acheter des produits. Toutes les pages de la séquence depuis le début jusqu’à la fin (le paiement) sont conformes afin que toute page faisant partie du processus soit conforme.",
+    "5.2.4": "La satisfaction à un critère de succès ne dépend que des méthodes d’utilisation des technologies qui sont compatibles avec l’accessibilité. Toute information ou fonctionnalité proposée d’une manière non compatible avec l’accessibilité est également disponible sous une forme compatible avec l’accessibilité. Voir Comprendre la compatibilité avec l’accessibilité (en anglais).",
+    "5.2.5": "Si des technologies sont employées de manière non compatible avec l’accessibilité ou non conforme, alors elles n’empêchent pas les utilisateurs d’accéder au reste de la page. En outre, la page Web dans sa globalité continue de répondre aux exigences de conformité dans chacun des cas suivants :\n• quand toute technologie non dépendante est activée dans l’agent utilisateur,\n• quand toute technologie non dépendante est désactivée dans l’agent utilisateur et\n• quand toute technologie non dépendante n’est pas reconnue par l’agent utilisateur.\nDe plus, les critères de succès suivants s’appliquent à tout le contenu de la page, y compris au contenu dont on ne dépend pas autrement pour atteindre la conformité, car un échec à les satisfaire pourrait perturber toute utilisation de la page :\n• 1.4.2 — Contrôle du son,\n• 2.1.2 — Pas de piège au clavier,\n• 2.3.1 — Pas plus de trois flashs ou sous le seuil critique, et\n• 2.2.2 — Mettre en pause, arrêter, masquer.\nNote : Si une page ne peut pas être rendue conforme (par exemple une page de test de la conformité ou une page d’exemple), elle ne peut pas être incluse dans le périmètre de conformité ou dans une déclaration de conformité.\nPour plus d’information et des exemples, voir Comprendre les exigences de conformité (en anglais).",
+    "5.3.1": "Une déclaration de conformité n’est pas obligatoire. Les auteurs peuvent se conformer aux WCAG 2.2 sans faire aucune déclaration. Toutefois, si une déclaration de conformité est faite, cette déclaration de conformité doit inclure les informations suivantes :\n• Date de la déclaration\n• Titre des Règles, version et URI « Règles pour l’accessibilité des contenus Web 2.2 à https://www.w3.org/TR/WCAG22/ »\n• Niveau de conformité satisfait : (Niveau A, AA ou AAA)\n•\nUne brève description des pages Web, comme une liste d’URI pour lesquelles la déclaration est faite en précisant si les sous-domaines sont inclus dans la déclaration.\nNote : Les pages Web peuvent être décrites sous forme de liste ou par une expression qui décrit tous les URI inclus dans la déclaration.\nNote : Les produits Web qui ne comportent pas d’URI avant leur installation sur le site Web du client peuvent comporter un engagement à l’effet que le produit sera conforme une fois installé.\n• Une liste des technologies Web dont dépend l’utilisation du contenu.\nNote : Si un logo de conformité est utilisé, il devrait constituer une déclaration et doit donc être accompagné des éléments requis pour une déclaration de conformité tel qu’énumérés ci-dessus.",
+    "5.3.2": "En plus des éléments ci-dessus qui sont requis pour une déclaration de conformité, considérer la possibilité d’ajouter des informations pour aider les utilisateurs. Les informations supplémentaires recommandées comprennent :\n• Une liste des critères de succès qui vont au-delà du niveau de conformité atteint. Cette information devrait être donnée d’une façon que les utilisateurs pourront utiliser, de préférence sous la forme de métadonnées lisibles par machine.\n• Une liste des technologies qui « sont utilisées mais dont l’utilisation du contenu ne dépend pas ».\n• Une liste des agents utilisateurs, incluant les technologies d’assistance qui ont été utilisées pour vérifier le contenu.\n• Une liste des caractéristiques d’accessibilité spécifiques du contenu, fournies par des métadonnées lisibles par machine.\n• De l’information à propos des dispositions prises pour aller au-delà des critères de succès dans le but d’améliorer l’accessibilité.\n• Une version lisible par machine d’une métadonnée sur les technologies spécifiques dont dépend l’utilisation du contenu.\n• Une version lisible par machine de la déclaration de conformité.\nNote : Lire Comprendre la déclaration de conformité (en anglais) pour plus d’information et pour des exemples de déclarations de conformité.\nNote : Lire Comprendre les métadonnées (en anglais) pour plus d’informations à propos de l’utilisation des métadonnées dans une déclaration de conformité."
+  },
+  "criteriaTerms": {
+    "1.1.1": [
+      "non-text-content",
+      "text-alternative",
+      "name",
+      "text",
+      "specific-sensory-experience",
+      "captcha",
+      "pure-decoration",
+      "assistive-technologies"
+    ],
+    "1.2.1": [
+      "prerecorded",
+      "audio-only",
+      "video-only",
+      "media-alternative-for-text",
+      "alternative-for-time-based-media"
+    ],
+    "1.2.2": [
+      "captions",
+      "audio",
+      "prerecorded",
+      "synchronized-media",
+      "media-alternative-for-text"
+    ],
+    "1.2.3": [
+      "alternative-for-time-based-media",
+      "audio-descriptions",
+      "video",
+      "prerecorded",
+      "synchronized-media",
+      "media-alternative-for-text"
+    ],
+    "1.2.4": [
+      "captions",
+      "audio",
+      "live",
+      "synchronized-media"
+    ],
+    "1.2.5": [
+      "audio-descriptions",
+      "video",
+      "prerecorded",
+      "synchronized-media"
+    ],
+    "1.2.6": [
+      "sign-language-interpretation",
+      "audio",
+      "prerecorded",
+      "synchronized-media"
+    ],
+    "1.2.7": [
+      "audio-descriptions",
+      "extended-audio-description",
+      "video",
+      "prerecorded",
+      "synchronized-media"
+    ],
+    "1.2.8": [
+      "alternative-for-time-based-media",
+      "synchronized-media",
+      "prerecorded",
+      "video-only"
+    ],
+    "1.2.9": [
+      "alternative-for-time-based-media",
+      "audio-only",
+      "live"
+    ],
+    "1.3.1": [
+      "structure",
+      "relationships",
+      "presentation",
+      "programmatically-determinable"
+    ],
+    "1.3.2": [
+      "correct-reading-sequence",
+      "programmatically-determinable"
+    ],
+    "1.3.4": [
+      "essential"
+    ],
+    "1.3.5": [
+      "programmatically-determinable"
+    ],
+    "1.3.6": [
+      "user-interface-components",
+      "regions",
+      "programmatically-determinable"
+    ],
+    "1.4.2": [
+      "mechanism"
+    ],
+    "1.4.3": [
+      "text",
+      "images-of-text",
+      "contrast-ratio",
+      "large-scale",
+      "user-interface-components",
+      "pure-decoration"
+    ],
+    "1.4.4": [
+      "captions",
+      "images-of-text",
+      "text",
+      "assistive-technologies"
+    ],
+    "1.4.5": [
+      "text",
+      "images-of-text",
+      "visually-customized",
+      "essential"
+    ],
+    "1.4.6": [
+      "text",
+      "images-of-text",
+      "contrast-ratio",
+      "large-scale",
+      "user-interface-components",
+      "pure-decoration"
+    ],
+    "1.4.7": [
+      "audio-only",
+      "prerecorded",
+      "captcha"
+    ],
+    "1.4.8": [
+      "blocks-of-text",
+      "mechanism",
+      "on-a-full-screen-window"
+    ],
+    "1.4.9": [
+      "images-of-text",
+      "pure-decoration",
+      "text",
+      "essential"
+    ],
+    "1.4.10": [
+      "css-pixels"
+    ],
+    "1.4.11": [
+      "presentation",
+      "contrast-ratio",
+      "user-interface-components",
+      "states",
+      "essential"
+    ],
+    "1.4.12": [
+      "style-properties",
+      "text"
+    ],
+    "1.4.13": [
+      "mechanism",
+      "input-error"
+    ],
+    "2.1.1": [
+      "functionality",
+      "keyboard-interface"
+    ],
+    "2.1.2": [
+      "keyboard-interface"
+    ],
+    "2.1.3": [
+      "functionality",
+      "keyboard-interface"
+    ],
+    "2.1.4": [
+      "keyboard-shortcuts",
+      "mechanism",
+      "user-interface-components"
+    ],
+    "2.2.1": [
+      "essential"
+    ],
+    "2.2.2": [
+      "blinking",
+      "pause",
+      "essential"
+    ],
+    "2.2.3": [
+      "essential",
+      "synchronized-media",
+      "real-time-events"
+    ],
+    "2.2.4": [
+      "emergency"
+    ],
+    "2.2.6": [
+      "user-inactivity"
+    ],
+    "2.3.1": [
+      "web-page-s",
+      "flashes",
+      "general-flash-and-red-flash-thresholds"
+    ],
+    "2.3.2": [
+      "web-page-s",
+      "flashes"
+    ],
+    "2.3.3": [
+      "motion-animation",
+      "essential"
+    ],
+    "2.4.1": [
+      "mechanism",
+      "web-page-s"
+    ],
+    "2.4.2": [
+      "web-page-s"
+    ],
+    "2.4.3": [
+      "web-page-s",
+      "navigated-sequentially"
+    ],
+    "2.4.4": [
+      "purpose-of-each-link",
+      "programmatically-determined-link-context",
+      "ambiguous-to-users-in-general"
+    ],
+    "2.4.5": [
+      "web-page-s",
+      "set-of-web-pages",
+      "processes"
+    ],
+    "2.4.6": [
+      "labels"
+    ],
+    "2.4.8": [
+      "set-of-web-pages"
+    ],
+    "2.4.9": [
+      "mechanism",
+      "ambiguous-to-users-in-general"
+    ],
+    "2.4.10": [
+      "section",
+      "user-interface-components"
+    ],
+    "2.4.11": [
+      "user-interface-components"
+    ],
+    "2.4.12": [
+      "user-interface-components"
+    ],
+    "2.4.13": [
+      "focus-indicator",
+      "perimeter",
+      "css-pixels",
+      "user-agents",
+      "presentation",
+      "content",
+      "technologies"
+    ],
+    "2.5.1": [
+      "functionality",
+      "single-pointer",
+      "essential"
+    ],
+    "2.5.2": [
+      "functionality",
+      "single-pointer",
+      "down-event",
+      "up-event",
+      "mechanism",
+      "essential"
+    ],
+    "2.5.3": [
+      "user-interface-components",
+      "labels",
+      "text",
+      "images-of-text",
+      "name"
+    ],
+    "2.5.4": [
+      "functionality",
+      "user-interface-components",
+      "accessibility-supported",
+      "essential"
+    ],
+    "2.5.5": [
+      "targets",
+      "pointer-inputs",
+      "css-pixels",
+      "essential"
+    ],
+    "2.5.6": [
+      "essential"
+    ],
+    "2.5.7": [
+      "functionality",
+      "dragging-movements",
+      "single-pointer",
+      "essential",
+      "user-agents"
+    ],
+    "2.5.8": [
+      "targets",
+      "pointer-inputs",
+      "css-pixels",
+      "bounding-boxes",
+      "user-agents",
+      "presentation",
+      "essential"
+    ],
+    "3.1.1": [
+      "human-language-s",
+      "web-page-s",
+      "programmatically-determinable"
+    ],
+    "3.1.2": [
+      "human-language-s",
+      "programmatically-determinable"
+    ],
+    "3.1.3": [
+      "mechanism",
+      "used-in-an-unusual-or-restricted-way",
+      "idioms",
+      "jargon"
+    ],
+    "3.1.4": [
+      "mechanism",
+      "abbreviations"
+    ],
+    "3.1.5": [
+      "lower-secondary-education-level",
+      "supplementary-content"
+    ],
+    "3.1.6": [
+      "mechanism"
+    ],
+    "3.2.1": [
+      "user-interface-components",
+      "change-of-context"
+    ],
+    "3.2.2": [
+      "user-interface-components",
+      "change-of-context"
+    ],
+    "3.2.3": [
+      "set-of-web-pages",
+      "web-page-s",
+      "same-relative-order"
+    ],
+    "3.2.4": [
+      "set-of-web-pages",
+      "same-functionality"
+    ],
+    "3.2.5": [
+      "change-of-context",
+      "mechanism"
+    ],
+    "3.2.6": [
+      "web-page-s",
+      "mechanism",
+      "set-of-web-pages"
+    ],
+    "3.3.1": [
+      "input-error"
+    ],
+    "3.3.2": [
+      "labels"
+    ],
+    "3.3.3": [
+      "input-error"
+    ],
+    "3.3.4": [
+      "web-page-s",
+      "legal-commitments",
+      "user-controllable"
+    ],
+    "3.3.5": [
+      "context-sensitive-help"
+    ],
+    "3.3.6": [
+      "web-page-s"
+    ],
+    "3.3.7": [
+      "processes",
+      "essential"
+    ],
+    "3.3.8": [
+      "processes",
+      "cognitive-function-test",
+      "mechanism",
+      "non-text-content"
+    ],
+    "3.3.9": [
+      "processes",
+      "cognitive-function-test",
+      "mechanism"
+    ],
+    "4.1.2": [
+      "user-interface-components",
+      "name",
+      "role",
+      "programmatically-determinable",
+      "programmatically-set",
+      "user-agents",
+      "assistive-technologies"
+    ],
+    "4.1.3": [
+      "status-messages",
+      "programmatically-determinable",
+      "role",
+      "assistive-technologies"
+    ],
+    "5.2.1": [
+      "web-page-s",
+      "satisfies",
+      "conforming-alternate-versions"
+    ],
+    "5.2.2": [
+      "conform",
+      "web-page-s"
+    ],
+    "5.2.3": [
+      "web-page-s",
+      "processes"
+    ],
+    "5.2.4": [
+      "relied-upon",
+      "technologies",
+      "accessibility-supported"
+    ],
+    "5.2.5": [
+      "technologies",
+      "accessibility-supported",
+      "web-page-s",
+      "relied-upon"
+    ],
+    "5.3.1": [
+      "technologies",
+      "relied-upon"
+    ],
+    "5.3.2": [
+      "relied-upon"
+    ]
+  },
+  "glossary": {
+    "abbreviations": {
+      "title": "abréviation",
+      "body": "forme abrégée d’un mot, d’une expression ou d’un nom lorsque l’abréviation ne fait pas encore partie de la langue courante\nNote : Ceci comprend les sigles et les acronymes formés à partir des initiales des mots où :\n•\nles sigles sont une forme abrégée d’un nom ou d’une expression constituée des lettres initiales des mots ou des syllabes contenues dans ce nom ou cette expression.\nNote : Ne sont pas définies dans toutes les langues.\nExemple 1\nSNCF est le sigle de la Société nationale des chemins de fer français.\nExemple 2\nESP est le sigle, en anglais, de extrasensory perception, la perception extrasensorielle.\n•\nles acronymes sont des abréviations formées à partir des premières lettres ou des parties d’autres mots (dans un nom ou une expression) et qui peuvent être prononcés comme un mot.\nExemple 3\nONU est un acronyme constitué des premières lettres de Organisation des Nations unies.\nNote : Quelques sociétés ont adopté ce qui constituait un sigle ou un acronyme comme nom de leur société. Dans un tel cas, le nouveau nom de la société est constitué des lettres (par exemple, Ecma) et le mot n’est plus alors considéré comme une abréviation."
+    },
+    "user-agents": {
+      "title": "agent utilisateur",
+      "body": "tout logiciel qui récupère et présente le contenu Web aux utilisateurs\nExemple\nLes navigateurs Web, les lecteurs de média, les modules d’extensions et les autres programmes — dont les technologies d’assistance — qui aident à récupérer, restituer et interagir avec le contenu Web."
+    },
+    "large-scale": {
+      "title": "(texte) agrandi",
+      "body": "avec au minimum 18 points ou 14 points gras ou une taille de caractère équivalente pour les polices chinoises, japonaises ou coréennes (CJK)\nNote : Les polices avec des traits extraordinairement fins ou des aspects et des caractéristiques inhabituels qui réduisent la reconnaissance de la forme des lettres sont plus difficiles à lire, spécialement à des niveaux de contrastes bas.\nNote : La taille de caractère est la taille lorsque le contenu est affiché. Cela n’inclut pas le redimensionnement qui pourrait être fait par l’utilisateur.\nNote : La taille réelle des caractères qu’un utilisateur voit est dépendante à la fois de la définition de la taille faite par l’auteur, du périphérique de restitution de l’utilisateur ou du paramétrage de l’agent utilisateur. Pour la majorité des polices de corps de texte, 14 et 18 points est sensiblement équivalent à 1,2 et 1,5 em ou à 120% et 150% de la taille par défaut du corps de texte (en considérant que la police de corps est à 100%), mais les auteurs seraient tenus de vérifier cela pour les polices particulières qui seraient utilisées. Quand les polices sont définies en unités relatives, la taille réelle du point est mesurée par l’agent utilisateur pour l’affichage. La taille d’un point doit être obtenue auprès de l’agent utilisateur ou calculée sur la même base de mesure que celle de l’agent utilisateur, lors de l’évaluation de ce critère de succès. Les utilisateurs qui ont une basse vision auront à choisir les paramètres appropriés.\nNote : Lors de l’utilisation de texte sans spécification de taille de caractère, la taille la plus petite utilisée dans les principaux navigateurs pour le texte dont la taille n’est pas spécifiée serait considérée comme une taille raisonnable pour la police. Si un titre de niveau 1 est restitué en 14pt gras ou plus sur les principaux navigateurs, alors il est raisonnable de considérer qu’il s’agit de texte agrandi. Le redimensionnement relatif peut être calculé de manière identique à partir de la taille par défaut.\nNote : La taille 18 ou 14 points pour les textes en alphabet latin est définie à partir de la taille minimum pour les grands caractères (14pt) et de la taille standard plus grande (18pt). Pour les autres polices telles que les langues CJK, les tailles « équivalentes » seraient la taille de grand caractère minimum utilisée pour ces langues et la taille de grands caractères plus grande suivante."
+    },
+    "context-sensitive-help": {
+      "title": "aide contextuelle",
+      "body": "texte d’aide qui fournit des informations relatives à la fonction actuellement utilisée\nNote : Des étiquettes claires peuvent jouer le rôle d’aide contextuelle."
+    },
+    "ambiguous-to-users-in-general": {
+      "title": "ambigu pour tout utilisateur",
+      "body": "l’intention ne peut être déterminée à partir du lien et de toute l’information de la page Web présentée à l’utilisateur en même temps que ce lien (c’est-à-dire qu’un lecteur sans limitations fonctionnelles ne connaîtrait pas la fonction d’un lien avant de l’activer)\nExemple\nLe mot goyave dans la phrase suivante utilisé comme lien : « L’une des exportations importantes est la goyave ». Ce lien pourrait conduire à une définition de la goyave, à un graphe présentant une liste des quantités de goyave exportées ou à une photo de gens récoltant la goyave. Jusqu’à ce que le lien soit activé, tout utilisateur est dans l’incertitude et une personne handicapée n’est donc pas désavantagée."
+    },
+    "motion-animation": {
+      "title": "animation basée sur le mouvement",
+      "body": "ajout d’étapes entre des états pour créer l’illusion de mouvement ou pour donner l’impression d’une transition fluide\nExemple\nPar exemple, un élément qui se déplace ou change de taille lors de son apparition est considéré comme animé. Un élément qui apparaît instantanément sans transition n’est pas considéré comme animé. L’animation basée sur le mouvement ne comprend pas les changements de couleur, d’effet de flou ou d’opacité qui ne modifient pas la taille, la forme ou la position perçues de l’élément."
+    },
+    "ascii-art": {
+      "title": "art ASCII",
+      "body": "dessin créé par une disposition spatiale de caractères ou glyphes (habituellement à partir des 95 caractères imprimables définis en ASCII)"
+    },
+    "audio": {
+      "title": "audio",
+      "body": "la technologie de reproduction des sons\nNote : Le son peut être créé de façon synthétique (y compris la synthèse vocale), être enregistré à partir de sons réels ou les deux."
+    },
+    "audio-descriptions": {
+      "title": "audio-description",
+      "body": "narration ajoutée à une piste sonore pour décrire les détails visuels importants qui ne peuvent être compris à partir de la piste sonore principale seulement\nNote : L’audio-description d’une vidéo fournit de l’information à propos des actions, des personnages, des changements de scènes, du texte apparaissant à l’écran et d’autres contenus visuels.\nNote : Dans une audio-description standard, la narration est ajoutée durant les pauses qui existent dans le dialogue. (Voir aussi audio-description étendue.)\nNote : Lorsque toute l’information de la vidéo est déjà donnée dans la piste audio, aucune audio-description supplémentaire n’est requise.\nNote : Aussi nommée « vidéo-description » et « narration descriptive »."
+    },
+    "extended-audio-description": {
+      "title": "audio-description étendue",
+      "body": "audio-description ajoutée à une présentation audiovisuelle en mettant en pause la vidéo de manière à avoir le temps d’ajouter des descriptions supplémentaires\nNote : cette technique est à utiliser seulement si le sens de la vidéo est perdu sans audio-description supplémentaire et que les pauses entre les dialogues ou la narration sont trop courtes."
+    },
+    "blocks-of-text": {
+      "title": "blocs de texte",
+      "body": "plus d’une phrase de texte"
+    },
+    "bounding-boxes": {
+      "title": "boîte de délimitation minimale",
+      "body": "le plus petit rectangle englobant aligné sur l’axe horizontal à l’intérieur duquel se trouvent tous les points d’une forme. Pour les composants qui s’étendent sur plusieurs lignes dans le cadre d’une phrase ou d’un bloc de texte (comme les liens hypertextes), la boîte de délimitation est déterminée par la façon dont le composant apparaîtrait sur une seule ligne."
+    },
+    "captcha": {
+      "title": "CAPTCHA",
+      "body": "sigle de « Completely Automated Public Turing test to tell Computers and Humans Apart » (test public de Turing entièrement automatique ayant pour but de distinguer les humains des ordinateurs)\nNote : Les tests de type CAPTCHA demandent souvent à l’utilisateur de taper un texte présenté dans une image ou un extrait audio déformés.\nNote : Un test de Turing est tout système de tests conçu pour distinguer un humain d’un ordinateur. Il est nommé en l’honneur du célèbre informaticien Alan Turing. Ce terme a été popularisé par les chercheurs de l’Université Carnegie Mellon."
+    },
+    "change-of-context": {
+      "title": "changements de contexte",
+      "body": "changements majeurs qui, s’ils sont faits sans que l’utilisateur en soit conscient, peuvent désorienter les utilisateurs qui ne peuvent voir l’ensemble de la page en même temps\nLes changements de contexte comprennent les changements de :\n• agent utilisateur ;\n• espace de restitution ;\n• focus ;\n• contenu qui modifie la signification de la page Web.\nNote : Un changement de contenu n’est pas toujours un changement de contexte. Un changement dans le contenu comme le déploiement d’une arborescence, un menu dynamique ou un déplacement de tabulation ne change pas nécessairement le contexte à moins qu’il ne change aussi l’un des éléments énumérés ci-dessus (par exemple le focus).\nExemple\nL’ouverture d’une nouvelle fenêtre, le déplacement du focus sur un composant différent, le déplacement vers une nouvelle page (y compris tout ce qui, pour l’utilisateur, aurait l’air d’un déplacement vers une autre page) ou la réorganisation significative du contenu d’une page sont autant d’exemples d’un changement de contexte."
+    },
+    "targets": {
+      "title": "cible",
+      "body": "zone du dispositif d’affichage qui reçoit l’action d’un pointeur, telle que la zone interactive d’un composant d’interface utilisateur\nNote : Si deux cibles ou plus se chevauchent, la zone de chevauchement ne devrait pas être incluse dans la mesure de la taille de la cible, sauf si les cibles qui se chevauchent exécutent la même action ou ouvrent la même page."
+    },
+    "blinking": {
+      "title": "clignotement",
+      "body": "alternance entre deux états visuels d’une façon qui veut attirer l’attention\nNote : Voir aussi flash. Il est possible que quelque chose soit suffisamment gros et clignote de façon suffisamment lumineuse à la fréquence appropriée pour être aussi considéré comme un flash."
+    },
+    "accessibility-supported": {
+      "title": "compatible avec l’accessibilité",
+      "body": "compatible avec les technologies d’assistance des utilisateurs ainsi qu’avec les fonctions d’accessibilité des navigateurs et des autres agents utilisateurs\nPour que l’utilisation d’une technologie Web (ou d’une fonctionnalité d’une technologie) soit considérée comme compatible avec l’accessibilité, les conditions 1 et 2 doivent toutes deux être respectées pour une technologie Web (ou pour une fonctionnalité d’une technologie) :\n•\nLa façon dont la technologie Web est utilisée doit être compatible avec les technologies d’assistance des utilisateurs. Cela signifie que la façon dont la technologie est utilisée a été testée dans une perspective d’interopérabilité avec des utilisateurs des technologies d’assistance dans la ou les langues du contenu ;\nET\n•\nLa technologie Web doit fonctionner avec des agents utilisateurs qui sont compatibles avec l’accessibilité et qui sont à la disposition des utilisateurs. Cela signifie qu’au moins une des quatre affirmations suivantes est vraie :\n•\nLa technologie fonctionne de façon native dans des agents utilisateurs largement distribués qui sont eux-mêmes compatibles avec l’accessibilité (comme HTML et CSS) ;\nOU\n•\nLa technologie fonctionne avec un module d’extension largement distribué et qui est lui-même compatible avec l’accessibilité ;\nOU\n•\nLe contenu est disponible dans un environnement fermé comme le réseau d’une université ou d’une entreprise où l’agent utilisateur requis par la technologie et utilisé par l’organisation est lui-même compatible avec l’accessibilité ;\nOU\n•\nLes agents utilisateurs avec lesquels fonctionne la technologie sont compatibles avec l’accessibilité et sont disponibles en téléchargement ou à l’achat d’une façon qui :\n• ne coûte pas plus cher à une personne handicapée qu’à une personne sans limitations fonctionnelles et\n• est aussi facile à trouver et à obtenir par une personne handicapée qu’elle l’est pour une personne sans limitations fonctionnelles.\nNote : Le groupe de travail sur les règles d’accessibilité (AG WG) et le W3C ne précisent pas quel niveau de compatibilité avec les technologies d’assistance une technologie Web particulière doit avoir pour être considérée comme compatible avec l’accessibilité. Voir le niveau de compatibilité avec les technologies d’assistance nécessaire à la « compatibilité avec l’accessibilité » (en anglais).\nNote : Les technologies Web peuvent être utilisées d’une manière qui n’est pas compatible avec l’accessibilité tant que l’utilisation du contenu n’en dépend pas et que la page dans son ensemble satisfait aux exigences de conformité, incluant l’exigence de conformité 4 et l’exigence de conformité 5.\nNote : Quand une technologie Web est utilisée d’une manière qui est « compatible avec l’accessibilité », cela n’implique pas que toute la technologie ou que tous les usages de cette technologie sont compatibles. La plupart des technologies, y compris HTML, comportent une fonction ou un usage qui n’est pas compatible. Les pages sont conformes aux WCAG seulement si les usages de la technologie qui sont compatibles avec l’accessibilité sont les seuls dont dépend l’utilisation du contenu et que ces usages permettent de satisfaire aux exigences des WCAG.\nNote : Lorsqu’une technologie Web est citée et qu’elle se présente en plusieurs versions, la ou les versions compatibles devraient être spécifiées.\nNote : Pour les auteurs, une façon de repérer les usages d’une technologie qui sont compatibles avec l’accessibilité consisterait à consulter la compilation des usages qui sont documentés comme compatibles avec l’accessibilité. Voir Comprendre les usages des technologies compatibles avec l’accessibilité (en anglais). Les auteurs, les sociétés, les vendeurs de technologies ou n’importe qui d’autre peuvent documenter les usages des technologies qui sont compatibles avec l’accessibilité. Toutefois, tous les usages des technologies documentés devraient satisfaire à la définition des technologies Web compatibles avec l’accessibilité telle qu’elle est énoncée ci-dessus."
+    },
+    "user-interface-components": {
+      "title": "composant d’interface utilisateur",
+      "body": "partie du contenu qui est perçue par les utilisateurs comme un élément de contrôle unique pour une fonction distincte\nNote : Plusieurs composants d’interface utilisateur peuvent être implémentés au sein d’un seul programme. La notion de composant n’est pas liée ici aux techniques de programmation, mais plutôt à ce que les utilisateurs perçoivent comme des éléments de contrôle distincts.\nNote : Les composants d’interface utilisateur incluent les éléments de formulaire et les liens aussi bien que des composants générés par scripts.\nNote : Les termes « composant » ou « composant d’interface utilisateur » sont aussi parfois désignés par « élément d’interface utilisateur ».\nExemple\nUn microprogramme (applet) dispose d’un « élément de contrôle » permettant de se déplacer dans le contenu ligne par ligne, page par page ou au hasard. Puisque chacune de ces fonctions devrait avoir un nom et fonctionner indépendamment, elles constitueraient chacune un « composant d’interface utilisateur »."
+    },
+    "conform": {
+      "title": "conformité",
+      "body": "satisfaire à toutes les exigences d’une norme ou d’un standard donné, d’une règle ou d’une spécification"
+    },
+    "supplementary-content": {
+      "title": "contenu additionnel",
+      "body": "contenu supplémentaire illustrant ou clarifiant le contenu primaire\nExemple 1\nLa version audio d’une page Web.\nExemple 2\nL’illustration d’un processus complexe.\nExemple 3\nUn paragraphe résumant les principales conclusions et recommandations d’un rapport de recherche."
+    },
+    "non-text-content": {
+      "title": "contenu non textuel",
+      "body": "tout contenu qui n’est pas une suite de caractères déterminée par un programme informatique ou suite de caractères sans signification dans aucune langue\nNote : Ceci inclut l’art ASCII (qui est un dessin à base de caractères), les émoticônes, l’écriture « leetspeak » (qui utilise la substitution de caractères) et les images représentant du texte."
+    },
+    "content": {
+      "title": "contenu (contenu Web)",
+      "body": "information et expérience sensorielle à communiquer à l’utilisateur au moyen d’un agent utilisateur, y compris le code ou le balisage qui définit la structure, la présentation et les interactions du contenu"
+    },
+    "programmatically-determined-link-context": {
+      "title": "contexte du lien déterminé par un programme informatique",
+      "body": "information supplémentaire qui peut être déterminée par un programme informatique à partir des relations avec un lien, combinée avec le texte du lien et présentée aux utilisateurs sous différentes formes\nExemple\nEn HTML, l’information qui est déterminée par un programme informatique à partir d’un lien en français, y compris le texte qui est dans le même paragraphe, la même liste ou la même cellule de tableau que le lien, ou une cellule d’en-tête de tableau associée avec la cellule contenant le lien.\nNote :\nPuisque les lecteurs d’écran interprètent la ponctuation, ils peuvent aussi fournir le contexte de la phrase en cours, lorsque le focus est sur le lien contenu dans cette phrase."
+    },
+    "user-controllable": {
+      "title": "contrôlable par l’utilisateur",
+      "body": "données auxquelles les utilisateurs ont accès\nNote : Ceci ne concerne pas les journaux de connexions (logs) Internet et les données de supervision des moteurs de recherche.\nExemple\nLes champs nom et adresse d’un compte utilisateur."
+    },
+    "on-a-full-screen-window": {
+      "title": "dans une fenêtre plein écran",
+      "body": "sur les écrans d’ordinateur de bureau ou portable de taille courante dont l’espace de restitution est maximisé\nNote : Du fait que les gens gardent leurs ordinateurs pendant plusieurs années, il est conseillé de ne pas se baser sur les dernières résolutions d’écrans des ordinateurs de bureau ou portable, mais de prendre en considération la plus représentative des résolutions d’écrans durant une période de plusieurs années précédant cette évaluation."
+    },
+    "programmatically-set": {
+      "title": "défini par programmation",
+      "body": "défini par un logiciel utilisant des méthodes qui fonctionnent avec les agents utilisateurs, y compris les technologies d’assistance"
+    },
+    "relied-upon": {
+      "title": "dépendre",
+      "body": "(technologies)\nle contenu ne serait pas conforme si cette technologie est inactivée ou si elle n’est pas compatible"
+    },
+    "programmatically-determinable": {
+      "title": "déterminé (déterminable) par un programme informatique",
+      "body": "déterminé par un programme à partir de données fournies par l’auteur d’une manière qui permet aux agents utilisateurs, y compris les technologies d’assistance, d’extraire et de présenter cette information aux utilisateurs sous différentes formes\nExemple 1\nDéterminé dans un langage de balisage à partir d’éléments et d’attributs auxquels on accède grâce aux technologies d’assistance couramment disponibles.\nExemple 2\nDéterminé grâce à des structures de données spécifiques d’une technologie pour un langage non-balisé et exposée aux technologies d’assistance via une API d’accessibilité aux technologies d’assistance couramment disponibles."
+    },
+    "live": {
+      "title": "en direct",
+      "body": "information captée depuis un événement du monde réel et transmise à un récepteur sans autre délai que celui de la diffusion\nNote : Le délai de diffusion est un court délai souvent automatisé, utilisé par exemple pour permettre aux diffuseurs de mettre en liste d’attente ou de censurer le flux sonore (ou vidéo), mais insuffisant pour permettre un montage significatif.\nNote : Si l’information est totalement générée par ordinateur il ne s’agit pas d’information en direct."
+    },
+    "legal-commitments": {
+      "title": "engagements juridiques",
+      "body": "transactions par lesquelles la personne contracte une obligation ou reçoit un bénéfice de nature juridique\nExemple\nUn contrat de mariage, un échange d’actions (financier et juridique), un legs, un prêt, une adoption, un enrôlement dans l’armée, un contrat de tout type, etc."
+    },
+    "enclose": {
+      "title": "englobe",
+      "body": "délimite ou entoure complètement"
+    },
+    "primary-education": {
+      "title": "enseignement primaire",
+      "body": "période de six ans qui commence entre l’âge de 5 et 7 ans, sans forcément d’antécédents d’éducation\nNote : Cette définition se fonde sur la norme de Classification internationale type de l’éducation de l’[UNESCO]."
+    },
+    "set-of-web-pages": {
+      "title": "ensemble de pages Web",
+      "body": "groupe de pages Web partageant un objectif commun et créées par le même auteur, groupe ou organisation\nExemple\nCela inclut, par exemple :\n• une publication répartie sur plusieurs pages Web et dans laquelle chaque page contient un chapitre ou une autre section importante de l’ouvrage. La publication constitue une seule unité logique, contiguë, et contient des éléments de navigation qui permettent d’accéder à l’ensemble des pages.\n• un site web de commerce électronique présente des produits dans un ensemble de pages Web qui partagent toutes la même navigation et la même identification. Toutefois, lors du processus de paiement, le modèle change ; la navigation et d’autres éléments sont retirés, de sorte que les pages de ce processus sont fonctionnellement et visuellement différentes. Les pages de paiement ne font pas partie de l’ensemble des pages de produits.\n• un blog sur un sous-domaine (par exemple blog.example.com) dont la navigation est différente et dont les contenus sont produits par des auteurs distincts des pages du domaine principal (example.com).\nNote : Différentes versions linguistiques seraient considérées comme des ensembles de pages Web distincts."
+    },
+    "pointer-inputs": {
+      "title": "entrée de pointeur",
+      "body": "entrée effectuée par un dispositif pouvant cibler une coordonnée spécifique (ou un ensemble de coordonnées) sur un écran, tel qu’une souris, un stylet ou un contact tactile\nNote : Voir la définition de « pointeur » dans Pointer Events (en anglais) [pointerevents]."
+    },
+    "text-alternative": {
+      "title": "équivalent textuel",
+      "body": "texte associé par programmation à un contenu non textuel ou dont il est fait mention depuis un texte associé par programmation à un contenu non textuel. Un texte associé par programmation est un texte dont l’emplacement peut être déterminé par programmation depuis le contenu non textuel.\nExemple\nL’image d’un graphique est décrite textuellement dans le paragraphe suivant le graphique. Le bref équivalent textuel du graphique indique que la description suit celui-ci.\nNote : Se référer à Comprendre les équivalents textuels (en anglais) pour plus d’informations."
+    },
+    "input-error": {
+      "title": "erreur de saisie",
+      "body": "information fournie par l’utilisateur qui n’est pas acceptée\nNote :\nCela inclut :\n• L’information qui est demandée par la page Web mais oubliée par l’utilisateur.\n• L’information qui est fournie par l’utilisateur mais qui ne correspond pas au format ou aux valeurs des données attendus."
+    },
+    "viewport": {
+      "title": "espace de restitution",
+      "body": "objet au sein duquel l’agent utilisateur présente du contenu\nNote : L’agent utilisateur présente le contenu au travers d’un ou plusieurs espaces de restitution. Les espaces de restitution peuvent être des fenêtres, des cadres, des haut-parleurs et des loupes virtuelles. Un espace de restitution peut contenir lui-même un autre espace de restitution (par exemple, des cadres imbriqués). Les composants d’interface créés par l’agent utilisateur, tels que des invites de commandes, des menus et des alertes ne sont pas des espaces de restitution.\nNote : Cette définition est fondée sur le Glossaire des règles pour l’accessibilité des agents utilisateurs 1.0 (en anglais) [UAAG10]."
+    },
+    "essential": {
+      "title": "essentiel",
+      "body": "(essentielle)\nélément qui changerait fondamentalement les informations ou les fonctionnalités du contenu s’il était supprimé et informations et fonctionnalités qui ne pourraient être restituées autrement d’une manière conforme"
+    },
+    "states": {
+      "title": "état",
+      "body": "propriété dynamique représentant les caractéristiques d’un composant d’interface utilisateur qui peut changer en réponse à une action de l’utilisateur ou à des processus automatisés\nLes états n’affectent pas la nature du composant, mais représentent des données associées au composant ou aux possibilités d’interaction par l’utilisateur. Il s’agit par exemple des états focus, survolé, sélectionné, pressé, coché, visité/non visité, et développé/réduit."
+    },
+    "labels": {
+      "title": "étiquette",
+      "body": "texte ou autre composant avec un équivalent textuel qui est restitué à l’utilisateur pour permettre d’identifier un composant dans un contenu Web.\nNote : Une étiquette est présentée à tous les utilisateurs alors que le nom peut être masqué et seulement restitué par une technologie d’assistance. Dans de nombreux cas (mais pas tous) le nom et l’étiquette sont identiques.\nNote : Le terme étiquette n’est pas limité à l’élément label en HTML."
+    },
+    "up-event": {
+      "title": "événement ascendant (up-event)",
+      "body": "événement de la plateforme qui se produit lorsque le mécanisme de déclenchement d’un pointeur est relâché\nL’événement ascendant peut avoir des noms différents selon les plateformes, comme « touchend » ou « mouseup »."
+    },
+    "down-event": {
+      "title": "événement descendant (down-event)",
+      "body": "événement de la plateforme qui se produit lorsque le mécanisme de déclenchement d’un pointeur est enfoncé\nL’événement descendant peut avoir des noms différents selon les plateformes, comme « touchstart » ou « mousedown »."
+    },
+    "real-time-events": {
+      "title": "événement en temps réel",
+      "body": "événement qui a) se produit en même temps que la visualisation et b) n’est pas entièrement généré par le contenu\nExemple 1\nUne diffusion Web d’une représentation en direct (qui se produit en même temps que la visualisation et qui n’est pas pré-enregistrée).\nExemple 2\nDes enchères en ligne avec des gens qui enchérissent (avec une visualisation en direct).\nExemple 3\nDes humains interagissant dans un monde virtuel grâce à des avatars (qui ne sont pas entièrement générés par le contenu et qui se produisent en même temps que la visualisation)."
+    },
+    "specific-sensory-experience": {
+      "title": "expérience sensorielle spécifique",
+      "body": "une expérience sensorielle qui n’est pas purement décorative et dont l’objectif premier n’est pas de transmettre une information importante ou d’accomplir une fonction\nExemple\nOn compte parmi les exemples un morceau de flûte solo, des œuvres d’art visuel, etc."
+    },
+    "idioms": {
+      "title": "expression idiomatique",
+      "body": "phrase dont le sens ne peut être déduit du sens des mots qui la composent et dont les mots spécifiques ne peuvent être changés sans en perdre le sens\nNote : Les expressions idiomatiques ne peuvent être traduites littéralement sans perdre leur sens (culturel ou linguistique).\nExemple 1\nEn anglais, « spilling the beans » signifie « révéler un secret ». Cependant, « knocking over the beans » ou « spilling the vegetable » ne signifie pas la même chose.\nExemple 2\nEn japonais, la phrase « さじを投げる » se traduit littéralement par « il jette une cuillère » mais cela signifie qu’il n’y a rien qu’il puisse faire et que finalement il abandonne.\nExemple 3\nEn néerlandais, « Hij ging met de kippen op stok » se traduit littéralement par « il est allé rôtir avec les poulets » mais cela signifie qu’il est allé au lit tôt."
+    },
+    "flashes": {
+      "title": "flash",
+      "body": "alternance de luminance relative qui peut causer des crises chez certaines personnes si leur taille est suffisamment importante dans une gamme de fréquences spécifiques\nNote : Voir seuil de flash générique et seuil de flash rouge pour plus d’informations sur les types de flashs qui ne sont pas autorisés.\nNote : Voir aussi clignotement."
+    },
+    "purpose-of-each-link": {
+      "title": "fonction du lien",
+      "body": "nature d’un résultat obtenu par l’activation d’un lien"
+    },
+    "functionality": {
+      "title": "fonctionnalité",
+      "body": "processus et résultats atteignables par une action de l’utilisateur"
+    },
+    "same-functionality": {
+      "title": "fonctionnalité similaire",
+      "body": "produit le même résultat à l’utilisation\nExemple\nUn bouton « rechercher » sur une page Web et un bouton « trouver » sur une autre peuvent tous les deux proposer un champ pour saisir un terme et lister les sujets présents dans le site et pertinents par rapport au terme soumis. Dans ce cas, ils offrent la même fonctionnalité mais ne sont pas nommés à l’identique."
+    },
+    "user-inactivity": {
+      "title": "inactivité de l’utilisateur",
+      "body": "intervalle de temps continu pendant lequel l’utilisateur n’effectue aucune action\nLa méthode de détection sera déterminée par le site Web ou l’application."
+    },
+    "focus-indicator": {
+      "title": "indicateur de focus",
+      "body": "pixels qui sont modifiés pour indiquer visuellement qu’un composant d’interface utilisateur est dans un état focalisé"
+    },
+    "informative": {
+      "title": "informatif, informative",
+      "body": "dans un but d’informations complémentaires et non exigé pour la conformité\nNote : Le contenu exigé pour la conformité est indiqué comme « normatif »."
+    },
+    "keyboard-interface": {
+      "title": "interface clavier",
+      "body": "interface utilisée par un logiciel pour obtenir une saisie au clavier\nNote :\nUne interface clavier permet aux utilisateurs de fournir aux programmes une saisie au clavier même si la technologie native ne comporte pas de clavier.\nExemple\nUn assistant numérique personnel (PDA) à écran tactile possède une interface clavier intégrée à son système d’exploitation et un connecteur pour des claviers externes. Les applications dans le PDA peuvent utiliser l’interface pour obtenir une saisie au clavier externe ou par d’autres applications qui simulent une sortie clavier comme les interpréteurs d’écriture manuscrite ou les applications de transcription vocale en texte avec des fonctionnalités « d’émulation clavier ».\nNote :\nL’utilisation d’une application (ou de parties d’une application) à travers un pointeur souris dirigé au clavier, comme MouseKeys, ne constitue pas une opération réalisée au travers d’une interface clavier car l’utilisation du programme passe par l’interface de pointage et non pas par l’interface clavier."
+    },
+    "sign-language-interpretation": {
+      "title": "interprétation en langue des signes",
+      "body": "traduction d’une langue, généralement parlée, en langue des signes\nNote : Les véritables langues des signes sont des langues indépendantes qui ne sont pas attachées à la langue parlée de la même région ou du même pays."
+    },
+    "jargon": {
+      "title": "jargon",
+      "body": "termes utilisés par les personnes d’une façon particulière dans un domaine particulier\nExemple\nLes termes « touches rémanentes » sont du jargon du domaine des technologies d’assistance."
+    },
+    "human-language-s": {
+      "title": "langue",
+      "body": "langue qui est parlée, écrite ou signée (à l’aide des signes visuels ou tactiles) pour communiquer avec les humains\nNote : Voir aussi langue des signes."
+    },
+    "sign-language": {
+      "title": "langue des signes",
+      "body": "un langage employant des combinaisons de mouvements des mains et des bras, des expressions faciales ou des positions corporelles pour transmettre du sens"
+    },
+    "relative-luminance": {
+      "title": "luminance relative",
+      "body": "luminance relative d’un quelconque point de l’espace colorimétrique normalisé à 0 pour le noir le plus foncé et à 1 pour le blanc le plus clair\nNote :\nPour l’espace colorimétrique de couleur sRGB, la luminance relative d’une couleur est définie par L = 0,2126 * R + 0,7152 * G + 0,0722 * B où R, G et B sont définis par :\n• si RsRGB <= 0,04045 alors R = RsRGB/12,92 sinon R = ((RsRGB+0,055)/1,055) ^ 2,4\n• si GsRGB <= 0,04045 alors G = GsRGB/12,92 sinon G = ((GsRGB+0,055)/1,055) ^ 2,4\n• si BsRGB <= 0,04045 alors B = BsRGB/12,92 sinon B = ((BsRGB+0,055)/1,055) ^ 2,4\net RsRGB, GsRGB, et BsRGB sont définis par :\n• RsRGB = R8bit/255\n• GsRGB = G8bit/255\n• BsRGB = B8bit/255\nLe caractère \"^\" est l’opérateur exponentiel. (formule tirée de [SRGB]).\nNote : Avant mai 2021, la valeur de 0,04045 dans la définition était différente (0,03928). Elle provenait d’une version précédente de la spécification et a été mise à jour. Cela n’a aucun effet pratique sur les calculs dans le contexte de ces règles.\nNote : La plupart des systèmes utilisés aujourd’hui pour afficher le contenu Web adoptent l’encodage sRGB. À moins que l’on sache qu’un autre espace colorimétrique va être utilisé pour traiter et afficher le contenu, les auteurs devraient l’évaluer en utilisant l’espace colorimétrique sRGB. Si l’on utilise d’autres espaces colorimétriques, voir Comprendre le critère de succès 1.4.3 (en anglais).\nNote : Si un tramage est effectué après l’affichage, alors la valeur source de la couleur est utilisée. Pour les couleurs tramées à la source, les valeurs moyennes des couleurs qui sont tramées devraient être utilisées (R moyen, G moyen, B moyen).\nNote : Il existe des outils qui effectuent automatiquement les calculs lors des tests de contraste et de flash.\nNote : Une page distincte donnant la définition de la luminance relative en utilisant MathML pour afficher les formules est disponible."
+    },
+    "mechanism": {
+      "title": "mécanisme",
+      "body": "processus ou technique pour obtenir un résultat\nNote : Le mécanisme peut être explicitement fourni par le contenu ou dépendre de la plateforme ou de l’agent utilisateur, y compris les technologies d’assistance.\nNote : Le mécanisme doit satisfaire à tous les critères de succès (d’un niveau donné) pour déclarer un niveau de conformité."
+    },
+    "media-alternative-for-text": {
+      "title": "média de remplacement pour un texte",
+      "body": "média qui ne donne pas plus d’information que ce que donne le texte (directement ou via un équivalent textuel)\nNote : Une version de remplacement pour un texte est fournie à ceux qui bénéficient de représentations équivalentes du texte. Les versions de remplacement de texte peuvent n’être que seulement audio, que seulement vidéo (y compris la vidéo en langue des signes) ou audio-vidéo."
+    },
+    "synchronized-media": {
+      "title": "média synchronisé",
+      "body": "flux audio ou vidéo synchronisé avec un autre format pour présenter de l’information et/ou comportant des composants temporels interactifs, à moins que le média soit un média de remplacement pour un texte clairement identifié comme tel"
+    },
+    "same-relative-order": {
+      "title": "même ordre relatif",
+      "body": "même position relativement aux autres éléments\nNote : Plusieurs éléments sont considérés être dans le même ordre relatif même si d’autres éléments sont insérés ou retirés de l’ordre original. Par exemple, des menus de navigation extensibles peuvent intégrer un niveau de détail additionnel, une section de navigation secondaire peut être insérée dans l’ordre de lecture."
+    },
+    "status-messages": {
+      "title": "message d’état",
+      "body": "changement dans le contenu qui n’est pas un changement de contexte et qui fournit des informations à l’utilisateur sur le succès ou les résultats d’une action, sur l’état d’attente d’une application, sur la progression d’un processus ou sur l’existence d’erreurs"
+    },
+    "pause": {
+      "title": "mis en pause",
+      "body": "arrêté par une action de l’utilisateur et relancé seulement sur demande de l’utilisateur"
+    },
+    "dragging-movements": {
+      "title": "mouvement de glissement",
+      "body": "une action où un élément est saisi par le pointeur lors de l’événement descendant (down-event) et pendant laquelle l’élément (ou une représentation de sa position) suit le pointeur jusqu’à l’événement ascendant (up-event).\nNote : Les éléments de liste, de texte et les images sont des exemples d’éléments pouvant être déplacés par glissement."
+    },
+    "name": {
+      "title": "nom",
+      "body": "texte grâce auquel un logiciel peut identifier pour l’utilisateur un composant du contenu Web\nNote : Le nom peut être caché et présenté seulement aux technologies d’assistance, alors qu’une étiquette est présentée à tous les utilisateurs. Dans de nombreux cas (mais pas dans tous), l’étiquette et le nom sont identiques.\nNote : Celui-ci n’a pas de lien avec l’attribut HTML name."
+    },
+    "normative": {
+      "title": "normatif",
+      "body": "exigé pour la conformité\nNote : Il est possible d’être en conformité stricte avec ce document de nombreuses manières bien définies.\nNote : Le contenu identifié comme « informatif » ou « non normatif » n’est jamais exigé pour la conformité."
+    },
+    "correct-reading-sequence": {
+      "title": "ordre de lecture correct",
+      "body": "tout ordre séquentiel où les mots et les paragraphes sont présentés dans un ordre qui ne modifie pas la signification du contenu"
+    },
+    "web-page-s": {
+      "title": "page Web",
+      "body": "une ressource autonome obtenue depuis un URI unique grâce au protocole HTTP, accompagnée de toutes les autres ressources utilisées dans la restitution ou conçues pour être restituées simultanément par un agent utilisateur\nNote : Bien que toutes les « autres ressources » seraient restituées avec la ressource primaire, elles ne sont pas nécessairement restituées simultanément.\nNote : À des fins de conformité avec ces règles, une ressource doit être autonome à l’intérieur du périmètre de conformité pour être considérée comme une page Web.\nExemple 1\nUne ressource Web incluant toutes les images et médias liés.\nExemple 2\nUn programme Web de courrier électronique (Webmail) développé à l’aide d’AJAX (Asynchronous JavaScript and XML, JavaScript asynchrone et XML). Le programme réside intégralement à l’adresse http://exemple.com/mail, mais comprend une boîte de réception, un carnet d’adresses et un calendrier. Des liens et des boutons permettent d’afficher la boîte de réception, les contacts ou le calendrier, mais ne changent pas globalement l’URI de la page.\nExemple 3\nUn site portail personnalisable, dans lequel les utilisateurs peuvent choisir le contenu à afficher à partir d’un ensemble de modules de contenu.\nExemple 4\nQuand on saisit « http://shopping.exemple.com/ » dans son navigateur, on entre dans un environnement commercial animé et interactif dans lequel on se déplace visuellement dans une boutique, retirant les produits directement depuis les rayons pour les placer dans un panier d’achat face à soi. Cliquer sur un produit déclenche une démonstration avec la fiche technique juste à côté. Cela peut être un site Web à page unique ou simplement une page à l’intérieur d’un site Web."
+    },
+    "navigated-sequentially": {
+      "title": "parcouru de façon séquentielle",
+      "body": "parcouru dans l’ordre défini par le déplacement du focus (d’un élément à l’autre) en utilisant une interface clavier"
+    },
+    "perimeter": {
+      "title": "périmètre",
+      "body": "ligne la plus courte entre la ligne continue délimitant une forme, en excluant les pixels partagés, et la ligne continue délimitant sa boîte de délimitation minimale\nExemple\nLe calcul de l’aire d’un périmètre de 2 pixels CSS autour d’un rectangle est 4h+4l, où h est la hauteur et l est la largeur. Pour un périmètre de 2 pixels CSS autour d’un cercle, il s’agit de 4𝜋r."
+    },
+    "visually-customized": {
+      "title": "personnalisé visuellement",
+      "body": "la police, la taille, la couleur et le fond sont paramétrables"
+    },
+    "css-pixels": {
+      "title": "pixel CSS",
+      "body": "angle visuel d’environ 0,0213 degré\nUn pixel CSS est l’unité de mesure canonique pour toutes les longueurs et mesures en CSS. Cette unité est indépendante de la densité et différente des pixels matériels réels présents sur un écran. Les agents utilisateurs et les systèmes d’exploitation devraient garantir qu’un pixel CSS représente la meilleure approximation du pixel de référence défini dans le module CSS Values and Units de niveau 3 (en anglais) [css3-values], qui tient compte des dimensions physiques de l’écran et de la distance de visualisation supposée (facteurs qui ne peuvent être déterminés par les auteurs de contenu)."
+    },
+    "single-pointer": {
+      "title": "pointage à contact unique",
+      "body": "action de pointage qui fonctionne au moyen d’un seul point de contact avec l’écran, y compris les appuis courts et les simples clics, les doubles appuis et les doubles clics, les appuis longs et les gestes basés sur un tracé."
+    },
+    "prerecorded": {
+      "title": "pré-enregistré",
+      "body": "information qui n’est pas diffusée en direct"
+    },
+    "lower-secondary-education-level": {
+      "title": "premier cycle de l’enseignement secondaire",
+      "body": "les deux ou trois années de scolarité qui commencent après six ans environ d’enseignement primaire et qui se terminent après neuf ans environ de scolarisation depuis le début de l’enseignement primaire\nNote : Cette définition se fonde sur la norme de Classification internationale type de l’éducation de l’[UNESCO]."
+    },
+    "presentation": {
+      "title": "présentation",
+      "body": "rendu du contenu sous une forme perceptible par l’utilisateur"
+    },
+    "processes": {
+      "title": "processus",
+      "body": "série d’actions de l’utilisateur dont l’enchaînement est nécessaire à l’accomplissement d’une tâche\nExemple 1\nUtilisation réussie par l’utilisateur, sur un site de vente, d’un enchaînement de pages Web permettant de voir différents produits, des prix et des offres, de sélectionner des produits, de soumettre une commande, de fournir les informations d’envoi et de paiement.\nExemple 2\nUne page permettant de créer un compte utilisateur nécessitant l’accomplissement d’un test de Turing avant de pouvoir accéder à cette page de formulaire de création de compte."
+    },
+    "style-properties": {
+      "title": "propriété de style",
+      "body": "propriété dont la valeur détermine la présentation (par exemple, la police, la couleur, la taille, l’emplacement, les marges intérieures (padding), le volume, la prosodie de la synthèse vocale) des éléments de contenu lorsqu’ils sont restitués (par exemple, à l’écran, par un haut-parleur, sur une plage braille) par les agents utilisateurs.\nLes propriétés de style peuvent avoir plusieurs origines :\n• Les styles par défaut de l’agent utilisateur : les valeurs des propriétés de style par défaut appliquées en l’absence de tout style d’auteur ou d’utilisateur. Certaines technologies Web spécifient un rendu par défaut, d’autres non ;\n• Styles d’auteur : les valeurs des propriétés de style qui sont définies par l’auteur dans le cadre du contenu (par exemple, les styles en ligne, les feuilles de style de l’auteur) ;\n• Styles de l’utilisateur : les valeurs des propriétés de style qui sont définies par l’utilisateur (par exemple, via les paramètres de l’interface de l’agent utilisateur, les feuilles de style de l’utilisateur)."
+    },
+    "pure-decoration": {
+      "title": "purement décoratif",
+      "body": "utilisé seulement dans un but esthétique, ne fournissant aucune information et n’ayant aucune fonctionnalité\nNote : Un texte est purement décoratif si les mots peuvent être réarrangés ou remplacés sans changer leur raison d’être.\nExemple\nLa page de couverture d’un dictionnaire présente un arrière-plan estompé et constitué de mots choisis au hasard."
+    },
+    "keyboard-shortcuts": {
+      "title": "raccourci clavier",
+      "body": "moyen alternatif pour déclencher une action par l’appui d’une ou plusieurs touches"
+    },
+    "contrast-ratio": {
+      "title": "rapport de contraste",
+      "body": "(L1 + 0,05) / (L2 + 0,05), où\n• L1 est la luminance relative de la couleur la plus claire et\n• L2 est la luminance relative de la couleur la plus sombre.\nNote : Le rapport de contraste peut varier de 1 à 21 (communément écrit 1:1, 1 pour 1, à 21:1, 21 pour 1).\nNote : Étant donné que les auteurs ne contrôlent pas la configuration de l’utilisateur concernant le rendu du texte (par exemple le lissage de police ou l’anti-crénelage), le rapport de contraste du texte peut être évalué en désactivant l’anti-crénelage.\nNote : En ce qui concerne les critères de succès 1.4.3 et 1.4.6, le contraste est mesuré en tenant compte de l’arrière-plan sur lequel le texte est normalement affiché. Si aucune couleur d’arrière-plan n’est spécifiée, il est considéré comme blanc.\nNote : La couleur d’arrière-plan est la couleur spécifiée du contenu sur lequel le texte est normalement affiché. Il est considéré comme une erreur de ne pas définir une couleur d’arrière-plan lorsque la couleur du texte est spécifiée, parce que la couleur d’arrière-plan de l’utilisateur est inconnue et ne peut donc pas être évaluée pour vérifier si le contraste est suffisant. Pour la même raison, il est aussi considéré comme une erreur de ne pas définir la couleur du texte lorsqu’une couleur d’arrière-plan est spécifiée.\nNote : Lorsqu’il y a une bordure autour de la lettre, la bordure peut augmenter le contraste et serait utilisée dans le calcul du contraste entre la lettre et son arrière-plan. La couleur d’une bordure étroite autour de la lettre serait utilisée à la place de la lettre. Une bordure large autour de la lettre qui remplit l’espace dans lequel se découpe le détail de la lettre agit comme un halo et serait considérée comme un arrière-plan.\nNote : La conformité aux WCAG devrait être évaluée pour les paires de couleurs spécifiées dans le contenu qu’un auteur s’attendrait à voir apparaître de façon adjacente dans une présentation habituelle. Les auteurs n’ont pas besoin de prendre en considération les présentations inhabituelles comme les changements de couleurs faits par l’agent utilisateur sauf si ces changements sont provoqués par le code de l’auteur."
+    },
+    "regions": {
+      "title": "région",
+      "body": "section de contenu perceptible, déterminée par un programme informatique\nNote : En HTML, toute zone identifiée avec un rôle de repère (landmark) serait considérée comme une région."
+    },
+    "relationships": {
+      "title": "relations",
+      "body": "associations significatives entre des parties distinctes du contenu"
+    },
+    "role": {
+      "title": "rôle",
+      "body": "texte ou nombre par lequel un logiciel peut identifier la fonction d’un composant dans du contenu Web\nExemple\nUn nombre qui indique si une image sert d’hyperlien, de bouton de commande ou de case à cocher."
+    },
+    "satisfies": {
+      "title": "satisfait à un critère de succès",
+      "body": "le critère de succès ne se révèle pas « faux » lors de l’évaluation de la page"
+    },
+    "section": {
+      "title": "section",
+      "body": "une portion autonome de contenu écrit qui traite d’un ou plusieurs sujets ou idées liés entre eux\nNote : Une section peut consister en un ou plusieurs paragraphes et inclure des graphiques, des tableaux, des listes et des sous-sections."
+    },
+    "general-flash-and-red-flash-thresholds": {
+      "title": "seuil de flash générique et seuil de flash rouge",
+      "body": "un flash ou une séquence d’images changeant rapidement est en dessous du seuil de flash (c’est-à-dire que le contenu est conforme) si l’une des conditions suivantes est satisfaite :\n• il n’y a pas plus de trois flashs génériques et pas plus de trois flashs rouges par seconde ; ou\n• la surface d’affichage combinée des flashs simultanés ne représente pas plus de 0,006 stéradian dans chaque champ visuel de 10 degrés sur l’écran (soit 25% de chaque champ visuel de 10 degrés sur l’écran) à une distance habituelle de visualisation\noù :\n• un flash générique est défini comme une alternance de luminance relative de 10% ou plus par rapport à la luminance relative maximum (1.0), où la luminance relative de l’image la plus sombre est en dessous de 0,80 et où « une alternance » est définie comme étant une augmentation suivie d’une diminution ou une diminution suivie d’une augmentation, et\n• un flash rouge est défini comme toute alternance de transition impliquant un rouge saturé.\nException : Le flash qui suit un modèle précis et équilibré comme du bruit blanc ou un modèle de damier alterné avec des « carrés » dont les côtés font moins de 0,1 degré (du champ visuel à une distance habituelle de visualisation) ne dépasse pas le seuil de flash.\nNote : Pour les logiciels ou le contenu Web, un rectangle de 341 x 256 pixels n’importe où sur la surface d’affichage de l’écran, quand la résolution est à 1024 x 768 pixels, fournit une bonne estimation de ce que représente 10 degrés du champ visuel sur l’écran pour un écran et une distance habituelle de visualisation. Par exemple des écrans de 38 à 43 centimètres (15 à 17 pouces) à une distance de 55 à 65 centimètres (22-26 pouces). Cette résolution de 75 à 85 ppp est connue pour être plus basse, et donc plus conservatrice que la résolution nominale du pixel CSS de 96 ppp dans les spécifications CSS. Un affichage à une résolution supérieure du même contenu produirait des images plus petites et plus sûres, c’est pourquoi des résolutions inférieures sont utilisées pour définir le seuil.\nNote : Une transition est le changement, dans un temps donné, de luminance relative (ou de luminance relative ou de couleur pour le flash rouge) entre les pics et les creux adjacents dans un ensemble de mesures de luminance relative (ou de luminance relative ou de couleur pour le flash rouge). Un flash est constitué de deux transitions opposées.\nNote : La nouvelle définition utilisée dans le domaine pour « deux transitions opposées de rouge saturé » (provenant des WCAG 2.2) est : une paire de transitions opposées où une transition depuis ou vers un état avec une valeur R/(R + G + B) qui est supérieure ou égale à 0,8, et la différence entre les états est de plus de 0,2 (sans unité) sur le diagramme de chromaticité CIE 1976 UCS. [ISO_9241-391]\nNote : Des outils sont disponibles pour effectuer l’analyse depuis des captures vidéos. Cependant, aucun outil n’est nécessaire pour évaluer cette condition si le flash est inférieur ou égal à 3 flashs par seconde. Le contenu est automatiquement conforme (voir #1 et #2 ci-dessus)."
+    },
+    "audio-only": {
+      "title": "seulement audio",
+      "body": "une présentation temporelle qui contient seulement de l’audio (sans vidéo ni interaction)"
+    },
+    "video-only": {
+      "title": "seulement vidéo",
+      "body": "une présentation temporelle qui ne contient que de la vidéo (aucun flux audio ni aucune interaction)"
+    },
+    "captions": {
+      "title": "sous-titres",
+      "body": "visuel synchronisé ou équivalent textuel pour l’information audio avec ou sans parole nécessaire à la compréhension du contenu d’un média\nNote : Les sous-titres (en anglais captions) sont similaires à ceux qui sont utilisés seulement pour les dialogues (en anglais subtitles) sauf que les sous-titres ne communiquent pas seulement le contenu des dialogues parlés mais aussi des équivalents pour les informations audio autres que le dialogue et nécessaires à la compréhension du contenu du programme, y compris les effets sonores, la musique, les rires, l’identification et le positionnement des interlocuteurs.\nNote : Les sous-titres codés sont de la même espèce mais peuvent être activés ou désactivés dans certains lecteurs multimédia.\nNote : Les sous-titres visibles sont des sous-titres qui ne peuvent être désactivés. Par exemple, si les sous-titres sont un équivalent visuel en texte sous forme d’image intégré à la vidéo.\nNote : Les sous-titres ne devraient pas masquer l’information pertinente de la vidéo, même partiellement.\nNote : Dans certaines langues comme l’anglais on distingue entre caption et subtitles, le terme caption étant parfois traduit en français par sous-titres pour malentendants.\nNote : L’audio-description peut aussi être sous-titrée, mais n’a pas besoin de l’être, étant donné qu’il s’agit d’une description d’information qui est déjà présentée visuellement."
+    },
+    "structure": {
+      "title": "structure",
+      "body": "• La manière dont les parties d’une page Web sont organisées entre elles ; et\n• La manière dont un groupe de pages Web est organisé"
+    },
+    "assistive-technologies": {
+      "title": "technologie d’assistance",
+      "body": "(tel qu’utilisé dans ce document)\nmatériel ou logiciel qui agit comme agent utilisateur ou simultanément avec un agent utilisateur usuel afin de fournir des fonctionnalités répondant aux besoins des utilisateurs ayant des limitations fonctionnelles, fonctionnalités qui vont au-delà de celles qui sont offertes par les agents utilisateurs usuels\nNote : Les fonctionnalités fournies par les technologies d’assistance comprennent des présentations de remplacement (par exemple de la synthèse vocale ou du contenu agrandi), des méthodes de saisie alternatives (par exemple la voix), des mécanismes de navigation ou d’orientation supplémentaires et des transformations de contenu (par exemple pour rendre un tableau plus accessible).\nNote : Les technologies d’assistance communiquent souvent les données et les messages aux agents utilisateurs usuels en utilisant et en surveillant le fonctionnement d’une API (interface de programmation).\nNote : La distinction entre agents utilisateurs usuels et technologies d’assistance n’est pas absolue. Plusieurs agents utilisateurs usuels comportent des fonctions d’assistance aux utilisateurs ayant des limitations fonctionnelles. La principale différence est que ces agents utilisateurs usuels visent un public large et diversifié qui comprend des personnes avec et sans limitations fonctionnelles. Les technologies d’assistance visent des populations plus restreintes d’utilisateurs ayant des limitations fonctionnelles particulières. L’assistance fournie par une technologie d’assistance est plus spécifique et appropriée aux besoins des utilisateurs visés. Un agent utilisateur usuel peut comporter des fonctionnalités importantes pour les technologies d’assistance comme l’extraction du contenu Web à partir d’objets de programmation ou l’analyse syntaxique du balisage par paquets identifiables.\nExemple\nLes technologies d’assistance qui sont importantes dans le contexte du présent document comprennent les technologies suivantes :\n• les agrandisseurs d’écran et les autres assistants de lecture visuelle qui sont utilisés par les personnes ayant des limitations de la vision, de la perception ou d’accès physique à l’imprimé pour modifier la police de caractères, la taille, l’espacement, la couleur, la synchronisation avec la synthèse vocale, etc. dans le but d’améliorer la lisibilité visuelle du rendu des textes et des images ;\n• les lecteurs d’écran qui sont utilisés par les personnes aveugles pour lire l’information textuelle en synthèse vocale ou en braille ;\n• les logiciels de conversion du texte en parole qui sont utilisés par certaines personnes ayant des limitations cognitives, des limitations du langage et des difficultés d’apprentissage pour convertir le texte en synthèse vocale ;\n• les logiciels de reconnaissance vocale qui peuvent être utilisés par les personnes ayant certaines limitations motrices ;\n• des claviers de remplacement qui sont utilisés par des personnes ayant certaines limitations motrices pour simuler le clavier (y compris des claviers de remplacement qui utilisent des pointeurs de tête, des commutateurs simples, des dispositifs d’aspiration/expiration et d’autres dispositifs spéciaux d’aide à la saisie.) ;\n• des dispositifs de pointage adaptés qui sont utilisés par des personnes ayant certaines limitations motrices pour simuler le pointeur de la souris et l’activation des boutons."
+    },
+    "technologies": {
+      "title": "technologie Web",
+      "body": "mécanisme pour encoder les instructions devant être restituées, jouées ou exécutées par les agents utilisateurs\nNote : Tels qu’employés dans ces règles, l’expression « technologie Web » et le mot « technologie » (utilisé seul) désignent les technologies relatives aux contenus Web.\nNote : Les technologies relatives aux contenus Web comprennent les langages de balisage, les formats de données ou les langages de programmation que les auteurs sont amenés à utiliser seuls ou combinés pour créer des expériences pour l’utilisateur final qui vont de pages Web statiques jusqu’à des présentations multimédia synchronisées, en passant par des applications Web dynamiques.\nExemple\nOn compte parmi les exemples les plus fréquents de technologies Web : HTML, CSS, SVG, PNG, PDF, Flash et JavaScript."
+    },
+    "cognitive-function-test": {
+      "title": "test cognitif",
+      "body": "Une tâche qui demande à l’utilisateur de mémoriser, manipuler ou retranscrire une information. Des exemples comprennent, mais ne se limitent pas à :\n• la mémorisation, par exemple se souvenir d’un identifiant, d’un mot de passe, d’un ensemble de caractères, d’images ou de motifs. Les identifiants courants tels que le nom, l’adresse de courrier électronique et le numéro de téléphone ne sont pas considérés comme des tests cognitifs, car ils sont propres à l’utilisateur et constants d’un site Web à l’autre ;\n• la transcription, comme la saisie de caractères ;\n• l’utilisation d’une orthographe correcte ;\n• l’exécution de calculs ;\n• la résolution d’énigmes."
+    },
+    "text": {
+      "title": "texte",
+      "body": "séquence de caractères pouvant être déterminée par un programme informatique et exprimant quelque chose dans une langue donnée."
+    },
+    "images-of-text": {
+      "title": "texte sous forme d’image",
+      "body": "texte qui est restitué sous une forme non textuelle (par exemple une image) dans le but de permettre un effet visuel particulier\nNote : Cela n’inclut pas le texte qui est une partie d’une image qui contient d’autres contenus visuels signifiants.\nExemple\nLe nom d’une personne sur un badge dans une photographie."
+    },
+    "emergency": {
+      "title": "urgence",
+      "body": "un événement ou une situation soudaine et imprévue qui exige une action immédiate afin de préserver la santé, la sécurité ou la propriété"
+    },
+    "used-in-an-unusual-or-restricted-way": {
+      "title": "utilisé de manière inhabituelle ou de façon limitée",
+      "body": "mots employés de telle manière qu’ils obligent les utilisateurs à savoir exactement quelle définition appliquer afin de comprendre correctement le contenu\nExemple\nLe terme « mémoire » possède une signification différente dans une conversation universitaire de celle qu’il peut avoir dans un article consacré au stockage informatique, mais la définition pertinente peut être déduite du contexte. À l’inverse, le mot « texte » est utilisé de manière très spécifique dans les WCAG 2.1, à tel point qu’une définition figure dans le glossaire."
+    },
+    "conforming-alternate-versions": {
+      "title": "version de remplacement conforme",
+      "body": "version qui\n• se conforme au niveau déterminé et\n• fournit toutes les informations similaires et les mêmes fonctionnalités dans la même langue et\n• est aussi à jour que le contenu non conforme et\n•\npour laquelle au moins l’une des affirmations suivantes est vraie :\n• la version conforme peut être atteinte à partir de la page non conforme via un mécanisme compatible avec l’accessibilité ou\n• la version non conforme peut être atteinte seulement à partir de la version conforme ou\n• la version non conforme peut être atteinte seulement à partir d’une page conforme qui fournit aussi un mécanisme pour atteindre la version conforme.\nNote : Dans cette définition, « peut être atteinte seulement » signifie qu’il y a un mécanisme comme une redirection conditionnelle, qui empêche un utilisateur « d’atteindre » (de charger) la page non conforme à moins que l’utilisateur ne vienne justement de la version conforme de cette même page.\nNote : La version de remplacement n’a pas besoin d’être appariée page par page avec la version originale (par exemple la version de remplacement conforme peut se présenter en plusieurs pages).\nNote : Si des versions sont proposées dans plusieurs langues, une version de remplacement conforme est donc requise pour chacune de ces langues.\nNote : Des versions de remplacement peuvent aussi être fournies afin d’accommoder différents environnements technologiques ou différents groupes d’utilisateurs. Chaque version devrait être aussi conforme que possible. Une version devrait être entièrement conforme afin de satisfaire à l’exigence de conformité 1.\nNote : La version de remplacement conforme n’a pas besoin d’être située dans le périmètre de conformité ni même sur le même site Web tant qu’elle est aussi librement disponible que la version non conforme.\nNote : Une version de remplacement ne devrait pas être confondue avec un contenu additionnel qui s’ajoute à la page originale pour en améliorer la compréhension.\nNote : Permettre la configuration des préférences de l’utilisateur à l’intérieur du contenu afin de produire une version conforme est un mécanisme acceptable pour atteindre une autre version tant que la méthode utilisée pour configurer les préférences est compatible avec l’accessibilité.\nVoir Comprendre Version de remplacement conforme (en anglais)"
+    },
+    "alternative-for-time-based-media": {
+      "title": "version de remplacement pour un média temporel",
+      "body": "document renfermant dans un ordre correct une description des contenus visuels et sonores d’un média temporel et fournissant un moyen de réaliser les effets de toute interaction temporelle\nNote : Un scénario utilisé pour créer le contenu d’un média synchronisé serait conforme à cette définition seulement s’il a été corrigé afin de représenter fidèlement la version finale du média synchronisé après édition."
+    },
+    "video": {
+      "title": "vidéo",
+      "body": "vidéo la technologie des images ou photos en mouvement ou en séquence\nNote : Une vidéo peut être constituée d’images fixes ou animées ou des deux."
+    }
   }
 }

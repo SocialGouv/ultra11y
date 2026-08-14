@@ -9,7 +9,7 @@
 import { existsSync, statSync } from "node:fs";
 import { join, isAbsolute } from "node:path";
 import { readText } from "./util.js";
-import { registerRuntimePack, getPack, enableSecondaryMapping } from "./standards/registry.js";
+import { registerRuntimePack, registerScoped, ensureScope, withScope, getPack, enableSecondaryMapping } from "./standards/registry.js";
 import { formatIssues } from "./standards/validate.js";
 import { checkGuidance } from "./pack.js";
 import { registerRuntimeGuidance, hasGuidance } from "./guidance/index.js";
@@ -90,8 +90,31 @@ function packPaths(path: string): { pack: string; glossary?: string; guidance?: 
 }
 
 /** Load + register every configured/flagged pack (and its guidance) into the registries.
- *  Must run BEFORE any `resolveStandard`/`loadPack` so a runtime pack is resolvable. */
-export function loadRuntimeStandards(cwd: string, packFlags: string[], onWarn: (m: string) => void, override = false): LoadResult {
+ *  Must run BEFORE any `resolveStandard`/`loadPack` so a runtime pack is resolvable.
+ *
+ *  `opts.scope` confines the packs to one project root instead of the process-wide
+ *  registry — what a long-lived MCP server needs, since it serves many projects and two
+ *  of them may each declare a different pack under the same key. Guidance datasets stay
+ *  process-wide: they are keyed by pack key and only ever ADD examples, so a stray one
+ *  cannot change a verdict. */
+export function loadRuntimeStandards(
+  cwd: string,
+  packFlags: string[],
+  onWarn: (m: string) => void,
+  override = false,
+  opts: { scope?: string } = {},
+): LoadResult {
+  // Every READ below (`getPack` for a secondary mapping, for a guidance dataset's target
+  // pack) must see the packs this call just registered — which, under a scope, live in
+  // that scope's overlay and nowhere else.
+  return withScope(opts.scope, () => loadStandardsInto(cwd, packFlags, onWarn, override, opts));
+}
+
+function loadStandardsInto(cwd: string, packFlags: string[], onWarn: (m: string) => void, override: boolean, opts: { scope?: string }): LoadResult {
+  // Materialize the overlay up front, even when this project declares no pack of its own:
+  // a config that only enables a `secondaryMappings` entry still needs somewhere to put
+  // its copy-on-write clone of the built-in it edits.
+  if (opts.scope) ensureScope(opts.scope);
   const result: LoadResult = { errors: [], loadedPacks: [], loadedGuidance: [] };
   let config: Ultra11yConfig | null = null;
   try {
@@ -125,7 +148,7 @@ export function loadRuntimeStandards(cwd: string, packFlags: string[], onWarn: (
         onWarn(`ultra11y: ${paths.glossary} is not valid JSON — ignoring glossary.`);
       }
     }
-    const v = registerRuntimePack(packObj, glossary, { override });
+    const v = opts.scope ? registerScoped(opts.scope, packObj, glossary, { override }) : registerRuntimePack(packObj, glossary, { override });
     for (const issue of v.issues) if (issue.severity === "warn") onWarn(`ultra11y: ${raw}: ${issue.path ? `${issue.path}: ` : ""}${issue.message}`);
     if (!v.ok || !v.pack) {
       result.errors.push(`--pack ${paths.pack}: invalid pack\n${formatIssues(v.issues).join("\n")}`);

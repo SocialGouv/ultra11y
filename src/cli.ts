@@ -1,5 +1,5 @@
 import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync, copyFileSync } from "node:fs";
-import { join, relative, sep, dirname } from "node:path";
+import { join, relative, resolve, sep, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   VERSION,
@@ -3720,7 +3720,11 @@ export async function main(argv: string[]): Promise<number> {
           .map((s) => s.trim())
           .filter(Boolean)
       : [];
-  const loaded = loadRuntimeStandards(process.cwd(), packList, (m) => console.error(m), p.flags.override === true);
+  // `mcp --cwd <dir>` dedicates the server to another project, and a standards pack is
+  // that project's configuration — read it from THERE, not from whichever directory node
+  // happened to be started in. Every other command works on the process cwd.
+  const configRoot = p.command === "mcp" && typeof p.flags.cwd === "string" && p.flags.cwd ? resolve(p.flags.cwd) : process.cwd();
+  const loaded = loadRuntimeStandards(configRoot, packList, (m) => console.error(m), p.flags.override === true);
   if (loaded.errors.length) {
     for (const e of loaded.errors) console.error(`ultra11y: ${e}`);
     return 2;
