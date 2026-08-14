@@ -50372,17 +50372,19 @@ function resolve4(opts) {
   const mode = opts.transport ?? "auto";
   const api = (env.GITHUB_API_URL || "https://api.github.com").replace(/\/+$/, "");
   const token = env.GH_TOKEN || env.GITHUB_TOKEN;
-  const cliOk = (opts.cliAvailable ?? ghAvailable)();
+  const probe = opts.cliAvailable ?? ghAvailable;
+  let cached;
+  const cliOk = () => cached ??= probe();
   if (mode === "cli") {
-    return cliOk ? { transport: "cli", api } : { transport: "cli", api, reason: "`gh` is not installed or not authenticated (run `gh auth login`)" };
+    return cliOk() ? { transport: "cli", api } : { transport: "cli", api, reason: "`gh` is not installed or not authenticated (run `gh auth login`)" };
   }
-  const repo = env.ULTRA11Y_GITHUB_REPO || env.GITHUB_REPOSITORY || (mode === "rest" || !cliOk ? gitRemoteSlug("github.com") : void 0);
+  const repo = env.ULTRA11Y_GITHUB_REPO || env.GITHUB_REPOSITORY || (mode === "rest" || !cliOk() ? gitRemoteSlug("github.com") : void 0);
   if (mode === "rest") {
     if (!token) return { transport: "rest", api, reason: "no GitHub token \u2014 set GH_TOKEN or GITHUB_TOKEN" };
     if (!repo) return { transport: "rest", api, token, reason: "no repository \u2014 set GITHUB_REPOSITORY (owner/name) or ULTRA11Y_GITHUB_REPO" };
     return { transport: "rest", api, token, repo };
   }
-  if (cliOk) return { transport: "cli", api };
+  if (cliOk()) return { transport: "cli", api };
   if (token && repo) return { transport: "rest", api, token, repo };
   const missing = [!token ? "a token (GH_TOKEN/GITHUB_TOKEN)" : "", !repo ? "a repository (GITHUB_REPOSITORY)" : ""].filter(Boolean);
   return {

@@ -34,21 +34,26 @@ function resolve(opts: GithubOptions): Resolved {
   const mode = opts.transport ?? "auto";
   const api = (env.GITHUB_API_URL || "https://api.github.com").replace(/\/+$/, "");
   const token = env.GH_TOKEN || env.GITHUB_TOKEN;
-  const cliOk = (opts.cliAvailable ?? ghAvailable)();
+  // LAZY, because the probe is `gh auth status` — a subprocess that calls github.com. REST is
+  // the transport for the runners where `gh` is absent or useless, so a caller who already
+  // named REST must not pay for a network round trip whose answer is then discarded.
+  const probe = opts.cliAvailable ?? ghAvailable;
+  let cached: boolean | undefined;
+  const cliOk = (): boolean => (cached ??= probe());
 
   if (mode === "cli") {
-    return cliOk ? { transport: "cli", api } : { transport: "cli", api, reason: "`gh` is not installed or not authenticated (run `gh auth login`)" };
+    return cliOk() ? { transport: "cli", api } : { transport: "cli", api, reason: "`gh` is not installed or not authenticated (run `gh auth login`)" };
   }
   // Only REST needs the repo slug, and only REST should pay for a `git` subprocess to find
   // it — the CLI transport already knows which checkout it is standing in.
-  const repo = env.ULTRA11Y_GITHUB_REPO || env.GITHUB_REPOSITORY || (mode === "rest" || !cliOk ? gitRemoteSlug("github.com") : undefined);
+  const repo = env.ULTRA11Y_GITHUB_REPO || env.GITHUB_REPOSITORY || (mode === "rest" || !cliOk() ? gitRemoteSlug("github.com") : undefined);
   if (mode === "rest") {
     if (!token) return { transport: "rest", api, reason: "no GitHub token — set GH_TOKEN or GITHUB_TOKEN" };
     if (!repo) return { transport: "rest", api, token, reason: "no repository — set GITHUB_REPOSITORY (owner/name) or ULTRA11Y_GITHUB_REPO" };
     return { transport: "rest", api, token, repo };
   }
   // auto: the CLI first (it owns its auth), then REST, then say what BOTH were missing.
-  if (cliOk) return { transport: "cli", api };
+  if (cliOk()) return { transport: "cli", api };
   if (token && repo) return { transport: "rest", api, token, repo };
   const missing = [!token ? "a token (GH_TOKEN/GITHUB_TOKEN)" : "", !repo ? "a repository (GITHUB_REPOSITORY)" : ""].filter(Boolean);
   return {

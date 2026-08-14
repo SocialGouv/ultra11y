@@ -59,10 +59,19 @@ beforeEach(() => {
   err = [];
   vi.spyOn(console, "log").mockImplementation((m?: unknown) => void out.push(String(m)));
   vi.spyOn(console, "error").mockImplementation((m?: unknown) => void err.push(String(m)));
-  // A fully-configured REST GitHub, so the CLI never probes for `gh`.
   process.env.ULTRA11Y_TICKET_PROVIDER = "github";
   process.env.GITHUB_TOKEN = "t";
   process.env.GITHUB_REPOSITORY = "acme/app";
+  // NO SUBPROCESS, NO NETWORK — and this is not a nicety. `auto` transport resolution probes
+  // the REAL `gh` binary (`gh auth status`, which calls github.com) BEFORE it looks at the
+  // token, so which transport these tests exercise was decided by whatever `gh` the machine
+  // happened to have. Unauthenticated here → REST → green; authenticated on a GitHub-hosted
+  // runner → the CLI transport, `fetch` stubbed for nothing, and three tests red for a whole
+  // release while passing on every developer's laptop. An empty PATH turns the probe into an
+  // immediate ENOENT: the same answer on every machine, and one fewer round trip per test.
+  // Auto-resolution itself is tested where it is injectable — tests/tickets-github.test.ts
+  // drives `cliAvailable` directly, which is the only honest way to assert a probe's outcome.
+  process.env.PATH = join(dir, "no-such-bin");
 });
 
 afterEach(() => {

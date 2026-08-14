@@ -55,6 +55,24 @@ describe("transport resolution", () => {
     expect(p.available()).toBe(true);
   });
 
+  // The probe is `gh auth status` — a subprocess that calls github.com. REST exists precisely
+  // for the runners where `gh` is absent or useless (container jobs, self-hosted, GitLab CI),
+  // so paying for that round trip when the caller already named REST is a network call the run
+  // has no use for, and one more thing that can hang a pipeline.
+  it("never probes for `gh` when the caller already asked for REST", () => {
+    let probed = false;
+    const p = createGithubProvider({
+      transport: "rest",
+      env: REST_ENV,
+      cliAvailable: () => {
+        probed = true;
+        return true;
+      },
+    });
+    expect(p.available()).toBe(true);
+    expect(probed, "resolving an explicit --transport rest still shelled out to `gh`").toBe(false);
+  });
+
   it("names BOTH missing things when neither transport can work", () => {
     const p = createGithubProvider({ env: {}, cliAvailable: () => false });
     expect(p.available()).toBe(false);
