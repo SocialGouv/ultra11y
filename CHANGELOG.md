@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [4.2.0](https://github.com/maxgfr/ultra11y/compare/v4.1.0...v4.2.0) (2026-08-14)
+
+
+### Bug Fixes
+
+* **tickets:** the transport under test was the machine's, not the argument's ([c96f141](https://github.com/maxgfr/ultra11y/commit/c96f14193728e943b15b187884dd44af8ac49893))
+
+
+### Features
+
+* **evidence:** every document that shows a defect says what it did not show ([fa4b996](https://github.com/maxgfr/ultra11y/commit/fa4b9960cdac24a30d226ec39fae5f81b6b8a11b)), closes [#16](https://github.com/maxgfr/ultra11y/issues/16)
+
 # [4.1.0](https://github.com/maxgfr/ultra11y/compare/v4.0.1...v4.1.0) (2026-08-13)
 
 

@@ -5,7 +5,7 @@ when_to_use: "Invoke WITHOUT being asked whenever changed front-end code should 
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs *), Read, Grep, Glob
 license: MIT
 metadata:
-  version: 4.1.0
+  version: 4.2.0
 ---
 
 # review-a11y — accessibility review of changed code
