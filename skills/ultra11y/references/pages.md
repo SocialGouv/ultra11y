@@ -318,21 +318,32 @@ The mark is not monochrome: a white halo, a red ring, corner brackets whose shap
 and a dashed inner line that survives a monochrome print. This tool reports 1.4.1 failures; its
 own deliverable cannot commit one.
 
-**Nothing is cut in silence.** Twelve refusal reasons, each with its own sentence, counted per
-page and per criterion in the sheet itself:
+**Nothing is cut in silence.** Thirteen refusal reasons, each with its own sentence, counted
+per page and per criterion in the sheet itself:
 
 | Reason | What happened |
 |---|---|
-| `no-snapshot` · `no-screenshot` | the page has no capture to crop from |
+| `no-snapshot` | the capture this finding's own path names is not on this disk |
+| `no-screenshot` | the producer captured no image for that page |
 | `unreadable-image` · `no-boxes` · `truncated` | the capture or the box digest cannot be trusted |
 | `no-offsets` · `unjoinable` | the finding has no byte range, or it resolves to no element |
 | `page-scope` | the finding is about the document, not an element you can frame |
 | `zero-area` · `below-the-fold` | the element is invisible, or outside a viewport-only capture |
 | `unknown-scale` | the device pixel ratio could not be derived — a crop would be off-target |
-| `capped` | 6 per rule, 12 per page, 200 per run |
+| `deduplicated` | the same defect on the same element — another occurrence's picture shows it |
+| `capped` | a **distinct** defect went undrawn: 6 per rule, 12 per page, `--evidence-max` per run |
+
+The last two are counted apart on purpose. `deduplicated` costs the reader nothing — the
+defect is on screen, under another occurrence. `capped` is a real gap, and it is the only one
+a setting can close.
+
+A finding raised on SOURCE is in neither column: it never had pixels, so it is not an
+occurrence that failed to be illustrated, and a repository audited from source alone gets no
+notice at all rather than one line per finding.
 
 An occurrence with no picture must never read as an occurrence with no defect, so the sheet
-says how many were not illustrated and why.
+says how many were not illustrated and why. So does the combined document, the HTML sheets and
+the composite — every surface that can show a crop can say what it did not show.
 
 Without `--evidence` the Markdown is **byte-identical** to what it was. The crop bullet carries
 no `[ ]`, so `verify` builds the same worklist with or without it — indentation alone would not
@@ -340,10 +351,18 @@ be enough, since `AUDITOR_OCCURRENCE` is anchored `^\s*-\s\[ \]` and tolerates l
 
 ### The same, as a page (`--html`)
 
-`--html` writes `index.html` and one `page-<id>.html` beside the Markdown they mirror, plus a
-detachable single file that prints to PDF. Self-contained: no script, no external asset,
-nothing pointing outside the output directory. See `references/ci.md` for the artifact layout
-and the inline-size budget.
+`--html` writes `index.html` and one `page-<id>.html` beside the Markdown they mirror.
+Self-contained: no script, no external asset, nothing pointing outside the output directory.
+
+**The printable single file comes from `report --html`, not from here.** One composite per
+artifact: emitting one from both commands would put a second copy of every inlined crop into
+the same upload, so `pages --html` deliberately writes none.
+
+```sh
+node scripts/ultra11y.mjs report --in audits/audit-latest.json --html --evidence --out audits
+```
+
+See `references/ci.md` for the artifact layout and the inline-size budget.
 
 ## Holding an external audit against the grid
 

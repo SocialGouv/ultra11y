@@ -20,10 +20,18 @@
 // engine refuses. Deriving re-runs the same verified join every time, and refuses wholesale
 // when it does not hold, exactly as `align()` already does for styles and boxes.
 //
-// WHAT IT REFUSES. Most findings get no crop, and each reason is recorded and reported rather
-// than left as a gap: a source finding has no pixels, a component capture was rendered by
-// jsdom which paints nothing, a page-scope rule points at `<html>` and would "highlight" the
-// whole screenshot, and — the one that surprises people — an element below the fold is simply
+// WHAT IT REFUSES, AND WHAT IT NEVER COUNTED. Two different things, and conflating them is
+// how a report starts lying about its own coverage.
+//
+// NOT COUNTED: a finding raised on source code. It is not an occurrence this tier failed to
+// draw, it is an occurrence outside the tier — so it never enters `located`, and a repository
+// audited from source alone gets NO notice rather than one line per finding saying pixels
+// were never involved. The filter is the snapshot PATH (`byPage` below).
+//
+// REFUSED: a finding that IS on a captured page and still gets no crop. Each of those has a
+// reason, recorded and reported rather than left as a gap — a page-scope rule points at
+// `<html>` and would "highlight" the whole screenshot, a component capture rendered by jsdom
+// paints nothing, and — the one that surprises people — an element below the fold is simply
 // not in the image, because every producer captures the VIEWPORT on purpose so the screenshot
 // shares boxes.json's coordinate system (src/integrations/playwright.ts). None of these is a
 // bug to work around; each is a fact to state.
@@ -39,20 +47,28 @@ import type { SnapshotMeta, SnapshotViewport } from "./snapshot.js";
 import type { AuditResult, BoxDigest, BoxEntry, Finding, Lang } from "./types.js";
 
 /** Why a finding got no picture. Every one of these is REPORTED, never swallowed: a reader
- *  who sees fewer images than non-conformities must be told which, and why. */
-export type EvidenceSkip =
-  | "no-snapshot" // not raised on a page snapshot's dom.html (source finding, component capture)
-  | "no-screenshot" // the producer captured no image for this page
-  | "unreadable-image" // screen.png is not 8-bit truecolour, or is corrupt
-  | "no-boxes" // no boxes.json, or it did not verify against this dom.html
-  | "truncated" // the collector hit its element cap; this element has no box
-  | "no-offsets" // the finding carries no sourceStart (cannot be joined)
-  | "unjoinable" // sourceStart matches no element in dom.html
-  | "page-scope" // anchored at the document element: the page screenshot IS the illustration
-  | "zero-area" // the element has no painted box (display:contents, empty inline)
-  | "below-the-fold" // outside a viewport-only capture
-  | "unknown-scale" // image-pixels-per-CSS-pixel is indeterminate
-  | "capped"; // de-duplicated away by the caps below
+ *  who sees fewer images than non-conformities must be told which, and why.
+ *
+ *  A VALUE, not only a type, so the documentation can be held against it: `references/pages.md`
+ *  publishes this list to auditors, and a reason added here without a row there is a refusal
+ *  the reader meets in a report and cannot look up (tests/skill-md.test.ts). */
+export const EVIDENCE_SKIPS = [
+  "no-snapshot", // the snapshot this finding's own path names is not on disk (audit rendered elsewhere, `.ultra11y/` cleaned)
+  "no-screenshot", // the producer captured no image for this page
+  "unreadable-image", // screen.png is not 8-bit truecolour, or is corrupt
+  "no-boxes", // no boxes.json, or it did not verify against this dom.html
+  "truncated", // the collector hit its element cap; this element has no box
+  "no-offsets", // the finding carries no sourceStart (cannot be joined)
+  "unjoinable", // sourceStart matches no element in dom.html
+  "page-scope", // anchored at the document element: the page screenshot IS the illustration
+  "zero-area", // the element has no painted box (display:contents, empty inline)
+  "below-the-fold", // outside a viewport-only capture
+  "unknown-scale", // image-pixels-per-CSS-pixel is indeterminate
+  "deduplicated", // the same (rule, element) is already illustrated — one picture, every occurrence
+  "capped", // a numeric limit ran out (DEFAULT_CAPS below) — a DISTINCT defect went undrawn
+] as const;
+
+export type EvidenceSkip = (typeof EVIDENCE_SKIPS)[number];
 
 export interface EvidenceGeometry {
   /** Context kept around the element, in CSS pixels. */
@@ -323,7 +339,7 @@ const S: Record<Lang, { alt: (sel: string, page: string) => string; notImaged: (
     alt: (sel, page) => `Capture recadrée de l'élément ${sel} sur la page ${page}, entouré d'un cadre`,
     notImaged: (n) => `${n} occurrence(s) ne sont pas illustrées :`,
     reasons: {
-      "no-snapshot": "constat levé sur le code source, pas sur une page capturée — il n'y a pas de pixels à montrer",
+      "no-snapshot": "la capture de page que ce constat désigne n'est pas sur ce disque — sa référence fichier:ligne reste valable",
       "no-screenshot": "le producteur n'a pas fourni de capture pour cette page, donc le niveau pixel est inactif ici",
       "unreadable-image": "la capture n'est pas décodable (le moteur lit le truecolour 8 bits uniquement) — mieux vaut aucune image qu'une fausse",
       "no-boxes":
@@ -335,14 +351,15 @@ const S: Record<Lang, { alt: (sel: string, page: string) => string; notImaged: (
       "zero-area": "l'élément n'occupe aucune surface peinte",
       "below-the-fold": "l'élément est hors de la capture (la capture couvre la fenêtre, pas la page entière) — sa référence fichier:ligne reste valable",
       "unknown-scale": "le rapport pixels/CSS est indéterminé pour cette page ; un rapport deviné encadrerait le mauvais endroit",
-      capped: "occurrences regroupées : une illustration par élément distinct, dans la limite fixée",
+      deduplicated: "même défaut sur le même élément : il est montré par l'illustration d'une autre occurrence, rien n'a été perdu",
+      capped: "défaut distinct laissé sans image : le plafond de vignettes de ce lot est atteint — relevez `--evidence-max` pour les obtenir",
     },
   },
   en: {
     alt: (sel, page) => `Cropped screenshot of the ${sel} element on the ${page} page, outlined`,
     notImaged: (n) => `${n} occurrence(s) are not illustrated:`,
     reasons: {
-      "no-snapshot": "raised on source code, not on a captured page — there are no pixels to show",
+      "no-snapshot": "the page snapshot this finding names is not on this disk — its file:line reference still holds",
       "no-screenshot": "the producer supplied no screenshot for this page, so the pixel tier is inactive here",
       "unreadable-image": "the screenshot does not decode (the engine reads 8-bit truecolour only) — no image beats a wrong one",
       "no-boxes": "the element positions do not verify against the serialized DOM, so they were refused wholesale rather than outlining the wrong element",
@@ -353,25 +370,36 @@ const S: Record<Lang, { alt: (sel: string, page: string) => string; notImaged: (
       "zero-area": "the element paints no box",
       "below-the-fold": "the element sits outside the capture (the screenshot covers the viewport, not the whole page) — its file:line reference still holds",
       "unknown-scale": "the image-pixel to CSS-pixel ratio is indeterminate for this page; a guessed ratio would outline the wrong place",
-      capped: "occurrences grouped: one illustration per distinct element, up to the cap",
+      deduplicated: "the same defect on the same element: it is shown by the illustration of another occurrence, nothing was lost",
+      capped: "a distinct defect left undrawn: this run's crop limit was reached — raise `--evidence-max` to get them",
     },
   },
 };
 
-/** What the report says about what it did NOT draw — per page, or overall when `pageId` is
- *  null. Empty when everything located was imaged. */
-export function evidenceNotice(m: EvidenceManifest, pageId: string | null, lang: Lang): string[] {
+/** The refusals themselves — per page, or overall when `pageId` is null. Undefined when
+ *  everything located was imaged.
+ *
+ *  This is the DECISION (which refusals, with what counts, in what order); the bullet
+ *  characters belong to whoever renders it. Markdown gets `- `, the HTML tier gets `<li>`,
+ *  and neither can drift from the other because there is only one list here. */
+export function evidenceRefusals(m: EvidenceManifest, pageId: string | null, lang: Lang): { headline: string; reasons: string[] } | undefined {
   const t = pageId === null ? m.totals : m.perPage.get(pageId);
-  if (!t) return [];
+  if (!t) return undefined;
   const missing = t.located - t.imaged;
-  if (missing <= 0) return [];
+  if (missing <= 0) return undefined;
+  const entries = Object.entries(t.skipped).filter(([, n]) => n) as [EvidenceSkip, number][];
   const s = S[lang];
-  const out = [s.notImaged(missing)];
-  for (const [reason, n] of Object.entries(t.skipped).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))) {
-    if (!n) continue;
-    out.push(`- ${n} — ${s.reasons[reason as EvidenceSkip]}`);
-  }
-  return out;
+  return {
+    headline: s.notImaged(missing),
+    reasons: entries.sort((a, b) => b[1] - a[1]).map(([reason, n]) => `${n} — ${s.reasons[reason]}`),
+  };
+}
+
+/** What the report says about what it did NOT draw, as Markdown. Empty when there is
+ *  nothing to say. */
+export function evidenceNotice(m: EvidenceManifest, pageId: string | null, lang: Lang): string[] {
+  const r = evidenceRefusals(m, pageId, lang);
+  return r ? [r.headline, ...r.reasons.map((x) => `- ${x}`)] : [];
 }
 
 // ---- the run -----------------------------------------------------------------------------
@@ -441,10 +469,17 @@ export function writeEvidence(result: AuditResult, opts: EvidenceOptions): Evide
       // handful of DIFFERENT things actually wrong.
       const key = `${f.ruleId}\u0000${f.selectorHint}`;
       const ruleCount = perRule.get(f.ruleId) ?? 0;
-      if (seen.has(key) || ruleCount >= caps.perRule || onPage >= caps.perPage || manifest.crops.size >= caps.total) {
-        manifest.skipped.set(id, "capped");
-        bump(tally, "capped");
-        bump(manifest.totals, "capped");
+      // TWO FACTS, never one label. `deduplicated` means the reader IS looking at this defect,
+      // in another occurrence's picture — nothing was lost. `capped` means a DISTINCT defect
+      // has no picture at all because a limit ran out. Only the second costs the reader
+      // something, and only the second is worth a setting; folding them together hid the one
+      // sentence that could tell someone their artifact is incomplete.
+      const overLimit = ruleCount >= caps.perRule || onPage >= caps.perPage || manifest.crops.size >= caps.total;
+      const refusal = seen.has(key) ? "deduplicated" : overLimit ? "capped" : null;
+      if (refusal) {
+        manifest.skipped.set(id, refusal);
+        bump(tally, refusal);
+        bump(manifest.totals, refusal);
         continue;
       }
 

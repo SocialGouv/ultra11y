@@ -5,13 +5,16 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join, sep } from "node:path";
 import { main } from "../src/cli.js";
 import { parseHtml } from "../src/parse/html.js";
 import { encodePng } from "../src/pixel.js";
 import { PAGES_DIR } from "../src/snapshot.js";
 
-const DOM = `<!doctype html><html lang="fr"><head><title>Accueil</title></head><body><main><h1>Accueil</h1>
+/** Distinct per page ON PURPOSE: `audit` de-duplicates byte-identical inputs, so two pages
+ *  sharing a DOM would collapse into one and every per-page assertion below would be about a
+ *  single page wearing two names. */
+const DOM = (name: string): string => `<!doctype html><html lang="fr"><head><title>${name}</title></head><body><main><h1>${name}</h1>
 <img src="hero.png">
 <a href="/a"><img src="i.png"></a>
 <input type="text">
@@ -20,16 +23,19 @@ const DOM = `<!doctype html><html lang="fr"><head><title>Accueil</title></head><
 /** A page snapshot the pixel tier can actually work from: DOM, meta with a viewport, boxes
  *  joined by document-order ordinal, and a screenshot made with the engine's own encoder —
  *  so no binary enters the repository. */
-function snapshot(root: string, id: string, name: string): void {
+function snapshot(root: string, id: string, name: string, opts: { screenshot?: boolean } = {}): void {
   const dir = join(root, PAGES_DIR, id);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "meta.json"), JSON.stringify({ v: 1, id, name, url: `https://exemple.fr/${id}`, viewport: { width: 400, height: 300 } }));
-  writeFileSync(join(dir, "dom.html"), DOM);
-  const doc = parseHtml(DOM, "d.html");
+  const dom = DOM(name);
+  writeFileSync(join(dir, "dom.html"), dom);
+  const doc = parseHtml(dom, "d.html");
   const entries = doc.elements.map((el, i) => ({ i, tag: el.tag, x: 10 + (i % 3) * 20, y: 10 + i * 12, w: 80, h: 24 }));
   entries[0] = { i: 0, tag: doc.elements[0]!.tag, x: 0, y: 0, w: 400, h: 300 };
   writeFileSync(join(dir, "boxes.json"), JSON.stringify({ v: 1, entries }));
-  writeFileSync(join(dir, "screen.png"), encodePng({ width: 400, height: 300, data: Buffer.alloc(400 * 300 * 4, 0xc8) }));
+  // A page the producer captured no image for is the cheapest GUARANTEED refusal: every
+  // finding on it is `no-screenshot`, whatever the rules happen to fire.
+  if (opts.screenshot !== false) writeFileSync(join(dir, "screen.png"), encodePng({ width: 400, height: 300, data: Buffer.alloc(400 * 300 * 4, 0xc8) }));
 }
 
 function capture() {
@@ -61,6 +67,13 @@ async function project(): Promise<string> {
   const r = await run(["audit", `${PAGES_DIR}/**/dom.html`, "--out", "out", "--json"], root);
   expect(r.code).toBe(0);
   return root;
+}
+
+/** The CROPS an output directory holds, and only them. `assets/<id>.png` is a page
+ *  screenshot the sheet copier put there; a crop is always `assets/<page-id>/<hash>.png`,
+ *  so the nesting is the discriminant. */
+function crops(root: string, dir: string): string[] {
+  return readdirSync(join(root, dir, "assets"), { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".png") && f.includes(sep));
 }
 
 const roots: string[] = [];
@@ -99,6 +112,51 @@ describe("pages --evidence", () => {
     await run(["pages", "--in", "out/audit-latest.json", "--format", "report", "--split", "page", "--evidence", "--out", "out/pages"], root);
     const md = readFileSync(join(root, "out", "pages", "page-accueil.md"), "utf8");
     if (md.includes("not illustrated") || md.includes("pas illustrées")) expect(md).toMatch(/- \d+ — /);
+  });
+
+  // `--evidence-max` is the artifact's size fuse: one design-system defect repeated across
+  // 38 routes is 38 pictures of the same thing. It shipped as an `action.yml` input read by
+  // nothing, documented in references/ci.md as if it worked — so it is asserted here by its
+  // EFFECT on the files, not by the flag being accepted.
+  it("caps the crops it writes at --evidence-max", async () => {
+    const root = await tmpProject();
+    await run(["pages", "--in", "out/audit-latest.json", "--format", "report", "--split", "page", "--evidence", "--out", "out/all"], root);
+    expect(crops(root, "out/all").length, "the fixture must produce more crops than the cap, or the cap proves nothing").toBeGreaterThan(1);
+
+    const r = await run(
+      ["pages", "--in", "out/audit-latest.json", "--format", "report", "--split", "page", "--evidence", "--evidence-max", "1", "--out", "out/capped"],
+      root,
+    );
+    expect(r.code).toBe(0);
+    expect(crops(root, "out/capped")).toHaveLength(1);
+  });
+
+  it("caps `report --html --evidence` the same way — one fuse, both callers", async () => {
+    const root = await tmpProject();
+    const r = await run(["report", "--in", "out/audit-latest.json", "--html", "--evidence", "--evidence-max", "1", "--out", "out/audits"], root);
+    expect(r.code).toBe(0);
+    expect(crops(root, "out/audits")).toHaveLength(1);
+  });
+
+  // The combined document is the same deliverable as the sheets, in one file — and it was the
+  // one Markdown surface that carried the crops without the refusals. An occurrence with no
+  // picture read there exactly like an occurrence with no defect.
+  it("carries the refusals in the combined document too, page by page", async () => {
+    const root = mkdtempSync(join(tmpdir(), "ultra11y-visual-"));
+    roots.push(root);
+    snapshot(root, "accueil", "Accueil");
+    snapshot(root, "muette", "Muette", { screenshot: false });
+    expect((await run(["audit", `${PAGES_DIR}/**/dom.html`, "--out", "out", "--json"], root)).code).toBe(0);
+
+    const base = ["pages", "--in", "out/audit-latest.json", "--format", "report", "--lang", "en", "--evidence"];
+    await run([...base, "--split", "page", "--out", "out/split"], root);
+    const one = await run([...base, "--out", "out/one"], root);
+
+    expect(readFileSync(join(root, "out", "split", "page-muette.md"), "utf8")).toContain("supplied no screenshot");
+    const combined = readFileSync(join(root, one.out.trim()), "utf8");
+    expect(combined).toContain("are not illustrated");
+    // ONCE, under the page it belongs to — not one global blob repeated on every page.
+    expect(combined.match(/supplied no screenshot/g)).toHaveLength(1);
   });
 
   it("leaves the Markdown byte-identical when it is not asked for", async () => {
@@ -173,13 +231,6 @@ describe("--html", () => {
     expect(r.err).toContain("sarif");
   });
 
-  it("refuses --evidence on `report` without --html, rather than writing images nothing shows", async () => {
-    const root = await tmpProject();
-    const r = await run(["report", "--in", "out/audit-latest.json", "--evidence", "--out", "out/audits"], root);
-    expect(r.code).toBe(2);
-    expect(r.err).toMatch(/--html/);
-  });
-
   it("emits nothing that points outside the artifact", async () => {
     const root = await tmpProject();
     await run(["pages", "--in", "out/audit-latest.json", "--format", "report", "--split", "page", "--evidence", "--html", "--out", "out/pages"], root);
@@ -192,6 +243,58 @@ describe("--html", () => {
         expect(ref, `${f} points outside the artifact`).not.toMatch(/^\.\.\/|^https?:|^file:|\.ultra11y/);
       }
     }
+  });
+});
+
+describe("report --evidence", () => {
+  /** Every `.md` and `.html` in the output tree, concatenated. */
+  const documents = (root: string, dir: string): string =>
+    readdirSync(join(root, dir), { recursive: true, encoding: "utf8" })
+      .filter((f) => f.endsWith(".md") || f.endsWith(".html"))
+      .map((f) => readFileSync(join(root, dir, f), "utf8"))
+      .join("\n");
+
+  // 4.1.0 wrote crops into `audits/assets/` that NO document referenced, and inlined the same
+  // images as base64 in the composite: every vignette travelled twice, once for nothing. The
+  // cause was the original plan's own intention left unwired — the Markdown conformance
+  // report, the deliverable an auditor signs, had no pictures at all.
+  it("leaves no crop that no document references", async () => {
+    const root = await tmpProject();
+    await run(["report", "--in", "out/audit-latest.json", "--html", "--evidence", "--out", "out/audits"], root);
+    const docs = documents(root, "out/audits");
+    const written = crops(root, "out/audits");
+    expect(written.length).toBeGreaterThan(0);
+    for (const c of written) expect(docs, `nothing references ${c}`).toContain(basename(c));
+  });
+
+  it("illustrates the conformance report itself", async () => {
+    const root = await tmpProject();
+    await run(["report", "--in", "out/audit-latest.json", "--html", "--evidence", "--out", "out/audits"], root);
+    const md = readdirSync(join(root, "out", "audits")).find((f) => /^wcag-.*\.md$/.test(f))!;
+    // `./assets/<page>/<hash>.png` — the NESTED path is a crop. `./assets/<page>.png` is the
+    // page screenshot the report already carried, and matching that would prove nothing.
+    expect(readFileSync(join(root, "out", "audits", md), "utf8")).toMatch(/!\[[^\]]+\]\(\.\/assets\/[^/)]+\/[0-9a-f]+\.png\)/);
+  });
+
+  // The refusal this replaces said "--evidence only illustrates the HTML report". That was
+  // true and is not any more, so it is gone rather than kept as a lie with an exit code.
+  it("illustrates the Markdown report on its own, with no --html", async () => {
+    const root = await tmpProject();
+    const r = await run(["report", "--in", "out/audit-latest.json", "--evidence", "--out", "out/audits"], root);
+    expect(r.code).toBe(0);
+    expect(readFileSync(r.out.trim().startsWith("/") ? r.out.trim() : join(root, r.out.trim()), "utf8")).toContain("./assets/");
+    expect(readdirSync(join(root, "out", "audits")).filter((f) => f.endsWith(".html"))).toHaveLength(0);
+  });
+
+  // DECIDED, and written in the code rather than only in a plan: a ticket body is read on
+  // github.com, where a path relative to `audits/` resolves to nothing. A broken image in an
+  // issue is worse than no image, so the backlog surfaces stay text.
+  it("keeps the crops out of `prd`, whose output is read outside the artifact", async () => {
+    const root = await tmpProject();
+    await run(["report", "--in", "out/audit-latest.json", "--evidence", "--out", "out/audits"], root);
+    const r = await run(["prd", "--in", "out/audit-latest.json", "--evidence", "--out", "out/prd"], root);
+    expect(r.code).toBe(0);
+    expect(documents(root, "out/prd")).not.toContain("assets/");
   });
 });
 

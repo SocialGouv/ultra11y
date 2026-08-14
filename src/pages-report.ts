@@ -155,10 +155,15 @@ export interface PageReportOpts {
   /** The annotated crop illustrating one occurrence, when the evidence tier drew one. Passed
    *  straight through to the auditor block, which owns the one place a crop is emitted. */
   cropFor?: AuditorCropLookup;
-  /** What the evidence tier could NOT draw on this page, and why — already localized. Printed
+  /** What the evidence tier could NOT draw on a page, and why — already localized. Printed
    *  under the screenshot so a reader is never left to infer that an absent image means an
-   *  absent defect. */
-  evidenceNotice?: string[];
+   *  absent defect.
+   *
+   *  A LOOKUP, not a list, because `renderPagesDocument` renders every page from one opts
+   *  object: a list would print one page's refusals under all of them, and the caller that
+   *  wanted to avoid that instead passed nothing at all — which is how the combined document
+   *  came to carry the crops without the refusals. */
+  evidenceNotice?: (pageId: string) => string[];
 }
 
 /** One criterion's line on one page's sheet. Exported because the HTML renderer and the CI
@@ -270,7 +275,8 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
 
   // What the evidence tier refused to draw, and why. An unillustrated occurrence must never
   // read as an absent one — the whole posture of this engine is that nothing is cut silently.
-  if (opts.evidenceNotice?.length) out.push(...opts.evidenceNotice, "");
+  const refused = opts.evidenceNotice?.(page.id) ?? [];
+  if (refused.length) out.push(...refused, "");
 
   // The grid carries the criterion's own numbered TESTS, not just its title and status:
   // those tests are what has to be checked, and listing them only inside the

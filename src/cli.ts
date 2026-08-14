@@ -88,7 +88,8 @@ Usage:
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
   ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor] [--format sarif|github]   (re-gate an audit already computed — e.g. one carrying adjudicated verdicts — without a second detection pass)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
-  ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file; --evidence adds annotated crops)
+  ultra11y report   --in <audit.json> [--evidence [--evidence-max <n>]] [--out <dir>]   (the Markdown report, illustrated with annotated crops)
+  ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file)
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
@@ -113,7 +114,7 @@ Usage:
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
-  ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence] [--html]   (annotated crops of each non-conformity, and the HTML site)
+  ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
   ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
   ultra11y pages    --in <audit.json> --standard <pack> --diff <external.json>   (hold the grid against an audit someone else performed)
   ultra11y import   --from file <report.json> | --from ara <id> [--source <adapter>] [--out <dir>] [--json]
@@ -516,6 +517,8 @@ const VALUE_FLAGS = new Set([
   "format",
   // Bytes of image data the single-file HTML report may carry inline (src/html-emit.ts).
   "inline-budget",
+  // Hard cap on the crops one run writes (src/evidence.ts `DEFAULT_CAPS.total`).
+  "evidence-max",
   "guidance",
   "runtime",
   "cwd",
@@ -1409,7 +1412,7 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   // was raised on — never stamped on the finding, because a rectangle in pixels is a property
   // of the image and goes silently wrong the moment the audit is re-rendered against another
   // capture. `writeEvidence` reports what it could NOT draw, and that refusal is printed.
-  const manifest = wantEvidence ? writeEvidence(result, { outDir }) : undefined;
+  const manifest = wantEvidence ? writeEvidence(result, { outDir, ...evidenceCapsOf(p) }) : undefined;
   const cropFor = manifest
     ? (f: Finding) => {
         const c = manifest.crops.get(findingId(f));
@@ -1425,8 +1428,12 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
     );
     for (const line of total) console.error(line);
   }
+  // ONE object, both paths. The split path used to assemble its own notice and the combined
+  // path silently went without — so the deliverable that fits in a single file was the one
+  // that never said what it had not illustrated.
   const evidenceOpts = {
     ...(cropFor ? { cropFor } : {}),
+    ...(manifest ? { evidenceNotice: (id: string) => evidenceNotice(manifest, id, lang) } : {}),
   };
 
   if (!split) {
@@ -1456,11 +1463,7 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   const sheet = (id: string): string => `page-${id}.md`;
   const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
   for (const pg of derived) {
-    const notice = manifest ? evidenceNotice(manifest, pg.id, lang) : [];
-    writeFileSync(
-      join(outDir, sheet(pg.id)),
-      `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts, ...(notice.length ? { evidenceNotice: notice } : {}) })}\n`,
-    );
+    writeFileSync(join(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}\n`);
   }
   const index = join(outDir, "index.md");
   writeFileSync(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}\n`);
@@ -1480,14 +1483,32 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   return html?.imagesDropped ? 1 : 0;
 }
 
-/** `--inline-budget` in bytes, or undefined for the module default. Rejected loudly rather
- *  than coerced: silently falling back to 12 MB on a typo is how a run appears to honour a
- *  budget it never read. */
-function budgetOf(p: ParsedArgs): number | undefined {
-  const raw = p.flags["inline-budget"];
+/** A positive integer flag, or undefined for the module default. A malformed value is
+ *  REPORTED, never coerced: silently falling back to the default on a typo is how a run
+ *  appears to honour a limit it never read — the same class of defect as an input the
+ *  action declares and no step passes. */
+function positiveIntFlag(p: ParsedArgs, name: string): number | undefined {
+  const raw = p.flags[name];
   if (typeof raw !== "string" || !raw) return undefined;
   const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
+  if (Number.isFinite(n) && n > 0) return n;
+  console.error(`ultra11y: --${name} expects a positive integer (got "${raw}"). Ignored — the default applies.`);
+  return undefined;
+}
+
+/** `--inline-budget` in bytes, or undefined for the module default. */
+function budgetOf(p: ParsedArgs): number | undefined {
+  return positiveIntFlag(p, "inline-budget");
+}
+
+/** `--evidence-max` as the evidence tier's cap override. Only the RUN-WIDE total is exposed:
+ *  the per-rule and per-page caps are what make one image stand for a repeated defect, and a
+ *  user raising them would get back the 472-pictures-of-one-defect artifact the caps exist to
+ *  prevent. What a user actually needs to control is how big the upload gets — that is the
+ *  total, and it is the only one that is a size fuse rather than a de-duplication rule. */
+function evidenceCapsOf(p: ParsedArgs): { caps: { total: number } } | Record<string, never> {
+  const total = positiveIntFlag(p, "evidence-max");
+  return total === undefined ? {} : { caps: { total } };
 }
 
 /** Write the HTML documents and report the budget ladder. Shared by `pages` and `report`, so
@@ -1797,21 +1818,28 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
     return 0;
   }
 
-  const path = writeReport(result, { out, lang, standard });
+  // THE EVIDENCE TIER, before anything is rendered — because BOTH deliverables read it. The
+  // crops are written once into `<out>/assets/<page>/`; the Markdown report references them
+  // as files and the composite inlines the same bytes as data: URIs, because only the
+  // composite has to travel alone. Rendering the Markdown first is what left those files
+  // referenced by no document at all while the composite carried a second copy of each.
+  const manifest = p.flags.evidence === true ? writeEvidence(result, { outDir: out, ...evidenceCapsOf(p) }) : undefined;
+  if (manifest) {
+    for (const line of evidenceNotice(manifest, null, lang)) console.error(line);
+  }
+  const cropFor = manifest
+    ? (f: Finding) => {
+        const c = manifest.crops.get(findingId(f));
+        return c ? { href: c.href, alt: c.alt[lang] } : undefined;
+      }
+    : undefined;
+
+  const path = writeReport(result, { out, lang, standard, ...(cropFor ? { cropFor } : {}) });
   // The HTML tier: the artifact's front door plus the detachable, printable composite. Written
   // beside the Markdown, in the same `--out`, so the directory stays one self-contained root.
   let html: ReturnType<typeof writeHtml> | undefined;
   if (p.flags.html === true) {
-    const manifest = p.flags.evidence === true ? writeEvidence(result, { outDir: out }) : undefined;
-    if (manifest) for (const line of evidenceNotice(manifest, null, lang)) console.error(line);
     html = emitHtml(result, { outDir: out, standard, lang, ...(manifest ? { evidence: manifest } : {}), inlineBudget: budgetOf(p) });
-  } else if (p.flags.evidence === true) {
-    console.error(
-      lang === "fr"
-        ? "ultra11y report : --evidence n'illustre que le rapport HTML. Ajoutez --html, ou utilisez `pages --format report --evidence` pour des fiches Markdown illustrées."
-        : "ultra11y report: --evidence only illustrates the HTML report. Add --html, or use `pages --format report --evidence` for illustrated Markdown sheets.",
-    );
-    return 2;
   }
   // Partial-audit advisory (owner decision): a pack (RGAA) report whose scan coverage
   // leaves needs-rendering criteria untested — warn prominently on the CLI, naming exactly

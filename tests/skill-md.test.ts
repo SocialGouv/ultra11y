@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { parse } from "yaml";
 import { VERSION } from "../src/types.js";
 import { COMMANDS, REMOVED_FLAGS } from "../src/cli.js";
+import { EVIDENCE_SKIPS } from "../src/evidence.js";
 import { ALL_RULES } from "../src/rules/registry.js";
 
 // Guards that the published skills stay installable via `npx skills add` and
@@ -107,6 +108,15 @@ describe("skill docs stay in sync with the CLI", () => {
       if (removed.has(f)) continue;
       expect(help.includes(f), `--help omits ${f}, which the docs document`).toBe(true);
     }
+  });
+
+  // The refusal list is not internal vocabulary: an auditor reads `deduplicated` or
+  // `below-the-fold` in a delivered report and looks it up. A reason the engine can emit and
+  // the reference does not name is a word the reader cannot resolve — and the table said
+  // "twelve" for a whole release while the engine had its own ideas.
+  it("names every evidence refusal reason in references/pages.md", () => {
+    const doc = refBodies["pages.md"] ?? "";
+    for (const skip of EVIDENCE_SKIPS) expect(doc.includes(`\`${skip}\``), `references/pages.md never names \`${skip}\``).toBe(true);
   });
 
   it("pins the '53 static checks' prose claim to the real ALL_RULES count", () => {

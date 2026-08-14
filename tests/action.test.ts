@@ -36,6 +36,16 @@ describe("the action is well-formed", () => {
   it("documents every input", () => {
     for (const [name, spec] of Object.entries(ACTION.inputs)) expect(spec.description, `input ${name}`).toBeTruthy();
   });
+
+  // The closure that `CONSUMERS` gates, taken by the other end. `CONSUMERS` catches a STEP
+  // nobody listed; this catches an INPUT nobody reads — a setting the description promises
+  // and no command receives. `evidence-max` shipped in 4.1.0 exactly like that: declared,
+  // defaulted to 200, documented in references/ci.md, and passed to nothing.
+  it("reads every input it declares — an unread input is a documented lie", () => {
+    for (const name of Object.keys(ACTION.inputs)) {
+      expect(RAW.includes(`inputs.${name}`), `input \`${name}\` is declared but no step reads it`).toBe(true);
+    }
+  });
 });
 
 describe("it runs the engine that ships with it", () => {
@@ -384,6 +394,27 @@ describe("the HTML tier", () => {
   it("degrades to a warning rather than failing the job", () => {
     expect(html().run).toContain("::warning::");
     expect(html().run).toContain("exit 0");
+  });
+
+  // `Markdown report` writes `audits/<std>-<date>.md` and runs `check` on it; `HTML report`
+  // invokes `report` again into the same `--out`, which REWRITES that same file. So the two
+  // invocations must agree about evidence — otherwise the document the integrity gate
+  // validated is not the document that ships, and the difference is exactly the illustrations.
+  it("gives both `report` invocations the same evidence flags", () => {
+    const writers = ACTION.runs.steps.filter((s) => s.run?.includes("report --in audits/audit-latest.json") && !s.run.includes("--format"));
+    expect(writers.map((s) => s.name)).toEqual(["Markdown report", "HTML report"]);
+    for (const s of writers) {
+      expect(s.run, `step "${s.name}" ignores inputs.evidence`).toContain("inputs.evidence }}");
+      expect(s.run, `step "${s.name}" ignores inputs.evidence-max`).toContain("inputs.evidence-max }}");
+    }
+  });
+
+  // The composite is one self-contained file, so every crop it shows travels inside it as
+  // base64. A team whose artifact blows past the 12 MB default hits that in CI and nowhere
+  // else — which is precisely where the knob was missing.
+  it("lets a team set the composite's inline budget from CI, where the problem actually shows up", () => {
+    expect(ACTION.inputs["inline-budget"]).toBeDefined();
+    expect(html().run).toContain("inputs.inline-budget }}");
   });
 
   it("publishes both document paths as outputs", () => {

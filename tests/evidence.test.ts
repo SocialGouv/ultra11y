@@ -294,9 +294,14 @@ describe("writeEvidence", () => {
     expect(new Set([...m.crops.values()].map((c) => c.ruleId)).size).toBe(1);
     expect(m.totals.imaged).toBe(6);
     expect(m.totals.located).toBe(472);
-    expect(m.totals.skipped.capped).toBe(466);
+    // The 466 that got no picture are NOT one number. The 7th distinct element never got one
+    // at all — the per-rule cap ran out on it — and its 67 occurrences are a real gap. The
+    // other 399 are occurrences of the six elements already illustrated: covered, not lost.
+    // Reporting both as "capped" hid the only figure a reader needs to judge completeness.
+    expect(m.totals.skipped.capped).toBe(67);
+    expect(m.totals.skipped.deduplicated).toBe(399);
     // The arithmetic must close: nothing is dropped without being counted.
-    expect(m.totals.imaged + (m.totals.skipped.capped ?? 0)).toBe(m.totals.located);
+    expect(m.totals.imaged + (m.totals.skipped.capped ?? 0) + (m.totals.skipped.deduplicated ?? 0)).toBe(m.totals.located);
   });
 
   it("caps a page even when the rules are many", () => {
@@ -357,6 +362,61 @@ describe("what the report says about what it did not draw", () => {
     expect(fr.join("\n")).toContain("2 occurrence(s) ne sont pas illustrées");
     expect(en.join("\n")).toContain("2 occurrence(s) are not illustrated");
     expect(fr.join("\n")).not.toEqual(en.join("\n"));
+  });
+
+  // THE DENOMINATOR. `--evidence` is on by default in the action while most repositories are
+  // audited from source, so "N occurrences are not illustrated" over findings that never had
+  // pixels would be the notice almost every user sees — noise that teaches them to skip the
+  // one that matters. A source finding is not an occurrence this tier failed to draw; it is
+  // outside the tier. `writeEvidence` keys on the snapshot PATH and drops the rest before
+  // counting, and this pins that: the silence is a property of the denominator, not a
+  // special case bolted onto the prose.
+  it("never counts a source finding as an occurrence it failed to illustrate", () => {
+    const m = writeEvidence(audit([finding({ file: "src/App.tsx" }), finding({ file: "src/Nav.tsx" })]), { outDir: join(root, "audits"), root });
+    expect(m.totals).toEqual({ located: 0, imaged: 0, skipped: {} });
+    expect(evidenceNotice(m, null, "en")).toEqual([]);
+    expect(evidenceNotice(m, null, "fr")).toEqual([]);
+  });
+
+  // Two different facts wore one label. "Your 40 occurrences of this defect are shown by one
+  // picture" and "your 13th DISTINCT defect got no picture because a limit ran out" are not
+  // the same sentence, and a reader deciding whether the artifact is complete needs the
+  // second one to be visible rather than folded into the first.
+  it("distinguishes an occurrence folded into another from one a limit cut off", () => {
+    snapshot("accueil");
+    const [a, b] = anchors();
+    // Same rule, same selector → the second is the SAME defect, shown by the first's picture.
+    const twins = [finding({ sourceStart: a!.start }), finding({ sourceStart: a!.start, line: 9 })];
+    const folded = writeEvidence(audit(twins), { outDir: join(root, "dedup"), root });
+    expect(folded.totals.skipped).toEqual({ deduplicated: 1 });
+    expect(evidenceNotice(folded, null, "en").join("\n")).toContain("shown by the illustration of another");
+
+    // Two DIFFERENT elements, one crop allowed → the second is cut off, not folded.
+    const distinct = [finding({ sourceStart: a!.start }), finding({ sourceStart: b!.start, selectorHint: "a.fr-btn" })];
+    const cut = writeEvidence(audit(distinct), { outDir: join(root, "capped"), root, caps: { total: 1 } });
+    expect(cut.totals.skipped).toEqual({ capped: 1 });
+    expect(evidenceNotice(cut, null, "en").join("\n")).toContain("--evidence-max");
+  });
+
+  // Given the test above, `no-snapshot` CANNOT mean "raised on source code" — a source
+  // finding never reaches the tally to be given a reason. What it actually means is that the
+  // audit names a snapshot that is not on this disk: a JSON rendered on another machine, or
+  // a cleaned `.ultra11y/`. The sentence has to say the thing that happened.
+  it("names a missing snapshot for what it is, not for a case it cannot be", () => {
+    const m = writeEvidence(audit([finding({ file: join(snapshotDir(root, "ghost"), "dom.html") })]), { outDir: join(root, "audits"), root });
+    expect(m.totals.skipped).toEqual({ "no-snapshot": 1 });
+    const en = evidenceNotice(m, null, "en").join("\n");
+    expect(en).toContain("is not on this disk");
+    expect(en).not.toContain("source code");
+    expect(evidenceNotice(m, null, "fr").join("\n")).toContain("n'est pas sur ce disque");
+  });
+
+  it("counts only the snapshot findings when source and snapshot findings are mixed", () => {
+    snapshot("accueil", { screenshot: null });
+    const m = writeEvidence(audit([finding({ file: "src/App.tsx" }), finding()]), { outDir: join(root, "audits"), root });
+    const en = evidenceNotice(m, null, "en").join("\n");
+    expect(en).toContain("1 occurrence(s) are not illustrated");
+    expect(en).toContain("supplied no screenshot");
   });
 
   it("says nothing when everything located was imaged", () => {

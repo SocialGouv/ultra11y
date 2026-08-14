@@ -411,10 +411,11 @@ node scripts/ultra11y.mjs check  --report audits/wcag-YYYY-MM-DD.md # integrity 
 
 ### A report someone will actually open
 
-`--html` turns the audit into a page: `audits/index.html` as the entry point, plus a
-detachable single file that prints to PDF. Self-contained — no script, no external asset,
-nothing pointing outside the directory — and it passes this engine's own accessibility audit,
-which is the least a tool like this owes.
+`--html` turns the audit into a page: `audits/index.html` as the entry point, plus — from
+`report` — a detachable single file that prints to PDF. Self-contained — no script, no
+external asset, nothing pointing outside the directory — and it passes this engine's own
+accessibility audit, which is the least a tool like this owes. `pages --html` writes the
+navigable sheets only: **one composite per artifact**, or every inlined crop travels twice.
 
 ```sh
 node scripts/ultra11y.mjs report --in audit.json --html --evidence --out audits
@@ -424,9 +425,14 @@ node scripts/ultra11y.mjs pages  --in audit.json --format report --split page \
 
 `--evidence` illustrates each non-conformity with an **annotated crop of the offending
 element**, cut from the page snapshot: `selectorHint` is lossy, and a rendered-tier finding on
-a client-rendered page is anchored at `dom.html:2` whatever it is really about. It needs
-snapshots, and it says per page and per criterion what it could not draw and why — an
-occurrence with no picture must never read as an occurrence with no defect.
+a client-rendered page is anchored at `dom.html:2` whatever it is really about. It illustrates
+the Markdown conformance report as much as the HTML — one set of files in `assets/`, referenced
+by every document that shows the defect — so `--html` is not required to get pictures.
+
+It needs snapshots, and it says per page and per criterion what it could not draw and why — an
+occurrence with no picture must never read as an occurrence with no defect. It distinguishes
+an occurrence *folded* into another's picture from a distinct defect a limit *cut off*, because
+only the second is a gap.
 
 In the GitHub Action both are **on by default**, so the uploaded artifact has a front door
 without changing a workflow. See `references/ci.md`.

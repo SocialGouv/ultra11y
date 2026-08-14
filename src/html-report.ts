@@ -32,12 +32,30 @@ import type { AuditResult, Finding, Lang, PageResult, Status } from "./types.js"
  *  `cropFor`, and for the same reason: this module never learns how a finding is keyed. */
 export type CropLookup = (f: Finding) => { href: string; alt: string } | undefined;
 
+/** What the evidence tier REFUSED to draw, for one page or — with `null` — for the whole
+ *  run. Same shape as the crop lookup and for the same reason: this module never learns how
+ *  the evidence tier works, only what it decided (src/evidence.ts `evidenceRefusals`). */
+export type RefusalLookup = (pageId: string | null) => { headline: string; reasons: string[] } | undefined;
+
 export interface HtmlReportOpts {
   standard?: StandardId;
   lang?: Lang;
   crops?: CropLookup;
+  /** An occurrence with no picture must never read as an occurrence with no defect, so the
+   *  document states what it did not draw. Without this, the HTML — the deliverable that
+   *  actually reaches the client — is the one surface that keeps the omission to itself. */
+  refusals?: RefusalLookup;
   /** Sibling documents, for the nav. */
   nav?: Doc["nav"];
+}
+
+/** The refusal list as blocks: the sentence, then one item per reason. */
+function refusalBlocks(r: { headline: string; reasons: string[] } | undefined): Block[] {
+  if (!r) return [];
+  return [
+    { kind: "note", tone: "warn", runs: [{ text: r.headline }] },
+    { kind: "list", items: r.reasons.map((text) => [{ text }]) },
+  ];
 }
 
 const T = {
@@ -91,7 +109,6 @@ const T = {
     openPages: "Rapport page par page",
     noScreenshot: "Aucune capture d'écran pour cette page.",
     screenshotAlt: (n: string) => `Capture d'écran de la page ${n}`,
-    notImaged: (n: number) => `${n} occurrence(s) n'ont pas pu être illustrées.`,
   },
   en: {
     reportTitle: "Conformance report",
@@ -143,7 +160,6 @@ const T = {
     openPages: "Page-by-page report",
     noScreenshot: "No screenshot for this page.",
     screenshotAlt: (n: string) => `Screenshot of the ${n} page`,
-    notImaged: (n: number) => `${n} occurrence(s) could not be illustrated.`,
   },
 } as const;
 
@@ -262,10 +278,13 @@ function resolveOccurrence(f: Finding, lang: Lang): string {
 }
 
 /** §2 + §Recommendations — every non-conformity, then the advisory units. */
-function findingsBlocks(result: AuditResult, standard: StandardId, lang: Lang, level: 2 | 3, crops?: CropLookup): Block[] {
+function findingsBlocks(result: AuditResult, standard: StandardId, lang: Lang, level: 2 | 3, crops?: CropLookup, refusals?: RefusalLookup): Block[] {
   const t = T[lang];
   const { nc, advisory } = partitionUnits(prdUnits(result, standard, lang));
   const out: Block[] = [{ kind: "heading", level: 2, text: t.ncTitle, id: "nc" }];
+  // Before the first figure, not after the last: a reader who stops scrolling must already
+  // know that the pictures below are a subset of the occurrences listed beside them.
+  out.push(...refusalBlocks(refusals?.(null)));
   if (!nc.length) out.push({ kind: "para", runs: [{ text: t.noNc }] });
   for (const u of nc) out.push(...criterionBlocks(u, standard, lang, level === 2 ? 3 : 4, crops));
   if (advisory.length) {
@@ -391,7 +410,7 @@ export function compositeDoc(result: AuditResult, opts: HtmlReportOpts = {}): Do
   const h = headline(result, standard, lang);
   const blocks: Block[] = [...synthesisBlocks(result, standard, lang)];
   if (h.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
-  blocks.push(...findingsBlocks(result, standard, lang, 2, opts.crops));
+  blocks.push(...findingsBlocks(result, standard, lang, 2, opts.crops, opts.refusals));
   blocks.push(...scoreboardBlocks(result, standard, lang));
   const scope = pagesOf(result);
   if (scope.length) blocks.push(...crossGridBlocks(result, derivePages(result, scope), standard, lang));
@@ -435,6 +454,10 @@ export function pageDoc(result: AuditResult, page: PageResult, opts: HtmlReportO
   blocks.push(
     opts.screenshot ? { kind: "figure", src: opts.screenshot, alt: t.screenshotAlt(page.name) } : { kind: "para", runs: [{ text: t.noScreenshot, em: true }] },
   );
+  // Right after the capture and before the grid — the same place the Markdown sheet puts it
+  // (src/pages-report.ts), so a reader moving between the two documents finds it twice in
+  // the same spot rather than once in one of them.
+  blocks.push(...refusalBlocks(opts.refusals?.(page.id)));
   blocks.push(...pageGridBlocks(result, page, standard, lang));
 
   // The page's OWN findings, through the same view the Markdown sheet uses — so a criterion

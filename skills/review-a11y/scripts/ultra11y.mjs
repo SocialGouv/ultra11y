@@ -49748,12 +49748,13 @@ function render(r, lang, opts) {
       const group = ncUnits.filter((u) => u.severity === sev);
       if (!group.length) continue;
       out2.push(`### ${ICON3[sev]} ${s.sev[sev]} (${group.length})`, "");
-      for (const u of group) out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "####" }));
+      for (const u of group) out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "####", ...opts.cropFor ? { cropFor: opts.cropFor } : {} }));
     }
   }
   if (advisoryUnits.length) {
     out2.push(`## \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
-    for (const u of advisoryUnits) out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###" }));
+    for (const u of advisoryUnits)
+      out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###", ...opts.cropFor ? { cropFor: opts.cropFor } : {} }));
   }
   const pageScope = pagesOf(r);
   if (pageScope.length) attributePages(r, pageScope);
@@ -49837,9 +49838,9 @@ function reportGroups(r, lang = "en") {
   }
   return r.guidelines.map((g) => ({ key: g.key, title: guidelineTitle(g.key, lang) ?? g.title, rows: byGuideline.get(g.key) ?? [] }));
 }
-function renderReport(r, lang = "en", outDir) {
+function renderReport(r, lang = "en", outDir, cropFor) {
   const s = L4[lang];
-  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups: reportGroups(r, lang), standard: CORE2, outDir });
+  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups: reportGroups(r, lang), standard: CORE2, outDir, ...cropFor ? { cropFor } : {} });
 }
 function packReportGroups(r, pack, lang = "en") {
   const derived = derivePackResults(r, pack.key);
@@ -49862,7 +49863,7 @@ function packReportGroups(r, pack, lang = "en") {
   }
   return pack.themes.map((t2) => ({ key: `${t2.number}.`, title: themeName(pack, t2.number, lang) ?? "", rows: byTheme.get(t2.number) ?? [] }));
 }
-function renderPackReport(r, pack, lang = "en", outDir) {
+function renderPackReport(r, pack, lang = "en", outDir, cropFor) {
   const derived = derivePackResults(r, pack.key);
   const std = `${pack.name} ${pack.baseVersion}`;
   return render(r, lang, {
@@ -49876,12 +49877,13 @@ function renderPackReport(r, pack, lang = "en", outDir) {
     // Forwarded, unlike before: without it the per-page screenshots resolved against the
     // CWD instead of the report's own directory, so a pack report written to `audits/`
     // carried links that only worked when read from the repo root.
-    outDir
+    outDir,
+    ...cropFor ? { cropFor } : {}
   });
 }
 function writeReport(r, opts) {
   const core = isCore(opts.standard);
-  const md = core ? renderReport(r, opts.lang, opts.out) : renderPackReport(r, loadPack(opts.standard), opts.lang, opts.out);
+  const md = core ? renderReport(r, opts.lang, opts.out, opts.cropFor) : renderPackReport(r, loadPack(opts.standard), opts.lang, opts.out, opts.cropFor);
   mkdirSync7(opts.out, { recursive: true });
   const path = join29(opts.out, `${core ? "wcag" : opts.standard}-${r.date}.md`);
   writeFileSync8(path, md);
@@ -51518,7 +51520,8 @@ function renderPageReport(result, page, opts = {}) {
   const shot = opts.screenshots?.get(page.id);
   if (shot) out2.push(`![${s.screenshotAlt(page.name)}](${shot})`, "");
   else out2.push(`_${s.noScreenshot}_`, "");
-  if (opts.evidenceNotice?.length) out2.push(...opts.evidenceNotice, "");
+  const refused = opts.evidenceNotice?.(page.id) ?? [];
+  if (refused.length) out2.push(...refused, "");
   const withTests = rows.some((r) => r.tests.length);
   out2.push(`${h}# ${s.gridTitle}`, "", `> ${s.gridNote}`, "");
   out2.push(withTests ? `| ${s.criterion} | ${s.tests} | ${s.status} |` : `| ${s.criterion} | ${s.status} |`);
@@ -56588,7 +56591,7 @@ var S2 = {
     alt: (sel, page) => `Capture recadr\xE9e de l'\xE9l\xE9ment ${sel} sur la page ${page}, entour\xE9 d'un cadre`,
     notImaged: (n) => `${n} occurrence(s) ne sont pas illustr\xE9es :`,
     reasons: {
-      "no-snapshot": "constat lev\xE9 sur le code source, pas sur une page captur\xE9e \u2014 il n'y a pas de pixels \xE0 montrer",
+      "no-snapshot": "la capture de page que ce constat d\xE9signe n'est pas sur ce disque \u2014 sa r\xE9f\xE9rence fichier:ligne reste valable",
       "no-screenshot": "le producteur n'a pas fourni de capture pour cette page, donc le niveau pixel est inactif ici",
       "unreadable-image": "la capture n'est pas d\xE9codable (le moteur lit le truecolour 8 bits uniquement) \u2014 mieux vaut aucune image qu'une fausse",
       "no-boxes": "les positions d'\xE9l\xE9ments ne se v\xE9rifient pas contre le DOM s\xE9rialis\xE9, elles ont donc \xE9t\xE9 refus\xE9es en bloc plut\xF4t que d'encadrer le mauvais \xE9l\xE9ment",
@@ -56599,14 +56602,15 @@ var S2 = {
       "zero-area": "l'\xE9l\xE9ment n'occupe aucune surface peinte",
       "below-the-fold": "l'\xE9l\xE9ment est hors de la capture (la capture couvre la fen\xEAtre, pas la page enti\xE8re) \u2014 sa r\xE9f\xE9rence fichier:ligne reste valable",
       "unknown-scale": "le rapport pixels/CSS est ind\xE9termin\xE9 pour cette page ; un rapport devin\xE9 encadrerait le mauvais endroit",
-      capped: "occurrences regroup\xE9es : une illustration par \xE9l\xE9ment distinct, dans la limite fix\xE9e"
+      deduplicated: "m\xEAme d\xE9faut sur le m\xEAme \xE9l\xE9ment : il est montr\xE9 par l'illustration d'une autre occurrence, rien n'a \xE9t\xE9 perdu",
+      capped: "d\xE9faut distinct laiss\xE9 sans image : le plafond de vignettes de ce lot est atteint \u2014 relevez `--evidence-max` pour les obtenir"
     }
   },
   en: {
     alt: (sel, page) => `Cropped screenshot of the ${sel} element on the ${page} page, outlined`,
     notImaged: (n) => `${n} occurrence(s) are not illustrated:`,
     reasons: {
-      "no-snapshot": "raised on source code, not on a captured page \u2014 there are no pixels to show",
+      "no-snapshot": "the page snapshot this finding names is not on this disk \u2014 its file:line reference still holds",
       "no-screenshot": "the producer supplied no screenshot for this page, so the pixel tier is inactive here",
       "unreadable-image": "the screenshot does not decode (the engine reads 8-bit truecolour only) \u2014 no image beats a wrong one",
       "no-boxes": "the element positions do not verify against the serialized DOM, so they were refused wholesale rather than outlining the wrong element",
@@ -56617,22 +56621,26 @@ var S2 = {
       "zero-area": "the element paints no box",
       "below-the-fold": "the element sits outside the capture (the screenshot covers the viewport, not the whole page) \u2014 its file:line reference still holds",
       "unknown-scale": "the image-pixel to CSS-pixel ratio is indeterminate for this page; a guessed ratio would outline the wrong place",
-      capped: "occurrences grouped: one illustration per distinct element, up to the cap"
+      deduplicated: "the same defect on the same element: it is shown by the illustration of another occurrence, nothing was lost",
+      capped: "a distinct defect left undrawn: this run's crop limit was reached \u2014 raise `--evidence-max` to get them"
     }
   }
 };
-function evidenceNotice(m, pageId, lang) {
+function evidenceRefusals(m, pageId, lang) {
   const t2 = pageId === null ? m.totals : m.perPage.get(pageId);
-  if (!t2) return [];
+  if (!t2) return void 0;
   const missing = t2.located - t2.imaged;
-  if (missing <= 0) return [];
+  if (missing <= 0) return void 0;
+  const entries = Object.entries(t2.skipped).filter(([, n]) => n);
   const s = S2[lang];
-  const out2 = [s.notImaged(missing)];
-  for (const [reason, n] of Object.entries(t2.skipped).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))) {
-    if (!n) continue;
-    out2.push(`- ${n} \u2014 ${s.reasons[reason]}`);
-  }
-  return out2;
+  return {
+    headline: s.notImaged(missing),
+    reasons: entries.sort((a, b) => b[1] - a[1]).map(([reason, n]) => `${n} \u2014 ${s.reasons[reason]}`)
+  };
+}
+function evidenceNotice(m, pageId, lang) {
+  const r = evidenceRefusals(m, pageId, lang);
+  return r ? [r.headline, ...r.reasons.map((x) => `- ${x}`)] : [];
 }
 function bump(t2, reason) {
   t2.skipped[reason] = (t2.skipped[reason] ?? 0) + 1;
@@ -56680,10 +56688,12 @@ function writeEvidence(result, opts) {
       const id = findingId(f);
       const key = `${f.ruleId}\0${f.selectorHint}`;
       const ruleCount = perRule.get(f.ruleId) ?? 0;
-      if (seen.has(key) || ruleCount >= caps.perRule || onPage >= caps.perPage || manifest.crops.size >= caps.total) {
-        manifest.skipped.set(id, "capped");
-        bump(tally, "capped");
-        bump(manifest.totals, "capped");
+      const overLimit = ruleCount >= caps.perRule || onPage >= caps.perPage || manifest.crops.size >= caps.total;
+      const refusal = seen.has(key) ? "deduplicated" : overLimit ? "capped" : null;
+      if (refusal) {
+        manifest.skipped.set(id, refusal);
+        bump(tally, refusal);
+        bump(manifest.totals, refusal);
         continue;
       }
       const crop = cropFinding(ctx, f, opts.geometry);
@@ -56890,6 +56900,13 @@ function renderHtmlDocument(doc) {
 }
 
 // src/html-report.ts
+function refusalBlocks(r) {
+  if (!r) return [];
+  return [
+    { kind: "note", tone: "warn", runs: [{ text: r.headline }] },
+    { kind: "list", items: r.reasons.map((text) => [{ text }]) }
+  ];
+}
 var T4 = {
   fr: {
     reportTitle: "Rapport de conformit\xE9",
@@ -56939,8 +56956,7 @@ var T4 = {
     openComposite: "Rapport complet, en un seul fichier (imprimable en PDF)",
     openPages: "Rapport page par page",
     noScreenshot: "Aucune capture d'\xE9cran pour cette page.",
-    screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`,
-    notImaged: (n) => `${n} occurrence(s) n'ont pas pu \xEAtre illustr\xE9es.`
+    screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`
   },
   en: {
     reportTitle: "Conformance report",
@@ -56990,8 +57006,7 @@ var T4 = {
     openComposite: "Full report, in a single file (printable to PDF)",
     openPages: "Page-by-page report",
     noScreenshot: "No screenshot for this page.",
-    screenshotAlt: (n) => `Screenshot of the ${n} page`,
-    notImaged: (n) => `${n} occurrence(s) could not be illustrated.`
+    screenshotAlt: (n) => `Screenshot of the ${n} page`
   }
 };
 function ticks(text) {
@@ -57086,10 +57101,11 @@ function criterionBlocks(unit, standard, lang, level, crops) {
 function resolveOccurrence(f, lang) {
   return f.msg ? auditorUnitModel({ criteriaId: f.criteriaId, title: "", label: "", refs: [], severity: f.severity, findings: [f] }, CORE2, lang).messages[0] ?? f.message : f.message;
 }
-function findingsBlocks(result, standard, lang, level, crops) {
+function findingsBlocks(result, standard, lang, level, crops, refusals) {
   const t2 = T4[lang];
   const { nc, advisory } = partitionUnits(prdUnits(result, standard, lang));
   const out2 = [{ kind: "heading", level: 2, text: t2.ncTitle, id: "nc" }];
+  out2.push(...refusalBlocks(refusals?.(null)));
   if (!nc.length) out2.push({ kind: "para", runs: [{ text: t2.noNc }] });
   for (const u of nc) out2.push(...criterionBlocks(u, standard, lang, level === 2 ? 3 : 4, crops));
   if (advisory.length) {
@@ -57201,7 +57217,7 @@ function compositeDoc(result, opts = {}) {
   const h = headline(result, standard, lang);
   const blocks = [...synthesisBlocks(result, standard, lang)];
   if (h.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
-  blocks.push(...findingsBlocks(result, standard, lang, 2, opts.crops));
+  blocks.push(...findingsBlocks(result, standard, lang, 2, opts.crops, opts.refusals));
   blocks.push(...scoreboardBlocks(result, standard, lang));
   const scope = pagesOf(result);
   if (scope.length) blocks.push(...crossGridBlocks(result, derivePages(result, scope), standard, lang));
@@ -57238,6 +57254,7 @@ function pageDoc(result, page, opts = {}) {
   blocks.push(
     opts.screenshot ? { kind: "figure", src: opts.screenshot, alt: t2.screenshotAlt(page.name) } : { kind: "para", runs: [{ text: t2.noScreenshot, em: true }] }
   );
+  blocks.push(...refusalBlocks(opts.refusals?.(page.id)));
   blocks.push(...pageGridBlocks(result, page, standard, lang));
   const view = { ...result, criteria: page.criteria, findings: page.findings };
   const { nc, advisory } = partitionUnits(prdUnits(view, standard, lang));
@@ -57302,6 +57319,10 @@ function cropLookup(m, lang, hrefOf) {
     return href ? { href, alt: c2.alt[lang] } : void 0;
   };
 }
+function refusalLookup(m, lang) {
+  if (!m) return void 0;
+  return (pageId) => evidenceRefusals(m, pageId, lang);
+}
 function pickRung(cropBytes, shotBytes, budget) {
   const sum = (xs) => xs.reduce((a, b) => a + b, 0);
   if (sum(cropBytes) + sum(shotBytes) <= budget) return { steps: [], cropsPerCriterion: Number.POSITIVE_INFINITY, shots: true };
@@ -57363,9 +57384,16 @@ function writeHtml(result, opts) {
     { href: `./${compositeName}`, text: t2.docTitle },
     ...opts.pages ? [{ href: "./pages/index.html", text: t2.pagesTitle }] : []
   ];
+  const refusals = refusalLookup(opts.evidence, lang);
   let compositePath;
   if (!flat) {
-    const composite = compositeDoc(result, { standard, lang, crops: budgetedCrops, nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` })) });
+    const composite = compositeDoc(result, {
+      standard,
+      lang,
+      crops: budgetedCrops,
+      ...refusals ? { refusals } : {},
+      nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` }))
+    });
     if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
     compositePath = join41(opts.outDir, compositeName);
     writeFileSync16(compositePath, renderHtmlDocument(composite));
@@ -57403,6 +57431,7 @@ function writeHtml(result, opts) {
         standard,
         lang,
         crops: fileCrops,
+        ...refusals ? { refusals } : {},
         nav: sheetNav,
         // Where `cmdPages`' screenshot copier already put the capture: `assets/<id>.png`,
         // beside the entry point, seen from wherever this sheet sits.
@@ -59837,7 +59866,8 @@ Usage:
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
   ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor] [--format sarif|github]   (re-gate an audit already computed \u2014 e.g. one carrying adjudicated verdicts \u2014 without a second detection pass)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
-  ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file; --evidence adds annotated crops)
+  ultra11y report   --in <audit.json> [--evidence [--evidence-max <n>]] [--out <dir>]   (the Markdown report, illustrated with annotated crops)
+  ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file)
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
@@ -59862,7 +59892,7 @@ Usage:
   ultra11y snapshot list  [--root <dir>] [--json]
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
-  ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence] [--html]   (annotated crops of each non-conformity, and the HTML site)
+  ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
   ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
   ultra11y pages    --in <audit.json> --standard <pack> --diff <external.json>   (hold the grid against an audit someone else performed)
   ultra11y import   --from file <report.json> | --from ara <id> [--source <adapter>] [--out <dir>] [--json]
@@ -60261,6 +60291,8 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "format",
   // Bytes of image data the single-file HTML report may carry inline (src/html-emit.ts).
   "inline-budget",
+  // Hard cap on the crops one run writes (src/evidence.ts `DEFAULT_CAPS.total`).
+  "evidence-max",
   "guidance",
   "runtime",
   "cwd",
@@ -60905,7 +60937,7 @@ async function cmdPages(p) {
     return 0;
   }
   mkdirSync17(outDir, { recursive: true });
-  const manifest = wantEvidence ? writeEvidence(result, { outDir }) : void 0;
+  const manifest = wantEvidence ? writeEvidence(result, { outDir, ...evidenceCapsOf(p) }) : void 0;
   const cropFor = manifest ? (f) => {
     const c2 = manifest.crops.get(findingId(f));
     return c2 ? { href: c2.href, alt: c2.alt[lang] } : void 0;
@@ -60918,7 +60950,8 @@ async function cmdPages(p) {
     for (const line of total) console.error(line);
   }
   const evidenceOpts = {
-    ...cropFor ? { cropFor } : {}
+    ...cropFor ? { cropFor } : {},
+    ...manifest ? { evidenceNotice: (id) => evidenceNotice(manifest, id, lang) } : {}
   };
   if (!split) {
     const file = join47(outDir, `pages-${result.date}.md`);
@@ -60941,12 +60974,8 @@ async function cmdPages(p) {
   const sheet = (id) => `page-${id}.md`;
   const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
   for (const pg of derived) {
-    const notice = manifest ? evidenceNotice(manifest, pg.id, lang) : [];
-    writeFileSync19(
-      join47(outDir, sheet(pg.id)),
-      `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts, ...notice.length ? { evidenceNotice: notice } : {} })}
-`
-    );
+    writeFileSync19(join47(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
+`);
   }
   const index = join47(outDir, "index.md");
   writeFileSync19(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
@@ -60964,11 +60993,20 @@ async function cmdPages(p) {
   console.log(index);
   return html?.imagesDropped ? 1 : 0;
 }
-function budgetOf(p) {
-  const raw = p.flags["inline-budget"];
+function positiveIntFlag(p, name2) {
+  const raw = p.flags[name2];
   if (typeof raw !== "string" || !raw) return void 0;
   const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : void 0;
+  if (Number.isFinite(n) && n > 0) return n;
+  console.error(`ultra11y: --${name2} expects a positive integer (got "${raw}"). Ignored \u2014 the default applies.`);
+  return void 0;
+}
+function budgetOf(p) {
+  return positiveIntFlag(p, "inline-budget");
+}
+function evidenceCapsOf(p) {
+  const total = positiveIntFlag(p, "evidence-max");
+  return total === void 0 ? {} : { caps: { total } };
 }
 function emitHtml(result, opts) {
   const res = writeHtml(result, opts);
@@ -61207,17 +61245,18 @@ async function cmdReport(p) {
     emitCiFormat(result, ciFormat, standard, lang);
     return 0;
   }
-  const path = writeReport(result, { out: out2, lang, standard });
+  const manifest = p.flags.evidence === true ? writeEvidence(result, { outDir: out2, ...evidenceCapsOf(p) }) : void 0;
+  if (manifest) {
+    for (const line of evidenceNotice(manifest, null, lang)) console.error(line);
+  }
+  const cropFor = manifest ? (f) => {
+    const c2 = manifest.crops.get(findingId(f));
+    return c2 ? { href: c2.href, alt: c2.alt[lang] } : void 0;
+  } : void 0;
+  const path = writeReport(result, { out: out2, lang, standard, ...cropFor ? { cropFor } : {} });
   let html;
   if (p.flags.html === true) {
-    const manifest = p.flags.evidence === true ? writeEvidence(result, { outDir: out2 }) : void 0;
-    if (manifest) for (const line of evidenceNotice(manifest, null, lang)) console.error(line);
     html = emitHtml(result, { outDir: out2, standard, lang, ...manifest ? { evidence: manifest } : {}, inlineBudget: budgetOf(p) });
-  } else if (p.flags.evidence === true) {
-    console.error(
-      lang === "fr" ? "ultra11y report : --evidence n'illustre que le rapport HTML. Ajoutez --html, ou utilisez `pages --format report --evidence` pour des fiches Markdown illustr\xE9es." : "ultra11y report: --evidence only illustrates the HTML report. Add --html, or use `pages --format report --evidence` for illustrated Markdown sheets."
-    );
-    return 2;
   }
   const untested = isCore(standard) ? [] : untestedNeedsRendering(result);
   const partial = untested.length > 0;

@@ -12,9 +12,9 @@
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { findingId } from "./baseline.js";
-import type { EvidenceManifest } from "./evidence.js";
+import { evidenceRefusals, type EvidenceManifest } from "./evidence.js";
 import { renderHtmlDocument, type Doc, type Run } from "./html.js";
-import { compositeDoc, indexDoc, pageDoc, pagesIndexDoc, type CropLookup } from "./html-report.js";
+import { compositeDoc, indexDoc, pageDoc, pagesIndexDoc, type CropLookup, type RefusalLookup } from "./html-report.js";
 import { derivePages, pagesOf } from "./pages.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
 import type { AuditResult, Finding, Lang } from "./types.js";
@@ -122,6 +122,15 @@ function cropLookup(m: EvidenceManifest | undefined, lang: Lang, hrefOf: (path: 
   };
 }
 
+/** What the tier refused to draw, keyed the way the report tier wants it. Independent of the
+ *  budget ladder on purpose: the ladder's own notices say which pictures were dropped FOR
+ *  SIZE, this says which occurrences have no picture AT ALL. Both belong in the document, and
+ *  neither substitutes for the other. */
+function refusalLookup(m: EvidenceManifest | undefined, lang: Lang): RefusalLookup | undefined {
+  if (!m) return undefined;
+  return (pageId) => evidenceRefusals(m, pageId, lang);
+}
+
 /** Which rung the evidence lands on for a given budget. Pure — the sizes are measured once
  *  and the decision is taken before a single byte is encoded. */
 export function pickRung(cropBytes: number[], shotBytes: number[], budget: number): { steps: DegradeStep[]; cropsPerCriterion: number; shots: boolean } {
@@ -202,9 +211,16 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
   // ONE composite per artifact. `report --html` owns it; `pages --html` writes the index and
   // its sheets beside the Markdown they mirror. Emitting one from both would put two copies of
   // every inlined crop into the same upload.
+  const refusals = refusalLookup(opts.evidence, lang);
   let compositePath: string | undefined;
   if (!flat) {
-    const composite = compositeDoc(result, { standard, lang, crops: budgetedCrops, nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` })) });
+    const composite = compositeDoc(result, {
+      standard,
+      lang,
+      crops: budgetedCrops,
+      ...(refusals ? { refusals } : {}),
+      nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` })),
+    });
     if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
     compositePath = join(opts.outDir, compositeName);
     writeFileSync(compositePath, renderHtmlDocument(composite));
@@ -253,6 +269,7 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
         standard,
         lang,
         crops: fileCrops,
+        ...(refusals ? { refusals } : {}),
         nav: sheetNav,
         // Where `cmdPages`' screenshot copier already put the capture: `assets/<id>.png`,
         // beside the entry point, seen from wherever this sheet sits.

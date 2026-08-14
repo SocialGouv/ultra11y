@@ -273,6 +273,39 @@ describe("writing the artifact", () => {
     expect(sheet).not.toContain("data:image");
   });
 
+  // THE RULE THAT JUSTIFIES THE WHOLE TIER. An occurrence with no picture must never read as
+  // an occurrence with no defect — that is precisely the misreading issue #16 measured. The
+  // Markdown sheet has carried the refusal list since the tier shipped; the HTML, which is
+  // the document an auditor actually hands to a client, carried nothing at all.
+  it("says in the HTML what it could not illustrate, and why", () => {
+    const tally = { located: 3, imaged: 0, skipped: { "below-the-fold": 2, "page-scope": 1 } };
+    const manifest = {
+      crops: new Map(),
+      skipped: new Map(),
+      perPage: new Map([["accueil", tally]]),
+      totals: tally,
+    } as unknown as Parameters<typeof writeHtml>[1]["evidence"];
+    const res = writeHtml(WITH_PAGES(), { outDir: out, lang: "en", pages: true, evidence: manifest });
+    for (const p of [res.composite!, join(out, "pages", "page-accueil.html")]) {
+      const html = readFileSync(p, "utf8");
+      expect(html, p).toContain("3 occurrence(s) are not illustrated");
+      expect(html, p).toContain("the screenshot covers the viewport, not the whole page");
+      expect(html, p).toContain("the page screenshot above is the illustration");
+    }
+  });
+
+  it("says nothing about evidence when everything located was drawn", () => {
+    const tally = { located: 2, imaged: 2, skipped: {} };
+    const manifest = {
+      crops: new Map(),
+      skipped: new Map(),
+      perPage: new Map([["accueil", tally]]),
+      totals: tally,
+    } as unknown as Parameters<typeof writeHtml>[1]["evidence"];
+    const res = writeHtml(WITH_PAGES(), { outDir: out, lang: "en", pages: true, evidence: manifest });
+    expect(readFileSync(res.composite!, "utf8")).not.toContain("are not illustrated");
+  });
+
   // IMAGES DEGRADE, NON-CONFORMITIES NEVER. A budget of one byte drops every illustration —
   // and the document must still carry every finding, and say what it dropped.
   it("degrades the images and keeps the findings when the budget is exhausted", () => {

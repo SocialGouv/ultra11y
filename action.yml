@@ -104,9 +104,13 @@ inputs:
     required: false
     default: 'true'
   evidence-max:
-    description: 'Hard cap on the number of crops produced in one run. Guards the artifact size when one design-system defect repeats across every route.'
+    description: 'Hard cap on the number of crops produced in one run. Guards the artifact size when one design-system defect repeats across every route. The per-rule (6) and per-page (12) de-duplication limits are fixed: they are what makes ONE picture stand for a repeated defect, and every occurrence they fold away is counted and named in the report.'
     required: false
     default: '200'
+  inline-budget:
+    description: 'Bytes of image data the single-file composite may carry inline. Above it, images degrade one rung at a time — page screenshots first, then all but one crop per criterion — and every rung is announced in the document. Non-conformities never degrade. Empty leaves the engine default (12 MB).'
+    required: false
+    default: ''
   artifact-name:
     description: 'Name of the uploaded artifact. Defaults to `ultra11y-<standard>`. Artifact names must be UNIQUE within a workflow run, so set this when the action runs more than once in one job (e.g. the code diff and then the served pages) — otherwise the second upload fails with a 409.'
     required: false
@@ -454,7 +458,18 @@ runs:
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
       run: |
-        path=$(node "$ENGINE" report --in audits/audit-latest.json --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}' --out audits)
+        # The SAME evidence flags the HTML step passes. That step re-runs `report` into this
+        # very directory and rewrites this very file, so anything they disagree about is a
+        # difference between the document `check` validates below and the document that ships.
+        args=()
+        if [ '${{ inputs.evidence }}' = 'true' ]; then
+          args+=(--evidence)
+          if [ -n '${{ inputs.evidence-max }}' ]; then
+            args+=(--evidence-max '${{ inputs.evidence-max }}')
+          fi
+        fi
+        path=$(node "$ENGINE" report --in audits/audit-latest.json "${args[@]}" \
+          --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}' --out audits)
         echo "path=$path" >> "$GITHUB_OUTPUT"
         # The integrity gate: no invented criterion, no unjustified NA, coherent maths.
         node "$ENGINE" check --report "$path" --standard '${{ inputs.standard }}' --quiet
@@ -477,6 +492,12 @@ runs:
         args=()
         if [ '${{ inputs.evidence }}' = 'true' ]; then
           args+=(--evidence)
+          if [ -n '${{ inputs.evidence-max }}' ]; then
+            args+=(--evidence-max '${{ inputs.evidence-max }}')
+          fi
+        fi
+        if [ -n '${{ inputs.inline-budget }}' ]; then
+          args+=(--inline-budget '${{ inputs.inline-budget }}')
         fi
         if ! node "$ENGINE" report --in audits/audit-latest.json --html "${args[@]}" \
           --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}' --out audits >/dev/null; then

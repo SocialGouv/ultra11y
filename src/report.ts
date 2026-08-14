@@ -9,7 +9,7 @@ import { join, relative } from "node:path";
 import type { AuditResult, Finding, Lang, Severity, Status } from "./types.js";
 import { guidelineTitle, scTitle } from "./wcag.js";
 import { prdUnits, partitionUnits } from "./prd.js";
-import { renderAuditorUnit } from "./auditor.js";
+import { renderAuditorUnit, type AuditorCropLookup } from "./auditor.js";
 import { resolveMessage } from "./messages.js";
 import { attributePages, derivePages, pagesOf, renderPageGrid } from "./pages.js";
 import { PAGES_DIR } from "./snapshot.js";
@@ -280,6 +280,9 @@ function render(
     // Where this report will be WRITTEN. Only used to resolve the per-page screenshots
     // relatively; absent ⇒ paths relative to the CWD, which is what stdout wants.
     outDir?: string;
+    // The annotated crop for an occurrence, when the evidence tier drew one. Absent ⇒ every
+    // byte below is what it was before the tier existed (tests/__snapshots__/auditor).
+    cropFor?: AuditorCropLookup;
   },
 ): string {
   const s = L[lang];
@@ -332,7 +335,7 @@ function render(
       const group = ncUnits.filter((u) => u.severity === sev);
       if (!group.length) continue;
       out.push(`### ${ICON[sev]} ${s.sev[sev]} (${group.length})`, "");
-      for (const u of group) out.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "####" }));
+      for (const u of group) out.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "####", ...(opts.cropFor ? { cropFor: opts.cropFor } : {}) }));
     }
   }
 
@@ -342,7 +345,8 @@ function render(
   // the NC over-under-projection gate never see them). Only emitted when present.
   if (advisoryUnits.length) {
     out.push(`## 💡 ${s.recTitle}`, "", `> ${s.recNote}`, "");
-    for (const u of advisoryUnits) out.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###" }));
+    for (const u of advisoryUnits)
+      out.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###", ...(opts.cropFor ? { cropFor: opts.cropFor } : {}) }));
   }
 
   // « Grille par page » — the per-page criterion matrix. RGAA is a per-page norm, so this is
@@ -485,9 +489,9 @@ export function reportGroups(r: AuditResult, lang: Lang = "en"): ReportGroup[] {
   return r.guidelines.map((g) => ({ key: g.key, title: guidelineTitle(g.key, lang) ?? g.title, rows: byGuideline.get(g.key) ?? [] }));
 }
 
-export function renderReport(r: AuditResult, lang: Lang = "en", outDir?: string): string {
+export function renderReport(r: AuditResult, lang: Lang = "en", outDir?: string, cropFor?: AuditorCropLookup): string {
   const s = L[lang];
-  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups: reportGroups(r, lang), standard: CORE, outDir });
+  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups: reportGroups(r, lang), standard: CORE, outDir, ...(cropFor ? { cropFor } : {}) });
 }
 
 /** A PACK report's criterion rows, grouped by theme. The pack twin of `reportGroups`, and
@@ -524,7 +528,7 @@ export function packReportGroups(r: AuditResult, pack: StandardPack, lang: Lang 
 }
 
 /** A derived report for a country standards pack (RGAA, …), projected from the WCAG audit. */
-export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang = "en", outDir?: string): string {
+export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang = "en", outDir?: string, cropFor?: AuditorCropLookup): string {
   const derived = derivePackResults(r, pack.key);
   const std = `${pack.name} ${pack.baseVersion}`;
   // Owner decision: a pack (RGAA) report is flagged PARTIAL while any needs-rendering
@@ -543,6 +547,7 @@ export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang 
     // CWD instead of the report's own directory, so a pack report written to `audits/`
     // carried links that only worked when read from the repo root.
     outDir,
+    ...(cropFor ? { cropFor } : {}),
   });
 }
 
@@ -550,13 +555,17 @@ export interface ReportOpts {
   out: string;
   lang: Lang;
   standard: StandardId;
+  /** The evidence tier's crops, when `--evidence` asked for them. The hrefs are relative to
+   *  `out`, which is where this report is written — so the Markdown REFERENCES the same files
+   *  the composite inlines, instead of the run writing images no document points at. */
+  cropFor?: AuditorCropLookup;
 }
 
 /** Render and write the report; returns the written path. The WCAG report is canonical
  *  (`wcag-<date>.md`); a pack report is a derived `<pack>-<date>.md`. */
 export function writeReport(r: AuditResult, opts: ReportOpts): string {
   const core = isCore(opts.standard);
-  const md = core ? renderReport(r, opts.lang, opts.out) : renderPackReport(r, loadPack(opts.standard), opts.lang, opts.out);
+  const md = core ? renderReport(r, opts.lang, opts.out, opts.cropFor) : renderPackReport(r, loadPack(opts.standard), opts.lang, opts.out, opts.cropFor);
   mkdirSync(opts.out, { recursive: true });
   const path = join(opts.out, `${core ? "wcag" : opts.standard}-${r.date}.md`);
   writeFileSync(path, md);

@@ -271,7 +271,7 @@ opens. `html: 'true'` and `evidence: 'true'` are on by default, so it now has a 
 audits/
 ├── index.html                        ← the entry point: rate, synthesis, page scoreboard, links
 ├── ultra11y-<std>-<date>.html        ← the whole audit in ONE file, printable to PDF
-├── <std>-<date>.md                   ← the Markdown report (unchanged)
+├── <std>-<date>.md                   ← the Markdown report, illustrated by the same crops
 ├── audit-latest.json                 ← the machine-readable audit (unchanged)
 ├── assets/
 │   ├── <page-id>.png                 ← the page screenshot
@@ -298,26 +298,46 @@ to a `::warning::` and cannot catch its own regression.
 
 ### The crops
 
-An occurrence in a sheet gains a sub-bullet showing the element, ringed:
+An occurrence gains a sub-bullet showing the element, ringed:
 
 ```md
 - [ ] `.ultra11y/pages/accueil/dom.html:412` (`div.card`) — <img> without an alt attribute…
   - ![Cropped capture of the img element on the accueil page, outlined](./assets/accueil/c90959b13aa2.png)
 ```
 
-They are derived AT RENDER TIME from the page snapshot, never stamped on the finding: a
+**Every document that shows a non-conformity shows its crop**: the Markdown conformance
+report, the per-page sheets, and the single-file composite. They all reference one set of
+files in `assets/`; only the composite pays the base64 tax, because only it has to travel
+alone. `report --evidence` therefore works with or without `--html` — the images are not an
+HTML-only tier. `prd`, `gh` and `jira` deliberately stay text: their output is read on
+github.com, where a path relative to `audits/` resolves to nothing, and a broken image in an
+issue is worse than no image.
+
+Crops are derived AT RENDER TIME from the page snapshot, never stamped on the finding: a
 rectangle in pixels is a property of the image, and a stamped box goes silently wrong the
 moment the audit is re-rendered against a different capture. So `evidence` needs snapshots —
-`snapshot: 'true'` (the default), the E2E plugins, or `ultra11y dev`.
+`snapshot: 'true'` (the default), the E2E plugins, or `ultra11y dev`. Audited from source
+alone, the tier is simply inactive and says nothing: a source finding never had pixels, so it
+is not an occurrence that failed to be illustrated.
 
 The mark is **not monochrome**: a white halo, a red ring and corner brackets whose *shape*
 says "here". A tool that reports 1.4.1 failures cannot ship a deliverable that commits one.
 
 When a crop cannot be drawn, the report says so per page and per criterion, with the reason —
-`no-screenshot`, `below-the-fold`, `unknown-scale`, `capped`, and eight more. **An occurrence
-without a picture must never read as an occurrence without a defect.** Caps are 6 per rule, 12
-per page and `evidence-max` overall (200 by default), because one design-system defect
-multiplied by 38 routes is one defect, not 472 pictures.
+`no-screenshot`, `below-the-fold`, `unknown-scale`, and nine more. **An occurrence without a
+picture must never read as an occurrence without a defect.**
+
+Two of those reasons look alike and are not:
+
+| Reason | What it means | Costs the reader |
+|---|---|---|
+| `deduplicated` | the same defect on the same element, already shown by another occurrence's picture | nothing |
+| `capped` | a **distinct** defect left undrawn because a limit ran out | a picture — raise `evidence-max` |
+
+`evidence-max` (200 by default) is the run-wide fuse and the only one that is a setting: it
+guards the upload's size. The per-rule (6) and per-page (12) limits are fixed, because they
+are what makes one picture stand for a repeated defect — one design-system failure multiplied
+by 38 routes is one defect, not 472 pictures.
 
 ### Printing it
 
@@ -326,9 +346,11 @@ The single file is the deliverable an auditor hands to a client: open
 its evidence on one sheet rather than splitting them across a page break.
 
 Its images travel inside it as `data:` URIs, and base64 costs a third more than the bytes it
-encodes — so there is a budget (`--inline-budget`, 12 MB) and a ladder. Over budget, page
-screenshots go first, then all but one crop per criterion, then the images entirely. Every
-rung is written **into the document** and onto stderr. Images degrade; the non-conformities
+encodes — so there is a budget (the `inline-budget` input, `--inline-budget` on the CLI, 12 MB
+by default) and a ladder. Over budget, page screenshots go first, then all but one crop per
+criterion, then the images entirely. Every rung is written **into the document** and onto
+stderr, and the other documents still reference every crop as a file. Images degrade; the
+non-conformities
 never do.
 
 ### Publishing it as a page (optional, and it costs something)
