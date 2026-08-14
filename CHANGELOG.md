@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [4.4.0](https://github.com/maxgfr/ultra11y/compare/v4.3.0...v4.4.0) (2026-08-14)
+
+
+### Features
+
+* **mcp:** serve every standards pack as a rule engine, not just WCAG ([b087948](https://github.com/maxgfr/ultra11y/commit/b0879486813067c22ce4ad06eedce7cc437fff02))
+
 # [4.3.0](https://github.com/maxgfr/ultra11y/compare/v4.2.0...v4.3.0) (2026-08-14)
 
 
