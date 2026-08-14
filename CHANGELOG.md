@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [4.4.1](https://github.com/maxgfr/ultra11y/compare/v4.4.0...v4.4.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* **guidance:** generate the WCAG dataset from the W3C source instead of by hand ([6abc330](https://github.com/maxgfr/ultra11y/commit/6abc330d5130a991899ed6d97b5bb785e2e505ad))
+
 # [4.4.0](https://github.com/maxgfr/ultra11y/compare/v4.3.0...v4.4.0) (2026-08-14)
 
 
