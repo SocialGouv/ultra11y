@@ -1,8 +1,10 @@
 name: Standards source refresh
 
 # Daily re-fetch of the upstream normative sources this repo vendors:
-#   - the WCAG 2.2 success-criterion universe and the W3C AUTHORIZED French titles
-#     (scripts/vendor/wcag-2.2-*.json -> src/data/wcag*.json)
+#   - the WCAG 2.2 success-criterion universe, and the AA core derived from it
+#     (scripts/vendor/wcag-2.2-sc*.json -> src/data/wcag*.json). The core needs no local
+#     w3c/wcag checkout: it is the universe's core-AA slice, so a renamed or newly added
+#     criterion reaches the shipped dataset on the next run instead of drifting.
 #   - the WCAG normative text + glossary, English and the authorized French translation
 #     (scripts/vendor/wcag-2.2-text.json, wcag-2.2-fr.json -> src/data/wcag.json)
 #   - the W3C Techniques + Understanding docs, from which the WCAG-keyed implementation
@@ -54,6 +56,7 @@ jobs:
       - name: Re-fetch the vendored W3C sources (SC universe, normative text, authorized fr, techniques)
         run: |
           node scripts/build-standards.mjs --refresh-universe
+          node scripts/build-standards.mjs --refresh-core
           node scripts/build-standards.mjs --refresh-text
           node scripts/build-standards.mjs --refresh-fr
           node scripts/build-guidance-wcag.mjs --refresh

@@ -13,6 +13,7 @@
 //   node scripts/build-standards.mjs --offline       # same (alias; the snapshots are always local)
 //   node scripts/build-standards.mjs --refresh <dir> # re-derive the vendored AA snapshot from a w3c/wcag checkout
 //   node scripts/build-standards.mjs --refresh-universe # re-fetch (network) the vendored FULL SC universe (all levels + removed 4.1.1)
+//   node scripts/build-standards.mjs --refresh-core # re-derive the shipped AA snapshot from that universe (no checkout, no network)
 //   node scripts/build-standards.mjs --refresh-fr    # re-fetch (network) the vendored French SC/guideline/principle titles
 //   node scripts/build-standards.mjs --refresh-text  # re-fetch (network) the vendored NORMATIVE SC text + the WCAG glossary
 import { writeFileSync, readFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
@@ -396,6 +397,49 @@ async function deriveFr() {
       `${Object.keys(criteriaText).length} SC bodies, ${Object.keys(glossary).length} glossary terms → ${VENDOR_FR}`,
   );
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Core mode: the shipped AA snapshot, derived from the vendored UNIVERSE.
+//
+// `deriveSnapshot` above reads a local w3c/wcag checkout, which is why it was the one
+// vendored source the daily refresh could not touch — a new or renamed success criterion
+// would land in the universe and never reach the shipped core.
+//
+// It needs no checkout and no extra network: `--refresh-universe` already fetches the same
+// numbering and titles for EVERY criterion, and records which are `core-AA`. The AA slice
+// is that filter. Byte-identical to what the checkout produces (tests/wcag-core-sync).
+//
+//   node scripts/build-standards.mjs --refresh-core
+// ---------------------------------------------------------------------------
+function deriveCoreFromUniverse() {
+  if (!existsSync(VENDOR_UNIVERSE)) {
+    console.error(`build-standards --refresh-core: missing ${VENDOR_UNIVERSE}. Run: node scripts/build-standards.mjs --refresh-universe`);
+    process.exit(1);
+  }
+  const universe = JSON.parse(readFileSync(VENDOR_UNIVERSE, "utf8"));
+  const aa = universe.criteria.filter((c) => c.status === "core-AA").map(({ status, ...rest }) => rest);
+  if (!aa.length) {
+    console.error(`build-standards --refresh-core: ${VENDOR_UNIVERSE} classifies no criterion as core-AA — refusing to write an empty core.`);
+    process.exit(1);
+  }
+  const used = new Set(aa.map((c) => c.guideline));
+  const snapshot = {
+    wcagVersion: universe.wcagVersion,
+    source: universe.source,
+    criteriaSource: universe.criteriaSource,
+    principles: universe.principles.map((p) => ({ number: p.number, title: p.title })),
+    guidelines: universe.guidelines.filter((g) => used.has(g.number)).map((g) => ({ number: g.number, title: g.title })),
+    criteria: aa,
+  };
+  return JSON.stringify(snapshot, null, 2) + "\n";
+}
+
+function refreshCore() {
+  const text = deriveCoreFromUniverse();
+  mkdirSync(dirname(VENDOR), { recursive: true });
+  writeFileSync(VENDOR, text);
+  console.log(`build-standards --refresh-core: ${JSON.parse(text).criteria.length} A/AA criteria derived from the vendored universe → ${VENDOR}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -830,6 +874,7 @@ async function main() {
   const refreshIdx = process.argv.indexOf("--refresh");
   if (refreshIdx !== -1) deriveSnapshot(process.argv[refreshIdx + 1]);
   if (process.argv.includes("--refresh-universe")) await deriveUniverse();
+  if (process.argv.includes("--refresh-core")) refreshCore();
   if (process.argv.includes("--refresh-fr")) await deriveFr();
   if (process.argv.includes("--refresh-text")) await deriveText();
   build();
