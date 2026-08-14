@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [4.3.0](https://github.com/maxgfr/ultra11y/compare/v4.2.0...v4.3.0) (2026-08-14)
+
+
+### Features
+
+* **engine:** re-pin vendored engines ([af5bd7d](https://github.com/maxgfr/ultra11y/commit/af5bd7d7a8509c17ef7bf718430f75737a863dc9))
+
 # [4.2.0](https://github.com/maxgfr/ultra11y/compare/v4.1.0...v4.2.0) (2026-08-14)
 
 
