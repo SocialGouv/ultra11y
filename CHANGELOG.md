@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.3.0](https://github.com/maxgfr/ultra11y/compare/v5.2.1...v5.3.0) (2026-08-17)
+
+
+### Features
+
+* **ci:** give the page-by-page grid its own pull-request comment ([85f2052](https://github.com/maxgfr/ultra11y/commit/85f205259bf5557ec19f5c1572c457ff72c061f5))
+* **skills:** hand the change over to review-a11y, in a subagent ([3f4ccd2](https://github.com/maxgfr/ultra11y/commit/3f4ccd27320bbb412ab7fe00ffc61dcd197e1ec0))
+
 ## [5.2.1](https://github.com/maxgfr/ultra11y/compare/v5.2.0...v5.2.1) (2026-08-17)
 
 
