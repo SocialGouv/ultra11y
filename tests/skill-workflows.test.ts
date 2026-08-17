@@ -191,6 +191,10 @@ describe("ci.md teaches the CI output formats", () => {
     expect(t).toMatch(/gate\*\* runs last|gate runs last/i);
     expect(t).toContain("fail-on");
   });
+
+  it("documents the authenticated scan, since most page samples sit behind a login", () => {
+    expect(t).toContain("storage-state");
+  });
   it("documents how the repo publishes itself, tokenlessly", () => {
     expect(t).toContain("id-token: write");
     expect(t).toMatch(/trusted publish/i);
@@ -248,4 +252,28 @@ describe("devtools.md teaches the dev side-car", () => {
   it("says what it does NOT decide, so a clean panel is not read as a pass", () => {
     expect(t).toMatch(/does not adjudicate|never "this page is accessible"/i);
   });
+});
+
+// Six hand-written `@v3` pins survived two majors, because nothing compared them to the
+// version being shipped. A reader who copies one gets an action frozen two majors back and
+// no error to explain it — the alias resolves, it is simply the wrong one. The generated
+// workflow (src/init.ts) derives its pin from VERSION and never drifted; only prose did, so
+// prose is what this gates.
+describe("the documented action pin tracks the version being shipped", () => {
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const MAJOR = (JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string }).version.split(".")[0];
+  const DOCS = ["README.md", "skills/ultra11y/references/ci.md"];
+
+  for (const doc of DOCS) {
+    it(`pins only @v${MAJOR} in ${doc}`, () => {
+      const text = readFileSync(join(ROOT, doc), "utf8");
+      // Trailing punctuation belongs to the prose around the pin, not to the ref.
+      const pins = [...text.matchAll(/maxgfr\/ultra11y@(\S+)/g)].map((m) => (m[1] ?? "").replace(/[.,`)]+$/, ""));
+      expect(pins.length, `${doc} documents no action pin at all`).toBeGreaterThan(0);
+      for (const pin of pins) {
+        // An exact `vX.Y.Z` is fine too — `init --ci` writes one — as long as it is this major.
+        expect(pin, `${doc} pins ${pin}, but this repo ships ${MAJOR}.x`).toMatch(new RegExp(`^v${MAJOR}(\\.\\d+\\.\\d+)?$`));
+      }
+    });
+  }
 });

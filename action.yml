@@ -59,6 +59,14 @@ inputs:
     description: 'Cap on the number of pages taken from `sitemap`/`crawl`.'
     required: false
     default: '20'
+  storage-state:
+    description: 'Playwright storageState JSON for an AUTHENTICATED scan — the session most real page samples need, since the pages worth auditing usually sit behind a login. Produce it in the job (a Playwright setup project, `browser_context.storage_state()`, …) and pass the path. A per-page `storageState` in `.ultra11yrc.json` overrides this one, so a sample can mix public and signed-in pages in one run. The path is handed to Playwright and never read by the engine.'
+    required: false
+    default: ''
+  interact-clicks:
+    description: 'Let the live-region probe click buttons during an AUTHENTICATED scan. Off by default there — with a session loaded a click can trigger a server mutation — and always on without `storage-state`. Buttons whose name reads destructive are never clicked either way.'
+    required: false
+    default: 'false'
   snapshot:
     description: 'Persist every scanned page to .ultra11y/pages/<id>/ and fold it into the audit. This is what lets a page be conforming at all — without a snapshot its criteria can only ever be "to assess". Set false to scan without recording.'
     required: false
@@ -140,7 +148,7 @@ inputs:
     required: false
     default: 'false'
   adjudicate:
-    description: 'Rule on the judgment criteria the static engine cannot decide (alt relevance, link purpose in context, reading order): `api` sends the worklist to the Anthropic API in batches, `agent` hands it to a Claude Code run, `none` (default) leaves them « to assess ». Both non-`none` modes read ANTHROPIC_API_KEY from the JOB environment — never from an input — and skip themselves when it is absent, which is what makes them harmless on a fork pull request.'
+    description: 'Rule on the judgment criteria the static engine cannot decide (alt relevance, link purpose in context, reading order): `api` sends the worklist to the Anthropic API in batches, `agent` hands it to a Claude Code run, `none` (default) leaves them « to assess ». Both modes read their credential from the JOB environment, never from an input, and skip themselves when it is absent — which is what makes them harmless on a fork pull request. `api` needs ANTHROPIC_API_KEY (the Messages API takes nothing else); `agent` accepts ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN, the token a Pro/Max subscriber mints with `claude setup-token`. `agent` also skips itself on an event claude-code-action does not support — `push` above all.'
     required: false
     default: 'none'
   adjudicate-model:
@@ -263,6 +271,10 @@ runs:
       run: |
         args=(--merge audits/audit-latest.json --out audits)
         if [ '${{ inputs.snapshot }}' != 'true' ]; then args+=(--no-snapshot); fi
+        # An authenticated scan. The path is forwarded to Playwright as a path and never read
+        # here, so a session file cannot end up in this log.
+        if [ -n '${{ inputs.storage-state }}' ]; then args+=(--storage-state '${{ inputs.storage-state }}'); fi
+        if [ '${{ inputs.interact-clicks }}' = 'true' ]; then args+=(--interact-clicks); fi
         if [ '${{ inputs.sample }}' = 'true' ]; then
           node "$ENGINE" scan --sample "${args[@]}"
         elif [ -n '${{ inputs.sitemap }}' ]; then
@@ -286,20 +298,64 @@ runs:
     # per-page report, SARIF, annotations, the PR comment, tickets and the report, all of
     # which read audits/audit-latest.json and so inherit the verdicts.
     #
-    # The key is read from the JOB environment, never from an input: a composite action's
-    # steps inherit it, and a secret that never travels through an input is one fewer secret
-    # to leak into a log.
+    # The credential is read from the JOB environment, never from an input: a composite
+    # action's steps inherit it, and a secret that never travels through an input is one
+    # fewer secret to leak into a log.
+    #
+    # The two modes do NOT take the same credential, because they are not the same caller.
+    # `api` runs `judge`, which speaks x-api-key to api.anthropic.com and has no OAuth
+    # exchange — it needs ANTHROPIC_API_KEY and nothing else can stand in. `agent` shells out
+    # to claude-code-action, which accepts either an API key or the OAuth token a Pro/Max
+    # subscriber mints with `claude setup-token` — so a repository that has only
+    # CLAUDE_CODE_OAUTH_TOKEN can still adjudicate, which is the common case for a team
+    # already running Claude Code in CI.
+    #
+    # A missing credential is never an error: the tier evaporates with a ::warning:: and the
+    # judgment criteria stay « à évaluer ». That is what keeps it harmless on a fork's pull
+    # request, where secrets are not exposed.
     - name: Resolve the adjudication tier
       id: adjudication
       if: inputs.adjudicate != 'none'
       shell: bash
       run: |
-        if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+        mode='${{ inputs.adjudicate }}'
+        event='${{ github.event_name }}'
+
+        if [ "$mode" = 'api' ]; then
+          if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "on=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           echo "on=false" >> "$GITHUB_OUTPUT"
-          echo "::warning::ultra11y: adjudicate=${{ inputs.adjudicate }} but ANTHROPIC_API_KEY is absent from the job environment — the judgment criteria stay to assess. Secrets are not exposed to a fork's pull request, so this is the expected path there."
-        else
-          echo "on=true" >> "$GITHUB_OUTPUT"
+          if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+            echo "::warning::ultra11y: adjudicate=api needs ANTHROPIC_API_KEY — the job has CLAUDE_CODE_OAUTH_TOKEN, which the Messages API does not accept. Use adjudicate=agent to rule with that token. The judgment criteria stay to assess."
+          else
+            echo "::warning::ultra11y: adjudicate=api but ANTHROPIC_API_KEY is absent from the job environment — the judgment criteria stay to assess. Secrets are not exposed to a fork's pull request, so this is the expected path there."
+          fi
+          exit 0
         fi
+
+        # mode = agent.
+        if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+          echo "on=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::ultra11y: adjudicate=agent but neither ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN is in the job environment — the judgment criteria stay to assess. Secrets are not exposed to a fork's pull request, so this is the expected path there."
+          exit 0
+        fi
+
+        # claude-code-action parses the GitHub event context BEFORE it reads the prompt, and
+        # throws `Unsupported event type: <event>` on anything outside this list — `push`
+        # most of all, which is exactly what an accessibility gate runs on. Left unguarded,
+        # turning this tier on would convert a green a11y job into a hard build failure that
+        # says nothing about accessibility. Degrade like a missing key instead.
+        case "$event" in
+          pull_request|pull_request_target|pull_request_review|pull_request_review_comment|issues|issue_comment|workflow_dispatch|repository_dispatch|schedule|workflow_run)
+            echo "on=true" >> "$GITHUB_OUTPUT"
+            ;;
+          *)
+            echo "on=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::ultra11y: adjudicate=agent cannot run on the '$event' event — claude-code-action supports pull_request, pull_request_target, pull_request_review(_comment), issues, issue_comment, workflow_dispatch, repository_dispatch, schedule and workflow_run. The audit is unaffected; the judgment criteria stay to assess. Use adjudicate=api on this event, or move the tier to a pull_request/schedule job."
+            ;;
+        esac
 
     # MODE `api` — one Messages call per batch of 8 criteria. `judge` builds its own worklist,
     # renders it through the very formatter the agent reads, and folds the verdicts through
@@ -348,12 +404,28 @@ runs:
 
     # The version is pinned in the literal below because GitHub refuses an expression in
     # `uses:` — it cannot be an input, so it is a dependency this action owns and bumps.
+    #
+    # BOTH credentials are handed over, and either may be empty: claude-code-action treats
+    # them as alternatives and falls back to the job environment for each, so passing the
+    # blank one costs nothing and lets an OAuth-only repository through. `Resolve the
+    # adjudication tier` has already established that at least one is set.
+    #
+    # `github_token` is passed for a reason that is easy to miss: without it the action mints
+    # its own GitHub App token over OIDC, which needs `id-token: write` in the CALLER's
+    # workflow. This step never touches the GitHub API — it reads a runbook and writes one
+    # JSON file — so handing it the job's own token keeps the permission surface of a
+    # consumer's a11y workflow exactly as it was.
+    #
+    # `--max-turns` bounds an unattended run. claude-code-action sets no default, and this
+    # step has nobody watching it.
     - name: Adjudicate with an agent — Claude Code
       if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent'
       uses: anthropics/claude-code-action@v1
       with:
         anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
-        claude_args: '--allowedTools Read,Grep,Glob,Edit,Write'
+        claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+        github_token: ${{ github.token }}
+        claude_args: '--allowedTools Read,Grep,Glob,Edit,Write --max-turns 60'
         prompt: |
           You are running head-less in CI. Adjudicate an accessibility audit, and do nothing else.
 

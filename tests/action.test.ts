@@ -257,6 +257,73 @@ describe("the adjudication tier", () => {
     expect(agent?.with?.prompt).toContain("ADJUDICATE.todo.json");
     expect(agent?.with?.prompt).toMatch(/do not commit/i);
   });
+
+  // The two modes do not take the same credential, and conflating them produces the worst
+  // kind of failure: a tier that reports itself on and then rules on nothing.
+  it("lets `agent` run on a subscription token, and keeps `api` on the API key", () => {
+    const resolve = ACTION.runs.steps.find((s) => s.id === "adjudication");
+    // `api` speaks x-api-key to api.anthropic.com; an OAuth token is not a substitute, and
+    // the warning has to SAY so rather than look like a missing secret.
+    expect(resolve?.run).toContain("CLAUDE_CODE_OAUTH_TOKEN");
+    expect(resolve?.run).toMatch(/adjudicate=api needs ANTHROPIC_API_KEY/);
+    // …while `agent` shells out to claude-code-action, which accepts either.
+    expect(resolve?.run).toMatch(/adjudicate=agent but neither ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN/);
+
+    const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
+    expect(agent?.with?.anthropic_api_key).toContain("ANTHROPIC_API_KEY");
+    expect(agent?.with?.claude_code_oauth_token).toContain("CLAUDE_CODE_OAUTH_TOKEN");
+  });
+
+  // claude-code-action parses the event context before it reads the prompt and throws on
+  // anything outside its list. `push` is the one that matters: it is what an accessibility
+  // gate runs on, so an unguarded tier turns a green job into a build failure that says
+  // nothing about accessibility.
+  it("skips the agent on an event claude-code-action rejects, instead of failing the job", () => {
+    const resolve = ACTION.runs.steps.find((s) => s.id === "adjudication");
+    expect(resolve?.run).toContain("github.event_name");
+    for (const supported of ["pull_request", "workflow_dispatch", "schedule", "workflow_run", "repository_dispatch"]) {
+      expect(resolve?.run, `event ${supported} is not accepted`).toContain(supported);
+    }
+    // Degrades exactly like a missing credential — a warning and `on=false`, never an exit 1.
+    expect(resolve?.run).toContain("::warning::");
+    expect(resolve?.run).not.toMatch(/exit 1/);
+  });
+
+  // Without a token the action mints its own over OIDC, which needs `id-token: write` in the
+  // CALLER's workflow. This step never touches the GitHub API, so requiring that of every
+  // consumer would be a permission asked for and never used.
+  it("hands the agent the job's own GitHub token, so no consumer needs id-token: write", () => {
+    const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
+    expect(agent?.with?.github_token).toContain("github.token");
+  });
+
+  // Nobody is watching this run. claude-code-action sets no default turn limit.
+  it("bounds the unattended agent run", () => {
+    const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
+    expect(agent?.with?.claude_args).toContain("--max-turns");
+  });
+});
+
+// The pages worth auditing usually sit behind a login, and a scan that silently lands on the
+// sign-in screen reports that screen's accessibility under another page's name.
+describe("the authenticated scan", () => {
+  const scan = () => ACTION.runs.steps.find((s) => s.name === "Scan the pages");
+
+  it("forwards a storage state to the scan", () => {
+    expect(ACTION.inputs["storage-state"]).toBeTruthy();
+    expect(ACTION.inputs["storage-state"]?.default).toBe("");
+    expect(scan()?.run).toContain("--storage-state");
+  });
+
+  it("keeps the click probe off by default on a signed-in scan, and opt-in-able", () => {
+    expect(ACTION.inputs["interact-clicks"]?.default).toBe("false");
+    expect(scan()?.run).toContain("--interact-clicks");
+  });
+
+  // A session file is a credential. It is handed to Playwright as a path and never read.
+  it("says out loud that the storage state is a path, not a value to read", () => {
+    expect(ACTION.inputs["storage-state"]?.description).toMatch(/never read/i);
+  });
 });
 
 describe("the gate", () => {

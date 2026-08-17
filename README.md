@@ -125,7 +125,7 @@ claude mcp add ultra11y -- npx -y ultra11y mcp
 **As a GitHub Action** — audits the PR diff and, optionally, the served pages:
 
 ```yaml
-- uses: maxgfr/ultra11y@v3
+- uses: maxgfr/ultra11y@v4
   with: { since: auto, standard: rgaa, fail-on: blocking }
 ```
 
@@ -383,7 +383,7 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   block. It re-decides nothing and invents no format, so a page sheet and the compliance report
   cannot disagree; `check` gates it against invented criteria like any other report.
   See `references/pages.md`.
-- **A shipped GitHub Action** — `uses: maxgfr/ultra11y@main` audits the **code** (PR diff) and,
+- **A shipped GitHub Action** — `uses: maxgfr/ultra11y@v4` audits the **code** (PR diff) and,
   optionally, the **pages** (it can start your app, wait for it, then scan real URLs or your
   declared sample). The engine ships inside the action, so there is nothing to install and no
   `setup-node`. The gate runs **last**, after SARIF, annotations, the summary, the sticky PR

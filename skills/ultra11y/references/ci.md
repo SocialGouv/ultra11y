@@ -15,7 +15,7 @@ permissions:
 steps:
   - uses: actions/checkout@v4
     with: { fetch-depth: 0 }        # the diff gate needs the base ref
-  - uses: maxgfr/ultra11y@v3      # or pin the exact version, as `init --ci` does
+  - uses: maxgfr/ultra11y@v4      # or pin the exact version, as `init --ci` does
     with:
       since: auto                   # the PR's base branch
       standard: rgaa
@@ -27,7 +27,7 @@ steps:
 Page by page, with a real browser, in the same step:
 
 ```yaml
-  - uses: maxgfr/ultra11y@v3
+  - uses: maxgfr/ultra11y@v4
     with:
       standard: rgaa
       start: npm run start
@@ -66,7 +66,7 @@ partial by construction. `adjudicate` closes that — opt-in, in two modes.
 env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # the job's env, never an input
 steps:
-  - uses: maxgfr/ultra11y@v3
+  - uses: maxgfr/ultra11y@v4
     with:
       standard: rgaa
       adjudicate: api          # or `agent`
@@ -89,13 +89,42 @@ open the cited files and read around them, which is what *link purpose **in cont
 asks for. Expect the API mode to answer `manual` more often; that is it being honest, not
 broken. The metric that separates them is the count of criteria left to assess.
 
-**Both modes read `ANTHROPIC_API_KEY` from the job environment, never from an input** — a
+**Both modes read their credential from the job environment, never from an input** — a
 composite action's steps inherit it, and a secret that never travels through an input is one
-fewer secret to leak into a log. When the key is absent the tier **skips itself**: the job stays
+fewer secret to leak into a log. When it is absent the tier **skips itself**: the job stays
 green, the report is still written, and the criteria stay « à évaluer ». That is not an edge
 case — it is precisely what a **fork's pull request** looks like, where secrets are never
 exposed. An adjudication that fails mid-flight (a rate-limited batch refuses the whole fold) is
 absorbed the same way, because losing the verdicts must never cost you the audit.
+
+**The two modes do not take the same credential.** `api` runs `judge`, which speaks `x-api-key`
+to `api.anthropic.com`; nothing else stands in for `ANTHROPIC_API_KEY` there. `agent` shells out
+to `claude-code-action`, which accepts **either** an API key **or** the OAuth token a Pro/Max
+subscriber mints with `claude setup-token` — so a repository that already runs Claude Code in CI
+and holds only `CLAUDE_CODE_OAUTH_TOKEN` can adjudicate without buying API credit. Set whichever
+you have; set both and the API key wins.
+
+```yaml
+env:
+  # `agent` takes either of these. `api` takes only the first.
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+```
+
+Asking for `api` with only the OAuth token is a warning, not a failure — the tier skips and says
+which credential it would have needed, rather than failing a request the Messages API was always
+going to reject.
+
+**`agent` cannot run on every event.** `claude-code-action` resolves the GitHub event context
+*before* it reads the prompt, and throws `Unsupported event type: <event>` on anything outside
+`pull_request`, `pull_request_target`, `pull_request_review(_comment)`, `issues`,
+`issue_comment`, `workflow_dispatch`, `repository_dispatch`, `schedule` and `workflow_run`.
+**`push` is not in that list** — and `push` is exactly what an accessibility gate runs on. So the
+tier checks the event and degrades to a warning there, the same way it does without a credential:
+an a11y job must never go red for a reason that has nothing to do with accessibility. Put the
+agent tier on the `pull_request` or `schedule` job, or use `adjudicate: api`, which has no such
+constraint. The action also hands `claude-code-action` the job's own `GITHUB_TOKEN`, so this tier
+never obliges you to add `id-token: write` for a step that makes no GitHub API call.
 
 **Cost is per run and does not amortise.** Roughly $0.20 for a WCAG run and $0.50 for RGAA at
 Sonnet pricing — the worklist is re-sent whole each time and no batch is large enough to earn
@@ -235,7 +264,7 @@ The action audits the **code** and, when you point it at a served app, the **pag
 list can come from three places, and none of them has to be written by hand:
 
 ```yaml
-- uses: maxgfr/ultra11y@v3
+- uses: maxgfr/ultra11y@v4
   with:
     standard: rgaa
     start: npm run start
@@ -261,6 +290,40 @@ Two surfaces come out of it:
   standard with its status on that page, and each non-conformity as the ordinary auditor block.
 
 A run with no page in scope is not a failure: the report step says so and the job carries on.
+
+### Pages behind a login (`storage-state`)
+
+The pages worth auditing are rarely the public ones. A form-heavy funnel, a dashboard, a
+back-office — all of them sit behind a sign-in, and a scan that reaches them anonymously does
+not fail: it records **the sign-in screen** under the name of the page you asked for. That is
+the worst failure mode an accessibility report has, because the document looks complete.
+
+Produce a Playwright `storageState` in the job — most repositories already have one, written by
+the setup project their E2E suite depends on — and hand the action its path:
+
+```yaml
+- run: npx playwright test --project=setup      # your existing login, writing the session file
+- uses: maxgfr/ultra11y@v4
+  with:
+    standard: rgaa
+    sample: 'true'
+    storage-state: test-results/.auth/user.json
+```
+
+The path is forwarded to Playwright as a path and never read by the engine, so a session file
+cannot end up in the job log. A per-page `storageState` in `.ultra11yrc.json` **overrides** this
+one, so a sample can mix public and signed-in pages in a single run.
+
+Two things worth knowing about an authenticated scan:
+
+- **The click probe is off.** With a session loaded, a click can trigger a real mutation on a
+  real record. The live-region probe still fills inputs and re-measures, but it does not click
+  buttons unless you set `interact-clicks: 'true'`. (Buttons whose accessible name reads
+  destructive are never clicked, session or not.)
+- **A session is not a state machine.** Being signed in gets you past the login; it does not put
+  a multi-step funnel on step 4. If a route is guarded by application state, seed that state in
+  the job before scanning — otherwise the page redirects and you are back to auditing the wrong
+  screen under the right name.
 
 ## What the artifact looks like when you open it
 
@@ -395,9 +458,9 @@ one job — the code diff, then the served pages — died on a `409 Conflict`, w
 written and never uploaded. Pass `artifact-name` on each invocation:
 
 ```yaml
-- uses: maxgfr/ultra11y@v3
+- uses: maxgfr/ultra11y@v4
   with: { since: auto, artifact-name: a11y-code }
-- uses: maxgfr/ultra11y@v3
+- uses: maxgfr/ultra11y@v4
   with: { crawl: http://localhost:3000, artifact-name: a11y-pages }
 ```
 
