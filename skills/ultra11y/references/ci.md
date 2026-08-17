@@ -15,7 +15,7 @@ permissions:
 steps:
   - uses: actions/checkout@v4
     with: { fetch-depth: 0 }        # the diff gate needs the base ref
-  - uses: maxgfr/ultra11y@v4      # or pin the exact version, as `init --ci` does
+  - uses: maxgfr/ultra11y@v5      # or pin the exact version, as `init --ci` does
     with:
       since: auto                   # the PR's base branch
       standard: rgaa
@@ -27,7 +27,7 @@ steps:
 Page by page, with a real browser, in the same step:
 
 ```yaml
-  - uses: maxgfr/ultra11y@v4
+  - uses: maxgfr/ultra11y@v5
     with:
       standard: rgaa
       start: npm run start
@@ -37,7 +37,7 @@ Page by page, with a real browser, in the same step:
 ```
 
 `ultra11y init --ci` writes a workflow using it, **pinned to the exact engine version that
-generated the file** (`@v<that version>`) so a CI run stays reproducible. `@v<major>` — `@v3`
+generated the file** (`@v<that version>`) so a CI run stays reproducible. `@v<major>` — `@v5`
 today — is a moving alias the release workflow repoints at each release, for teams who would
 rather take fixes automatically. It moves **within** a major only: when a breaking change cuts
 the next one, the old alias freezes where it is, so a pipeline pinned to it keeps working and
@@ -66,7 +66,7 @@ partial by construction. `adjudicate` closes that — opt-in, in two modes.
 env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # the job's env, never an input
 steps:
-  - uses: maxgfr/ultra11y@v4
+  - uses: maxgfr/ultra11y@v5
     with:
       standard: rgaa
       adjudicate: api          # or `agent`
@@ -273,7 +273,7 @@ The action audits the **code** and, when you point it at a served app, the **pag
 list can come from three places, and none of them has to be written by hand:
 
 ```yaml
-- uses: maxgfr/ultra11y@v4
+- uses: maxgfr/ultra11y@v5
   with:
     standard: rgaa
     start: npm run start
@@ -312,7 +312,7 @@ the setup project their E2E suite depends on — and hand the action its path:
 
 ```yaml
 - run: npx playwright test --project=setup      # your existing login, writing the session file
-- uses: maxgfr/ultra11y@v4
+- uses: maxgfr/ultra11y@v5
   with:
     standard: rgaa
     sample: 'true'
@@ -467,9 +467,9 @@ one job — the code diff, then the served pages — died on a `409 Conflict`, w
 written and never uploaded. Pass `artifact-name` on each invocation:
 
 ```yaml
-- uses: maxgfr/ultra11y@v4
+- uses: maxgfr/ultra11y@v5
   with: { since: auto, artifact-name: a11y-code }
-- uses: maxgfr/ultra11y@v4
+- uses: maxgfr/ultra11y@v5
   with: { crawl: http://localhost:3000, artifact-name: a11y-pages }
 ```
 
