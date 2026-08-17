@@ -5,7 +5,9 @@ import { join } from "node:path";
 import { runAudit, buildAudit } from "../src/audit.js";
 import { parseSource } from "../src/parse/source.js";
 import { renderReport, renderPackReport, writeReport, untestedNeedsRendering } from "../src/report.js";
-import { mergeDynamic } from "../src/scan.js";
+import { renderedTestedScs } from "../src/rules/rendered.js";
+import { DOCKER_TESTED_SCS, mergeDynamic } from "../src/scan.js";
+import { localTestedScs } from "../src/scan-local.js";
 import { prdUnits, partitionUnits } from "../src/prd.js";
 import { derivePackResults, loadPack, packConformancePct } from "../src/standards/index.js";
 import type { AuditResult, DynamicResult, Finding } from "../src/types.js";
@@ -122,7 +124,10 @@ describe("partial-audit advisory banner (Task 5 — needs-rendering-aware covera
     findings: [reflowFinding],
     testedScs: ["1.4.10"],
   };
-  // A local run with interactions measures the full needs-rendering set.
+  // Everything an automated tier can credit: the live-browser probes PLUS the criteria the
+  // offline snapshot tier decides (1.3.4, 1.4.1, 1.4.3, 1.4.11, 2.4.7).
+  const EVERY_CREDITABLE_SC = ["1.3.4", "1.4.1", "1.4.10", "1.4.11", "1.4.12", "1.4.13", "1.4.3", "1.4.4", "2.4.7", "4.1.3"];
+  // A local run with interactions measures the full live-browser set.
   const localScan: DynamicResult = {
     tool: "ultra11y",
     engine: "axe-core@playwright (local)",
@@ -131,16 +136,35 @@ describe("partial-audit advisory banner (Task 5 — needs-rendering-aware covera
     findings: [reflowFinding],
     testedScs: ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13", "4.1.3"],
   };
+  // …and the snapshot tier supplies the rest, offline.
+  const snapshotScan: DynamicResult = {
+    tool: "ultra11y",
+    engine: "axe-core@playwright (local)",
+    target: "https://example.fr",
+    date: "2026-07-13",
+    findings: [reflowFinding],
+    testedScs: ["1.3.4", "1.4.1", "1.4.3", "1.4.11", "2.4.7"],
+  };
 
-  it("appears on an RGAA report with NO merged scan results, naming every needs-rendering criterion", () => {
+  it("appears on an RGAA report with NO merged scan results, naming every creditable criterion", () => {
     const md = renderPackReport(bad, loadPack("rgaa"), "fr");
     expect(md).toContain("Audit partiel");
     expect(md).toContain("zoom 200 %");
     expect(md).toContain("reflow 320 px");
     expect(md).toContain("visibilité du focus");
+    expect(md).toContain("contraste du texte"); // the snapshot tier's own criteria are named too
     expect(md).toContain("scan --sample");
     expect(renderPackReport(bad, loadPack("rgaa"), "en")).toContain("Partial audit");
-    expect(untestedNeedsRendering(bad)).toEqual(["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13", "4.1.3"]);
+    expect(untestedNeedsRendering(bad).sort()).toEqual(EVERY_CREDITABLE_SC);
+  });
+
+  // The banner must never name a criterion no tier can credit, or it becomes permanent: no run
+  // could clear it, so a reader learns to ignore the whole advisory. Those five carry a
+  // per-criterion reason instead (src/audit.ts RESIDUAL_TRAIL).
+  it("never names a criterion no automated tier measures", () => {
+    for (const sc of ["1.4.5", "2.1.2", "2.3.1", "2.4.11", "2.5.8"]) {
+      expect(untestedNeedsRendering(bad), `SC ${sc}`).not.toContain(sc);
+    }
   });
 
   it("does NOT appear on the core WCAG report", () => {
@@ -150,7 +174,7 @@ describe("partial-audit advisory banner (Task 5 — needs-rendering-aware covera
 
   it("PERSISTS after a Docker-only scan (reflow measured, local probes never ran) — naming exactly the untested ones", () => {
     const merged = mergeDynamic(bad, dockerScan, "fr");
-    expect(untestedNeedsRendering(merged)).toEqual(["1.4.4", "1.4.12", "2.4.7", "1.4.13", "4.1.3"]);
+    expect(untestedNeedsRendering(merged).sort()).toEqual(EVERY_CREDITABLE_SC.filter((sc) => sc !== "1.4.10"));
     const md = renderPackReport(merged, loadPack("rgaa"), "fr");
     expect(md).toContain("Audit partiel");
     // Names the local-only probes that never ran…
@@ -163,11 +187,35 @@ describe("partial-audit advisory banner (Task 5 — needs-rendering-aware covera
     expect(md).not.toContain("reflow 320 px");
   });
 
-  it("is GONE after a full local scan (every needs-rendering criterion measured)", () => {
+  it("SHRINKS after a full local scan, keeping the snapshot tier's own criteria named", () => {
     const merged = mergeDynamic(bad, localScan, "fr");
+    // The live browser cannot decide contrast from computed styles — that is the snapshot
+    // tier's job — so the banner correctly still asks for it.
+    expect(untestedNeedsRendering(merged).sort()).toEqual(["1.3.4", "1.4.1", "1.4.11", "1.4.3"]);
+    expect(renderPackReport(merged, loadPack("rgaa"), "fr")).toContain("Audit partiel");
+  });
+
+  it("is GONE once both tiers have run — the live probes AND the snapshots", () => {
+    const merged = mergeDynamic(mergeDynamic(bad, localScan, "fr"), snapshotScan, "fr");
     expect(untestedNeedsRendering(merged)).toEqual([]);
     expect(renderPackReport(merged, loadPack("rgaa"), "fr")).not.toContain("Audit partiel");
     expect(renderPackReport(merged, loadPack("rgaa"), "en")).not.toContain("Partial audit");
+  });
+
+  // The banner's list and the tiers' coverage sets are two halves of one claim. Pin them
+  // together: a tier that learns to measure a new criterion must also start reporting it as
+  // missing until it does, and a criterion dropped from a tier must leave the banner.
+  it("names exactly the union of what the snapshot tier and the live-browser tiers can credit", () => {
+    const snapshotTier = renderedTestedScs({
+      styles: new Map(),
+      boxes: new Map(),
+      screenshot: "/tmp/shot.png",
+      css: { rules: [], unreadable: 0, truncated: false } as never,
+    });
+    const liveTier = [...DOCKER_TESTED_SCS, ...localTestedScs(true)];
+    const creditable = [...new Set([...snapshotTier, ...liveTier])].sort();
+
+    expect(untestedNeedsRendering(bad).sort()).toEqual(creditable);
   });
 
   it("back-compat: an audit merged before the coverage stamp counts a dyn-* finding as coverage of its SC", () => {

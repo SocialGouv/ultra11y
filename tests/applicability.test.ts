@@ -169,3 +169,40 @@ describe("the RGAA projection carries the NA through", () => {
     expect(naCount + manualCount).toBeLessThanOrEqual(106);
   });
 });
+
+// « To assess » used to be a shrug. One generic sentence per tier answered for all 52 undecided
+// criteria: "needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size)" was
+// printed against 1.4.5 (images of text) as readily as against 1.4.3 (contrast), naming four
+// measurements of which at most one was the criterion's. A reader could not tell what was
+// missing, and neither could the next run.
+describe("every criterion left to assess says why, and where its evidence comes from", () => {
+  const r = audit(doc('<p>Text</p><label for="e">Email</label><input id="e"><video src="v.mp4"></video>'));
+
+  it("gives every residual risk a non-empty reason", () => {
+    expect(r.residualRisks.length).toBeGreaterThan(0);
+    for (const risk of r.residualRisks) {
+      expect(risk.reason.trim(), `SC ${risk.criteriaId}`).not.toBe("");
+      expect(risk.reason.length, `SC ${risk.criteriaId}`).toBeGreaterThan(20);
+    }
+  });
+
+  it("names the measurement that decides each rendering criterion, not a generic list", () => {
+    const reasonOf = (sc: string) => r.residualRisks.find((x) => x.criteriaId === sc)?.reason ?? "";
+    expect(reasonOf("1.4.3")).toMatch(/computed text\/background colours/i);
+    expect(reasonOf("1.4.10")).toMatch(/320px viewport/i);
+    expect(reasonOf("2.4.7")).toMatch(/:focus/);
+    expect(reasonOf("1.4.4")).toMatch(/200% zoom/i);
+  });
+
+  it("says plainly when NO automated tier decides a criterion, instead of pointing at `scan`", () => {
+    for (const sc of ["1.4.5", "2.1.2", "2.3.1", "2.4.11"]) {
+      expect(r.residualRisks.find((x) => x.criteriaId === sc)?.reason, `SC ${sc}`).toMatch(/no automated tier decides this/i);
+    }
+  });
+
+  it("carries a runnable command wherever one would actually help", () => {
+    for (const sc of ["1.4.3", "1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.4.7", "4.1.3"]) {
+      expect(r.residualRisks.find((x) => x.criteriaId === sc)?.reason, `SC ${sc}`).toMatch(/`[^`]*(scan|verify)[^`]*`/);
+    }
+  });
+});

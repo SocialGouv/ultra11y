@@ -12,6 +12,7 @@ import { attachSignals, isSnapshotDom, snapshotPageId } from "./snapshot.js";
 import { attr, elementsByTag, type Doc, type CaptureProvenance } from "./parse/html.js";
 import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir, readCaptureDir, capturesForSources } from "./capture.js";
 import { isFullDocument } from "./rules/rule.js";
+import { renderedTestedScs } from "./rules/rendered.js";
 import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
 import { listPacks } from "./standards/registry.js";
@@ -139,7 +140,50 @@ function hasFormControl(d: Doc): boolean {
   });
 }
 
-function residualReason(automatability: string): string {
+// ---- WHY a criterion is still to assess, and WHERE its evidence would come from -----------
+//
+// One generic sentence per tier used to answer for all 52 undecided criteria: "needs a rendered
+// DOM (contrast, focus visibility, zoom/reflow, target size)" was printed against 1.4.5 (images
+// of text) as readily as against 1.4.3 (contrast), naming four measurements of which at most
+// one was the criterion's. A reader could not tell what was missing, and neither could the next
+// run — so « to assess » read as a shrug rather than as an instruction.
+//
+// Each entry names the measurement that decides the criterion and the command that produces it.
+// Absent ⇒ the tier default below, which is still true, just unspecific.
+const RESIDUAL_TRAIL: Record<string, string> = {
+  // Rendering criteria the SNAPSHOT tier decides offline, from computed styles + stylesheets.
+  "1.3.4":
+    "Decided on a page's own stylesheets (an orientation media query that rotates the document) — record a snapshot with `scan --sample` (or an E2E capture), then re-audit.",
+  "1.4.1": "Decided on computed colours (a link distinguished by colour alone) — record a snapshot with `scan --sample`, then re-audit.",
+  "1.4.3":
+    "Decided on computed text/background colours, with a screenshot fallback where the backdrop is an image — record a snapshot with `scan --sample`, then re-audit.",
+  "1.4.11": "Decided on computed colours of UI components and graphics — record a snapshot with `scan --sample`, then re-audit.",
+  "2.4.7":
+    "Decided on the page's own stylesheets (a `:focus` rule that removes the indicator without restoring one), or by the live focus probe — record a snapshot with `scan --sample`, then re-audit.",
+  // Rendering criteria that need a LIVE browser: they are measured by acting on the page.
+  "1.4.4": "Needs a live browser: the page is re-measured at 200% zoom — `scan <url> --runtime local --merge <audit.json>`.",
+  "1.4.10": "Needs a live browser: the page is re-measured in a 320px viewport (reflow) — `scan <url> --merge <audit.json>`.",
+  "1.4.12": "Needs a live browser: text spacing overrides are injected and the layout re-measured — `scan <url> --runtime local --merge <audit.json>`.",
+  "1.4.13":
+    "Needs a live browser: hover/focus-triggered content is opened and probed for dismiss/hover/persist — `scan <url> --runtime local --merge <audit.json>`.",
+  // axe's own `target-size` rule can FAIL this on a live page, but no tier certifies it, so a
+  // clean scan leaves it open rather than conforming. Say both halves.
+  "2.5.8":
+    "A live scan can fail this (axe `target-size`) but never certify it — `scan <url> --runtime local --merge <audit.json>`, then adjudicate what is left.",
+  "4.1.3":
+    "Needs a live browser WITH interaction: a status message is triggered and the live region observed — `scan <url> --runtime local --merge <audit.json>` (interactions are on by default).",
+  // Rendering criteria no automated tier measures — say so, rather than pointing at `scan` and
+  // letting the reader discover it changes nothing.
+  "1.4.5":
+    "No automated tier decides this: whether text is presented as an image is a reading of each image's content. Adjudicate it (`verify --manual`) against the images the audit lists.",
+  "2.1.2": "No automated tier decides this: escaping a keyboard trap has to be attempted by hand, on each focusable region.",
+  "2.3.1": "No automated tier decides this: flashing has to be observed over time on the rendered page.",
+  "2.4.11": "No automated tier decides this: whether a focused element stays unobscured depends on the sticky headers and overlays in play on each screen.",
+};
+
+function residualReason(automatability: string, sc?: string): string {
+  const trail = sc ? RESIDUAL_TRAIL[sc] : undefined;
+  if (trail) return trail;
   return automatability === "needs-rendering"
     ? "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`."
     : "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).";
@@ -173,6 +217,10 @@ interface Accum {
   sfcExts: Set<string>; // which SFC extensions were seen
   captures: { file: string; provenance: CaptureProvenance }[]; // rendered capture files audited
   langCounts: Map<string, number>; // <html lang> primary subtags seen, for repo-language detection
+  // Success criteria the RENDERED tier measured, from the snapshots ingested in this run
+  // (src/rules/rendered.ts renderedTestedScs). Stamped onto scope.scan.testedScs so the
+  // partial-audit banner names what is genuinely missing instead of every rendering criterion.
+  renderedScs: Set<string>;
 }
 
 // Precompute the static success criteria + their applicability predicates once.
@@ -200,6 +248,7 @@ function newAccum(): Accum {
     sfcExts: new Set(),
     captures: [],
     langCounts: new Map(),
+    renderedScs: new Set(),
   };
 }
 
@@ -264,6 +313,9 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
   for (const [id, pred] of SUBJECT_PREDS) {
     if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
   }
+  // A page snapshot just let the rendered tier MEASURE some criteria, offline and with no
+  // browser. Record which, so the report stops claiming they were never tested.
+  if (doc.signals) for (const sc of renderedTestedScs(doc.signals)) acc.renderedScs.add(sc);
   if (doc.opaqueComponents?.length) {
     for (const lib of doc.opaqueComponents) acc.opaqueLibs.add(lib);
     acc.opaqueFiles++;
@@ -323,7 +375,7 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       // engine can't decide — leave it for the agent to adjudicate (`verify --manual`,
       // gated) or the `scan` tier (rendering criteria); never a silent conforming.
       status = "manual";
-      residualRisks.push({ criteriaId: c.sc, reason: residualReason(c.automatability), automatability: c.automatability });
+      residualRisks.push({ criteriaId: c.sc, reason: residualReason(c.automatability, c.sc), automatability: c.automatability });
     }
     criteria.push({ id: c.sc, guideline: c.guideline, status, findings: fs, ...(justification ? { justification } : {}) });
   }
@@ -366,6 +418,11 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
           }
         : {}),
       ...(acc.langCounts.size ? { langs: [...acc.langCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([lang]) => lang) } : {}),
+      // Coverage the RENDERED tier earned from the snapshots this run ingested. Same field the
+      // live-browser merge stamps (`mergeDynamic`), because it is the same claim: these criteria
+      // were measured. Omitted when no snapshot carried usable signals, so a source-only audit
+      // is byte-for-byte unchanged and still says the rendering criteria are untested.
+      ...(acc.renderedScs.size ? { scan: { testedScs: [...acc.renderedScs].sort() } } : {}),
       // The pages this run genuinely read. Written UNCONDITIONALLY — `[]` is the whole point,
       // because "this audit read no page" is exactly the claim a source-only run needs to make,
       // and an omit-when-empty field would say nothing precisely then. See scope.pagesAudited.

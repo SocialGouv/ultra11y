@@ -171,17 +171,35 @@ const L = {
   },
 } as const;
 
-// The needs-rendering criteria the scan tier decides, with the labels the partial-audit
-// banner names them by. Coverage comes from scope.scan.testedScs (stamped by mergeDynamic:
-// Docker measures 1.4.10 only; the local runtime adds zoom / spacing / focus / hover, and
-// live regions when interactions are on) — so the banner only ever names criteria that
-// genuinely lack a dynamic verdict, and drops only when every one of them is covered.
+// Every criterion an automated tier can CREDIT, with the labels the partial-audit banner names
+// them by. Two tiers contribute, and `scope.scan.testedScs` is the single coverage stamp for
+// both — so the banner only ever names criteria that genuinely lack a verdict, and disappears
+// once they are all covered:
+//
+//   - the SNAPSHOT tier (src/rules/rendered.ts), offline from a recorded page: 1.3.4, 1.4.1,
+//     1.4.3, 1.4.11, 2.4.7;
+//   - the LIVE-BROWSER tier (src/scan.ts Docker measures 1.4.10 only; src/scan-local.ts adds
+//     zoom / spacing / focus / hover, and live regions when interactions are on).
+//
+// This listed six, all from the live-browser tier, and that was wrong in both directions at
+// once: an audit that had ingested 35 snapshots and measured contrast and focus visibility from
+// them was still told the rendering criteria "were not tested", while the criteria those
+// snapshots really did decide were absent from the list and so could never be reported covered.
+//
+// The five needs-rendering criteria NO tier measures (1.4.5, 2.1.2, 2.3.1, 2.4.11, 2.5.8) are
+// deliberately NOT here: listing them would make the banner permanent and un-actionable, since
+// no run could ever clear it. They carry a per-criterion reason instead (src/audit.ts
+// RESIDUAL_TRAIL) saying that no automated tier decides them, and what does.
 const NEEDS_RENDERING: readonly { sc: string; label: Record<Lang, string> }[] = [
+  { sc: "1.3.4", label: { fr: "verrou d’orientation", en: "orientation lock" } },
+  { sc: "1.4.1", label: { fr: "information par la couleur", en: "use of colour" } },
+  { sc: "1.4.3", label: { fr: "contraste du texte", en: "text contrast" } },
   { sc: "1.4.4", label: { fr: "zoom 200 %", en: "200% zoom" } },
   { sc: "1.4.10", label: { fr: "reflow 320 px", en: "320px reflow" } },
+  { sc: "1.4.11", label: { fr: "contraste des composants", en: "non-text contrast" } },
   { sc: "1.4.12", label: { fr: "espacement du texte", en: "text spacing" } },
-  { sc: "2.4.7", label: { fr: "visibilité du focus", en: "focus visibility" } },
   { sc: "1.4.13", label: { fr: "contenu au survol", en: "content on hover" } },
+  { sc: "2.4.7", label: { fr: "visibilité du focus", en: "focus visibility" } },
   { sc: "4.1.3", label: { fr: "régions live", en: "live regions" } },
 ];
 

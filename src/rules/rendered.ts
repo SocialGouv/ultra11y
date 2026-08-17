@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import { contrastRatio, parseColor, type RGBA } from "../color.js";
 import type { Doc, El } from "../parse/html.js";
 import { decodePng, dominantBackground, type Image } from "../pixel.js";
-import type { StyleEntry } from "../types.js";
+import type { RenderSignals, StyleEntry } from "../types.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
 const SKIP_TAGS = new Set(["script", "style", "head", "title", "meta", "noscript", "link", "html", "br", "wbr"]);
@@ -377,3 +377,41 @@ export const renderedRules: Rule[] = [
   renderedFocusNotVisible,
   renderedOrientationLock,
 ];
+
+// ---- COVERAGE: which criteria a snapshot actually let this tier measure -------------------
+//
+// A snapshot's coverage was invisible. `scope.scan.testedScs` is stamped only by
+// `mergeDynamic` (the live-browser path), so an audit that ingested 35 recorded pages and
+// decided contrast and focus visibility from them still printed "the rendering criteria were
+// not tested" — naming criteria it had in fact just measured. A reader who trusts that banner
+// goes looking for a browser run that already happened.
+//
+// Coverage is claimed PER RULE and only when the signals that rule reads are present, because
+// the tier's trustworthiness rests on being able to say "I don't know": a snapshot whose style
+// digest failed verification, or whose collector truncated, measured nothing and must credit
+// nothing. Declared beside the rules, and `tests/rendered-rules.test.ts` asserts every rule has
+// an entry, so a new rule cannot silently claim — or silently lose — coverage.
+const SIGNALS_REQUIRED: Record<string, (s: RenderSignals) => boolean> = {
+  // Computed colours, per element.
+  "rendered-contrast": (s) => !!s.styles && !s.truncated,
+  "rendered-link-colour-only": (s) => !!s.styles && !s.truncated,
+  "rendered-nontext-contrast": (s) => !!s.styles && !s.truncated,
+  // The pixel fallback needs the screenshot AND the boxes to sample it by.
+  "rendered-contrast-pixel": (s) => !!s.screenshot && !!s.boxes && !s.truncated,
+  // These two read the page's own stylesheets, and both decline on an unreadable sheet.
+  "rendered-focus-not-visible": (s) => !!s.css && s.css.unreadable === 0 && !s.css.truncated,
+  "rendered-orientation-lock": (s) => !!s.css && s.css.unreadable === 0,
+};
+
+/** The success criteria this tier measured on a document carrying `signals`. Derived from the
+ *  rules themselves, so the list cannot drift from what actually ran. */
+export function renderedTestedScs(signals: RenderSignals): string[] {
+  const scs = new Set<string>();
+  for (const rule of renderedRules) {
+    if (SIGNALS_REQUIRED[rule.id]?.(signals)) for (const sc of rule.criteria) scs.add(sc);
+  }
+  return [...scs].sort();
+}
+
+/** Every rule id that declares its signal requirement — for the drift test. */
+export const RENDERED_SIGNAL_RULES: readonly string[] = Object.keys(SIGNALS_REQUIRED);

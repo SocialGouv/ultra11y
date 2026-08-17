@@ -7,6 +7,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAudit } from "../src/audit.js";
+import { RENDERED_SIGNAL_RULES, renderedRules } from "../src/rules/rendered.js";
 import { PAGES_DIR, SNAPSHOT_VERSION, writeSnapshot, type StyleEntry } from "../src/snapshot.js";
 
 let root: string;
@@ -391,5 +392,52 @@ describe("an orientation lock (WCAG 1.3.4 → RGAA 13.9)", () => {
   it("DECLINES when a stylesheet could not be read", () => {
     const css = cssDigest([{ selector: "html", media: "(orientation: portrait)", decls: { transform: "rotate(90deg)" } }], 1);
     expect(ids(page, { css })).not.toContain("rendered-orientation-lock");
+  });
+});
+
+// A snapshot's coverage used to be invisible: `scope.scan.testedScs` was stamped only by the
+// live-browser merge, so an audit that had ingested recorded pages and decided contrast and
+// focus visibility from them still reported "the rendering criteria were not tested" — naming
+// criteria it had just measured. Coverage is claimed per rule, and only when the signals that
+// rule reads are present, because this tier's whole value is being able to say "I don't know".
+describe("what a snapshot lets this tier CREDIT", () => {
+  const page = PAGE("<p>Texte</p>");
+
+  it("credits the computed-colour criteria when the style digest is there", () => {
+    const r = audit(page, { styles: styles([...HEAD, ["p", { color: "rgb(0, 0, 0)" }]]) });
+    for (const sc of ["1.4.3", "1.4.1", "1.4.11"]) expect(r.scope.scan?.testedScs, `SC ${sc}`).toContain(sc);
+  });
+
+  it("credits the stylesheet criteria when the CSS digest is readable", () => {
+    const r = audit(page, { css: cssDigest([{ selector: "a:focus", decls: { outline: "none" } }]) });
+    expect(r.scope.scan?.testedScs).toContain("2.4.7"); // focus visibility
+    expect(r.scope.scan?.testedScs).toContain("1.3.4"); // orientation lock
+  });
+
+  it("credits NOTHING from a snapshot carrying no signals at all", () => {
+    expect(audit(page).scope.scan).toBeUndefined();
+  });
+
+  it("credits NOTHING for the stylesheet criteria when a sheet was unreadable", () => {
+    // The rules themselves decline here, so claiming coverage would assert a measurement that
+    // never happened — the exact laundering this tier exists to avoid.
+    const r = audit(page, { css: cssDigest([{ selector: "a:focus", decls: { outline: "none" } }], 1) });
+    expect(r.scope.scan?.testedScs ?? []).not.toContain("2.4.7");
+    expect(r.scope.scan?.testedScs ?? []).not.toContain("1.3.4");
+  });
+
+  it("credits NOTHING when the collector truncated — elements past the cap have no signals", () => {
+    const r = audit(page, { styles: { ...styles([...HEAD, ["p", { color: "rgb(0, 0, 0)" }]]), truncated: true } });
+    expect(r.scope.scan?.testedScs ?? []).not.toContain("1.4.3");
+  });
+
+  it("leaves a plain source audit byte-for-byte unchanged", () => {
+    const f = join(root, "plain.html");
+    writeFileSync(f, page);
+    expect(runAudit({ inputs: [f] }).scope.scan).toBeUndefined();
+  });
+
+  it("declares a signal requirement for every rendered rule, so a new one cannot slip past", () => {
+    expect([...RENDERED_SIGNAL_RULES].sort()).toEqual(renderedRules.map((r) => r.id).sort());
   });
 });

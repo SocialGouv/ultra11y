@@ -38491,6 +38491,625 @@ function toFinding(doc, ruleId, def, rf, ruleAdvisory) {
   };
 }
 
+// src/rules/rendered.ts
+import { readFileSync as readFileSync15 } from "fs";
+
+// src/color.ts
+var NAMED = {
+  transparent: { r: 0, g: 0, b: 0, a: 0 },
+  white: { r: 255, g: 255, b: 255, a: 1 },
+  black: { r: 0, g: 0, b: 0, a: 1 },
+  red: { r: 255, g: 0, b: 0, a: 1 },
+  lime: { r: 0, g: 255, b: 0, a: 1 },
+  green: { r: 0, g: 128, b: 0, a: 1 },
+  blue: { r: 0, g: 0, b: 255, a: 1 },
+  yellow: { r: 255, g: 255, b: 0, a: 1 },
+  cyan: { r: 0, g: 255, b: 255, a: 1 },
+  aqua: { r: 0, g: 255, b: 255, a: 1 },
+  magenta: { r: 255, g: 0, b: 255, a: 1 },
+  fuchsia: { r: 255, g: 0, b: 255, a: 1 },
+  silver: { r: 192, g: 192, b: 192, a: 1 },
+  gray: { r: 128, g: 128, b: 128, a: 1 },
+  grey: { r: 128, g: 128, b: 128, a: 1 },
+  maroon: { r: 128, g: 0, b: 0, a: 1 },
+  olive: { r: 128, g: 128, b: 0, a: 1 },
+  purple: { r: 128, g: 0, b: 128, a: 1 },
+  teal: { r: 0, g: 128, b: 128, a: 1 },
+  navy: { r: 0, g: 0, b: 128, a: 1 },
+  orange: { r: 255, g: 165, b: 0, a: 1 }
+};
+function hex(part) {
+  return parseInt(part.length === 1 ? part + part : part, 16);
+}
+function parseColor(input) {
+  const s = input.trim().toLowerCase();
+  if (!s) return null;
+  if (s in NAMED) return { ...NAMED[s] };
+  if (s.startsWith("#")) {
+    const h = s.slice(1);
+    if (/^[0-9a-f]{3}$/.test(h)) return { r: hex(h[0]), g: hex(h[1]), b: hex(h[2]), a: 1 };
+    if (/^[0-9a-f]{4}$/.test(h)) return { r: hex(h[0]), g: hex(h[1]), b: hex(h[2]), a: hex(h[3]) / 255 };
+    if (/^[0-9a-f]{6}$/.test(h)) return { r: hex(h.slice(0, 2)), g: hex(h.slice(2, 4)), b: hex(h.slice(4, 6)), a: 1 };
+    if (/^[0-9a-f]{8}$/.test(h)) return { r: hex(h.slice(0, 2)), g: hex(h.slice(2, 4)), b: hex(h.slice(4, 6)), a: hex(h.slice(6, 8)) / 255 };
+    return null;
+  }
+  const m = /^rgba?\(([^)]+)\)$/.exec(s);
+  if (m) {
+    const parts2 = m[1].split(/[,/\s]+/).filter(Boolean);
+    if (parts2.length < 3) return null;
+    const chan = (p) => p.endsWith("%") ? Math.round(parseFloat(p) / 100 * 255) : parseFloat(p);
+    const r = chan(parts2[0]);
+    const g = chan(parts2[1]);
+    const b = chan(parts2[2]);
+    const a = parts2[3] !== void 0 ? parts2[3].endsWith("%") ? parseFloat(parts2[3]) / 100 : parseFloat(parts2[3]) : 1;
+    if ([r, g, b, a].some((n) => Number.isNaN(n))) return null;
+    return { r, g, b, a };
+  }
+  return null;
+}
+function channelLuminance(c2) {
+  const cs = c2 / 255;
+  return cs <= 0.03928 ? cs / 12.92 : ((cs + 0.055) / 1.055) ** 2.4;
+}
+function relativeLuminance({ r, g, b }) {
+  return 0.2126 * channelLuminance(r) + 0.7152 * channelLuminance(g) + 0.0722 * channelLuminance(b);
+}
+function contrastRatio(a, b) {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+function parseInlineStyle(style) {
+  const out2 = /* @__PURE__ */ new Map();
+  for (const decl of style.split(";")) {
+    const i2 = decl.indexOf(":");
+    if (i2 === -1) continue;
+    const prop = decl.slice(0, i2).trim().toLowerCase();
+    const val = decl.slice(i2 + 1).trim();
+    if (prop && val) out2.set(prop, val);
+  }
+  return out2;
+}
+
+// src/pixel.ts
+import { deflateSync, inflateSync } from "zlib";
+var SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+function paeth(a, b, c2) {
+  const p = a + b - c2;
+  const pa = Math.abs(p - a);
+  const pb = Math.abs(p - b);
+  const pc = Math.abs(p - c2);
+  if (pa <= pb && pa <= pc) return a;
+  return pb <= pc ? b : c2;
+}
+function decodePng(buf) {
+  if (buf.length < 8 + 25) return null;
+  for (let i2 = 0; i2 < SIGNATURE.length; i2++) if (buf[i2] !== SIGNATURE[i2]) return null;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  let interlace = 0;
+  const idat = [];
+  let off = 8;
+  while (off + 8 <= buf.length) {
+    const len = buf.readUInt32BE(off);
+    const type = buf.toString("ascii", off + 4, off + 8);
+    const dataStart = off + 8;
+    const dataEnd = dataStart + len;
+    if (dataEnd + 4 > buf.length) return null;
+    if (type === "IHDR") {
+      if (len < 13) return null;
+      width = buf.readUInt32BE(dataStart);
+      height = buf.readUInt32BE(dataStart + 4);
+      bitDepth = buf[dataStart + 8] ?? 0;
+      colorType = buf[dataStart + 9] ?? 0;
+      interlace = buf[dataStart + 12] ?? 0;
+    } else if (type === "IDAT") {
+      idat.push(buf.subarray(dataStart, dataEnd));
+    } else if (type === "IEND") {
+      break;
+    }
+    off = dataEnd + 4;
+  }
+  if (!width || !height || !idat.length) return null;
+  if (bitDepth !== 8) return null;
+  if (colorType !== 2 && colorType !== 6) return null;
+  if (interlace !== 0) return null;
+  const channels = colorType === 6 ? 4 : 3;
+  let raw;
+  try {
+    raw = inflateSync(Buffer.concat(idat));
+  } catch {
+    return null;
+  }
+  const stride = width * channels;
+  if (raw.length < height * (stride + 1)) return null;
+  const out2 = Buffer.alloc(height * stride);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)] ?? 0;
+    const lineIn = y * (stride + 1) + 1;
+    const lineOut = y * stride;
+    const prevOut = lineOut - stride;
+    for (let i2 = 0; i2 < stride; i2++) {
+      const x = raw[lineIn + i2] ?? 0;
+      const a = i2 >= channels ? out2[lineOut + i2 - channels] ?? 0 : 0;
+      const b = y > 0 ? out2[prevOut + i2] ?? 0 : 0;
+      const c2 = y > 0 && i2 >= channels ? out2[prevOut + i2 - channels] ?? 0 : 0;
+      let v;
+      switch (filter) {
+        case 0:
+          v = x;
+          break;
+        case 1:
+          v = x + a;
+          break;
+        case 2:
+          v = x + b;
+          break;
+        case 3:
+          v = x + (a + b >> 1);
+          break;
+        case 4:
+          v = x + paeth(a, b, c2);
+          break;
+        default:
+          return null;
+      }
+      out2[lineOut + i2] = v & 255;
+    }
+  }
+  return {
+    width,
+    height,
+    at(x, y) {
+      if (x < 0 || y < 0 || x >= width || y >= height) return void 0;
+      const p = y * stride + x * channels;
+      return {
+        r: out2[p] ?? 0,
+        g: out2[p + 1] ?? 0,
+        b: out2[p + 2] ?? 0,
+        a: channels === 4 ? (out2[p + 3] ?? 255) / 255 : 1
+      };
+    }
+  };
+}
+function clamp(img, r) {
+  const x = Math.max(0, Math.round(r.x));
+  const y = Math.max(0, Math.round(r.y));
+  const x2 = Math.min(img.width, Math.round(r.x + r.w));
+  const y2 = Math.min(img.height, Math.round(r.y + r.h));
+  if (x2 <= x || y2 <= y) return null;
+  return { x, y, w: x2 - x, h: y2 - y };
+}
+var MAX_SAMPLES = 4096;
+var DOMINANCE = 0.6;
+var BUCKET = 16;
+function dominantBackground(img, rect) {
+  const r = clamp(img, rect);
+  if (!r) return null;
+  const step = Math.max(1, Math.floor(Math.sqrt(r.w * r.h / MAX_SAMPLES)));
+  const counts = /* @__PURE__ */ new Map();
+  let total = 0;
+  for (let y = r.y; y < r.y + r.h; y += step) {
+    for (let x = r.x; x < r.x + r.w; x += step) {
+      const p = img.at(x, y);
+      if (!p) continue;
+      const key = Math.round(p.r / BUCKET) << 16 | Math.round(p.g / BUCKET) << 8 | Math.round(p.b / BUCKET);
+      const cur = counts.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+      cur.n++;
+      cur.r += p.r;
+      cur.g += p.g;
+      cur.b += p.b;
+      counts.set(key, cur);
+      total++;
+    }
+  }
+  if (!total) return null;
+  let best = null;
+  for (const c2 of counts.values()) if (!best || c2.n > best.n) best = c2;
+  if (!best || best.n / total < DOMINANCE) return null;
+  return { r: Math.round(best.r / best.n), g: Math.round(best.g / best.n), b: Math.round(best.b / best.n), a: 1 };
+}
+var CRC_TABLE = /* @__PURE__ */ (() => {
+  const t2 = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c2 = n;
+    for (let k = 0; k < 8; k++) c2 = c2 & 1 ? 3988292384 ^ c2 >>> 1 : c2 >>> 1;
+    t2[n] = c2 >>> 0;
+  }
+  return t2;
+})();
+function crc32(buf) {
+  let c2 = 4294967295;
+  for (let i2 = 0; i2 < buf.length; i2++) c2 = CRC_TABLE[(c2 ^ buf[i2]) & 255] ^ c2 >>> 8;
+  return (c2 ^ 4294967295) >>> 0;
+}
+function chunk(type, data2) {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data2.length);
+  const body3 = Buffer.concat([Buffer.from(type, "latin1"), data2]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body3));
+  return Buffer.concat([len, body3, crc]);
+}
+function encodePng(r) {
+  const expected = r.width * r.height * 4;
+  if (r.width <= 0 || r.height <= 0) throw new Error(`encodePng: refusing a ${r.width}\xD7${r.height} raster`);
+  if (r.data.length !== expected) {
+    throw new Error(`encodePng: ${r.width}\xD7${r.height} needs ${expected} bytes of RGBA, got ${r.data.length}`);
+  }
+  const stride = r.width * 4;
+  const raw = Buffer.alloc(r.height * (stride + 1));
+  for (let y = 0; y < r.height; y++) {
+    raw[y * (stride + 1)] = 0;
+    r.data.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(r.width, 0);
+  ihdr.writeUInt32BE(r.height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  return Buffer.concat([Buffer.from(SIGNATURE), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw, { level: 9 })), chunk("IEND", Buffer.alloc(0))]);
+}
+function cropImage(img, rect) {
+  const r = clamp(img, rect);
+  if (!r) return null;
+  const data2 = Buffer.alloc(r.w * r.h * 4);
+  let i2 = 0;
+  for (let y = r.y; y < r.y + r.h; y++) {
+    for (let x = r.x; x < r.x + r.w; x++) {
+      const p = img.at(x, y);
+      data2[i2] = p?.r ?? 0;
+      data2[i2 + 1] = p?.g ?? 0;
+      data2[i2 + 2] = p?.b ?? 0;
+      data2[i2 + 3] = Math.round((p?.a ?? 1) * 255);
+      i2 += 4;
+    }
+  }
+  return { raster: { width: r.w, height: r.h, data: data2 }, rect: r };
+}
+function blend(raster, x, y, c2) {
+  if (x < 0 || y < 0 || x >= raster.width || y >= raster.height) return;
+  const p = (y * raster.width + x) * 4;
+  const a = Math.min(1, Math.max(0, c2.a));
+  if (a >= 1) {
+    raster.data[p] = c2.r;
+    raster.data[p + 1] = c2.g;
+    raster.data[p + 2] = c2.b;
+    raster.data[p + 3] = 255;
+    return;
+  }
+  const inv = 1 - a;
+  raster.data[p] = Math.round(c2.r * a + raster.data[p] * inv);
+  raster.data[p + 1] = Math.round(c2.g * a + raster.data[p + 1] * inv);
+  raster.data[p + 2] = Math.round(c2.b * a + raster.data[p + 2] * inv);
+  raster.data[p + 3] = Math.max(raster.data[p + 3], Math.round(a * 255));
+}
+function fillRect(raster, rect, color) {
+  const x0 = Math.max(0, Math.round(rect.x));
+  const y0 = Math.max(0, Math.round(rect.y));
+  const x1 = Math.min(raster.width, Math.round(rect.x + rect.w));
+  const y1 = Math.min(raster.height, Math.round(rect.y + rect.h));
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) blend(raster, x, y, color);
+}
+function strokeRect(raster, rect, color, width, dash) {
+  const t2 = Math.max(1, Math.round(width));
+  const x0 = Math.round(rect.x);
+  const y0 = Math.round(rect.y);
+  const x1 = Math.round(rect.x + rect.w);
+  const y1 = Math.round(rect.y + rect.h);
+  if (x1 <= x0 || y1 <= y0) return;
+  const on = (coord) => {
+    if (!dash || dash <= 1) return true;
+    const half = dash / 2;
+    return Math.floor(coord / half) % 2 === 0;
+  };
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const top = y < y0 + t2;
+      const bottom = y >= y1 - t2;
+      const left = x < x0 + t2;
+      const right = x >= x1 - t2;
+      if (!top && !bottom && !left && !right) continue;
+      if (!on(top || bottom ? x : y)) continue;
+      blend(raster, x, y, color);
+    }
+  }
+}
+
+// src/rules/rendered.ts
+var SKIP_TAGS = /* @__PURE__ */ new Set(["script", "style", "head", "title", "meta", "noscript", "link", "html", "br", "wbr"]);
+function styleAt(doc, i2) {
+  return doc.signals?.styles?.get(i2);
+}
+function hasDirectText(el) {
+  return el.children.some((c2) => c2.type === "text" && c2.data.trim() !== "");
+}
+function invisible(css) {
+  if (css.display === "none" || css.visibility === "hidden") return true;
+  const op = Number.parseFloat(css.opacity ?? "1");
+  return Number.isFinite(op) && op === 0;
+}
+function backdropOf(doc, index, el) {
+  for (let p = el; p; p = p.parent) {
+    const i2 = index.get(p);
+    if (i2 === void 0) continue;
+    const css = styleAt(doc, i2)?.css;
+    if (!css) continue;
+    const img = css.backgroundImage;
+    if (img && img !== "none") return void 0;
+    const c2 = parseColor(css.backgroundColor ?? "");
+    if (c2 && c2.a >= 1) return { color: c2, fromImage: false };
+  }
+  return void 0;
+}
+function isLargeText(css) {
+  const px = Number.parseFloat(css.fontSize ?? "");
+  if (!Number.isFinite(px)) return false;
+  const weight = Number.parseInt(css.fontWeight ?? "400", 10);
+  const bold = Number.isFinite(weight) ? weight >= 700 : css.fontWeight === "bold";
+  return px >= 24 || px >= 18.66 && bold;
+}
+function elementIndex(doc) {
+  const m = /* @__PURE__ */ new Map();
+  doc.elements.forEach((el, i2) => m.set(el, i2));
+  return m;
+}
+var renderedContrast = {
+  id: "rendered-contrast",
+  criteria: ["1.4.3"],
+  severity: "majeur",
+  run(doc) {
+    if (!doc.signals?.styles) return [];
+    const index = elementIndex(doc);
+    const out2 = [];
+    for (const [el, i2] of index) {
+      if (SKIP_TAGS.has(el.tag) || !hasDirectText(el)) continue;
+      const css = styleAt(doc, i2)?.css;
+      if (!css || invisible(css)) continue;
+      const fg = parseColor(css.color ?? "");
+      if (!fg || fg.a < 1) continue;
+      const bd = backdropOf(doc, index, el);
+      if (!bd) continue;
+      const ratio = contrastRatio(fg, bd.color);
+      const large = isLargeText(css);
+      const min = large ? 3 : 4.5;
+      if (ratio >= min) continue;
+      out2.push({
+        criteriaId: "1.4.3",
+        el,
+        msgId: "rendered-contrast",
+        params: { ratio: ratio.toFixed(2), min, textSize: large ? "large" : "normal" }
+      });
+    }
+    return out2;
+  }
+};
+var renderedContrastPixel = {
+  id: "rendered-contrast-pixel",
+  criteria: ["1.4.3"],
+  severity: "majeur",
+  run(doc) {
+    const shot = doc.signals?.screenshot;
+    const boxes = doc.signals?.boxes;
+    if (!shot || !boxes || !doc.signals?.styles) return [];
+    let img = null;
+    try {
+      img = decodePng(readFileSync15(shot));
+    } catch {
+      return [];
+    }
+    if (!img) return [];
+    const index = elementIndex(doc);
+    const out2 = [];
+    for (const [el, i2] of index) {
+      if (SKIP_TAGS.has(el.tag) || !hasDirectText(el)) continue;
+      const css = styleAt(doc, i2)?.css;
+      if (!css || invisible(css)) continue;
+      if (backdropOf(doc, index, el)) continue;
+      const fg = parseColor(css.color ?? "");
+      if (!fg || fg.a < 1) continue;
+      const box = boxes.get(i2);
+      if (!box || box.w < 4 || box.h < 4) continue;
+      const bg = dominantBackground(img, box);
+      if (!bg) continue;
+      const ratio = contrastRatio(fg, bg);
+      const large = isLargeText(css);
+      const min = large ? 3 : 4.5;
+      if (ratio >= min) continue;
+      out2.push({
+        criteriaId: "1.4.3",
+        el,
+        msgId: "rendered-contrast-pixel",
+        params: { ratio: ratio.toFixed(2), min, textSize: large ? "large" : "normal" }
+      });
+    }
+    return out2;
+  }
+};
+function hasNonColourAffordance(css, parentCss) {
+  const deco = css.textDecorationLine ?? "";
+  if (deco && deco !== "none") return true;
+  if ((css.borderBottomStyle ?? "none") !== "none" && Number.parseFloat(css.borderBottomWidth ?? "0") > 0) return true;
+  const bg = parseColor(css.backgroundColor ?? "");
+  if (bg && bg.a > 0) return true;
+  const w = Number.parseInt(css.fontWeight ?? "400", 10);
+  const pw = Number.parseInt(parentCss?.fontWeight ?? "400", 10);
+  if (Number.isFinite(w) && Number.isFinite(pw) && w >= pw + 200) return true;
+  return false;
+}
+var TEXT_BLOCK = /* @__PURE__ */ new Set(["p", "li", "dd", "dt", "td", "th", "blockquote", "figcaption", "caption"]);
+var renderedLinkColourOnly = {
+  id: "rendered-link-colour-only",
+  criteria: ["1.4.1"],
+  severity: "majeur",
+  run(doc) {
+    if (!doc.signals?.styles) return [];
+    const index = elementIndex(doc);
+    const out2 = [];
+    for (const [el, i2] of index) {
+      if (el.tag !== "a" || !hasDirectText(el)) continue;
+      const parent = el.parent;
+      if (!parent || !TEXT_BLOCK.has(parent.tag)) continue;
+      const css = styleAt(doc, i2)?.css;
+      const pi = index.get(parent);
+      const parentCss = pi === void 0 ? void 0 : styleAt(doc, pi)?.css;
+      if (!css || !parentCss || invisible(css)) continue;
+      if (hasNonColourAffordance(css, parentCss)) continue;
+      const linkColor = parseColor(css.color ?? "");
+      const textColor = parseColor(parentCss.color ?? "");
+      if (!linkColor || !textColor) continue;
+      const distinct = contrastRatio(linkColor, textColor);
+      if (distinct <= 1.02) continue;
+      out2.push({
+        criteriaId: "1.4.1",
+        el,
+        msgId: "rendered-link-colour-only",
+        params: { ratio: distinct.toFixed(2) }
+      });
+    }
+    return out2;
+  }
+};
+var BOUNDED_CONTROLS = /* @__PURE__ */ new Set(["input", "select", "textarea", "button"]);
+var SIDES = ["Top", "Right", "Bottom", "Left"];
+function borderColours(css) {
+  const out2 = [];
+  for (const s of SIDES) {
+    const style = css[`border${s}Style`];
+    const width = Number.parseFloat(css[`border${s}Width`] ?? "0");
+    if (!style || style === "none" || style === "hidden" || !(width > 0)) continue;
+    const c2 = parseColor(css[`border${s}Color`] ?? "");
+    if (c2 && c2.a >= 1) out2.push(c2);
+  }
+  return out2;
+}
+var renderedNonTextContrast = {
+  id: "rendered-nontext-contrast",
+  criteria: ["1.4.11"],
+  severity: "majeur",
+  run(doc) {
+    if (!doc.signals?.styles) return [];
+    const index = elementIndex(doc);
+    const out2 = [];
+    for (const [el, i2] of index) {
+      if (!BOUNDED_CONTROLS.has(el.tag)) continue;
+      const type = (el.attribs.type ?? "").toLowerCase();
+      if (el.tag === "input" && (type === "hidden" || type === "image")) continue;
+      const css = styleAt(doc, i2)?.css;
+      if (!css || invisible(css)) continue;
+      if (css.boxShadow && css.boxShadow !== "none") continue;
+      if ((css.outlineStyle ?? "none") !== "none" && Number.parseFloat(css.outlineWidth ?? "0") > 0) continue;
+      const surrounding = el.parent ? backdropOf(doc, index, el.parent) : void 0;
+      if (!surrounding) continue;
+      const own = parseColor(css.backgroundColor ?? "");
+      const fill = own && own.a >= 1 ? own : surrounding.color;
+      if (contrastRatio(fill, surrounding.color) >= 3) continue;
+      const borders = borderColours(css);
+      if (borders.some((b) => contrastRatio(b, surrounding.color) >= 3 || contrastRatio(b, fill) >= 3)) continue;
+      out2.push({
+        criteriaId: "1.4.11",
+        el,
+        msgId: "rendered-nontext-contrast",
+        params: { ratio: contrastRatio(fill, surrounding.color).toFixed(2), control: el.tag }
+      });
+    }
+    return out2;
+  }
+};
+var FOCUS_SEL = /:focus(-visible|-within)?\b/;
+function killsOutline(d) {
+  const o = (d.outline ?? "").trim();
+  if (o === "none" || /^0(px)?( |$)/.test(o) || /\bnone\b/.test(o)) return true;
+  if ((d.outlineStyle ?? "") === "none") return true;
+  return d.outlineWidth !== void 0 && Number.parseFloat(d.outlineWidth) === 0;
+}
+function restoresIndicator(d) {
+  if (d.boxShadow && d.boxShadow !== "none") return true;
+  if (d.outlineStyle && d.outlineStyle !== "none" && Number.parseFloat(d.outlineWidth ?? "1") > 0) return true;
+  if (d.outline && !killsOutline(d)) return true;
+  if (d.textDecorationLine && d.textDecorationLine !== "none") return true;
+  for (const k of Object.keys(d)) {
+    if (/^border(Top|Right|Bottom|Left)?(Color|Width|Style)?$/.test(k) && d[k] && d[k] !== "none") return true;
+    if (/^background(Color|Image)?$/.test(k) && d[k] && d[k] !== "none" && d[k] !== "rgba(0, 0, 0, 0)") return true;
+  }
+  return d.filter !== void 0 || d.transform !== void 0 || d.color !== void 0;
+}
+var renderedFocusNotVisible = {
+  id: "rendered-focus-not-visible",
+  criteria: ["2.4.7"],
+  severity: "majeur",
+  scope: "page",
+  run(doc) {
+    const css = doc.signals?.css;
+    if (!css || css.unreadable > 0 || css.truncated) return [];
+    const focusRules = css.rules.filter((r) => FOCUS_SEL.test(r.selector));
+    if (!focusRules.length) return [];
+    if (!focusRules.some((r) => killsOutline(r.decls))) return [];
+    if (focusRules.some((r) => restoresIndicator(r.decls))) return [];
+    const anchor = doc.elements.find((e) => ["a", "button", "input", "select", "textarea"].includes(e.tag));
+    if (!anchor) return [];
+    const killer = focusRules.find((r) => killsOutline(r.decls));
+    return [{ criteriaId: "2.4.7", el: doc.elements[0] ?? anchor, msgId: "rendered-focus-not-visible", params: { selector: killer?.selector ?? ":focus" } }];
+  }
+};
+var DOC_SEL = /^\s*(\*|:root|html|body)\s*$/i;
+function quarterTurn(transform) {
+  const m = /rotate[ZY]?\(\s*(-?[\d.]+)deg\s*\)/i.exec(transform);
+  if (!m) return false;
+  const deg = Math.abs(Number.parseFloat(m[1])) % 180;
+  return Math.abs(deg - 90) < 1;
+}
+var renderedOrientationLock = {
+  id: "rendered-orientation-lock",
+  criteria: ["1.3.4"],
+  severity: "majeur",
+  scope: "page",
+  run(doc) {
+    const css = doc.signals?.css;
+    if (!css || css.unreadable > 0) return [];
+    for (const r of css.rules) {
+      if (!r.media || !/orientation\s*:/i.test(r.media)) continue;
+      if (!r.selector.split(",").some((s) => DOC_SEL.test(s))) continue;
+      const t2 = r.decls.transform ?? "";
+      if (!quarterTurn(t2)) continue;
+      const el = doc.elements[0];
+      if (!el) continue;
+      return [{ criteriaId: "1.3.4", el, msgId: "rendered-orientation-lock", params: { media: r.media, transform: t2 } }];
+    }
+    return [];
+  }
+};
+var renderedRules = [
+  renderedContrast,
+  renderedContrastPixel,
+  renderedLinkColourOnly,
+  renderedNonTextContrast,
+  renderedFocusNotVisible,
+  renderedOrientationLock
+];
+var SIGNALS_REQUIRED = {
+  // Computed colours, per element.
+  "rendered-contrast": (s) => !!s.styles && !s.truncated,
+  "rendered-link-colour-only": (s) => !!s.styles && !s.truncated,
+  "rendered-nontext-contrast": (s) => !!s.styles && !s.truncated,
+  // The pixel fallback needs the screenshot AND the boxes to sample it by.
+  "rendered-contrast-pixel": (s) => !!s.screenshot && !!s.boxes && !s.truncated,
+  // These two read the page's own stylesheets, and both decline on an unreadable sheet.
+  "rendered-focus-not-visible": (s) => !!s.css && s.css.unreadable === 0 && !s.css.truncated,
+  "rendered-orientation-lock": (s) => !!s.css && s.css.unreadable === 0
+};
+function renderedTestedScs(signals) {
+  const scs = /* @__PURE__ */ new Set();
+  for (const rule of renderedRules) {
+    if (SIGNALS_REQUIRED[rule.id]?.(signals)) for (const sc of rule.criteria) scs.add(sc);
+  }
+  return [...scs].sort();
+}
+var RENDERED_SIGNAL_RULES = Object.keys(SIGNALS_REQUIRED);
+
 // src/name.ts
 var collapse = (s) => s.replace(/\s+/g, " ").trim();
 function mayInjectContent(el) {
@@ -41027,86 +41646,8 @@ var cssGeneratedContentInformative = {
 };
 var presentationRules = [metaViewportZoomBlock, cssGeneratedContentInformative];
 
-// src/color.ts
-var NAMED = {
-  transparent: { r: 0, g: 0, b: 0, a: 0 },
-  white: { r: 255, g: 255, b: 255, a: 1 },
-  black: { r: 0, g: 0, b: 0, a: 1 },
-  red: { r: 255, g: 0, b: 0, a: 1 },
-  lime: { r: 0, g: 255, b: 0, a: 1 },
-  green: { r: 0, g: 128, b: 0, a: 1 },
-  blue: { r: 0, g: 0, b: 255, a: 1 },
-  yellow: { r: 255, g: 255, b: 0, a: 1 },
-  cyan: { r: 0, g: 255, b: 255, a: 1 },
-  aqua: { r: 0, g: 255, b: 255, a: 1 },
-  magenta: { r: 255, g: 0, b: 255, a: 1 },
-  fuchsia: { r: 255, g: 0, b: 255, a: 1 },
-  silver: { r: 192, g: 192, b: 192, a: 1 },
-  gray: { r: 128, g: 128, b: 128, a: 1 },
-  grey: { r: 128, g: 128, b: 128, a: 1 },
-  maroon: { r: 128, g: 0, b: 0, a: 1 },
-  olive: { r: 128, g: 128, b: 0, a: 1 },
-  purple: { r: 128, g: 0, b: 128, a: 1 },
-  teal: { r: 0, g: 128, b: 128, a: 1 },
-  navy: { r: 0, g: 0, b: 128, a: 1 },
-  orange: { r: 255, g: 165, b: 0, a: 1 }
-};
-function hex(part) {
-  return parseInt(part.length === 1 ? part + part : part, 16);
-}
-function parseColor(input) {
-  const s = input.trim().toLowerCase();
-  if (!s) return null;
-  if (s in NAMED) return { ...NAMED[s] };
-  if (s.startsWith("#")) {
-    const h = s.slice(1);
-    if (/^[0-9a-f]{3}$/.test(h)) return { r: hex(h[0]), g: hex(h[1]), b: hex(h[2]), a: 1 };
-    if (/^[0-9a-f]{4}$/.test(h)) return { r: hex(h[0]), g: hex(h[1]), b: hex(h[2]), a: hex(h[3]) / 255 };
-    if (/^[0-9a-f]{6}$/.test(h)) return { r: hex(h.slice(0, 2)), g: hex(h.slice(2, 4)), b: hex(h.slice(4, 6)), a: 1 };
-    if (/^[0-9a-f]{8}$/.test(h)) return { r: hex(h.slice(0, 2)), g: hex(h.slice(2, 4)), b: hex(h.slice(4, 6)), a: hex(h.slice(6, 8)) / 255 };
-    return null;
-  }
-  const m = /^rgba?\(([^)]+)\)$/.exec(s);
-  if (m) {
-    const parts2 = m[1].split(/[,/\s]+/).filter(Boolean);
-    if (parts2.length < 3) return null;
-    const chan = (p) => p.endsWith("%") ? Math.round(parseFloat(p) / 100 * 255) : parseFloat(p);
-    const r = chan(parts2[0]);
-    const g = chan(parts2[1]);
-    const b = chan(parts2[2]);
-    const a = parts2[3] !== void 0 ? parts2[3].endsWith("%") ? parseFloat(parts2[3]) / 100 : parseFloat(parts2[3]) : 1;
-    if ([r, g, b, a].some((n) => Number.isNaN(n))) return null;
-    return { r, g, b, a };
-  }
-  return null;
-}
-function channelLuminance(c2) {
-  const cs = c2 / 255;
-  return cs <= 0.03928 ? cs / 12.92 : ((cs + 0.055) / 1.055) ** 2.4;
-}
-function relativeLuminance({ r, g, b }) {
-  return 0.2126 * channelLuminance(r) + 0.7152 * channelLuminance(g) + 0.0722 * channelLuminance(b);
-}
-function contrastRatio(a, b) {
-  const la = relativeLuminance(a);
-  const lb = relativeLuminance(b);
-  const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
-  return (hi + 0.05) / (lo + 0.05);
-}
-function parseInlineStyle(style) {
-  const out2 = /* @__PURE__ */ new Map();
-  for (const decl of style.split(";")) {
-    const i2 = decl.indexOf(":");
-    if (i2 === -1) continue;
-    const prop = decl.slice(0, i2).trim().toLowerCase();
-    const val = decl.slice(i2 + 1).trim();
-    if (prop && val) out2.set(prop, val);
-  }
-  return out2;
-}
-
 // src/rules/colors.ts
-var SKIP_TAGS = /* @__PURE__ */ new Set(["script", "style", "head", "title", "meta", "noscript", "link"]);
+var SKIP_TAGS2 = /* @__PURE__ */ new Set(["script", "style", "head", "title", "meta", "noscript", "link"]);
 function styleOf(el) {
   const s = attr(el, "style");
   return s ? parseInlineStyle(s) : /* @__PURE__ */ new Map();
@@ -41170,7 +41711,7 @@ function isLarge(el) {
   if (px === "unknown") return true;
   return px >= 24 || px >= 18.66 && isBold(el);
 }
-function hasDirectText(el) {
+function hasDirectText2(el) {
   return el.children.some((c2) => c2.type === "text" && c2.data.trim() !== "");
 }
 var contrastLiteral = {
@@ -41180,7 +41721,7 @@ var contrastLiteral = {
   run(doc) {
     const out2 = [];
     for (const el of doc.elements) {
-      if (SKIP_TAGS.has(el.tag) || !hasDirectText(el)) continue;
+      if (SKIP_TAGS2.has(el.tag) || !hasDirectText2(el)) continue;
       const fg = fgOf(el);
       const bg = bgOf(el);
       if (!fg || !bg || fg.a < 1 || bg.a < 1) continue;
@@ -41199,528 +41740,6 @@ var contrastLiteral = {
   }
 };
 var colorsRules = [contrastLiteral];
-
-// src/rules/rendered.ts
-import { readFileSync as readFileSync15 } from "fs";
-
-// src/pixel.ts
-import { deflateSync, inflateSync } from "zlib";
-var SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
-function paeth(a, b, c2) {
-  const p = a + b - c2;
-  const pa = Math.abs(p - a);
-  const pb = Math.abs(p - b);
-  const pc = Math.abs(p - c2);
-  if (pa <= pb && pa <= pc) return a;
-  return pb <= pc ? b : c2;
-}
-function decodePng(buf) {
-  if (buf.length < 8 + 25) return null;
-  for (let i2 = 0; i2 < SIGNATURE.length; i2++) if (buf[i2] !== SIGNATURE[i2]) return null;
-  let width = 0;
-  let height = 0;
-  let bitDepth = 0;
-  let colorType = 0;
-  let interlace = 0;
-  const idat = [];
-  let off = 8;
-  while (off + 8 <= buf.length) {
-    const len = buf.readUInt32BE(off);
-    const type = buf.toString("ascii", off + 4, off + 8);
-    const dataStart = off + 8;
-    const dataEnd = dataStart + len;
-    if (dataEnd + 4 > buf.length) return null;
-    if (type === "IHDR") {
-      if (len < 13) return null;
-      width = buf.readUInt32BE(dataStart);
-      height = buf.readUInt32BE(dataStart + 4);
-      bitDepth = buf[dataStart + 8] ?? 0;
-      colorType = buf[dataStart + 9] ?? 0;
-      interlace = buf[dataStart + 12] ?? 0;
-    } else if (type === "IDAT") {
-      idat.push(buf.subarray(dataStart, dataEnd));
-    } else if (type === "IEND") {
-      break;
-    }
-    off = dataEnd + 4;
-  }
-  if (!width || !height || !idat.length) return null;
-  if (bitDepth !== 8) return null;
-  if (colorType !== 2 && colorType !== 6) return null;
-  if (interlace !== 0) return null;
-  const channels = colorType === 6 ? 4 : 3;
-  let raw;
-  try {
-    raw = inflateSync(Buffer.concat(idat));
-  } catch {
-    return null;
-  }
-  const stride = width * channels;
-  if (raw.length < height * (stride + 1)) return null;
-  const out2 = Buffer.alloc(height * stride);
-  for (let y = 0; y < height; y++) {
-    const filter = raw[y * (stride + 1)] ?? 0;
-    const lineIn = y * (stride + 1) + 1;
-    const lineOut = y * stride;
-    const prevOut = lineOut - stride;
-    for (let i2 = 0; i2 < stride; i2++) {
-      const x = raw[lineIn + i2] ?? 0;
-      const a = i2 >= channels ? out2[lineOut + i2 - channels] ?? 0 : 0;
-      const b = y > 0 ? out2[prevOut + i2] ?? 0 : 0;
-      const c2 = y > 0 && i2 >= channels ? out2[prevOut + i2 - channels] ?? 0 : 0;
-      let v;
-      switch (filter) {
-        case 0:
-          v = x;
-          break;
-        case 1:
-          v = x + a;
-          break;
-        case 2:
-          v = x + b;
-          break;
-        case 3:
-          v = x + (a + b >> 1);
-          break;
-        case 4:
-          v = x + paeth(a, b, c2);
-          break;
-        default:
-          return null;
-      }
-      out2[lineOut + i2] = v & 255;
-    }
-  }
-  return {
-    width,
-    height,
-    at(x, y) {
-      if (x < 0 || y < 0 || x >= width || y >= height) return void 0;
-      const p = y * stride + x * channels;
-      return {
-        r: out2[p] ?? 0,
-        g: out2[p + 1] ?? 0,
-        b: out2[p + 2] ?? 0,
-        a: channels === 4 ? (out2[p + 3] ?? 255) / 255 : 1
-      };
-    }
-  };
-}
-function clamp(img, r) {
-  const x = Math.max(0, Math.round(r.x));
-  const y = Math.max(0, Math.round(r.y));
-  const x2 = Math.min(img.width, Math.round(r.x + r.w));
-  const y2 = Math.min(img.height, Math.round(r.y + r.h));
-  if (x2 <= x || y2 <= y) return null;
-  return { x, y, w: x2 - x, h: y2 - y };
-}
-var MAX_SAMPLES = 4096;
-var DOMINANCE = 0.6;
-var BUCKET = 16;
-function dominantBackground(img, rect) {
-  const r = clamp(img, rect);
-  if (!r) return null;
-  const step = Math.max(1, Math.floor(Math.sqrt(r.w * r.h / MAX_SAMPLES)));
-  const counts = /* @__PURE__ */ new Map();
-  let total = 0;
-  for (let y = r.y; y < r.y + r.h; y += step) {
-    for (let x = r.x; x < r.x + r.w; x += step) {
-      const p = img.at(x, y);
-      if (!p) continue;
-      const key = Math.round(p.r / BUCKET) << 16 | Math.round(p.g / BUCKET) << 8 | Math.round(p.b / BUCKET);
-      const cur = counts.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
-      cur.n++;
-      cur.r += p.r;
-      cur.g += p.g;
-      cur.b += p.b;
-      counts.set(key, cur);
-      total++;
-    }
-  }
-  if (!total) return null;
-  let best = null;
-  for (const c2 of counts.values()) if (!best || c2.n > best.n) best = c2;
-  if (!best || best.n / total < DOMINANCE) return null;
-  return { r: Math.round(best.r / best.n), g: Math.round(best.g / best.n), b: Math.round(best.b / best.n), a: 1 };
-}
-var CRC_TABLE = /* @__PURE__ */ (() => {
-  const t2 = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c2 = n;
-    for (let k = 0; k < 8; k++) c2 = c2 & 1 ? 3988292384 ^ c2 >>> 1 : c2 >>> 1;
-    t2[n] = c2 >>> 0;
-  }
-  return t2;
-})();
-function crc32(buf) {
-  let c2 = 4294967295;
-  for (let i2 = 0; i2 < buf.length; i2++) c2 = CRC_TABLE[(c2 ^ buf[i2]) & 255] ^ c2 >>> 8;
-  return (c2 ^ 4294967295) >>> 0;
-}
-function chunk(type, data2) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data2.length);
-  const body3 = Buffer.concat([Buffer.from(type, "latin1"), data2]);
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(body3));
-  return Buffer.concat([len, body3, crc]);
-}
-function encodePng(r) {
-  const expected = r.width * r.height * 4;
-  if (r.width <= 0 || r.height <= 0) throw new Error(`encodePng: refusing a ${r.width}\xD7${r.height} raster`);
-  if (r.data.length !== expected) {
-    throw new Error(`encodePng: ${r.width}\xD7${r.height} needs ${expected} bytes of RGBA, got ${r.data.length}`);
-  }
-  const stride = r.width * 4;
-  const raw = Buffer.alloc(r.height * (stride + 1));
-  for (let y = 0; y < r.height; y++) {
-    raw[y * (stride + 1)] = 0;
-    r.data.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
-  }
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(r.width, 0);
-  ihdr.writeUInt32BE(r.height, 4);
-  ihdr[8] = 8;
-  ihdr[9] = 6;
-  return Buffer.concat([Buffer.from(SIGNATURE), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw, { level: 9 })), chunk("IEND", Buffer.alloc(0))]);
-}
-function cropImage(img, rect) {
-  const r = clamp(img, rect);
-  if (!r) return null;
-  const data2 = Buffer.alloc(r.w * r.h * 4);
-  let i2 = 0;
-  for (let y = r.y; y < r.y + r.h; y++) {
-    for (let x = r.x; x < r.x + r.w; x++) {
-      const p = img.at(x, y);
-      data2[i2] = p?.r ?? 0;
-      data2[i2 + 1] = p?.g ?? 0;
-      data2[i2 + 2] = p?.b ?? 0;
-      data2[i2 + 3] = Math.round((p?.a ?? 1) * 255);
-      i2 += 4;
-    }
-  }
-  return { raster: { width: r.w, height: r.h, data: data2 }, rect: r };
-}
-function blend(raster, x, y, c2) {
-  if (x < 0 || y < 0 || x >= raster.width || y >= raster.height) return;
-  const p = (y * raster.width + x) * 4;
-  const a = Math.min(1, Math.max(0, c2.a));
-  if (a >= 1) {
-    raster.data[p] = c2.r;
-    raster.data[p + 1] = c2.g;
-    raster.data[p + 2] = c2.b;
-    raster.data[p + 3] = 255;
-    return;
-  }
-  const inv = 1 - a;
-  raster.data[p] = Math.round(c2.r * a + raster.data[p] * inv);
-  raster.data[p + 1] = Math.round(c2.g * a + raster.data[p + 1] * inv);
-  raster.data[p + 2] = Math.round(c2.b * a + raster.data[p + 2] * inv);
-  raster.data[p + 3] = Math.max(raster.data[p + 3], Math.round(a * 255));
-}
-function fillRect(raster, rect, color) {
-  const x0 = Math.max(0, Math.round(rect.x));
-  const y0 = Math.max(0, Math.round(rect.y));
-  const x1 = Math.min(raster.width, Math.round(rect.x + rect.w));
-  const y1 = Math.min(raster.height, Math.round(rect.y + rect.h));
-  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) blend(raster, x, y, color);
-}
-function strokeRect(raster, rect, color, width, dash) {
-  const t2 = Math.max(1, Math.round(width));
-  const x0 = Math.round(rect.x);
-  const y0 = Math.round(rect.y);
-  const x1 = Math.round(rect.x + rect.w);
-  const y1 = Math.round(rect.y + rect.h);
-  if (x1 <= x0 || y1 <= y0) return;
-  const on = (coord) => {
-    if (!dash || dash <= 1) return true;
-    const half = dash / 2;
-    return Math.floor(coord / half) % 2 === 0;
-  };
-  for (let y = y0; y < y1; y++) {
-    for (let x = x0; x < x1; x++) {
-      const top = y < y0 + t2;
-      const bottom = y >= y1 - t2;
-      const left = x < x0 + t2;
-      const right = x >= x1 - t2;
-      if (!top && !bottom && !left && !right) continue;
-      if (!on(top || bottom ? x : y)) continue;
-      blend(raster, x, y, color);
-    }
-  }
-}
-
-// src/rules/rendered.ts
-var SKIP_TAGS2 = /* @__PURE__ */ new Set(["script", "style", "head", "title", "meta", "noscript", "link", "html", "br", "wbr"]);
-function styleAt(doc, i2) {
-  return doc.signals?.styles?.get(i2);
-}
-function hasDirectText2(el) {
-  return el.children.some((c2) => c2.type === "text" && c2.data.trim() !== "");
-}
-function invisible(css) {
-  if (css.display === "none" || css.visibility === "hidden") return true;
-  const op = Number.parseFloat(css.opacity ?? "1");
-  return Number.isFinite(op) && op === 0;
-}
-function backdropOf(doc, index, el) {
-  for (let p = el; p; p = p.parent) {
-    const i2 = index.get(p);
-    if (i2 === void 0) continue;
-    const css = styleAt(doc, i2)?.css;
-    if (!css) continue;
-    const img = css.backgroundImage;
-    if (img && img !== "none") return void 0;
-    const c2 = parseColor(css.backgroundColor ?? "");
-    if (c2 && c2.a >= 1) return { color: c2, fromImage: false };
-  }
-  return void 0;
-}
-function isLargeText(css) {
-  const px = Number.parseFloat(css.fontSize ?? "");
-  if (!Number.isFinite(px)) return false;
-  const weight = Number.parseInt(css.fontWeight ?? "400", 10);
-  const bold = Number.isFinite(weight) ? weight >= 700 : css.fontWeight === "bold";
-  return px >= 24 || px >= 18.66 && bold;
-}
-function elementIndex(doc) {
-  const m = /* @__PURE__ */ new Map();
-  doc.elements.forEach((el, i2) => m.set(el, i2));
-  return m;
-}
-var renderedContrast = {
-  id: "rendered-contrast",
-  criteria: ["1.4.3"],
-  severity: "majeur",
-  run(doc) {
-    if (!doc.signals?.styles) return [];
-    const index = elementIndex(doc);
-    const out2 = [];
-    for (const [el, i2] of index) {
-      if (SKIP_TAGS2.has(el.tag) || !hasDirectText2(el)) continue;
-      const css = styleAt(doc, i2)?.css;
-      if (!css || invisible(css)) continue;
-      const fg = parseColor(css.color ?? "");
-      if (!fg || fg.a < 1) continue;
-      const bd = backdropOf(doc, index, el);
-      if (!bd) continue;
-      const ratio = contrastRatio(fg, bd.color);
-      const large = isLargeText(css);
-      const min = large ? 3 : 4.5;
-      if (ratio >= min) continue;
-      out2.push({
-        criteriaId: "1.4.3",
-        el,
-        msgId: "rendered-contrast",
-        params: { ratio: ratio.toFixed(2), min, textSize: large ? "large" : "normal" }
-      });
-    }
-    return out2;
-  }
-};
-var renderedContrastPixel = {
-  id: "rendered-contrast-pixel",
-  criteria: ["1.4.3"],
-  severity: "majeur",
-  run(doc) {
-    const shot = doc.signals?.screenshot;
-    const boxes = doc.signals?.boxes;
-    if (!shot || !boxes || !doc.signals?.styles) return [];
-    let img = null;
-    try {
-      img = decodePng(readFileSync15(shot));
-    } catch {
-      return [];
-    }
-    if (!img) return [];
-    const index = elementIndex(doc);
-    const out2 = [];
-    for (const [el, i2] of index) {
-      if (SKIP_TAGS2.has(el.tag) || !hasDirectText2(el)) continue;
-      const css = styleAt(doc, i2)?.css;
-      if (!css || invisible(css)) continue;
-      if (backdropOf(doc, index, el)) continue;
-      const fg = parseColor(css.color ?? "");
-      if (!fg || fg.a < 1) continue;
-      const box = boxes.get(i2);
-      if (!box || box.w < 4 || box.h < 4) continue;
-      const bg = dominantBackground(img, box);
-      if (!bg) continue;
-      const ratio = contrastRatio(fg, bg);
-      const large = isLargeText(css);
-      const min = large ? 3 : 4.5;
-      if (ratio >= min) continue;
-      out2.push({
-        criteriaId: "1.4.3",
-        el,
-        msgId: "rendered-contrast-pixel",
-        params: { ratio: ratio.toFixed(2), min, textSize: large ? "large" : "normal" }
-      });
-    }
-    return out2;
-  }
-};
-function hasNonColourAffordance(css, parentCss) {
-  const deco = css.textDecorationLine ?? "";
-  if (deco && deco !== "none") return true;
-  if ((css.borderBottomStyle ?? "none") !== "none" && Number.parseFloat(css.borderBottomWidth ?? "0") > 0) return true;
-  const bg = parseColor(css.backgroundColor ?? "");
-  if (bg && bg.a > 0) return true;
-  const w = Number.parseInt(css.fontWeight ?? "400", 10);
-  const pw = Number.parseInt(parentCss?.fontWeight ?? "400", 10);
-  if (Number.isFinite(w) && Number.isFinite(pw) && w >= pw + 200) return true;
-  return false;
-}
-var TEXT_BLOCK = /* @__PURE__ */ new Set(["p", "li", "dd", "dt", "td", "th", "blockquote", "figcaption", "caption"]);
-var renderedLinkColourOnly = {
-  id: "rendered-link-colour-only",
-  criteria: ["1.4.1"],
-  severity: "majeur",
-  run(doc) {
-    if (!doc.signals?.styles) return [];
-    const index = elementIndex(doc);
-    const out2 = [];
-    for (const [el, i2] of index) {
-      if (el.tag !== "a" || !hasDirectText2(el)) continue;
-      const parent = el.parent;
-      if (!parent || !TEXT_BLOCK.has(parent.tag)) continue;
-      const css = styleAt(doc, i2)?.css;
-      const pi = index.get(parent);
-      const parentCss = pi === void 0 ? void 0 : styleAt(doc, pi)?.css;
-      if (!css || !parentCss || invisible(css)) continue;
-      if (hasNonColourAffordance(css, parentCss)) continue;
-      const linkColor = parseColor(css.color ?? "");
-      const textColor = parseColor(parentCss.color ?? "");
-      if (!linkColor || !textColor) continue;
-      const distinct = contrastRatio(linkColor, textColor);
-      if (distinct <= 1.02) continue;
-      out2.push({
-        criteriaId: "1.4.1",
-        el,
-        msgId: "rendered-link-colour-only",
-        params: { ratio: distinct.toFixed(2) }
-      });
-    }
-    return out2;
-  }
-};
-var BOUNDED_CONTROLS = /* @__PURE__ */ new Set(["input", "select", "textarea", "button"]);
-var SIDES = ["Top", "Right", "Bottom", "Left"];
-function borderColours(css) {
-  const out2 = [];
-  for (const s of SIDES) {
-    const style = css[`border${s}Style`];
-    const width = Number.parseFloat(css[`border${s}Width`] ?? "0");
-    if (!style || style === "none" || style === "hidden" || !(width > 0)) continue;
-    const c2 = parseColor(css[`border${s}Color`] ?? "");
-    if (c2 && c2.a >= 1) out2.push(c2);
-  }
-  return out2;
-}
-var renderedNonTextContrast = {
-  id: "rendered-nontext-contrast",
-  criteria: ["1.4.11"],
-  severity: "majeur",
-  run(doc) {
-    if (!doc.signals?.styles) return [];
-    const index = elementIndex(doc);
-    const out2 = [];
-    for (const [el, i2] of index) {
-      if (!BOUNDED_CONTROLS.has(el.tag)) continue;
-      const type = (el.attribs.type ?? "").toLowerCase();
-      if (el.tag === "input" && (type === "hidden" || type === "image")) continue;
-      const css = styleAt(doc, i2)?.css;
-      if (!css || invisible(css)) continue;
-      if (css.boxShadow && css.boxShadow !== "none") continue;
-      if ((css.outlineStyle ?? "none") !== "none" && Number.parseFloat(css.outlineWidth ?? "0") > 0) continue;
-      const surrounding = el.parent ? backdropOf(doc, index, el.parent) : void 0;
-      if (!surrounding) continue;
-      const own = parseColor(css.backgroundColor ?? "");
-      const fill = own && own.a >= 1 ? own : surrounding.color;
-      if (contrastRatio(fill, surrounding.color) >= 3) continue;
-      const borders = borderColours(css);
-      if (borders.some((b) => contrastRatio(b, surrounding.color) >= 3 || contrastRatio(b, fill) >= 3)) continue;
-      out2.push({
-        criteriaId: "1.4.11",
-        el,
-        msgId: "rendered-nontext-contrast",
-        params: { ratio: contrastRatio(fill, surrounding.color).toFixed(2), control: el.tag }
-      });
-    }
-    return out2;
-  }
-};
-var FOCUS_SEL = /:focus(-visible|-within)?\b/;
-function killsOutline(d) {
-  const o = (d.outline ?? "").trim();
-  if (o === "none" || /^0(px)?( |$)/.test(o) || /\bnone\b/.test(o)) return true;
-  if ((d.outlineStyle ?? "") === "none") return true;
-  return d.outlineWidth !== void 0 && Number.parseFloat(d.outlineWidth) === 0;
-}
-function restoresIndicator(d) {
-  if (d.boxShadow && d.boxShadow !== "none") return true;
-  if (d.outlineStyle && d.outlineStyle !== "none" && Number.parseFloat(d.outlineWidth ?? "1") > 0) return true;
-  if (d.outline && !killsOutline(d)) return true;
-  if (d.textDecorationLine && d.textDecorationLine !== "none") return true;
-  for (const k of Object.keys(d)) {
-    if (/^border(Top|Right|Bottom|Left)?(Color|Width|Style)?$/.test(k) && d[k] && d[k] !== "none") return true;
-    if (/^background(Color|Image)?$/.test(k) && d[k] && d[k] !== "none" && d[k] !== "rgba(0, 0, 0, 0)") return true;
-  }
-  return d.filter !== void 0 || d.transform !== void 0 || d.color !== void 0;
-}
-var renderedFocusNotVisible = {
-  id: "rendered-focus-not-visible",
-  criteria: ["2.4.7"],
-  severity: "majeur",
-  scope: "page",
-  run(doc) {
-    const css = doc.signals?.css;
-    if (!css || css.unreadable > 0 || css.truncated) return [];
-    const focusRules = css.rules.filter((r) => FOCUS_SEL.test(r.selector));
-    if (!focusRules.length) return [];
-    if (!focusRules.some((r) => killsOutline(r.decls))) return [];
-    if (focusRules.some((r) => restoresIndicator(r.decls))) return [];
-    const anchor = doc.elements.find((e) => ["a", "button", "input", "select", "textarea"].includes(e.tag));
-    if (!anchor) return [];
-    const killer = focusRules.find((r) => killsOutline(r.decls));
-    return [{ criteriaId: "2.4.7", el: doc.elements[0] ?? anchor, msgId: "rendered-focus-not-visible", params: { selector: killer?.selector ?? ":focus" } }];
-  }
-};
-var DOC_SEL = /^\s*(\*|:root|html|body)\s*$/i;
-function quarterTurn(transform) {
-  const m = /rotate[ZY]?\(\s*(-?[\d.]+)deg\s*\)/i.exec(transform);
-  if (!m) return false;
-  const deg = Math.abs(Number.parseFloat(m[1])) % 180;
-  return Math.abs(deg - 90) < 1;
-}
-var renderedOrientationLock = {
-  id: "rendered-orientation-lock",
-  criteria: ["1.3.4"],
-  severity: "majeur",
-  scope: "page",
-  run(doc) {
-    const css = doc.signals?.css;
-    if (!css || css.unreadable > 0) return [];
-    for (const r of css.rules) {
-      if (!r.media || !/orientation\s*:/i.test(r.media)) continue;
-      if (!r.selector.split(",").some((s) => DOC_SEL.test(s))) continue;
-      const t2 = r.decls.transform ?? "";
-      if (!quarterTurn(t2)) continue;
-      const el = doc.elements[0];
-      if (!el) continue;
-      return [{ criteriaId: "1.3.4", el, msgId: "rendered-orientation-lock", params: { media: r.media, transform: t2 } }];
-    }
-    return [];
-  }
-};
-var renderedRules = [
-  renderedContrast,
-  renderedContrastPixel,
-  renderedLinkColourOnly,
-  renderedNonTextContrast,
-  renderedFocusNotVisible,
-  renderedOrientationLock
-];
 
 // src/rules/timing.ts
 var metaRefreshRedirect = {
@@ -47430,7 +47449,32 @@ function hasFormControl(d) {
     return e.attribs.contenteditable !== void 0;
   });
 }
-function residualReason(automatability2) {
+var RESIDUAL_TRAIL = {
+  // Rendering criteria the SNAPSHOT tier decides offline, from computed styles + stylesheets.
+  "1.3.4": "Decided on a page's own stylesheets (an orientation media query that rotates the document) \u2014 record a snapshot with `scan --sample` (or an E2E capture), then re-audit.",
+  "1.4.1": "Decided on computed colours (a link distinguished by colour alone) \u2014 record a snapshot with `scan --sample`, then re-audit.",
+  "1.4.3": "Decided on computed text/background colours, with a screenshot fallback where the backdrop is an image \u2014 record a snapshot with `scan --sample`, then re-audit.",
+  "1.4.11": "Decided on computed colours of UI components and graphics \u2014 record a snapshot with `scan --sample`, then re-audit.",
+  "2.4.7": "Decided on the page's own stylesheets (a `:focus` rule that removes the indicator without restoring one), or by the live focus probe \u2014 record a snapshot with `scan --sample`, then re-audit.",
+  // Rendering criteria that need a LIVE browser: they are measured by acting on the page.
+  "1.4.4": "Needs a live browser: the page is re-measured at 200% zoom \u2014 `scan <url> --runtime local --merge <audit.json>`.",
+  "1.4.10": "Needs a live browser: the page is re-measured in a 320px viewport (reflow) \u2014 `scan <url> --merge <audit.json>`.",
+  "1.4.12": "Needs a live browser: text spacing overrides are injected and the layout re-measured \u2014 `scan <url> --runtime local --merge <audit.json>`.",
+  "1.4.13": "Needs a live browser: hover/focus-triggered content is opened and probed for dismiss/hover/persist \u2014 `scan <url> --runtime local --merge <audit.json>`.",
+  // axe's own `target-size` rule can FAIL this on a live page, but no tier certifies it, so a
+  // clean scan leaves it open rather than conforming. Say both halves.
+  "2.5.8": "A live scan can fail this (axe `target-size`) but never certify it \u2014 `scan <url> --runtime local --merge <audit.json>`, then adjudicate what is left.",
+  "4.1.3": "Needs a live browser WITH interaction: a status message is triggered and the live region observed \u2014 `scan <url> --runtime local --merge <audit.json>` (interactions are on by default).",
+  // Rendering criteria no automated tier measures — say so, rather than pointing at `scan` and
+  // letting the reader discover it changes nothing.
+  "1.4.5": "No automated tier decides this: whether text is presented as an image is a reading of each image's content. Adjudicate it (`verify --manual`) against the images the audit lists.",
+  "2.1.2": "No automated tier decides this: escaping a keyboard trap has to be attempted by hand, on each focusable region.",
+  "2.3.1": "No automated tier decides this: flashing has to be observed over time on the rendered page.",
+  "2.4.11": "No automated tier decides this: whether a focused element stays unobscured depends on the sticky headers and overlays in play on each screen."
+};
+function residualReason(automatability2, sc) {
+  const trail = sc ? RESIDUAL_TRAIL[sc] : void 0;
+  if (trail) return trail;
   return automatability2 === "needs-rendering" ? "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) \u2014 decide via `scan`." : "Judgement criterion \u2014 adjudicated by the agent from source/context (`verify --manual`, gated).";
 }
 function subjectMatterReason(sc, files) {
@@ -47455,7 +47499,8 @@ function newAccum() {
     sfcFiles: 0,
     sfcExts: /* @__PURE__ */ new Set(),
     captures: [],
-    langCounts: /* @__PURE__ */ new Map()
+    langCounts: /* @__PURE__ */ new Map(),
+    renderedScs: /* @__PURE__ */ new Set()
   };
 }
 function primarySubtag(lang) {
@@ -47491,6 +47536,7 @@ function foldDoc(acc, doc, graph) {
   for (const [id, pred] of SUBJECT_PREDS) {
     if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
   }
+  if (doc.signals) for (const sc of renderedTestedScs(doc.signals)) acc.renderedScs.add(sc);
   if (doc.opaqueComponents?.length) {
     for (const lib of doc.opaqueComponents) acc.opaqueLibs.add(lib);
     acc.opaqueFiles++;
@@ -47532,7 +47578,7 @@ function finalize(acc, inputs, extra = {}) {
       justification = subjectMatterReason(c2.sc, acc.fileCount);
     } else {
       status = "manual";
-      residualRisks.push({ criteriaId: c2.sc, reason: residualReason(c2.automatability), automatability: c2.automatability });
+      residualRisks.push({ criteriaId: c2.sc, reason: residualReason(c2.automatability, c2.sc), automatability: c2.automatability });
     }
     criteria.push({ id: c2.sc, guideline: c2.guideline, status, findings: fs2, ...justification ? { justification } : {} });
   }
@@ -47570,6 +47616,11 @@ function finalize(acc, inputs, extra = {}) {
         }
       } : {},
       ...acc.langCounts.size ? { langs: [...acc.langCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([lang]) => lang) } : {},
+      // Coverage the RENDERED tier earned from the snapshots this run ingested. Same field the
+      // live-browser merge stamps (`mergeDynamic`), because it is the same claim: these criteria
+      // were measured. Omitted when no snapshot carried usable signals, so a source-only audit
+      // is byte-for-byte unchanged and still says the rendering criteria are untested.
+      ...acc.renderedScs.size ? { scan: { testedScs: [...acc.renderedScs].sort() } } : {},
       // The pages this run genuinely read. Written UNCONDITIONALLY — `[]` is the whole point,
       // because "this audit read no page" is exactly the claim a source-only run needs to make,
       // and an omit-when-empty field would say nothing precisely then. See scope.pagesAudited.
@@ -53422,11 +53473,15 @@ var L4 = {
   }
 };
 var NEEDS_RENDERING = [
+  { sc: "1.3.4", label: { fr: "verrou d\u2019orientation", en: "orientation lock" } },
+  { sc: "1.4.1", label: { fr: "information par la couleur", en: "use of colour" } },
+  { sc: "1.4.3", label: { fr: "contraste du texte", en: "text contrast" } },
   { sc: "1.4.4", label: { fr: "zoom 200 %", en: "200% zoom" } },
   { sc: "1.4.10", label: { fr: "reflow 320 px", en: "320px reflow" } },
+  { sc: "1.4.11", label: { fr: "contraste des composants", en: "non-text contrast" } },
   { sc: "1.4.12", label: { fr: "espacement du texte", en: "text spacing" } },
-  { sc: "2.4.7", label: { fr: "visibilit\xE9 du focus", en: "focus visibility" } },
   { sc: "1.4.13", label: { fr: "contenu au survol", en: "content on hover" } },
+  { sc: "2.4.7", label: { fr: "visibilit\xE9 du focus", en: "focus visibility" } },
   { sc: "4.1.3", label: { fr: "r\xE9gions live", en: "live regions" } }
 ];
 function untestedNeedsRendering(r) {
