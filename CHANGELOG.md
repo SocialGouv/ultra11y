@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [4.5.1](https://github.com/maxgfr/ultra11y/compare/v4.5.0...v4.5.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **scan:** refuse to record a sample page the browser never stayed on ([44932ab](https://github.com/maxgfr/ultra11y/commit/44932abcb3b3d22d962532a0baa4c161cbf06598))
+
 # [4.5.0](https://github.com/maxgfr/ultra11y/compare/v4.4.1...v4.5.0) (2026-08-17)
 
 
