@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.4.1](https://github.com/maxgfr/ultra11y/compare/v5.4.0...v5.4.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **audit:** stop one analytics iframe holding twelve media criteria open ([fa76ec1](https://github.com/maxgfr/ultra11y/commit/fa76ec1c877257ed148e3f260564aeb20d67ec45))
+
 # [5.4.0](https://github.com/maxgfr/ultra11y/compare/v5.3.4...v5.4.0) (2026-08-17)
 
 
