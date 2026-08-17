@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.2.1](https://github.com/maxgfr/ultra11y/compare/v5.2.0...v5.2.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **e2e:** let `settle` take the Page its caller actually has ([fba441f](https://github.com/maxgfr/ultra11y/commit/fba441f2d93c41622c07688fba3503d60b918468))
+
 # [5.2.0](https://github.com/maxgfr/ultra11y/compare/v5.1.0...v5.2.0) (2026-08-17)
 
 
