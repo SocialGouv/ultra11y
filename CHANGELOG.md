@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.3.4](https://github.com/maxgfr/ultra11y/compare/v5.3.3...v5.3.4) (2026-08-17)
+
+
+### Bug Fixes
+
+* **adjudicate:** give the CI adjudicator a worklist it can actually fill ([1bf573e](https://github.com/maxgfr/ultra11y/commit/1bf573efd727dd3ee12fce1e5761674ba1e8f505))
+
 ## [5.3.3](https://github.com/maxgfr/ultra11y/compare/v5.3.2...v5.3.3) (2026-08-17)
 
 
