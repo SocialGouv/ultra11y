@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.3.2](https://github.com/maxgfr/ultra11y/compare/v5.3.1...v5.3.2) (2026-08-17)
+
+
+### Bug Fixes
+
+* **ci:** count a page's rate in the active standard, not in WCAG's ([c5c0c44](https://github.com/maxgfr/ultra11y/commit/c5c0c44e78ea97b84aec865817fd337191d83f86))
+
 ## [5.3.1](https://github.com/maxgfr/ultra11y/compare/v5.3.0...v5.3.1) (2026-08-17)
 
 
