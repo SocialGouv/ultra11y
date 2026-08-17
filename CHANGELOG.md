@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.1.0](https://github.com/maxgfr/ultra11y/compare/v5.0.1...v5.1.0) (2026-08-17)
+
+
+### Features
+
+* **e2e:** let a fixture refuse a page the browser did not stay on ([97bbdda](https://github.com/maxgfr/ultra11y/commit/97bbddaf57219b62eb15f7650f9a90ad6bfcb86f))
+
 ## [5.0.1](https://github.com/maxgfr/ultra11y/compare/v5.0.0...v5.0.1) (2026-08-17)
 
 
