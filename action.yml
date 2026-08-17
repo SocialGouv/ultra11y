@@ -59,6 +59,10 @@ inputs:
     description: 'Cap on the number of pages taken from `sitemap`/`crawl`.'
     required: false
     default: '20'
+  runtime:
+    description: 'Browser tier for the page scan: `auto` (default — the repo''s own @playwright/test + @axe-core/playwright when both resolve, else a Docker image), `local`, or `docker`. Worth setting explicitly when the scan MUST have the local tier: an authenticated scan (`storage-state`, or a `storageState` on a sample page) is local-only, and on `auto` a missing dependency silently degrades to Docker, which then refuses the run.'
+    required: false
+    default: 'auto'
   storage-state:
     description: 'Playwright storageState JSON for an AUTHENTICATED scan — the session most real page samples need, since the pages worth auditing usually sit behind a login. Produce it in the job (a Playwright setup project, `browser_context.storage_state()`, …) and pass the path. A per-page `storageState` in `.ultra11yrc.json` overrides this one, so a sample can mix public and signed-in pages in one run. The path is handed to Playwright and never read by the engine.'
     required: false
@@ -271,6 +275,7 @@ runs:
       run: |
         args=(--merge audits/audit-latest.json --out audits)
         if [ '${{ inputs.snapshot }}' != 'true' ]; then args+=(--no-snapshot); fi
+        if [ '${{ inputs.runtime }}' != 'auto' ]; then args+=(--runtime '${{ inputs.runtime }}'); fi
         # An authenticated scan. The path is forwarded to Playwright as a path and never read
         # here, so a session file cannot end up in this log.
         if [ -n '${{ inputs.storage-state }}' ]; then args+=(--storage-state '${{ inputs.storage-state }}'); fi

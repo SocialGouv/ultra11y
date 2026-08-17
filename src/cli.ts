@@ -3004,10 +3004,25 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     }
     sampleConfig = v.sample;
     if (!useLocal && sampleConfig.pages.some((pg) => pg.storageState)) {
+      // `--runtime local` is not always the caller's to pass: inside the GitHub Action the
+      // scan is invoked for them. On `auto` the runtime fell back to Docker because the local
+      // tier could not resolve, so naming the missing dependency is the only actionable half
+      // of this message — "use --runtime local" alone sends an Action user to a flag they
+      // cannot reach, and telling them to force a runtime that still cannot load would
+      // exchange this error for a worse one.
+      const forced = typeof p.flags.runtime === "string" && p.flags.runtime === "docker";
       console.error(
         lang === "fr"
-          ? "ultra11y scan : l'échantillon comporte des pages authentifiées (storageState), non prises en charge par le runtime Docker. Utilisez --runtime local --cwd <projet>."
-          : "ultra11y scan: the sample has authenticated pages (storageState), unsupported by the Docker runtime. Use --runtime local --cwd <project>.",
+          ? `ultra11y scan : l'échantillon comporte des pages authentifiées (storageState), non prises en charge par le runtime Docker.${
+              forced
+                ? " Retirez --runtime docker."
+                : " Le runtime local n'a pas pu être résolu : installez @playwright/test et @axe-core/playwright dans le projet audité (ou pointez --cwd dessus). Via l'Action, ce sont des dépendances du dépôt."
+            }`
+          : `ultra11y scan: the sample has authenticated pages (storageState), unsupported by the Docker runtime.${
+              forced
+                ? " Drop --runtime docker."
+                : " The local runtime could not be resolved: install @playwright/test and @axe-core/playwright in the audited project (or point --cwd at it). Through the Action, those are dependencies of the repository."
+            }`,
       );
       return 2;
     }

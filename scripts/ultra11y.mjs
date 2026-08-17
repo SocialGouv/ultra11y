@@ -66635,8 +66635,9 @@ async function cmdScan(p) {
     }
     sampleConfig = v.sample;
     if (!useLocal && sampleConfig.pages.some((pg) => pg.storageState)) {
+      const forced = typeof p.flags.runtime === "string" && p.flags.runtime === "docker";
       console.error(
-        lang === "fr" ? "ultra11y scan : l'\xE9chantillon comporte des pages authentifi\xE9es (storageState), non prises en charge par le runtime Docker. Utilisez --runtime local --cwd <projet>." : "ultra11y scan: the sample has authenticated pages (storageState), unsupported by the Docker runtime. Use --runtime local --cwd <project>."
+        lang === "fr" ? `ultra11y scan : l'\xE9chantillon comporte des pages authentifi\xE9es (storageState), non prises en charge par le runtime Docker.${forced ? " Retirez --runtime docker." : " Le runtime local n'a pas pu \xEAtre r\xE9solu : installez @playwright/test et @axe-core/playwright dans le projet audit\xE9 (ou pointez --cwd dessus). Via l'Action, ce sont des d\xE9pendances du d\xE9p\xF4t."}` : `ultra11y scan: the sample has authenticated pages (storageState), unsupported by the Docker runtime.${forced ? " Drop --runtime docker." : " The local runtime could not be resolved: install @playwright/test and @axe-core/playwright in the audited project (or point --cwd at it). Through the Action, those are dependencies of the repository."}`
       );
       return 2;
     }

@@ -320,6 +320,16 @@ describe("the authenticated scan", () => {
     expect(scan()?.run).toContain("--interact-clicks");
   });
 
+  // An authenticated scan is local-tier only. On `auto` a missing @axe-core/playwright
+  // degrades to Docker, which then refuses the run — and without this input the caller has
+  // no way to say "the local tier is the point".
+  it("lets the caller pin the browser tier, since an authenticated scan needs the local one", () => {
+    expect(ACTION.inputs.runtime?.default).toBe("auto");
+    expect(scan()?.run).toContain("--runtime");
+    // `auto` is the engine's own default; passing it back would be noise.
+    expect(scan()?.run).toContain("inputs.runtime }}' != 'auto'");
+  });
+
   // A session file is a credential. It is handed to Playwright as a path and never read.
   it("says out loud that the storage state is a path, not a value to read", () => {
     expect(ACTION.inputs["storage-state"]?.description).toMatch(/never read/i);
