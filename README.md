@@ -391,6 +391,13 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   rules on the judgment criteria that would otherwise stay « à évaluer » in CI, reading its key
   from the job environment and skipping itself without one. `ultra11y init --ci` writes a
   workflow using it. See `references/ci.md`.
+- **Two PR comments, not one** — `comment-kind: digest` (the default) posts the distinct
+  defects a reviewer can act on; `comment-kind: pages` posts the **page-by-page grid**: one row
+  per page with its basis, its rate *and its denominator*, then the non-conforming criteria of
+  each failing page. Each kind is keyed by its own sticky marker, so a workflow that gates code
+  in one job and sweeps pages in another keeps **both** comments — sharing a marker is how a
+  684-occurrence sweep silently overwrote a four-finding gate, and the actionable half is the
+  one that vanished.
 - **CI surfaces** — a red job says *that* the build broke, not *where*. `--format sarif` emits
   SARIF 2.1.0 for GitHub code scanning, so each finding lands as an **inline annotation on the
   causing line** of the PR; `--format github` does the same via `::error::` workflow commands
