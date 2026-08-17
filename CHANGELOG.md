@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.0.0](https://github.com/maxgfr/ultra11y/compare/v4.5.2...v5.0.0) (2026-08-17)
+
+
+* fix(scan)!: the redirect guard was wrong at both ends ([75b3c41](https://github.com/maxgfr/ultra11y/commit/75b3c41c76fc0b47e7a07fa87ef7b54d5caf4266))
+
+
+### BREAKING CHANGES
+
+* `scan --sample` exits 1 when every sample page is refused,
+where it previously exited 0 with an empty audit. A pipeline that scanned a
+sample it could never reach — an expired session, a wrong base URL — was
+reporting success; it now reports the failure it always had.
+
 ## [4.5.2](https://github.com/maxgfr/ultra11y/compare/v4.5.1...v4.5.2) (2026-08-17)
 
 
