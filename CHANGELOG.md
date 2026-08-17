@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [4.5.2](https://github.com/maxgfr/ultra11y/compare/v4.5.1...v4.5.2) (2026-08-17)
+
+
+### Bug Fixes
+
+* **scan:** send an authenticated scan somewhere it can actually go ([2a25c3f](https://github.com/maxgfr/ultra11y/commit/2a25c3f9ea77ec8fd7f8e78ba4397f5c7f9d17c1))
+
 ## [4.5.1](https://github.com/maxgfr/ultra11y/compare/v4.5.0...v4.5.1) (2026-08-17)
 
 
