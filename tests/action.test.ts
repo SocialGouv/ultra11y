@@ -631,3 +631,42 @@ describe("the action is EXECUTED by CI, not only parsed", () => {
     }
   });
 });
+
+// The action hardcodes claude-code-action's supported events while `uses:` floats on `@v1`.
+// The list can only drift one way that matters: upstream ADDS an event (`push` is the one the
+// comment calls out), and this action keeps skipping the tier on it — silently, since skipping
+// is the designed degradation. Nothing would fail; the tier would just stop being offered.
+// This test is the reminder, and it fetches nothing: it asserts the pin and the list are
+// stated together, so a bump of one is a diff that shows the other.
+describe("the event allowlist is pinned to a claude-code-action version", () => {
+  const resolve = () => ACTION.runs.steps.find((s) => s.id === "adjudication");
+  const agent = () => ACTION.runs.steps.find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
+
+  it("names the version the list was copied from, next to the list", () => {
+    const run = resolve()?.run ?? "";
+    const pin = agent()?.uses?.split("@")[1] ?? "";
+    expect(pin).toMatch(/^v\d+$/);
+    expect(run, `the allowlist must name the claude-code-action version it mirrors (${pin})`).toContain(`claude-code-action@${pin}`);
+  });
+
+  it("still mirrors the ten events that version accepts", () => {
+    const run = resolve()?.run ?? "";
+    for (const e of [
+      "pull_request",
+      "pull_request_target",
+      "pull_request_review",
+      "pull_request_review_comment",
+      "issues",
+      "issue_comment",
+      "workflow_dispatch",
+      "repository_dispatch",
+      "schedule",
+      "workflow_run",
+    ]) {
+      expect(run, `event ${e} missing from the allowlist`).toContain(e);
+    }
+    // `push` is the one upstream might add. If it ever appears here, the comment above and
+    // the workflow guidance in references/ci.md have to move with it.
+    expect(run).not.toMatch(/\|push\)|\(push\|/);
+  });
+});

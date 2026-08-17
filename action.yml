@@ -374,6 +374,11 @@ runs:
           exit 0
         fi
 
+        # Mirrors the events claude-code-action@v1 accepts (src/github/context.ts). The `uses:`
+        # pin floats within that major, so this list can fall behind upstream ADDING one —
+        # `push` above all. Nothing would break: the tier would simply keep skipping an event
+        # it could now run on. tests/action.test.ts ties the list to the pin so a bump shows it.
+        #
         # claude-code-action parses the GitHub event context BEFORE it reads the prompt, and
         # throws `Unsupported event type: <event>` on anything outside this list — `push`
         # most of all, which is exactly what an accessibility gate runs on. Left unguarded,
