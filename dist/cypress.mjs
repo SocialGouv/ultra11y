@@ -120,6 +120,20 @@ function slugify(url) {
   const slug = path.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return slug || (path === "/" || path === "" ? "accueil" : "page");
 }
+function stayedOnPage(expected, actual) {
+  if (!expected || !actual) return true;
+  const path = (u) => {
+    try {
+      return new URL(u, "http://x.invalid").pathname.replace(/\/+$/, "");
+    } catch {
+      return void 0;
+    }
+  };
+  const a = path(expected);
+  const b = path(actual);
+  if (a === void 0 || b === void 0) return true;
+  return a === b;
+}
 function buildPayload(collected, url, runner, opts, screenshot) {
   const id = opts.as || slugify(url);
   return {
@@ -151,6 +165,11 @@ function registerUltra11yCommand() {
     return cy.window({ log: false }).then((win) => {
       const collected = win.eval(COLLECT_SNAPSHOT);
       const url = collected.url || win.location.href;
+      if (opts.expectPath && !stayedOnPage(opts.expectPath, url)) {
+        throw new Error(
+          `ultra11y: ${opts.expectPath} landed on ${url} \u2014 not recording it as "${opts.as ?? opts.name ?? "this page"}". The state that opens this route is not the one the test built; seed it first, or drop the page from the sample.`
+        );
+      }
       const payload = {
         ...buildPayload(collected, url, "cypress", opts),
         failOn: opts.failOn,

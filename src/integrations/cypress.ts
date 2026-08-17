@@ -10,7 +10,7 @@
 // must be wired in `cypress.config.js` too — Cypress test code cannot write to disk, so the
 // collected page round-trips through a task.
 import { COLLECT_SNAPSHOT } from "../collector.js";
-import { type CheckOptions, buildPayload, slugify } from "./payload.js";
+import { type CheckOptions, buildPayload, slugify, stayedOnPage } from "./payload.js";
 
 // Cypress's globals are not a dependency of this package; they exist at run time only.
 declare const Cypress: {
@@ -45,6 +45,14 @@ export function registerUltra11yCommand(): void {
     return cy.window({ log: false }).then((win: { eval(s: string): unknown; location: { href: string } }) => {
       const collected = win.eval(COLLECT_SNAPSHOT) as Parameters<typeof buildPayload>[0];
       const url = collected.url || win.location.href;
+      // Same refusal as the Playwright fixture: a page the browser did not stay on must not
+      // be filed under the requested page's identity. See CheckOptions.expectPath.
+      if (opts.expectPath && !stayedOnPage(opts.expectPath, url)) {
+        throw new Error(
+          `ultra11y: ${opts.expectPath} landed on ${url} — not recording it as "${opts.as ?? opts.name ?? "this page"}". ` +
+            `The state that opens this route is not the one the test built; seed it first, or drop the page from the sample.`,
+        );
+      }
       const payload = {
         ...buildPayload(collected, url, "cypress", opts),
         failOn: opts.failOn,

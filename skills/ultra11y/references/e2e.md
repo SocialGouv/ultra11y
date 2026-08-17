@@ -33,6 +33,27 @@ than restating them, and a test evaluates the generated `failingFindings` alongs
 one over the same findings. A fixture that gated differently from the published plugin would
 fail two projects differently while claiming to be the same tool.
 
+
+## A page the browser did not stay on (`expectPath`)
+
+`as`/`name` is the identity the report speaks, and the fixture applies it to whatever is on
+screen. So a route your test could not open — a guarded step, an expired session — gets filed
+under the requested page's name, and its sheet, screenshot and rate all describe another
+screen. Nothing about the document looks wrong.
+
+Pass the path you navigated to and the fixture refuses instead:
+
+```js
+await checkA11y(page, { as: "declaration-etape-4", expectPath: "/declaration/etape/4" });
+// throws: /declaration/etape/4 landed on /declaration/etape/1 — not recording it as
+// "declaration-etape-4". The state that opens this route is not the one the test built.
+```
+
+Opt-in, and path-only: a query or fragment the app appends to its own route is the same page.
+`scan --sample` applies the same rule without being asked, because there the URL *is* the
+instruction. A page reported missing is a bug in your seeding; a page reported under the wrong
+name is a false conformance claim.
+
 ## Playwright
 
 ```js

@@ -18,7 +18,7 @@
 // criteria without booting the app, and how the report speaks page by page. Commit it.
 import { createRequire } from "node:module";
 import { COLLECT_SNAPSHOT } from "../collector.js";
-import { type AuditLike, type CheckOptions, auditSnapshot, buildPayload, gate, writePagesReport } from "./core.js";
+import { type AuditLike, type CheckOptions, auditSnapshot, buildPayload, gate, stayedOnPage, writePagesReport } from "./core.js";
 
 // Playwright's own types are not a dependency of this package (it is a peer of YOUR repo),
 // so the page object is structurally typed to exactly what is used.
@@ -52,6 +52,16 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
   }
 
   const url = collected.url || page.url();
+  // Refuse a page the browser did not stay on, when the caller said where it went. The
+  // snapshot's identity is `as`/`name`, applied to whatever is on screen — so a guarded route
+  // that redirected would be filed under the requested page's name, and the resulting sheet,
+  // screenshot and rate would all describe another screen. Skipping loudly beats that.
+  if (opts.expectPath && !stayedOnPage(opts.expectPath, url)) {
+    throw new Error(
+      `ultra11y: ${opts.expectPath} landed on ${url} — not recording it as "${opts.as ?? opts.name ?? "this page"}". ` +
+        `The state that opens this route is not the one the test built; seed it first, or drop the page from the sample.`,
+    );
+  }
   const payload = buildPayload(collected, url, "playwright", opts, shot);
   const result = auditSnapshot(payload);
   if (opts.report) writePagesReport(typeof opts.report === "object" ? opts.report : {});

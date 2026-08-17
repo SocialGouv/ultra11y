@@ -98,6 +98,30 @@ export interface CheckOptions {
   notes?: string;
   /** Capture a viewport screenshot for the pixel tier (Playwright: on by default). */
   screenshot?: boolean;
+  /** The path you NAVIGATED to. Given it, the fixture refuses to record a page the browser
+   *  did not stay on — a guarded route that redirected, a session that expired — instead of
+   *  filing that other screen under this page's `as`/`name`. Nothing about such a snapshot
+   *  looks wrong, which is what makes it the worst thing an accessibility report can carry.
+   *  Compared by path (a query or fragment the app appends to its own route is the same
+   *  page); a full URL works too. `scan --sample` applies the same rule. */
+  expectPath?: string;
+}
+
+/** Did the browser stay on the page the caller asked for? Path-only, trailing slash folded;
+ *  anything unparseable passes — this catches a redirect, it does not invent one. */
+export function stayedOnPage(expected: string, actual: string): boolean {
+  if (!expected || !actual) return true;
+  const path = (u: string): string | undefined => {
+    try {
+      return new URL(u, "http://x.invalid").pathname.replace(/\/+$/, "");
+    } catch {
+      return undefined;
+    }
+  };
+  const a = path(expected);
+  const b = path(actual);
+  if (a === undefined || b === undefined) return true;
+  return a === b;
 }
 
 /** Build the snapshot payload from a collected page. Shared so every runner stamps the
