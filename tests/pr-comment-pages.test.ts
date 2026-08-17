@@ -90,13 +90,22 @@ describe("the two stickies cannot overwrite one another", () => {
 });
 
 describe("the page-by-page comment", () => {
-  it("names every page in scope, with its rate and its denominator", () => {
+  it("names every page in scope", () => {
     const md = pagesComment(audit(), { lang: "fr" });
     expect(md).toContain("Accueil");
     expect(md).toContain("Contact");
-    // A rate is never bare: `50 % (1/2)` — the denominator is what stops "100 %" over two
-    // decided criteria travelling as a conformant page.
-    expect(md).toMatch(/\(\d+\/\d+\)/);
+  });
+
+  it("scores a page in COUNTS, never a percentage", () => {
+    // A rate over the decided criteria alone reads as a page score. With the judgment criteria
+    // unruled — the normal state, and where a rejected adjudication lands — every page showed
+    // « 50 % (4/106) »: 2 C and 2 NC out of 106. Same cell on a good page and a bad one.
+    const md = pagesComment(audit(), { standard: "rgaa", lang: "fr" });
+    const scoreboard = md.slice(md.indexOf("| Page |"), md.indexOf("<details>") >>> 0 || md.length);
+    expect(scoreboard).not.toMatch(/\d+\s?%/);
+    expect(md).toContain("À évaluer");
+    // And the legend says what the columns are, so the counts are not left to inference.
+    expect(md).toMatch(/Pas de pourcentage ici/);
   });
 
   it("details the non-conforming criteria of a failing page, and only those", () => {
@@ -113,28 +122,32 @@ describe("the page-by-page comment", () => {
     expect(summaries).toBe(1);
   });
 
-  it("counts a page's rate in the ACTIVE standard, not in WCAG's", () => {
-    // Shipped and caught on a real PR: the scoreboard read « 50 % (4/55) » — WCAG's 55 — while
-    // the detail block under it tallied the same page over RGAA's 106, and the headline above
-    // said (9/106). `PageResult.conformancePct` is always WCAG-keyed; the row has to come from
-    // the pack's own projection, like the artifact's per-page sheet does.
-    const md = pagesComment(audit(), { standard: "rgaa", lang: "fr" });
-    expect(md).not.toMatch(/\(\d+\/55\)/);
-    // 106 is RGAA's criterion count — the same denominator the sheet and the headline use.
-    expect(md).toMatch(/\(\d+\/106\)/);
+  it("counts a page in the ACTIVE standard's criteria, not in WCAG's", () => {
+    // Shipped and caught on a real PR: the row was computed from `PageResult`, which is always
+    // WCAG-keyed, so a page under RGAA was scored against the core's 55 while its own sheet in
+    // the artifact counted the same verdicts against 106.
+    const only: PageScope[] = [{ id: "contact", name: "Contact", url: "https://x/contact", sources: ["app/contact/page.tsx"], basis: "snapshot" }];
+    const one = { scope: { inputs: [], files: 1, pages: only } } as Partial<AuditResult>;
+    const rgaa = pagesComment(audit(one), { standard: "rgaa", lang: "fr" });
+    const core = pagesComment(audit(one), { lang: "fr" });
+    const toAssess = (md: string): number => Number(/\| instantané \| (\d+) \| (\d+) \| (\d+) \|/.exec(md)?.[3]);
+    // RGAA has 106 criteria to the core's 55, so the "to assess" column must differ — the same
+    // number under both standards is the bug.
+    expect(toAssess(rgaa)).toBeGreaterThan(toAssess(core));
   });
 
-  it("agrees with its own detail block on how many criteria were decided", () => {
+  it("agrees with its own detail block on what the page's standing is", () => {
     // ONE page, so the scoreboard row and the detail block below it describe the same thing —
     // the scoreboard is in scope order while the blocks are sorted worst-first.
     const only: PageScope[] = [{ id: "contact", name: "Contact", url: "https://x/contact", sources: ["app/contact/page.tsx"], basis: "snapshot" }];
     const md = pagesComment(audit({ scope: { inputs: [], files: 1, pages: only } } as Partial<AuditResult>), { standard: "rgaa", lang: "fr" });
-    // Scoreboard cell: `X % (decided/total)`. Tally line: `c conforme(s) · nc non conforme(s)`.
-    const cell = /\((\d+)\/(\d+)\)/.exec(md.slice(md.indexOf("| Page |")));
-    const tally = /(\d+) conforme\(s\) · (\d+) non conforme\(s\)/.exec(md);
-    expect(cell).not.toBeNull();
+    const row = /\| instantané \| (\d+) \| (\d+) \| (\d+) \|/.exec(md);
+    const tally = /(\d+) conforme\(s\) · (\d+) non conforme\(s\) · (\d+) non applicable\(s\) · (\d+) à évaluer/.exec(md);
+    expect(row).not.toBeNull();
     expect(tally).not.toBeNull();
-    expect(Number(cell?.[1])).toBe(Number(tally?.[1]) + Number(tally?.[2]));
+    expect(row?.[1]).toBe(tally?.[1]); // C
+    expect(row?.[2]).toBe(tally?.[2]); // NC
+    expect(row?.[3]).toBe(tally?.[4]); // to assess
   });
 
   it("explains a count the criteria cannot account for, instead of an empty block", () => {

@@ -60058,10 +60058,14 @@ var S = {
     clamped: (n) => `_${n} groupe(s) retir\xE9(s) de ce commentaire pour tenir dans la limite de GitHub \u2014 le r\xE9sum\xE9 de job les porte tous._`,
     unanchored: (n) => `${n} constat(s) rattach\xE9(s) \xE0 une URL, sans ligne de code \xE0 annoter \u2014 voir le rapport.`,
     unattributed: (n) => `${n} constat(s) ne sont rattach\xE9s \xE0 aucune page (code partag\xE9, fichier hors routes) \u2014 compt\xE9s dans l'audit global, jamais r\xE9partis d'office.`,
-    sourceBasis: "Une page marqu\xE9e \xAB source \xBB n'a pas d'instantan\xE9 : l'absence de constat n'y vaut PAS conformit\xE9, et son taux ne porte que sur ce que le moteur a pu d\xE9cider ailleurs.",
+    sourceBasis: "Une page marqu\xE9e \xAB source \xBB n'a pas d'instantan\xE9 : l'absence de constat n'y vaut PAS conformit\xE9. Ses crit\xE8res non d\xE9cid\xE9s restent \xAB \xE0 \xE9valuer \xBB, ils ne basculent jamais en conformes par silence.",
     pageByPage: "page par page",
     pagesCount: (n) => `${n} page(s)`,
     testsCol: "Tests",
+    conformingCol: "C",
+    nonConformingCol: "NC",
+    toAssessCol: "\xC0 \xE9valuer",
+    scoreboardNote: "`C` conforme \xB7 `NC` non conforme \xB7 \xAB \xC0 \xE9valuer \xBB : personne ne l'a encore tranch\xE9 \u2014 ni conforme ni non conforme. Pas de pourcentage ici : un taux calcul\xE9 sur les seuls crit\xE8res d\xE9cid\xE9s se lit comme une note de page, et vaut la m\xEAme chose sur une bonne page que sur une mauvaise. Le taux et sa couverture sont dans la fiche par page de l'artefact.",
     noPages: "Aucune page dans le p\xE9rim\xE8tre de ce run : le balayage n'a produit aucun instantan\xE9. Ce n'est pas un bilan vide, c'est un bilan absent \u2014 les crit\xE8res au rendu restent \xE0 \xE9valuer.",
     pagesDetailNote: "Un bloc par page portant au moins une non-conformit\xE9, et seulement ses crit\xE8res **non conformes** \u2014 la grille compl\xE8te (tous les crit\xE8res de chaque page, avec leurs tests et leurs captures) vit dans l'artefact.",
     pagesClamped: (n) => `_Le d\xE9tail de ${n} page(s) a \xE9t\xE9 retir\xE9 de ce commentaire pour tenir dans la limite de GitHub \u2014 l'artefact les porte toutes._`,
@@ -60099,10 +60103,14 @@ var S = {
     clamped: (n) => `_${n} group(s) dropped from this comment to fit GitHub's limit \u2014 the job summary carries them all._`,
     unanchored: (n) => `${n} finding(s) keyed to a URL, with no code line to annotate \u2014 see the report.`,
     unattributed: (n) => `${n} finding(s) are attributed to no page (shared code, file outside any route) \u2014 counted in the overall audit, never spread across pages.`,
-    sourceBasis: 'A page marked "source" has no snapshot: the absence of a finding there does NOT mean conforming, and its rate covers only what the engine could decide elsewhere.',
+    sourceBasis: 'A page marked "source" has no snapshot: the absence of a finding there does NOT mean conforming. Its undecided criteria stay \u201Cto assess\u201D; they never turn conforming by silence.',
     pageByPage: "page by page",
     pagesCount: (n) => `${n} page(s)`,
     testsCol: "Tests",
+    conformingCol: "C",
+    nonConformingCol: "NC",
+    toAssessCol: "To assess",
+    scoreboardNote: "`C` conforming \xB7 `NC` non-conforming \xB7 \u201CTo assess\u201D: nobody has ruled on it yet \u2014 neither conforming nor not. No percentage here: a rate over the decided criteria alone reads as a page score, and reads the same on a good page as on a bad one. The rate and its coverage live in the artifact's per-page sheet.",
     noPages: "No page in this run's scope: the sweep produced no snapshot. This is not an empty scoreboard, it is a missing one \u2014 the rendering criteria stay to assess.",
     pagesDetailNote: "One block per page carrying at least one non-conformity, and only its **non-conforming** criteria \u2014 the full grid (every criterion of every page, with its tests and its screenshot) lives in the artifact.",
     pagesClamped: (n) => `_The detail of ${n} page(s) was dropped from this comment to fit GitHub's limit \u2014 the artifact carries them all._`,
@@ -60226,13 +60234,15 @@ function perPageTable(result, standard = CORE2, lang = "en") {
   return [`### ${s.perPage}`, "", ...scoreboardTable(result, derived, standard, s, lang), "", ...basisCaveats(result, derived, s, lang)].join("\n");
 }
 function scoreboardTable(result, derived, standard, s, lang) {
-  const out2 = [`| ${s.page} | ${s.basis} | ${s.pageRate} | \u{1F534} | \u{1F7E0} | \u{1F7E1} |`, "| --- | --- | ---: | ---: | ---: | ---: |"];
+  const out2 = [
+    `| ${s.page} | ${s.basis} | ${s.conformingCol} | ${s.nonConformingCol} | ${s.toAssessCol} | \u{1F534} | \u{1F7E0} | \u{1F7E1} |`,
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"
+  ];
   for (const pg of derived) {
     const n = (sev) => severityCount(pg, sev);
-    const rows = pageCriterionRows(result, pg, standard, lang);
-    const cov = pageCoverage(rows);
+    const t2 = pageTally(pageCriterionRows(result, pg, standard, lang));
     out2.push(
-      `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
+      `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${t2.c} | ${t2.nc} | ${t2.manual} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
     );
   }
   return out2;
@@ -60241,7 +60251,7 @@ function severityCount(pg, sev) {
   return pg.findings.filter((f) => !f.advisory && f.severity === sev).length;
 }
 function basisCaveats(result, derived, s, lang) {
-  const out2 = [];
+  const out2 = [`> ${s.scoreboardNote}`, ""];
   const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
   if (orphans) out2.push(`> ${s.unattributed(orphans)}`, "");
   if (derived.some((p) => p.basis === "attributed")) out2.push(`> ${s.sourceBasis}`, "");

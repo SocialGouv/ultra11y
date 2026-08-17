@@ -36,7 +36,7 @@ import {
   renderRedirected,
   unattributedFindings,
 } from "./pages.js";
-import { pageCoverage, pageCriterionRows, pageRatePct, pageTally, pageTallyNote } from "./pages-report.js";
+import { pageCriterionRows, pageTally, pageTallyNote } from "./pages-report.js";
 
 export interface AnnotateOptions {
   standard?: StandardId;
@@ -125,10 +125,15 @@ const S = {
     unattributed: (n: number) =>
       `${n} constat(s) ne sont rattachés à aucune page (code partagé, fichier hors routes) — comptés dans l'audit global, jamais répartis d'office.`,
     sourceBasis:
-      "Une page marquée « source » n'a pas d'instantané : l'absence de constat n'y vaut PAS conformité, et son taux ne porte que sur ce que le moteur a pu décider ailleurs.",
+      "Une page marquée « source » n'a pas d'instantané : l'absence de constat n'y vaut PAS conformité. Ses critères non décidés restent « à évaluer », ils ne basculent jamais en conformes par silence.",
     pageByPage: "page par page",
     pagesCount: (n: number) => `${n} page(s)`,
     testsCol: "Tests",
+    conformingCol: "C",
+    nonConformingCol: "NC",
+    toAssessCol: "À évaluer",
+    scoreboardNote:
+      "`C` conforme · `NC` non conforme · « À évaluer » : personne ne l'a encore tranché — ni conforme ni non conforme. Pas de pourcentage ici : un taux calculé sur les seuls critères décidés se lit comme une note de page, et vaut la même chose sur une bonne page que sur une mauvaise. Le taux et sa couverture sont dans la fiche par page de l'artefact.",
     noPages:
       "Aucune page dans le périmètre de ce run : le balayage n'a produit aucun instantané. Ce n'est pas un bilan vide, c'est un bilan absent — les critères au rendu restent à évaluer.",
     pagesDetailNote:
@@ -173,10 +178,15 @@ const S = {
     unattributed: (n: number) =>
       `${n} finding(s) are attributed to no page (shared code, file outside any route) — counted in the overall audit, never spread across pages.`,
     sourceBasis:
-      'A page marked "source" has no snapshot: the absence of a finding there does NOT mean conforming, and its rate covers only what the engine could decide elsewhere.',
+      'A page marked "source" has no snapshot: the absence of a finding there does NOT mean conforming. Its undecided criteria stay “to assess”; they never turn conforming by silence.',
     pageByPage: "page by page",
     pagesCount: (n: number) => `${n} page(s)`,
     testsCol: "Tests",
+    conformingCol: "C",
+    nonConformingCol: "NC",
+    toAssessCol: "To assess",
+    scoreboardNote:
+      "`C` conforming · `NC` non-conforming · “To assess”: nobody has ruled on it yet — neither conforming nor not. No percentage here: a rate over the decided criteria alone reads as a page score, and reads the same on a good page as on a bad one. The rate and its coverage live in the artifact's per-page sheet.",
     noPages:
       "No page in this run's scope: the sweep produced no snapshot. This is not an empty scoreboard, it is a missing one — the rendering criteria stay to assess.",
     pagesDetailNote:
@@ -391,20 +401,27 @@ export function perPageTable(result: AuditResult, standard: StandardId = CORE, l
  *  comment draw ONE table from one projection — a second copy of this loop is a second chance
  *  to disagree about what a page's rate is.
  *
- *  The rate comes from `pageCriterionRows`, in the ACTIVE standard's vocabulary — NOT from
- *  `PageResult.conformancePct`, which is always WCAG-keyed. Under a pack the two count
- *  different things, and the gap is visible in one glance: a page rendered « 50 % (4/55) »
- *  here while its own sheet in the artifact counted those 4 against RGAA's 106, and the run
- *  headline right above said `(9/106)`. One document, one standard, two denominators —
- *  exactly the drift `formatRate` exists to prevent. */
+ *  COUNTS, not a percentage. Every status comes from `pageCriterionRows`, in the ACTIVE
+ *  standard's vocabulary — `PageResult.conformancePct` is always WCAG-keyed and would report a
+ *  pack page against the core's 55.
+ *
+ *  A percentage was worse than useless here. When the judgment criteria are undecided — which
+ *  is the NORMAL state without an adjudication pass, and the state a rejected one falls back to
+ *  — a page has 2 conforming and 2 non-conforming out of 106, and the cell read « 50 % (4/106) »
+ *  on every row. Half of four criteria is not half a page, but the eye reads a page score, and
+ *  it read the same score for a good page and a bad one. The three counts cannot be misread:
+ *  what conforms, what does not, and how much nobody has ruled on yet. The percentage stays in
+ *  the artifact's per-page sheet, next to the coverage sentence that qualifies it. */
 function scoreboardTable(result: AuditResult, derived: PageResult[], standard: StandardId, s: (typeof S)[Lang], lang: Lang): string[] {
-  const out: string[] = [`| ${s.page} | ${s.basis} | ${s.pageRate} | 🔴 | 🟠 | 🟡 |`, "| --- | --- | ---: | ---: | ---: | ---: |"];
+  const out: string[] = [
+    `| ${s.page} | ${s.basis} | ${s.conformingCol} | ${s.nonConformingCol} | ${s.toAssessCol} | 🔴 | 🟠 | 🟡 |`,
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+  ];
   for (const pg of derived) {
     const n = (sev: Severity): number => severityCount(pg, sev);
-    const rows = pageCriterionRows(result, pg, standard, lang);
-    const cov = pageCoverage(rows);
+    const t = pageTally(pageCriterionRows(result, pg, standard, lang));
     out.push(
-      `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
+      `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${t.c} | ${t.nc} | ${t.manual} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
     );
   }
   return out;
@@ -418,7 +435,8 @@ function severityCount(pg: PageResult, sev: Severity): number {
  *  than a snapshot actually present. One caveat per basis, from the shared sentences — a
  *  « non audité » page must not be explained by the note that asserts it has no snapshot. */
 function basisCaveats(result: AuditResult, derived: PageResult[], s: (typeof S)[Lang], lang: Lang): string[] {
-  const out: string[] = [];
+  // What the three count columns mean, and why there is no percentage beside them.
+  const out: string[] = [`> ${s.scoreboardNote}`, ""];
   const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
   if (orphans) out.push(`> ${s.unattributed(orphans)}`, "");
   if (derived.some((p) => p.basis === "attributed")) out.push(`> ${s.sourceBasis}`, "");
