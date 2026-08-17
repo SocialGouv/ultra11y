@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.0.1](https://github.com/maxgfr/ultra11y/compare/v5.0.0...v5.0.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **orchestrate:** tell the adjudicator about the field the fold rejects it for ([7ad08c2](https://github.com/maxgfr/ultra11y/commit/7ad08c2ca4b4ae17db43f92ead1fcf3458818a18))
+
 # [5.0.0](https://github.com/maxgfr/ultra11y/compare/v4.5.2...v5.0.0) (2026-08-17)
 
 
