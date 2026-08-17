@@ -8,7 +8,7 @@
 // the builders and must list every new probe/step added to the runtime.
 import { createRequire } from "node:module";
 import { describe, it, expect } from "vitest";
-import { probeSources, clicksAllowed } from "../src/scan-local.js";
+import { probeSources, clicksAllowed, landedOnRequestedPage } from "../src/scan-local.js";
 
 const sources = probeSources();
 const names = Object.keys(sources);
@@ -40,6 +40,35 @@ describe("scan-local probe strings — every string-evaluated expression parses 
     // but the body only runs when the function is CALLED, which we never do (the
     // sources reference document/window and must not execute in Node).
     expect(() => new Function(`return (${src});`)).not.toThrow();
+  });
+});
+
+// A sample page's declared id/name is applied to whatever the browser had on screen. If the
+// route bounced — expired session, a wizard step the state does not open — the page sheet,
+// the screenshot and the rate all describe another screen under the requested page's name.
+// Nothing about it looks wrong, which is exactly why it has to be caught here.
+describe("a scanned page is the page that was asked for", () => {
+  it("accepts the same path, whatever the app appends to it", () => {
+    expect(landedOnRequestedPage("http://localhost:3000/aide", "http://localhost:3000/aide")).toBe(true);
+    expect(landedOnRequestedPage("http://localhost:3000/aide", "http://localhost:3000/aide?from=nav")).toBe(true);
+    expect(landedOnRequestedPage("http://localhost:3000/aide", "http://localhost:3000/aide#section")).toBe(true);
+    expect(landedOnRequestedPage("http://localhost:3000/aide", "http://localhost:3000/aide/")).toBe(true);
+  });
+
+  it("rejects a different path — the redirect this guard exists for", () => {
+    // The session expired and the funnel bounced to sign-in.
+    expect(landedOnRequestedPage("http://localhost:3000/declaration/etape/2", "http://localhost:3000/login")).toBe(false);
+    // The wizard sent us back to the step the state actually opens.
+    expect(landedOnRequestedPage("http://localhost:3000/declaration/etape/4", "http://localhost:3000/declaration/etape/1")).toBe(false);
+    expect(landedOnRequestedPage("http://localhost:3000/admin", "http://localhost:3000/mon-espace")).toBe(false);
+  });
+
+  // The guard is here to catch a redirect, not to invent one: anything it cannot parse, and
+  // targets that cannot redirect at all, pass through.
+  it("stays out of the way when there is nothing to compare", () => {
+    expect(landedOnRequestedPage("/tmp/page.html", "")).toBe(true);
+    expect(landedOnRequestedPage("file:///tmp/page.html", "file:///tmp/page.html")).toBe(true);
+    expect(landedOnRequestedPage("::not a url::", "::not a url::")).toBe(true);
   });
 });
 

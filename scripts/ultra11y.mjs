@@ -58352,6 +58352,20 @@ var LIVE_REGION_DETAIL = {
 function clicksAllowed(storageState, interactClicks) {
   return interactClicks === true || !storageState;
 }
+function landedOnRequestedPage(requested, landed) {
+  if (!landed || requested === landed) return true;
+  const path = (u) => {
+    try {
+      return new URL(u, "http://x.invalid").pathname.replace(/\/+$/, "");
+    } catch {
+      return void 0;
+    }
+  };
+  const a = path(requested);
+  const b = path(landed);
+  if (a === void 0 || b === void 0) return true;
+  return a === b;
+}
 async function probeLiveRegion(page, lang, allowClicks) {
   const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
   return await page.evaluate(liveRegionExpr(detail, allowClicks)).catch(() => []);
@@ -58520,6 +58534,7 @@ async function runSampleScanLocal(pages, opts) {
   const browser = await launchChromium(chromium);
   const findings = [];
   const snapshots = [];
+  const redirected = [];
   try {
     for (const page of pages) {
       const storageState = page.storageState ?? opts.storageState;
@@ -58531,6 +58546,10 @@ async function runSampleScanLocal(pages, opts) {
         lang,
         snapshot: Boolean(opts.snapshotRoot)
       });
+      if (!landedOnRequestedPage(page.url, out2.url)) {
+        redirected.push({ id: page.id, name: page.name, requested: page.url, landed: out2.url });
+        continue;
+      }
       findings.push(...tagSampleFindings(toDynamicResult(out2, page.url, lang, LOCAL_ENGINE).findings, page));
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, page.url, page) : void 0;
       if (id) snapshots.push(id);
@@ -58546,7 +58565,8 @@ async function runSampleScanLocal(pages, opts) {
     findings,
     sample: sampleScope({ pages }),
     testedScs: localTestedScs(interact),
-    ...snapshots.length ? { snapshots } : {}
+    ...snapshots.length ? { snapshots } : {},
+    ...redirected.length ? { redirected } : {}
   };
 }
 async function runCrawlScanLocal(opts) {
@@ -66644,6 +66664,13 @@ async function cmdScan(p) {
   } catch (e) {
     console.error(`ultra11y scan: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
+  }
+  if (dynamic.redirected?.length) {
+    for (const r of dynamic.redirected) {
+      console.error(
+        lang === "fr" ? `\u26A0\uFE0F ultra11y scan : \xAB ${r.name} \xBB (${r.id}) non enregistr\xE9e \u2014 ${r.requested} a redirig\xE9 vers ${r.landed}. L'enregistrer aurait d\xE9crit cet \xE9cran sous le nom du premier.` : `\u26A0\uFE0F ultra11y scan: "${r.name}" (${r.id}) not recorded \u2014 ${r.requested} redirected to ${r.landed}. Recording it would have described that screen under the first one's name.`
+      );
+    }
   }
   if (useSample && sampleConfig) {
     const lintKey = typeof p.flags.standard === "string" && p.flags.standard ? p.flags.standard : "rgaa";

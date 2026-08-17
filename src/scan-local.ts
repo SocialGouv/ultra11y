@@ -11,7 +11,7 @@
 import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
-import type { DynamicFinding, DynamicResult, Lang, SamplePage } from "./types.js";
+import type { DynamicFinding, DynamicResult, Lang, SamplePage, ScanRedirect } from "./types.js";
 import { type DiscoverOpts, discoverUrls, type ProbeHit, type RunnerOutput, tagSampleFindings, toDynamicResult, writeRunnerSnapshot } from "./scan.js";
 import { sampleScope } from "./sample.js";
 import { COLLECT_SNAPSHOT, type CollectedPage } from "./snapshot.js";
@@ -604,6 +604,36 @@ export function clicksAllowed(storageState: string | undefined, interactClicks: 
   return interactClicks === true || !storageState;
 }
 
+/** Did the browser end up on the page we ASKED for?
+ *
+ *  A sample page's declared id/name is the identity the report and the per-page grid speak,
+ *  and it is applied to whatever the browser had on screen. So a route that redirects — an
+ *  expired session bouncing to /login, a wizard step the application state does not open —
+ *  gets recorded under the requested page's name while showing another screen entirely.
+ *  Nothing about the resulting document looks wrong, which is what makes it the worst
+ *  failure mode an accessibility report has: a reader sees a page sheet, a screenshot and a
+ *  conformance rate, and none of it describes the page named at the top.
+ *
+ *  Only the PATH is compared. A query string or fragment the app appends to its own route is
+ *  the same page; a different path is a different page. Anything unparseable is treated as a
+ *  match — this guard exists to catch a redirect, not to invent one. Exported for the
+ *  browser-free policy test. */
+export function landedOnRequestedPage(requested: string, landed: string): boolean {
+  if (!landed || requested === landed) return true;
+  const path = (u: string): string | undefined => {
+    try {
+      // `file://` targets and relative paths never redirect; base makes them parseable.
+      return new URL(u, "http://x.invalid").pathname.replace(/\/+$/, "");
+    } catch {
+      return undefined;
+    }
+  };
+  const a = path(requested);
+  const b = path(landed);
+  if (a === undefined || b === undefined) return true;
+  return a === b;
+}
+
 async function probeLiveRegion(page: Any, lang: Lang, allowClicks: boolean): Promise<ProbeHit[]> {
   const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
   return (await page.evaluate(liveRegionExpr(detail, allowClicks)).catch(() => [])) as ProbeHit[];
@@ -880,6 +910,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
   const browser = await launchChromium(chromium);
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];
+  const redirected: ScanRedirect[] = [];
   try {
     for (const page of pages) {
       const storageState = page.storageState ?? opts.storageState; // per-page override
@@ -891,6 +922,15 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
         lang,
         snapshot: Boolean(opts.snapshotRoot),
       });
+      // The declared identity is applied to whatever the browser had on screen, so a page
+      // that bounced elsewhere would be filed under the name of the page nobody looked at.
+      // Drop it instead, and say which one and where it went: a page reported missing is a
+      // bug in the sample or the seeded state, and both are fixable. A page reported under
+      // the wrong name is neither — it is a false conformance claim.
+      if (!landedOnRequestedPage(page.url, out.url)) {
+        redirected.push({ id: page.id, name: page.name, requested: page.url, landed: out.url });
+        continue;
+      }
       findings.push(...tagSampleFindings(toDynamicResult(out, page.url, lang, LOCAL_ENGINE).findings, page));
       // The sample page's declared id/name/auth/notes win over anything derived from the
       // URL: that identity is what the report and the per-page grid speak.
@@ -909,6 +949,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
     sample: sampleScope({ pages }),
     testedScs: localTestedScs(interact),
     ...(snapshots.length ? { snapshots } : {}),
+    ...(redirected.length ? { redirected } : {}),
   };
 }
 

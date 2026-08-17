@@ -47,6 +47,18 @@ export interface SampleScope {
   transverse?: string[];
 }
 
+// A sample page the scan REFUSED to record, because the browser ended up somewhere else —
+// a session that had expired, a wizard step the application state does not open. Recording
+// it would have filed another screen under this page's name, which reads as a complete
+// report and is a false conformance claim. Reported so the sample or the seeded state can
+// be fixed; never silently dropped.
+export interface ScanRedirect {
+  id: string;
+  name: string;
+  requested: string;
+  landed: string;
+}
+
 // ---- WCAG 2.2 canonical core (src/data/wcag.json, produced by scripts/build-standards.mjs)
 // The engine's canonical key. Success-criterion ids/titles/levels are derived from the
 // official W3C source (https://github.com/w3c/wcag); rule coverage + automatability are
@@ -560,4 +572,7 @@ export interface DynamicResult {
   // static rules never ran against its DOM, so src/pages.ts keeps it `manual` forever).
   // Empty/absent when snapshotting was off or every collection failed. Optional/additive.
   snapshots?: string[];
+  // Sample pages dropped because the browser landed on a different path than the one asked
+  // for. Absent when every page was reached. Optional/additive — see ScanRedirect.
+  redirected?: ScanRedirect[];
 }

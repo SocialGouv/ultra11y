@@ -220,7 +220,17 @@ Sheets are named `page-<id>.md`: a page whose id is `index` — the ordinary id 
 gates that mean something here — above all **no invented criterion** — instead of demanding
 the §1–5 structure of a conformance document.
 
-### Three honesty rules
+### Four honesty rules
+
+**0. A page is recorded only if the browser stayed on it.** A sample page's declared `id` and
+`name` are the identity the report speaks, and they are applied to whatever was on screen. So a
+route that redirects — an expired session bouncing to sign-in, a wizard step the application
+state does not open — would be filed under the requested page's name while showing something
+else: a sheet, a screenshot and a rate that describe a different screen, with nothing about the
+document looking wrong. `scan --sample` compares the landed **path** against the requested one
+(a query string or fragment the app appends is the same page) and **drops** a page that moved,
+naming it and where it went. A page reported missing is a bug in the sample or in the state you
+seeded, and both are fixable; a page reported under the wrong name is a false conformance claim.
 
 **1. A finding is attributed to a page only when something says so.** In order: the snapshot
 path it was raised on (`.ultra11y/pages/<id>/dom.html` — the id is *in the path*, which is what

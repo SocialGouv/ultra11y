@@ -3044,6 +3044,18 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     console.error(`ultra11y scan: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
   }
+  // Pages the scan refused to file, because the browser ended up on another route. Loud, and
+  // on stderr: a silently shorter sample is indistinguishable from a sample that passed, and
+  // the cause is always fixable — an expired session, or state the wizard step needs.
+  if (dynamic.redirected?.length) {
+    for (const r of dynamic.redirected) {
+      console.error(
+        lang === "fr"
+          ? `⚠️ ultra11y scan : « ${r.name} » (${r.id}) non enregistrée — ${r.requested} a redirigé vers ${r.landed}. L'enregistrer aurait décrit cet écran sous le nom du premier.`
+          : `⚠️ ultra11y scan: "${r.name}" (${r.id}) not recorded — ${r.requested} redirected to ${r.landed}. Recording it would have described that screen under the first one's name.`,
+      );
+    }
+  }
   // Advisory sample-methodology lint: which normative page KINDS the configured sample
   // lacks. Standard-agnostic mechanics + RGAA-specific required kinds; scan has no
   // --standard, so we lint against the config's default standard (else RGAA if registered).
