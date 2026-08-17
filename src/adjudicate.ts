@@ -10,7 +10,7 @@
 // C/NA, no ungroundable NC, no reasonless manual, full coverage of the residual set. The
 // decisions are the AGENT's, statically, gated — not a deferral to a human.
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { AuditResult, Automatability, Finding, Lang, PackCriterionAdjudication, ResidualRisk, Severity, Status } from "./types.js";
 import { SCHEMA_VERSION } from "./types.js";
 import { discover } from "./discover.js";
@@ -331,7 +331,13 @@ function docsForAudit(audit: AuditResult, cwd?: string): Doc[] {
   const docs: Doc[] = [];
   for (const f of files) {
     try {
-      docs.push(parseSource(readText(cwd ? join(cwd, f) : f), f));
+      // `resolve`, not `join`: a cwd resolves RELATIVE paths and must leave an absolute one
+      // alone. `join("/repo", "/tmp/x/page.html")` produced `/repo/tmp/x/page.html`, which is
+      // unreadable — and the catch below swallows it, so every criterion silently arrived with
+      // ZERO evidence. The gate then refused each C verdict for "no evidence harvested",
+      // blaming the adjudicator for a path bug. Grounding has always used `resolve` for the
+      // same reason; these two must agree, since one harvests the anchors the other checks.
+      docs.push(parseSource(readText(cwd ? resolve(cwd, f) : f), f));
     } catch {
       /* unreadable — skip, mirrors runAudit */
     }
@@ -526,17 +532,36 @@ function normativeRefResolves(ref: string | undefined, standard: StandardId, ite
  *
  *  `strict: true` restores the old file-level behaviour for a caller that genuinely wants
  *  all-or-nothing (a conformance deliverable signed off in one pass). */
-export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opts: { cwd?: string; strict?: boolean } = {}): ApplyAdjudicationResult {
+export function applyAdjudication(
+  audit: AuditResult,
+  adj: AdjudicationFile,
+  opts: {
+    cwd?: string;
+    strict?: boolean;
+    /** Criteria the caller KNOWS this adjudication does not cover, each with the reason to
+     *  record. A ledger replay supplies them (« stale », « never adjudicated ») so an absence
+     *  it fully expected is not reported as a coverage violation — while the criterion still
+     *  stays to assess, carrying that reason instead of a blank cell. */
+    residualReasons?: Record<string, string>;
+  } = {},
+): ApplyAdjudicationResult {
   const issues: string[] = [];
+  const expected = opts.residualReasons ?? {};
   // Per-criterion attribution. The gate used to collect one flat list, which is why it could
   // only ever reject the whole file: an issue did not know which verdict it condemned.
   const itemIssues = new Map<string, string[]>();
+  // Criteria that will NOT fold and must keep `manual` with a reason — the refused ones plus
+  // the ones the caller declared uncovered.
+  const notFolded = new Set<string>();
   const blame = (criteriaId: string, issue: string) => {
     issues.push(issue);
+    notFolded.add(criteriaId);
     const list = itemIssues.get(criteriaId);
     if (list) list.push(issue);
     else itemIssues.set(criteriaId, [issue]);
   };
+  /** An open criterion this adjudication deliberately does not carry. Not a gate violation. */
+  const uncovered = (criteriaId: string) => notFolded.add(criteriaId);
   // Spelling first, decisions second: "na" is NA, and rejecting the run over the case of a
   // verdict taught the caller nothing about accessibility. Everything below stays fail-closed.
   canonicalizeAdjudication(adj);
@@ -551,12 +576,16 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
     for (const pc of derivePackResults(audit, adj.standard)) {
       if (pc.status !== "manual") continue;
       open.add(pc.id);
-      if (!byId.has(pc.id)) blame(pc.id, `criterion ${pc.id}: missing from the adjudication (coverage gap)`);
+      if (byId.has(pc.id)) continue;
+      if (Object.hasOwn(expected, pc.id)) uncovered(pc.id);
+      else blame(pc.id, `criterion ${pc.id}: missing from the adjudication (coverage gap)`);
     }
   } else {
     for (const r of audit.residualRisks) {
       open.add(r.criteriaId);
-      if (!byId.has(r.criteriaId)) blame(r.criteriaId, `criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+      if (byId.has(r.criteriaId)) continue;
+      if (Object.hasOwn(expected, r.criteriaId)) uncovered(r.criteriaId);
+      else blame(r.criteriaId, `criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
     }
   }
 
@@ -676,11 +705,12 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
     return { ok: false, audit, issues, applied: 0, stillManual: 0, rejected: 0, rejectedCriteria: [], grounding };
   }
   // PARTIAL: a refused criterion is dropped, the rest folds. `rejectedCriteria` keeps file
-  // order and de-duplicates, since one criterion can raise several issues.
+  // order and de-duplicates, since one criterion can raise several issues. It counts only the
+  // criteria the gate REFUSED — an uncovered one the caller already declared is not a refusal.
   const rejectedCriteria = adj.items.map((it) => it.criteriaId).filter((id) => itemIssues.has(id));
   for (const id of itemIssues.keys()) if (!rejectedCriteria.includes(id)) rejectedCriteria.push(id);
-  const rejectedSet = new Set(rejectedCriteria);
-  const rejectedWhy = (id: string) => residualRejectedReason(itemIssues.get(id)?.[0] ?? "refused by the gate");
+  const rejectedSet = notFolded;
+  const rejectedWhy = (id: string) => expected[id] ?? residualRejectedReason(itemIssues.get(id)?.[0] ?? "refused by the gate");
 
   // Apply: clone the audit, update the decided criteria + append agent findings.
   const next: AuditResult = structuredClone(audit);
@@ -735,9 +765,10 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
         decidedBy: "agent",
       });
     }
-    // An OPEN criterion the file never mentioned (coverage gap) also has to say why it is
-    // still to assess — the loop above only walks the items that exist.
-    for (const id of rejectedCriteria) {
+    // An OPEN criterion the file never mentioned — a coverage gap, or one the caller declared
+    // uncovered — also has to say why it is still to assess; the loop above only walks the
+    // items that exist.
+    for (const id of notFolded) {
       if (byId.has(id) || !open.has(id)) continue;
       decided.push({ id, status: "manual", reason: "undecidable", justification: rejectedWhy(id), findings: [] });
     }

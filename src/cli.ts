@@ -50,6 +50,7 @@ import {
   hydrateAdjudication,
   type AdjudicationFile,
 } from "./adjudicate.js";
+import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, type VerdictLedger, writeLedger } from "./ledger.js";
 import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable } from "./scan-local.js";
@@ -375,6 +376,13 @@ Options:
   --generate         criteria: emit the bundled references/criteria.md (WCAG 2.2 AA)
   --apply <file>     verify: reduce a filled verdicts file to a pass/fail gate
                      (requires --report — coverage is re-derived from the report, uncapped)
+                     Also accepts an ADJUDICATION (--in <audit.json>), or a VERDICT LEDGER,
+                     which it REPLAYS onto the audit with no model in the loop
+  --ledger <file>    verify --apply / judge --apply: record the verdicts the fold ACCEPTED,
+                     so a later run replays them for free (default:
+                     .ultra11y/verdicts/<standard>.json). Replay re-derives the evidence
+                     and re-runs the same gate; a verdict whose evidence changed is
+                     dropped as stale and its criterion says so
   --max-verify <n>   verify: cap the worklist size; 0 = no cap           (default: 40)
   --verdicts <file>  check --semantic: the adjudicated verdicts artifact
                      (default: VERIFY.todo.json next to the report)
@@ -519,6 +527,10 @@ const VALUE_FLAGS = new Set([
   "dedup",
   "only",
   "standard",
+  // `verify --apply` / `judge --apply`: where to RECORD the verdicts the fold accepted, so a
+  // later run can replay them without a model (src/ledger.ts). A path; empty falls back to the
+  // standard's default location under .ultra11y/verdicts/.
+  "ledger",
   "baseline",
   "fail-on",
   "split",
@@ -2500,9 +2512,13 @@ function cmdVerify(p: ParsedArgs): number {
       return 2;
     }
     // Dispatch on shape: an OBJECT with kind:"adjudication" is a manual-criteria adjudication
-    // (src/adjudicate.ts); a plain ARRAY is the classic NC-verdicts worklist.
+    // (src/adjudicate.ts); kind:"verdict-ledger" is a stored one being REPLAYED (src/ledger.ts,
+    // no model in the loop); a plain ARRAY is the classic NC-verdicts worklist.
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && (parsed as { kind?: string }).kind === "adjudication") {
       return applyAdjudicationFile(p, parsed as AdjudicationFile, lang);
+    }
+    if (isLedger(parsed)) {
+      return replayLedgerFile(p, parsed, lang);
     }
     if (!Array.isArray(parsed)) {
       console.error("ultra11y verify: --apply must be a JSON array of verdicts, or an adjudication object.");
@@ -2631,6 +2647,109 @@ function cmdVerify(p: ParsedArgs): number {
   return 0;
 }
 
+/** Where to record the verdicts a fold accepted. `--ledger <path>` names a file; `--ledger`
+ *  bare takes the standard's default location. Absent ⇒ nothing is recorded, so a caller who
+ *  never asked for a ledger never gets a surprise file in their tree. */
+function ledgerTarget(p: ParsedArgs, standard: StandardId): string | undefined {
+  const flag = p.flags.ledger;
+  if (flag === undefined || flag === false) return undefined;
+  return typeof flag === "string" && flag ? flag : ledgerPath(standard);
+}
+
+/** `verify --apply <ledger.json> --in <audit.json> --out <dir>` — REPLAY stored verdicts onto
+ *  a fresh audit, with no model in the loop.
+ *
+ *  This is the parity mechanism: the same `applyAdjudication` gate runs, on evidence re-derived
+ *  from the audit in front of it, so a stored verdict has to prove itself again exactly as it
+ *  did the day it was recorded. A verdict whose evidence has since changed is dropped as stale
+ *  and its criterion returns to « to assess », saying so. */
+function replayLedgerFile(p: ParsedArgs, ledger: VerdictLedger, lang: Lang): number {
+  const inFlag = p.flags.in;
+  if (typeof inFlag !== "string" || !inFlag) {
+    console.error(
+      lang === "fr"
+        ? "ultra11y verify : --apply <registre> exige --in <audit.json> (l'audit à mettre à jour)."
+        : "ultra11y verify: --apply <ledger> requires --in <audit.json> (the audit to update).",
+    );
+    return 2;
+  }
+  let audit: AuditResult;
+  try {
+    audit = JSON.parse(readText(inFlag)) as AuditResult;
+  } catch {
+    console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
+    return 2;
+  }
+  const cwd = typeof p.flags.cwd === "string" ? (p.flags.cwd as string) : undefined;
+  const standard = resolveStandard(p.flags.standard) ?? ledger.standard;
+  const rp = replayLedger(audit, ledger, { cwd, standard });
+  const r = applyAdjudication(audit, rp.adj, { cwd, strict: p.flags.strict === true, residualReasons: rp.residualReasons });
+
+  if (!r.ok && (p.flags.strict === true || r.applied + r.stillManual === 0)) {
+    if (p.flags.json) console.log(JSON.stringify({ ...r, replay: rp }, null, 2));
+    else {
+      console.error(lang === "fr" ? `✗ Registre rejeté (${r.issues.length} problème(s)) :` : `✗ Ledger rejected (${r.issues.length} issue(s)):`);
+      for (const i of r.issues) console.error(`  ✗ ${i}`);
+    }
+    return 1;
+  }
+  const out = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
+  mkdirSync(out, { recursive: true });
+  const auditPath = join(out, "audit-latest.json");
+  writeFileSync(auditPath, `${JSON.stringify(r.audit, null, 2)}\n`);
+
+  if (p.flags.json)
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          auditPath,
+          applied: r.applied,
+          stillManual: r.stillManual,
+          rejected: r.rejected,
+          rejectedCriteria: r.rejectedCriteria,
+          replayed: rp.fresh.length,
+          stale: rp.stale,
+          obsolete: rp.obsolete,
+          missing: rp.missing,
+          issues: r.issues,
+          conformancePct: r.audit.conformancePct,
+          grounding: r.grounding,
+        },
+        null,
+        2,
+      ),
+    );
+  else {
+    console.log(
+      lang === "fr"
+        ? `✓ ${r.applied} verdict(s) rejoué(s) depuis le registre, ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""} → ${auditPath}`
+        : `✓ ${r.applied} verdict(s) replayed from the ledger, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""} → ${auditPath}`,
+    );
+    // Named, never merely counted: these are exactly the criteria a refresh pass has to
+    // adjudicate, and a silent count is what let a half-covered grid read as complete.
+    if (rp.stale.length)
+      console.error(
+        lang === "fr"
+          ? `⚠ ${rp.stale.length} verdict(s) périmé(s) (l'évidence a changé) : ${rp.stale.join(", ")}`
+          : `⚠ ${rp.stale.length} stale verdict(s) (the evidence changed): ${rp.stale.join(", ")}`,
+      );
+    if (rp.missing.length)
+      console.error(
+        lang === "fr"
+          ? `⚠ ${rp.missing.length} critère(s) absent(s) du registre : ${rp.missing.join(", ")}`
+          : `⚠ ${rp.missing.length} criterion(ia) absent from the ledger: ${rp.missing.join(", ")}`,
+      );
+    if (rp.obsolete.length)
+      console.error(
+        lang === "fr"
+          ? `ℹ ${rp.obsolete.length} entrée(s) obsolète(s) (le moteur les décide désormais) : ${rp.obsolete.join(", ")}`
+          : `ℹ ${rp.obsolete.length} obsolete entry(ies) (the engine now decides them): ${rp.obsolete.join(", ")}`,
+      );
+  }
+  return 0;
+}
+
 /** `verify --apply <adjudication.json> --in <audit.json> --out <dir>` — fold an AI
  *  adjudication of the manual criteria back into the audit, fail-closed, then rewrite the
  *  audit JSON so `report`/`prd` re-render with the adjudicated statuses. */
@@ -2684,6 +2803,22 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
   mkdirSync(out, { recursive: true });
   const auditPath = join(out, "audit-latest.json");
   writeFileSync(auditPath, JSON.stringify(r.audit, null, 2) + "\n");
+  // Record what landed, so the next run does not have to pay a model to learn it again. Only
+  // the ACCEPTED verdicts go in: a refused one in the ledger would be laundered back on the
+  // next replay, which is the whole thing the gate exists to prevent.
+  const ledgerOut = ledgerTarget(p, adj.standard);
+  if (ledgerOut) {
+    const refused = new Set(r.rejectedCriteria);
+    const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
+    const fresh = entriesFrom(adj, accepted, r.audit.date);
+    writeLedger(ledgerOut, mergeLedger(readLedger(ledgerOut), adj.standard, fresh));
+    if (!p.flags.json)
+      console.log(
+        lang === "fr"
+          ? `✓ ${fresh.length} verdict(s) enregistré(s) au registre → ${ledgerOut}`
+          : `✓ ${fresh.length} verdict(s) recorded in the ledger → ${ledgerOut}`,
+      );
+  }
   // Carry the numbers the fold produced. The failure payload has always described its own
   // outcome (`issues`); the success one described only the mechanics, so a caller that gates
   // on the adjudicated result — a CI step, an orchestrator's tool node — had to re-read and
@@ -2856,6 +2991,20 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   mkdirSync(out, { recursive: true });
   const auditPath = join(out, "audit-latest.json");
   writeFileSync(auditPath, `${JSON.stringify(r.audit, null, 2)}\n`);
+  // Same recording as `verify --apply`: what the model paid for, written down where the next
+  // run can replay it for free.
+  const ledgerOut = ledgerTarget(p, adj.standard);
+  if (ledgerOut) {
+    const refused = new Set(r.rejectedCriteria);
+    const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
+    const fresh = entriesFrom(adj, accepted, r.audit.date);
+    writeLedger(ledgerOut, mergeLedger(readLedger(ledgerOut), adj.standard, fresh));
+    console.log(
+      lang === "fr"
+        ? `✓ ${fresh.length} verdict(s) enregistré(s) au registre → ${ledgerOut}`
+        : `✓ ${fresh.length} verdict(s) recorded in the ledger → ${ledgerOut}`,
+    );
+  }
   console.log(
     lang === "fr"
       ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""} → ${auditPath}`

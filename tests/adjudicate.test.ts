@@ -200,6 +200,31 @@ describe("applyAdjudication — updates the audit + records provenance", () => {
   });
 });
 
+describe("buildAdjudicationWorklist — a cwd resolves relative paths and leaves absolute ones alone", () => {
+  // Regression: `docsForAudit` joined the cwd onto every discovered file, so an absolute input
+  // became `<cwd>/var/folders/…` — unreadable. The read is wrapped in a catch, so the failure
+  // was silent: every criterion arrived with ZERO evidence and the gate then refused each C
+  // verdict for "no evidence harvested", blaming the adjudicator for a path bug.
+  it("harvests the same evidence with an explicit cwd as without one", () => {
+    const audit = auditPage();
+    const without = buildAdjudicationWorklist(audit);
+    const withCwd = buildAdjudicationWorklist(audit, { cwd: process.cwd() });
+
+    const count = (items: AdjudicationItem[]) => items.reduce((n, i) => n + i.evidence.length, 0);
+    expect(count(withCwd)).toBe(count(without));
+    expect(count(without)).toBeGreaterThan(0); // the fixture really does carry evidence
+  });
+
+  it("still clears a C verdict when the caller passes a cwd", () => {
+    const audit = auditPage();
+    const items = buildAdjudicationWorklist(audit, { cwd: process.cwd() }).map((i) =>
+      i.criteriaId === "2.4.4" ? clearWith(i, "Every link text is self-describing in context.") : { ...i, verdict: "manual" as const, reason: "undecidable" },
+    );
+    const r = applyAdjudication(audit, file(items), { cwd: process.cwd() });
+    expect(r.audit.criteria.find((c) => c.id === "2.4.4")!.status).toBe("C");
+  });
+});
+
 // The fold is fail-closed PER VERDICT, not per FILE. Measured on a real CI run: 95 of 96
 // verdicts were filled correctly, one was null, and the all-or-nothing fold discarded all 96 —
 // so a $16 adjudication published « to assess » across the whole grid. A refusal must cost its
