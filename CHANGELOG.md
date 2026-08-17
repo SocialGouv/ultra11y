@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [4.5.0](https://github.com/maxgfr/ultra11y/compare/v4.4.1...v4.5.0) (2026-08-17)
+
+
+### Features
+
+* **action:** adjudicate on a subscription token, and scan behind a login ([34ab8e8](https://github.com/maxgfr/ultra11y/commit/34ab8e8881a2fdefbefec103c9c1a580b264ce1a))
+
 ## [4.4.1](https://github.com/maxgfr/ultra11y/compare/v4.4.0...v4.4.1) (2026-08-14)
 
 
