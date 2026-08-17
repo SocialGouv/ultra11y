@@ -41,8 +41,13 @@ interface SweepOptions {
     only?: (page: SamplePageLike) => boolean;
     /** Awaited after navigation, before collecting. This is where a framework's readiness goes:
      *  a design system that boots asynchronously will otherwise be serialized half-mounted, and
-     *  the audit reports non-conformities about markup no user ever meets. */
-    settle?: (page: PlaywrightPage) => Promise<void>;
+     *  the audit reports non-conformities about markup no user ever meets.
+     *
+     *  Typed loosely on purpose. The caller writes this against Playwright's real `Page` — with
+     *  `waitForLoadState`, `waitForFunction`, locators — and Playwright is not a dependency of
+     *  this package, so the narrow structural shape the collector needs would reject the very
+     *  function this option exists to take. Same reasoning as `test` below. */
+    settle?: (page: any) => Promise<void> | void;
     /** Passed to every `checkA11y`. `failOn: false` (the default here) records without
      *  asserting: the durable output of a sweep is the snapshot, not a red test. */
     check?: Omit<PlaywrightCheckOptions, "as" | "name" | "auth" | "notes" | "sources" | "expectPath">;
