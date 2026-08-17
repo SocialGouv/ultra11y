@@ -81,10 +81,12 @@ const APPLICABLE: Record<string, (d: Doc) => boolean> = {
 // Three rules keep this honest, because a wrong NA is far worse than an honest « to assess » —
 // it is a non-conformity hidden inside a report someone signs:
 //
-//   1. OVER-INCLUSION IS THE SAFE DIRECTION. A predicate answers "could this criterion
-//      possibly apply here?", so it must say YES on anything ambiguous. `<object>`/`<embed>`/
-//      `<iframe>` are usually not media, and they are all listed anyway: their presence merely
-//      keeps a criterion open, which costs nothing but a line in the worklist.
+//   1. UNCERTAINTY RESOLVES TOWARDS "APPLICABLE". A predicate answers "could this criterion
+//      possibly apply here?", so it says YES whenever it genuinely cannot tell — an `<object>`
+//      with no declared `type`, for instance. That is not the same as saying yes to everything:
+//      a predicate that treats every embed as a video is not cautious, it is wrong, and it
+//      costs a human the work of re-deriving "nothing here". Measured: one analytics `<iframe>`
+//      once held all twelve RGAA multimedia criteria open on a codebase with no media at all.
 //   2. APPLICABILITY IS OR-FOLDED ACROSS THE WHOLE SCOPE (see `foldDoc`). One document with a
 //      `<video>` keeps the media criteria open for the entire audit. NA means "nothing,
 //      anywhere in what was audited" — never "nothing in this file".
@@ -119,9 +121,47 @@ const SUBJECT_MATTER: Record<string, (d: Doc) => boolean> = {
   "1.3.5": hasFormControl,
 };
 
-/** Media, and everything that could be carrying media. Over-inclusive on purpose (rule 1). */
+/** A URL or MIME type that looks like time-based media, or a player embedding one. */
+// Accented forms included on purpose: the standards this serves are read in French, so a
+// `title="Vidéo de présentation"` must count. `\bvideo\b` did not match it — the boundary falls
+// inside the word — and an accent is the last thing that should decide whether a criterion is
+// assessed.
+const MEDIA_HINT =
+  /(youtube|youtu\.be|vimeo|dailymotion|soundcloud|spotify|twitch|wistia|brightcove|jwplayer|videopress|podcast|player|vid[eé]o|audio|baladodiffusion)/i;
+const MEDIA_EXT = /\.(mp4|webm|ogv|ogg|mov|m4v|avi|mpe?g|mp3|wav|flac|m4a|aac|opus|m3u8|mpd)(?:[?#]|$)/i;
+
+/**
+ * Is there time-based media — the subject of WCAG 1.2.x — anywhere in this document?
+ *
+ * Split in two, because "over-inclusion is the safe direction" is a rule about UNCERTAINTY, not
+ * a licence to treat every embed as a video. Measured on a real audit: one `<iframe>` holding an
+ * analytics opt-out widget kept all 12 RGAA multimedia criteria « to assess » across a codebase
+ * with no audio and no video anywhere. That is not caution, it is a false positive with a cost —
+ * twelve criteria a human now has to read through to reach the same "nothing here" the engine
+ * could have proved.
+ *
+ * So:
+ *   - `<video>`, `<audio>`, `<track>`, `<source>` are media, full stop.
+ *   - `<object>`/`<embed>` are media unless their `type` says otherwise — an unknown type stays
+ *     applicable, since that is genuine uncertainty.
+ *   - an `<iframe>` counts only when its `src`/`title` actually points at media (a player host,
+ *     a media extension, the words video/audio/podcast). A widget iframe does not.
+ *   - `<canvas>` and `<marquee>` are NOT here. Neither can carry a caption or an audio
+ *     description, which is what 1.2.x is about; moving content is 2.2.2 and flashing is 2.3.1,
+ *     and those have their own criteria.
+ */
 function hasMedia(d: Doc): boolean {
-  return has(d, "audio", "video", "track", "source", "object", "embed", "iframe", "marquee", "canvas");
+  if (has(d, "audio", "video", "track", "source")) return true;
+  return d.elements.some((el) => {
+    if (el.tag === "object" || el.tag === "embed") {
+      const type = (el.attribs.type ?? "").toLowerCase();
+      // A declared non-media type rules it out; anything else is uncertain, so it counts.
+      return !type || type.startsWith("audio/") || type.startsWith("video/") || type.startsWith("application/") ? true : false;
+    }
+    if (el.tag !== "iframe") return false;
+    const hay = `${el.attribs.src ?? ""} ${el.attribs.title ?? ""} ${el.attribs.allow ?? ""}`;
+    return MEDIA_HINT.test(hay) || MEDIA_EXT.test(el.attribs.src ?? "");
+  });
 }
 
 /** Device-motion input: the only thing WCAG 2.5.4 is about. */
@@ -194,7 +234,7 @@ function residualReason(automatability: string, sc?: string): string {
 function subjectMatterReason(sc: string, files: number): string {
   const scope = `nothing in the ${files} file(s) audited is concerned`;
   if (sc.startsWith("1.2."))
-    return `No time-based media in scope: ${scope} — no <audio>, <video>, <track>, <object>, <embed>, <iframe> or <canvas> element was found.`;
+    return `No time-based media in scope: ${scope} — no <audio>, <video>, <track> or <source> element, no <object>/<embed>, and no <iframe> pointing at media.`;
   if (sc === "2.5.4") return `No motion actuation in scope: ${scope} — no device-motion or device-orientation API is used.`;
   if (sc === "1.3.5" || sc.startsWith("3.3.")) return `No user input in scope: ${scope} — no form control (native, ARIA or contenteditable) was found.`;
   return `No element in scope is concerned by this success criterion (${scope}).`;

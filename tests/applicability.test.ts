@@ -53,21 +53,39 @@ describe("time-based media (WCAG 1.2.x)", () => {
     }
   });
 
-  // Each of these must keep the criteria OPEN. Over-inclusion is the safe direction: an
-  // <iframe> is usually not media, and it still counts, because being wrong the other way
-  // publishes "not applicable" over a real video.
+  // Each of these must keep the criteria OPEN — either it IS media, or it is genuinely
+  // uncertain, and being wrong that way publishes "not applicable" over a real video.
   for (const [label, markup] of [
     ["a <video>", '<video src="v.mp4"></video>'],
     ["an <audio>", '<audio src="a.mp3"></audio>'],
     ["a stray <track>", '<track kind="captions" src="c.vtt">'],
-    ["an <iframe> that might be an embed", '<iframe src="https://example.org/player" title="Player"></iframe>'],
-    ["an <object>", '<object data="x.swf"></object>'],
-    ["an <embed>", '<embed src="x.mp4">'],
-    ["a <canvas>", "<canvas></canvas>"],
+    ["a bare <source>", '<source src="v.webm">'],
+    ["a YouTube embed", '<iframe src="https://www.youtube.com/embed/abc" title="Démo"></iframe>'],
+    ["an iframe whose title says video", '<iframe src="https://example.org/x" title="Vidéo de présentation"></iframe>'],
+    ["an iframe serving an .mp4", '<iframe src="https://cdn.example.org/clip.mp4"></iframe>'],
+    ["an <object> of unknown type", '<object data="x.swf"></object>'],
+    ["an <embed> declaring video", '<embed src="x" type="video/mp4">'],
   ] as const) {
     it(`keeps the media criteria open when the page has ${label}`, () => {
       const r = audit(doc(markup));
       for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).not.toBe("NA");
+    });
+  }
+
+  // …and these must NOT hold them open. "Over-inclusion is the safe direction" is a rule about
+  // UNCERTAINTY, not a licence to treat every embed as a video. Measured on a real audit: one
+  // <iframe> holding an analytics opt-out widget kept all 12 RGAA multimedia criteria « to
+  // assess » across a codebase with no audio and no video anywhere — twelve criteria a human
+  // then reads through to reach the same "nothing here" the engine could have proved.
+  for (const [label, markup] of [
+    ["an analytics opt-out iframe", '<iframe src="https://matomo.example.fr/index.php?module=CoreAdminHome" title="Gestion du suivi"></iframe>'],
+    ["a map iframe", '<iframe src="https://maps.example.org/embed?q=Paris" title="Carte"></iframe>'],
+    ["a <canvas> — it can carry no caption or audio description", "<canvas></canvas>"],
+    ["a <marquee> — moving content is 2.2.2, not 1.2.x", "<marquee>Actu</marquee>"],
+  ] as const) {
+    it(`still closes the media criteria as NA with ${label}`, () => {
+      const r = audit(doc(markup));
+      for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).toBe("NA");
     });
   }
 

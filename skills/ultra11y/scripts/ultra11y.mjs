@@ -47435,8 +47435,19 @@ var SUBJECT_MATTER = {
   // Identify Input Purpose — about autocomplete on fields collecting user data.
   "1.3.5": hasFormControl
 };
+var MEDIA_HINT = /(youtube|youtu\.be|vimeo|dailymotion|soundcloud|spotify|twitch|wistia|brightcove|jwplayer|videopress|podcast|player|vid[eé]o|audio|baladodiffusion)/i;
+var MEDIA_EXT = /\.(mp4|webm|ogv|ogg|mov|m4v|avi|mpe?g|mp3|wav|flac|m4a|aac|opus|m3u8|mpd)(?:[?#]|$)/i;
 function hasMedia(d) {
-  return has(d, "audio", "video", "track", "source", "object", "embed", "iframe", "marquee", "canvas");
+  if (has(d, "audio", "video", "track", "source")) return true;
+  return d.elements.some((el) => {
+    if (el.tag === "object" || el.tag === "embed") {
+      const type = (el.attribs.type ?? "").toLowerCase();
+      return !type || type.startsWith("audio/") || type.startsWith("video/") || type.startsWith("application/") ? true : false;
+    }
+    if (el.tag !== "iframe") return false;
+    const hay = `${el.attribs.src ?? ""} ${el.attribs.title ?? ""} ${el.attribs.allow ?? ""}`;
+    return MEDIA_HINT.test(hay) || MEDIA_EXT.test(el.attribs.src ?? "");
+  });
 }
 function hasMotionApi(d) {
   return /\b(?:devicemotion|deviceorientation|DeviceMotionEvent|DeviceOrientationEvent|Accelerometer|Gyroscope|requestPermission)\b/i.test(d.source);
@@ -47480,7 +47491,7 @@ function residualReason(automatability2, sc) {
 function subjectMatterReason(sc, files) {
   const scope = `nothing in the ${files} file(s) audited is concerned`;
   if (sc.startsWith("1.2."))
-    return `No time-based media in scope: ${scope} \u2014 no <audio>, <video>, <track>, <object>, <embed>, <iframe> or <canvas> element was found.`;
+    return `No time-based media in scope: ${scope} \u2014 no <audio>, <video>, <track> or <source> element, no <object>/<embed>, and no <iframe> pointing at media.`;
   if (sc === "2.5.4") return `No motion actuation in scope: ${scope} \u2014 no device-motion or device-orientation API is used.`;
   if (sc === "1.3.5" || sc.startsWith("3.3.")) return `No user input in scope: ${scope} \u2014 no form control (native, ARIA or contenteditable) was found.`;
   return `No element in scope is concerned by this success criterion (${scope}).`;
