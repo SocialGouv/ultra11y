@@ -64,10 +64,96 @@ const APPLICABLE: Record<string, (d: Doc) => boolean> = {
   "3.1.1": (d) => isFullDocument(d), // Language of Page — html-lang-missing / lang-invalid
 };
 
+// ---- SUBJECT MATTER: what makes a NON-static criterion applicable at all -----------------
+//
+// A judgment or rendering criterion used to have exactly two outcomes: `NC` when a rule fired,
+// `manual` otherwise. So a repository containing no audio and no video still reported all five
+// time-based-media criteria as « to assess » — and under RGAA, whose theme 4 projects from
+// them, that is 13 criteria a reader has to work through to discover there was never anything
+// to look at. Measured on a real 300-file audit: 96 of 106 criteria « to assess », whole themes
+// among them applicable to nothing in scope.
+//
+// « Not applicable » is a real, normative verdict, and the engine can prove it for a criterion
+// whose SUBJECT MATTER is a thing you can look for in the source. So: no media element in the
+// whole scope ⇒ the media criteria are NA, with a justification naming the observation.
+//
+// Three rules keep this honest, because a wrong NA is far worse than an honest « to assess » —
+// it is a non-conformity hidden inside a report someone signs:
+//
+//   1. OVER-INCLUSION IS THE SAFE DIRECTION. A predicate answers "could this criterion
+//      possibly apply here?", so it must say YES on anything ambiguous. `<object>`/`<embed>`/
+//      `<iframe>` are usually not media, and they are all listed anyway: their presence merely
+//      keeps a criterion open, which costs nothing but a line in the worklist.
+//   2. APPLICABILITY IS OR-FOLDED ACROSS THE WHOLE SCOPE (see `foldDoc`). One document with a
+//      `<video>` keeps the media criteria open for the entire audit. NA means "nothing,
+//      anywhere in what was audited" — never "nothing in this file".
+//   3. THE VERDICT IS SCOPE-BOUND AND SAYS SO. The justification states what was searched and
+//      not found, so it is falsifiable by a reader. A scope that cannot see rendered output
+//      (an opaque component library) is already flagged on the audit itself, and `check`'s
+//      unjustified-NA gate still applies.
+const SUBJECT_MATTER: Record<string, (d: Doc) => boolean> = {
+  // ---- Time-based media (WCAG 1.2.x → RGAA theme 4) ----
+  // Captions, transcripts, audio description and sign language all presuppose a media element.
+  // `track` counts on its own: a stray <track> means media is being assembled somewhere.
+  "1.2.1": hasMedia,
+  "1.2.2": hasMedia,
+  "1.2.3": hasMedia,
+  "1.2.4": hasMedia,
+  "1.2.5": hasMedia,
+  // ---- Motion actuation (WCAG 2.5.4) ----
+  // Applicable only where device motion drives the interface, which is a source-visible API.
+  "2.5.4": hasMotionApi,
+  // ---- Forms (WCAG 3.3.x) ----
+  // Error identification, labels and instructions, error suggestion, error prevention,
+  // redundant entry and accessible authentication all presuppose user input. 3.3.4 and 3.3.8
+  // are narrower still (legal/financial transactions, authentication), so "any form control"
+  // is the deliberately over-inclusive predicate for them.
+  "3.3.1": hasFormControl,
+  "3.3.2": hasFormControl,
+  "3.3.3": hasFormControl,
+  "3.3.4": hasFormControl,
+  "3.3.7": hasFormControl,
+  "3.3.8": hasFormControl,
+  // Identify Input Purpose — about autocomplete on fields collecting user data.
+  "1.3.5": hasFormControl,
+};
+
+/** Media, and everything that could be carrying media. Over-inclusive on purpose (rule 1). */
+function hasMedia(d: Doc): boolean {
+  return has(d, "audio", "video", "track", "source", "object", "embed", "iframe", "marquee", "canvas");
+}
+
+/** Device-motion input: the only thing WCAG 2.5.4 is about. */
+function hasMotionApi(d: Doc): boolean {
+  return /\b(?:devicemotion|deviceorientation|DeviceMotionEvent|DeviceOrientationEvent|Accelerometer|Gyroscope|requestPermission)\b/i.test(d.source);
+}
+
+/** Any control that takes user input, native or delegated. Over-inclusive on purpose. */
+function hasFormControl(d: Doc): boolean {
+  if (has(d, "input", "select", "textarea", "form", "fieldset", "output", "datalist")) return true;
+  // A custom widget standing in for a field, and a submit control that implies one.
+  return d.elements.some((e) => {
+    const role = (e.attribs.role ?? "").toLowerCase();
+    if (role && /^(textbox|combobox|listbox|checkbox|radio|radiogroup|slider|spinbutton|searchbox|switch|form)$/.test(role)) return true;
+    return e.attribs.contenteditable !== undefined;
+  });
+}
+
 function residualReason(automatability: string): string {
   return automatability === "needs-rendering"
     ? "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`."
     : "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).";
+}
+
+/** Why a non-static criterion is NA — the observation, so a reader can falsify it. Scope-bound
+ *  by construction (`n` files audited), which is exactly the claim being made. */
+function subjectMatterReason(sc: string, files: number): string {
+  const scope = `nothing in the ${files} file(s) audited is concerned`;
+  if (sc.startsWith("1.2."))
+    return `No time-based media in scope: ${scope} — no <audio>, <video>, <track>, <object>, <embed>, <iframe> or <canvas> element was found.`;
+  if (sc === "2.5.4") return `No motion actuation in scope: ${scope} — no device-motion or device-orientation API is used.`;
+  if (sc === "1.3.5" || sc.startsWith("3.3.")) return `No user input in scope: ${scope} — no form control (native, ARIA or contenteditable) was found.`;
+  return `No element in scope is concerned by this success criterion (${scope}).`;
 }
 
 // Streaming accumulator: parse → run rules → fold → DISCARD each Doc, so the
@@ -93,6 +179,13 @@ interface Accum {
 const STATIC_PREDS: ReadonlyArray<readonly [string, (d: Doc) => boolean]> = allSC()
   .filter((c) => c.automatability === "static")
   .map((c) => [c.sc, APPLICABLE[c.sc] ?? isFullDocument] as const);
+
+// The same fold, for the non-static criteria whose subject matter is source-visible. Kept as a
+// separate list so the `static` contract above ("clean ⇒ C") is untouched: a criterion here can
+// only ever gain `NA`, never `C`.
+const SUBJECT_PREDS: ReadonlyArray<readonly [string, (d: Doc) => boolean]> = allSC()
+  .filter((c) => c.automatability !== "static" && SUBJECT_MATTER[c.sc] !== undefined)
+  .map((c) => [c.sc, SUBJECT_MATTER[c.sc]!] as const);
 
 function newAccum(): Accum {
   return {
@@ -166,6 +259,11 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
   for (const [id, pred] of STATIC_PREDS) {
     if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
   }
+  // OR-folded across the whole scope: one document carrying the subject matter keeps the
+  // criterion open for the entire audit (see SUBJECT_MATTER, rule 2).
+  for (const [id, pred] of SUBJECT_PREDS) {
+    if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
+  }
   if (doc.opaqueComponents?.length) {
     for (const lib of doc.opaqueComponents) acc.opaqueLibs.add(lib);
     acc.opaqueFiles++;
@@ -215,6 +313,12 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
     } else if (normativeFs.length > 0) {
       // a rule on a needs-rendering / judgment SC raised a DEFINITE failure
       status = "NC";
+    } else if (SUBJECT_MATTER[c.sc] !== undefined && !(acc.applicable.get(c.sc) ?? false)) {
+      // The criterion's SUBJECT MATTER is absent from the entire scope, so there is nothing to
+      // judge and nothing to render — « not applicable » is the accurate verdict, not « to
+      // assess ». Never a `C`: this says the criterion does not apply, never that it is met.
+      status = "NA";
+      justification = subjectMatterReason(c.sc, acc.fileCount);
     } else {
       // engine can't decide — leave it for the agent to adjudicate (`verify --manual`,
       // gated) or the `scan` tier (rendering criteria); never a silent conforming.

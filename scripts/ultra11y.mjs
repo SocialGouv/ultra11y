@@ -47390,10 +47390,59 @@ var APPLICABLE = {
   "3.1.1": (d) => isFullDocument(d)
   // Language of Page — html-lang-missing / lang-invalid
 };
+var SUBJECT_MATTER = {
+  // ---- Time-based media (WCAG 1.2.x → RGAA theme 4) ----
+  // Captions, transcripts, audio description and sign language all presuppose a media element.
+  // `track` counts on its own: a stray <track> means media is being assembled somewhere.
+  "1.2.1": hasMedia,
+  "1.2.2": hasMedia,
+  "1.2.3": hasMedia,
+  "1.2.4": hasMedia,
+  "1.2.5": hasMedia,
+  // ---- Motion actuation (WCAG 2.5.4) ----
+  // Applicable only where device motion drives the interface, which is a source-visible API.
+  "2.5.4": hasMotionApi,
+  // ---- Forms (WCAG 3.3.x) ----
+  // Error identification, labels and instructions, error suggestion, error prevention,
+  // redundant entry and accessible authentication all presuppose user input. 3.3.4 and 3.3.8
+  // are narrower still (legal/financial transactions, authentication), so "any form control"
+  // is the deliberately over-inclusive predicate for them.
+  "3.3.1": hasFormControl,
+  "3.3.2": hasFormControl,
+  "3.3.3": hasFormControl,
+  "3.3.4": hasFormControl,
+  "3.3.7": hasFormControl,
+  "3.3.8": hasFormControl,
+  // Identify Input Purpose — about autocomplete on fields collecting user data.
+  "1.3.5": hasFormControl
+};
+function hasMedia(d) {
+  return has(d, "audio", "video", "track", "source", "object", "embed", "iframe", "marquee", "canvas");
+}
+function hasMotionApi(d) {
+  return /\b(?:devicemotion|deviceorientation|DeviceMotionEvent|DeviceOrientationEvent|Accelerometer|Gyroscope|requestPermission)\b/i.test(d.source);
+}
+function hasFormControl(d) {
+  if (has(d, "input", "select", "textarea", "form", "fieldset", "output", "datalist")) return true;
+  return d.elements.some((e) => {
+    const role = (e.attribs.role ?? "").toLowerCase();
+    if (role && /^(textbox|combobox|listbox|checkbox|radio|radiogroup|slider|spinbutton|searchbox|switch|form)$/.test(role)) return true;
+    return e.attribs.contenteditable !== void 0;
+  });
+}
 function residualReason(automatability2) {
   return automatability2 === "needs-rendering" ? "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) \u2014 decide via `scan`." : "Judgement criterion \u2014 adjudicated by the agent from source/context (`verify --manual`, gated).";
 }
+function subjectMatterReason(sc, files) {
+  const scope = `nothing in the ${files} file(s) audited is concerned`;
+  if (sc.startsWith("1.2."))
+    return `No time-based media in scope: ${scope} \u2014 no <audio>, <video>, <track>, <object>, <embed>, <iframe> or <canvas> element was found.`;
+  if (sc === "2.5.4") return `No motion actuation in scope: ${scope} \u2014 no device-motion or device-orientation API is used.`;
+  if (sc === "1.3.5" || sc.startsWith("3.3.")) return `No user input in scope: ${scope} \u2014 no form control (native, ARIA or contenteditable) was found.`;
+  return `No element in scope is concerned by this success criterion (${scope}).`;
+}
 var STATIC_PREDS = allSC().filter((c2) => c2.automatability === "static").map((c2) => [c2.sc, APPLICABLE[c2.sc] ?? isFullDocument]);
+var SUBJECT_PREDS = allSC().filter((c2) => c2.automatability !== "static" && SUBJECT_MATTER[c2.sc] !== void 0).map((c2) => [c2.sc, SUBJECT_MATTER[c2.sc]]);
 function newAccum() {
   return {
     byCriterion: /* @__PURE__ */ new Map(),
@@ -47439,6 +47488,9 @@ function foldDoc(acc, doc, graph) {
   for (const [id, pred] of STATIC_PREDS) {
     if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
   }
+  for (const [id, pred] of SUBJECT_PREDS) {
+    if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
+  }
   if (doc.opaqueComponents?.length) {
     for (const lib of doc.opaqueComponents) acc.opaqueLibs.add(lib);
     acc.opaqueFiles++;
@@ -47475,6 +47527,9 @@ function finalize(acc, inputs, extra = {}) {
       }
     } else if (normativeFs.length > 0) {
       status = "NC";
+    } else if (SUBJECT_MATTER[c2.sc] !== void 0 && !(acc.applicable.get(c2.sc) ?? false)) {
+      status = "NA";
+      justification = subjectMatterReason(c2.sc, acc.fileCount);
     } else {
       status = "manual";
       residualRisks.push({ criteriaId: c2.sc, reason: residualReason(c2.automatability), automatability: c2.automatability });
