@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.3.3](https://github.com/maxgfr/ultra11y/compare/v5.3.2...v5.3.3) (2026-08-17)
+
+
+### Bug Fixes
+
+* **ci:** score a page in counts, not in a percentage that reads as a grade ([98f8e56](https://github.com/maxgfr/ultra11y/commit/98f8e566791075b06e8f4d6104d06a44beffd8df))
+
 ## [5.3.2](https://github.com/maxgfr/ultra11y/compare/v5.3.1...v5.3.2) (2026-08-17)
 
 
