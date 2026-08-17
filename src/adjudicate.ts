@@ -909,11 +909,18 @@ function plainTest(s: string): string {
   return s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
 }
 
-export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en", standard: StandardId = CORE): string {
+/** `preamble: false` renders the criterion sections ALONE.
+ *
+ *  The preamble names the file to write into and the command to fold with, which is right for
+ *  the one combined document and wrong for a per-criterion brief: repeated 96 times it is 96
+ *  copies of instructions that contradict a CI adjudicator's toolset (it has no shell) and
+ *  point at the wrong file. The briefs carry evidence and protocol; the instructions live once,
+ *  in the worklist's `contract` field and the dispatch contract. */
+export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en", standard: StandardId = CORE, opts: { preamble?: boolean } = {}): string {
   const s = T[lang];
   const pack = isCore(standard) ? undefined : loadPack(standard);
-  const out: string[] = [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
-  if (pack) out.push(`> ${s.packIntro(pack.name)}`, "");
+  const out: string[] = opts.preamble === false ? [] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
+  if (pack && opts.preamble !== false) out.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
     out.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` — ${it.title}` : ""}  _(${it.automatability})_`);
     out.push("", `> ${s.evidence} (${it.evidence.length}${it.evidenceTruncated ? ` / ${it.evidenceTruncated.total}` : ""}):`, "");
@@ -970,6 +977,10 @@ export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en",
 export interface WriteAdjudicationResult {
   todoPath: string;
   mdPath: string;
+  /** The verdicts-only file, for an adjudicator that cannot edit half a megabyte of JSON. */
+  verdictsPath: string;
+  /** One small Markdown brief per criterion, for one that cannot read it either. */
+  itemsDir: string;
   count: number;
 }
 
@@ -992,5 +1003,60 @@ export function writeAdjudication(
   };
   writeFileSync(todoPath, JSON.stringify(file, null, 2) + "\n");
   writeFileSync(mdPath, formatAdjudication(items, opts.lang ?? "en", opts.standard));
-  return { todoPath, mdPath, count: items.length };
+
+  // THE SPLIT SURFACE, for an adjudicator that cannot shell out.
+  //
+  // The two documents above are sized for a session with a shell: 96 RGAA criteria carrying
+  // 30 evidence anchors each come to ~540 KB of JSON and ~470 KB of Markdown, and the runbook
+  // tells the reader to edit the JSON in place and then run the engine to fold it. That is
+  // fine locally. In CI the adjudicator is handed Read/Grep/Glob/Edit/Write and nothing else,
+  // and against those tools the same instructions are impossible: reading either document
+  // swamps the context, editing 96 verdicts inside half a megabyte of JSON is 96 exact-match
+  // edits, and every prescribed `node …` command is denied. Measured on a real run: 17
+  // permission denials, 75 of 424 turns used, and a todo file that came back untouched — so
+  // the fail-closed fold correctly discarded all 96 and every criterion stayed "to assess".
+  //
+  // So the same worklist is also written as one small file to WRITE and one small file per
+  // criterion to READ. Additive on purpose: the two documents above keep their exact shape and
+  // every existing caller, gate and test is untouched.
+  const verdictsPath = join(outDir, "ADJUDICATE.verdicts.json");
+  writeFileSync(verdictsPath, JSON.stringify({ ...file, items: slimAdjudicationItems(items) }, null, 2) + "\n");
+  const itemsDir = join(outDir, "adjudicate");
+  mkdirSync(itemsDir, { recursive: true });
+  for (const it of items) {
+    writeFileSync(join(itemsDir, `${it.criteriaId}.md`), formatAdjudication([it], opts.lang ?? "en", opts.standard, { preamble: false }));
+  }
+  return { todoPath, mdPath, verdictsPath, itemsDir, count: items.length };
+}
+
+/** The worklist with the evidence stripped: what an adjudicator has to WRITE, without the
+ *  bulk it only has to READ. Every field the fold requires — verdict, justification, reason,
+ *  findings, citations, recommendations — is kept, so a filled slim file carries a complete
+ *  decision. The evidence comes back at fold time via `hydrateAdjudication`. */
+export function slimAdjudicationItems(items: AdjudicationItem[]): AdjudicationItem[] {
+  return items.map((it) => {
+    const { evidence: _evidence, evidenceTruncated: _truncated, ...rest } = it;
+    return { ...rest, evidence: [] } as AdjudicationItem;
+  });
+}
+
+/** Put the evidence back on a slim adjudication, re-derived from the audit it was built from.
+ *
+ *  Safe because the worklist is a pure function of the audit: same audit, same harvesters, same
+ *  anchors. This is what lets `verify --apply` accept a verdicts-only file WITHOUT relaxing a
+ *  single check — the citation gate still matches each cited anchor against this criterion's
+ *  own harvested evidence, exactly as it does for an inline worklist.
+ *
+ *  An item the re-derivation does not know is left alone: it is a surplus verdict, and the
+ *  coverage check in `applyAdjudication` is what must reject it. */
+export function hydrateAdjudication(adj: AdjudicationFile, audit: AuditResult, opts: { cwd?: string } = {}): void {
+  const needs = adj.items.filter((it) => !it.evidence || it.evidence.length === 0);
+  if (!needs.length) return;
+  const derived = new Map(buildAdjudicationWorklist(audit, { ...opts, standard: adj.standard }).map((it) => [it.criteriaId, it]));
+  for (const it of needs) {
+    const full = derived.get(it.criteriaId);
+    if (!full) continue;
+    it.evidence = full.evidence;
+    if (full.evidenceTruncated) it.evidenceTruncated = full.evidenceTruncated;
+  }
 }

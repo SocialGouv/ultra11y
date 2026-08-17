@@ -263,11 +263,32 @@ describe("the adjudication tier", () => {
     expect(agent?.uses).not.toContain("${{");
   });
 
-  it("keeps the agent read-only over the source and pointed at the emitted runbook", () => {
+  // The prompt has to match the TOOLSET the same step grants, and it did not. It sent the agent
+  // to the emitted RUNBOOK, which tells the reader to edit `ADJUDICATE.todo.json` in place and
+  // then run `node …/ultra11y.mjs verify --apply`. On a real run that is 540 KB of JSON to edit
+  // with no shell to script it: 17 permission denials, the file untouched, and the fail-closed
+  // fold correctly discarding all 96 verdicts. So the CI contract is now its own.
+  it("points the agent at the small files, and at nothing it cannot do", () => {
     const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
-    expect(agent?.with?.prompt).toContain("RUNBOOK.md");
-    expect(agent?.with?.prompt).toContain("ADJUDICATE.todo.json");
-    expect(agent?.with?.prompt).toMatch(/do not commit/i);
+    const prompt = agent?.with?.prompt ?? "";
+    // The one file it writes, and the per-criterion briefs it reads.
+    expect(prompt).toContain("ADJUDICATE.verdicts.json");
+    expect(prompt).toContain("audits/adjudicate/");
+    // The dispatch contract still governs the verdicts themselves.
+    expect(prompt).toContain("adjudicator.md");
+    // It must be told to IGNORE the runbook's commands, since it has no shell and this
+    // workflow folds for it. A prompt that merely omits them leaves the runbook free to
+    // reintroduce them — the agent reads the contract file too.
+    expect(prompt).toMatch(/no shell/i);
+    expect(prompt).toMatch(/Ignore any instruction[\s\S]*to run a command/i);
+    expect(prompt).toMatch(/do not commit/i);
+  });
+
+  // The agent's allowlist and the file it is asked to fill have to stay consistent: the fold
+  // reads the verdicts file, so that is the file the prompt must name.
+  it("folds the same file the agent was told to write", () => {
+    const fold = adjudicationSteps().find((s) => typeof s.run === "string" && s.run.includes("verify --apply"));
+    expect(fold?.run).toContain("audits/ADJUDICATE.verdicts.json");
   });
 
   // The two modes do not take the same credential, and conflating them produces the worst

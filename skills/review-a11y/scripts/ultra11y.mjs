@@ -56773,11 +56773,11 @@ function packGuidanceBlock(standard, criterionId, lang) {
 function plainTest(s) {
   return s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
 }
-function formatAdjudication(items, lang = "en", standard = CORE2) {
+function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   const s = T2[lang];
   const pack = isCore(standard) ? void 0 : loadPack(standard);
-  const out2 = [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
-  if (pack) out2.push(`> ${s.packIntro(pack.name)}`, "");
+  const out2 = opts.preamble === false ? [] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
+  if (pack && opts.preamble !== false) out2.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
     out2.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` \u2014 ${it.title}` : ""}  _(${it.automatability})_`);
     out2.push("", `> ${s.evidence} (${it.evidence.length}${it.evidenceTruncated ? ` / ${it.evidenceTruncated.total}` : ""}):`, "");
@@ -56838,7 +56838,31 @@ function writeAdjudication(items, outDir, opts) {
   };
   writeFileSync10(todoPath, JSON.stringify(file, null, 2) + "\n");
   writeFileSync10(mdPath, formatAdjudication(items, opts.lang ?? "en", opts.standard));
-  return { todoPath, mdPath, count: items.length };
+  const verdictsPath = join35(outDir, "ADJUDICATE.verdicts.json");
+  writeFileSync10(verdictsPath, JSON.stringify({ ...file, items: slimAdjudicationItems(items) }, null, 2) + "\n");
+  const itemsDir = join35(outDir, "adjudicate");
+  mkdirSync9(itemsDir, { recursive: true });
+  for (const it of items) {
+    writeFileSync10(join35(itemsDir, `${it.criteriaId}.md`), formatAdjudication([it], opts.lang ?? "en", opts.standard, { preamble: false }));
+  }
+  return { todoPath, mdPath, verdictsPath, itemsDir, count: items.length };
+}
+function slimAdjudicationItems(items) {
+  return items.map((it) => {
+    const { evidence: _evidence, evidenceTruncated: _truncated, ...rest } = it;
+    return { ...rest, evidence: [] };
+  });
+}
+function hydrateAdjudication(adj, audit2, opts = {}) {
+  const needs = adj.items.filter((it) => !it.evidence || it.evidence.length === 0);
+  if (!needs.length) return;
+  const derived = new Map(buildAdjudicationWorklist(audit2, { ...opts, standard: adj.standard }).map((it) => [it.criteriaId, it]));
+  for (const it of needs) {
+    const full = derived.get(it.criteriaId);
+    if (!full) continue;
+    it.evidence = full.evidence;
+    if (full.evidenceTruncated) it.evidenceTruncated = full.evidenceTruncated;
+  }
 }
 
 // src/llm.ts
@@ -66559,6 +66583,7 @@ function applyAdjudicationFile(p, adj, lang) {
     console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
     return 2;
   }
+  hydrateAdjudication(adj, audit2, { cwd: typeof p.flags.cwd === "string" ? p.flags.cwd : void 0 });
   const r = applyAdjudication(audit2, adj);
   if (!r.ok) {
     if (p.flags.json) console.log(JSON.stringify(r, null, 2));

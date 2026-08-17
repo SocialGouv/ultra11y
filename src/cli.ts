@@ -42,7 +42,14 @@ import { runCriteria, renderCriteriaReference } from "./criteria.js";
 import { checkReport, checkSemantic } from "./check.js";
 import { buildWorklist, writeWorklist, applyVerdicts, VERIFY_MAX, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
-import { buildAdjudicationWorklist, formatAdjudication, writeAdjudication, applyAdjudication, type AdjudicationFile } from "./adjudicate.js";
+import {
+  buildAdjudicationWorklist,
+  formatAdjudication,
+  writeAdjudication,
+  applyAdjudication,
+  hydrateAdjudication,
+  type AdjudicationFile,
+} from "./adjudicate.js";
 import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable } from "./scan-local.js";
@@ -2637,6 +2644,11 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
     console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
     return 2;
   }
+  // A verdicts-only file (`ADJUDICATE.verdicts.json`) carries decisions without the evidence
+  // they were made against. Put it back from the audit before folding: the worklist is a pure
+  // function of the audit, so this reconstructs the very anchors the citation gate checks
+  // against — the fold below is the same fold, with the same refusals.
+  hydrateAdjudication(adj, audit, { cwd: typeof p.flags.cwd === "string" ? (p.flags.cwd as string) : undefined });
   const r = applyAdjudication(audit, adj);
   if (!r.ok) {
     if (p.flags.json) console.log(JSON.stringify(r, null, 2));

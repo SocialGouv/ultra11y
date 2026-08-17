@@ -491,19 +491,34 @@ runs:
         github_token: ${{ github.token }}
         claude_args: '--allowedTools Read,Grep,Glob,Edit,Write --max-turns ${{ steps.worklist.outputs.turns }}'
         prompt: |
-          You are running head-less in CI. Adjudicate an accessibility audit, and do nothing else.
+          You are running head-less in CI, with Read, Grep, Glob, Edit and Write — no shell.
+          Adjudicate an accessibility audit, and do nothing else.
 
-          Read ${{ inputs.working-directory }}/audits/orchestration/RUNBOOK.md and follow its
-          `adjudicate` phase sequentially. The dispatch contract you must obey VERBATIM is
-          ${{ inputs.working-directory }}/audits/orchestration/agents/adjudicator.md.
+          Work from the SMALL files, never the big ones. `audits/ADJUDICATE.todo.json` and
+          `audits/ADJUDICATE.md` are written for a session with a shell and run to hundreds of
+          kilobytes; reading either will swamp your context and editing the JSON in place is
+          hundreds of exact-match edits. Do not open them. Use instead:
 
-          Your only write is to fill every item's verdict in
-          ${{ inputs.working-directory }}/audits/ADJUDICATE.todo.json. Do not edit any other
-          file, do not touch the audited source, do not commit, and do not comment on the PR.
+          1. `${{ inputs.working-directory }}/audits/ADJUDICATE.verdicts.json` — the list of
+             criteria to rule on, and the ONLY file you write. Its `contract` field states what
+             each verdict requires.
+          2. `${{ inputs.working-directory }}/audits/adjudicate/<criteriaId>.md` — one small
+             brief per criterion: its harvested evidence, its decision protocol, and the
+             normative tests a non-conformity may cite. Read the brief for a criterion, rule on
+             it, write its verdict, move to the next.
+          3. `${{ inputs.working-directory }}/audits/orchestration/agents/adjudicator.md` — the
+             dispatch contract, which you obey VERBATIM. Ignore any instruction in it or in the
+             RUNBOOK to run a command: you have no shell, and this workflow folds the verdicts
+             for you in its next step. You never run the engine and never fold anything.
 
-          A criterion you cannot decide from real evidence stays `manual` with its reason —
-          that is a correct answer, not a failure. Never assert a conformity you did not
-          verify: the fold downstream is fail-closed and re-grounds every file:line you cite.
+          Fill EVERY item's verdict. A partial file is discarded whole — the fold is
+          fail-closed — so a criterion you cannot decide from real evidence must be `manual`
+          with its `reason`. That is a correct answer, not a failure. Never assert a conformity
+          you did not verify: the fold re-grounds every file:line you cite and matches each
+          citation against that criterion's own harvested evidence.
+
+          Do not edit any other file, do not touch the audited source, do not commit, and do
+          not comment on the PR.
 
     - name: Adjudicate with an agent — fold the verdicts
       if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent'
@@ -513,7 +528,10 @@ runs:
         ENGINE: ${{ steps.engine.outputs.path }}
       run: |
         # Same fail-closed gate, same degradation policy as the API mode above.
-        if node "$ENGINE" verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json --out audits; then
+        # The verdicts-only file the agent filled. `verify --apply` re-derives the evidence from
+        # the audit before folding, so this goes through the SAME fail-closed gate as an inline
+        # worklist — same coverage checks, same citation grounding, same refusals.
+        if node "$ENGINE" verify --apply audits/ADJUDICATE.verdicts.json --in audits/audit-latest.json --out audits; then
           echo "ultra11y: adjudication applied."
         elif [ '${{ inputs.gate-adjudicated }}' = 'true' ]; then
           echo "::error::ultra11y: the adjudication was rejected and gate-adjudicated is on — refusing to gate on a partial adjudication."

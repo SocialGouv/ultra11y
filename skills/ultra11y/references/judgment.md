@@ -71,6 +71,31 @@ test).
    the **produced** HTML (see `render` / audit the build), otherwise the verdict is a false
    negative.
 
+## When the adjudicator has no shell (CI)
+
+`verify --manual` writes the worklist **twice**, plus one brief per criterion:
+
+| file | for |
+|---|---|
+| `ADJUDICATE.todo.json` · `ADJUDICATE.md` | a session **with a shell**: evidence inline, edit in place, fold yourself |
+| `ADJUDICATE.verdicts.json` | the **only file to write** when you have no shell — verdicts, no evidence |
+| `adjudicate/<criteriaId>.md` | one small brief per criterion: its evidence, its protocol, its citable tests |
+
+Why the split exists, measured rather than assumed: under RGAA the worklist is 96 criteria
+carrying 1590 harvested anchors — **536 KB** of JSON and **466 KB** of Markdown. An agent given
+`Read/Grep/Glob/Edit/Write` cannot work with that: reading either document swamps its context,
+and filling 96 verdicts inside half a megabyte is 96 exact-match edits. A real CI run spent 75
+of 424 turns, hit 17 permission denials trying to run the commands the runbook prescribes, and
+returned the file untouched — so the fail-closed fold discarded all 96 verdicts and every
+criterion stayed « to assess », in a job that reported success. The verdicts file is **37 KB**
+for the same worklist, and each brief is a few KB.
+
+`verify --apply` accepts either file. Given the verdicts-only one it **re-derives the evidence
+from the audit** (the worklist is a pure function of the audit) and then runs the identical
+fold: same coverage checks in both directions, same citation matching against *that criterion's*
+own anchors, same refusals. The smaller surface buys nothing from the gate — a `C` that cites
+an anchor it was never shown is refused exactly as before.
+
 ## Adversarial verification of the non-conformities — `verify --report`
 
 Unchanged: `node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md` writes `VERIFY.md`
