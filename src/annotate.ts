@@ -132,7 +132,7 @@ const S = {
     noPages:
       "Aucune page dans le périmètre de ce run : le balayage n'a produit aucun instantané. Ce n'est pas un bilan vide, c'est un bilan absent — les critères au rendu restent à évaluer.",
     pagesDetailNote:
-      "Un bloc par page portant au moins une non-conformité, et seulement ses critères **non conformes** — la grille complète (les 106 critères de chaque page, avec leurs tests et leurs captures) vit dans l'artefact.",
+      "Un bloc par page portant au moins une non-conformité, et seulement ses critères **non conformes** — la grille complète (tous les critères de chaque page, avec leurs tests et leurs captures) vit dans l'artefact.",
     pagesClamped: (n: number) =>
       `_Le détail de ${n} page(s) a été retiré de ce commentaire pour tenir dans la limite de GitHub — l'artefact les porte toutes._`,
     scoreboardClamped: (n: number) => `_${n} page(s) retirée(s) du tableau pour tenir dans la limite de GitHub — l'artefact les porte toutes._`,

@@ -60063,7 +60063,7 @@ var S = {
     pagesCount: (n) => `${n} page(s)`,
     testsCol: "Tests",
     noPages: "Aucune page dans le p\xE9rim\xE8tre de ce run : le balayage n'a produit aucun instantan\xE9. Ce n'est pas un bilan vide, c'est un bilan absent \u2014 les crit\xE8res au rendu restent \xE0 \xE9valuer.",
-    pagesDetailNote: "Un bloc par page portant au moins une non-conformit\xE9, et seulement ses crit\xE8res **non conformes** \u2014 la grille compl\xE8te (les 106 crit\xE8res de chaque page, avec leurs tests et leurs captures) vit dans l'artefact.",
+    pagesDetailNote: "Un bloc par page portant au moins une non-conformit\xE9, et seulement ses crit\xE8res **non conformes** \u2014 la grille compl\xE8te (tous les crit\xE8res de chaque page, avec leurs tests et leurs captures) vit dans l'artefact.",
     pagesClamped: (n) => `_Le d\xE9tail de ${n} page(s) a \xE9t\xE9 retir\xE9 de ce commentaire pour tenir dans la limite de GitHub \u2014 l'artefact les porte toutes._`,
     scoreboardClamped: (n) => `_${n} page(s) retir\xE9e(s) du tableau pour tenir dans la limite de GitHub \u2014 l'artefact les porte toutes._`,
     noCriterionForFindings: (n) => `${n} constat(s) sur cette page ne rendent aucun crit\xE8re du r\xE9f\xE9rentiel non conforme : leur r\xE8gle sort du p\xE9rim\xE8tre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont d\xE9taill\xE9s dans l'artefact.`
