@@ -113,6 +113,30 @@ describe("the page-by-page comment", () => {
     expect(summaries).toBe(1);
   });
 
+  it("counts a page's rate in the ACTIVE standard, not in WCAG's", () => {
+    // Shipped and caught on a real PR: the scoreboard read « 50 % (4/55) » — WCAG's 55 — while
+    // the detail block under it tallied the same page over RGAA's 106, and the headline above
+    // said (9/106). `PageResult.conformancePct` is always WCAG-keyed; the row has to come from
+    // the pack's own projection, like the artifact's per-page sheet does.
+    const md = pagesComment(audit(), { standard: "rgaa", lang: "fr" });
+    expect(md).not.toMatch(/\(\d+\/55\)/);
+    // 106 is RGAA's criterion count — the same denominator the sheet and the headline use.
+    expect(md).toMatch(/\(\d+\/106\)/);
+  });
+
+  it("agrees with its own detail block on how many criteria were decided", () => {
+    // ONE page, so the scoreboard row and the detail block below it describe the same thing —
+    // the scoreboard is in scope order while the blocks are sorted worst-first.
+    const only: PageScope[] = [{ id: "contact", name: "Contact", url: "https://x/contact", sources: ["app/contact/page.tsx"], basis: "snapshot" }];
+    const md = pagesComment(audit({ scope: { inputs: [], files: 1, pages: only } } as Partial<AuditResult>), { standard: "rgaa", lang: "fr" });
+    // Scoreboard cell: `X % (decided/total)`. Tally line: `c conforme(s) · nc non conforme(s)`.
+    const cell = /\((\d+)\/(\d+)\)/.exec(md.slice(md.indexOf("| Page |")));
+    const tally = /(\d+) conforme\(s\) · (\d+) non conforme\(s\)/.exec(md);
+    expect(cell).not.toBeNull();
+    expect(tally).not.toBeNull();
+    expect(Number(cell?.[1])).toBe(Number(tally?.[1]) + Number(tally?.[2]));
+  });
+
   it("explains a count the criteria cannot account for, instead of an empty block", () => {
     // Under a pack, a finding whose rule sits outside every criterion's applicability is
     // counted in the severity columns and turns no criterion NC. Silence there leaves a

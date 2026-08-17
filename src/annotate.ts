@@ -36,7 +36,7 @@ import {
   renderRedirected,
   unattributedFindings,
 } from "./pages.js";
-import { pageCriterionRows, pageTally, pageTallyNote } from "./pages-report.js";
+import { pageCoverage, pageCriterionRows, pageRatePct, pageTally, pageTallyNote } from "./pages-report.js";
 
 export interface AnnotateOptions {
   standard?: StandardId;
@@ -384,18 +384,27 @@ export function perPageTable(result: AuditResult, standard: StandardId = CORE, l
   attributePages(result, scope);
   const derived = derivePages(result, scope);
   // The summary has a 1 MiB budget: it never clamps, and passes every page.
-  return [`### ${s.perPage}`, "", ...scoreboardTable(derived, s, lang), "", ...basisCaveats(result, derived, s, lang)].join("\n");
+  return [`### ${s.perPage}`, "", ...scoreboardTable(result, derived, standard, s, lang), "", ...basisCaveats(result, derived, s, lang)].join("\n");
 }
 
 /** The scoreboard's rows. Extracted so the job summary and the page-by-page pull-request
  *  comment draw ONE table from one projection — a second copy of this loop is a second chance
- *  to disagree about what a page's rate is. */
-function scoreboardTable(derived: PageResult[], s: (typeof S)[Lang], lang: Lang): string[] {
+ *  to disagree about what a page's rate is.
+ *
+ *  The rate comes from `pageCriterionRows`, in the ACTIVE standard's vocabulary — NOT from
+ *  `PageResult.conformancePct`, which is always WCAG-keyed. Under a pack the two count
+ *  different things, and the gap is visible in one glance: a page rendered « 50 % (4/55) »
+ *  here while its own sheet in the artifact counted those 4 against RGAA's 106, and the run
+ *  headline right above said `(9/106)`. One document, one standard, two denominators —
+ *  exactly the drift `formatRate` exists to prevent. */
+function scoreboardTable(result: AuditResult, derived: PageResult[], standard: StandardId, s: (typeof S)[Lang], lang: Lang): string[] {
   const out: string[] = [`| ${s.page} | ${s.basis} | ${s.pageRate} | 🔴 | 🟠 | 🟡 |`, "| --- | --- | ---: | ---: | ---: | ---: |"];
   for (const pg of derived) {
     const n = (sev: Severity): number => severityCount(pg, sev);
+    const rows = pageCriterionRows(result, pg, standard, lang);
+    const cov = pageCoverage(rows);
     out.push(
-      `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${formatRate(pg.conformancePct, pg.decided, pg.total)} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
+      `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
     );
   }
   return out;
@@ -520,7 +529,7 @@ export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runU
   // goes first because the scoreboard is the half that cannot be reconstructed from the
   // artifact link alone.
   const assemble = (nBlocks: number, nRows: number): string => {
-    const body: string[] = [...scoreboardTable(derived.slice(0, nRows), s, lang), ""];
+    const body: string[] = [...scoreboardTable(result, derived.slice(0, nRows), standard, s, lang), ""];
     if (nRows < derived.length) body.push(s.scoreboardClamped(derived.length - nRows), "");
     body.push(...basisCaveats(result, derived, s, lang));
     if (redirected.length) body.push(...renderRedirected(redirected, lang), "");

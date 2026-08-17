@@ -60223,14 +60223,16 @@ function perPageTable(result, standard = CORE2, lang = "en") {
   if (!scope.length) return "";
   attributePages(result, scope);
   const derived = derivePages(result, scope);
-  return [`### ${s.perPage}`, "", ...scoreboardTable(derived, s, lang), "", ...basisCaveats(result, derived, s, lang)].join("\n");
+  return [`### ${s.perPage}`, "", ...scoreboardTable(result, derived, standard, s, lang), "", ...basisCaveats(result, derived, s, lang)].join("\n");
 }
-function scoreboardTable(derived, s, lang) {
+function scoreboardTable(result, derived, standard, s, lang) {
   const out2 = [`| ${s.page} | ${s.basis} | ${s.pageRate} | \u{1F534} | \u{1F7E0} | \u{1F7E1} |`, "| --- | --- | ---: | ---: | ---: | ---: |"];
   for (const pg of derived) {
     const n = (sev) => severityCount(pg, sev);
+    const rows = pageCriterionRows(result, pg, standard, lang);
+    const cov = pageCoverage(rows);
     out2.push(
-      `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${formatRate(pg.conformancePct, pg.decided, pg.total)} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
+      `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
     );
   }
   return out2;
@@ -60304,7 +60306,7 @@ function pagesComment(result, opts = {}) {
     (a, b) => severityCount(b, "bloquant") - severityCount(a, "bloquant") || severityCount(b, "majeur") - severityCount(a, "majeur") || severityCount(b, "mineur") - severityCount(a, "mineur")
   ).map((p) => pageBlock(result, p, standard, lang)).filter((b) => b !== void 0);
   const assemble = (nBlocks2, nRows2) => {
-    const body3 = [...scoreboardTable(derived.slice(0, nRows2), s, lang), ""];
+    const body3 = [...scoreboardTable(result, derived.slice(0, nRows2), standard, s, lang), ""];
     if (nRows2 < derived.length) body3.push(s.scoreboardClamped(derived.length - nRows2), "");
     body3.push(...basisCaveats(result, derived, s, lang));
     if (redirected.length) body3.push(...renderRedirected(redirected, lang), "");
