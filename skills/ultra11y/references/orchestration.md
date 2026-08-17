@@ -20,6 +20,22 @@ node scripts/ultra11y.mjs orchestrate --run <dir> [--phase adjudicate|verify-rep
 | Subagents but no Workflow tool | Same `orchestrate`; dispatch one subagent per batch following `<RUN>/orchestration/agents/<role>.md` (the workflow script lists the batches and their prompts). One writer: you fold the results in. |
 | Eco mode, or no subagents | `orchestrate --run <RUN> --eco` → follow `<RUN>/orchestration/RUNBOOK.md` sequentially, playing each role yourself. Correctness-identical; only wall-clock differs. |
 
+## The other dispatch: the review
+
+The judgment phases are not the only thing that leaves this skill. Once the audit has
+produced fixes, the **`review-a11y` skill** reviews the code under change — dispatched the
+same way, and read from the same table:
+
+| Your harness | How to run the review |
+|---|---|
+| Subagents (Workflow tool or not) | One subagent, one prompt: use the `review-a11y` skill on the change, return its report verbatim. |
+| No subagents | Invoke `review-a11y` directly, in this session. |
+
+It differs from a judgment batch in one way that matters: **the review is not a worklist**.
+Nothing is folded back, no gate re-reads it, and it writes nothing — so the one-writer rule
+below is satisfied trivially, and there is no `--apply` step to keep. What comes back is a
+report for a human.
+
 ## The rules that do not bend
 
 - **Subagents never write.** Every emitted contract ends with the one-writer rule, and the

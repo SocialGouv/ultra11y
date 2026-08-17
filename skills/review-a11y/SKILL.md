@@ -110,6 +110,14 @@ rendered DOM; residual risks listed above.
   and criterion-grounded.
 - Pre-existing issues spotted in passing go in ONE final line, out of the verdict.
 
+**Running as a subagent.** This skill is often dispatched rather than typed: by the plugin
+hook on a pending `git commit` / `git push` / `gh pr create`, or by the `ultra11y` skill once
+its audit has produced fixes. When it is, the report above **is** the return value — it
+becomes a tool result for the caller, not a message to a human. So return it whole and
+nothing else: no preamble, no "I ran the engine and found…", no offer to fix. A caller that
+receives a summary has to guess at the findings, which is the one thing this skill exists to
+stop. Everything in §4 stays opt-in and belongs to the caller, not to you.
+
 ## 4. After the review (opt-in)
 
 - **Safe mechanical fixes**: `fix --staged --write --safe` (auto-applies the safe codemods

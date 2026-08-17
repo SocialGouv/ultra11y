@@ -332,9 +332,41 @@ drive the judgment and content stages:
    ONE building block, in the language of this conversation (pass `--lang` explicitly —
    Core rule 5).
 
+6. **Hand the change over to `review-a11y`, in a subagent.** Once the deliverable is out,
+   the code you just fixed still has to be reviewed as a *change*, and that is the other
+   skill's job — see **Handing over to `review-a11y`** below.
+
 **Stop** when `check` and `verify --apply` are green again and only explicitly-named
 residual risks remain. (To automate the outer cadence, the harness `/loop` command can
 re-run this cycle.)
+
+## Handing over to `review-a11y`
+
+This skill does the analysis end to end: audit, render, adjudicate, fix, re-audit, deliver.
+When it has produced fixes, **dispatch `review-a11y` on the code under change as a subagent**,
+and report what it returns.
+
+```
+Agent(subagent_type: "general-purpose", prompt: "Use the review-a11y skill on the working diff. Return its report verbatim.")
+```
+
+Two skills, two scopes, and the split is not cosmetic:
+
+| | scope | asks |
+|---|---|---|
+| `ultra11y` (this one) | the repository, a page sample, a standard | *does this product conform, and where is the proof?* |
+| `review-a11y` | exactly the code under change (staged, diff, or branch vs merge-base) | *is this change safe to merge?* |
+
+**Why a subagent rather than an inline pass.** A full audit fills a context with a 3 MB
+engine's output, dozens of reference files and a page sample; a review has to read the diff
+closely with none of that in the way. Handing it over keeps the review's judgment
+independent of the audit that just ran — the same reason `verify` refutes findings instead
+of trusting them. If the harness has no subagent tool, invoke `review-a11y` directly: the
+routing table in `references/orchestration.md` names the fallbacks, and the review is
+identical either way.
+
+**Do not paraphrase its verdict.** It returns a severity-ranked review with `file:line` and a
+one-line verdict; that is the deliverable, not a summary of it.
 
 ## Combining engine, judgment and residual risk
 

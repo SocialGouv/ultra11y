@@ -57,6 +57,26 @@ describe("the skills are installable", () => {
     expect(description).toMatch(/staged|diff|branch|change/i);
   });
 
+  // The two skills are one pipeline: the audit does the analysis, the review reads the change
+  // it produced. That handoff used to be DESCRIPTIVE only — each frontmatter pointed at the
+  // other and nothing ever dispatched — so an audit ended with a deliverable and the changed
+  // code was never reviewed as a change.
+  it("ultra11y dispatches review-a11y as a subagent once its analysis is done", () => {
+    expect(body).toMatch(/review-a11y/);
+    expect(body).toMatch(/subagent/i);
+    // Named tool, not a vague "hand it over": a step nobody can execute is a step nobody runs.
+    expect(body).toMatch(/Agent\(/);
+    // And the fallback, so a harness without subagents is not left stuck.
+    expect(body).toMatch(/no subagent/i);
+  });
+
+  it("review-a11y states what it must return when it IS the subagent", () => {
+    const b = skills["review-a11y"]!.body;
+    expect(b).toMatch(/subagent/i);
+    // Its report is the return value, so a summary would lose the findings.
+    expect(b).toMatch(/return value|returns? it whole|verbatim/i);
+  });
+
   it.each(SKILL_NAMES)("%s keeps version in lockstep with package.json and src/types.ts", (name) => {
     const data = parse(skills[name]!.frontmatter) as { metadata?: { version?: string } };
     expect(data.metadata?.version).toBe(pkg.version);
