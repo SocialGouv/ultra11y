@@ -437,6 +437,10 @@ Options:
   --apply            judge: fold the verdicts straight into the audit, through the SAME
                      fail-closed gate an agent's verdicts pass (no unjustified C/NA, no
                      ungroundable NC, no unadjudicated criterion)
+  --strict           verify --apply / judge --apply: all-or-nothing fold — one refused
+                     verdict discards the whole adjudication. The default folds PER
+                     VERDICT: a refusal costs its own criterion, which stays to assess
+                     carrying the refusal, and every verdict that proved itself lands
   --semantic         verify: fold the support-check into one pass
                      check: engage the semantic gate — requires an adjudicated verdicts
                      artifact (fails closed when absent) and re-grounds every passing
@@ -599,6 +603,9 @@ const BOOLEAN_FLAGS = new Set([
   "generate",
   "semantic",
   "manual",
+  // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
+  // verdict discards the whole adjudication. The default is per-verdict.
+  "strict",
   "no-technical",
   "override",
   "local",
@@ -2648,15 +2655,29 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
   // they were made against. Put it back from the audit before folding: the worklist is a pure
   // function of the audit, so this reconstructs the very anchors the citation gate checks
   // against — the fold below is the same fold, with the same refusals.
-  hydrateAdjudication(adj, audit, { cwd: typeof p.flags.cwd === "string" ? (p.flags.cwd as string) : undefined });
-  const r = applyAdjudication(audit, adj);
-  if (!r.ok) {
+  const cwd = typeof p.flags.cwd === "string" ? (p.flags.cwd as string) : undefined;
+  hydrateAdjudication(adj, audit, { cwd });
+  const strict = p.flags.strict === true;
+  const r = applyAdjudication(audit, adj, { cwd, strict });
+  // STRICT: one refusal discards the file, nothing is persisted — the historical contract.
+  // PARTIAL (default): the refusals are reported, the criteria they condemn stay to assess,
+  // and everything that proved itself is kept. Only a fold that landed NOTHING is an error;
+  // otherwise a single bad verdict would again cost the whole run.
+  if (!r.ok && (strict || r.applied + r.stillManual === 0)) {
     if (p.flags.json) console.log(JSON.stringify(r, null, 2));
     else {
       console.error(lang === "fr" ? `✗ Adjudication rejetée (${r.issues.length} problème(s)) :` : `✗ Adjudication rejected (${r.issues.length} issue(s)):`);
       for (const i of r.issues) console.error(`  ✗ ${i}`);
     }
     return 1;
+  }
+  if (r.rejected > 0 && !p.flags.json) {
+    console.error(
+      lang === "fr"
+        ? `⚠ ${r.rejected} critère(s) refusé(s) par la porte — ils restent à évaluer, avec le motif du refus :`
+        : `⚠ ${r.rejected} criterion(ia) refused by the gate — they stay to assess, carrying the refusal:`,
+    );
+    for (const i of r.issues) console.error(`  ✗ ${i}`);
   }
   // Persist the updated audit so report/prd re-render with the adjudicated statuses.
   const out = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
@@ -2675,6 +2696,9 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
           auditPath,
           applied: r.applied,
           stillManual: r.stillManual,
+          rejected: r.rejected,
+          rejectedCriteria: r.rejectedCriteria,
+          issues: r.issues,
           conformancePct: r.audit.conformancePct,
           findings: r.audit.findings.length,
           grounding: r.grounding,
@@ -2686,8 +2710,8 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
   else
     console.log(
       lang === "fr"
-        ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel → ${auditPath}`
-        : `✓ ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual → ${auditPath}`,
+        ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""} → ${auditPath}`
+        : `✓ ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""} → ${auditPath}`,
     );
   return 0;
 }
@@ -2811,20 +2835,31 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   // --apply runs the SAME gate an agent's verdicts go through. A truncated run cannot pass
   // its coverage check, which is the correct outcome, not a bug.
   const adj = JSON.parse(readText(w.todoPath)) as AdjudicationFile;
-  const r = applyAdjudication(audit, adj);
-  if (!r.ok) {
+  const r = applyAdjudication(audit, adj, { strict: p.flags.strict === true });
+  // Same policy as `verify --apply`: a batch the model got wrong costs its own criteria, not
+  // the whole paid run. Only a fold that landed nothing at all is an error.
+  if (!r.ok && (p.flags.strict === true || r.applied + r.stillManual === 0)) {
     console.error(lang === "fr" ? `✗ Adjudication rejetée (${r.issues.length} problème(s)) :` : `✗ Adjudication rejected (${r.issues.length} issue(s)):`);
     for (const i of r.issues.slice(0, 40)) console.error(`  ✗ ${i}`);
     if (r.issues.length > 40) console.error(`  … +${r.issues.length - 40}`);
     return 1;
+  }
+  if (r.rejected > 0) {
+    console.error(
+      lang === "fr"
+        ? `⚠ ${r.rejected} critère(s) refusé(s) par la porte — ils restent à évaluer, avec le motif du refus :`
+        : `⚠ ${r.rejected} criterion(ia) refused by the gate — they stay to assess, carrying the refusal:`,
+    );
+    for (const i of r.issues.slice(0, 40)) console.error(`  ✗ ${i}`);
+    if (r.issues.length > 40) console.error(`  … +${r.issues.length - 40}`);
   }
   mkdirSync(out, { recursive: true });
   const auditPath = join(out, "audit-latest.json");
   writeFileSync(auditPath, `${JSON.stringify(r.audit, null, 2)}\n`);
   console.log(
     lang === "fr"
-      ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel → ${auditPath}`
-      : `✓ ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual → ${auditPath}`,
+      ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""} → ${auditPath}`
+      : `✓ ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""} → ${auditPath}`,
   );
   return 0;
 }

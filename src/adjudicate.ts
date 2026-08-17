@@ -20,7 +20,7 @@ import { type Doc, type El, elementsByTag, attr, textContent, ancestors, snippet
 import { parseInlineStyle } from "./color.js";
 import { ADJUDICATION } from "./adjudication-data.js";
 import { scTitle, getSC, hasSC, techniquesFor, allSC, guidelineTitle } from "./wcag.js";
-import { groundItems, type GroundingSummary } from "./grounding.js";
+import { groundFinding, type GroundingSummary } from "./grounding.js";
 import {
   type StandardId,
   CORE,
@@ -413,6 +413,13 @@ export interface ApplyAdjudicationResult {
   issues: string[];
   applied: number;
   stillManual: number;
+  /** Criteria whose verdict was REFUSED by the gate and therefore not applied. They stay
+   *  « to assess », each carrying the refusal as its residual reason. Always 0 in strict mode,
+   *  where a single refusal discards the whole fold. */
+  rejected: number;
+  /** The ids behind `rejected`, in file order — so a caller can name them without re-parsing
+   *  `issues` (one criterion can raise several). */
+  rejectedCriteria: string[];
   grounding: GroundingSummary;
 }
 
@@ -504,11 +511,32 @@ function normativeRefResolves(ref: string | undefined, standard: StandardId, ite
   return itemCriterionId === undefined || critId === itemCriterionId;
 }
 
-/** Fold an adjudication file back into the audit. FAIL-CLOSED (see module header). Returns
- *  a NEW AuditResult with the decided statuses, agent findings, recomputed conformancePct,
- *  a shrunk residual set, and the `adjudicated` marker. */
-export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opts: { cwd?: string } = {}): ApplyAdjudicationResult {
+/** Fold an adjudication file back into the audit. Returns a NEW AuditResult with the decided
+ *  statuses, agent findings, recomputed conformancePct, a shrunk residual set, and the
+ *  `adjudicated` marker.
+ *
+ *  FAIL-CLOSED PER VERDICT, which is not the same thing as fail-closed per FILE. Every check
+ *  below is unchanged and no refused verdict is ever applied — but a refusal now costs its own
+ *  criterion and nothing else. The all-or-nothing fold was measured to be worse than useless:
+ *  a CI run that filled 95 of 96 verdicts correctly had all 96 discarded, so the audit paid a
+ *  full adjudication and published « to assess » across the board. Since the point of the gate
+ *  is to keep an unproven verdict out of the report — not to punish the ones that proved
+ *  themselves — a refused criterion simply stays « to assess », carrying the refusal as its
+ *  residual reason so the next run knows what to fix.
+ *
+ *  `strict: true` restores the old file-level behaviour for a caller that genuinely wants
+ *  all-or-nothing (a conformance deliverable signed off in one pass). */
+export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opts: { cwd?: string; strict?: boolean } = {}): ApplyAdjudicationResult {
   const issues: string[] = [];
+  // Per-criterion attribution. The gate used to collect one flat list, which is why it could
+  // only ever reject the whole file: an issue did not know which verdict it condemned.
+  const itemIssues = new Map<string, string[]>();
+  const blame = (criteriaId: string, issue: string) => {
+    issues.push(issue);
+    const list = itemIssues.get(criteriaId);
+    if (list) list.push(issue);
+    else itemIssues.set(criteriaId, [issue]);
+  };
   // Spelling first, decisions second: "na" is NA, and rejecting the run over the case of a
   // verdict taught the caller nothing about accessibility. Everything below stays fail-closed.
   canonicalizeAdjudication(adj);
@@ -523,12 +551,12 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
     for (const pc of derivePackResults(audit, adj.standard)) {
       if (pc.status !== "manual") continue;
       open.add(pc.id);
-      if (!byId.has(pc.id)) issues.push(`criterion ${pc.id}: missing from the adjudication (coverage gap)`);
+      if (!byId.has(pc.id)) blame(pc.id, `criterion ${pc.id}: missing from the adjudication (coverage gap)`);
     }
   } else {
     for (const r of audit.residualRisks) {
       open.add(r.criteriaId);
-      if (!byId.has(r.criteriaId)) issues.push(`criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+      if (!byId.has(r.criteriaId)) blame(r.criteriaId, `criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
     }
   }
 
@@ -539,18 +567,25 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
   // citation, no normativeRef. Adjudication may only ever decide what the engine left open.
   for (const it of adj.items) {
     if (!open.has(it.criteriaId)) {
-      issues.push(`criterion ${it.criteriaId}: not open for adjudication — the engine already decided it, or it is not part of ${adj.standard}`);
+      blame(it.criteriaId, `criterion ${it.criteriaId}: not open for adjudication — the engine already decided it, or it is not part of ${adj.standard}`);
     }
   }
 
-  // Per-item fail-closed validation.
-  const groundInputs: { file: string; line: number; selector?: string; snippet?: string }[] = [];
+  // Per-item fail-closed validation. Grounding inputs are collected PER ITEM (not into one
+  // flat list) for the same reason as `blame`: a failed citation has to condemn its own
+  // criterion and no other.
+  const groundInputs = new Map<string, { file: string; line: number; selector?: string; snippet?: string }[]>();
+  const toGround = (criteriaId: string, g: { file: string; line: number; selector?: string; snippet?: string }) => {
+    const list = groundInputs.get(criteriaId);
+    if (list) list.push(g);
+    else groundInputs.set(criteriaId, [g]);
+  };
   for (const it of adj.items) {
     const v = it.verdict;
     if (v === null) {
-      issues.push(`criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
+      blame(it.criteriaId, `criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
     } else if (v === "C" || v === "NA") {
-      if (!it.justification || !it.justification.trim()) issues.push(`criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
+      if (!it.justification || !it.justification.trim()) blame(it.criteriaId, `criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
       // A clearing verdict is gated exactly like an accusing one. Before this, the only
       // check was "the justification is a non-empty string", so `"x"` cleared a criterion —
       // and a model answering C to everything published a conformance nobody had assessed.
@@ -561,12 +596,14 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
         // concerned"); `C` is not — it must stay `manual` and be ruled on against the
         // criterion's own tests, from a rendered capture or by hand.
         if (v === "C") {
-          issues.push(
+          blame(
+            it.criteriaId,
             `criterion ${it.criteriaId}: a C verdict needs evidence to cite, and none was harvested for this criterion — record "manual" (reason "undecidable"), or "NA" if nothing in scope is concerned`,
           );
         }
       } else if (cites.length === 0) {
-        issues.push(
+        blame(
+          it.criteriaId,
           `criterion ${it.criteriaId}: a ${v} verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, …}])`,
         );
       } else {
@@ -576,50 +613,74 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
         const anchors = new Set(it.evidence.map((e) => `${e.file}:${e.line}`));
         for (const c of cites) {
           if (!anchors.has(`${c.file}:${c.line}`)) {
-            issues.push(`criterion ${it.criteriaId}: citation ${c.file}:${c.line} is not among this criterion's harvested evidence (fabricated?)`);
+            blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c.file}:${c.line} is not among this criterion's harvested evidence (fabricated?)`);
           }
-          groundInputs.push({ file: c.file, line: c.line, selector: c.selector, snippet: c.snippet });
+          toGround(it.criteriaId, { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet });
         }
       }
     } else if (v === "NC") {
-      if (!it.findings || it.findings.length === 0) issues.push(`criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding`);
+      if (!it.findings || it.findings.length === 0) blame(it.criteriaId, `criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding`);
       for (const f of it.findings ?? []) {
         // FAIL-CLOSED: every NC finding must cite a precise, resolvable test of the active
         // standard. A good practice with no normative test is a recommendation, not an NC.
         if (!f.normativeRef || !f.normativeRef.trim()) {
-          issues.push(`criterion ${it.criteriaId}: an NC finding requires a normativeRef citing the failed test of the active standard`);
+          blame(it.criteriaId, `criterion ${it.criteriaId}: an NC finding requires a normativeRef citing the failed test of the active standard`);
         } else if (!normativeRefResolves(f.normativeRef, adj.standard, isCore(adj.standard) ? undefined : it.criteriaId)) {
-          issues.push(
+          blame(
+            it.criteriaId,
             isCore(adj.standard)
               ? `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" does not resolve to a test of ${adj.standard} (fabricated?)`
               : `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" is not a test of ${adj.standard} ${it.criteriaId} — cite one of its own tests (e.g. "${it.criteriaId}.1"); a WCAG id looks alike but denotes an unrelated test`,
           );
         }
-        groundInputs.push({ file: f.file, line: f.line, selector: f.selector, snippet: f.snippet });
+        toGround(it.criteriaId, { file: f.file, line: f.line, selector: f.selector, snippet: f.snippet });
       }
     } else if (v === "manual") {
       if (!it.reason || !MANUAL_REASONS.has(it.reason))
-        issues.push(`criterion ${it.criteriaId}: a manual verdict requires reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`);
+        blame(it.criteriaId, `criterion ${it.criteriaId}: a manual verdict requires reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`);
     } else {
       // Name the vocabulary in the rejection. The caller is usually a model that has just
       // spent a whole worklist filling this file; "unknown verdict" alone told it nothing
       // about how to be right on the retry.
-      issues.push(`criterion ${it.criteriaId}: unknown verdict "${String(v)}" — expected one of ${VERDICTS.join(" | ")}`);
+      blame(it.criteriaId, `criterion ${it.criteriaId}: unknown verdict "${String(v)}" — expected one of ${VERDICTS.join(" | ")}`);
     }
     // Recommendations are independent of the verdict (a C criterion may still carry a good
     // practice) and are grounded exactly like an NC finding — no normativeRef required, as
     // a recommendation has no normative test by definition.
-    for (const rec of it.recommendations ?? []) groundInputs.push({ file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
+    for (const rec of it.recommendations ?? []) toGround(it.criteriaId, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
   }
 
   // Content-level grounding of every agent NC finding, every C/NA citation, and every
-  // recommendation — the same check, whichever direction the verdict points.
-  const grounding = groundItems(groundInputs, { cwd: opts.cwd });
-  for (const gi of grounding.issues) issues.push(gi);
-
-  if (issues.length) {
-    return { ok: false, audit, issues, applied: 0, stillManual: 0, grounding };
+  // recommendation — the same check, whichever direction the verdict points. Walked per
+  // criterion so a failure is attributable; the aggregate summary is identical to what the
+  // flat `groundItems` produced.
+  const grounding: GroundingSummary = { grounded: 0, moved: 0, failed: 0, issues: [] };
+  for (const [criteriaId, inputs] of groundInputs) {
+    for (const input of inputs) {
+      const r = groundFinding(input, { cwd: opts.cwd });
+      if (r.ok) {
+        grounding.grounded++;
+        if (r.moved) grounding.moved++;
+      } else {
+        grounding.failed++;
+        if (r.issue) {
+          grounding.issues.push(r.issue);
+          blame(criteriaId, r.issue);
+        }
+      }
+    }
   }
+
+  // STRICT: the historical file-level fold. One refusal, nothing lands.
+  if (opts.strict && issues.length) {
+    return { ok: false, audit, issues, applied: 0, stillManual: 0, rejected: 0, rejectedCriteria: [], grounding };
+  }
+  // PARTIAL: a refused criterion is dropped, the rest folds. `rejectedCriteria` keeps file
+  // order and de-duplicates, since one criterion can raise several issues.
+  const rejectedCriteria = adj.items.map((it) => it.criteriaId).filter((id) => itemIssues.has(id));
+  for (const id of itemIssues.keys()) if (!rejectedCriteria.includes(id)) rejectedCriteria.push(id);
+  const rejectedSet = new Set(rejectedCriteria);
+  const rejectedWhy = (id: string) => residualRejectedReason(itemIssues.get(id)?.[0] ?? "refused by the gate");
 
   // Apply: clone the audit, update the decided criteria + append agent findings.
   const next: AuditResult = structuredClone(audit);
@@ -636,6 +697,20 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
   if (packMode) {
     const decided: PackCriterionAdjudication[] = [];
     for (const it of adj.items) {
+      // A refused verdict does not land. It is recorded as still-`manual` carrying the
+      // refusal, so the page grid and the report say WHY this criterion is still to assess
+      // instead of leaving a blank cell.
+      if (rejectedSet.has(it.criteriaId)) {
+        if (!open.has(it.criteriaId)) continue; // surplus item: not ours to record at all
+        decided.push({
+          id: it.criteriaId,
+          status: "manual",
+          reason: "undecidable",
+          justification: rejectedWhy(it.criteriaId),
+          findings: [],
+        });
+        continue;
+      }
       if (it.verdict === "manual") {
         stillManual++;
         decided.push({
@@ -660,17 +735,24 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
         decidedBy: "agent",
       });
     }
+    // An OPEN criterion the file never mentioned (coverage gap) also has to say why it is
+    // still to assess — the loop above only walks the items that exist.
+    for (const id of rejectedCriteria) {
+      if (byId.has(id) || !open.has(id)) continue;
+      decided.push({ id, status: "manual", reason: "undecidable", justification: rejectedWhy(id), findings: [] });
+    }
     next.packAdjudication = { standard: adj.standard, criteria: decided };
     // The agent's findings still join the flat list so grounding, `check` and the reports can
     // resolve them — but they never touch a WCAG criterion's status.
     next.findings = [...next.findings, ...newFindings];
-    next.adjudicated = { date: adj.auditDate, applied, stillManual };
-    return { ok: true, audit: next, issues, applied, stillManual, grounding };
+    next.adjudicated = { date: adj.auditDate, applied, stillManual, ...(rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {}) };
+    return { ok: issues.length === 0, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, grounding };
   }
 
   for (const it of adj.items) {
     const c = critById.get(it.criteriaId);
     if (!c) continue; // an item for a non-residual criterion — ignore (coverage already gated)
+    if (rejectedSet.has(it.criteriaId)) continue; // refused: the criterion keeps its `manual` status
     if (it.verdict === "manual") {
       c.status = "manual";
       c.decidedBy = "agent";
@@ -696,7 +778,7 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
   // gets its recommendations, and an NC item's reset `c.findings` keeps them appended last.
   for (const it of adj.items) {
     const c = critById.get(it.criteriaId);
-    if (!c) continue;
+    if (!c || rejectedSet.has(it.criteriaId)) continue;
     for (const rec of it.recommendations ?? []) {
       const f = agentFinding(it.criteriaId, rec, true);
       c.findings.push(f);
@@ -705,11 +787,16 @@ export function applyAdjudication(audit: AuditResult, adj: AdjudicationFile, opt
   }
 
   next.findings = [...next.findings, ...newFindings];
-  // Residual set now holds only the still-manual criteria.
-  next.residualRisks = next.residualRisks.filter((r) => byId.get(r.criteriaId)?.verdict === "manual");
+  // Residual set now holds every criterion still to assess: the ones ruled `manual` by the
+  // adjudication, AND the ones whose verdict the gate refused. A refused criterion keeps its
+  // place in the residual set with the refusal as its reason — dropping it would report it as
+  // decided, and blanking the reason is exactly the empty cell this release is removing.
+  next.residualRisks = next.residualRisks
+    .filter((r) => byId.get(r.criteriaId)?.verdict === "manual" || rejectedSet.has(r.criteriaId))
+    .map((r) => (rejectedSet.has(r.criteriaId) ? { ...r, reason: rejectedWhy(r.criteriaId) } : r));
   recomputeTallies(next);
-  next.adjudicated = { date: adj.auditDate, applied, stillManual };
-  return { ok: true, audit: next, issues: [], applied, stillManual, grounding };
+  next.adjudicated = { date: adj.auditDate, applied, stillManual, ...(rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {}) };
+  return { ok: issues.length === 0, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, grounding };
 }
 
 function agentFinding(criteriaId: string, f: AgentFinding, advisory = false): Finding {
@@ -750,6 +837,10 @@ function recomputeTallies(a: AuditResult): void {
 
 const residualScanReason = () => "Rendering criterion — decide on the rendered DOM (`scan`).";
 const residualUndecidableReason = () => "Left as an explicit residual risk (not decidable from the available evidence).";
+/** Why a criterion is still to assess after a PARTIAL fold: its verdict was refused. Carries
+ *  the first refusal verbatim, so the reader (and the next adjudication pass) sees the actual
+ *  contract violation rather than a bare « to assess ». */
+const residualRejectedReason = (why: string) => `Adjudication refused by the gate — ${why.replace(/^criterion \S+: /, "")}. Re-adjudicate this criterion.`;
 
 // ---- worklist file rendering ----
 const T = {

@@ -415,7 +415,11 @@ export interface PackCriterionAdjudication {
   justification?: string; // REQUIRED for C and NA
   reason?: "needs-rendered-dom" | "undecidable"; // REQUIRED for a still-manual verdict
   findings: Finding[]; // REQUIRED (≥1, groundable, each citing a test OF THIS CRITERION) for NC
-  decidedBy: "agent";
+  // Absent when the partial fold REFUSED this criterion's verdict: the entry then exists only
+  // to carry the refusal as the criterion's `justification`, and claiming the agent decided it
+  // would be the exact laundering the gate just prevented. Present ("agent") on every verdict
+  // that actually landed, including a deliberate still-`manual` one.
+  decidedBy?: "agent";
 }
 
 export interface GuidelineTally {
@@ -515,8 +519,11 @@ export interface AuditResult {
   // Set once `verify --apply <adjudication>` has folded an AI adjudication of the manual
   // criteria back into the audit (src/adjudicate.ts). `stillManual` = criteria the agent
   // left as an explicit residual (needs a rendered DOM → `scan`, or genuinely undecidable).
+  // `rejected` = criteria whose verdict the gate REFUSED, which the partial fold leaves to
+  // assess with the refusal as their reason (absent when nothing was refused; always absent
+  // under `--strict`, where one refusal discards the whole fold).
   // Optional/additive — absent on a plain engine audit.
-  adjudicated?: { date: string; applied: number; stillManual: number };
+  adjudicated?: { date: string; applied: number; stillManual: number; rejected?: number };
   // Set when the agent adjudicated at a COUNTRY STANDARD's granularity (`verify --manual
   // --standard <pack>`). Kept SEPARATE from `criteria` so the WCAG core verdict is never
   // touched by a pack decision — and so several pack criteria sharing one success criterion

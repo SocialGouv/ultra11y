@@ -56523,6 +56523,13 @@ function normativeRefResolves(ref, standard, itemCriterionId) {
 }
 function applyAdjudication(audit2, adj, opts = {}) {
   const issues = [];
+  const itemIssues = /* @__PURE__ */ new Map();
+  const blame = (criteriaId, issue) => {
+    issues.push(issue);
+    const list = itemIssues.get(criteriaId);
+    if (list) list.push(issue);
+    else itemIssues.set(criteriaId, [issue]);
+  };
   canonicalizeAdjudication(adj);
   const byId2 = new Map(adj.items.map((it) => [it.criteriaId, it]));
   const packMode = !isCore(adj.standard);
@@ -56531,71 +56538,97 @@ function applyAdjudication(audit2, adj, opts = {}) {
     for (const pc of derivePackResults(audit2, adj.standard)) {
       if (pc.status !== "manual") continue;
       open.add(pc.id);
-      if (!byId2.has(pc.id)) issues.push(`criterion ${pc.id}: missing from the adjudication (coverage gap)`);
+      if (!byId2.has(pc.id)) blame(pc.id, `criterion ${pc.id}: missing from the adjudication (coverage gap)`);
     }
   } else {
     for (const r of audit2.residualRisks) {
       open.add(r.criteriaId);
-      if (!byId2.has(r.criteriaId)) issues.push(`criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+      if (!byId2.has(r.criteriaId)) blame(r.criteriaId, `criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
     }
   }
   for (const it of adj.items) {
     if (!open.has(it.criteriaId)) {
-      issues.push(`criterion ${it.criteriaId}: not open for adjudication \u2014 the engine already decided it, or it is not part of ${adj.standard}`);
+      blame(it.criteriaId, `criterion ${it.criteriaId}: not open for adjudication \u2014 the engine already decided it, or it is not part of ${adj.standard}`);
     }
   }
-  const groundInputs = [];
+  const groundInputs = /* @__PURE__ */ new Map();
+  const toGround = (criteriaId, g) => {
+    const list = groundInputs.get(criteriaId);
+    if (list) list.push(g);
+    else groundInputs.set(criteriaId, [g]);
+  };
   for (const it of adj.items) {
     const v = it.verdict;
     if (v === null) {
-      issues.push(`criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
+      blame(it.criteriaId, `criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
     } else if (v === "C" || v === "NA") {
-      if (!it.justification || !it.justification.trim()) issues.push(`criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
+      if (!it.justification || !it.justification.trim()) blame(it.criteriaId, `criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
       const cites = it.citations ?? [];
       if (it.evidence.length === 0) {
         if (v === "C") {
-          issues.push(
+          blame(
+            it.criteriaId,
             `criterion ${it.criteriaId}: a C verdict needs evidence to cite, and none was harvested for this criterion \u2014 record "manual" (reason "undecidable"), or "NA" if nothing in scope is concerned`
           );
         }
       } else if (cites.length === 0) {
-        issues.push(
+        blame(
+          it.criteriaId,
           `criterion ${it.criteriaId}: a ${v} verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, \u2026}])`
         );
       } else {
         const anchors = new Set(it.evidence.map((e) => `${e.file}:${e.line}`));
         for (const c2 of cites) {
           if (!anchors.has(`${c2.file}:${c2.line}`)) {
-            issues.push(`criterion ${it.criteriaId}: citation ${c2.file}:${c2.line} is not among this criterion's harvested evidence (fabricated?)`);
+            blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c2.file}:${c2.line} is not among this criterion's harvested evidence (fabricated?)`);
           }
-          groundInputs.push({ file: c2.file, line: c2.line, selector: c2.selector, snippet: c2.snippet });
+          toGround(it.criteriaId, { file: c2.file, line: c2.line, selector: c2.selector, snippet: c2.snippet });
         }
       }
     } else if (v === "NC") {
-      if (!it.findings || it.findings.length === 0) issues.push(`criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding`);
+      if (!it.findings || it.findings.length === 0) blame(it.criteriaId, `criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding`);
       for (const f of it.findings ?? []) {
         if (!f.normativeRef || !f.normativeRef.trim()) {
-          issues.push(`criterion ${it.criteriaId}: an NC finding requires a normativeRef citing the failed test of the active standard`);
+          blame(it.criteriaId, `criterion ${it.criteriaId}: an NC finding requires a normativeRef citing the failed test of the active standard`);
         } else if (!normativeRefResolves(f.normativeRef, adj.standard, isCore(adj.standard) ? void 0 : it.criteriaId)) {
-          issues.push(
+          blame(
+            it.criteriaId,
             isCore(adj.standard) ? `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" does not resolve to a test of ${adj.standard} (fabricated?)` : `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" is not a test of ${adj.standard} ${it.criteriaId} \u2014 cite one of its own tests (e.g. "${it.criteriaId}.1"); a WCAG id looks alike but denotes an unrelated test`
           );
         }
-        groundInputs.push({ file: f.file, line: f.line, selector: f.selector, snippet: f.snippet });
+        toGround(it.criteriaId, { file: f.file, line: f.line, selector: f.selector, snippet: f.snippet });
       }
     } else if (v === "manual") {
       if (!it.reason || !MANUAL_REASONS.has(it.reason))
-        issues.push(`criterion ${it.criteriaId}: a manual verdict requires reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`);
+        blame(it.criteriaId, `criterion ${it.criteriaId}: a manual verdict requires reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`);
     } else {
-      issues.push(`criterion ${it.criteriaId}: unknown verdict "${String(v)}" \u2014 expected one of ${VERDICTS.join(" | ")}`);
+      blame(it.criteriaId, `criterion ${it.criteriaId}: unknown verdict "${String(v)}" \u2014 expected one of ${VERDICTS.join(" | ")}`);
     }
-    for (const rec of it.recommendations ?? []) groundInputs.push({ file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
+    for (const rec of it.recommendations ?? []) toGround(it.criteriaId, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
   }
-  const grounding = groundItems(groundInputs, { cwd: opts.cwd });
-  for (const gi of grounding.issues) issues.push(gi);
-  if (issues.length) {
-    return { ok: false, audit: audit2, issues, applied: 0, stillManual: 0, grounding };
+  const grounding = { grounded: 0, moved: 0, failed: 0, issues: [] };
+  for (const [criteriaId, inputs] of groundInputs) {
+    for (const input of inputs) {
+      const r = groundFinding(input, { cwd: opts.cwd });
+      if (r.ok) {
+        grounding.grounded++;
+        if (r.moved) grounding.moved++;
+      } else {
+        grounding.failed++;
+        if (r.issue) {
+          grounding.issues.push(r.issue);
+          blame(criteriaId, r.issue);
+        }
+      }
+    }
   }
+  if (opts.strict && issues.length) {
+    return { ok: false, audit: audit2, issues, applied: 0, stillManual: 0, rejected: 0, rejectedCriteria: [], grounding };
+  }
+  const rejectedCriteria = adj.items.map((it) => it.criteriaId).filter((id) => itemIssues.has(id));
+  for (const id of itemIssues.keys()) if (!rejectedCriteria.includes(id)) rejectedCriteria.push(id);
+  const rejectedSet = new Set(rejectedCriteria);
+  const rejectedWhy = (id) => residualRejectedReason(itemIssues.get(id)?.[0] ?? "refused by the gate");
   const next = structuredClone(audit2);
   const critById = new Map(next.criteria.map((c2) => [c2.id, c2]));
   const newFindings = [];
@@ -56604,6 +56637,17 @@ function applyAdjudication(audit2, adj, opts = {}) {
   if (packMode) {
     const decided = [];
     for (const it of adj.items) {
+      if (rejectedSet.has(it.criteriaId)) {
+        if (!open.has(it.criteriaId)) continue;
+        decided.push({
+          id: it.criteriaId,
+          status: "manual",
+          reason: "undecidable",
+          justification: rejectedWhy(it.criteriaId),
+          findings: []
+        });
+        continue;
+      }
       if (it.verdict === "manual") {
         stillManual++;
         decided.push({
@@ -56628,14 +56672,19 @@ function applyAdjudication(audit2, adj, opts = {}) {
         decidedBy: "agent"
       });
     }
+    for (const id of rejectedCriteria) {
+      if (byId2.has(id) || !open.has(id)) continue;
+      decided.push({ id, status: "manual", reason: "undecidable", justification: rejectedWhy(id), findings: [] });
+    }
     next.packAdjudication = { standard: adj.standard, criteria: decided };
     next.findings = [...next.findings, ...newFindings];
-    next.adjudicated = { date: adj.auditDate, applied, stillManual };
-    return { ok: true, audit: next, issues, applied, stillManual, grounding };
+    next.adjudicated = { date: adj.auditDate, applied, stillManual, ...rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {} };
+    return { ok: issues.length === 0, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, grounding };
   }
   for (const it of adj.items) {
     const c2 = critById.get(it.criteriaId);
     if (!c2) continue;
+    if (rejectedSet.has(it.criteriaId)) continue;
     if (it.verdict === "manual") {
       c2.status = "manual";
       c2.decidedBy = "agent";
@@ -56656,7 +56705,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
   }
   for (const it of adj.items) {
     const c2 = critById.get(it.criteriaId);
-    if (!c2) continue;
+    if (!c2 || rejectedSet.has(it.criteriaId)) continue;
     for (const rec of it.recommendations ?? []) {
       const f = agentFinding(it.criteriaId, rec, true);
       c2.findings.push(f);
@@ -56664,10 +56713,10 @@ function applyAdjudication(audit2, adj, opts = {}) {
     }
   }
   next.findings = [...next.findings, ...newFindings];
-  next.residualRisks = next.residualRisks.filter((r) => byId2.get(r.criteriaId)?.verdict === "manual");
+  next.residualRisks = next.residualRisks.filter((r) => byId2.get(r.criteriaId)?.verdict === "manual" || rejectedSet.has(r.criteriaId)).map((r) => rejectedSet.has(r.criteriaId) ? { ...r, reason: rejectedWhy(r.criteriaId) } : r);
   recomputeTallies(next);
-  next.adjudicated = { date: adj.auditDate, applied, stillManual };
-  return { ok: true, audit: next, issues: [], applied, stillManual, grounding };
+  next.adjudicated = { date: adj.auditDate, applied, stillManual, ...rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {} };
+  return { ok: issues.length === 0, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, grounding };
 }
 function agentFinding(criteriaId, f, advisory = false) {
   return {
@@ -56698,6 +56747,7 @@ function recomputeTallies(a) {
 }
 var residualScanReason = () => "Rendering criterion \u2014 decide on the rendered DOM (`scan`).";
 var residualUndecidableReason = () => "Left as an explicit residual risk (not decidable from the available evidence).";
+var residualRejectedReason = (why) => `Adjudication refused by the gate \u2014 ${why.replace(/^criterion \S+: /, "")}. Re-adjudicate this criterion.`;
 var T2 = {
   fr: {
     title: "# Adjudication des crit\xE8res \xE0 \xE9valuer (ultra11y)",
@@ -64899,6 +64949,10 @@ Options:
   --apply            judge: fold the verdicts straight into the audit, through the SAME
                      fail-closed gate an agent's verdicts pass (no unjustified C/NA, no
                      ungroundable NC, no unadjudicated criterion)
+  --strict           verify --apply / judge --apply: all-or-nothing fold \u2014 one refused
+                     verdict discards the whole adjudication. The default folds PER
+                     VERDICT: a refusal costs its own criterion, which stays to assess
+                     carrying the refusal, and every verdict that proved itself lands
   --semantic         verify: fold the support-check into one pass
                      check: engage the semantic gate \u2014 requires an adjudicated verdicts
                      artifact (fails closed when absent) and re-grounds every passing
@@ -65044,6 +65098,9 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "generate",
   "semantic",
   "manual",
+  // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
+  // verdict discards the whole adjudication. The default is per-verdict.
+  "strict",
   "no-technical",
   "override",
   "local",
@@ -66583,15 +66640,23 @@ function applyAdjudicationFile(p, adj, lang) {
     console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
     return 2;
   }
-  hydrateAdjudication(adj, audit2, { cwd: typeof p.flags.cwd === "string" ? p.flags.cwd : void 0 });
-  const r = applyAdjudication(audit2, adj);
-  if (!r.ok) {
+  const cwd = typeof p.flags.cwd === "string" ? p.flags.cwd : void 0;
+  hydrateAdjudication(adj, audit2, { cwd });
+  const strict = p.flags.strict === true;
+  const r = applyAdjudication(audit2, adj, { cwd, strict });
+  if (!r.ok && (strict || r.applied + r.stillManual === 0)) {
     if (p.flags.json) console.log(JSON.stringify(r, null, 2));
     else {
       console.error(lang === "fr" ? `\u2717 Adjudication rejet\xE9e (${r.issues.length} probl\xE8me(s)) :` : `\u2717 Adjudication rejected (${r.issues.length} issue(s)):`);
       for (const i2 of r.issues) console.error(`  \u2717 ${i2}`);
     }
     return 1;
+  }
+  if (r.rejected > 0 && !p.flags.json) {
+    console.error(
+      lang === "fr" ? `\u26A0 ${r.rejected} crit\xE8re(s) refus\xE9(s) par la porte \u2014 ils restent \xE0 \xE9valuer, avec le motif du refus :` : `\u26A0 ${r.rejected} criterion(ia) refused by the gate \u2014 they stay to assess, carrying the refusal:`
+    );
+    for (const i2 of r.issues) console.error(`  \u2717 ${i2}`);
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
   mkdirSync17(out2, { recursive: true });
@@ -66605,6 +66670,9 @@ function applyAdjudicationFile(p, adj, lang) {
           auditPath,
           applied: r.applied,
           stillManual: r.stillManual,
+          rejected: r.rejected,
+          rejectedCriteria: r.rejectedCriteria,
+          issues: r.issues,
           conformancePct: r.audit.conformancePct,
           findings: r.audit.findings.length,
           grounding: r.grounding
@@ -66615,7 +66683,7 @@ function applyAdjudicationFile(p, adj, lang) {
     );
   else
     console.log(
-      lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual \u2192 ${auditPath}`
+      lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel${r.rejected ? `, ${r.rejected} refus\xE9(s)` : ""} \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""} \u2192 ${auditPath}`
     );
   return 0;
 }
@@ -66697,19 +66765,26 @@ async function cmdJudge(p) {
     return 0;
   }
   const adj = JSON.parse(readText(w.todoPath));
-  const r = applyAdjudication(audit2, adj);
-  if (!r.ok) {
+  const r = applyAdjudication(audit2, adj, { strict: p.flags.strict === true });
+  if (!r.ok && (p.flags.strict === true || r.applied + r.stillManual === 0)) {
     console.error(lang === "fr" ? `\u2717 Adjudication rejet\xE9e (${r.issues.length} probl\xE8me(s)) :` : `\u2717 Adjudication rejected (${r.issues.length} issue(s)):`);
     for (const i2 of r.issues.slice(0, 40)) console.error(`  \u2717 ${i2}`);
     if (r.issues.length > 40) console.error(`  \u2026 +${r.issues.length - 40}`);
     return 1;
+  }
+  if (r.rejected > 0) {
+    console.error(
+      lang === "fr" ? `\u26A0 ${r.rejected} crit\xE8re(s) refus\xE9(s) par la porte \u2014 ils restent \xE0 \xE9valuer, avec le motif du refus :` : `\u26A0 ${r.rejected} criterion(ia) refused by the gate \u2014 they stay to assess, carrying the refusal:`
+    );
+    for (const i2 of r.issues.slice(0, 40)) console.error(`  \u2717 ${i2}`);
+    if (r.issues.length > 40) console.error(`  \u2026 +${r.issues.length - 40}`);
   }
   mkdirSync17(out2, { recursive: true });
   const auditPath = join50(out2, "audit-latest.json");
   writeFileSync19(auditPath, `${JSON.stringify(r.audit, null, 2)}
 `);
   console.log(
-    lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual \u2192 ${auditPath}`
+    lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel${r.rejected ? `, ${r.rejected} refus\xE9(s)` : ""} \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""} \u2192 ${auditPath}`
   );
   return 0;
 }

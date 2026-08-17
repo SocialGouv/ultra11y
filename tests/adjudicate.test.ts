@@ -200,6 +200,92 @@ describe("applyAdjudication — updates the audit + records provenance", () => {
   });
 });
 
+// The fold is fail-closed PER VERDICT, not per FILE. Measured on a real CI run: 95 of 96
+// verdicts were filled correctly, one was null, and the all-or-nothing fold discarded all 96 —
+// so a $16 adjudication published « to assess » across the whole grid. A refusal must cost its
+// own criterion and nothing else.
+describe("applyAdjudication — partial fold", () => {
+  const withOneNull = () => {
+    const audit = auditPage();
+    const items = buildAdjudicationWorklist(audit).map((i) =>
+      i.criteriaId === "1.1.1" ? { ...i, verdict: null } : clearWith(i, "assessed conforming from source"),
+    );
+    return { audit, items };
+  };
+
+  it("applies every valid verdict and refuses only the offending criterion", () => {
+    const { audit, items } = withOneNull();
+    const r = applyAdjudication(audit, file(items));
+
+    expect(r.rejected).toBe(1);
+    expect(r.rejectedCriteria).toEqual(["1.1.1"]);
+    expect(r.applied).toBeGreaterThan(1); // the other verdicts landed…
+    expect(r.audit.criteria.find((c) => c.id === "1.1.1")!.status).toBe("manual"); // …this one did not
+    // `ok` still reports "the file had issues" — a caller that wants the old contract reads it.
+    expect(r.ok).toBe(false);
+  });
+
+  it("never applies a refused verdict, even when the rest of the file is clean", () => {
+    const audit = auditPage();
+    // A C verdict citing evidence it was never shown — the fabrication check.
+    const items = buildAdjudicationWorklist(audit).map((i) =>
+      i.criteriaId === "2.4.4"
+        ? { ...i, verdict: "C" as const, justification: "looks fine", citations: [{ file: PAGE, line: 999, selector: "a", snippet: "invented" }] }
+        : clearWith(i, "assessed conforming from source"),
+    );
+    const r = applyAdjudication(audit, file(items));
+
+    expect(r.rejectedCriteria).toContain("2.4.4");
+    const c = r.audit.criteria.find((c) => c.id === "2.4.4")!;
+    expect(c.status).toBe("manual");
+    expect(c.decidedBy).not.toBe("agent");
+  });
+
+  it("keeps a refused criterion in the residual set, carrying the refusal as its reason", () => {
+    const { audit, items } = withOneNull();
+    const r = applyAdjudication(audit, file(items));
+
+    const residual = r.audit.residualRisks.find((x) => x.criteriaId === "1.1.1");
+    expect(residual).toBeDefined();
+    // The whole point of the reason: no blank « to assess » cell anywhere in the report.
+    expect(residual!.reason).toMatch(/refused by the gate/i);
+    expect(residual!.reason).toMatch(/unadjudicated/i);
+    expect(residual!.reason).not.toMatch(/^\s*$/);
+  });
+
+  it("records the refusal count on the audit, and omits it when nothing was refused", () => {
+    const { audit, items } = withOneNull();
+    expect(applyAdjudication(audit, file(items)).audit.adjudicated?.rejected).toBe(1);
+
+    const clean = auditPage();
+    const allClear = buildAdjudicationWorklist(clean).map((i) => clearWith(i, "assessed conforming from source"));
+    const rClean = applyAdjudication(clean, file(allClear));
+    expect(rClean.rejected).toBe(0);
+    expect(rClean.audit.adjudicated?.rejected).toBeUndefined();
+  });
+
+  it("strict mode restores the all-or-nothing fold", () => {
+    const { audit, items } = withOneNull();
+    const r = applyAdjudication(audit, file(items), { strict: true });
+
+    expect(r.ok).toBe(false);
+    expect(r.applied).toBe(0);
+    expect(r.rejected).toBe(0); // nothing was singled out — the FILE was refused
+    expect(r.audit).toBe(audit); // the audit is returned untouched
+  });
+
+  it("refuses a coverage gap without costing the criteria that were ruled on", () => {
+    const audit = auditPage();
+    const all = buildAdjudicationWorklist(audit).map((i) => clearWith(i, "assessed conforming from source"));
+    const missing = all[0]!.criteriaId;
+    const r = applyAdjudication(audit, file(all.slice(1)));
+
+    expect(r.rejectedCriteria).toContain(missing);
+    expect(r.applied).toBeGreaterThan(0);
+    expect(r.audit.residualRisks.find((x) => x.criteriaId === missing)!.reason).toMatch(/coverage gap/i);
+  });
+});
+
 describe("applyAdjudication — fail-closed validation", () => {
   const baseItems = () => buildAdjudicationWorklist(auditPage());
   const decideAll = (over: Partial<AdjudicationItem>, only?: string) =>
