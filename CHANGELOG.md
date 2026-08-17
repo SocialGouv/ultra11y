@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.4.0](https://github.com/maxgfr/ultra11y/compare/v5.3.4...v5.4.0) (2026-08-17)
+
+
+### Bug Fixes
+
+* **adjudicate:** make a refused verdict cost its own criterion, not the whole run ([250fed5](https://github.com/maxgfr/ultra11y/commit/250fed56f52aad60bf6ae3d9d93febdc492b30f2))
+* **rendered:** credit what a snapshot measured, and tell each criterion what it still needs ([8a8e28c](https://github.com/maxgfr/ultra11y/commit/8a8e28c05adaae3627243db50c21b2d517ebc847))
+
+
+### Features
+
+* **audit:** let the engine prove a criterion NOT APPLICABLE, instead of leaving it to assess ([02573d1](https://github.com/maxgfr/ultra11y/commit/02573d14aadc189e6eba1a7144fb20d4d0a361cb))
+* **ci:** replay the ledger before paying a model, and stop the docs contradicting themselves ([7f86cf5](https://github.com/maxgfr/ultra11y/commit/7f86cf5a27be92b314c048db057d0a345f90f401))
+* **ledger:** keep an adjudicated verdict decided, so CI stops paying to relearn it ([90e6be3](https://github.com/maxgfr/ultra11y/commit/90e6be376b5585d734164860c724ef45331a0ba2))
+
 ## [5.3.4](https://github.com/maxgfr/ultra11y/compare/v5.3.3...v5.3.4) (2026-08-17)
 
 

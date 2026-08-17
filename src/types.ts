@@ -1,6 +1,6 @@
 // Single source of truth for shared types + the embedded version. sync-version.mjs
 // rewrites VERSION at release time (kept in lockstep with package.json + SKILL.md).
-export const VERSION = "5.3.4";
+export const VERSION = "5.4.0";
 export const SCHEMA_VERSION = 2;
 
 // Lang = the UI FRAME's language — the `L` localization tables each module (report,
