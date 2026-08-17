@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.3.1](https://github.com/maxgfr/ultra11y/compare/v5.3.0...v5.3.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **ci:** do not quote RGAA's criterion count in a standard-agnostic string ([8f94bd8](https://github.com/maxgfr/ultra11y/commit/8f94bd8908405f112710a5dd28c3b994746e92eb))
+
 # [5.3.0](https://github.com/maxgfr/ultra11y/compare/v5.2.1...v5.3.0) (2026-08-17)
 
 
