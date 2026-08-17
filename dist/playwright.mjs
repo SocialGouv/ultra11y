@@ -296,7 +296,10 @@ function sweepSample(opts = {}) {
       const landed = page.url();
       t.skip(!stayedOnPage(target, landed), `${target} landed on ${landed} \u2014 the current state does not open this screen; nothing to record as "${p.name}"`);
       const status = response?.status();
-      t.skip(status !== void 0 && status >= 400, `${target} answered HTTP ${status} \u2014 an error page at the requested address; nothing to record as "${p.name}"`);
+      t.skip(
+        status !== void 0 && status >= 400,
+        `${target} answered HTTP ${status} \u2014 an error page at the requested address; nothing to record as "${p.name}"`
+      );
       await checkA11y(page, {
         failOn: false,
         ...opts.check,
