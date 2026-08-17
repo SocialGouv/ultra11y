@@ -34,7 +34,14 @@ Page by page, with a real browser, in the same step:
       wait-on: http://localhost:3000
       urls: http://localhost:3000 http://localhost:3000/contact
       # …or `sample: 'true'` to scan the sample declared in .ultra11yrc.json
+      comment: 'true'
+      comment-kind: pages           # the page-by-page grid, under its own sticky marker
 ```
+
+A page sweep is usually a **second job** — it needs a built app, a database, a browser — and
+it can comment alongside the code gate above without either overwriting the other, because
+each kind has its own marker. Give the two jobs distinct `artifact-name`s too: artifact names
+must be unique within a run.
 
 `ultra11y init --ci` writes a workflow using it, **pinned to the exact engine version that
 generated the file** (`@v<that version>`) so a CI run stays reproducible. `@v<major>` — `@v5`
@@ -232,12 +239,27 @@ them as separate analyses instead of one overwriting the other.
 
 ## The sticky PR comment
 
-`ULTRA11Y_PR_COMMENT=1` (what the action's `comment: 'true'` sets) posts the job summary as a
-pull-request comment and **edits it in place** on every subsequent run — a CI job that appends
-a fresh comment on each push turns a busy PR into a wall of stale audits. The comment is keyed
-by an invisible marker that includes the standard, so a WCAG run and an RGAA run keep separate
-comments instead of overwriting each other, and a human's comment is never adopted (an edit is
-destructive, so the match has to be exact).
+`ULTRA11Y_PR_COMMENT=1` (what the action's `comment: 'true'` sets) posts a pull-request comment
+and **edits it in place** on every subsequent run — a CI job that appends a fresh comment on
+each push turns a busy PR into a wall of stale audits. The comment is keyed by an invisible
+marker, and a human's comment is never adopted (an edit is destructive, so the match has to be
+exact).
+
+It is **not** the job summary. That document has a 1 MiB budget and a reader who went looking
+for it; a comment has 64 KiB and a reader scanning a diff. Two documents are available, chosen
+with the action's `comment-kind` (`ULTRA11Y_PR_COMMENT_KIND`):
+
+| kind | what it posts |
+|---|---|
+| `digest` (default) | The verdict, the coverage, and the distinct defects — one row per (criterion, rule, selector), so 472 occurrences of one design-system defect are one row. Then a link. |
+| `pages` | The page-by-page grid: one row per page with its basis, its rate **and its denominator**, and its severities; then a collapsed block per failing page listing its non-conforming criteria. Needs pages in scope; with none it says so rather than posting an empty scoreboard. |
+
+**The marker carries both the standard and the kind**, so a WCAG run and an RGAA run keep
+separate comments — and so do the code digest and the page grid of one standard. That last
+part is not hypothetical: a workflow whose gate job and page-sweep job both commented under
+one marker had the sweep (337 files, 684 occurrences) overwrite the gate's four actionable
+findings on every run, and the tier that got muzzled was the page sweep. The kinds are also
+built so neither key is a substring of the other, because the lookup matches with `includes`.
 
 It is best-effort, like issue creation: off a pull request, or with no `gh`/no auth, it
 reports `skipped` and the run carries on. A comment is never worth failing a build over. If

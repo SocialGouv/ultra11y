@@ -103,6 +103,10 @@ inputs:
     description: 'Post a sticky comment on the pull request (edited in place on each run). Needs `pull-requests: write`.'
     required: false
     default: 'false'
+  comment-kind:
+    description: 'WHICH document the comment carries: `digest` (default) names the distinct defects of the code audit; `pages` posts the page-by-page grid — one row per page with its rate and severities, then the non-conforming criteria of each failing page. Each kind has its OWN sticky marker, so a workflow whose code gate and page sweep both comment on one pull request keeps both comments instead of the second overwriting the first. `pages` needs pages in scope (a scan, a snapshot sweep) — with none it says so rather than posting an empty scoreboard.'
+    required: false
+    default: 'digest'
   report:
     description: 'Also write the Markdown report and upload it as an artifact.'
     required: false
@@ -556,6 +560,10 @@ runs:
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
         ULTRA11Y_PR_COMMENT: ${{ inputs.comment == 'true' && '1' || '0' }}
+        # Which document to post. Read as a plain string by the engine, which falls back to
+        # the digest on anything it does not recognise — a typo here must degrade to the
+        # comment every existing workflow already gets, never to no comment at all.
+        ULTRA11Y_PR_COMMENT_KIND: ${{ inputs.comment-kind }}
         GH_TOKEN: ${{ github.token }}
         # The run URL is known before anything is produced and cannot 404, so the digest always
         # links it. The artifact NAME is guarded by the same condition as the upload: naming an

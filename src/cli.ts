@@ -18,7 +18,7 @@ import { runAudit } from "./audit.js";
 import { decide, type PreToolUsePayload } from "./hook.js";
 import { writeReport, untestedNeedsRendering, partialAuditBanner } from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
-import { pushPrComment } from "./pr-comment.js";
+import { commentKindFrom, pushPrComment } from "./pr-comment.js";
 import { buildTickets } from "./tickets/grain.js";
 import { pushTickets } from "./tickets/push.js";
 import { autoProvider, createProvider, isProviderId } from "./tickets/registry.js";
@@ -57,7 +57,7 @@ import { installForTargets, parseTargets, statusReport, uninstallForTargets } fr
 import { agentsMdBlock } from "./install/agents-md.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
 import { toSarif } from "./sarif.js";
-import { annotations, prComment, stepSummary } from "./annotate.js";
+import { annotations, pagesComment, prComment, stepSummary } from "./annotate.js";
 import { evidenceNotice, writeEvidence } from "./evidence.js";
 import { writeHtml } from "./html-emit.js";
 import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
@@ -789,7 +789,12 @@ function emitCiFormat(result: AuditResult, format: CiFormat, standard: StandardI
   // reader who went looking for it; a PR comment has 64 KiB and a reader scanning a diff.
   // Posting one string to both is what turned a 700-finding audit into a wall on the PR.
   if (process.env.ULTRA11Y_PR_COMMENT === "1") {
-    const digest = prComment(result, {
+    // WHICH document this run posts. Anything but an explicit `pages` is the historical
+    // digest under the historical marker: an unset — or misspelled — variable must degrade to
+    // the behaviour every existing workflow already depends on, never to silence.
+    const kind = commentKindFrom(process.env.ULTRA11Y_PR_COMMENT_KIND);
+    const render = kind === "pages" ? pagesComment : prComment;
+    const body = render(result, {
       standard,
       lang,
       // The run is known before the artifact exists, so the link is always safe. The artifact
@@ -798,7 +803,7 @@ function emitCiFormat(result: AuditResult, format: CiFormat, standard: StandardI
       ...(process.env.ULTRA11Y_RUN_URL ? { runUrl: process.env.ULTRA11Y_RUN_URL } : {}),
       ...(process.env.ULTRA11Y_ARTIFACT_NAME ? { artifactName: process.env.ULTRA11Y_ARTIFACT_NAME } : {}),
     });
-    const c = pushPrComment(digest, standard);
+    const c = pushPrComment(body, standard, kind);
     console.error(
       c.ok
         ? lang === "fr"

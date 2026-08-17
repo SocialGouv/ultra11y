@@ -2,7 +2,8 @@
 //
 // A CI run that appends a new comment every push turns a busy PR into a wall of stale
 // audits. This posts ONE comment and EDITS it on every subsequent run, keyed by an invisible
-// marker. The marker is per-standard, so a WCAG run and an RGAA run coexist instead of
+// marker. The marker is per-standard AND per-kind, so a WCAG run and an RGAA run coexist —
+// and so do the code digest and the page-by-page grid of one standard — instead of
 // overwriting one another (the same reason SARIF runs carry distinct automationDetails ids).
 //
 // It deliberately lives outside src/tickets/: it has no title, no de-dupe key, no labels and
@@ -11,13 +12,41 @@
 import type { StandardId } from "./standards/index.js";
 import { ghExec, ghErrorReason } from "./gh-cli.js";
 
-/** The hidden key identifying this tool's comment for a given standard. */
-export function COMMENT_MARKER(standard: StandardId): string {
-  return `<!-- ultra11y:report standard="${standard}" -->`;
+/** WHICH document a sticky carries.
+ *
+ *  One workflow can run two tiers against the same pull request — a code gate and a page
+ *  sweep — and they do not write the same document: the digest names the distinct defects a
+ *  reviewer can act on in the diff, the page grid names what conforms page by page. They
+ *  shared one marker, and the sweep (337 files, 684 occurrences) overwrote the four
+ *  actionable findings of the gate on every run. The actionable half is the one that
+ *  disappeared, so the kind is part of the key.
+ *
+ *  `digest` renders the historical marker BYTE FOR BYTE. A sticky already posted must keep
+ *  being edited in place; re-keying it would leave the old comment orphaned on the PR and
+ *  post a duplicate beside it. */
+export type CommentKind = "digest" | "pages";
+
+/** The hidden key identifying this tool's comment for a given standard and kind.
+ *
+ *  The kinds cannot collide as substrings of one another: the digest key ends in `" -->"`
+ *  right after the standard, which the pages key never contains. That matters because
+ *  `pickExistingComment` matches with `includes` — a prefix relationship there would make one
+ *  tier adopt and overwrite the other's comment, which is the bug this parameter exists for. */
+export function COMMENT_MARKER(standard: StandardId, kind: CommentKind = "digest"): string {
+  return `<!-- ultra11y:report standard="${standard}"${kind === "digest" ? "" : ` kind="${kind}"`} -->`;
 }
 
-export function stickyBody(markdown: string, standard: StandardId): string {
-  return `${COMMENT_MARKER(standard)}\n${markdown}`;
+export function stickyBody(markdown: string, standard: StandardId, kind: CommentKind = "digest"): string {
+  return `${COMMENT_MARKER(standard, kind)}\n${markdown}`;
+}
+
+/** The kind a caller asked for, from an untrusted string (a workflow input, an env var).
+ *
+ *  Fails to `digest`, never to nothing: an unset or misspelled value must degrade to the
+ *  document every existing workflow already posts. A typo that silenced the comment entirely
+ *  would look exactly like a clean run. */
+export function commentKindFrom(value: string | undefined): CommentKind {
+  return value === "pages" ? "pages" : "digest";
 }
 
 /** The pull request to comment on: an explicit override, else the number GitHub Actions puts
@@ -51,11 +80,11 @@ export interface CommentResult {
 /** Post (or update) the audit summary on the current pull request. Best-effort: with no `gh`,
  *  no auth or no PR, it reports `skipped` and the caller carries on — a comment is never
  *  worth failing a build over. */
-export function pushPrComment(markdown: string, standard: StandardId = "wcag"): CommentResult {
+export function pushPrComment(markdown: string, standard: StandardId = "wcag", kind: CommentKind = "digest"): CommentResult {
   const pr = prNumberFromEnv();
   if (pr === undefined) return { ok: true, action: "skipped", reason: "not a pull-request run" };
-  const marker = COMMENT_MARKER(standard);
-  const body = stickyBody(markdown, standard);
+  const marker = COMMENT_MARKER(standard, kind);
+  const body = stickyBody(markdown, standard, kind);
   try {
     const repo = ghExec(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).trim();
     let existing: IssueComment | undefined;

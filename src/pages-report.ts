@@ -218,6 +218,15 @@ export function pageTally(rows: PageCriterionRow[]): { c: number; nc: number; na
   };
 }
 
+/** The tally as one sentence — « X conforme(s) · Y non conforme(s) · … ». Exported for the
+ *  same reason `formatRate` is: the sheet, the HTML and the pull-request grid all state a
+ *  page's standing, and a surface that phrases its own is a surface that will drift. The
+ *  « à évaluer » count is the half readers drop, and it is the one that says how much of the
+ *  page nobody has ruled on yet. */
+export function pageTallyNote(t: { c: number; nc: number; na: number; manual: number }, lang: Lang): string {
+  return L[lang].tally(t.c, t.nc, t.na, t.manual);
+}
+
 /** The rate's denominator, extracted so the sheet's « Couverture » line and the index cell are
  *  computed ONCE. They disagreed before: the sheet said 2/106 while the index printed a bare
  *  100 %, and the index is the artefact people paste into a pull request. */
@@ -259,7 +268,7 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
   const cov = pageCoverage(rows);
   const rate = pageRatePct(rows);
   out.push(`- **${s.rate}** : **${rate === null ? "—" : `${rate} %`}** _(${s.rateNote})_`);
-  out.push(`- ${s.tally(t.c, t.nc, t.na, t.manual)}`);
+  out.push(`- ${pageTallyNote(t, lang)}`);
   // The rate alone reads as a verdict on the page. Naming the denominator next to it is
   // what stops "100 %" over six decided criteria from being quoted as a conformant page.
   out.push(`- ${s.coverage(cov.decided, cov.total)}`, "");

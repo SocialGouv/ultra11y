@@ -335,6 +335,28 @@ jobs:
             console.log("pages:", p.map(x => x.id + " " + x.conformancePct + "%").join(", "));
           '
 
+      # The page-by-page comment, on the only audit in this repo that actually carries pages.
+      # The DOCUMENT is unit-tested (tests/pr-comment-pages.test.ts, against the same
+      # projections); what only an integration can prove is that the kind threads from the
+      # environment through the shipped BUNDLE on a real audit. Rendered, never posted:
+      # `comment: 'true'` here would write on this repository's own pull requests.
+      - name: The page-by-page comment renders from the shipped bundle
+        env:
+          ULTRA11Y_PR_COMMENT: "1"
+          ULTRA11Y_PR_COMMENT_KIND: pages
+          ULTRA11Y_ARTIFACT_NAME: action-e2e-pages
+        run: |
+          set -euo pipefail
+          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" report --in audits/audit-latest.json \
+            --standard rgaa --lang fr --format github > /dev/null 2> comment.log
+          # Off a pull request the post is skipped — and reaching "skipped" is exactly what
+          # proves the render ran first, since it is rendered before it is pushed.
+          grep -qi "ignoré\|skipped" comment.log || { echo "::error::the pages comment path did not run"; cat comment.log; exit 1; }
+          # A kind the engine does not know must fall back to the digest, never to silence.
+          ULTRA11Y_PR_COMMENT_KIND=nonsense node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" report \
+            --in audits/audit-latest.json --standard rgaa --lang fr --format github > /dev/null 2> fallback.log
+          grep -qi "ignoré\|skipped" fallback.log || { echo "::error::an unknown comment-kind silenced the comment"; cat fallback.log; exit 1; }
+
       # THE COMPENSATING CONTROL. The action's `HTML report` step degrades to a ::warning:: on
       # purpose — a rendering bug must never become a red accessibility gate — which means
       # nothing over there can catch a front door that stopped being produced. These

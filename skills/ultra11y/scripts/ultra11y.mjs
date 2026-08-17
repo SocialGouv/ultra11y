@@ -53611,12 +53611,15 @@ function ghAvailable() {
 }
 
 // src/pr-comment.ts
-function COMMENT_MARKER(standard) {
-  return `<!-- ultra11y:report standard="${standard}" -->`;
+function COMMENT_MARKER(standard, kind = "digest") {
+  return `<!-- ultra11y:report standard="${standard}"${kind === "digest" ? "" : ` kind="${kind}"`} -->`;
 }
-function stickyBody(markdown, standard) {
-  return `${COMMENT_MARKER(standard)}
+function stickyBody(markdown, standard, kind = "digest") {
+  return `${COMMENT_MARKER(standard, kind)}
 ${markdown}`;
+}
+function commentKindFrom(value) {
+  return value === "pages" ? "pages" : "digest";
 }
 function prNumberFromEnv(env = process.env) {
   const explicit = Number.parseInt(env.ULTRA11Y_PR ?? "", 10);
@@ -53628,11 +53631,11 @@ function prNumberFromEnv(env = process.env) {
 function pickExistingComment(comments, marker) {
   return comments.find((c2) => typeof c2.body === "string" && c2.body.includes(marker));
 }
-function pushPrComment(markdown, standard = "wcag") {
+function pushPrComment(markdown, standard = "wcag", kind = "digest") {
   const pr = prNumberFromEnv();
   if (pr === void 0) return { ok: true, action: "skipped", reason: "not a pull-request run" };
-  const marker = COMMENT_MARKER(standard);
-  const body3 = stickyBody(markdown, standard);
+  const marker = COMMENT_MARKER(standard, kind);
+  const body3 = stickyBody(markdown, standard, kind);
   try {
     const repo = ghExec(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).trim();
     let existing;
@@ -55184,6 +55187,9 @@ function pageTally(rows) {
     manual: rows.filter((r) => r.status === "manual").length
   };
 }
+function pageTallyNote(t2, lang) {
+  return L7[lang].tally(t2.c, t2.nc, t2.na, t2.manual);
+}
 function pageCoverage(rows) {
   const t2 = pageTally(rows);
   return { decided: t2.c + t2.nc, total: rows.length };
@@ -55209,7 +55215,7 @@ function renderPageReport(result, page, opts = {}) {
   const cov = pageCoverage(rows);
   const rate = pageRatePct(rows);
   out2.push(`- **${s.rate}** : **${rate === null ? "\u2014" : `${rate} %`}** _(${s.rateNote})_`);
-  out2.push(`- ${s.tally(t2.c, t2.nc, t2.na, t2.manual)}`);
+  out2.push(`- ${pageTallyNote(t2, lang)}`);
   out2.push(`- ${s.coverage(cov.decided, cov.total)}`, "");
   if (page.basis !== "snapshot") out2.push(`> \u26A0\uFE0F ${s.sourceWarn}`, "");
   const shot = opts.screenshots?.get(page.id);
@@ -60052,7 +60058,15 @@ var S = {
     clamped: (n) => `_${n} groupe(s) retir\xE9(s) de ce commentaire pour tenir dans la limite de GitHub \u2014 le r\xE9sum\xE9 de job les porte tous._`,
     unanchored: (n) => `${n} constat(s) rattach\xE9(s) \xE0 une URL, sans ligne de code \xE0 annoter \u2014 voir le rapport.`,
     unattributed: (n) => `${n} constat(s) ne sont rattach\xE9s \xE0 aucune page (code partag\xE9, fichier hors routes) \u2014 compt\xE9s dans l'audit global, jamais r\xE9partis d'office.`,
-    sourceBasis: "Une page marqu\xE9e \xAB source \xBB n'a pas d'instantan\xE9 : l'absence de constat n'y vaut PAS conformit\xE9, et son taux ne porte que sur ce que le moteur a pu d\xE9cider ailleurs."
+    sourceBasis: "Une page marqu\xE9e \xAB source \xBB n'a pas d'instantan\xE9 : l'absence de constat n'y vaut PAS conformit\xE9, et son taux ne porte que sur ce que le moteur a pu d\xE9cider ailleurs.",
+    pageByPage: "page par page",
+    pagesCount: (n) => `${n} page(s)`,
+    testsCol: "Tests",
+    noPages: "Aucune page dans le p\xE9rim\xE8tre de ce run : le balayage n'a produit aucun instantan\xE9. Ce n'est pas un bilan vide, c'est un bilan absent \u2014 les crit\xE8res au rendu restent \xE0 \xE9valuer.",
+    pagesDetailNote: "Un bloc par page portant au moins une non-conformit\xE9, et seulement ses crit\xE8res **non conformes** \u2014 la grille compl\xE8te (les 106 crit\xE8res de chaque page, avec leurs tests et leurs captures) vit dans l'artefact.",
+    pagesClamped: (n) => `_Le d\xE9tail de ${n} page(s) a \xE9t\xE9 retir\xE9 de ce commentaire pour tenir dans la limite de GitHub \u2014 l'artefact les porte toutes._`,
+    scoreboardClamped: (n) => `_${n} page(s) retir\xE9e(s) du tableau pour tenir dans la limite de GitHub \u2014 l'artefact les porte toutes._`,
+    noCriterionForFindings: (n) => `${n} constat(s) sur cette page ne rendent aucun crit\xE8re du r\xE9f\xE9rentiel non conforme : leur r\xE8gle sort du p\xE9rim\xE8tre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont d\xE9taill\xE9s dans l'artefact.`
   },
   en: {
     title: "ultra11y accessibility audit",
@@ -60085,7 +60099,15 @@ var S = {
     clamped: (n) => `_${n} group(s) dropped from this comment to fit GitHub's limit \u2014 the job summary carries them all._`,
     unanchored: (n) => `${n} finding(s) keyed to a URL, with no code line to annotate \u2014 see the report.`,
     unattributed: (n) => `${n} finding(s) are attributed to no page (shared code, file outside any route) \u2014 counted in the overall audit, never spread across pages.`,
-    sourceBasis: 'A page marked "source" has no snapshot: the absence of a finding there does NOT mean conforming, and its rate covers only what the engine could decide elsewhere.'
+    sourceBasis: 'A page marked "source" has no snapshot: the absence of a finding there does NOT mean conforming, and its rate covers only what the engine could decide elsewhere.',
+    pageByPage: "page by page",
+    pagesCount: (n) => `${n} page(s)`,
+    testsCol: "Tests",
+    noPages: "No page in this run's scope: the sweep produced no snapshot. This is not an empty scoreboard, it is a missing one \u2014 the rendering criteria stay to assess.",
+    pagesDetailNote: "One block per page carrying at least one non-conformity, and only its **non-conforming** criteria \u2014 the full grid (every criterion of every page, with its tests and its screenshot) lives in the artifact.",
+    pagesClamped: (n) => `_The detail of ${n} page(s) was dropped from this comment to fit GitHub's limit \u2014 the artifact carries them all._`,
+    scoreboardClamped: (n) => `_${n} page(s) dropped from the table to fit GitHub's limit \u2014 the artifact carries them all._`,
+    noCriterionForFindings: (n) => `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`
   }
 };
 var MAX_ROWS = 50;
@@ -60201,22 +60223,103 @@ function perPageTable(result, standard = CORE2, lang = "en") {
   if (!scope.length) return "";
   attributePages(result, scope);
   const derived = derivePages(result, scope);
-  const out2 = [`### ${s.perPage}`, ""];
-  out2.push(`| ${s.page} | ${s.basis} | ${s.pageRate} | \u{1F534} | \u{1F7E0} | \u{1F7E1} |`, "| --- | --- | ---: | ---: | ---: | ---: |");
+  return [`### ${s.perPage}`, "", ...scoreboardTable(derived, s, lang), "", ...basisCaveats(result, derived, s, lang)].join("\n");
+}
+function scoreboardTable(derived, s, lang) {
+  const out2 = [`| ${s.page} | ${s.basis} | ${s.pageRate} | \u{1F534} | \u{1F7E0} | \u{1F7E1} |`, "| --- | --- | ---: | ---: | ---: | ---: |"];
   for (const pg of derived) {
-    const nc = pg.findings.filter((f) => !f.advisory);
-    const n = (sev) => nc.filter((f) => f.severity === sev).length;
+    const n = (sev) => severityCount(pg, sev);
     out2.push(
       `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${formatRate(pg.conformancePct, pg.decided, pg.total)} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
     );
   }
-  out2.push("");
+  return out2;
+}
+function severityCount(pg, sev) {
+  return pg.findings.filter((f) => !f.advisory && f.severity === sev).length;
+}
+function basisCaveats(result, derived, s, lang) {
+  const out2 = [];
   const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
   if (orphans) out2.push(`> ${s.unattributed(orphans)}`, "");
   if (derived.some((p) => p.basis === "attributed")) out2.push(`> ${s.sourceBasis}`, "");
   const notAudited = pageBasisWarning("not-audited", lang);
   if (notAudited && derived.some((p) => p.basis === "not-audited")) out2.push(`> ${notAudited}`, "");
+  return out2;
+}
+function pageBlock(result, page, standard, lang) {
+  const s = S[lang];
+  const rows = pageCriterionRows(result, page, standard, lang);
+  const nc = rows.filter((r) => r.status === "NC");
+  const occurrences = page.findings.filter((f) => !f.advisory).length;
+  if (!nc.length && !occurrences) return void 0;
+  const cell = (v) => v.replace(/\|/g, "\\|");
+  const counts = `\u{1F534} ${severityCount(page, "bloquant")} \xB7 \u{1F7E0} ${severityCount(page, "majeur")} \xB7 \u{1F7E1} ${severityCount(page, "mineur")}`;
+  const withTests = nc.some((r) => r.tests.length);
+  const out2 = [
+    "<details>",
+    `<summary><b>${cell(page.name)}</b>${page.auth ? " \u{1F512}" : ""} \u2014 ${counts}</summary>`,
+    // GFM only renders Markdown inside <details> after a blank line; without it the table
+    // ships to the reader as literal pipes.
+    "",
+    `${pageTallyNote(pageTally(rows), lang)}`,
+    ""
+  ];
+  if (!nc.length) {
+    out2.push(s.noCriterionForFindings(occurrences), "", "</details>");
+    return out2.join("\n");
+  }
+  out2.push(withTests ? `| ${s.criterion} | ${s.testsCol} |` : `| ${s.criterion} |`, withTests ? "| --- | --- |" : "| --- |");
+  for (const r of nc) {
+    out2.push(withTests ? `| ${cell(r.label)} | ${r.tests.map((t2) => `\`${t2}\``).join(" ")} |` : `| ${cell(r.label)} |`);
+  }
+  out2.push("", "</details>");
   return out2.join("\n");
+}
+function pagesComment(result, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const s = S[lang];
+  const stdLabel = isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name;
+  const redirected = result.scope.redirected ?? [];
+  const scope = pagesOf(result);
+  const head = [`### ${s.title} \u2014 ${stdLabel} \xB7 ${s.pageByPage}`, ""];
+  const tail = [];
+  if (opts.artifactName) tail.push(s.artifact(opts.artifactName), "");
+  if (opts.runUrl) tail.push(s.runLink(opts.runUrl), "");
+  if (!scope.length) {
+    head.push(s.noPages, "");
+    if (redirected.length) head.push(...renderRedirected(redirected, lang), "");
+    return [...head, ...tail].join("\n").trimEnd();
+  }
+  attributePages(result, scope);
+  const derived = derivePages(result, scope);
+  const normative = findingsForStandard(result, standard).filter((f) => !f.advisory);
+  const blocking = normative.filter((f) => f.severity === "bloquant").length;
+  const rate = runRate(result, standard, lang);
+  head.push(blocking ? s.verdictFail(blocking) : normative.length ? s.verdictWarn : s.verdictPass, "");
+  head.push(`\`${result.date}\` \xB7 ${s.pagesCount(derived.length)} \xB7 **${rate.text}** ${s.rate}`, "");
+  if (rate.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
+  const blocks = [...derived].sort(
+    (a, b) => severityCount(b, "bloquant") - severityCount(a, "bloquant") || severityCount(b, "majeur") - severityCount(a, "majeur") || severityCount(b, "mineur") - severityCount(a, "mineur")
+  ).map((p) => pageBlock(result, p, standard, lang)).filter((b) => b !== void 0);
+  const assemble = (nBlocks2, nRows2) => {
+    const body3 = [...scoreboardTable(derived.slice(0, nRows2), s, lang), ""];
+    if (nRows2 < derived.length) body3.push(s.scoreboardClamped(derived.length - nRows2), "");
+    body3.push(...basisCaveats(result, derived, s, lang));
+    if (redirected.length) body3.push(...renderRedirected(redirected, lang), "");
+    if (blocks.length) {
+      body3.push(`> ${s.pagesDetailNote}`, "");
+      body3.push(...blocks.slice(0, nBlocks2).flatMap((b) => [b, ""]));
+      if (nBlocks2 < blocks.length) body3.push(s.pagesClamped(blocks.length - nBlocks2), "");
+    }
+    return [...head, ...body3, ...tail].join("\n").trimEnd();
+  };
+  let nBlocks = blocks.length;
+  let nRows = derived.length;
+  while (nBlocks > 0 && assemble(nBlocks, nRows).length > COMMENT_LIMIT) nBlocks--;
+  while (nRows > 0 && assemble(nBlocks, nRows).length > COMMENT_LIMIT) nRows--;
+  return assemble(nBlocks, nRows);
 }
 
 // src/evidence.ts
@@ -65032,7 +65135,9 @@ function emitCiFormat(result, format, standard, lang, failOn) {
     console.error(md);
   }
   if (process.env.ULTRA11Y_PR_COMMENT === "1") {
-    const digest = prComment(result, {
+    const kind = commentKindFrom(process.env.ULTRA11Y_PR_COMMENT_KIND);
+    const render2 = kind === "pages" ? pagesComment : prComment;
+    const body3 = render2(result, {
       standard,
       lang,
       // The run is known before the artifact exists, so the link is always safe. The artifact
@@ -65041,7 +65146,7 @@ function emitCiFormat(result, format, standard, lang, failOn) {
       ...process.env.ULTRA11Y_RUN_URL ? { runUrl: process.env.ULTRA11Y_RUN_URL } : {},
       ...process.env.ULTRA11Y_ARTIFACT_NAME ? { artifactName: process.env.ULTRA11Y_ARTIFACT_NAME } : {}
     });
-    const c2 = pushPrComment(digest, standard);
+    const c2 = pushPrComment(body3, standard, kind);
     console.error(
       c2.ok ? lang === "fr" ? `ultra11y : commentaire de PR ${c2.action === "updated" ? "mis \xE0 jour" : c2.action === "created" ? "cr\xE9\xE9" : "ignor\xE9"}${c2.reason ? ` (${c2.reason})` : ""}.` : `ultra11y: PR comment ${c2.action}${c2.reason ? ` (${c2.reason})` : ""}.` : lang === "fr" ? `ultra11y : commentaire de PR impossible${c2.reason ? ` \u2014 ${c2.reason}` : ""}.` : `ultra11y: PR comment failed${c2.reason ? ` \u2014 ${c2.reason}` : ""}.`
     );
