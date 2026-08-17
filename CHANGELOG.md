@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.2.0](https://github.com/maxgfr/ultra11y/compare/v5.1.0...v5.2.0) (2026-08-17)
+
+
+### Features
+
+* **e2e:** drive the sweep from the sample instead of a second copy of it ([7d17aa9](https://github.com/maxgfr/ultra11y/commit/7d17aa98d603fa528867072ab85d2ee0e3bbc9ea))
+
 # [5.1.0](https://github.com/maxgfr/ultra11y/compare/v5.0.1...v5.1.0) (2026-08-17)
 
 
