@@ -62,12 +62,54 @@ run and an RGAA run coexist rather than overwriting each other. The Markdown rep
 through `check` before being uploaded, so CI cannot publish a report citing an invented
 criterion.
 
-## Adjudicating the judgment criteria in CI (`adjudicate`)
+## The verdict ledger (`ledger`) — a complete grid in CI, with no model
 
 Of the 55 WCAG 2.2 AA criteria the engine decides a handful; **38 are judgment calls**, and
-under RGAA **81 of 106** can only ever derive `manual`. Inside a coding agent the agent rules
-on them. In CI nobody does, so they stay « à évaluer » and the published conformance rate is
-partial by construction. `adjudicate` closes that — opt-in, in two modes.
+under RGAA **59 of 106** can only ever derive `manual`. Inside a coding agent the agent rules on
+them. In CI nobody does — so before the ledger, a CI grid was partial by construction and the
+only way to close it was to pay for an agent pass on every run.
+
+A **ledger** is a file of verdicts committed to the audited repository
+(`.ultra11y/verdicts/<standard>.json`), each carrying its justification, its citations, and a
+FINGERPRINT of the evidence it was ruled against:
+
+```yaml
+- uses: maxgfr/ultra11y@v5
+  with:
+    standard: rgaa
+    ledger: 'true'          # or an explicit path
+```
+
+Replaying it is **a re-verification, not a cache hit**. Every stored verdict is rebuilt into an
+ordinary adjudication over the evidence re-derived from the audit in front of it, and folded
+through the same `applyAdjudication` — same coverage checks in both directions, same citation
+matching against the criterion's own anchors, same content-level re-grounding. A verdict nobody
+can prove is refused in CI exactly as it would be in a session.
+
+Three properties are worth knowing:
+
+- **A stale verdict is dropped, never carried.** When the code under a criterion changes, the
+  evidence changes with it, the fingerprint stops matching, and the criterion returns to « à
+  évaluer » saying so — with the date it was recorded and both evidence counts. A verdict that
+  silently outlives the code it described is the one thing a conformance deliverable cannot
+  afford. The log names every stale and every uncovered criterion, so a refresh pass knows
+  exactly what to re-adjudicate.
+- **A reformatting is not a change.** The fingerprint ignores line numbers and the replay
+  re-anchors stored citations onto today's lines, so adding a comment at the top of a file does
+  not invalidate every verdict in it.
+- **A missing or refused ledger never fails the job.** The criteria stay « à évaluer », which is
+  where they would have been without one.
+
+To FILL it, run an adjudication with `ledger` set: the accepted verdicts are recorded on the way
+out. Only accepted ones — a refused verdict in the ledger would be laundered back in on the next
+replay. A defensible split is a weekly (or `workflow_dispatch`) job that adjudicates and commits
+the refreshed ledger, and a pull-request job that only replays it.
+
+## Adjudicating the judgment criteria in CI (`adjudicate`)
+
+`adjudicate` is what FILLS the ledger — opt-in, in two modes. It runs **after** the replay, so a
+paid pass only ever covers what the ledger did not: on a repository whose ledger is current, it
+has nothing left to rule on and costs nothing.
 
 ```yaml
 env:

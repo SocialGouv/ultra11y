@@ -117,7 +117,7 @@ Then `node scripts/ultra11y.mjs verify --apply VERIFY.todo.json` is green again 
 ## Under a country standard, the worklist speaks that standard
 
 `verify --manual --standard rgaa` keys the worklist by **RGAA criteria**, not WCAG success
-criteria — which is the granularity that matters, since 99 of RGAA's 106 criteria can only
+criteria — which is the granularity that matters, since 59 of RGAA's 106 criteria can only
 ever derive `manual`. Each item carries, inline:
 
 - the criterion's **numbered tests, in full** (`11.2.1` … `11.2.6`) — what actually has to be
@@ -163,15 +163,27 @@ gate refuses:
 
 | It returns | The gate does |
 |---|---|
-| `C`/`NA` with no justification | rejects the whole adjudication |
-| `NC` citing nothing, or a `file:line` that does not resolve against real source | rejects |
-| `NC` citing a `normativeRef` belonging to another criterion | rejects |
-| `manual` with no reason | rejects |
+| `C`/`NA` with no justification | refuses THAT criterion |
+| `NC` citing nothing, or a `file:line` that does not resolve against real source | refuses it |
+| `NC` citing a `normativeRef` belonging to another criterion | refuses it |
+| `manual` with no reason | refuses it |
 | a verdict for a criterion nobody asked about | dropped before it reaches the gate |
-| fewer verdicts than criteria (a truncated `--max` run, a failed batch) | rejects on coverage |
+| fewer verdicts than criteria (a bounded `--max` run, a failed batch) | the missing ones stay « à évaluer »; the rest lands |
 | all `manual` with reasons | **accepts** — that is a correct answer, not a failure |
 
-A rejected adjudication leaves `audit-latest.json` untouched.
+**The fold is fail-closed per VERDICT, not per FILE.** No refused verdict is ever applied, and a
+refusal costs its own criterion and nothing else: that criterion stays « à évaluer » carrying the
+refusal as its reason, and every verdict that proved itself lands. This is not a loosening of the
+gate — every check above is unchanged — it is a change of blast radius, and it was measured:
+a CI run filled 95 of 96 verdicts correctly, one came back `null`, and the old file-level fold
+discarded all 96, so a $16 adjudication published « à évaluer » across the whole grid in a job
+that reported success.
+
+`--strict` restores the all-or-nothing fold for a caller who genuinely wants it (a deliverable
+signed off in one pass); there, a rejected adjudication leaves `audit-latest.json` untouched.
+
+Whatever lands can be RECORDED with `--ledger <path>` and replayed on a later run with no model
+in the loop — see `references/ci.md`.
 
 **Strictly opt-in.** With no key the command explains itself and exits 2; nothing else in the
 engine changes.
@@ -184,8 +196,9 @@ while an agent can open the cited files, which is what *link purpose in context*
 Both skip themselves when `ANTHROPIC_API_KEY` is absent from the job environment, and both
 absorb their own failure rather than taking the audit down with them. See `references/ci.md`.
 
-`--max` bounds the spend and says out loud which criteria it did not submit. It is **refused
-together with `--apply`**, before any call is made: the gate rejects an incomplete
-adjudication by design, so the pair could only ever bill you for a guaranteed failure. Drop
-`--max` to adjudicate everything, or drop `--apply` to produce the worklist now and fold it
-in later.
+`--max` bounds the spend and says out loud which criteria it did not submit. It now composes
+with `--apply`: the fold is per-verdict, so a bounded run lands what it covered and the rest stay
+« à évaluer » — which is exactly what bounding spend is for. (It used to be refused outright, and
+rightly so while the fold was all-or-nothing: the pair could only ever bill a full run to
+guarantee a coverage failure. That refusal survives under `--apply --strict`, where it is still
+true.)

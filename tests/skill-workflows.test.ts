@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { standardCoverage } from "../src/standards/coverage.js";
 
 const REFS = join(dirname(fileURLToPath(import.meta.url)), "..", "skills/ultra11y/references");
 const read = (f: string): string => readFileSync(join(REFS, f), "utf8");
@@ -213,7 +214,11 @@ describe("judgment.md teaches adjudicating under a country standard", () => {
   it("says the worklist is keyed by the standard's own criteria", () => {
     expect(t).toContain("--standard rgaa");
     expect(t).toMatch(/RGAA criteria/);
-    expect(t).toMatch(/99 of/);
+    // DERIVED, not hardcoded: this used to pin "99 of", a figure the pack never supported — so
+    // the test held a wrong number in place instead of catching it. The cross-document check
+    // lives in tests/standards-coverage.test.ts.
+    const judgment = [...standardCoverage("rgaa").values()].filter((c) => c.tier === "judgment").length;
+    expect(t).toMatch(new RegExp(`${judgment} of RGAA's 106`));
   });
   it("states the citation rule and WHY it exists", () => {
     expect(t).toContain("normativeRef");

@@ -226,12 +226,41 @@ describe("the adjudication tier", () => {
     expect(readers.length).toBeGreaterThan(CONSUMERS.length);
     for (const r of readers) {
       // Gate re-reads it to decide red or green, not to render a surface, and is asserted last
-      // by its own test.
-      if (r.startsWith("Adjudicate") || r.startsWith("Gate")) continue;
+      // by its own test. The ledger replay is a DECIDER, like the adjudication tier — it folds
+      // stored verdicts INTO the audit — and has its own ordering test below.
+      if (r.startsWith("Adjudicate") || r.startsWith("Gate") || r.startsWith("Replay the verdict ledger")) continue;
       expect(
         CONSUMERS.some((d) => r.includes(d)),
         `step "${r}" reads audit-latest.json but is not in CONSUMERS`,
       ).toBe(true);
+    }
+  });
+
+  // The ledger is what lets a CI job publish a complete grid without a model, and its position
+  // is the whole economy of the tier: replay first, so a paid pass only ever covers what the
+  // ledger did not. Ordered after the scan for the same reason the adjudication is — by then
+  // the rendered criteria are decided and no stored verdict can contradict a measurement.
+  it("replays the verdict ledger after the scan and BEFORE any paid adjudication", () => {
+    const ledger = idx("Replay the verdict ledger");
+    const scan = idx("Scan the pages");
+    const firstPaid = ACTION.runs.steps.findIndex((s) => s.name?.startsWith("Adjudicate") || s.name?.includes("Resolve the adjudication"));
+
+    expect(ledger).toBeGreaterThan(scan);
+    expect(ledger).toBeLessThan(firstPaid);
+  });
+
+  it("never lets a missing or refused ledger take the job down", () => {
+    const ledger = ACTION.runs.steps.find((s) => s.id === "ledger");
+    expect(ledger?.run).toContain("::warning::");
+    // No `exit 1` anywhere: the criteria simply stay to assess, which is where they would have
+    // been without a ledger at all.
+    expect(ledger?.run).not.toContain("exit 1");
+  });
+
+  it("records the accepted verdicts in both adjudication modes, so a paid pass is never paid twice", () => {
+    for (const name of ["Adjudicate with the API", "Adjudicate with an agent — fold the verdicts"]) {
+      const step = ACTION.runs.steps.find((s) => s.name === name);
+      expect(step?.run, `step "${name}" does not record a ledger`).toContain("--ledger");
     }
   });
 

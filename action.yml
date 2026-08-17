@@ -155,12 +155,16 @@ inputs:
     description: 'Print the ticket plan without creating anything. Use it on a pull request, and file for real only on the default branch.'
     required: false
     default: 'false'
+  ledger:
+    description: 'Path to a committed VERDICT LEDGER (default `.ultra11y/verdicts/<standard>.json` when set to `true`; empty disables it). Adjudicated verdicts are recorded there and REPLAYED on later runs with no model in the loop, which is what lets a CI job publish a complete criterion grid for free. The replay is a re-verification, not a cache hit: every verdict goes back through the same gate, over evidence re-derived from the audit in front of it, and one whose evidence has since changed is dropped as stale with the criterion saying so. Combine with `adjudicate` to refresh what the ledger does not cover — the replay runs first, so the model is only ever asked about the remainder.'
+    required: false
+    default: ''
   adjudicate:
-    description: 'Rule on the judgment criteria the static engine cannot decide (alt relevance, link purpose in context, reading order): `api` sends the worklist to the Anthropic API in batches, `agent` hands it to a Claude Code run, `none` (default) leaves them « to assess ». Both modes read their credential from the JOB environment, never from an input, and skip themselves when it is absent — which is what makes them harmless on a fork pull request. `api` needs ANTHROPIC_API_KEY (the Messages API takes nothing else); `agent` accepts ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN, the token a Pro/Max subscriber mints with `claude setup-token`. `agent` also skips itself on an event claude-code-action does not support — `push` above all.'
+    description: 'Rule on the judgment criteria the static engine cannot decide (alt relevance, link purpose in context, reading order): `api` sends the worklist to the Anthropic API in batches, `agent` hands it to a Claude Code run, `none` (default) leaves them « to assess ». Both modes read their credential from the JOB environment, never from an input, and skip themselves when it is absent — which is what makes them harmless on a fork pull request. `api` needs ANTHROPIC_API_KEY (the Messages API takes nothing else); `agent` accepts ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN, the token a Pro/Max subscriber mints with `claude setup-token`. `agent` also skips itself on an event claude-code-action does not support — `push` above all. Pair it with `ledger` so each run records what it paid for.'
     required: false
     default: 'none'
   adjudicate-max-turns:
-    description: 'Turn budget for `adjudicate: agent`. Empty (default) derives it from the worklist — 4 turns per criterion plus headroom — because the runbook is sequential and each criterion costs real tool calls. Set it only to override that: a budget too small does not truncate the result, it LOSES it, since the fold refuses a partial adjudication and discards every verdict already produced.'
+    description: 'Turn budget for `adjudicate: agent`. Empty (default) derives it from the worklist — 4 turns per criterion plus headroom — because the runbook is sequential and each criterion costs real tool calls. Set it only to override that: a budget too small costs the criteria it did not reach (the fold is per-verdict), so the remainder simply stays to assess.'
     required: false
     default: ''
   adjudicate-model:
@@ -303,12 +307,51 @@ runs:
           node "$ENGINE" scan ${{ inputs.urls }} "${args[@]}"
         fi
 
-    # THE ADJUDICATION TIER — the judgment criteria, ruled on when nobody is in the loop.
+    # THE VERDICT LEDGER — the judgment criteria that were already ruled on, replayed for free.
     #
-    # Of the 55 WCAG 2.2 AA criteria, 38 are judgment calls; under RGAA, 81 of 106 can only
-    # ever derive `manual`. Inside a coding agent those are adjudicated by the agent itself.
-    # In CI nobody rules on them, so they stay « à évaluer » forever: honest, and an
-    # incomplete deliverable. These steps close that gap — strictly opt-in.
+    # This is what makes a CI grid complete without a model. A ledger is a committed file of
+    # verdicts, each carrying a fingerprint of the evidence it was ruled against; replaying it
+    # runs every verdict back through the SAME gate the adjudication passes, over evidence
+    # re-derived from the audit in front of it. So a stored verdict has to prove itself again on
+    # each run, and one whose evidence has changed is dropped as stale with its criterion saying
+    # exactly that — never silently carried forward.
+    #
+    # It runs BEFORE the adjudication tier for the same reason `scan` does: by the time a model
+    # is asked anything, everything already decided is decided, so a paid pass only ever covers
+    # the remainder. On a repository whose ledger is current, that remainder is empty and the
+    # tier below costs nothing at all.
+    - name: Replay the verdict ledger
+      id: ledger
+      if: inputs.ledger != '' && inputs.ledger != 'false'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+        LEDGER: ${{ inputs.ledger }}
+        STANDARD: ${{ inputs.standard }}
+      run: |
+        set -euo pipefail
+        path="$LEDGER"
+        if [ "$path" = 'true' ]; then path=".ultra11y/verdicts/${STANDARD}.json"; fi
+        if [ ! -f "$path" ]; then
+          echo "::warning::ultra11y: no verdict ledger at $path — the judgment criteria stay to assess. Run an adjudication with \`ledger\` set to record one, then commit it."
+          exit 0
+        fi
+        # Never fatal. A ledger the gate refuses leaves the criteria to assess, which is the
+        # same place they would have been without one — it must not cost the whole audit.
+        if node "$ENGINE" verify --apply "$path" --in audits/audit-latest.json --out audits --standard "$STANDARD"; then
+          echo "ultra11y: replayed the verdict ledger from $path."
+        else
+          echo "::warning::ultra11y: the verdict ledger at $path was refused — the judgment criteria stay to assess."
+        fi
+
+    # THE ADJUDICATION TIER — the judgment criteria nothing has ruled on yet.
+    #
+    # Of the 55 WCAG 2.2 AA criteria, 38 are judgment calls and 14 need a rendered page. Inside
+    # a coding agent those are adjudicated by the agent itself. In CI nobody rules on them, so
+    # they stay « à évaluer » forever: honest, and an incomplete deliverable. These steps close
+    # that gap — strictly opt-in. With `ledger` set, they also RECORD what they ruled, so the
+    # next run replays it instead of paying again.
     #
     # They sit HERE, after `scan`, on purpose: the rendered tier has just decided the criteria
     # that need a browser, so the model is never asked to rule on computed contrast — it would
@@ -411,10 +454,15 @@ runs:
         args=(--in audits/audit-latest.json --out audits --apply)
         args+=(--standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}')
         if [ -n '${{ inputs.adjudicate-model }}' ]; then args+=(--model '${{ inputs.adjudicate-model }}'); fi
-        # An adjudication that fails is not an audit that fails. The fold is fail-closed, so
-        # one rate-limited batch refuses the whole apply — absorb that and carry on with the
-        # criteria still to assess, exactly as if the tier had been off. The one exception is
-        # a caller who gated on these verdicts: there, staying quiet would gate on nothing.
+        # Record what this pass paid for, so the next run replays it for free. Only ACCEPTED
+        # verdicts are written — a refused one in the ledger would be laundered back in.
+        if [ -n '${{ inputs.ledger }}' ] && [ '${{ inputs.ledger }}' != 'false' ]; then
+          if [ '${{ inputs.ledger }}' = 'true' ]; then args+=(--ledger ".ultra11y/verdicts/${{ inputs.standard }}.json"); else args+=(--ledger '${{ inputs.ledger }}'); fi
+        fi
+        # An adjudication that fails is not an audit that fails. The fold is per-verdict, so a
+        # rate-limited batch costs its own criteria and no others — absorb that and carry on
+        # with what is still to assess, exactly as if the tier had been off. The one exception
+        # is a caller who gated on these verdicts: there, staying quiet would gate on nothing.
         if node "$ENGINE" judge "${args[@]}"; then
           echo "ultra11y: adjudication applied."
         elif [ '${{ inputs.gate-adjudicated }}' = 'true' ]; then
@@ -511,11 +559,14 @@ runs:
              RUNBOOK to run a command: you have no shell, and this workflow folds the verdicts
              for you in its next step. You never run the engine and never fold anything.
 
-          Fill EVERY item's verdict. A partial file is discarded whole — the fold is
-          fail-closed — so a criterion you cannot decide from real evidence must be `manual`
-          with its `reason`. That is a correct answer, not a failure. Never assert a conformity
-          you did not verify: the fold re-grounds every file:line you cite and matches each
-          citation against that criterion's own harvested evidence.
+          Fill EVERY item's verdict. Each one stands or falls on its own: a verdict the gate
+          refuses costs its own criterion (which stays « to assess », carrying the refusal) and
+          leaves every other verdict standing — so work through the list steadily rather than
+          rushing to fill it, and never guess to avoid leaving a gap. A criterion you cannot
+          decide from real evidence must be `manual` with its `reason`; that is a correct
+          answer, not a failure. Never assert a conformity you did not verify: the fold
+          re-grounds every file:line you cite and matches each citation against that
+          criterion's own harvested evidence.
 
           Do not edit any other file, do not touch the audited source, do not commit, and do
           not comment on the PR.
@@ -527,17 +578,24 @@ runs:
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
       run: |
-        # Same fail-closed gate, same degradation policy as the API mode above.
+        # Same gate, same degradation policy as the API mode above.
         # The verdicts-only file the agent filled. `verify --apply` re-derives the evidence from
-        # the audit before folding, so this goes through the SAME fail-closed gate as an inline
-        # worklist — same coverage checks, same citation grounding, same refusals.
-        if node "$ENGINE" verify --apply audits/ADJUDICATE.verdicts.json --in audits/audit-latest.json --out audits; then
+        # the audit before folding, so this goes through the SAME gate as an inline worklist —
+        # same coverage checks, same citation grounding, same refusals. The fold is per-verdict,
+        # so a criterion the agent got wrong (or never reached) costs itself and nothing else.
+        args=(--apply audits/ADJUDICATE.verdicts.json --in audits/audit-latest.json --out audits)
+        # Record the accepted verdicts, so the next run replays them instead of paying again.
+        if [ -n '${{ inputs.ledger }}' ] && [ '${{ inputs.ledger }}' != 'false' ]; then
+          if [ '${{ inputs.ledger }}' = 'true' ]; then args+=(--ledger ".ultra11y/verdicts/${{ inputs.standard }}.json"); else args+=(--ledger '${{ inputs.ledger }}'); fi
+          args+=(--standard '${{ inputs.standard }}')
+        fi
+        if node "$ENGINE" verify "${args[@]}"; then
           echo "ultra11y: adjudication applied."
         elif [ '${{ inputs.gate-adjudicated }}' = 'true' ]; then
-          echo "::error::ultra11y: the adjudication was rejected and gate-adjudicated is on — refusing to gate on a partial adjudication."
+          echo "::error::ultra11y: the adjudication landed nothing and gate-adjudicated is on — refusing to gate on an empty adjudication."
           exit 1
         else
-          echo "::warning::ultra11y: the adjudication was rejected — the judgment criteria stay to assess."
+          echo "::warning::ultra11y: the adjudication landed nothing — the judgment criteria stay to assess."
         fi
 
     # The per-page DOSSIERS — one sheet per page (its screenshot, every criterion of the

@@ -4,6 +4,7 @@
 // own data rather than a heuristic. A plan that double-counts, drops a criterion, or files a
 // criterion the engine cannot see as "the engine has it" is worse than no plan — it turns
 // into a conformance claim nobody tested.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { criterionCoverage, ruleTier, standardCoverage, type Tier } from "../src/standards/coverage.js";
 import { allSC } from "../src/wcag.js";
@@ -120,5 +121,47 @@ describe("every criterion carries a stated reason", () => {
         expect(cov.why.length, `${standard} ${id}`).toBeGreaterThan(20);
       }
     }
+  });
+});
+
+// The prose used to disagree with itself about the single number a reader most wants: how many
+// RGAA criteria will no tool decide? SKILL.md said 58, references/ci.md said 81,
+// references/judgment.md said 99, and the pack itself says 59 — so at least two of the three
+// were wrong, and nothing would ever have caught them. references/pages.md named five criteria
+// that earn `C` by silence where only two do, because three of the five are `judgment: true`
+// and `judgmentGuard` turns their `C` into `manual`.
+//
+// These figures are load-bearing: they are how someone decides whether to pay for an
+// adjudication. Pin every place that states one against the pack that defines it.
+describe("the documented RGAA figures match the pack", () => {
+  const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+  const cov = standardCoverage("rgaa");
+  const judgmentCount = [...cov.values()].filter((c) => c.tier === "judgment").length;
+
+  it("states the same judgment count everywhere it is quoted", () => {
+    expect(judgmentCount).toBe(59); // the pack's own arithmetic; update the docs WITH this line
+    for (const doc of ["skills/ultra11y/SKILL.md", "skills/ultra11y/references/ci.md", "skills/ultra11y/references/judgment.md"]) {
+      const text = read(doc);
+      const quoted = [...text.matchAll(/(\d+)\s*(?:of|de)\s*(?:RGAA's\s*)?106/gi)].map((m) => Number(m[1]));
+      expect(quoted.length, `${doc} quotes no "<n> of 106" figure`).toBeGreaterThan(0);
+      for (const n of quoted) expect(n, `${doc} quotes "${n} of 106"`).toBe(judgmentCount);
+    }
+  });
+
+  it("names exactly the criteria that can earn C by silence, and no more", () => {
+    const staticSc = new Set(
+      allSC()
+        .filter((c) => c.automatability === "static")
+        .map((c) => c.sc),
+    );
+    const canC = allCriteria(loadPack("rgaa"))
+      .filter((c) => !c.judgment && c.wcag.length > 0 && c.wcag.every((sc) => staticSc.has(sc)))
+      .map((c) => c.id);
+    expect(canC.sort()).toEqual(["8.3", "8.5"]);
+
+    // …and the doc says so, rather than the five it used to list.
+    const pages = read("skills/ultra11y/references/pages.md");
+    expect(pages).toMatch(/\*\*8\.3 and 8\.5, and\s*\n?those two only\*\*/);
+    expect(pages).toMatch(/judgmentGuard/);
   });
 });

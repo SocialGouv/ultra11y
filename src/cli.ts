@@ -2905,16 +2905,18 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   }
   const max = typeof p.flags.max === "string" ? Number(p.flags.max) : undefined;
   const truncated = max !== undefined && Number.isFinite(max) && max > 0 && items.length > max;
-  // `--max` bounds the spend; `--apply` folds the verdicts through a gate that REFUSES an
-  // incomplete adjudication. Together they can never succeed — so say so before spending
-  // anything, instead of billing a full run and failing on coverage at the end.
-  if (truncated && p.flags.apply === true) {
+  // `--max` bounds the spend. It used to be refused outright together with `--apply`, and
+  // rightly so: the fold was all-or-nothing, so a bounded adjudication could only ever fail on
+  // coverage — billing a full run to guarantee a failure. The fold is now per-verdict, so a
+  // bounded run lands what it covered and leaves the rest to assess, which is precisely what
+  // someone bounding spend is asking for. The pair is impossible only under `--strict`.
+  if (truncated && p.flags.apply === true && p.flags.strict === true) {
     console.error(
       lang === "fr"
-        ? `ultra11y judge : --max ${max} ne couvre que ${max} des ${items.length} critères, et --apply exige une adjudication COMPLÈTE (le gate refuse une couverture partielle).\n` +
-            "  Retirez --max pour tout adjuger, ou retirez --apply pour produire la worklist et l'appliquer plus tard."
-        : `ultra11y judge: --max ${max} covers only ${max} of ${items.length} criteria, and --apply requires a COMPLETE adjudication (the gate refuses partial coverage).\n` +
-            "  Drop --max to adjudicate everything, or drop --apply to produce the worklist and apply it later.",
+        ? `ultra11y judge : --max ${max} ne couvre que ${max} des ${items.length} critères, et --apply --strict exige une adjudication COMPLÈTE (le fold tout-ou-rien refuse une couverture partielle).\n` +
+            "  Retirez --strict pour appliquer ce qui est couvert, retirez --max pour tout adjuger, ou retirez --apply pour produire la worklist et l'appliquer plus tard."
+        : `ultra11y judge: --max ${max} covers only ${max} of ${items.length} criteria, and --apply --strict requires a COMPLETE adjudication (the all-or-nothing fold refuses partial coverage).\n` +
+            "  Drop --strict to apply what is covered, drop --max to adjudicate everything, or drop --apply to produce the worklist and apply it later.",
     );
     return 2;
   }

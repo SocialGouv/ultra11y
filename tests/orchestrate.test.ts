@@ -363,8 +363,15 @@ describe("the adjudicator contract states every field the fold enforces", () => 
     expect(contract).toMatch(/evidence\[\]/);
   });
 
-  it("says an all-or-nothing refusal is the cost, so the stake is legible", () => {
-    expect(contract).toMatch(/WHOLE adjudication|whole adjudication/i);
+  // The stake has to be stated TRUTHFULLY, because it is what the adjudicator optimises
+  // against. It used to say a refusal discarded the whole adjudication; the fold is now
+  // per-verdict, and telling a model that its good work is at stake when it is not teaches it
+  // to guess in order to fill gaps — the one behaviour the gate exists to punish.
+  it("says a refusal costs its own criterion, and steers to an honest `manual` over a guess", () => {
+    expect(contract).toMatch(/costs THAT criterion/i);
+    expect(contract).toMatch(/leaves every other verdict standing/i);
+    expect(contract).toMatch(/never guess/i);
+    expect(contract).not.toMatch(/WHOLE adjudication/i);
   });
 
   it("carries citations in the structured-output schema the fan-out path validates against", () => {

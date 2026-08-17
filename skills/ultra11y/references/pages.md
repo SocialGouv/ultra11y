@@ -292,10 +292,19 @@ criterion means one definite failure fired *somewhere* — not that the engine c
 criterion. On a page where the failure did not fire, the engine knows "no definite failure
 here", which is not "conforming": alt relevance, link purpose and reading order are still
 nobody's verdict. So only the `static` criteria (the ones with an applicability predicate and
-rules, `src/audit.ts` `APPLICABLE`) earn `C` by silence — under RGAA that is 4.10 and
-8.3/8.4/8.5/8.6. Everything else stays « à évaluer » until `scan` or an adjudication decides
-it. Before this rule a page with no images scored 100% on « chaque image a-t-elle une
-alternative pertinente ? », a rate computed over criteria nobody had assessed.
+rules, `src/audit.ts` `APPLICABLE`) earn `C` by silence — under RGAA that is **8.3 and 8.5, and
+those two only**. 4.10, 8.4 and 8.6 look like they should qualify and do not: each is flagged
+`judgment: true`, because the criterion asks more than its mapped success criterion does (8.6
+asks whether the page title is *pertinent*; 2.4.2 only that a title exists), so `judgmentGuard`
+turns their `C` into `manual` on purpose. Everything else stays « à évaluer » until `scan`, the
+snapshot tier or an adjudication decides it. Before this rule a page with no images scored 100%
+on « chaque image a-t-elle une alternative pertinente ? », a rate computed over criteria nobody
+had assessed.
+
+What a criterion CAN be decided as, without any of that, is a separate question: since the
+engine learned to prove applicability (`src/audit.ts` `SUBJECT_MATTER`), a criterion whose
+subject matter is absent from the whole scope closes as a justified `NA` — so a repository with
+no media reports RGAA theme 4 as not applicable rather than as « à évaluer ».
 
 A non-normative recommendation never flips a page criterion to `NC`, exactly as in core.
 

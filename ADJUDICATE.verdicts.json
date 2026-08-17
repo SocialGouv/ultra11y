@@ -1,0 +1,51 @@
+{
+  "tool": "ultra11y",
+  "kind": "adjudication",
+  "schemaVersion": 2,
+  "standard": "wcag",
+  "auditDate": "2026-08-11",
+  "contract": {
+    "verdicts": [
+      "C",
+      "NC",
+      "NA",
+      "manual"
+    ],
+    "manualReasons": [
+      "needs-rendered-dom",
+      "undecidable"
+    ],
+    "requires": {
+      "C": "a non-empty justification AND citations[] naming the harvested evidence it cleared (each anchor resolvable and drawn from this criterion's own evidence); a criterion with no harvested evidence cannot be C at all",
+      "NA": "a non-empty justification",
+      "NC": "at least one groundable finding, each citing a normativeRef that resolves against the active standard",
+      "manual": "a reason ∈ {needs-rendered-dom, undecidable}"
+    }
+  },
+  "items": [
+    {
+      "criteriaId": "1.1.1",
+      "automatability": "judgment",
+      "title": "Non-text Content",
+      "verdict": null,
+      "justification": "",
+      "reason": null,
+      "findings": [],
+      "recommendations": [],
+      "decidedBy": "agent",
+      "evidence": []
+    },
+    {
+      "criteriaId": "1.2.1",
+      "automatability": "judgment",
+      "title": "Audio-only and Video-only (Prerecorded)",
+      "verdict": null,
+      "justification": "",
+      "reason": null,
+      "findings": [],
+      "recommendations": [],
+      "decidedBy": "agent",
+      "evidence": []
+    }
+  ]
+}

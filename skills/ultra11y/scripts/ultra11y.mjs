@@ -62496,7 +62496,7 @@ For EACH of your criteria:
    - \`manual\` (still undecidable) \u2014 REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide, e.g. computed contrast) or \`undecidable\` (the evidence cannot settle it either way).
 3. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with a reason \u2014 that is a valid, honest verdict; the scan tier or a human picks it up.
 
-Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "citations", "reason", "findings" }] }\` \u2014 your ITEMS only, every field grounded in what you actually read, every NC finding carrying its \`normativeRef\`, and every C (plus every evidenced NA) carrying its \`citations\`. A verdict that clears a criterion without naming what it cleared is refused by the fold, and one refusal discards the WHOLE adjudication \u2014 including every other verdict you got right.
+Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "citations", "reason", "findings" }] }\` \u2014 your ITEMS only, every field grounded in what you actually read, every NC finding carrying its \`normativeRef\`, and every C (plus every evidenced NA) carrying its \`citations\`. A verdict that clears a criterion without naming what it cleared is refused by the fold; the refusal costs THAT criterion \u2014 which stays \xAB to assess \xBB carrying the reason \u2014 and leaves every other verdict standing. So never guess to fill a gap: an honest \`manual\` is worth more than a verdict the gate throws away.
 ${footer}`,
     refuter: `# Contract: refuter
 
@@ -62539,7 +62539,7 @@ ${status}
 ## The loop (play every role yourself, one item at a time)
 
 1. **Audit** (if not done): \`${engine} audit "<globs>" --graph --out ${runAbs}\` \u2192 \`${join47(runAbs, "audit-latest.json")}\`.
-2. **Adjudicate the residual criteria** \u2014 \`${engine} verify --manual --in ${join47(runAbs, "audit-latest.json")} --out ${runAbs}\` writes \`${join47(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join47(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold, fail-closed: \`${engine} verify --apply ${join47(runAbs, "ADJUDICATE.todo.json")} --in ${join47(runAbs, "audit-latest.json")} --out ${runAbs}\`.
+2. **Adjudicate the residual criteria** \u2014 \`${engine} verify --manual --in ${join47(runAbs, "audit-latest.json")} --out ${runAbs}\` writes \`${join47(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join47(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${engine} verify --apply ${join47(runAbs, "ADJUDICATE.todo.json")} --in ${join47(runAbs, "audit-latest.json")} --out ${runAbs}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
 3. **Report**: \`${engine} report --in ${join47(runAbs, "audit-latest.json")} --out ${runAbs}\`.
 4. **Verify the report's claims** \u2014 \`${engine} verify --report <the report .md> --out ${runAbs}\` writes \`${join47(runAbs, "VERIFY.todo.json")}\`. For EVERY entry, apply \`${join47(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${engine} verify --apply ${join47(runAbs, "VERIFY.todo.json")} --report <the report .md>\`.
 5. **Gate**: \`${engine} check --report <the report .md> --semantic\` must exit 0 before presenting anything.
@@ -67061,11 +67061,11 @@ async function cmdJudge(p) {
   }
   const max = typeof p.flags.max === "string" ? Number(p.flags.max) : void 0;
   const truncated = max !== void 0 && Number.isFinite(max) && max > 0 && items.length > max;
-  if (truncated && p.flags.apply === true) {
+  if (truncated && p.flags.apply === true && p.flags.strict === true) {
     console.error(
-      lang === "fr" ? `ultra11y judge : --max ${max} ne couvre que ${max} des ${items.length} crit\xE8res, et --apply exige une adjudication COMPL\xC8TE (le gate refuse une couverture partielle).
-  Retirez --max pour tout adjuger, ou retirez --apply pour produire la worklist et l'appliquer plus tard.` : `ultra11y judge: --max ${max} covers only ${max} of ${items.length} criteria, and --apply requires a COMPLETE adjudication (the gate refuses partial coverage).
-  Drop --max to adjudicate everything, or drop --apply to produce the worklist and apply it later.`
+      lang === "fr" ? `ultra11y judge : --max ${max} ne couvre que ${max} des ${items.length} crit\xE8res, et --apply --strict exige une adjudication COMPL\xC8TE (le fold tout-ou-rien refuse une couverture partielle).
+  Retirez --strict pour appliquer ce qui est couvert, retirez --max pour tout adjuger, ou retirez --apply pour produire la worklist et l'appliquer plus tard.` : `ultra11y judge: --max ${max} covers only ${max} of ${items.length} criteria, and --apply --strict requires a COMPLETE adjudication (the all-or-nothing fold refuses partial coverage).
+  Drop --strict to apply what is covered, drop --max to adjudicate everything, or drop --apply to produce the worklist and apply it later.`
     );
     return 2;
   }
