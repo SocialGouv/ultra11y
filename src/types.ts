@@ -34,6 +34,12 @@ export interface SamplePage {
   auth?: boolean; // the page sits behind authentication (renders an auth badge)
   storageState?: string; // Playwright storageState FILE PATH (content never read) — per-page auth
   notes?: string; // reproduction steps / required state, surfaced in the ticket repro block
+  // Source files that RENDER this page. A finding raised on the page's DOM is then reported
+  // against your component instead of against `dom.html`, which is the difference between a
+  // report a developer can act on and one that points at a serialized blob. Declared here so
+  // the sample is the single place a page is described — a repo that drives its own sweep no
+  // longer needs a parallel route table to carry them.
+  sources?: string[];
 }
 export interface SampleConfig {
   pages: SamplePage[];

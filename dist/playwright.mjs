@@ -1,5 +1,7 @@
 // src/integrations/playwright.ts
+import { readFileSync } from "fs";
 import { createRequire as createRequire2 } from "module";
+import { join } from "path";
 
 // src/collector.ts
 var COLLECTED_CSS = [
@@ -263,7 +265,55 @@ var test = (() => {
   }
   return void 0;
 })();
+function samplePagesFor(opts = {}) {
+  const cwd = opts.cwd ?? process.cwd();
+  let declared;
+  try {
+    const raw = readFileSync(join(cwd, ".ultra11yrc.json"), "utf8");
+    declared = JSON.parse(raw).sample?.pages ?? [];
+  } catch {
+    throw new Error(`ultra11y: no readable .ultra11yrc.json in ${cwd} \u2014 sweepSample reads the page sample from it.`);
+  }
+  return declared.filter((p) => opts.only?.(p) ?? true);
+}
+function sweepTarget(url) {
+  try {
+    return new URL(url).pathname || url;
+  } catch {
+    return url;
+  }
+}
+function sweepSample(opts = {}) {
+  const pages = samplePagesFor(opts);
+  const t = test;
+  if (!t) throw new Error("ultra11y: @playwright/test could not be resolved \u2014 sweepSample needs it.");
+  if (!pages.length) return;
+  for (const p of pages) {
+    const target = sweepTarget(p.url);
+    t(`a11y \u2014 ${p.name}`, async ({ page }) => {
+      const response = await page.goto(target);
+      if (opts.settle) await opts.settle(page);
+      const landed = page.url();
+      t.skip(!stayedOnPage(target, landed), `${target} landed on ${landed} \u2014 the current state does not open this screen; nothing to record as "${p.name}"`);
+      const status = response?.status();
+      t.skip(status !== void 0 && status >= 400, `${target} answered HTTP ${status} \u2014 an error page at the requested address; nothing to record as "${p.name}"`);
+      await checkA11y(page, {
+        failOn: false,
+        ...opts.check,
+        as: p.id,
+        name: p.name,
+        ...p.auth !== void 0 ? { auth: p.auth } : {},
+        ...p.notes ? { notes: p.notes } : {},
+        ...p.sources ? { sources: p.sources } : {},
+        expectPath: target
+      });
+    });
+  }
+}
 export {
   checkA11y,
+  samplePagesFor,
+  sweepSample,
+  sweepTarget,
   test
 };

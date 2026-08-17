@@ -34,6 +34,35 @@ one over the same findings. A fixture that gated differently from the published 
 fail two projects differently while claiming to be the same tool.
 
 
+
+## Sweeping the declared sample (`sweepSample`)
+
+The sample in `.ultra11yrc.json` already says what every page is — id, name, URL, whether it
+sits behind a login, the `sources` that render it. A repo that then hand-writes a route table
+to drive its sweep keeps a second copy of that, and the two drift: a page renamed in one place
+keeps its old identity in the report, which is the failure this tier exists to prevent.
+
+So let the sample drive it:
+
+```ts
+import { sweepSample } from "ultra11y/playwright";
+
+sweepSample({
+  // Your framework's readiness. Without it a design system that boots asynchronously is
+  // serialized half-mounted, and the audit reports markup no user ever meets.
+  settle: async (page) => { await page.waitForLoadState("networkidle").catch(() => {}); },
+  // Pages your own specs drive — a wizard step that needs state seeded first.
+  only: (p) => !p.id.startsWith("declaration-etape-"),
+});
+```
+
+One test per page, each navigated, checked against `expectPath` and its HTTP status, and
+recorded under its declared identity. A page the browser did not stay on is `test.skip`ped
+with the reason.
+
+`samplePagesFor()` and `sweepTarget()` are the same logic without the runner, for a repo that
+wants to declare its own tests.
+
 ## A page the browser did not stay on (`expectPath`)
 
 `as`/`name` is the identity the report speaks, and the fixture applies it to whatever is on

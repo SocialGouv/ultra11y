@@ -57306,7 +57306,7 @@ function validateSample(raw) {
   const ids = /* @__PURE__ */ new Set();
   pages?.forEach((pg, i2) => {
     if (typeof pg !== "object" || pg === null || Array.isArray(pg)) {
-      err2(`sample.pages[${i2}]`, "each page must be an object { id, name, url, auth?, storageState?, notes? }");
+      err2(`sample.pages[${i2}]`, "each page must be an object { id, name, url, auth?, storageState?, notes?, sources? }");
       return;
     }
     const p = pg;
@@ -57330,6 +57330,8 @@ function validateSample(raw) {
       );
     }
     if (p.notes !== void 0 && typeof p.notes !== "string") err2(`sample.pages[${i2}].notes`, "notes must be a string");
+    if (p.sources !== void 0 && (!Array.isArray(p.sources) || p.sources.some((s2) => typeof s2 !== "string")))
+      err2(`sample.pages[${i2}].sources`, "sources must be an array of file paths");
   });
   if (s.transverse !== void 0) {
     if (!Array.isArray(s.transverse)) {
@@ -57350,7 +57352,8 @@ function normalizeSample(s) {
     url: String(p.url),
     ...typeof p.auth === "boolean" ? { auth: p.auth } : {},
     ...typeof p.storageState === "string" ? { storageState: p.storageState } : {},
-    ...typeof p.notes === "string" ? { notes: p.notes } : {}
+    ...typeof p.notes === "string" ? { notes: p.notes } : {},
+    ...Array.isArray(p.sources) ? { sources: p.sources } : {}
   }));
   const transverse = Array.isArray(s.transverse) ? s.transverse.map(String) : void 0;
   return { pages, ...transverse?.length ? { transverse } : {} };

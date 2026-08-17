@@ -16,7 +16,9 @@
 // to `.ultra11y/pages/<id>/` (DOM + computed styles + boxes + stylesheets + screenshot), so
 // the same page re-audits offline with no browser: that is how CI decides the rendering
 // criteria without booting the app, and how the report speaks page by page. Commit it.
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 import { COLLECT_SNAPSHOT } from "../collector.js";
 import { type AuditLike, type CheckOptions, auditSnapshot, buildPayload, gate, stayedOnPage, writePagesReport } from "./core.js";
 
@@ -101,5 +103,113 @@ export const test: any = (() => {
   }
   return undefined;
 })();
+
+/** Options for {@link sweepSample}. */
+export interface SweepOptions {
+  /** Where `.ultra11yrc.json` lives. Defaults to the process cwd. */
+  cwd?: string;
+  /** Which declared pages this sweep owns. Return false for a page the repo snapshots itself
+   *  — a wizard step that needs application state seeded first, say. Skipped pages are simply
+   *  not declared here; they are still in the sample, so the report still expects them. */
+  only?: (page: SamplePageLike) => boolean;
+  /** Awaited after navigation, before collecting. This is where a framework's readiness goes:
+   *  a design system that boots asynchronously will otherwise be serialized half-mounted, and
+   *  the audit reports non-conformities about markup no user ever meets. */
+  settle?: (page: PlaywrightPage) => Promise<void>;
+  /** Passed to every `checkA11y`. `failOn: false` (the default here) records without
+   *  asserting: the durable output of a sweep is the snapshot, not a red test. */
+  check?: Omit<PlaywrightCheckOptions, "as" | "name" | "auth" | "notes" | "sources" | "expectPath">;
+}
+
+export interface SamplePageLike {
+  id: string;
+  name: string;
+  url: string;
+  auth?: boolean;
+  notes?: string;
+  sources?: string[];
+}
+
+/** Declare one Playwright test per page of the `.ultra11yrc.json` sample.
+ *
+ *  The sample already says what every page is — id, name, URL, whether it sits behind a login,
+ *  the sources that render it. A repo that then hand-writes a route table to drive its sweep is
+ *  keeping a second copy of that, and the two drift: a page renamed in one place keeps its old
+ *  identity in the report, which is the failure this whole tier exists to prevent.
+ *
+ *  So the sample drives the sweep:
+ *
+ *  ```ts
+ *  import { test } from "@playwright/test";
+ *  import { sweepSample } from "ultra11y/playwright";
+ *
+ *  sweepSample({ settle: async (page) => { await page.waitForLoadState("networkidle"); } });
+ *  ```
+ *
+ *  Each page is navigated, checked against `expectPath` and its HTTP status, and recorded. A
+ *  page the browser did not stay on — or that answered an error at the requested address — is
+ *  `test.skip`ped with the reason, never filed under the requested name.
+ *
+ *  Pages your own specs drive (a funnel step that needs state seeded) are excluded with
+ *  `only`. */
+export function samplePagesFor(opts: Pick<SweepOptions, "cwd" | "only"> = {}): SamplePageLike[] {
+  const cwd = opts.cwd ?? process.cwd();
+  let declared: SamplePageLike[];
+  try {
+    const raw = readFileSync(join(cwd, ".ultra11yrc.json"), "utf8");
+    declared = (JSON.parse(raw) as { sample?: { pages?: SamplePageLike[] } }).sample?.pages ?? [];
+  } catch {
+    // Not "declare zero tests and pass" — that is indistinguishable from a sweep that ran.
+    throw new Error(`ultra11y: no readable .ultra11yrc.json in ${cwd} — sweepSample reads the page sample from it.`);
+  }
+  return declared.filter((p) => opts.only?.(p) ?? true);
+}
+
+/** The path a sample URL points at. The sample stores absolute URLs (it is also read by
+ *  `scan`, which needs a real address); a Playwright test wants the path, so its `baseURL`
+ *  applies. Anything unparseable is already a path. */
+export function sweepTarget(url: string): string {
+  try {
+    return new URL(url).pathname || url;
+  } catch {
+    return url;
+  }
+}
+
+export function sweepSample(opts: SweepOptions = {}): void {
+  const pages = samplePagesFor(opts);
+  const t = test;
+  if (!t) throw new Error("ultra11y: @playwright/test could not be resolved — sweepSample needs it.");
+  if (!pages.length) return;
+
+  // Serial by default is NOT imposed here: pages are independent unless the repo's own state
+  // makes them otherwise, and that is the repo's call (`workers` in its config).
+  for (const p of pages) {
+    const target = sweepTarget(p.url);
+    t(`a11y — ${p.name}`, async ({ page }: { page: PlaywrightPage & { goto(u: string): Promise<{ status(): number } | null> } }) => {
+      const response = await page.goto(target);
+      if (opts.settle) await opts.settle(page);
+
+      const landed = page.url();
+      t.skip(!stayedOnPage(target, landed), `${target} landed on ${landed} — the current state does not open this screen; nothing to record as "${p.name}"`);
+      const status = response?.status();
+      t.skip(
+        status !== undefined && status >= 400,
+        `${target} answered HTTP ${status} — an error page at the requested address; nothing to record as "${p.name}"`,
+      );
+
+      await checkA11y(page, {
+        failOn: false,
+        ...opts.check,
+        as: p.id,
+        name: p.name,
+        ...(p.auth !== undefined ? { auth: p.auth } : {}),
+        ...(p.notes ? { notes: p.notes } : {}),
+        ...(p.sources ? { sources: p.sources } : {}),
+        expectPath: target,
+      });
+    });
+  }
+}
 
 export type { AuditLike, CheckOptions };
