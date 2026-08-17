@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { type AdjudicationItem, writeAdjudication } from "../src/adjudicate.js";
 import { main } from "../src/cli.js";
 import { BATCH_SIZE, SMALL_WORKLIST, listPhases, orchestrateRun } from "../src/orchestrate.js";
+import { agentContracts, phaseSpec } from "../src/orchestrate-templates.js";
 import { type VerifyItem, writeWorklist } from "../src/verify.js";
 
 const ENGINE = "/opt/skills/ultra11y/scripts/ultra11y.mjs";
@@ -331,5 +332,49 @@ describe("orchestrate — stale artifact reconciliation", () => {
     orchestrateRun(run, ENGINE);
     orchestrateRun(run, ENGINE, { eco: true });
     expect(existsSync(wf(run, "adjudicate"))).toBe(false);
+  });
+});
+
+// The contract IS the spec the agent obeys — `action.yml` tells it to follow
+// `agents/adjudicator.md` VERBATIM. So anything the fold requires and the contract omits is
+// not a documentation gap, it is an instruction to produce work that will be thrown away.
+//
+// That happened: the fold requires `citations[]` on a C (and on an evidenced NA), the contract
+// asked only for `justification`, and a CI run produced 97 obedient verdicts of which 63 were
+// refused — discarding the whole adjudication, since the fold is all-or-nothing.
+describe("the adjudicator contract states every field the fold enforces", () => {
+  const contract = agentContracts("/run", ENGINE).adjudicator!;
+  const schema = JSON.stringify(phaseSpec("adjudicate").schema);
+
+  it("asks for citations on C, where the fold rejects their absence", () => {
+    expect(contract).toContain("citations");
+    // Named on the C rule itself, not merely mentioned somewhere in the file.
+    const cRule = contract.split("\n").find((l) => l.includes("`C`") && l.includes("REQUIRES"));
+    expect(cRule, "the C rule must name citations").toMatch(/citations/);
+  });
+
+  it("asks for citations on an evidenced NA, on the same rule", () => {
+    const naRule = contract.split("\n").find((l) => l.includes("`NA`") && l.includes("REQUIRES"));
+    expect(naRule, "the NA rule must name citations").toMatch(/citations/);
+  });
+
+  it("says the anchors must come from the item's own evidence, so none is invented", () => {
+    expect(contract).toMatch(/verbatim|VERBATIM/);
+    expect(contract).toMatch(/evidence\[\]/);
+  });
+
+  it("says an all-or-nothing refusal is the cost, so the stake is legible", () => {
+    expect(contract).toMatch(/WHOLE adjudication|whole adjudication/i);
+  });
+
+  it("carries citations in the structured-output schema the fan-out path validates against", () => {
+    expect(schema).toContain("citations");
+  });
+
+  // The same mismatch already bit `normativeRef` once (see the comment in ADJUDICATE_SCHEMA).
+  it("keeps normativeRef required on an NC finding", () => {
+    expect(schema).toContain("normativeRef");
+    const ncRule = contract.split("\n").find((l) => l.includes("`NC`") && l.includes("REQUIRES"));
+    expect(ncRule).toMatch(/normativeRef/);
   });
 });

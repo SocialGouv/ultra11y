@@ -61923,6 +61923,20 @@ var ADJUDICATE_SCHEMA = {
           criteriaId: { type: "string" },
           verdict: { enum: ["C", "NC", "NA", "manual"] },
           justification: { type: "string", description: "REQUIRED for C and NA" },
+          // REQUIRED by the fold alongside `justification`, for exactly the same reason
+          // `normativeRef` is required on an NC: a cleared criterion has to name what it
+          // cleared. Omitting it here (and from the adjudicator contract) made every
+          // adjudication produce C/NA verdicts that `verify --apply` then refused wholesale —
+          // 63 rejections out of 97 verdicts on the run that surfaced this.
+          citations: {
+            type: "array",
+            description: "REQUIRED for C, and for NA when evidence was presented: the evidence items you cleared, `file`/`line` copied verbatim from this criterion's own evidence[]",
+            items: {
+              type: "object",
+              required: ["file", "line"],
+              properties: { file: { type: "string" }, line: { type: "number" }, selector: { type: "string" }, snippet: { type: "string" } }
+            }
+          },
           reason: { type: ["string", "null"], enum: ["needs-rendered-dom", "undecidable", null], description: "REQUIRED for a still-manual verdict" },
           findings: {
             type: "array",
@@ -62048,13 +62062,13 @@ For EACH of your criteria:
 
 1. Read its worklist entry. \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) harvested from the audited code \u2014 open the cited files at the cited lines whenever the snippet alone cannot decide.
 2. Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold):
-   - \`C\` (conforming) \u2014 REQUIRES \`justification\` explaining why the evidence satisfies the criterion.
+   - \`C\` (conforming) \u2014 REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this item's own \`evidence[]\`; an anchor that is not in that list is treated as fabricated). A criterion whose \`evidence[]\` is empty cannot be \`C\` at all \u2014 it is \`manual\` (\`undecidable\`), or \`NA\` if nothing in scope is concerned.
    - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the item's OWN tests, which the worklist lists for you under \xAB tests to rule on \xBB.
-   - \`NA\` (not applicable) \u2014 REQUIRES \`justification\`.
+   - \`NA\` (not applicable) \u2014 REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
    - \`manual\` (still undecidable) \u2014 REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide, e.g. computed contrast) or \`undecidable\` (the evidence cannot settle it either way).
 3. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with a reason \u2014 that is a valid, honest verdict; the scan tier or a human picks it up.
 
-Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "reason", "findings" }] }\` \u2014 your ITEMS only, every field grounded in what you actually read, every NC finding carrying its \`normativeRef\`.
+Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "citations", "reason", "findings" }] }\` \u2014 your ITEMS only, every field grounded in what you actually read, every NC finding carrying its \`normativeRef\`, and every C (plus every evidenced NA) carrying its \`citations\`. A verdict that clears a criterion without naming what it cleared is refused by the fold, and one refusal discards the WHOLE adjudication \u2014 including every other verdict you got right.
 ${footer}`,
     refuter: `# Contract: refuter
 
