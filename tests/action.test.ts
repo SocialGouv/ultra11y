@@ -13,7 +13,19 @@ const ACTION = parse(RAW) as {
   description: string;
   inputs: Record<string, { description: string; default?: string; required?: boolean }>;
   outputs: Record<string, { value: string }>;
-  runs: { using: string; steps: { id?: string; name?: string; uses?: string; shell?: string; run?: string; if?: string; with?: Record<string, string> }[] };
+  runs: {
+    using: string;
+    steps: {
+      id?: string;
+      name?: string;
+      uses?: string;
+      shell?: string;
+      run?: string;
+      if?: string;
+      with?: Record<string, string>;
+      env?: Record<string, string>;
+    }[];
+  };
 };
 
 /** The position of a step, by a distinctive fragment of its name. Module-scoped: several
@@ -302,6 +314,47 @@ describe("the adjudication tier", () => {
     const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
     expect(agent?.with?.claude_args).toContain("--max-turns");
   });
+
+  // A fixed cap is a cliff, not a bound: the runbook is sequential and each criterion costs
+  // real tool calls, so under RGAA (~80 items) a small budget truncates — and a truncated
+  // adjudication is not a partial one, it is a discarded one (the fold fail-closes on the
+  // first null verdict). The budget therefore has to follow the worklist.
+  it("derives the turn budget from the worklist instead of hardcoding it", () => {
+    const worklist = adjudicationSteps().find((s) => s.id === "worklist");
+    expect(worklist?.run, "the worklist step must count the items").toContain("--json");
+    expect(worklist?.run).toContain("turns=");
+    const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
+    expect(agent?.with?.claude_args).toContain("steps.worklist.outputs.turns");
+    // …and stay overridable, because a derived default is still a guess.
+    expect(ACTION.inputs["adjudicate-max-turns"]).toBeTruthy();
+    expect(ACTION.inputs["adjudicate-max-turns"]?.default).toBe("");
+  });
+
+  // An input arrives from a caller's workflow, which is free to wire an event payload into
+  // it — `repository_dispatch` is on the very list the tier checks. Expanded into a
+  // single-quoted bash string, a quote in the value escapes into the shell.
+  it("reads caller-controlled inputs from the environment, not by interpolation", () => {
+    // Assembled rather than written out: a literal `${{ … }}` in a JS string reads as a
+    // template placeholder to the linter, and escaping it here would hide what is asserted.
+    const expr = (name: string): string => `$\{{ inputs.${name} }}`;
+
+    const resolve = ACTION.runs.steps.find((s) => s.id === "adjudication");
+    expect(resolve?.env?.MODE).toContain("inputs.adjudicate");
+    expect(resolve?.run, "the mode must not be interpolated into the script").not.toContain(expr("adjudicate"));
+
+    const scan = ACTION.runs.steps.find((s) => s.name === "Scan the pages");
+    expect(scan?.env?.RUNTIME).toContain("inputs.runtime");
+    expect(scan?.env?.STORAGE_STATE).toContain("inputs.storage-state");
+    expect(scan?.run).not.toContain(expr("storage-state"));
+    expect(scan?.run).not.toContain(expr("runtime"));
+  });
+
+  // A typo used to reach the agent branch, report the tier on, then match no downstream step:
+  // a tier that announced itself and did nothing.
+  it("refuses a mode it does not know instead of half-enabling itself", () => {
+    const resolve = ACTION.runs.steps.find((s) => s.id === "adjudication");
+    expect(resolve?.run).toMatch(/is not a mode/);
+  });
 });
 
 // The pages worth auditing usually sit behind a login, and a scan that silently lands on the
@@ -327,7 +380,7 @@ describe("the authenticated scan", () => {
     expect(ACTION.inputs.runtime?.default).toBe("auto");
     expect(scan()?.run).toContain("--runtime");
     // `auto` is the engine's own default; passing it back would be noise.
-    expect(scan()?.run).toContain("inputs.runtime }}' != 'auto'");
+    expect(scan()?.run).toContain(`"$RUNTIME" != 'auto'`);
   });
 
   // A session file is a credential. It is handed to Playwright as a path and never read.

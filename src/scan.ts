@@ -171,6 +171,15 @@ export interface RunnerOutput {
   // base64). Absent when snapshotting was off or the collection failed — in which case the
   // page keeps its findings but earns no snapshot, and therefore no conforming-by-silence.
   snapshot?: CollectedPage & { screenshot?: string };
+  // WHERE the browser was when the measurement started — read right after goto + settle,
+  // before any probe could click something that routes. `url` above is read at the END and
+  // is the address the run finished on; only this one is the identity of what was audited.
+  // Local runtime only; absent from a Docker RunnerOutput.
+  landedUrl?: string;
+  // The navigation's HTTP status. A framework can answer 404/500 with a full document at the
+  // requested URL (Next's `notFound()`), which no URL comparison can detect. Absent for
+  // `file://` and for the Docker runner — absent is never treated as a failure.
+  httpStatus?: number;
 }
 
 /** The page id for a scanned target. A served URL slugifies from its PATH, which is the
@@ -541,6 +550,18 @@ export function mergeDynamic(audit: AuditResult, dynamic: DynamicResult, lang: L
   // Record the normative page sample the dynamic tier ran over (Task 5) — drives the
   // report's « Constats par page » section. Storage-state paths were already dropped upstream.
   if (dynamic.sample) merged.scope.sample = dynamic.sample;
+  // Pages the scan refused to record. They are NOT in `sample`, so without this the audit
+  // would simply be quietly shorter than the sample the repository declares — and a shorter
+  // deliverable that says nothing reads as a complete one. Unioned across merges by id, so a
+  // page recovered by a later scan stops being reported as missing.
+  if (dynamic.redirected?.length) {
+    const byId = new Map((merged.scope.redirected ?? []).map((r) => [r.id, r]));
+    for (const r of dynamic.redirected) byId.set(r.id, r);
+    const scannedIds = new Set((merged.scope.sample?.pages ?? []).map((p) => p.id));
+    const still = [...byId.values()].filter((r) => !scannedIds.has(r.id));
+    if (still.length) merged.scope.redirected = still;
+    else delete merged.scope.redirected;
+  }
   // Record which needs-rendering SCs this scan actually MEASURED (union across merges) —
   // the partial-audit advisory keys on this, so a Docker run (reflow only) never silently
   // suppresses the banner for the local-only probes it did not run.

@@ -63,6 +63,32 @@ describe("a scanned page is the page that was asked for", () => {
     expect(landedOnRequestedPage("http://localhost:3000/admin", "http://localhost:3000/mon-espace")).toBe(false);
   });
 
+  // A hash-router app puts the route in the fragment, so comparing paths alone (both empty)
+  // would wave through the very bounce this guard is named after. Same for query routing.
+  it("compares the fragment and the query when the REQUEST carried one", () => {
+    expect(landedOnRequestedPage("http://app/#/admin", "http://app/#/login")).toBe(false);
+    expect(landedOnRequestedPage("http://app/#/admin", "http://app/#/admin")).toBe(true);
+    expect(landedOnRequestedPage("http://app/?page=admin", "http://app/?page=login")).toBe(false);
+    expect(landedOnRequestedPage("http://app/?page=admin", "http://app/?page=admin")).toBe(true);
+  });
+
+  // A same-path bounce to an IdP or a maintenance host is the same misattribution; a scheme,
+  // a port or a `www.` prefix is canonicalisation.
+  it("treats a different host as a different page, but tolerates canonicalisation", () => {
+    expect(landedOnRequestedPage("http://localhost:3000/app", "https://sso.example.com/app")).toBe(false);
+    expect(landedOnRequestedPage("http://example.com/aide", "https://example.com/aide")).toBe(true);
+    expect(landedOnRequestedPage("http://example.com/aide", "https://www.example.com/aide")).toBe(true);
+    expect(landedOnRequestedPage("http://localhost:3000/aide", "http://localhost:4000/aide")).toBe(true);
+  });
+
+  // The caller must hand over the RESOLVED navigation target. A relative file target becomes
+  // `file:///abs/...` before `goto`, and comparing that against the raw config value dropped
+  // every file-based sample page — a guaranteed false positive, silent except on stderr.
+  it("matches a resolved file target against itself", () => {
+    expect(landedOnRequestedPage("file:///Users/me/proj/dist/index.html", "file:///Users/me/proj/dist/index.html")).toBe(true);
+    expect(landedOnRequestedPage("file:///Users/me/proj/dist/index.html", "file:///Users/me/proj/dist/other.html")).toBe(false);
+  });
+
   // The guard is here to catch a redirect, not to invent one: anything it cannot parse, and
   // targets that cannot redirect at all, pass through.
   it("stays out of the way when there is nothing to compare", () => {

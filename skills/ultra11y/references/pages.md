@@ -222,15 +222,31 @@ the §1–5 structure of a conformance document.
 
 ### Four honesty rules
 
-**0. A page is recorded only if the browser stayed on it.** A sample page's declared `id` and
-`name` are the identity the report speaks, and they are applied to whatever was on screen. So a
-route that redirects — an expired session bouncing to sign-in, a wizard step the application
-state does not open — would be filed under the requested page's name while showing something
-else: a sheet, a screenshot and a rate that describe a different screen, with nothing about the
-document looking wrong. `scan --sample` compares the landed **path** against the requested one
-(a query string or fragment the app appends is the same page) and **drops** a page that moved,
-naming it and where it went. A page reported missing is a bug in the sample or in the state you
-seeded, and both are fixable; a page reported under the wrong name is a false conformance claim.
+**0. A page is recorded only if the browser stayed on it, and answered.** A sample page's
+declared `id` and `name` are the identity the report speaks, and they are applied to whatever was
+on screen. So a route that redirects — an expired session bouncing to sign-in, a wizard step the
+application state does not open — would be filed under the requested page's name while showing
+something else: a sheet, a screenshot and a rate that describe a different screen, with nothing
+about the document looking wrong.
+
+`scan --sample` refuses two ways:
+
+- **It moved.** The address is compared as the app routes: the **path** always; the **fragment**
+  and the **query** when the request carried one, because a hash-router app puts the route there
+  and `#/admin` → `#/login` is exactly the bounce this rule exists for; the **host**, since a
+  same-path landing on an IdP is the same misattribution (a scheme, a port or a `www.` differ
+  freely — that is canonicalisation). The comparison uses the URL captured right after the
+  navigation settles, before any probe could click something that routes.
+- **It answered an error.** A framework's own not-found page is a complete, valid document
+  served at the address you asked for — `notFound()` in Next is exactly that — so no address
+  comparison can see it. The HTTP status can: anything ≥ 400 is refused.
+
+A refused page is **named in the report**, with what was asked, what was reached and why, and it
+is removed from `scope.sample` — leaving it there would put it back in the grid with the same
+basis as a page really visited, so the deliverable would claim we looked at it. A run where
+*every* page was refused exits non-zero: that is not a partial result, it is a scan that measured
+nothing. A page reported missing is a bug in the sample or in the state you seeded, and both are
+fixable; a page reported under the wrong name is a false conformance claim.
 
 **1. A finding is attributed to a page only when something says so.** In order: the snapshot
 path it was raised on (`.ultra11y/pages/<id>/dom.html` — the id is *in the path*, which is what

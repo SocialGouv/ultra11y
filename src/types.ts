@@ -57,6 +57,12 @@ export interface ScanRedirect {
   name: string;
   requested: string;
   landed: string;
+  // WHY it was refused. `redirect`: the browser ended up at another address. `http-status`:
+  // it stayed at the requested one but the server answered an error — a framework's own
+  // not-found page is a full, valid document at the right URL, which no address comparison
+  // can tell from the real thing.
+  reason?: "redirect" | "http-status";
+  status?: number;
 }
 
 // ---- WCAG 2.2 canonical core (src/data/wcag.json, produced by scripts/build-standards.mjs)
@@ -478,6 +484,12 @@ export interface AuditResult {
     // merges. Drives the partial-audit advisory (src/report.ts untestedNeedsRendering) so
     // the banner never claims a probe ran when it did not. Optional/additive.
     scan?: { testedScs: string[] };
+    // Sample pages a `scan --sample` REFUSED to record, and why. They are deliberately absent
+    // from `sample` above — a page kept there would be re-added to the per-page grid with the
+    // same basis as one really visited, so the deliverable would claim a page nobody looked
+    // at. Carried here instead so the report can say what is missing rather than hide it.
+    // Optional/additive — absent when every page was reached.
+    redirected?: ScanRedirect[];
   };
   guidelines: GuidelineTally[];
   criteria: CriterionResult[];

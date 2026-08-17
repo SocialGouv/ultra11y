@@ -76,7 +76,16 @@ steps:
 |---|---|---|
 | `adjudicate` | `none` | `api` · `agent` · `none` |
 | `adjudicate-model` | *(empty)* | model id for `api`; else `$ULTRA11Y_LLM_MODEL`, else the engine default |
+| `adjudicate-max-turns` | *(empty)* | turn budget for `agent`; empty derives it from the worklist |
 | `gate-adjudicated` | `false` | let a model-ruled NC fail the job |
+
+**The turn budget is derived, and that matters more than it sounds.** The runbook is sequential
+and the whole point of agent mode is that it opens the files a criterion cites, so the cost is
+per item — under RGAA the worklist runs to ~80. A budget too small does not truncate the result,
+it **loses** it: the fold is fail-closed on a single unfilled verdict, so a run cut short throws
+away every verdict it had already produced, and you pay for all of them. The action therefore
+counts the worklist and budgets from it. `adjudicate-max-turns` overrides that when you know
+better.
 
 **`api`** sends the worklist to the Messages API in batches of 8 and folds the verdicts back.
 **`agent`** emits the worklist plus `orchestrate --eco`'s runbook and hands them to a

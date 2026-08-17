@@ -3010,7 +3010,10 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       // of this message — "use --runtime local" alone sends an Action user to a flag they
       // cannot reach, and telling them to force a runtime that still cannot load would
       // exchange this error for a worse one.
-      const forced = typeof p.flags.runtime === "string" && p.flags.runtime === "docker";
+      // `runtimeFlag`, not `p.flags.runtime`: `--docker` is a documented alias, and reading the
+      // raw flag would hand a caller who typed it the OTHER half of this message — "install
+      // these dependencies" when the fix is to drop the flag they just passed.
+      const forced = runtimeFlag === "docker";
       console.error(
         lang === "fr"
           ? `ultra11y scan : l'échantillon comporte des pages authentifiées (storageState), non prises en charge par le runtime Docker.${
@@ -3064,11 +3067,31 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
   // the cause is always fixable — an expired session, or state the wizard step needs.
   if (dynamic.redirected?.length) {
     for (const r of dynamic.redirected) {
+      const why =
+        r.reason === "http-status"
+          ? lang === "fr"
+            ? `a répondu HTTP ${r.status} à la même adresse`
+            : `answered HTTP ${r.status} at the same address`
+          : lang === "fr"
+            ? `a redirigé vers ${r.landed}`
+            : `redirected to ${r.landed}`;
       console.error(
         lang === "fr"
-          ? `⚠️ ultra11y scan : « ${r.name} » (${r.id}) non enregistrée — ${r.requested} a redirigé vers ${r.landed}. L'enregistrer aurait décrit cet écran sous le nom du premier.`
-          : `⚠️ ultra11y scan: "${r.name}" (${r.id}) not recorded — ${r.requested} redirected to ${r.landed}. Recording it would have described that screen under the first one's name.`,
+          ? `⚠️ ultra11y scan : « ${r.name} » (${r.id}) non enregistrée — ${r.requested} ${why}. L'enregistrer aurait décrit cet écran sous le nom demandé.`
+          : `⚠️ ultra11y scan: "${r.name}" (${r.id}) not recorded — ${r.requested} ${why}. Recording it would have described that screen under the requested name.`,
       );
+    }
+    // Every page refused is not a partial result, it is a scan that measured nothing. Exiting
+    // 0 there would hand CI a green step and an empty report — the exact shape of a run that
+    // passed. The usual cause is one fixable thing (an expired session, a wrong base URL),
+    // so failing here is what makes it visible on the first run instead of the tenth.
+    if (useSample && sampleConfig && dynamic.redirected.length === sampleConfig.pages.length) {
+      console.error(
+        lang === "fr"
+          ? `ultra11y scan : aucune des ${sampleConfig.pages.length} pages de l'échantillon n'a pu être enregistrée — rien n'a été mesuré. Vérifiez la session, l'URL de base et l'état applicatif attendu par ces pages.`
+          : `ultra11y scan: none of the ${sampleConfig.pages.length} sample pages could be recorded — nothing was measured. Check the session, the base URL, and the application state those pages expect.`,
+      );
+      return 1;
     }
   }
   // Advisory sample-methodology lint: which normative page KINDS the configured sample

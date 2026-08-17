@@ -53203,6 +53203,20 @@ function pageGridModel(result, derived, standard, lang) {
   for (const p of derived) for (const pc of derivePackResults(pageView(result, p), standard)) put(pc.id, p.id, pc.status);
   return { rows, status };
 }
+function renderRedirected(redirected, lang = "en") {
+  const fr = lang === "fr";
+  const out2 = [
+    fr ? `> \u26A0\uFE0F **${redirected.length} page(s) de l'\xE9chantillon n'ont pas \xE9t\xE9 enregistr\xE9es** \u2014 le navigateur n'est pas rest\xE9 sur l'adresse demand\xE9e. Les enregistrer aurait d\xE9crit un autre \xE9cran sous le nom demand\xE9. Elles ne comptent donc ni comme conformes ni comme non conformes : elles manquent.` : `> \u26A0\uFE0F **${redirected.length} sample page(s) were not recorded** \u2014 the browser did not stay on the address asked for. Recording them would have described another screen under the requested name. They count as neither conforming nor non-conforming: they are missing.`,
+    "",
+    fr ? "| Page | Demand\xE9 | Atteint | Motif |" : "| Page | Requested | Landed | Reason |",
+    "| --- | --- | --- | --- |"
+  ];
+  for (const r of redirected) {
+    const why = r.reason === "http-status" ? fr ? `HTTP ${r.status ?? "\u2265 400"} \u2014 page d'erreur rendue \xE0 la m\xEAme adresse` : `HTTP ${r.status ?? "\u2265 400"} \u2014 error page served at the same address` : fr ? "redirection" : "redirect";
+    out2.push(`| ${r.name} (\`${r.id}\`) | \`${r.requested}\` | \`${r.landed}\` | ${why} |`);
+  }
+  return out2;
+}
 function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   const s = L3[lang];
   const out2 = [];
@@ -53445,6 +53459,7 @@ function render(r, lang, opts) {
     const derived = derivePages(r, pageScope);
     out2.push(`## \u{1F4C4} ${s.perPageTitle}`, "", `> ${s.perPageNote}`, "");
     if (r.scope.sample?.transverse?.length) out2.push(`> ${s.transverseNote(r.scope.sample.transverse.join(", "))}`, "");
+    if (r.scope.redirected?.length) out2.push(...renderRedirected(r.scope.redirected, lang), "");
     const pack = isCore(opts.standard) ? void 0 : loadPack(opts.standard);
     for (const pg of derived) {
       const nc = pg.findings.filter((f) => !f.advisory);
@@ -57792,6 +57807,14 @@ function resolveHostAnchor(file, snippet2) {
 function mergeDynamic(audit2, dynamic, lang = "en") {
   const merged = JSON.parse(JSON.stringify(audit2));
   if (dynamic.sample) merged.scope.sample = dynamic.sample;
+  if (dynamic.redirected?.length) {
+    const byId3 = new Map((merged.scope.redirected ?? []).map((r) => [r.id, r]));
+    for (const r of dynamic.redirected) byId3.set(r.id, r);
+    const scannedIds = new Set((merged.scope.sample?.pages ?? []).map((p) => p.id));
+    const still = [...byId3.values()].filter((r) => !scannedIds.has(r.id));
+    if (still.length) merged.scope.redirected = still;
+    else delete merged.scope.redirected;
+  }
   if (dynamic.testedScs?.length) {
     const tested = /* @__PURE__ */ new Set([...merged.scope.scan?.testedScs ?? [], ...dynamic.testedScs]);
     merged.scope.scan = { testedScs: [...tested].sort() };
@@ -58354,17 +58377,23 @@ function clicksAllowed(storageState, interactClicks) {
 }
 function landedOnRequestedPage(requested, landed) {
   if (!landed || requested === landed) return true;
-  const path = (u) => {
+  const parse2 = (u) => {
     try {
-      return new URL(u, "http://x.invalid").pathname.replace(/\/+$/, "");
+      return new URL(u, "http://x.invalid");
     } catch {
       return void 0;
     }
   };
-  const a = path(requested);
-  const b = path(landed);
-  if (a === void 0 || b === void 0) return true;
-  return a === b;
+  const a = parse2(requested);
+  const b = parse2(landed);
+  if (!a || !b) return true;
+  const path = (u) => u.pathname.replace(/\/+$/, "");
+  if (path(a) !== path(b)) return false;
+  const host = (u) => u.hostname.replace(/^www\./, "");
+  if (host(a) !== host(b)) return false;
+  if (a.hash && a.hash !== b.hash) return false;
+  if (a.search && a.search !== b.search) return false;
+  return true;
 }
 async function probeLiveRegion(page, lang, allowClicks) {
   const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
@@ -58405,10 +58434,12 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
   const empty = [];
   try {
     const url = isFile ? "file://" + resolve11(target) : target;
-    await page.goto(url, { waitUntil: "load", timeout: 45e3 });
+    const response = await page.goto(url, { waitUntil: "load", timeout: 45e3 });
     await page.waitForLoadState("networkidle", { timeout: 8e3 }).catch(() => {
     });
     await page.waitForTimeout(1200);
+    const landedUrl = page.url() || url;
+    const httpStatus = typeof response?.status === "function" ? response.status() : void 0;
     let snapshot;
     let screenshot;
     if (opts.snapshot !== false) {
@@ -58454,6 +58485,8 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
     const liveRegion = opts.interact ? await probeLiveRegion(page, l, opts.allowClicks).catch(() => empty) : [];
     return {
       url: page.url() || target,
+      landedUrl,
+      ...httpStatus !== void 0 ? { httpStatus } : {},
       violations,
       reflow,
       focusVisible: dialogFocus.length ? [...focusVisible, ...dialogFocus] : focusVisible,
@@ -58546,8 +58579,14 @@ async function runSampleScanLocal(pages, opts) {
         lang,
         snapshot: Boolean(opts.snapshotRoot)
       });
-      if (!landedOnRequestedPage(page.url, out2.url)) {
-        redirected.push({ id: page.id, name: page.name, requested: page.url, landed: out2.url });
+      const requestedUrl = isFile ? "file://" + resolve11(page.url) : page.url;
+      const landedUrl = out2.landedUrl ?? out2.url;
+      if (!landedOnRequestedPage(requestedUrl, landedUrl)) {
+        redirected.push({ id: page.id, name: page.name, requested: page.url, landed: landedUrl, reason: "redirect" });
+        continue;
+      }
+      if (out2.httpStatus !== void 0 && out2.httpStatus >= 400) {
+        redirected.push({ id: page.id, name: page.name, requested: page.url, landed: landedUrl, reason: "http-status", status: out2.httpStatus });
         continue;
       }
       findings.push(...tagSampleFindings(toDynamicResult(out2, page.url, lang, LOCAL_ENGINE).findings, page));
@@ -58557,13 +58596,15 @@ async function runSampleScanLocal(pages, opts) {
   } finally {
     await browser.close();
   }
+  const dropped = new Set(redirected.map((r) => r.id));
+  const scanned = pages.filter((p) => !dropped.has(p.id));
   return {
     tool: "ultra11y",
     engine: LOCAL_ENGINE,
-    target: `${pages.length} page(s) (\xE9chantillon)`,
+    target: `${scanned.length}/${pages.length} page(s) (\xE9chantillon)`,
     date: today(),
     findings,
-    sample: sampleScope({ pages }),
+    sample: sampleScope({ pages: scanned }),
     testedScs: localTestedScs(interact),
     ...snapshots.length ? { snapshots } : {},
     ...redirected.length ? { redirected } : {}
@@ -66635,7 +66676,7 @@ async function cmdScan(p) {
     }
     sampleConfig = v.sample;
     if (!useLocal && sampleConfig.pages.some((pg) => pg.storageState)) {
-      const forced = typeof p.flags.runtime === "string" && p.flags.runtime === "docker";
+      const forced = runtimeFlag === "docker";
       console.error(
         lang === "fr" ? `ultra11y scan : l'\xE9chantillon comporte des pages authentifi\xE9es (storageState), non prises en charge par le runtime Docker.${forced ? " Retirez --runtime docker." : " Le runtime local n'a pas pu \xEAtre r\xE9solu : installez @playwright/test et @axe-core/playwright dans le projet audit\xE9 (ou pointez --cwd dessus). Via l'Action, ce sont des d\xE9pendances du d\xE9p\xF4t."}` : `ultra11y scan: the sample has authenticated pages (storageState), unsupported by the Docker runtime.${forced ? " Drop --runtime docker." : " The local runtime could not be resolved: install @playwright/test and @axe-core/playwright in the audited project (or point --cwd at it). Through the Action, those are dependencies of the repository."}`
       );
@@ -66668,9 +66709,16 @@ async function cmdScan(p) {
   }
   if (dynamic.redirected?.length) {
     for (const r of dynamic.redirected) {
+      const why = r.reason === "http-status" ? lang === "fr" ? `a r\xE9pondu HTTP ${r.status} \xE0 la m\xEAme adresse` : `answered HTTP ${r.status} at the same address` : lang === "fr" ? `a redirig\xE9 vers ${r.landed}` : `redirected to ${r.landed}`;
       console.error(
-        lang === "fr" ? `\u26A0\uFE0F ultra11y scan : \xAB ${r.name} \xBB (${r.id}) non enregistr\xE9e \u2014 ${r.requested} a redirig\xE9 vers ${r.landed}. L'enregistrer aurait d\xE9crit cet \xE9cran sous le nom du premier.` : `\u26A0\uFE0F ultra11y scan: "${r.name}" (${r.id}) not recorded \u2014 ${r.requested} redirected to ${r.landed}. Recording it would have described that screen under the first one's name.`
+        lang === "fr" ? `\u26A0\uFE0F ultra11y scan : \xAB ${r.name} \xBB (${r.id}) non enregistr\xE9e \u2014 ${r.requested} ${why}. L'enregistrer aurait d\xE9crit cet \xE9cran sous le nom demand\xE9.` : `\u26A0\uFE0F ultra11y scan: "${r.name}" (${r.id}) not recorded \u2014 ${r.requested} ${why}. Recording it would have described that screen under the requested name.`
       );
+    }
+    if (useSample && sampleConfig && dynamic.redirected.length === sampleConfig.pages.length) {
+      console.error(
+        lang === "fr" ? `ultra11y scan : aucune des ${sampleConfig.pages.length} pages de l'\xE9chantillon n'a pu \xEAtre enregistr\xE9e \u2014 rien n'a \xE9t\xE9 mesur\xE9. V\xE9rifiez la session, l'URL de base et l'\xE9tat applicatif attendu par ces pages.` : `ultra11y scan: none of the ${sampleConfig.pages.length} sample pages could be recorded \u2014 nothing was measured. Check the session, the base URL, and the application state those pages expect.`
+      );
+      return 1;
     }
   }
   if (useSample && sampleConfig) {

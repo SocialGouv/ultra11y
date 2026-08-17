@@ -155,6 +155,10 @@ inputs:
     description: 'Rule on the judgment criteria the static engine cannot decide (alt relevance, link purpose in context, reading order): `api` sends the worklist to the Anthropic API in batches, `agent` hands it to a Claude Code run, `none` (default) leaves them « to assess ». Both modes read their credential from the JOB environment, never from an input, and skip themselves when it is absent — which is what makes them harmless on a fork pull request. `api` needs ANTHROPIC_API_KEY (the Messages API takes nothing else); `agent` accepts ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN, the token a Pro/Max subscriber mints with `claude setup-token`. `agent` also skips itself on an event claude-code-action does not support — `push` above all.'
     required: false
     default: 'none'
+  adjudicate-max-turns:
+    description: 'Turn budget for `adjudicate: agent`. Empty (default) derives it from the worklist — 4 turns per criterion plus headroom — because the runbook is sequential and each criterion costs real tool calls. Set it only to override that: a budget too small does not truncate the result, it LOSES it, since the fold refuses a partial adjudication and discards every verdict already produced.'
+    required: false
+    default: ''
   adjudicate-model:
     description: 'Model id for `adjudicate: api`. Empty follows $ULTRA11Y_LLM_MODEL, then the engine default.'
     required: false
@@ -272,13 +276,18 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
+        RUNTIME: ${{ inputs.runtime }}
+        STORAGE_STATE: ${{ inputs.storage-state }}
       run: |
         args=(--merge audits/audit-latest.json --out audits)
         if [ '${{ inputs.snapshot }}' != 'true' ]; then args+=(--no-snapshot); fi
-        if [ '${{ inputs.runtime }}' != 'auto' ]; then args+=(--runtime '${{ inputs.runtime }}'); fi
+        # Read from the environment, never interpolated into the script — see the note on the
+        # adjudication step: an input is caller-controlled data, and a quote in it would
+        # otherwise escape into this shell.
+        if [ "$RUNTIME" != 'auto' ]; then args+=(--runtime "$RUNTIME"); fi
         # An authenticated scan. The path is forwarded to Playwright as a path and never read
         # here, so a session file cannot end up in this log.
-        if [ -n '${{ inputs.storage-state }}' ]; then args+=(--storage-state '${{ inputs.storage-state }}'); fi
+        if [ -n "$STORAGE_STATE" ]; then args+=(--storage-state "$STORAGE_STATE"); fi
         if [ '${{ inputs.interact-clicks }}' = 'true' ]; then args+=(--interact-clicks); fi
         if [ '${{ inputs.sample }}' = 'true' ]; then
           node "$ENGINE" scan --sample "${args[@]}"
@@ -322,9 +331,27 @@ runs:
       id: adjudication
       if: inputs.adjudicate != 'none'
       shell: bash
+      # Through `env:`, not interpolated into the script. An input reaches a reusable action
+      # from a caller's workflow, and a caller is free to wire an event payload into it —
+      # `repository_dispatch` is on the very list this step checks. Expanded into a
+      # single-quoted bash string, a value carrying a quote escapes into the shell; read from
+      # the environment it is only ever data. Same reason `runtime` and `storage-state` do it.
+      env:
+        MODE: ${{ inputs.adjudicate }}
       run: |
-        mode='${{ inputs.adjudicate }}'
+        mode="$MODE"
         event='${{ github.event_name }}'
+
+        # A typo'd mode used to reach the agent branch, report `on=true`, and then match no
+        # downstream step at all — a tier that announced itself and did nothing.
+        case "$mode" in
+          api|agent) ;;
+          *)
+            echo "on=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::ultra11y: adjudicate='$mode' is not a mode — expected 'api', 'agent' or 'none'. The judgment criteria stay to assess."
+            exit 0
+            ;;
+        esac
 
         if [ "$mode" = 'api' ]; then
           if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
@@ -397,15 +424,38 @@ runs:
     # fan-out: the latter needs the harness to expose a Workflow tool, which is not part of
     # claude-code-action's contract.
     - name: Adjudicate with an agent — worklist and runbook
+      id: worklist
       if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
+        STANDARD: ${{ inputs.standard }}
+        LANG_OPT: ${{ inputs.lang }}
+        MAX_TURNS: ${{ inputs.adjudicate-max-turns }}
       run: |
         node "$ENGINE" verify --manual --in audits/audit-latest.json --out audits \
-          --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}'
+          --standard "$STANDARD" --lang "$LANG_OPT" --json > /tmp/ultra11y-worklist.json
         node "$ENGINE" orchestrate --run audits --phase adjudicate --eco
+
+        # THE TURN BUDGET IS DERIVED, not guessed. The runbook is sequential and the whole
+        # point of agent mode is that it OPENS the cited files, so the cost is per item: under
+        # RGAA the worklist runs to ~80. A fixed cap is not a bound but a cliff — a truncated
+        # run leaves `verdict: null` entries, `applyAdjudication` fail-closes on a single one,
+        # and every valid verdict already produced is discarded with the rest. Nothing is
+        # partially applied, so under-budgeting costs the entire spend rather than the tail.
+        #
+        # 4 turns per item plus 40 of headroom, floored at 60 so a tiny worklist still has
+        # room to read around what it cites. An explicit `adjudicate-max-turns` wins.
+        n=$(node -p 'try{JSON.parse(require("fs").readFileSync("/tmp/ultra11y-worklist.json","utf8")).count||0}catch{0}')
+        if [ -n "$MAX_TURNS" ]; then
+          turns="$MAX_TURNS"
+        else
+          turns=$(( n * 4 + 40 ))
+          if [ "$turns" -lt 60 ]; then turns=60; fi
+        fi
+        echo "turns=$turns" >> "$GITHUB_OUTPUT"
+        echo "ultra11y: $n criteria to adjudicate, budget $turns turns."
 
     # The version is pinned in the literal below because GitHub refuses an expression in
     # `uses:` — it cannot be an input, so it is a dependency this action owns and bumps.
@@ -430,7 +480,7 @@ runs:
         anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
         claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
         github_token: ${{ github.token }}
-        claude_args: '--allowedTools Read,Grep,Glob,Edit,Write --max-turns 60'
+        claude_args: '--allowedTools Read,Grep,Glob,Edit,Write --max-turns ${{ steps.worklist.outputs.turns }}'
         prompt: |
           You are running head-less in CI. Adjudicate an accessibility audit, and do nothing else.
 

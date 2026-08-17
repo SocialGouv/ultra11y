@@ -23,7 +23,7 @@
 //      scored 100% on "does each image have a relevant alternative?". See `pageStatus`.
 import { snapshotPageId } from "./snapshot.js";
 import { CORE, type StandardId, derivePackResults, isCore, loadPack, themeName } from "./standards/index.js";
-import type { AuditResult, CriterionResult, Finding, Lang, PageResult, PageScope, Status } from "./types.js";
+import type { AuditResult, CriterionResult, Finding, Lang, PageResult, PageScope, Status, ScanRedirect } from "./types.js";
 import { isUrlPath } from "./util.js";
 import { automatability, compareSC, scTitle } from "./wcag.js";
 
@@ -373,6 +373,37 @@ export function pageGridModel(result: AuditResult, derived: PageResult[], standa
   const rows = pack.criteria.map((pc) => ({ id: pc.id, label: pc.id, group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim() }));
   for (const p of derived) for (const pc of derivePackResults(pageView(result, p), standard)) put(pc.id, p.id, pc.status);
   return { rows, status };
+}
+
+/** The pages a scan REFUSED to record, named in the deliverable.
+ *
+ *  Honesty rule 0 (see the header) removes these from `scope.sample`, because a page kept
+ *  there is re-added to the grid with the same basis as one really visited. Removing it is
+ *  correct and insufficient: the report would then just be shorter than the sample the
+ *  project declares, and a silently shorter report reads as a complete one. So the drop is
+ *  stated — which page, where it went, and why — because that is what makes it fixable. */
+export function renderRedirected(redirected: ScanRedirect[], lang: Lang = "en"): string[] {
+  const fr = lang === "fr";
+  const out: string[] = [
+    fr
+      ? `> ⚠️ **${redirected.length} page(s) de l'échantillon n'ont pas été enregistrées** — le navigateur n'est pas resté sur l'adresse demandée. Les enregistrer aurait décrit un autre écran sous le nom demandé. Elles ne comptent donc ni comme conformes ni comme non conformes : elles manquent.`
+      : `> ⚠️ **${redirected.length} sample page(s) were not recorded** — the browser did not stay on the address asked for. Recording them would have described another screen under the requested name. They count as neither conforming nor non-conforming: they are missing.`,
+    "",
+    fr ? "| Page | Demandé | Atteint | Motif |" : "| Page | Requested | Landed | Reason |",
+    "| --- | --- | --- | --- |",
+  ];
+  for (const r of redirected) {
+    const why =
+      r.reason === "http-status"
+        ? fr
+          ? `HTTP ${r.status ?? "≥ 400"} — page d'erreur rendue à la même adresse`
+          : `HTTP ${r.status ?? "≥ 400"} — error page served at the same address`
+        : fr
+          ? "redirection"
+          : "redirect";
+    out.push(`| ${r.name} (\`${r.id}\`) | \`${r.requested}\` | \`${r.landed}\` | ${why} |`);
+  }
+  return out;
 }
 
 /** The Markdown grid: one row per criterion, one column per page. */

@@ -11,7 +11,7 @@ import { guidelineTitle, scTitle } from "./wcag.js";
 import { prdUnits, partitionUnits } from "./prd.js";
 import { renderAuditorUnit, type AuditorCropLookup } from "./auditor.js";
 import { resolveMessage } from "./messages.js";
-import { attributePages, derivePages, pagesOf, renderPageGrid } from "./pages.js";
+import { attributePages, derivePages, pagesOf, renderPageGrid, renderRedirected } from "./pages.js";
 import { PAGES_DIR } from "./snapshot.js";
 import {
   type StandardId,
@@ -376,6 +376,10 @@ function render(
     const derived = derivePages(r, pageScope);
     out.push(`## 📄 ${s.perPageTitle}`, "", `> ${s.perPageNote}`, "");
     if (r.scope.sample?.transverse?.length) out.push(`> ${s.transverseNote(r.scope.sample.transverse.join(", "))}`, "");
+    // Pages the scan refused to record. Named here, in the section a reader uses to judge
+    // coverage, because the alternative is a report that is simply shorter than the sample
+    // the project declares — and a silently shorter deliverable reads as a complete one.
+    if (r.scope.redirected?.length) out.push(...renderRedirected(r.scope.redirected, lang), "");
     // Standard-aware per-finding label: a pack report (RGAA, …) speaks its own criteria
     // everywhere else, so this per-page line should too, rather than the raw WCAG SC id.
     // `loadPack` once, outside the finding loop — never per-finding.

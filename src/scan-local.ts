@@ -614,24 +614,48 @@ export function clicksAllowed(storageState: string | undefined, interactClicks: 
  *  failure mode an accessibility report has: a reader sees a page sheet, a screenshot and a
  *  conformance rate, and none of it describes the page named at the top.
  *
- *  Only the PATH is compared. A query string or fragment the app appends to its own route is
- *  the same page; a different path is a different page. Anything unparseable is treated as a
- *  match — this guard exists to catch a redirect, not to invent one. Exported for the
+ *  What counts as "the same page" is decided per component, because which component carries
+ *  the route is the app's choice, not ours:
+ *
+ *  - **path** always, trailing slash folded (`/aide/` ≡ `/aide`).
+ *  - **fragment** only when the REQUEST had one. That is the hash-router case, where the
+ *    fragment IS the route: asking for `#/admin` and landing on `#/login` is precisely the
+ *    bounce this guard exists to catch, and comparing paths alone (both empty) would miss it.
+ *    When the request carried no fragment, one the app appended to its own route is noise.
+ *  - **query** on the same rule, for `?page=admin` style routing.
+ *  - **host** always, since a same-path bounce to an IdP or a maintenance host is exactly the
+ *    misattribution above. Only the scheme, the port and a `www.` prefix may differ — those
+ *    are canonicalisation, not another page.
+ *
+ *  `requested` must be the RESOLVED navigation target, not the raw config value: a relative
+ *  `dist/index.html` becomes `file:///abs/dist/index.html` before `goto`, and comparing the
+ *  two forms would drop every relative file target. Anything unparseable is treated as a
+ *  match — this guard catches a redirect, it does not invent one. Exported for the
  *  browser-free policy test. */
 export function landedOnRequestedPage(requested: string, landed: string): boolean {
   if (!landed || requested === landed) return true;
-  const path = (u: string): string | undefined => {
+  const parse = (u: string): URL | undefined => {
     try {
-      // `file://` targets and relative paths never redirect; base makes them parseable.
-      return new URL(u, "http://x.invalid").pathname.replace(/\/+$/, "");
+      return new URL(u, "http://x.invalid");
     } catch {
       return undefined;
     }
   };
-  const a = path(requested);
-  const b = path(landed);
-  if (a === undefined || b === undefined) return true;
-  return a === b;
+  const a = parse(requested);
+  const b = parse(landed);
+  if (!a || !b) return true;
+
+  const path = (u: URL): string => u.pathname.replace(/\/+$/, "");
+  if (path(a) !== path(b)) return false;
+
+  // `www.` is canonicalisation; a different host is a different site.
+  const host = (u: URL): string => u.hostname.replace(/^www\./, "");
+  if (host(a) !== host(b)) return false;
+
+  // Only compared when the REQUEST carried one — see the doc block.
+  if (a.hash && a.hash !== b.hash) return false;
+  if (a.search && a.search !== b.search) return false;
+  return true;
 }
 
 async function probeLiveRegion(page: Any, lang: Lang, allowClicks: boolean): Promise<ProbeHit[]> {
@@ -716,12 +740,25 @@ async function runOnPage(
   const empty: ProbeHit[] = [];
   try {
     const url = isFile ? "file://" + resolve(target) : target;
-    await page.goto(url, { waitUntil: "load", timeout: 45000 });
+    const response = await page.goto(url, { waitUntil: "load", timeout: 45000 });
     // Let the client hydrate and any framework JS inject content/landmarks (SPA routes,
     // DSFR JS) before measuring — otherwise axe/probes see the pre-hydration DOM and
     // report false "no h1 / not in a landmark". Bounded networkidle + a short settle.
     await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
     await page.waitForTimeout(1200);
+
+    // The identity of what is ABOUT to be measured, captured here and nowhere later. The
+    // probes below click buttons, and a click that routes (history.pushState) leaves
+    // `page.url()` on another route — read at the end, it would accuse the server of a
+    // redirect that never happened and throw away a page audited at the right address.
+    // `file://` is normalised through the same resolve() the navigation used, so a relative
+    // target compares against its own resolved form rather than against a bare path.
+    const landedUrl = (page.url() as string) || url;
+    // A framework can answer 404/500 with a full, valid document AT THE SAME URL —
+    // Next's `notFound()` is exactly that. The path guard cannot see it, and recording it
+    // would file an error page under a real page's name. `status()` is the only signal that
+    // separates them. `file://` navigations report no status; absent is not a failure.
+    const httpStatus: number | undefined = typeof response?.status === "function" ? (response.status() as number) : undefined;
 
     // THE SNAPSHOT IS COLLECTED FIRST, on the PRISTINE page — before axe injects its source,
     // before any probe fills an input, resizes the viewport or bolts on the text-spacing
@@ -792,6 +829,8 @@ async function runOnPage(
     const liveRegion = opts.interact ? await probeLiveRegion(page, l, opts.allowClicks).catch(() => empty) : [];
     return {
       url: (page.url() as string) || target,
+      landedUrl,
+      ...(httpStatus !== undefined ? { httpStatus } : {}),
       violations,
       reflow,
       focusVisible: dialogFocus.length ? [...focusVisible, ...dialogFocus] : focusVisible,
@@ -923,12 +962,23 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
         snapshot: Boolean(opts.snapshotRoot),
       });
       // The declared identity is applied to whatever the browser had on screen, so a page
-      // that bounced elsewhere would be filed under the name of the page nobody looked at.
-      // Drop it instead, and say which one and where it went: a page reported missing is a
-      // bug in the sample or the seeded state, and both are fixable. A page reported under
-      // the wrong name is neither — it is a false conformance claim.
-      if (!landedOnRequestedPage(page.url, out.url)) {
-        redirected.push({ id: page.id, name: page.name, requested: page.url, landed: out.url });
+      // that bounced elsewhere — or answered an error at the same address — would be filed
+      // under the name of the page nobody looked at. Drop it instead, and say which one and
+      // why: a page reported missing is a bug in the sample or the seeded state, and both
+      // are fixable. A page reported under the wrong name is neither — it is a false
+      // conformance claim.
+      //
+      // Compared against the RESOLVED target and the URL captured before the probes ran
+      // (`landedUrl`), never `out.url`: that one is read at the end of the run, so a probe
+      // click that routed would look exactly like a server redirect.
+      const requestedUrl = isFile ? "file://" + resolve(page.url) : page.url;
+      const landedUrl = out.landedUrl ?? out.url;
+      if (!landedOnRequestedPage(requestedUrl, landedUrl)) {
+        redirected.push({ id: page.id, name: page.name, requested: page.url, landed: landedUrl, reason: "redirect" });
+        continue;
+      }
+      if (out.httpStatus !== undefined && out.httpStatus >= 400) {
+        redirected.push({ id: page.id, name: page.name, requested: page.url, landed: landedUrl, reason: "http-status", status: out.httpStatus });
         continue;
       }
       findings.push(...tagSampleFindings(toDynamicResult(out, page.url, lang, LOCAL_ENGINE).findings, page));
@@ -940,13 +990,20 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
   } finally {
     await browser.close();
   }
+  // The sample RECORDED is the sample actually scanned. Keeping a dropped page here would be
+  // worse than losing it: `pagesOf` re-adds every declared page to the grid with
+  // `basis: "attributed"` — the same basis as a page that was really visited — so the
+  // deliverable would positively claim we looked at a page we refused to record. The pages
+  // that were dropped travel in `redirected`, which says so out loud.
+  const dropped = new Set(redirected.map((r) => r.id));
+  const scanned = pages.filter((p) => !dropped.has(p.id));
   return {
     tool: "ultra11y",
     engine: LOCAL_ENGINE,
-    target: `${pages.length} page(s) (échantillon)`,
+    target: `${scanned.length}/${pages.length} page(s) (échantillon)`,
     date: today(),
     findings,
-    sample: sampleScope({ pages }),
+    sample: sampleScope({ pages: scanned }),
     testedScs: localTestedScs(interact),
     ...(snapshots.length ? { snapshots } : {}),
     ...(redirected.length ? { redirected } : {}),
