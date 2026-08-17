@@ -181,16 +181,16 @@ describe("a model cannot get past the gate an agent's verdicts pass", () => {
 });
 
 describe("`judge --max` and `--apply` together", () => {
-  it("are refused up front, because a bounded run can never satisfy the coverage gate", async () => {
-    // The gate rejects an incomplete adjudication by design. Discovering that AFTER paying
-    // for a full round of model calls is a bill for a guaranteed failure.
+  it("are still refused up front under --strict, where a bounded run genuinely cannot pass", async () => {
+    // The all-or-nothing fold rejects an incomplete adjudication by design. Discovering that
+    // AFTER paying for a full round of model calls is a bill for a guaranteed failure.
     const { execFileSync } = await import("node:child_process");
     const engine = new URL("../scripts/ultra11y.mjs", import.meta.url).pathname;
     const audit = new URL("./fixtures/", import.meta.url).pathname;
     let out = "";
     let code = 0;
     try {
-      execFileSync(process.execPath, [engine, "judge", "--in", `${audit}judge-audit.json`, "--max", "2", "--apply", "--lang", "en"], {
+      execFileSync(process.execPath, [engine, "judge", "--in", `${audit}judge-audit.json`, "--max", "2", "--apply", "--strict", "--lang", "en"], {
         encoding: "utf8",
         env: { ...process.env, ANTHROPIC_API_KEY: "sk-test" },
         stdio: ["ignore", "pipe", "pipe"],
@@ -201,8 +201,37 @@ describe("`judge --max` and `--apply` together", () => {
       out = err.stderr;
     }
     expect(code).toBe(2);
-    expect(out).toMatch(/--apply requires a COMPLETE adjudication/);
+    expect(out).toMatch(/--apply --strict requires a COMPLETE adjudication/);
     // And it never reached the network: no batch was announced.
     expect(out).not.toMatch(/batch\(es\), model/);
+  });
+
+  // Without --strict the pair COMPOSES, and must not be turned away. The refusal above was
+  // right only while the fold was all-or-nothing: a bounded run could then only ever fail the
+  // coverage check. The fold is now per-verdict, so a bounded run lands what it covered —
+  // which is exactly what someone bounding spend is asking for.
+  it("compose without --strict: a bounded run is allowed to apply what it covered", async () => {
+    const { execFileSync } = await import("node:child_process");
+    const engine = new URL("../scripts/ultra11y.mjs", import.meta.url).pathname;
+    const audit = new URL("./fixtures/", import.meta.url).pathname;
+    let out = "";
+    let code = 0;
+    try {
+      execFileSync(process.execPath, [engine, "judge", "--in", `${audit}judge-audit.json`, "--max", "2", "--apply", "--lang", "en"], {
+        encoding: "utf8",
+        // A minimal environment: `process.execPath` is absolute, so nothing else is needed, and
+        // the key is the only thing this command reads from the environment.
+        env: { ANTHROPIC_API_KEY: "sk-test" },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (e) {
+      const err = e as { status: number; stderr: string };
+      code = err.status;
+      out = err.stderr;
+    }
+    // It may still fail LATER (the key is fake, so the calls do not resolve) — what matters is
+    // that it was not refused up front for being bounded.
+    expect(code).not.toBe(2);
+    expect(out).not.toMatch(/requires a COMPLETE adjudication/);
   });
 });
