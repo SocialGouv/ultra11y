@@ -575,7 +575,10 @@ runs:
           same header link on thirty-eight pages is ONE decision, not thirty-eight — so ruling
           on the representative rules on all of them, and the brief shows you the whole
           population rather than a sample of it. When you cite, any occurrence of a class the
-          criterion carries is accepted, so cite the one you actually opened.
+          criterion carries is accepted, so cite the one you actually opened — as an OBJECT,
+          `{"file": "...", "line": 12, "selector": "...", "snippet": "..."}`, never as the bare
+          `"file:line"` string `alsoAt` uses. A string is accepted, but it carries no snippet,
+          and the snippet is what proves the citation resolves to the thing you meant.
 
           And each item says whether that reading was COMPLETE (`evidenceComplete`). On a
           complete one you may conclude anything the evidence supports. On an incomplete one

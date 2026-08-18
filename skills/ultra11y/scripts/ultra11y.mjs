@@ -57288,6 +57288,14 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
     (r) => blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? void 0, harvestSubjects(subjectsForSc(r.criteriaId), docs))
   );
 }
+function readCitation(c2) {
+  if (typeof c2 !== "string") return c2;
+  const at = c2.lastIndexOf(":");
+  if (at <= 0) return null;
+  const line = Number.parseInt(c2.slice(at + 1), 10);
+  if (!Number.isFinite(line)) return null;
+  return { file: c2.slice(0, at), line, selector: "", snippet: "" };
+}
 function auditFiles(audit2, cwd) {
   const inputs = audit2.scope.inputs.filter((i2) => i2 !== "-" && i2 !== "<stdin>");
   if (!inputs.length) return /* @__PURE__ */ new Set();
@@ -57408,7 +57416,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
       blame(it.criteriaId, `criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
     } else if (v === "C" || v === "NA") {
       if (!it.justification || !it.justification.trim()) blame(it.criteriaId, `criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
-      const cites = it.citations ?? [];
+      const cites = (it.citations ?? []).map(readCitation).filter((c2) => c2 !== null);
       if (v === "C" && it.evidenceComplete === false) {
         blame(
           it.criteriaId,
@@ -57843,7 +57851,9 @@ function entriesFrom(adj, accepted, date) {
       verdict: it.verdict,
       ...it.justification?.trim() ? { justification: it.justification.trim() } : {},
       ...it.reason ? { reason: it.reason } : {},
-      ...it.citations?.length ? { citations: it.citations } : {},
+      // Normalised here too: a citation may have arrived as a bare "file:line" string, and a
+      // ledger entry has to hold the object form so a replay can re-anchor and re-ground it.
+      ...it.citations?.length ? { citations: it.citations.map(readCitation).filter((c2) => c2 !== null) } : {},
       ...it.findings?.length ? { findings: it.findings } : {},
       ...it.recommendations?.length ? { recommendations: it.recommendations } : {},
       evidenceFingerprint: evidenceFingerprint(it.evidence),

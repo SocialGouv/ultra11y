@@ -489,6 +489,26 @@ describe("applyAdjudication — fail-closed validation", () => {
     expect(r.ok).toBe(false);
     expect(r.issues.join("\n")).toMatch(/9\.9\.9|does not resolve/);
   });
+  describe("a citation is read whichever way it was written", () => {
+    it('accepts the bare "file:line" string form, and gates it exactly the same', () => {
+      // A real CI run wrote citations as strings and had 63 verdicts refused for a SHAPE rather
+      // than for a claim. The worklist itself is full of that form — `alsoAt` is exactly
+      // `file:line` — so an adjudicator reaching for it is being consistent, not careless.
+      const src = baseItems().find((i) => i.criteriaId === "2.4.4")!;
+      const anchor = `${src.evidence[0]!.file}:${src.evidence[0]!.line}`;
+      const items = decideAll({ verdict: "C", justification: "Chaque intitulé est explicite.", citations: [anchor] }, "2.4.4");
+      const r = applyAdjudication(auditPage(), file(items));
+      expect(r.ok, r.issues.join(" | ")).toBe(true);
+      expect(r.audit.criteria.find((c) => c.id === "2.4.4")?.status).toBe("C");
+    });
+
+    it("still refuses a string citation naming a file this audit never read", () => {
+      const items = decideAll({ verdict: "C", justification: "ok", citations: ["src/never-audited-by-this-run.tsx:3"] }, "2.4.4");
+      const r = applyAdjudication(auditPage(), file(items));
+      expect(r.ok).toBe(false);
+      expect(r.issues.join("\n")).toMatch(/not among this criterion's harvested evidence/);
+    });
+  });
 });
 
 // normativeRefResolves' pack branch (src/adjudicate.ts): for a non-core standard the ref

@@ -139,7 +139,10 @@ export interface AdjudicationItem {
   // is what turns "cite something real" into "cite the evidence you were shown". When the
   // harvester found no evidence at all there is nothing to clear, and the honest verdicts
   // are `manual` or `NA`, never `C`.
-  citations?: Evidence[];
+  // Objects are what the contract asks for; a bare `"file:line"` string is accepted too,
+  // because that is the shape the worklist's own `alsoAt` uses and a real run reached for it.
+  // See `readCitation` — the gate is identical either way, a string just carries no snippet.
+  citations?: (Evidence | string)[];
   // Non-normative good practices the agent noted on this criterion — folded back into the
   // audit as ADVISORY findings (grounded exactly like an NC finding, but never affecting
   // status: they cannot flip the criterion to NC nor enter conformancePct). Optional.
@@ -332,6 +335,25 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
   return audit.residualRisks.map((r: ResidualRisk) =>
     blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? undefined, harvestSubjects(subjectsForSc(r.criteriaId), docs)),
   );
+}
+
+/** Read a citation whichever way it was written.
+ *
+ *  The contract asks for `{file, line, …}`, and a real run wrote `"src/Foo.tsx:15"` instead —
+ *  63 verdicts refused for a shape, not for a claim. It is an unambiguous form and the
+ *  worklist itself is full of it (`alsoAt` is exactly `file:line`), so an adjudicator
+ *  reaching for it is being consistent, not careless.
+ *
+ *  Nothing about the gate moves: membership and grounding run on the result either way. A
+ *  string simply carries no snippet, so grounding falls back to its selector/line checks —
+ *  weaker evidence, and the reason the object form stays what the contract asks for. */
+export function readCitation(c: Evidence | string): Evidence | null {
+  if (typeof c !== "string") return c;
+  const at = c.lastIndexOf(":");
+  if (at <= 0) return null;
+  const line = Number.parseInt(c.slice(at + 1), 10);
+  if (!Number.isFinite(line)) return null;
+  return { file: c.slice(0, at), line, selector: "", snippet: "" };
 }
 
 /** The files this audit actually read. Computed from the audit's own scope inputs, so it is
@@ -580,7 +602,7 @@ export function applyAdjudication(
       // A clearing verdict is gated exactly like an accusing one. Before this, the only
       // check was "the justification is a non-empty string", so `"x"` cleared a criterion —
       // and a model answering C to everything published a conformance nobody had assessed.
-      const cites = it.citations ?? [];
+      const cites = (it.citations ?? []).map(readCitation).filter((c): c is Evidence => c !== null);
       // An INCOMPLETE reading may report a failure it saw; it may never clear what it never
       // looked at. Before class-based harvesting the evidence was a 30-anchor sample of a
       // population that ran to thousands, so a `C` was routinely a conformity claim over

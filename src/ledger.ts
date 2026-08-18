@@ -30,7 +30,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { type AdjudicationFile, type AdjudicationItem, type AgentFinding, buildAdjudicationWorklist, type Evidence } from "./adjudicate.js";
+import { type AdjudicationFile, type AdjudicationItem, type AgentFinding, buildAdjudicationWorklist, type Evidence, readCitation } from "./adjudicate.js";
 import { CORE, type StandardId } from "./standards/index.js";
 import type { AuditResult } from "./types.js";
 import { SCHEMA_VERSION } from "./types.js";
@@ -148,7 +148,9 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
       verdict: it.verdict,
       ...(it.justification?.trim() ? { justification: it.justification.trim() } : {}),
       ...(it.reason ? { reason: it.reason } : {}),
-      ...(it.citations?.length ? { citations: it.citations } : {}),
+      // Normalised here too: a citation may have arrived as a bare "file:line" string, and a
+      // ledger entry has to hold the object form so a replay can re-anchor and re-ground it.
+      ...(it.citations?.length ? { citations: it.citations.map(readCitation).filter((c): c is Evidence => c !== null) } : {}),
       ...(it.findings?.length ? { findings: it.findings } : {}),
       ...(it.recommendations?.length ? { recommendations: it.recommendations } : {}),
       evidenceFingerprint: evidenceFingerprint(it.evidence),
