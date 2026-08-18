@@ -245,6 +245,21 @@ export function sweepTarget(url: string): string {
   }
 }
 
+/** The defaults every swept page is checked with, and the one seam a test can reach without
+ *  a Playwright runtime in the room.
+ *
+ *  `probes: true` is the default HERE and opt-in on `checkA11y`, and the asymmetry is the
+ *  point. `checkA11y` is called from a test that owns its page and may be asserting on focus
+ *  or hover a line later; a sweep exists for nothing but recording the sample, and the probes
+ *  are the only thing that can decide zoom, reflow, text spacing and content-on-hover on
+ *  screens a cold scanner never reaches. Measured on egapro: 15 of 20 pages came from a sweep
+ *  that never probed, and because conformity is an AND across every page in scope, those four
+ *  criteria stayed « à évaluer » for the whole audit — including on the five pages that HAD
+ *  been probed. Opt out with `check: { probes: false }`. */
+export function sweepCheckOptions(check?: SweepOptions["check"]): SweepOptions["check"] & { failOn: false | undefined } {
+  return { failOn: false, probes: true, ...check } as SweepOptions["check"] & { failOn: false | undefined };
+}
+
 export function sweepSample(opts: SweepOptions = {}): void {
   const pages = samplePagesFor(opts);
   const t = test;
@@ -268,8 +283,7 @@ export function sweepSample(opts: SweepOptions = {}): void {
       );
 
       await checkA11y(page, {
-        failOn: false,
-        ...opts.check,
+        ...sweepCheckOptions(opts.check),
         as: p.id,
         name: p.name,
         ...(p.auth !== undefined ? { auth: p.auth } : {}),

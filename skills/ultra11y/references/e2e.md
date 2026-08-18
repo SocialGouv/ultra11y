@@ -63,6 +63,31 @@ with the reason.
 `samplePagesFor()` and `sweepTarget()` are the same logic without the runner, for a repo that
 wants to declare its own tests.
 
+### The sweep probes by default
+
+`checkA11y` leaves the live probes opt-in — it is called from a test that owns its page and may
+be asserting on focus or hover a line later. A sweep is not that: it exists for nothing but
+recording the sample, and the probes are the only thing that can decide zoom (1.4.4), reflow
+(1.4.10), text spacing (1.4.12) and content on hover (1.4.13) on screens a cold scanner never
+reaches. So `sweepSample` turns them on.
+
+This matters more than it looks, because conformity on those criteria is an AND across every
+page in scope. Measured on a real repository: 15 of the 20 recorded pages came from a sweep
+that never probed, so all four criteria stayed « à évaluer » for the whole audit — including on
+the five pages that HAD been probed. One unprobed page closes the door for all of them.
+
+```ts
+sweepSample({ check: { probes: false } });            // opt out entirely
+sweepSample({ check: { probes: { budgetMs: 8_000 } } }); // …or just bound them
+```
+
+The probes are bounded by construction: every interaction carries its own timeout, the pass
+carries a wall-clock budget, and whatever the budget cuts short is recorded as `skipped` with
+the criterion and the milliseconds spent — never dropped, because a measurement that did not
+happen must not read as one that found nothing. The numbers live in `.ultra11yrc.json` under
+`probes` (`budgetMs`, `actionTimeoutMs`, `maxTriggers`, `maxFocusables`, `maxHits`,
+`reflowWidth`), which is where a judgement about YOUR pages belongs.
+
 ## A page the browser did not stay on (`expectPath`)
 
 `as`/`name` is the identity the report speaks, and the fixture applies it to whatever is on

@@ -81,3 +81,28 @@ describe("sweepTarget — the sample stores URLs, a test wants a path", () => {
     expect(sweepTarget("/aide")).toBe("/aide");
   });
 });
+
+// The sweep's own defaults. Separated from `sweepSample` so they can be checked without a
+// Playwright runtime — the same reason page SELECTION is separate above.
+describe("what a swept page is checked with", () => {
+  it("probes by default — the sweep exists for the criteria only a probe can decide", async () => {
+    // Measured on egapro: `sweepSample({ settle, only })` owned 15 of the 20 recorded pages
+    // and passed no probes, so 1.4.4 / 1.4.10 / 1.4.12 / 1.4.13 stayed « à évaluer » for the
+    // WHOLE audit — conformity is an AND across every page in scope, so the five pages that
+    // were probed could not carry the other fifteen.
+    const { sweepCheckOptions } = await import("../src/integrations/playwright.js");
+    expect(sweepCheckOptions().probes).toBe(true);
+  });
+
+  it("records without asserting — the durable output of a sweep is the snapshot", async () => {
+    const { sweepCheckOptions } = await import("../src/integrations/playwright.js");
+    expect(sweepCheckOptions().failOn).toBe(false);
+  });
+
+  it("lets the repository turn the probes off, and everything else it passes still wins", async () => {
+    const { sweepCheckOptions } = await import("../src/integrations/playwright.js");
+    expect(sweepCheckOptions({ probes: false }).probes).toBe(false);
+    expect(sweepCheckOptions({ probes: { budgetMs: 5_000 } }).probes).toEqual({ budgetMs: 5_000 });
+    expect(sweepCheckOptions({ failOn: "blocking" }).failOn).toBe("blocking");
+  });
+});
