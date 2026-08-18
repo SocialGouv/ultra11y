@@ -58049,6 +58049,7 @@ var T2 = {
     on: "sur",
     alsoAt: "aussi en",
     snippetLabel: "`snippet` \xE0 copier dans la citation",
+    renderedAvailable: "**RENDU DISPONIBLE.** Cet audit a ing\xE9r\xE9 des captures de page : le rendu de la page est sur le disque, sous `.ultra11y/pages/<id>/` \u2014 `dom.html` (le DOM s\xE9rialis\xE9 par le navigateur), `styles.json` (les styles calcul\xE9s), `boxes.json` (les bo\xEEtes et positions), `axtree.json` (l'arbre d'accessibilit\xE9) et `screen.png`. Un crit\xE8re \xAB \xE0 restituer \xBB \u2014 information par la couleur, op\xE9rabilit\xE9 clavier d'un script, geste au pointeur \u2014 se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. `needs-rendered-dom` reste la bonne r\xE9ponse pour un crit\xE8re dont aucune capture ne porte le sujet, et pour lui seul.",
     incomplete: "LECTURE INCOMPL\xC8TE \u2014 un \xAB C \xBB sera refus\xE9 sur ce crit\xE8re",
     none: "(aucune \xE9vidence automatique \u2014 d\xE9cidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "\xC0 v\xE9rifier manuellement",
@@ -58079,6 +58080,7 @@ var T2 = {
     on: "on",
     alsoAt: "also at",
     snippetLabel: "`snippet` to copy into the citation",
+    renderedAvailable: "**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under `.ultra11y/pages/<id>/` \u2014 `dom.html` (the DOM the browser serialized), `styles.json` (computed styles), `boxes.json` (boxes and positions), `axtree.json` (the accessibility tree) and `screen.png`. A needs-rendering criterion \u2014 information by colour, keyboard operability of a script, a pointer gesture \u2014 is decided FROM THOSE FILES: read them as you would read the source. `needs-rendered-dom` stays the right answer for a criterion no capture carries the subject of, and for that alone.",
     incomplete: "INCOMPLETE READING \u2014 a C will be refused on this criterion",
     none: "(no automatic evidence \u2014 decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
@@ -58124,6 +58126,9 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   const { showAlsoAt: shown } = adjudicationLimits(opts.cwd);
   const pack = isCore(standard) ? void 0 : loadPack(standard);
   const out2 = opts.preamble === false ? [] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
+  if (opts.preamble !== false && items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
+    out2.push(`> ${s.renderedAvailable}`, "");
+  }
   if (pack && opts.preamble !== false) out2.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
     out2.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` \u2014 ${it.title}` : ""}  _(${it.automatability})_`);

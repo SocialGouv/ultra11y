@@ -1134,6 +1134,8 @@ const T = {
     on: "sur",
     alsoAt: "aussi en",
     snippetLabel: "`snippet` à copier dans la citation",
+    renderedAvailable:
+      "**RENDU DISPONIBLE.** Cet audit a ingéré des captures de page : le rendu de la page est sur le disque, sous `.ultra11y/pages/<id>/` — `dom.html` (le DOM sérialisé par le navigateur), `styles.json` (les styles calculés), `boxes.json` (les boîtes et positions), `axtree.json` (l'arbre d'accessibilité) et `screen.png`. Un critère « à restituer » — information par la couleur, opérabilité clavier d'un script, geste au pointeur — se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. `needs-rendered-dom` reste la bonne réponse pour un critère dont aucune capture ne porte le sujet, et pour lui seul.",
     incomplete: "LECTURE INCOMPLÈTE — un « C » sera refusé sur ce critère",
     none: "(aucune évidence automatique — décidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "À vérifier manuellement",
@@ -1165,6 +1167,8 @@ const T = {
     on: "on",
     alsoAt: "also at",
     snippetLabel: "`snippet` to copy into the citation",
+    renderedAvailable:
+      "**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under `.ultra11y/pages/<id>/` — `dom.html` (the DOM the browser serialized), `styles.json` (computed styles), `boxes.json` (boxes and positions), `axtree.json` (the accessibility tree) and `screen.png`. A needs-rendering criterion — information by colour, keyboard operability of a script, a pointer gesture — is decided FROM THOSE FILES: read them as you would read the source. `needs-rendered-dom` stays the right answer for a criterion no capture carries the subject of, and for that alone.",
     incomplete: "INCOMPLETE READING — a C will be refused on this criterion",
     none: "(no automatic evidence — decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
@@ -1303,6 +1307,21 @@ export function formatAdjudication(
   const { showAlsoAt: shown } = adjudicationLimits(opts.cwd);
   const pack = isCore(standard) ? undefined : loadPack(standard);
   const out: string[] = opts.preamble === false ? [] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
+  // THE RENDERED PAGE, WHEN THERE IS ONE.
+  //
+  // A `needs-rendering` criterion used to arrive with one instruction — answer
+  // `needs-rendered-dom`, let `scan` deal with it — and on an audit that has just ingested
+  // thirty-five snapshots that is simply untrue: the rendered DOM is on disk, with its computed
+  // styles, its boxes and its accessibility tree. Measured on a real run, 3.1, 7.3 and 12.9 came
+  // back « needs a rendered DOM » while `.ultra11y/pages/` held the very captures that settle
+  // them. No budget fixes that; the tool was telling the adjudicator to give up.
+  //
+  // Keyed on the harvest itself rather than on a flag: if an anchor points into a capture, the
+  // capture is there. On a source-only audit the note stays silent, because there
+  // `needs-rendered-dom` IS the correct answer and saying otherwise would invite a guess.
+  if (opts.preamble !== false && items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
+    out.push(`> ${s.renderedAvailable}`, "");
+  }
   if (pack && opts.preamble !== false) out.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
     out.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` — ${it.title}` : ""}  _(${it.automatability})_`);

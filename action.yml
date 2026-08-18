@@ -579,6 +579,16 @@ runs:
              RUNBOOK to run a command: you have no shell, and this workflow folds the verdicts
              for you in its next step. You never run the engine and never fold anything.
 
+          THE RENDERED PAGE IS PROBABLY ON DISK. When this audit ingested page captures — look
+          for evidence anchored in `.ultra11y/pages/<id>/dom.html` — the rendered page is there
+          to read: `dom.html` is the DOM the browser serialized, beside `styles.json` (computed
+          styles), `boxes.json` (boxes and positions), `axtree.json` (the accessibility tree)
+          and `screen.png`. A needs-rendering criterion — information carried by colour,
+          keyboard operability of a script, a pointer gesture — is decided FROM THOSE FILES.
+          Open them as you would open the source. `needs-rendered-dom` is the right answer only
+          for a criterion no capture carries the subject of; on an audit full of captures it is
+          almost always the wrong one, and it costs the criterion for nothing.
+
           Two things about the evidence, because they change how you should read it.
 
           It is grouped by CONTENT CLASS: one representative per distinct thing, carrying
