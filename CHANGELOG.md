@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.5.3](https://github.com/maxgfr/ultra11y/compare/v5.5.2...v5.5.3) (2026-08-18)
+
+
+### Bug Fixes
+
+* **adjudicate:** stop refusing correct work, without loosening what "verified" means ([465b7f7](https://github.com/maxgfr/ultra11y/commit/465b7f710d1b25ee573fb24bcdc14046198ee98b))
+
 ## [5.5.2](https://github.com/maxgfr/ultra11y/compare/v5.5.1...v5.5.2) (2026-08-18)
 
 
