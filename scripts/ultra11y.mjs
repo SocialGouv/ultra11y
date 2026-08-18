@@ -57421,6 +57421,7 @@ function adjudicationText(sc, lang) {
 // src/adjudicate.ts
 var ADJUDICATE_MAX_EVIDENCE_CLASSES = 1200;
 var ALSO_AT_SHOWN = 8;
+var CITE_DRIFT_DEFAULT = 10;
 function adjudicationContract() {
   return {
     verdicts: [...VERDICTS],
@@ -57448,7 +57449,23 @@ function docsForAudit(audit2, cwd) {
   }
   return docs;
 }
-function collapse2(harvested) {
+var ADJUDICATION_DEFAULTS = {
+  maxClasses: ADJUDICATE_MAX_EVIDENCE_CLASSES,
+  showAlsoAt: ALSO_AT_SHOWN,
+  citationDrift: CITE_DRIFT_DEFAULT
+};
+function adjudicationLimits(cwd) {
+  const cfg = loadConfig(cwd ?? ".")?.adjudication;
+  if (!cfg) return ADJUDICATION_DEFAULTS;
+  const positive2 = (v, fallback) => typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback;
+  return {
+    maxClasses: positive2(cfg.maxClasses, ADJUDICATION_DEFAULTS.maxClasses),
+    showAlsoAt: positive2(cfg.showAlsoAt, ADJUDICATION_DEFAULTS.showAlsoAt),
+    // 0 is meaningful here (exact-anchor matching), so it is allowed through.
+    citationDrift: typeof cfg.citationDrift === "number" && Number.isFinite(cfg.citationDrift) && cfg.citationDrift >= 0 ? Math.floor(cfg.citationDrift) : ADJUDICATION_DEFAULTS.citationDrift
+  };
+}
+function collapse2(harvested, limits) {
   const byClass = /* @__PURE__ */ new Map();
   for (const item of harvested) {
     const g = byClass.get(item.cls);
@@ -57456,7 +57473,7 @@ function collapse2(harvested) {
     else byClass.set(item.cls, [item]);
   }
   const groups = [...byClass.values()];
-  const evidence = groups.slice(0, ADJUDICATE_MAX_EVIDENCE_CLASSES).map((group) => {
+  const evidence = groups.slice(0, limits.maxClasses).map((group) => {
     const rep = group.find((x) => isSnapshotFile(x.ev.file)) ?? group[0];
     const others = group.filter((x) => x !== rep);
     const pages = [...new Set(group.map((x) => pageOfDoc(x.ev.file)).filter((x) => x !== void 0))];
@@ -57475,11 +57492,11 @@ function collapse2(harvested) {
       files: new Set(harvested.map((x) => x.ev.file)).size,
       pages: new Set(harvested.map((x) => pageOfDoc(x.ev.file)).filter((x) => x !== void 0)).size
     },
-    complete: groups.length <= ADJUDICATE_MAX_EVIDENCE_CLASSES
+    complete: groups.length <= limits.maxClasses
   };
 }
-function blankItem(criteriaId, automatability2, title2, harvested) {
-  const { evidence, population, complete } = collapse2(harvested);
+function blankItem(criteriaId, automatability2, title2, harvested, limits) {
+  const { evidence, population, complete } = collapse2(harvested, limits);
   return {
     criteriaId,
     automatability: automatability2,
@@ -57507,6 +57524,7 @@ function subjectsForPackCriterion(standard, id, scs) {
 function buildAdjudicationWorklist(audit2, opts = {}) {
   const docs = docsForAudit(audit2, opts.cwd);
   const standard = opts.standard;
+  const limits = adjudicationLimits(opts.cwd);
   if (standard !== void 0 && !isCore(standard)) {
     const pack = loadPack(standard);
     return derivePackResults(audit2, standard).filter((pc) => pc.status === "manual").map((pc) => {
@@ -57518,12 +57536,13 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
         pc.id,
         automatability2,
         crit ? titlePlain(pack, crit, "fr") : void 0,
-        harvestSubjects(subjectsForPackCriterion(standard, pc.id, scs), docs)
+        harvestSubjects(subjectsForPackCriterion(standard, pc.id, scs), docs),
+        limits
       );
     });
   }
   return audit2.residualRisks.map(
-    (r) => blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? void 0, harvestSubjects(subjectsForSc(r.criteriaId), docs))
+    (r) => blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? void 0, harvestSubjects(subjectsForSc(r.criteriaId), docs), limits)
   );
 }
 function readCitation(c2) {
@@ -57544,14 +57563,13 @@ function auditFiles(audit2, cwd) {
     return /* @__PURE__ */ new Set();
   }
 }
-var CITE_DRIFT = 10;
-function cites0(anchors, c2) {
+function cites0(anchors, c2, drift) {
   for (const a of anchors) {
     const at = a.lastIndexOf(":");
     if (at < 0) continue;
     if (a.slice(0, at) !== c2.file) continue;
     const line = Number.parseInt(a.slice(at + 1), 10);
-    if (Number.isFinite(line) && Math.abs(line - c2.line) <= CITE_DRIFT) return true;
+    if (Number.isFinite(line) && Math.abs(line - c2.line) <= drift) return true;
   }
   return false;
 }
@@ -57642,6 +57660,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
   }
   const groundInputs = /* @__PURE__ */ new Map();
   let scopeCache;
+  const { citationDrift } = adjudicationLimits(opts.cwd);
   const scopeFiles = () => scopeCache ??= auditFiles(audit2, opts.cwd);
   const toGround = (criteriaId, g) => {
     const list = groundInputs.get(criteriaId);
@@ -57676,7 +57695,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
       } else if (cites.length > 0) {
         const anchors = it.evidence.flatMap((e) => [`${e.file}:${e.line}`, ...e.alsoAt ?? []]);
         for (const c2 of cites) {
-          if (!cites0(anchors, c2) && !scopeFiles().has(c2.file)) {
+          if (!cites0(anchors, c2, citationDrift) && !scopeFiles().has(c2.file)) {
             blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c2.file}:${c2.line} is not among this criterion's harvested evidence (fabricated?)`);
           }
           toGround(it.criteriaId, { file: c2.file, line: c2.line, selector: c2.selector, snippet: c2.snippet });
@@ -57934,6 +57953,7 @@ function plainTest(s) {
 }
 function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   const s = T2[lang];
+  const { showAlsoAt: shown } = adjudicationLimits(opts.cwd);
   const pack = isCore(standard) ? void 0 : loadPack(standard);
   const out2 = opts.preamble === false ? [] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
   if (pack && opts.preamble !== false) out2.push(`> ${s.packIntro(pack.name)}`, "");
@@ -57948,7 +57968,7 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
         const extra = [
           e.occurrences && e.occurrences > 1 ? `\xD7${e.occurrences}` : "",
           e.pages?.length ? `${s.on} ${e.pages.slice(0, 4).join(", ")}${e.pages.length > 4 ? "\u2026" : ""}` : "",
-          e.alsoAt?.length ? `${s.alsoAt} ${e.alsoAt.slice(0, ALSO_AT_SHOWN).join(", ")}${e.alsoAt.length > ALSO_AT_SHOWN ? "\u2026" : ""}` : ""
+          e.alsoAt?.length ? `${s.alsoAt} ${e.alsoAt.slice(0, shown).join(", ")}${e.alsoAt.length > shown ? "\u2026" : ""}` : ""
         ].filter(Boolean).join(" ");
         out2.push(`- \`${e.file}:${e.line}\` (\`${e.selector}\`)${extra ? ` [${extra}]` : ""}${e.note ? ` \u2014 ${e.note}` : ""}`);
       }
@@ -59079,6 +59099,7 @@ const __vis = (e) => {
 };
 const __html = (e) => (e.outerHTML || '').slice(0, 160);
 `;
+var PROBE_DEFAULTS = { reflowWidth: 320, maxFocusables: 120, maxHits: 20 };
 var REFLOW_PROBE = `(() => {
   const el = document.scrollingElement || document.documentElement;
   return { horizontalScroll: el.scrollWidth > el.clientWidth + 2 };
@@ -59118,7 +59139,7 @@ var TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
   }
   return hits;
 })()`;
-function focusSetupExpr(scope = "") {
+function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables) {
   const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
   return `(() => { ${PRELUDE}
   const sel = 'a[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
@@ -59152,7 +59173,7 @@ function focusSetupExpr(scope = "") {
     proxy.setAttribute('data-u11y-fp', key);
     window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy) };
     n++;
-    if (n >= 120) break;
+    if (n >= ${maxFocusables}) break;
   }
   return n;
 })()`;
@@ -59191,12 +59212,12 @@ function hoverVisibleExpr(id, wantHidden = false) {
   const j = JSON.stringify(id);
   return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
 }
-async function probeFocusVisible(page, scope = "") {
-  const count = await page.evaluate(focusSetupExpr(scope));
+async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS) {
+  const count = await page.evaluate(focusSetupExpr(scope, limits.maxFocusables));
   if (!count) return [];
   const hits = [];
   const seen = /* @__PURE__ */ new Set();
-  const limit = Math.min(count + 2, 130);
+  const limit = Math.min(count + 2, limits.maxFocusables + 10);
   for (let i2 = 0; i2 < limit; i2++) {
     await page.keyboard.press("Tab");
     const r = await page.evaluate(FOCUS_CHECK_PROBE);
@@ -59214,7 +59235,7 @@ async function probeFocusVisible(page, scope = "") {
   }
   return hits;
 }
-async function probeHover(page) {
+async function probeHover(page, limits = PROBE_DEFAULTS) {
   const triggers = await page.evaluate(HOVER_SETUP_PROBE);
   const hits = [];
   for (const tr of triggers) {
@@ -59238,7 +59259,7 @@ async function probeHover(page) {
         detail: `Le contenu r\xE9v\xE9l\xE9 au survol (aria-describedby #${tr.target}) ne se masque pas avec \xC9chap \u2014 Contenu au survol ou au focus (1.4.13).`
       });
     }
-    if (hits.length >= 8) break;
+    if (hits.length >= Math.min(limits.maxHits, 8)) break;
   }
   return hits;
 }

@@ -46,6 +46,38 @@ export interface PlaywrightCheckOptions extends CheckOptions {
   report?: boolean | { out?: string; standard?: string; lang?: string };
 }
 
+/** Read the three shapes `probes` accepts — `true`, a list of criteria, or an options object —
+ *  into the one shape `runLiveProbes` takes. */
+function probeOptions(p: PlaywrightCheckOptions["probes"]): { only?: string[]; limits?: { reflowWidth?: number; maxFocusables?: number; maxHits?: number } } {
+  // `probes: true` means "use what the repository declared". The bounds are a judgement about
+  // the pages being audited, so they belong in `.ultra11yrc.json` next to the sample and the
+  // standard — not repeated at every call site, and not compiled into the tool.
+  //
+  // Read directly rather than through `loadConfig`: this module is a lean bundle a consumer
+  // imports into their test run, and pulling the standards registry in for three numbers
+  // would be a poor trade.
+  if (p === true || p === undefined) return fromConfig();
+  if (p === false) return {};
+  if (Array.isArray(p)) return { only: p, ...fromConfig() };
+  const { only, ...limits } = p;
+  return { ...(only ? { only } : {}), limits };
+}
+
+function fromConfig(): { only?: string[]; limits?: { reflowWidth?: number; maxFocusables?: number; maxHits?: number } } {
+  try {
+    const cfg = JSON.parse(readFileSync(join(process.cwd(), ".ultra11yrc.json"), "utf8")) as {
+      probes?: { only?: string[]; reflowWidth?: number; maxFocusables?: number; maxHits?: number };
+    };
+    if (!cfg.probes) return {};
+    const { only, ...limits } = cfg.probes;
+    return { ...(only ? { only } : {}), limits };
+  } catch {
+    // No config, or one this cannot read — the engine defaults apply, which is the same thing
+    // every repository that never opens the question gets.
+    return {};
+  }
+}
+
 /** Collect the current page, persist it as a snapshot, audit it, and fail on the threshold. */
 export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptions = {}): Promise<AuditLike> {
   const collected = (await page.evaluate(COLLECT_SNAPSHOT)) as Parameters<typeof buildPayload>[0];
@@ -84,7 +116,7 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
   let probes: unknown;
   if (opts.probes) {
     try {
-      probes = await runLiveProbes(page, Array.isArray(opts.probes) ? { only: opts.probes } : {});
+      probes = await runLiveProbes(page, probeOptions(opts.probes));
     } catch (e) {
       // LOUD, not silent. A swallowed probe failure is indistinguishable from a page with
       // nothing wrong: the criteria it would have decided simply stay « to assess », run after

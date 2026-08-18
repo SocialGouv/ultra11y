@@ -17,6 +17,7 @@ import { discover } from "./discover.js";
 import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
 import { attachSignals } from "./snapshot.js";
+import { loadConfig } from "./config.js";
 import { type Harvested, harvestSubjects, isSnapshotFile, PACK_SUBJECTS, pageOfDoc, SC_SUBJECTS } from "./adjudicate-subjects.js";
 import type { Doc } from "./parse/html.js";
 import { ADJUDICATION } from "./adjudication-data.js";
@@ -65,6 +66,9 @@ export const ADJUDICATE_MAX_EVIDENCE_CLASSES = 1200;
  *  gate refuse real occurrences for being ninth. Measured on a real run: 31 of 37 refusals
  *  were citations of elements the criterion genuinely carried. Only the reading is bounded. */
 const ALSO_AT_SHOWN = 8;
+
+/** Lines a citation may sit from the anchor it was given and still count as citing it. */
+const CITE_DRIFT_DEFAULT = 10;
 
 /** How much there actually was to look at, so a reader can tell a complete reading from a
  *  glance at the first few. */
@@ -219,6 +223,40 @@ function docsForAudit(audit: AuditResult, cwd?: string): Doc[] {
   return docs;
 }
 
+/** The numbers that decide how much of a criterion is shown and how strictly a citation is
+ *  read. Every one of them was a constant compiled into the engine, and every one is a
+ *  judgement about a CODEBASE rather than a fact about accessibility — so the audited
+ *  repository owns them, through `.ultra11yrc.json`. Absent ⇒ these defaults, which is what
+ *  every repository that never opens the question keeps. */
+export interface AdjudicationLimits {
+  maxClasses: number;
+  showAlsoAt: number;
+  citationDrift: number;
+}
+
+export const ADJUDICATION_DEFAULTS: AdjudicationLimits = {
+  maxClasses: ADJUDICATE_MAX_EVIDENCE_CLASSES,
+  showAlsoAt: ALSO_AT_SHOWN,
+  citationDrift: CITE_DRIFT_DEFAULT,
+};
+
+/** Read them from the audited repository, falling back to the defaults per field — a config
+ *  that sets one number must not silently reset the others. */
+export function adjudicationLimits(cwd?: string): AdjudicationLimits {
+  const cfg = loadConfig(cwd ?? ".")?.adjudication;
+  if (!cfg) return ADJUDICATION_DEFAULTS;
+  const positive = (v: unknown, fallback: number): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback);
+  return {
+    maxClasses: positive(cfg.maxClasses, ADJUDICATION_DEFAULTS.maxClasses),
+    showAlsoAt: positive(cfg.showAlsoAt, ADJUDICATION_DEFAULTS.showAlsoAt),
+    // 0 is meaningful here (exact-anchor matching), so it is allowed through.
+    citationDrift:
+      typeof cfg.citationDrift === "number" && Number.isFinite(cfg.citationDrift) && cfg.citationDrift >= 0
+        ? Math.floor(cfg.citationDrift)
+        : ADJUDICATION_DEFAULTS.citationDrift,
+  };
+}
+
 /** Collapse harvested anchors to one representative per CONTENT CLASS, and record how big
  *  the population really was.
  *
@@ -229,7 +267,7 @@ function docsForAudit(audit: AuditResult, cwd?: string): Doc[] {
  *  pages are 97 distinct (text, href) pairs; 47 images are 8 distinct (alt, src) pairs. One
  *  representative per class, with its occurrence count, is therefore the WHOLE population,
  *  said once per distinct thing — which is what makes an honest `C` reachable at all. */
-function collapse(harvested: Harvested[]): { evidence: Evidence[]; population: EvidencePopulation; complete: boolean } {
+function collapse(harvested: Harvested[], limits: AdjudicationLimits): { evidence: Evidence[]; population: EvidencePopulation; complete: boolean } {
   const byClass = new Map<string, Harvested[]>();
   for (const item of harvested) {
     const g = byClass.get(item.cls);
@@ -237,7 +275,7 @@ function collapse(harvested: Harvested[]): { evidence: Evidence[]; population: E
     else byClass.set(item.cls, [item]);
   }
   const groups = [...byClass.values()];
-  const evidence = groups.slice(0, ADJUDICATE_MAX_EVIDENCE_CLASSES).map((group) => {
+  const evidence = groups.slice(0, limits.maxClasses).map((group) => {
     // Prefer a RENDERED anchor as the representative: it proves what the browser actually
     // produced, and it is intrinsically page-scoped. The source anchor that produced it is
     // not lost — it travels in `alsoAt`, which is what someone editing the fix needs.
@@ -259,12 +297,18 @@ function collapse(harvested: Harvested[]): { evidence: Evidence[]; population: E
       files: new Set(harvested.map((x) => x.ev.file)).size,
       pages: new Set(harvested.map((x) => pageOfDoc(x.ev.file)).filter((x) => x !== undefined)).size,
     },
-    complete: groups.length <= ADJUDICATE_MAX_EVIDENCE_CLASSES,
+    complete: groups.length <= limits.maxClasses,
   };
 }
 
-function blankItem(criteriaId: string, automatability: Automatability, title: string | undefined, harvested: Harvested[]): AdjudicationItem {
-  const { evidence, population, complete } = collapse(harvested);
+function blankItem(
+  criteriaId: string,
+  automatability: Automatability,
+  title: string | undefined,
+  harvested: Harvested[],
+  limits: AdjudicationLimits,
+): AdjudicationItem {
+  const { evidence, population, complete } = collapse(harvested, limits);
   return {
     criteriaId,
     automatability,
@@ -310,6 +354,7 @@ function subjectsForPackCriterion(standard: StandardId, id: string, scs: string[
 export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: string; standard?: StandardId } = {}): AdjudicationItem[] {
   const docs = docsForAudit(audit, opts.cwd);
   const standard = opts.standard;
+  const limits = adjudicationLimits(opts.cwd);
 
   if (standard !== undefined && !isCore(standard)) {
     const pack = loadPack(standard);
@@ -328,12 +373,13 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
           automatability,
           crit ? packTitlePlain(pack, crit, "fr") : undefined,
           harvestSubjects(subjectsForPackCriterion(standard, pc.id, scs), docs),
+          limits,
         );
       });
   }
 
   return audit.residualRisks.map((r: ResidualRisk) =>
-    blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? undefined, harvestSubjects(subjectsForSc(r.criteriaId), docs)),
+    blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? undefined, harvestSubjects(subjectsForSc(r.criteriaId), docs), limits),
   );
 }
 
@@ -382,14 +428,13 @@ function auditFiles(audit: AuditResult, cwd?: string): Set<string> {
  *  criterion was never given. And it is only half the gate — `groundFinding` still has to find
  *  the cited content in the real source, so a plausible-looking file:line in the right
  *  neighbourhood proves nothing on its own. */
-const CITE_DRIFT = 10;
-function cites0(anchors: string[], c: { file: string; line: number }): boolean {
+function cites0(anchors: string[], c: { file: string; line: number }, drift: number): boolean {
   for (const a of anchors) {
     const at = a.lastIndexOf(":");
     if (at < 0) continue;
     if (a.slice(0, at) !== c.file) continue;
     const line = Number.parseInt(a.slice(at + 1), 10);
-    if (Number.isFinite(line) && Math.abs(line - c.line) <= CITE_DRIFT) return true;
+    if (Number.isFinite(line) && Math.abs(line - c.line) <= drift) return true;
   }
   return false;
 }
@@ -587,6 +632,7 @@ export function applyAdjudication(
   const groundInputs = new Map<string, { file: string; line: number; selector?: string; snippet?: string }[]>();
   // Memoised: only a citation that missed its criterion's own anchors ever asks for it.
   let scopeCache: Set<string> | undefined;
+  const { citationDrift } = adjudicationLimits(opts.cwd);
   const scopeFiles = (): Set<string> => (scopeCache ??= auditFiles(audit, opts.cwd));
   const toGround = (criteriaId: string, g: { file: string; line: number; selector?: string; snippet?: string }) => {
     const list = groundInputs.get(criteriaId);
@@ -667,7 +713,7 @@ export function applyAdjudication(
           // bound — a file outside the audited scope is still refused — and it is not the last
           // one: `groundFinding` below still has to find the cited content at that file:line in
           // the real source, which is what "not fabricated" actually means.
-          if (!cites0(anchors, c) && !scopeFiles().has(c.file)) {
+          if (!cites0(anchors, c, citationDrift) && !scopeFiles().has(c.file)) {
             blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c.file}:${c.line} is not among this criterion's harvested evidence (fabricated?)`);
           }
           toGround(it.criteriaId, { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet });
@@ -1076,8 +1122,15 @@ function plainTest(s: string): string {
  *  copies of instructions that contradict a CI adjudicator's toolset (it has no shell) and
  *  point at the wrong file. The briefs carry evidence and protocol; the instructions live once,
  *  in the worklist's `contract` field and the dispatch contract. */
-export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en", standard: StandardId = CORE, opts: { preamble?: boolean } = {}): string {
+export function formatAdjudication(
+  items: AdjudicationItem[],
+  lang: Lang = "en",
+  standard: StandardId = CORE,
+  opts: { preamble?: boolean; cwd?: string } = {},
+): string {
   const s = T[lang];
+  // Display only — the gate always reads the complete sibling set.
+  const { showAlsoAt: shown } = adjudicationLimits(opts.cwd);
   const pack = isCore(standard) ? undefined : loadPack(standard);
   const out: string[] = opts.preamble === false ? [] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
   if (pack && opts.preamble !== false) out.push(`> ${s.packIntro(pack.name)}`, "");
@@ -1094,7 +1147,7 @@ export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en",
         const extra = [
           e.occurrences && e.occurrences > 1 ? `×${e.occurrences}` : "",
           e.pages?.length ? `${s.on} ${e.pages.slice(0, 4).join(", ")}${e.pages.length > 4 ? "…" : ""}` : "",
-          e.alsoAt?.length ? `${s.alsoAt} ${e.alsoAt.slice(0, ALSO_AT_SHOWN).join(", ")}${e.alsoAt.length > ALSO_AT_SHOWN ? "…" : ""}` : "",
+          e.alsoAt?.length ? `${s.alsoAt} ${e.alsoAt.slice(0, shown).join(", ")}${e.alsoAt.length > shown ? "…" : ""}` : "",
         ]
           .filter(Boolean)
           .join(" ");

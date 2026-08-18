@@ -45,6 +45,40 @@ export interface Ultra11yConfig {
     transport?: "auto" | "cli" | "rest";
     maxTickets?: number;
   };
+  // How much a criterion is shown, and how strictly a citation is read. Every one of these
+  // was a constant compiled into the engine, and every one of them is a JUDGEMENT about a
+  // codebase rather than a fact about accessibility: how large a population an adjudicator
+  // can read in one sitting, how far a citation may sit from the anchor it was given. A
+  // number that decides whether a verdict is accepted belongs to the repository being
+  // audited, not to the tool auditing it.
+  //
+  // Absent ⇒ the engine's own default, which is what every existing repo keeps.
+  adjudication?: {
+    /** Content classes shown per criterion. Past it the reading is declared incomplete and a
+     *  `C` is refused — so raising it lets a bigger application be cleared, and lowering it
+     *  makes the tool refuse to conclude sooner. Default 1200. */
+    maxClasses?: number;
+    /** Sibling anchors rendered per class in the worklist. Display only: the gate always
+     *  reads the complete set. Default 8. */
+    showAlsoAt?: number;
+    /** Lines a citation may sit from the anchor it was given and still count as citing it —
+     *  the caption inside the table, the attribute below the tag. Beyond it, the citation must
+     *  land in a file the audit read. Default 10, matching the grounding window. */
+    citationDrift?: number;
+  };
+  // The live probes (`checkA11y({ probes: true })`). Same reasoning: a 320px reflow width is
+  // a normative constant, but how many focusables are worth tabbing through on YOUR pages is
+  // not.
+  probes?: {
+    /** Criteria to probe. Absent ⇒ all of them. */
+    only?: string[];
+    /** Viewport width for the reflow probe. Default 320 (WCAG 1.4.10). */
+    reflowWidth?: number;
+    /** Focusables tagged, and Tab presses spent, per page. Default 120. */
+    maxFocusables?: number;
+    /** Hits recorded per probe before it stops looking. Default 20. */
+    maxHits?: number;
+  };
 }
 
 export interface LoadResult {

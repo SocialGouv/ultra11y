@@ -47,6 +47,20 @@ const __vis = (e) => {
 const __html = (e) => (e.outerHTML || '').slice(0, 160);
 `;
 
+/** The numbers a probe stops at, and the width it narrows to.
+ *
+ *  320px is normative (WCAG 1.4.10) and stays the default; how many focusables are worth
+ *  tabbing through, and how many hits are worth recording before the point is made, are
+ *  judgements about the pages being audited. A repository that has 400 focusable elements on
+ *  one screen should be able to say so instead of being quietly cut off at 120. */
+export interface ProbeLimits {
+  reflowWidth: number;
+  maxFocusables: number;
+  maxHits: number;
+}
+
+export const PROBE_DEFAULTS: ProbeLimits = { reflowWidth: 320, maxFocusables: 120, maxHits: 20 };
+
 // The 320px reflow check (same semantics as the Docker RUNNER), mapped to 1.4.10.
 export const REFLOW_PROBE = `(() => {
   const el = document.scrollingElement || document.documentElement;
@@ -106,7 +120,7 @@ export const TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
 // always report "no visible change" as a false pass — so for a visually-hidden but
 // focusable radio/checkbox we measure the PROXY (label[for], wrapping label, or the
 // aria-labelledby target) instead, keyed by the input (which is what Tab focuses).
-export function focusSetupExpr(scope = ""): string {
+export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables): string {
   const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
   return `(() => { ${PRELUDE}
   const sel = 'a[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
@@ -140,7 +154,7 @@ export function focusSetupExpr(scope = ""): string {
     proxy.setAttribute('data-u11y-fp', key);
     window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy) };
     n++;
-    if (n >= 120) break;
+    if (n >= ${maxFocusables}) break;
   }
   return n;
 })()`;
@@ -188,12 +202,12 @@ export function hoverVisibleExpr(id: string, wantHidden = false): string {
   return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
 }
 
-export async function probeFocusVisible(page: Any, scope = ""): Promise<ProbeHit[]> {
-  const count = (await page.evaluate(focusSetupExpr(scope))) as number;
+export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimits = PROBE_DEFAULTS): Promise<ProbeHit[]> {
+  const count = (await page.evaluate(focusSetupExpr(scope, limits.maxFocusables))) as number;
   if (!count) return [];
   const hits: ProbeHit[] = [];
   const seen = new Set<string>();
-  const limit = Math.min(count + 2, 130);
+  const limit = Math.min(count + 2, limits.maxFocusables + 10);
   for (let i = 0; i < limit; i++) {
     await page.keyboard.press("Tab");
     const r = (await page.evaluate(FOCUS_CHECK_PROBE)) as { key: string; changed: boolean; selector: string; html: string } | null;
@@ -212,7 +226,7 @@ export async function probeFocusVisible(page: Any, scope = ""): Promise<ProbeHit
   return hits;
 }
 
-export async function probeHover(page: Any): Promise<ProbeHit[]> {
+export async function probeHover(page: Any, limits: ProbeLimits = PROBE_DEFAULTS): Promise<ProbeHit[]> {
   const triggers = (await page.evaluate(HOVER_SETUP_PROBE)) as { key: string; target: string; selector: string }[];
   const hits: ProbeHit[] = [];
   for (const tr of triggers) {
@@ -235,7 +249,7 @@ export async function probeHover(page: Any): Promise<ProbeHit[]> {
         detail: `Le contenu révélé au survol (aria-describedby #${tr.target}) ne se masque pas avec Échap — Contenu au survol ou au focus (1.4.13).`,
       });
     }
-    if (hits.length >= 8) break;
+    if (hits.length >= Math.min(limits.maxHits, 8)) break;
   }
   return hits;
 }
@@ -257,7 +271,8 @@ export async function probeHover(page: Any): Promise<ProbeHit[]> {
  *  Read-only by contract: no fill, no click, no navigation. The stateful probes stay in
  *  `scanLocal`, where the safety contract for driving a page is already stated and where a
  *  mutation cannot surprise a test that owns the session. */
-export async function runLiveProbes(page: Any, opts: { only?: string[] } = {}): Promise<LiveProbeResult> {
+export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?: Partial<ProbeLimits> } = {}): Promise<LiveProbeResult> {
+  const limits: ProbeLimits = { ...PROBE_DEFAULTS, ...opts.limits };
   const only = opts.only?.length ? new Set(opts.only) : null;
   const want = (id: string): boolean => only === null || only.has(id);
   // Capability checks, not assumptions. A page object that cannot resize or press a key is a
@@ -280,7 +295,7 @@ export async function runLiveProbes(page: Any, opts: { only?: string[] } = {}): 
   // Each probe is guarded on its own: one that throws costs its criterion, never the others
   // and never the caller's test.
   if (want("2.4.7") && canType) {
-    const r = await probeFocusVisible(page).catch((e: unknown) => {
+    const r = await probeFocusVisible(page, "", limits).catch((e: unknown) => {
       skip("2.4.7", String((e as Error)?.message ?? e).slice(0, 160));
       return null;
     });
@@ -290,7 +305,7 @@ export async function runLiveProbes(page: Any, opts: { only?: string[] } = {}): 
     }
   }
   if (want("1.4.13") && canHover && canType) {
-    const r = await probeHover(page).catch((e: unknown) => {
+    const r = await probeHover(page, limits).catch((e: unknown) => {
       skip("1.4.13", String((e as Error)?.message ?? e).slice(0, 160));
       return null;
     });
@@ -305,7 +320,7 @@ export async function runLiveProbes(page: Any, opts: { only?: string[] } = {}): 
   }
   if (want("1.4.10") && canResize) {
     let narrowed = true;
-    await page.setViewportSize({ width: 320, height: restore.height }).catch((e: unknown) => {
+    await page.setViewportSize({ width: limits.reflowWidth, height: restore.height }).catch((e: unknown) => {
       narrowed = false;
       skip("1.4.10", String((e as Error)?.message ?? e).slice(0, 160));
     });

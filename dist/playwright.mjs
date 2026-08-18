@@ -154,6 +154,7 @@ const __vis = (e) => {
 };
 const __html = (e) => (e.outerHTML || '').slice(0, 160);
 `;
+var PROBE_DEFAULTS = { reflowWidth: 320, maxFocusables: 120, maxHits: 20 };
 var REFLOW_PROBE = `(() => {
   const el = document.scrollingElement || document.documentElement;
   return { horizontalScroll: el.scrollWidth > el.clientWidth + 2 };
@@ -193,7 +194,7 @@ var TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
   }
   return hits;
 })()`;
-function focusSetupExpr(scope = "") {
+function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables) {
   const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
   return `(() => { ${PRELUDE}
   const sel = 'a[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
@@ -227,7 +228,7 @@ function focusSetupExpr(scope = "") {
     proxy.setAttribute('data-u11y-fp', key);
     window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy) };
     n++;
-    if (n >= 120) break;
+    if (n >= ${maxFocusables}) break;
   }
   return n;
 })()`;
@@ -266,12 +267,12 @@ function hoverVisibleExpr(id, wantHidden = false) {
   const j = JSON.stringify(id);
   return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
 }
-async function probeFocusVisible(page, scope = "") {
-  const count = await page.evaluate(focusSetupExpr(scope));
+async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS) {
+  const count = await page.evaluate(focusSetupExpr(scope, limits.maxFocusables));
   if (!count) return [];
   const hits = [];
   const seen = /* @__PURE__ */ new Set();
-  const limit = Math.min(count + 2, 130);
+  const limit = Math.min(count + 2, limits.maxFocusables + 10);
   for (let i = 0; i < limit; i++) {
     await page.keyboard.press("Tab");
     const r = await page.evaluate(FOCUS_CHECK_PROBE);
@@ -289,7 +290,7 @@ async function probeFocusVisible(page, scope = "") {
   }
   return hits;
 }
-async function probeHover(page) {
+async function probeHover(page, limits = PROBE_DEFAULTS) {
   const triggers = await page.evaluate(HOVER_SETUP_PROBE);
   const hits = [];
   for (const tr of triggers) {
@@ -313,11 +314,12 @@ async function probeHover(page) {
         detail: `Le contenu r\xE9v\xE9l\xE9 au survol (aria-describedby #${tr.target}) ne se masque pas avec \xC9chap \u2014 Contenu au survol ou au focus (1.4.13).`
       });
     }
-    if (hits.length >= 8) break;
+    if (hits.length >= Math.min(limits.maxHits, 8)) break;
   }
   return hits;
 }
 async function runLiveProbes(page, opts = {}) {
+  const limits = { ...PROBE_DEFAULTS, ...opts.limits };
   const only = opts.only?.length ? new Set(opts.only) : null;
   const want = (id) => only === null || only.has(id);
   const canResize = typeof page.setViewportSize === "function" && typeof page.viewportSize === "function";
@@ -335,7 +337,7 @@ async function runLiveProbes(page, opts = {}) {
   if (!canHover) skip("1.4.13", "the page object cannot hover");
   if (!canStyle) skip("1.4.12", "the page object cannot inject a stylesheet");
   if (want("2.4.7") && canType) {
-    const r = await probeFocusVisible(page).catch((e) => {
+    const r = await probeFocusVisible(page, "", limits).catch((e) => {
       skip("2.4.7", String(e?.message ?? e).slice(0, 160));
       return null;
     });
@@ -345,7 +347,7 @@ async function runLiveProbes(page, opts = {}) {
     }
   }
   if (want("1.4.13") && canHover && canType) {
-    const r = await probeHover(page).catch((e) => {
+    const r = await probeHover(page, limits).catch((e) => {
       skip("1.4.13", String(e?.message ?? e).slice(0, 160));
       return null;
     });
@@ -360,7 +362,7 @@ async function runLiveProbes(page, opts = {}) {
   }
   if (want("1.4.10") && canResize) {
     let narrowed = true;
-    await page.setViewportSize({ width: 320, height: restore.height }).catch((e) => {
+    await page.setViewportSize({ width: limits.reflowWidth, height: restore.height }).catch((e) => {
       narrowed = false;
       skip("1.4.10", String(e?.message ?? e).slice(0, 160));
     });
@@ -525,6 +527,23 @@ function writePagesReport(opts = {}, engine = enginePath()) {
 }
 
 // src/integrations/playwright.ts
+function probeOptions(p) {
+  if (p === true || p === void 0) return fromConfig();
+  if (p === false) return {};
+  if (Array.isArray(p)) return { only: p, ...fromConfig() };
+  const { only, ...limits } = p;
+  return { ...only ? { only } : {}, limits };
+}
+function fromConfig() {
+  try {
+    const cfg = JSON.parse(readFileSync(join(process.cwd(), ".ultra11yrc.json"), "utf8"));
+    if (!cfg.probes) return {};
+    const { only, ...limits } = cfg.probes;
+    return { ...only ? { only } : {}, limits };
+  } catch {
+    return {};
+  }
+}
 async function checkA11y(page, opts = {}) {
   const collected = await page.evaluate(COLLECT_SNAPSHOT);
   let shot;
@@ -543,7 +562,7 @@ async function checkA11y(page, opts = {}) {
   let probes;
   if (opts.probes) {
     try {
-      probes = await runLiveProbes(page, Array.isArray(opts.probes) ? { only: opts.probes } : {});
+      probes = await runLiveProbes(page, probeOptions(opts.probes));
     } catch (e) {
       console.warn(
         `ultra11y: the live probes failed on this page \u2014 ${e instanceof Error ? e.message : String(e)}. The snapshot was still recorded; the criteria they decide stay to assess.`

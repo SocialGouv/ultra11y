@@ -120,8 +120,12 @@ export interface CheckOptions {
    *  and a suite should opt into that. Everything is restored before it returns, and the
    *  snapshot has already been collected, so what they measure cannot alter what was recorded.
    *  Pass an array to run only some of them (by criterion: "1.4.4", "1.4.10", "1.4.12",
-   *  "1.4.13", "2.4.7"). */
-  probes?: boolean | string[];
+   *  "1.4.13", "2.4.7"), or an object to also set the bounds — how wide the reflow probe
+   *  narrows to, how many focusables are worth tabbing through, how many hits are worth
+   *  recording. 320px is normative and stays the default; the other two are judgements about
+   *  YOUR pages, and a screen with 400 focusables should be able to say so rather than being
+   *  quietly cut off at 120. */
+  probes?: boolean | string[] | { only?: string[]; reflowWidth?: number; maxFocusables?: number; maxHits?: number };
 }
 
 /** Did the browser stay on the page the caller asked for? Path-only, trailing slash folded;

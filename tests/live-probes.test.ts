@@ -110,3 +110,19 @@ describe("runLiveProbes", () => {
     expect(r.textSpacing).toEqual([]);
   });
 });
+
+describe("the bounds belong to the repository, not to the tool", () => {
+  it("narrows to the width the caller asked for", async () => {
+    const page = fakePage();
+    await runLiveProbes(page, { limits: { reflowWidth: 360 } });
+    expect(page.log).toContain("viewport:360x900");
+  });
+
+  it("keeps the engine default for anything the caller left alone", async () => {
+    // A config that sets one number must not silently reset the others — the trap every
+    // partial-override reader falls into.
+    const page = fakePage();
+    await runLiveProbes(page, { limits: { maxHits: 3 } });
+    expect(page.log).toContain("viewport:320x900");
+  });
+});
