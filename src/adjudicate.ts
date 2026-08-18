@@ -1450,6 +1450,10 @@ export function writeAdjudication(
  *  for the population; the whole set is in the brief, and `occurrences` travels with each. */
 const PREFILLED_CITATIONS = 3;
 
+/** Characters of the snippet a pre-filled citation carries. Enough to identify the element to
+ *  a reader of the diff; the grounding matches on the anchor, not on the length. */
+const CITATION_SNIPPET_MAX = 120;
+
 export function slimAdjudicationItems(items: AdjudicationItem[]): AdjudicationItem[] {
   return items.map((it) => {
     const { evidence: _evidence, evidenceTruncated: _truncated, ...rest } = it;
@@ -1471,7 +1475,18 @@ export function slimAdjudicationItems(items: AdjudicationItem[]): AdjudicationIt
     // `population` and `evidenceComplete` are kept for the same reason they always were: they
     // are two numbers, not bulk, and they tell the adjudicator how much of the subject it is
     // actually looking at.
-    const citations = it.evidence.slice(0, PREFILLED_CITATIONS).map((e) => ({ ...e }));
+    // MINIMAL, and that is not a detail: the first cut of this pre-filled the whole Evidence
+    // object, `alsoAt` included — 167 sibling anchors on one criterion — and turned the file
+    // the prompt calls "the small one to write" into 367 KB. Measured: the adjudicator stopped
+    // after 22 turns of a 228 budget, filled nothing, and every criterion came back
+    // `unadjudicated`. A citation only ever needs to say WHICH element; the population, the
+    // siblings and the note belong to the brief, which is the file to READ.
+    const citations = it.evidence.slice(0, PREFILLED_CITATIONS).map((e) => ({
+      file: e.file,
+      line: e.line,
+      ...(e.selector ? { selector: e.selector } : {}),
+      ...(e.snippet ? { snippet: e.snippet.slice(0, CITATION_SNIPPET_MAX) } : {}),
+    }));
     return { ...rest, evidence: [], ...(citations.length ? { citations } : {}) } as AdjudicationItem;
   });
 }

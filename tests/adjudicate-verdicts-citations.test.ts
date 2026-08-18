@@ -96,3 +96,30 @@ describe("the verdicts skeleton pre-fills the citations", () => {
     expect(r.issues.join("\n")).not.toMatch(/must cite at least one/);
   });
 });
+
+// The file the prompt calls "the small one to WRITE" has to stay small.
+//
+// The first cut of the pre-fill copied the whole Evidence object — `note`, `occurrences`,
+// `pages`, and `alsoAt`, which on one criterion held 167 sibling anchors. The skeleton went to
+// 367 KB. Measured on a real run: the adjudicator stopped after 22 turns of a 228 budget,
+// wrote nothing, and all 42 criteria came back `unadjudicated`.
+describe("the skeleton stays small enough to be written", () => {
+  it("carries only what says WHICH element — never the population or the siblings", () => {
+    const slim = slimAdjudicationItems(items());
+    for (const it of slim) {
+      for (const c of it.citations ?? []) {
+        expect(Object.keys(c).sort()).toEqual(["file", "line", "selector", "snippet"].filter((k) => k in (c as object)).sort());
+        expect((c as { alsoAt?: unknown }).alsoAt).toBeUndefined();
+        expect((c as { pages?: unknown }).pages).toBeUndefined();
+        expect((c as { occurrences?: unknown }).occurrences).toBeUndefined();
+        expect((c as { note?: unknown }).note).toBeUndefined();
+      }
+    }
+  });
+
+  it("keeps a pre-filled snippet short — it identifies, it does not reproduce", () => {
+    for (const it of slimAdjudicationItems(items())) {
+      for (const c of it.citations ?? []) expect(((c as { snippet?: string }).snippet ?? "").length).toBeLessThanOrEqual(120);
+    }
+  });
+});

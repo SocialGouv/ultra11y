@@ -58208,10 +58208,16 @@ function writeAdjudication(items, outDir, opts) {
   return { todoPath, mdPath, verdictsPath, itemsDir, count: items.length };
 }
 var PREFILLED_CITATIONS = 3;
+var CITATION_SNIPPET_MAX = 120;
 function slimAdjudicationItems(items) {
   return items.map((it) => {
     const { evidence: _evidence, evidenceTruncated: _truncated, ...rest } = it;
-    const citations = it.evidence.slice(0, PREFILLED_CITATIONS).map((e) => ({ ...e }));
+    const citations = it.evidence.slice(0, PREFILLED_CITATIONS).map((e) => ({
+      file: e.file,
+      line: e.line,
+      ...e.selector ? { selector: e.selector } : {},
+      ...e.snippet ? { snippet: e.snippet.slice(0, CITATION_SNIPPET_MAX) } : {}
+    }));
     return { ...rest, evidence: [], ...citations.length ? { citations } : {} };
   });
 }
