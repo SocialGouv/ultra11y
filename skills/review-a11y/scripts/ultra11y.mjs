@@ -37192,19 +37192,36 @@ var COLLECT_SNAPSHOT = `(() => {
   // query that locks the orientation (1.3.4) \u2014 and this is the only place they exist.
   // A cross-origin sheet throws on .cssRules: COUNT those instead of ignoring them, so a rule
   // reading this digest can tell "nothing there" apart from "I could not look".
+  // The cap is on the ORDINARY pool only, and the traversal never stops early.
+  //
+  // It used to return the moment the pool filled, which abandoned every remaining sheet \u2014
+  // and on a design-system app the pool fills long before the end. Measured on a real capture
+  // of 38 pages: all 38 came back truncated, so rendered-focus-not-visible declined on every
+  // one of them and 2.4.7 could never be decided by any number of scans. The rule was right to
+  // decline (a :focus rule might have been among the dropped ones); the collector was wrong to
+  // make that unavoidable.
+  //
+  // So the rules a rendered criterion actually READS \u2014 :focus styling, orientation locks,
+  // pinned positioning, animation \u2014 are kept whatever the pool is doing, and truncated now
+  // means "some ordinary rule was dropped", which is a much weaker statement. A rule can then
+  // ask for what it needs instead of refusing on a cap that never concerned it.
   const cssRules = [];
   let unreadable = 0;
+  let dropped = 0;
   const MAXR = 4000;
   const camel = (p) => p.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  const KEEP_SELECTOR = /:focus|:target|:active/i;
+  const KEEP_PROP = /^(?:outline|position|animation|transition|transform)/;
   const walk = (list, media) => {
     for (const r of list) {
-      if (cssRules.length >= MAXR) return;
       if (typeof r.selectorText === 'string' && r.style) {
         const decls = {};
         for (let i = 0; i < r.style.length; i++) {
           const prop = r.style[i];
           decls[camel(prop)] = r.style.getPropertyValue(prop);
         }
+        const keep = KEEP_SELECTOR.test(r.selectorText) || Object.keys(decls).some((k) => KEEP_PROP.test(k));
+        if (cssRules.length >= MAXR && !keep) { dropped++; continue; }
         cssRules.push(media ? { selector: r.selectorText, media: media, decls: decls } : { selector: r.selectorText, decls: decls });
       } else if (r.cssRules) {
         const cond = r.conditionText || (r.media && r.media.mediaText) || media;
@@ -37223,7 +37240,7 @@ var COLLECT_SNAPSHOT = `(() => {
   const truncated = els.length > MAX;
   return {
     dom: document.documentElement.outerHTML,
-    css: { v: 1, rules: cssRules, unreadable: unreadable, truncated: cssRules.length >= MAXR },
+    css: { v: 1, rules: cssRules, unreadable: unreadable, truncated: dropped > 0, dropped: dropped },
     title: document.title,
     // The doctype is NOT part of documentElement.outerHTML, so a capture that records only
     // the DOM drops it \u2014 and RGAA 8.1 (is a doctype present, valid, and before <html>?) then
@@ -39103,8 +39120,16 @@ var SIGNALS_REQUIRED = {
   "rendered-nontext-contrast": (s) => !!s.styles && !s.truncated,
   // The pixel fallback needs the screenshot AND the boxes to sample it by.
   "rendered-contrast-pixel": (s) => !!s.screenshot && !!s.boxes && !s.truncated,
-  // These two read the page's own stylesheets, and both decline on an unreadable sheet.
-  "rendered-focus-not-visible": (s) => !!s.css && s.css.unreadable === 0 && !s.css.truncated,
+  // These two read the page's own stylesheets, and both decline on an unreadable sheet — a
+  // sheet the browser refused is a sheet that could hold the very rule they are looking for.
+  //
+  // Truncation is a different question, and it used to be conflated with that one. The
+  // collector now KEEPS every :focus/:target/:active rule regardless of its pool cap, so
+  // `truncated` no longer means "a focus rule may be missing", it means "some ordinary rule
+  // was dropped". Declining on it made 2.4.7 undecidable on every page of a design-system app
+  // — measured: 38 captures, 38 truncated, zero verdicts — for a cap that never touched the
+  // rules this reads.
+  "rendered-focus-not-visible": (s) => !!s.css && s.css.unreadable === 0,
   "rendered-orientation-lock": (s) => !!s.css && s.css.unreadable === 0
 };
 function renderedTestedScs(signals) {
@@ -39113,6 +39138,13 @@ function renderedTestedScs(signals) {
     if (SIGNALS_REQUIRED[rule.id]?.(signals)) for (const sc of rule.criteria) scs.add(sc);
   }
   return [...scs].sort();
+}
+function renderedRulesRan(signals) {
+  if (!signals) return [];
+  return renderedRules.filter((rule) => SIGNALS_REQUIRED[rule.id]?.(signals)).map((rule) => rule.id);
+}
+function renderedRulesFor(sc) {
+  return renderedRules.filter((rule) => rule.criteria.includes(sc)).map((rule) => rule.id);
 }
 var RENDERED_SIGNAL_RULES = Object.keys(SIGNALS_REQUIRED);
 
@@ -47560,7 +47592,9 @@ function newAccum() {
     sfcExts: /* @__PURE__ */ new Set(),
     captures: [],
     langCounts: /* @__PURE__ */ new Map(),
-    renderedScs: /* @__PURE__ */ new Set()
+    renderedScs: /* @__PURE__ */ new Set(),
+    pageIds: /* @__PURE__ */ new Set(),
+    renderedRan: /* @__PURE__ */ new Map()
   };
 }
 function primarySubtag(lang) {
@@ -47597,6 +47631,15 @@ function foldDoc(acc, doc, graph) {
     if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
   }
   if (doc.signals) for (const sc of renderedTestedScs(doc.signals)) acc.renderedScs.add(sc);
+  const pageId = snapshotPageId(doc.file);
+  if (pageId) {
+    acc.pageIds.add(pageId);
+    for (const ruleId of renderedRulesRan(doc.signals)) {
+      const seen = acc.renderedRan.get(ruleId) ?? /* @__PURE__ */ new Set();
+      seen.add(pageId);
+      acc.renderedRan.set(ruleId, seen);
+    }
+  }
   if (doc.opaqueComponents?.length) {
     for (const lib of doc.opaqueComponents) acc.opaqueLibs.add(lib);
     acc.opaqueFiles++;
@@ -47613,6 +47656,19 @@ function foldDoc(acc, doc, graph) {
   if (subtag) acc.langCounts.set(subtag, (acc.langCounts.get(subtag) ?? 0) + 1);
   acc.fileCount++;
 }
+function renderedProves(sc, acc) {
+  if (acc.pageIds.size === 0) return false;
+  const rules = renderedRulesFor(sc);
+  if (!rules.length) return false;
+  return rules.every((ruleId) => {
+    const ran = acc.renderedRan.get(ruleId);
+    return ran !== void 0 && acc.pageIds.size === [...acc.pageIds].filter((p) => ran.has(p)).length;
+  });
+}
+function renderedProvesReason(sc, acc) {
+  const rules = renderedRulesFor(sc);
+  return `Measured on the rendered pages: ${rules.join(", ")} ran on all ${acc.pageIds.size} page(s) in scope and raised nothing. Conformity here is a MEASUREMENT, not a judgement \u2014 a page whose signals were incomplete would have kept this criterion open.`;
+}
 function finalize(acc, inputs, extra = {}) {
   const criteria = [];
   const residualRisks = [];
@@ -47621,6 +47677,7 @@ function finalize(acc, inputs, extra = {}) {
     const normativeFs = fs2.filter((f) => !f.advisory);
     let status;
     let justification;
+    let decidedBy;
     if (c2.automatability === "static") {
       const applicable = acc.applicable.get(c2.sc) ?? false;
       if (!applicable) {
@@ -47636,11 +47693,15 @@ function finalize(acc, inputs, extra = {}) {
     } else if (SUBJECT_MATTER[c2.sc] !== void 0 && !(acc.applicable.get(c2.sc) ?? false)) {
       status = "NA";
       justification = subjectMatterReason(c2.sc, acc.fileCount);
+    } else if (c2.automatability === "needs-rendering" && renderedProves(c2.sc, acc)) {
+      status = "C";
+      justification = renderedProvesReason(c2.sc, acc);
+      decidedBy = "scan";
     } else {
       status = "manual";
       residualRisks.push({ criteriaId: c2.sc, reason: residualReason(c2.automatability, c2.sc), automatability: c2.automatability });
     }
-    criteria.push({ id: c2.sc, guideline: c2.guideline, status, findings: fs2, ...justification ? { justification } : {} });
+    criteria.push({ id: c2.sc, guideline: c2.guideline, status, findings: fs2, ...justification ? { justification } : {}, ...decidedBy ? { decidedBy } : {} });
   }
   const guidelines = allGuidelines().map((g) => {
     const inG = criteria.filter((c2) => c2.guideline === g.number);

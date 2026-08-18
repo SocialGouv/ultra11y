@@ -12,7 +12,7 @@ import { attachSignals, isSnapshotDom, snapshotPageId } from "./snapshot.js";
 import { attr, elementsByTag, type Doc, type CaptureProvenance } from "./parse/html.js";
 import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir, readCaptureDir, capturesForSources } from "./capture.js";
 import { isFullDocument } from "./rules/rule.js";
-import { renderedTestedScs } from "./rules/rendered.js";
+import { renderedRulesFor, renderedRulesRan, renderedTestedScs } from "./rules/rendered.js";
 import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
 import { listPacks } from "./standards/registry.js";
@@ -321,6 +321,15 @@ interface Accum {
   // (src/rules/rendered.ts renderedTestedScs). Stamped onto scope.scan.testedScs so the
   // partial-audit banner names what is genuinely missing instead of every rendering criterion.
   renderedScs: Set<string>;
+  // PER-PAGE rendered coverage — the accounting `renderedScs` is not.
+  //
+  // `renderedScs` answers "was this measured anywhere?", which is the right claim for the
+  // partial-audit banner and the WRONG one for concluding conformity: a criterion measured on
+  // one page out of thirty-eight is not a criterion measured. Concluding `C` needs "measured
+  // on EVERY page in scope, by every rule that carries it", so coverage is tracked per rule
+  // and per page and folded with an AND at the end.
+  pageIds: Set<string>;
+  renderedRan: Map<string, Set<string>>; // rendered rule id → page ids where its signals were present
 }
 
 // Precompute the static success criteria + their applicability predicates once.
@@ -349,6 +358,8 @@ function newAccum(): Accum {
     captures: [],
     langCounts: new Map(),
     renderedScs: new Set(),
+    pageIds: new Set(),
+    renderedRan: new Map(),
   };
 }
 
@@ -416,6 +427,18 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
   // A page snapshot just let the rendered tier MEASURE some criteria, offline and with no
   // browser. Record which, so the report stops claiming they were never tested.
   if (doc.signals) for (const sc of renderedTestedScs(doc.signals)) acc.renderedScs.add(sc);
+  // Only a SNAPSHOT is a page. A source file carrying no signals must never count towards
+  // "every page was measured" — that is the difference between a fold that can conclude and
+  // one that merely looks like it can.
+  const pageId = snapshotPageId(doc.file);
+  if (pageId) {
+    acc.pageIds.add(pageId);
+    for (const ruleId of renderedRulesRan(doc.signals)) {
+      const seen = acc.renderedRan.get(ruleId) ?? new Set<string>();
+      seen.add(pageId);
+      acc.renderedRan.set(ruleId, seen);
+    }
+  }
   if (doc.opaqueComponents?.length) {
     for (const lib of doc.opaqueComponents) acc.opaqueLibs.add(lib);
     acc.opaqueFiles++;
@@ -438,6 +461,42 @@ interface FinalizeExtra {
   dedup?: { canonicalFiles: number; duplicateFiles: number };
 }
 
+/** Did the RENDERED tier measure this criterion on every page in scope, and find nothing?
+ *
+ *  This is the accounting src/rules/rendered.ts deferred when it landed: "letting a clean
+ *  measurement conclude C … needs per-rule coverage accounting". Without it a measured
+ *  criterion stayed « to assess » forever, so a page could be scanned thirty-eight times and
+ *  still publish nothing — which is the same outcome as never scanning at all.
+ *
+ *  Four conditions, and every one of them is load-bearing:
+ *
+ *   1. at least one page is in scope. No page ⇒ no measurement ⇒ nothing to conclude;
+ *   2. the criterion is carried by at least one rendered rule. A criterion NO rule measures
+ *      (1.4.5, 2.1.2, 2.3.1, 2.4.11, 2.5.8) can never be concluded here — its silence is not
+ *      a measurement, and treating it as one is exactly the failure this tier exists to avoid;
+ *   3. EVERY such rule ran on EVERY page. One page whose collector truncated, whose style
+ *      digest failed verification or whose stylesheet was cross-origin, and the criterion
+ *      stays open for the whole scope. The fold is an AND, never an OR;
+ *   4. no normative finding — guaranteed by the caller's branch order, stated here because
+ *      the rule reads as incomplete without it.
+ *
+ *  What it deliberately does NOT do is conclude from a rule that DECLINED. A rule that read
+ *  nothing measured nothing, and `SIGNALS_REQUIRED` is what tells the two apart. */
+function renderedProves(sc: string, acc: Accum): boolean {
+  if (acc.pageIds.size === 0) return false;
+  const rules = renderedRulesFor(sc);
+  if (!rules.length) return false;
+  return rules.every((ruleId) => {
+    const ran = acc.renderedRan.get(ruleId);
+    return ran !== undefined && acc.pageIds.size === [...acc.pageIds].filter((p) => ran.has(p)).length;
+  });
+}
+
+function renderedProvesReason(sc: string, acc: Accum): string {
+  const rules = renderedRulesFor(sc);
+  return `Measured on the rendered pages: ${rules.join(", ")} ran on all ${acc.pageIds.size} page(s) in scope and raised nothing. Conformity here is a MEASUREMENT, not a judgement — a page whose signals were incomplete would have kept this criterion open.`;
+}
+
 function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): AuditResult {
   const criteria: CriterionResult[] = [];
   const residualRisks: ResidualRisk[] = [];
@@ -451,6 +510,10 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
     const normativeFs = fs.filter((f) => !f.advisory);
     let status: Status;
     let justification: string | undefined;
+    // Absent ⇒ the deterministic engine. `scan` marks a verdict the RENDERED tier measured,
+    // kept distinct from an engine one so a reader can tell what was proved from source and
+    // what was proved on a page — and distinct from `agent`, which is a judgement call.
+    let decidedBy: CriterionResult["decidedBy"] | undefined;
 
     if (c.automatability === "static") {
       const applicable = acc.applicable.get(c.sc) ?? false;
@@ -471,13 +534,18 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       // assess ». Never a `C`: this says the criterion does not apply, never that it is met.
       status = "NA";
       justification = subjectMatterReason(c.sc, acc.fileCount);
+    } else if (c.automatability === "needs-rendering" && renderedProves(c.sc, acc)) {
+      // The rendered tier measured it, on every page, and found nothing. That is a verdict.
+      status = "C";
+      justification = renderedProvesReason(c.sc, acc);
+      decidedBy = "scan";
     } else {
       // engine can't decide — leave it for the agent to adjudicate (`verify --manual`,
       // gated) or the `scan` tier (rendering criteria); never a silent conforming.
       status = "manual";
       residualRisks.push({ criteriaId: c.sc, reason: residualReason(c.automatability, c.sc), automatability: c.automatability });
     }
-    criteria.push({ id: c.sc, guideline: c.guideline, status, findings: fs, ...(justification ? { justification } : {}) });
+    criteria.push({ id: c.sc, guideline: c.guideline, status, findings: fs, ...(justification ? { justification } : {}), ...(decidedBy ? { decidedBy } : {}) });
   }
 
   const guidelines: GuidelineTally[] = allGuidelines().map((g) => {

@@ -398,8 +398,16 @@ const SIGNALS_REQUIRED: Record<string, (s: RenderSignals) => boolean> = {
   "rendered-nontext-contrast": (s) => !!s.styles && !s.truncated,
   // The pixel fallback needs the screenshot AND the boxes to sample it by.
   "rendered-contrast-pixel": (s) => !!s.screenshot && !!s.boxes && !s.truncated,
-  // These two read the page's own stylesheets, and both decline on an unreadable sheet.
-  "rendered-focus-not-visible": (s) => !!s.css && s.css.unreadable === 0 && !s.css.truncated,
+  // These two read the page's own stylesheets, and both decline on an unreadable sheet — a
+  // sheet the browser refused is a sheet that could hold the very rule they are looking for.
+  //
+  // Truncation is a different question, and it used to be conflated with that one. The
+  // collector now KEEPS every :focus/:target/:active rule regardless of its pool cap, so
+  // `truncated` no longer means "a focus rule may be missing", it means "some ordinary rule
+  // was dropped". Declining on it made 2.4.7 undecidable on every page of a design-system app
+  // — measured: 38 captures, 38 truncated, zero verdicts — for a cap that never touched the
+  // rules this reads.
+  "rendered-focus-not-visible": (s) => !!s.css && s.css.unreadable === 0,
   "rendered-orientation-lock": (s) => !!s.css && s.css.unreadable === 0,
 };
 
@@ -411,6 +419,21 @@ export function renderedTestedScs(signals: RenderSignals): string[] {
     if (SIGNALS_REQUIRED[rule.id]?.(signals)) for (const sc of rule.criteria) scs.add(sc);
   }
   return [...scs].sort();
+}
+
+/** The rendered rules whose required signals were present on a document — i.e. the rules that
+ *  genuinely RAN there, as opposed to declining. Same table as `renderedTestedScs`, reported
+ *  per RULE rather than per criterion, because concluding conformity needs to know that every
+ *  rule carrying a criterion ran on every page — not merely that some rule ran somewhere. */
+export function renderedRulesRan(signals: RenderSignals | undefined): string[] {
+  if (!signals) return [];
+  return renderedRules.filter((rule) => SIGNALS_REQUIRED[rule.id]?.(signals)).map((rule) => rule.id);
+}
+
+/** The rendered rules that carry a success criterion. A criterion with none is not measured by
+ *  this tier at all, and must never be concluded from its silence. */
+export function renderedRulesFor(sc: string): string[] {
+  return renderedRules.filter((rule) => rule.criteria.includes(sc)).map((rule) => rule.id);
 }
 
 /** Every rule id that declares its signal requirement — for the drift test. */

@@ -65,19 +65,36 @@ var COLLECT_SNAPSHOT = `(() => {
   // query that locks the orientation (1.3.4) \u2014 and this is the only place they exist.
   // A cross-origin sheet throws on .cssRules: COUNT those instead of ignoring them, so a rule
   // reading this digest can tell "nothing there" apart from "I could not look".
+  // The cap is on the ORDINARY pool only, and the traversal never stops early.
+  //
+  // It used to return the moment the pool filled, which abandoned every remaining sheet \u2014
+  // and on a design-system app the pool fills long before the end. Measured on a real capture
+  // of 38 pages: all 38 came back truncated, so rendered-focus-not-visible declined on every
+  // one of them and 2.4.7 could never be decided by any number of scans. The rule was right to
+  // decline (a :focus rule might have been among the dropped ones); the collector was wrong to
+  // make that unavoidable.
+  //
+  // So the rules a rendered criterion actually READS \u2014 :focus styling, orientation locks,
+  // pinned positioning, animation \u2014 are kept whatever the pool is doing, and truncated now
+  // means "some ordinary rule was dropped", which is a much weaker statement. A rule can then
+  // ask for what it needs instead of refusing on a cap that never concerned it.
   const cssRules = [];
   let unreadable = 0;
+  let dropped = 0;
   const MAXR = 4000;
   const camel = (p) => p.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  const KEEP_SELECTOR = /:focus|:target|:active/i;
+  const KEEP_PROP = /^(?:outline|position|animation|transition|transform)/;
   const walk = (list, media) => {
     for (const r of list) {
-      if (cssRules.length >= MAXR) return;
       if (typeof r.selectorText === 'string' && r.style) {
         const decls = {};
         for (let i = 0; i < r.style.length; i++) {
           const prop = r.style[i];
           decls[camel(prop)] = r.style.getPropertyValue(prop);
         }
+        const keep = KEEP_SELECTOR.test(r.selectorText) || Object.keys(decls).some((k) => KEEP_PROP.test(k));
+        if (cssRules.length >= MAXR && !keep) { dropped++; continue; }
         cssRules.push(media ? { selector: r.selectorText, media: media, decls: decls } : { selector: r.selectorText, decls: decls });
       } else if (r.cssRules) {
         const cond = r.conditionText || (r.media && r.media.mediaText) || media;
@@ -96,7 +113,7 @@ var COLLECT_SNAPSHOT = `(() => {
   const truncated = els.length > MAX;
   return {
     dom: document.documentElement.outerHTML,
-    css: { v: 1, rules: cssRules, unreadable: unreadable, truncated: cssRules.length >= MAXR },
+    css: { v: 1, rules: cssRules, unreadable: unreadable, truncated: dropped > 0, dropped: dropped },
     title: document.title,
     // The doctype is NOT part of documentElement.outerHTML, so a capture that records only
     // the DOM drops it \u2014 and RGAA 8.1 (is a doctype present, valid, and before <html>?) then

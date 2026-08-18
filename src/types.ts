@@ -320,7 +320,13 @@ export interface CssDigest {
   // ABSENCE is then not evidence of anything, so the rules that read this digest decline to
   // conclude when it is non-zero. Silence here means "I could not look", not "nothing there".
   unreadable: number;
+  /** Some ORDINARY rule was dropped past the pool cap. Deliberately a weaker statement than it
+   *  used to be: the rules a rendered criterion reads (:focus/:target/:active styling, and
+   *  anything declaring outline/position/animation/transition/transform) are kept whatever the
+   *  pool is doing, so a rule that needs only those need not decline on this flag. */
   truncated?: boolean;
+  /** How many ordinary rules were dropped, for the reader. */
+  dropped?: number;
 }
 
 /** The accessibility tree as the browser computed it. Deliberately loose: producers differ.

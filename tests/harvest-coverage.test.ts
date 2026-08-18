@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { PACK_SUBJECTS, SC_SUBJECTS, SUBJECTS } from "../src/adjudicate-subjects.js";
 import { allSC } from "../src/wcag.js";
 import { loadPack } from "../src/standards/index.js";
-import { STANDARDS } from "../src/standards/registry.js";
 
 // THE KEYSTONE, and the mirror of the one in data-integrity-adjudication.test.ts.
 //
@@ -37,7 +36,7 @@ describe("every criterion the engine hands over has something to look at", () =>
 
   it("keys pack overrides on criteria the pack actually has", () => {
     for (const [standard, byCriterion] of Object.entries(PACK_SUBJECTS)) {
-      const pack = loadPack(standard as keyof typeof STANDARDS extends never ? never : Parameters<typeof loadPack>[0]);
+      const pack = loadPack(standard as Parameters<typeof loadPack>[0]);
       const known = new Set(pack.criteria.map((c) => c.id));
       const strays = Object.keys(byCriterion).filter((id) => !known.has(id));
       expect(strays, `${standard} overrides criteria it does not define: ${strays.join(", ")}`).toEqual([]);
