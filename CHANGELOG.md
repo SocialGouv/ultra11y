@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.5.0](https://github.com/maxgfr/ultra11y/compare/v5.4.1...v5.5.0) (2026-08-18)
+
+
+### Bug Fixes
+
+* **pages:** show a recorded verdict on the pages, instead of flattening it ([a3159b7](https://github.com/maxgfr/ultra11y/commit/a3159b78f59a3792e3ad33ce444e6a4df526bd5c))
+
+
+### Features
+
+* **adjudicate:** show a criterion its own subject, and the whole of it ([ee769e8](https://github.com/maxgfr/ultra11y/commit/ee769e8af240b7c6b87abd2a3ae92f9d78818fe0))
+* **check:** prove the grid is complete, instead of hoping it is ([fa41588](https://github.com/maxgfr/ultra11y/commit/fa41588fd5374907e8df99bd5ba0d21b8d93ea27))
+* **rendered:** let a measurement conclude, and keep the cap off what it reads ([47a1214](https://github.com/maxgfr/ultra11y/commit/47a1214c7cf7407f2c77d094a6c259bbcbea9211))
+
 ## [5.4.1](https://github.com/maxgfr/ultra11y/compare/v5.4.0...v5.4.1) (2026-08-17)
 
 
