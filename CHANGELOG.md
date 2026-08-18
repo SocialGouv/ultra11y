@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.5.2](https://github.com/maxgfr/ultra11y/compare/v5.5.1...v5.5.2) (2026-08-18)
+
+
+### Bug Fixes
+
+* **adjudicate:** give the class cap room to grow, so volume stops deciding verdicts ([1c542fd](https://github.com/maxgfr/ultra11y/commit/1c542fd16b4f5007b337a8fa42c9d4b57775b249))
+* **adjudicate:** stop a clock from ageing a verdict ([2b4f331](https://github.com/maxgfr/ultra11y/commit/2b4f3316e9962d45322ea129656dc920866053fb))
+
 ## [5.5.1](https://github.com/maxgfr/ultra11y/compare/v5.5.0...v5.5.1) (2026-08-18)
 
 
