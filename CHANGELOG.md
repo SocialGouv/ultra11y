@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.11.0](https://github.com/maxgfr/ultra11y/compare/v5.10.1...v5.11.0) (2026-08-18)
+
+
+### Features
+
+* **action:** let the agent tier go round again on what is still undecided ([4497354](https://github.com/maxgfr/ultra11y/commit/4497354a17ef99b1456019803b5f39a7d23a411a))
+
 ## [5.10.1](https://github.com/maxgfr/ultra11y/compare/v5.10.0...v5.10.1) (2026-08-18)
 
 
