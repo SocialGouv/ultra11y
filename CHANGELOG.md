@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.6.0](https://github.com/maxgfr/ultra11y/compare/v5.5.4...v5.6.0) (2026-08-18)
+
+
+### Features
+
+* **probes:** let a suite measure what only a live browser can ([5ba4bd2](https://github.com/maxgfr/ultra11y/commit/5ba4bd29984bcb4f70c3d6530966d629e4a8e953))
+
 ## [5.5.4](https://github.com/maxgfr/ultra11y/compare/v5.5.3...v5.5.4) (2026-08-18)
 
 
