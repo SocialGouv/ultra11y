@@ -41,12 +41,26 @@ adjudicates. So the engine's clean run is a starting point, never a verdict — 
 > 3. **Never invent a conformity either**: a `C` is cited exactly like an `NC` — it names in
 >    `citations[]` the harvested evidence it cleared, each anchor resolvable and drawn from
 >    the evidence that criterion was actually shown. A criterion presented with *no* evidence
->    cannot be `C` at all; it stays `manual`. And an adjudicated `C` is never merged with an
->    engine-decided one: reports list it separately and keep it out of the automatic pass rate.
+>    cannot be `C` at all; it stays `manual`. Neither can one whose reading was INCOMPLETE
+>    (`evidenceComplete: false`): a criterion you were shown part of can still fail on what
+>    you saw, but it can never be cleared over what you did not. And an adjudicated `C` is
+>    never merged with an engine-decided one: reports list it separately and keep it out of
+>    the automatic pass rate.
+> 3b. **What you are shown is the whole population, said once per distinct thing.** Evidence
+>    is one representative per CONTENT CLASS, carrying `occurrences`, the other anchors in
+>    `alsoAt`, and the `pages` it appears on — 887 links across 38 captured pages are 97
+>    distinct (text, href) pairs. Ruling on the representative rules on all of them, which is
+>    what makes an honest `C` reachable; and a citation naming ANY occurrence of a class the
+>    criterion carries is accepted, so cite the one you actually opened.
 > 4. **Residual is explicit, never silently conforming**: the AI agent *adjudicates* every
 >    *judgment* criterion itself (`verify --manual`, gated), and the *rendering* criteria go to
->    `scan`; any criterion still unproven stays "to assess manually" — no status without a
->    recorded, justified verdict.
+>    `scan` — which now CONCLUDES `C` (`decidedBy: "scan"`) when every rule carrying a
+>    criterion ran on every page in scope and raised nothing, and stays silent when even one
+>    page's signals were incomplete. Any criterion still unproven stays "to assess manually" —
+>    no status without a recorded, justified verdict. To make that a gate rather than a hope,
+>    `check --in <audit.json> --require-decided` fails while anything is still to assess, and
+>    `--allow-undecided <file>` takes the criteria you genuinely cannot decide, each with its
+>    reason (a named list, never a threshold).
 > 5. **Look the criterion up; never recall it.** `criteria [--standard <pack>] <id>` — or
 >    `ultra11y_criteria` over MCP — returns the criterion's own wording, its **numbered
 >    tests**, and the glossary definitions those tests cite. RGAA 8.3 is not "the page needs a

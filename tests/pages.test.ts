@@ -276,3 +276,26 @@ describe("the rendered grid", () => {
     expect(renderPageGrid(audit(), [], "wcag", "en")).toMatch(/no page/i);
   });
 });
+
+describe("per-page status — a recorded verdict is not silence", () => {
+  it("shows an adjudicated verdict on the pages, instead of flattening it back to « to assess »", () => {
+    // Silence on a judgment criterion is not conformity — that is the rule above, and it
+    // stands. A verdict somebody RECORDED, with citations the fold re-grounded, is a
+    // different thing, and dropping it meant a consumer could adjudicate a whole grid and
+    // see none of it per page.
+    const r = audit({ criteria: [{ ...C("1.1.1", "C"), decidedBy: "agent" }] });
+    for (const p of derivePages(r, PAGES)) expect(p.criteria.find((c) => c.id === "1.1.1")?.status).toBe("C");
+  });
+
+  it("shows a MEASURED rendering verdict the same way", () => {
+    const r = audit({ criteria: [{ ...C("1.4.3", "C"), decidedBy: "scan" }] });
+    for (const p of derivePages(r, PAGES)) expect(p.criteria.find((c) => c.id === "1.4.3")?.status).toBe("C");
+  });
+
+  it("still refuses to turn ENGINE silence into a page conformity", () => {
+    // No `decidedBy` — nobody ruled on it, a rule merely did not fire on this page.
+    const nc = F({ page: "accueil", criteriaId: "1.1.1" });
+    const r = audit({ findings: [nc], criteria: [C("1.1.1", "NC", [nc])] });
+    expect(derivePages(r, PAGES).find((p) => p.id === "contact")?.criteria.find((c) => c.id === "1.1.1")?.status).toBe("manual");
+  });
+});

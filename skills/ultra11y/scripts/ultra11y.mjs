@@ -53314,6 +53314,7 @@ function pageStatus(c2, pageFindings, basis) {
   if (pageFindings.some((f) => !f.advisory)) return "NC";
   if (c2.status === "manual") return "manual";
   if (c2.status === "NA") return "NA";
+  if (c2.decidedBy === "agent" || c2.decidedBy === "scan") return c2.status;
   if (automatability(c2.id) !== "static") return "manual";
   return basis === "snapshot" ? "C" : "manual";
 }

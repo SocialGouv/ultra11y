@@ -167,6 +167,22 @@ function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScop
   if (c.status === "manual") return "manual"; // the engine cannot decide it anywhere
   if (c.status === "NA") return "NA"; // not applicable in scope ⇒ not applicable here
 
+  // A verdict SOMEBODY RECORDED is not silence, and rule 3 below is only about silence.
+  //
+  // `decidedBy` is set in exactly two places: `applyAdjudication`, where an agent ruled with
+  // citations the fold re-grounded, and the rendered tier, where every rule carrying the
+  // criterion ran on every page and raised nothing. Neither is "no finding fired here". Left
+  // to fall through, every such verdict was flattened back to « à évaluer » on every page, so
+  // a WCAG-standard consumer could adjudicate a whole grid and see none of it in its page
+  // sheets. (A pack consumer already saw them: derivePackResults applies packAdjudication
+  // before deriving. This closes the same hole on the core path.)
+  //
+  // The scope caveat is real and stated in the report rather than hidden here: an adjudicated
+  // verdict is scope-wide, so it shows on every page including ones its citations have
+  // nothing to do with. That is what makes a complete page grid reachable at all, and it is
+  // labelled as a scope-wide decision where it is rendered.
+  if (c.decidedBy === "agent" || c.decidedBy === "scan") return c.status;
+
   // 3. SILENCE ONLY DECIDES WHAT THE ENGINE CAN DECIDE.
   //
   // A scope-wide `NC` on a JUDGMENT criterion does not mean the engine can rule on it — it
