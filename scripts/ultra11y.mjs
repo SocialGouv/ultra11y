@@ -55758,6 +55758,13 @@ import { mkdirSync as mkdirSync9, writeFileSync as writeFileSync10 } from "fs";
 import { join as join35, resolve as resolve10 } from "path";
 
 // src/adjudicate-subjects.ts
+var VOLATILE = [
+  [/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, "<date>"],
+  [/\b\d{4}-\d{2}-\d{2}\b/g, "<date>"],
+  [/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, "<time>"],
+  [/\b\d{6,}\b/g, "<num>"]
+];
+var stable = (s) => VOLATILE.reduce((acc, [re, to]) => acc.replace(re, to), s);
 var selectorFor = (el) => {
   const id = el.attribs.id ? `#${el.attribs.id}` : "";
   const cls = el.attribs.class ? `.${el.attribs.class.trim().split(/\s+/)[0]}` : "";
@@ -55766,14 +55773,14 @@ var selectorFor = (el) => {
 function h(doc, el, note, cls) {
   return {
     ev: { file: doc.file, line: el.line, selector: selectorFor(el), snippet: snippet(doc, el, 160), note },
-    cls: cls ?? `${el.tag}|${note}`,
+    cls: stable(cls ?? `${el.tag}|${note}`),
     at: el.start
   };
 }
 function hAt(doc, line, selector, note, cls) {
   return {
     ev: { file: doc.file, line, selector, snippet: (doc.source.split("\n")[line - 1] ?? "").trim().slice(0, 160), note },
-    cls,
+    cls: stable(cls),
     at: line
   };
 }

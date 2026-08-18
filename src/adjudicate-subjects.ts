@@ -27,6 +27,29 @@ import { type Doc, type El, ancestors, attr, elementsByTag, snippet as elSnippet
 import { parseInlineStyle } from "./color.js";
 import type { Evidence } from "./adjudicate.js";
 
+/** Mask the parts of a text that change between runs without the code changing.
+ *
+ *  Only the class IDENTITY is masked — the note and the snippet keep the real text, so the
+ *  adjudicator still reads what the page says. What this decides is whether two anchors are
+ *  "the same thing": a row rendered at 13:04 and the same row rendered at 14:12 are one
+ *  decision about accessibility, not two.
+ *
+ *  It matters beyond tidiness. The verdict ledger fingerprints the evidence a criterion was
+ *  ruled against, and a fingerprint that moves every run makes a stored verdict stale on
+ *  arrival — the criterion returns to « to assess » and the ledger stops paying for itself.
+ *  Measured on a real capture set: four criteria carried a run timestamp in their evidence.
+ *
+ *  Deliberately narrow. Generated ids that are stable for a given tree (React `useId`) and
+ *  content hashes that are stable for given source are NOT masked: when those move, the code
+ *  moved, and a verdict about it SHOULD be re-examined. */
+const VOLATILE: [RegExp, string][] = [
+  [/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, "<date>"],
+  [/\b\d{4}-\d{2}-\d{2}\b/g, "<date>"],
+  [/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, "<time>"],
+  [/\b\d{6,}\b/g, "<num>"],
+];
+const stable = (s: string): string => VOLATILE.reduce((acc, [re, to]) => acc.replace(re, to), s);
+
 /** One harvested anchor, plus the content class it belongs to. Two anchors sharing a class
  *  are the same thing rendered twice — a header link on 38 pages, not 38 link problems. */
 export interface Harvested {
@@ -52,7 +75,7 @@ const selectorFor = (el: El): string => {
 function h(doc: Doc, el: El, note: string, cls?: string): Harvested {
   return {
     ev: { file: doc.file, line: el.line, selector: selectorFor(el), snippet: elSnippet(doc, el, 160), note },
-    cls: cls ?? `${el.tag}|${note}`,
+    cls: stable(cls ?? `${el.tag}|${note}`),
     at: el.start,
   };
 }
@@ -62,7 +85,7 @@ function h(doc: Doc, el: El, note: string, cls?: string): Harvested {
 function hAt(doc: Doc, line: number, selector: string, note: string, cls: string): Harvested {
   return {
     ev: { file: doc.file, line, selector, snippet: (doc.source.split("\n")[line - 1] ?? "").trim().slice(0, 160), note },
-    cls,
+    cls: stable(cls),
     at: line,
   };
 }
