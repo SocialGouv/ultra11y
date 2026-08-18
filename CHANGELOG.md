@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.10.1](https://github.com/maxgfr/ultra11y/compare/v5.10.0...v5.10.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* **adjudicate:** keep the verdicts skeleton small enough to actually be written ([5c807ce](https://github.com/maxgfr/ultra11y/commit/5c807ce0baea07d327d08db28fbbdc4fa2a2542e))
+
 # [5.10.0](https://github.com/maxgfr/ultra11y/compare/v5.9.2...v5.10.0) (2026-08-18)
 
 
