@@ -57953,11 +57953,20 @@ function applyAdjudication(audit2, adj, opts = {}) {
         decidedBy: "agent"
       });
     }
+    const alreadyDecided = new Set(
+      audit2.packAdjudication?.standard === adj.standard ? audit2.packAdjudication.criteria.filter((c2) => c2.status !== "manual").map((c2) => c2.id) : []
+    );
     for (const id of notFolded) {
       if (byId2.has(id) || !open.has(id)) continue;
+      if (alreadyDecided.has(id)) continue;
       decided.push({ id, status: "manual", reason: "undecidable", justification: rejectedWhy(id), findings: [] });
     }
-    next.packAdjudication = { standard: adj.standard, criteria: decided };
+    const carried = /* @__PURE__ */ new Map();
+    if (audit2.packAdjudication?.standard === adj.standard) {
+      for (const c2 of audit2.packAdjudication.criteria) carried.set(c2.id, c2);
+    }
+    for (const c2 of decided) carried.set(c2.id, c2);
+    next.packAdjudication = { standard: adj.standard, criteria: [...carried.values()] };
     next.findings = [...next.findings, ...newFindings];
     next.adjudicated = { date: adj.auditDate, applied, stillManual, ...rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {} };
     return { ok: issues.length === 0, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, grounding };

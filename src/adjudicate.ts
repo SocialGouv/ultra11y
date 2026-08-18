@@ -1003,11 +1003,34 @@ export function applyAdjudication(
     // An OPEN criterion the file never mentioned — a coverage gap, or one the caller declared
     // uncovered — also has to say why it is still to assess; the loop above only walks the
     // items that exist.
+    const alreadyDecided = new Set(
+      audit.packAdjudication?.standard === adj.standard ? audit.packAdjudication.criteria.filter((c) => c.status !== "manual").map((c) => c.id) : [],
+    );
     for (const id of notFolded) {
       if (byId.has(id) || !open.has(id)) continue;
+      // …and never over a verdict an earlier pass already landed: this loop exists to explain
+      // an OPEN criterion, not to reopen a closed one.
+      if (alreadyDecided.has(id)) continue;
       decided.push({ id, status: "manual", reason: "undecidable", justification: rejectedWhy(id), findings: [] });
     }
-    next.packAdjudication = { standard: adj.standard, criteria: decided };
+    // MERGE, never replace. A fold used to write `packAdjudication` from the file it was
+    // given and nothing else, which is fine for one fold and wrong for two: a later pass
+    // re-derives its worklist from what is STILL open, so a criterion decided earlier is
+    // ABSENT from it by construction — and rewriting the set dropped it back to « à évaluer ».
+    //
+    // Measured on the first three-pass run: 47 criteria, 5 refused → 41 left; the next pass
+    // ruled those, 4 refused → and the third opened with 47 again. Each pass was undoing the
+    // one before it, so the tier could never converge however much it was allowed to spend.
+    //
+    // What the file rules wins for its own criteria — a pass that names a criterion decides it,
+    // even against an earlier verdict — and everything else it does not mention stays as it
+    // was. Only entries of the SAME standard carry over; a pack change starts a clean sheet.
+    const carried = new Map<string, PackCriterionAdjudication>();
+    if (audit.packAdjudication?.standard === adj.standard) {
+      for (const c of audit.packAdjudication.criteria) carried.set(c.id, c);
+    }
+    for (const c of decided) carried.set(c.id, c);
+    next.packAdjudication = { standard: adj.standard, criteria: [...carried.values()] };
     // The agent's findings still join the flat list so grounding, `check` and the reports can
     // resolve them — but they never touch a WCAG criterion's status.
     next.findings = [...next.findings, ...newFindings];
