@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.9.0](https://github.com/maxgfr/ultra11y/compare/v5.8.0...v5.9.0) (2026-08-18)
+
+
+### Bug Fixes
+
+* **adjudicate:** stop throwing away correct verdicts over how the element was retyped ([d9df63d](https://github.com/maxgfr/ultra11y/commit/d9df63ddcf39cc2f02b65dad3ec05eee0e8d1035))
+* **annotate:** tell the page comment what to change, not only which criterion failed ([3fd2596](https://github.com/maxgfr/ultra11y/commit/3fd25963191e80c9a62182ea01dfd73d415a3bec)), closes [SocialGouv/egapro#4169](https://github.com/SocialGouv/egapro/issues/4169)
+
+
+### Features
+
+* **action:** let a run name the deliverable that outlives it ([6fc15d9](https://github.com/maxgfr/ultra11y/commit/6fc15d9e70dde6637ead315919de4aaadae9b9c1))
+
 # [5.8.0](https://github.com/maxgfr/ultra11y/compare/v5.7.0...v5.8.0) (2026-08-18)
 
 
