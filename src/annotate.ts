@@ -141,6 +141,8 @@ const S = {
     pagesClamped: (n: number) =>
       `_Le détail de ${n} page(s) a été retiré de ce commentaire pour tenir dans la limite de GitHub — l'artefact les porte toutes._`,
     scoreboardClamped: (n: number) => `_${n} page(s) retirée(s) du tableau pour tenir dans la limite de GitHub — l'artefact les porte toutes._`,
+    pageDefects: "Défauts",
+    pageMoreDefects: (n: number) => `_… et ${n} autre(s) défaut(s) distinct(s) sur cette page — voir la fiche de page dans l'artefact._`,
     noCriterionForFindings: (n: number) =>
       `${n} constat(s) sur cette page ne rendent aucun critère du référentiel non conforme : leur règle sort du périmètre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont détaillés dans l'artefact.`,
   },
@@ -193,6 +195,8 @@ const S = {
       "One block per page carrying at least one non-conformity, and only its **non-conforming** criteria — the full grid (every criterion of every page, with its tests and its screenshot) lives in the artifact.",
     pagesClamped: (n: number) => `_The detail of ${n} page(s) was dropped from this comment to fit GitHub's limit — the artifact carries them all._`,
     scoreboardClamped: (n: number) => `_${n} page(s) dropped from the table to fit GitHub's limit — the artifact carries them all._`,
+    pageDefects: "Defects",
+    pageMoreDefects: (n: number) => `_… and ${n} more distinct defect(s) on this page — see its sheet in the artifact._`,
     noCriterionForFindings: (n: number) =>
       `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`,
   },
@@ -445,6 +449,13 @@ function basisCaveats(result: AuditResult, derived: PageResult[], s: (typeof S)[
   return out;
 }
 
+/** Distinct defects shown under one page before the block says how many it held back.
+ *
+ *  Distinct, not occurrences — the grouping already folded the repeats. Six is what fits
+ *  beside the criterion table without turning a 35-page comment into something nobody scrolls,
+ *  and the ones held back are counted rather than dropped in silence. */
+const PAGE_DEFECTS_SHOWN = 6;
+
 /** One page's collapsed block: its severity counts in the summary line, its standing as the
  *  shared tally sentence, and the criteria that are actually NON-CONFORMING.
  *
@@ -453,7 +464,7 @@ function basisCaveats(result: AuditResult, derived: PageResult[], s: (typeof S)[
  *  reviewer needs inline is which pages fail and on what — the tally line carries the rest
  *  (conforming, not applicable, and how many nobody has ruled on yet) without pretending the
  *  undecided ones are fine. */
-function pageBlock(result: AuditResult, page: PageResult, standard: StandardId, lang: Lang): string | undefined {
+function pageBlock(result: AuditResult, page: PageResult, standard: StandardId, lang: Lang, baseDir: string): string | undefined {
   const s = S[lang];
   const rows = pageCriterionRows(result, page, standard, lang);
   const nc = rows.filter((r) => r.status === "NC");
@@ -484,6 +495,32 @@ function pageBlock(result: AuditResult, page: PageResult, standard: StandardId, 
   for (const r of nc) {
     out.push(withTests ? `| ${cell(r.label)} | ${r.tests.map((t) => `\`${t}\``).join(" ")} |` : `| ${cell(r.label)} |`);
   }
+
+  // WHAT TO CHANGE, not only what was failed.
+  //
+  // The rows above name the criterion; a criterion is the norm, not the work. Measured on a
+  // real pull request: 506 lines, 35 pages, every non-conforming criterion listed — and not
+  // one file, line, selector or description of the defect anywhere in the document. A
+  // reviewer read « les couleurs sont-elles suffisamment contrastées ? » and had to download
+  // a 4 MB artifact to find out which element. The digest comment has carried location and
+  // defect since it existed; this is the same audit read page-first, and there is no reason
+  // for it to be the half that says nothing.
+  //
+  // Grouped, never listed: one design-system defect repeated on twenty rows is ONE thing to
+  // fix, and twenty identical lines is how a comment becomes unreadable and then gets muzzled.
+  const defects = groupFindings(
+    page.findings.filter((f) => !f.advisory),
+    standard,
+    lang,
+    baseDir,
+  );
+  if (defects.length) {
+    out.push("", `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} |`, "| --- | --- | --- | ---: |");
+    for (const g of defects.slice(0, PAGE_DEFECTS_SHOWN)) {
+      out.push(`| ${ICON[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(g.message)} | ${g.occurrences} |`);
+    }
+    if (defects.length > PAGE_DEFECTS_SHOWN) out.push("", s.pageMoreDefects(defects.length - PAGE_DEFECTS_SHOWN));
+  }
   out.push("", "</details>");
   return out.join("\n");
 }
@@ -504,6 +541,7 @@ export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runU
   const standard = opts.standard ?? CORE;
   const lang = opts.lang ?? "en";
   const s = S[lang];
+  const baseDir = opts.baseDir ?? process.cwd();
   const stdLabel = isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name;
   const redirected = result.scope.redirected ?? [];
   const scope = pagesOf(result);
@@ -539,7 +577,7 @@ export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runU
         severityCount(b, "majeur") - severityCount(a, "majeur") ||
         severityCount(b, "mineur") - severityCount(a, "mineur"),
     )
-    .map((p) => pageBlock(result, p, standard, lang))
+    .map((p) => pageBlock(result, p, standard, lang, baseDir))
     .filter((b): b is string => b !== undefined);
 
   // WHOLE blocks and WHOLE rows, never a slice of the finished string — cutting a rendered

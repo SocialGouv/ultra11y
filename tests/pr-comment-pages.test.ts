@@ -228,3 +228,93 @@ describe("the page-by-page comment", () => {
     expect(md).toMatch(/to assess/);
   });
 });
+
+// ---- what a reviewer can ACT on --------------------------------------------------------
+//
+// Measured on a real pull request (SocialGouv/egapro#4169): the page-by-page comment ran to
+// 506 lines, named 35 pages, listed their non-conforming criteria — and contained not one
+// file, not one line number, not one selector, not one description of what was wrong. A
+// reviewer read « 3.3 — les couleurs utilisées … sont-elles suffisamment contrastées ? » and
+// had to download a 4 MB artifact to learn which element, on which page, at which ratio.
+//
+// The digest comment has done this properly since it existed: location, defect, occurrences.
+// The page comment is the SAME audit read page-first; there is no reason for it to be the
+// half that says nothing. The criterion answers "what standard did we fail"; the finding
+// answers "what do I change", and only the second is work a reviewer can start.
+describe("the page comment says what is actually wrong, not only which criterion failed", () => {
+  const withDefects = () =>
+    audit({
+      criteria: [
+        C("1.1.1", "NC", [
+          F({ page: "contact", file: "src/modules/Contact.tsx", line: 42, selectorHint: "img.hero", message: "image sans alternative textuelle" }),
+        ]),
+        C("1.3.1", "NC", [
+          F({
+            page: "contact",
+            criteriaId: "1.3.1",
+            ruleId: "dl-orphan",
+            file: "src/modules/Contact.tsx",
+            line: 88,
+            selectorHint: "dd",
+            severity: "majeur",
+            message: "<dd> hors de tout <dl>",
+          }),
+        ]),
+      ],
+      findings: [
+        F({ page: "contact", file: "src/modules/Contact.tsx", line: 42, selectorHint: "img.hero", message: "image sans alternative textuelle" }),
+        F({
+          page: "contact",
+          criteriaId: "1.3.1",
+          ruleId: "dl-orphan",
+          file: "src/modules/Contact.tsx",
+          line: 88,
+          selectorHint: "dd",
+          severity: "majeur",
+          message: "<dd> hors de tout <dl>",
+        }),
+      ],
+    } as Partial<AuditResult>);
+
+  it("names the file and line of each defect", () => {
+    const md = pagesComment(withDefects(), { lang: "fr" });
+    expect(md).toContain("src/modules/Contact.tsx:42");
+    expect(md).toContain("src/modules/Contact.tsx:88");
+  });
+
+  it("says what the defect IS, in words a reviewer can act on", () => {
+    const md = pagesComment(withDefects(), { lang: "fr" });
+    expect(md).toContain("image sans alternative textuelle");
+    expect(md).toContain("<dd> hors de tout <dl>");
+  });
+
+  it("carries the selector, so the element is identifiable in a rendered page", () => {
+    expect(pagesComment(withDefects(), { lang: "fr" })).toContain("img.hero");
+  });
+
+  it("still names the criterion — the defect says what to change, the criterion says why", () => {
+    const md = pagesComment(withDefects(), { standard: "rgaa", lang: "fr" });
+    expect(md).toMatch(/1\.1|Chaque image/);
+  });
+
+  it("folds repeated occurrences of one defect instead of printing them all", () => {
+    // The same design-system defect on twenty rows of one page is ONE thing to fix. Printing
+    // twenty identical lines is how a comment becomes unreadable and then gets muzzled.
+    const many = Array.from({ length: 20 }, (_, i) =>
+      F({ page: "contact", file: "src/modules/Table.tsx", line: 10, selectorHint: "th", message: "en-tête non référencé" }),
+    );
+    const md = pagesComment(audit({ criteria: [C("1.1.1", "NC", many)], findings: many } as Partial<AuditResult>), { lang: "fr" });
+    expect((md.match(/src\/modules\/Table\.tsx:10/g) ?? []).length).toBe(1);
+    expect(md).toMatch(/20/);
+  });
+
+  it("keeps a page with many distinct defects from crowding out every other page", () => {
+    const distinct = Array.from({ length: 40 }, (_, i) =>
+      F({ page: "contact", file: `src/m/F${i}.tsx`, line: i + 1, selectorHint: `img.n${i}`, message: `défaut ${i}` }),
+    );
+    const md = pagesComment(audit({ criteria: [C("1.1.1", "NC", distinct)], findings: distinct } as Partial<AuditResult>), { lang: "fr" });
+    expect(md.length).toBeLessThan(65_536);
+    // …and it says what it did not print, rather than trailing off.
+    expect(md).toMatch(/autre|more/i);
+  });
+});
