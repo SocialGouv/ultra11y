@@ -261,10 +261,32 @@ export function allIds(doc: Doc): { id: string; el: El }[] {
 }
 
 /** The source line(s) the element starts on, trimmed and truncated. */
+/** The source text that SHOWS this element, bounded to `max`.
+ *
+ *  Anchored at the element's own offset, not at the start of its line. On hand-written source
+ *  the two are the same thing once indentation is trimmed — but a serialized DOM capture is a
+ *  SINGLE LINE, so anchoring on the line handed back the document head for every element in
+ *  the page, identical for all of them. Measured on a real capture: every one of 128 form
+ *  controls carried `<html data-fr-scheme="system" lang="fr">…` as its snippet, which tells a
+ *  reader nothing and gives the grounding check nothing to match on.
+ *
+ *  The line still bounds the slice, so a multi-line element shows its opening tag rather than
+ *  its whole subtree. */
 export function snippet(doc: Doc, el: El, max = 120): string {
   const lineStart = doc.lineStarts[el.line - 1] ?? 0;
   let end = doc.source.indexOf("\n", lineStart);
   if (end === -1) end = doc.source.length;
-  const raw = doc.source.slice(lineStart, end).trim();
-  return raw.length > max ? raw.slice(0, max - 1) + "…" : raw;
+  const from = Math.min(Math.max(el.start, lineStart), end);
+  // A JSX element usually opens on one line and carries its attributes on the next ones, so
+  // stopping at the line break showed "<a" and nothing else. Read to the end of the OPENING
+  // TAG instead — that is what identifies the element — and collapse the whitespace, which
+  // grounding normalises on both sides anyway (src/grounding.ts).
+  //
+  // The opening tag and not the element: a snippet longer than `max` gets an ellipsis, and an
+  // ellipsis is not in the source, so `includes` stops matching and grounding refuses a
+  // citation that was perfectly real. Keeping the slice short keeps it verbatim.
+  const tagEnd = doc.source.indexOf(">", from);
+  const to = Math.min(from + max, Math.max(Math.min(end, from + max), tagEnd === -1 ? end : tagEnd + 1));
+  const raw = doc.source.slice(from, Math.min(to, doc.source.length)).replace(/\s+/g, " ").trim();
+  return raw.length > max ? `${raw.slice(0, max - 1)}…` : raw;
 }

@@ -5456,8 +5456,11 @@ function snippet(doc, el, max = 120) {
   const lineStart = doc.lineStarts[el.line - 1] ?? 0;
   let end = doc.source.indexOf("\n", lineStart);
   if (end === -1) end = doc.source.length;
-  const raw = doc.source.slice(lineStart, end).trim();
-  return raw.length > max ? raw.slice(0, max - 1) + "\u2026" : raw;
+  const from = Math.min(Math.max(el.start, lineStart), end);
+  const tagEnd = doc.source.indexOf(">", from);
+  const to = Math.min(from + max, Math.max(Math.min(end, from + max), tagEnd === -1 ? end : tagEnd + 1));
+  const raw = doc.source.slice(from, Math.min(to, doc.source.length)).replace(/\s+/g, " ").trim();
+  return raw.length > max ? `${raw.slice(0, max - 1)}\u2026` : raw;
 }
 
 // src/parse/jsx.ts
