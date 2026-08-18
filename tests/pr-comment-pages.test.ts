@@ -116,10 +116,13 @@ describe("the page-by-page comment", () => {
     expect(md).toContain("conforme(s)");
   });
 
-  it("opens a details block only for a page that actually fails", () => {
+  it("opens a page block only for a page that actually fails", () => {
     const md = pagesComment(audit(), { lang: "fr" });
-    const summaries = [...md.matchAll(/<summary>/g)].length;
-    expect(summaries).toBe(1);
+    // Counted on the PAGE blocks specifically: the document also folds the full criterion grid
+    // into a <details> of its own, which is not a page and must not be mistaken for one.
+    // A page block is the one whose summary carries the severity counts; the grid's does not.
+    const pageBlocks = [...md.matchAll(/<summary><b>([^<]*)<\/b>[^\n]*🔴[^\n]*<\/summary>/g)].map((m) => m[1]);
+    expect(pageBlocks).toEqual(["Contact"]);
   });
 
   it("counts a page in the ACTIVE standard's criteria, not in WCAG's", () => {

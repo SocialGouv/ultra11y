@@ -23,7 +23,7 @@ import { resolveMessage, resolveRemediation } from "./messages.js";
 import { findingsForStandard, packCriteriaForFinding } from "./standards/derive.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
 import { packReportGroups, reportCoverage, reportGroups } from "./report.js";
-import type { AuditResult, Finding, Lang, PageResult, Severity } from "./types.js";
+import type { AuditResult, Finding, Lang, PageResult, Severity, Status } from "./types.js";
 import { isUrlPath, repoRelative } from "./util.js";
 import {
   agentMarkNote,
@@ -32,6 +32,7 @@ import {
   derivePages,
   formatRate,
   pageBasisWarning,
+  pageGridModel,
   pagesOf,
   renderRedirected,
   unattributedFindings,
@@ -142,6 +143,9 @@ const S = {
       `_Le détail de ${n} page(s) a été retiré de ce commentaire pour tenir dans la limite de GitHub — l'artefact les porte toutes._`,
     scoreboardClamped: (n: number) => `_${n} page(s) retirée(s) du tableau pour tenir dans la limite de GitHub — l'artefact les porte toutes._`,
     pageDefects: "Défauts",
+    fullGrid: "Grille complète — chaque critère du référentiel, page par page",
+    gridLegend: "`C` conforme · `NC` non conforme · `—` non applicable · `?` à évaluer",
+    gridDropped: "_La grille complète ne tient pas dans un commentaire GitHub (64 Kio) — elle est dans la fiche par page du livrable._",
     pageMoreDefects: (n: number) => `_… et ${n} autre(s) défaut(s) distinct(s) sur cette page — voir la fiche de page dans l'artefact._`,
     noCriterionForFindings: (n: number) =>
       `${n} constat(s) sur cette page ne rendent aucun critère du référentiel non conforme : leur règle sort du périmètre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont détaillés dans l'artefact.`,
@@ -196,6 +200,9 @@ const S = {
     pagesClamped: (n: number) => `_The detail of ${n} page(s) was dropped from this comment to fit GitHub's limit — the artifact carries them all._`,
     scoreboardClamped: (n: number) => `_${n} page(s) dropped from the table to fit GitHub's limit — the artifact carries them all._`,
     pageDefects: "Defects",
+    fullGrid: "Full grid — every criterion of the standard, page by page",
+    gridLegend: "`C` conforming · `NC` non-conforming · `—` not applicable · `?` to assess",
+    gridDropped: "_The full grid does not fit in a GitHub comment (64 KiB) — it is in the deliverable's per-page sheet._",
     pageMoreDefects: (n: number) => `_… and ${n} more distinct defect(s) on this page — see its sheet in the artifact._`,
     noCriterionForFindings: (n: number) =>
       `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`,
@@ -525,6 +532,41 @@ function pageBlock(result: AuditResult, page: PageResult, standard: StandardId, 
   return out.join("\n");
 }
 
+/** The whole criterion × page grid, collapsed — every criterion of the standard, and where
+ *  each page stands on it.
+ *
+ *  The scoreboard says HOW MANY criteria a page conforms to and the per-page blocks say which
+ *  ones it FAILS; between the two, the criteria a page CONFORMS to were never named. Under a
+ *  per-page norm that is most of the deliverable, and a reviewer asking « which of the 106 does
+ *  this page pass? » had to download the artifact to find out.
+ *
+ *  Drawn from `pageGridModel`, the same projection the artifact and the HTML use. A surface
+ *  that recomputes a status is a surface that will eventually disagree with the report. */
+function fullGridBlock(result: AuditResult, derived: PageResult[], standard: StandardId, s: (typeof S)[Lang], lang: Lang): string[] {
+  const { rows, status } = pageGridModel(result, derived, standard, lang);
+  if (!rows.length || !derived.length) return [];
+  const cell = (v: string): string => v.replace(/\|/g, "\\|");
+  const head = [s.criterion, ...derived.map((p) => `${cell(p.name)}${p.auth ? " 🔒" : ""}`)];
+  const out: string[] = [
+    "<details>",
+    `<summary><b>${s.fullGrid}</b> — ${rows.length} × ${derived.length}</summary>`,
+    // GFM only renders Markdown inside <details> after a blank line.
+    "",
+    `> ${s.gridLegend}`,
+    "",
+    `| ${head.join(" | ")} |`,
+    `| ${head.map(() => "---").join(" | ")} |`,
+  ];
+  for (const row of rows) {
+    out.push(`| ${cell(row.label)} | ${derived.map((p) => GRID_MARK[status.get(row.id)?.get(p.id) ?? "manual"]).join(" | ")} |`);
+  }
+  out.push("", "</details>");
+  return out;
+}
+
+/** The marks the grid draws. Same vocabulary as the per-page sheet's. */
+const GRID_MARK: Record<Status, string> = { C: "C", NC: "NC", NA: "—", manual: "?" };
+
 /** The PAGE-BY-PAGE pull-request comment.
  *
  *  A second document under a second marker, for a second tier. The digest above answers
@@ -584,11 +626,16 @@ export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runU
   // document at a byte offset lands mid-row and GFM then renders a broken table. The detail
   // goes first because the scoreboard is the half that cannot be reconstructed from the
   // artifact link alone.
-  const assemble = (nBlocks: number, nRows: number): string => {
+  const assemble = (nBlocks: number, nRows: number, withGrid = true): string => {
     const body: string[] = [...scoreboardTable(result, derived.slice(0, nRows), standard, s, lang), ""];
     if (nRows < derived.length) body.push(s.scoreboardClamped(derived.length - nRows), "");
     body.push(...basisCaveats(result, derived, s, lang));
     if (redirected.length) body.push(...renderRedirected(redirected, lang), "");
+    // The full grid, folded away so the scoreboard stays what a reviewer reads first. It is
+    // the biggest thing in the document — 106 criteria × 35 pages — so it is also the first
+    // thing the size clamp gives up, WHOLE and with a line saying where to find it.
+    if (withGrid) body.push(...fullGridBlock(result, derived, standard, s, lang), "");
+    else body.push(s.gridDropped, "");
     if (blocks.length) {
       body.push(`> ${s.pagesDetailNote}`, "");
       body.push(...blocks.slice(0, nBlocks).flatMap((b) => [b, ""]));
@@ -599,7 +646,10 @@ export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runU
 
   let nBlocks = blocks.length;
   let nRows = derived.length;
-  while (nBlocks > 0 && assemble(nBlocks, nRows).length > COMMENT_LIMIT) nBlocks--;
-  while (nRows > 0 && assemble(nBlocks, nRows).length > COMMENT_LIMIT) nRows--;
-  return assemble(nBlocks, nRows);
+  // The grid goes first when it does not fit: it is the one part that is reproducible in full
+  // from the artifact, while the scoreboard and the defect blocks are not.
+  if (assemble(nBlocks, nRows).length <= COMMENT_LIMIT) return assemble(nBlocks, nRows);
+  while (nBlocks > 0 && assemble(nBlocks, nRows, false).length > COMMENT_LIMIT) nBlocks--;
+  while (nRows > 0 && assemble(nBlocks, nRows, false).length > COMMENT_LIMIT) nRows--;
+  return assemble(nBlocks, nRows, false);
 }

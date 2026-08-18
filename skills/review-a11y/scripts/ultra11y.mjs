@@ -61417,6 +61417,9 @@ var S = {
     pagesClamped: (n) => `_Le d\xE9tail de ${n} page(s) a \xE9t\xE9 retir\xE9 de ce commentaire pour tenir dans la limite de GitHub \u2014 l'artefact les porte toutes._`,
     scoreboardClamped: (n) => `_${n} page(s) retir\xE9e(s) du tableau pour tenir dans la limite de GitHub \u2014 l'artefact les porte toutes._`,
     pageDefects: "D\xE9fauts",
+    fullGrid: "Grille compl\xE8te \u2014 chaque crit\xE8re du r\xE9f\xE9rentiel, page par page",
+    gridLegend: "`C` conforme \xB7 `NC` non conforme \xB7 `\u2014` non applicable \xB7 `?` \xE0 \xE9valuer",
+    gridDropped: "_La grille compl\xE8te ne tient pas dans un commentaire GitHub (64 Kio) \u2014 elle est dans la fiche par page du livrable._",
     pageMoreDefects: (n) => `_\u2026 et ${n} autre(s) d\xE9faut(s) distinct(s) sur cette page \u2014 voir la fiche de page dans l'artefact._`,
     noCriterionForFindings: (n) => `${n} constat(s) sur cette page ne rendent aucun crit\xE8re du r\xE9f\xE9rentiel non conforme : leur r\xE8gle sort du p\xE9rim\xE8tre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont d\xE9taill\xE9s dans l'artefact.`
   },
@@ -61464,6 +61467,9 @@ var S = {
     pagesClamped: (n) => `_The detail of ${n} page(s) was dropped from this comment to fit GitHub's limit \u2014 the artifact carries them all._`,
     scoreboardClamped: (n) => `_${n} page(s) dropped from the table to fit GitHub's limit \u2014 the artifact carries them all._`,
     pageDefects: "Defects",
+    fullGrid: "Full grid \u2014 every criterion of the standard, page by page",
+    gridLegend: "`C` conforming \xB7 `NC` non-conforming \xB7 `\u2014` not applicable \xB7 `?` to assess",
+    gridDropped: "_The full grid does not fit in a GitHub comment (64 KiB) \u2014 it is in the deliverable's per-page sheet._",
     pageMoreDefects: (n) => `_\u2026 and ${n} more distinct defect(s) on this page \u2014 see its sheet in the artifact._`,
     noCriterionForFindings: (n) => `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`
   }
@@ -61652,6 +61658,28 @@ function pageBlock(result, page, standard, lang, baseDir) {
   out2.push("", "</details>");
   return out2.join("\n");
 }
+function fullGridBlock(result, derived, standard, s, lang) {
+  const { rows, status } = pageGridModel(result, derived, standard, lang);
+  if (!rows.length || !derived.length) return [];
+  const cell = (v) => v.replace(/\|/g, "\\|");
+  const head = [s.criterion, ...derived.map((p) => `${cell(p.name)}${p.auth ? " \u{1F512}" : ""}`)];
+  const out2 = [
+    "<details>",
+    `<summary><b>${s.fullGrid}</b> \u2014 ${rows.length} \xD7 ${derived.length}</summary>`,
+    // GFM only renders Markdown inside <details> after a blank line.
+    "",
+    `> ${s.gridLegend}`,
+    "",
+    `| ${head.join(" | ")} |`,
+    `| ${head.map(() => "---").join(" | ")} |`
+  ];
+  for (const row of rows) {
+    out2.push(`| ${cell(row.label)} | ${derived.map((p) => GRID_MARK[status.get(row.id)?.get(p.id) ?? "manual"]).join(" | ")} |`);
+  }
+  out2.push("", "</details>");
+  return out2;
+}
+var GRID_MARK = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
 function pagesComment(result, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
@@ -61680,11 +61708,13 @@ function pagesComment(result, opts = {}) {
   const blocks = [...derived].sort(
     (a, b) => severityCount(b, "bloquant") - severityCount(a, "bloquant") || severityCount(b, "majeur") - severityCount(a, "majeur") || severityCount(b, "mineur") - severityCount(a, "mineur")
   ).map((p) => pageBlock(result, p, standard, lang, baseDir)).filter((b) => b !== void 0);
-  const assemble = (nBlocks2, nRows2) => {
+  const assemble = (nBlocks2, nRows2, withGrid = true) => {
     const body3 = [...scoreboardTable(result, derived.slice(0, nRows2), standard, s, lang), ""];
     if (nRows2 < derived.length) body3.push(s.scoreboardClamped(derived.length - nRows2), "");
     body3.push(...basisCaveats(result, derived, s, lang));
     if (redirected.length) body3.push(...renderRedirected(redirected, lang), "");
+    if (withGrid) body3.push(...fullGridBlock(result, derived, standard, s, lang), "");
+    else body3.push(s.gridDropped, "");
     if (blocks.length) {
       body3.push(`> ${s.pagesDetailNote}`, "");
       body3.push(...blocks.slice(0, nBlocks2).flatMap((b) => [b, ""]));
@@ -61694,9 +61724,10 @@ function pagesComment(result, opts = {}) {
   };
   let nBlocks = blocks.length;
   let nRows = derived.length;
-  while (nBlocks > 0 && assemble(nBlocks, nRows).length > COMMENT_LIMIT) nBlocks--;
-  while (nRows > 0 && assemble(nBlocks, nRows).length > COMMENT_LIMIT) nRows--;
-  return assemble(nBlocks, nRows);
+  if (assemble(nBlocks, nRows).length <= COMMENT_LIMIT) return assemble(nBlocks, nRows);
+  while (nBlocks > 0 && assemble(nBlocks, nRows, false).length > COMMENT_LIMIT) nBlocks--;
+  while (nRows > 0 && assemble(nBlocks, nRows, false).length > COMMENT_LIMIT) nRows--;
+  return assemble(nBlocks, nRows, false);
 }
 
 // src/evidence.ts
