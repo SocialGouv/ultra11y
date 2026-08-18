@@ -107,6 +107,14 @@ the refreshed ledger, and a pull-request job that only replays it.
 
 ## Adjudicating the judgment criteria in CI (`adjudicate`)
 
+> **One pass is not always enough, and not because of the criteria.** The adjudicator can stop
+> early: measured on a real run, `num_turns: 22` against a budget of 228, `is_error: false`, and
+> 42 criteria still `verdict: null` — a whole worklist abandoned with no error to show for it.
+> `adjudicate-passes: "3"` sends it round again on the residue. Each pass re-derives the worklist
+> with `verify --manual`, which by construction holds only what is still `manual` (never reached,
+> or ruled and refused by the gate, carrying its refusal), so a pass costs the remainder and
+> nothing more — and a run that decided everything skips the rest before any model is invoked.
+
 `adjudicate` is what FILLS the ledger — opt-in, in two modes. It runs **after** the replay, so a
 paid pass only ever covers what the ledger did not: on a repository whose ledger is current, it
 has nothing left to rule on and costs nothing.
@@ -126,6 +134,7 @@ steps:
 | `adjudicate` | `none` | `api` · `agent` · `none` |
 | `adjudicate-model` | *(empty)* | model id for `api`; else `$ULTRA11Y_LLM_MODEL`, else the engine default |
 | `adjudicate-max-turns` | *(empty)* | turn budget for `agent`; empty derives it from the worklist |
+| `adjudicate-passes` | `1` | how many times `agent` may go round; each pass re-derives the worklist from what is STILL undecided. Capped at 3 |
 | `gate-adjudicated` | `false` | let a model-ruled NC fail the job |
 
 **The turn budget is derived, and that matters more than it sounds.** The runbook is sequential

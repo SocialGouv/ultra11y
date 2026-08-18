@@ -748,3 +748,53 @@ describe("the comment names the deliverable that survives the run", () => {
     expect(String(upload.with?.name)).not.toContain("report-artifact");
   });
 });
+
+// ONE PASS WAS NEVER ENOUGH, and not because of the criteria.
+//
+// The adjudicator can stop early. Measured on a real run: `num_turns: 22` against a budget of
+// 228, `is_error: false`, and 42 criteria still `verdict: null` — a whole worklist abandoned
+// with no error to show for it. A single pass has no way to come back to them, so a green job
+// published a grid nobody had filled.
+describe("the agent tier can go round again on what is still undecided", () => {
+  const passStep = (n: number, kind: string) => ACTION.runs.steps.find((s) => s.name?.includes(`pass ${n}, ${kind}`))!;
+
+  it("offers the number of passes as an input, defaulting to the historical single pass", () => {
+    expect(ACTION.inputs["adjudicate-passes"]).toBeDefined();
+    expect(ACTION.inputs["adjudicate-passes"]?.default).toBe("1");
+  });
+
+  it("re-derives the worklist each time, so a pass only ever costs the residue", () => {
+    // `verify --manual` rebuilds from the audit, which by construction holds only what is
+    // still `manual` — never reached, or refused by the gate and returned carrying its refusal.
+    for (const n of [2, 3]) expect(String(passStep(n, "worklist").run)).toContain("verify --manual");
+  });
+
+  it("skips a later pass entirely when nothing is left", () => {
+    // The stop condition, checked BEFORE any model is invoked: a run that decided everything
+    // must not pay an adjudicator to discover it.
+    expect(String(passStep(2, "worklist").if)).toContain("steps.worklist.outputs.remaining != '0'");
+    expect(String(passStep(2, "Claude Code").if)).toContain("steps.worklist2.outputs.remaining != '0'");
+    expect(String(passStep(3, "Claude Code").if)).toContain("steps.worklist3.outputs.remaining != '0'");
+  });
+
+  it("honours the cap: two passes stop at two, one pass never starts a second", () => {
+    expect(String(passStep(2, "worklist").if)).toContain("inputs.adjudicate-passes != '1'");
+    const third = String(passStep(3, "worklist").if);
+    expect(third).toContain("inputs.adjudicate-passes != '1'");
+    expect(third).toContain("inputs.adjudicate-passes != '2'");
+  });
+
+  it("folds after every pass, through the same gate as the first", () => {
+    for (const n of [2, 3]) {
+      const fold = String(passStep(n, "fold").run);
+      expect(fold).toContain("--apply audits/ADJUDICATE.verdicts.json");
+      expect(fold).toContain("--ledger");
+    }
+  });
+
+  it("never fails the job on a pass that landed nothing", () => {
+    // Same degradation policy as the first fold: an adjudication that decides nothing is a
+    // grid that stays « to assess », not a build that breaks.
+    for (const n of [2, 3]) expect(String(passStep(n, "fold").run)).toContain("::warning::");
+  });
+});

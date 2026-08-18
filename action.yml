@@ -167,6 +167,10 @@ inputs:
     description: 'Rule on the judgment criteria the static engine cannot decide (alt relevance, link purpose in context, reading order): `api` sends the worklist to the Anthropic API in batches, `agent` hands it to a Claude Code run, `none` (default) leaves them « to assess ». Both modes read their credential from the JOB environment, never from an input, and skip themselves when it is absent — which is what makes them harmless on a fork pull request. `api` needs ANTHROPIC_API_KEY (the Messages API takes nothing else); `agent` accepts ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN, the token a Pro/Max subscriber mints with `claude setup-token`. `agent` also skips itself on an event claude-code-action does not support — `push` above all. Pair it with `ledger` so each run records what it paid for.'
     required: false
     default: 'none'
+  adjudicate-passes:
+    description: 'How many times `adjudicate: agent` may go round. Each pass re-derives the worklist from what is STILL undecided — a criterion the previous pass never reached, or whose verdict the gate refused — so a second pass only ever costs the residue, and a run that decided everything stops on its own. Default 1 (one pass, the historical behaviour). Raise it when completeness matters more than the bill: measured on a real run, an adjudicator stopped after 22 turns of a 228 budget with 42 criteria still `null`, and a single pass had no way to come back to them. Capped at 3.'
+    required: false
+    default: '1'
   adjudicate-max-turns:
     description: 'Turn budget for `adjudicate: agent`. Empty (default) derives it from the worklist — 4 turns per criterion plus headroom — because the runbook is sequential and each criterion costs real tool calls. Set it only to override that: a budget too small costs the criteria it did not reach (the fold is per-verdict), so the remainder simply stays to assess.'
     required: false
@@ -525,6 +529,9 @@ runs:
           if [ "$turns" -lt 60 ]; then turns=60; fi
         fi
         echo "turns=$turns" >> "$GITHUB_OUTPUT"
+        # What is still open. A later pass reads this to decide whether it has anything to do:
+        # a run that decided everything must not pay for a second adjudicator to discover it.
+        echo "remaining=$n" >> "$GITHUB_OUTPUT"
         echo "ultra11y: $n criteria to adjudicate, budget $turns turns."
 
     # The version is pinned in the literal below because GitHub refuses an expression in
@@ -648,6 +655,160 @@ runs:
         else
           echo "::warning::ultra11y: the adjudication landed nothing — the judgment criteria stay to assess."
         fi
+
+    # THE SECOND AND THIRD PASSES — the residue, and only the residue.
+    #
+    # One pass was never enough in practice, for a reason that has nothing to do with the
+    # criteria and everything to do with the adjudicator: it can stop early. Measured on a real
+    # run, `num_turns: 22` against a budget of 228, `is_error: false`, and 42 criteria still
+    # `verdict: null` — a whole worklist abandoned with no error to show for it. A single pass
+    # has no way to come back to them, so a green job published a grid nobody had filled.
+    #
+    # Each extra pass re-derives the worklist with `verify --manual`, which by construction
+    # contains ONLY what is still `manual` — never reached, or refused by the gate and returned
+    # to « to assess » carrying its refusal. So a pass costs the residue and nothing more, and a
+    # run that decided everything skips the rest outright: `remaining == 0` is the stop
+    # condition, and it is checked before any model is invoked.
+    #
+    # Unrolled rather than looped because a composite action has no loop. Two extra passes is
+    # what `adjudicate-passes` caps at: the returns fall off fast — what two adjudicators in a
+    # row decline to decide is very rarely decidable by a third, and by then the honest answer
+    # is the criterion's own `manual` reason.
+    - name: Adjudicate with an agent — pass 2, worklist
+      id: worklist2
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-passes != '1' && steps.worklist.outputs.remaining != '0'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+        STANDARD: ${{ inputs.standard }}
+        LANG_OPT: ${{ inputs.lang }}
+        MAX_TURNS: ${{ inputs.adjudicate-max-turns }}
+      run: |
+        node "$ENGINE" verify --manual --in audits/audit-latest.json --out audits \
+          --standard "$STANDARD" --lang "$LANG_OPT" --json > /tmp/ultra11y-worklist.json
+        node "$ENGINE" orchestrate --run audits --phase adjudicate --eco
+        n=$(node -p 'try{JSON.parse(require("fs").readFileSync("/tmp/ultra11y-worklist.json","utf8")).count||0}catch{0}')
+        if [ -n "$MAX_TURNS" ]; then turns="$MAX_TURNS"; else turns=$(( n * 4 + 40 )); if [ "$turns" -lt 60 ]; then turns=60; fi; fi
+        echo "turns=$turns" >> "$GITHUB_OUTPUT"
+        echo "remaining=$n" >> "$GITHUB_OUTPUT"
+        echo "ultra11y: pass 2 — $n criterion(ia) still undecided, budget $turns turns."
+
+    - name: Adjudicate with an agent — pass 2, Claude Code
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0'
+      uses: anthropics/claude-code-action@v1
+      with:
+        anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
+        claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+        github_token: ${{ github.token }}
+        claude_args: '--allowedTools Read,Grep,Glob,Edit,Write --max-turns ${{ steps.worklist2.outputs.turns }}'
+        prompt: |
+          You are running head-less in CI, with Read, Grep, Glob, Edit and Write — no shell.
+          Adjudicate an accessibility audit, and do nothing else.
+
+          THIS IS A SECOND PASS. Everything a previous adjudicator decided has already been
+          applied and is gone from the list; what remains in
+          `${{ inputs.working-directory }}/audits/ADJUDICATE.verdicts.json` is exactly what is
+          still undecided — either never reached, or ruled and REFUSED by the gate, in which
+          case the refusal says what was wrong with the verdict. Read it and do better.
+
+          Work from the SMALL files. Do not open `audits/ADJUDICATE.todo.json` or
+          `audits/ADJUDICATE.md` — they run to megabytes and reading either will swamp your
+          context. Use instead:
+
+          1. `${{ inputs.working-directory }}/audits/ADJUDICATE.verdicts.json` — the criteria
+             left to rule on, and the ONLY file you write. Its `contract` field states what each
+             verdict requires, and its `citations` arrive pre-filled with the harvested
+             representatives: keep them when your verdict covers them, replace them with the
+             occurrence you actually opened otherwise, never leave the field empty.
+          2. `${{ inputs.working-directory }}/audits/adjudicate/<criteriaId>.md` — one small
+             brief per criterion: its harvested evidence with the `snippet` to copy, its
+             decision protocol, and the normative tests a non-conformity may cite.
+
+          Fill EVERY remaining item. A `C` needs a justification AND citations, and it needs the
+          evidence reading to have been complete. An `NC` needs at least one finding citing a
+          normative test of the active standard. A criterion you genuinely cannot decide from
+          the evidence is `manual` with its `reason` — that is a correct answer, and it is the
+          one to give rather than guessing.
+
+          Do not edit any other file, do not touch the audited source, do not commit, and do
+          not comment on the PR.
+
+    - name: Adjudicate with an agent — pass 2, fold
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        args=(--apply audits/ADJUDICATE.verdicts.json --in audits/audit-latest.json --out audits)
+        if [ -n '${{ inputs.ledger }}' ] && [ '${{ inputs.ledger }}' != 'false' ]; then
+          if [ '${{ inputs.ledger }}' = 'true' ]; then args+=(--ledger ".ultra11y/verdicts/${{ inputs.standard }}.json"); else args+=(--ledger '${{ inputs.ledger }}'); fi
+          args+=(--standard '${{ inputs.standard }}')
+        fi
+        node "$ENGINE" verify "${args[@]}" || echo "::warning::ultra11y: pass 2 landed nothing — the remaining criteria stay to assess."
+
+    - name: Adjudicate with an agent — pass 3, worklist
+      id: worklist3
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0' && inputs.adjudicate-passes != '1' && inputs.adjudicate-passes != '2'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+        STANDARD: ${{ inputs.standard }}
+        LANG_OPT: ${{ inputs.lang }}
+        MAX_TURNS: ${{ inputs.adjudicate-max-turns }}
+      run: |
+        node "$ENGINE" verify --manual --in audits/audit-latest.json --out audits \
+          --standard "$STANDARD" --lang "$LANG_OPT" --json > /tmp/ultra11y-worklist.json
+        node "$ENGINE" orchestrate --run audits --phase adjudicate --eco
+        n=$(node -p 'try{JSON.parse(require("fs").readFileSync("/tmp/ultra11y-worklist.json","utf8")).count||0}catch{0}')
+        if [ -n "$MAX_TURNS" ]; then turns="$MAX_TURNS"; else turns=$(( n * 4 + 40 )); if [ "$turns" -lt 60 ]; then turns=60; fi; fi
+        echo "turns=$turns" >> "$GITHUB_OUTPUT"
+        echo "remaining=$n" >> "$GITHUB_OUTPUT"
+        echo "ultra11y: pass 3 — $n criterion(ia) still undecided, budget $turns turns."
+
+    - name: Adjudicate with an agent — pass 3, Claude Code
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0'
+      uses: anthropics/claude-code-action@v1
+      with:
+        anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
+        claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+        github_token: ${{ github.token }}
+        claude_args: '--allowedTools Read,Grep,Glob,Edit,Write --max-turns ${{ steps.worklist3.outputs.turns }}'
+        prompt: |
+          You are running head-less in CI, with Read, Grep, Glob, Edit and Write — no shell.
+          Adjudicate an accessibility audit, and do nothing else.
+
+          THIS IS THE LAST PASS. Two adjudicators have already been through this audit; what is
+          left in `${{ inputs.working-directory }}/audits/ADJUDICATE.verdicts.json` is what they
+          did not reach or what the gate refused, and the refusal on each item says why.
+
+          Read `${{ inputs.working-directory }}/audits/adjudicate/<criteriaId>.md` for the
+          criterion's evidence and decision protocol. Do not open `ADJUDICATE.todo.json` or
+          `ADJUDICATE.md`. Write only the verdicts file.
+
+          Every item must come back with a verdict. If the evidence genuinely does not settle a
+          criterion, `manual` with its `reason` is the right answer and the one to record —
+          after two passes, an honest « nobody can decide this from what was harvested » is
+          worth more than a guess, and it is what the report will publish.
+
+          Do not edit any other file, do not touch the audited source, do not commit, and do
+          not comment on the PR.
+
+    - name: Adjudicate with an agent — pass 3, fold
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        args=(--apply audits/ADJUDICATE.verdicts.json --in audits/audit-latest.json --out audits)
+        if [ -n '${{ inputs.ledger }}' ] && [ '${{ inputs.ledger }}' != 'false' ]; then
+          if [ '${{ inputs.ledger }}' = 'true' ]; then args+=(--ledger ".ultra11y/verdicts/${{ inputs.standard }}.json"); else args+=(--ledger '${{ inputs.ledger }}'); fi
+          args+=(--standard '${{ inputs.standard }}')
+        fi
+        node "$ENGINE" verify "${args[@]}" || echo "::warning::ultra11y: pass 3 landed nothing — the remaining criteria stay to assess."
 
     # COMPLETENESS — is the grid actually filled in?
     #
