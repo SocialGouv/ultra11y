@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.8.0](https://github.com/maxgfr/ultra11y/compare/v5.7.0...v5.8.0) (2026-08-18)
+
+
+### Bug Fixes
+
+* **audit:** count what a probe measured as coverage, and say when it fell short ([7f4c726](https://github.com/maxgfr/ultra11y/commit/7f4c72627ec50b654d0d2f6330cd0515a3c9a8dc))
+* **probes:** stop a probe from spending somebody else's test timeout ([fdd6d88](https://github.com/maxgfr/ultra11y/commit/fdd6d88d8cf966cd92a9bd56799796a0185439dd))
+
+
+### Features
+
+* **audit:** rule a criterion NOT APPLICABLE when its subject is absent from the whole scope ([00f4486](https://github.com/maxgfr/ultra11y/commit/00f44868845735da48b352e7d66ed24ad7e8070d))
+* **playwright:** let the sample sweep measure what only a probe can ([b274f26](https://github.com/maxgfr/ultra11y/commit/b274f26a7bc7d61e70242008cf186ec59c5eb677))
+
 # [5.7.0](https://github.com/maxgfr/ultra11y/compare/v5.6.1...v5.7.0) (2026-08-18)
 
 
