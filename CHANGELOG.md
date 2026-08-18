@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.6.1](https://github.com/maxgfr/ultra11y/compare/v5.6.0...v5.6.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* **probes:** say why a measurement did not happen, instead of losing it ([80a75cb](https://github.com/maxgfr/ultra11y/commit/80a75cb63094055f57fbd134474aeff6f61c8008))
+
 # [5.6.0](https://github.com/maxgfr/ultra11y/compare/v5.5.4...v5.6.0) (2026-08-18)
 
 

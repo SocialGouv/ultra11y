@@ -10,7 +10,7 @@
       "name": "ultra11y",
       "source": "./",
       "description": "Automatic accessibility review of the code under change before every commit, push and pull request, plus full WCAG 2.2 AA / RGAA audits and conformance deliverables on demand.",
-      "version": "5.6.0",
+      "version": "5.6.1",
       "author": { "name": "maxgfr" },
       "homepage": "https://github.com/maxgfr/ultra11y",
       "repository": "https://github.com/maxgfr/ultra11y",
