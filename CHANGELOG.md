@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.7.0](https://github.com/maxgfr/ultra11y/compare/v5.6.1...v5.7.0) (2026-08-18)
+
+
+### Features
+
+* **config:** let the audited repository own the numbers that decide its verdicts ([93b7a7c](https://github.com/maxgfr/ultra11y/commit/93b7a7c0e16f700e27090692a75e312dfbedb8ab))
+
 ## [5.6.1](https://github.com/maxgfr/ultra11y/compare/v5.6.0...v5.6.1) (2026-08-18)
 
 
