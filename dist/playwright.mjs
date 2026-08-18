@@ -132,6 +132,236 @@ var COLLECT_SNAPSHOT = `(() => {
   };
 })()`;
 
+// src/probes.ts
+var PRELUDE = `
+const __sel = (e) => {
+  if (!e || !e.tagName) return '\u2014';
+  const t = e.tagName.toLowerCase();
+  if (e.id) return t + '#' + e.id;
+  const c = typeof e.className === 'string' ? e.className.trim().split(/\\s+/)[0] : '';
+  return c ? t + '.' + c : t;
+};
+const __vis = (e) => {
+  const r = e.getBoundingClientRect();
+  if (r.width <= 4 || r.height <= 4) return false; // tiny / 1px sr-only boxes
+  const s = getComputedStyle(e);
+  if (s.display === 'none' || s.visibility === 'hidden' || parseFloat(s.opacity) === 0) return false;
+  // visually-hidden "screen-reader-only" pattern (clip rect / clip-path inset) \u2014 present in
+  // the a11y tree but not painted; must not be measured for clipping/target-size.
+  if (s.clip && s.clip !== 'auto' && s.clip !== 'rect(auto, auto, auto, auto)') return false;
+  if (s.clipPath && (s.clipPath.indexOf('inset(100%') >= 0 || s.clipPath.indexOf('inset(50%') >= 0)) return false;
+  return true;
+};
+const __html = (e) => (e.outerHTML || '').slice(0, 160);
+`;
+var REFLOW_PROBE = `(() => {
+  const el = document.scrollingElement || document.documentElement;
+  return { horizontalScroll: el.scrollWidth > el.clientWidth + 2 };
+})()`;
+var REFLOW_ZOOM_PROBE = `(() => { ${PRELUDE}
+  const root = document.documentElement;
+  const prev = root.style.fontSize;
+  root.style.fontSize = '200%';
+  const hits = [];
+  for (const e of Array.from(document.querySelectorAll('p,li,h1,h2,h3,h4,h5,h6,td,th,button,a,label,span'))) {
+    if (!__vis(e)) continue;
+    if ((e.textContent || '').trim().length < 8) continue;
+    const s = getComputedStyle(e);
+    const clip = s.overflow === 'hidden' || s.overflowY === 'hidden' || s.overflowX === 'hidden';
+    const noWrap = s.whiteSpace === 'nowrap' || s.textOverflow === 'ellipsis';
+    if ((clip || noWrap) && (e.scrollHeight > e.clientHeight + 6 || e.scrollWidth > e.clientWidth + 6)) {
+      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqu\xE9/masqu\xE9 \xE0 200% (conteneur overflow:hidden / nowrap) \u2014 perte de contenu au zoom (1.4.4).' });
+    }
+    if (hits.length >= 12) break;
+  }
+  root.style.fontSize = prev;
+  return hits;
+})()`;
+var TEXT_SPACING_CSS = "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }";
+var TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
+  const hits = [];
+  for (const e of Array.from(document.querySelectorAll('p,li,span,a,button,h1,h2,h3,h4,h5,h6,td,th,label,div'))) {
+    if (!__vis(e)) continue;
+    if ((e.textContent || '').trim().length < 8) continue;
+    const s = getComputedStyle(e);
+    const clipped = (s.overflowX === 'hidden' || s.overflowY === 'hidden' || s.overflow === 'hidden') && (e.scrollHeight > e.clientHeight + 2 || e.scrollWidth > e.clientWidth + 2);
+    const ellipsis = s.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 2;
+    if (clipped || ellipsis) {
+      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqu\xE9/masqu\xE9 sous l\\'espacement de texte WCAG 1.4.12 \u2014 perte de contenu.' });
+    }
+    if (hits.length >= 20) break;
+  }
+  return hits;
+})()`;
+function focusSetupExpr(scope = "") {
+  const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
+  return `(() => { ${PRELUDE}
+  const sel = 'a[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
+  const snap = (e) => { const s = getComputedStyle(e); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
+  // Visually-hidden radio/checkbox \u2192 measure its visible label/proxy, not the input.
+  const proxyFor = (e) => {
+    const type = (e.getAttribute('type') || '').toLowerCase();
+    const custom = e.tagName === 'INPUT' && (type === 'radio' || type === 'checkbox') && !__vis(e);
+    if (!custom) return __vis(e) ? e : null;
+    let p = null;
+    if (e.id) { try { p = document.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(e.id) : e.id) + '"]'); } catch (_) {} }
+    if (!p) p = e.closest('label');
+    if (!p) { const lb = (e.getAttribute('aria-labelledby') || '').split(/\\s+/)[0]; if (lb) p = document.getElementById(lb); }
+    return (p && __vis(p)) ? p : null;
+  };
+  // Fresh authoritative pass: drop any tags a previous (whole-document or dialog) pass left.
+  for (const el of Array.from(document.querySelectorAll('[data-u11y-f],[data-u11y-fp]'))) { el.removeAttribute('data-u11y-f'); el.removeAttribute('data-u11y-fp'); }
+  const roots = ${rootExpr};
+  const focusables = [];
+  for (const root of Array.from(roots)) {
+    if (root.matches && root.matches(sel)) focusables.push(root);
+    for (const e of Array.from(root.querySelectorAll(sel))) focusables.push(e);
+  }
+  window.__u11yF = {};
+  let n = 0;
+  for (const e of focusables) {
+    const proxy = proxyFor(e);
+    if (!proxy) continue;
+    const key = 'k' + n;
+    e.setAttribute('data-u11y-f', key);
+    proxy.setAttribute('data-u11y-fp', key);
+    window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy) };
+    n++;
+    if (n >= 120) break;
+  }
+  return n;
+})()`;
+}
+var FOCUS_CHECK_PROBE = `(() => {
+  const e = document.activeElement;
+  if (!e || e === document.body || e === document.documentElement) return null;
+  const key = e.getAttribute && e.getAttribute('data-u11y-f');
+  if (!key || !window.__u11yF || !window.__u11yF[key]) return null;
+  const rec = window.__u11yF[key];
+  const proxy = document.querySelector('[data-u11y-fp="' + key + '"]') || e;
+  const s = getComputedStyle(proxy);
+  const now = [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|');
+  return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
+})()`;
+var HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
+  const out = [];
+  let n = 0;
+  for (const e of Array.from(document.querySelectorAll('[aria-describedby]'))) {
+    const id = (e.getAttribute('aria-describedby') || '').split(/\\s+/)[0];
+    if (!id) continue;
+    const t = document.getElementById(id);
+    if (!t) continue;
+    const s = getComputedStyle(t);
+    const hidden = s.display === 'none' || s.visibility === 'hidden' || t.getBoundingClientRect().height === 0;
+    if (!hidden) continue;
+    const key = 'h' + n;
+    e.setAttribute('data-u11y-h', key);
+    out.push({ key: key, target: id, selector: __sel(e) });
+    n++;
+    if (n >= 10) break;
+  }
+  return out;
+})()`;
+function hoverVisibleExpr(id, wantHidden = false) {
+  const j = JSON.stringify(id);
+  return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
+}
+async function probeFocusVisible(page, scope = "") {
+  const count = await page.evaluate(focusSetupExpr(scope));
+  if (!count) return [];
+  const hits = [];
+  const seen = /* @__PURE__ */ new Set();
+  const limit = Math.min(count + 2, 130);
+  for (let i = 0; i < limit; i++) {
+    await page.keyboard.press("Tab");
+    const r = await page.evaluate(FOCUS_CHECK_PROBE);
+    if (!r) continue;
+    if (seen.has(r.key)) break;
+    seen.add(r.key);
+    if (!r.changed) {
+      hits.push({
+        selector: r.selector,
+        html: r.html,
+        detail: "Le focus clavier ne produit aucun changement visible (outline/box-shadow/bordure/fond) \u2014 focus non visible (2.4.7)."
+      });
+    }
+    if (hits.length >= 20) break;
+  }
+  return hits;
+}
+async function probeHover(page) {
+  const triggers = await page.evaluate(HOVER_SETUP_PROBE);
+  const hits = [];
+  for (const tr of triggers) {
+    try {
+      await page.hover(`[data-u11y-h="${tr.key}"]`);
+    } catch {
+      continue;
+    }
+    await page.waitForTimeout(150);
+    const shown = await page.evaluate(hoverVisibleExpr(tr.target));
+    if (!shown) continue;
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(100);
+    const dismissed = await page.evaluate(hoverVisibleExpr(tr.target, true));
+    await page.mouse.move(2, 2).catch(() => {
+    });
+    if (!dismissed) {
+      hits.push({
+        selector: tr.selector,
+        html: "",
+        detail: `Le contenu r\xE9v\xE9l\xE9 au survol (aria-describedby #${tr.target}) ne se masque pas avec \xC9chap \u2014 Contenu au survol ou au focus (1.4.13).`
+      });
+    }
+    if (hits.length >= 8) break;
+  }
+  return hits;
+}
+async function runLiveProbes(page, opts = {}) {
+  const only = opts.only?.length ? new Set(opts.only) : null;
+  const want = (id) => only === null || only.has(id);
+  const size = page.viewportSize?.() ?? null;
+  const restore = size ?? { width: 1280, height: 900 };
+  const out = { focusVisible: [], hover: [], reflowZoom: [], textSpacing: [], reflow: { horizontalScroll: false }, probed: [] };
+  if (want("2.4.7")) {
+    out.focusVisible = await probeFocusVisible(page).catch(() => []);
+    out.probed.push("2.4.7");
+  }
+  if (want("1.4.13")) {
+    out.hover = await probeHover(page).catch(() => []);
+    out.probed.push("1.4.13");
+  }
+  if (want("1.4.4")) {
+    out.reflowZoom = await page.evaluate(REFLOW_ZOOM_PROBE).catch(() => []) ?? [];
+    out.probed.push("1.4.4");
+  }
+  if (want("1.4.10")) {
+    await page.setViewportSize({ width: 320, height: restore.height }).catch(() => {
+    });
+    out.reflow = await page.evaluate(REFLOW_PROBE).catch(() => ({ horizontalScroll: false })) ?? {
+      horizontalScroll: false
+    };
+    await page.setViewportSize(restore).catch(() => {
+    });
+    out.probed.push("1.4.10");
+  }
+  if (want("1.4.12")) {
+    const handle = await page.addStyleTag({ content: TEXT_SPACING_CSS }).catch(() => null);
+    out.textSpacing = await page.evaluate(TEXT_SPACING_PROBE).catch(() => []) ?? [];
+    if (handle) await page.evaluate(REMOVE_TEXT_SPACING_STEP).catch(() => {
+    });
+    out.probed.push("1.4.12");
+  }
+  return out;
+}
+var REMOVE_TEXT_SPACING_STEP = `(() => {
+  const sheets = Array.from(document.querySelectorAll('style'));
+  for (const s of sheets) {
+    if (s.textContent && s.textContent.indexOf('letter-spacing: 0.12em') >= 0) s.remove();
+  }
+  return true;
+})()`;
+
 // src/integrations/core.ts
 import { spawnSync } from "child_process";
 import { createRequire } from "module";
@@ -180,7 +410,7 @@ function stayedOnPage(expected, actual) {
   if (a === void 0 || b === void 0) return true;
   return a === b;
 }
-function buildPayload(collected, url, runner, opts, screenshot) {
+function buildPayload(collected, url, runner, opts, screenshot, probes) {
   const id = opts.as || slugify(url);
   return {
     meta: {
@@ -199,7 +429,11 @@ function buildPayload(collected, url, runner, opts, screenshot) {
     styles: collected.styles,
     boxes: collected.boxes,
     css: collected.css,
-    ...screenshot ? { screenshot } : {}
+    ...screenshot ? { screenshot } : {},
+    // What the live probes measured, when the caller asked for them. It rides in the payload
+    // because `snapshot write` persists it beside the DOM — the audit that folds it runs later
+    // and in another process, so a measurement kept in memory decides nothing.
+    ...probes ? { probes } : {}
   };
 }
 function gate(result, pageName, failOn) {
@@ -263,7 +497,14 @@ async function checkA11y(page, opts = {}) {
       `ultra11y: ${opts.expectPath} landed on ${url} \u2014 not recording it as "${opts.as ?? opts.name ?? "this page"}". The state that opens this route is not the one the test built; seed it first, or drop the page from the sample.`
     );
   }
-  const payload = buildPayload(collected, url, "playwright", opts, shot);
+  let probes;
+  if (opts.probes) {
+    try {
+      probes = await runLiveProbes(page, Array.isArray(opts.probes) ? { only: opts.probes } : {});
+    } catch {
+    }
+  }
+  const payload = buildPayload(collected, url, "playwright", opts, shot, probes);
   const result = auditSnapshot(payload);
   if (opts.report) writePagesReport(typeof opts.report === "object" ? opts.report : {});
   gate(result, String(payload.meta.name), opts.failOn);

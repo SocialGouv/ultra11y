@@ -57,6 +57,40 @@ function auditPages(count: number, spoil?: (i: number) => Record<string, unknown
 
 const of = (r: ReturnType<typeof runAudit>, sc: string) => r.criteria.find((c) => c.id === sc);
 
+describe("a live probe is the other way a criterion gets measured", () => {
+  // Zoom, reflow, text spacing, hover and focus visibility are properties of a page being
+  // ACTED ON. No digest settles them, so before the probes they could only ever stay « to
+  // assess » — on egapro, that was most of theme 10, run after run.
+  const probed = { probed: ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.4.7"] };
+
+  it("concludes C when the probe ran on every page and observed nothing", () => {
+    const r = auditPages(2, () => ({ probes: probed }));
+    const c = of(r, "1.4.10");
+    expect(c?.status).toBe("C");
+    expect(c?.decidedBy).toBe("scan");
+    expect(c?.justification).toMatch(/Measured in a real browser on all 2 page/);
+  });
+
+  it("keeps it open when the probe did not run on one of the pages", () => {
+    // Same AND across pages as the snapshot tier, for the same reason: the page nobody
+    // probed is exactly where the failure would be.
+    const r = auditPages(3, (i) => (i === 1 ? {} : { probes: probed }));
+    expect(of(r, "1.4.10")?.status).toBe("manual");
+  });
+
+  it("turns what a probe OBSERVED into a non-conformity on the criterion it evidences", () => {
+    const r = auditPages(2, () => ({ probes: { ...probed, reflow: { horizontalScroll: true } } }));
+    expect(of(r, "1.4.10")?.status).toBe("NC");
+    expect(r.findings.some((f) => f.ruleId === "dyn-reflow" && f.criteriaId === "1.4.10")).toBe(true);
+  });
+
+  it("credits only the criteria named in `probed` — silence is not a measurement", () => {
+    const r = auditPages(2, () => ({ probes: { probed: ["1.4.10"] } }));
+    expect(of(r, "1.4.10")?.status).toBe("C");
+    expect(of(r, "1.4.12")?.status).toBe("manual");
+  });
+});
+
 describe("the rendered tier concludes only what it measured everywhere", () => {
   it("concludes C, marked as MEASURED rather than judged, when every rule ran on every page", () => {
     const r = auditPages(3);

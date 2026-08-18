@@ -1,4 +1,4 @@
-import { C as CheckOptions, A as AuditLike } from './payload-B6NDkLYJ.js';
+import { C as CheckOptions, A as AuditLike } from './payload-BshGXnOO.js';
 
 interface PlaywrightPage {
     evaluate(script: string): Promise<unknown>;
@@ -6,6 +6,25 @@ interface PlaywrightPage {
         fullPage: boolean;
     }): Promise<Buffer>;
     url(): string;
+    viewportSize?(): {
+        width: number;
+        height: number;
+    } | null;
+    setViewportSize?(size: {
+        width: number;
+        height: number;
+    }): Promise<void>;
+    addStyleTag?(opts: {
+        content: string;
+    }): Promise<unknown>;
+    hover?(selector: string): Promise<void>;
+    waitForTimeout?(ms: number): Promise<void>;
+    keyboard?: {
+        press(key: string): Promise<void>;
+    };
+    mouse?: {
+        move(x: number, y: number): Promise<void>;
+    };
 }
 interface PlaywrightCheckOptions extends CheckOptions {
     /** Also write the per-page report once this page is recorded. Off by default: a report

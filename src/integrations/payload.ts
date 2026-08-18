@@ -53,6 +53,8 @@ export interface SnapshotPayload {
   boxes?: unknown;
   css?: unknown;
   screenshot?: string;
+  /** What the live probes measured, when the caller ran them. */
+  probes?: unknown;
 }
 
 /** Same slug rule as the engine (src/snapshot.ts slugifyPageId): accent-folded URL path. */
@@ -105,6 +107,21 @@ export interface CheckOptions {
    *  Compared by path (a query or fragment the app appends to its own route is the same
    *  page); a full URL works too. `scan --sample` applies the same rule. */
   expectPath?: string;
+  /** Run the LIVE PROBES on this page after collecting it: 200% zoom, 320px reflow, the
+   *  text-spacing override, focus visibility and content-on-hover.
+   *
+   *  These are the measurements a recorded snapshot can never settle, because they are
+   *  properties of a page being acted on rather than of a page as it stands. `scan` runs them
+   *  in its own browser, which is exactly why they were undecidable on any screen behind a
+   *  login or a state machine — the scanner arrives cold and gets a redirect. Your suite has
+   *  the page in the right state; this is how it says so.
+   *
+   *  Off by default: the probes press Tab, hover, resize the viewport and inject a stylesheet,
+   *  and a suite should opt into that. Everything is restored before it returns, and the
+   *  snapshot has already been collected, so what they measure cannot alter what was recorded.
+   *  Pass an array to run only some of them (by criterion: "1.4.4", "1.4.10", "1.4.12",
+   *  "1.4.13", "2.4.7"). */
+  probes?: boolean | string[];
 }
 
 /** Did the browser stay on the page the caller asked for? Path-only, trailing slash folded;
@@ -133,6 +150,7 @@ export function buildPayload(
   runner: string,
   opts: CheckOptions,
   screenshot?: string,
+  probes?: unknown,
 ): SnapshotPayload {
   const id = opts.as || slugify(url);
   return {
@@ -153,6 +171,10 @@ export function buildPayload(
     boxes: collected.boxes,
     css: collected.css,
     ...(screenshot ? { screenshot } : {}),
+    // What the live probes measured, when the caller asked for them. It rides in the payload
+    // because `snapshot write` persists it beside the DOM — the audit that folds it runs later
+    // and in another process, so a measurement kept in memory decides nothing.
+    ...(probes ? { probes } : {}),
   };
 }
 

@@ -20,6 +20,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { COLLECT_SNAPSHOT } from "../collector.js";
+import { runLiveProbes } from "../probes.js";
 import { type AuditLike, type CheckOptions, auditSnapshot, buildPayload, gate, stayedOnPage, writePagesReport } from "./core.js";
 
 // Playwright's own types are not a dependency of this package (it is a peer of YOUR repo),
@@ -28,6 +29,15 @@ interface PlaywrightPage {
   evaluate(script: string): Promise<unknown>;
   screenshot(opts: { fullPage: boolean }): Promise<Buffer>;
   url(): string;
+  // Used only by the live probes (`probes: true`), so they stay optional: a page object that
+  // cannot resize or press a key still records a snapshot exactly as before.
+  viewportSize?(): { width: number; height: number } | null;
+  setViewportSize?(size: { width: number; height: number }): Promise<void>;
+  addStyleTag?(opts: { content: string }): Promise<unknown>;
+  hover?(selector: string): Promise<void>;
+  waitForTimeout?(ms: number): Promise<void>;
+  keyboard?: { press(key: string): Promise<void> };
+  mouse?: { move(x: number, y: number): Promise<void> };
 }
 
 export interface PlaywrightCheckOptions extends CheckOptions {
@@ -64,7 +74,23 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
         `The state that opens this route is not the one the test built; seed it first, or drop the page from the sample.`,
     );
   }
-  const payload = buildPayload(collected, url, "playwright", opts, shot);
+  // The probes run AFTER the snapshot is collected, deliberately: they stress the page —
+  // double the root font size, narrow the viewport to 320px, force a spacing stylesheet, press
+  // Tab, hover a tooltip — and what gets recorded must be the page as the test built it, not
+  // the page mid-measurement. Everything they touch is restored before this returns.
+  //
+  // Guarded as a whole: a probe run that throws costs the measurements, never the snapshot and
+  // never the caller's test.
+  let probes: unknown;
+  if (opts.probes) {
+    try {
+      probes = await runLiveProbes(page, Array.isArray(opts.probes) ? { only: opts.probes } : {});
+    } catch {
+      /* the page is still recorded; the criteria these decide simply stay to assess */
+    }
+  }
+
+  const payload = buildPayload(collected, url, "playwright", opts, shot, probes);
   const result = auditSnapshot(payload);
   if (opts.report) writePagesReport(typeof opts.report === "object" ? opts.report : {});
   gate(result, String(payload.meta.name), opts.failOn);

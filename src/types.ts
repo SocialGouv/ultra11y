@@ -355,6 +355,17 @@ export interface RenderSignals {
   css?: CssDigest;
   /** Absolute path to the page screenshot, when one was captured. */
   screenshot?: string;
+  /** What the live probes measured on this page, when the producer ran them (zoom, reflow,
+   *  text spacing, focus visibility, hover). Carries `probed` — the criteria actually looked
+   *  at — because an empty hit list is only evidence for those. */
+  probes?: {
+    focusVisible?: { selector: string; html: string; detail: string }[];
+    hover?: { selector: string; html: string; detail: string }[];
+    reflowZoom?: { selector: string; html: string; detail: string }[];
+    textSpacing?: { selector: string; html: string; detail: string }[];
+    reflow?: { horizontalScroll: boolean };
+    probed?: string[];
+  };
   /** The page's doctype declaration, from the snapshot's meta. Absent when the capture
    *  predates the field — a different statement from an empty string ("the page had none"),
    *  and the adjudication harvest keeps the two apart. */

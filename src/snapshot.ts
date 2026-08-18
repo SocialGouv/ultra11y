@@ -67,6 +67,20 @@ export interface SnapshotMeta {
   notes?: string;
 }
 
+/** What the LIVE probes measured on this page, when the producer ran them. Persisted beside
+ *  the DOM because the audit that folds them runs later, in another process, over the whole
+ *  `.ultra11y/pages` tree — a measurement that lives only in the producer's memory decides
+ *  nothing. `probed` is the load-bearing half: the absence of a hit means "nothing found"
+ *  only for the criteria that were actually looked at. */
+export interface SnapshotProbes {
+  focusVisible?: { selector: string; html: string; detail: string }[];
+  hover?: { selector: string; html: string; detail: string }[];
+  reflowZoom?: { selector: string; html: string; detail: string }[];
+  textSpacing?: { selector: string; html: string; detail: string }[];
+  reflow?: { horizontalScroll: boolean };
+  probed?: string[];
+}
+
 export interface Snapshot {
   meta: SnapshotMeta;
   dom: string;
@@ -74,6 +88,8 @@ export interface Snapshot {
   boxes?: BoxDigest;
   axtree?: AxNode;
   css?: CssDigest;
+  /** What the live probes measured, when the producer ran them. */
+  probes?: SnapshotProbes;
   /** Path of the screenshot on disk, relative to the snapshot dir. Set on READ. */
   screenshot?: string;
   /** The screenshot's bytes, base64, as a producer hands them over. Set on WRITE — a
@@ -215,6 +231,7 @@ export function writeSnapshot(root: string, snap: Snapshot): string {
   if (snap.boxes) writeFileSync(join(dir, "boxes.json"), `${JSON.stringify(snap.boxes)}\n`);
   if (snap.axtree) writeFileSync(join(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}\n`);
   if (snap.css) writeFileSync(join(dir, "css.json"), `${JSON.stringify(snap.css)}\n`);
+  if (snap.probes) writeFileSync(join(dir, "probes.json"), `${JSON.stringify(snap.probes)}\n`);
   // The screenshot rides in as base64 (a producer has bytes, not a path). It powers the
   // pixel tier — contrast over a gradient or a background image, where the CSSOM has no
   // answer. A screenshot that cannot be decoded/written must NEVER fail the snapshot: the
@@ -392,6 +409,7 @@ export function attachSignals(doc: Doc): void {
   const axtree = readJson<AxNode>(join(dir, "axtree.json"));
   const css = readJson<CssDigest>(join(dir, "css.json"));
   const meta = readJson<{ doctype?: string }>(join(dir, "meta.json"));
+  const probes = readJson<SnapshotProbes>(join(dir, "probes.json"));
   const shot = join(dir, "screen.png");
 
   const alignedStyleMap = styles ? align(doc, styles.entries) : null;
@@ -406,6 +424,7 @@ export function attachSignals(doc: Doc): void {
     ...(css ? { css } : {}),
     ...(existsSync(shot) ? { screenshot: shot } : {}),
     ...(meta?.doctype !== undefined ? { doctype: meta.doctype } : {}),
+    ...(probes ? { probes } : {}),
     ...(truncated ? { truncated } : {}),
   };
   if (Object.keys(signals).length) doc.signals = signals;

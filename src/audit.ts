@@ -4,7 +4,7 @@
 // judgment, surfaced as residual risks). `report` renders this; Claude completes
 // the manual criteria.
 import { createHash } from "node:crypto";
-import type { AuditResult, CriterionResult, Finding, ResidualRisk, Status, GuidelineTally } from "./types.js";
+import type { AuditResult, CriterionResult, DynamicEngine, Finding, RenderSignals, ResidualRisk, Severity, Status, GuidelineTally } from "./types.js";
 import { VERSION, SCHEMA_VERSION } from "./types.js";
 import { allSC, allGuidelines } from "./wcag.js";
 import { parseSource } from "./parse/source.js";
@@ -13,6 +13,7 @@ import { attr, elementsByTag, type Doc, type CaptureProvenance } from "./parse/h
 import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir, readCaptureDir, capturesForSources } from "./capture.js";
 import { isFullDocument } from "./rules/rule.js";
 import { renderedRulesFor, renderedRulesRan, renderedTestedScs } from "./rules/rendered.js";
+import { PROBE_SEVERITY, PROBE_WCAG } from "./axe-map.js";
 import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
 import { listPacks } from "./standards/registry.js";
@@ -331,6 +332,11 @@ interface Accum {
   // and per page and folded with an AND at the end.
   pageIds: Set<string>;
   renderedRan: Map<string, Set<string>>; // rendered rule id → page ids where its signals were present
+  // LIVE-PROBE coverage: success criterion → page ids where a probe actually measured it.
+  // Separate from `renderedRan` because these come from a browser acting on the page (zoom,
+  // 320px viewport, injected spacing, Tab, hover), not from a digest — and because a probe
+  // that did not run must never be read as a probe that found nothing.
+  probedScs: Map<string, Set<string>>;
 }
 
 // Precompute the static success criteria + their applicability predicates once.
@@ -361,6 +367,7 @@ function newAccum(): Accum {
     renderedScs: new Set(),
     pageIds: new Set(),
     renderedRan: new Map(),
+    probedScs: new Map(),
   };
 }
 
@@ -439,6 +446,22 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
       seen.add(pageId);
       acc.renderedRan.set(ruleId, seen);
     }
+    // What a browser MEASURED on this page, by acting on it. `probed` is what makes the
+    // silence meaningful: a criterion with no hit is conforming only where the probe ran.
+    const probes = doc.signals?.probes;
+    if (probes) {
+      for (const sc of probes.probed ?? []) {
+        const seen = acc.probedScs.get(sc) ?? new Set<string>();
+        seen.add(pageId);
+        acc.probedScs.set(sc, seen);
+      }
+      for (const f of probeFindings(probes, doc.file, pageId)) {
+        const list = acc.byCriterion.get(f.criteriaId) ?? [];
+        list.push(f);
+        acc.byCriterion.set(f.criteriaId, list);
+        acc.allFindings.push(f);
+      }
+    }
   }
   if (doc.opaqueComponents?.length) {
     for (const lib of doc.opaqueComponents) acc.opaqueLibs.add(lib);
@@ -485,6 +508,12 @@ interface FinalizeExtra {
  *  nothing measured nothing, and `SIGNALS_REQUIRED` is what tells the two apart. */
 function renderedProves(sc: string, acc: Accum): boolean {
   if (acc.pageIds.size === 0) return false;
+  // A LIVE PROBE is the other way a criterion gets measured, and for several it is the only
+  // way: zoom, reflow, text spacing, hover and focus visibility are properties of a page
+  // being acted on, which no digest can settle. Same rule as the snapshot tier — every page
+  // in scope, or nothing.
+  const probed = acc.probedScs.get(sc);
+  if (probed && probed.size === acc.pageIds.size) return true;
   const rules = renderedRulesFor(sc);
   if (!rules.length) return false;
   return rules.every((ruleId) => {
@@ -494,8 +523,55 @@ function renderedProves(sc: string, acc: Accum): boolean {
 }
 
 function renderedProvesReason(sc: string, acc: Accum): string {
+  const probed = acc.probedScs.get(sc);
+  if (probed && probed.size === acc.pageIds.size) {
+    return `Measured in a real browser on all ${acc.pageIds.size} page(s) in scope — the probe acted on the page (zoom, 320px viewport, text-spacing override, Tab, hover) and observed nothing. A page the probe had not run on would have kept this criterion open.`;
+  }
   const rules = renderedRulesFor(sc);
   return `Measured on the rendered pages: ${rules.join(", ")} ran on all ${acc.pageIds.size} page(s) in scope and raised nothing. Conformity here is a MEASUREMENT, not a judgement — a page whose signals were incomplete would have kept this criterion open.`;
+}
+
+/** Turn what a live probe OBSERVED into findings on the page it observed them.
+ *
+ *  Each hit is a definite failure the browser reproduced — text clipped at 200% zoom, a page
+ *  that will not reflow at 320px, a focus that produces no visible change — so it is an NC on
+ *  the criterion it evidences, not a residual risk. The mapping is the one `scan` already
+ *  uses (src/axe-map.ts), so a probe hit means the same thing whichever runtime produced it.
+ *
+ *  Anchored at the snapshot's own file:line 1: the probe measured the RENDERED page, and
+ *  pretending to know which source line produced it would be a citation nobody could check. */
+function probeFindings(probes: NonNullable<RenderSignals["probes"]>, file: string, page: string): Finding[] {
+  const out: Finding[] = [];
+  const add = (criteriaId: string, ruleId: string, severity: Severity, selector: string, snippet: string, message: string): void => {
+    out.push({
+      ruleId,
+      criteriaId,
+      file,
+      line: 1,
+      col: 1,
+      selectorHint: selector || "document",
+      severity,
+      message,
+      remediation: "",
+      snippet: snippet.slice(0, 200),
+      page,
+    });
+  };
+  const buckets: [keyof typeof probes, Exclude<DynamicEngine, "axe" | "reflow">][] = [
+    ["focusVisible", "focus-visible"],
+    ["hover", "hover"],
+    ["reflowZoom", "reflow-zoom"],
+    ["textSpacing", "text-spacing"],
+  ];
+  for (const [key, engine] of buckets) {
+    const hits = probes[key] as { selector: string; html: string; detail: string }[] | undefined;
+    if (!Array.isArray(hits)) continue;
+    for (const h of hits) add(PROBE_WCAG[engine], `dyn-${engine}`, PROBE_SEVERITY[engine], h.selector, h.html, h.detail);
+  }
+  if (probes.reflow?.horizontalScroll) {
+    add("1.4.10", "dyn-reflow", "majeur", "document", "", "Horizontal scrolling at 320px width — content does not reflow.");
+  }
+  return out;
 }
 
 function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): AuditResult {

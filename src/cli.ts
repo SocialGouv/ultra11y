@@ -68,7 +68,17 @@ import { toSarif } from "./sarif.js";
 import { annotations, pagesComment, prComment, stepSummary } from "./annotate.js";
 import { evidenceNotice, writeEvidence } from "./evidence.js";
 import { writeHtml } from "./html-emit.js";
-import { PAGES_DIR, readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
+import {
+  PAGES_DIR,
+  readSnapshots,
+  type SnapshotProbes,
+  validateSnapshotMeta,
+  writeSnapshot,
+  type AxNode,
+  type BoxDigest,
+  type CssDigest,
+  type StyleDigest,
+} from "./snapshot.js";
 import { attributePages, derivePages, pageScopesFrom, pageView, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
 import { renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
 import { crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
@@ -1604,7 +1614,16 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
     console.error("ultra11y snapshot write: no payload on stdin (expected {meta, dom, styles?, boxes?, axtree?}).");
     return 2;
   }
-  let payload: { meta?: unknown; dom?: unknown; styles?: StyleDigest; boxes?: BoxDigest; axtree?: AxNode; css?: CssDigest; screenshot?: unknown };
+  let payload: {
+    meta?: unknown;
+    dom?: unknown;
+    styles?: StyleDigest;
+    boxes?: BoxDigest;
+    axtree?: AxNode;
+    css?: CssDigest;
+    screenshot?: unknown;
+    probes?: SnapshotProbes;
+  };
   try {
     payload = JSON.parse(raw);
   } catch {
@@ -1630,6 +1649,10 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
       ...(payload.boxes ? { boxes: payload.boxes } : {}),
       ...(payload.axtree ? { axtree: payload.axtree } : {}),
       ...(payload.css ? { css: payload.css } : {}),
+      // What the live probes measured, when the producer ran them. Persisted beside the DOM
+      // because the audit that folds them runs later, in another process — a measurement
+      // that lives only in the producer's memory decides nothing.
+      ...(payload.probes ? { probes: payload.probes } : {}),
       // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
       // pixel tier. writeSnapshot owns the decoding, so every producer — this command, the
       // dev side-car, `scan` — writes it the one same way.

@@ -155,7 +155,7 @@ function stayedOnPage(expected, actual) {
   if (a === void 0 || b === void 0) return true;
   return a === b;
 }
-function buildPayload(collected, url, runner, opts, screenshot) {
+function buildPayload(collected, url, runner, opts, screenshot, probes) {
   const id = opts.as || slugify(url);
   return {
     meta: {
@@ -174,7 +174,11 @@ function buildPayload(collected, url, runner, opts, screenshot) {
     styles: collected.styles,
     boxes: collected.boxes,
     css: collected.css,
-    ...screenshot ? { screenshot } : {}
+    ...screenshot ? { screenshot } : {},
+    // What the live probes measured, when the caller asked for them. It rides in the payload
+    // because `snapshot write` persists it beside the DOM — the audit that folds it runs later
+    // and in another process, so a measurement kept in memory decides nothing.
+    ...probes ? { probes } : {}
   };
 }
 

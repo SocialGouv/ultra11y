@@ -37342,6 +37342,8 @@ ${snap.dom}
 `);
   if (snap.css) writeFileSync5(join25(dir, "css.json"), `${JSON.stringify(snap.css)}
 `);
+  if (snap.probes) writeFileSync5(join25(dir, "probes.json"), `${JSON.stringify(snap.probes)}
+`);
   if (snap.screenshotBase64) {
     try {
       writeFileSync5(join25(dir, "screen.png"), Buffer.from(snap.screenshotBase64, "base64"));
@@ -37440,6 +37442,7 @@ function attachSignals(doc) {
   const axtree = readJson2(join25(dir, "axtree.json"));
   const css = readJson2(join25(dir, "css.json"));
   const meta2 = readJson2(join25(dir, "meta.json"));
+  const probes = readJson2(join25(dir, "probes.json"));
   const shot = join25(dir, "screen.png");
   const alignedStyleMap = styles ? align(doc, styles.entries) : null;
   const alignedBoxMap = boxes ? align(doc, boxes.entries) : null;
@@ -37452,6 +37455,7 @@ function attachSignals(doc) {
     ...css ? { css } : {},
     ...existsSync12(shot) ? { screenshot: shot } : {},
     ...meta2?.doctype !== void 0 ? { doctype: meta2.doctype } : {},
+    ...probes ? { probes } : {},
     ...truncated ? { truncated } : {}
   };
   if (Object.keys(signals).length) doc.signals = signals;
@@ -39150,6 +39154,186 @@ function renderedRulesFor(sc) {
   return renderedRules.filter((rule) => rule.criteria.includes(sc)).map((rule) => rule.id);
 }
 var RENDERED_SIGNAL_RULES = Object.keys(SIGNALS_REQUIRED);
+
+// src/axe-map.ts
+var PROBE_WCAG = {
+  "focus-visible": "2.4.7",
+  // Focus Visible — focusing a control produces no visible change
+  "reflow-zoom": "1.4.4",
+  // Resize Text / 200% zoom — content clipped/lost when enlarged
+  "text-spacing": "1.4.12",
+  // Text Spacing — clipping/overlap under the WCAG spacing override
+  hover: "1.4.13",
+  // Content on Hover or Focus — not dismissible/hoverable/persistent
+  // Stateful input-overflow probes — a FILLED input whose typed value is clipped/unreadable
+  // under a stress. Same defect, one SC per stress (so each folds onto the SC that stress
+  // actually evidences), so they stay unambiguous cross-standard (RGAA 10.11/10.4/10.12).
+  "input-overflow-reflow": "1.4.10",
+  // typed value clipped at 320px width
+  "input-overflow-zoom": "1.4.4",
+  // typed value clipped at 200% zoom
+  "input-overflow-spacing": "1.4.12",
+  // typed value clipped under the WCAG text-spacing override
+  "live-region": "4.1.3"
+  // Status Messages — content updated by an interaction outside any live region
+};
+var PROBE_SEVERITY = {
+  "focus-visible": "majeur",
+  "reflow-zoom": "majeur",
+  "text-spacing": "mineur",
+  hover: "mineur",
+  // Input-overflow is a directly OBSERVED loss of content (the value the user typed is no
+  // longer visible), not a heuristic — the human auditor confirmed the real instance class
+  // — so it is majeur on every stress (incl. text-spacing, unlike the generic text-spacing
+  // probe which stays mineur). live-region is an honest heuristic → mineur.
+  "input-overflow-reflow": "majeur",
+  "input-overflow-zoom": "majeur",
+  "input-overflow-spacing": "majeur",
+  "live-region": "mineur"
+};
+var AXE_WCAG = {
+  // images
+  "image-alt": "1.1.1",
+  "input-image-alt": "1.1.1",
+  "area-alt": "1.1.1",
+  "role-img-alt": "1.1.1",
+  "image-redundant-alt": "1.1.1",
+  "svg-img-alt": "1.1.1",
+  // frames
+  "frame-title": "4.1.2",
+  "frame-title-unique": "4.1.2",
+  // colour (the headline dynamic win)
+  "color-contrast": "1.4.3",
+  "color-contrast-enhanced": "1.4.3",
+  "link-in-text-block": "1.4.1",
+  // tables / structure
+  "td-headers-attr": "1.3.1",
+  "th-has-data-cells": "1.3.1",
+  "scope-attr-valid": "1.3.1",
+  "table-fake-caption": "1.3.1",
+  "td-has-header": "1.3.1",
+  "empty-table-header": "1.3.1",
+  // links & buttons
+  "link-name": "2.4.4",
+  "button-name": "4.1.2",
+  "input-button-name": "4.1.2",
+  // scripts / ARIA
+  "aria-allowed-attr": "4.1.2",
+  "aria-allowed-role": "4.1.2",
+  "aria-command-name": "4.1.2",
+  "aria-hidden-body": "4.1.2",
+  "aria-hidden-focus": "4.1.2",
+  "aria-input-field-name": "4.1.2",
+  "aria-required-attr": "4.1.2",
+  "aria-required-children": "4.1.2",
+  "aria-required-parent": "4.1.2",
+  "aria-roles": "4.1.2",
+  "aria-toggle-field-name": "4.1.2",
+  "aria-valid-attr": "4.1.2",
+  "aria-valid-attr-value": "4.1.2",
+  "nested-interactive": "4.1.2",
+  "aria-tooltip-name": "4.1.2",
+  "aria-meter-name": "4.1.2",
+  "aria-progressbar-name": "4.1.2",
+  "aria-dialog-name": "4.1.2",
+  "presentation-role-conflict": "4.1.2",
+  "duplicate-id-aria": "4.1.2",
+  // mandatory elements / language
+  "duplicate-id": "4.1.2",
+  "duplicate-id-active": "4.1.2",
+  "html-has-lang": "3.1.1",
+  "html-xml-lang-mismatch": "3.1.1",
+  "html-lang-valid": "3.1.1",
+  "valid-lang": "3.1.2",
+  "document-title": "2.4.2",
+  // structure
+  "heading-order": "1.3.1",
+  "empty-heading": "1.3.1",
+  "page-has-heading-one": "1.3.1",
+  list: "1.3.1",
+  listitem: "1.3.1",
+  "definition-list": "1.3.1",
+  dlitem: "1.3.1",
+  "landmark-one-main": "1.3.1",
+  region: "1.3.1",
+  // presentation / zoom
+  "meta-viewport": "1.4.4",
+  "meta-viewport-large": "1.4.4",
+  // forms
+  label: "4.1.2",
+  "form-field-multiple-labels": "4.1.2",
+  "select-name": "4.1.2",
+  "label-title-only": "4.1.2",
+  "autocomplete-valid": "1.3.5",
+  fieldset: "1.3.1",
+  // multimedia
+  "audio-caption": "1.2.2",
+  "video-caption": "1.2.2",
+  "no-autoplay-audio": "1.4.2",
+  blink: "2.2.2",
+  marquee: "2.2.2",
+  // navigation
+  tabindex: "2.4.3",
+  "skip-link": "2.4.1",
+  bypass: "2.4.1",
+  accesskeys: "2.1.1"
+};
+var FALLBACK_SC = "4.1.2";
+function scFromWcagTags(tags) {
+  if (!tags) return null;
+  for (const t3 of tags) {
+    const m = /^wcag(\d)(\d)(\d+)$/.exec(t3);
+    if (m) {
+      const sc = `${m[1]}.${m[2]}.${m[3]}`;
+      if (hasSC(sc)) return sc;
+    }
+  }
+  return null;
+}
+function severityFromImpact(impact) {
+  switch (impact) {
+    case "critical":
+    case "serious":
+      return "bloquant";
+    case "moderate":
+      return "majeur";
+    default:
+      return "mineur";
+  }
+}
+var AXE_ADVISORY_EXCEPTIONS = {
+  "heading-order": false,
+  tabindex: false,
+  "skip-link": false,
+  "label-title-only": false,
+  "landmark-one-main": false,
+  "empty-heading": false,
+  "duplicate-id": false,
+  "nested-interactive": false,
+  "form-field-multiple-labels": false,
+  "aria-required-children": false,
+  "aria-required-attr": false,
+  "aria-required-parent": false,
+  "aria-valid-attr": false,
+  "aria-valid-attr-value": false,
+  "autocomplete-valid": false,
+  "label-content-name-mismatch": false,
+  "td-headers-attr": false,
+  "th-has-data-cells": false,
+  "definition-list": false,
+  dlitem: false
+};
+function axeAdvisory(tags) {
+  const t3 = tags ?? [];
+  if (t3.length === 0) return false;
+  return !t3.some((tag) => /^wcag\d+$/.test(tag));
+}
+function isAxeAdvisory(ruleId, tags) {
+  return AXE_ADVISORY_EXCEPTIONS[ruleId] ?? axeAdvisory(tags);
+}
+function scForAxe(ruleId, tags) {
+  return AXE_WCAG[ruleId] ?? scFromWcagTags(tags) ?? FALLBACK_SC;
+}
 
 // src/name.ts
 var collapse = (s) => s.replace(/\s+/g, " ").trim();
@@ -47598,7 +47782,8 @@ function newAccum() {
     langCounts: /* @__PURE__ */ new Map(),
     renderedScs: /* @__PURE__ */ new Set(),
     pageIds: /* @__PURE__ */ new Set(),
-    renderedRan: /* @__PURE__ */ new Map()
+    renderedRan: /* @__PURE__ */ new Map(),
+    probedScs: /* @__PURE__ */ new Map()
   };
 }
 function primarySubtag(lang) {
@@ -47643,6 +47828,20 @@ function foldDoc(acc, doc, graph) {
       seen.add(pageId);
       acc.renderedRan.set(ruleId, seen);
     }
+    const probes = doc.signals?.probes;
+    if (probes) {
+      for (const sc of probes.probed ?? []) {
+        const seen = acc.probedScs.get(sc) ?? /* @__PURE__ */ new Set();
+        seen.add(pageId);
+        acc.probedScs.set(sc, seen);
+      }
+      for (const f of probeFindings(probes, doc.file, pageId)) {
+        const list = acc.byCriterion.get(f.criteriaId) ?? [];
+        list.push(f);
+        acc.byCriterion.set(f.criteriaId, list);
+        acc.allFindings.push(f);
+      }
+    }
   }
   if (doc.opaqueComponents?.length) {
     for (const lib of doc.opaqueComponents) acc.opaqueLibs.add(lib);
@@ -47662,6 +47861,8 @@ function foldDoc(acc, doc, graph) {
 }
 function renderedProves(sc, acc) {
   if (acc.pageIds.size === 0) return false;
+  const probed = acc.probedScs.get(sc);
+  if (probed && probed.size === acc.pageIds.size) return true;
   const rules = renderedRulesFor(sc);
   if (!rules.length) return false;
   return rules.every((ruleId) => {
@@ -47670,8 +47871,45 @@ function renderedProves(sc, acc) {
   });
 }
 function renderedProvesReason(sc, acc) {
+  const probed = acc.probedScs.get(sc);
+  if (probed && probed.size === acc.pageIds.size) {
+    return `Measured in a real browser on all ${acc.pageIds.size} page(s) in scope \u2014 the probe acted on the page (zoom, 320px viewport, text-spacing override, Tab, hover) and observed nothing. A page the probe had not run on would have kept this criterion open.`;
+  }
   const rules = renderedRulesFor(sc);
   return `Measured on the rendered pages: ${rules.join(", ")} ran on all ${acc.pageIds.size} page(s) in scope and raised nothing. Conformity here is a MEASUREMENT, not a judgement \u2014 a page whose signals were incomplete would have kept this criterion open.`;
+}
+function probeFindings(probes, file, page) {
+  const out2 = [];
+  const add2 = (criteriaId, ruleId, severity, selector, snippet2, message) => {
+    out2.push({
+      ruleId,
+      criteriaId,
+      file,
+      line: 1,
+      col: 1,
+      selectorHint: selector || "document",
+      severity,
+      message,
+      remediation: "",
+      snippet: snippet2.slice(0, 200),
+      page
+    });
+  };
+  const buckets = [
+    ["focusVisible", "focus-visible"],
+    ["hover", "hover"],
+    ["reflowZoom", "reflow-zoom"],
+    ["textSpacing", "text-spacing"]
+  ];
+  for (const [key, engine] of buckets) {
+    const hits = probes[key];
+    if (!Array.isArray(hits)) continue;
+    for (const h2 of hits) add2(PROBE_WCAG[engine], `dyn-${engine}`, PROBE_SEVERITY[engine], h2.selector, h2.html, h2.detail);
+  }
+  if (probes.reflow?.horizontalScroll) {
+    add2("1.4.10", "dyn-reflow", "majeur", "document", "", "Horizontal scrolling at 320px width \u2014 content does not reflow.");
+  }
+  return out2;
 }
 function finalize(acc, inputs, extra = {}) {
   const criteria = [];
@@ -58112,186 +58350,6 @@ import { tmpdir as tmpdir2 } from "os";
 import { join as join37, resolve as resolve11 } from "path";
 import { fileURLToPath as fileURLToPath3 } from "url";
 
-// src/axe-map.ts
-var PROBE_WCAG = {
-  "focus-visible": "2.4.7",
-  // Focus Visible — focusing a control produces no visible change
-  "reflow-zoom": "1.4.4",
-  // Resize Text / 200% zoom — content clipped/lost when enlarged
-  "text-spacing": "1.4.12",
-  // Text Spacing — clipping/overlap under the WCAG spacing override
-  hover: "1.4.13",
-  // Content on Hover or Focus — not dismissible/hoverable/persistent
-  // Stateful input-overflow probes — a FILLED input whose typed value is clipped/unreadable
-  // under a stress. Same defect, one SC per stress (so each folds onto the SC that stress
-  // actually evidences), so they stay unambiguous cross-standard (RGAA 10.11/10.4/10.12).
-  "input-overflow-reflow": "1.4.10",
-  // typed value clipped at 320px width
-  "input-overflow-zoom": "1.4.4",
-  // typed value clipped at 200% zoom
-  "input-overflow-spacing": "1.4.12",
-  // typed value clipped under the WCAG text-spacing override
-  "live-region": "4.1.3"
-  // Status Messages — content updated by an interaction outside any live region
-};
-var PROBE_SEVERITY = {
-  "focus-visible": "majeur",
-  "reflow-zoom": "majeur",
-  "text-spacing": "mineur",
-  hover: "mineur",
-  // Input-overflow is a directly OBSERVED loss of content (the value the user typed is no
-  // longer visible), not a heuristic — the human auditor confirmed the real instance class
-  // — so it is majeur on every stress (incl. text-spacing, unlike the generic text-spacing
-  // probe which stays mineur). live-region is an honest heuristic → mineur.
-  "input-overflow-reflow": "majeur",
-  "input-overflow-zoom": "majeur",
-  "input-overflow-spacing": "majeur",
-  "live-region": "mineur"
-};
-var AXE_WCAG = {
-  // images
-  "image-alt": "1.1.1",
-  "input-image-alt": "1.1.1",
-  "area-alt": "1.1.1",
-  "role-img-alt": "1.1.1",
-  "image-redundant-alt": "1.1.1",
-  "svg-img-alt": "1.1.1",
-  // frames
-  "frame-title": "4.1.2",
-  "frame-title-unique": "4.1.2",
-  // colour (the headline dynamic win)
-  "color-contrast": "1.4.3",
-  "color-contrast-enhanced": "1.4.3",
-  "link-in-text-block": "1.4.1",
-  // tables / structure
-  "td-headers-attr": "1.3.1",
-  "th-has-data-cells": "1.3.1",
-  "scope-attr-valid": "1.3.1",
-  "table-fake-caption": "1.3.1",
-  "td-has-header": "1.3.1",
-  "empty-table-header": "1.3.1",
-  // links & buttons
-  "link-name": "2.4.4",
-  "button-name": "4.1.2",
-  "input-button-name": "4.1.2",
-  // scripts / ARIA
-  "aria-allowed-attr": "4.1.2",
-  "aria-allowed-role": "4.1.2",
-  "aria-command-name": "4.1.2",
-  "aria-hidden-body": "4.1.2",
-  "aria-hidden-focus": "4.1.2",
-  "aria-input-field-name": "4.1.2",
-  "aria-required-attr": "4.1.2",
-  "aria-required-children": "4.1.2",
-  "aria-required-parent": "4.1.2",
-  "aria-roles": "4.1.2",
-  "aria-toggle-field-name": "4.1.2",
-  "aria-valid-attr": "4.1.2",
-  "aria-valid-attr-value": "4.1.2",
-  "nested-interactive": "4.1.2",
-  "aria-tooltip-name": "4.1.2",
-  "aria-meter-name": "4.1.2",
-  "aria-progressbar-name": "4.1.2",
-  "aria-dialog-name": "4.1.2",
-  "presentation-role-conflict": "4.1.2",
-  "duplicate-id-aria": "4.1.2",
-  // mandatory elements / language
-  "duplicate-id": "4.1.2",
-  "duplicate-id-active": "4.1.2",
-  "html-has-lang": "3.1.1",
-  "html-xml-lang-mismatch": "3.1.1",
-  "html-lang-valid": "3.1.1",
-  "valid-lang": "3.1.2",
-  "document-title": "2.4.2",
-  // structure
-  "heading-order": "1.3.1",
-  "empty-heading": "1.3.1",
-  "page-has-heading-one": "1.3.1",
-  list: "1.3.1",
-  listitem: "1.3.1",
-  "definition-list": "1.3.1",
-  dlitem: "1.3.1",
-  "landmark-one-main": "1.3.1",
-  region: "1.3.1",
-  // presentation / zoom
-  "meta-viewport": "1.4.4",
-  "meta-viewport-large": "1.4.4",
-  // forms
-  label: "4.1.2",
-  "form-field-multiple-labels": "4.1.2",
-  "select-name": "4.1.2",
-  "label-title-only": "4.1.2",
-  "autocomplete-valid": "1.3.5",
-  fieldset: "1.3.1",
-  // multimedia
-  "audio-caption": "1.2.2",
-  "video-caption": "1.2.2",
-  "no-autoplay-audio": "1.4.2",
-  blink: "2.2.2",
-  marquee: "2.2.2",
-  // navigation
-  tabindex: "2.4.3",
-  "skip-link": "2.4.1",
-  bypass: "2.4.1",
-  accesskeys: "2.1.1"
-};
-var FALLBACK_SC = "4.1.2";
-function scFromWcagTags(tags) {
-  if (!tags) return null;
-  for (const t3 of tags) {
-    const m = /^wcag(\d)(\d)(\d+)$/.exec(t3);
-    if (m) {
-      const sc = `${m[1]}.${m[2]}.${m[3]}`;
-      if (hasSC(sc)) return sc;
-    }
-  }
-  return null;
-}
-function severityFromImpact(impact) {
-  switch (impact) {
-    case "critical":
-    case "serious":
-      return "bloquant";
-    case "moderate":
-      return "majeur";
-    default:
-      return "mineur";
-  }
-}
-var AXE_ADVISORY_EXCEPTIONS = {
-  "heading-order": false,
-  tabindex: false,
-  "skip-link": false,
-  "label-title-only": false,
-  "landmark-one-main": false,
-  "empty-heading": false,
-  "duplicate-id": false,
-  "nested-interactive": false,
-  "form-field-multiple-labels": false,
-  "aria-required-children": false,
-  "aria-required-attr": false,
-  "aria-required-parent": false,
-  "aria-valid-attr": false,
-  "aria-valid-attr-value": false,
-  "autocomplete-valid": false,
-  "label-content-name-mismatch": false,
-  "td-headers-attr": false,
-  "th-has-data-cells": false,
-  "definition-list": false,
-  dlitem: false
-};
-function axeAdvisory(tags) {
-  const t3 = tags ?? [];
-  if (t3.length === 0) return false;
-  return !t3.some((tag) => /^wcag\d+$/.test(tag));
-}
-function isAxeAdvisory(ruleId, tags) {
-  return AXE_ADVISORY_EXCEPTIONS[ruleId] ?? axeAdvisory(tags);
-}
-function scForAxe(ruleId, tags) {
-  return AXE_WCAG[ruleId] ?? scFromWcagTags(tags) ?? FALLBACK_SC;
-}
-
 // src/crawl.ts
 function parseSitemapUrls(xml) {
   const out2 = [];
@@ -58998,58 +59056,8 @@ function mergeSnapshotAudit(base, snap) {
 import { existsSync as existsSync24, statSync as statSync9 } from "fs";
 import { createRequire } from "module";
 import { resolve as resolve12 } from "path";
-var LOCAL_ENGINE = "axe-core@playwright (local)";
-var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13"];
-function localTestedScs(interact) {
-  return interact ? [...LOCAL_TESTED_SCS, "4.1.3"] : [...LOCAL_TESTED_SCS];
-}
-var PW_SPEC = "@playwright/test";
-var AXE_SPEC = "@axe-core/playwright";
-function localAvailable(cwd) {
-  try {
-    const req = createRequire(resolve12(cwd, "package.json"));
-    req.resolve(PW_SPEC);
-    req.resolve(AXE_SPEC);
-    return true;
-  } catch {
-    return false;
-  }
-}
-function resolveLocalDeps(cwd) {
-  let chromium;
-  let AxeBuilder;
-  try {
-    const req = createRequire(resolve12(cwd, "package.json"));
-    const pw = req(PW_SPEC);
-    const axeMod = req(AXE_SPEC);
-    chromium = pw.chromium;
-    AxeBuilder = axeMod.default ?? axeMod;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(
-      `Playwright not resolvable from "${cwd}". Pass --cwd <dir> at a project with @playwright/test + @axe-core/playwright installed (e.g. --cwd packages/app), or use --runtime docker. (${msg})`
-    );
-  }
-  if (!chromium || typeof AxeBuilder !== "function") {
-    throw new Error(
-      `Resolved Playwright/@axe-core/playwright from "${cwd}" but they did not expose chromium / AxeBuilder. Check the installed versions, or use --runtime docker.`
-    );
-  }
-  return { chromium, AxeBuilder };
-}
-async function launchChromium(chromium) {
-  try {
-    return await chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (/Executable doesn'?t exist|playwright install|browserType\.launch/i.test(msg)) {
-      throw new Error(
-        `Could not launch Chromium for the resolved Playwright. Install it from the --cwd project: \`npx playwright install chromium\`. (${msg})`
-      );
-    }
-    throw e;
-  }
-}
+
+// src/probes.ts
 var PRELUDE = `
 const __sel = (e) => {
   if (!e || !e.tagName) return '\u2014';
@@ -59205,6 +59213,88 @@ async function probeFocusVisible(page, scope = "") {
     if (hits.length >= 20) break;
   }
   return hits;
+}
+async function probeHover(page) {
+  const triggers = await page.evaluate(HOVER_SETUP_PROBE);
+  const hits = [];
+  for (const tr of triggers) {
+    try {
+      await page.hover(`[data-u11y-h="${tr.key}"]`);
+    } catch {
+      continue;
+    }
+    await page.waitForTimeout(150);
+    const shown = await page.evaluate(hoverVisibleExpr(tr.target));
+    if (!shown) continue;
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(100);
+    const dismissed = await page.evaluate(hoverVisibleExpr(tr.target, true));
+    await page.mouse.move(2, 2).catch(() => {
+    });
+    if (!dismissed) {
+      hits.push({
+        selector: tr.selector,
+        html: "",
+        detail: `Le contenu r\xE9v\xE9l\xE9 au survol (aria-describedby #${tr.target}) ne se masque pas avec \xC9chap \u2014 Contenu au survol ou au focus (1.4.13).`
+      });
+    }
+    if (hits.length >= 8) break;
+  }
+  return hits;
+}
+
+// src/scan-local.ts
+var LOCAL_ENGINE = "axe-core@playwright (local)";
+var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13"];
+function localTestedScs(interact) {
+  return interact ? [...LOCAL_TESTED_SCS, "4.1.3"] : [...LOCAL_TESTED_SCS];
+}
+var PW_SPEC = "@playwright/test";
+var AXE_SPEC = "@axe-core/playwright";
+function localAvailable(cwd) {
+  try {
+    const req = createRequire(resolve12(cwd, "package.json"));
+    req.resolve(PW_SPEC);
+    req.resolve(AXE_SPEC);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function resolveLocalDeps(cwd) {
+  let chromium;
+  let AxeBuilder;
+  try {
+    const req = createRequire(resolve12(cwd, "package.json"));
+    const pw = req(PW_SPEC);
+    const axeMod = req(AXE_SPEC);
+    chromium = pw.chromium;
+    AxeBuilder = axeMod.default ?? axeMod;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `Playwright not resolvable from "${cwd}". Pass --cwd <dir> at a project with @playwright/test + @axe-core/playwright installed (e.g. --cwd packages/app), or use --runtime docker. (${msg})`
+    );
+  }
+  if (!chromium || typeof AxeBuilder !== "function") {
+    throw new Error(
+      `Resolved Playwright/@axe-core/playwright from "${cwd}" but they did not expose chromium / AxeBuilder. Check the installed versions, or use --runtime docker.`
+    );
+  }
+  return { chromium, AxeBuilder };
+}
+async function launchChromium(chromium) {
+  try {
+    return await chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/Executable doesn'?t exist|playwright install|browserType\.launch/i.test(msg)) {
+      throw new Error(
+        `Could not launch Chromium for the resolved Playwright. Install it from the --cwd project: \`npx playwright install chromium\`. (${msg})`
+      );
+    }
+    throw e;
+  }
 }
 var FILL_INPUTS_STEP = `(() => { ${PRELUDE}
   const LONG = '\xC9tablissement G\xE9n\xE9ral des Tr\xE8s Longues Valeurs Saisies 0123456789 exemple';
@@ -59483,34 +59573,6 @@ function landedOnRequestedPage(requested, landed) {
 async function probeLiveRegion(page, lang, allowClicks) {
   const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
   return await page.evaluate(liveRegionExpr(detail, allowClicks)).catch(() => []);
-}
-async function probeHover(page) {
-  const triggers = await page.evaluate(HOVER_SETUP_PROBE);
-  const hits = [];
-  for (const tr of triggers) {
-    try {
-      await page.hover(`[data-u11y-h="${tr.key}"]`);
-    } catch {
-      continue;
-    }
-    await page.waitForTimeout(150);
-    const shown = await page.evaluate(hoverVisibleExpr(tr.target));
-    if (!shown) continue;
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(100);
-    const dismissed = await page.evaluate(hoverVisibleExpr(tr.target, true));
-    await page.mouse.move(2, 2).catch(() => {
-    });
-    if (!dismissed) {
-      hits.push({
-        selector: tr.selector,
-        html: "",
-        detail: `Le contenu r\xE9v\xE9l\xE9 au survol (aria-describedby #${tr.target}) ne se masque pas avec \xC9chap \u2014 Contenu au survol ou au focus (1.4.13).`
-      });
-    }
-    if (hits.length >= 8) break;
-  }
-  return hits;
 }
 var AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
@@ -66849,6 +66911,10 @@ async function cmdSnapshot(p) {
       ...payload.boxes ? { boxes: payload.boxes } : {},
       ...payload.axtree ? { axtree: payload.axtree } : {},
       ...payload.css ? { css: payload.css } : {},
+      // What the live probes measured, when the producer ran them. Persisted beside the DOM
+      // because the audit that folds them runs later, in another process — a measurement
+      // that lives only in the producer's memory decides nothing.
+      ...payload.probes ? { probes: payload.probes } : {},
       // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
       // pixel tier. writeSnapshot owns the decoding, so every producer — this command, the
       // dev side-car, `scan` — writes it the one same way.
