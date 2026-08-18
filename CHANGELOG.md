@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.9.2](https://github.com/maxgfr/ultra11y/compare/v5.9.1...v5.9.2) (2026-08-18)
+
+
+### Bug Fixes
+
+* **adjudicate:** show theme 2 the frames it is about, instead of the whole ARIA harvest ([984620d](https://github.com/maxgfr/ultra11y/commit/984620da4e93f5ee47d3280aeb113ec5e82d38f8))
+* **adjudicate:** stop making a correct verdict fail on a transcription step ([dd30ce4](https://github.com/maxgfr/ultra11y/commit/dd30ce4766b9a366f556ce060e26195ccd6ab787))
+
 ## [5.9.1](https://github.com/maxgfr/ultra11y/compare/v5.9.0...v5.9.1) (2026-08-18)
 
 
