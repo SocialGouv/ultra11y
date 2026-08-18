@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.11.2](https://github.com/maxgfr/ultra11y/compare/v5.11.1...v5.11.2) (2026-08-18)
+
+
+### Bug Fixes
+
+* **adjudicate:** stop a later pass from undoing the one before it ([58e78da](https://github.com/maxgfr/ultra11y/commit/58e78da9251266a8d731922bd297794c6ea4c144))
+
 ## [5.11.1](https://github.com/maxgfr/ultra11y/compare/v5.11.0...v5.11.1) (2026-08-18)
 
 
