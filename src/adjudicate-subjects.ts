@@ -321,10 +321,17 @@ export const SUBJECTS: Record<string, Subject> = {
   navMechanisms: (docs) =>
     docs.flatMap((d) => [
       ...elementsByTag(d, "nav").map((e) =>
-        h(d, e, `<nav> aria-label="${attr(e, "aria-label") ?? ""}" links=${elementsByTag(d, "a").filter((a) => ancestors(a).includes(e)).length}`, `nav|${attr(e, "aria-label") ?? ""}`),
+        h(
+          d,
+          e,
+          `<nav> aria-label="${attr(e, "aria-label") ?? ""}" links=${elementsByTag(d, "a").filter((a) => ancestors(a).includes(e)).length}`,
+          `nav|${attr(e, "aria-label") ?? ""}`,
+        ),
       ),
       ...elementsByTag(d, ...CONTROL_TAGS)
-        .filter((e) => (attr(e, "type") ?? "") === "search" || /search|recherch/i.test(`${attr(e, "name") ?? ""} ${attr(e, "id") ?? ""} ${attr(e, "class") ?? ""}`))
+        .filter(
+          (e) => (attr(e, "type") ?? "") === "search" || /search|recherch/i.test(`${attr(e, "name") ?? ""} ${attr(e, "id") ?? ""} ${attr(e, "class") ?? ""}`),
+        )
         .map((e) => h(d, e, `search field — one of the "multiple ways" mechanisms`, `search|${attr(e, "name") ?? ""}`)),
       ...elementsByTag(d, "a")
         .filter((e) => /plan-du-site|sitemap|site-map|index/i.test(attr(e, "href") ?? ""))
@@ -367,7 +374,9 @@ export const SUBJECTS: Record<string, Subject> = {
       return [
         ...d.elements
           .filter(isRegion)
-          .map((e) => h(d, e, `aria-live="${attr(e, "aria-live") ?? ""}" role="${attr(e, "role") ?? ""}"`, `live|${attr(e, "aria-live") ?? ""}|${attr(e, "role") ?? ""}`)),
+          .map((e) =>
+            h(d, e, `aria-live="${attr(e, "aria-live") ?? ""}" role="${attr(e, "role") ?? ""}"`, `live|${attr(e, "aria-live") ?? ""}|${attr(e, "role") ?? ""}`),
+          ),
         ...d.elements
           .filter((e) => !isRegion(e) && STATUS_CLASS.test(attr(e, "class") ?? "") && ancestors(e).some((a) => a.tag === "form"))
           .map((e) =>
@@ -385,14 +394,19 @@ export const SUBJECTS: Record<string, Subject> = {
   focusOrder: (docs) =>
     docs.flatMap((d) => {
       const out: Harvested[] = [
-        ...d.elements.filter((e) => attr(e, "tabindex") !== undefined).map((e) => h(d, e, `tabindex="${attr(e, "tabindex")}"`, `tabindex|${attr(e, "tabindex")}`)),
+        ...d.elements
+          .filter((e) => attr(e, "tabindex") !== undefined)
+          .map((e) => h(d, e, `tabindex="${attr(e, "tabindex")}"`, `tabindex|${attr(e, "tabindex")}`)),
         ...elementsByTag(d, "dialog")
           .concat(d.elements.filter((e) => attr(e, "role") === "dialog"))
           .filter((e, i, a) => a.indexOf(e) === i)
-          .map((e) => h(d, e, `<${e.tag} role="${attr(e, "role") ?? ""}"> — verify focus moves in on open and is restored to the trigger on close`, `dialog|${e.tag}`)),
+          .map((e) =>
+            h(d, e, `<${e.tag} role="${attr(e, "role") ?? ""}"> — verify focus moves in on open and is restored to the trigger on close`, `dialog|${e.tag}`),
+          ),
       ];
       const rl = lineOf(d, ROUTER_IMPORT);
-      if (rl !== undefined) out.push(hAt(d, rl, "import", "client-router import — verify page title + focus are restored on partial (SPA) navigation", "router"));
+      if (rl !== undefined)
+        out.push(hAt(d, rl, "import", "client-router import — verify page title + focus are restored on partial (SPA) navigation", "router"));
       return out;
     }),
 
@@ -400,7 +414,12 @@ export const SUBJECTS: Record<string, Subject> = {
   focusables: (docs) =>
     docs.flatMap((d) => [
       ...elementsByTag(d, "iframe", "object", "embed").map((e) =>
-        h(d, e, `<${e.tag}> title="${attr(e, "title") ?? ""}" src="${(attr(e, "src") ?? "").slice(0, 60)}" — can focus LEAVE this embedded content with the keyboard alone?`, `embed|${e.tag}|${attr(e, "src") ?? ""}`),
+        h(
+          d,
+          e,
+          `<${e.tag}> title="${attr(e, "title") ?? ""}" src="${(attr(e, "src") ?? "").slice(0, 60)}" — can focus LEAVE this embedded content with the keyboard alone?`,
+          `embed|${e.tag}|${attr(e, "src") ?? ""}`,
+        ),
       ),
       ...elementsByTag(d, "dialog")
         .concat(d.elements.filter((e) => attr(e, "role") === "dialog" || attr(e, "aria-modal") === "true"))
@@ -423,19 +442,35 @@ export const SUBJECTS: Record<string, Subject> = {
   // already exempts proper nouns, technical terms and words that entered the vernacular.
   langParts: (docs) =>
     docs.flatMap((d) => [
-      ...elementsByTag(d, "html").map((e) => h(d, e, `page="${pageOfDoc(d.file) ?? "source"}" declares lang="${attr(e, "lang") ?? ""}" — passages in another language must override it`, `declaredlang|${attr(e, "lang") ?? ""}`)),
+      ...elementsByTag(d, "html").map((e) =>
+        h(
+          d,
+          e,
+          `page="${pageOfDoc(d.file) ?? "source"}" declares lang="${attr(e, "lang") ?? ""}" — passages in another language must override it`,
+          `declaredlang|${attr(e, "lang") ?? ""}`,
+        ),
+      ),
       ...d.elements
         .filter((e) => e.tag !== "html" && attr(e, "lang") !== undefined)
         .map((e) => h(d, e, `lang="${attr(e, "lang")}" text="${t(e, 40)}"`, `lang|${attr(e, "lang")}|${t(e, 40)}`)),
       ...d.elements
         .filter((e) => e.children.some((c) => c.type === "text") && FOREIGN_LEXICON.test(textContent(e)) && attr(e, "lang") === undefined)
-        .map((e) => h(d, e, `candidate foreign passage, NOT marked with lang: "${t(e, 60)}" — a proper noun, a technical term or a word in common use is exempt`, `foreign|${t(e, 60)}`)),
+        .map((e) =>
+          h(
+            d,
+            e,
+            `candidate foreign passage, NOT marked with lang: "${t(e, 60)}" — a proper noun, a technical term or a word in common use is exempt`,
+            `foreign|${t(e, 60)}`,
+          ),
+        ),
     ]),
 
   // The document's own language declaration.
   docLang: (docs) =>
     docs.flatMap((d) =>
-      elementsByTag(d, "html").map((e) => h(d, e, `<html lang="${attr(e, "lang") ?? ""}"> — is it present, valid, and the language of the content?`, `doclang|${attr(e, "lang") ?? ""}`)),
+      elementsByTag(d, "html").map((e) =>
+        h(d, e, `<html lang="${attr(e, "lang") ?? ""}"> — is it present, valid, and the language of the content?`, `doclang|${attr(e, "lang") ?? ""}`),
+      ),
     ),
 
   // The document's title, with the page it belongs to, so "is it pertinent?" is answerable.
@@ -458,7 +493,15 @@ export const SUBJECTS: Record<string, Subject> = {
       if (page !== undefined) {
         const dt = d.signals?.doctype;
         if (dt === undefined) {
-          return [hAt(d, 1, "doctype", `page="${page}" — this capture predates doctype recording, so the declaration was NOT captured. That is not evidence the page lacks one: re-record the snapshots to decide this criterion.`, `doctype|unrecorded`)];
+          return [
+            hAt(
+              d,
+              1,
+              "doctype",
+              `page="${page}" — this capture predates doctype recording, so the declaration was NOT captured. That is not evidence the page lacks one: re-record the snapshots to decide this criterion.`,
+              `doctype|unrecorded`,
+            ),
+          ];
         }
         return [hAt(d, 1, "doctype", `page="${page}" doctype=${dt === "" ? "(none on the page)" : dt}`, `doctype|${dt}`)];
       }
@@ -473,32 +516,51 @@ export const SUBJECTS: Record<string, Subject> = {
     docs.flatMap((d) =>
       d.elements
         .filter((e) => INTERACTIVE_TAGS.includes(e.tag) && attr(e, "aria-label") !== undefined && t(e, 40).length > 0)
-        .map((e) => h(d, e, `visible="${t(e, 40)}" aria-label="${attr(e, "aria-label")}" — is the visible text CONTAINED in the accessible name?`, `namevs|${t(e, 40)}|${attr(e, "aria-label")}`)),
+        .map((e) =>
+          h(
+            d,
+            e,
+            `visible="${t(e, 40)}" aria-label="${attr(e, "aria-label")}" — is the visible text CONTAINED in the accessible name?`,
+            `namevs|${t(e, 40)}|${attr(e, "aria-label")}`,
+          ),
+        ),
     ),
 
   // Pointer, touch, gesture and drag handlers — everything a keyboard may not reach.
   pointerHandlers: (docs) =>
     docs.flatMap((d) => [
       ...d.elements
-        .filter((e) => !INTERACTIVE_TAGS.includes(e.tag) && Object.keys(e.attribs).some((k) => /^on(click|mousedown|mouseup|mouseenter|pointerdown|touchstart)$/i.test(k)))
+        .filter(
+          (e) =>
+            !INTERACTIVE_TAGS.includes(e.tag) && Object.keys(e.attribs).some((k) => /^on(click|mousedown|mouseup|mouseenter|pointerdown|touchstart)$/i.test(k)),
+        )
         .map((e) => h(d, e, `<${e.tag}> carries a pointer handler but is not natively interactive — keyboard equivalent?`, `clickable|${e.tag}|${t(e, 40)}`)),
-      ...linesOf(d, /\bon(?:MouseDown|PointerDown|TouchStart)\s*=/).map((l) => hAt(d, l.line, "handler", `down-event handler (action must not fire on DOWN, or must be abortable): ${l.text}`, `downevent|${l.text}`)),
-      ...linesOf(d, /\b(?:draggable|onDragStart|useDrag|DndContext|react-beautiful-dnd|@dnd-kit)\b/).map((l) => hAt(d, l.line, "drag", `drag interaction: ${l.text}`, `drag|${l.text}`)),
-      ...linesOf(d, /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b/i).map((l) => hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`)),
+      ...linesOf(d, /\bon(?:MouseDown|PointerDown|TouchStart)\s*=/).map((l) =>
+        hAt(d, l.line, "handler", `down-event handler (action must not fire on DOWN, or must be abortable): ${l.text}`, `downevent|${l.text}`),
+      ),
+      ...linesOf(d, /\b(?:draggable|onDragStart|useDrag|DndContext|react-beautiful-dnd|@dnd-kit)\b/).map((l) =>
+        hAt(d, l.line, "drag", `drag interaction: ${l.text}`, `drag|${l.text}`),
+      ),
+      ...linesOf(d, /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b/i).map((l) =>
+        hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`),
+      ),
     ]),
 
   // Single-character keyboard shortcuts.
   shortcuts: (docs) =>
     docs.flatMap((d) =>
-      linesOf(d, /\b(?:key|code|charCode)\s*===?\s*["'][a-zA-Z0-9]["']/).map((l) => hAt(d, l.line, "shortcut", `single-character key comparison: ${l.text}`, `shortcut|${l.text}`)),
+      linesOf(d, /\b(?:key|code|charCode)\s*===?\s*["'][a-zA-Z0-9]["']/).map((l) =>
+        hAt(d, l.line, "shortcut", `single-character key comparison: ${l.text}`, `shortcut|${l.text}`),
+      ),
     ),
 
   // Instructions that lean on a sensory characteristic alone.
   sensoryText: (docs) =>
     docs.flatMap((d) =>
-      linesOf(d, /\b(?:ci-dessus|ci-dessous|à droite|a droite|à gauche|a gauche|bouton (?:vert|rouge|bleu)|en rouge|en vert|le carré|la case de droite|above|below|to the right|to the left|green button|red button|round button)\b/i).map((l) =>
-        hAt(d, l.line, "text", `sensory-sounding instruction: ${l.text}`, `sensory|${l.text}`),
-      ),
+      linesOf(
+        d,
+        /\b(?:ci-dessus|ci-dessous|à droite|a droite|à gauche|a gauche|bouton (?:vert|rouge|bleu)|en rouge|en vert|le carré|la case de droite|above|below|to the right|to the left|green button|red button|round button)\b/i,
+      ).map((l) => hAt(d, l.line, "text", `sensory-sounding instruction: ${l.text}`, `sensory|${l.text}`)),
     ),
 
   // Time limits: session expiry, meta refresh, timed redirects.
@@ -508,7 +570,9 @@ export const SUBJECTS: Record<string, Subject> = {
         .filter((e) => e.tag === "meta" && (attr(e, "http-equiv") ?? "").toLowerCase() === "refresh")
         .map((e) => h(d, e, `<meta http-equiv="refresh" content="${attr(e, "content") ?? ""}">`, `metarefresh|${attr(e, "content") ?? ""}`)),
       ...linesOf(d, /\b(?:setTimeout|setInterval)\s*\(/).map((l) => hAt(d, l.line, "timer", `timer: ${l.text}`, `timer|${l.text}`)),
-      ...linesOf(d, /\b(?:sessionTimeout|maxAge|expiresIn|session_max|idleTimeout)\b/i).map((l) => hAt(d, l.line, "session", `session/expiry config: ${l.text}`, `session|${l.text}`)),
+      ...linesOf(d, /\b(?:sessionTimeout|maxAge|expiresIn|session_max|idleTimeout)\b/i).map((l) =>
+        hAt(d, l.line, "session", `session/expiry config: ${l.text}`, `session|${l.text}`),
+      ),
     ]),
 
   // Moving, blinking or auto-updating content, and how it can be stopped.
@@ -521,14 +585,20 @@ export const SUBJECTS: Record<string, Subject> = {
       ...linesOf(d, /\b(?:carousel|slider|autoplay|animation-iteration-count\s*:\s*infinite|requestAnimationFrame)\b/i).map((l) =>
         hAt(d, l.line, "motion", `moving/auto-updating content: ${l.text}`, `motion|${l.text}`),
       ),
-      ...elementsByTag(d, "video", "audio").map((e) => h(d, e, `<${e.tag} autoplay=${attr(e, "autoplay") !== undefined} controls=${attr(e, "controls") !== undefined}>`, `media|${e.tag}`)),
+      ...elementsByTag(d, "video", "audio").map((e) =>
+        h(d, e, `<${e.tag} autoplay=${attr(e, "autoplay") !== undefined} controls=${attr(e, "controls") !== undefined}>`, `media|${e.tag}`),
+      ),
     ]),
 
   // A change of context triggered by focus or by changing a value.
   contextChange: (docs) =>
     docs.flatMap((d) => [
-      ...linesOf(d, /\bon(?:Focus|Blur)\s*=/).map((l) => hAt(d, l.line, "handler", `focus handler — does it change context (navigate, submit, move focus)? ${l.text}`, `onfocus|${l.text}`)),
-      ...linesOf(d, /\bonChange\s*=/).map((l) => hAt(d, l.line, "handler", `change handler — does changing the value itself change context? ${l.text}`, `onchange|${l.text}`)),
+      ...linesOf(d, /\bon(?:Focus|Blur)\s*=/).map((l) =>
+        hAt(d, l.line, "handler", `focus handler — does it change context (navigate, submit, move focus)? ${l.text}`, `onfocus|${l.text}`),
+      ),
+      ...linesOf(d, /\bonChange\s*=/).map((l) =>
+        hAt(d, l.line, "handler", `change handler — does changing the value itself change context? ${l.text}`, `onchange|${l.text}`),
+      ),
     ]),
 
   // Reading order: anything that moves meaning-bearing content away from DOM order.
@@ -536,11 +606,26 @@ export const SUBJECTS: Record<string, Subject> = {
     docs.flatMap((d) => [
       ...d.elements
         .filter((e) => /(?:^|;)\s*order\s*:|flex-direction\s*:\s*\w+-reverse|position\s*:\s*absolute/.test(attr(e, "style") ?? ""))
-        .map((e) => h(d, e, `inline layout override: ${(attr(e, "style") ?? "").slice(0, 80)} — does it move meaning?`, `orderinline|${(attr(e, "style") ?? "").slice(0, 80)}`)),
+        .map((e) =>
+          h(
+            d,
+            e,
+            `inline layout override: ${(attr(e, "style") ?? "").slice(0, 80)} — does it move meaning?`,
+            `orderinline|${(attr(e, "style") ?? "").slice(0, 80)}`,
+          ),
+        ),
       ...(d.signals?.css?.rules ?? [])
         .filter((r) => r.decls.order !== undefined || /-reverse/.test(r.decls.flexDirection ?? "") || /reverse/.test(r.decls.flexFlow ?? ""))
         .slice(0, 60)
-        .map((r) => hAt(d, 1, `css:${r.selector}`, `stylesheet reorders layout: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} } — does it move meaning-bearing content?`, `ordercss|${r.selector}`)),
+        .map((r) =>
+          hAt(
+            d,
+            1,
+            `css:${r.selector}`,
+            `stylesheet reorders layout: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} } — does it move meaning-bearing content?`,
+            `ordercss|${r.selector}`,
+          ),
+        ),
     ]),
 
   // Office documents offered for download — the subject of "is there an accessible version?".
@@ -563,7 +648,12 @@ export const SUBJECTS: Record<string, Subject> = {
   hiddenContent: (docs) =>
     docs.flatMap((d) =>
       d.elements
-        .filter((e) => attr(e, "aria-hidden") !== undefined || attr(e, "hidden") !== undefined || /(?:^|[-_ ])(sr-only|visually-hidden|screen-reader|fr-sr-only)(?:[-_ ]|$)/i.test(attr(e, "class") ?? ""))
+        .filter(
+          (e) =>
+            attr(e, "aria-hidden") !== undefined ||
+            attr(e, "hidden") !== undefined ||
+            /(?:^|[-_ ])(sr-only|visually-hidden|screen-reader|fr-sr-only)(?:[-_ ]|$)/i.test(attr(e, "class") ?? ""),
+        )
         .map((e) =>
           h(
             d,
@@ -583,7 +673,15 @@ export const SUBJECTS: Record<string, Subject> = {
       ...(d.signals?.css?.rules ?? [])
         .filter((r) => /^(?:fixed|sticky)$/.test((r.decls.position ?? "").trim()))
         .slice(0, 60)
-        .map((r) => hAt(d, 1, `css:${r.selector}`, `pinned by stylesheet: ${r.selector.slice(0, 60)} { position: ${r.decls.position} } — can it cover a focused element?`, `stickycss|${r.selector}`)),
+        .map((r) =>
+          hAt(
+            d,
+            1,
+            `css:${r.selector}`,
+            `pinned by stylesheet: ${r.selector.slice(0, 60)} { position: ${r.decls.position} } — can it cover a focused element?`,
+            `stickycss|${r.selector}`,
+          ),
+        ),
     ]),
 };
 

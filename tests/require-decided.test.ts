@@ -27,13 +27,25 @@ const audit = (criteria: Pick<CriterionResult, "id" | "status">[]): AuditResult 
 
 describe("check --require-decided", () => {
   it("passes when every criterion carries a verdict", () => {
-    const r = checkDecided(audit([{ id: "1.1.1", status: "C" }, { id: "1.4.3", status: "NC" }, { id: "1.2.1", status: "NA" }]));
+    const r = checkDecided(
+      audit([
+        { id: "1.1.1", status: "C" },
+        { id: "1.4.3", status: "NC" },
+        { id: "1.2.1", status: "NA" },
+      ]),
+    );
     expect(r.ok).toBe(true);
     expect(r.undecided).toEqual([]);
   });
 
   it("fails and NAMES the criteria still to assess", () => {
-    const r = checkDecided(audit([{ id: "1.1.1", status: "C" }, { id: "2.4.4", status: "manual" }, { id: "1.3.1", status: "manual" }]));
+    const r = checkDecided(
+      audit([
+        { id: "1.1.1", status: "C" },
+        { id: "2.4.4", status: "manual" },
+        { id: "1.3.1", status: "manual" },
+      ]),
+    );
     expect(r.ok).toBe(false);
     expect(r.undecided).toEqual(["1.3.1", "2.4.4"]);
     expect(r.issues.join(" ")).toMatch(/1\.3\.1, 2\.4\.4/);

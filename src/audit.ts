@@ -290,7 +290,8 @@ function subjectMatterReason(sc: string, files: number): string {
   if (sc === "1.3.5" || sc.startsWith("3.3.")) return `No user input in scope: ${scope} — no form control (native, ARIA or contenteditable) was found.`;
   // Each of these names the construct that was searched for, and how wide the search was, so
   // the claim is falsifiable by whoever reads it — which is the whole contract of an NA.
-  if (sc === "2.1.4") return `No single-character keyboard shortcut in scope: ${scope} — no single-printable-character key comparison and no accesskey attribute was found.`;
+  if (sc === "2.1.4")
+    return `No single-character keyboard shortcut in scope: ${scope} — no single-printable-character key comparison and no accesskey attribute was found.`;
   if (sc === "2.2.1") return `No time limit in scope: ${scope} — no timer, no <meta http-equiv="refresh">, and no session-expiry configuration was found.`;
   if (sc === "2.2.2" || sc === "2.3.1")
     return `No moving, blinking or auto-updating content in scope: ${scope} — no <marquee>/<blink>, no media element, no CSS animation (inline or in a captured stylesheet), and no carousel/autoplay/rAF signal was found.`;

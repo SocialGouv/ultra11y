@@ -18,8 +18,7 @@ import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
 import { attachSignals } from "./snapshot.js";
 import { type Harvested, harvestSubjects, isSnapshotFile, PACK_SUBJECTS, pageOfDoc, SC_SUBJECTS } from "./adjudicate-subjects.js";
-import { type Doc, type El, elementsByTag, attr, textContent, ancestors, snippet as elSnippet } from "./parse/html.js";
-import { parseInlineStyle } from "./color.js";
+import type { Doc } from "./parse/html.js";
 import { ADJUDICATION } from "./adjudication-data.js";
 import { scTitle, getSC, hasSC, techniquesFor, allSC, guidelineTitle } from "./wcag.js";
 import { groundFinding, type GroundingSummary } from "./grounding.js";
@@ -178,7 +177,6 @@ export function adjudicationContract(): AdjudicationContract {
   };
 }
 
-
 /** Resolve the audit's scope inputs back to parsed docs (harvesting reads the same files
  *  the audit did — run `verify --manual` from the audit's cwd). Best-effort: unreadable /
  *  vanished files are skipped, exactly like the audit's own read loop. */
@@ -290,7 +288,6 @@ function subjectsForPackCriterion(standard: StandardId, id: string, scs: string[
   return out;
 }
 
-
 /** Build the adjudication worklist.
  *
  *  For the WCAG core: one item per residual-risk (manual) success criterion.
@@ -316,7 +313,12 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
         // core (RGAA 8.1 → the removed 4.1.1) is still the agent's to decide from source.
         const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a): a is Automatability => !!a);
         const automatability: Automatability = autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
-        return blankItem(pc.id, automatability, crit ? packTitlePlain(pack, crit, "fr") : undefined, harvestSubjects(subjectsForPackCriterion(standard, pc.id, scs), docs));
+        return blankItem(
+          pc.id,
+          automatability,
+          crit ? packTitlePlain(pack, crit, "fr") : undefined,
+          harvestSubjects(subjectsForPackCriterion(standard, pc.id, scs), docs),
+        );
       });
   }
 

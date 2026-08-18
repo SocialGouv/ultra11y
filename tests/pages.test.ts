@@ -296,6 +296,10 @@ describe("per-page status — a recorded verdict is not silence", () => {
     // No `decidedBy` — nobody ruled on it, a rule merely did not fire on this page.
     const nc = F({ page: "accueil", criteriaId: "1.1.1" });
     const r = audit({ findings: [nc], criteria: [C("1.1.1", "NC", [nc])] });
-    expect(derivePages(r, PAGES).find((p) => p.id === "contact")?.criteria.find((c) => c.id === "1.1.1")?.status).toBe("manual");
+    expect(
+      derivePages(r, PAGES)
+        .find((p) => p.id === "contact")
+        ?.criteria.find((c) => c.id === "1.1.1")?.status,
+    ).toBe("manual");
   });
 });

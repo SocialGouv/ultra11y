@@ -47568,7 +47568,8 @@ function subjectMatterReason(sc, files) {
     return `No time-based media in scope: ${scope} \u2014 no <audio>, <video>, <track> or <source> element, no <object>/<embed>, and no <iframe> pointing at media.`;
   if (sc === "2.5.4") return `No motion actuation in scope: ${scope} \u2014 no device-motion or device-orientation API is used.`;
   if (sc === "1.3.5" || sc.startsWith("3.3.")) return `No user input in scope: ${scope} \u2014 no form control (native, ARIA or contenteditable) was found.`;
-  if (sc === "2.1.4") return `No single-character keyboard shortcut in scope: ${scope} \u2014 no single-printable-character key comparison and no accesskey attribute was found.`;
+  if (sc === "2.1.4")
+    return `No single-character keyboard shortcut in scope: ${scope} \u2014 no single-printable-character key comparison and no accesskey attribute was found.`;
   if (sc === "2.2.1") return `No time limit in scope: ${scope} \u2014 no timer, no <meta http-equiv="refresh">, and no session-expiry configuration was found.`;
   if (sc === "2.2.2" || sc === "2.3.1")
     return `No moving, blinking or auto-updating content in scope: ${scope} \u2014 no <marquee>/<blink>, no media element, no CSS animation (inline or in a captured stylesheet), and no carousel/autoplay/rAF signal was found.`;
@@ -55955,9 +55956,16 @@ var SUBJECTS = {
   // Every mechanism that leads to a page — the subject of "multiple ways".
   navMechanisms: (docs) => docs.flatMap((d) => [
     ...elementsByTag(d, "nav").map(
-      (e) => h(d, e, `<nav> aria-label="${attr(e, "aria-label") ?? ""}" links=${elementsByTag(d, "a").filter((a) => ancestors(a).includes(e)).length}`, `nav|${attr(e, "aria-label") ?? ""}`)
+      (e) => h(
+        d,
+        e,
+        `<nav> aria-label="${attr(e, "aria-label") ?? ""}" links=${elementsByTag(d, "a").filter((a) => ancestors(a).includes(e)).length}`,
+        `nav|${attr(e, "aria-label") ?? ""}`
+      )
     ),
-    ...elementsByTag(d, ...CONTROL_TAGS).filter((e) => (attr(e, "type") ?? "") === "search" || /search|recherch/i.test(`${attr(e, "name") ?? ""} ${attr(e, "id") ?? ""} ${attr(e, "class") ?? ""}`)).map((e) => h(d, e, `search field \u2014 one of the "multiple ways" mechanisms`, `search|${attr(e, "name") ?? ""}`)),
+    ...elementsByTag(d, ...CONTROL_TAGS).filter(
+      (e) => (attr(e, "type") ?? "") === "search" || /search|recherch/i.test(`${attr(e, "name") ?? ""} ${attr(e, "id") ?? ""} ${attr(e, "class") ?? ""}`)
+    ).map((e) => h(d, e, `search field \u2014 one of the "multiple ways" mechanisms`, `search|${attr(e, "name") ?? ""}`)),
     ...elementsByTag(d, "a").filter((e) => /plan-du-site|sitemap|site-map|index/i.test(attr(e, "href") ?? "")).map((e) => h(d, e, `site map / index link text="${t(e, 40)}" href="${attr(e, "href")}"`, `sitemap|${attr(e, "href")}`))
   ]),
   // The repeated blocks whose ORDER must not change from page to page. One class per page so
@@ -55980,7 +55988,9 @@ var SUBJECTS = {
   liveRegions: (docs) => docs.flatMap((d) => {
     const isRegion = (e) => attr(e, "aria-live") !== void 0 || ["status", "alert", "log"].includes((attr(e, "role") ?? "").trim().toLowerCase());
     return [
-      ...d.elements.filter(isRegion).map((e) => h(d, e, `aria-live="${attr(e, "aria-live") ?? ""}" role="${attr(e, "role") ?? ""}"`, `live|${attr(e, "aria-live") ?? ""}|${attr(e, "role") ?? ""}`)),
+      ...d.elements.filter(isRegion).map(
+        (e) => h(d, e, `aria-live="${attr(e, "aria-live") ?? ""}" role="${attr(e, "role") ?? ""}"`, `live|${attr(e, "aria-live") ?? ""}|${attr(e, "role") ?? ""}`)
+      ),
       ...d.elements.filter((e) => !isRegion(e) && STATUS_CLASS.test(attr(e, "class") ?? "") && ancestors(e).some((a) => a.tag === "form")).map(
         (e) => h(
           d,
@@ -55995,16 +56005,24 @@ var SUBJECTS = {
   focusOrder: (docs) => docs.flatMap((d) => {
     const out2 = [
       ...d.elements.filter((e) => attr(e, "tabindex") !== void 0).map((e) => h(d, e, `tabindex="${attr(e, "tabindex")}"`, `tabindex|${attr(e, "tabindex")}`)),
-      ...elementsByTag(d, "dialog").concat(d.elements.filter((e) => attr(e, "role") === "dialog")).filter((e, i2, a) => a.indexOf(e) === i2).map((e) => h(d, e, `<${e.tag} role="${attr(e, "role") ?? ""}"> \u2014 verify focus moves in on open and is restored to the trigger on close`, `dialog|${e.tag}`))
+      ...elementsByTag(d, "dialog").concat(d.elements.filter((e) => attr(e, "role") === "dialog")).filter((e, i2, a) => a.indexOf(e) === i2).map(
+        (e) => h(d, e, `<${e.tag} role="${attr(e, "role") ?? ""}"> \u2014 verify focus moves in on open and is restored to the trigger on close`, `dialog|${e.tag}`)
+      )
     ];
     const rl = lineOf(d, ROUTER_IMPORT);
-    if (rl !== void 0) out2.push(hAt(d, rl, "import", "client-router import \u2014 verify page title + focus are restored on partial (SPA) navigation", "router"));
+    if (rl !== void 0)
+      out2.push(hAt(d, rl, "import", "client-router import \u2014 verify page title + focus are restored on partial (SPA) navigation", "router"));
     return out2;
   }),
   // Focusable inventory plus the handlers that can hold focus — the keyboard-trap subject.
   focusables: (docs) => docs.flatMap((d) => [
     ...elementsByTag(d, "iframe", "object", "embed").map(
-      (e) => h(d, e, `<${e.tag}> title="${attr(e, "title") ?? ""}" src="${(attr(e, "src") ?? "").slice(0, 60)}" \u2014 can focus LEAVE this embedded content with the keyboard alone?`, `embed|${e.tag}|${attr(e, "src") ?? ""}`)
+      (e) => h(
+        d,
+        e,
+        `<${e.tag}> title="${attr(e, "title") ?? ""}" src="${(attr(e, "src") ?? "").slice(0, 60)}" \u2014 can focus LEAVE this embedded content with the keyboard alone?`,
+        `embed|${e.tag}|${attr(e, "src") ?? ""}`
+      )
     ),
     ...elementsByTag(d, "dialog").concat(d.elements.filter((e) => attr(e, "role") === "dialog" || attr(e, "aria-modal") === "true")).filter((e, i2, a) => a.indexOf(e) === i2).map((e) => h(d, e, `modal container <${e.tag}> aria-modal="${attr(e, "aria-modal") ?? ""}" \u2014 does Escape hand control back?`, `modal|${e.tag}`)),
     ...linesOf(d, /preventDefault\(\)/).map((l) => hAt(d, l.line, "handler", `preventDefault in a handler: ${l.text}`, `preventDefault|${l.text}`))
@@ -56022,13 +56040,29 @@ var SUBJECTS = {
   // verdict — "email", "test" and "sprint" are French usage now, and the decision protocol
   // already exempts proper nouns, technical terms and words that entered the vernacular.
   langParts: (docs) => docs.flatMap((d) => [
-    ...elementsByTag(d, "html").map((e) => h(d, e, `page="${pageOfDoc(d.file) ?? "source"}" declares lang="${attr(e, "lang") ?? ""}" \u2014 passages in another language must override it`, `declaredlang|${attr(e, "lang") ?? ""}`)),
+    ...elementsByTag(d, "html").map(
+      (e) => h(
+        d,
+        e,
+        `page="${pageOfDoc(d.file) ?? "source"}" declares lang="${attr(e, "lang") ?? ""}" \u2014 passages in another language must override it`,
+        `declaredlang|${attr(e, "lang") ?? ""}`
+      )
+    ),
     ...d.elements.filter((e) => e.tag !== "html" && attr(e, "lang") !== void 0).map((e) => h(d, e, `lang="${attr(e, "lang")}" text="${t(e, 40)}"`, `lang|${attr(e, "lang")}|${t(e, 40)}`)),
-    ...d.elements.filter((e) => e.children.some((c2) => c2.type === "text") && FOREIGN_LEXICON.test(textContent(e)) && attr(e, "lang") === void 0).map((e) => h(d, e, `candidate foreign passage, NOT marked with lang: "${t(e, 60)}" \u2014 a proper noun, a technical term or a word in common use is exempt`, `foreign|${t(e, 60)}`))
+    ...d.elements.filter((e) => e.children.some((c2) => c2.type === "text") && FOREIGN_LEXICON.test(textContent(e)) && attr(e, "lang") === void 0).map(
+      (e) => h(
+        d,
+        e,
+        `candidate foreign passage, NOT marked with lang: "${t(e, 60)}" \u2014 a proper noun, a technical term or a word in common use is exempt`,
+        `foreign|${t(e, 60)}`
+      )
+    )
   ]),
   // The document's own language declaration.
   docLang: (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "html").map((e) => h(d, e, `<html lang="${attr(e, "lang") ?? ""}"> \u2014 is it present, valid, and the language of the content?`, `doclang|${attr(e, "lang") ?? ""}`))
+    (d) => elementsByTag(d, "html").map(
+      (e) => h(d, e, `<html lang="${attr(e, "lang") ?? ""}"> \u2014 is it present, valid, and the language of the content?`, `doclang|${attr(e, "lang") ?? ""}`)
+    )
   ),
   // The document's title, with the page it belongs to, so "is it pertinent?" is answerable.
   docTitle: (docs) => docs.flatMap(
@@ -56047,7 +56081,15 @@ var SUBJECTS = {
     if (page !== void 0) {
       const dt = d.signals?.doctype;
       if (dt === void 0) {
-        return [hAt(d, 1, "doctype", `page="${page}" \u2014 this capture predates doctype recording, so the declaration was NOT captured. That is not evidence the page lacks one: re-record the snapshots to decide this criterion.`, `doctype|unrecorded`)];
+        return [
+          hAt(
+            d,
+            1,
+            "doctype",
+            `page="${page}" \u2014 this capture predates doctype recording, so the declaration was NOT captured. That is not evidence the page lacks one: re-record the snapshots to decide this criterion.`,
+            `doctype|unrecorded`
+          )
+        ];
       }
       return [hAt(d, 1, "doctype", `page="${page}" doctype=${dt === "" ? "(none on the page)" : dt}`, `doctype|${dt}`)];
     }
@@ -56058,30 +56100,50 @@ var SUBJECTS = {
   }),
   // A visible text label alongside an accessible name that replaces it.
   nameVsAccName: (docs) => docs.flatMap(
-    (d) => d.elements.filter((e) => INTERACTIVE_TAGS.includes(e.tag) && attr(e, "aria-label") !== void 0 && t(e, 40).length > 0).map((e) => h(d, e, `visible="${t(e, 40)}" aria-label="${attr(e, "aria-label")}" \u2014 is the visible text CONTAINED in the accessible name?`, `namevs|${t(e, 40)}|${attr(e, "aria-label")}`))
+    (d) => d.elements.filter((e) => INTERACTIVE_TAGS.includes(e.tag) && attr(e, "aria-label") !== void 0 && t(e, 40).length > 0).map(
+      (e) => h(
+        d,
+        e,
+        `visible="${t(e, 40)}" aria-label="${attr(e, "aria-label")}" \u2014 is the visible text CONTAINED in the accessible name?`,
+        `namevs|${t(e, 40)}|${attr(e, "aria-label")}`
+      )
+    )
   ),
   // Pointer, touch, gesture and drag handlers — everything a keyboard may not reach.
   pointerHandlers: (docs) => docs.flatMap((d) => [
-    ...d.elements.filter((e) => !INTERACTIVE_TAGS.includes(e.tag) && Object.keys(e.attribs).some((k) => /^on(click|mousedown|mouseup|mouseenter|pointerdown|touchstart)$/i.test(k))).map((e) => h(d, e, `<${e.tag}> carries a pointer handler but is not natively interactive \u2014 keyboard equivalent?`, `clickable|${e.tag}|${t(e, 40)}`)),
-    ...linesOf(d, /\bon(?:MouseDown|PointerDown|TouchStart)\s*=/).map((l) => hAt(d, l.line, "handler", `down-event handler (action must not fire on DOWN, or must be abortable): ${l.text}`, `downevent|${l.text}`)),
-    ...linesOf(d, /\b(?:draggable|onDragStart|useDrag|DndContext|react-beautiful-dnd|@dnd-kit)\b/).map((l) => hAt(d, l.line, "drag", `drag interaction: ${l.text}`, `drag|${l.text}`)),
-    ...linesOf(d, /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b/i).map((l) => hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`))
+    ...d.elements.filter(
+      (e) => !INTERACTIVE_TAGS.includes(e.tag) && Object.keys(e.attribs).some((k) => /^on(click|mousedown|mouseup|mouseenter|pointerdown|touchstart)$/i.test(k))
+    ).map((e) => h(d, e, `<${e.tag}> carries a pointer handler but is not natively interactive \u2014 keyboard equivalent?`, `clickable|${e.tag}|${t(e, 40)}`)),
+    ...linesOf(d, /\bon(?:MouseDown|PointerDown|TouchStart)\s*=/).map(
+      (l) => hAt(d, l.line, "handler", `down-event handler (action must not fire on DOWN, or must be abortable): ${l.text}`, `downevent|${l.text}`)
+    ),
+    ...linesOf(d, /\b(?:draggable|onDragStart|useDrag|DndContext|react-beautiful-dnd|@dnd-kit)\b/).map(
+      (l) => hAt(d, l.line, "drag", `drag interaction: ${l.text}`, `drag|${l.text}`)
+    ),
+    ...linesOf(d, /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b/i).map(
+      (l) => hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`)
+    )
   ]),
   // Single-character keyboard shortcuts.
   shortcuts: (docs) => docs.flatMap(
-    (d) => linesOf(d, /\b(?:key|code|charCode)\s*===?\s*["'][a-zA-Z0-9]["']/).map((l) => hAt(d, l.line, "shortcut", `single-character key comparison: ${l.text}`, `shortcut|${l.text}`))
+    (d) => linesOf(d, /\b(?:key|code|charCode)\s*===?\s*["'][a-zA-Z0-9]["']/).map(
+      (l) => hAt(d, l.line, "shortcut", `single-character key comparison: ${l.text}`, `shortcut|${l.text}`)
+    )
   ),
   // Instructions that lean on a sensory characteristic alone.
   sensoryText: (docs) => docs.flatMap(
-    (d) => linesOf(d, /\b(?:ci-dessus|ci-dessous|à droite|a droite|à gauche|a gauche|bouton (?:vert|rouge|bleu)|en rouge|en vert|le carré|la case de droite|above|below|to the right|to the left|green button|red button|round button)\b/i).map(
-      (l) => hAt(d, l.line, "text", `sensory-sounding instruction: ${l.text}`, `sensory|${l.text}`)
-    )
+    (d) => linesOf(
+      d,
+      /\b(?:ci-dessus|ci-dessous|à droite|a droite|à gauche|a gauche|bouton (?:vert|rouge|bleu)|en rouge|en vert|le carré|la case de droite|above|below|to the right|to the left|green button|red button|round button)\b/i
+    ).map((l) => hAt(d, l.line, "text", `sensory-sounding instruction: ${l.text}`, `sensory|${l.text}`))
   ),
   // Time limits: session expiry, meta refresh, timed redirects.
   timers: (docs) => docs.flatMap((d) => [
     ...d.elements.filter((e) => e.tag === "meta" && (attr(e, "http-equiv") ?? "").toLowerCase() === "refresh").map((e) => h(d, e, `<meta http-equiv="refresh" content="${attr(e, "content") ?? ""}">`, `metarefresh|${attr(e, "content") ?? ""}`)),
     ...linesOf(d, /\b(?:setTimeout|setInterval)\s*\(/).map((l) => hAt(d, l.line, "timer", `timer: ${l.text}`, `timer|${l.text}`)),
-    ...linesOf(d, /\b(?:sessionTimeout|maxAge|expiresIn|session_max|idleTimeout)\b/i).map((l) => hAt(d, l.line, "session", `session/expiry config: ${l.text}`, `session|${l.text}`))
+    ...linesOf(d, /\b(?:sessionTimeout|maxAge|expiresIn|session_max|idleTimeout)\b/i).map(
+      (l) => hAt(d, l.line, "session", `session/expiry config: ${l.text}`, `session|${l.text}`)
+    )
   ]),
   // Moving, blinking or auto-updating content, and how it can be stopped.
   motion: (docs) => docs.flatMap((d) => [
@@ -56090,17 +56152,38 @@ var SUBJECTS = {
     ...linesOf(d, /\b(?:carousel|slider|autoplay|animation-iteration-count\s*:\s*infinite|requestAnimationFrame)\b/i).map(
       (l) => hAt(d, l.line, "motion", `moving/auto-updating content: ${l.text}`, `motion|${l.text}`)
     ),
-    ...elementsByTag(d, "video", "audio").map((e) => h(d, e, `<${e.tag} autoplay=${attr(e, "autoplay") !== void 0} controls=${attr(e, "controls") !== void 0}>`, `media|${e.tag}`))
+    ...elementsByTag(d, "video", "audio").map(
+      (e) => h(d, e, `<${e.tag} autoplay=${attr(e, "autoplay") !== void 0} controls=${attr(e, "controls") !== void 0}>`, `media|${e.tag}`)
+    )
   ]),
   // A change of context triggered by focus or by changing a value.
   contextChange: (docs) => docs.flatMap((d) => [
-    ...linesOf(d, /\bon(?:Focus|Blur)\s*=/).map((l) => hAt(d, l.line, "handler", `focus handler \u2014 does it change context (navigate, submit, move focus)? ${l.text}`, `onfocus|${l.text}`)),
-    ...linesOf(d, /\bonChange\s*=/).map((l) => hAt(d, l.line, "handler", `change handler \u2014 does changing the value itself change context? ${l.text}`, `onchange|${l.text}`))
+    ...linesOf(d, /\bon(?:Focus|Blur)\s*=/).map(
+      (l) => hAt(d, l.line, "handler", `focus handler \u2014 does it change context (navigate, submit, move focus)? ${l.text}`, `onfocus|${l.text}`)
+    ),
+    ...linesOf(d, /\bonChange\s*=/).map(
+      (l) => hAt(d, l.line, "handler", `change handler \u2014 does changing the value itself change context? ${l.text}`, `onchange|${l.text}`)
+    )
   ]),
   // Reading order: anything that moves meaning-bearing content away from DOM order.
   readingOrder: (docs) => docs.flatMap((d) => [
-    ...d.elements.filter((e) => /(?:^|;)\s*order\s*:|flex-direction\s*:\s*\w+-reverse|position\s*:\s*absolute/.test(attr(e, "style") ?? "")).map((e) => h(d, e, `inline layout override: ${(attr(e, "style") ?? "").slice(0, 80)} \u2014 does it move meaning?`, `orderinline|${(attr(e, "style") ?? "").slice(0, 80)}`)),
-    ...(d.signals?.css?.rules ?? []).filter((r) => r.decls.order !== void 0 || /-reverse/.test(r.decls.flexDirection ?? "") || /reverse/.test(r.decls.flexFlow ?? "")).slice(0, 60).map((r) => hAt(d, 1, `css:${r.selector}`, `stylesheet reorders layout: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} } \u2014 does it move meaning-bearing content?`, `ordercss|${r.selector}`))
+    ...d.elements.filter((e) => /(?:^|;)\s*order\s*:|flex-direction\s*:\s*\w+-reverse|position\s*:\s*absolute/.test(attr(e, "style") ?? "")).map(
+      (e) => h(
+        d,
+        e,
+        `inline layout override: ${(attr(e, "style") ?? "").slice(0, 80)} \u2014 does it move meaning?`,
+        `orderinline|${(attr(e, "style") ?? "").slice(0, 80)}`
+      )
+    ),
+    ...(d.signals?.css?.rules ?? []).filter((r) => r.decls.order !== void 0 || /-reverse/.test(r.decls.flexDirection ?? "") || /reverse/.test(r.decls.flexFlow ?? "")).slice(0, 60).map(
+      (r) => hAt(
+        d,
+        1,
+        `css:${r.selector}`,
+        `stylesheet reorders layout: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} } \u2014 does it move meaning-bearing content?`,
+        `ordercss|${r.selector}`
+      )
+    )
   ]),
   // Office documents offered for download — the subject of "is there an accessible version?".
   downloadDocs: (docs) => docs.flatMap(
@@ -56116,7 +56199,9 @@ var SUBJECTS = {
   // Content deliberately hidden from one rendering or the other — the subject of "is what is
   // hidden from assistive technology genuinely meant to be ignored?".
   hiddenContent: (docs) => docs.flatMap(
-    (d) => d.elements.filter((e) => attr(e, "aria-hidden") !== void 0 || attr(e, "hidden") !== void 0 || /(?:^|[-_ ])(sr-only|visually-hidden|screen-reader|fr-sr-only)(?:[-_ ]|$)/i.test(attr(e, "class") ?? "")).map(
+    (d) => d.elements.filter(
+      (e) => attr(e, "aria-hidden") !== void 0 || attr(e, "hidden") !== void 0 || /(?:^|[-_ ])(sr-only|visually-hidden|screen-reader|fr-sr-only)(?:[-_ ]|$)/i.test(attr(e, "class") ?? "")
+    ).map(
       (e) => h(
         d,
         e,
@@ -56128,7 +56213,15 @@ var SUBJECTS = {
   // Content pinned over the page — what can obscure a focused element.
   stickies: (docs) => docs.flatMap((d) => [
     ...d.elements.filter((e) => /position\s*:\s*(?:fixed|sticky)/.test(attr(e, "style") ?? "")).map((e) => h(d, e, `pinned element (inline): ${(attr(e, "style") ?? "").slice(0, 60)} \u2014 can it cover a focused element?`, `sticky|${selectorFor(e)}`)),
-    ...(d.signals?.css?.rules ?? []).filter((r) => /^(?:fixed|sticky)$/.test((r.decls.position ?? "").trim())).slice(0, 60).map((r) => hAt(d, 1, `css:${r.selector}`, `pinned by stylesheet: ${r.selector.slice(0, 60)} { position: ${r.decls.position} } \u2014 can it cover a focused element?`, `stickycss|${r.selector}`))
+    ...(d.signals?.css?.rules ?? []).filter((r) => /^(?:fixed|sticky)$/.test((r.decls.position ?? "").trim())).slice(0, 60).map(
+      (r) => hAt(
+        d,
+        1,
+        `css:${r.selector}`,
+        `pinned by stylesheet: ${r.selector.slice(0, 60)} { position: ${r.decls.position} } \u2014 can it cover a focused element?`,
+        `stickycss|${r.selector}`
+      )
+    )
   ])
 };
 var SC_SUBJECTS = {
@@ -57173,7 +57266,12 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
       const scs = crit?.wcag ?? pc.scs;
       const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a) => !!a);
       const automatability2 = autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
-      return blankItem(pc.id, automatability2, crit ? titlePlain(pack, crit, "fr") : void 0, harvestSubjects(subjectsForPackCriterion(standard, pc.id, scs), docs));
+      return blankItem(
+        pc.id,
+        automatability2,
+        crit ? titlePlain(pack, crit, "fr") : void 0,
+        harvestSubjects(subjectsForPackCriterion(standard, pc.id, scs), docs)
+      );
     });
   }
   return audit2.residualRisks.map(

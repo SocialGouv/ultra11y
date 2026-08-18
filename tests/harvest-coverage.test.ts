@@ -30,7 +30,8 @@ describe("every criterion the engine hands over has something to look at", () =>
   it("names only subjects that exist", () => {
     const unknown = new Set<string>();
     for (const ids of Object.values(SC_SUBJECTS)) for (const id of ids) if (!SUBJECTS[id]) unknown.add(id);
-    for (const byCriterion of Object.values(PACK_SUBJECTS)) for (const ids of Object.values(byCriterion)) for (const id of ids) if (!SUBJECTS[id]) unknown.add(id);
+    for (const byCriterion of Object.values(PACK_SUBJECTS))
+      for (const ids of Object.values(byCriterion)) for (const id of ids) if (!SUBJECTS[id]) unknown.add(id);
     expect([...unknown], "subject ids referenced but not implemented").toEqual([]);
   });
 
