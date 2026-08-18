@@ -57181,7 +57181,7 @@ function adjudicationText(sc, lang) {
 }
 
 // src/adjudicate.ts
-var ADJUDICATE_MAX_EVIDENCE_CLASSES = 600;
+var ADJUDICATE_MAX_EVIDENCE_CLASSES = 1200;
 var ALSO_AT_MAX = 8;
 function adjudicationContract() {
   return {

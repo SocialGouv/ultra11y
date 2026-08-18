@@ -47,15 +47,18 @@ import { guidanceExampleBlock } from "./prd.js";
  *  887 links over 38 captured pages are 97 distinct (text, href) pairs. When even the class
  *  count exceeds this, `evidenceComplete` goes false and the fold refuses a `C` outright —
  *  an incomplete reading may still find a real failure, it may never clear one. */
-export const ADJUDICATE_MAX_EVIDENCE_CLASSES = 600;
+export const ADJUDICATE_MAX_EVIDENCE_CLASSES = 1200;
 
-// Why 600 and not a rounder, smaller number: it is set by what a real application actually
-// contains, measured, not by taste. On a 338-file product with 38 captured pages the largest
-// per-criterion populations are 456 classes (what survives when CSS is off), 404 (reading
-// order), 360 (structure) and 334 (the heading outline) — and those ARE the populations, not
-// samples of them. A cap below them would not bound anything worth bounding; it would simply
-// refuse every `C` on the criteria that matter most, and refusing to conclude is only honest
-// when something really was not looked at.
+// The number is set by what a real application actually contains, measured, and then given
+// room to grow. On a 338-file product with 38 captured pages the largest per-criterion
+// populations run to 592 classes (what survives when CSS is off), 531 (reading order) and 487
+// (structure) — and those ARE the populations, not samples of them.
+//
+// The headroom is the point. A cap sitting just above today's largest criterion is a gate
+// that flips the day someone adds a heading: the criterion becomes unclearable for reasons of
+// VOLUME rather than of uncertainty, which is the wrong reason to refuse a verdict and an
+// especially confusing one, since nothing about the code got worse. Refusing to conclude is
+// honest only when something really was not looked at.
 
 /** Sibling anchors listed per class. Bounded for readability; `occurrences` carries the true
  *  count, and the citation gate accepts any anchor of the class, listed or not. */
