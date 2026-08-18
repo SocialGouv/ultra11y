@@ -1446,12 +1446,33 @@ export function writeAdjudication(
  *  bulk it only has to READ. Every field the fold requires — verdict, justification, reason,
  *  findings, citations, recommendations — is kept, so a filled slim file carries a complete
  *  decision. The evidence comes back at fold time via `hydrateAdjudication`. */
+/** Representatives pre-cited in the skeleton. Three is enough to show the shape and to stand
+ *  for the population; the whole set is in the brief, and `occurrences` travels with each. */
+const PREFILLED_CITATIONS = 3;
+
 export function slimAdjudicationItems(items: AdjudicationItem[]): AdjudicationItem[] {
   return items.map((it) => {
     const { evidence: _evidence, evidenceTruncated: _truncated, ...rest } = it;
-    // `population` and `evidenceComplete` are kept: they are two numbers, not bulk, and they
-    // tell the adjudicator how much of the subject it is actually looking at.
-    return { ...rest, evidence: [] } as AdjudicationItem;
+    // THE CITATIONS ARRIVE FILLED IN.
+    //
+    // This file is the only one a CI adjudicator writes, and it used to arrive with no evidence
+    // and no citations: clearing a criterion meant authoring
+    // `citations: [{file, line, selector, snippet}]` from scratch, by hand, cross-referencing a
+    // separate brief, once per criterion. Measured on a real run: thirty criteria came back `C`
+    // with a considered justification and no citations at all, and the fold refused every one
+    // — « a C verdict must cite at least one of the N evidence item(s) it was shown ». The
+    // agent had read the evidence. It had simply not copied an anchor into a second file.
+    //
+    // Pre-filling decides nothing. The verdict and the justification are still the agent's, and
+    // a `C` still has to survive grounding, the coverage check and the complete-evidence rule.
+    // What it removes is a transcription step that was costing correct verdicts — the same
+    // failure, one level up, as an adjudicator retyping a snippet instead of copying it.
+    //
+    // `population` and `evidenceComplete` are kept for the same reason they always were: they
+    // are two numbers, not bulk, and they tell the adjudicator how much of the subject it is
+    // actually looking at.
+    const citations = it.evidence.slice(0, PREFILLED_CITATIONS).map((e) => ({ ...e }));
+    return { ...rest, evidence: [], ...(citations.length ? { citations } : {}) } as AdjudicationItem;
   });
 }
 

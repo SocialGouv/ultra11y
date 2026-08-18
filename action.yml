@@ -597,6 +597,11 @@ runs:
           real — but a `C` will be refused, because clearing a criterion is a claim about
           everything, including the part you were not shown.
 
+          The `citations` of each item ARRIVE PRE-FILLED with the representatives that criterion
+          was harvested from. Keep them when your verdict covers them — which is what a `C`
+          means — and replace them with the occurrence you actually opened when that is a better
+          record of what you read. Do not delete them and leave the field empty.
+
           A `C` WITHOUT CITATIONS IS REFUSED, every time, however good the justification. « All
           the navigation menus are consistent » is a claim about elements; name at least one of
           the ones you were shown, with its `file`, `line` and `snippet`. Measured on a real

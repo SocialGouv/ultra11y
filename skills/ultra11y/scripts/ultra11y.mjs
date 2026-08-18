@@ -58207,10 +58207,12 @@ function writeAdjudication(items, outDir, opts) {
   }
   return { todoPath, mdPath, verdictsPath, itemsDir, count: items.length };
 }
+var PREFILLED_CITATIONS = 3;
 function slimAdjudicationItems(items) {
   return items.map((it) => {
     const { evidence: _evidence, evidenceTruncated: _truncated, ...rest } = it;
-    return { ...rest, evidence: [] };
+    const citations = it.evidence.slice(0, PREFILLED_CITATIONS).map((e) => ({ ...e }));
+    return { ...rest, evidence: [], ...citations.length ? { citations } : {} };
   });
 }
 function hydrateAdjudication(adj, audit2, opts = {}) {
