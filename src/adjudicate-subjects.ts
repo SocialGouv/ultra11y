@@ -496,6 +496,23 @@ export const SUBJECTS: Record<string, Subject> = {
       ),
     ),
 
+  // Frames, and the title each one carries. RGAA theme 2 is about nothing else: 2.1 asks
+  // whether every frame HAS a title, 2.2 whether that title is pertinent. Both used to inherit
+  // `aria` from WCAG 4.1.2 and be handed every ARIA attribute in the application — measured on
+  // a real run, the adjudicator answered `undecidable` on both, correctly, because nothing it
+  // had been shown could settle a question about `<iframe title>`.
+  frames: (docs) =>
+    docs.flatMap((d) =>
+      elementsByTag(d, "iframe", "frame").map((e) =>
+        h(
+          d,
+          e,
+          `<${e.tag}> title="${attr(e, "title") ?? ""}" name="${attr(e, "name") ?? ""}" src="${(attr(e, "src") ?? "").slice(0, 60)}" — un titre de cadre est-il présent, et décrit-il le contenu du cadre ?`,
+          `frame|${attr(e, "title") ?? ""}|${attr(e, "src") ?? ""}`,
+        ),
+      ),
+    ),
+
   // The document's title, with the page it belongs to, so "is it pertinent?" is answerable.
   docTitle: (docs) =>
     docs.flatMap((d) =>
@@ -790,6 +807,9 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // Theme 6 — links.
     "6.1": ["links"],
     "6.2": ["links"],
+    // Theme 2 — frames. Both criteria are about the frame and its title, and nothing else.
+    "2.1": ["frames"],
+    "2.2": ["frames"],
     // Theme 8 — the document itself. 8.1 maps onto no WCAG 2.2 criterion at all, so the pack
     // is the ONLY place its subject can be named.
     "8.1": ["doctype"],
@@ -907,7 +927,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
 // hand-written applicability predicates in src/audit.ts, which are more careful than any
 // subject here and which win outright where they exist. The pack criteria that map onto them
 // inherit the NA through the derivation, so nothing is lost by leaving them out.
-export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set(["images", "tables", "lists", "links", "controls", "autocomplete", "errors"]);
+export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set(["images", "tables", "lists", "links", "controls", "autocomplete", "errors", "frames"]);
 
 /** The subjects that decide a success criterion. Empty ⇒ the criterion has none declared,
  *  which `tests/harvest-coverage.test.ts` refuses for any criterion the engine hands over. */

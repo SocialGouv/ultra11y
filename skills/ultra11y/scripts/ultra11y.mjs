@@ -39652,6 +39652,21 @@ var SUBJECTS = {
       (e) => h(d, e, `<html lang="${attr(e, "lang") ?? ""}"> \u2014 is it present, valid, and the language of the content?`, `doclang|${attr(e, "lang") ?? ""}`)
     )
   ),
+  // Frames, and the title each one carries. RGAA theme 2 is about nothing else: 2.1 asks
+  // whether every frame HAS a title, 2.2 whether that title is pertinent. Both used to inherit
+  // `aria` from WCAG 4.1.2 and be handed every ARIA attribute in the application — measured on
+  // a real run, the adjudicator answered `undecidable` on both, correctly, because nothing it
+  // had been shown could settle a question about `<iframe title>`.
+  frames: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, "iframe", "frame").map(
+      (e) => h(
+        d,
+        e,
+        `<${e.tag}> title="${attr(e, "title") ?? ""}" name="${attr(e, "name") ?? ""}" src="${(attr(e, "src") ?? "").slice(0, 60)}" \u2014 un titre de cadre est-il pr\xE9sent, et d\xE9crit-il le contenu du cadre ?`,
+        `frame|${attr(e, "title") ?? ""}|${attr(e, "src") ?? ""}`
+      )
+    )
+  ),
   // The document's title, with the page it belongs to, so "is it pertinent?" is answerable.
   docTitle: (docs) => docs.flatMap(
     (d) => elementsByTag(d, "title").map((e) => h(d, e, `page="${pageOfDoc(d.file) ?? "source"}" <title>${t(e, 80)}</title>`, `doctitle|${t(e, 80)}`))
@@ -39880,6 +39895,9 @@ var PACK_SUBJECTS = {
     // Theme 6 — links.
     "6.1": ["links"],
     "6.2": ["links"],
+    // Theme 2 — frames. Both criteria are about the frame and its title, and nothing else.
+    "2.1": ["frames"],
+    "2.2": ["frames"],
     // Theme 8 — the document itself. 8.1 maps onto no WCAG 2.2 criterion at all, so the pack
     // is the ONLY place its subject can be named.
     "8.1": ["doctype"],
@@ -39960,7 +39978,7 @@ var PACK_SUBJECTS = {
     "13.11": ["pointerHandlers"]
   }
 };
-var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set(["images", "tables", "lists", "links", "controls", "autocomplete", "errors"]);
+var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set(["images", "tables", "lists", "links", "controls", "autocomplete", "errors", "frames"]);
 var subjectsForSc = (sc) => SC_SUBJECTS[sc] ?? [];
 function subjectsForPackCriterion(standard, id, scs) {
   const own = PACK_SUBJECTS[standard]?.[id];
