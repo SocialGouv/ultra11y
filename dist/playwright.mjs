@@ -320,37 +320,80 @@ async function probeHover(page) {
 async function runLiveProbes(page, opts = {}) {
   const only = opts.only?.length ? new Set(opts.only) : null;
   const want = (id) => only === null || only.has(id);
-  const size = page.viewportSize?.() ?? null;
+  const canResize = typeof page.setViewportSize === "function" && typeof page.viewportSize === "function";
+  const canType = !!page.keyboard && typeof page.keyboard.press === "function";
+  const canHover = typeof page.hover === "function" && typeof page.waitForTimeout === "function";
+  const canStyle = typeof page.addStyleTag === "function";
+  const size = canResize ? page.viewportSize() ?? null : null;
   const restore = size ?? { width: 1280, height: 900 };
-  const out = { focusVisible: [], hover: [], reflowZoom: [], textSpacing: [], reflow: { horizontalScroll: false }, probed: [] };
-  if (want("2.4.7")) {
-    out.focusVisible = await probeFocusVisible(page).catch(() => []);
-    out.probed.push("2.4.7");
+  const out = { focusVisible: [], hover: [], reflowZoom: [], textSpacing: [], reflow: { horizontalScroll: false }, probed: [], skipped: [] };
+  const skip = (sc, why) => {
+    out.skipped?.push({ sc, why });
+  };
+  if (!canResize) skip("1.4.10", "the page object cannot resize its viewport");
+  if (!canType) skip("2.4.7", "the page object exposes no keyboard");
+  if (!canHover) skip("1.4.13", "the page object cannot hover");
+  if (!canStyle) skip("1.4.12", "the page object cannot inject a stylesheet");
+  if (want("2.4.7") && canType) {
+    const r = await probeFocusVisible(page).catch((e) => {
+      skip("2.4.7", String(e?.message ?? e).slice(0, 160));
+      return null;
+    });
+    if (r) {
+      out.focusVisible = r;
+      out.probed.push("2.4.7");
+    }
   }
-  if (want("1.4.13")) {
-    out.hover = await probeHover(page).catch(() => []);
-    out.probed.push("1.4.13");
+  if (want("1.4.13") && canHover && canType) {
+    const r = await probeHover(page).catch((e) => {
+      skip("1.4.13", String(e?.message ?? e).slice(0, 160));
+      return null;
+    });
+    if (r) {
+      out.hover = r;
+      out.probed.push("1.4.13");
+    }
   }
   if (want("1.4.4")) {
     out.reflowZoom = await page.evaluate(REFLOW_ZOOM_PROBE).catch(() => []) ?? [];
     out.probed.push("1.4.4");
   }
-  if (want("1.4.10")) {
-    await page.setViewportSize({ width: 320, height: restore.height }).catch(() => {
+  if (want("1.4.10") && canResize) {
+    let narrowed = true;
+    await page.setViewportSize({ width: 320, height: restore.height }).catch((e) => {
+      narrowed = false;
+      skip("1.4.10", String(e?.message ?? e).slice(0, 160));
     });
-    out.reflow = await page.evaluate(REFLOW_PROBE).catch(() => ({ horizontalScroll: false })) ?? {
-      horizontalScroll: false
-    };
-    await page.setViewportSize(restore).catch(() => {
-    });
-    out.probed.push("1.4.10");
+    if (narrowed) {
+      const r = await page.evaluate(REFLOW_PROBE).catch((e) => {
+        skip("1.4.10", String(e?.message ?? e).slice(0, 160));
+        return null;
+      });
+      await page.setViewportSize(restore).catch(() => {
+      });
+      if (r) {
+        out.reflow = r;
+        out.probed.push("1.4.10");
+      }
+    }
   }
-  if (want("1.4.12")) {
-    const handle = await page.addStyleTag({ content: TEXT_SPACING_CSS }).catch(() => null);
-    out.textSpacing = await page.evaluate(TEXT_SPACING_PROBE).catch(() => []) ?? [];
-    if (handle) await page.evaluate(REMOVE_TEXT_SPACING_STEP).catch(() => {
+  if (want("1.4.12") && canStyle) {
+    const handle = await page.addStyleTag({ content: TEXT_SPACING_CSS }).catch((e) => {
+      skip("1.4.12", String(e?.message ?? e).slice(0, 160));
+      return null;
     });
-    out.probed.push("1.4.12");
+    if (handle) {
+      const r = await page.evaluate(TEXT_SPACING_PROBE).catch((e) => {
+        skip("1.4.12", String(e?.message ?? e).slice(0, 160));
+        return null;
+      });
+      await page.evaluate(REMOVE_TEXT_SPACING_STEP).catch(() => {
+      });
+      if (r) {
+        out.textSpacing = r;
+        out.probed.push("1.4.12");
+      }
+    }
   }
   return out;
 }
@@ -501,7 +544,10 @@ async function checkA11y(page, opts = {}) {
   if (opts.probes) {
     try {
       probes = await runLiveProbes(page, Array.isArray(opts.probes) ? { only: opts.probes } : {});
-    } catch {
+    } catch (e) {
+      console.warn(
+        `ultra11y: the live probes failed on this page \u2014 ${e instanceof Error ? e.message : String(e)}. The snapshot was still recorded; the criteria they decide stay to assess.`
+      );
     }
   }
   const payload = buildPayload(collected, url, "playwright", opts, shot, probes);

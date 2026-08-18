@@ -81,6 +81,22 @@ describe("runLiveProbes", () => {
     expect(page.log.some((l) => l.startsWith("key:"))).toBe(false);
   });
 
+  it("records WHY a probe did not run, instead of losing it", async () => {
+    // The whole point. A measurement that vanishes silently is indistinguishable from a page
+    // with nothing wrong: the criterion sits at « to assess » run after run, and nobody can
+    // tell whether it was measured and clean or never measured at all. On a real CI run that
+    // is exactly what happened — the probes threw, the catch swallowed it, and five criteria
+    // stayed undecided with no trace of why.
+    const page = fakePage({
+      setViewportSize: async () => {
+        throw new Error("viewport is fixed in this context");
+      },
+    });
+    const r = await runLiveProbes(page);
+    expect(r.probed).not.toContain("1.4.10");
+    expect(r.skipped?.find((s) => s.sc === "1.4.10")?.why).toMatch(/viewport is fixed/);
+  });
+
   it("keeps going when one probe throws — a measurement lost is not a page lost", async () => {
     // The guard that matters in a suite: a probe failing must cost its own criterion, never
     // the snapshot and never the caller's test.

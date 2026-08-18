@@ -85,8 +85,15 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
   if (opts.probes) {
     try {
       probes = await runLiveProbes(page, Array.isArray(opts.probes) ? { only: opts.probes } : {});
-    } catch {
-      /* the page is still recorded; the criteria these decide simply stay to assess */
+    } catch (e) {
+      // LOUD, not silent. A swallowed probe failure is indistinguishable from a page with
+      // nothing wrong: the criteria it would have decided simply stay « to assess », run after
+      // run, with nobody able to tell whether they were measured and clean or never measured
+      // at all. That confusion is the exact failure mode this tool exists to prevent, so it
+      // must not be the one it ships. The page is still recorded either way.
+      console.warn(
+        `ultra11y: the live probes failed on this page — ${e instanceof Error ? e.message : String(e)}. The snapshot was still recorded; the criteria they decide stay to assess.`,
+      );
     }
   }
 

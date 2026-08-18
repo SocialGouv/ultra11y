@@ -260,38 +260,87 @@ export async function probeHover(page: Any): Promise<ProbeHit[]> {
 export async function runLiveProbes(page: Any, opts: { only?: string[] } = {}): Promise<LiveProbeResult> {
   const only = opts.only?.length ? new Set(opts.only) : null;
   const want = (id: string): boolean => only === null || only.has(id);
-  const size = (page.viewportSize?.() ?? null) as { width: number; height: number } | null;
+  // Capability checks, not assumptions. A page object that cannot resize or press a key is a
+  // page whose reflow and focus-visibility simply were not measured — which is a fact to
+  // record, not a crash to propagate into somebody's test run.
+  const canResize = typeof page.setViewportSize === "function" && typeof page.viewportSize === "function";
+  const canType = !!page.keyboard && typeof page.keyboard.press === "function";
+  const canHover = typeof page.hover === "function" && typeof page.waitForTimeout === "function";
+  const canStyle = typeof page.addStyleTag === "function";
+  const size = (canResize ? (page.viewportSize() ?? null) : null) as { width: number; height: number } | null;
   const restore = size ?? { width: 1280, height: 900 };
-  const out: LiveProbeResult = { focusVisible: [], hover: [], reflowZoom: [], textSpacing: [], reflow: { horizontalScroll: false }, probed: [] };
+  const out: LiveProbeResult = { focusVisible: [], hover: [], reflowZoom: [], textSpacing: [], reflow: { horizontalScroll: false }, probed: [], skipped: [] };
+  const skip = (sc: string, why: string): void => {
+    out.skipped?.push({ sc, why });
+  };
+  if (!canResize) skip("1.4.10", "the page object cannot resize its viewport");
+  if (!canType) skip("2.4.7", "the page object exposes no keyboard");
+  if (!canHover) skip("1.4.13", "the page object cannot hover");
+  if (!canStyle) skip("1.4.12", "the page object cannot inject a stylesheet");
   // Each probe is guarded on its own: one that throws costs its criterion, never the others
   // and never the caller's test.
-  if (want("2.4.7")) {
-    out.focusVisible = await probeFocusVisible(page).catch(() => [] as ProbeHit[]);
-    out.probed.push("2.4.7");
+  if (want("2.4.7") && canType) {
+    const r = await probeFocusVisible(page).catch((e: unknown) => {
+      skip("2.4.7", String((e as Error)?.message ?? e).slice(0, 160));
+      return null;
+    });
+    if (r) {
+      out.focusVisible = r;
+      out.probed.push("2.4.7");
+    }
   }
-  if (want("1.4.13")) {
-    out.hover = await probeHover(page).catch(() => [] as ProbeHit[]);
-    out.probed.push("1.4.13");
+  if (want("1.4.13") && canHover && canType) {
+    const r = await probeHover(page).catch((e: unknown) => {
+      skip("1.4.13", String((e as Error)?.message ?? e).slice(0, 160));
+      return null;
+    });
+    if (r) {
+      out.hover = r;
+      out.probed.push("1.4.13");
+    }
   }
   if (want("1.4.4")) {
     out.reflowZoom = ((await page.evaluate(REFLOW_ZOOM_PROBE).catch(() => [])) as ProbeHit[]) ?? [];
     out.probed.push("1.4.4");
   }
-  if (want("1.4.10")) {
-    await page.setViewportSize({ width: 320, height: restore.height }).catch(() => {});
-    out.reflow = ((await page.evaluate(REFLOW_PROBE).catch(() => ({ horizontalScroll: false }))) as { horizontalScroll: boolean }) ?? {
-      horizontalScroll: false,
-    };
-    await page.setViewportSize(restore).catch(() => {});
-    out.probed.push("1.4.10");
+  if (want("1.4.10") && canResize) {
+    let narrowed = true;
+    await page.setViewportSize({ width: 320, height: restore.height }).catch((e: unknown) => {
+      narrowed = false;
+      skip("1.4.10", String((e as Error)?.message ?? e).slice(0, 160));
+    });
+    if (narrowed) {
+      const r = (await page.evaluate(REFLOW_PROBE).catch((e: unknown) => {
+        skip("1.4.10", String((e as Error)?.message ?? e).slice(0, 160));
+        return null;
+      })) as { horizontalScroll: boolean } | null;
+      // The viewport goes back whatever the probe did — the caller's next assertion must not
+      // be measuring a 320px page.
+      await page.setViewportSize(restore).catch(() => {});
+      if (r) {
+        out.reflow = r;
+        out.probed.push("1.4.10");
+      }
+    }
   }
-  if (want("1.4.12")) {
+  if (want("1.4.12") && canStyle) {
     // Tagged so it can be removed again — an injected stylesheet left behind would change
     // every measurement the caller makes after this call.
-    const handle = await page.addStyleTag({ content: TEXT_SPACING_CSS }).catch(() => null);
-    out.textSpacing = ((await page.evaluate(TEXT_SPACING_PROBE).catch(() => [])) as ProbeHit[]) ?? [];
-    if (handle) await page.evaluate(REMOVE_TEXT_SPACING_STEP).catch(() => {});
-    out.probed.push("1.4.12");
+    const handle = await page.addStyleTag({ content: TEXT_SPACING_CSS }).catch((e: unknown) => {
+      skip("1.4.12", String((e as Error)?.message ?? e).slice(0, 160));
+      return null;
+    });
+    if (handle) {
+      const r = (await page.evaluate(TEXT_SPACING_PROBE).catch((e: unknown) => {
+        skip("1.4.12", String((e as Error)?.message ?? e).slice(0, 160));
+        return null;
+      })) as ProbeHit[] | null;
+      await page.evaluate(REMOVE_TEXT_SPACING_STEP).catch(() => {});
+      if (r) {
+        out.textSpacing = r;
+        out.probed.push("1.4.12");
+      }
+    }
   }
   return out;
 }
@@ -317,4 +366,9 @@ export interface LiveProbeResult {
   /** The success criteria actually probed on THIS page. Absence of a hit only means
    *  something when the probe ran, which is why this travels with the hits. */
   probed: string[];
+  /** Why a probe did not run, when one did not. Recorded rather than dropped: a measurement
+   *  that vanishes silently is indistinguishable from a page with nothing wrong, and the
+   *  criteria it would have decided then sit at « to assess » with nobody able to tell which
+   *  of the two happened. */
+  skipped?: { sc: string; why: string }[];
 }
