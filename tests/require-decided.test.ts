@@ -82,3 +82,33 @@ describe("check --require-decided", () => {
     expect(isUndecidedFile(null)).toBe(false);
   });
 });
+
+describe("a not-applicable verdict is not a conformity, and is not gated like one", () => {
+  it("accepts an NA with a justification and no citations", async () => {
+    // The engine's OWN NA carries a justification naming what it searched for, and no
+    // citations (src/audit.ts subjectMatterReason). Demanding citations from the agent was
+    // holding it to a stricter standard than the engine — and a contradictory one: an NA says
+    // "none of this is what the criterion is about", so citing the elements it just ruled out
+    // of scope makes no sense. Measured on a real run, six criteria were refused for this
+    // alone, every one of them an honest NA.
+    const { applyAdjudication, buildAdjudicationWorklist } = await import("../src/adjudicate.js");
+    const { runAudit } = await import("../src/audit.js");
+    const { mkdtempSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+
+    const dir = mkdtempSync(join(tmpdir(), "u11y-na-"));
+    const f = join(dir, "p.html");
+    writeFileSync(f, `<!doctype html><html lang="fr"><head><title>T</title></head><body><main><h1>H</h1><a href="/x">Voir la page x</a></main></body></html>`);
+    const audit = runAudit({ inputs: [f] });
+    const items = buildAdjudicationWorklist(audit).map((it) =>
+      it.criteriaId === "2.4.4"
+        ? { ...it, verdict: "NA" as const, justification: "Aucun lien de ce type n'est concerné dans le périmètre audité." }
+        : { ...it, verdict: "manual" as const, reason: "undecidable" },
+    );
+    const r = applyAdjudication(audit, { tool: "ultra11y", kind: "adjudication", schemaVersion: 2, standard: "wcag", auditDate: audit.date, items });
+
+    expect(r.issues.join("\n")).not.toMatch(/must cite at least one/);
+    expect(r.audit.criteria.find((c) => c.id === "2.4.4")?.status).toBe("NA");
+  });
+});

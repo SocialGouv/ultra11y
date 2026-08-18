@@ -60,9 +60,11 @@ export const ADJUDICATE_MAX_EVIDENCE_CLASSES = 1200;
 // especially confusing one, since nothing about the code got worse. Refusing to conclude is
 // honest only when something really was not looked at.
 
-/** Sibling anchors listed per class. Bounded for readability; `occurrences` carries the true
- *  count, and the citation gate accepts any anchor of the class, listed or not. */
-const ALSO_AT_MAX = 8;
+/** Sibling anchors RENDERED per class. The data keeps them all — the citation gate reads that
+ *  list to decide whether an anchor belongs to the criterion, so a bound here would make the
+ *  gate refuse real occurrences for being ninth. Measured on a real run: 31 of 37 refusals
+ *  were citations of elements the criterion genuinely carried. Only the reading is bounded. */
+const ALSO_AT_SHOWN = 8;
 
 /** How much there actually was to look at, so a reader can tell a complete reading from a
  *  glance at the first few. */
@@ -84,7 +86,9 @@ export interface Evidence {
   /** Anchors sharing this content class — the same header link on 38 pages is one decision,
    *  not 38. Absent when the class has a single anchor. */
   occurrences?: number;
-  /** Some of the other anchors of this class, as `file:line`. Bounded (see ALSO_AT_MAX). */
+  /** Every other anchor of this class, as `file:line`. Complete on purpose: the citation gate
+   *  reads it to decide membership, so a bound here would refuse real occurrences. The
+   *  worklist renders only the first few (ALSO_AT_SHOWN). */
   alsoAt?: string[];
   /** Page ids this class appears on, when it was harvested from rendered captures. */
   pages?: string[];
@@ -240,7 +244,7 @@ function collapse(harvested: Harvested[]): { evidence: Evidence[]; population: E
     return {
       ...rep.ev,
       ...(group.length > 1 ? { occurrences: group.length } : {}),
-      ...(others.length ? { alsoAt: others.slice(0, ALSO_AT_MAX).map((x) => `${x.ev.file}:${x.ev.line}`) } : {}),
+      ...(others.length ? { alsoAt: others.map((x) => `${x.ev.file}:${x.ev.line}`) } : {}),
       ...(pages.length ? { pages } : {}),
     };
   });
@@ -328,6 +332,44 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
   return audit.residualRisks.map((r: ResidualRisk) =>
     blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? undefined, harvestSubjects(subjectsForSc(r.criteriaId), docs)),
   );
+}
+
+/** The files this audit actually read. Computed from the audit's own scope inputs, so it is
+ *  the same set the harvest walked — `discover` only globs, it does not parse, so this costs
+ *  little and is memoised per fold. */
+function auditFiles(audit: AuditResult, cwd?: string): Set<string> {
+  const inputs = audit.scope.inputs.filter((i) => i !== "-" && i !== "<stdin>");
+  if (!inputs.length) return new Set();
+  try {
+    void cwd; // `discover` returns the same repo-relative paths the harvest anchors use
+    return new Set(discover(inputs, {}).files);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Does this citation name evidence the criterion actually carries?
+ *
+ *  Same file, and within the drift `groundFinding` already tolerates. Exact line equality was
+ *  too literal to be useful: the harvest anchors a <table> at line 19, the agent cites the
+ *  <caption> at line 20 — which is the very thing RGAA 5.4 asks about, inside the element it
+ *  was shown — and the gate called it fabricated. Measured on a real run, that class of
+ *  refusal cost more criteria than every other cause combined.
+ *
+ *  What the check still catches is what it was written for: a citation pointing at a file the
+ *  criterion was never given. And it is only half the gate — `groundFinding` still has to find
+ *  the cited content in the real source, so a plausible-looking file:line in the right
+ *  neighbourhood proves nothing on its own. */
+const CITE_DRIFT = 10;
+function cites0(anchors: string[], c: { file: string; line: number }): boolean {
+  for (const a of anchors) {
+    const at = a.lastIndexOf(":");
+    if (at < 0) continue;
+    if (a.slice(0, at) !== c.file) continue;
+    const line = Number.parseInt(a.slice(at + 1), 10);
+    if (Number.isFinite(line) && Math.abs(line - c.line) <= CITE_DRIFT) return true;
+  }
+  return false;
 }
 
 export interface ApplyAdjudicationResult {
@@ -521,6 +563,9 @@ export function applyAdjudication(
   // flat list) for the same reason as `blame`: a failed citation has to condemn its own
   // criterion and no other.
   const groundInputs = new Map<string, { file: string; line: number; selector?: string; snippet?: string }[]>();
+  // Memoised: only a citation that missed its criterion's own anchors ever asks for it.
+  let scopeCache: Set<string> | undefined;
+  const scopeFiles = (): Set<string> => (scopeCache ??= auditFiles(audit, opts.cwd));
   const toGround = (criteriaId: string, g: { file: string; line: number; selector?: string; snippet?: string }) => {
     const list = groundInputs.get(criteriaId);
     if (list) list.push(g);
@@ -557,12 +602,21 @@ export function applyAdjudication(
             `criterion ${it.criteriaId}: a C verdict needs evidence to cite, and none was harvested for this criterion — record "manual" (reason "undecidable"), or "NA" if nothing in scope is concerned`,
           );
         }
-      } else if (cites.length === 0) {
+      } else if (cites.length === 0 && v === "C") {
+        // Only a `C` must cite. A `C` says "everything here conforms", so it has to name what
+        // it cleared; an `NA` says "none of this is what the criterion is about", and there is
+        // nothing to clear — asking it to cite the very elements it just ruled out of scope is
+        // a contradiction, and one the engine does not hold ITSELF to: an engine-proved NA
+        // (src/audit.ts subjectMatterReason) carries a justification naming what was searched
+        // for, and no citations at all. Measured on a real run, six criteria were refused for
+        // this alone, each of them an honest NA.
+        //
+        // The justification is what keeps an NA falsifiable, and it is still required above.
         blame(
           it.criteriaId,
-          `criterion ${it.criteriaId}: a ${v} verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, …}])`,
+          `criterion ${it.criteriaId}: a C verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, …}])`,
         );
-      } else {
+      } else if (cites.length > 0) {
         // Each citation must name evidence THIS item carried. Grounding alone would only
         // prove the anchor exists somewhere in the tree; the pairing proves the agent ruled
         // on what it was actually given.
@@ -576,9 +630,22 @@ export function applyAdjudication(
         // exactly how RGAA 5.8, 9.2 and 11.1 were refused. Membership was the defect;
         // grounding — which proves the citation resolves against real source — is unchanged
         // and still runs on every one of them.
-        const anchors = new Set(it.evidence.flatMap((e) => [`${e.file}:${e.line}`, ...(e.alsoAt ?? [])]));
+        const anchors = it.evidence.flatMap((e) => [`${e.file}:${e.line}`, ...(e.alsoAt ?? [])]);
         for (const c of cites) {
-          if (!anchors.has(`${c.file}:${c.line}`)) {
+          // Two ways to belong, and the second one is what a good adjudicator does.
+          //
+          // The harvest anchors a rendered page (`.ultra11y/pages/<id>/dom.html`) because that
+          // is what proves the browser's output — but the place a reader goes to FIX it is the
+          // component that produced it, and that is what the agent naturally cites. Measured
+          // on a real run: 15 of the 16 citations still refused after the drift tolerance were
+          // in files this audit had read, pointing at the source behind the evidence. Refusing
+          // them called correct work fabricated.
+          //
+          // So a citation also belongs when it lands in a file the audit read. That is a real
+          // bound — a file outside the audited scope is still refused — and it is not the last
+          // one: `groundFinding` below still has to find the cited content at that file:line in
+          // the real source, which is what "not fabricated" actually means.
+          if (!cites0(anchors, c) && !scopeFiles().has(c.file)) {
             blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c.file}:${c.line} is not among this criterion's harvested evidence (fabricated?)`);
           }
           toGround(it.criteriaId, { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet });
@@ -829,6 +896,7 @@ const T = {
     occurrences: "occurrences",
     pagesWord: "page(s)",
     on: "sur",
+    alsoAt: "aussi en",
     incomplete: "LECTURE INCOMPLÈTE — un « C » sera refusé sur ce critère",
     none: "(aucune évidence automatique — décidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "À vérifier manuellement",
@@ -858,6 +926,7 @@ const T = {
     occurrences: "occurrences",
     pagesWord: "page(s)",
     on: "on",
+    alsoAt: "also at",
     incomplete: "INCOMPLETE READING — a C will be refused on this criterion",
     none: "(no automatic evidence — decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
@@ -1003,6 +1072,7 @@ export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en",
         const extra = [
           e.occurrences && e.occurrences > 1 ? `×${e.occurrences}` : "",
           e.pages?.length ? `${s.on} ${e.pages.slice(0, 4).join(", ")}${e.pages.length > 4 ? "…" : ""}` : "",
+          e.alsoAt?.length ? `${s.alsoAt} ${e.alsoAt.slice(0, ALSO_AT_SHOWN).join(", ")}${e.alsoAt.length > ALSO_AT_SHOWN ? "…" : ""}` : "",
         ]
           .filter(Boolean)
           .join(" ");

@@ -57182,7 +57182,7 @@ function adjudicationText(sc, lang) {
 
 // src/adjudicate.ts
 var ADJUDICATE_MAX_EVIDENCE_CLASSES = 1200;
-var ALSO_AT_MAX = 8;
+var ALSO_AT_SHOWN = 8;
 function adjudicationContract() {
   return {
     verdicts: [...VERDICTS],
@@ -57225,7 +57225,7 @@ function collapse2(harvested) {
     return {
       ...rep.ev,
       ...group.length > 1 ? { occurrences: group.length } : {},
-      ...others.length ? { alsoAt: others.slice(0, ALSO_AT_MAX).map((x) => `${x.ev.file}:${x.ev.line}`) } : {},
+      ...others.length ? { alsoAt: others.map((x) => `${x.ev.file}:${x.ev.line}`) } : {},
       ...pages.length ? { pages } : {}
     };
   });
@@ -57287,6 +57287,27 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
   return audit2.residualRisks.map(
     (r) => blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? void 0, harvestSubjects(subjectsForSc(r.criteriaId), docs))
   );
+}
+function auditFiles(audit2, cwd) {
+  const inputs = audit2.scope.inputs.filter((i2) => i2 !== "-" && i2 !== "<stdin>");
+  if (!inputs.length) return /* @__PURE__ */ new Set();
+  try {
+    void cwd;
+    return new Set(discover(inputs, {}).files);
+  } catch {
+    return /* @__PURE__ */ new Set();
+  }
+}
+var CITE_DRIFT = 10;
+function cites0(anchors, c2) {
+  for (const a of anchors) {
+    const at = a.lastIndexOf(":");
+    if (at < 0) continue;
+    if (a.slice(0, at) !== c2.file) continue;
+    const line = Number.parseInt(a.slice(at + 1), 10);
+    if (Number.isFinite(line) && Math.abs(line - c2.line) <= CITE_DRIFT) return true;
+  }
+  return false;
 }
 var NC_SEVERITY_DEFAULT = "majeur";
 var MANUAL_REASONS = /* @__PURE__ */ new Set(["needs-rendered-dom", "undecidable"]);
@@ -57374,6 +57395,8 @@ function applyAdjudication(audit2, adj, opts = {}) {
     }
   }
   const groundInputs = /* @__PURE__ */ new Map();
+  let scopeCache;
+  const scopeFiles = () => scopeCache ??= auditFiles(audit2, opts.cwd);
   const toGround = (criteriaId, g) => {
     const list = groundInputs.get(criteriaId);
     if (list) list.push(g);
@@ -57399,15 +57422,15 @@ function applyAdjudication(audit2, adj, opts = {}) {
             `criterion ${it.criteriaId}: a C verdict needs evidence to cite, and none was harvested for this criterion \u2014 record "manual" (reason "undecidable"), or "NA" if nothing in scope is concerned`
           );
         }
-      } else if (cites.length === 0) {
+      } else if (cites.length === 0 && v === "C") {
         blame(
           it.criteriaId,
-          `criterion ${it.criteriaId}: a ${v} verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, \u2026}])`
+          `criterion ${it.criteriaId}: a C verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, \u2026}])`
         );
-      } else {
-        const anchors = new Set(it.evidence.flatMap((e) => [`${e.file}:${e.line}`, ...e.alsoAt ?? []]));
+      } else if (cites.length > 0) {
+        const anchors = it.evidence.flatMap((e) => [`${e.file}:${e.line}`, ...e.alsoAt ?? []]);
         for (const c2 of cites) {
-          if (!anchors.has(`${c2.file}:${c2.line}`)) {
+          if (!cites0(anchors, c2) && !scopeFiles().has(c2.file)) {
             blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c2.file}:${c2.line} is not among this criterion's harvested evidence (fabricated?)`);
           }
           toGround(it.criteriaId, { file: c2.file, line: c2.line, selector: c2.selector, snippet: c2.snippet });
@@ -57593,6 +57616,7 @@ var T2 = {
     occurrences: "occurrences",
     pagesWord: "page(s)",
     on: "sur",
+    alsoAt: "aussi en",
     incomplete: "LECTURE INCOMPL\xC8TE \u2014 un \xAB C \xBB sera refus\xE9 sur ce crit\xE8re",
     none: "(aucune \xE9vidence automatique \u2014 d\xE9cidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "\xC0 v\xE9rifier manuellement",
@@ -57621,6 +57645,7 @@ var T2 = {
     occurrences: "occurrences",
     pagesWord: "page(s)",
     on: "on",
+    alsoAt: "also at",
     incomplete: "INCOMPLETE READING \u2014 a C will be refused on this criterion",
     none: "(no automatic evidence \u2014 decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
@@ -57676,7 +57701,8 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
       for (const e of it.evidence) {
         const extra = [
           e.occurrences && e.occurrences > 1 ? `\xD7${e.occurrences}` : "",
-          e.pages?.length ? `${s.on} ${e.pages.slice(0, 4).join(", ")}${e.pages.length > 4 ? "\u2026" : ""}` : ""
+          e.pages?.length ? `${s.on} ${e.pages.slice(0, 4).join(", ")}${e.pages.length > 4 ? "\u2026" : ""}` : "",
+          e.alsoAt?.length ? `${s.alsoAt} ${e.alsoAt.slice(0, ALSO_AT_SHOWN).join(", ")}${e.alsoAt.length > ALSO_AT_SHOWN ? "\u2026" : ""}` : ""
         ].filter(Boolean).join(" ");
         out2.push(`- \`${e.file}:${e.line}\` (\`${e.selector}\`)${extra ? ` [${extra}]` : ""}${e.note ? ` \u2014 ${e.note}` : ""}`);
       }

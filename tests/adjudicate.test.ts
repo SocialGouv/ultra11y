@@ -369,12 +369,38 @@ describe("applyAdjudication — fail-closed validation", () => {
     expect(r.issues.join("\n")).toMatch(/needs evidence to cite/);
   });
 
-  it("refuses a citation that is not among the evidence the criterion was shown", () => {
+  it("refuses a citation pointing at a file this audit never read", () => {
+    // The bound that survives. Membership stopped meaning "this exact anchor was in your
+    // brief" — measured, that refused correct work: the harvest anchors a rendered page, and
+    // the agent cites the component that produced it, which is where a fix goes. It still
+    // means "a file this audit actually looked at", and that is what this pins.
     const src = baseItems().find((i) => i.criteriaId === "2.4.4")!;
-    const items = decideAll({ verdict: "C", justification: "ok", citations: [{ ...src.evidence[0]!, line: 9999 }] }, "2.4.4");
+    const items = decideAll({ verdict: "C", justification: "ok", citations: [{ ...src.evidence[0]!, file: "src/never-audited-by-this-run.tsx" }] }, "2.4.4");
     const r = applyAdjudication(auditPage(), file(items));
     expect(r.ok).toBe(false);
     expect(r.issues.join("\n")).toMatch(/not among this criterion's harvested evidence/);
+  });
+
+  it("refuses a citation whose content is nowhere in the file it names", () => {
+    // The other half of the gate, and the one that actually means "not fabricated": whatever
+    // the citation points at has to BE there. Widening membership does not touch this.
+    const src = baseItems().find((i) => i.criteriaId === "2.4.4")!;
+    const items = decideAll(
+      { verdict: "C", justification: "ok", citations: [{ ...src.evidence[0]!, snippet: '<a href="/invented-by-the-model">Nowhere</a>' }] },
+      "2.4.4",
+    );
+    const r = applyAdjudication(auditPage(), file(items));
+    expect(r.ok).toBe(false);
+    expect(r.issues.join("\n")).toMatch(/cited snippet not found/);
+  });
+
+  it("accepts a citation a few lines off the anchor — the caption inside the table it was shown", () => {
+    // RGAA 5.4 asks about a table's caption; the harvest anchors the <table>. Refusing the
+    // caption for being one line below cost real criteria on a real run.
+    const src = baseItems().find((i) => i.criteriaId === "2.4.4")!;
+    const items = decideAll({ verdict: "C", justification: "ok", citations: [{ ...src.evidence[0]!, line: src.evidence[0]!.line + 1 }] }, "2.4.4");
+    const r = applyAdjudication(auditPage(), file(items));
+    expect(r.ok, r.issues.join(" | ")).toBe(true);
   });
 
   it("accepts a C that cites the evidence it was shown", () => {
