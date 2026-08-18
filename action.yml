@@ -175,6 +175,14 @@ inputs:
     description: 'Gate on the ADJUDICATED audit instead of re-auditing the source, so a model-ruled non-conformity can fail the job. The trade is real: the red/green stops being reproducible run to run. Ignored when `adjudicate` is `none`.'
     required: false
     default: 'false'
+  require-decided:
+    description: 'Fail the job while ANY criterion of the active standard is still « to assess ». Off by default. This is a different question from `fail-on`, which governs NON-CONFORMITIES: a run can find nothing wrong and still have decided almost nothing, and it reports success either way — measured on a real pull request, 94 of 106 criteria came back « à évaluer » in a green job, because an adjudication that lands nothing only warns. Turn this on once a ledger or an adjudication tier is in place, and pair it with `undecidable-file` for the criteria that genuinely cannot be decided.'
+    required: false
+    default: 'false'
+  undecidable-file:
+    description: 'Path to the criteria this project declares it cannot decide — `{"entries":[{"criteriaId":"…","reason":"…"}]}`. Deliberately a NAMED list and not a tolerance: a percentage passes whatever it must to stay green, and what it hides is exactly the criteria nobody could decide. An entry with no reason fails the gate, and so does one whose criterion has since been decided — an exception must not outlive what it excused. Each declared criterion is printed in the job log with its reason.'
+    required: false
+    default: ''
   working-directory:
     description: 'Directory to run in.'
     required: false
@@ -599,6 +607,28 @@ runs:
           echo "::warning::ultra11y: the adjudication landed nothing — the judgment criteria stay to assess."
         fi
 
+    # COMPLETENESS — is the grid actually filled in?
+    #
+    # Deliberately measured here and enforced in the final `Gate` step: failing on the spot
+    # would skip the report, the HTML and the artifact upload, and the first thing anyone does
+    # with an incomplete grid is go and read which criteria are missing.
+    - name: Completeness gate
+      id: decided
+      if: inputs.require-decided == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        args=(--in audits/audit-latest.json --require-decided --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}')
+        if [ -n '${{ inputs.undecidable-file }}' ]; then args+=(--allow-undecided '${{ inputs.undecidable-file }}'); fi
+        if node "$ENGINE" check "${args[@]}"; then
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::ultra11y: the criterion grid is incomplete — see the criteria named above. The job fails at the gate step."
+        fi
+
     # The per-page DOSSIERS — one sheet per page (its screenshot, every criterion of the
     # standard, each non-conformity), plus an index. Uploaded with the rest of audits/.
     - name: Per-page report
@@ -743,12 +773,21 @@ runs:
 
     # The gate runs LAST, so a failing audit has already produced every surface above.
     - name: Gate
-      if: inputs.fail-on != ''
+      if: inputs.fail-on != '' || inputs.require-decided == 'true'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
       run: |
+        # COMPLETENESS first, and on its own: a project may want a complete grid without
+        # gating on non-conformities at all (`fail-on: ""`), which is the normal shape for a
+        # measuring tier. Failing here rather than in the step that computed it is what lets
+        # the report and the artifacts be written before the job goes red.
+        if [ '${{ inputs.require-decided }}' = 'true' ] && [ '${{ steps.decided.outputs.ok }}' != 'true' ]; then
+          echo "::error::ultra11y: the criterion grid is incomplete — some criteria are still « to assess ». Adjudicate them, or declare them in the file named by undecidable-file, with a reason."
+          exit 1
+        fi
+        if [ -z '${{ inputs.fail-on }}' ]; then exit 0; fi
         # Two gates, one step — the gate must stay LAST, so this is a branch, not a new step.
         #
         # DEFAULT: re-audit the SOURCE. The red/green is then a pure function of the commit,

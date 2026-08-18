@@ -55703,6 +55703,50 @@ function sectionBody(md, n) {
   const next = /^##\s+/m.exec(md.slice(from));
   return next ? md.slice(from, from + next.index) : md.slice(from);
 }
+function byCriterionId(a, b) {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i2 = 0; i2 < Math.max(pa.length, pb.length); i2++) {
+    const d = (pa[i2] ?? 0) - (pb[i2] ?? 0);
+    if (d) return d;
+  }
+  return 0;
+}
+function isUndecidedFile(v) {
+  return !!v && typeof v === "object" && Array.isArray(v.entries);
+}
+function checkDecided(audit2, standard = CORE2, lang = "en", opts = {}) {
+  const fr = lang === "fr";
+  const rows = isCore(standard) ? audit2.criteria.map((c2) => ({ id: c2.id, status: c2.status })) : derivePackResults(audit2, standard).map((c2) => ({ id: c2.id, status: c2.status }));
+  const issues = [];
+  const declared = /* @__PURE__ */ new Map();
+  for (const e of opts.allow?.entries ?? []) {
+    if (!e.criteriaId) continue;
+    if (!e.reason?.trim()) {
+      issues.push(
+        fr ? `Crit\xE8re ${e.criteriaId} d\xE9clar\xE9 ind\xE9cidable sans motif \u2014 un crit\xE8re laiss\xE9 ouvert doit dire pourquoi, sinon la d\xE9claration ne vaut rien.` : `Criterion ${e.criteriaId} is declared undecidable with no reason \u2014 an open criterion must say why, or the declaration means nothing.`
+      );
+      continue;
+    }
+    declared.set(e.criteriaId, e);
+  }
+  const open = new Set(rows.filter((r) => r.status === "manual").map((r) => r.id));
+  for (const id of declared.keys()) {
+    if (!open.has(id)) {
+      issues.push(
+        fr ? `Crit\xE8re ${id} d\xE9clar\xE9 ind\xE9cidable, mais il porte d\xE9sormais un verdict \u2014 retirez-le de la liste.` : `Criterion ${id} is declared undecidable but now carries a verdict \u2014 remove it from the list.`
+      );
+    }
+  }
+  const undecided = [...open].filter((id) => !declared.has(id)).sort(byCriterionId);
+  const allowed = [...open].filter((id) => declared.has(id)).map((id) => declared.get(id));
+  if (undecided.length) {
+    issues.push(
+      fr ? `${undecided.length}/${rows.length} crit\xE8re(s) encore \xAB \xE0 \xE9valuer \xBB : ${undecided.join(", ")}.` : `${undecided.length}/${rows.length} criterion(ia) still to assess: ${undecided.join(", ")}.`
+    );
+  }
+  return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length };
+}
 
 // src/adjudicate.ts
 import { mkdirSync as mkdirSync9, writeFileSync as writeFileSync10 } from "fs";
@@ -65433,6 +65477,7 @@ Usage:
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
   ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES \u2014 its tests depend on them)
   ultra11y check    --report <md> [--standard <pack>] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
+  ultra11y check    --in <audit.json> --require-decided [--standard <pack>] [--allow-undecided <file>]   (fail while any criterion is still \xAB to assess \xBB)
   ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
   ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (adjudicate the manual criteria)
   ultra11y verify   --apply <adjudication.json> --in <audit.json> [--out <dir>]        (fold the adjudication into the audit)
@@ -65713,6 +65758,16 @@ Options:
                      dropped as stale and its criterion says so
   --max-verify <n>   verify: cap the worklist size; 0 = no cap           (default: 40)
   --verdicts <file>  check --semantic: the adjudicated verdicts artifact
+  --require-decided  check: fail while ANY criterion of the standard is still \xAB to assess \xBB.
+                     Needs --in. A green job does not otherwise mean the grid was filled:
+                     --fail-on governs non-conformities, and an adjudication that lands
+                     nothing only warns.
+  --allow-undecided <file>
+                     check --require-decided: criteria this project declares it cannot
+                     decide, as {"entries":[{"criteriaId","reason"}]}. A NAMED list, never a
+                     tolerance: a threshold would hide exactly the criteria nobody could
+                     decide. An entry with no reason fails the gate, and one whose criterion
+                     now carries a verdict fails it too.
                      (default: VERIFY.todo.json next to the report)
   --run <dir>        orchestrate: the run dir holding the worklists (ADJUDICATE.todo.json,
                      VERIFY.todo.json); artifacts land under <dir>/orchestration/
@@ -65834,6 +65889,8 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "theme",
   "apply",
   "verdicts",
+  // `check --require-decided`: the criteria a project declares it cannot decide.
+  "allow-undecided",
   "max-verify",
   "lang",
   "merge",
@@ -65925,6 +65982,8 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "list",
   "generate",
   "semantic",
+  // `check`: fail while any criterion of the standard is still « to assess ».
+  "require-decided",
   "manual",
   // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
   // verdict discards the whole adjudication. The default is per-verdict.
@@ -67285,15 +67344,18 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
   return 0;
 }
 function cmdCheck(p) {
-  const rep = p.flags.report;
-  if (typeof rep !== "string" || !rep) {
-    console.error("ultra11y check: --report <md> is required.");
-    return 2;
-  }
   const standard = stdOf(p, "check");
   if (standard === null) return 2;
+  const requireDecided = p.flags["require-decided"] === true;
+  const rep = p.flags.report;
+  if (typeof rep !== "string" || !rep) {
+    if (!requireDecided) {
+      console.error("ultra11y check: --report <md> is required.");
+      return 2;
+    }
+  }
   const lang = resolveLang(p.flags, { standard });
-  const md = readInputFile(rep, "check", "--report");
+  const md = typeof rep === "string" && rep ? readInputFile(rep, "check", "--report") : "";
   if (md === null) return 2;
   let audit2;
   const inFlag = p.flags.in;
@@ -67312,22 +67374,49 @@ function cmdCheck(p) {
       return 2;
     }
   }
-  const res = checkReport(md, standard, lang, { audit: audit2 });
-  const sem = p.flags.semantic === true ? checkSemantic(md, {
+  if (requireDecided && !audit2) {
+    console.error("ultra11y check: --require-decided needs --in <audit.json> \u2014 completeness is a property of the audit, not of the report.");
+    return 2;
+  }
+  let allow;
+  const allowFlag = p.flags["allow-undecided"];
+  if (typeof allowFlag === "string" && allowFlag) {
+    try {
+      const parsed = JSON.parse(readText(allowFlag));
+      if (!isUndecidedFile(parsed)) {
+        console.error(`ultra11y check: --allow-undecided file has no "entries" array: ${allowFlag}.`);
+        return 2;
+      }
+      allow = parsed;
+    } catch {
+      console.error(`ultra11y check: --allow-undecided file not found or not valid JSON: ${allowFlag}.`);
+      return 2;
+    }
+  }
+  const decided = requireDecided && audit2 ? checkDecided(audit2, standard, lang, { allow }) : null;
+  const res = md ? checkReport(md, standard, lang, { audit: audit2 }) : { ok: true, issues: [] };
+  const sem = p.flags.semantic === true && typeof rep === "string" && rep ? checkSemantic(md, {
     reportPath: rep,
     verdictsPath: typeof p.flags.verdicts === "string" && p.flags.verdicts ? p.flags.verdicts : void 0,
     standard,
     lang
   }) : null;
-  const ok = res.ok && (sem === null || sem.ok);
+  const ok = res.ok && (sem === null || sem.ok) && (decided === null || decided.ok);
   if (p.flags.json) {
-    console.log(JSON.stringify(sem ? { ...res, ok, semantic: sem } : res, null, 2));
+    console.log(JSON.stringify({ ...res, ok, ...sem ? { semantic: sem } : {}, ...decided ? { decided } : {} }, null, 2));
   } else if (!p.flags.quiet) {
+    if (decided) {
+      const allowedNote = decided.allowed.length ? lang === "fr" ? ` (${decided.allowed.length} crit\xE8re(s) d\xE9clar\xE9(s) ind\xE9cidable(s) : ${decided.allowed.map((a) => `${a.criteriaId} \u2014 ${a.reason}`).join(" \xB7 ")})` : ` (${decided.allowed.length} criterion(ia) declared undecidable: ${decided.allowed.map((a) => `${a.criteriaId} \u2014 ${a.reason}`).join(" \xB7 ")})` : "";
+      if (decided.ok)
+        console.log(
+          lang === "fr" ? `\u2713 Grille compl\xE8te : les ${decided.total} crit\xE8res portent un verdict${allowedNote}.` : `\u2713 Complete grid: all ${decided.total} criteria carry a verdict${allowedNote}.`
+        );
+    }
     if (ok)
       console.log(
         sem ? lang === "fr" ? `\u2713 Rapport valide + gate s\xE9mantique engag\xE9e : ${sem.total} verdict(s), ${sem.grounded} ancr\xE9(s) dans la source${sem.moved ? ` (${sem.moved} d\xE9plac\xE9(s))` : ""}.` : `\u2713 Report valid + semantic gate engaged: ${sem.total} verdict(s), ${sem.grounded} grounded in source${sem.moved ? ` (${sem.moved} moved)` : ""}.` : lang === "fr" ? "\u2713 Rapport valide : sections, crit\xE8res cit\xE9s et justifications NA coh\xE9rents." : "\u2713 Report valid: sections, cited criteria and NA justifications are consistent."
       );
-    else for (const i2 of [...res.issues, ...sem?.issues ?? []]) console.error(`\u2717 ${i2}`);
+    else for (const i2 of [...res.issues, ...sem?.issues ?? [], ...decided?.issues ?? []]) console.error(`\u2717 ${i2}`);
   }
   return ok ? 0 : 1;
 }

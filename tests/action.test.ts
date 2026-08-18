@@ -170,14 +170,14 @@ describe("the bash is safe under `set -e`", () => {
   });
 });
 
-// The judgment criteria — 38 of the 55 WCAG ones, 81 of RGAA's 106 — that no static pass can
+// The judgment criteria — 38 of the 55 WCAG ones, 59 of RGAA's 106 — that no static pass can
 // decide. In a coding agent the agent rules on them; in CI nobody does, so without this tier
 // they stay « à évaluer » forever and the published conformance rate is partial by
 // construction. Everything here is opt-in, and everything degrades.
 describe("the adjudication tier", () => {
   /** Every surface that RENDERS from the adjudicated audit. They must all run after the
    *  verdicts are folded in, or the adjudication reaches nothing. */
-  const CONSUMERS = ["Per-page report", "SARIF", "Annotations", "File tracker tickets", "Markdown report", "HTML report"];
+  const CONSUMERS = ["Per-page report", "SARIF", "Annotations", "File tracker tickets", "Markdown report", "HTML report", "Completeness gate"];
 
   const adjudicationSteps = (): typeof ACTION.runs.steps => ACTION.runs.steps.filter((s) => s.name?.startsWith("Adjudicate"));
 

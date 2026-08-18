@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AuditResult, Lang } from "./types.js";
 import { hasSC } from "./wcag.js";
-import { type StandardId, criterionCoverage, isCore, loadPack, hasId, idCaptureSource, derivePackResults } from "./standards/index.js";
+import { type StandardId, CORE, criterionCoverage, isCore, loadPack, hasId, idCaptureSource, derivePackResults } from "./standards/index.js";
 import { buildWorklist, applyVerdicts, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import { isPagesReport } from "./pages-report.js";
@@ -307,4 +307,108 @@ function sectionBody(md: string, n: number): string {
   const from = start.index + start[0].length;
   const next = /^##\s+/m.exec(md.slice(from));
   return next ? md.slice(from, from + next.index) : md.slice(from);
+}
+
+// ---- the completeness gate --------------------------------------------------------------
+//
+// `check --require-decided` — does every criterion of the active standard carry a real
+// verdict, or does the grid still say « à évaluer » somewhere?
+//
+// Why this exists as a GATE rather than a number in a report: a job can be green while
+// deciding almost nothing. Measured on a real pull request, the page tier ran, adjudicated
+// nothing, published 94 of 106 criteria as « à évaluer » — and reported success, because
+// `fail-on` governs non-conformities and an adjudication that lands nothing only warns. A
+// reader who trusts the green tick reads a grid that was never filled in.
+//
+// The escape hatch is a NAMED list, never a threshold. A percentage lets anything through so
+// long as enough else passes, and it is precisely the criteria nobody could decide that a
+// threshold would hide. An entry states which criterion and why; an entry with no reason
+// fails the gate, because "documented" has to mean something.
+
+/** Numeric-segment order, so 2.1 comes before 10.1. */
+function byCriterionId(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+/** One criterion a project declares it cannot decide, and why. */
+export interface UndecidedAllowance {
+  criteriaId: string;
+  reason: string;
+  recordedBy?: string;
+  date?: string;
+}
+
+export interface UndecidedFile {
+  tool?: string;
+  kind?: string;
+  standard?: string;
+  entries: UndecidedAllowance[];
+}
+
+export interface DecidedResult {
+  ok: boolean;
+  issues: string[];
+  /** Criteria still « to assess » and NOT covered by an allowance. */
+  undecided: string[];
+  /** Criteria still « to assess » but declared, with their stated reason. */
+  allowed: UndecidedAllowance[];
+  total: number;
+}
+
+export function isUndecidedFile(v: unknown): v is UndecidedFile {
+  return !!v && typeof v === "object" && Array.isArray((v as UndecidedFile).entries);
+}
+
+/** Every criterion of `standard` that carries no verdict, minus the ones declared. */
+export function checkDecided(audit: AuditResult, standard: StandardId = CORE, lang: Lang = "en", opts: { allow?: UndecidedFile } = {}): DecidedResult {
+  const fr = lang === "fr";
+  const rows = isCore(standard)
+    ? audit.criteria.map((c) => ({ id: c.id, status: c.status }))
+    : derivePackResults(audit, standard).map((c) => ({ id: c.id, status: c.status }));
+  const issues: string[] = [];
+
+  const declared = new Map<string, UndecidedAllowance>();
+  for (const e of opts.allow?.entries ?? []) {
+    if (!e.criteriaId) continue;
+    if (!e.reason?.trim()) {
+      issues.push(
+        fr
+          ? `Critère ${e.criteriaId} déclaré indécidable sans motif — un critère laissé ouvert doit dire pourquoi, sinon la déclaration ne vaut rien.`
+          : `Criterion ${e.criteriaId} is declared undecidable with no reason — an open criterion must say why, or the declaration means nothing.`,
+      );
+      continue;
+    }
+    declared.set(e.criteriaId, e);
+  }
+  // A declaration that no longer matches an open criterion is stale, and a stale allowance is
+  // how an exception list quietly outlives the thing it excused.
+  const open = new Set(rows.filter((r) => r.status === "manual").map((r) => r.id));
+  for (const id of declared.keys()) {
+    if (!open.has(id)) {
+      issues.push(
+        fr
+          ? `Critère ${id} déclaré indécidable, mais il porte désormais un verdict — retirez-le de la liste.`
+          : `Criterion ${id} is declared undecidable but now carries a verdict — remove it from the list.`,
+      );
+    }
+  }
+
+  // Sorted the way a criterion id reads, not the way a string does: lexicographic order puts
+  // 10.1 before 2.1, and this list is meant to be worked through.
+  const undecided = [...open].filter((id) => !declared.has(id)).sort(byCriterionId);
+  const allowed = [...open].filter((id) => declared.has(id)).map((id) => declared.get(id)!);
+  if (undecided.length) {
+    issues.push(
+      fr
+        ? `${undecided.length}/${rows.length} critère(s) encore « à évaluer » : ${undecided.join(", ")}.`
+        : `${undecided.length}/${rows.length} criterion(ia) still to assess: ${undecided.join(", ")}.`,
+    );
+  }
+  return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length };
 }

@@ -39,7 +39,7 @@ import { buildGraphStreaming } from "./graph/build.js";
 import { discover } from "./discover.js";
 import { toPosix, GRAPH_ONLY_EXT } from "./glob.js";
 import { runCriteria, renderCriteriaReference } from "./criteria.js";
-import { checkReport, checkSemantic } from "./check.js";
+import { checkDecided, checkReport, checkSemantic, isUndecidedFile, type UndecidedFile } from "./check.js";
 import { buildWorklist, writeWorklist, applyVerdicts, VERIFY_MAX, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import {
@@ -105,6 +105,7 @@ Usage:
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
   ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES — its tests depend on them)
   ultra11y check    --report <md> [--standard <pack>] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
+  ultra11y check    --in <audit.json> --require-decided [--standard <pack>] [--allow-undecided <file>]   (fail while any criterion is still « to assess »)
   ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
   ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (adjudicate the manual criteria)
   ultra11y verify   --apply <adjudication.json> --in <audit.json> [--out <dir>]        (fold the adjudication into the audit)
@@ -385,6 +386,16 @@ Options:
                      dropped as stale and its criterion says so
   --max-verify <n>   verify: cap the worklist size; 0 = no cap           (default: 40)
   --verdicts <file>  check --semantic: the adjudicated verdicts artifact
+  --require-decided  check: fail while ANY criterion of the standard is still « to assess ».
+                     Needs --in. A green job does not otherwise mean the grid was filled:
+                     --fail-on governs non-conformities, and an adjudication that lands
+                     nothing only warns.
+  --allow-undecided <file>
+                     check --require-decided: criteria this project declares it cannot
+                     decide, as {"entries":[{"criteriaId","reason"}]}. A NAMED list, never a
+                     tolerance: a threshold would hide exactly the criteria nobody could
+                     decide. An entry with no reason fails the gate, and one whose criterion
+                     now carries a verdict fails it too.
                      (default: VERIFY.todo.json next to the report)
   --run <dir>        orchestrate: the run dir holding the worklists (ADJUDICATE.todo.json,
                      VERIFY.todo.json); artifacts land under <dir>/orchestration/
@@ -510,6 +521,8 @@ const VALUE_FLAGS = new Set([
   "theme",
   "apply",
   "verdicts",
+  // `check --require-decided`: the criteria a project declares it cannot decide.
+  "allow-undecided",
   "max-verify",
   "lang",
   "merge",
@@ -614,6 +627,8 @@ const BOOLEAN_FLAGS = new Set([
   "list",
   "generate",
   "semantic",
+  // `check`: fail while any criterion of the standard is still « to assess ».
+  "require-decided",
   "manual",
   // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
   // verdict discards the whole adjudication. The default is per-verdict.
@@ -2431,15 +2446,21 @@ function cmdRender(p: ParsedArgs): number {
 }
 
 function cmdCheck(p: ParsedArgs): number {
-  const rep = p.flags.report;
-  if (typeof rep !== "string" || !rep) {
-    console.error("ultra11y check: --report <md> is required.");
-    return 2;
-  }
   const standard = stdOf(p, "check");
   if (standard === null) return 2;
+  // --require-decided gates the AUDIT, not the report: it asks whether every criterion of the
+  // active standard carries a verdict. It therefore needs --in and not --report, and stands on
+  // its own — a project can demand a complete grid long before it publishes a deliverable.
+  const requireDecided = p.flags["require-decided"] === true;
+  const rep = p.flags.report;
+  if (typeof rep !== "string" || !rep) {
+    if (!requireDecided) {
+      console.error("ultra11y check: --report <md> is required.");
+      return 2;
+    }
+  }
   const lang = resolveLang(p.flags, { standard });
-  const md = readInputFile(rep, "check", "--report");
+  const md = typeof rep === "string" && rep ? readInputFile(rep, "check", "--report") : "";
   if (md === null) return 2;
   // --in <audit.json>: enable the pack applicability gate (R1) — re-derive from the audit
   // and fail on any NC criterion the report over-/under-projects.
@@ -2460,11 +2481,35 @@ function cmdCheck(p: ParsedArgs): number {
       return 2;
     }
   }
-  const res = checkReport(md, standard, lang, { audit });
+  if (requireDecided && !audit) {
+    console.error("ultra11y check: --require-decided needs --in <audit.json> — completeness is a property of the audit, not of the report.");
+    return 2;
+  }
+  // The declared-undecidable list, when one is given. Deliberately a NAMED list rather than a
+  // tolerance: a threshold passes whatever it has to in order to stay green, and the criteria
+  // it would hide are exactly the ones nobody could decide.
+  let allow: UndecidedFile | undefined;
+  const allowFlag = p.flags["allow-undecided"];
+  if (typeof allowFlag === "string" && allowFlag) {
+    try {
+      const parsed = JSON.parse(readText(allowFlag)) as unknown;
+      if (!isUndecidedFile(parsed)) {
+        console.error(`ultra11y check: --allow-undecided file has no "entries" array: ${allowFlag}.`);
+        return 2;
+      }
+      allow = parsed;
+    } catch {
+      console.error(`ultra11y check: --allow-undecided file not found or not valid JSON: ${allowFlag}.`);
+      return 2;
+    }
+  }
+  const decided = requireDecided && audit ? checkDecided(audit, standard, lang, { allow }) : null;
+  const res = md ? checkReport(md, standard, lang, { audit }) : { ok: true, issues: [] };
   // --semantic: the support-level gate ON TOP of the structural check. Fails closed —
   // a green exit must always mean the gate engaged (family P0: never green-but-inactive).
+  // `--semantic` reads the report, so it only applies when there IS one.
   const sem =
-    p.flags.semantic === true
+    p.flags.semantic === true && typeof rep === "string" && rep
       ? checkSemantic(md, {
           reportPath: rep,
           verdictsPath: typeof p.flags.verdicts === "string" && p.flags.verdicts ? p.flags.verdicts : undefined,
@@ -2472,10 +2517,25 @@ function cmdCheck(p: ParsedArgs): number {
           lang,
         })
       : null;
-  const ok = res.ok && (sem === null || sem.ok);
+  const ok = res.ok && (sem === null || sem.ok) && (decided === null || decided.ok);
   if (p.flags.json) {
-    console.log(JSON.stringify(sem ? { ...res, ok, semantic: sem } : res, null, 2));
+    console.log(JSON.stringify({ ...res, ok, ...(sem ? { semantic: sem } : {}), ...(decided ? { decided } : {}) }, null, 2));
   } else if (!p.flags.quiet) {
+    if (decided) {
+      // Say what the gate engaged on, green or red. A completeness gate that reports only its
+      // failures is one nobody can tell apart from a gate that never ran.
+      const allowedNote = decided.allowed.length
+        ? lang === "fr"
+          ? ` (${decided.allowed.length} critère(s) déclaré(s) indécidable(s) : ${decided.allowed.map((a) => `${a.criteriaId} — ${a.reason}`).join(" · ")})`
+          : ` (${decided.allowed.length} criterion(ia) declared undecidable: ${decided.allowed.map((a) => `${a.criteriaId} — ${a.reason}`).join(" · ")})`
+        : "";
+      if (decided.ok)
+        console.log(
+          lang === "fr"
+            ? `✓ Grille complète : les ${decided.total} critères portent un verdict${allowedNote}.`
+            : `✓ Complete grid: all ${decided.total} criteria carry a verdict${allowedNote}.`,
+        );
+    }
     if (ok)
       console.log(
         sem
@@ -2486,7 +2546,7 @@ function cmdCheck(p: ParsedArgs): number {
             ? "✓ Rapport valide : sections, critères cités et justifications NA cohérents."
             : "✓ Report valid: sections, cited criteria and NA justifications are consistent.",
       );
-    else for (const i of [...res.issues, ...(sem?.issues ?? [])]) console.error(`✗ ${i}`);
+    else for (const i of [...res.issues, ...(sem?.issues ?? []), ...(decided?.issues ?? [])]) console.error(`✗ ${i}`);
   }
   return ok ? 0 : 1;
 }
