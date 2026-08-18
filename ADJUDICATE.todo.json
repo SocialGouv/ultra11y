@@ -28,6 +28,13 @@
       "automatability": "judgment",
       "title": "Non-text Content",
       "evidence": [],
+      "population": {
+        "classes": 0,
+        "occurrences": 0,
+        "files": 0,
+        "pages": 0
+      },
+      "evidenceComplete": true,
       "verdict": null,
       "justification": "",
       "reason": null,
@@ -40,6 +47,13 @@
       "automatability": "judgment",
       "title": "Audio-only and Video-only (Prerecorded)",
       "evidence": [],
+      "population": {
+        "classes": 0,
+        "occurrences": 0,
+        "files": 0,
+        "pages": 0
+      },
+      "evidenceComplete": true,
       "verdict": null,
       "justification": "",
       "reason": null,

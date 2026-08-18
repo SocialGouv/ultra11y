@@ -10,7 +10,7 @@ import {
   applyAdjudication,
   writeAdjudication,
   formatAdjudication,
-  ADJUDICATE_MAX_EVIDENCE,
+  ADJUDICATE_MAX_EVIDENCE_CLASSES,
   type AdjudicationFile,
   type AdjudicationItem,
 } from "../src/adjudicate.js";
@@ -83,16 +83,36 @@ describe("buildAdjudicationWorklist", () => {
     if (c) expect(JSON.stringify(c.evidence)).toMatch(/#333|#fff/);
   });
 
-  it("caps evidence per criterion and records the truncation honestly", () => {
+  it("collapses repeated content to ONE class, and keeps the occurrence count", () => {
+    // The same link forty times is one decision about link purpose, not forty. Collapsing it
+    // is what lets the agent be shown the WHOLE population instead of a sample of it.
+    const repeated = fixture(
+      "repeated.html",
+      `<!doctype html><html lang="en"><head><title>t</title></head><body><main><h1>h</h1>${Array.from({ length: 40 }, () => `<a href="/contact">Contact</a>`).join("")}<a href="/about">About us</a></main></body></html>`,
+    );
+    const a = runAudit({ inputs: [repeated] });
+    const c = buildAdjudicationWorklist(a).find((i) => i.criteriaId === "2.4.4")!;
+    expect(c.evidence.length).toBe(2); // "Contact" and "About us"
+    expect(c.population!.occurrences).toBe(41);
+    expect(c.population!.classes).toBe(2);
+    expect(c.evidenceComplete).toBe(true);
+    expect(c.evidence.find((e) => e.note?.includes("Contact"))!.occurrences).toBe(40);
+  });
+
+  it("caps CLASSES, and says the reading was incomplete when it does", () => {
+    // A distinct link each time is a distinct decision, so this population does not collapse —
+    // and past the cap the item must declare itself incomplete, because that flag is what the
+    // fold reads to refuse a `C` over things nobody was shown.
     const many = fixture(
       "many.html",
-      `<!doctype html><html lang="en"><head><title>t</title></head><body><main><h1>h</h1>${Array.from({ length: 50 }, (_, i) => `<a href="/l${i}">link ${i}</a>`).join("")}</main></body></html>`,
+      `<!doctype html><html lang="en"><head><title>t</title></head><body><main><h1>h</h1>${Array.from({ length: ADJUDICATE_MAX_EVIDENCE_CLASSES + 20 }, (_, i) => `<a href="/l${i}">link ${i}</a>`).join("")}</main></body></html>`,
     );
     const a = runAudit({ inputs: [many] });
     const c = buildAdjudicationWorklist(a).find((i) => i.criteriaId === "2.4.4")!;
-    expect(c.evidence.length).toBe(ADJUDICATE_MAX_EVIDENCE);
+    expect(c.evidence.length).toBe(ADJUDICATE_MAX_EVIDENCE_CLASSES);
+    expect(c.evidenceComplete).toBe(false);
     expect(c.evidenceTruncated).toBeDefined();
-    expect(c.evidenceTruncated!.total).toBeGreaterThan(ADJUDICATE_MAX_EVIDENCE);
+    expect(c.evidenceTruncated!.total).toBeGreaterThan(ADJUDICATE_MAX_EVIDENCE_CLASSES);
   });
 });
 

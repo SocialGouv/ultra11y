@@ -15,7 +15,7 @@ Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir
 
 ## 1.1.1 — Non-text Content  _(judgment)_
 
-> Evidence (0):
+> Evidence (0) — 0 distinct content classes, 0 occurrences:
 
 (no automatic evidence — decide from source, or leave `manual` with a reason)
 
@@ -33,7 +33,7 @@ Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir
 
 ## 1.2.1 — Audio-only and Video-only (Prerecorded)  _(judgment)_
 
-> Evidence (0):
+> Evidence (0) — 0 distinct content classes, 0 occurrences:
 
 (no automatic evidence — decide from source, or leave `manual` with a reason)
 

@@ -116,6 +116,10 @@ export const COLLECT_SNAPSHOT = `(() => {
     dom: document.documentElement.outerHTML,
     css: { v: 1, rules: cssRules, unreadable: unreadable, truncated: cssRules.length >= MAXR },
     title: document.title,
+    // The doctype is NOT part of documentElement.outerHTML, so a capture that records only
+    // the DOM drops it — and RGAA 8.1 (is a doctype present, valid, and before <html>?) then
+    // has nothing to look at. Recorded as its own field for that reason.
+    doctype: document.doctype ? '<!DOCTYPE ' + document.doctype.name + (document.doctype.publicId ? ' PUBLIC "' + document.doctype.publicId + '"' : '') + (document.doctype.systemId ? ' "' + document.doctype.systemId + '"' : '') + '>' : '',
     lang: document.documentElement.getAttribute('lang') || '',
     url: location.href,
     viewport: { width: window.innerWidth, height: window.innerHeight },

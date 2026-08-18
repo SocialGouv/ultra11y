@@ -1,7 +1,7 @@
 // THE OPTIONAL LLM TIER — a source of verdicts, not a new judge.
 //
 // Of the 55 WCAG 2.2 AA criteria the static engine decides a handful; 38 are judgment calls,
-// and under RGAA 81 of 106 criteria can only ever derive `manual`. Inside a coding agent
+// and under RGAA 59 of 106 criteria sit in the judgment tier. Inside a coding agent
 // those are adjudicated by the agent itself (`verify --manual` → `--apply`). Outside one —
 // a CI job, a browser extension, an E2E run — nobody rules on them, so they stay « à
 // évaluer » forever: honest, and unusable on its own.
@@ -140,7 +140,7 @@ const SYSTEM = `You are an accessibility auditor ruling on the criteria a static
 
 Rules, in order of importance:
 1. NEVER assert conformity you did not verify. "manual" with a reason is always available and is a correct answer.
-2. An NC must cite a real file:line taken from the evidence you were given, and the criterion's OWN numbered test as normativeRef. A citation that does not resolve against the real source is rejected downstream and wastes the whole batch.
+2. An NC must cite a real file:line taken from the evidence you were given, and the criterion's OWN numbered test as normativeRef. A citation that does not resolve against the real source is rejected downstream, and the refusal costs THAT criterion alone — every other verdict you got right still stands. So never guess to fill a gap: an honest "manual" is worth more than a verdict that will be refused.
 3. C and NA require a justification that says what you saw, AND a "citations" array naming the evidence items you cleared — file and line copied verbatim from the evidence presented for that criterion. A criterion presented with NO evidence cannot be C: record "manual" (reason "undecidable"), or NA if nothing in scope is concerned.
 4. A criterion that needs a rendered page (computed contrast, visible focus, zoom, reflow) and was given only source evidence is "manual" with reason "needs-rendered-dom".
 5. Rule only on the criteria presented. Never introduce another.`;

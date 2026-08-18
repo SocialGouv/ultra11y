@@ -119,6 +119,19 @@ const SUBJECT_MATTER: Record<string, (d: Doc) => boolean> = {
   "3.3.8": hasFormControl,
   // Identify Input Purpose — about autocomplete on fields collecting user data.
   "1.3.5": hasFormControl,
+  // ---- Interaction constructs (WCAG 2.1.4 / 2.2.x / 2.3.1 / 2.5.x) ----
+  // Every predicate below searches for a CODE CONSTRUCT, which is what makes proving its
+  // absence legitimate: a shortcut, a gesture, a drag, a timer or an animation has to be
+  // written to exist. That is not true of subject matter you can only see — "is any passage
+  // in another language?" cannot be answered by the absence of a `lang` attribute, so 3.1.2
+  // is deliberately NOT here and stays open for the agent to read the text.
+  "2.1.4": hasCharShortcut,
+  "2.2.1": hasTimeLimit,
+  "2.2.2": hasMovingContent,
+  "2.3.1": hasMovingContent,
+  "2.5.1": hasGesture,
+  "2.5.2": hasDownEventAction,
+  "2.5.7": hasDrag,
 };
 
 /** A URL or MIME type that looks like time-based media, or a player embedding one. */
@@ -167,6 +180,44 @@ function hasMedia(d: Doc): boolean {
 /** Device-motion input: the only thing WCAG 2.5.4 is about. */
 function hasMotionApi(d: Doc): boolean {
   return /\b(?:devicemotion|deviceorientation|DeviceMotionEvent|DeviceOrientationEvent|Accelerometer|Gyroscope|requestPermission)\b/i.test(d.source);
+}
+
+/** A single-printable-character keyboard shortcut: the only thing WCAG 2.1.4 is about.
+ *
+ *  Safe to prove ABSENT, unlike most subject matter, because the subject IS a code construct.
+ *  A shortcut has to be implemented to exist, so searching the source for one is exhaustive in
+ *  a way that searching a rendered page for "a passage in another language" never is. */
+function hasCharShortcut(d: Doc): boolean {
+  return /\b(?:key|code|charCode|which)\s*===?\s*["'][a-zA-Z0-9]["']|\baccessKey\b|\baccesskey=/i.test(d.source);
+}
+
+/** A path-based or multipoint gesture (WCAG 2.5.1), or a drag interaction (2.5.7). */
+function hasGesture(d: Doc): boolean {
+  return /\bon(?:TouchMove|TouchStart|GestureStart|PointerMove)\s*=|\b(?:pinch|swipe|hammerjs|panstart|touchmove)\b/i.test(d.source);
+}
+function hasDrag(d: Doc): boolean {
+  if (d.elements.some((e) => e.attribs.draggable !== undefined)) return true;
+  return /\b(?:onDragStart|onDragOver|onDrop|useDrag|useDraggable|DndContext|react-beautiful-dnd|@dnd-kit|sortablejs)\b/.test(d.source);
+}
+
+/** An action fired on the DOWN event — the subject of WCAG 2.5.2. */
+function hasDownEventAction(d: Doc): boolean {
+  return /\bon(?:MouseDown|PointerDown|TouchStart)\s*=|addEventListener\(\s*["'](?:mousedown|pointerdown|touchstart)["']/i.test(d.source);
+}
+
+/** A time limit imposed on the user (WCAG 2.2.1): a timer, a meta refresh, a session expiry. */
+function hasTimeLimit(d: Doc): boolean {
+  if (d.elements.some((e) => e.tag === "meta" && (e.attribs["http-equiv"] ?? "").toLowerCase() === "refresh")) return true;
+  return /\b(?:setTimeout|setInterval)\s*\(|\b(?:sessionTimeout|idleTimeout|expiresIn|maxAge|session_max)\b/i.test(d.source);
+}
+
+/** Moving, blinking, scrolling or auto-updating content (WCAG 2.2.2), and the flashing subset
+ *  (2.3.1). Both are code constructs — an animation has to be declared to run. */
+function hasMovingContent(d: Doc): boolean {
+  if (has(d, "marquee", "blink", "video", "audio")) return true;
+  if (d.elements.some((e) => /animation|transition/i.test(e.attribs.style ?? ""))) return true;
+  if ((d.signals?.css?.rules ?? []).some((r) => r.decls.animation !== undefined || r.decls.animationName !== undefined)) return true;
+  return /\b(?:carousel|autoplay|requestAnimationFrame|animation-iteration-count|\.gif["']|\bswiper\b)/i.test(d.source);
 }
 
 /** Any control that takes user input, native or delegated. Over-inclusive on purpose. */
@@ -237,6 +288,15 @@ function subjectMatterReason(sc: string, files: number): string {
     return `No time-based media in scope: ${scope} — no <audio>, <video>, <track> or <source> element, no <object>/<embed>, and no <iframe> pointing at media.`;
   if (sc === "2.5.4") return `No motion actuation in scope: ${scope} — no device-motion or device-orientation API is used.`;
   if (sc === "1.3.5" || sc.startsWith("3.3.")) return `No user input in scope: ${scope} — no form control (native, ARIA or contenteditable) was found.`;
+  // Each of these names the construct that was searched for, and how wide the search was, so
+  // the claim is falsifiable by whoever reads it — which is the whole contract of an NA.
+  if (sc === "2.1.4") return `No single-character keyboard shortcut in scope: ${scope} — no single-printable-character key comparison and no accesskey attribute was found.`;
+  if (sc === "2.2.1") return `No time limit in scope: ${scope} — no timer, no <meta http-equiv="refresh">, and no session-expiry configuration was found.`;
+  if (sc === "2.2.2" || sc === "2.3.1")
+    return `No moving, blinking or auto-updating content in scope: ${scope} — no <marquee>/<blink>, no media element, no CSS animation (inline or in a captured stylesheet), and no carousel/autoplay/rAF signal was found.`;
+  if (sc === "2.5.1") return `No path-based or multipoint gesture in scope: ${scope} — no touch-move, pinch, swipe or gesture handler was found.`;
+  if (sc === "2.5.2") return `No down-event action in scope: ${scope} — no mousedown/pointerdown/touchstart handler was found.`;
+  if (sc === "2.5.7") return `No dragging interaction in scope: ${scope} — no draggable attribute and no drag-and-drop library or handler was found.`;
   return `No element in scope is concerned by this success criterion (${scope}).`;
 }
 

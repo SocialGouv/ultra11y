@@ -5441,7 +5441,7 @@ function ancestors(el) {
   return out2;
 }
 function elementsByTag(doc, ...tags) {
-  const want = new Set(tags.map((t2) => t2.toLowerCase()));
+  const want = new Set(tags.map((t3) => t3.toLowerCase()));
   return doc.elements.filter((e) => want.has(e.tag));
 }
 function allIds(doc) {
@@ -17334,7 +17334,7 @@ var typescript = (superClass) => class TypeScriptParserMixin extends superClass 
   }
   tsParseTypeOrTypePredicateAnnotation(returnToken) {
     return this.tsInType(() => {
-      const t2 = this.startNode();
+      const t3 = this.startNode();
       this.expect(returnToken);
       const node = this.startNode();
       const asserts = !!this.tsTryParse(this.tsParseTypePredicateAsserts.bind(this));
@@ -17349,26 +17349,26 @@ var typescript = (superClass) => class TypeScriptParserMixin extends superClass 
           this.resetStartLocationFromNode(thisTypePredicate, node);
           thisTypePredicate.asserts = true;
         }
-        t2.typeAnnotation = thisTypePredicate;
-        return this.finishNode(t2, "TSTypeAnnotation");
+        t3.typeAnnotation = thisTypePredicate;
+        return this.finishNode(t3, "TSTypeAnnotation");
       }
       const typePredicateVariable = this.tsIsIdentifier() && this.tsTryParse(this.tsParseTypePredicatePrefix.bind(this));
       if (!typePredicateVariable) {
         if (!asserts) {
-          return this.tsParseTypeAnnotation(false, t2);
+          return this.tsParseTypeAnnotation(false, t3);
         }
         node.parameterName = this.parseIdentifier();
         node.asserts = asserts;
         node.typeAnnotation = null;
-        t2.typeAnnotation = this.finishNode(node, "TSTypePredicate");
-        return this.finishNode(t2, "TSTypeAnnotation");
+        t3.typeAnnotation = this.finishNode(node, "TSTypePredicate");
+        return this.finishNode(t3, "TSTypeAnnotation");
       }
       const type = this.tsParseTypeAnnotation(false);
       node.parameterName = typePredicateVariable;
       node.typeAnnotation = type;
       node.asserts = asserts;
-      t2.typeAnnotation = this.finishNode(node, "TSTypePredicate");
-      return this.finishNode(t2, "TSTypeAnnotation");
+      t3.typeAnnotation = this.finishNode(node, "TSTypePredicate");
+      return this.finishNode(t3, "TSTypeAnnotation");
     });
   }
   tsTryParseTypeOrTypePredicateAnnotation() {
@@ -17407,12 +17407,12 @@ var typescript = (superClass) => class TypeScriptParserMixin extends superClass 
     }
     return true;
   }
-  tsParseTypeAnnotation(eatColon = true, t2 = this.startNode()) {
+  tsParseTypeAnnotation(eatColon = true, t3 = this.startNode()) {
     this.tsInType(() => {
       if (eatColon) this.expect(10);
-      t2.typeAnnotation = this.tsParseType();
+      t3.typeAnnotation = this.tsParseType();
     });
-    return this.finishNode(t2, "TSTypeAnnotation");
+    return this.finishNode(t3, "TSTypeAnnotation");
   }
   tsParseType() {
     assert(this.state.inType);
@@ -19469,7 +19469,7 @@ function validatePlugins(pluginsMap) {
       }
       const topicToken = pluginsMap.get("pipelineOperator").topicToken;
       if (!TOPIC_TOKENS.includes(topicToken)) {
-        const tokenList = TOPIC_TOKENS.map((t2) => `"${t2}"`).join(", ");
+        const tokenList = TOPIC_TOKENS.map((t3) => `"${t3}"`).join(", ");
         throw new Error(`"pipelineOperator" in "proposal": "hack" mode also requires a "topicToken" option whose value must be one of: ${tokenList}.`);
       }
     }
@@ -20101,10 +20101,10 @@ function subtokens(raw) {
   const folded = foldText(raw).replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
   const out2 = [];
   const seen = /* @__PURE__ */ new Set();
-  const push = (t2) => {
-    if (t2.length < 2 || seen.has(t2)) return;
-    seen.add(t2);
-    out2.push(t2);
+  const push = (t3) => {
+    if (t3.length < 2 || seen.has(t3)) return;
+    seen.add(t3);
+    out2.push(t3);
   };
   if (!/\s/.test(raw.trim())) push(foldText(raw).toLowerCase().replace(/[^a-z0-9_]+/g, ""));
   for (const part of folded.split(/[^A-Za-z0-9]+/)) push(part.toLowerCase());
@@ -20112,16 +20112,16 @@ function subtokens(raw) {
 }
 function stemOf(term) {
   if (term.length < 4) return term;
-  let t2 = term;
-  if (t2.endsWith("ies") && t2.length > 4) t2 = t2.slice(0, -3) + "y";
-  else if (t2.endsWith("sses")) t2 = t2.slice(0, -2);
-  else if (t2.endsWith("ses") && t2.length > 4) t2 = t2.slice(0, -1);
-  else if (t2.endsWith("s") && !t2.endsWith("ss") && !t2.endsWith("us") && !t2.endsWith("is")) t2 = t2.slice(0, -1);
-  if (t2.endsWith("ying") && t2.length > 5) t2 = t2.slice(0, -4) + "y";
-  else if (t2.endsWith("ing") && t2.length > 5) t2 = t2.slice(0, -3);
-  else if (t2.endsWith("ed") && t2.length > 4) t2 = t2.slice(0, -2);
-  if (t2.endsWith("e") && t2.length > 3) t2 = t2.slice(0, -1);
-  return t2;
+  let t3 = term;
+  if (t3.endsWith("ies") && t3.length > 4) t3 = t3.slice(0, -3) + "y";
+  else if (t3.endsWith("sses")) t3 = t3.slice(0, -2);
+  else if (t3.endsWith("ses") && t3.length > 4) t3 = t3.slice(0, -1);
+  else if (t3.endsWith("s") && !t3.endsWith("ss") && !t3.endsWith("us") && !t3.endsWith("is")) t3 = t3.slice(0, -1);
+  if (t3.endsWith("ying") && t3.length > 5) t3 = t3.slice(0, -4) + "y";
+  else if (t3.endsWith("ing") && t3.length > 5) t3 = t3.slice(0, -3);
+  else if (t3.endsWith("ed") && t3.length > 4) t3 = t3.slice(0, -2);
+  if (t3.endsWith("e") && t3.length > 3) t3 = t3.slice(0, -1);
+  return t3;
 }
 var whichCache;
 var STOPWORDS;
@@ -21625,8 +21625,8 @@ function extractMarkdown(content) {
   let frontTitle;
   const fm = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(body22);
   if (fm) {
-    const t2 = /(^|\n)title:\s*["']?(.+?)["']?\s*(\n|$)/i.exec(fm[1]);
-    if (t2) frontTitle = t2[2].trim();
+    const t3 = /(^|\n)title:\s*["']?(.+?)["']?\s*(\n|$)/i.exec(fm[1]);
+    if (t3) frontTitle = t3[2].trim();
     body22 = body22.slice(fm[0].length);
   }
   const scan2 = stripFences(body22);
@@ -21636,18 +21636,18 @@ function extractMarkdown(content) {
   let summary;
   let summaryClosed = false;
   for (const line of lines) {
-    const h = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
-    if (h) {
-      const text = cleanProse(h[2]);
+    const h2 = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+    if (h2) {
+      const text = cleanProse(h2[2]);
       headings2.push(text);
-      if (!title2 && h[1].length === 1) title2 = text;
-      if (!summary && h[1].length >= 2) summaryClosed = true;
+      if (!title2 && h2[1].length === 1) title2 = text;
+      if (!summary && h2[1].length >= 2) summaryClosed = true;
       continue;
     }
     if (!summary && !summaryClosed) {
-      const t2 = line.trim();
-      if (t2 && !/^([-*+]|\d+\.)\s/.test(t2) && !t2.startsWith("|") && !t2.startsWith("<")) {
-        const cleaned = cleanProse(t2);
+      const t3 = line.trim();
+      if (t3 && !/^([-*+]|\d+\.)\s/.test(t3) && !t3.startsWith("|") && !t3.startsWith("<")) {
+        const cleaned = cleanProse(t3);
         if (cleaned.length >= 8 && hasProse(cleaned) && !cleaned.endsWith(":") && !isBoilerplate(cleaned)) {
           summary = cleaned.slice(0, 200);
         }
@@ -27065,10 +27065,10 @@ function stripDocMarkup(text) {
 function summarizeDocLines(lines, maxLen = MAX_DOC) {
   const kept = [];
   for (const line of lines) {
-    const t2 = line.trim();
-    if (!t2 || isDirective2(t2) || isBanner(t2)) continue;
-    if (/^@[a-z]/i.test(t2)) break;
-    kept.push(t2);
+    const t3 = line.trim();
+    if (!t3 || isDirective2(t3) || isBanner(t3)) continue;
+    if (/^@[a-z]/i.test(t3)) break;
+    kept.push(t3);
   }
   const text = stripDocMarkup(kept.join(" "));
   if (text.length < 3) return void 0;
@@ -27172,9 +27172,9 @@ function collectAll(root, spec, defNames, maxCalls, wantImports) {
   const termsFound = /* @__PURE__ */ new Set();
   const addTerms2 = (text) => {
     if (termsFound.size >= MAX_TERMS) return;
-    for (const t2 of subtokens(text)) {
+    for (const t3 of subtokens(text)) {
       if (termsFound.size >= MAX_TERMS) return;
-      termsFound.add(t2);
+      termsFound.add(t3);
     }
   };
   const literals = new LiteralCollector();
@@ -27216,12 +27216,12 @@ function collectAll(root, spec, defNames, maxCalls, wantImports) {
       } else if (how === "member") {
         addCall(readName(node.childForFieldName("name")), node, readReceiver(node));
       } else if (how === "constructor") {
-        let t2 = node.childForFieldName("constructor") ?? node.childForFieldName("type") ?? node.childForFieldName("name");
-        for (let i2 = 0; !t2 && i2 < kids.length; i2++) {
+        let t3 = node.childForFieldName("constructor") ?? node.childForFieldName("type") ?? node.childForFieldName("name");
+        for (let i2 = 0; !t3 && i2 < kids.length; i2++) {
           const c2 = kids[i2];
-          if (IDENT_LEAF.test(c2.type)) t2 = c2;
+          if (IDENT_LEAF.test(c2.type)) t3 = c2;
         }
-        addCall(readName(t2), node, readReceiver(t2 ?? null));
+        addCall(readName(t3), node, readReceiver(t3 ?? null));
       }
     }
     if (wantNames && type === "import_statement") {
@@ -27769,10 +27769,10 @@ function expandUseGroups(path, out2 = []) {
   }
   parts2.push(cur);
   for (const part of parts2) {
-    const t2 = part.trim();
-    if (!t2) continue;
-    if (t2 === "self") expandUseGroups(prefix2.replace(/::\s*$/, ""), out2);
-    else expandUseGroups(prefix2 + t2, out2);
+    const t3 = part.trim();
+    if (!t3) continue;
+    if (t3 === "self") expandUseGroups(prefix2.replace(/::\s*$/, ""), out2);
+    else expandUseGroups(prefix2 + t3, out2);
   }
   return out2;
 }
@@ -27807,21 +27807,21 @@ function extractImports(ext2, content) {
   } else if (ext2 === ".go") {
     let inBlock = false;
     for (const line of lines) {
-      const t2 = line.trim();
+      const t3 = line.trim();
       if (inBlock) {
-        if (t2 === ")") {
+        if (t3 === ")") {
           inBlock = false;
           continue;
         }
-        const b = /"([^"]+)"/.exec(t2);
+        const b = /"([^"]+)"/.exec(t3);
         if (b) specs.add(b[1]);
         continue;
       }
-      if (/^import\s*\($/.test(t2)) {
+      if (/^import\s*\($/.test(t3)) {
         inBlock = true;
         continue;
       }
-      const single = /^import\s+(?:[\w.]+\s+)?"([^"]+)"/.exec(t2);
+      const single = /^import\s+(?:[\w.]+\s+)?"([^"]+)"/.exec(t3);
       if (single) specs.add(single[1]);
     }
   } else if (ext2 === ".rs") {
@@ -27900,9 +27900,9 @@ function collectTermsRegex(content) {
   const found = /* @__PURE__ */ new Set();
   const add2 = (text) => {
     if (found.size >= MAX_TERMS2) return;
-    for (const t2 of subtokens(text)) {
+    for (const t3 of subtokens(text)) {
       if (found.size >= MAX_TERMS2) return;
-      found.add(t2);
+      found.add(t3);
     }
   };
   let inBlock = false;
@@ -28744,8 +28744,8 @@ function resolveJs(fromRel, spec, ctx) {
       matched = true;
       const suffix = tp.star ? spec.slice(tp.prefix.length) : "";
       let targetTreeExists = false;
-      for (const t2 of tp.targets) {
-        const resolved = tp.star ? t2.replace(/\*/, suffix) : t2;
+      for (const t3 of tp.targets) {
+        const resolved = tp.star ? t3.replace(/\*/, suffix) : t3;
         const p = norm(posix.join(cfg.baseUrl, resolved));
         const hit = tryResolve(p);
         if (hit) return { kind: "resolved", target: hit };
@@ -28777,8 +28777,8 @@ function resolveJs(fromRel, spec, ctx) {
         if (!subKey.startsWith(pre) || !subKey.endsWith(post) || subKey.length < pre.length + post.length) continue;
         fill = subKey.slice(pre.length, subKey.length - post.length);
       } else if (entry.key !== subKey) continue;
-      for (const t2 of entry.targets) {
-        const hit = probeEntry(fill === void 0 ? t2 : t2.replace(/\*/g, fill));
+      for (const t3 of entry.targets) {
+        const hit = probeEntry(fill === void 0 ? t3 : t3.replace(/\*/g, fill));
         if (hit) return { kind: "resolved", target: hit };
       }
       break;
@@ -29807,10 +29807,10 @@ var init_tests_map = __esm({
 });
 function addTerms(doc, field, text) {
   const f = doc.fields[field];
-  for (const t2 of subtokens(text)) {
-    f.tf.set(t2, (f.tf.get(t2) ?? 0) + 1);
+  for (const t3 of subtokens(text)) {
+    f.tf.set(t3, (f.tf.get(t3) ?? 0) + 1);
     f.len++;
-    doc.all.add(t2);
+    doc.all.add(t3);
   }
 }
 function emptyFields() {
@@ -29842,9 +29842,9 @@ function buildDocs(scan2) {
       }
     }
     for (const seg of f.rel.split("/")) addTerms(doc, "path", seg);
-    for (const h of f.headings) addTerms(doc, "heading", h);
+    for (const h2 of f.headings) addTerms(doc, "heading", h2);
     if (f.summary) addTerms(doc, "summary", f.summary);
-    for (const t2 of f.terms ?? []) addTerms(doc, "body", t2);
+    for (const t3 of f.terms ?? []) addTerms(doc, "body", t3);
     docs.push(doc);
   }
   return docs;
@@ -29912,10 +29912,10 @@ function runSearch(scan2, query, opts = {}) {
   const terms = [];
   const seen = /* @__PURE__ */ new Set();
   for (const kw of keywords2(query)) {
-    for (const t2 of subtokens(kw)) {
-      if (seen.has(t2)) continue;
-      seen.add(t2);
-      terms.push(t2);
+    for (const t3 of subtokens(kw)) {
+      if (seen.has(t3)) continue;
+      seen.add(t3);
+      terms.push(t3);
     }
   }
   if (!terms.length) {
@@ -29926,7 +29926,7 @@ function runSearch(scan2, query, opts = {}) {
       dropped.length ? `Nothing was searched for: every token in this query (${dropped.join(", ")}) is a stopword or too short to index. Search with the identifiers or domain words you are actually looking for.` : "Nothing was searched for: the query carried no indexable token."
     );
   }
-  const queryWantsTests = terms.some((t2) => TEST_INTENT.test(t2));
+  const queryWantsTests = terms.some((t3) => TEST_INTENT.test(t3));
   const docs = bm25DocsFor(scan2);
   const n = docs.length;
   if (!n) return emptyExplanation(query, "none", "This index contains no files.");
@@ -29937,38 +29937,38 @@ function runSearch(scan2, query, opts = {}) {
     avgLen[f] = total / n || 1;
   }
   const df = /* @__PURE__ */ new Map();
-  for (const t2 of terms) {
+  for (const t3 of terms) {
     let count = 0;
-    for (const d of docs) if (d.all.has(t2)) count++;
-    df.set(t2, count);
+    for (const d of docs) if (d.all.has(t3)) count++;
+    df.set(t3, count);
   }
   const fuzzyEnabled = opts.fuzzy ?? true;
   const fuzzyCandidates = /* @__PURE__ */ new Map();
   if (fuzzyEnabled) {
-    const unmatched = terms.filter((t2) => df.get(t2) === 0);
+    const unmatched = terms.filter((t3) => df.get(t3) === 0);
     if (unmatched.length) {
       const stemIndex = bm25StemsFor(scan2);
       const stillUnmatched = [];
-      for (const t2 of unmatched) {
-        const viaStem = (stemIndex.get(stemOf(t2)) ?? []).filter((v) => v !== t2);
+      for (const t3 of unmatched) {
+        const viaStem = (stemIndex.get(stemOf(t3)) ?? []).filter((v) => v !== t3);
         if (viaStem.length) {
           fuzzyCandidates.set(
-            t2,
+            t3,
             viaStem.slice(0, FUZZY_CAP).map((term) => ({ term, dice: STEM_WEIGHT }))
           );
-        } else stillUnmatched.push(t2);
+        } else stillUnmatched.push(t3);
       }
       if (stillUnmatched.length) {
         const trigramIndex = bm25TrigramsFor(scan2);
-        for (const t2 of stillUnmatched) {
-          const grams = charTrigrams(t2);
+        for (const t3 of stillUnmatched) {
+          const grams = charTrigrams(t3);
           const candidates2 = [];
           for (const [vocabTerm, vocabGrams] of trigramIndex) {
             const dice = diceCoefficient(grams, vocabGrams);
             if (dice >= FUZZY_DICE_THRESHOLD) candidates2.push({ term: vocabTerm, dice });
           }
           candidates2.sort((a, b) => b.dice - a.dice || byStr(a.term, b.term));
-          fuzzyCandidates.set(t2, candidates2.slice(0, FUZZY_CAP));
+          fuzzyCandidates.set(t3, candidates2.slice(0, FUZZY_CAP));
         }
       }
     }
@@ -30004,21 +30004,21 @@ function runSearch(scan2, query, opts = {}) {
       }
       return wtf;
     };
-    for (const t2 of terms) {
-      const wtf = weightedTf(t2);
+    for (const t3 of terms) {
+      const wtf = weightedTf(t3);
       if (wtf > 0) {
-        matched.push(t2);
-        symbolTerms.add(t2);
-        if (d.exactNames.has(t2)) exactNameHit = true;
-        score += idfOf(df.get(t2)) * (wtf / (K1 + wtf));
+        matched.push(t3);
+        symbolTerms.add(t3);
+        if (d.exactNames.has(t3)) exactNameHit = true;
+        score += idfOf(df.get(t3)) * (wtf / (K1 + wtf));
         continue;
       }
-      for (const cand of fuzzyCandidates.get(t2) ?? []) {
+      for (const cand of fuzzyCandidates.get(t3) ?? []) {
         const cwtf = weightedTf(cand.term);
         if (!cwtf) continue;
         score += idfOf(dfOfVocabTerm(cand.term)) * (cwtf / (K1 + cwtf)) * cand.dice;
         symbolTerms.add(cand.term);
-        fuzzyHit.add(t2);
+        fuzzyHit.add(t3);
       }
     }
     if (!matched.length && !fuzzyHit.size) continue;
@@ -30030,7 +30030,7 @@ function runSearch(scan2, query, opts = {}) {
     const scored = d.decls.map((decl) => {
       const toks = new Set(subtokens(decl.name));
       let hits2 = 0;
-      for (const t2 of symbolTerms) if (toks.has(t2)) hits2++;
+      for (const t3 of symbolTerms) if (toks.has(t3)) hits2++;
       return { decl, hits: hits2 };
     }).filter((s) => s.hits > 0).sort((a, b) => b.hits - a.hits || byStr(a.decl.name, b.decl.name));
     const hits = scored.slice(0, TOP_SYMBOLS).map((s) => s.decl);
@@ -30038,12 +30038,12 @@ function runSearch(scan2, query, opts = {}) {
       file: d.file,
       score: Number(score.toFixed(4)),
       matchedTerms: matched.sort(byStr),
-      topSymbols: hits.map((h) => h.name)
+      topSymbols: hits.map((h2) => h2.name)
     };
     if (matchedFields.size) result.matchedFields = FIELDS.filter((f) => matchedFields.has(f));
     if (hits.length) {
       result.symbolHits = hits;
-      result.line = Math.min(...hits.map((h) => h.line));
+      result.line = Math.min(...hits.map((h2) => h2.line));
     }
     if (fuzzyHit.size) result.fuzzyTerms = [...fuzzyHit].sort(byStr);
     if (!matched.length) result.bridgedOnly = true;
@@ -30088,15 +30088,15 @@ function noteFor(explain, missingIdentifier, allBridged) {
     return explain.unresolvedTerms.length ? `No file matches. ${explain.unresolvedTerms.length === 1 ? "The term" : "The terms"} ${explain.unresolvedTerms.join(", ")} appear nowhere in this index.` : "No file matches this query.";
   }
   if (missingIdentifier && wholeIdentifier) {
-    const parts2 = terms.filter((t2) => t2.term !== wholeIdentifier.term && t2.df > 0).map((t2) => t2.term).join(", ");
-    const near = terms.find((t2) => t2.term === wholeIdentifier.term)?.bridge?.to ?? [];
+    const parts2 = terms.filter((t3) => t3.term !== wholeIdentifier.term && t3.df > 0).map((t3) => t3.term).join(", ");
+    const near = terms.find((t3) => t3.term === wholeIdentifier.term)?.bridge?.to ?? [];
     const because = parts2 ? ` The ${resultCount} result${resultCount === 1 ? "" : "s"} below match only its parts (${parts2}).` : "";
     const suggestion = near.length ? ` Closest indexed name${near.length === 1 ? "" : "s"}: ${near.join(", ")}.` : "";
     return `No file in this index defines or mentions "${wholeIdentifier.term}".${because}${suggestion} If you expected it here, check you are indexing the right branch or commit.`;
   }
   if (allBridged) {
-    const bridged = terms.filter((t2) => t2.bridge);
-    const spelled = bridged.map((t2) => `"${t2.term}" \u2192 ${t2.bridge.to.join(", ")}`).join("; ");
+    const bridged = terms.filter((t3) => t3.bridge);
+    const spelled = bridged.map((t3) => `"${t3.term}" \u2192 ${t3.bridge.to.join(", ")}`).join("; ");
     return `Nothing matched verbatim. Every result below came from a near match: ${spelled}. Re-run with --exact to see only literal matches.`;
   }
   return void 0;
@@ -31034,10 +31034,10 @@ function npmFamilyPatterns(root, warnings) {
   const positives = [];
   const negations = [];
   const push = (raw, kind) => {
-    const t2 = raw.trim();
-    if (!t2) return;
-    if (t2.startsWith("!")) negations.push(t2.slice(1));
-    else positives.push({ pattern: t2, kind });
+    const t3 = raw.trim();
+    if (!t3) return;
+    if (t3.startsWith("!")) negations.push(t3.slice(1));
+    else positives.push({ pattern: t3, kind });
   };
   const pkg = readJson(join14(root, "package.json"), "package.json", warnings);
   const ws = pkg?.workspaces;
@@ -31094,8 +31094,8 @@ function detectGoWork(root, found, warnings) {
   const dirs = [];
   for (const block of gowork.matchAll(/^use\s*\(([\s\S]*?)\)/gm)) {
     for (const line of block[1].split(/\r?\n/)) {
-      const t2 = line.replace(/\/\/.*$/, "").trim();
-      if (t2) dirs.push(t2);
+      const t3 = line.replace(/\/\/.*$/, "").trim();
+      if (t3) dirs.push(t3);
     }
   }
   for (const m of gowork.matchAll(/^use\s+([^\s(]+)/gm)) dirs.push(m[1]);
@@ -31716,8 +31716,8 @@ function findLiteralDuplications(scan2, opts = {}) {
     if (files.size < minFiles || g.sites.length < minCount) continue;
     const holders = g.sites.filter((s) => s.holder);
     const literals = g.sites.filter((s) => !s.holder);
-    const distinctHolderNames = new Set(holders.map((h) => h.holder));
-    const distinctHolders = new Set(holders.map((h) => `${h.file}\0${h.holder}`));
+    const distinctHolderNames = new Set(holders.map((h2) => h2.holder));
+    const distinctHolders = new Set(holders.map((h2) => `${h2.file}\0${h2.holder}`));
     let tier = distinctHolders.size >= 2 ? "competing" : holders.length > 0 ? "bypassed" : "uncentralized";
     if (g.kind === "number") {
       if (distinctHolderNames.size !== 1 || literals.length === 0) continue;
@@ -31742,8 +31742,8 @@ function findLiteralDuplications(scan2, opts = {}) {
 function siteOrder(a, b) {
   return byStr(a.file, b.file) || a.line - b.line;
 }
-function tierRank(t2) {
-  return t2 === "competing" ? 0 : t2 === "bypassed" ? 1 : 2;
+function tierRank(t3) {
+  return t3 === "competing" ? 0 : t3 === "bypassed" ? 1 : 2;
 }
 function groupFamilies(dups) {
   const byPrefix = /* @__PURE__ */ new Map();
@@ -31821,8 +31821,8 @@ function buildArtifactsFromScan(scan2, opts = {}) {
     if (testMap.testFiles.has(f.rel)) f.testFile = true;
   }
   for (const m of graph.modules) {
-    const t2 = testMap.testedByModule.get(m.slug);
-    if (t2?.length) m.testedBy = t2;
+    const t3 = testMap.testedByModule.get(m.slug);
+    if (t3?.length) m.testedBy = t3;
   }
   const surprises = computeSurprises(graph);
   if (surprises.length) graph.surprises = surprises;
@@ -33430,7 +33430,7 @@ function toolsInProfiles(spec) {
   const names = spec.split(",").map((s) => s.trim()).filter(Boolean);
   const out2 = /* @__PURE__ */ new Set();
   for (const name2 of names) {
-    if (name2 === "all") return new Set(TOOLS.map((t2) => t2.name));
+    if (name2 === "all") return new Set(TOOLS.map((t3) => t3.name));
     const profile = TOOL_PROFILES[name2];
     if (!profile) throw new Error(`unknown tool profile "${name2}" \u2014 one of: ${profileNames().join(", ")}`);
     for (const tool of profile) out2.add(tool);
@@ -33441,23 +33441,23 @@ function toolsFor(defaultRepo, protocolVersion = PROTOCOL_VERSIONS[0], profile) 
   const withAnnotations = protocolVersion >= ANNOTATIONS_SINCE;
   const withRich = protocolVersion >= RICH_TOOLS_SINCE;
   const allowed = profile ? toolsInProfiles(profile) : void 0;
-  const TOOLS_ = allowed ? TOOLS.filter((t2) => allowed.has(t2.name)) : TOOLS;
+  const TOOLS_ = allowed ? TOOLS.filter((t3) => allowed.has(t3.name)) : TOOLS;
   if (!defaultRepo && !withAnnotations && !withRich) return TOOLS_;
-  return TOOLS_.map((t2) => ({
-    ...t2,
-    ...withRich && TOOL_META[t2.name] ? { title: TOOL_META[t2.name].title } : {},
-    ...withRich && OUTPUT_SCHEMAS[t2.name] ? { outputSchema: OUTPUT_SCHEMAS[t2.name] } : {},
-    ...withAnnotations ? { annotations: annotationsFor(t2.name) } : {},
-    inputSchema: !defaultRepo ? t2.inputSchema : {
-      ...t2.inputSchema,
+  return TOOLS_.map((t3) => ({
+    ...t3,
+    ...withRich && TOOL_META[t3.name] ? { title: TOOL_META[t3.name].title } : {},
+    ...withRich && OUTPUT_SCHEMAS[t3.name] ? { outputSchema: OUTPUT_SCHEMAS[t3.name] } : {},
+    ...withAnnotations ? { annotations: annotationsFor(t3.name) } : {},
+    inputSchema: !defaultRepo ? t3.inputSchema : {
+      ...t3.inputSchema,
       properties: {
-        ...t2.inputSchema.properties,
+        ...t3.inputSchema.properties,
         repo: {
           type: "string",
           description: `Absolute path to the repository root (optional \u2014 defaults to ${defaultRepo})`
         }
       },
-      required: t2.inputSchema.required.filter((r) => r !== "repo")
+      required: t3.inputSchema.required.filter((r) => r !== "repo")
     }
   }));
 }
@@ -34600,7 +34600,7 @@ async function runMcpServer(opts = {}) {
         const args2 = params.arguments ?? {};
         try {
           const decl = tools.find(
-            (t2) => t2.name === name2
+            (t3) => t3.name === name2
           );
           const invalid = decl ? validateArgs(decl.inputSchema, args2) : void 0;
           if (invalid) throw new Error(invalid);
@@ -35785,13 +35785,13 @@ function symbolsInHunks(defs, hunks) {
     });
   };
   const span = (d) => (d.endLine ?? d.line) - d.line;
-  for (const h of hunks) {
-    const enclosing = defs.filter((d) => d.line <= h.end && (d.endLine ?? d.line) >= h.start);
+  for (const h2 of hunks) {
+    const enclosing = defs.filter((d) => d.line <= h2.end && (d.endLine ?? d.line) >= h2.start);
     if (enclosing.length) {
       enclosing.sort((a, b) => span(a) - span(b) || b.line - a.line || byStr(a.name, b.name));
       for (const d of enclosing) push(d, false);
     } else {
-      const above = defs.filter((d) => d.line <= h.start && d.endLine === void 0);
+      const above = defs.filter((d) => d.line <= h2.start && d.endLine === void 0);
       const near = above[above.length - 1];
       if (near) push(near, true);
     }
@@ -35847,7 +35847,7 @@ function computeDelta(graph, symbols, diff, depth = DEFAULT_DELTA_DEPTH) {
       status: df.status,
       ...carry,
       module: node.module,
-      hunks: hunks.map((h) => ({ start: h.start, end: h.end })),
+      hunks: hunks.map((h2) => ({ start: h2.start, end: h2.end })),
       symbols: syms
     });
   }
@@ -36871,8 +36871,8 @@ function extSet(extra) {
   const set = new Set(DEFAULT_EXT);
   for (const raw of extra ?? []) {
     for (const e of raw.split(",")) {
-      const t2 = e.trim().toLowerCase();
-      if (t2) set.add(t2.startsWith(".") ? t2 : `.${t2}`);
+      const t3 = e.trim().toLowerCase();
+      if (t3) set.add(t3.startsWith(".") ? t3 : `.${t3}`);
     }
   }
   return set;
@@ -37225,6 +37225,10 @@ var COLLECT_SNAPSHOT = `(() => {
     dom: document.documentElement.outerHTML,
     css: { v: 1, rules: cssRules, unreadable: unreadable, truncated: cssRules.length >= MAXR },
     title: document.title,
+    // The doctype is NOT part of documentElement.outerHTML, so a capture that records only
+    // the DOM drops it \u2014 and RGAA 8.1 (is a doctype present, valid, and before <html>?) then
+    // has nothing to look at. Recorded as its own field for that reason.
+    doctype: document.doctype ? '<!DOCTYPE ' + document.doctype.name + (document.doctype.publicId ? ' PUBLIC "' + document.doctype.publicId + '"' : '') + (document.doctype.systemId ? ' "' + document.doctype.systemId + '"' : '') + '>' : '',
     lang: document.documentElement.getAttribute('lang') || '',
     url: location.href,
     viewport: { width: window.innerWidth, height: window.innerHeight },
@@ -37415,6 +37419,7 @@ function attachSignals(doc) {
   const boxes = readJson2(join25(dir, "boxes.json"));
   const axtree = readJson2(join25(dir, "axtree.json"));
   const css = readJson2(join25(dir, "css.json"));
+  const meta2 = readJson2(join25(dir, "meta.json"));
   const shot = join25(dir, "screen.png");
   const alignedStyleMap = styles ? align(doc, styles.entries) : null;
   const alignedBoxMap = boxes ? align(doc, boxes.entries) : null;
@@ -37426,6 +37431,7 @@ function attachSignals(doc) {
     // Not element-indexed, so it needs no alignment — it is a property of the stylesheet.
     ...css ? { css } : {},
     ...existsSync12(shot) ? { screenshot: shot } : {},
+    ...meta2?.doctype !== void 0 ? { doctype: meta2.doctype } : {},
     ...truncated ? { truncated } : {}
   };
   if (Object.keys(signals).length) doc.signals = signals;
@@ -38446,8 +38452,8 @@ function selectorOf(el) {
   const cls = el.attribs.class;
   if (cls) return `${el.tag}.${cls.trim().split(/\s+/)[0]}`;
   if (el.tag === "a" && el.attribs.href) {
-    const h = el.attribs.href;
-    return `a[href=${h.length > 30 ? h.slice(0, 30) + "\u2026" : h}]`;
+    const h2 = el.attribs.href;
+    return `a[href=${h2.length > 30 ? h2.slice(0, 30) + "\u2026" : h2}]`;
   }
   return el.tag;
 }
@@ -38526,11 +38532,11 @@ function parseColor(input) {
   if (!s) return null;
   if (s in NAMED) return { ...NAMED[s] };
   if (s.startsWith("#")) {
-    const h = s.slice(1);
-    if (/^[0-9a-f]{3}$/.test(h)) return { r: hex(h[0]), g: hex(h[1]), b: hex(h[2]), a: 1 };
-    if (/^[0-9a-f]{4}$/.test(h)) return { r: hex(h[0]), g: hex(h[1]), b: hex(h[2]), a: hex(h[3]) / 255 };
-    if (/^[0-9a-f]{6}$/.test(h)) return { r: hex(h.slice(0, 2)), g: hex(h.slice(2, 4)), b: hex(h.slice(4, 6)), a: 1 };
-    if (/^[0-9a-f]{8}$/.test(h)) return { r: hex(h.slice(0, 2)), g: hex(h.slice(2, 4)), b: hex(h.slice(4, 6)), a: hex(h.slice(6, 8)) / 255 };
+    const h2 = s.slice(1);
+    if (/^[0-9a-f]{3}$/.test(h2)) return { r: hex(h2[0]), g: hex(h2[1]), b: hex(h2[2]), a: 1 };
+    if (/^[0-9a-f]{4}$/.test(h2)) return { r: hex(h2[0]), g: hex(h2[1]), b: hex(h2[2]), a: hex(h2[3]) / 255 };
+    if (/^[0-9a-f]{6}$/.test(h2)) return { r: hex(h2.slice(0, 2)), g: hex(h2.slice(2, 4)), b: hex(h2.slice(4, 6)), a: 1 };
+    if (/^[0-9a-f]{8}$/.test(h2)) return { r: hex(h2.slice(0, 2)), g: hex(h2.slice(2, 4)), b: hex(h2.slice(4, 6)), a: hex(h2.slice(6, 8)) / 255 };
     return null;
   }
   const m = /^rgba?\(([^)]+)\)$/.exec(s);
@@ -38713,13 +38719,13 @@ function dominantBackground(img, rect) {
   return { r: Math.round(best.r / best.n), g: Math.round(best.g / best.n), b: Math.round(best.b / best.n), a: 1 };
 }
 var CRC_TABLE = /* @__PURE__ */ (() => {
-  const t2 = new Uint32Array(256);
+  const t3 = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
     let c2 = n;
     for (let k = 0; k < 8; k++) c2 = c2 & 1 ? 3988292384 ^ c2 >>> 1 : c2 >>> 1;
-    t2[n] = c2 >>> 0;
+    t3[n] = c2 >>> 0;
   }
-  return t2;
+  return t3;
 })();
 function crc32(buf) {
   let c2 = 4294967295;
@@ -38795,7 +38801,7 @@ function fillRect(raster, rect, color) {
   for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) blend(raster, x, y, color);
 }
 function strokeRect(raster, rect, color, width, dash) {
-  const t2 = Math.max(1, Math.round(width));
+  const t3 = Math.max(1, Math.round(width));
   const x0 = Math.round(rect.x);
   const y0 = Math.round(rect.y);
   const x1 = Math.round(rect.x + rect.w);
@@ -38808,10 +38814,10 @@ function strokeRect(raster, rect, color, width, dash) {
   };
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
-      const top = y < y0 + t2;
-      const bottom = y >= y1 - t2;
-      const left = x < x0 + t2;
-      const right = x >= x1 - t2;
+      const top = y < y0 + t3;
+      const bottom = y >= y1 - t3;
+      const left = x < x0 + t3;
+      const right = x >= x1 - t3;
       if (!top && !bottom && !left && !right) continue;
       if (!on(top || bottom ? x : y)) continue;
       blend(raster, x, y, color);
@@ -39073,11 +39079,11 @@ var renderedOrientationLock = {
     for (const r of css.rules) {
       if (!r.media || !/orientation\s*:/i.test(r.media)) continue;
       if (!r.selector.split(",").some((s) => DOC_SEL.test(s))) continue;
-      const t2 = r.decls.transform ?? "";
-      if (!quarterTurn(t2)) continue;
+      const t3 = r.decls.transform ?? "";
+      if (!quarterTurn(t3)) continue;
       const el = doc.elements[0];
       if (!el) continue;
-      return [{ criteriaId: "1.3.4", el, msgId: "rendered-orientation-lock", params: { media: r.media, transform: t2 } }];
+      return [{ criteriaId: "1.3.4", el, msgId: "rendered-orientation-lock", params: { media: r.media, transform: t3 } }];
     }
     return [];
   }
@@ -39728,7 +39734,7 @@ var invalidAriaRole = {
       if (!role) continue;
       if (role.includes("{")) continue;
       const tokens = role.split(/\s+/);
-      const bad = tokens.filter((t2) => !VALID_ROLES.has(t2.toLowerCase()));
+      const bad = tokens.filter((t3) => !VALID_ROLES.has(t3.toLowerCase()));
       if (bad.length === tokens.length) {
         out2.push({
           criteriaId: "4.1.2",
@@ -40170,7 +40176,7 @@ var titleMissingEmpty = {
   scope: "page",
   run(doc) {
     const titles = elementsByTag(doc, "title");
-    const hasNonEmpty = titles.some((t2) => visibleText(t2).length > 0);
+    const hasNonEmpty = titles.some((t3) => visibleText(t3).length > 0);
     if (hasNonEmpty) return [];
     if (titleSetByFramework(doc) || shellHeadInjected(doc)) return [];
     const anchor = elementsByTag(doc, "head")[0] ?? elementsByTag(doc, "html")[0] ?? doc.elements[0];
@@ -40346,7 +40352,7 @@ var h1Missing = {
   scope: "page",
   advisory: true,
   run(doc) {
-    const hasH1 = headings(doc).some((h) => h.level === 1);
+    const hasH1 = headings(doc).some((h2) => h2.level === 1);
     if (hasH1) return [];
     if (contentMaybeInjected(doc) || shellBodyInjected(doc)) return [];
     const anchor = elementsByTag(doc, "body")[0] ?? elementsByTag(doc, "html")[0];
@@ -40458,14 +40464,14 @@ var dlStructure = {
 var headingsRules = [headingOrderSkip, h1Missing, h1Multiple, listStructure, emptyHeading, dlStructure];
 
 // src/rules/tables.ts
-var declaredLayout = (t2) => ["presentation", "none"].includes((attr(t2, "role") ?? "").trim());
-var named2 = (t2) => !!(attr(t2, "aria-label") ?? "").trim() || hasAttr(t2, "aria-labelledby");
-function isLayoutTable(t2) {
-  if (declaredLayout(t2)) return true;
-  const desc = descendants(t2);
+var declaredLayout = (t3) => ["presentation", "none"].includes((attr(t3, "role") ?? "").trim());
+var named2 = (t3) => !!(attr(t3, "aria-label") ?? "").trim() || hasAttr(t3, "aria-labelledby");
+function isLayoutTable(t3) {
+  if (declaredLayout(t3)) return true;
+  const desc = descendants(t3);
   if (desc.some((d) => d.tag === "table")) return true;
   const hasTh = desc.some((d) => d.tag === "th");
-  const hasCaption = t2.children.some((c2) => c2.type === "element" && c2.tag === "caption");
+  const hasCaption = t3.children.some((c2) => c2.type === "element" && c2.tag === "caption");
   const rows = desc.filter((d) => d.tag === "tr").length;
   return !hasTh && !hasCaption && rows <= 1;
 }
@@ -40475,9 +40481,9 @@ var dataTableNoHeaders = {
   severity: "majeur",
   run(doc) {
     const out2 = [];
-    for (const t2 of doc.elements) {
-      if (t2.tag !== "table" || isLayoutTable(t2)) continue;
-      const desc = descendants(t2);
+    for (const t3 of doc.elements) {
+      if (t3.tag !== "table" || isLayoutTable(t3)) continue;
+      const desc = descendants(t3);
       if (!desc.some((d) => d.tag === "tr" || d.tag === "td" || d.tag === "th")) continue;
       const ths = desc.filter((d) => d.tag === "th");
       const hasTh = ths.length > 0;
@@ -40498,13 +40504,13 @@ var dataTableNoHeaders = {
       if (!hasTh) {
         out2.push({
           criteriaId: "1.3.1",
-          el: t2,
+          el: t3,
           msgId: "data-table-no-headers.no-th"
         });
       } else if (!hasAssoc) {
         out2.push({
           criteriaId: "1.3.1",
-          el: t2,
+          el: t3,
           msgId: "data-table-no-headers.no-assoc"
         });
       }
@@ -40518,13 +40524,13 @@ var tableCaptionMissing = {
   severity: "mineur",
   run(doc) {
     const out2 = [];
-    for (const t2 of doc.elements) {
-      if (t2.tag !== "table" || isLayoutTable(t2)) continue;
-      const hasCaption = t2.children.some((c2) => c2.type === "element" && c2.tag === "caption");
-      if (hasCaption || named2(t2)) continue;
+    for (const t3 of doc.elements) {
+      if (t3.tag !== "table" || isLayoutTable(t3)) continue;
+      const hasCaption = t3.children.some((c2) => c2.type === "element" && c2.tag === "caption");
+      if (hasCaption || named2(t3)) continue;
       out2.push({
         criteriaId: "1.3.1",
-        el: t2,
+        el: t3,
         msgId: "table-caption-missing"
       });
     }
@@ -40537,16 +40543,16 @@ var layoutTableDataMarkup = {
   severity: "mineur",
   run(doc) {
     const out2 = [];
-    for (const t2 of doc.elements) {
-      if (t2.tag !== "table" || !declaredLayout(t2)) continue;
-      const desc = descendants(t2);
-      const dataMarkup = desc.some((d) => d.tag === "th") || t2.children.some((c2) => c2.type === "element" && c2.tag === "caption") || desc.some((d) => hasAttr(d, "scope") || hasAttr(d, "headers"));
+    for (const t3 of doc.elements) {
+      if (t3.tag !== "table" || !declaredLayout(t3)) continue;
+      const desc = descendants(t3);
+      const dataMarkup = desc.some((d) => d.tag === "th") || t3.children.some((c2) => c2.type === "element" && c2.tag === "caption") || desc.some((d) => hasAttr(d, "scope") || hasAttr(d, "headers"));
       if (!dataMarkup) continue;
       out2.push({
         criteriaId: "1.3.1",
-        el: t2,
+        el: t3,
         msgId: "layout-table-data-markup",
-        params: { role: attr(t2, "role") ?? "" }
+        params: { role: attr(t3, "role") ?? "" }
       });
     }
     return out2;
@@ -40586,9 +40592,9 @@ var tableEmptyDataCell = {
   advisory: true,
   run(doc) {
     const out2 = [];
-    for (const t2 of doc.elements) {
-      if (t2.tag !== "table" || isLayoutTable(t2)) continue;
-      for (const cell of descendants(t2)) {
+    for (const t3 of doc.elements) {
+      if (t3.tag !== "table" || isLayoutTable(t3)) continue;
+      for (const cell of descendants(t3)) {
         if (cell.tag !== "td") continue;
         if (mayInjectContent(cell)) continue;
         if (cell.children.some((c2) => c2.type === "element")) continue;
@@ -41122,7 +41128,7 @@ var errorNotAssociated = {
 };
 var PURPOSE_TYPES = /* @__PURE__ */ new Set(["email", "tel"]);
 var PURPOSE_WORDS = /* @__PURE__ */ new Set(["email", "tel", "telephone", "phone", "mobile", "postal", "zip", "address", "street", "city", "country"]);
-var hasPurposeToken = (nameId) => nameId.split(/[-_\s]+|(?<=[a-z0-9])(?=[A-Z])/).some((t2) => PURPOSE_WORDS.has(t2.toLowerCase()));
+var hasPurposeToken = (nameId) => nameId.split(/[-_\s]+|(?<=[a-z0-9])(?=[A-Z])/).some((t3) => PURPOSE_WORDS.has(t3.toLowerCase()));
 var SKIP_INPUT_TYPES = /* @__PURE__ */ new Set(["search", "hidden", "submit", "reset", "button", "password", "checkbox", "radio", "file", "range", "color"]);
 var CUSTOM_WIDGET_ROLES = /* @__PURE__ */ new Set(["textbox", "combobox", "checkbox", "radio", "switch", "spinbutton"]);
 var REQUIRED_SIGNAL = /(^|[-_ ])(required|mandatory|is-required)/i;
@@ -41262,7 +41268,7 @@ function isDateField(el, doc) {
   const type = (attr(el, "type") ?? "text").trim().toLowerCase();
   if (type === "date" || type === "month") return true;
   if (type.includes("{") || NON_DATE_INPUT_TYPES.has(type)) return false;
-  return tokenize3(fieldText(el, doc)).some((t2) => DATE_TOKENS.has(t2));
+  return tokenize3(fieldText(el, doc)).some((t3) => DATE_TOKENS.has(t3));
 }
 var dateFieldsUngrouped = {
   id: "date-fields-ungrouped",
@@ -41308,7 +41314,7 @@ var autocompleteTokenInvalid = {
 };
 function autofillField(el) {
   const tokens = (attr(el, "autocomplete") ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
-  return tokens.find((t2) => CREDENTIAL_FIELDS.has(t2)) ?? "";
+  return tokens.find((t3) => CREDENTIAL_FIELDS.has(t3)) ?? "";
 }
 var credentialEntryBlocked = {
   id: "credential-entry-blocked",
@@ -41967,13 +41973,13 @@ function readTsAliases(startDir, cwd = process.cwd()) {
   const out2 = [];
   for (const [pattern, targetsRaw] of Object.entries(paths)) {
     if (!Array.isArray(targetsRaw)) continue;
-    const targets = targetsRaw.filter((t2) => typeof t2 === "string");
+    const targets = targetsRaw.filter((t3) => typeof t3 === "string");
     if (!targets.length) continue;
     const wildcard = pattern.includes("*");
     const prefix2 = wildcard ? pattern.slice(0, pattern.indexOf("*")) : pattern;
-    const bases = targets.map((t2) => {
-      const star = t2.indexOf("*");
-      const tp = wildcard && star >= 0 ? t2.slice(0, star) : t2;
+    const bases = targets.map((t3) => {
+      const star = t3.indexOf("*");
+      const tp = wildcard && star >= 0 ? t3.slice(0, star) : t3;
       return toPosix(relative(cwd, join27(baseAbs, tp))) || ".";
     });
     out2.push({ prefix: prefix2, wildcard, bases });
@@ -46438,15 +46444,15 @@ function validatePack(raw, opts = {}) {
   const themes = Array.isArray(p.themes) ? p.themes : null;
   if (!themes) err2("themes", "themes must be an array");
   const themeNumbers = /* @__PURE__ */ new Set();
-  themes?.forEach((t2, i2) => {
-    const n = t2?.number;
+  themes?.forEach((t3, i2) => {
+    const n = t3?.number;
     if (typeof n !== "number") {
       err2(`themes[${i2}].number`, "theme number must be a number");
       return;
     }
     if (themeNumbers.has(n)) err2(`themes[${i2}].number`, `duplicate theme number ${n}`);
     themeNumbers.add(n);
-    const name2 = t2?.name;
+    const name2 = t3?.name;
     if (!name2 || typeof name2[loc] !== "string") err2(`themes[${i2}].name`, `theme ${n} missing name[${loc}]`);
   });
   const criteria = Array.isArray(p.criteria) ? p.criteria : null;
@@ -46521,10 +46527,10 @@ function validatePack(raw, opts = {}) {
       });
     }
   });
-  themes?.forEach((t2, i2) => {
-    const n = t2?.number;
+  themes?.forEach((t3, i2) => {
+    const n = t3?.number;
     if (typeof n !== "number") return;
-    const declared = t2?.count;
+    const declared = t3?.count;
     const actual = countByTheme.get(n) ?? 0;
     if (typeof declared === "number" && declared !== actual) {
       err2(`themes[${i2}].count`, `theme ${n} declares count ${declared} but has ${actual} criteria`);
@@ -46735,14 +46741,14 @@ function validateMatch(node, path, depth, err2, top) {
       });
   }
   if (n.text !== void 0) {
-    const t2 = n.text;
-    if (!t2 || typeof t2 !== "object" || Array.isArray(t2)) {
+    const t3 = n.text;
+    if (!t3 || typeof t3 !== "object" || Array.isArray(t3)) {
       err2(`${path}.text`, "match text must be an object { op, value }");
     } else {
-      if (typeof t2.op !== "string" || !TEXT_OPS.has(t2.op)) err2(`${path}.text.op`, "text op must be one of matches|lacks");
-      if (typeof t2.value !== "string" || t2.value === "") err2(`${path}.text.value`, "text value must be a non-empty regex string");
+      if (typeof t3.op !== "string" || !TEXT_OPS.has(t3.op)) err2(`${path}.text.op`, "text op must be one of matches|lacks");
+      if (typeof t3.value !== "string" || t3.value === "") err2(`${path}.text.value`, "text value must be a non-empty regex string");
       else {
-        const bad = regexIssue(t2.value);
+        const bad = regexIssue(t3.value);
         if (bad) err2(`${path}.text.value`, `text regex ${bad}`);
       }
     }
@@ -46759,9 +46765,9 @@ function validateLocaleText(v, path, err2) {
     err2(path, "must be a localized object carrying both en and fr");
     return;
   }
-  const t2 = v;
+  const t3 = v;
   for (const lang of ["en", "fr"]) {
-    if (typeof t2[lang] !== "string" || t2[lang] === "") err2(`${path}.${lang}`, `missing ${lang} text`);
+    if (typeof t3[lang] !== "string" || t3[lang] === "") err2(`${path}.${lang}`, `missing ${lang} text`);
   }
 }
 function normalize(p) {
@@ -46905,10 +46911,10 @@ function matchAttr(el, a) {
       return false;
   }
 }
-function matchText(el, t2) {
+function matchText(el, t3) {
   const text = visibleText(el);
-  const hit = compile(t2.value).test(text);
-  return t2.op === "matches" ? hit : !hit;
+  const hit = compile(t3.value).test(text);
+  return t3.op === "matches" ? hit : !hit;
 }
 function matchNode(el, node, depth) {
   if (depth > MAX_MATCH_DEPTH2) return false;
@@ -47288,8 +47294,8 @@ function gitChangedFiles(ref) {
   const add2 = (s) => {
     if (!s) return;
     for (const line of s.split("\n")) {
-      const t2 = line.trim();
-      if (t2) out2.add(t2);
+      const t3 = line.trim();
+      if (t3) out2.add(t3);
     }
   };
   add2(git(["diff", "--name-only", "--diff-filter=d", base]));
@@ -47433,7 +47439,20 @@ var SUBJECT_MATTER = {
   "3.3.7": hasFormControl,
   "3.3.8": hasFormControl,
   // Identify Input Purpose — about autocomplete on fields collecting user data.
-  "1.3.5": hasFormControl
+  "1.3.5": hasFormControl,
+  // ---- Interaction constructs (WCAG 2.1.4 / 2.2.x / 2.3.1 / 2.5.x) ----
+  // Every predicate below searches for a CODE CONSTRUCT, which is what makes proving its
+  // absence legitimate: a shortcut, a gesture, a drag, a timer or an animation has to be
+  // written to exist. That is not true of subject matter you can only see — "is any passage
+  // in another language?" cannot be answered by the absence of a `lang` attribute, so 3.1.2
+  // is deliberately NOT here and stays open for the agent to read the text.
+  "2.1.4": hasCharShortcut,
+  "2.2.1": hasTimeLimit,
+  "2.2.2": hasMovingContent,
+  "2.3.1": hasMovingContent,
+  "2.5.1": hasGesture,
+  "2.5.2": hasDownEventAction,
+  "2.5.7": hasDrag
 };
 var MEDIA_HINT = /(youtube|youtu\.be|vimeo|dailymotion|soundcloud|spotify|twitch|wistia|brightcove|jwplayer|videopress|podcast|player|vid[eé]o|audio|baladodiffusion)/i;
 var MEDIA_EXT = /\.(mp4|webm|ogv|ogg|mov|m4v|avi|mpe?g|mp3|wav|flac|m4a|aac|opus|m3u8|mpd)(?:[?#]|$)/i;
@@ -47451,6 +47470,29 @@ function hasMedia(d) {
 }
 function hasMotionApi(d) {
   return /\b(?:devicemotion|deviceorientation|DeviceMotionEvent|DeviceOrientationEvent|Accelerometer|Gyroscope|requestPermission)\b/i.test(d.source);
+}
+function hasCharShortcut(d) {
+  return /\b(?:key|code|charCode|which)\s*===?\s*["'][a-zA-Z0-9]["']|\baccessKey\b|\baccesskey=/i.test(d.source);
+}
+function hasGesture(d) {
+  return /\bon(?:TouchMove|TouchStart|GestureStart|PointerMove)\s*=|\b(?:pinch|swipe|hammerjs|panstart|touchmove)\b/i.test(d.source);
+}
+function hasDrag(d) {
+  if (d.elements.some((e) => e.attribs.draggable !== void 0)) return true;
+  return /\b(?:onDragStart|onDragOver|onDrop|useDrag|useDraggable|DndContext|react-beautiful-dnd|@dnd-kit|sortablejs)\b/.test(d.source);
+}
+function hasDownEventAction(d) {
+  return /\bon(?:MouseDown|PointerDown|TouchStart)\s*=|addEventListener\(\s*["'](?:mousedown|pointerdown|touchstart)["']/i.test(d.source);
+}
+function hasTimeLimit(d) {
+  if (d.elements.some((e) => e.tag === "meta" && (e.attribs["http-equiv"] ?? "").toLowerCase() === "refresh")) return true;
+  return /\b(?:setTimeout|setInterval)\s*\(|\b(?:sessionTimeout|idleTimeout|expiresIn|maxAge|session_max)\b/i.test(d.source);
+}
+function hasMovingContent(d) {
+  if (has(d, "marquee", "blink", "video", "audio")) return true;
+  if (d.elements.some((e) => /animation|transition/i.test(e.attribs.style ?? ""))) return true;
+  if ((d.signals?.css?.rules ?? []).some((r) => r.decls.animation !== void 0 || r.decls.animationName !== void 0)) return true;
+  return /\b(?:carousel|autoplay|requestAnimationFrame|animation-iteration-count|\.gif["']|\bswiper\b)/i.test(d.source);
 }
 function hasFormControl(d) {
   if (has(d, "input", "select", "textarea", "form", "fieldset", "output", "datalist")) return true;
@@ -47494,6 +47536,13 @@ function subjectMatterReason(sc, files) {
     return `No time-based media in scope: ${scope} \u2014 no <audio>, <video>, <track> or <source> element, no <object>/<embed>, and no <iframe> pointing at media.`;
   if (sc === "2.5.4") return `No motion actuation in scope: ${scope} \u2014 no device-motion or device-orientation API is used.`;
   if (sc === "1.3.5" || sc.startsWith("3.3.")) return `No user input in scope: ${scope} \u2014 no form control (native, ARIA or contenteditable) was found.`;
+  if (sc === "2.1.4") return `No single-character keyboard shortcut in scope: ${scope} \u2014 no single-printable-character key comparison and no accesskey attribute was found.`;
+  if (sc === "2.2.1") return `No time limit in scope: ${scope} \u2014 no timer, no <meta http-equiv="refresh">, and no session-expiry configuration was found.`;
+  if (sc === "2.2.2" || sc === "2.3.1")
+    return `No moving, blinking or auto-updating content in scope: ${scope} \u2014 no <marquee>/<blink>, no media element, no CSS animation (inline or in a captured stylesheet), and no carousel/autoplay/rAF signal was found.`;
+  if (sc === "2.5.1") return `No path-based or multipoint gesture in scope: ${scope} \u2014 no touch-move, pinch, swipe or gesture handler was found.`;
+  if (sc === "2.5.2") return `No down-event action in scope: ${scope} \u2014 no mousedown/pointerdown/touchstart handler was found.`;
+  if (sc === "2.5.7") return `No dragging interaction in scope: ${scope} \u2014 no draggable attribute and no drag-and-drop library or handler was found.`;
   return `No element in scope is concerned by this success criterion (${scope}).`;
 }
 var STATIC_PREDS = allSC().filter((c2) => c2.automatability === "static").map((c2) => [c2.sc, APPLICABLE[c2.sc] ?? isFullDocument]);
@@ -47715,12 +47764,12 @@ function runAudit(opts) {
       }
     }
     if (dedupMode !== "off") {
-      const h = hashContent(content, dedupMode);
-      if (seen.has(h)) {
+      const h2 = hashContent(content, dedupMode);
+      if (seen.has(h2)) {
         duplicateFiles++;
         continue;
       }
-      seen.add(h);
+      seen.add(h2);
     }
     const ingested = isSnapshotDom(file) || isUnderDir(file, opts.captureDir ?? CAPTURES_DIR);
     const doc = reused ?? parseSource(content, file, { forceJsx: opts.forceJsx && !ingested });
@@ -47815,8 +47864,8 @@ function listTheme(pack, n) {
   return pack.criteria.filter((c2) => c2.theme === n);
 }
 function themeName(pack, n, lang) {
-  const t2 = pack.themes.find((x) => x.number === n);
-  return t2 ? localize(pack, t2.name, lang) : void 0;
+  const t3 = pack.themes.find((x) => x.number === n);
+  return t3 ? localize(pack, t3.name, lang) : void 0;
 }
 function title(pack, c2, lang) {
   return localize(pack, c2.title, lang);
@@ -47836,9 +47885,9 @@ function glossaryAnchorsOf(crit) {
   if (!crit) return [];
   const texts = [...Object.values(crit.tests ?? {}).flat(), ...crit.technicalNote ?? [], ...crit.particularCases ?? []];
   const seen = /* @__PURE__ */ new Set();
-  for (const t2 of texts) {
+  for (const t3 of texts) {
     GLOSSARY_REF.lastIndex = 0;
-    for (let m = GLOSSARY_REF.exec(t2); m; m = GLOSSARY_REF.exec(t2)) if (m[1]) seen.add(m[1]);
+    for (let m = GLOSSARY_REF.exec(t3); m; m = GLOSSARY_REF.exec(t3)) if (m[1]) seen.add(m[1]);
   }
   return [...seen];
 }
@@ -52067,10 +52116,10 @@ function resolveThreshold(cwd, env) {
   return "bloquant";
 }
 function loopKey(sessionId, intent, findings) {
-  const h = createHash5("sha256");
-  h.update(`${sessionId}\0${intent}\0`);
-  for (const id of findings.map(findingId).sort()) h.update(`${id}\0`);
-  return h.digest("hex").slice(0, 32);
+  const h2 = createHash5("sha256");
+  h2.update(`${sessionId}\0${intent}\0`);
+  for (const id of findings.map(findingId).sort()) h2.update(`${id}\0`);
+  return h2.digest("hex").slice(0, 32);
 }
 function firstSighting(key) {
   try {
@@ -52333,11 +52382,11 @@ function ruleTier(ruleId, pack) {
   return "source";
 }
 function cheapest(tiers) {
-  for (const t2 of TIER_ORDER) if (tiers.includes(t2)) return t2;
+  for (const t3 of TIER_ORDER) if (tiers.includes(t3)) return t3;
   return void 0;
 }
 function dedupe(tiers) {
-  return TIER_ORDER.filter((t2) => tiers.includes(t2));
+  return TIER_ORDER.filter((t3) => tiers.includes(t3));
 }
 function coreCoverage(sc) {
   const c2 = getSC(sc);
@@ -52361,7 +52410,7 @@ function coreCoverage(sc) {
       tier: tier2,
       sourceIsEnough: false,
       canFailFrom: dedupe(tiers),
-      alsoNeeds: dedupe(tiers).filter((t2) => t2 !== tier2),
+      alsoNeeds: dedupe(tiers).filter((t3) => t3 !== tier2),
       engineRules,
       applicabilityDeclared: true,
       why: tier2 === "rendered-page" ? "WCAG automatability class `needs-rendering`, and a rendered-* rule covers it: a captured page snapshot is enough, no live browser." : "WCAG automatability class `needs-rendering`: only a real browser produces this evidence."
@@ -52372,7 +52421,7 @@ function coreCoverage(sc) {
     tier,
     sourceIsEnough: tier === "source",
     canFailFrom: dedupe(tiers),
-    alsoNeeds: dedupe(tiers).filter((t2) => t2 !== tier),
+    alsoNeeds: dedupe(tiers).filter((t3) => t3 !== tier),
     engineRules,
     applicabilityDeclared: true,
     why: "WCAG automatability class `static`: an engine rule decides it from the source tree."
@@ -52398,13 +52447,13 @@ function packCoverage(pack, pc) {
   }
   const declared = pc.appliesTo?.ruleIds;
   if (declared === void 0) {
-    const tiers2 = pc.wcag.map((sc) => coreCoverage(sc)?.tier).filter((t2) => t2 !== void 0);
+    const tiers2 = pc.wcag.map((sc) => coreCoverage(sc)?.tier).filter((t3) => t3 !== void 0);
     const tier2 = tiers2.includes("judgment") ? "judgment" : cheapest(tiers2) ?? "judgment";
     return {
       tier: tier2,
       sourceIsEnough: tier2 === "source",
       canFailFrom: dedupe(tiers2),
-      alsoNeeds: dedupe(tiers2).filter((t2) => t2 !== tier2),
+      alsoNeeds: dedupe(tiers2).filter((t3) => t3 !== tier2),
       engineRules: [],
       applicabilityDeclared: false,
       why: "the pack declares no rule applicability, so this is inferred from the WCAG success criteria it maps to."
@@ -52439,7 +52488,7 @@ function packCoverage(pack, pc) {
     tier,
     sourceIsEnough: tier === "source",
     canFailFrom: dedupe(tiers),
-    alsoNeeds: dedupe(tiers).filter((t2) => t2 !== tier),
+    alsoNeeds: dedupe(tiers).filter((t3) => t3 !== tier),
     engineRules,
     applicabilityDeclared: true,
     why: `the standard declares ${engineRules.length} applicable engine rule${engineRules.length === 1 ? "" : "s"}; the cheapest evidence tier among them is \`${tier}\`.`
@@ -52595,8 +52644,8 @@ var L = {
   }
 };
 var uniq = (xs) => [...new Set(xs.filter(Boolean))];
-function groupOccurrences(findings, collapse2) {
-  if (!collapse2) return findings.map((f) => [f]);
+function groupOccurrences(findings, collapse3) {
+  if (!collapse3) return findings.map((f) => [f]);
   const groups = /* @__PURE__ */ new Map();
   for (const f of findings) {
     const key = `${f.file}\0${f.ruleId}\0${f.selectorHint}`;
@@ -52854,7 +52903,7 @@ var L2 = {
     ac: "Crit\xE8res d'acceptation (Given/When/Then)",
     tasks: "T\xE2ches",
     asUser: "En tant qu'utilisateur en situation de handicap",
-    iNeed: (t2) => `je dois pouvoir compter sur : ${t2}`,
+    iNeed: (t3) => `je dois pouvoir compter sur : ${t3}`,
     given: "\xC9tant donn\xE9",
     when: "Lorsque",
     then: "Alors",
@@ -52887,7 +52936,7 @@ var L2 = {
     ac: "Acceptance criteria (Given/When/Then)",
     tasks: "Tasks",
     asUser: "As a user relying on assistive technology",
-    iNeed: (t2) => `I need: ${t2}`,
+    iNeed: (t3) => `I need: ${t3}`,
     given: "Given",
     when: "When",
     then: "Then",
@@ -52925,11 +52974,11 @@ function prdUnits(r, standard = "wcag", lang = "en") {
     for (const pr of derivePackResults(r, standard)) {
       if (!pr.findings.length) continue;
       const pc = pack.criteria.find((c2) => c2.id === pr.id);
-      const t2 = titlePlain(pack, pc, lang);
+      const t3 = titlePlain(pack, pc, lang);
       units.push({
         criteriaId: pr.id,
-        title: t2,
-        label: `${pack.name} ${pr.id} \u2014 ${t2}`,
+        title: t3,
+        label: `${pack.name} ${pr.id} \u2014 ${t3}`,
         refs: pc.wcag,
         severity: mostSevere(pr.findings),
         findings: sortFindings(pr.findings),
@@ -53070,7 +53119,7 @@ function toRuleOnSection(r, standard, lang) {
     const crit = pack.criteria.find((c2) => c2.id === pc.id);
     const title2 = crit ? titlePlain(pack, crit, lang) : pc.id;
     const tests = packTestIds(pack, pc.id);
-    out2.push(`- [ ] **${pack.name} ${pc.id}** \u2014 ${title2}${tests.length ? `  \xB7  ${s.tests}: ${tests.map((t2) => `\`${t2}\``).join(" ")}` : ""}`);
+    out2.push(`- [ ] **${pack.name} ${pc.id}** \u2014 ${title2}${tests.length ? `  \xB7  ${s.tests}: ${tests.map((t3) => `\`${t3}\``).join(" ")}` : ""}`);
   }
   out2.push("");
   return out2;
@@ -53407,7 +53456,7 @@ var L4 = {
     dedup: "D\xE9dup",
     canonical: "fichier(s) canonique(s) audit\xE9(s)",
     duplicate: "doublon(s) identique(s) ignor\xE9(s)",
-    truncated: (l, t2, s) => `P\xE9rim\xE8tre tronqu\xE9 : ${l}/${t2} fichiers audit\xE9s (priorit\xE9 d'abord), ${s} ignor\xE9(s). \xC9largir avec --max-files.`,
+    truncated: (l, t3, s) => `P\xE9rim\xE8tre tronqu\xE9 : ${l}/${t3} fichiers audit\xE9s (priorit\xE9 d'abord), ${s} ignor\xE9(s). \xC9largir avec --max-files.`,
     rendered: (n, libs) => `Verdict source pr\xE9liminaire : ${n} fichier(s) rendent des composants de biblioth\xE8que (${libs}) dont le HTML produit n'est pas visible en analyse statique. Auditez la sortie de build (\`render\` / \`audit <dist>\`) ou \`scan\` avant de conclure.`,
     sourceTemplate: (n, exts) => `Verdict source pr\xE9liminaire : ${n} composant(s) ${exts} audit\xE9(s) en SOURCE (template). Les slots, snippets et liaisons dynamiques (:attr, {@render}) sont invisibles en analyse statique \u2014 auditez le rendu (\`render\` / \`scan\`) avant de conclure.`,
     captures: (n) => `${n} fichier(s) de capture rendus audit\xE9s \xE0 pleine fid\xE9lit\xE9 (DOM r\xE9el) \u2014 le vrai HTML produit, pas l'appel de composant.`,
@@ -53463,7 +53512,7 @@ var L4 = {
     dedup: "Dedup",
     canonical: "canonical file(s) audited",
     duplicate: "identical duplicate(s) skipped",
-    truncated: (l, t2, s) => `Scope truncated: ${l}/${t2} files audited (highest-priority first), ${s} skipped. Widen with --max-files.`,
+    truncated: (l, t3, s) => `Scope truncated: ${l}/${t3} files audited (highest-priority first), ${s} skipped. Widen with --max-files.`,
     rendered: (n, libs) => `Preliminary source verdict: ${n} file(s) render component-library components (${libs}) whose produced HTML is invisible to static analysis. Audit the build output (\`render\` / \`audit <dist>\`) or \`scan\` before concluding.`,
     sourceTemplate: (n, exts) => `Preliminary source verdict: ${n} ${exts} component(s) audited as SOURCE (template). Slots, snippets and dynamic bindings (:attr, {@render}) are invisible to static analysis \u2014 audit the rendered output (\`render\` / \`scan\`) before concluding.`,
     captures: (n) => `${n} rendered capture file(s) audited at full fidelity (real DOM) \u2014 the true produced HTML, not the component call.`,
@@ -53516,17 +53565,17 @@ function tallyRows(rows) {
 function reportTotals(groups) {
   const tot = { c: 0, nc: 0, na: 0, manual: 0 };
   for (const g of groups) {
-    const t2 = tallyRows(g.rows);
-    tot.c += t2.c;
-    tot.nc += t2.nc;
-    tot.na += t2.na;
-    tot.manual += t2.manual;
+    const t3 = tallyRows(g.rows);
+    tot.c += t3.c;
+    tot.nc += t3.nc;
+    tot.na += t3.na;
+    tot.manual += t3.manual;
   }
   return tot;
 }
 function reportCoverage(groups) {
-  const t2 = reportTotals(groups);
-  return { decided: t2.c + t2.nc, total: t2.c + t2.nc + t2.na + t2.manual };
+  const t3 = reportTotals(groups);
+  return { decided: t3.c + t3.nc, total: t3.c + t3.nc + t3.na + t3.manual };
 }
 function render(r, lang, opts) {
   const s = L4[lang];
@@ -53551,8 +53600,8 @@ function render(r, lang, opts) {
   out2.push(`| ${th.join(" | ")} |`);
   out2.push(`|${"---|".repeat(th.length)}`);
   for (const g of opts.groups) {
-    const t2 = tallyRows(g.rows);
-    out2.push(`| ${g.key} ${g.title} | ${t2.c} | ${t2.nc} | ${t2.na} | ${t2.manual} |`);
+    const t3 = tallyRows(g.rows);
+    out2.push(`| ${g.key} ${g.title} | ${t3.c} | ${t3.nc} | ${t3.na} | ${t3.manual} |`);
   }
   const tot = reportTotals(opts.groups);
   out2.push(`| **${s.total}** | **${tot.c}** | **${tot.nc}** | **${tot.na}** | **${tot.manual}** |`, "");
@@ -53633,7 +53682,7 @@ function render(r, lang, opts) {
     const pack5 = isCore(opts.standard) ? void 0 : loadPack(opts.standard);
     for (const x of manual) {
       const tests = pack5 ? packTestIds(pack5, x.id) : [];
-      const testRef = tests.length ? ` \u2014 ${s.testsToRule}: ${tests.map((t2) => `\`${t2}\``).join(" \xB7 ")}` : "";
+      const testRef = tests.length ? ` \u2014 ${s.testsToRule}: ${tests.map((t3) => `\`${t3}\``).join(" \xB7 ")}` : "";
       out2.push(`- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}${testRef}`);
     }
     out2.push("", `> ${s.manualHowTo}`, "");
@@ -53679,7 +53728,7 @@ function packReportGroups(r, pack, lang = "en") {
     };
     (byTheme.get(pr.theme) ?? byTheme.set(pr.theme, []).get(pr.theme)).push(row);
   }
-  return pack.themes.map((t2) => ({ key: `${t2.number}.`, title: themeName(pack, t2.number, lang) ?? "", rows: byTheme.get(t2.number) ?? [] }));
+  return pack.themes.map((t3) => ({ key: `${t3.number}.`, title: themeName(pack, t3.number, lang) ?? "", rows: byTheme.get(t3.number) ?? [] }));
 }
 function renderPackReport(r, pack, lang = "en", outDir, cropFor) {
   const derived = derivePackResults(r, pack.key);
@@ -53841,14 +53890,14 @@ var L5 = {
   }
 };
 function renderRemediationBody(unit, lang) {
-  const t2 = L5[lang];
+  const t3 = L5[lang];
   const lines = [];
   if (unit.refs.length) lines.push(`**WCAG** : ${unit.refs.join(", ")}`, "");
-  for (const fx of [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))]) lines.push(`**${t2.fix}** : ${fx}`);
-  lines.push("", `**${t2.occ} (${unit.findings.length})**`, "");
+  for (const fx of [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))]) lines.push(`**${t3.fix}** : ${fx}`);
+  lines.push("", `**${t3.occ} (${unit.findings.length})**`, "");
   for (const f of unit.findings) {
     lines.push(`- [ ] \`${f.file}:${f.line}\` (\`${f.selectorHint}\`) \u2014 ${resolveMessage(f, lang)}`);
-    if (f.related) lines.push(`  - ${t2.def} : \`${f.related.file}:${f.related.line}\` (\`${f.related.selectorHint}\`)`);
+    if (f.related) lines.push(`  - ${t3.def} : \`${f.related.file}:${f.related.line}\` (\`${f.related.selectorHint}\`)`);
   }
   return lines.join("\n");
 }
@@ -53857,16 +53906,16 @@ function renderCriterionBody(unit, standard, lang, opts = {}) {
   return renderAuditorUnit(unit, standard, lang, { ...opts.technical !== void 0 ? { technical: opts.technical } : {} }).join("\n").trimEnd();
 }
 function pagePreamble(page, lang, basisWarning) {
-  const t2 = L5[lang];
-  const out2 = [`**${t2.page}** : ${page.name}`, `**${t2.url}** : ${page.url}`];
-  if (page.auth) out2.push(`**${t2.auth}** : ${t2.yes}`);
+  const t3 = L5[lang];
+  const out2 = [`**${t3.page}** : ${page.name}`, `**${t3.url}** : ${page.url}`];
+  if (page.auth) out2.push(`**${t3.auth}** : ${t3.yes}`);
   out2.push("");
   if (basisWarning) out2.push(`> \u26A0\uFE0F ${basisWarning}`, "");
   return out2;
 }
 function filePreamble(file, lang) {
-  const t2 = L5[lang];
-  return [`**${t2.file}** : \`${file}\``, "", `> ${t2.fileNote}`, ""];
+  const t3 = L5[lang];
+  return [`**${t3.file}** : \`${file}\``, "", `> ${t3.fileNote}`, ""];
 }
 function clampBody(body3, limit, lang) {
   if (body3.length <= limit) return body3;
@@ -53993,7 +54042,7 @@ function buildTickets(result, opts) {
       continue;
     }
     for (const u of units) {
-      const t2 = ticketFromUnit(u, pageCriterionTitle(page.id, u, label), {
+      const t3 = ticketFromUnit(u, pageCriterionTitle(page.id, u, label), {
         grain: "page-criterion",
         pageId: page.id,
         pageName: page.name,
@@ -54002,7 +54051,7 @@ function buildTickets(result, opts) {
         basis: page.basis,
         criteriaId: u.criteriaId
       });
-      tickets.push({ ...t2, body: clamp2([...preamble, t2.body].join("\n")) });
+      tickets.push({ ...t3, body: clamp2([...preamble, t3.body].join("\n")) });
     }
   }
   if (orphans.length) {
@@ -54246,16 +54295,16 @@ function createGithubProvider(opts = {}) {
     const raw = ghExec(["issue", "list", "--state", "all", "--limit", "1000", "--json", "title"]);
     return JSON.parse(raw).filter((i2) => i2.title).map((i2) => ({ title: i2.title }));
   }
-  async function createRest(t2) {
+  async function createRest(t3) {
     const url = `${r.api}/repos/${r.repo}/issues`;
     const post = async (labels) => requestJson(url, {
       method: "POST",
       headers: auth,
-      body: { title: t2.title, body: t2.body, ...labels ? { labels } : {} },
+      body: { title: t3.title, body: t3.body, ...labels ? { labels } : {} },
       ...http
     });
     try {
-      const { data: data2 } = await post(t2.labels);
+      const { data: data2 } = await post(t3.labels);
       return { ok: true, ...data2.number !== void 0 ? { id: String(data2.number) } : {}, ...data2.html_url ? { url: data2.html_url } : {} };
     } catch (e) {
       if (e instanceof HttpError && e.status === 422) {
@@ -54269,14 +54318,14 @@ function createGithubProvider(opts = {}) {
       return { ok: false, reason: e instanceof HttpError ? reasonFrom(e.detail) : e instanceof Error ? e.message : String(e) };
     }
   }
-  function createCli(t2) {
-    const base = ["issue", "create", "--title", t2.title, "--body-file", "-"];
+  function createCli(t3) {
+    const base = ["issue", "create", "--title", t3.title, "--body-file", "-"];
     try {
-      ghExec([...base, "--label", t2.labels.join(",")], t2.body);
+      ghExec([...base, "--label", t3.labels.join(",")], t3.body);
       return { ok: true };
     } catch (labelledErr) {
       try {
-        ghExec(base, t2.body);
+        ghExec(base, t3.body);
         return { ok: true };
       } catch (err2) {
         return { ok: false, reason: ghErrorReason(err2) ?? ghErrorReason(labelledErr) };
@@ -54296,7 +54345,7 @@ function createGithubProvider(opts = {}) {
         return [];
       }
     },
-    create: async (t2) => r.transport === "cli" ? createCli(t2) : createRest(t2)
+    create: async (t3) => r.transport === "cli" ? createCli(t3) : createRest(t3)
   };
 }
 
@@ -54368,12 +54417,12 @@ function createGitlabProvider(opts = {}) {
     const rows = Array.isArray(parsed) ? parsed : parsed.issues ?? [];
     return rows.filter((i2) => i2.title).map((i2) => ({ title: i2.title }));
   }
-  async function createRest(t2) {
+  async function createRest(t3) {
     try {
       const { data: data2 } = await requestJson(`${r.api}/projects/${id}/issues`, {
         method: "POST",
         headers: auth,
-        body: { title: t2.title, description: t2.body, labels: t2.labels.join(",") },
+        body: { title: t3.title, description: t3.body, labels: t3.labels.join(",") },
         ...http
       });
       return { ok: true, ...data2.iid !== void 0 ? { id: String(data2.iid) } : {}, ...data2.web_url ? { url: data2.web_url } : {} };
@@ -54382,9 +54431,9 @@ function createGitlabProvider(opts = {}) {
       return { ok: false, reason: withTokenHint(e instanceof HttpError ? `${e.status} ${reason}` : reason) };
     }
   }
-  function createCli(t2) {
+  function createCli(t3) {
     try {
-      glabExec(["issue", "create", "--title", t2.title, "--description", t2.body, "--label", t2.labels.join(",")]);
+      glabExec(["issue", "create", "--title", t3.title, "--description", t3.body, "--label", t3.labels.join(",")]);
       return { ok: true };
     } catch (err2) {
       return { ok: false, reason: withTokenHint(execReason(err2) ?? "glab issue create failed") };
@@ -54403,7 +54452,7 @@ function createGitlabProvider(opts = {}) {
         return [];
       }
     },
-    create: async (t2) => r.transport === "cli" ? createCli(t2) : createRest(t2)
+    create: async (t3) => r.transport === "cli" ? createCli(t3) : createRest(t3)
   };
 }
 
@@ -54449,20 +54498,20 @@ function createJiraProvider(opts = {}) {
     }
     return out2;
   }
-  function fields(t2, opt) {
+  function fields(t3, opt) {
     return {
       project: { key: r.project },
-      summary: t2.title,
-      description: r.apiVersion === "3" ? toAdf(t2.body) : t2.body,
+      summary: t3.title,
+      description: r.apiVersion === "3" ? toAdf(t3.body) : t3.body,
       issuetype: { name: r.issueType },
-      ...opt.labels ? { labels: [.../* @__PURE__ */ new Set([...t2.labels, JIRA_SCOPE_LABEL])].map((l) => l.replace(/\s+/g, "-")) } : {},
-      ...opt.priority ? { priority: { name: PRIORITY[t2.severity] } } : {}
+      ...opt.labels ? { labels: [.../* @__PURE__ */ new Set([...t3.labels, JIRA_SCOPE_LABEL])].map((l) => l.replace(/\s+/g, "-")) } : {},
+      ...opt.priority ? { priority: { name: PRIORITY[t3.severity] } } : {}
     };
   }
-  async function post(t2, opt) {
-    return requestJson(`${r.url}/rest/api/${r.apiVersion}/issue`, { method: "POST", headers, body: { fields: fields(t2, opt) }, ...http });
+  async function post(t3, opt) {
+    return requestJson(`${r.url}/rest/api/${r.apiVersion}/issue`, { method: "POST", headers, body: { fields: fields(t3, opt) }, ...http });
   }
-  async function create(t2) {
+  async function create(t3) {
     const attempts = [
       { priority: true, labels: true },
       { priority: false, labels: true },
@@ -54471,7 +54520,7 @@ function createJiraProvider(opts = {}) {
     let last = "";
     for (const opt of attempts) {
       try {
-        const { data: data2 } = await post(t2, opt);
+        const { data: data2 } = await post(t3, opt);
         return { ok: true, ...data2.key ? { id: data2.key, url: `${r.url}/browse/${data2.key}` } : {} };
       } catch (e) {
         last = e instanceof HttpError ? reasonFrom(e.detail) : e instanceof Error ? e.message : String(e);
@@ -54815,9 +54864,9 @@ function packThemeList(pack, lang) {
   out2.push(
     `${pack.name} ${pack.baseVersion} \u2014 ${pack.themes.length} ${lang === "fr" ? "th\xE9matiques" : "themes"}, ${pack.criteria.length} ${lang === "fr" ? "crit\xE8res" : "criteria"}`
   );
-  for (const t2 of pack.themes) {
+  for (const t3 of pack.themes) {
     out2.push(
-      `${String(t2.number).padStart(2)}. ${(themeName(pack, t2.number, lang) ?? "").padEnd(32).slice(0, 32)} ${String(t2.count).padStart(3)} ${lang === "fr" ? "crit\xE8res" : "criteria"}`
+      `${String(t3.number).padStart(2)}. ${(themeName(pack, t3.number, lang) ?? "").padEnd(32).slice(0, 32)} ${String(t3.count).padStart(3)} ${lang === "fr" ? "crit\xE8res" : "criteria"}`
     );
   }
   return out2.join("\n");
@@ -54922,7 +54971,7 @@ function renderCriteriaReference() {
     out2.push(`|${"---|".repeat(head.length)}`);
     for (const c2 of byG.get(g.number) ?? []) {
       const hits = packsForSc(c2.sc);
-      const packCols = packs.map((p) => hits.find((h) => h.key === p.key)?.ids.join(", ") ?? "\u2014");
+      const packCols = packs.map((p) => hits.find((h2) => h2.key === p.key)?.ids.join(", ") ?? "\u2014");
       const row = [c2.sc, c2.title.replace(/\|/g, "\\|"), c2.level, c2.automatability, c2.ruleIds.join(", ") || "\u2014", ...packCols];
       out2.push(`| ${row.join(" | ")} |`);
     }
@@ -54978,9 +55027,9 @@ function buildWorklistLegacy(reportMd, standard, max) {
   const header4 = legacyNcHeader(standard);
   const lines = reportMd.split("\n");
   for (let i2 = 0; i2 < lines.length && items.length < max; i2++) {
-    const h = header4.exec(lines[i2]);
-    if (!h) continue;
-    let claim = h[2] ?? "";
+    const h2 = header4.exec(lines[i2]);
+    if (!h2) continue;
+    let claim = h2[2] ?? "";
     for (let j = i2 + 1; j < Math.min(i2 + 4, lines.length); j++) {
       const sub = /^\s+-\s+(.*)$/.exec(lines[j]);
       if (sub && !sub[1].startsWith("_")) {
@@ -54988,7 +55037,7 @@ function buildWorklistLegacy(reportMd, standard, max) {
         break;
       }
     }
-    items.push({ n: items.length + 1, criteriaId: h[1], file: h[3], line: Number(h[4]), selector: h[5], claim, verdict: null, note: "" });
+    items.push({ n: items.length + 1, criteriaId: h2[1], file: h2[3], line: Number(h2[4]), selector: h2[5], claim, verdict: null, note: "" });
   }
   return items;
 }
@@ -55308,12 +55357,12 @@ function pageTally(rows) {
     manual: rows.filter((r) => r.status === "manual").length
   };
 }
-function pageTallyNote(t2, lang) {
-  return L7[lang].tally(t2.c, t2.nc, t2.na, t2.manual);
+function pageTallyNote(t3, lang) {
+  return L7[lang].tally(t3.c, t3.nc, t3.na, t3.manual);
 }
 function pageCoverage(rows) {
-  const t2 = pageTally(rows);
-  return { decided: t2.c + t2.nc, total: rows.length };
+  const t3 = pageTally(rows);
+  return { decided: t3.c + t3.nc, total: rows.length };
 }
 function pageRatePct(rows) {
   const { c: c2, nc } = pageTally(rows);
@@ -55322,21 +55371,21 @@ function pageRatePct(rows) {
 function renderPageReport(result, page, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
-  const h = opts.heading ?? "##";
+  const h2 = opts.heading ?? "##";
   const s = L7[lang];
   const out2 = [];
-  out2.push(`${h} ${page.name}${page.auth ? " \u{1F512}" : ""}`, "");
+  out2.push(`${h2} ${page.name}${page.auth ? " \u{1F512}" : ""}`, "");
   const meta2 = [];
   meta2.push(`- **${s.url}** : \`${page.url}\``);
   meta2.push(`- **${s.basis}** : ${basisLabel(page.basis, lang)}`);
   if (page.auth) meta2.push(`- **${s.auth}** : \u2705`);
   out2.push(...meta2);
   const rows = pageCriterionRows(result, page, standard, lang);
-  const t2 = pageTally(rows);
+  const t3 = pageTally(rows);
   const cov = pageCoverage(rows);
   const rate = pageRatePct(rows);
   out2.push(`- **${s.rate}** : **${rate === null ? "\u2014" : `${rate} %`}** _(${s.rateNote})_`);
-  out2.push(`- ${pageTallyNote(t2, lang)}`);
+  out2.push(`- ${pageTallyNote(t3, lang)}`);
   out2.push(`- ${s.coverage(cov.decided, cov.total)}`, "");
   if (page.basis !== "snapshot") out2.push(`> \u26A0\uFE0F ${s.sourceWarn}`, "");
   const shot = opts.screenshots?.get(page.id);
@@ -55345,7 +55394,7 @@ function renderPageReport(result, page, opts = {}) {
   const refused = opts.evidenceNotice?.(page.id) ?? [];
   if (refused.length) out2.push(...refused, "");
   const withTests = rows.some((r) => r.tests.length);
-  out2.push(`${h}# ${s.gridTitle}`, "", `> ${s.gridNote}`, "");
+  out2.push(`${h2}# ${s.gridTitle}`, "", `> ${s.gridNote}`, "");
   out2.push(withTests ? `| ${s.criterion} | ${s.tests} | ${s.status} |` : `| ${s.criterion} | ${s.status} |`);
   out2.push(withTests ? "| --- | --- | --- |" : "| --- | --- |");
   let group = "";
@@ -55355,7 +55404,7 @@ function renderPageReport(result, page, opts = {}) {
       out2.push(withTests ? `| **${group}** | | |` : `| **${group}** | |`);
     }
     const mark = row.decidedBy === "agent" && row.status === "C" ? `${MARK2[row.status]}*` : MARK2[row.status];
-    if (withTests) out2.push(`| ${row.label} | ${row.tests.map((t3) => `\`${t3}\``).join(" ")} | ${mark} |`);
+    if (withTests) out2.push(`| ${row.label} | ${row.tests.map((t4) => `\`${t4}\``).join(" ")} | ${mark} |`);
     else out2.push(`| ${row.label} | ${mark} |`);
   }
   out2.push("", `> ${s.manualWarn}`, "");
@@ -55363,12 +55412,12 @@ function renderPageReport(result, page, opts = {}) {
   const units = prdUnits(pageView(result, page), standard, lang);
   const ncUnits = units.filter((u) => !u.advisory);
   const advUnits = units.filter((u) => u.advisory);
-  const unit = { heading: `${h}##`, collapse: true, ...opts.cropFor ? { cropFor: opts.cropFor } : {} };
-  out2.push(`${h}# ${s.ncTitle}`, "");
+  const unit = { heading: `${h2}##`, collapse: true, ...opts.cropFor ? { cropFor: opts.cropFor } : {} };
+  out2.push(`${h2}# ${s.ncTitle}`, "");
   if (!ncUnits.length) out2.push(s.noNc, "");
   else for (const u of ncUnits) out2.push(...renderAuditorUnit(u, standard, lang, unit));
   if (advUnits.length) {
-    out2.push(`${h}# \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
+    out2.push(`${h2}# \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
     for (const u of advUnits) out2.push(...renderAuditorUnit(u, standard, lang, unit));
   }
   return out2.join("\n");
@@ -55597,6 +55646,546 @@ function sectionBody(md, n) {
 // src/adjudicate.ts
 import { mkdirSync as mkdirSync9, writeFileSync as writeFileSync10 } from "fs";
 import { join as join35, resolve as resolve10 } from "path";
+
+// src/adjudicate-subjects.ts
+var selectorFor = (el) => {
+  const id = el.attribs.id ? `#${el.attribs.id}` : "";
+  const cls = el.attribs.class ? `.${el.attribs.class.trim().split(/\s+/)[0]}` : "";
+  return `${el.tag}${id}${cls}`;
+};
+function h(doc, el, note, cls) {
+  return {
+    ev: { file: doc.file, line: el.line, selector: selectorFor(el), snippet: snippet(doc, el, 160), note },
+    cls: cls ?? `${el.tag}|${note}`,
+    at: el.start
+  };
+}
+function hAt(doc, line, selector, note, cls) {
+  return {
+    ev: { file: doc.file, line, selector, snippet: (doc.source.split("\n")[line - 1] ?? "").trim().slice(0, 160), note },
+    cls,
+    at: line
+  };
+}
+var declsText = (decls) => Object.entries(decls).map(([k, v]) => `${k}: ${v}`).join("; ").slice(0, 100);
+var t = (el, n = 60) => textContent(el).trim().replace(/\s+/g, " ").slice(0, n);
+function nearestHeading(doc, el) {
+  const headings2 = elementsByTag(doc, "h1", "h2", "h3", "h4", "h5", "h6").filter((x) => x.start < el.start);
+  const last = headings2[headings2.length - 1];
+  return last ? t(last, 80) : void 0;
+}
+function lineOf(doc, re) {
+  const m = re.exec(doc.source);
+  return m ? doc.source.slice(0, m.index).split("\n").length : void 0;
+}
+function linesOf(doc, re, cap = 200) {
+  const out2 = [];
+  const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : `${re.flags}g`);
+  let m;
+  while ((m = g.exec(doc.source)) && out2.length < cap) {
+    const line = doc.source.slice(0, m.index).split("\n").length;
+    out2.push({ line, text: (doc.source.split("\n")[line - 1] ?? "").trim().slice(0, 120) });
+    if (m.index === g.lastIndex) g.lastIndex++;
+  }
+  return out2;
+}
+var LABEL_LIKE = /(^|[-_ ])(field-label|field-key|label|key|term)([-_ ]|$)/i;
+var VALUE_LIKE = /(^|[-_ ])(field-value|field-data|value|data)([-_ ]|$)/i;
+function keyValuePairs(doc) {
+  const out2 = [];
+  for (const el of doc.elements) {
+    const isDt = el.tag === "dt";
+    const isLabelDiv = el.tag !== "label" && el.tag !== "dt" && LABEL_LIKE.test(attr(el, "class") ?? "");
+    if (!isDt && !isLabelDiv) continue;
+    const parent = el.parent;
+    if (!parent) continue;
+    const sibs = parent.children.filter((c2) => c2.type === "element");
+    const next = sibs[sibs.indexOf(el) + 1];
+    if (!next) continue;
+    const paired = isDt ? next.tag === "dd" : VALUE_LIKE.test(attr(next, "class") ?? "");
+    if (!paired) continue;
+    out2.push({ key: el, label: t(el, 40), value: t(next, 40) });
+  }
+  return out2;
+}
+var DOWNLOAD_HREF = /\.(pdf|docx?|xlsx?)(?:[?#]|$)/i;
+var STATUS_CLASS = /(error|status|message|alert|notif|toast|feedback|live)/i;
+var ROUTER_IMPORT = /['"](?:react-router(?:-dom)?|next\/(?:router|navigation)|vue-router|@remix-run\/[\w-]+|@tanstack\/[\w-]*router|@sveltejs\/kit|\$app\/(?:navigation|stores))['"]/;
+var FOREIGN_LEXICON = /\b(?:the|and|with|your|about|please|download|settings|welcome|dashboard|overview|read more|learn more|sign in|sign up|log in|get started|coming soon|powered by)\b/i;
+var CONTROL_TAGS = ["input", "select", "textarea"];
+var INTERACTIVE_TAGS = ["a", "button", "input", "select", "textarea", "summary", "details", "label"];
+function labelFor(doc, el) {
+  const id = attr(el, "id");
+  const lbl = id ? elementsByTag(doc, "label").find((l) => attr(l, "for") === id) : void 0;
+  if (lbl) return t(lbl, 40);
+  const wrapping = ancestors(el).find((a) => a.tag === "label");
+  return wrapping ? t(wrapping, 40) : "";
+}
+function pageOfDoc(file) {
+  const m = /(?:^|\/)\.ultra11y\/pages\/([^/]+)\//.exec(file.replace(/\\/g, "/"));
+  return m ? m[1] : void 0;
+}
+var isSnapshotFile = (file) => pageOfDoc(file) !== void 0;
+var SUBJECTS = {
+  // Every image-like element and the alternative it carries. Class = (alt, src): the same
+  // logo on 38 pages is one decision, not 38.
+  images: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas").concat(d.elements.filter((e) => attr(e, "role") === "img")).filter((e, i2, a) => a.indexOf(e) === i2).map(
+      (e) => h(
+        d,
+        e,
+        `<${e.tag}> alt="${attr(e, "alt") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" src="${(attr(e, "src") ?? "").slice(0, 80)}"`,
+        `image|${e.tag}|${attr(e, "alt") ?? ""}|${attr(e, "aria-label") ?? ""}|${attr(e, "src") ?? ""}`
+      )
+    )
+  ),
+  // Links: text + destination + the heading they are read under. Class = (text, href).
+  links: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, "a").filter((e) => attr(e, "href") !== void 0).map((e) => {
+      const href = attr(e, "href") ?? "";
+      const dl = DOWNLOAD_HREF.exec(href);
+      const note = dl ? ` download-format=${dl[1].toLowerCase()} (naming the format, e.g. "(PDF)", is a recommendation \u2014 not an NC)` : "";
+      return h(d, e, `text="${t(e)}" href="${href}" under="${nearestHeading(d, e) ?? ""}"${note}`, `link|${t(e)}|${href}`);
+    })
+  ),
+  // Literal inline colour pairs — the statically visible subset of contrast.
+  colourPairs: (docs) => docs.flatMap(
+    (d) => d.elements.filter((e) => {
+      const st = parseInlineStyle(attr(e, "style") ?? "");
+      return st.has("color") || st.has("background-color") || st.has("background");
+    }).map((e) => {
+      const st = parseInlineStyle(attr(e, "style") ?? "");
+      const fg = st.get("color") ?? "?";
+      const bg = st.get("background-color") ?? st.get("background") ?? "?";
+      return h(d, e, `color=${fg} background=${bg}`, `colour|${fg}|${bg}`);
+    })
+  ),
+  // Headings, labels, legends and captions — the text judged for descriptiveness.
+  headings: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption").map(
+      (e) => h(d, e, `<${e.tag}> text="${t(e)}"`, `heading|${e.tag}|${t(e)}`)
+    )
+  ),
+  // Form controls and the label/placeholder/instruction attached to them.
+  controls: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, ...CONTROL_TAGS).map(
+      (e) => h(
+        d,
+        e,
+        `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" required=${attr(e, "required") !== void 0} describedby="${attr(e, "aria-describedby") ?? ""}"`,
+        `control|${e.tag}|${attr(e, "type") ?? ""}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`
+      )
+    )
+  ),
+  // The `autocomplete` token a field carries — the subject of "identify input purpose".
+  autocomplete: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, ...CONTROL_TAGS).map(
+      (e) => h(
+        d,
+        e,
+        `<${e.tag} type="${attr(e, "type") ?? ""}" name="${attr(e, "name") ?? ""}"> autocomplete="${attr(e, "autocomplete") ?? ""}" \u2014 does this field collect data ABOUT THE USER?`,
+        `autocomplete|${attr(e, "type") ?? ""}|${attr(e, "name") ?? ""}|${attr(e, "autocomplete") ?? ""}`
+      )
+    )
+  ),
+  // Error messaging and its association with the offending field.
+  errors: (docs) => docs.flatMap((d) => [
+    ...d.elements.filter((e) => attr(e, "aria-invalid") !== void 0 || attr(e, "aria-errormessage") !== void 0).map(
+      (e) => h(
+        d,
+        e,
+        `aria-invalid="${attr(e, "aria-invalid") ?? ""}" aria-errormessage="${attr(e, "aria-errormessage") ?? ""}" aria-describedby="${attr(e, "aria-describedby") ?? ""}"`,
+        `errorstate|${attr(e, "aria-invalid") ?? ""}|${attr(e, "aria-errormessage") ?? ""}`
+      )
+    ),
+    ...d.elements.filter((e) => STATUS_CLASS.test(attr(e, "class") ?? "") && ancestors(e).some((a) => a.tag === "form")).map((e) => h(d, e, `error/status text in a form: "${t(e, 60)}"`, `errortext|${t(e, 60)}`))
+  ]),
+  // Structure conveyed by markup: the outline, tables, lists, and div-presented pairs.
+  structure: (docs) => docs.flatMap((d) => [
+    ...elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol", "dl").map(
+      (e) => h(d, e, `<${e.tag}> "${t(e, 50)}"`, `structure|${e.tag}|${t(e, 50)}`)
+    ),
+    ...keyValuePairs(d).map(
+      (p) => h(
+        d,
+        p.key,
+        `key/value pair \u2014 label="${p.label}" value="${p.value}" (div-presented field? verify the relationship isn't only visual \u2014 RGAA 8.9/9.3)`,
+        `kv|${p.label}|${p.value}`
+      )
+    )
+  ]),
+  // Tables, with the parts that decide whether they are data or layout.
+  tables: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, "table").map((e) => {
+      const caption = elementsByTag(d, "caption").find((c2) => ancestors(c2)[0] === e);
+      const ths = elementsByTag(d, "th").filter((x) => ancestors(x).includes(e));
+      return h(
+        d,
+        e,
+        `<table> caption="${caption ? t(caption, 40) : ""}" role="${attr(e, "role") ?? ""}" th=${ths.length} summary="${attr(e, "summary") ?? ""}" \u2014 data table or layout?`,
+        `table|${caption ? t(caption, 40) : ""}|${ths.length}|${attr(e, "role") ?? ""}`
+      );
+    })
+  ),
+  // Lists and definition lists, for the technique-consistency question.
+  lists: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, "ul", "ol", "dl").map((e) => {
+      const items = e.children.filter((c2) => c2.type === "element").length;
+      return h(d, e, `<${e.tag}> items=${items} first="${t(e, 40)}"`, `list|${e.tag}|${items}|${t(e, 40)}`);
+    })
+  ),
+  // Landmarks and the navigation structure that lets a user bypass repeated blocks.
+  landmarks: (docs) => docs.flatMap((d) => [
+    ...elementsByTag(d, "header", "nav", "main", "footer", "aside", "form", "section").concat(d.elements.filter((e) => ["banner", "navigation", "main", "contentinfo", "complementary", "search", "region"].includes(attr(e, "role") ?? ""))).filter((e, i2, a) => a.indexOf(e) === i2).map(
+      (e) => h(
+        d,
+        e,
+        `<${e.tag}> role="${attr(e, "role") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" aria-labelledby="${attr(e, "aria-labelledby") ?? ""}"`,
+        `landmark|${e.tag}|${attr(e, "role") ?? ""}|${attr(e, "aria-label") ?? ""}`
+      )
+    ),
+    ...elementsByTag(d, "a").filter((e) => (attr(e, "href") ?? "").startsWith("#")).map((e) => h(d, e, `in-page link (skip link?) text="${t(e, 40)}" href="${attr(e, "href")}"`, `skiplink|${t(e, 40)}|${attr(e, "href")}`))
+  ]),
+  // Every mechanism that leads to a page — the subject of "multiple ways".
+  navMechanisms: (docs) => docs.flatMap((d) => [
+    ...elementsByTag(d, "nav").map(
+      (e) => h(d, e, `<nav> aria-label="${attr(e, "aria-label") ?? ""}" links=${elementsByTag(d, "a").filter((a) => ancestors(a).includes(e)).length}`, `nav|${attr(e, "aria-label") ?? ""}`)
+    ),
+    ...elementsByTag(d, ...CONTROL_TAGS).filter((e) => (attr(e, "type") ?? "") === "search" || /search|recherch/i.test(`${attr(e, "name") ?? ""} ${attr(e, "id") ?? ""} ${attr(e, "class") ?? ""}`)).map((e) => h(d, e, `search field \u2014 one of the "multiple ways" mechanisms`, `search|${attr(e, "name") ?? ""}`)),
+    ...elementsByTag(d, "a").filter((e) => /plan-du-site|sitemap|site-map|index/i.test(attr(e, "href") ?? "")).map((e) => h(d, e, `site map / index link text="${t(e, 40)}" href="${attr(e, "href")}"`, `sitemap|${attr(e, "href")}`))
+  ]),
+  // The repeated blocks whose ORDER must not change from page to page. One class per page so
+  // "same relative order everywhere" is answerable from the evidence itself.
+  repeatedBlocks: (docs) => docs.flatMap((d) => {
+    const page = pageOfDoc(d.file) ?? "source";
+    return elementsByTag(d, "header", "nav", "footer").map((e) => {
+      const order = elementsByTag(d, "a").filter((a) => ancestors(a).includes(e)).map((a) => t(a, 24)).slice(0, 20).join(" \u203A ");
+      return h(d, e, `page="${page}" <${e.tag}> order: ${order}`, `repeated|${page}|${e.tag}`);
+    });
+  }),
+  // Elements whose ARIA name, role or state is authored rather than native.
+  aria: (docs) => docs.flatMap(
+    (d) => d.elements.filter((e) => attr(e, "role") !== void 0 || Object.keys(e.attribs).some((k) => k.startsWith("aria-"))).map((e) => {
+      const ariaKeys = Object.keys(e.attribs).filter((k) => k.startsWith("aria-")).sort().join(",");
+      return h(d, e, `<${e.tag}> role="${attr(e, "role") ?? ""}" ${ariaKeys}`, `aria|${e.tag}|${attr(e, "role") ?? ""}|${ariaKeys}`);
+    })
+  ),
+  // Live regions and the async feedback that must reach them.
+  liveRegions: (docs) => docs.flatMap((d) => {
+    const isRegion = (e) => attr(e, "aria-live") !== void 0 || ["status", "alert", "log"].includes((attr(e, "role") ?? "").trim().toLowerCase());
+    return [
+      ...d.elements.filter(isRegion).map((e) => h(d, e, `aria-live="${attr(e, "aria-live") ?? ""}" role="${attr(e, "role") ?? ""}"`, `live|${attr(e, "aria-live") ?? ""}|${attr(e, "role") ?? ""}`)),
+      ...d.elements.filter((e) => !isRegion(e) && STATUS_CLASS.test(attr(e, "class") ?? "") && ancestors(e).some((a) => a.tag === "form")).map(
+        (e) => h(
+          d,
+          e,
+          `status-like class="${(attr(e, "class") ?? "").slice(0, 40)}" in a form \u2014 verify async feedback is announced (role=status/alert or aria-live)`,
+          `statusclass|${(attr(e, "class") ?? "").slice(0, 40)}`
+        )
+      )
+    ];
+  }),
+  // Explicit tab order, dialogs, and the SPA signals that decide focus restitution.
+  focusOrder: (docs) => docs.flatMap((d) => {
+    const out2 = [
+      ...d.elements.filter((e) => attr(e, "tabindex") !== void 0).map((e) => h(d, e, `tabindex="${attr(e, "tabindex")}"`, `tabindex|${attr(e, "tabindex")}`)),
+      ...elementsByTag(d, "dialog").concat(d.elements.filter((e) => attr(e, "role") === "dialog")).filter((e, i2, a) => a.indexOf(e) === i2).map((e) => h(d, e, `<${e.tag} role="${attr(e, "role") ?? ""}"> \u2014 verify focus moves in on open and is restored to the trigger on close`, `dialog|${e.tag}`))
+    ];
+    const rl = lineOf(d, ROUTER_IMPORT);
+    if (rl !== void 0) out2.push(hAt(d, rl, "import", "client-router import \u2014 verify page title + focus are restored on partial (SPA) navigation", "router"));
+    return out2;
+  }),
+  // Focusable inventory plus the handlers that can hold focus — the keyboard-trap subject.
+  focusables: (docs) => docs.flatMap((d) => [
+    ...elementsByTag(d, "iframe", "object", "embed").map(
+      (e) => h(d, e, `<${e.tag}> title="${attr(e, "title") ?? ""}" src="${(attr(e, "src") ?? "").slice(0, 60)}" \u2014 can focus LEAVE this embedded content with the keyboard alone?`, `embed|${e.tag}|${attr(e, "src") ?? ""}`)
+    ),
+    ...elementsByTag(d, "dialog").concat(d.elements.filter((e) => attr(e, "role") === "dialog" || attr(e, "aria-modal") === "true")).filter((e, i2, a) => a.indexOf(e) === i2).map((e) => h(d, e, `modal container <${e.tag}> aria-modal="${attr(e, "aria-modal") ?? ""}" \u2014 does Escape hand control back?`, `modal|${e.tag}`)),
+    ...linesOf(d, /preventDefault\(\)/).map((l) => hAt(d, l.line, "handler", `preventDefault in a handler: ${l.text}`, `preventDefault|${l.text}`))
+  ]),
+  // Language changes inside a page.
+  //
+  // The absence of a `lang` attribute proves NOTHING here, which is why this criterion has no
+  // applicability predicate: a page with no `lang` anywhere is either a page with no change of
+  // language (conforming) or a page whose foreign passages are all unmarked (failing), and
+  // those are opposite verdicts. So the harvest cannot just list `lang` attributes — it has to
+  // hand over the CANDIDATES too, or the agent is asked to rule on an empty set.
+  //
+  // Three things go in: the language each page declares, every element-level override, and
+  // every text run carrying a word from a foreign lexicon. The lexicon is a lead, never a
+  // verdict — "email", "test" and "sprint" are French usage now, and the decision protocol
+  // already exempts proper nouns, technical terms and words that entered the vernacular.
+  langParts: (docs) => docs.flatMap((d) => [
+    ...elementsByTag(d, "html").map((e) => h(d, e, `page="${pageOfDoc(d.file) ?? "source"}" declares lang="${attr(e, "lang") ?? ""}" \u2014 passages in another language must override it`, `declaredlang|${attr(e, "lang") ?? ""}`)),
+    ...d.elements.filter((e) => e.tag !== "html" && attr(e, "lang") !== void 0).map((e) => h(d, e, `lang="${attr(e, "lang")}" text="${t(e, 40)}"`, `lang|${attr(e, "lang")}|${t(e, 40)}`)),
+    ...d.elements.filter((e) => e.children.some((c2) => c2.type === "text") && FOREIGN_LEXICON.test(textContent(e)) && attr(e, "lang") === void 0).map((e) => h(d, e, `candidate foreign passage, NOT marked with lang: "${t(e, 60)}" \u2014 a proper noun, a technical term or a word in common use is exempt`, `foreign|${t(e, 60)}`))
+  ]),
+  // The document's own language declaration.
+  docLang: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, "html").map((e) => h(d, e, `<html lang="${attr(e, "lang") ?? ""}"> \u2014 is it present, valid, and the language of the content?`, `doclang|${attr(e, "lang") ?? ""}`))
+  ),
+  // The document's title, with the page it belongs to, so "is it pertinent?" is answerable.
+  docTitle: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, "title").map((e) => h(d, e, `page="${pageOfDoc(d.file) ?? "source"}" <title>${t(e, 80)}</title>`, `doctitle|${t(e, 80)}`))
+  ),
+  // The doctype — the subject of RGAA 8.1, which maps onto no WCAG 2.2 criterion, so the pack
+  // is the only place it can be named.
+  //
+  // Three states, deliberately kept apart. A capture's `dom.html` is documentElement.outerHTML
+  // and never contains a doctype, so reading the DOM for one would report "absent" on every
+  // page in the world. The capture records it beside the DOM (SnapshotMeta.doctype): present
+  // is the declaration, empty is a page that genuinely had none, and ABSENT is a capture taken
+  // before the field existed — which is not evidence of anything and must not read as one.
+  doctype: (docs) => docs.flatMap((d) => {
+    const page = pageOfDoc(d.file);
+    if (page !== void 0) {
+      const dt = d.signals?.doctype;
+      if (dt === void 0) {
+        return [hAt(d, 1, "doctype", `page="${page}" \u2014 this capture predates doctype recording, so the declaration was NOT captured. That is not evidence the page lacks one: re-record the snapshots to decide this criterion.`, `doctype|unrecorded`)];
+      }
+      return [hAt(d, 1, "doctype", `page="${page}" doctype=${dt === "" ? "(none on the page)" : dt}`, `doctype|${dt}`)];
+    }
+    const line = lineOf(d, /<!DOCTYPE/i);
+    if (line === void 0) return [];
+    const decl = (d.source.split("\n")[line - 1] ?? "").trim().slice(0, 80);
+    return [hAt(d, line, "doctype", `source file ${decl}`, `doctype|${decl}`)];
+  }),
+  // A visible text label alongside an accessible name that replaces it.
+  nameVsAccName: (docs) => docs.flatMap(
+    (d) => d.elements.filter((e) => INTERACTIVE_TAGS.includes(e.tag) && attr(e, "aria-label") !== void 0 && t(e, 40).length > 0).map((e) => h(d, e, `visible="${t(e, 40)}" aria-label="${attr(e, "aria-label")}" \u2014 is the visible text CONTAINED in the accessible name?`, `namevs|${t(e, 40)}|${attr(e, "aria-label")}`))
+  ),
+  // Pointer, touch, gesture and drag handlers — everything a keyboard may not reach.
+  pointerHandlers: (docs) => docs.flatMap((d) => [
+    ...d.elements.filter((e) => !INTERACTIVE_TAGS.includes(e.tag) && Object.keys(e.attribs).some((k) => /^on(click|mousedown|mouseup|mouseenter|pointerdown|touchstart)$/i.test(k))).map((e) => h(d, e, `<${e.tag}> carries a pointer handler but is not natively interactive \u2014 keyboard equivalent?`, `clickable|${e.tag}|${t(e, 40)}`)),
+    ...linesOf(d, /\bon(?:MouseDown|PointerDown|TouchStart)\s*=/).map((l) => hAt(d, l.line, "handler", `down-event handler (action must not fire on DOWN, or must be abortable): ${l.text}`, `downevent|${l.text}`)),
+    ...linesOf(d, /\b(?:draggable|onDragStart|useDrag|DndContext|react-beautiful-dnd|@dnd-kit)\b/).map((l) => hAt(d, l.line, "drag", `drag interaction: ${l.text}`, `drag|${l.text}`)),
+    ...linesOf(d, /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b/i).map((l) => hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`))
+  ]),
+  // Single-character keyboard shortcuts.
+  shortcuts: (docs) => docs.flatMap(
+    (d) => linesOf(d, /\b(?:key|code|charCode)\s*===?\s*["'][a-zA-Z0-9]["']/).map((l) => hAt(d, l.line, "shortcut", `single-character key comparison: ${l.text}`, `shortcut|${l.text}`))
+  ),
+  // Instructions that lean on a sensory characteristic alone.
+  sensoryText: (docs) => docs.flatMap(
+    (d) => linesOf(d, /\b(?:ci-dessus|ci-dessous|à droite|a droite|à gauche|a gauche|bouton (?:vert|rouge|bleu)|en rouge|en vert|le carré|la case de droite|above|below|to the right|to the left|green button|red button|round button)\b/i).map(
+      (l) => hAt(d, l.line, "text", `sensory-sounding instruction: ${l.text}`, `sensory|${l.text}`)
+    )
+  ),
+  // Time limits: session expiry, meta refresh, timed redirects.
+  timers: (docs) => docs.flatMap((d) => [
+    ...d.elements.filter((e) => e.tag === "meta" && (attr(e, "http-equiv") ?? "").toLowerCase() === "refresh").map((e) => h(d, e, `<meta http-equiv="refresh" content="${attr(e, "content") ?? ""}">`, `metarefresh|${attr(e, "content") ?? ""}`)),
+    ...linesOf(d, /\b(?:setTimeout|setInterval)\s*\(/).map((l) => hAt(d, l.line, "timer", `timer: ${l.text}`, `timer|${l.text}`)),
+    ...linesOf(d, /\b(?:sessionTimeout|maxAge|expiresIn|session_max|idleTimeout)\b/i).map((l) => hAt(d, l.line, "session", `session/expiry config: ${l.text}`, `session|${l.text}`))
+  ]),
+  // Moving, blinking or auto-updating content, and how it can be stopped.
+  motion: (docs) => docs.flatMap((d) => [
+    ...elementsByTag(d, "marquee", "blink").map((e) => h(d, e, `<${e.tag}> \u2014 moving content with no native control`, `marquee|${e.tag}`)),
+    ...d.elements.filter((e) => /animation|transition/.test(attr(e, "style") ?? "")).map((e) => h(d, e, `inline animation: ${(attr(e, "style") ?? "").slice(0, 80)}`, `inlineanim|${(attr(e, "style") ?? "").slice(0, 80)}`)),
+    ...linesOf(d, /\b(?:carousel|slider|autoplay|animation-iteration-count\s*:\s*infinite|requestAnimationFrame)\b/i).map(
+      (l) => hAt(d, l.line, "motion", `moving/auto-updating content: ${l.text}`, `motion|${l.text}`)
+    ),
+    ...elementsByTag(d, "video", "audio").map((e) => h(d, e, `<${e.tag} autoplay=${attr(e, "autoplay") !== void 0} controls=${attr(e, "controls") !== void 0}>`, `media|${e.tag}`))
+  ]),
+  // A change of context triggered by focus or by changing a value.
+  contextChange: (docs) => docs.flatMap((d) => [
+    ...linesOf(d, /\bon(?:Focus|Blur)\s*=/).map((l) => hAt(d, l.line, "handler", `focus handler \u2014 does it change context (navigate, submit, move focus)? ${l.text}`, `onfocus|${l.text}`)),
+    ...linesOf(d, /\bonChange\s*=/).map((l) => hAt(d, l.line, "handler", `change handler \u2014 does changing the value itself change context? ${l.text}`, `onchange|${l.text}`))
+  ]),
+  // Reading order: anything that moves meaning-bearing content away from DOM order.
+  readingOrder: (docs) => docs.flatMap((d) => [
+    ...d.elements.filter((e) => /(?:^|;)\s*order\s*:|flex-direction\s*:\s*\w+-reverse|position\s*:\s*absolute/.test(attr(e, "style") ?? "")).map((e) => h(d, e, `inline layout override: ${(attr(e, "style") ?? "").slice(0, 80)} \u2014 does it move meaning?`, `orderinline|${(attr(e, "style") ?? "").slice(0, 80)}`)),
+    ...(d.signals?.css?.rules ?? []).filter((r) => r.decls.order !== void 0 || /-reverse/.test(r.decls.flexDirection ?? "") || /reverse/.test(r.decls.flexFlow ?? "")).slice(0, 60).map((r) => hAt(d, 1, `css:${r.selector}`, `stylesheet reorders layout: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} } \u2014 does it move meaning-bearing content?`, `ordercss|${r.selector}`))
+  ]),
+  // Office documents offered for download — the subject of "is there an accessible version?".
+  downloadDocs: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, "a").filter((e) => DOWNLOAD_HREF.test(attr(e, "href") ?? "")).map(
+      (e) => h(
+        d,
+        e,
+        `downloadable document: text="${t(e, 50)}" href="${attr(e, "href")}" \u2014 is an accessible version offered, and is it pertinent?`,
+        `download|${t(e, 50)}|${attr(e, "href")}`
+      )
+    )
+  ),
+  // Content deliberately hidden from one rendering or the other — the subject of "is what is
+  // hidden from assistive technology genuinely meant to be ignored?".
+  hiddenContent: (docs) => docs.flatMap(
+    (d) => d.elements.filter((e) => attr(e, "aria-hidden") !== void 0 || attr(e, "hidden") !== void 0 || /(?:^|[-_ ])(sr-only|visually-hidden|screen-reader|fr-sr-only)(?:[-_ ]|$)/i.test(attr(e, "class") ?? "")).map(
+      (e) => h(
+        d,
+        e,
+        `<${e.tag}> aria-hidden="${attr(e, "aria-hidden") ?? ""}" hidden=${attr(e, "hidden") !== void 0} class="${(attr(e, "class") ?? "").slice(0, 40)}" text="${t(e, 40)}"`,
+        `hidden|${e.tag}|${attr(e, "aria-hidden") ?? ""}|${t(e, 40)}`
+      )
+    )
+  ),
+  // Content pinned over the page — what can obscure a focused element.
+  stickies: (docs) => docs.flatMap((d) => [
+    ...d.elements.filter((e) => /position\s*:\s*(?:fixed|sticky)/.test(attr(e, "style") ?? "")).map((e) => h(d, e, `pinned element (inline): ${(attr(e, "style") ?? "").slice(0, 60)} \u2014 can it cover a focused element?`, `sticky|${selectorFor(e)}`)),
+    ...(d.signals?.css?.rules ?? []).filter((r) => /^(?:fixed|sticky)$/.test((r.decls.position ?? "").trim())).slice(0, 60).map((r) => hAt(d, 1, `css:${r.selector}`, `pinned by stylesheet: ${r.selector.slice(0, 60)} { position: ${r.decls.position} } \u2014 can it cover a focused element?`, `stickycss|${r.selector}`))
+  ])
+};
+var SC_SUBJECTS = {
+  "1.1.1": ["images"],
+  "1.2.1": ["motion"],
+  "1.2.2": ["motion"],
+  "1.2.3": ["motion"],
+  "1.2.4": ["motion"],
+  "1.2.5": ["motion"],
+  "1.3.1": ["structure", "tables", "lists", "headings"],
+  "1.3.2": ["readingOrder", "structure"],
+  "1.3.3": ["sensoryText"],
+  "1.3.4": ["readingOrder"],
+  "1.3.5": ["autocomplete"],
+  "1.4.1": ["colourPairs", "links"],
+  "1.4.3": ["colourPairs"],
+  "1.4.4": ["readingOrder"],
+  "1.4.5": ["images"],
+  "1.4.10": ["readingOrder"],
+  "1.4.11": ["colourPairs"],
+  "1.4.12": ["readingOrder"],
+  "1.4.13": ["aria", "stickies"],
+  "2.1.1": ["pointerHandlers", "focusables"],
+  "2.1.2": ["focusables", "pointerHandlers"],
+  "2.1.4": ["shortcuts"],
+  "2.2.1": ["timers"],
+  "2.2.2": ["motion", "timers"],
+  "2.3.1": ["motion"],
+  "2.4.1": ["landmarks"],
+  "2.4.3": ["focusOrder"],
+  "2.4.4": ["links"],
+  "2.4.5": ["navMechanisms", "links"],
+  "2.4.6": ["headings"],
+  "2.4.7": ["colourPairs"],
+  "2.4.11": ["stickies"],
+  "2.5.1": ["pointerHandlers"],
+  "2.5.2": ["pointerHandlers"],
+  "2.5.3": ["nameVsAccName"],
+  "2.5.4": ["pointerHandlers"],
+  "2.5.7": ["pointerHandlers"],
+  "2.5.8": ["stickies", "links"],
+  "3.1.2": ["langParts"],
+  "3.2.1": ["contextChange"],
+  "3.2.2": ["contextChange"],
+  "3.2.3": ["repeatedBlocks"],
+  "3.2.4": ["repeatedBlocks", "nameVsAccName"],
+  "3.2.6": ["repeatedBlocks", "links"],
+  "3.3.1": ["errors", "controls"],
+  "3.3.2": ["controls"],
+  "3.3.3": ["errors", "controls"],
+  "3.3.4": ["controls", "errors"],
+  "3.3.7": ["controls"],
+  "3.3.8": ["controls"],
+  "4.1.2": ["aria"],
+  "4.1.3": ["liveRegions"]
+};
+var PACK_SUBJECTS = {
+  rgaa: {
+    // Theme 5 — tables. The question is about the table, never about the page outline.
+    "5.1": ["tables"],
+    "5.2": ["tables"],
+    "5.3": ["tables"],
+    "5.4": ["tables"],
+    "5.5": ["tables"],
+    "5.6": ["tables"],
+    "5.7": ["tables"],
+    "5.8": ["tables"],
+    // Theme 6 — links.
+    "6.1": ["links"],
+    "6.2": ["links"],
+    // Theme 8 — the document itself. 8.1 maps onto no WCAG 2.2 criterion at all, so the pack
+    // is the ONLY place its subject can be named.
+    "8.1": ["doctype"],
+    "8.3": ["docLang"],
+    "8.4": ["docLang"],
+    "8.5": ["docTitle"],
+    "8.6": ["docTitle"],
+    "8.7": ["langParts"],
+    "8.8": ["langParts"],
+    "8.9": ["structure"],
+    "8.10": ["readingOrder", "langParts"],
+    // Theme 9 — structure.
+    "9.1": ["headings"],
+    "9.2": ["landmarks"],
+    "9.3": ["lists"],
+    "9.4": ["structure"],
+    // Theme 11 — forms.
+    "11.1": ["controls"],
+    "11.2": ["controls"],
+    "11.3": ["controls", "nameVsAccName"],
+    "11.4": ["controls"],
+    "11.5": ["controls"],
+    "11.6": ["controls", "landmarks"],
+    "11.7": ["controls", "landmarks"],
+    "11.8": ["controls"],
+    "11.9": ["controls"],
+    "11.10": ["controls", "errors"],
+    "11.11": ["errors", "controls"],
+    "11.12": ["controls", "errors"],
+    "11.13": ["autocomplete"],
+    // Theme 12 — navigation.
+    "12.1": ["navMechanisms"],
+    "12.2": ["repeatedBlocks"],
+    "12.3": ["navMechanisms"],
+    "12.4": ["repeatedBlocks", "navMechanisms"],
+    "12.5": ["repeatedBlocks"],
+    "12.6": ["landmarks"],
+    "12.7": ["landmarks"],
+    "12.8": ["focusOrder"],
+    "12.9": ["focusables", "pointerHandlers"],
+    "12.10": ["shortcuts"],
+    "12.11": ["pointerHandlers", "focusables"],
+    // Theme 4 — multimedia. 4.10 (is automatically-triggered sound controllable?) maps onto
+    // WCAG 1.4.2, which is `static` and therefore has no subject of its own — but the pack
+    // flags 4.10 `judgment`, so judgmentGuard reopens it and it would arrive with nothing.
+    "4.10": ["motion"],
+    // Theme 3 — colour. The question is about what colour alone conveys, not the outline.
+    "3.1": ["colourPairs", "links"],
+    "3.2": ["colourPairs"],
+    "3.3": ["colourPairs"],
+    // Theme 7 — scripts. "Is each script operable by keyboard AND pointer?" is about the
+    // handlers and the focusable surface, never about the page's headings and lists.
+    "7.1": ["aria", "pointerHandlers"],
+    "7.3": ["pointerHandlers", "focusables"],
+    "7.4": ["contextChange"],
+    "7.5": ["liveRegions"],
+    // Theme 10 — presentation. These ask what survives when CSS is off, what the stylesheet
+    // reorders, and what is hidden on purpose.
+    "10.1": ["readingOrder"],
+    "10.2": ["hiddenContent", "structure"],
+    "10.3": ["readingOrder", "structure"],
+    "10.4": ["readingOrder"],
+    "10.8": ["hiddenContent", "aria"],
+    "10.9": ["sensoryText"],
+    "10.10": ["sensoryText"],
+    "10.11": ["readingOrder"],
+    "10.12": ["readingOrder"],
+    "10.13": ["aria", "stickies"],
+    "10.14": ["focusables", "pointerHandlers"],
+    // Theme 13 — consultation.
+    "13.1": ["timers"],
+    "13.3": ["downloadDocs"],
+    "13.4": ["downloadDocs"],
+    "13.7": ["motion"],
+    "13.8": ["motion", "timers"],
+    "13.9": ["readingOrder"],
+    "13.10": ["pointerHandlers"],
+    "13.11": ["pointerHandlers"]
+  }
+};
+function harvestSubjects(ids, docs) {
+  const out2 = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const id of ids) {
+    for (const item of SUBJECTS[id]?.(docs) ?? []) {
+      const key = `${item.ev.file}:${item.at}:${item.cls}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out2.push(item);
+    }
+  }
+  return out2;
+}
 
 // src/data/adjudication.json
 var adjudication_default = {
@@ -56383,7 +56972,8 @@ function adjudicationText(sc, lang) {
 }
 
 // src/adjudicate.ts
-var ADJUDICATE_MAX_EVIDENCE = 30;
+var ADJUDICATE_MAX_EVIDENCE_CLASSES = 600;
+var ALSO_AT_MAX = 8;
 function adjudicationContract() {
   return {
     verdicts: [...VERDICTS],
@@ -56396,146 +56986,6 @@ function adjudicationContract() {
     }
   };
 }
-var selectorFor = (el) => {
-  const id = el.attribs.id ? `#${el.attribs.id}` : "";
-  const cls = el.attribs.class ? `.${el.attribs.class.trim().split(/\s+/)[0]}` : "";
-  return `${el.tag}${id}${cls}`;
-};
-var ev = (doc, el, note) => ({
-  file: doc.file,
-  line: el.line,
-  selector: selectorFor(el),
-  snippet: snippet(doc, el, 160),
-  ...note ? { note } : {}
-});
-function nearestHeading(doc, el) {
-  const headings2 = elementsByTag(doc, "h1", "h2", "h3", "h4", "h5", "h6").filter((h2) => h2.start < el.start);
-  const h = headings2[headings2.length - 1];
-  return h ? textContent(h).trim().slice(0, 80) : void 0;
-}
-var LABEL_LIKE = /(^|[-_ ])(field-label|field-key|label|key|term)([-_ ]|$)/i;
-var VALUE_LIKE = /(^|[-_ ])(field-value|field-data|value|data)([-_ ]|$)/i;
-function keyValuePairs(doc) {
-  const out2 = [];
-  for (const el of doc.elements) {
-    const isDt = el.tag === "dt";
-    const isLabelDiv = el.tag !== "label" && el.tag !== "dt" && LABEL_LIKE.test(attr(el, "class") ?? "");
-    if (!isDt && !isLabelDiv) continue;
-    const parent = el.parent;
-    if (!parent) continue;
-    const sibs = parent.children.filter((c2) => c2.type === "element");
-    const next = sibs[sibs.indexOf(el) + 1];
-    if (!next) continue;
-    const paired = isDt ? next.tag === "dd" : VALUE_LIKE.test(attr(next, "class") ?? "");
-    if (!paired) continue;
-    out2.push({ key: el, label: textContent(el).trim().slice(0, 40), value: textContent(next).trim().slice(0, 40) });
-  }
-  return out2;
-}
-var DOWNLOAD_HREF = /\.(pdf|docx?|xlsx?)(?:[?#]|$)/i;
-var ROUTER_IMPORT = /['"](?:react-router(?:-dom)?|next\/(?:router|navigation)|vue-router|@remix-run\/[\w-]+|@tanstack\/[\w-]*router|@sveltejs\/kit|\$app\/(?:navigation|stores))['"]/;
-function routerImportEvidence(doc) {
-  const m = ROUTER_IMPORT.exec(doc.source);
-  if (!m) return [];
-  const line = doc.source.slice(0, m.index).split("\n").length;
-  return [
-    {
-      file: doc.file,
-      line,
-      selector: "import",
-      snippet: (doc.source.split("\n")[line - 1] ?? "").trim().slice(0, 120),
-      note: "client-router import \u2014 verify page title + focus are restored on partial (SPA) navigation"
-    }
-  ];
-}
-var STATUS_CLASS = /(error|status|message|alert|notif|toast|feedback|live)/i;
-var HARVESTERS = {
-  // 1.1.1 Non-text Content — every image-like element's text alternative
-  "1.1.1": (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas").concat(d.elements.filter((e) => attr(e, "role") === "img")).filter((e, i2, a) => a.indexOf(e) === i2).map((e) => ev(d, e, `alt="${attr(e, "alt") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}"`))
-  ),
-  // 2.4.4 Link Purpose (In Context) — link text + destination + nearest heading. A
-  // document-download link's format mention "(PDF)" (RGAA 6.1) is a RECOMMENDATION, not an
-  // NC — the note says so, so the agent never files an NC for a missing format hint.
-  "2.4.4": (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "a").filter((e) => attr(e, "href") !== void 0).map((e) => {
-      const href = attr(e, "href") ?? "";
-      const dl = DOWNLOAD_HREF.exec(href);
-      const note = dl ? ` download-format=${dl[1].toLowerCase()} (naming the format, e.g. "(PDF)", is a recommendation \u2014 not an NC)` : "";
-      return ev(d, e, `text="${textContent(e).trim().slice(0, 60)}" href="${href}" under="${nearestHeading(d, e) ?? ""}"${note}`);
-    })
-  ),
-  // 1.4.3 Contrast (Minimum) — literal inline colour pairs (the ones statically visible)
-  "1.4.3": (docs) => docs.flatMap(
-    (d) => d.elements.filter((e) => {
-      const st = parseInlineStyle(attr(e, "style") ?? "");
-      return st.has("color") || st.has("background-color") || st.has("background");
-    }).map((e) => {
-      const st = parseInlineStyle(attr(e, "style") ?? "");
-      return ev(d, e, `color=${st.get("color") ?? "?"} background=${st.get("background-color") ?? st.get("background") ?? "?"}`);
-    })
-  ),
-  // 2.4.6 Headings and Labels — heading + label + <caption> text to judge for
-  // descriptiveness/concision (captions feed the RGAA 5.5 title-concision question).
-  "2.4.6": (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption").map(
-      (e) => ev(d, e, `<${e.tag}> text="${textContent(e).trim().slice(0, 60)}"`)
-    )
-  ),
-  // 3.3.2 Labels or Instructions — controls + their associated labels/placeholders
-  "3.3.2": (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "input", "select", "textarea").map((e) => {
-      const id = attr(e, "id");
-      const lbl = id ? elementsByTag(d, "label").find((l) => attr(l, "for") === id) : void 0;
-      return ev(
-        d,
-        e,
-        `label="${lbl ? textContent(lbl).trim().slice(0, 40) : ""}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}"`
-      );
-    })
-  ),
-  // 1.3.1 Info and Relationships — heading outline + tables/lists (structure to judge for
-  // technique consistency), PLUS div-presented key/value pairs (RGAA 8.9 read-only fields /
-  // 9.3 <dl> semantics) so the "Mon profil" recap pattern is never silently conforming.
-  "1.3.1": (docs) => docs.flatMap((d) => [
-    ...elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol", "dl").map(
-      (e) => ev(d, e, `<${e.tag}> "${textContent(e).trim().slice(0, 50)}"`)
-    ),
-    ...keyValuePairs(d).map(
-      (p) => ev(d, p.key, `key/value pair \u2014 label="${p.label}" value="${p.value}" (div-presented field? verify the relationship isn't only visual \u2014 RGAA 8.9/9.3)`)
-    )
-  ]),
-  // 4.1.3 Status Messages (RGAA 7.4/7.5) — live regions + status-ish text near a form
-  "4.1.3": (docs) => docs.flatMap((d) => {
-    const isRegion = (e) => attr(e, "aria-live") !== void 0 || ["status", "alert", "log"].includes((attr(e, "role") ?? "").trim().toLowerCase());
-    const regions = d.elements.filter(isRegion);
-    const nearForm = d.elements.filter((e) => !isRegion(e) && STATUS_CLASS.test(attr(e, "class") ?? "") && ancestors(e).some((a) => a.tag === "form"));
-    return [
-      ...regions.map((e) => ev(d, e, `aria-live="${attr(e, "aria-live") ?? ""}" role="${attr(e, "role") ?? ""}"`)),
-      ...nearForm.map(
-        (e) => ev(
-          d,
-          e,
-          `status-like class="${(attr(e, "class") ?? "").slice(0, 40)}" in a form \u2014 verify async feedback is announced (role=status/alert or aria-live)`
-        )
-      )
-    ];
-  }),
-  // 4.1.2 Name, Role, Value — elements carrying a role or ARIA state
-  "4.1.2": (docs) => docs.flatMap(
-    (d) => d.elements.filter((e) => attr(e, "role") !== void 0 || Object.keys(e.attribs).some((k) => k.startsWith("aria-"))).map((e) => ev(d, e, `role="${attr(e, "role") ?? ""}"`))
-  ),
-  // 2.4.3 Focus Order — explicit tabindex values in DOM order, PLUS SPA focus signals
-  // (RGAA 12.8): <dialog> usage and client-router imports (verify focus is moved on route
-  // change / dialog open, and a mobile menu's target receives focus).
-  "2.4.3": (docs) => docs.flatMap((d) => [
-    ...d.elements.filter((e) => attr(e, "tabindex") !== void 0).map((e) => ev(d, e, `tabindex="${attr(e, "tabindex")}"`)),
-    ...elementsByTag(d, "dialog").map((e) => ev(d, e, `<dialog> \u2014 verify focus moves in on open and is restored to the trigger on close`)),
-    ...routerImportEvidence(d)
-  ]),
-  // 3.1.2 Language of Parts — element-level lang overrides (not the root <html lang>)
-  "3.1.2": (docs) => docs.flatMap((d) => d.elements.filter((e) => e.tag !== "html" && attr(e, "lang") !== void 0).map((e) => ev(d, e, `lang="${attr(e, "lang")}"`)))
-};
 function docsForAudit(audit2, cwd) {
   const inputs = audit2.scope.inputs.filter((i2) => i2 !== "-" && i2 !== "<stdin>");
   if (!inputs.length) return [];
@@ -56543,20 +56993,54 @@ function docsForAudit(audit2, cwd) {
   const docs = [];
   for (const f of files) {
     try {
-      docs.push(parseSource(readText(cwd ? resolve10(cwd, f) : f), f));
+      const doc = parseSource(readText(cwd ? resolve10(cwd, f) : f), f);
+      attachSignals(doc);
+      docs.push(doc);
     } catch {
     }
   }
   return docs;
 }
+function collapse2(harvested) {
+  const byClass = /* @__PURE__ */ new Map();
+  for (const item of harvested) {
+    const g = byClass.get(item.cls);
+    if (g) g.push(item);
+    else byClass.set(item.cls, [item]);
+  }
+  const groups = [...byClass.values()];
+  const evidence = groups.slice(0, ADJUDICATE_MAX_EVIDENCE_CLASSES).map((group) => {
+    const rep = group.find((x) => isSnapshotFile(x.ev.file)) ?? group[0];
+    const others = group.filter((x) => x !== rep);
+    const pages = [...new Set(group.map((x) => pageOfDoc(x.ev.file)).filter((x) => x !== void 0))];
+    return {
+      ...rep.ev,
+      ...group.length > 1 ? { occurrences: group.length } : {},
+      ...others.length ? { alsoAt: others.slice(0, ALSO_AT_MAX).map((x) => `${x.ev.file}:${x.ev.line}`) } : {},
+      ...pages.length ? { pages } : {}
+    };
+  });
+  return {
+    evidence,
+    population: {
+      classes: groups.length,
+      occurrences: harvested.length,
+      files: new Set(harvested.map((x) => x.ev.file)).size,
+      pages: new Set(harvested.map((x) => pageOfDoc(x.ev.file)).filter((x) => x !== void 0)).size
+    },
+    complete: groups.length <= ADJUDICATE_MAX_EVIDENCE_CLASSES
+  };
+}
 function blankItem(criteriaId, automatability2, title2, harvested) {
-  const evidence = harvested.slice(0, ADJUDICATE_MAX_EVIDENCE);
+  const { evidence, population, complete } = collapse2(harvested);
   return {
     criteriaId,
     automatability: automatability2,
     ...title2 ? { title: title2 } : {},
     evidence,
-    ...harvested.length > ADJUDICATE_MAX_EVIDENCE ? { evidenceTruncated: { shown: evidence.length, total: harvested.length } } : {},
+    population,
+    evidenceComplete: complete,
+    ...complete ? {} : { evidenceTruncated: { shown: evidence.length, total: population.classes } },
     verdict: null,
     justification: "",
     reason: null,
@@ -56565,17 +57049,12 @@ function blankItem(criteriaId, automatability2, title2, harvested) {
     decidedBy: "agent"
   };
 }
-function packEvidence(scs, docs) {
+var subjectsForSc = (sc) => SC_SUBJECTS[sc] ?? [];
+function subjectsForPackCriterion(standard, id, scs) {
+  const own = PACK_SUBJECTS[standard]?.[id];
+  if (own) return own;
   const out2 = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const sc of scs) {
-    for (const e of HARVESTERS[sc]?.(docs) ?? []) {
-      const key = `${e.file}:${e.line}:${e.selector}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out2.push(e);
-    }
-  }
+  for (const sc of scs) for (const subject of subjectsForSc(sc)) if (!out2.includes(subject)) out2.push(subject);
   return out2;
 }
 function buildAdjudicationWorklist(audit2, opts = {}) {
@@ -56588,11 +57067,11 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
       const scs = crit?.wcag ?? pc.scs;
       const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a) => !!a);
       const automatability2 = autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
-      return blankItem(pc.id, automatability2, crit ? titlePlain(pack, crit, "fr") : void 0, packEvidence(scs, docs));
+      return blankItem(pc.id, automatability2, crit ? titlePlain(pack, crit, "fr") : void 0, harvestSubjects(subjectsForPackCriterion(standard, pc.id, scs), docs));
     });
   }
   return audit2.residualRisks.map(
-    (r) => blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? void 0, HARVESTERS[r.criteriaId]?.(docs) ?? [])
+    (r) => blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? void 0, harvestSubjects(subjectsForSc(r.criteriaId), docs))
   );
 }
 var NC_SEVERITY_DEFAULT = "majeur";
@@ -56693,6 +57172,12 @@ function applyAdjudication(audit2, adj, opts = {}) {
     } else if (v === "C" || v === "NA") {
       if (!it.justification || !it.justification.trim()) blame(it.criteriaId, `criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
       const cites = it.citations ?? [];
+      if (v === "C" && it.evidenceComplete === false) {
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: a C verdict needs the COMPLETE evidence set, and this criterion's harvest was capped at ${it.evidence.length} of ${it.population?.classes ?? "?"} content classes \u2014 record "manual", or "NC" if what you did see fails`
+        );
+      }
       if (it.evidence.length === 0) {
         if (v === "C") {
           blame(
@@ -56706,7 +57191,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
           `criterion ${it.criteriaId}: a ${v} verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, \u2026}])`
         );
       } else {
-        const anchors = new Set(it.evidence.map((e) => `${e.file}:${e.line}`));
+        const anchors = new Set(it.evidence.flatMap((e) => [`${e.file}:${e.line}`, ...e.alsoAt ?? []]));
         for (const c2 of cites) {
           if (!anchors.has(`${c2.file}:${c2.line}`)) {
             blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c2.file}:${c2.line} is not among this criterion's harvested evidence (fabricated?)`);
@@ -56890,6 +57375,11 @@ var T2 = {
     rule: "> Ne signalez une NC que si un test pr\xE9cis du r\xE9f\xE9rentiel actif \xE9choue \u2014 citez-le (`normativeRef`). Une bonne pratique sans test normatif est une recommandation (`recommendations[]`, non normative). Une simple pr\xE9occupation UX n'est ni l'un ni l'autre.\n>\n> Sym\xE9triquement, un `C` se cite comme une NC : il faut nommer dans `citations[]` les \xE9vidences lev\xE9es. **Un crit\xE8re pr\xE9sent\xE9 sans aucune \xE9vidence ne peut pas \xEAtre `C`** \u2014 c'est `manual` (`undecidable`), ou `NA` si rien n'est concern\xE9.",
     then: "Puis : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (\xE9choue si un verdict manque sa justification, ses citations, son finding ou sa raison).",
     evidence: "\xC9vidences",
+    classes: "classes de contenu distinctes",
+    occurrences: "occurrences",
+    pagesWord: "page(s)",
+    on: "sur",
+    incomplete: "LECTURE INCOMPL\xC8TE \u2014 un \xAB C \xBB sera refus\xE9 sur ce crit\xE8re",
     none: "(aucune \xE9vidence automatique \u2014 d\xE9cidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "\xC0 v\xE9rifier manuellement",
     decide: "R\xE8gle de d\xE9cision",
@@ -56913,6 +57403,11 @@ var T2 = {
     rule: "> Report NC only if a precise test of the active standard fails \u2014 cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative). A purely UX concern is neither.\n>\n> A `C` is cited the same way an NC is: name the evidence you cleared in `citations[]`. **A criterion presented with no evidence at all cannot be `C`** \u2014 record `manual` (`undecidable`), or `NA` if nothing in scope is concerned.",
     then: "Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (fails if any verdict lacks its justification, citations, finding or reason).",
     evidence: "Evidence",
+    classes: "distinct content classes",
+    occurrences: "occurrences",
+    pagesWord: "page(s)",
+    on: "on",
+    incomplete: "INCOMPLETE READING \u2014 a C will be refused on this criterion",
     none: "(no automatic evidence \u2014 decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
     decide: "Decision rule",
@@ -56959,10 +57454,18 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   if (pack && opts.preamble !== false) out2.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
     out2.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` \u2014 ${it.title}` : ""}  _(${it.automatability})_`);
-    out2.push("", `> ${s.evidence} (${it.evidence.length}${it.evidenceTruncated ? ` / ${it.evidenceTruncated.total}` : ""}):`, "");
+    const pop = it.population;
+    const popNote = pop ? ` \u2014 ${pop.classes} ${s.classes}, ${pop.occurrences} ${s.occurrences}${pop.pages ? `, ${pop.pages} ${s.pagesWord}` : ""}${it.evidenceComplete === false ? ` \u26A0 ${s.incomplete}` : ""}` : "";
+    out2.push("", `> ${s.evidence} (${it.evidence.length}${it.evidenceTruncated ? ` / ${it.evidenceTruncated.total}` : ""})${popNote}:`, "");
     if (!it.evidence.length) out2.push(s.none, "");
     else {
-      for (const e of it.evidence) out2.push(`- \`${e.file}:${e.line}\` (\`${e.selector}\`)${e.note ? ` \u2014 ${e.note}` : ""}`);
+      for (const e of it.evidence) {
+        const extra = [
+          e.occurrences && e.occurrences > 1 ? `\xD7${e.occurrences}` : "",
+          e.pages?.length ? `${s.on} ${e.pages.slice(0, 4).join(", ")}${e.pages.length > 4 ? "\u2026" : ""}` : ""
+        ].filter(Boolean).join(" ");
+        out2.push(`- \`${e.file}:${e.line}\` (\`${e.selector}\`)${extra ? ` [${extra}]` : ""}${e.note ? ` \u2014 ${e.note}` : ""}`);
+      }
       out2.push("");
     }
     const protocol = ADJUDICATION[it.criteriaId];
@@ -57041,6 +57544,8 @@ function hydrateAdjudication(adj, audit2, opts = {}) {
     if (!full) continue;
     it.evidence = full.evidence;
     if (full.evidenceTruncated) it.evidenceTruncated = full.evidenceTruncated;
+    if (full.population) it.population = full.population;
+    it.evidenceComplete = full.evidenceComplete;
   }
 }
 
@@ -57257,7 +57762,7 @@ var SYSTEM = `You are an accessibility auditor ruling on the criteria a static e
 
 Rules, in order of importance:
 1. NEVER assert conformity you did not verify. "manual" with a reason is always available and is a correct answer.
-2. An NC must cite a real file:line taken from the evidence you were given, and the criterion's OWN numbered test as normativeRef. A citation that does not resolve against the real source is rejected downstream and wastes the whole batch.
+2. An NC must cite a real file:line taken from the evidence you were given, and the criterion's OWN numbered test as normativeRef. A citation that does not resolve against the real source is rejected downstream, and the refusal costs THAT criterion alone \u2014 every other verdict you got right still stands. So never guess to fill a gap: an honest "manual" is worth more than a verdict that will be refused.
 3. C and NA require a justification that says what you saw, AND a "citations" array naming the evidence items you cleared \u2014 file and line copied verbatim from the evidence presented for that criterion. A criterion presented with NO evidence cannot be C: record "manual" (reason "undecidable"), or NA if nothing in scope is concerned.
 4. A criterion that needs a rendered page (computed contrast, visible focus, zoom, reflow) and was given only source evidence is "manual" with reason "needs-rendered-dom".
 5. Rule only on the criteria presented. Never introduce another.`;
@@ -57483,8 +57988,8 @@ var AXE_WCAG = {
 var FALLBACK_SC = "4.1.2";
 function scFromWcagTags(tags) {
   if (!tags) return null;
-  for (const t2 of tags) {
-    const m = /^wcag(\d)(\d)(\d+)$/.exec(t2);
+  for (const t3 of tags) {
+    const m = /^wcag(\d)(\d)(\d+)$/.exec(t3);
     if (m) {
       const sc = `${m[1]}.${m[2]}.${m[3]}`;
       if (hasSC(sc)) return sc;
@@ -57526,9 +58031,9 @@ var AXE_ADVISORY_EXCEPTIONS = {
   dlitem: false
 };
 function axeAdvisory(tags) {
-  const t2 = tags ?? [];
-  if (t2.length === 0) return false;
-  return !t2.some((tag) => /^wcag\d+$/.test(tag));
+  const t3 = tags ?? [];
+  if (t3.length === 0) return false;
+  return !t3.some((tag) => /^wcag\d+$/.test(tag));
 }
 function isAxeAdvisory(ruleId, tags) {
   return AXE_ADVISORY_EXCEPTIONS[ruleId] ?? axeAdvisory(tags);
@@ -57664,8 +58169,8 @@ function validateSample(raw) {
     if (!Array.isArray(s.transverse)) {
       err2("sample.transverse", "transverse must be an array of strings");
     } else {
-      s.transverse.forEach((t2, i2) => {
-        if (typeof t2 !== "string" || t2.trim() === "") err2(`sample.transverse[${i2}]`, "transverse entries must be non-empty strings");
+      s.transverse.forEach((t3, i2) => {
+        if (typeof t3 !== "string" || t3.trim() === "") err2(`sample.transverse[${i2}]`, "transverse entries must be non-empty strings");
       });
     }
   }
@@ -57711,7 +58216,7 @@ function lintSample(sample, methodology) {
   const missing = [];
   for (const kind of methodology.requiredKinds) {
     const kws = kind.keywords.map(norm4).filter(Boolean);
-    const covered = haystacks.some((h) => kws.some((k) => keywordMatches(h, k))) || transverseHay !== "" && kws.some((k) => keywordMatches(transverseHay, k)) || hasTransverse && /transverse/.test(kind.id) || /representative|representatif/.test(kind.id) && sample.pages.length >= 2;
+    const covered = haystacks.some((h2) => kws.some((k) => keywordMatches(h2, k))) || transverseHay !== "" && kws.some((k) => keywordMatches(transverseHay, k)) || hasTransverse && /transverse/.test(kind.id) || /representative|representatif/.test(kind.id) && sample.pages.length >= 2;
     if (!covered) missing.push(kind);
   }
   return { missing };
@@ -57988,15 +58493,15 @@ function toDynamicResult(out2, target, lang = "en", engine = "axe-core@playwrigh
     const hits = out2[key];
     if (!hits) continue;
     const severity = PROBE_SEVERITY[probe];
-    for (const h of hits) {
+    for (const h2 of hits) {
       findings.push({
         criteriaId: PROBE_WCAG[probe],
         axeRule: probe,
         impact: severity === "majeur" ? "serious" : "minor",
         severity,
-        message: h.detail,
-        selector: h.selector || "\u2014",
-        snippet: h.html ?? "",
+        message: h2.detail,
+        selector: h2.selector || "\u2014",
+        snippet: h2.html ?? "",
         engine: probe,
         page
       });
@@ -58121,7 +58626,7 @@ function resolveHostAnchor(file, snippet2) {
     idx = source.indexOf(openMatch[0]);
     if (idx >= 0) return at(idx, openMatch[0].length);
   }
-  const norm5 = (t2) => t2.replace(/\s+/g, " ").trim();
+  const norm5 = (t3) => t3.replace(/\s+/g, " ").trim();
   const needle = norm5(openMatch ? openMatch[0] : s);
   if (needle) {
     const lines = source.split("\n");
@@ -59417,8 +59922,8 @@ var FIX_LABEL = {
 };
 function fixSummary(r, lang = "fr", write = false) {
   const out2 = [];
-  const t2 = r.totals;
-  const head = lang === "fr" ? `${write ? "Corrections appliqu\xE9es" : "Corrections propos\xE9es (dry-run)"} : ${t2.auto} auto, ${t2.placeholder} \xE0 compl\xE9ter, ${t2.proposal} jugement \xB7 ${t2.filesWritten} fichier(s) \xE9crit(s)${t2.filesRestaged ? `, ${t2.filesRestaged} re-stag\xE9(s)` : ""}${t2.regressions ? `, ${t2.regressions} bloqu\xE9(s) par le garde anti-r\xE9gression` : ""}${t2.partialStageSkipped ? `, ${t2.partialStageSkipped} ignor\xE9(s) (modifs non-stag\xE9es)` : ""}.` : `${write ? "Fixes applied" : "Proposed fixes (dry-run)"}: ${t2.auto} auto, ${t2.placeholder} fill-in, ${t2.proposal} judgment \xB7 ${t2.filesWritten} file(s) written${t2.filesRestaged ? `, ${t2.filesRestaged} re-staged` : ""}${t2.regressions ? `, ${t2.regressions} blocked by the regression gate` : ""}${t2.partialStageSkipped ? `, ${t2.partialStageSkipped} skipped (unstaged edits)` : ""}.`;
+  const t3 = r.totals;
+  const head = lang === "fr" ? `${write ? "Corrections appliqu\xE9es" : "Corrections propos\xE9es (dry-run)"} : ${t3.auto} auto, ${t3.placeholder} \xE0 compl\xE9ter, ${t3.proposal} jugement \xB7 ${t3.filesWritten} fichier(s) \xE9crit(s)${t3.filesRestaged ? `, ${t3.filesRestaged} re-stag\xE9(s)` : ""}${t3.regressions ? `, ${t3.regressions} bloqu\xE9(s) par le garde anti-r\xE9gression` : ""}${t3.partialStageSkipped ? `, ${t3.partialStageSkipped} ignor\xE9(s) (modifs non-stag\xE9es)` : ""}.` : `${write ? "Fixes applied" : "Proposed fixes (dry-run)"}: ${t3.auto} auto, ${t3.placeholder} fill-in, ${t3.proposal} judgment \xB7 ${t3.filesWritten} file(s) written${t3.filesRestaged ? `, ${t3.filesRestaged} re-staged` : ""}${t3.regressions ? `, ${t3.regressions} blocked by the regression gate` : ""}${t3.partialStageSkipped ? `, ${t3.partialStageSkipped} skipped (unstaged edits)` : ""}.`;
   out2.push(head, "");
   for (const ff of r.files) {
     const fixable = ff.items.filter((i2) => i2.fixability !== "proposal");
@@ -59638,7 +60143,7 @@ var CLAUDE_MARKER = "hook --claude-code";
 var MATCHER = "Bash|bash|shell|local_shell|exec_command|run_command|exec";
 function withoutOurs(groups) {
   if (!Array.isArray(groups)) return [];
-  return groups.map((g) => ({ ...g, hooks: (g.hooks ?? []).filter((h) => !String(h.command ?? "").includes(CLAUDE_MARKER)) })).filter((g) => (g.hooks ?? []).length > 0);
+  return groups.map((g) => ({ ...g, hooks: (g.hooks ?? []).filter((h2) => !String(h2.command ?? "").includes(CLAUDE_MARKER)) })).filter((g) => (g.hooks ?? []).length > 0);
 }
 function installClaudeCode({ settingsPath, command }) {
   return editJsonFile(settingsPath, (root) => {
@@ -59663,7 +60168,7 @@ function claudeCodeWired(settingsPath) {
   const root = readJsonSafe(settingsPath);
   const groups = root?.hooks?.PreToolUse;
   if (!Array.isArray(groups)) return 0;
-  return groups.reduce((n, g) => n + (g.hooks ?? []).filter((h) => String(h.command ?? "").includes(CLAUDE_MARKER)).length, 0);
+  return groups.reduce((n, g) => n + (g.hooks ?? []).filter((h2) => String(h2.command ?? "").includes(CLAUDE_MARKER)).length, 0);
 }
 
 // src/install/text-edit.ts
@@ -59849,7 +60354,7 @@ var CODEX_MARKER = "hook --codex";
 var MATCHER2 = "Bash|bash|shell|local_shell|exec_command|run_command|exec";
 function withoutOurs2(groups) {
   if (!Array.isArray(groups)) return [];
-  return groups.map((g) => ({ ...g, hooks: (g.hooks ?? []).filter((h) => !String(h.command ?? "").includes(CODEX_MARKER)) })).filter((g) => (g.hooks ?? []).length > 0);
+  return groups.map((g) => ({ ...g, hooks: (g.hooks ?? []).filter((h2) => !String(h2.command ?? "").includes(CODEX_MARKER)) })).filter((g) => (g.hooks ?? []).length > 0);
 }
 function enableHooksFeature(content) {
   if (HOOKS_ON.test(featuresBody(content))) return { content, changed: false };
@@ -59925,7 +60430,7 @@ function codexWired(codexDir) {
   const root = readJsonSafe(join41(codexDir, "hooks.json"));
   const groups = root?.hooks?.PreToolUse;
   if (!Array.isArray(groups)) return 0;
-  return groups.reduce((n, g) => n + (g.hooks ?? []).filter((h) => String(h.command ?? "").includes(CODEX_MARKER)).length, 0);
+  return groups.reduce((n, g) => n + (g.hooks ?? []).filter((h2) => String(h2.command ?? "").includes(CODEX_MARKER)).length, 0);
 }
 function codexHooksEnabled(codexDir) {
   const p = join41(codexDir, "config.toml");
@@ -59996,7 +60501,7 @@ import { join as join43 } from "path";
 var ALL_TARGETS = ["claude-code", "codex", "opencode"];
 function parseTargets(flags2) {
   const picked = /* @__PURE__ */ new Set();
-  if (flags2.all === true) for (const t2 of ALL_TARGETS) picked.add(t2);
+  if (flags2.all === true) for (const t3 of ALL_TARGETS) picked.add(t3);
   if (flags2["claude-code"] === true) picked.add("claude-code");
   if (flags2.codex === true) picked.add("codex");
   if (flags2.opencode === true) picked.add("opencode");
@@ -60155,35 +60660,35 @@ var STR = {
     capturesNote: "rendered capture file(s) audited at full fidelity (real DOM) \u2014 the true produced HTML"
   }
 };
-function t(lang, key) {
+function t2(lang, key) {
   return STR[lang][key];
 }
 var ICON4 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
 function auditSummary(r, lang) {
   const lines = [];
-  lines.push(`${t(lang, "summaryTitle")} \u2014 ${r.date}`);
-  lines.push(`${r.scope.files} ${t(lang, "files")} \xB7 ${r.conformancePct}% ${t(lang, "autoConformance")}`);
+  lines.push(`${t2(lang, "summaryTitle")} \u2014 ${r.date}`);
+  lines.push(`${r.scope.files} ${t2(lang, "files")} \xB7 ${r.conformancePct}% ${t2(lang, "autoConformance")}`);
   lines.push("");
-  lines.push(`${t(lang, "guideline")}        C  NC  NA  \u23F3`);
+  lines.push(`${t2(lang, "guideline")}        C  NC  NA  \u23F3`);
   for (const g of r.guidelines) {
     const name2 = `${g.key} ${guidelineTitle(g.key, lang) ?? g.title}`.padEnd(28).slice(0, 28);
     lines.push(`${name2} ${String(g.c).padStart(2)}  ${String(g.nc).padStart(2)}  ${String(g.na).padStart(2)}  ${String(g.manual).padStart(2)}`);
   }
   lines.push("");
   if (r.findings.length === 0) {
-    lines.push(t(lang, "noFindings"));
+    lines.push(t2(lang, "noFindings"));
   } else {
-    lines.push(`${t(lang, "findingsTitle")} (${r.findings.length}) :`);
+    lines.push(`${t2(lang, "findingsTitle")} (${r.findings.length}) :`);
     for (const f of r.findings.slice(0, 20)) {
       lines.push(`  ${ICON4[f.severity]} [${f.criteriaId}] ${f.file}:${f.line}  ${resolveMessage(f, lang)}`);
     }
     if (r.findings.length > 20) lines.push(`  \u2026 (+${r.findings.length - 20})`);
   }
   lines.push("");
-  lines.push(`${t(lang, "residualTitle")} : ${r.residualRisks.length} ${t(lang, "manualNote")}`);
-  if (r.scope.rendered) lines.push(`\u{1F9E9} ${r.scope.rendered.files} ${t(lang, "renderedNote")} (${r.scope.rendered.opaqueLibraries.join(", ")}).`);
-  if (r.scope.sourceTemplate) lines.push(`\u{1F9E9} ${r.scope.sourceTemplate.files} ${t(lang, "sfcNote")} (${r.scope.sourceTemplate.extensions.join(", ")}).`);
-  if (r.scope.captures) lines.push(`\u2705 ${r.scope.captures.files} ${t(lang, "capturesNote")}.`);
+  lines.push(`${t2(lang, "residualTitle")} : ${r.residualRisks.length} ${t2(lang, "manualNote")}`);
+  if (r.scope.rendered) lines.push(`\u{1F9E9} ${r.scope.rendered.files} ${t2(lang, "renderedNote")} (${r.scope.rendered.opaqueLibraries.join(", ")}).`);
+  if (r.scope.sourceTemplate) lines.push(`\u{1F9E9} ${r.scope.sourceTemplate.files} ${t2(lang, "sfcNote")} (${r.scope.sourceTemplate.extensions.join(", ")}).`);
+  if (r.scope.captures) lines.push(`\u2705 ${r.scope.captures.files} ${t2(lang, "capturesNote")}.`);
   return lines.join("\n");
 }
 function captureCoverageSummary(cov, lang) {
@@ -60561,9 +61066,9 @@ function scoreboardTable(result, derived, standard, s, lang) {
   ];
   for (const pg of derived) {
     const n = (sev) => severityCount(pg, sev);
-    const t2 = pageTally(pageCriterionRows(result, pg, standard, lang));
+    const t3 = pageTally(pageCriterionRows(result, pg, standard, lang));
     out2.push(
-      `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${t2.c} | ${t2.nc} | ${t2.manual} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
+      `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${t3.c} | ${t3.nc} | ${t3.manual} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
     );
   }
   return out2;
@@ -60604,7 +61109,7 @@ function pageBlock(result, page, standard, lang) {
   }
   out2.push(withTests ? `| ${s.criterion} | ${s.testsCol} |` : `| ${s.criterion} |`, withTests ? "| --- | --- |" : "| --- |");
   for (const r of nc) {
-    out2.push(withTests ? `| ${cell(r.label)} | ${r.tests.map((t2) => `\`${t2}\``).join(" ")} |` : `| ${cell(r.label)} |`);
+    out2.push(withTests ? `| ${cell(r.label)} | ${r.tests.map((t3) => `\`${t3}\``).join(" ")} |` : `| ${cell(r.label)} |`);
   }
   out2.push("", "</details>");
   return out2.join("\n");
@@ -60732,19 +61237,19 @@ function cropRect(box, g, scale, img) {
   const bw = box.w * scale;
   const bh = box.h * scale;
   const w = Math.min(Math.max(bw + g.pad * 2 * scale, g.minWidth * scale), g.maxWidth * scale, img.width);
-  const h = Math.min(Math.max(bh + g.pad * 2 * scale, g.minHeight * scale), g.maxHeight * scale, img.height);
+  const h2 = Math.min(Math.max(bh + g.pad * 2 * scale, g.minHeight * scale), g.maxHeight * scale, img.height);
   let x = bx + bw / 2 - w / 2;
-  let y = by + bh / 2 - h / 2;
+  let y = by + bh / 2 - h2 / 2;
   x = Math.max(0, Math.min(x, img.width - w));
-  y = Math.max(0, Math.min(y, img.height - h));
-  return { x, y, w, h };
+  y = Math.max(0, Math.min(y, img.height - h2));
+  return { x, y, w, h: h2 };
 }
 function annotate(raster, target) {
   strokeRect(raster, { x: target.x - RING, y: target.y - RING, w: target.w + RING * 2, h: target.h + RING * 2 }, HALO, RING);
   strokeRect(raster, target, MARK3, RING);
   strokeRect(raster, { x: target.x + RING, y: target.y + RING, w: target.w - RING * 2, h: target.h - RING * 2 }, HALO, 1, 6);
   const arm = Math.max(6, Math.min(18, Math.round(Math.min(target.w, target.h) / 3)));
-  const t2 = RING;
+  const t3 = RING;
   const x0 = target.x - RING;
   const y0 = target.y - RING;
   const x1 = target.x + target.w + RING;
@@ -60755,8 +61260,8 @@ function annotate(raster, target) {
     [x0, y1, 1, -1],
     [x1, y1, -1, -1]
   ]) {
-    fillRect(raster, { x: dx > 0 ? cx : cx - arm, y: dy > 0 ? cy - t2 : cy, w: arm, h: t2 }, MARK3);
-    fillRect(raster, { x: dx > 0 ? cx - t2 : cx, y: dy > 0 ? cy : cy - arm, w: t2, h: arm }, MARK3);
+    fillRect(raster, { x: dx > 0 ? cx : cx - arm, y: dy > 0 ? cy - t3 : cy, w: arm, h: t3 }, MARK3);
+    fillRect(raster, { x: dx > 0 ? cx - t3 : cx, y: dy > 0 ? cy : cy - arm, w: t3, h: arm }, MARK3);
   }
 }
 function cropFinding(ctx, f, geometry) {
@@ -60834,11 +61339,11 @@ var S2 = {
   }
 };
 function evidenceRefusals(m, pageId, lang) {
-  const t2 = pageId === null ? m.totals : m.perPage.get(pageId);
-  if (!t2) return void 0;
-  const missing = t2.located - t2.imaged;
+  const t3 = pageId === null ? m.totals : m.perPage.get(pageId);
+  if (!t3) return void 0;
+  const missing = t3.located - t3.imaged;
   if (missing <= 0) return void 0;
-  const entries = Object.entries(t2.skipped).filter(([, n]) => n);
+  const entries = Object.entries(t3.skipped).filter(([, n]) => n);
   const s = S2[lang];
   return {
     headline: s.notImaged(missing),
@@ -60849,8 +61354,8 @@ function evidenceNotice(m, pageId, lang) {
   const r = evidenceRefusals(m, pageId, lang);
   return r ? [r.headline, ...r.reasons.map((x) => `- ${x}`)] : [];
 }
-function bump(t2, reason) {
-  t2.skipped[reason] = (t2.skipped[reason] ?? 0) + 1;
+function bump(t3, reason) {
+  t3.skipped[reason] = (t3.skipped[reason] ?? 0) + 1;
 }
 function cropName(f) {
   return `${createHash7("sha1").update(findingId(f)).digest("hex").slice(0, 12)}.png`;
@@ -61080,19 +61585,19 @@ function blockHtml(b) {
   }
 }
 function renderHtmlDocument(doc) {
-  const t2 = T3[doc.lang];
+  const t3 = T3[doc.lang];
   const out2 = [];
   out2.push(`<!doctype html>`, `<html lang="${doc.lang}">`, "<head>");
   out2.push('<meta charset="utf-8">', '<meta name="viewport" content="width=device-width, initial-scale=1">');
   out2.push(`<title>${esc2(doc.title)}</title>`);
   out2.push(`<style>${STYLE}</style>`);
   out2.push("</head>", "<body>");
-  out2.push(`<a class="skip" href="#content">${esc2(t2.skip)}</a>`);
+  out2.push(`<a class="skip" href="#content">${esc2(t3.skip)}</a>`);
   out2.push('<header class="top"><div class="wrap">');
   out2.push(`<h1>${esc2(doc.title)}</h1>`);
   if (doc.subtitle?.length) out2.push(`<p class="sub">${runsHtml(doc.subtitle)}</p>`);
   if (doc.nav?.length) {
-    out2.push(`<nav class="docs" aria-label="${esc2(t2.nav)}"><ul>`);
+    out2.push(`<nav class="docs" aria-label="${esc2(t3.nav)}"><ul>`);
     for (const l of doc.nav) out2.push(`<li><a href="${esc2(l.href)}"${l.current ? ' aria-current="page"' : ""}>${esc2(l.text)}</a></li>`);
     out2.push("</ul></nav>");
   }
@@ -61100,7 +61605,7 @@ function renderHtmlDocument(doc) {
   out2.push('<main id="content" class="wrap">');
   for (const b of doc.blocks) out2.push(...blockHtml(b));
   out2.push("</main>");
-  out2.push(`<footer class="bot"><div class="wrap"><p>${esc2(t2.generated)} \xB7 ${esc2(t2.printHint)}</p></div></footer>`);
+  out2.push(`<footer class="bot"><div class="wrap"><p>${esc2(t3.generated)} \xB7 ${esc2(t3.printHint)}</p></div></footer>`);
   out2.push("</body>", "</html>");
   return `${out2.join("\n")}
 `;
@@ -61123,7 +61628,7 @@ var T4 = {
     files: "fichiers",
     rate: "r\xE9ussite automatique",
     synthesis: "Synth\xE8se",
-    synthCaption: (h) => `Nombre de crit\xE8res par statut, regroup\xE9s par ${h}.`,
+    synthCaption: (h2) => `Nombre de crit\xE8res par statut, regroup\xE9s par ${h2}.`,
     byGuideline: "r\xE8gle WCAG",
     byTheme: "th\xE9matique",
     total: "Total",
@@ -61132,7 +61637,7 @@ var T4 = {
     notApplicable: "NA",
     toAssess: "\xC0 \xE9valuer",
     group: "Groupe",
-    coverage: (d, t2) => `Couverture : ${d}/${t2} crit\xE8re(s) d\xE9cid\xE9(s). Le taux ne porte que sur eux et ne dit rien des ${t2 - d} autres.`,
+    coverage: (d, t3) => `Couverture : ${d}/${t3} crit\xE8re(s) d\xE9cid\xE9(s). Le taux ne porte que sur eux et ne dit rien des ${t3 - d} autres.`,
     ncTitle: "Non-conformit\xE9s",
     ncCaption: "Une entr\xE9e par crit\xE8re non conforme.",
     noNc: "Aucune non-conformit\xE9 relev\xE9e par le moteur statique. Les crit\xE8res \xAB \xE0 \xE9valuer \xBB restent \xE0 trancher.",
@@ -61173,7 +61678,7 @@ var T4 = {
     files: "files",
     rate: "automatic pass rate",
     synthesis: "Synthesis",
-    synthCaption: (h) => `Criteria count per status, grouped by ${h}.`,
+    synthCaption: (h2) => `Criteria count per status, grouped by ${h2}.`,
     byGuideline: "WCAG guideline",
     byTheme: "theme",
     total: "Total",
@@ -61182,7 +61687,7 @@ var T4 = {
     notApplicable: "NA",
     toAssess: "To assess",
     group: "Group",
-    coverage: (d, t2) => `Coverage: ${d}/${t2} criteria decided. The rate covers only those and says nothing about the other ${t2 - d}.`,
+    coverage: (d, t3) => `Coverage: ${d}/${t3} criteria decided. The rate covers only those and says nothing about the other ${t3 - d}.`,
     ncTitle: "Non-conformities",
     ncCaption: "One entry per non-conforming criterion.",
     noNc: "No non-conformity found by the static engine. The criteria left to assess are still open.",
@@ -61221,16 +61726,16 @@ function ticks(text) {
 }
 var stdName = (standard) => isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name;
 function headline(result, standard, lang) {
-  const t2 = T4[lang];
+  const t3 = T4[lang];
   const groups = isCore(standard) ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
   const { decided, total } = reportCoverage(groups);
   const agentRuled = groups.some((g) => g.rows.some((r) => r.decidedBy === "agent" && r.status === "C"));
   return {
     runs: [
       { text: result.date, mono: true },
-      { text: ` \xB7 ${result.scope.files} ${t2.files} \xB7 ` },
+      { text: ` \xB7 ${result.scope.files} ${t3.files} \xB7 ` },
       { text: `${formatRate(decided === 0 ? null : result.conformancePct, decided, total)}${agentRuled ? "*" : ""}`, strong: true },
-      { text: ` ${t2.rate}` }
+      { text: ` ${t3.rate}` }
     ],
     agentRuled,
     decided,
@@ -61238,7 +61743,7 @@ function headline(result, standard, lang) {
   };
 }
 function synthesisBlocks(result, standard, lang) {
-  const t2 = T4[lang];
+  const t3 = T4[lang];
   const core = isCore(standard);
   const groups = core ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
   const tot = reportTotals(groups);
@@ -61254,49 +61759,49 @@ function synthesisBlocks(result, standard, lang) {
     ];
   });
   rows.push([
-    { text: t2.total, strong: true },
+    { text: t3.total, strong: true },
     { text: String(tot.c), align: "end", strong: true },
     { text: String(tot.nc), align: "end", strong: true },
     { text: String(tot.na), align: "end", strong: true },
     { text: String(tot.manual), align: "end", strong: true }
   ]);
   return [
-    { kind: "heading", level: 2, text: t2.synthesis, id: "synthesis" },
+    { kind: "heading", level: 2, text: t3.synthesis, id: "synthesis" },
     {
       kind: "table",
-      caption: t2.synthCaption(core ? t2.byGuideline : t2.byTheme),
+      caption: t3.synthCaption(core ? t3.byGuideline : t3.byTheme),
       columns: [
-        { text: t2.group },
-        { text: t2.conforming, align: "end" },
-        { text: t2.nonConforming, align: "end" },
-        { text: t2.notApplicable, align: "end" },
-        { text: t2.toAssess, align: "end" }
+        { text: t3.group },
+        { text: t3.conforming, align: "end" },
+        { text: t3.nonConforming, align: "end" },
+        { text: t3.notApplicable, align: "end" },
+        { text: t3.toAssess, align: "end" }
       ],
       rows
     },
-    { kind: "note", tone: "warn", runs: ticks(t2.coverage(decided, total)) },
-    { kind: "note", tone: "warn", runs: ticks(t2.manualWarn) }
+    { kind: "note", tone: "warn", runs: ticks(t3.coverage(decided, total)) },
+    { kind: "note", tone: "warn", runs: ticks(t3.manualWarn) }
   ];
 }
 function criterionBlocks(unit, standard, lang, level, crops) {
-  const t2 = T4[lang];
+  const t3 = T4[lang];
   const m = auditorUnitModel(unit, standard, lang, { collapse: true });
   const out2 = [{ kind: "heading", level, text: `${m.icon} ${m.label}`, id: `c-${unit.criteriaId}` }];
   out2.push({ kind: "note", tone: "info", runs: ticks(m.normativeNote) });
   out2.push({ kind: "list", items: m.fields.map((f) => [{ text: `${f.label} : `, strong: true }, ...ticks(f.value)]) });
   out2.push({
     kind: "para",
-    runs: [{ text: `${t2.what} (${m.conformanceTerms.nonConformant}) : `, strong: true }, { text: `${m.occurrences} \u2014 ${m.messages.join(" ; ")}` }]
+    runs: [{ text: `${t3.what} (${m.conformanceTerms.nonConformant}) : `, strong: true }, { text: `${m.occurrences} \u2014 ${m.messages.join(" ; ")}` }]
   });
   if (m.fixes.length) out2.push({ kind: "para", runs: [{ text: `${m.conformanceTerms.conformant} : `, strong: true }, { text: m.fixes.join(" ; ") }] });
   const hasEvidence = crops ? m.normative.some((f) => crops(f)) : false;
-  const columns = [{ text: t2.where }, { text: t2.selector }, { text: t2.what }, ...hasEvidence ? [{ text: t2.evidence }] : []];
+  const columns = [{ text: t3.where }, { text: t3.selector }, { text: t3.what }, ...hasEvidence ? [{ text: t3.evidence }] : []];
   const rows = m.normative.map((f) => {
     const cells = [{ text: `${f.file}:${f.line}`, mono: true }, { text: f.selectorHint, mono: true }, { text: resolveOccurrence(f, lang) }];
     if (hasEvidence) cells.push({ text: crops?.(f) ? "\u25A3" : "" });
     return cells;
   });
-  if (rows.length) out2.push({ kind: "table", caption: t2.occCaption(unit.criteriaId), columns, rows });
+  if (rows.length) out2.push({ kind: "table", caption: t3.occCaption(unit.criteriaId), columns, rows });
   if (crops) {
     for (const f of m.normative) {
       const c2 = crops(f);
@@ -61309,21 +61814,21 @@ function resolveOccurrence(f, lang) {
   return f.msg ? auditorUnitModel({ criteriaId: f.criteriaId, title: "", label: "", refs: [], severity: f.severity, findings: [f] }, CORE2, lang).messages[0] ?? f.message : f.message;
 }
 function findingsBlocks(result, standard, lang, level, crops, refusals) {
-  const t2 = T4[lang];
+  const t3 = T4[lang];
   const { nc, advisory } = partitionUnits(prdUnits(result, standard, lang));
-  const out2 = [{ kind: "heading", level: 2, text: t2.ncTitle, id: "nc" }];
+  const out2 = [{ kind: "heading", level: 2, text: t3.ncTitle, id: "nc" }];
   out2.push(...refusalBlocks(refusals?.(null)));
-  if (!nc.length) out2.push({ kind: "para", runs: [{ text: t2.noNc }] });
+  if (!nc.length) out2.push({ kind: "para", runs: [{ text: t3.noNc }] });
   for (const u of nc) out2.push(...criterionBlocks(u, standard, lang, level === 2 ? 3 : 4, crops));
   if (advisory.length) {
-    out2.push({ kind: "heading", level: 2, text: t2.recTitle, id: "rec" });
-    out2.push({ kind: "note", tone: "info", runs: ticks(t2.recNote) });
+    out2.push({ kind: "heading", level: 2, text: t3.recTitle, id: "rec" });
+    out2.push({ kind: "note", tone: "info", runs: ticks(t3.recNote) });
     for (const u of advisory) out2.push(...criterionBlocks(u, standard, lang, level === 2 ? 3 : 4, crops));
   }
   return out2;
 }
 function scoreboardBlocks(result, standard, lang, sheetHref) {
-  const t2 = T4[lang];
+  const t3 = T4[lang];
   const scope = pagesOf(result);
   if (!scope.length) return [];
   const derived = derivePages(result, scope);
@@ -61334,11 +61839,11 @@ function scoreboardBlocks(result, standard, lang, sheetHref) {
     { text: formatRate(p.conformancePct, p.decided, p.total), align: "end" }
   ]);
   const out2 = [
-    { kind: "heading", level: 2, text: t2.perPage, id: "pages" },
+    { kind: "heading", level: 2, text: t3.perPage, id: "pages" },
     {
       kind: "table",
-      caption: t2.perPageCaption,
-      columns: [{ text: t2.page }, { text: t2.url }, { text: t2.basis }, { text: t2.pageRate, align: "end" }],
+      caption: t3.perPageCaption,
+      columns: [{ text: t3.page }, { text: t3.url }, { text: t3.basis }, { text: t3.pageRate, align: "end" }],
       rows
     }
   ];
@@ -61351,14 +61856,14 @@ function scoreboardBlocks(result, standard, lang, sheetHref) {
   return out2;
 }
 function crossGridBlocks(result, derived, standard, lang) {
-  const t2 = T4[lang];
+  const t3 = T4[lang];
   if (!derived.length) return [];
   const { rows, status } = pageGridModel(result, derived, standard, lang);
   if (!rows.length) return [];
   const table = {
     kind: "table",
-    caption: t2.crossGridCaption,
-    columns: [{ text: t2.criterion }, ...derived.map((p) => ({ text: `${p.name}${p.auth ? " \u{1F512}" : ""}` }))],
+    caption: t3.crossGridCaption,
+    columns: [{ text: t3.criterion }, ...derived.map((p) => ({ text: `${p.name}${p.auth ? " \u{1F512}" : ""}` }))],
     rows: []
   };
   let group = "";
@@ -61369,15 +61874,15 @@ function crossGridBlocks(result, derived, standard, lang) {
     }
     table.rows.push([{ text: row.label }, ...derived.map((p) => ({ status: status.get(row.id)?.get(p.id) ?? "manual", text: "" }))]);
   }
-  return [{ kind: "heading", level: 2, text: t2.grid, id: "grid" }, { kind: "note", tone: "info", runs: ticks(t2.legend) }, table];
+  return [{ kind: "heading", level: 2, text: t3.grid, id: "grid" }, { kind: "note", tone: "info", runs: ticks(t3.legend) }, table];
 }
 function pageGridBlocks(result, page, standard, lang) {
-  const t2 = T4[lang];
+  const t3 = T4[lang];
   const rows = pageCriterionRows(result, page, standard, lang);
   if (!rows.length) return [];
   const cov = pageCoverage(rows);
   const tally = pageTally(rows);
-  const table = { kind: "table", caption: t2.gridCaption(page.name), columns: [{ text: t2.criterion }, { text: t2.status }], rows: [] };
+  const table = { kind: "table", caption: t3.gridCaption(page.name), columns: [{ text: t3.criterion }, { text: t3.status }], rows: [] };
   let group = "";
   for (const row of rows) {
     if (row.group !== group) {
@@ -61387,16 +61892,16 @@ function pageGridBlocks(result, page, standard, lang) {
     table.rows.push([{ text: row.label }, { status: row.status, text: row.decidedBy === "agent" && row.status === "C" ? "*" : "" }]);
   }
   const out2 = [
-    { kind: "heading", level: 2, text: t2.grid },
+    { kind: "heading", level: 2, text: t3.grid },
     {
       kind: "para",
       runs: [
-        { text: `${t2.pageRate} : `, strong: true },
+        { text: `${t3.pageRate} : `, strong: true },
         { text: formatRate(pageRatePct(rows), cov.decided, cov.total), strong: true }
       ]
     },
-    { kind: "para", runs: [{ text: t2.tally(tally.c, tally.nc, tally.na, tally.manual) }] },
-    { kind: "note", tone: "info", runs: ticks(t2.legend) },
+    { kind: "para", runs: [{ text: t3.tally(tally.c, tally.nc, tally.na, tally.manual) }] },
+    { kind: "note", tone: "info", runs: ticks(t3.legend) },
     table
   ];
   if (rows.some((r) => r.decidedBy === "agent" && r.status === "C")) out2.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
@@ -61405,78 +61910,78 @@ function pageGridBlocks(result, page, standard, lang) {
 function indexDoc(result, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
-  const t2 = T4[lang];
-  const h = headline(result, standard, lang);
+  const t3 = T4[lang];
+  const h2 = headline(result, standard, lang);
   const blocks = [];
   if (opts.links?.length) {
-    blocks.push({ kind: "heading", level: 2, text: t2.documents, id: "documents" });
+    blocks.push({ kind: "heading", level: 2, text: t3.documents, id: "documents" });
     blocks.push({ kind: "list", items: opts.links.map((l) => [{ text: l.text, href: l.href }]) });
   }
   blocks.push(...synthesisBlocks(result, standard, lang));
-  if (h.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
+  if (h2.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
   blocks.push(...scoreboardBlocks(result, standard, lang));
-  return { lang, title: `${t2.indexTitle} \u2014 ${stdName(standard)}`, subtitle: h.runs, ...opts.nav ? { nav: opts.nav } : {}, blocks };
+  return { lang, title: `${t3.indexTitle} \u2014 ${stdName(standard)}`, subtitle: h2.runs, ...opts.nav ? { nav: opts.nav } : {}, blocks };
 }
 function compositeDoc(result, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
-  const t2 = T4[lang];
-  const h = headline(result, standard, lang);
+  const t3 = T4[lang];
+  const h2 = headline(result, standard, lang);
   const blocks = [...synthesisBlocks(result, standard, lang)];
-  if (h.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
+  if (h2.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
   blocks.push(...findingsBlocks(result, standard, lang, 2, opts.crops, opts.refusals));
   blocks.push(...scoreboardBlocks(result, standard, lang));
   const scope = pagesOf(result);
   if (scope.length) blocks.push(...crossGridBlocks(result, derivePages(result, scope), standard, lang));
-  return { lang, title: `${t2.reportTitle} ${standardLabel(standard)} \u2014 ${result.date}`, subtitle: h.runs, ...opts.nav ? { nav: opts.nav } : {}, blocks };
+  return { lang, title: `${t3.reportTitle} ${standardLabel(standard)} \u2014 ${result.date}`, subtitle: h2.runs, ...opts.nav ? { nav: opts.nav } : {}, blocks };
 }
 function pagesIndexDoc(result, opts = { sheetHref: (id) => `./page-${id}.html` }) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
-  const t2 = T4[lang];
-  const h = headline(result, standard, lang);
+  const t3 = T4[lang];
+  const h2 = headline(result, standard, lang);
   const scope = pagesOf(result);
   const blocks = [...scoreboardBlocks(result, standard, lang, opts.sheetHref)];
   if (scope.length) blocks.push(...crossGridBlocks(result, derivePages(result, scope), standard, lang));
-  return { lang, title: `${t2.pagesTitle} \u2014 ${stdName(standard)}`, subtitle: h.runs, ...opts.nav ? { nav: opts.nav } : {}, blocks };
+  return { lang, title: `${t3.pagesTitle} \u2014 ${stdName(standard)}`, subtitle: h2.runs, ...opts.nav ? { nav: opts.nav } : {}, blocks };
 }
 function pageDoc(result, page, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
-  const t2 = T4[lang];
+  const t3 = T4[lang];
   const blocks = [
     {
       kind: "list",
       items: [
         [
-          { text: `${t2.url} : `, strong: true },
+          { text: `${t3.url} : `, strong: true },
           { text: page.url, mono: true }
         ],
-        [{ text: `${t2.basis} : `, strong: true }, { text: basisLabel(page.basis, lang) }]
+        [{ text: `${t3.basis} : `, strong: true }, { text: basisLabel(page.basis, lang) }]
       ]
     }
   ];
   const warn = pageBasisWarning(page.basis, lang);
   if (warn) blocks.push({ kind: "note", tone: "warn", runs: ticks(warn) });
   blocks.push(
-    opts.screenshot ? { kind: "figure", src: opts.screenshot, alt: t2.screenshotAlt(page.name) } : { kind: "para", runs: [{ text: t2.noScreenshot, em: true }] }
+    opts.screenshot ? { kind: "figure", src: opts.screenshot, alt: t3.screenshotAlt(page.name) } : { kind: "para", runs: [{ text: t3.noScreenshot, em: true }] }
   );
   blocks.push(...refusalBlocks(opts.refusals?.(page.id)));
   blocks.push(...pageGridBlocks(result, page, standard, lang));
   const view = { ...result, criteria: page.criteria, findings: page.findings };
   const { nc, advisory } = partitionUnits(prdUnits(view, standard, lang));
-  blocks.push({ kind: "heading", level: 2, text: t2.ncTitle });
-  if (!nc.length) blocks.push({ kind: "para", runs: [{ text: t2.noNc }] });
+  blocks.push({ kind: "heading", level: 2, text: t3.ncTitle });
+  if (!nc.length) blocks.push({ kind: "para", runs: [{ text: t3.noNc }] });
   for (const u of nc) blocks.push(...criterionBlocks(u, standard, lang, 3, opts.crops));
   if (advisory.length) {
-    blocks.push({ kind: "heading", level: 2, text: t2.recTitle });
-    blocks.push({ kind: "note", tone: "info", runs: ticks(t2.recNote) });
+    blocks.push({ kind: "heading", level: 2, text: t3.recTitle });
+    blocks.push({ kind: "note", tone: "info", runs: ticks(t3.recNote) });
     for (const u of advisory) blocks.push(...criterionBlocks(u, standard, lang, 3, opts.crops));
   }
   return {
     lang,
     title: `${page.name} \u2014 ${stdName(standard)}`,
-    subtitle: [{ text: result.date, mono: true }, { text: ` \xB7 ${findingsForStandard(view, standard).length} ${t2.what.toLowerCase()}` }],
+    subtitle: [{ text: result.date, mono: true }, { text: ` \xB7 ${findingsForStandard(view, standard).length} ${t3.what.toLowerCase()}` }],
     ...opts.nav ? { nav: opts.nav } : {},
     blocks
   };
@@ -61548,7 +62053,7 @@ function pickRung(cropBytes, shotBytes, budget) {
 function writeHtml(result, opts) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
-  const t2 = T5[lang];
+  const t3 = T5[lang];
   const budget = opts.inlineBudget ?? DEFAULT_INLINE_BUDGET;
   const stdKey = isCore(standard) ? "wcag" : loadPack(standard).key;
   mkdirSync15(opts.outDir, { recursive: true });
@@ -61560,10 +62065,10 @@ function writeHtml(result, opts) {
     budget
   );
   const notices = [];
-  if (rung.steps.includes("none")) notices.push(t2.overNone(mb(budget)));
-  else if (rung.steps.includes("crops")) notices.push(t2.overCrops(mb(crops.reduce((a, c2) => a + inlineSize(c2.path), 0)), mb(budget)));
+  if (rung.steps.includes("none")) notices.push(t3.overNone(mb(budget)));
+  else if (rung.steps.includes("crops")) notices.push(t3.overCrops(mb(crops.reduce((a, c2) => a + inlineSize(c2.path), 0)), mb(budget)));
   else if (rung.steps.includes("screenshots"))
-    notices.push(t2.overComposite(mb(crops.reduce((a, c2) => a + inlineSize(c2.path), 0) + shots.reduce((a, s) => a + inlineSize(s), 0)), mb(budget)));
+    notices.push(t3.overComposite(mb(crops.reduce((a, c2) => a + inlineSize(c2.path), 0) + shots.reduce((a, s) => a + inlineSize(s), 0)), mb(budget)));
   let inlinedBytes = 0;
   const perCriterion = /* @__PURE__ */ new Map();
   const inlineCrops = cropLookup(opts.evidence, lang, (path) => {
@@ -61586,10 +62091,10 @@ function writeHtml(result, opts) {
   const sheetDir = flat ? opts.outDir : join45(opts.outDir, "pages");
   const up = flat ? "./" : "../";
   const compositeName = `ultra11y-${stdKey}-${result.date}.html`;
-  const nav = flat ? [{ href: "./index.html", text: t2.pagesTitle }] : [
-    { href: "./index.html", text: t2.indexTitle },
-    { href: `./${compositeName}`, text: t2.docTitle },
-    ...opts.pages ? [{ href: "./pages/index.html", text: t2.pagesTitle }] : []
+  const nav = flat ? [{ href: "./index.html", text: t3.pagesTitle }] : [
+    { href: "./index.html", text: t3.indexTitle },
+    { href: `./${compositeName}`, text: t3.docTitle },
+    ...opts.pages ? [{ href: "./pages/index.html", text: t3.pagesTitle }] : []
   ];
   const refusals = refusalLookup(opts.evidence, lang);
   let compositePath;
@@ -61614,10 +62119,10 @@ function writeHtml(result, opts) {
   if (opts.pages) {
     const derived = derivePages(result, pagesOf(result));
     mkdirSync15(sheetDir, { recursive: true });
-    const sheetNav = flat ? [{ href: "./index.html", text: t2.pagesTitle }] : [
-      { href: `${up}index.html`, text: t2.indexTitle },
-      { href: `${up}${compositeName}`, text: t2.docTitle },
-      { href: "./index.html", text: t2.pagesTitle }
+    const sheetNav = flat ? [{ href: "./index.html", text: t3.pagesTitle }] : [
+      { href: `${up}index.html`, text: t3.indexTitle },
+      { href: `${up}${compositeName}`, text: t3.docTitle },
+      { href: "./index.html", text: t3.pagesTitle }
     ];
     if (!flat) {
       writeFileSync17(
@@ -62172,6 +62677,9 @@ export async function checkA11y(page, opts = {}) {
       runner: "playwright",
       viewport: collected.viewport,
       capturedAt: new Date().toISOString(),
+      // dom.html is documentElement.outerHTML and does NOT carry the doctype, so it is
+      // recorded here or nowhere - and a criterion that asks about it then has no evidence.
+      ...(collected.doctype !== undefined ? { doctype: collected.doctype } : {}),
       ...(opts.auth !== undefined ? { auth: opts.auth } : {}),
       ...(opts.sources ? { sources: opts.sources } : {}),
       ...(opts.notes ? { notes: opts.notes } : {}),
@@ -62272,6 +62780,7 @@ Cypress.Commands.add("ultra11y", (opts = {}) => {
         runner: "cypress",
         viewport: collected.viewport,
         capturedAt: new Date().toISOString(),
+        ...(collected.doctype !== undefined ? { doctype: collected.doctype } : {}),
         ...(opts.auth !== undefined ? { auth: opts.auth } : {}),
         ...(opts.sources ? { sources: opts.sources } : {}),
         ...(opts.notes ? { notes: opts.notes } : {}),
@@ -62805,8 +63314,8 @@ function criterionView(standard, id, lang, includeGuidance = false) {
 function tierCensus(standard, ids) {
   const by = {};
   for (const id of ids) {
-    const t2 = criterionCoverage(standard, id)?.tier;
-    if (t2) by[t2] = (by[t2] ?? 0) + 1;
+    const t3 = criterionCoverage(standard, id)?.tier;
+    if (t3) by[t3] = (by[t3] ?? 0) + 1;
   }
   return by;
 }
@@ -62873,10 +63382,10 @@ function criteriaIndex(standard, lang) {
       pack.key,
       criteria.map((c2) => c2.id)
     ),
-    groups: pack.themes.map((t2) => ({
-      number: String(t2.number),
-      ...themeName(pack, t2.number, lang) ? { name: themeName(pack, t2.number, lang) } : {},
-      count: t2.count
+    groups: pack.themes.map((t3) => ({
+      number: String(t3.number),
+      ...themeName(pack, t3.number, lang) ? { name: themeName(pack, t3.number, lang) } : {},
+      count: t3.count
     })),
     criteria: criteria.map((c2) => {
       const cov = criterionCoverage(pack.key, c2.id);
@@ -62965,8 +63474,8 @@ function glossaryView(standard, term, lang = "en") {
 function tierCensus2(standard, ids) {
   const by = {};
   for (const id of ids) {
-    const t2 = criterionCoverage(standard, id)?.tier;
-    if (t2) by[t2] = (by[t2] ?? 0) + 1;
+    const t3 = criterionCoverage(standard, id)?.tier;
+    if (t3) by[t3] = (by[t3] ?? 0) + 1;
   }
   return by;
 }
@@ -63066,8 +63575,8 @@ var TIER_GUIDE = {
 var TIERS = ["source", "cross-file", "rendered-page", "browser", "judgment", "out-of-scope"];
 function titleOf(standard, id, lang) {
   if (isCore(standard)) {
-    const t2 = scTitle(id, lang);
-    return t2 ?? id;
+    const t3 = scTitle(id, lang);
+    return t3 ?? id;
   }
   const pack = loadPack(standard);
   const c2 = allCriteria(pack).find((x) => x.id === id);
@@ -63348,7 +63857,7 @@ function handleTickets(args2, cwd) {
     standard,
     grain,
     dry_run: true,
-    tickets: plan.tickets.map((t2) => ({ title: t2.title, labels: t2.labels, severity: t2.severity, advisory: t2.advisory, scope: t2.scope, body: t2.body })),
+    tickets: plan.tickets.map((t3) => ({ title: t3.title, labels: t3.labels, severity: t3.severity, advisory: t3.advisory, scope: t3.scope, body: t3.body })),
     unattributed: plan.unattributed,
     to_file_them: `ultra11y tickets --in <audit.json> --provider github|gitlab|jira --grain ${grain}`
   };
@@ -64091,16 +64600,16 @@ function toolsFor2(protocolVersion, opts = {}) {
   const base = opts.allowWrite ? [...TOOLS2, ...REFERENCE_TOOLS, ...WRITE_TOOLS] : [...TOOLS2, ...REFERENCE_TOOLS];
   const withAnnotations = protocolVersion >= ANNOTATIONS_SINCE2;
   const withRich = protocolVersion >= RICH_TOOLS_SINCE2;
-  return base.map((t2) => {
+  return base.map((t3) => {
     const decl = {
-      name: t2.name,
-      description: t2.description,
-      inputSchema: applyStandards(applyDefaultCwd(t2.inputSchema, opts.defaultCwd), opts.standards)
+      name: t3.name,
+      description: t3.description,
+      inputSchema: applyStandards(applyDefaultCwd(t3.inputSchema, opts.defaultCwd), opts.standards)
     };
-    if (withRich && t2.title) decl.title = t2.title;
-    if (withRich && t2.outputSchema) decl.outputSchema = t2.outputSchema;
+    if (withRich && t3.title) decl.title = t3.title;
+    if (withRich && t3.outputSchema) decl.outputSchema = t3.outputSchema;
     if (withAnnotations) {
-      const a = annotationsFor2(t2.name);
+      const a = annotationsFor2(t3.name);
       if (a) decl.annotations = a;
     }
     return decl;
@@ -64247,7 +64756,7 @@ ${CORE_RULE}
 function str3(v) {
   return typeof v === "string" && v.trim() !== "" ? v : void 0;
 }
-var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t2) => t2.name));
+var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t3) => t3.name));
 
 // src/mcp/resources.ts
 import { existsSync as existsSync34, readdirSync as readdirSync6, readFileSync as readFileSync32, realpathSync as realpathSync5, statSync as statSync13 } from "fs";
@@ -64560,7 +65069,7 @@ function createServer2(opts = {}) {
     const params = msg.params ?? {};
     const name2 = typeof params.name === "string" ? params.name : "";
     const args2 = params.arguments ?? {};
-    const decl = listTools().find((t2) => t2.name === name2);
+    const decl = listTools().find((t3) => t3.name === name2);
     if (!decl) {
       reply({ error: { code: ERR_INVALID_PARAMS, message: `unknown tool: ${name2 || "(none given)"}` } });
       return;
@@ -65802,8 +66311,8 @@ async function cmdPagesDiscover(p) {
   await Promise.all(
     Array.from({ length: Math.min(CONCURRENCY2, queue.length) }, async () => {
       for (let url = queue.shift(); url !== void 0; url = queue.shift()) {
-        const t2 = extractTitle(await fetchHtml2(url));
-        if (t2) titles.set(url, t2);
+        const t3 = extractTitle(await fetchHtml2(url));
+        if (t3) titles.set(url, t3);
       }
     })
   );

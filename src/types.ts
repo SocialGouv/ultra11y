@@ -349,6 +349,10 @@ export interface RenderSignals {
   css?: CssDigest;
   /** Absolute path to the page screenshot, when one was captured. */
   screenshot?: string;
+  /** The page's doctype declaration, from the snapshot's meta. Absent when the capture
+   *  predates the field — a different statement from an empty string ("the page had none"),
+   *  and the adjudication harvest keeps the two apart. */
+  doctype?: string;
   /** The collector truncated: elements past the cap have NO signals and stay undecided. */
   truncated?: boolean;
 }

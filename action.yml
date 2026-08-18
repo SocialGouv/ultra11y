@@ -497,10 +497,11 @@ runs:
 
         # THE TURN BUDGET IS DERIVED, not guessed. The runbook is sequential and the whole
         # point of agent mode is that it OPENS the cited files, so the cost is per item: under
-        # RGAA the worklist runs to ~80. A fixed cap is not a bound but a cliff — a truncated
-        # run leaves `verdict: null` entries, `applyAdjudication` fail-closes on a single one,
-        # and every valid verdict already produced is discarded with the rest. Nothing is
-        # partially applied, so under-budgeting costs the entire spend rather than the tail.
+        # RGAA the worklist runs to ~90. The fold is per-verdict, so an under-budgeted run is
+        # not a cliff: the items it never reached keep `verdict: null`, the fold refuses those
+        # and only those, and every verdict already produced still lands. Under-budgeting
+        # therefore costs the tail, not the spend — but the tail is exactly the criteria that
+        # then stay « to assess », which is the thing this whole tier exists to remove.
         #
         # 4 turns per item plus 40 of headroom, floored at 60 so a tiny worklist still has
         # room to read around what it cites. An explicit `adjudicate-max-turns` wins.

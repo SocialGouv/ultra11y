@@ -27,6 +27,13 @@
       "criteriaId": "1.1.1",
       "automatability": "judgment",
       "title": "Non-text Content",
+      "population": {
+        "classes": 0,
+        "occurrences": 0,
+        "files": 0,
+        "pages": 0
+      },
+      "evidenceComplete": true,
       "verdict": null,
       "justification": "",
       "reason": null,
@@ -39,6 +46,13 @@
       "criteriaId": "1.2.1",
       "automatability": "judgment",
       "title": "Audio-only and Video-only (Prerecorded)",
+      "population": {
+        "classes": 0,
+        "occurrences": 0,
+        "files": 0,
+        "pages": 0
+      },
+      "evidenceComplete": true,
       "verdict": null,
       "justification": "",
       "reason": null,

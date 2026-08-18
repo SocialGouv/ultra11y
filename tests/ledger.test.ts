@@ -131,7 +131,11 @@ describe("replayLedger — parity with the adjudicated audit, without a model", 
     const f = page("shift.html");
     const { ledger } = recordLedger(f);
 
-    writeFileSync(f, PAGE_HTML.replace('<html lang="en">', '<html lang="en">\n<!-- shifts every line below -->'));
+    // The inserted text must be inert: it has to shift lines WITHOUT adding evidence to any
+    // criterion, or the verdict is legitimately stale and the test proves nothing. (The
+    // original wording said "below", which the sensory-characteristics harvest reads as a
+    // candidate instruction — so 1.3.3 really had gained an anchor.)
+    writeFileSync(f, PAGE_HTML.replace('<html lang="en">', '<html lang="en">\n<!-- inert line shift -->'));
     const shifted = auditOf(f);
     const rp = replayLedger(shifted, ledger, { cwd: process.cwd() });
     const r = applyAdjudication(shifted, rp.adj, { cwd: process.cwd(), residualReasons: rp.residualReasons });

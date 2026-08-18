@@ -55,11 +55,34 @@ describe("runAudit — conforming page", () => {
   });
 
   it("still surfaces manual criteria as residual risks", () => {
-    expect(r.residualRisks.length).toBeGreaterThan(40);
+    // Deliberately a floor, not a fixed count. Every applicability predicate the engine gains
+    // moves a criterion from « to assess » to a proved NA, so pinning the exact number would
+    // fail on every honest improvement — and the property under test is that the criteria the
+    // engine genuinely cannot decide are still SURFACED rather than silently conforming.
+    expect(r.residualRisks.length).toBeGreaterThan(30);
+    expect(r.criteria.some((c) => c.status === "C" && c.id === "2.4.5")).toBe(false);
   });
 
   it("marks static SCs with no relevant elements as NA", () => {
     expect(statusOf(r, "1.4.2")).toBe("NA"); // Audio Control — no audio/video on the good page
+  });
+
+  it("proves NA on the interaction criteria whose construct is absent from the source", () => {
+    // A shortcut, a gesture, a drag, a timer and an animation all have to be WRITTEN to
+    // exist, so their absence from the source is a real observation rather than silence —
+    // which is what separates these from 3.1.2, where a missing `lang` proves nothing.
+    for (const sc of ["2.1.4", "2.2.1", "2.2.2", "2.3.1", "2.5.1", "2.5.2", "2.5.7"]) {
+      expect(statusOf(r, sc), `${sc} on a page with none of its subject matter`).toBe("NA");
+    }
+    // …and the claim says what was searched for, so a reader can falsify it.
+    expect(r.criteria.find((c) => c.id === "2.1.4")?.justification).toMatch(/single-printable-character key comparison/);
+  });
+
+  it("keeps Language of Parts OPEN, because a missing lang attribute proves nothing", () => {
+    // The trap this pins: absence of `lang` is equally consistent with "no passage in another
+    // language" (conforming) and "every foreign passage is unmarked" (failing). An NA here
+    // would publish the first while the second was true.
+    expect(statusOf(r, "3.1.2")).toBe("manual");
   });
 });
 

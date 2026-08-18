@@ -131,6 +131,9 @@ export async function checkA11y(page, opts = {}) {
       runner: "playwright",
       viewport: collected.viewport,
       capturedAt: new Date().toISOString(),
+      // dom.html is documentElement.outerHTML and does NOT carry the doctype, so it is
+      // recorded here or nowhere - and a criterion that asks about it then has no evidence.
+      ...(collected.doctype !== undefined ? { doctype: collected.doctype } : {}),
       ...(opts.auth !== undefined ? { auth: opts.auth } : {}),
       ...(opts.sources ? { sources: opts.sources } : {}),
       ...(opts.notes ? { notes: opts.notes } : {}),
@@ -235,6 +238,7 @@ Cypress.Commands.add("ultra11y", (opts = {}) => {
         runner: "cypress",
         viewport: collected.viewport,
         capturedAt: new Date().toISOString(),
+        ...(collected.doctype !== undefined ? { doctype: collected.doctype } : {}),
         ...(opts.auth !== undefined ? { auth: opts.auth } : {}),
         ...(opts.sources ? { sources: opts.sources } : {}),
         ...(opts.notes ? { notes: opts.notes } : {}),

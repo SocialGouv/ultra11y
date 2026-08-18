@@ -16,6 +16,8 @@ import { SCHEMA_VERSION } from "./types.js";
 import { discover } from "./discover.js";
 import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
+import { attachSignals } from "./snapshot.js";
+import { type Harvested, harvestSubjects, isSnapshotFile, PACK_SUBJECTS, pageOfDoc, SC_SUBJECTS } from "./adjudicate-subjects.js";
 import { type Doc, type El, elementsByTag, attr, textContent, ancestors, snippet as elSnippet } from "./parse/html.js";
 import { parseInlineStyle } from "./color.js";
 import { ADJUDICATION } from "./adjudication-data.js";
@@ -38,9 +40,38 @@ import {
 import { guidanceForCriterion } from "./guidance/index.js";
 import { guidanceExampleBlock } from "./prd.js";
 
-/** Cap on evidence items harvested per criterion — bounded so a huge page can't produce an
- *  unreadable worklist; the honest overflow count is recorded in `evidenceTruncated`. */
-export const ADJUDICATE_MAX_EVIDENCE = 30;
+/** Cap on CONTENT CLASSES shown per criterion — not on anchors.
+ *
+ *  The distinction is the whole point. A cap on anchors makes the evidence a sample, and a
+ *  `C` over a sample is a conformity claim about elements nobody looked at. A cap on classes
+ *  bounds the reading while keeping the population complete, because the population collapses:
+ *  887 links over 38 captured pages are 97 distinct (text, href) pairs. When even the class
+ *  count exceeds this, `evidenceComplete` goes false and the fold refuses a `C` outright —
+ *  an incomplete reading may still find a real failure, it may never clear one. */
+export const ADJUDICATE_MAX_EVIDENCE_CLASSES = 600;
+
+// Why 600 and not a rounder, smaller number: it is set by what a real application actually
+// contains, measured, not by taste. On a 338-file product with 38 captured pages the largest
+// per-criterion populations are 456 classes (what survives when CSS is off), 404 (reading
+// order), 360 (structure) and 334 (the heading outline) — and those ARE the populations, not
+// samples of them. A cap below them would not bound anything worth bounding; it would simply
+// refuse every `C` on the criteria that matter most, and refusing to conclude is only honest
+// when something really was not looked at.
+
+/** Sibling anchors listed per class. Bounded for readability; `occurrences` carries the true
+ *  count, and the citation gate accepts any anchor of the class, listed or not. */
+const ALSO_AT_MAX = 8;
+
+/** How much there actually was to look at, so a reader can tell a complete reading from a
+ *  glance at the first few. */
+export interface EvidencePopulation {
+  /** Distinct content classes — what the agent is shown, one representative each. */
+  classes: number;
+  /** Raw anchors behind them. `occurrences` per class sums to this. */
+  occurrences: number;
+  files: number;
+  pages: number;
+}
 
 export interface Evidence {
   file: string;
@@ -48,6 +79,13 @@ export interface Evidence {
   selector: string;
   snippet: string;
   note?: string; // extra context the harvester surfaced (e.g. a link's nearest heading)
+  /** Anchors sharing this content class — the same header link on 38 pages is one decision,
+   *  not 38. Absent when the class has a single anchor. */
+  occurrences?: number;
+  /** Some of the other anchors of this class, as `file:line`. Bounded (see ALSO_AT_MAX). */
+  alsoAt?: string[];
+  /** Page ids this class appears on, when it was harvested from rendered captures. */
+  pages?: string[];
 }
 
 export type CriterionVerdict = "C" | "NC" | "NA" | "manual" | null;
@@ -73,6 +111,12 @@ export interface AdjudicationItem {
   automatability: Automatability;
   title?: string;
   evidence: Evidence[];
+  /** What the harvest actually found, before collapsing to classes. */
+  population?: EvidencePopulation;
+  /** False when even the CLASS count exceeded the cap, so some distinct thing was never
+   *  shown. A `C` is refused on such an item: a reading that skipped part of the population
+   *  can report a failure it saw, but it cannot clear what it never looked at. */
+  evidenceComplete?: boolean;
   evidenceTruncated?: { shown: number; total: number };
   verdict: CriterionVerdict; // the agent fills this
   justification: string; // REQUIRED for C and NA
@@ -134,192 +178,6 @@ export function adjudicationContract(): AdjudicationContract {
   };
 }
 
-// ---- evidence harvesters ----
-// Each harvester answers "for this SC, what did the engine see that the agent needs to
-// rule?" — bounded, source-anchored, language-neutral. A criterion with no harvester gets
-// an empty-evidence item (the agent decides from source, or leaves it manual with a reason).
-
-const selectorFor = (el: El): string => {
-  const id = el.attribs.id ? `#${el.attribs.id}` : "";
-  const cls = el.attribs.class ? `.${el.attribs.class.trim().split(/\s+/)[0]}` : "";
-  return `${el.tag}${id}${cls}`;
-};
-
-const ev = (doc: Doc, el: El, note?: string): Evidence => ({
-  file: doc.file,
-  line: el.line,
-  selector: selectorFor(el),
-  snippet: elSnippet(doc, el, 160),
-  ...(note ? { note } : {}),
-});
-
-/** Nearest preceding heading text — the context a link/control is read in. */
-function nearestHeading(doc: Doc, el: El): string | undefined {
-  const headings = elementsByTag(doc, "h1", "h2", "h3", "h4", "h5", "h6").filter((h) => h.start < el.start);
-  const h = headings[headings.length - 1];
-  return h ? textContent(h).trim().slice(0, 80) : undefined;
-}
-
-// Key/value display patterns (RGAA 8.9 div-presented fields / 9.3 <dl> semantics): a
-// <dt>→<dd> pair, or a "label"-classed element immediately followed by a "value"-classed
-// sibling (the "Mon profil" recap pattern). Surfaced so the agent can judge whether the
-// relationship is only visual — never asserted an NC statically.
-const LABEL_LIKE = /(^|[-_ ])(field-label|field-key|label|key|term)([-_ ]|$)/i;
-const VALUE_LIKE = /(^|[-_ ])(field-value|field-data|value|data)([-_ ]|$)/i;
-function keyValuePairs(doc: Doc): { key: El; label: string; value: string }[] {
-  const out: { key: El; label: string; value: string }[] = [];
-  for (const el of doc.elements) {
-    const isDt = el.tag === "dt";
-    const isLabelDiv = el.tag !== "label" && el.tag !== "dt" && LABEL_LIKE.test(attr(el, "class") ?? "");
-    if (!isDt && !isLabelDiv) continue;
-    const parent = el.parent;
-    if (!parent) continue;
-    const sibs = parent.children.filter((c): c is El => c.type === "element");
-    const next = sibs[sibs.indexOf(el) + 1];
-    if (!next) continue;
-    const paired = isDt ? next.tag === "dd" : VALUE_LIKE.test(attr(next, "class") ?? "");
-    if (!paired) continue;
-    out.push({ key: el, label: textContent(el).trim().slice(0, 40), value: textContent(next).trim().slice(0, 40) });
-  }
-  return out;
-}
-
-// Download links whose destination is a document (RGAA 6.1): naming the format "(PDF)" is
-// a RECOMMENDATION, not an NC — the harvester note says so explicitly.
-const DOWNLOAD_HREF = /\.(pdf|docx?|xlsx?)(?:[?#]|$)/i;
-
-// SPA signals feeding the RGAA 12.8 questions (page title / focus restitution on partial
-// reload): a client-router import in the source. One synthetic evidence per doc, at the
-// import line (no El to anchor on — these are source-level signals).
-const ROUTER_IMPORT =
-  /['"](?:react-router(?:-dom)?|next\/(?:router|navigation)|vue-router|@remix-run\/[\w-]+|@tanstack\/[\w-]*router|@sveltejs\/kit|\$app\/(?:navigation|stores))['"]/;
-function routerImportEvidence(doc: Doc): Evidence[] {
-  const m = ROUTER_IMPORT.exec(doc.source);
-  if (!m) return [];
-  const line = doc.source.slice(0, m.index).split("\n").length;
-  return [
-    {
-      file: doc.file,
-      line,
-      selector: "import",
-      snippet: (doc.source.split("\n")[line - 1] ?? "").trim().slice(0, 120),
-      note: "client-router import — verify page title + focus are restored on partial (SPA) navigation",
-    },
-  ];
-}
-
-// Status-message signal near a form: a status-ish class inside a <form> (dynamic feedback
-// text feeding the RGAA 7.5 / WCAG 4.1.3 question).
-const STATUS_CLASS = /(error|status|message|alert|notif|toast|feedback|live)/i;
-
-type Harvester = (docs: Doc[]) => Evidence[];
-
-const HARVESTERS: Record<string, Harvester> = {
-  // 1.1.1 Non-text Content — every image-like element's text alternative
-  "1.1.1": (docs) =>
-    docs.flatMap((d) =>
-      elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas")
-        .concat(d.elements.filter((e) => attr(e, "role") === "img"))
-        .filter((e, i, a) => a.indexOf(e) === i)
-        .map((e) => ev(d, e, `alt="${attr(e, "alt") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}"`)),
-    ),
-  // 2.4.4 Link Purpose (In Context) — link text + destination + nearest heading. A
-  // document-download link's format mention "(PDF)" (RGAA 6.1) is a RECOMMENDATION, not an
-  // NC — the note says so, so the agent never files an NC for a missing format hint.
-  "2.4.4": (docs) =>
-    docs.flatMap((d) =>
-      elementsByTag(d, "a")
-        .filter((e) => attr(e, "href") !== undefined)
-        .map((e) => {
-          const href = attr(e, "href") ?? "";
-          const dl = DOWNLOAD_HREF.exec(href);
-          const note = dl ? ` download-format=${dl[1]!.toLowerCase()} (naming the format, e.g. "(PDF)", is a recommendation — not an NC)` : "";
-          return ev(d, e, `text="${textContent(e).trim().slice(0, 60)}" href="${href}" under="${nearestHeading(d, e) ?? ""}"${note}`);
-        }),
-    ),
-  // 1.4.3 Contrast (Minimum) — literal inline colour pairs (the ones statically visible)
-  "1.4.3": (docs) =>
-    docs.flatMap((d) =>
-      d.elements
-        .filter((e) => {
-          const st = parseInlineStyle(attr(e, "style") ?? "");
-          return st.has("color") || st.has("background-color") || st.has("background");
-        })
-        .map((e) => {
-          const st = parseInlineStyle(attr(e, "style") ?? "");
-          return ev(d, e, `color=${st.get("color") ?? "?"} background=${st.get("background-color") ?? st.get("background") ?? "?"}`);
-        }),
-    ),
-  // 2.4.6 Headings and Labels — heading + label + <caption> text to judge for
-  // descriptiveness/concision (captions feed the RGAA 5.5 title-concision question).
-  "2.4.6": (docs) =>
-    docs.flatMap((d) =>
-      elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption").map((e) =>
-        ev(d, e, `<${e.tag}> text="${textContent(e).trim().slice(0, 60)}"`),
-      ),
-    ),
-  // 3.3.2 Labels or Instructions — controls + their associated labels/placeholders
-  "3.3.2": (docs) =>
-    docs.flatMap((d) =>
-      elementsByTag(d, "input", "select", "textarea").map((e) => {
-        const id = attr(e, "id");
-        const lbl = id ? elementsByTag(d, "label").find((l) => attr(l, "for") === id) : undefined;
-        return ev(
-          d,
-          e,
-          `label="${lbl ? textContent(lbl).trim().slice(0, 40) : ""}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}"`,
-        );
-      }),
-    ),
-  // 1.3.1 Info and Relationships — heading outline + tables/lists (structure to judge for
-  // technique consistency), PLUS div-presented key/value pairs (RGAA 8.9 read-only fields /
-  // 9.3 <dl> semantics) so the "Mon profil" recap pattern is never silently conforming.
-  "1.3.1": (docs) =>
-    docs.flatMap((d) => [
-      ...elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol", "dl").map((e) =>
-        ev(d, e, `<${e.tag}> "${textContent(e).trim().slice(0, 50)}"`),
-      ),
-      ...keyValuePairs(d).map((p) =>
-        ev(d, p.key, `key/value pair — label="${p.label}" value="${p.value}" (div-presented field? verify the relationship isn't only visual — RGAA 8.9/9.3)`),
-      ),
-    ]),
-  // 4.1.3 Status Messages (RGAA 7.4/7.5) — live regions + status-ish text near a form
-  "4.1.3": (docs) =>
-    docs.flatMap((d) => {
-      const isRegion = (e: El) => attr(e, "aria-live") !== undefined || ["status", "alert", "log"].includes((attr(e, "role") ?? "").trim().toLowerCase());
-      const regions = d.elements.filter(isRegion);
-      const nearForm = d.elements.filter((e) => !isRegion(e) && STATUS_CLASS.test(attr(e, "class") ?? "") && ancestors(e).some((a) => a.tag === "form"));
-      return [
-        ...regions.map((e) => ev(d, e, `aria-live="${attr(e, "aria-live") ?? ""}" role="${attr(e, "role") ?? ""}"`)),
-        ...nearForm.map((e) =>
-          ev(
-            d,
-            e,
-            `status-like class="${(attr(e, "class") ?? "").slice(0, 40)}" in a form — verify async feedback is announced (role=status/alert or aria-live)`,
-          ),
-        ),
-      ];
-    }),
-  // 4.1.2 Name, Role, Value — elements carrying a role or ARIA state
-  "4.1.2": (docs) =>
-    docs.flatMap((d) =>
-      d.elements
-        .filter((e) => attr(e, "role") !== undefined || Object.keys(e.attribs).some((k) => k.startsWith("aria-")))
-        .map((e) => ev(d, e, `role="${attr(e, "role") ?? ""}"`)),
-    ),
-  // 2.4.3 Focus Order — explicit tabindex values in DOM order, PLUS SPA focus signals
-  // (RGAA 12.8): <dialog> usage and client-router imports (verify focus is moved on route
-  // change / dialog open, and a mobile menu's target receives focus).
-  "2.4.3": (docs) =>
-    docs.flatMap((d) => [
-      ...d.elements.filter((e) => attr(e, "tabindex") !== undefined).map((e) => ev(d, e, `tabindex="${attr(e, "tabindex")}"`)),
-      ...elementsByTag(d, "dialog").map((e) => ev(d, e, `<dialog> — verify focus moves in on open and is restored to the trigger on close`)),
-      ...routerImportEvidence(d),
-    ]),
-  // 3.1.2 Language of Parts — element-level lang overrides (not the root <html lang>)
-  "3.1.2": (docs) =>
-    docs.flatMap((d) => d.elements.filter((e) => e.tag !== "html" && attr(e, "lang") !== undefined).map((e) => ev(d, e, `lang="${attr(e, "lang")}"`))),
-};
 
 /** Resolve the audit's scope inputs back to parsed docs (harvesting reads the same files
  *  the audit did — run `verify --manual` from the audit's cwd). Best-effort: unreadable /
@@ -337,7 +195,15 @@ function docsForAudit(audit: AuditResult, cwd?: string): Doc[] {
       // ZERO evidence. The gate then refused each C verdict for "no evidence harvested",
       // blaming the adjudicator for a path bug. Grounding has always used `resolve` for the
       // same reason; these two must agree, since one harvests the anchors the other checks.
-      docs.push(parseSource(readText(cwd ? resolve(cwd, f) : f), f));
+      const doc = parseSource(readText(cwd ? resolve(cwd, f) : f), f);
+      // A page snapshot is a DIRECTORY of signals (computed styles, boxes, stylesheets, the
+      // screenshot), not a lone .html — and `parseSource` only reads the DOM. Without this
+      // call the harvest sees every captured page as inert markup, so a criterion decided on
+      // what the browser MEASURED (an image of text, a target's size, a sticky header over a
+      // focused element) arrived with nothing to rule on. `runAudit` has always attached them
+      // (src/audit.ts); the two must agree, since one harvests the anchors the other checks.
+      attachSignals(doc);
+      docs.push(doc);
     } catch {
       /* unreadable — skip, mirrors runAudit */
     }
@@ -345,14 +211,60 @@ function docsForAudit(audit: AuditResult, cwd?: string): Doc[] {
   return docs;
 }
 
-function blankItem(criteriaId: string, automatability: Automatability, title: string | undefined, harvested: Evidence[]): AdjudicationItem {
-  const evidence = harvested.slice(0, ADJUDICATE_MAX_EVIDENCE);
+/** Collapse harvested anchors to one representative per CONTENT CLASS, and record how big
+ *  the population really was.
+ *
+ *  The old shape was `harvested.slice(0, 30)` — a SAMPLE. A `C` over a sample is a claim
+ *  about a population nobody looked at, and the numbers were not close: measured on a real
+ *  audit, RGAA 11.1 was ruled on 30 of 2652 anchors, none of them from a rendered page. But
+ *  the population is only large when counted as occurrences. 887 links across 38 captured
+ *  pages are 97 distinct (text, href) pairs; 47 images are 8 distinct (alt, src) pairs. One
+ *  representative per class, with its occurrence count, is therefore the WHOLE population,
+ *  said once per distinct thing — which is what makes an honest `C` reachable at all. */
+function collapse(harvested: Harvested[]): { evidence: Evidence[]; population: EvidencePopulation; complete: boolean } {
+  const byClass = new Map<string, Harvested[]>();
+  for (const item of harvested) {
+    const g = byClass.get(item.cls);
+    if (g) g.push(item);
+    else byClass.set(item.cls, [item]);
+  }
+  const groups = [...byClass.values()];
+  const evidence = groups.slice(0, ADJUDICATE_MAX_EVIDENCE_CLASSES).map((group) => {
+    // Prefer a RENDERED anchor as the representative: it proves what the browser actually
+    // produced, and it is intrinsically page-scoped. The source anchor that produced it is
+    // not lost — it travels in `alsoAt`, which is what someone editing the fix needs.
+    const rep = group.find((x) => isSnapshotFile(x.ev.file)) ?? group[0]!;
+    const others = group.filter((x) => x !== rep);
+    const pages = [...new Set(group.map((x) => pageOfDoc(x.ev.file)).filter((x): x is string => x !== undefined))];
+    return {
+      ...rep.ev,
+      ...(group.length > 1 ? { occurrences: group.length } : {}),
+      ...(others.length ? { alsoAt: others.slice(0, ALSO_AT_MAX).map((x) => `${x.ev.file}:${x.ev.line}`) } : {}),
+      ...(pages.length ? { pages } : {}),
+    };
+  });
+  return {
+    evidence,
+    population: {
+      classes: groups.length,
+      occurrences: harvested.length,
+      files: new Set(harvested.map((x) => x.ev.file)).size,
+      pages: new Set(harvested.map((x) => pageOfDoc(x.ev.file)).filter((x) => x !== undefined)).size,
+    },
+    complete: groups.length <= ADJUDICATE_MAX_EVIDENCE_CLASSES,
+  };
+}
+
+function blankItem(criteriaId: string, automatability: Automatability, title: string | undefined, harvested: Harvested[]): AdjudicationItem {
+  const { evidence, population, complete } = collapse(harvested);
   return {
     criteriaId,
     automatability,
     ...(title ? { title } : {}),
     evidence,
-    ...(harvested.length > ADJUDICATE_MAX_EVIDENCE ? { evidenceTruncated: { shown: evidence.length, total: harvested.length } } : {}),
+    population,
+    evidenceComplete: complete,
+    ...(complete ? {} : { evidenceTruncated: { shown: evidence.length, total: population.classes } }),
     verdict: null,
     justification: "",
     reason: null,
@@ -362,22 +274,22 @@ function blankItem(criteriaId: string, automatability: Automatability, title: st
   };
 }
 
-/** Evidence for a PACK criterion: the union of the harvesters of every success criterion it
- *  maps onto, de-duplicated. A pack criterion is finer than a WCAG SC (1.1.1 fans out to 19
- *  RGAA criteria), so the same element would otherwise be listed once per mapped SC. */
-function packEvidence(scs: string[], docs: Doc[]): Evidence[] {
-  const out: Evidence[] = [];
-  const seen = new Set<string>();
-  for (const sc of scs) {
-    for (const e of HARVESTERS[sc]?.(docs) ?? []) {
-      const key = `${e.file}:${e.line}:${e.selector}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(e);
-    }
-  }
+/** The subjects that decide a success criterion. Empty ⇒ the criterion has none declared,
+ *  which `tests/harvest-coverage.test.ts` refuses for any criterion the engine hands over. */
+const subjectsForSc = (sc: string): string[] => SC_SUBJECTS[sc] ?? [];
+
+/** The subjects that decide a PACK criterion: its own when it declares them, else the union
+ *  of its mapped success criteria's. The override is what stops RGAA 11.1 (are the fields
+ *  labelled?) from being handed the page's heading outline because 1.3.1 happens to come
+ *  first in its `wcag` list. */
+function subjectsForPackCriterion(standard: StandardId, id: string, scs: string[]): string[] {
+  const own = PACK_SUBJECTS[standard]?.[id];
+  if (own) return own;
+  const out: string[] = [];
+  for (const sc of scs) for (const subject of subjectsForSc(sc)) if (!out.includes(subject)) out.push(subject);
   return out;
 }
+
 
 /** Build the adjudication worklist.
  *
@@ -404,12 +316,12 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
         // core (RGAA 8.1 → the removed 4.1.1) is still the agent's to decide from source.
         const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a): a is Automatability => !!a);
         const automatability: Automatability = autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
-        return blankItem(pc.id, automatability, crit ? packTitlePlain(pack, crit, "fr") : undefined, packEvidence(scs, docs));
+        return blankItem(pc.id, automatability, crit ? packTitlePlain(pack, crit, "fr") : undefined, harvestSubjects(subjectsForPackCriterion(standard, pc.id, scs), docs));
       });
   }
 
   return audit.residualRisks.map((r: ResidualRisk) =>
-    blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? undefined, HARVESTERS[r.criteriaId]?.(docs) ?? []),
+    blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? undefined, harvestSubjects(subjectsForSc(r.criteriaId), docs)),
   );
 }
 
@@ -619,6 +531,16 @@ export function applyAdjudication(
       // check was "the justification is a non-empty string", so `"x"` cleared a criterion —
       // and a model answering C to everything published a conformance nobody had assessed.
       const cites = it.citations ?? [];
+      // An INCOMPLETE reading may report a failure it saw; it may never clear what it never
+      // looked at. Before class-based harvesting the evidence was a 30-anchor sample of a
+      // population that ran to thousands, so a `C` was routinely a conformity claim over
+      // elements nobody had been shown. Clearing is the direction that needs the whole set.
+      if (v === "C" && it.evidenceComplete === false) {
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: a C verdict needs the COMPLETE evidence set, and this criterion's harvest was capped at ${it.evidence.length} of ${it.population?.classes ?? "?"} content classes — record "manual", or "NC" if what you did see fails`,
+        );
+      }
       if (it.evidence.length === 0) {
         // Nothing was harvested for this criterion, so there is nothing the agent could have
         // read to clear it. `NA` is still legitimate (the honest "no element in scope is
@@ -639,7 +561,17 @@ export function applyAdjudication(
         // Each citation must name evidence THIS item carried. Grounding alone would only
         // prove the anchor exists somewhere in the tree; the pairing proves the agent ruled
         // on what it was actually given.
-        const anchors = new Set(it.evidence.map((e) => `${e.file}:${e.line}`));
+        // The anchor set is every occurrence of a class this criterion carries — the
+        // representative AND its siblings — not the representatives alone.
+        //
+        // The check proves "you ruled on what you were given". Matching only representatives
+        // proved something narrower and wrong: a class holds one anchor per rendered page, an
+        // agent with file access naturally cites the occurrence it opened, and the gate then
+        // called a real, grounded `file:line` fabricated. Measured on a real run, that is
+        // exactly how RGAA 5.8, 9.2 and 11.1 were refused. Membership was the defect;
+        // grounding — which proves the citation resolves against real source — is unchanged
+        // and still runs on every one of them.
+        const anchors = new Set(it.evidence.flatMap((e) => [`${e.file}:${e.line}`, ...(e.alsoAt ?? [])]));
         for (const c of cites) {
           if (!anchors.has(`${c.file}:${c.line}`)) {
             blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c.file}:${c.line} is not among this criterion's harvested evidence (fabricated?)`);
@@ -888,6 +820,11 @@ const T = {
     rule: "> Ne signalez une NC que si un test précis du référentiel actif échoue — citez-le (`normativeRef`). Une bonne pratique sans test normatif est une recommandation (`recommendations[]`, non normative). Une simple préoccupation UX n'est ni l'un ni l'autre.\n>\n> Symétriquement, un `C` se cite comme une NC : il faut nommer dans `citations[]` les évidences levées. **Un critère présenté sans aucune évidence ne peut pas être `C`** — c'est `manual` (`undecidable`), ou `NA` si rien n'est concerné.",
     then: "Puis : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (échoue si un verdict manque sa justification, ses citations, son finding ou sa raison).",
     evidence: "Évidences",
+    classes: "classes de contenu distinctes",
+    occurrences: "occurrences",
+    pagesWord: "page(s)",
+    on: "sur",
+    incomplete: "LECTURE INCOMPLÈTE — un « C » sera refusé sur ce critère",
     none: "(aucune évidence automatique — décidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "À vérifier manuellement",
     decide: "Règle de décision",
@@ -912,6 +849,11 @@ const T = {
     rule: "> Report NC only if a precise test of the active standard fails — cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative). A purely UX concern is neither.\n>\n> A `C` is cited the same way an NC is: name the evidence you cleared in `citations[]`. **A criterion presented with no evidence at all cannot be `C`** — record `manual` (`undecidable`), or `NA` if nothing in scope is concerned.",
     then: "Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (fails if any verdict lacks its justification, citations, finding or reason).",
     evidence: "Evidence",
+    classes: "distinct content classes",
+    occurrences: "occurrences",
+    pagesWord: "page(s)",
+    on: "on",
+    incomplete: "INCOMPLETE READING — a C will be refused on this criterion",
     none: "(no automatic evidence — decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
     decide: "Decision rule",
@@ -1045,10 +987,22 @@ export function formatAdjudication(items: AdjudicationItem[], lang: Lang = "en",
   if (pack && opts.preamble !== false) out.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
     out.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` — ${it.title}` : ""}  _(${it.automatability})_`);
-    out.push("", `> ${s.evidence} (${it.evidence.length}${it.evidenceTruncated ? ` / ${it.evidenceTruncated.total}` : ""}):`, "");
+    const pop = it.population;
+    const popNote = pop
+      ? ` — ${pop.classes} ${s.classes}, ${pop.occurrences} ${s.occurrences}${pop.pages ? `, ${pop.pages} ${s.pagesWord}` : ""}${it.evidenceComplete === false ? ` ⚠ ${s.incomplete}` : ""}`
+      : "";
+    out.push("", `> ${s.evidence} (${it.evidence.length}${it.evidenceTruncated ? ` / ${it.evidenceTruncated.total}` : ""})${popNote}:`, "");
     if (!it.evidence.length) out.push(s.none, "");
     else {
-      for (const e of it.evidence) out.push(`- \`${e.file}:${e.line}\` (\`${e.selector}\`)${e.note ? ` — ${e.note}` : ""}`);
+      for (const e of it.evidence) {
+        const extra = [
+          e.occurrences && e.occurrences > 1 ? `×${e.occurrences}` : "",
+          e.pages?.length ? `${s.on} ${e.pages.slice(0, 4).join(", ")}${e.pages.length > 4 ? "…" : ""}` : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        out.push(`- \`${e.file}:${e.line}\` (\`${e.selector}\`)${extra ? ` [${extra}]` : ""}${e.note ? ` — ${e.note}` : ""}`);
+      }
       out.push("");
     }
     const protocol = ADJUDICATION[it.criteriaId];
@@ -1158,6 +1112,8 @@ export function writeAdjudication(
 export function slimAdjudicationItems(items: AdjudicationItem[]): AdjudicationItem[] {
   return items.map((it) => {
     const { evidence: _evidence, evidenceTruncated: _truncated, ...rest } = it;
+    // `population` and `evidenceComplete` are kept: they are two numbers, not bulk, and they
+    // tell the adjudicator how much of the subject it is actually looking at.
     return { ...rest, evidence: [] } as AdjudicationItem;
   });
 }
@@ -1180,5 +1136,10 @@ export function hydrateAdjudication(adj: AdjudicationFile, audit: AuditResult, o
     if (!full) continue;
     it.evidence = full.evidence;
     if (full.evidenceTruncated) it.evidenceTruncated = full.evidenceTruncated;
+    // The completeness facts travel with the evidence: the `C` gate reads `evidenceComplete`,
+    // and leaving it undefined on a re-hydrated item would let an incomplete reading clear a
+    // criterion through the slim path that the inline path refuses.
+    if (full.population) it.population = full.population;
+    it.evidenceComplete = full.evidenceComplete;
   }
 }

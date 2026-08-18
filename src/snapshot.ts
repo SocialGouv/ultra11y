@@ -54,6 +54,12 @@ export interface SnapshotMeta {
   viewport?: SnapshotViewport;
   capturedAt?: string; // ISO timestamp SUPPLIED by the producer — never invented here
   runner?: string; // "playwright" | "cypress" | "dev" | "scan"
+  /** The document's doctype declaration, verbatim. Recorded separately because `dom.html` is
+   *  `documentElement.outerHTML`, which does not contain it — so without this field the
+   *  criterion that asks about the doctype has no evidence at all. Empty string = the page
+   *  genuinely had none; absent = this capture predates the field. Those are NOT the same
+   *  claim, and the adjudication harvest keeps them apart. */
+  doctype?: string;
   // Repo source files that rendered this page, when the producer can attribute them
   // (a Next route file, the components a test imported). Drives per-page attribution of
   // SOURCE findings — see src/pages.ts.
@@ -385,6 +391,7 @@ export function attachSignals(doc: Doc): void {
   const boxes = readJson<BoxDigest>(join(dir, "boxes.json"));
   const axtree = readJson<AxNode>(join(dir, "axtree.json"));
   const css = readJson<CssDigest>(join(dir, "css.json"));
+  const meta = readJson<{ doctype?: string }>(join(dir, "meta.json"));
   const shot = join(dir, "screen.png");
 
   const alignedStyleMap = styles ? align(doc, styles.entries) : null;
@@ -398,6 +405,7 @@ export function attachSignals(doc: Doc): void {
     // Not element-indexed, so it needs no alignment — it is a property of the stylesheet.
     ...(css ? { css } : {}),
     ...(existsSync(shot) ? { screenshot: shot } : {}),
+    ...(meta?.doctype !== undefined ? { doctype: meta.doctype } : {}),
     ...(truncated ? { truncated } : {}),
   };
   if (Object.keys(signals).length) doc.signals = signals;
