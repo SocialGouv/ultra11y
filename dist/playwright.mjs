@@ -154,7 +154,22 @@ const __vis = (e) => {
 };
 const __html = (e) => (e.outerHTML || '').slice(0, 160);
 `;
-var PROBE_DEFAULTS = { reflowWidth: 320, maxFocusables: 120, maxHits: 20 };
+var PROBE_DEFAULTS = {
+  reflowWidth: 320,
+  maxFocusables: 120,
+  maxHits: 20,
+  maxTriggers: 60,
+  actionTimeoutMs: 1e3,
+  budgetMs: 2e4
+};
+function probeDeadline(budgetMs, now = Date.now) {
+  const end = now() + budgetMs;
+  return { out: () => now() >= end, left: () => Math.max(0, end - now()) };
+}
+function actionTimeout(limits, deadline) {
+  const left = deadline ? deadline.left() : limits.actionTimeoutMs;
+  return Math.max(1, Math.min(limits.actionTimeoutMs, left || limits.actionTimeoutMs));
+}
 var REFLOW_PROBE = `(() => {
   const el = document.scrollingElement || document.documentElement;
   return { horizontalScroll: el.scrollWidth > el.clientWidth + 2 };
@@ -267,13 +282,14 @@ function hoverVisibleExpr(id, wantHidden = false) {
   const j = JSON.stringify(id);
   return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
 }
-async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS) {
+async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
   const count = await page.evaluate(focusSetupExpr(scope, limits.maxFocusables));
   if (!count) return [];
   const hits = [];
   const seen = /* @__PURE__ */ new Set();
   const limit = Math.min(count + 2, limits.maxFocusables + 10);
   for (let i = 0; i < limit; i++) {
+    if (deadline?.out()) break;
     await page.keyboard.press("Tab");
     const r = await page.evaluate(FOCUS_CHECK_PROBE);
     if (!r) continue;
@@ -290,12 +306,13 @@ async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS) {
   }
   return hits;
 }
-async function probeHover(page, limits = PROBE_DEFAULTS) {
+async function probeHover(page, limits = PROBE_DEFAULTS, deadline) {
   const triggers = await page.evaluate(HOVER_SETUP_PROBE);
   const hits = [];
-  for (const tr of triggers) {
+  for (const tr of triggers.slice(0, Math.max(1, limits.maxTriggers))) {
+    if (deadline?.out()) break;
     try {
-      await page.hover(`[data-u11y-h="${tr.key}"]`);
+      await page.hover(`[data-u11y-h="${tr.key}"]`, { timeout: actionTimeout(limits, deadline) });
     } catch {
       continue;
     }
@@ -322,6 +339,7 @@ async function runLiveProbes(page, opts = {}) {
   const limits = { ...PROBE_DEFAULTS, ...opts.limits };
   const only = opts.only?.length ? new Set(opts.only) : null;
   const want = (id) => only === null || only.has(id);
+  const deadline = probeDeadline(limits.budgetMs);
   const canResize = typeof page.setViewportSize === "function" && typeof page.viewportSize === "function";
   const canType = !!page.keyboard && typeof page.keyboard.press === "function";
   const canHover = typeof page.hover === "function" && typeof page.waitForTimeout === "function";
@@ -332,45 +350,53 @@ async function runLiveProbes(page, opts = {}) {
   const skip = (sc, why) => {
     out.skipped?.push({ sc, why });
   };
+  const bounded = async (sc, run) => {
+    if (deadline.out()) {
+      skip(sc, `the probe budget of ${limits.budgetMs}ms was already spent when this criterion came up`);
+      return null;
+    }
+    let timer;
+    const CUT = /* @__PURE__ */ Symbol("cut");
+    const started = Date.now();
+    try {
+      const raced = await Promise.race([
+        run().catch((e) => {
+          throw e;
+        }),
+        new Promise((resolve) => {
+          timer = setTimeout(() => resolve(CUT), Math.max(1, deadline.left()));
+        })
+      ]);
+      if (raced === CUT) {
+        skip(sc, `the probe budget of ${limits.budgetMs}ms ran out after ${Date.now() - started}ms \u2014 this measurement did not complete`);
+        return null;
+      }
+      return raced;
+    } catch (e) {
+      skip(sc, String(e?.message ?? e).slice(0, 160));
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
   if (!canResize) skip("1.4.10", "the page object cannot resize its viewport");
   if (!canType) skip("2.4.7", "the page object exposes no keyboard");
   if (!canHover) skip("1.4.13", "the page object cannot hover");
   if (!canStyle) skip("1.4.12", "the page object cannot inject a stylesheet");
-  if (want("2.4.7") && canType) {
-    const r = await probeFocusVisible(page, "", limits).catch((e) => {
-      skip("2.4.7", String(e?.message ?? e).slice(0, 160));
-      return null;
-    });
-    if (r) {
-      out.focusVisible = r;
-      out.probed.push("2.4.7");
-    }
-  }
-  if (want("1.4.13") && canHover && canType) {
-    const r = await probeHover(page, limits).catch((e) => {
-      skip("1.4.13", String(e?.message ?? e).slice(0, 160));
-      return null;
-    });
-    if (r) {
-      out.hover = r;
-      out.probed.push("1.4.13");
-    }
-  }
   if (want("1.4.4")) {
-    out.reflowZoom = await page.evaluate(REFLOW_ZOOM_PROBE).catch(() => []) ?? [];
-    out.probed.push("1.4.4");
+    const r = await bounded("1.4.4", async () => await page.evaluate(REFLOW_ZOOM_PROBE));
+    if (r) {
+      out.reflowZoom = r ?? [];
+      out.probed.push("1.4.4");
+    }
   }
   if (want("1.4.10") && canResize) {
-    let narrowed = true;
-    await page.setViewportSize({ width: limits.reflowWidth, height: restore.height }).catch((e) => {
-      narrowed = false;
-      skip("1.4.10", String(e?.message ?? e).slice(0, 160));
+    const narrowed = await bounded("1.4.10", async () => {
+      await page.setViewportSize({ width: limits.reflowWidth, height: restore.height });
+      return true;
     });
     if (narrowed) {
-      const r = await page.evaluate(REFLOW_PROBE).catch((e) => {
-        skip("1.4.10", String(e?.message ?? e).slice(0, 160));
-        return null;
-      });
+      const r = await bounded("1.4.10", async () => await page.evaluate(REFLOW_PROBE));
       await page.setViewportSize(restore).catch(() => {
       });
       if (r) {
@@ -380,21 +406,29 @@ async function runLiveProbes(page, opts = {}) {
     }
   }
   if (want("1.4.12") && canStyle) {
-    const handle = await page.addStyleTag({ content: TEXT_SPACING_CSS }).catch((e) => {
-      skip("1.4.12", String(e?.message ?? e).slice(0, 160));
-      return null;
-    });
+    const handle = await bounded("1.4.12", () => page.addStyleTag({ content: TEXT_SPACING_CSS }));
     if (handle) {
-      const r = await page.evaluate(TEXT_SPACING_PROBE).catch((e) => {
-        skip("1.4.12", String(e?.message ?? e).slice(0, 160));
-        return null;
-      });
+      const r = await bounded("1.4.12", async () => await page.evaluate(TEXT_SPACING_PROBE));
       await page.evaluate(REMOVE_TEXT_SPACING_STEP).catch(() => {
       });
       if (r) {
         out.textSpacing = r;
         out.probed.push("1.4.12");
       }
+    }
+  }
+  if (want("2.4.7") && canType) {
+    const r = await bounded("2.4.7", () => probeFocusVisible(page, "", limits, deadline));
+    if (r) {
+      out.focusVisible = r;
+      out.probed.push("2.4.7");
+    }
+  }
+  if (want("1.4.13") && canHover && canType) {
+    const r = await bounded("1.4.13", () => probeHover(page, limits, deadline));
+    if (r) {
+      out.hover = r;
+      out.probed.push("1.4.13");
     }
   }
   return out;
@@ -610,6 +644,9 @@ function sweepTarget(url) {
     return url;
   }
 }
+function sweepCheckOptions(check) {
+  return { failOn: false, probes: true, ...check };
+}
 function sweepSample(opts = {}) {
   const pages = samplePagesFor(opts);
   const t = test;
@@ -628,8 +665,7 @@ function sweepSample(opts = {}) {
         `${target} answered HTTP ${status} \u2014 an error page at the requested address; nothing to record as "${p.name}"`
       );
       await checkA11y(page, {
-        failOn: false,
-        ...opts.check,
+        ...sweepCheckOptions(opts.check),
         as: p.id,
         name: p.name,
         ...p.auth !== void 0 ? { auth: p.auth } : {},
@@ -643,6 +679,7 @@ function sweepSample(opts = {}) {
 export {
   checkA11y,
   samplePagesFor,
+  sweepCheckOptions,
   sweepSample,
   sweepTarget,
   test

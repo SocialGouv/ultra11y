@@ -515,6 +515,11 @@ export interface AuditResult {
     // merges. Drives the partial-audit advisory (src/report.ts untestedNeedsRendering) so
     // the banner never claims a probe ran when it did not. Optional/additive.
     scan?: { testedScs: string[] };
+    /** Subject ids that harvested at least one anchor anywhere in scope, sorted. The audit
+     *  reads files in a stream and never holds them all, so absence is folded here once and
+     *  then READ by every projection — the pack derivation above all, since a country
+     *  standard is where a reader actually counts rows. See EXISTENCE_SUBJECTS. */
+    subjectsSeen?: string[];
     // Sample pages a `scan --sample` REFUSED to record, and why. They are deliberately absent
     // from `sample` above — a page kept there would be re-added to the per-page grid with the
     // same basis as one really visited, so the deliverable would claim a page nobody looked

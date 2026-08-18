@@ -14,6 +14,7 @@ import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir,
 import { isFullDocument } from "./rules/rule.js";
 import { renderedRulesFor, renderedRulesRan, renderedTestedScs } from "./rules/rendered.js";
 import { PROBE_SEVERITY, PROBE_WCAG } from "./axe-map.js";
+import { subjectsAbsent, subjectsForSc, subjectsPresentIn } from "./adjudicate-subjects.js";
 import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
 import { listPacks } from "./standards/registry.js";
@@ -283,6 +284,35 @@ function residualReason(automatability: string, sc?: string): string {
 
 /** Why a non-static criterion is NA — the observation, so a reader can falsify it. Scope-bound
  *  by construction (`n` files audited), which is exactly the claim being made. */
+/** What the harvest looked for and did not find — stated so a reader can falsify it, which is
+ *  the whole contract of an NA. Names the criterion, the constructs searched for, and how wide
+ *  the search was. */
+const SUBJECT_NOUNS: Record<string, string> = {
+  images: "no image element (<img>, <svg>, <picture>, <object>, <input type=image> or role=img)",
+  tables: "no <table>, and no element with a table role",
+  lists: "no list (<ul>, <ol>, <dl> or a list role)",
+  links: "no link",
+  controls: "no form control (native, ARIA or contenteditable)",
+  autocomplete: "no field carrying user information that autocomplete applies to",
+  errors: "no error message and no field marked invalid",
+  nameVsAccName: "no control whose visible text and accessible name could differ",
+  focusables: "no focusable element",
+  focusOrder: "no element taking part in the focus order",
+  pointerHandlers: "no pointer, touch, gesture or drag handler",
+  shortcuts: "no keyboard shortcut and no accesskey",
+  sensoryText: "no instruction relying on shape, position, size or sound",
+  timers: "no time limit, timer or auto-refresh",
+  motion: "no moving, blinking, auto-updating or media content",
+  contextChange: "no control that changes context on its own",
+  downloadDocs: "no downloadable document",
+  stickies: "no fixed or sticky positioned element",
+};
+
+export function subjectAbsenceReason(criterionId: string, subjects: string[], files: number): string {
+  const nouns = subjects.map((id) => SUBJECT_NOUNS[id] ?? `no element for "${id}"`);
+  return `Nothing in scope is concerned by ${criterionId}: across the ${files} file(s) audited there is ${nouns.join(", and ")}. « Not applicable » is a verdict about the SUBJECT of the criterion — it never says the criterion is met, and one element of this kind anywhere in scope reopens it.`;
+}
+
 function subjectMatterReason(sc: string, files: number): string {
   const scope = `nothing in the ${files} file(s) audited is concerned`;
   if (sc.startsWith("1.2."))
@@ -337,6 +367,10 @@ interface Accum {
   // 320px viewport, injected spacing, Tab, hover), not from a digest — and because a probe
   // that did not run must never be read as a probe that found nothing.
   probedScs: Map<string, Set<string>>;
+  // Subject ids that harvested at least one anchor ANYWHERE in scope — the OR fold behind
+  // « nothing of this kind exists here ». See EXISTENCE_SUBJECTS for what may be concluded
+  // from a subject's silence, and what may not.
+  subjectsSeen: Set<string>;
 }
 
 // Precompute the static success criteria + their applicability predicates once.
@@ -368,6 +402,7 @@ function newAccum(): Accum {
     pageIds: new Set(),
     renderedRan: new Map(),
     probedScs: new Map(),
+    subjectsSeen: new Set(),
   };
 }
 
@@ -432,6 +467,13 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
   for (const [id, pred] of SUBJECT_PREDS) {
     if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
   }
+  // The same OR fold, one level down: which SUBJECTS this document carries an anchor for. The
+  // adjudication harvest already declares, per criterion, exactly which elements decide it —
+  // so a criterion whose every subject came back empty across the whole scope had nothing to
+  // look at, which is « non applicable » and not « à évaluer ». Only subjects whose emptiness
+  // PROVES absence take part (EXISTENCE_SUBJECTS); a subject already seen is never evaluated
+  // again, so this costs almost nothing after the first few documents.
+  for (const id of subjectsPresentIn(doc, acc.subjectsSeen)) acc.subjectsSeen.add(id);
   // A page snapshot just let the rendered tier MEASURE some criteria, offline and with no
   // browser. Record which, so the report stops claiming they were never tested.
   if (doc.signals) for (const sc of renderedTestedScs(doc.signals)) acc.renderedScs.add(sc);
@@ -636,6 +678,23 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       // assess ». Never a `C`: this says the criterion does not apply, never that it is met.
       status = "NA";
       justification = subjectMatterReason(c.sc, acc.fileCount);
+    } else if (SUBJECT_MATTER[c.sc] === undefined && acc.fileCount > 0 && subjectsAbsent(subjectsForSc(c.sc), acc.subjectsSeen)) {
+      // Every element this criterion is ABOUT is absent from the whole scope. Same verdict as
+      // the branch above and the same three guardrails; what differs is where the question
+      // came from — the adjudication harvest, which states per criterion what decides it,
+      // rather than a predicate written per criterion here. `fileCount > 0` because a run that
+      // read no file has proved nothing about anything.
+      //
+      // ONE CRITERION, ONE AUTHORITY. Where a hand-written predicate exists it wins outright,
+      // even when it says "applicable" and the harvest says "absent" — it was written for that
+      // criterion, it resolves uncertainty towards applicable on purpose, and it knows things a
+      // generic subject does not: that a stray <track>, an <object> of unknown type or a
+      // mention of `devicemotion` in a script all keep their family open. A harvest subject
+      // aimed at collecting EVIDENCE is not the same instrument as a predicate aimed at
+      // deciding APPLICABILITY, and letting the coarser one overrule the finer would trade a
+      // careful "still applicable" for a careless NA.
+      status = "NA";
+      justification = subjectAbsenceReason(c.sc, subjectsForSc(c.sc), acc.fileCount);
     } else if (c.automatability === "needs-rendering" && renderedProves(c.sc, acc)) {
       // The rendered tier measured it, on every page, and found nothing. That is a verdict.
       status = "C";
@@ -694,6 +753,10 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       // were measured. Omitted when no snapshot carried usable signals, so a source-only audit
       // is byte-for-byte unchanged and still says the rendering criteria are untested.
       ...(acc.renderedScs.size ? { scan: { testedScs: [...acc.renderedScs].sort() } } : {}),
+      // Stamped even when empty is NOT the same as absent: `[]` says the fold ran and found
+      // nothing, `undefined` says this audit predates the fold. A pack derivation must be
+      // able to tell those apart before concluding NA from silence.
+      ...(acc.fileCount > 0 ? { subjectsSeen: [...acc.subjectsSeen].sort() } : {}),
       // The pages this run genuinely read. Written UNCONDITIONALLY — `[]` is the whole point,
       // because "this audit read no page" is exactly the claim a source-only run needs to make,
       // and an omit-when-empty field would say nothing precisely then. See scope.pagesAudited.

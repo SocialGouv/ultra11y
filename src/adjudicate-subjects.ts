@@ -871,6 +871,93 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
   },
 };
 
+// ---- WHOSE EMPTINESS PROVES ABSENCE ------------------------------------------------------
+//
+// A subject that harvested nothing across the whole scope means one of two very different
+// things, and the whole value of this table is telling them apart.
+//
+//   « No <table> anywhere in what was audited » is a FACT ABOUT THE CODE. Every RGAA theme-5
+//   criterion then has nothing to answer, and « non applicable » is the normative verdict —
+//   not « à évaluer », which claims only that nobody has looked yet.
+//
+//   « No heading outline harvested » is a fact about the SCOPE: it usually means no full
+//   document was parsed. Concluding NA from it would clear a criterion nobody measured.
+//
+// Worse than useless, some absences are the non-conformity itself. `langParts` harvests
+// marked-up language changes; a page that fails RGAA 8.7 has exactly zero of them.
+// `liveRegions` harvests status containers; a status message nobody marked up is what 4.1.3
+// exists to catch. Those must never read as "not applicable", so they are not here.
+//
+// The rule for adding one: could a page that FAILS this criterion harvest nothing? If yes, it
+// does not belong. Uncertainty resolves towards applicable — the same direction the
+// applicability predicates in src/audit.ts resolve, and for the same reason: a wrong NA is a
+// non-conformity hidden inside a report someone signs, while a needless « à évaluer » only
+// costs somebody the work of writing "nothing here".
+//
+// In practice that rule admits exactly one kind of subject: the ones that collect an ELEMENT
+// SPECIES by tag or role. "No <table> in this markup" is a fact; a reader can check it. The
+// subjects built on a vocabulary — `sensoryText` matches « ci-dessous » and « to the right »,
+// `shortcuts` matches a single-character key comparison, `timers` matches `setTimeout` — are
+// heuristics aimed at SURFACING candidates, and their silence is precisely what a page that
+// fails the criterion looks like: an instruction saying « cliquez sur l'icône en forme de
+// loupe » matches no word on the list. Those stay out, however tempting the criteria they
+// would close.
+//
+// Several are also simply redundant: 1.2.x, 1.3.5, 2.1.4, 2.2.x, 2.3.1 and 2.5.x already have
+// hand-written applicability predicates in src/audit.ts, which are more careful than any
+// subject here and which win outright where they exist. The pack criteria that map onto them
+// inherit the NA through the derivation, so nothing is lost by leaving them out.
+export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set(["images", "tables", "lists", "links", "controls", "autocomplete", "errors"]);
+
+/** The subjects that decide a success criterion. Empty ⇒ the criterion has none declared,
+ *  which `tests/harvest-coverage.test.ts` refuses for any criterion the engine hands over. */
+export const subjectsForSc = (sc: string): string[] => SC_SUBJECTS[sc] ?? [];
+
+/** The subjects that decide a PACK criterion: its own when it declares them, else the union
+ *  of its mapped success criteria's. The override is what stops RGAA 11.1 (are the fields
+ *  labelled?) from being handed the page's heading outline because 1.3.1 happens to come
+ *  first in its `wcag` list. */
+export function subjectsForPackCriterion(standard: string, id: string, scs: string[]): string[] {
+  const own = PACK_SUBJECTS[standard]?.[id];
+  if (own) return own;
+  const out: string[] = [];
+  for (const sc of scs) for (const subject of subjectsForSc(sc)) if (!out.includes(subject)) out.push(subject);
+  return out;
+}
+
+/** Did EVERY subject of this criterion look, across the whole scope, and find nothing — and is
+ *  every one of them a subject whose emptiness proves absence?
+ *
+ *  `seen` is the set of subject ids that harvested at least one anchor anywhere in the audited
+ *  scope, so this is an AND over the criterion's subjects and an OR over the scope. A criterion
+ *  with no declared subject answers false: nothing was looked for, so nothing was proved. */
+export function subjectsAbsent(ids: string[], seen: ReadonlySet<string>): boolean {
+  if (!ids.length) return false;
+  return ids.every((id) => EXISTENCE_SUBJECTS.has(id) && !seen.has(id));
+}
+
+/** Which subjects a document carries at least one anchor for. Used to fold absence across a
+ *  scope one document at a time — the audit reads files in a stream and never holds them all,
+ *  so the accounting has to be a growing set of subject ids rather than a list of anchors.
+ *
+ *  `skip` is what keeps this cheap: a subject already seen is never evaluated again, so after
+ *  the first few documents this costs almost nothing. */
+export function subjectsPresentIn(doc: Doc, skip: ReadonlySet<string>): string[] {
+  const out: string[] = [];
+  for (const id of EXISTENCE_SUBJECTS) {
+    if (skip.has(id)) continue;
+    const run = SUBJECTS[id];
+    if (!run) continue;
+    try {
+      if (run([doc]).length) out.push(id);
+    } catch {
+      // A subject that throws on an odd document has looked and found nothing here; the next
+      // document still gets its chance. It must never take the audit down with it.
+    }
+  }
+  return out;
+}
+
 /** The union of the named subjects, de-duplicated by anchor. Order is the subject order, so a
  *  criterion's own subject always comes before anything it merely inherits. */
 export function harvestSubjects(ids: string[], docs: Doc[]): Harvested[] {

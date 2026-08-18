@@ -142,7 +142,18 @@ describe("the work that is NOT a non-conformity is still shown", () => {
   it("report §5 names each criterion's own numbered tests", () => {
     const md = renderPackReport(r(), loadPack("rgaa"), "fr");
     expect(md).toMatch(/tests à trancher/);
-    expect(md).toMatch(/`11\.2\.1`/);
+    // 6.1 — the page carries a link, so its purpose is genuinely still to rule on.
+    expect(md).toMatch(/`6\.1\.1`/);
+  });
+
+  it("does NOT list a criterion whose subject the page does not contain", () => {
+    // The other half of the same job, and the one that decides whether a backlog is read. This
+    // page has no form control, so RGAA theme 11 has nothing to rule on — listing it is not
+    // thoroughness, it is thirteen rows of work that does not exist. « Non applicable » is the
+    // normative verdict for a criterion with no subject, and it keeps the backlog honest.
+    const md = renderPackReport(r(), loadPack("rgaa"), "fr");
+    const toRule = md.slice(md.indexOf("tests à trancher"));
+    expect(toRule).not.toMatch(/`11\.2\.1`/);
   });
 
   it("report §5 points at the command that produces the full wording", () => {
@@ -152,7 +163,9 @@ describe("the work that is NOT a non-conformity is still shown", () => {
   it("the PRD lists them as work to rule on", () => {
     const doc = renderPrdDoc(r(), "fr", "rgaa");
     expect(doc).toMatch(/Critères à trancher \(\d+\)/);
-    expect(doc).toMatch(/RGAA 11\.2/);
+    expect(doc).toMatch(/RGAA 6\.1/);
+    // …and not the form theme, which this page has nothing for.
+    expect(doc).not.toMatch(/RGAA 11\.2\b/);
   });
 
   it("and says plainly that they are NOT non-conformities", () => {

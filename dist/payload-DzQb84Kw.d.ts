@@ -61,8 +61,27 @@ interface CheckOptions {
      *  and a suite should opt into that. Everything is restored before it returns, and the
      *  snapshot has already been collected, so what they measure cannot alter what was recorded.
      *  Pass an array to run only some of them (by criterion: "1.4.4", "1.4.10", "1.4.12",
-     *  "1.4.13", "2.4.7"). */
-    probes?: boolean | string[];
+     *  "1.4.13", "2.4.7"), or an object to also set the bounds — how wide the reflow probe
+     *  narrows to, how many focusables are worth tabbing through, how many hits are worth
+     *  recording. 320px is normative and stays the default; the other two are judgements about
+     *  YOUR pages, and a screen with 400 focusables should be able to say so rather than being
+     *  quietly cut off at 120. */
+    probes?: boolean | string[] | ProbeTuning;
+}
+/** The bounds a repository may put on the live probes. Stated once, here, because the same
+ *  list is read from `.ultra11yrc.json`, accepted at the call site and handed to the engine —
+ *  three copies of a field list is three chances for one of them to fall behind.
+ *
+ *  `budgetMs` and `actionTimeoutMs` are not tuning in the same sense as the others: they are
+ *  what stops a probe from spending SOMEBODY ELSE'S test timeout. See ProbeLimits. */
+interface ProbeTuning {
+    only?: string[];
+    reflowWidth?: number;
+    maxFocusables?: number;
+    maxHits?: number;
+    maxTriggers?: number;
+    actionTimeoutMs?: number;
+    budgetMs?: number;
 }
 
 export { type AuditLike as A, type CheckOptions as C, type FindingLike as F, type SnapshotPayload as S, slugify as s };

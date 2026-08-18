@@ -152,11 +152,15 @@ describe("an NA never replaces a real verdict", () => {
     for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).not.toBe("NA");
   });
 
-  it("leaves the criteria with no subject-matter predicate exactly as they were", () => {
-    // 1.3.1, 2.4.4, 4.1.2 and friends are about the whole document; nothing lets the engine
+  it("leaves the criteria about the whole document exactly as they were", () => {
+    // 1.3.1, 4.1.2, 1.4.3 and friends are about the document itself; nothing lets the engine
     // rule them out of scope, so they must still arrive as « to assess ».
     const r = audit(doc("<p>Text only.</p>"));
-    for (const sc of ["1.3.1", "2.4.4", "4.1.2", "1.4.3"]) expect(statusOf(r, sc), `SC ${sc}`).toBe("manual");
+    for (const sc of ["1.3.1", "4.1.2", "1.4.3"]) expect(statusOf(r, sc), `SC ${sc}`).toBe("manual");
+    // 2.4.4 is NOT one of them, and that is the point of the harvest-subject layer: link
+    // purpose is about LINKS, and a page with none has nothing to judge. It used to sit here
+    // because the engine had no way to ask "does this page contain a link at all?".
+    expect(statusOf(r, "2.4.4")).toBe("NA");
   });
 
   it("keeps every NA out of the automatic pass rate", () => {
@@ -213,9 +217,13 @@ describe("every criterion left to assess says why, and where its evidence comes 
   });
 
   it("says plainly when NO automated tier decides a criterion, instead of pointing at `scan`", () => {
-    for (const sc of ["1.4.5", "2.1.2", "2.3.1", "2.4.11"]) {
+    // 1.4.5 is no longer here: its subject is images, and this fixture has none, so it is now
+    // « non applicable » and carries no residual risk at all.
+    for (const sc of ["2.1.2", "2.3.1", "2.4.11"]) {
       expect(r.residualRisks.find((x) => x.criteriaId === sc)?.reason, `SC ${sc}`).toMatch(/no automated tier decides this/i);
     }
+    expect(r.residualRisks.some((x) => x.criteriaId === "1.4.5")).toBe(false);
+    expect(r.criteria.find((c) => c.id === "1.4.5")?.status).toBe("NA");
   });
 
   it("carries a runnable command wherever one would actually help", () => {

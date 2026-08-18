@@ -1,4 +1,4 @@
-import { C as CheckOptions, A as AuditLike } from './payload-D8dvqLcc.js';
+import { C as CheckOptions, A as AuditLike } from './payload-DzQb84Kw.js';
 
 interface PlaywrightPage {
     evaluate(script: string): Promise<unknown>;
@@ -106,6 +106,20 @@ declare function samplePagesFor(opts?: Pick<SweepOptions, "cwd" | "only">): Samp
  *  `scan`, which needs a real address); a Playwright test wants the path, so its `baseURL`
  *  applies. Anything unparseable is already a path. */
 declare function sweepTarget(url: string): string;
+/** The defaults every swept page is checked with, and the one seam a test can reach without
+ *  a Playwright runtime in the room.
+ *
+ *  `probes: true` is the default HERE and opt-in on `checkA11y`, and the asymmetry is the
+ *  point. `checkA11y` is called from a test that owns its page and may be asserting on focus
+ *  or hover a line later; a sweep exists for nothing but recording the sample, and the probes
+ *  are the only thing that can decide zoom, reflow, text spacing and content-on-hover on
+ *  screens a cold scanner never reaches. Measured on egapro: 15 of 20 pages came from a sweep
+ *  that never probed, and because conformity is an AND across every page in scope, those four
+ *  criteria stayed « à évaluer » for the whole audit — including on the five pages that HAD
+ *  been probed. Opt out with `check: { probes: false }`. */
+declare function sweepCheckOptions(check?: SweepOptions["check"]): SweepOptions["check"] & {
+    failOn: false | undefined;
+};
 declare function sweepSample(opts?: SweepOptions): void;
 
-export { AuditLike, CheckOptions, type PlaywrightCheckOptions, type SamplePageLike, type SweepOptions, checkA11y, samplePagesFor, sweepSample, sweepTarget, test };
+export { AuditLike, CheckOptions, type PlaywrightCheckOptions, type SamplePageLike, type SweepOptions, checkA11y, samplePagesFor, sweepCheckOptions, sweepSample, sweepTarget, test };

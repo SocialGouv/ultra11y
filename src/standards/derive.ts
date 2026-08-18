@@ -2,6 +2,7 @@
 // presentation-only WCAG view (former src/standard.ts). For each pack criterion, gather
 // the results of the WCAG SCs it maps to and fold them with the same NC-dominates rule.
 // Presentation-only: the canonical, gated verdict lives on the WCAG core.
+import { subjectsAbsent, subjectsForPackCriterion } from "../adjudicate-subjects.js";
 import type { AuditResult, CriterionResult, Status, Finding, Severity } from "../types.js";
 import { CORE_KEY, loadPack } from "./registry.js";
 import { knownScStatus } from "../wcag.js";
@@ -163,6 +164,23 @@ export function derivePackResults(audit: AuditResult, packKey: string): PackCrit
   // findings, keyed by the SC the rule declared.
   const myPackFindings = (audit.packFindings ?? []).filter((f) => f.ruleId.startsWith(`pack:${packKey}:`));
   const overrides = pack.overrides;
+  // « Nothing of this kind exists here », asked of the PACK's own criterion rather than of the
+  // success criteria it maps to.
+  //
+  // This layer has to exist separately from the WCAG one because a pack criterion is usually
+  // narrower than its mapping: RGAA theme 5 is tables end to end, and it maps onto WCAG 1.3.1,
+  // which is about structure in general and stays wide open on a page with no table. Deriving
+  // from the SC alone can therefore never close a theme that has nothing to answer — and the
+  // country standard is exactly where a reader counts rows, so it is where the noise costs
+  // most. Measured on a real audit: 96 of 106 RGAA criteria « à évaluer », whole themes among
+  // them applicable to nothing in scope.
+  //
+  // `subjectsSeen === undefined` means the audit predates the fold, not that nothing was
+  // found: conclude nothing from it, exactly as the audit itself refuses to conclude from a
+  // scope that read no file.
+  const seen = audit.scope.subjectsSeen;
+  const subjectAbsent = (pc: PackCriterion): boolean => seen !== undefined && subjectsAbsent(subjectsForPackCriterion(packKey, pc.id, pc.wcag), new Set(seen));
+
   const deriveBase = (pc: PackCriterion): PackCriterionResult => {
     // A criterion whose WCAG mapping is ENTIRELY outside the engine's core (e.g. RGAA 8.1
     // → only the removed 4.1.1, or a hypothetical pack criterion citing only an AAA SC)
@@ -187,6 +205,9 @@ export function derivePackResults(audit: AuditResult, packKey: string): PackCrit
     // excludes advisory findings (src/audit.ts finalize), so the aggregate is NC-clean.
     if (!pc.appliesTo) {
       const status: Status = scResults.length ? aggregate(scResults.map((r) => r.status)) : "NA";
+      if (status === "manual" && subjectAbsent(pc)) {
+        return { id: pc.id, theme: pc.theme, status: "NA" as Status, findings: allFindings, scs: pc.wcag };
+      }
       return { id: pc.id, theme: pc.theme, status, findings: allFindings, scs: pc.wcag };
     }
 
@@ -211,6 +232,9 @@ export function derivePackResults(audit: AuditResult, packKey: string): PackCrit
     // Otherwise the ordinary non-NC aggregate (C / manual / NA) over the mapped SCs, with
     // any advisory findings kept on the result so the pack view surfaces them.
     const status: Status = scResults.length ? aggregate(scResults.map((r) => r.status)) : "NA";
+    if (status === "manual" && subjectAbsent(pc)) {
+      return { id: pc.id, theme: pc.theme, status: "NA" as Status, findings, scs: pc.wcag };
+    }
     return { id: pc.id, theme: pc.theme, status, findings, scs: pc.wcag };
   };
 
