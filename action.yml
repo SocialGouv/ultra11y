@@ -568,6 +568,21 @@ runs:
              RUNBOOK to run a command: you have no shell, and this workflow folds the verdicts
              for you in its next step. You never run the engine and never fold anything.
 
+          Two things about the evidence, because they change how you should read it.
+
+          It is grouped by CONTENT CLASS: one representative per distinct thing, carrying
+          `occurrences`, the sibling anchors in `alsoAt`, and the `pages` it appears on. The
+          same header link on thirty-eight pages is ONE decision, not thirty-eight — so ruling
+          on the representative rules on all of them, and the brief shows you the whole
+          population rather than a sample of it. When you cite, any occurrence of a class the
+          criterion carries is accepted, so cite the one you actually opened.
+
+          And each item says whether that reading was COMPLETE (`evidenceComplete`). On a
+          complete one you may conclude anything the evidence supports. On an incomplete one
+          you may still record an `NC` for what you saw — a real failure does not stop being
+          real — but a `C` will be refused, because clearing a criterion is a claim about
+          everything, including the part you were not shown.
+
           Fill EVERY item's verdict. Each one stands or falls on its own: a verdict the gate
           refuses costs its own criterion (which stays « to assess », carrying the refusal) and
           leaves every other verdict standing — so work through the list steadily rather than
