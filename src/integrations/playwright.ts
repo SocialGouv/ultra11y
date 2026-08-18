@@ -21,7 +21,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { COLLECT_SNAPSHOT } from "../collector.js";
 import { runLiveProbes } from "../probes.js";
-import { type AuditLike, type CheckOptions, auditSnapshot, buildPayload, gate, stayedOnPage, writePagesReport } from "./core.js";
+import { type AuditLike, type CheckOptions, type ProbeTuning, auditSnapshot, buildPayload, gate, stayedOnPage, writePagesReport } from "./core.js";
 
 // Playwright's own types are not a dependency of this package (it is a peer of YOUR repo),
 // so the page object is structurally typed to exactly what is used.
@@ -48,7 +48,7 @@ export interface PlaywrightCheckOptions extends CheckOptions {
 
 /** Read the three shapes `probes` accepts — `true`, a list of criteria, or an options object —
  *  into the one shape `runLiveProbes` takes. */
-function probeOptions(p: PlaywrightCheckOptions["probes"]): { only?: string[]; limits?: { reflowWidth?: number; maxFocusables?: number; maxHits?: number } } {
+function probeOptions(p: PlaywrightCheckOptions["probes"]): { only?: string[]; limits?: Omit<ProbeTuning, "only"> } {
   // `probes: true` means "use what the repository declared". The bounds are a judgement about
   // the pages being audited, so they belong in `.ultra11yrc.json` next to the sample and the
   // standard — not repeated at every call site, and not compiled into the tool.
@@ -63,11 +63,9 @@ function probeOptions(p: PlaywrightCheckOptions["probes"]): { only?: string[]; l
   return { ...(only ? { only } : {}), limits };
 }
 
-function fromConfig(): { only?: string[]; limits?: { reflowWidth?: number; maxFocusables?: number; maxHits?: number } } {
+function fromConfig(): { only?: string[]; limits?: Omit<ProbeTuning, "only"> } {
   try {
-    const cfg = JSON.parse(readFileSync(join(process.cwd(), ".ultra11yrc.json"), "utf8")) as {
-      probes?: { only?: string[]; reflowWidth?: number; maxFocusables?: number; maxHits?: number };
-    };
+    const cfg = JSON.parse(readFileSync(join(process.cwd(), ".ultra11yrc.json"), "utf8")) as { probes?: ProbeTuning };
     if (!cfg.probes) return {};
     const { only, ...limits } = cfg.probes;
     return { ...(only ? { only } : {}), limits };

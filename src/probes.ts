@@ -57,9 +57,51 @@ export interface ProbeLimits {
   reflowWidth: number;
   maxFocusables: number;
   maxHits: number;
+  /** Hover triggers opened before the probe stops looking. `maxHits` bounds what is
+   *  RECORDED; this bounds what is TRIED, which is the number that costs wall-clock. */
+  maxTriggers: number;
+  /** Timeout handed to every interaction the probes drive (hover above all).
+   *
+   *  Playwright's own default is 0 — *wait forever*, bounded only by the caller's test
+   *  timeout. That default is right for a test asserting on its own page and catastrophic
+   *  here: a trigger that never becomes actionable then blocks OUR pass until SOMEBODY
+   *  ELSE'S test dies. Measured on a real sweep: one such trigger killed its test at 120s
+   *  and, through a serial group, took 15 more tests with it. */
+  actionTimeoutMs: number;
+  /** Wall-clock the whole pass may spend. What it cuts short is recorded in `skipped`, never
+   *  silently dropped: a measurement that did not happen must not read as one that found
+   *  nothing. */
+  budgetMs: number;
 }
 
-export const PROBE_DEFAULTS: ProbeLimits = { reflowWidth: 320, maxFocusables: 120, maxHits: 20 };
+export const PROBE_DEFAULTS: ProbeLimits = {
+  reflowWidth: 320,
+  maxFocusables: 120,
+  maxHits: 20,
+  maxTriggers: 60,
+  actionTimeoutMs: 1_000,
+  budgetMs: 20_000,
+};
+
+/** A deadline the probes can consult without every one of them knowing about the clock.
+ *  `left()` is what an interaction may still spend; `out()` is the question a loop asks
+ *  between iterations. */
+export interface ProbeDeadline {
+  out(): boolean;
+  left(): number;
+}
+
+export function probeDeadline(budgetMs: number, now: () => number = Date.now): ProbeDeadline {
+  const end = now() + budgetMs;
+  return { out: () => now() >= end, left: () => Math.max(0, end - now()) };
+}
+
+/** Never wait longer than the interaction's own timeout OR the budget, whichever is nearer —
+ *  and never wait zero, which Playwright reads as "no limit", the exact bug this closes. */
+function actionTimeout(limits: ProbeLimits, deadline?: ProbeDeadline): number {
+  const left = deadline ? deadline.left() : limits.actionTimeoutMs;
+  return Math.max(1, Math.min(limits.actionTimeoutMs, left || limits.actionTimeoutMs));
+}
 
 // The 320px reflow check (same semantics as the Docker RUNNER), mapped to 1.4.10.
 export const REFLOW_PROBE = `(() => {
@@ -202,13 +244,16 @@ export function hoverVisibleExpr(id: string, wantHidden = false): string {
   return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
 }
 
-export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimits = PROBE_DEFAULTS): Promise<ProbeHit[]> {
+export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<ProbeHit[]> {
   const count = (await page.evaluate(focusSetupExpr(scope, limits.maxFocusables))) as number;
   if (!count) return [];
   const hits: ProbeHit[] = [];
   const seen = new Set<string>();
   const limit = Math.min(count + 2, limits.maxFocusables + 10);
   for (let i = 0; i < limit; i++) {
+    // A tab ring of 130 elements is two round-trips each on a loaded CI runner. Stopping at
+    // the deadline costs the tail of the ring, which `runLiveProbes` then records.
+    if (deadline?.out()) break;
     await page.keyboard.press("Tab");
     const r = (await page.evaluate(FOCUS_CHECK_PROBE)) as { key: string; changed: boolean; selector: string; html: string } | null;
     if (!r) continue;
@@ -226,12 +271,18 @@ export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimi
   return hits;
 }
 
-export async function probeHover(page: Any, limits: ProbeLimits = PROBE_DEFAULTS): Promise<ProbeHit[]> {
+export async function probeHover(page: Any, limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<ProbeHit[]> {
   const triggers = (await page.evaluate(HOVER_SETUP_PROBE)) as { key: string; target: string; selector: string }[];
   const hits: ProbeHit[] = [];
-  for (const tr of triggers) {
+  // What is TRIED is capped, not just what is recorded: a design system that puts a tooltip
+  // on every icon offers hundreds of triggers, and each one costs a hover plus two waits.
+  for (const tr of triggers.slice(0, Math.max(1, limits.maxTriggers))) {
+    if (deadline?.out()) break;
     try {
-      await page.hover(`[data-u11y-h="${tr.key}"]`);
+      // The timeout is the whole point. Without it Playwright waits for actionability
+      // FOREVER — an element behind a sticky header, or one that never settles, then hangs
+      // the caller's test instead of costing this trigger.
+      await page.hover(`[data-u11y-h="${tr.key}"]`, { timeout: actionTimeout(limits, deadline) });
     } catch {
       continue;
     }
@@ -275,6 +326,7 @@ export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?:
   const limits: ProbeLimits = { ...PROBE_DEFAULTS, ...opts.limits };
   const only = opts.only?.length ? new Set(opts.only) : null;
   const want = (id: string): boolean => only === null || only.has(id);
+  const deadline = probeDeadline(limits.budgetMs);
   // Capability checks, not assumptions. A page object that cannot resize or press a key is a
   // page whose reflow and focus-visibility simply were not measured — which is a fact to
   // record, not a crash to propagate into somebody's test run.
@@ -288,49 +340,74 @@ export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?:
   const skip = (sc: string, why: string): void => {
     out.skipped?.push({ sc, why });
   };
+  /** Run one probe, and NEVER wait longer than the budget allows.
+   *
+   *  The timeout handed to `page.hover` is the polite ask; this is the guarantee. A page
+   *  object is whatever the caller's runtime hands us — a Playwright `Page`, a Cypress shim,
+   *  a home-made harness — and one that ignores the option would otherwise hang this pass and
+   *  the test around it. The cut promise keeps running in the background where we cannot
+   *  cancel it; its rejection is absorbed so it can never surface as an unhandled one. */
+  const bounded = async <T>(sc: string, run: () => Promise<T>): Promise<T | null> => {
+    if (deadline.out()) {
+      skip(sc, `the probe budget of ${limits.budgetMs}ms was already spent when this criterion came up`);
+      return null;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const CUT = Symbol("cut");
+    const started = Date.now();
+    try {
+      const raced = await Promise.race([
+        run().catch((e: unknown) => {
+          throw e;
+        }),
+        new Promise<typeof CUT>((resolve) => {
+          timer = setTimeout(() => resolve(CUT), Math.max(1, deadline.left()));
+        }),
+      ]);
+      if (raced === CUT) {
+        skip(sc, `the probe budget of ${limits.budgetMs}ms ran out after ${Date.now() - started}ms — this measurement did not complete`);
+        return null;
+      }
+      return raced as T;
+    } catch (e: unknown) {
+      skip(sc, String((e as Error)?.message ?? e).slice(0, 160));
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
   if (!canResize) skip("1.4.10", "the page object cannot resize its viewport");
   if (!canType) skip("2.4.7", "the page object exposes no keyboard");
   if (!canHover) skip("1.4.13", "the page object cannot hover");
   if (!canStyle) skip("1.4.12", "the page object cannot inject a stylesheet");
-  // Each probe is guarded on its own: one that throws costs its criterion, never the others
-  // and never the caller's test.
-  if (want("2.4.7") && canType) {
-    const r = await probeFocusVisible(page, "", limits).catch((e: unknown) => {
-      skip("2.4.7", String((e as Error)?.message ?? e).slice(0, 160));
-      return null;
-    });
-    if (r) {
-      out.focusVisible = r;
-      out.probed.push("2.4.7");
-    }
-  }
-  if (want("1.4.13") && canHover && canType) {
-    const r = await probeHover(page, limits).catch((e: unknown) => {
-      skip("1.4.13", String((e as Error)?.message ?? e).slice(0, 160));
-      return null;
-    });
-    if (r) {
-      out.hover = r;
-      out.probed.push("1.4.13");
-    }
-  }
+  // ORDER IS DELIBERATE: cheap and deterministic first, interactive last.
+  //
+  // Zoom, reflow and text spacing are one `evaluate` (plus a resize) each — milliseconds.
+  // Focus visibility tabs through the whole ring, and hover opens one trigger after another;
+  // those are the two that cost seconds, and the two that can be cut short. Running them last
+  // means a budget overrun costs the interactive tail rather than three measurements that
+  // would have completed in the time it takes to say so. It also leaves the caller's page
+  // closer to how they left it: nothing after us moves the focus or hovers an element.
+  //
+  // Each probe is guarded on its own: one that throws — or outlives the budget — costs its
+  // criterion, never the others and never the caller's test.
   if (want("1.4.4")) {
-    out.reflowZoom = ((await page.evaluate(REFLOW_ZOOM_PROBE).catch(() => [])) as ProbeHit[]) ?? [];
-    out.probed.push("1.4.4");
+    const r = await bounded("1.4.4", async () => (await page.evaluate(REFLOW_ZOOM_PROBE)) as ProbeHit[]);
+    if (r) {
+      out.reflowZoom = r ?? [];
+      out.probed.push("1.4.4");
+    }
   }
   if (want("1.4.10") && canResize) {
-    let narrowed = true;
-    await page.setViewportSize({ width: limits.reflowWidth, height: restore.height }).catch((e: unknown) => {
-      narrowed = false;
-      skip("1.4.10", String((e as Error)?.message ?? e).slice(0, 160));
+    const narrowed = await bounded("1.4.10", async () => {
+      await page.setViewportSize({ width: limits.reflowWidth, height: restore.height });
+      return true;
     });
     if (narrowed) {
-      const r = (await page.evaluate(REFLOW_PROBE).catch((e: unknown) => {
-        skip("1.4.10", String((e as Error)?.message ?? e).slice(0, 160));
-        return null;
-      })) as { horizontalScroll: boolean } | null;
+      const r = await bounded("1.4.10", async () => (await page.evaluate(REFLOW_PROBE)) as { horizontalScroll: boolean });
       // The viewport goes back whatever the probe did — the caller's next assertion must not
-      // be measuring a 320px page.
+      // be measuring a 320px page. Outside `bounded`, and outside every early return: a
+      // restore the budget could skip is a page handed back in the wrong shape.
       await page.setViewportSize(restore).catch(() => {});
       if (r) {
         out.reflow = r;
@@ -341,20 +418,28 @@ export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?:
   if (want("1.4.12") && canStyle) {
     // Tagged so it can be removed again — an injected stylesheet left behind would change
     // every measurement the caller makes after this call.
-    const handle = await page.addStyleTag({ content: TEXT_SPACING_CSS }).catch((e: unknown) => {
-      skip("1.4.12", String((e as Error)?.message ?? e).slice(0, 160));
-      return null;
-    });
+    const handle = await bounded("1.4.12", () => page.addStyleTag({ content: TEXT_SPACING_CSS }));
     if (handle) {
-      const r = (await page.evaluate(TEXT_SPACING_PROBE).catch((e: unknown) => {
-        skip("1.4.12", String((e as Error)?.message ?? e).slice(0, 160));
-        return null;
-      })) as ProbeHit[] | null;
+      const r = await bounded("1.4.12", async () => (await page.evaluate(TEXT_SPACING_PROBE)) as ProbeHit[]);
       await page.evaluate(REMOVE_TEXT_SPACING_STEP).catch(() => {});
       if (r) {
         out.textSpacing = r;
         out.probed.push("1.4.12");
       }
+    }
+  }
+  if (want("2.4.7") && canType) {
+    const r = await bounded("2.4.7", () => probeFocusVisible(page, "", limits, deadline));
+    if (r) {
+      out.focusVisible = r;
+      out.probed.push("2.4.7");
+    }
+  }
+  if (want("1.4.13") && canHover && canType) {
+    const r = await bounded("1.4.13", () => probeHover(page, limits, deadline));
+    if (r) {
+      out.hover = r;
+      out.probed.push("1.4.13");
     }
   }
   return out;

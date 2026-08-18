@@ -126,3 +126,97 @@ describe("the bounds belong to the repository, not to the tool", () => {
     expect(page.log).toContain("viewport:320x900");
   });
 });
+
+// ---- the caller's test clock is not ours to spend ----------------------------------------
+//
+// Measured on a real CI run (SocialGouv/egapro, Playwright trace of the a11y sweep): the
+// probes ran for 3.6s, called `page.hover()` on a trigger that never became actionable, and
+// never came back. Playwright's default action timeout is 0 — *wait forever* — so the hover
+// blocked until the caller's own 120s test timeout killed the test. The `try/catch` around it
+// never fired, because nothing ever rejected. Two specs died that way, and being in a serial
+// group they took 15 more tests with them: 15 of the 35 pages of the RGAA sample vanished
+// from the report, every run.
+//
+// So: every interaction carries its own timeout, and the whole pass carries a wall-clock
+// budget. What the budget cuts short is RECORDED — a measurement that did not happen must say
+// so, never read as a measurement that found nothing.
+describe("the probes never outlive the budget they were given", () => {
+  /** A trigger that is never actionable: Playwright would block here until the test dies. */
+  const hangingHover = () => new Promise<void>(() => {});
+
+  it("returns even when an interaction never resolves", async () => {
+    const page = fakePage({
+      hover: hangingHover,
+      evaluate: async (script: string) => {
+        if (script.includes("letter-spacing: 0.12em") && script.includes("remove")) return true;
+        if (script.includes("horizontalScroll")) return { horizontalScroll: false };
+        if (script.includes("data-u11y-h")) return [{ key: "h0", target: "tip", selector: "button" }];
+        if (script.includes("__u11yF")) return 0;
+        return [];
+      },
+    });
+    const started = Date.now();
+    const r = await runLiveProbes(page, { limits: { budgetMs: 300 } });
+    expect(Date.now() - started).toBeLessThan(5_000);
+    // The criteria the pass did reach are still measured — the budget costs the tail only.
+    expect(r.probed).toContain("1.4.10");
+  });
+
+  it("says which criterion the budget cost, and why", async () => {
+    const page = fakePage({
+      hover: hangingHover,
+      evaluate: async (script: string) => {
+        if (script.includes("letter-spacing: 0.12em") && script.includes("remove")) return true;
+        if (script.includes("horizontalScroll")) return { horizontalScroll: false };
+        if (script.includes("data-u11y-h")) return [{ key: "h0", target: "tip", selector: "button" }];
+        if (script.includes("__u11yF")) return 0;
+        return [];
+      },
+    });
+    const r = await runLiveProbes(page, { limits: { budgetMs: 300 } });
+    expect(r.probed).not.toContain("1.4.13");
+    expect(r.skipped?.find((s) => s.sc === "1.4.13")?.why ?? "").toMatch(/budget/i);
+  });
+
+  it("gives every hover a finite timeout, so a dead trigger costs a second and not a test", async () => {
+    const seen: unknown[] = [];
+    const page = fakePage({
+      hover: async (_sel: string, opts?: unknown) => {
+        seen.push(opts);
+      },
+      evaluate: async (script: string) => {
+        if (script.includes("letter-spacing: 0.12em") && script.includes("remove")) return true;
+        if (script.includes("horizontalScroll")) return { horizontalScroll: false };
+        if (script.includes("data-u11y-h")) return [{ key: "h0", target: "tip", selector: "button" }];
+        if (script.includes("__u11yF")) return 0;
+        return [];
+      },
+    });
+    await runLiveProbes(page);
+    expect(seen.length).toBeGreaterThan(0);
+    for (const opts of seen) {
+      const t = (opts as { timeout?: number } | undefined)?.timeout;
+      expect(typeof t, "page.hover() was called with no timeout — Playwright then waits forever").toBe("number");
+      expect(t).toBeGreaterThan(0);
+    }
+  });
+
+  it("stops opening hover triggers once the page has offered more than the cap", async () => {
+    let hovers = 0;
+    const triggers = Array.from({ length: 400 }, (_, i) => ({ key: `h${i}`, target: `t${i}`, selector: "button" }));
+    const page = fakePage({
+      hover: async () => {
+        hovers++;
+      },
+      evaluate: async (script: string) => {
+        if (script.includes("letter-spacing: 0.12em") && script.includes("remove")) return true;
+        if (script.includes("horizontalScroll")) return { horizontalScroll: false };
+        if (script.includes("data-u11y-h")) return triggers;
+        if (script.includes("__u11yF")) return 0;
+        return [];
+      },
+    });
+    await runLiveProbes(page, { limits: { maxTriggers: 25 } });
+    expect(hovers).toBeLessThanOrEqual(25);
+  });
+});

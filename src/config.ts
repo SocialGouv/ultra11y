@@ -78,6 +78,16 @@ export interface Ultra11yConfig {
     maxFocusables?: number;
     /** Hits recorded per probe before it stops looking. Default 20. */
     maxHits?: number;
+    /** Hover triggers OPENED before the probe stops looking. `maxHits` bounds what is
+     *  recorded; this bounds what is tried, which is what costs wall-clock. Default 60. */
+    maxTriggers?: number;
+    /** Timeout handed to every interaction the probes drive. Playwright's own default is 0 —
+     *  wait forever — which is right for a test asserting on its own page and catastrophic
+     *  for a probe running inside somebody else's. Default 1000. */
+    actionTimeoutMs?: number;
+    /** Wall-clock the whole probe pass may spend on one page. What it cuts short is recorded
+     *  as skipped, never silently dropped. Default 20000. */
+    budgetMs?: number;
   };
 }
 

@@ -125,7 +125,23 @@ export interface CheckOptions {
    *  recording. 320px is normative and stays the default; the other two are judgements about
    *  YOUR pages, and a screen with 400 focusables should be able to say so rather than being
    *  quietly cut off at 120. */
-  probes?: boolean | string[] | { only?: string[]; reflowWidth?: number; maxFocusables?: number; maxHits?: number };
+  probes?: boolean | string[] | ProbeTuning;
+}
+
+/** The bounds a repository may put on the live probes. Stated once, here, because the same
+ *  list is read from `.ultra11yrc.json`, accepted at the call site and handed to the engine —
+ *  three copies of a field list is three chances for one of them to fall behind.
+ *
+ *  `budgetMs` and `actionTimeoutMs` are not tuning in the same sense as the others: they are
+ *  what stops a probe from spending SOMEBODY ELSE'S test timeout. See ProbeLimits. */
+export interface ProbeTuning {
+  only?: string[];
+  reflowWidth?: number;
+  maxFocusables?: number;
+  maxHits?: number;
+  maxTriggers?: number;
+  actionTimeoutMs?: number;
+  budgetMs?: number;
 }
 
 /** Did the browser stay on the page the caller asked for? Path-only, trailing slash folded;
