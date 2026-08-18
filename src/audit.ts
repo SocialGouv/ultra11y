@@ -454,6 +454,15 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
         const seen = acc.probedScs.get(sc) ?? new Set<string>();
         seen.add(pageId);
         acc.probedScs.set(sc, seen);
+        // A probe is COVERAGE, not merely a way to conclude. `renderedScs` is the stamp the
+        // partial-audit banner reads (scope.scan.testedScs → untestedNeedsRendering), and it
+        // was fed by the digest tier alone — so a sweep that measured zoom, reflow, spacing
+        // and hover on every page still published « the needs-rendering criteria were not
+        // tested ». Measured on egapro: five digest criteria stamped, and a report that told
+        // its reader nothing had been tested. The two accountings stay separate on purpose:
+        // this one answers "was it measured anywhere?", `probedScs` answers "on which pages?",
+        // and only the second may conclude.
+        acc.renderedScs.add(sc);
       }
       for (const f of probeFindings(probes, doc.file, pageId)) {
         const list = acc.byCriterion.get(f.criteriaId) ?? [];
@@ -520,6 +529,22 @@ function renderedProves(sc: string, acc: Accum): boolean {
     const ran = acc.renderedRan.get(ruleId);
     return ran !== undefined && acc.pageIds.size === [...acc.pageIds].filter((p) => ran.has(p)).length;
   });
+}
+
+/** Why a rendering criterion stayed open when a probe DID run — just not everywhere.
+ *
+ *  Without this the two cases read identically: a criterion nobody ever probed, and one probed
+ *  on nineteen pages out of twenty. They call for opposite work — turn the probes on, versus
+ *  find out why that one page was not swept — and the fold is an AND, so the second is the
+ *  common one as soon as a repository drives its sweep from more than one spec. Returns
+ *  undefined when there is nothing partial to report. */
+function partialProbeReason(sc: string, acc: Accum): string | undefined {
+  const probed = acc.probedScs.get(sc);
+  if (!probed || probed.size === 0 || probed.size >= acc.pageIds.size) return undefined;
+  const missing = [...acc.pageIds].filter((p) => !probed.has(p)).sort();
+  const shown = missing.slice(0, 8);
+  const rest = missing.length - shown.length;
+  return `Probed on ${probed.size} of the ${acc.pageIds.size} pages in scope, so this criterion stays open: conformity here is measured on EVERY page or on none, and the page nobody probed is exactly where the failure would be. Not probed: ${shown.join(", ")}${rest > 0 ? `, and ${rest} more` : ""}.`;
 }
 
 function renderedProvesReason(sc: string, acc: Accum): string {
@@ -620,6 +645,7 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       // engine can't decide — leave it for the agent to adjudicate (`verify --manual`,
       // gated) or the `scan` tier (rendering criteria); never a silent conforming.
       status = "manual";
+      justification = partialProbeReason(c.sc, acc);
       residualRisks.push({ criteriaId: c.sc, reason: residualReason(c.automatability, c.sc), automatability: c.automatability });
     }
     criteria.push({ id: c.sc, guideline: c.guideline, status, findings: fs, ...(justification ? { justification } : {}), ...(decidedBy ? { decidedBy } : {}) });

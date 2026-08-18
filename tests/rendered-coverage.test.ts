@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { runAudit } from "../src/audit.js";
+import { untestedNeedsRendering } from "../src/report.js";
 import { PAGES_DIR, SNAPSHOT_VERSION, writeSnapshot, type StyleEntry } from "../src/snapshot.js";
 
 let root: string;
@@ -88,6 +89,43 @@ describe("a live probe is the other way a criterion gets measured", () => {
     const r = auditPages(2, () => ({ probes: { probed: ["1.4.10"] } }));
     expect(of(r, "1.4.10")?.status).toBe("C");
     expect(of(r, "1.4.12")?.status).toBe("manual");
+  });
+
+  it("counts a probe as COVERAGE, so the partial-audit banner stops naming what was measured", () => {
+    // `scope.scan.testedScs` is the single coverage stamp the report reads to decide whether
+    // to print « Audit partiel — les critères à restituer n'ont pas été testés ». It was fed
+    // by the digest tier alone, so a sweep that probed zoom, reflow, spacing and hover on
+    // every page still published that banner. Measured on egapro: testedScs came back as the
+    // five digest criteria and the report told its reader nothing had been tested.
+    const r = auditPages(2, () => ({ probes: probed }));
+    const tested = new Set(r.scope.scan?.testedScs ?? []);
+    for (const sc of ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.4.7"]) {
+      expect(tested.has(sc), `${sc} was probed on every page but is absent from scope.scan.testedScs`).toBe(true);
+    }
+    // …and 4.1.3 is STILL named, correctly: no probe measures a live region. Deciding it
+    // means clicking something and watching what gets announced, which is a mutation — the
+    // probes are read-only by contract, so that one belongs to `scan --interact-clicks`. A
+    // suite-driven sweep therefore closes four of the five and says so about the fifth.
+    expect(untestedNeedsRendering(r)).toEqual(["4.1.3"]);
+  });
+
+  it("still names a rendering criterion NOBODY probed", () => {
+    // The other half: coverage must not become a blanket claim. A run that probed only reflow
+    // has to keep saying that zoom and spacing were never tested.
+    const r = auditPages(2, () => ({ probes: { probed: ["1.4.10"] } }));
+    expect(untestedNeedsRendering(r)).toContain("1.4.4");
+    expect(untestedNeedsRendering(r)).not.toContain("1.4.10");
+  });
+
+  it("says on how many pages it was probed, instead of failing the AND in silence", () => {
+    // A criterion that stays open because 1 page of 3 was never probed reads exactly like one
+    // nobody ever probed at all. The auditor needs to know which of the two it is looking at —
+    // the fix is a page-by-page one, not a "turn the probes on" one.
+    const r = auditPages(3, (i) => (i === 1 ? {} : { probes: probed }));
+    const c = of(r, "1.4.10");
+    expect(c?.status).toBe("manual");
+    expect(c?.justification ?? "").toMatch(/2 of the 3 page|2 des 3 page/);
+    expect(c?.justification ?? "").toMatch(/p1/);
   });
 });
 
