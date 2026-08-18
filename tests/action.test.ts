@@ -720,3 +720,31 @@ describe("the event allowlist is pinned to a claude-code-action version", () => 
     expect(run).not.toMatch(/\|push\)|\(push\|/);
   });
 });
+
+// A run whose artifact is merged away downstream must not send its reader to a dead link.
+describe("the comment names the deliverable that survives the run", () => {
+  it("offers an input for it, distinct from the one it uploads under", () => {
+    // `artifact-name` must stay unique within a workflow run (GitHub 409s otherwise), so a
+    // repository that merges several parts into one deliverable CANNOT simply name them all
+    // the same. Measured on SocialGouv/egapro#4169: both sticky comments pointed at
+    // `ultra11y-part-code` / `ultra11y-part-pages`, which the merge job had just deleted.
+    expect(ACTION.inputs["report-artifact"]).toBeDefined();
+    expect(ACTION.inputs["report-artifact"]?.default).toBe("");
+  });
+
+  it("prefers it over the uploaded name, and falls back to the historical default", () => {
+    const step = ACTION.runs.steps.find((st) => st.name?.includes("PR comment"))!;
+    const expr = String(step.env?.ULTRA11Y_ARTIFACT_NAME);
+    // The precedence, read off the expression itself: report-artifact, then artifact-name,
+    // then `ultra11y-<standard>`. Asserted here because it is a contract a consumer's
+    // workflow depends on and it lives in YAML no type checker reads.
+    expect(expr.indexOf("inputs.report-artifact")).toBeLessThan(expr.indexOf("inputs.artifact-name"));
+    expect(expr).toContain("format('ultra11y-{0}', inputs.standard)");
+  });
+
+  it("still uploads under artifact-name — the link text moves, the upload does not", () => {
+    const upload = ACTION.runs.steps.find((st) => st.id === "upload")!;
+    expect(String(upload.with?.name)).toContain("inputs.artifact-name");
+    expect(String(upload.with?.name)).not.toContain("report-artifact");
+  });
+});

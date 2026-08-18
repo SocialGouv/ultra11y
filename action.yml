@@ -131,6 +131,10 @@ inputs:
     description: 'Name of the uploaded artifact. Defaults to `ultra11y-<standard>`. Artifact names must be UNIQUE within a workflow run, so set this when the action runs more than once in one job (e.g. the code diff and then the served pages) — otherwise the second upload fails with a 409.'
     required: false
     default: ''
+  report-artifact:
+    description: 'Name the comment and the job summary should send a reader to for the full report. Defaults to the artifact this action uploads. Set it when a LATER job merges several runs of this action into one deliverable (`actions/upload-artifact/merge` with `delete-merged`): the part this run uploaded no longer exists by the time anyone clicks the link, so a comment naming it sends the reader to nothing. This changes only what the comment SAYS — the upload still happens under `artifact-name`, which must stay unique within the workflow run.'
+    required: false
+    default: ''
   artifact-retention-days:
     description: 'How long GitHub keeps the uploaded artifact. Empty (default) follows the repository setting.'
     required: false
@@ -580,6 +584,13 @@ runs:
           `"file:line"` string `alsoAt` uses. A string is accepted, but it carries no snippet,
           and the snippet is what proves the citation resolves to the thing you meant.
 
+          COPY that `snippet` out of the brief; do not write the element out yourself. A
+          retyping with the attributes reordered, or with `class` left off, still names the
+          right element — the fold grounds the harvested anchor rather than your transcription
+          of it — but it has to stay RECOGNISABLE as that element: same tag, and at least one
+          distinctive word in common. Copying is free and it keeps the citation checkable by a
+          human reading the diff.
+
           And each item says whether that reading was COMPLETE (`evidenceComplete`). On a
           complete one you may conclude anything the evidence supports. On an incomplete one
           you may still record an `NC` for what you saw — a real failure does not stop being
@@ -694,7 +705,9 @@ runs:
         # links it. The artifact NAME is guarded by the same condition as the upload: naming an
         # artifact that was never uploaded sends the reviewer to a page that does not exist.
         ULTRA11Y_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        ULTRA11Y_ARTIFACT_NAME: ${{ (inputs.report == 'true' || inputs.html == 'true') && (inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard)) || '' }}
+        # `report-artifact` wins when set: a run whose part is merged away downstream must name
+        # the deliverable that SURVIVES, not the one it uploaded.
+        ULTRA11Y_ARTIFACT_NAME: ${{ (inputs.report == 'true' || inputs.html == 'true') && (inputs.report-artifact != '' && inputs.report-artifact || (inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard))) || '' }}
       run: node "$ENGINE" report --in audits/audit-latest.json --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}' --format github
 
     # Tickets. REST is why this works in a container job or on a self-hosted runner, where
