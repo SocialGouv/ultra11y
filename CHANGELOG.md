@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.11.1](https://github.com/maxgfr/ultra11y/compare/v5.11.0...v5.11.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* **adjudicate:** stop telling the adjudicator to give up when the rendered page is right there ([3ea0bb7](https://github.com/maxgfr/ultra11y/commit/3ea0bb7e9200ffdf9cd16c58d22e1e33888b7421))
+
 # [5.11.0](https://github.com/maxgfr/ultra11y/compare/v5.10.1...v5.11.0) (2026-08-18)
 
 
