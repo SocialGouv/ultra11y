@@ -381,9 +381,18 @@ describe("applyAdjudication — fail-closed validation", () => {
     expect(r.issues.join("\n")).toMatch(/not among this criterion's harvested evidence/);
   });
 
-  it("refuses a citation whose content is nowhere in the file it names", () => {
+  it("refuses a citation that describes something other than what it points at", () => {
     // The other half of the gate, and the one that actually means "not fabricated": whatever
-    // the citation points at has to BE there. Widening membership does not touch this.
+    // the citation describes has to BE what sits there. Widening membership does not touch it.
+    //
+    // The CHECK moved once, deliberately. It used to demand the agent's snippet be findable in
+    // the file byte for byte, which refused every faithful RETYPING — attributes reordered,
+    // `class` dropped — and on a rendered snapshot, where the whole document is one line, that
+    // was most of a real run: 54 of 81 verdicts lost to transcription. So a citation landing on
+    // harvested evidence is now judged RECOGNISABLE against that anchor instead: same tag, and
+    // at least one distinctive word in common. This link shares neither its href nor its text
+    // with the one that was harvested, so it is still refused — which is the property that
+    // matters, and the message says which element was actually there.
     const src = baseItems().find((i) => i.criteriaId === "2.4.4")!;
     const items = decideAll(
       { verdict: "C", justification: "ok", citations: [{ ...src.evidence[0]!, snippet: '<a href="/invented-by-the-model">Nowhere</a>' }] },
@@ -391,7 +400,7 @@ describe("applyAdjudication — fail-closed validation", () => {
     );
     const r = applyAdjudication(auditPage(), file(items));
     expect(r.ok).toBe(false);
-    expect(r.issues.join("\n")).toMatch(/cited snippet not found/);
+    expect(r.issues.join("\n")).toMatch(/does not describe the element harvested there|cited snippet not found/);
   });
 
   it("accepts a citation a few lines off the anchor — the caption inside the table it was shown", () => {

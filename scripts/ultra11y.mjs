@@ -57504,7 +57504,7 @@ function adjudicationContract() {
     verdicts: [...VERDICTS],
     manualReasons: [...MANUAL_REASON_VALUES],
     requires: {
-      C: "a non-empty justification AND citations[] naming the harvested evidence it cleared (each anchor resolvable and drawn from this criterion's own evidence); a criterion with no harvested evidence cannot be C at all",
+      C: "a non-empty justification AND citations[] naming the harvested evidence it cleared (each anchor resolvable and drawn from this criterion's own evidence, and about the same kind of element the harvest recorded there \u2014 copy the evidence's own `snippet` rather than retyping the element); a criterion with no harvested evidence cannot be C at all",
       NA: "a non-empty justification",
       NC: "at least one groundable finding, each citing a normativeRef that resolves against the active standard",
       manual: `a reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`
@@ -57639,6 +57639,61 @@ function auditFiles(audit2, cwd) {
   } catch {
     return /* @__PURE__ */ new Set();
   }
+}
+function tagOf2(x) {
+  const fromSnippet = /<\s*([a-zA-Z][\w-]*)/.exec(x.snippet ?? "");
+  if (fromSnippet) return fromSnippet[1].toLowerCase();
+  const fromSelector = /^\s*([a-zA-Z][\w-]*)/.exec(x.selector ?? "");
+  return fromSelector ? fromSelector[1].toLowerCase() : void 0;
+}
+function contentTokens(markup) {
+  const out2 = /* @__PURE__ */ new Set();
+  const withoutTags = markup.replace(/<[^>]*>/g, " ");
+  for (const m of markup.matchAll(/=\s*"([^"]*)"|=\s*'([^']*)'/g)) {
+    for (const w of (m[1] ?? m[2] ?? "").split(/[\s/_-]+/)) if (w.length >= 3) out2.add(w.toLowerCase());
+  }
+  for (const w of withoutTags.split(/[\s/_-]+/)) if (w.length >= 3) out2.add(w.toLowerCase());
+  return out2;
+}
+function recognisablySame(cite, anchor) {
+  const ta = tagOf2(cite);
+  const tb = tagOf2(anchor);
+  if (ta !== void 0 && tb !== void 0 && ta !== tb) return false;
+  if (!cite.snippet || !anchor.snippet) return true;
+  const want = contentTokens(anchor.snippet);
+  if (!want.size) return true;
+  const got = contentTokens(cite.snippet);
+  if (!got.size) return true;
+  for (const w of got) if (want.has(w)) return true;
+  return false;
+}
+function overlap(cite, anchor) {
+  if (!cite.snippet || !anchor.snippet) return 0;
+  const want = contentTokens(anchor.snippet);
+  if (!want.size) return 0;
+  let n = 0;
+  for (const w of contentTokens(cite.snippet)) if (want.has(w)) n++;
+  return n;
+}
+function anchorFor(evidence, c2, drift) {
+  const reps = evidence.filter((e) => e.file === c2.file && Math.abs(e.line - c2.line) <= drift);
+  const best = (cands) => {
+    let top;
+    let score = -1;
+    for (const e of cands) {
+      const n = overlap(c2, e);
+      if (n > score) {
+        score = n;
+        top = e;
+      }
+    }
+    return top;
+  };
+  const rep = best(reps);
+  if (rep) return { at: rep, representative: true };
+  const siblings = evidence.filter((e) => cites0(e.alsoAt ?? [], c2, drift));
+  const sib = best(siblings);
+  return sib ? { at: sib, representative: false } : void 0;
 }
 function cites0(anchors, c2, drift) {
   for (const a of anchors) {
@@ -57775,7 +57830,20 @@ function applyAdjudication(audit2, adj, opts = {}) {
           if (!cites0(anchors, c2, citationDrift) && !scopeFiles().has(c2.file)) {
             blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c2.file}:${c2.line} is not among this criterion's harvested evidence (fabricated?)`);
           }
-          toGround(it.criteriaId, { file: c2.file, line: c2.line, selector: c2.selector, snippet: c2.snippet });
+          const anchor = anchorFor(it.evidence, c2, citationDrift);
+          if (anchor && !recognisablySame(c2, anchor.at)) {
+            blame(
+              it.criteriaId,
+              `criterion ${it.criteriaId}: citation ${c2.file}:${c2.line} does not describe the element harvested there (${anchor.at.snippet ? `\`${anchor.at.snippet.slice(0, 80)}\`` : `<${tagOf2(anchor.at)}>`}) \u2014 cite the element you actually read, copying its \`snippet\` from the brief`
+            );
+          }
+          if (anchor?.representative) {
+            toGround(it.criteriaId, { file: anchor.at.file, line: anchor.at.line, selector: anchor.at.selector ?? c2.selector, snippet: anchor.at.snippet });
+          } else if (anchor) {
+            toGround(it.criteriaId, { file: c2.file, line: c2.line, selector: anchor.at.selector ?? c2.selector });
+          } else {
+            toGround(it.criteriaId, { file: c2.file, line: c2.line, selector: c2.selector, snippet: c2.snippet });
+          }
         }
       }
     } else if (v === "NC") {
@@ -57941,6 +58009,7 @@ function recomputeTallies(a) {
 var residualScanReason = () => "Rendering criterion \u2014 decide on the rendered DOM (`scan`).";
 var residualUndecidableReason = () => "Left as an explicit residual risk (not decidable from the available evidence).";
 var residualRejectedReason = (why) => `Adjudication refused by the gate \u2014 ${why.replace(/^criterion \S+: /, "")}. Re-adjudicate this criterion.`;
+var SNIPPET_SHOWN = 200;
 var T2 = {
   fr: {
     title: "# Adjudication des crit\xE8res \xE0 \xE9valuer (ultra11y)",
@@ -57959,6 +58028,7 @@ var T2 = {
     pagesWord: "page(s)",
     on: "sur",
     alsoAt: "aussi en",
+    snippetLabel: "`snippet` \xE0 copier dans la citation",
     incomplete: "LECTURE INCOMPL\xC8TE \u2014 un \xAB C \xBB sera refus\xE9 sur ce crit\xE8re",
     none: "(aucune \xE9vidence automatique \u2014 d\xE9cidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "\xC0 v\xE9rifier manuellement",
@@ -57988,6 +58058,7 @@ var T2 = {
     pagesWord: "page(s)",
     on: "on",
     alsoAt: "also at",
+    snippetLabel: "`snippet` to copy into the citation",
     incomplete: "INCOMPLETE READING \u2014 a C will be refused on this criterion",
     none: "(no automatic evidence \u2014 decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
@@ -58048,6 +58119,10 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
           e.alsoAt?.length ? `${s.alsoAt} ${e.alsoAt.slice(0, shown).join(", ")}${e.alsoAt.length > shown ? "\u2026" : ""}` : ""
         ].filter(Boolean).join(" ");
         out2.push(`- \`${e.file}:${e.line}\` (\`${e.selector}\`)${extra ? ` [${extra}]` : ""}${e.note ? ` \u2014 ${e.note}` : ""}`);
+        if (e.snippet?.trim()) {
+          const snip = e.snippet.trim().replace(/\s+/g, " ").slice(0, SNIPPET_SHOWN);
+          out2.push(`  - ${s.snippetLabel} : \`${snip}${e.snippet.trim().length > SNIPPET_SHOWN ? "\u2026" : ""}\``);
+        }
       }
       out2.push("");
     }
@@ -61319,6 +61394,8 @@ var S = {
     pagesDetailNote: "Un bloc par page portant au moins une non-conformit\xE9, et seulement ses crit\xE8res **non conformes** \u2014 la grille compl\xE8te (tous les crit\xE8res de chaque page, avec leurs tests et leurs captures) vit dans l'artefact.",
     pagesClamped: (n) => `_Le d\xE9tail de ${n} page(s) a \xE9t\xE9 retir\xE9 de ce commentaire pour tenir dans la limite de GitHub \u2014 l'artefact les porte toutes._`,
     scoreboardClamped: (n) => `_${n} page(s) retir\xE9e(s) du tableau pour tenir dans la limite de GitHub \u2014 l'artefact les porte toutes._`,
+    pageDefects: "D\xE9fauts",
+    pageMoreDefects: (n) => `_\u2026 et ${n} autre(s) d\xE9faut(s) distinct(s) sur cette page \u2014 voir la fiche de page dans l'artefact._`,
     noCriterionForFindings: (n) => `${n} constat(s) sur cette page ne rendent aucun crit\xE8re du r\xE9f\xE9rentiel non conforme : leur r\xE8gle sort du p\xE9rim\xE8tre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont d\xE9taill\xE9s dans l'artefact.`
   },
   en: {
@@ -61364,6 +61441,8 @@ var S = {
     pagesDetailNote: "One block per page carrying at least one non-conformity, and only its **non-conforming** criteria \u2014 the full grid (every criterion of every page, with its tests and its screenshot) lives in the artifact.",
     pagesClamped: (n) => `_The detail of ${n} page(s) was dropped from this comment to fit GitHub's limit \u2014 the artifact carries them all._`,
     scoreboardClamped: (n) => `_${n} page(s) dropped from the table to fit GitHub's limit \u2014 the artifact carries them all._`,
+    pageDefects: "Defects",
+    pageMoreDefects: (n) => `_\u2026 and ${n} more distinct defect(s) on this page \u2014 see its sheet in the artifact._`,
     noCriterionForFindings: (n) => `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`
   }
 };
@@ -61508,7 +61587,8 @@ function basisCaveats(result, derived, s, lang) {
   if (notAudited && derived.some((p) => p.basis === "not-audited")) out2.push(`> ${notAudited}`, "");
   return out2;
 }
-function pageBlock(result, page, standard, lang) {
+var PAGE_DEFECTS_SHOWN = 6;
+function pageBlock(result, page, standard, lang, baseDir) {
   const s = S[lang];
   const rows = pageCriterionRows(result, page, standard, lang);
   const nc = rows.filter((r) => r.status === "NC");
@@ -61534,6 +61614,19 @@ function pageBlock(result, page, standard, lang) {
   for (const r of nc) {
     out2.push(withTests ? `| ${cell(r.label)} | ${r.tests.map((t3) => `\`${t3}\``).join(" ")} |` : `| ${cell(r.label)} |`);
   }
+  const defects = groupFindings(
+    page.findings.filter((f) => !f.advisory),
+    standard,
+    lang,
+    baseDir
+  );
+  if (defects.length) {
+    out2.push("", `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} |`, "| --- | --- | --- | ---: |");
+    for (const g of defects.slice(0, PAGE_DEFECTS_SHOWN)) {
+      out2.push(`| ${ICON5[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(g.message)} | ${g.occurrences} |`);
+    }
+    if (defects.length > PAGE_DEFECTS_SHOWN) out2.push("", s.pageMoreDefects(defects.length - PAGE_DEFECTS_SHOWN));
+  }
   out2.push("", "</details>");
   return out2.join("\n");
 }
@@ -61541,6 +61634,7 @@ function pagesComment(result, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
   const s = S[lang];
+  const baseDir = opts.baseDir ?? process.cwd();
   const stdLabel = isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name;
   const redirected = result.scope.redirected ?? [];
   const scope = pagesOf(result);
@@ -61563,7 +61657,7 @@ function pagesComment(result, opts = {}) {
   if (rate.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
   const blocks = [...derived].sort(
     (a, b) => severityCount(b, "bloquant") - severityCount(a, "bloquant") || severityCount(b, "majeur") - severityCount(a, "majeur") || severityCount(b, "mineur") - severityCount(a, "mineur")
-  ).map((p) => pageBlock(result, p, standard, lang)).filter((b) => b !== void 0);
+  ).map((p) => pageBlock(result, p, standard, lang, baseDir)).filter((b) => b !== void 0);
   const assemble = (nBlocks2, nRows2) => {
     const body3 = [...scoreboardTable(result, derived.slice(0, nRows2), standard, s, lang), ""];
     if (nRows2 < derived.length) body3.push(s.scoreboardClamped(derived.length - nRows2), "");

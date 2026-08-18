@@ -183,7 +183,7 @@ export function adjudicationContract(): AdjudicationContract {
     verdicts: [...VERDICTS],
     manualReasons: [...MANUAL_REASON_VALUES],
     requires: {
-      C: "a non-empty justification AND citations[] naming the harvested evidence it cleared (each anchor resolvable and drawn from this criterion's own evidence); a criterion with no harvested evidence cannot be C at all",
+      C: "a non-empty justification AND citations[] naming the harvested evidence it cleared (each anchor resolvable and drawn from this criterion's own evidence, and about the same kind of element the harvest recorded there — copy the evidence's own `snippet` rather than retyping the element); a criterion with no harvested evidence cannot be C at all",
       NA: "a non-empty justification",
       NC: "at least one groundable finding, each citing a normativeRef that resolves against the active standard",
       manual: `a reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`,
@@ -428,6 +428,109 @@ function auditFiles(audit: AuditResult, cwd?: string): Set<string> {
  *  criterion was never given. And it is only half the gate — `groundFinding` still has to find
  *  the cited content in the real source, so a plausible-looking file:line in the right
  *  neighbourhood proves nothing on its own. */
+/** The tag a citation or an anchor is about, from its snippet first and its selector second.
+ *  Lowercased — HTML tag names are case-insensitive. Undefined when neither says. */
+function tagOf(x: { snippet?: string; selector?: string }): string | undefined {
+  const fromSnippet = /<\s*([a-zA-Z][\w-]*)/.exec(x.snippet ?? "");
+  if (fromSnippet) return fromSnippet[1]!.toLowerCase();
+  const fromSelector = /^\s*([a-zA-Z][\w-]*)/.exec(x.selector ?? "");
+  return fromSelector ? fromSelector[1]!.toLowerCase() : undefined;
+}
+
+/** The distinctive words of a markup fragment: attribute VALUES and text, minus the noise.
+ *
+ *  Values and text, never attribute names — every `<a>` has an `href`, so names carry no
+ *  identity. Short tokens go too: `""`, `en`, `0` are shared by half a document. */
+function contentTokens(markup: string): Set<string> {
+  const out = new Set<string>();
+  const withoutTags = markup.replace(/<[^>]*>/g, " ");
+  for (const m of markup.matchAll(/=\s*"([^"]*)"|=\s*'([^']*)'/g)) {
+    for (const w of (m[1] ?? m[2] ?? "").split(/[\s/_-]+/)) if (w.length >= 3) out.add(w.toLowerCase());
+  }
+  for (const w of withoutTags.split(/[\s/_-]+/)) if (w.length >= 3) out.add(w.toLowerCase());
+  return out;
+}
+
+/** Is the citation RECOGNISABLY the element the harvest recorded at that anchor?
+ *
+ *  This is what survives when byte-exact snippet matching is given up, and it has to do two
+ *  jobs at once. An adjudicator that retypes an element — attributes reordered, `class` left
+ *  off — named the right thing and must not be refused. An adjudicator that writes down a
+ *  DIFFERENT element at the same anchor (another link, another href, another label) has not
+ *  read what it claims to have read, and must be.
+ *
+ *  So: same tag, and at least one distinctive word in common — an attribute value or a word of
+ *  the text. `<img alt="" src="/assets/help.svg">` against
+ *  `<img src="/assets/help.svg" alt="" class="fr-responsive-img">` shares `assets` and
+ *  `help.svg`; `<a href="/invented">Nowhere</a>` against `<a href="/pricing">Read more</a>`
+ *  shares nothing at all.
+ *
+ *  Silence is not contradiction: a citation with no snippet, or an anchor whose markup carries
+ *  no distinctive word (`<br>`), is judged on the tag alone. Membership and the anchor's own
+ *  grounding still stand behind every one of them. */
+function recognisablySame(cite: { snippet?: string; selector?: string }, anchor: { snippet?: string; selector?: string }): boolean {
+  const ta = tagOf(cite);
+  const tb = tagOf(anchor);
+  if (ta !== undefined && tb !== undefined && ta !== tb) return false;
+  if (!cite.snippet || !anchor.snippet) return true;
+  const want = contentTokens(anchor.snippet);
+  if (!want.size) return true;
+  const got = contentTokens(cite.snippet);
+  if (!got.size) return true;
+  for (const w of got) if (want.has(w)) return true;
+  return false;
+}
+
+/** How much of the anchor's distinctive content the citation repeats. 0 = nothing in common. */
+function overlap(cite: { snippet?: string }, anchor: { snippet?: string }): number {
+  if (!cite.snippet || !anchor.snippet) return 0;
+  const want = contentTokens(anchor.snippet);
+  if (!want.size) return 0;
+  let n = 0;
+  for (const w of contentTokens(cite.snippet)) if (want.has(w)) n++;
+  return n;
+}
+
+/** The harvested anchor a citation resolves to, or undefined.
+ *
+ *  Two shapes, because a class carries two kinds of anchor. The REPRESENTATIVE has a snippet
+ *  the engine read out of the file itself; a SIBLING in `alsoAt` is a bare `file:line` — the
+ *  same content class at another occurrence, with no snippet recorded. Which one matched
+ *  decides what can be grounded, so the caller is told.
+ *
+ *  CONTENT BREAKS THE TIE, because the line often cannot. A page snapshot is
+ *  `documentElement.outerHTML`: one line, the whole document. Every anchor harvested from it
+ *  therefore sits at line 2, so "the anchor at the cited line" names dozens of elements at
+ *  once and taking the first is a coin toss — measured on a real run, that is how a citation
+ *  of an `<img>` came to be checked against an `<svg>` and refused for describing the wrong
+ *  element. So among the anchors the line admits, the one the citation actually describes
+ *  wins; ties and empty overlaps keep document order, which is what a single-anchor file
+ *  always did. */
+function anchorFor(
+  evidence: Evidence[],
+  c: { file: string; line: number; snippet?: string },
+  drift: number,
+): { at: Evidence; representative: boolean } | undefined {
+  const reps = evidence.filter((e) => e.file === c.file && Math.abs(e.line - c.line) <= drift);
+  const best = (cands: Evidence[]): Evidence | undefined => {
+    let top: Evidence | undefined;
+    let score = -1;
+    for (const e of cands) {
+      const n = overlap(c, e);
+      if (n > score) {
+        score = n;
+        top = e;
+      }
+    }
+    return top;
+  };
+  const rep = best(reps);
+  if (rep) return { at: rep, representative: true };
+  const siblings = evidence.filter((e) => cites0(e.alsoAt ?? [], c, drift));
+  const sib = best(siblings);
+  return sib ? { at: sib, representative: false } : undefined;
+}
+
 function cites0(anchors: string[], c: { file: string; line: number }, drift: number): boolean {
   for (const a of anchors) {
     const at = a.lastIndexOf(":");
@@ -716,7 +819,40 @@ export function applyAdjudication(
           if (!cites0(anchors, c, citationDrift) && !scopeFiles().has(c.file)) {
             blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c.file}:${c.line} is not among this criterion's harvested evidence (fabricated?)`);
           }
-          toGround(it.criteriaId, { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet });
+          // GROUND THE ANCHOR, NOT THE TRANSCRIPTION.
+          //
+          // Once a citation lands on evidence this criterion was shown, the harvested anchor is
+          // the ground truth: the engine read it out of the file, so it is there by
+          // construction. Re-checking the agent's RETYPING of it against the file tests
+          // spelling, not evidence — and it fails constantly, because an adjudicator writes the
+          // element out from the brief rather than copying the `snippet` field byte for byte.
+          //
+          // Measured on a real run: 81 criteria adjudicated, 78 of 82 citations landing exactly
+          // on a harvested anchor, and 54 verdicts refused — every one of them for
+          // `cited snippet not found`. A rendered snapshot serializes the document on ONE line,
+          // so its anchors all sit at line 2 and the grounding window is the whole page: what
+          // failed was never the location, only the transcription of it.
+          //
+          // A sibling from `alsoAt` carries no snippet (it is a bare `file:line`), so there is
+          // nothing authoritative to ground — the selector probe runs against the real file
+          // instead, which is the same check a citation with no snippet has always had.
+          //
+          // Anything OUTSIDE the harvest keeps the strict check below, unchanged. That is where
+          // a fabricated location would hide, and this must not become a way to launder one.
+          const anchor = anchorFor(it.evidence, c, citationDrift);
+          if (anchor && !recognisablySame(c, anchor.at)) {
+            blame(
+              it.criteriaId,
+              `criterion ${it.criteriaId}: citation ${c.file}:${c.line} does not describe the element harvested there (${anchor.at.snippet ? `\`${anchor.at.snippet.slice(0, 80)}\`` : `<${tagOf(anchor.at)}>`}) — cite the element you actually read, copying its \`snippet\` from the brief`,
+            );
+          }
+          if (anchor?.representative) {
+            toGround(it.criteriaId, { file: anchor.at.file, line: anchor.at.line, selector: anchor.at.selector ?? c.selector, snippet: anchor.at.snippet });
+          } else if (anchor) {
+            toGround(it.criteriaId, { file: c.file, line: c.line, selector: anchor.at.selector ?? c.selector });
+          } else {
+            toGround(it.criteriaId, { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet });
+          }
         }
       }
     } else if (v === "NC") {
@@ -945,6 +1081,11 @@ const residualUndecidableReason = () => "Left as an explicit residual risk (not 
  *  contract violation rather than a bare « to assess ». */
 const residualRejectedReason = (why: string) => `Adjudication refused by the gate — ${why.replace(/^criterion \S+: /, "")}. Re-adjudicate this criterion.`;
 
+/** Characters of a harvested snippet the brief prints. Long enough that the element is
+ *  unmistakable — its tag and its first distinctive attributes — and short enough that a page
+ *  snapshot's markup does not swamp a model's context. */
+const SNIPPET_SHOWN = 200;
+
 // ---- worklist file rendering ----
 const T = {
   fr: {
@@ -965,6 +1106,7 @@ const T = {
     pagesWord: "page(s)",
     on: "sur",
     alsoAt: "aussi en",
+    snippetLabel: "`snippet` à copier dans la citation",
     incomplete: "LECTURE INCOMPLÈTE — un « C » sera refusé sur ce critère",
     none: "(aucune évidence automatique — décidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "À vérifier manuellement",
@@ -995,6 +1137,7 @@ const T = {
     pagesWord: "page(s)",
     on: "on",
     alsoAt: "also at",
+    snippetLabel: "`snippet` to copy into the citation",
     incomplete: "INCOMPLETE READING — a C will be refused on this criterion",
     none: "(no automatic evidence — decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
@@ -1152,6 +1295,23 @@ export function formatAdjudication(
           .filter(Boolean)
           .join(" ");
         out.push(`- \`${e.file}:${e.line}\` (\`${e.selector}\`)${extra ? ` [${extra}]` : ""}${e.note ? ` — ${e.note}` : ""}`);
+        // THE SNIPPET, SHOWN AND NAMED.
+        //
+        // The contract asks a citation to carry one, and this brief used to end each line with
+        // the harvester's NOTE — which for an image subject reads `<svg> alt="" aria-label=""
+        // src=""`. That is markup-shaped, and it was the only markup-shaped string on the line.
+        // Measured on a real run: the adjudicator copied it into 34 citations, each one a tag
+        // glued to three empty attributes, and the fold refused every one — correctly, and
+        // uselessly, because a citation that repeats a template proves nothing. The agent was
+        // copying the only thing it had been given.
+        //
+        // Its own line, and labelled, so it cannot be read as more of the note. Bounded because
+        // a rendered snapshot's markup can be long and this file is read by a model with a
+        // context to spend.
+        if (e.snippet?.trim()) {
+          const snip = e.snippet.trim().replace(/\s+/g, " ").slice(0, SNIPPET_SHOWN);
+          out.push(`  - ${s.snippetLabel} : \`${snip}${e.snippet.trim().length > SNIPPET_SHOWN ? "…" : ""}\``);
+        }
       }
       out.push("");
     }
