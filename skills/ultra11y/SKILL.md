@@ -4,7 +4,7 @@ description: "Use to AUDIT existing HTML/CSS/JSX against WCAG 2.2 AA accessibili
 when_to_use: "Invoke when the user asks for an accessibility AUDIT or a formal deliverable: audit a repo, site or page against WCAG 2.2 AA or a country standard (RGAA, Section 508, EN 301 549); produce a dated conformance report, a criterion grid, a PRD backlog, or tickets (GitHub/GitLab/Jira); author accessible markup from scratch; wire the repo gate (init --hook/--ci) or a rendered-DOM capture pipeline. For a review of the code UNDER CHANGE (diff, branch, PR), use the `review-a11y` skill instead."
 license: MIT
 metadata:
-  version: 5.5.3
+  version: 5.5.4
 ---
 
 # ultra11y — audit WCAG 2.2 AA and write accessible markup

@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.5.4](https://github.com/maxgfr/ultra11y/compare/v5.5.3...v5.5.4) (2026-08-18)
+
+
+### Bug Fixes
+
+* **adjudicate:** read a citation whichever way it was written ([3994a9f](https://github.com/maxgfr/ultra11y/commit/3994a9f8e371b4b19c7c331101321d381fe127fd))
+
 ## [5.5.3](https://github.com/maxgfr/ultra11y/compare/v5.5.2...v5.5.3) (2026-08-18)
 
 
