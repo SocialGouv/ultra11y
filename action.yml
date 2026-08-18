@@ -597,6 +597,14 @@ runs:
           real — but a `C` will be refused, because clearing a criterion is a claim about
           everything, including the part you were not shown.
 
+          A `C` WITHOUT CITATIONS IS REFUSED, every time, however good the justification. « All
+          the navigation menus are consistent » is a claim about elements; name at least one of
+          the ones you were shown, with its `file`, `line` and `snippet`. Measured on a real
+          run: eight criteria were lost to this alone — 10.1, 10.2, 10.3, 11.11, 11.12, 12.3,
+          12.4 and 12.8 — each with hundreds of evidence items in front of it and not one cited.
+          If the brief is too large to read in full, that is what `manual` with
+          `reason: "undecidable"` is for; it is a correct answer, and an uncited `C` is not.
+
           Fill EVERY item's verdict. Each one stands or falls on its own: a verdict the gate
           refuses costs its own criterion (which stays « to assess », carrying the refusal) and
           leaves every other verdict standing — so work through the list steadily rather than

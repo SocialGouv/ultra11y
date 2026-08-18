@@ -57794,10 +57794,11 @@ function applyAdjudication(audit2, adj, opts = {}) {
   let scopeCache;
   const { citationDrift } = adjudicationLimits(opts.cwd);
   const scopeFiles = () => scopeCache ??= auditFiles(audit2, opts.cwd);
-  const toGround = (criteriaId, g) => {
+  const toGround = (criteriaId, g, fallback) => {
+    const entry = { g, ...fallback ? { fallback } : {} };
     const list = groundInputs.get(criteriaId);
-    if (list) list.push(g);
-    else groundInputs.set(criteriaId, [g]);
+    if (list) list.push(entry);
+    else groundInputs.set(criteriaId, [entry]);
   };
   for (const it of adj.items) {
     const v = it.verdict;
@@ -57831,18 +57832,15 @@ function applyAdjudication(audit2, adj, opts = {}) {
             blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c2.file}:${c2.line} is not among this criterion's harvested evidence (fabricated?)`);
           }
           const anchor = anchorFor(it.evidence, c2, citationDrift);
-          if (anchor && !recognisablySame(c2, anchor.at)) {
-            blame(
+          const cite = { file: c2.file, line: c2.line, selector: c2.selector, snippet: c2.snippet };
+          if (anchor && recognisablySame(c2, anchor.at)) {
+            toGround(
               it.criteriaId,
-              `criterion ${it.criteriaId}: citation ${c2.file}:${c2.line} does not describe the element harvested there (${anchor.at.snippet ? `\`${anchor.at.snippet.slice(0, 80)}\`` : `<${tagOf2(anchor.at)}>`}) \u2014 cite the element you actually read, copying its \`snippet\` from the brief`
+              cite,
+              anchor.representative ? { file: anchor.at.file, line: anchor.at.line, selector: anchor.at.selector ?? c2.selector, snippet: anchor.at.snippet } : { file: c2.file, line: c2.line, selector: anchor.at.selector ?? c2.selector }
             );
-          }
-          if (anchor?.representative) {
-            toGround(it.criteriaId, { file: anchor.at.file, line: anchor.at.line, selector: anchor.at.selector ?? c2.selector, snippet: anchor.at.snippet });
-          } else if (anchor) {
-            toGround(it.criteriaId, { file: c2.file, line: c2.line, selector: anchor.at.selector ?? c2.selector });
           } else {
-            toGround(it.criteriaId, { file: c2.file, line: c2.line, selector: c2.selector, snippet: c2.snippet });
+            toGround(it.criteriaId, cite);
           }
         }
       }
@@ -57869,8 +57867,12 @@ function applyAdjudication(audit2, adj, opts = {}) {
   }
   const grounding = { grounded: 0, moved: 0, failed: 0, issues: [] };
   for (const [criteriaId, inputs] of groundInputs) {
-    for (const input of inputs) {
-      const r = groundFinding(input, { cwd: opts.cwd });
+    for (const { g, fallback } of inputs) {
+      let r = groundFinding(g, { cwd: opts.cwd });
+      if (!r.ok && fallback) {
+        const viaAnchor = groundFinding(fallback, { cwd: opts.cwd });
+        if (viaAnchor.ok) r = { ok: true, moved: true };
+      }
       if (r.ok) {
         grounding.grounded++;
         if (r.moved) grounding.moved++;

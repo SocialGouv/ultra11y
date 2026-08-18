@@ -113,7 +113,10 @@ describe("a citation that lands on harvested evidence is grounded against that e
     };
     const r = applyAdjudication(audit(), file(only(wrongKind)), { cwd: dir });
     expect(r.rejectedCriteria).toContain(base.criteriaId);
-    expect(r.issues.join("\n")).toMatch(/cite the element you actually read/);
+    // The refusal comes from the FILE check, which is the honest reason: this markup is not
+    // there. Recognisability does not blame on its own — it only decides whether the harvested
+    // anchor may vouch for a citation the file could not confirm, and here it may not.
+    expect(r.issues.join("\n")).toMatch(/cited snippet not found/);
   });
 
   it("accepts the same element with its attributes in another order and some of them dropped", () => {
@@ -127,6 +130,34 @@ describe("a citation that lands on harvested evidence is grounded against that e
       citations: [{ file: anchor.file, line: anchor.line, selector: anchor.selector, snippet: `<${tag} alt="">` }],
     };
     const r = applyAdjudication(audit(), file(only(cleared)), { cwd: dir });
+    expect(r.rejectedCriteria, r.issues.join("\n")).not.toContain(base.criteriaId);
+  });
+});
+
+// The strict check comes FIRST, and the anchor is only ever a fallback.
+//
+// Getting that order wrong cost real criteria. The drift window exists so an adjudicator can
+// cite a RELATED element inside the anchor it was shown — RGAA 5.2 asks about a table's
+// summary, and the harvest anchors the `<table>`, so the honest citation is the `<caption>` a
+// line below. Grounding the anchor instead of the citation refused exactly that: measured on a
+// real run, 5.2, 5.4, 5.5, 11.6, 11.7 and 11.9 all died saying « does not describe the element
+// harvested there », each of them a correct citation of a neighbour.
+//
+// So: whatever the agent wrote is checked against the real file first. Only when that fails —
+// which is what a retyping looks like — does the harvested anchor stand in for it, and only
+// then does recognisability have anything to say.
+describe("a citation the file itself supports is never second-guessed", () => {
+  it("accepts a neighbouring element the agent really read, whatever the anchor holds", () => {
+    const base = itemWithEvidence();
+    const anchor = base.evidence[0]!;
+    // Present in the fixture, a different element from the anchor, and genuinely there.
+    const neighbour: AdjudicationItem = {
+      ...base,
+      verdict: "C",
+      justification: "vérifié : le lien porte un intitulé explicite",
+      citations: [{ file: anchor.file, line: anchor.line, selector: "a.fr-link", snippet: '<a href="/contact" class="fr-link">Nous contacter</a>' }],
+    };
+    const r = applyAdjudication(audit(), file(only(neighbour)), { cwd: dir });
     expect(r.rejectedCriteria, r.issues.join("\n")).not.toContain(base.criteriaId);
   });
 });

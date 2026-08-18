@@ -732,15 +732,21 @@ export function applyAdjudication(
   // Per-item fail-closed validation. Grounding inputs are collected PER ITEM (not into one
   // flat list) for the same reason as `blame`: a failed citation has to condemn its own
   // criterion and no other.
-  const groundInputs = new Map<string, { file: string; line: number; selector?: string; snippet?: string }[]>();
+  type Ground = { file: string; line: number; selector?: string; snippet?: string };
+  const groundInputs = new Map<string, { g: Ground; fallback?: Ground }[]>();
   // Memoised: only a citation that missed its criterion's own anchors ever asks for it.
   let scopeCache: Set<string> | undefined;
   const { citationDrift } = adjudicationLimits(opts.cwd);
   const scopeFiles = (): Set<string> => (scopeCache ??= auditFiles(audit, opts.cwd));
-  const toGround = (criteriaId: string, g: { file: string; line: number; selector?: string; snippet?: string }) => {
+  const toGround = (
+    criteriaId: string,
+    g: { file: string; line: number; selector?: string; snippet?: string },
+    fallback?: { file: string; line: number; selector?: string; snippet?: string },
+  ) => {
+    const entry = { g, ...(fallback ? { fallback } : {}) };
     const list = groundInputs.get(criteriaId);
-    if (list) list.push(g);
-    else groundInputs.set(criteriaId, [g]);
+    if (list) list.push(entry);
+    else groundInputs.set(criteriaId, [entry]);
   };
   for (const it of adj.items) {
     const v = it.verdict;
@@ -839,19 +845,33 @@ export function applyAdjudication(
           //
           // Anything OUTSIDE the harvest keeps the strict check below, unchanged. That is where
           // a fabricated location would hide, and this must not become a way to launder one.
+          // THE CITATION FIRST, THE ANCHOR ONLY AS A FALLBACK — and the order is the whole
+          // point.
+          //
+          // Whatever the agent wrote is checked against the real file, exactly as before. That
+          // is the strongest proof there is, and it covers the case the drift window exists
+          // for: RGAA 5.2 asks about a table's summary, the harvest anchors the `<table>`, and
+          // the honest citation is the `<caption>` a line below. Grounding the anchor INSTEAD
+          // refused precisely that — measured on a real run, 5.2, 5.4, 5.5, 11.6, 11.7 and
+          // 11.9 all died on it, each a correct citation of a neighbour.
+          //
+          // Only when the citation does not ground — which is what a RETYPING looks like, and
+          // on a one-line snapshot that is most of them — does the harvested anchor stand in.
+          // It is authoritative there: the engine read it out of the file itself. And only
+          // then does recognisability have anything to say, because only then is the anchor
+          // being used to vouch for something the file did not confirm on its own.
           const anchor = anchorFor(it.evidence, c, citationDrift);
-          if (anchor && !recognisablySame(c, anchor.at)) {
-            blame(
+          const cite = { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet };
+          if (anchor && recognisablySame(c, anchor.at)) {
+            toGround(
               it.criteriaId,
-              `criterion ${it.criteriaId}: citation ${c.file}:${c.line} does not describe the element harvested there (${anchor.at.snippet ? `\`${anchor.at.snippet.slice(0, 80)}\`` : `<${tagOf(anchor.at)}>`}) — cite the element you actually read, copying its \`snippet\` from the brief`,
+              cite,
+              anchor.representative
+                ? { file: anchor.at.file, line: anchor.at.line, selector: anchor.at.selector ?? c.selector, snippet: anchor.at.snippet }
+                : { file: c.file, line: c.line, selector: anchor.at.selector ?? c.selector },
             );
-          }
-          if (anchor?.representative) {
-            toGround(it.criteriaId, { file: anchor.at.file, line: anchor.at.line, selector: anchor.at.selector ?? c.selector, snippet: anchor.at.snippet });
-          } else if (anchor) {
-            toGround(it.criteriaId, { file: c.file, line: c.line, selector: anchor.at.selector ?? c.selector });
           } else {
-            toGround(it.criteriaId, { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet });
+            toGround(it.criteriaId, cite);
           }
         }
       }
@@ -893,8 +913,15 @@ export function applyAdjudication(
   // flat `groundItems` produced.
   const grounding: GroundingSummary = { grounded: 0, moved: 0, failed: 0, issues: [] };
   for (const [criteriaId, inputs] of groundInputs) {
-    for (const input of inputs) {
-      const r = groundFinding(input, { cwd: opts.cwd });
+    for (const { g, fallback } of inputs) {
+      let r = groundFinding(g, { cwd: opts.cwd });
+      // The harvested anchor vouches for a citation the file could not confirm on its own —
+      // an adjudicator's retyping of an element it did read. `moved` either way: what
+      // grounded is not verbatim what was cited.
+      if (!r.ok && fallback) {
+        const viaAnchor = groundFinding(fallback, { cwd: opts.cwd });
+        if (viaAnchor.ok) r = { ok: true, moved: true };
+      }
       if (r.ok) {
         grounding.grounded++;
         if (r.moved) grounding.moved++;
