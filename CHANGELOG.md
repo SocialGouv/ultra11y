@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.10.0](https://github.com/maxgfr/ultra11y/compare/v5.9.2...v5.10.0) (2026-08-18)
+
+
+### Features
+
+* **annotate:** put the whole criterion grid in the page comment ([c0c7d2b](https://github.com/maxgfr/ultra11y/commit/c0c7d2b39992b49c4c338158375f52b80d4914fb))
+
 ## [5.9.2](https://github.com/maxgfr/ultra11y/compare/v5.9.1...v5.9.2) (2026-08-18)
 
 
