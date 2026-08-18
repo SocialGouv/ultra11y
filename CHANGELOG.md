@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.5.1](https://github.com/maxgfr/ultra11y/compare/v5.5.0...v5.5.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* **parse:** anchor a snippet on its element, not on the line it shares ([a5f572b](https://github.com/maxgfr/ultra11y/commit/a5f572b74b182d42adcf2c76992018e8707dbf7e))
+
 # [5.5.0](https://github.com/maxgfr/ultra11y/compare/v5.4.1...v5.5.0) (2026-08-18)
 
 
