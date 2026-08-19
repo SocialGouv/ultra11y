@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.14.0](https://github.com/maxgfr/ultra11y/compare/v5.13.1...v5.14.0) (2026-08-19)
+
+
+### Features
+
+* **check:** fail while a declared page produced no capture ([4bfd08f](https://github.com/maxgfr/ultra11y/commit/4bfd08f3e26387206db84eaff05684ed2d35869b))
+
 ## [5.13.1](https://github.com/maxgfr/ultra11y/compare/v5.13.0...v5.13.1) (2026-08-19)
 
 
