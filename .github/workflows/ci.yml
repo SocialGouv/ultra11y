@@ -226,9 +226,12 @@ jobs:
   # no business slowing the unit suite down.
   browser-tier:
     runs-on: ubuntu-latest
-    # Sized to the slowest real CDN day, not the average one: this job's browser download
-    # has taken anywhere from ~1min to >15min, and a timeout here reads as a code failure.
-    timeout-minutes: 25
+    # The ceiling only needs to cover ONE slow-CDN download per Playwright version: the
+    # browsers are cached below, keyed on the lockfile, so a cache hit skips the download
+    # entirely. Before the cache, this job timed out at 15 then 25 minutes on a day the
+    # Azure runners' CDN crawled — a network problem that read in the run list exactly
+    # like a code failure.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -237,6 +240,13 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The browsers live outside the pnpm store (~/.cache/ms-playwright) and weigh
+      # ~170MB — the one download in this job the package cache does not cover.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm exec playwright install --with-deps chromium
       # ULTRA11Y_REQUIRE_BROWSER turns a silent skip into a failure. The tests skip by design
       # where no browser is installed; here one is installed on purpose, so a skip would make
@@ -249,9 +259,9 @@ jobs:
   action:
     runs-on: ubuntu-latest
     # A flaky install step once hung this job for 3h27 (GitHub's default job timeout is
-    # 6h); the real work needs ~10 minutes, but the browser download varies with the CDN
-    # (observed 1-15min+), so the ceiling is sized to the slow day, not the average one.
-    timeout-minutes: 25
+    # 6h); the real work needs ~10 minutes, and the browser download is cached below, so
+    # the ceiling only has to cover one slow-CDN download per Playwright version.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -346,7 +356,13 @@ jobs:
       # The page-by-page half: a real browser over a served page, snapshotted, folded into the
       # audit and rendered as per-page dossiers. This is the path the whole feature exists for,
       # and the one no unit test can reach. The packages were installed by `pnpm install`
-      # above; what is still missing is only the browser binary itself.
+      # above; what is still missing is only the browser binary itself — cached the same way
+      # as browser-tier's, so a cache hit skips the ~170MB download.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install the browser tier
         run: pnpm exec playwright install --with-deps chromium
 
