@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import { checkDecided, isUndecidedFile } from "../src/check.js";
-import type { AuditResult, CriterionResult } from "../src/types.js";
+import type { AuditResult, CriterionResult, Finding } from "../src/types.js";
 import { INAPPLICABLE_STATUS } from "../src/types.js";
 
 const audit = (criteria: Pick<CriterionResult, "id" | "status">[]): AuditResult =>
@@ -111,5 +111,92 @@ describe("a not-applicable verdict is not a conformity, and is not gated like on
 
     expect(r.issues.join("\n")).not.toMatch(/must cite at least one/);
     expect(r.audit.criteria.find((c) => c.id === "2.4.4")?.status).toBe(INAPPLICABLE_STATUS);
+  });
+});
+
+// THE PAGE DIMENSION — a strictly higher bar, and the one a per-page deliverable is judged on.
+//
+// The run's grid can be complete while a page's is not. A criterion non-conforming somewhere is
+// SETTLED for the run; on a page the failure never fired on it may still be nobody's verdict.
+// Measured on egapro: 104 of 106 decided for the run, and 8 to 11 open on each of its 37 pages
+// — a green completeness gate over a deliverable that was 90 % filled in.
+describe("check --require-decided=pages", () => {
+  const F = (over: Partial<Finding> = {}): Finding =>
+    ({
+      ruleId: "img-alt-missing",
+      criteriaId: "1.1.1",
+      file: "src/a.html",
+      line: 1,
+      col: 1,
+      selectorHint: "img",
+      severity: "bloquant",
+      message: "x",
+      remediation: "y",
+      snippet: "",
+      ...over,
+    }) as Finding;
+
+  const withPages = (criteria: Pick<CriterionResult, "id" | "status">[]): AuditResult => {
+    const a = audit(criteria);
+    a.scope.pages = [
+      { id: "accueil", name: "Accueil", url: "https://x/", basis: "snapshot" },
+      { id: "contact", name: "Contact", url: "https://x/contact", basis: "snapshot" },
+    ];
+    a.scope.pagesAudited = ["accueil", "contact"];
+    return a;
+  };
+
+  it("passes the run and FAILS the page, when a criterion is decided only run-wide", () => {
+    // 1.1.1 is NC for the run — a definite failure fired on `contact`. Nothing fired on
+    // `accueil`, and 1.1.1 is not a criterion the engine decides by silence, so there it is
+    // nobody's verdict yet. 2.4.2 is static, so silence on a snapshot page does decide it.
+    const a = withPages([
+      { id: "1.1.1", status: "NC" },
+      { id: "2.4.2", status: "C" },
+    ]);
+    expect(checkDecided(a).ok).toBe(true);
+    const perPage = checkDecided(a, "wcag", "en", { pages: true });
+    expect(perPage.ok).toBe(false);
+    expect(perPage.pages?.map((p) => p.name)).toEqual(["Accueil", "Contact"]);
+    expect(perPage.pages?.every((p) => p.undecided.includes("1.1.1"))).toBe(true);
+  });
+
+  it("states what is open EVERYWHERE once, and what is specific to a page on that page", () => {
+    // Under a per-page norm the usual shape is a criterion nobody can decide anywhere, so the
+    // naive rendering is one identical line per page — a wall that hides the page with a
+    // problem of its own. Here 1.1.1 is open on both, and 1.3.1 only on `accueil` (a definite
+    // failure on `contact` settles it there).
+    const only = F({ page: "contact", criteriaId: "1.3.1" });
+    const a = withPages([
+      { id: "1.1.1", status: "NC" },
+      { id: "1.3.1", status: "NC" },
+      { id: "2.4.2", status: "C" },
+    ]);
+    a.criteria[1]!.findings = [only];
+    a.findings = [only];
+    const r = checkDecided(a, "wcag", "en", { pages: true });
+    expect(r.issues.join("\n")).toMatch(/On all 2 affected page\(s\).*1\.1\.1/);
+    expect(r.issues.join("\n")).toMatch(/Page “Accueil”.*1\.3\.1/);
+    expect(r.issues.join("\n")).not.toMatch(/Page “Contact”/);
+  });
+
+  it("passes, and says it looked, when no page is in scope", () => {
+    // `[]` means "checked, nothing open"; `undefined` means "nobody looked". A gate whose
+    // result cannot tell those apart is one you cannot audit.
+    const r = checkDecided(audit([{ id: "1.1.1", status: "C" }]), "wcag", "en", { pages: true });
+    expect(r.ok).toBe(true);
+    expect(r.pages).toEqual([]);
+    expect(checkDecided(audit([{ id: "1.1.1", status: "C" }])).pages).toBeUndefined();
+  });
+
+  it("honours the declared-undecidable list on a page too", () => {
+    const a = withPages([
+      { id: "1.1.1", status: "NC" },
+      { id: "2.4.2", status: "C" },
+    ]);
+    const allow = { entries: [{ criteriaId: "1.1.1", reason: "no image in the design system yet" }] };
+    // Declared at the run level, the same criterion must not come back through the page door —
+    // an exception a reader signed off once should not have to be signed off per route.
+    expect(checkDecided(a, "wcag", "en", { pages: true, allow }).ok).toBe(true);
   });
 });

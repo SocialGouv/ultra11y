@@ -12,7 +12,8 @@ import { hasSC } from "./wcag.js";
 import { type StandardId, CORE, criterionCoverage, isCore, loadPack, hasId, idCaptureSource, derivePackResults } from "./standards/index.js";
 import { buildWorklist, applyVerdicts, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
-import { isPagesReport } from "./pages-report.js";
+import { isPagesReport, pageCriterionRows } from "./pages-report.js";
+import { attributePages, derivePages, pagesOf } from "./pages.js";
 import { PAGES_DIR } from "./snapshot.js";
 
 export interface CheckResult {
@@ -453,6 +454,13 @@ export interface DecidedResult {
   /** Criteria still « to assess » but declared, with their stated reason. */
   allowed: UndecidedAllowance[];
   total: number;
+  /** Per page, the criteria still « to assess » there and not declared. PRESENT — possibly
+   *  empty — whenever the caller asked for the page dimension, absent when it did not: `[]`
+   *  says the pages were checked and nothing is open, `undefined` says nobody looked, and a
+   *  reader of this result must be able to tell those apart. A criterion can be settled for
+   *  the RUN and open on a page — that is the normal shape of a per-page norm, and it is
+   *  exactly what a page-by-page deliverable is judged on. */
+  pages?: { id: string; name: string; undecided: string[] }[];
 }
 
 export function isUndecidedFile(v: unknown): v is UndecidedFile {
@@ -460,7 +468,12 @@ export function isUndecidedFile(v: unknown): v is UndecidedFile {
 }
 
 /** Every criterion of `standard` that carries no verdict, minus the ones declared. */
-export function checkDecided(audit: AuditResult, standard: StandardId = CORE, lang: Lang = "en", opts: { allow?: UndecidedFile } = {}): DecidedResult {
+export function checkDecided(
+  audit: AuditResult,
+  standard: StandardId = CORE,
+  lang: Lang = "en",
+  opts: { allow?: UndecidedFile; pages?: boolean } = {},
+): DecidedResult {
   const fr = lang === "fr";
   const rows = isCore(standard)
     ? audit.criteria.map((c) => ({ id: c.id, status: c.status }))
@@ -480,11 +493,29 @@ export function checkDecided(audit: AuditResult, standard: StandardId = CORE, la
     }
     declared.set(e.criteriaId, e);
   }
+  // THE PAGE DIMENSION — a different question, and the one a per-page norm is judged on.
+  //
+  // The run-wide grid can be complete while a page's is not: a criterion non-conforming
+  // somewhere is settled FOR THE RUN, and on a page the failure did not fire on it may still be
+  // nobody's verdict. A deliverable that publishes one sheet per page is only complete when
+  // every sheet is, so a gate that stops at the run's own grid passes green over exactly the
+  // gap the deliverable is about. Measured on egapro: 104/106 decided for the run, 8 to 11 open
+  // on each of the 37 pages.
+  //
+  // Off by default: it is a stricter question, it needs pages in scope, and a project that
+  // audits code only has nothing to answer.
+  //
+  // Computed HERE, before the staleness check below, because the two interact: a criterion open
+  // only on a page is not open for the run, and a declaration covering it would otherwise be
+  // reported as a stale exception for the thing it is actively excusing.
+  const perPage = opts.pages ? openPerPage(audit, standard, lang) : [];
+
   // A declaration that no longer matches an open criterion is stale, and a stale allowance is
   // how an exception list quietly outlives the thing it excused.
   const open = new Set(rows.filter((r) => r.status === "manual").map((r) => r.id));
+  const openAnywhere = new Set([...open, ...perPage.flatMap((p) => p.undecided)]);
   for (const id of declared.keys()) {
-    if (!open.has(id)) {
+    if (!openAnywhere.has(id)) {
       issues.push(
         fr
           ? `Critère ${id} déclaré indécidable, mais il porte désormais un verdict — retirez-le de la liste.`
@@ -504,5 +535,52 @@ export function checkDecided(audit: AuditResult, standard: StandardId = CORE, la
         : `${undecided.length}/${rows.length} criterion(ia) still to assess: ${undecided.join(", ")}.`,
     );
   }
-  return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length };
+
+  // The declared exceptions apply per page too: an allowance a reader signed off once should
+  // not have to be signed off again for every route it shows up on.
+  const pages = opts.pages
+    ? perPage.map((p) => ({ ...p, undecided: p.undecided.filter((id) => !declared.has(id)) })).filter((p) => p.undecided.length)
+    : undefined;
+  // ONE LINE FOR WHAT IS OPEN EVERYWHERE. Under a per-page norm the usual shape is a criterion
+  // the engine cannot decide anywhere, so the naive rendering is thirty-seven identical lines
+  // saying « 11.9, 12.3 » — a wall that hides the one page with a problem of its own. What is
+  // open on every page is stated once; what is specific to a page is stated on that page.
+  const pageCount = pages?.length ?? 0;
+  const everywhere = pageCount && pages ? pages[0]!.undecided.filter((id) => pages.every((p) => p.undecided.includes(id))) : [];
+  if (everywhere.length) {
+    issues.push(
+      fr
+        ? `Sur les ${pageCount} page(s) concernée(s) : ${everywhere.length} critère(s) encore « à évaluer » — ${everywhere.join(", ")}.`
+        : `On all ${pageCount} affected page(s): ${everywhere.length} criterion(ia) still to assess — ${everywhere.join(", ")}.`,
+    );
+  }
+  for (const p of pages ?? []) {
+    const own = p.undecided.filter((id) => !everywhere.includes(id));
+    if (!own.length) continue;
+    issues.push(
+      fr
+        ? `Page « ${p.name} » : ${own.length} critère(s) encore « à évaluer » — ${own.join(", ")}.`
+        : `Page “${p.name}”: ${own.length} criterion(ia) still to assess — ${own.join(", ")}.`,
+    );
+  }
+  return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length, ...(pages ? { pages } : {}) };
+}
+
+/** Every page in scope, with the criteria still « to assess » on it — BEFORE any allowance is
+ *  applied, because the staleness check needs to know what is open regardless of what is
+ *  excused. Empty when nothing was snapshotted: a repository that audits code only has no page
+ *  dimension to answer for, and inventing one would fail a gate over an absence. */
+function openPerPage(audit: AuditResult, standard: StandardId, lang: Lang): { id: string; name: string; undecided: string[] }[] {
+  const scope = pagesOf(audit);
+  if (!scope.length) return [];
+  attributePages(audit, scope);
+  const out: { id: string; name: string; undecided: string[] }[] = [];
+  for (const page of derivePages(audit, scope)) {
+    const openHere = pageCriterionRows(audit, page, standard, lang)
+      .filter((r) => r.status === "manual")
+      .map((r) => r.id)
+      .sort(byCriterionId);
+    if (openHere.length) out.push({ id: page.id, name: page.name, undecided: openHere });
+  }
+  return out;
 }

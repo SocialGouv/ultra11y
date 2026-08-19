@@ -57043,9 +57043,11 @@ function checkDecided(audit2, standard = CORE2, lang = "en", opts = {}) {
     }
     declared.set(e.criteriaId, e);
   }
+  const perPage = opts.pages ? openPerPage(audit2, standard, lang) : [];
   const open = new Set(rows.filter((r) => r.status === "manual").map((r) => r.id));
+  const openAnywhere = /* @__PURE__ */ new Set([...open, ...perPage.flatMap((p) => p.undecided)]);
   for (const id of declared.keys()) {
-    if (!open.has(id)) {
+    if (!openAnywhere.has(id)) {
       issues.push(
         fr ? `Crit\xE8re ${id} d\xE9clar\xE9 ind\xE9cidable, mais il porte d\xE9sormais un verdict \u2014 retirez-le de la liste.` : `Criterion ${id} is declared undecidable but now carries a verdict \u2014 remove it from the list.`
       );
@@ -57058,7 +57060,33 @@ function checkDecided(audit2, standard = CORE2, lang = "en", opts = {}) {
       fr ? `${undecided.length}/${rows.length} crit\xE8re(s) encore \xAB \xE0 \xE9valuer \xBB : ${undecided.join(", ")}.` : `${undecided.length}/${rows.length} criterion(ia) still to assess: ${undecided.join(", ")}.`
     );
   }
-  return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length };
+  const pages = opts.pages ? perPage.map((p) => ({ ...p, undecided: p.undecided.filter((id) => !declared.has(id)) })).filter((p) => p.undecided.length) : void 0;
+  const pageCount = pages?.length ?? 0;
+  const everywhere = pageCount && pages ? pages[0].undecided.filter((id) => pages.every((p) => p.undecided.includes(id))) : [];
+  if (everywhere.length) {
+    issues.push(
+      fr ? `Sur les ${pageCount} page(s) concern\xE9e(s) : ${everywhere.length} crit\xE8re(s) encore \xAB \xE0 \xE9valuer \xBB \u2014 ${everywhere.join(", ")}.` : `On all ${pageCount} affected page(s): ${everywhere.length} criterion(ia) still to assess \u2014 ${everywhere.join(", ")}.`
+    );
+  }
+  for (const p of pages ?? []) {
+    const own = p.undecided.filter((id) => !everywhere.includes(id));
+    if (!own.length) continue;
+    issues.push(
+      fr ? `Page \xAB ${p.name} \xBB : ${own.length} crit\xE8re(s) encore \xAB \xE0 \xE9valuer \xBB \u2014 ${own.join(", ")}.` : `Page \u201C${p.name}\u201D: ${own.length} criterion(ia) still to assess \u2014 ${own.join(", ")}.`
+    );
+  }
+  return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length, ...pages ? { pages } : {} };
+}
+function openPerPage(audit2, standard, lang) {
+  const scope = pagesOf(audit2);
+  if (!scope.length) return [];
+  attributePages(audit2, scope);
+  const out2 = [];
+  for (const page of derivePages(audit2, scope)) {
+    const openHere = pageCriterionRows(audit2, page, standard, lang).filter((r) => r.status === "manual").map((r) => r.id).sort(byCriterionId);
+    if (openHere.length) out2.push({ id: page.id, name: page.name, undecided: openHere });
+  }
+  return out2;
 }
 
 // src/adjudicate.ts
@@ -66737,7 +66765,12 @@ Options:
                      .ultra11y/pages/. Coverage, one level below --require-decided: a sweep that
                      loses pages produces a report that is merely SHORTER, and a shorter
                      deliverable reads exactly like a complete one.
-  --require-decided  check: fail while ANY criterion of the standard is still \xAB to assess \xBB.
+  --require-decided[=pages]
+                     check: fail while ANY criterion of the standard is still \xAB to assess \xBB.
+                     '=pages' also holds EVERY page's own grid to the same bar \u2014 a criterion
+                     failing on one route is settled for the run and may still be undecided on
+                     the routes it never fired on, which is what a per-page deliverable is
+                     judged on.
                      Needs --in. A green job does not otherwise mean the grid was filled:
                      --fail-on governs non-conformities, and an adjudication that lands
                      nothing only warns.
@@ -68339,7 +68372,13 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
 function cmdCheck(p) {
   const standard = stdOf(p, "check");
   if (standard === null) return 2;
-  const requireDecided = p.flags["require-decided"] === true;
+  const decidedFlag = p.flags["require-decided"];
+  const requireDecided = decidedFlag === true || decidedFlag === "pages" || decidedFlag === "true";
+  const requireDecidedPages = decidedFlag === "pages";
+  if (typeof decidedFlag === "string" && decidedFlag !== "pages" && decidedFlag !== "true") {
+    console.error(`ultra11y check: --require-decided takes no value, or 'pages' \u2014 got '${decidedFlag}'.`);
+    return 2;
+  }
   const requireSample = p.flags["require-sample"] === true;
   const rep = p.flags.report;
   if (typeof rep !== "string" || !rep) {
@@ -68387,7 +68426,7 @@ function cmdCheck(p) {
       return 2;
     }
   }
-  const decided = requireDecided && audit2 ? checkDecided(audit2, standard, lang, { allow }) : null;
+  const decided = requireDecided && audit2 ? checkDecided(audit2, standard, lang, { allow, pages: requireDecidedPages }) : null;
   const covered = requireSample ? checkSampleCaptured(".", lang) : null;
   const res = md ? checkReport(md, standard, lang, { audit: audit2 }) : { ok: true, issues: [] };
   const sem = p.flags.semantic === true && typeof rep === "string" && rep ? checkSemantic(md, {
