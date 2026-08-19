@@ -180,6 +180,8 @@ export interface PageCriterionRow {
   // that happened to trigger a non-conformity.
   tests: string[];
   decidedBy?: "engine" | "agent" | "scan";
+  /** Conforming because nothing of its kind is on this page — see INAPPLICABLE_STATUS. */
+  inapplicable?: boolean;
 }
 
 /** The criterion rows for ONE page, in the active standard's own vocabulary and order.
@@ -195,6 +197,7 @@ export function pageCriterionRows(result: AuditResult, page: PageResult, standar
         status: c.status,
         tests: [],
         decidedBy: c.decidedBy,
+        ...(c.inapplicable ? { inapplicable: true } : {}),
       }));
   }
   const pack = loadPack(standard);
@@ -206,14 +209,47 @@ export function pageCriterionRows(result: AuditResult, page: PageResult, standar
     status: byId.get(pc.id)?.status ?? "manual",
     tests: packTestIds(pack, pc.id),
     decidedBy: byId.get(pc.id)?.decidedBy,
+    ...(byId.get(pc.id)?.inapplicable ? { inapplicable: true } : {}),
   }));
+}
+
+/** The pages, PROJECTED ONTO THE ACTIVE STANDARD — criteria, coverage and rate.
+ *
+ *  `derivePages` is WCAG-keyed, because the core is what the engine decides. Every rendered
+ *  surface then re-projects through `pageCriterionRows`, and the JSON output did not: the same
+ *  command, with the same `--standard rgaa`, answered `67 % (6/55)` in JSON and `92 % (65/106)`
+ *  in its own report. Two documents about one page, disagreeing on both the number and what it
+ *  was a number OF.
+ *
+ *  So the projection lives here, once, and the JSON reads it like everything else. */
+export function pagesForStandard(result: AuditResult, pages: PageResult[], standard: StandardId, lang: Lang): PageResult[] {
+  if (isCore(standard)) return pages;
+  return pages.map((p) => {
+    const rows = pageCriterionRows(result, p, standard, lang);
+    const cov = pageCoverage(rows);
+    return {
+      ...p,
+      criteria: rows.map((r) => ({
+        id: r.id,
+        guideline: r.group,
+        status: r.status,
+        findings: [],
+        ...(r.decidedBy ? { decidedBy: r.decidedBy } : {}),
+      })),
+      conformancePct: pageRatePct(rows),
+      decided: cov.decided,
+      total: cov.total,
+    };
+  });
 }
 
 export function pageTally(rows: PageCriterionRow[]): { c: number; nc: number; na: number; manual: number } {
   return {
     c: rows.filter((r) => r.status === "C").length,
     nc: rows.filter((r) => r.status === "NC").length,
-    na: rows.filter((r) => r.status === "NA").length,
+    // No row carries `NA` any more (INAPPLICABLE_STATUS); this counts the conformities
+    // reached for want of a subject, and it is a SUBSET of `c` rather than a fourth bucket.
+    na: rows.filter((r) => r.inapplicable).length,
     manual: rows.filter((r) => r.status === "manual").length,
   };
 }

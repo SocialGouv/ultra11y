@@ -489,7 +489,7 @@ function stayedOnPage(expected, actual) {
   if (a === void 0 || b === void 0) return true;
   return a === b;
 }
-function buildPayload(collected, url, runner, opts, screenshot, probes) {
+function buildPayload(collected, url, runner, opts, screenshot, probes, axe) {
   const id = opts.as || slugify(url);
   return {
     meta: {
@@ -522,7 +522,10 @@ function buildPayload(collected, url, runner, opts, screenshot, probes) {
     // What the live probes measured, when the caller asked for them. It rides in the payload
     // because `snapshot write` persists it beside the DOM — the audit that folds it runs later
     // and in another process, so a measurement kept in memory decides nothing.
-    ...probes ? { probes } : {}
+    ...probes ? { probes } : {},
+    // Same contract as the probes: it rides in the payload and `snapshot write` persists it
+    // beside the DOM, so the offline re-audit sees what the browser saw.
+    ...axe ? { axe } : {}
   };
 }
 function gate(result, pageName, failOn) {
@@ -588,6 +591,32 @@ function fromConfig() {
     return {};
   }
 }
+async function runAxe(page, mode) {
+  if (mode === false) return void 0;
+  const demanded = mode === true;
+  let AxeBuilder;
+  try {
+    const req = createRequire2(join(process.cwd(), "package.json"));
+    const mod = req("@axe-core/playwright");
+    AxeBuilder = mod.default ?? mod;
+  } catch (e) {
+    if (demanded) {
+      console.warn(
+        `ultra11y: axe was requested but @axe-core/playwright could not be resolved from ${process.cwd()} \u2014 ${e instanceof Error ? e.message : String(e)}. Install it, or set \`axe: false\`. The criteria axe decides stay to assess.`
+      );
+    }
+    return void 0;
+  }
+  try {
+    const res = await new AxeBuilder({ page }).analyze();
+    return { ran: true, violations: res.violations ?? [] };
+  } catch (e) {
+    console.warn(
+      `ultra11y: the axe pass failed on this page \u2014 ${e instanceof Error ? e.message : String(e)}. The snapshot was still recorded; the criteria axe decides stay to assess.`
+    );
+    return void 0;
+  }
+}
 async function checkA11y(page, opts = {}) {
   const collected = await page.evaluate(COLLECT_SNAPSHOT);
   let shot;
@@ -613,7 +642,8 @@ async function checkA11y(page, opts = {}) {
       );
     }
   }
-  const payload = buildPayload(collected, url, "playwright", opts, shot, probes);
+  const axe = await runAxe(page, opts.axe ?? "auto");
+  const payload = buildPayload(collected, url, "playwright", opts, shot, probes, axe);
   const result = auditSnapshot(payload);
   if (opts.report) writePagesReport(typeof opts.report === "object" ? opts.report : {});
   gate(result, String(payload.meta.name), opts.failOn);

@@ -37345,6 +37345,8 @@ ${snap.dom}
 `);
   if (snap.probes) writeFileSync5(join25(dir, "probes.json"), `${JSON.stringify(snap.probes)}
 `);
+  if (snap.axe) writeFileSync5(join25(dir, "axe.json"), `${JSON.stringify(snap.axe)}
+`);
   if (snap.screenshotBase64) {
     try {
       writeFileSync5(join25(dir, "screen.png"), Buffer.from(snap.screenshotBase64, "base64"));
@@ -37444,6 +37446,7 @@ function attachSignals(doc) {
   const css = readJson2(join25(dir, "css.json"));
   const meta2 = readJson2(join25(dir, "meta.json"));
   const probes = readJson2(join25(dir, "probes.json"));
+  const axe = readJson2(join25(dir, "axe.json"));
   const shot = join25(dir, "screen.png");
   const alignedStyleMap = styles ? align(doc, styles.entries) : null;
   const alignedBoxMap = boxes ? align(doc, boxes.entries) : null;
@@ -37457,6 +37460,7 @@ function attachSignals(doc) {
     ...existsSync12(shot) ? { screenshot: shot } : {},
     ...meta2?.doctype !== void 0 ? { doctype: meta2.doctype } : {},
     ...probes ? { probes } : {},
+    ...axe ? { axe } : {},
     ...truncated ? { truncated } : {}
   };
   if (Object.keys(signals).length) doc.signals = signals;
@@ -48492,6 +48496,7 @@ function newAccum() {
     pageIds: /* @__PURE__ */ new Set(),
     renderedRan: /* @__PURE__ */ new Map(),
     probedScs: /* @__PURE__ */ new Map(),
+    axeRan: /* @__PURE__ */ new Set(),
     subjectsSeen: /* @__PURE__ */ new Set()
   };
 }
@@ -48547,6 +48552,16 @@ function foldDoc(acc, doc, graph) {
         acc.renderedScs.add(sc);
       }
       for (const f of probeFindings(probes, doc.file, pageId)) {
+        const list = acc.byCriterion.get(f.criteriaId) ?? [];
+        list.push(f);
+        acc.byCriterion.set(f.criteriaId, list);
+        acc.allFindings.push(f);
+      }
+    }
+    const axe = doc.signals?.axe;
+    if (axe?.ran) {
+      acc.axeRan.add(pageId);
+      for (const f of axeFindings(axe.violations ?? [], doc.file, pageId)) {
         const list = acc.byCriterion.get(f.criteriaId) ?? [];
         list.push(f);
         acc.byCriterion.set(f.criteriaId, list);
@@ -48627,6 +48642,33 @@ function probeFindings(probes, file, page) {
   }
   if (probes.reflow?.horizontalScroll) {
     add2("1.4.10", "dyn-reflow", "majeur", "document", "", "Horizontal scrolling at 320px width \u2014 content does not reflow.");
+  }
+  return out2;
+}
+function axeFindings(violations, file, page) {
+  const out2 = [];
+  for (const v of violations) {
+    if (!v?.id) continue;
+    const criteriaId = scForAxe(v.id, v.tags);
+    const severity = severityFromImpact(v.impact);
+    const advisory = isAxeAdvisory(v.id, v.tags);
+    const nodes = v.nodes?.length ? v.nodes : [{ target: [], html: "" }];
+    for (const n of nodes) {
+      out2.push({
+        ruleId: `axe:${v.id}`,
+        criteriaId,
+        file,
+        line: 1,
+        col: 1,
+        selectorHint: n.target?.join(" ") || "document",
+        severity,
+        message: `${v.help ?? v.id} (axe: ${v.id})`,
+        remediation: "",
+        snippet: (n.html ?? "").slice(0, 200),
+        page,
+        ...advisory ? { advisory: true } : {}
+      });
+    }
   }
   return out2;
 }
@@ -53371,10 +53413,12 @@ function derivePackResults(audit2, packKey) {
   return pack.criteria.map((pc) => {
     const decided = adjudicated?.get(pc.id);
     if (decided) {
+      const na = decided.status === "NA";
       return {
         id: pc.id,
         theme: pc.theme,
-        status: decided.status,
+        status: na ? INAPPLICABLE_STATUS : decided.status,
+        ...na ? { inapplicable: true } : {},
         findings: decided.findings,
         scs: pc.wcag,
         ...decided.justification ? { justification: decided.justification } : {},
@@ -56407,7 +56451,8 @@ function pageCriterionRows(result, page, standard, lang) {
       group: c2.guideline,
       status: c2.status,
       tests: [],
-      decidedBy: c2.decidedBy
+      decidedBy: c2.decidedBy,
+      ...c2.inapplicable ? { inapplicable: true } : {}
     }));
   }
   const pack = loadPack(standard);
@@ -56418,14 +56463,37 @@ function pageCriterionRows(result, page, standard, lang) {
     group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim(),
     status: byId2.get(pc.id)?.status ?? "manual",
     tests: packTestIds(pack, pc.id),
-    decidedBy: byId2.get(pc.id)?.decidedBy
+    decidedBy: byId2.get(pc.id)?.decidedBy,
+    ...byId2.get(pc.id)?.inapplicable ? { inapplicable: true } : {}
   }));
+}
+function pagesForStandard(result, pages, standard, lang) {
+  if (isCore(standard)) return pages;
+  return pages.map((p) => {
+    const rows = pageCriterionRows(result, p, standard, lang);
+    const cov = pageCoverage(rows);
+    return {
+      ...p,
+      criteria: rows.map((r) => ({
+        id: r.id,
+        guideline: r.group,
+        status: r.status,
+        findings: [],
+        ...r.decidedBy ? { decidedBy: r.decidedBy } : {}
+      })),
+      conformancePct: pageRatePct(rows),
+      decided: cov.decided,
+      total: cov.total
+    };
+  });
 }
 function pageTally(rows) {
   return {
     c: rows.filter((r) => r.status === "C").length,
     nc: rows.filter((r) => r.status === "NC").length,
-    na: rows.filter((r) => r.status === "NA").length,
+    // No row carries `NA` any more (INAPPLICABLE_STATUS); this counts the conformities
+    // reached for want of a subject, and it is a SUBSET of `c` rather than a fourth bucket.
+    na: rows.filter((r) => r.inapplicable).length,
     manual: rows.filter((r) => r.status === "manual").length
   };
 }
@@ -67043,7 +67111,13 @@ async function cmdPages(p) {
     return diffAgainstExternal(p, result, scope, standard, lang, p.flags.diff);
   }
   if (p.flags.json) {
-    console.log(JSON.stringify({ pages: derivePages(result, scope), unattributed: unattributedFindings(result).length }, null, 2));
+    console.log(
+      JSON.stringify(
+        { pages: pagesForStandard(result, derivePages(result, scope), standard, lang), unattributed: unattributedFindings(result).length },
+        null,
+        2
+      )
+    );
     return 0;
   }
   const format = typeof p.flags.format === "string" ? p.flags.format : "grid";
@@ -67230,6 +67304,9 @@ async function cmdSnapshot(p) {
       // because the audit that folds them runs later, in another process — a measurement
       // that lives only in the producer's memory decides nothing.
       ...payload.probes ? { probes: payload.probes } : {},
+      // Same reason, for the axe pass: what a rule engine found in the browser has to survive
+      // the process that found it, or the offline re-audit sees a page nobody ran axe on.
+      ...payload.axe ? { axe: payload.axe } : {},
       // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
       // pixel tier. writeSnapshot owns the decoding, so every producer — this command, the
       // dev side-car, `scan` — writes it the one same way.

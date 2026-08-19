@@ -283,10 +283,17 @@ export function derivePackResults(audit: AuditResult, packKey: string): PackCrit
   return pack.criteria.map((pc) => {
     const decided = adjudicated?.get(pc.id);
     if (decided) {
+      // A recorded `NA` — from a ledger written before this engine stopped reporting a third
+      // column, or from a model that still speaks it — means "nothing of that kind is in
+      // scope", which reads as conforming here (INAPPLICABLE_STATUS). Folded on the way out
+      // as well as on the way in (`applyAdjudication`), because a REPLAYED verdict never
+      // passes through that fold: it is read straight from the audit JSON.
+      const na = decided.status === "NA";
       return {
         id: pc.id,
         theme: pc.theme,
-        status: decided.status,
+        status: na ? INAPPLICABLE_STATUS : decided.status,
+        ...(na ? { inapplicable: true } : {}),
         findings: decided.findings,
         scs: pc.wcag,
         ...(decided.justification ? { justification: decided.justification } : {}),

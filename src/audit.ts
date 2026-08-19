@@ -13,7 +13,7 @@ import { attr, elementsByTag, type Doc, type CaptureProvenance } from "./parse/h
 import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir, readCaptureDir, capturesForSources } from "./capture.js";
 import { isFullDocument } from "./rules/rule.js";
 import { renderedRulesFor, renderedRulesRan, renderedTestedScs } from "./rules/rendered.js";
-import { PROBE_SEVERITY, PROBE_WCAG } from "./axe-map.js";
+import { PROBE_SEVERITY, PROBE_WCAG, isAxeAdvisory, scForAxe, severityFromImpact } from "./axe-map.js";
 import { subjectsAbsent, subjectsForSc, subjectsPresentIn } from "./adjudicate-subjects.js";
 import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
@@ -372,6 +372,11 @@ interface Accum {
   // « nothing of this kind exists here ». See EXISTENCE_SUBJECTS for what may be concluded
   // from a subject's silence, and what may not.
   subjectsSeen: Set<string>;
+  // AXE coverage: page ids on which an axe pass actually RAN. Separate from `probedScs`
+  // because axe covers a whole family of criteria at once rather than one per probe, and
+  // because — the same rule as everywhere in this tier — a rule engine that did not run has
+  // measured nothing, and its silence must never read as a clean page.
+  axeRan: Set<string>;
 }
 
 // Precompute the static success criteria + their applicability predicates once.
@@ -403,6 +408,7 @@ function newAccum(): Accum {
     pageIds: new Set(),
     renderedRan: new Map(),
     probedScs: new Map(),
+    axeRan: new Set(),
     subjectsSeen: new Set(),
   };
 }
@@ -508,6 +514,19 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
         acc.renderedScs.add(sc);
       }
       for (const f of probeFindings(probes, doc.file, pageId)) {
+        const list = acc.byCriterion.get(f.criteriaId) ?? [];
+        list.push(f);
+        acc.byCriterion.set(f.criteriaId, list);
+        acc.allFindings.push(f);
+      }
+    }
+    // What AXE found on this page, when the producer ran it. Same treatment as the probes,
+    // and deliberately the same mapping the Docker/local scan tiers use (src/axe-map.ts), so
+    // a `color-contrast` hit is the same non-conformity whichever tier surfaced it.
+    const axe = doc.signals?.axe;
+    if (axe?.ran) {
+      acc.axeRan.add(pageId);
+      for (const f of axeFindings(axe.violations ?? [], doc.file, pageId)) {
         const list = acc.byCriterion.get(f.criteriaId) ?? [];
         list.push(f);
         acc.byCriterion.set(f.criteriaId, list);
@@ -638,6 +657,45 @@ function probeFindings(probes: NonNullable<RenderSignals["probes"]>, file: strin
   }
   if (probes.reflow?.horizontalScroll) {
     add("1.4.10", "dyn-reflow", "majeur", "document", "", "Horizontal scrolling at 320px width — content does not reflow.");
+  }
+  return out;
+}
+
+/** Turn what AXE reported on a page into findings on that page.
+ *
+ *  The mapping is `scan`'s, unchanged (src/axe-map.ts `scForAxe` / `severityFromImpact` /
+ *  `isAxeAdvisory`): the criterion an axe rule evidences, the severity its impact carries, and
+ *  the best-practice rules that are a RECOMMENDATION rather than a non-conformity. One table,
+ *  so a `color-contrast` hit means the same thing whether Docker, a local scan or somebody's
+ *  own Playwright suite surfaced it.
+ *
+ *  Anchored at the snapshot's own file:line 1, like the probes and for the same reason: axe
+ *  measured the rendered page, and naming a source line it never read would be a citation
+ *  nobody could check. `Finding.page` carries the attribution that matters. */
+function axeFindings(violations: NonNullable<NonNullable<RenderSignals["axe"]>["violations"]>, file: string, page: string): Finding[] {
+  const out: Finding[] = [];
+  for (const v of violations) {
+    if (!v?.id) continue;
+    const criteriaId = scForAxe(v.id, v.tags);
+    const severity = severityFromImpact(v.impact);
+    const advisory = isAxeAdvisory(v.id, v.tags);
+    const nodes = v.nodes?.length ? v.nodes : [{ target: [] as string[], html: "" }];
+    for (const n of nodes) {
+      out.push({
+        ruleId: `axe:${v.id}`,
+        criteriaId,
+        file,
+        line: 1,
+        col: 1,
+        selectorHint: n.target?.join(" ") || "document",
+        severity,
+        message: `${v.help ?? v.id} (axe: ${v.id})`,
+        remediation: "",
+        snippet: (n.html ?? "").slice(0, 200),
+        page,
+        ...(advisory ? { advisory: true } : {}),
+      });
+    }
   }
   return out;
 }

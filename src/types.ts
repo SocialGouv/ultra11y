@@ -395,6 +395,19 @@ export interface RenderSignals {
     reflow?: { horizontalScroll: boolean };
     probed?: string[];
   };
+  /** What AXE-CORE found on this page, when the producer ran it.
+   *
+   *  The same rule engine `scan` drives, run instead inside the caller's own test — which is
+   *  the only tier that ever reaches a page behind a login and a state machine. Folded through
+   *  the same mapping (src/axe-map.ts), so an axe hit means the same thing whichever tier
+   *  produced it.
+   *
+   *  `ran` is what makes the silence usable: a criterion with no violation is conforming only
+   *  where axe actually ran, exactly as `probed` works for the live probes. */
+  axe?: {
+    violations?: { id: string; impact?: string | null; help?: string; tags?: string[]; nodes?: { target?: string[]; html?: string }[] }[];
+    ran?: boolean;
+  };
   /** The page's doctype declaration, from the snapshot's meta. Absent when the capture
    *  predates the field — a different statement from an empty string ("the page had none"),
    *  and the adjudication harvest keeps the two apart. */

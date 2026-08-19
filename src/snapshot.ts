@@ -90,6 +90,8 @@ export interface Snapshot {
   css?: CssDigest;
   /** What the live probes measured, when the producer ran them. */
   probes?: SnapshotProbes;
+  /** What axe-core found on this page, when the producer ran it. See RenderSignals.axe. */
+  axe?: RenderSignals["axe"];
   /** Path of the screenshot on disk, relative to the snapshot dir. Set on READ. */
   screenshot?: string;
   /** The screenshot's bytes, base64, as a producer hands them over. Set on WRITE — a
@@ -232,6 +234,7 @@ export function writeSnapshot(root: string, snap: Snapshot): string {
   if (snap.axtree) writeFileSync(join(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}\n`);
   if (snap.css) writeFileSync(join(dir, "css.json"), `${JSON.stringify(snap.css)}\n`);
   if (snap.probes) writeFileSync(join(dir, "probes.json"), `${JSON.stringify(snap.probes)}\n`);
+  if (snap.axe) writeFileSync(join(dir, "axe.json"), `${JSON.stringify(snap.axe)}\n`);
   // The screenshot rides in as base64 (a producer has bytes, not a path). It powers the
   // pixel tier — contrast over a gradient or a background image, where the CSSOM has no
   // answer. A screenshot that cannot be decoded/written must NEVER fail the snapshot: the
@@ -410,6 +413,7 @@ export function attachSignals(doc: Doc): void {
   const css = readJson<CssDigest>(join(dir, "css.json"));
   const meta = readJson<{ doctype?: string }>(join(dir, "meta.json"));
   const probes = readJson<SnapshotProbes>(join(dir, "probes.json"));
+  const axe = readJson<NonNullable<RenderSignals["axe"]>>(join(dir, "axe.json"));
   const shot = join(dir, "screen.png");
 
   const alignedStyleMap = styles ? align(doc, styles.entries) : null;
@@ -425,6 +429,7 @@ export function attachSignals(doc: Doc): void {
     ...(existsSync(shot) ? { screenshot: shot } : {}),
     ...(meta?.doctype !== undefined ? { doctype: meta.doctype } : {}),
     ...(probes ? { probes } : {}),
+    ...(axe ? { axe } : {}),
     ...(truncated ? { truncated } : {}),
   };
   if (Object.keys(signals).length) doc.signals = signals;

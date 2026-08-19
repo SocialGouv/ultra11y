@@ -55,6 +55,8 @@ export interface SnapshotPayload {
   screenshot?: string;
   /** What the live probes measured, when the caller ran them. */
   probes?: unknown;
+  /** What axe-core found on this page, when the caller ran it. */
+  axe?: unknown;
 }
 
 /** Same slug rule as the engine (src/snapshot.ts slugifyPageId): accent-folded URL path. */
@@ -126,6 +128,18 @@ export interface CheckOptions {
    *  YOUR pages, and a screen with 400 focusables should be able to say so rather than being
    *  quietly cut off at 120. */
   probes?: boolean | string[] | ProbeTuning;
+  /** Run AXE-CORE on the page before recording it.
+   *
+   *  `scan` has always driven axe; your suite never did — and your suite is the only tier that
+   *  reaches a page behind a login and a state machine, which is exactly where the criteria
+   *  axe decides (computed contrast above all) were left « to assess » run after run.
+   *
+   *  Default `auto`: axe runs when `@axe-core/playwright` resolves from your project, and is
+   *  silently skipped when it does not — so adding this costs nothing to a repo that has not
+   *  installed it. `false` turns it off; `true` demands it and reports loudly if it cannot be
+   *  resolved, which is what you want in CI where a silent downgrade is indistinguishable from
+   *  a clean page. */
+  axe?: boolean | "auto";
 }
 
 /** The bounds a repository may put on the live probes. Stated once, here, because the same
@@ -171,6 +185,7 @@ export function buildPayload(
   opts: CheckOptions,
   screenshot?: string,
   probes?: unknown,
+  axe?: unknown,
 ): SnapshotPayload {
   const id = opts.as || slugify(url);
   return {
@@ -205,6 +220,9 @@ export function buildPayload(
     // because `snapshot write` persists it beside the DOM — the audit that folds it runs later
     // and in another process, so a measurement kept in memory decides nothing.
     ...(probes ? { probes } : {}),
+    // Same contract as the probes: it rides in the payload and `snapshot write` persists it
+    // beside the DOM, so the offline re-audit sees what the browser saw.
+    ...(axe ? { axe } : {}),
   };
 }
 

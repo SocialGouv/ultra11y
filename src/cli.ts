@@ -80,7 +80,7 @@ import {
   type StyleDigest,
 } from "./snapshot.js";
 import { attributePages, derivePages, pageScopesFrom, pageView, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
-import { renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
+import { pagesForStandard, renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
 import { crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
 import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
@@ -91,6 +91,7 @@ import { listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
 import { readStdin, readText } from "./util.js";
 import { runStdioServer } from "./mcp/stdio.js";
 import { startHttpServer } from "./mcp/http.js";
+import type { RenderSignals } from "./types.js";
 
 const HELP = `ultra11y v${VERSION}
 Audit HTML/CSS/JSX against WCAG 2.2 AA and produce a dated compliance report, or
@@ -1387,7 +1388,14 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   }
 
   if (p.flags.json) {
-    console.log(JSON.stringify({ pages: derivePages(result, scope), unattributed: unattributedFindings(result).length }, null, 2));
+    // Projected onto the ACTIVE standard, like every rendered surface — see pagesForStandard.
+    console.log(
+      JSON.stringify(
+        { pages: pagesForStandard(result, derivePages(result, scope), standard, lang), unattributed: unattributedFindings(result).length },
+        null,
+        2,
+      ),
+    );
     return 0;
   }
 
@@ -1623,6 +1631,7 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
     css?: CssDigest;
     screenshot?: unknown;
     probes?: SnapshotProbes;
+    axe?: unknown;
   };
   try {
     payload = JSON.parse(raw);
@@ -1653,6 +1662,9 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
       // because the audit that folds them runs later, in another process — a measurement
       // that lives only in the producer's memory decides nothing.
       ...(payload.probes ? { probes: payload.probes } : {}),
+      // Same reason, for the axe pass: what a rule engine found in the browser has to survive
+      // the process that found it, or the offline re-audit sees a page nobody ran axe on.
+      ...(payload.axe ? { axe: payload.axe as RenderSignals["axe"] } : {}),
       // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
       // pixel tier. writeSnapshot owns the decoding, so every producer — this command, the
       // dev side-car, `scan` — writes it the one same way.
