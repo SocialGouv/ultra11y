@@ -58386,6 +58386,13 @@ function applyAdjudication(audit2, adj, opts = {}) {
   next.adjudicated = { date: adj.auditDate, applied, stillManual, ...rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {} };
   return { ok: issues.length === 0, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, grounding };
 }
+function agentSeverity(v, advisory) {
+  if (v === "bloquant" || v === "majeur" || v === "mineur") return v;
+  if (v === "critical" || v === "serious") return "bloquant";
+  if (v === "moderate") return "majeur";
+  if (v === "minor") return "mineur";
+  return advisory ? "mineur" : NC_SEVERITY_DEFAULT;
+}
 function agentFinding(criteriaId, f, advisory = false) {
   return {
     ruleId: `agent:${criteriaId}`,
@@ -58394,7 +58401,7 @@ function agentFinding(criteriaId, f, advisory = false) {
     line: f.line,
     col: 1,
     selectorHint: f.selector ?? "",
-    severity: f.severity ?? (advisory ? "mineur" : NC_SEVERITY_DEFAULT),
+    severity: agentSeverity(f.severity, advisory),
     message: f.message,
     remediation: getSC(criteriaId)?.understanding ? `See WCAG ${criteriaId}.` : "Address the reported non-conformity.",
     snippet: f.snippet ?? "",

@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import { mdText } from "../src/md.js";
 import { renderAuditorUnit } from "../src/auditor.js";
 import { resolveMessage } from "../src/messages.js";
+import { agentSeverity } from "../src/adjudicate.js";
 import type { PrdUnit } from "../src/prd.js";
 import type { Finding } from "../src/types.js";
 
@@ -77,5 +78,47 @@ describe("the h1 recommendation, end to end", () => {
     expect(md).toContain("`<h1>`");
     // Nothing a Markdown renderer would swallow: no `<h1>` survives outside a code span.
     expect(md.replace(/`[^`]*`/g, "")).not.toMatch(/<h1>/);
+  });
+});
+
+// A SEVERITY THE ENGINE DOES NOT KNOW CORRUPTS EVERY SURFACE KEYED ON IT.
+//
+// `AgentFinding.severity` is typed, and the type is a promise about our own code — not about a
+// JSON file a model produced, nor a verdict ledger replaying one it produced months ago.
+// Measured on a real pull-request comment: a verdict carrying axe's `"moderate"` rendered as
+// « | undefined moderate | », with no icon and no ordering; the same value would have produced
+// an empty SARIF level and an unsortable annotation.
+describe("an agent's severity is normalised at the boundary", () => {
+  it("maps axe's vocabulary the way the engine already maps it", () => {
+    expect(agentSeverity("moderate", false)).toBe("majeur");
+    expect(agentSeverity("critical", false)).toBe("bloquant");
+    expect(agentSeverity("serious", false)).toBe("bloquant");
+    expect(agentSeverity("minor", false)).toBe("mineur");
+  });
+
+  it("keeps a severity the engine does know", () => {
+    expect(agentSeverity("bloquant", false)).toBe("bloquant");
+    expect(agentSeverity("majeur", false)).toBe("majeur");
+    expect(agentSeverity("mineur", false)).toBe("mineur");
+  });
+
+  it("falls back to the SAME default an absent severity gets, never downgrading an NC", () => {
+    // `mineur` here would silently demote a non-conformity because a model misspelt a word.
+    expect(agentSeverity("catastrophic", false)).toBe("majeur");
+    expect(agentSeverity(undefined, false)).toBe("majeur");
+    expect(agentSeverity(null, false)).toBe("majeur");
+    expect(agentSeverity(3, false)).toBe("majeur");
+  });
+
+  it("keeps a recommendation minor, whatever it says", () => {
+    expect(agentSeverity(undefined, true)).toBe("mineur");
+    expect(agentSeverity("nonsense", true)).toBe("mineur");
+  });
+
+  it("renders with an icon on every Markdown surface", () => {
+    // The regression itself: a severity outside the vocabulary printed « undefined moderate ».
+    for (const sev of ["moderate", "catastrophic", undefined]) {
+      expect(["bloquant", "majeur", "mineur"]).toContain(agentSeverity(sev, false));
+    }
   });
 });
