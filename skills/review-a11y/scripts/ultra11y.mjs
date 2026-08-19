@@ -39283,6 +39283,12 @@ var AXE_WCAG = {
   bypass: "2.4.1",
   accesskeys: "2.1.1"
 };
+var AXE_DECIDES = {
+  // Text contrast. `color-contrast` is on by default, runs on every text node, and computes
+  // the ratio the criterion states — the one criterion where the automated answer IS the
+  // answer, which is why the local scan tier has always mapped it here.
+  "1.4.3": ["color-contrast"]
+};
 var FALLBACK_SC = "4.1.2";
 function scFromWcagTags(tags) {
   if (!tags) return null;
@@ -48561,6 +48567,7 @@ function foldDoc(acc, doc, graph) {
     const axe = doc.signals?.axe;
     if (axe?.ran) {
       acc.axeRan.add(pageId);
+      for (const sc of Object.keys(AXE_DECIDES)) acc.renderedScs.add(sc);
       for (const f of axeFindings(axe.violations ?? [], doc.file, pageId)) {
         const list = acc.byCriterion.get(f.criteriaId) ?? [];
         list.push(f);
@@ -48589,6 +48596,7 @@ function renderedProves(sc, acc) {
   if (acc.pageIds.size === 0) return false;
   const probed = acc.probedScs.get(sc);
   if (probed && probed.size === acc.pageIds.size) return true;
+  if (AXE_DECIDES[sc] && acc.axeRan.size === acc.pageIds.size) return true;
   const rules = renderedRulesFor(sc);
   if (!rules.length) return false;
   return rules.every((ruleId) => {
@@ -48605,6 +48613,9 @@ function partialProbeReason(sc, acc) {
   return `Probed on ${probed.size} of the ${acc.pageIds.size} pages in scope, so this criterion stays open: conformity here is measured on EVERY page or on none, and the page nobody probed is exactly where the failure would be. Not probed: ${shown.join(", ")}${rest > 0 ? `, and ${rest} more` : ""}.`;
 }
 function renderedProvesReason(sc, acc) {
+  if (AXE_DECIDES[sc] && acc.axeRan.size === acc.pageIds.size) {
+    return `Measured by axe-core on all ${acc.pageIds.size} page(s) in scope \u2014 ${AXE_DECIDES[sc]?.join(", ")} ran in the browser and reported nothing. A page axe had not run on would have kept this criterion open.`;
+  }
   const probed = acc.probedScs.get(sc);
   if (probed && probed.size === acc.pageIds.size) {
     return `Measured in a real browser on all ${acc.pageIds.size} page(s) in scope \u2014 the probe acted on the page (zoom, 320px viewport, text-spacing override, Tab, hover) and observed nothing. A page the probe had not run on would have kept this criterion open.`;

@@ -128,6 +128,27 @@ export const AXE_WCAG: Record<string, string> = {
   accesskeys: "2.1.1",
 };
 
+/** THE SUCCESS CRITERIA AN AXE PASS THAT FOUND NOTHING IS ALLOWED TO CLOSE.
+ *
+ *  Deliberately tiny, and deliberately a list rather than a rule. axe REPORTS on dozens of
+ *  success criteria (that is what AXE_WCAG above is for), but reporting on one is not the same
+ *  as being its canonical decider: `color-contrast` computes the very ratio 1.4.3 is written
+ *  in, while axe's ARIA rules cover a slice of 4.1.2 that no clean run can close. Reading the
+ *  second as the first is how a grid fills up with conformities nobody verified.
+ *
+ *  The guardrail around it is in src/audit.ts and is the same one the probes get: the pass must
+ *  have run on EVERY page in scope. A criterion measured on some pages is not a criterion
+ *  measured.
+ *
+ *  Entries are added one at a time, each with the rule that carries it and a reason to trust
+ *  it — never in bulk from axe's tag list. */
+export const AXE_DECIDES: Record<string, readonly string[]> = {
+  // Text contrast. `color-contrast` is on by default, runs on every text node, and computes
+  // the ratio the criterion states — the one criterion where the automated answer IS the
+  // answer, which is why the local scan tier has always mapped it here.
+  "1.4.3": ["color-contrast"],
+};
+
 export const FALLBACK_SC = "4.1.2";
 
 /** Read a WCAG SC from axe's native rule tags. axe tags each rule with `wcag<abc>`

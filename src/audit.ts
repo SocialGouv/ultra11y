@@ -13,7 +13,7 @@ import { attr, elementsByTag, type Doc, type CaptureProvenance } from "./parse/h
 import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir, readCaptureDir, capturesForSources } from "./capture.js";
 import { isFullDocument } from "./rules/rule.js";
 import { renderedRulesFor, renderedRulesRan, renderedTestedScs } from "./rules/rendered.js";
-import { PROBE_SEVERITY, PROBE_WCAG, isAxeAdvisory, scForAxe, severityFromImpact } from "./axe-map.js";
+import { AXE_DECIDES, PROBE_SEVERITY, PROBE_WCAG, isAxeAdvisory, scForAxe, severityFromImpact } from "./axe-map.js";
 import { subjectsAbsent, subjectsForSc, subjectsPresentIn } from "./adjudicate-subjects.js";
 import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
@@ -526,6 +526,7 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
     const axe = doc.signals?.axe;
     if (axe?.ran) {
       acc.axeRan.add(pageId);
+      for (const sc of Object.keys(AXE_DECIDES)) acc.renderedScs.add(sc);
       for (const f of axeFindings(axe.violations ?? [], doc.file, pageId)) {
         const list = acc.byCriterion.get(f.criteriaId) ?? [];
         list.push(f);
@@ -585,6 +586,9 @@ function renderedProves(sc: string, acc: Accum): boolean {
   // in scope, or nothing.
   const probed = acc.probedScs.get(sc);
   if (probed && probed.size === acc.pageIds.size) return true;
+  // AXE, on every page in scope, for the handful of criteria it is the canonical decider of
+  // (AXE_DECIDES). Same rule as the probes and the digest tier: every page, or nothing.
+  if (AXE_DECIDES[sc] && acc.axeRan.size === acc.pageIds.size) return true;
   const rules = renderedRulesFor(sc);
   if (!rules.length) return false;
   return rules.every((ruleId) => {
@@ -610,6 +614,9 @@ function partialProbeReason(sc: string, acc: Accum): string | undefined {
 }
 
 function renderedProvesReason(sc: string, acc: Accum): string {
+  if (AXE_DECIDES[sc] && acc.axeRan.size === acc.pageIds.size) {
+    return `Measured by axe-core on all ${acc.pageIds.size} page(s) in scope — ${AXE_DECIDES[sc]?.join(", ")} ran in the browser and reported nothing. A page axe had not run on would have kept this criterion open.`;
+  }
   const probed = acc.probedScs.get(sc);
   if (probed && probed.size === acc.pageIds.size) {
     return `Measured in a real browser on all ${acc.pageIds.size} page(s) in scope — the probe acted on the page (zoom, 320px viewport, text-spacing override, Tab, hover) and observed nothing. A page the probe had not run on would have kept this criterion open.`;

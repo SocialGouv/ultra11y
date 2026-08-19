@@ -80,3 +80,40 @@ describe("an axe pass recorded beside a snapshot", () => {
     expect(r.findings.some((x) => x.ruleId.startsWith("axe:"))).toBe(false);
   });
 });
+
+// ---- what an axe pass that found NOTHING is allowed to conclude ---------------------------
+//
+// This is the half that closes criteria rather than opening them, and the half that must be
+// wrong in only one direction. Silence from a rule engine that RAN on every page in scope is a
+// measurement; silence from one that ran on some of them, or never started, is not — and
+// reading the second as the first is how a grid fills with conformities nobody verified.
+//
+// The list of criteria axe may decide is deliberately tiny (src/axe-map.ts AXE_DECIDES) and
+// deliberately explicit. axe reports on dozens of success criteria, but reporting on one is not
+// the same as being its canonical decider: `color-contrast` computes the ratio the criterion is
+// written in, while axe's ARIA rules cover a slice of 4.1.2 that no clean run can close.
+describe("an axe pass that found nothing", () => {
+  const clean = { ran: true, violations: [] as unknown[] };
+
+  it("decides the criterion it is the canonical decider of, when it ran on every page", () => {
+    const r = pageWithAxe(clean);
+    const c = r.criteria.find((x) => x.id === "1.4.3");
+    expect(c?.status).toBe("C");
+    expect(c?.decidedBy).toBe("scan");
+    expect(c?.justification ?? "").toMatch(/axe/i);
+  });
+
+  it("decides nothing when no axe pass ran", () => {
+    expect(pageWithAxe(undefined).criteria.find((x) => x.id === "1.4.3")?.status).toBe("manual");
+  });
+
+  it("decides nothing it is not the canonical decider of, however clean the run", () => {
+    // 4.1.2 is a judgment criterion: axe checks a slice of it (roles, names on widgets it
+    // recognises) and a clean pass says nothing about the rest.
+    expect(pageWithAxe(clean).criteria.find((x) => x.id === "4.1.2")?.status).toBe("manual");
+  });
+
+  it("reports the criteria it covered, so the partial-audit banner stops naming them", () => {
+    expect(pageWithAxe(clean).scope.scan?.testedScs ?? []).toContain("1.4.3");
+  });
+});
