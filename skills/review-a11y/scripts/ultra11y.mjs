@@ -56439,7 +56439,7 @@ function renderCriteriaReference() {
 }
 
 // src/check.ts
-import { existsSync as existsSync20, readFileSync as readFileSync18 } from "fs";
+import { existsSync as existsSync20, readFileSync as readFileSync18, readdirSync as readdirSync5 } from "fs";
 import { dirname as dirname9, join as join34 } from "path";
 
 // src/verify.ts
@@ -56859,6 +56859,33 @@ function sectionBody(md, n) {
   const from = start2.index + start2[0].length;
   const next = /^##\s+/m.exec(md.slice(from));
   return next ? md.slice(from, from + next.index) : md.slice(from);
+}
+function checkSampleCaptured(root = ".", lang = "en") {
+  const fr = lang === "fr";
+  let declared = [];
+  try {
+    const cfg = JSON.parse(readFileSync18(join34(root, ".ultra11yrc.json"), "utf8"));
+    declared = cfg.sample?.pages ?? [];
+  } catch {
+    return { ok: true, issues: [], missing: [], declared: 0, captured: 0 };
+  }
+  if (!declared.length) return { ok: true, issues: [], missing: [], declared: 0, captured: 0 };
+  let captured = /* @__PURE__ */ new Set();
+  try {
+    captured = new Set(
+      readdirSync5(join34(root, PAGES_DIR), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).filter((id) => existsSync20(join34(root, PAGES_DIR, id, "dom.html")))
+    );
+  } catch {
+  }
+  const missing = declared.filter((p) => !captured.has(p.id)).map((p) => ({ id: p.id, name: p.name ?? p.id, url: p.url ?? "" }));
+  const issues = [];
+  if (missing.length) {
+    const kept = declared.length - missing.length;
+    issues.push(
+      fr ? `${kept}/${declared.length} page(s) d\xE9clar\xE9e(s) ont \xE9t\xE9 captur\xE9es. Aucune capture pour : ${missing.map((m) => `${m.name} (${m.id})`).join(", ")}. Une page d\xE9clar\xE9e sans capture n'est pas une page conforme, c'est une page que personne n'a regard\xE9e.` : `${kept}/${declared.length} declared page(s) were captured. No capture for: ${missing.map((m) => `${m.name} (${m.id})`).join(", ")}. A declared page with no capture is not a page that passed \u2014 it is a page nobody looked at.`
+    );
+  }
+  return { ok: issues.length === 0, issues, missing, declared: declared.length, captured: captured.size };
 }
 function byCriterionId(a, b) {
   const pa = a.split(".").map(Number);
@@ -58740,7 +58767,7 @@ function applyRawVerdicts(items, verdicts) {
 
 // src/scan.ts
 import { execFileSync as execFileSync6 } from "child_process";
-import { mkdtempSync as mkdtempSync2, writeFileSync as writeFileSync12, existsSync as existsSync23, statSync as statSync8, readdirSync as readdirSync5, rmSync as rmSync3, readFileSync as readFileSync20 } from "fs";
+import { mkdtempSync as mkdtempSync2, writeFileSync as writeFileSync12, existsSync as existsSync23, statSync as statSync8, readdirSync as readdirSync6, rmSync as rmSync3, readFileSync as readFileSync20 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
 import { join as join37, resolve as resolve11 } from "path";
 import { fileURLToPath as fileURLToPath3 } from "url";
@@ -59064,7 +59091,7 @@ function buildImage(tag = IMAGE_TAG) {
 function cleanTempContexts() {
   let removed = 0;
   const dir = tmpdir2();
-  for (const name2 of readdirSync5(dir)) {
+  for (const name2 of readdirSync6(dir)) {
     if (!name2.startsWith(CTX_PREFIX)) continue;
     rmSync3(join37(dir, name2), { recursive: true, force: true });
     removed++;
@@ -65563,7 +65590,7 @@ function str3(v) {
 var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t3) => t3.name));
 
 // src/mcp/resources.ts
-import { existsSync as existsSync34, readdirSync as readdirSync6, readFileSync as readFileSync32, realpathSync as realpathSync5, statSync as statSync13 } from "fs";
+import { existsSync as existsSync34, readdirSync as readdirSync7, readFileSync as readFileSync32, realpathSync as realpathSync5, statSync as statSync13 } from "fs";
 import { basename as basename3, dirname as dirname14, join as join50, resolve as resolve15, sep as sep6 } from "path";
 import { fileURLToPath as fileURLToPath4 } from "url";
 var SKILL_NAME = "ultra11y";
@@ -65579,7 +65606,7 @@ function listResources(moduleDir) {
   const out2 = [describe(root, "SKILL.md", `${SKILL_NAME}: the skill`)];
   const refDir = join50(root, "references");
   if (!existsSync34(refDir)) return out2;
-  for (const file of readdirSync6(refDir).sort()) {
+  for (const file of readdirSync7(refDir).sort()) {
     if (!file.endsWith(".md")) continue;
     out2.push(describe(root, join50("references", file), `${SKILL_NAME} reference: ${basename3(file, ".md")}`));
   }
@@ -66457,6 +66484,10 @@ Options:
                      dropped as stale and its criterion says so
   --max-verify <n>   verify: cap the worklist size; 0 = no cap           (default: 40)
   --verdicts <file>  check --semantic: the adjudicated verdicts artifact
+  --require-sample   check: fail while a page DECLARED in .ultra11yrc.json has no capture under
+                     .ultra11y/pages/. Coverage, one level below --require-decided: a sweep that
+                     loses pages produces a report that is merely SHORTER, and a shorter
+                     deliverable reads exactly like a complete one.
   --require-decided  check: fail while ANY criterion of the standard is still \xAB to assess \xBB.
                      Needs --in. A green job does not otherwise mean the grid was filled:
                      --fail-on governs non-conformities, and an adjudication that lands
@@ -66683,6 +66714,7 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "semantic",
   // `check`: fail while any criterion of the standard is still « to assess ».
   "require-decided",
+  "require-sample",
   "manual",
   // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
   // verdict discards the whole adjudication. The default is per-verdict.
@@ -68059,9 +68091,10 @@ function cmdCheck(p) {
   const standard = stdOf(p, "check");
   if (standard === null) return 2;
   const requireDecided = p.flags["require-decided"] === true;
+  const requireSample = p.flags["require-sample"] === true;
   const rep = p.flags.report;
   if (typeof rep !== "string" || !rep) {
-    if (!requireDecided) {
+    if (!requireDecided && !requireSample) {
       console.error("ultra11y check: --report <md> is required.");
       return 2;
     }
@@ -68106,6 +68139,7 @@ function cmdCheck(p) {
     }
   }
   const decided = requireDecided && audit2 ? checkDecided(audit2, standard, lang, { allow }) : null;
+  const covered = requireSample ? checkSampleCaptured(".", lang) : null;
   const res = md ? checkReport(md, standard, lang, { audit: audit2 }) : { ok: true, issues: [] };
   const sem = p.flags.semantic === true && typeof rep === "string" && rep ? checkSemantic(md, {
     reportPath: rep,
@@ -68113,9 +68147,9 @@ function cmdCheck(p) {
     standard,
     lang
   }) : null;
-  const ok = res.ok && (sem === null || sem.ok) && (decided === null || decided.ok);
+  const ok = res.ok && (sem === null || sem.ok) && (decided === null || decided.ok) && (covered === null || covered.ok);
   if (p.flags.json) {
-    console.log(JSON.stringify({ ...res, ok, ...sem ? { semantic: sem } : {}, ...decided ? { decided } : {} }, null, 2));
+    console.log(JSON.stringify({ ...res, ok, ...sem ? { semantic: sem } : {}, ...decided ? { decided } : {}, ...covered ? { covered } : {} }, null, 2));
   } else if (!p.flags.quiet) {
     if (decided) {
       const allowedNote = decided.allowed.length ? lang === "fr" ? ` (${decided.allowed.length} crit\xE8re(s) d\xE9clar\xE9(s) ind\xE9cidable(s) : ${decided.allowed.map((a) => `${a.criteriaId} \u2014 ${a.reason}`).join(" \xB7 ")})` : ` (${decided.allowed.length} criterion(ia) declared undecidable: ${decided.allowed.map((a) => `${a.criteriaId} \u2014 ${a.reason}`).join(" \xB7 ")})` : "";
@@ -68124,11 +68158,16 @@ function cmdCheck(p) {
           lang === "fr" ? `\u2713 Grille compl\xE8te : les ${decided.total} crit\xE8res portent un verdict${allowedNote}.` : `\u2713 Complete grid: all ${decided.total} criteria carry a verdict${allowedNote}.`
         );
     }
+    if (covered?.ok) {
+      console.log(
+        lang === "fr" ? `\u2713 \xC9chantillon couvert : les ${covered.declared} page(s) d\xE9clar\xE9e(s) ont une capture.` : `\u2713 Sample covered: all ${covered.declared} declared page(s) have a capture.`
+      );
+    }
     if (ok)
       console.log(
         sem ? lang === "fr" ? `\u2713 Rapport valide + gate s\xE9mantique engag\xE9e : ${sem.total} verdict(s), ${sem.grounded} ancr\xE9(s) dans la source${sem.moved ? ` (${sem.moved} d\xE9plac\xE9(s))` : ""}.` : `\u2713 Report valid + semantic gate engaged: ${sem.total} verdict(s), ${sem.grounded} grounded in source${sem.moved ? ` (${sem.moved} moved)` : ""}.` : lang === "fr" ? "\u2713 Rapport valide : sections, crit\xE8res cit\xE9s et justifications NA coh\xE9rents." : "\u2713 Report valid: sections, cited criteria and NA justifications are consistent."
       );
-    else for (const i2 of [...res.issues, ...sem?.issues ?? [], ...decided?.issues ?? []]) console.error(`\u2717 ${i2}`);
+    else for (const i2 of [...res.issues, ...sem?.issues ?? [], ...decided?.issues ?? [], ...covered?.issues ?? []]) console.error(`\u2717 ${i2}`);
   }
   return ok ? 0 : 1;
 }

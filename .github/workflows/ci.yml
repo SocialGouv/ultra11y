@@ -335,6 +335,35 @@ jobs:
             console.log("pages:", p.map(x => x.id + " " + x.conformancePct + "%").join(", "));
           '
 
+      # THE COVERAGE GATE, both ways. A gate is only worth having if it can also FAIL, and a
+      # green-but-inactive one is the exact failure it exists to prevent — the run it was built
+      # for shipped 20 of 35 declared pages, green, naming none of the missing fifteen.
+      - name: The sample-coverage gate passes when every declared page was captured
+        run: |
+          set -euo pipefail
+          cat > .ultra11yrc.json <<'RC'
+          { "standard": "rgaa", "sample": { "pages": [
+            { "id": "accueil", "name": "Accueil", "url": "http://127.0.0.1:8931/" },
+            { "id": "contact-html", "name": "Contact", "url": "http://127.0.0.1:8931/contact.html" }
+          ] } }
+          RC
+          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" check --require-sample --standard rgaa
+
+      - name: …and FAILS, naming the page, when one was declared and never captured
+        run: |
+          set -euo pipefail
+          cat > .ultra11yrc.json <<'RC'
+          { "standard": "rgaa", "sample": { "pages": [
+            { "id": "accueil", "name": "Accueil", "url": "http://127.0.0.1:8931/" },
+            { "id": "jamais-balayee", "name": "Jamais balayée", "url": "http://127.0.0.1:8931/nope.html" }
+          ] } }
+          RC
+          out=$(node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" check --require-sample --standard rgaa 2>&1) && {
+            echo "::error::the coverage gate passed on an uncaptured declared page"; exit 1; }
+          echo "$out"
+          echo "$out" | grep -q "Jamais balayée" || { echo "::error::the gate did not NAME the missing page"; exit 1; }
+          rm -f .ultra11yrc.json
+
       # The page-by-page comment, on the only audit in this repo that actually carries pages.
       # The DOCUMENT is unit-tested (tests/pr-comment-pages.test.ts, against the same
       # projections); what only an integration can prove is that the kind threads from the

@@ -39,7 +39,7 @@ import { buildGraphStreaming } from "./graph/build.js";
 import { discover } from "./discover.js";
 import { toPosix, GRAPH_ONLY_EXT } from "./glob.js";
 import { runCriteria, renderCriteriaReference } from "./criteria.js";
-import { checkDecided, checkReport, checkSemantic, isUndecidedFile, type UndecidedFile } from "./check.js";
+import { checkSampleCaptured, checkDecided, checkReport, checkSemantic, isUndecidedFile, type UndecidedFile } from "./check.js";
 import { buildWorklist, writeWorklist, applyVerdicts, VERIFY_MAX, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import {
@@ -397,6 +397,10 @@ Options:
                      dropped as stale and its criterion says so
   --max-verify <n>   verify: cap the worklist size; 0 = no cap           (default: 40)
   --verdicts <file>  check --semantic: the adjudicated verdicts artifact
+  --require-sample   check: fail while a page DECLARED in .ultra11yrc.json has no capture under
+                     .ultra11y/pages/. Coverage, one level below --require-decided: a sweep that
+                     loses pages produces a report that is merely SHORTER, and a shorter
+                     deliverable reads exactly like a complete one.
   --require-decided  check: fail while ANY criterion of the standard is still « to assess ».
                      Needs --in. A green job does not otherwise mean the grid was filled:
                      --fail-on governs non-conformities, and an adjudication that lands
@@ -640,6 +644,7 @@ const BOOLEAN_FLAGS = new Set([
   "semantic",
   // `check`: fail while any criterion of the standard is still « to assess ».
   "require-decided",
+  "require-sample",
   "manual",
   // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
   // verdict discards the whole adjudication. The default is per-verdict.
@@ -2487,9 +2492,12 @@ function cmdCheck(p: ParsedArgs): number {
   // active standard carries a verdict. It therefore needs --in and not --report, and stands on
   // its own — a project can demand a complete grid long before it publishes a deliverable.
   const requireDecided = p.flags["require-decided"] === true;
+  // Same reasoning for coverage: whether the sweep captured every declared page is a fact
+  // about the working tree, answerable long before there is a deliverable to validate.
+  const requireSample = p.flags["require-sample"] === true;
   const rep = p.flags.report;
   if (typeof rep !== "string" || !rep) {
-    if (!requireDecided) {
+    if (!requireDecided && !requireSample) {
       console.error("ultra11y check: --report <md> is required.");
       return 2;
     }
@@ -2539,6 +2547,10 @@ function cmdCheck(p: ParsedArgs): number {
     }
   }
   const decided = requireDecided && audit ? checkDecided(audit, standard, lang, { allow }) : null;
+  // COVERAGE, one level below completeness: did the run capture every page it says it audits?
+  // Needs no audit JSON — it holds the repository's declared sample against the snapshots on
+  // disk, which is what a sweep either produced or did not.
+  const covered = requireSample ? checkSampleCaptured(".", lang) : null;
   const res = md ? checkReport(md, standard, lang, { audit }) : { ok: true, issues: [] };
   // --semantic: the support-level gate ON TOP of the structural check. Fails closed —
   // a green exit must always mean the gate engaged (family P0: never green-but-inactive).
@@ -2552,9 +2564,9 @@ function cmdCheck(p: ParsedArgs): number {
           lang,
         })
       : null;
-  const ok = res.ok && (sem === null || sem.ok) && (decided === null || decided.ok);
+  const ok = res.ok && (sem === null || sem.ok) && (decided === null || decided.ok) && (covered === null || covered.ok);
   if (p.flags.json) {
-    console.log(JSON.stringify({ ...res, ok, ...(sem ? { semantic: sem } : {}), ...(decided ? { decided } : {}) }, null, 2));
+    console.log(JSON.stringify({ ...res, ok, ...(sem ? { semantic: sem } : {}), ...(decided ? { decided } : {}), ...(covered ? { covered } : {}) }, null, 2));
   } else if (!p.flags.quiet) {
     if (decided) {
       // Say what the gate engaged on, green or red. A completeness gate that reports only its
@@ -2571,6 +2583,15 @@ function cmdCheck(p: ParsedArgs): number {
             : `✓ Complete grid: all ${decided.total} criteria carry a verdict${allowedNote}.`,
         );
     }
+    if (covered?.ok) {
+      // Green or red, say what it engaged on — a gate that reports only its failures cannot be
+      // told apart from one that never ran.
+      console.log(
+        lang === "fr"
+          ? `✓ Échantillon couvert : les ${covered.declared} page(s) déclarée(s) ont une capture.`
+          : `✓ Sample covered: all ${covered.declared} declared page(s) have a capture.`,
+      );
+    }
     if (ok)
       console.log(
         sem
@@ -2581,7 +2602,7 @@ function cmdCheck(p: ParsedArgs): number {
             ? "✓ Rapport valide : sections, critères cités et justifications NA cohérents."
             : "✓ Report valid: sections, cited criteria and NA justifications are consistent.",
       );
-    else for (const i of [...res.issues, ...(sem?.issues ?? []), ...(decided?.issues ?? [])]) console.error(`✗ ${i}`);
+    else for (const i of [...res.issues, ...(sem?.issues ?? []), ...(decided?.issues ?? []), ...(covered?.issues ?? [])]) console.error(`✗ ${i}`);
   }
   return ok ? 0 : 1;
 }

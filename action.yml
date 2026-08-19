@@ -183,6 +183,10 @@ inputs:
     description: 'Gate on the ADJUDICATED audit instead of re-auditing the source, so a model-ruled non-conformity can fail the job. The trade is real: the red/green stops being reproducible run to run. Ignored when `adjudicate` is `none`.'
     required: false
     default: 'false'
+  require-sample:
+    description: 'Fail the job while a page DECLARED in `.ultra11yrc.json` produced no capture. COVERAGE, one level below `require-decided`: that one asks whether every criterion carries a verdict, this one asks whether the run looked at every page it says it audits. A sweep that loses pages produces a report that is merely SHORTER, and a shorter deliverable reads exactly like a complete one — measured on a real run, a hung probe took fifteen of thirty-five pages with it and the report shipped green, naming none of them. Only meaningful when the pages come from a sweep or a scan; a repository that declares no sample has nothing to answer and passes.'
+    required: false
+    default: 'false'
   require-decided:
     description: 'Fail the job while ANY criterion of the active standard is still « to assess ». Off by default. This is a different question from `fail-on`, which governs NON-CONFORMITIES: a run can find nothing wrong and still have decided almost nothing, and it reports success either way — measured on a real pull request, 94 of 106 criteria came back « à évaluer » in a green job, because an adjudication that lands nothing only warns. Turn this on once a ledger or an adjudication tier is in place, and pair it with `undecidable-file` for the criteria that genuinely cannot be decided.'
     required: false
@@ -820,6 +824,26 @@ runs:
         fi
         node "$ENGINE" verify "${args[@]}" || echo "::warning::ultra11y: pass 3 landed nothing — the remaining criteria stay to assess."
 
+    # COVERAGE — did the run look at every page it says it audits?
+    #
+    # Measured here and enforced in the final `Gate` step, for the same reason as completeness
+    # below: failing on the spot would skip the report and the artifact, and the first thing
+    # anyone does with an incomplete sweep is go and read which pages are missing.
+    - name: Sample coverage gate
+      id: covered
+      if: inputs.require-sample == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        if node "$ENGINE" check --require-sample --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}'; then
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::ultra11y: the page sample is not fully captured — see the pages named above. The job fails at the gate step."
+        fi
+
     # COMPLETENESS — is the grid actually filled in?
     #
     # Deliberately measured here and enforced in the final `Gate` step: failing on the spot
@@ -988,7 +1012,7 @@ runs:
 
     # The gate runs LAST, so a failing audit has already produced every surface above.
     - name: Gate
-      if: inputs.fail-on != '' || inputs.require-decided == 'true'
+      if: inputs.fail-on != '' || inputs.require-decided == 'true' || inputs.require-sample == 'true'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -998,6 +1022,12 @@ runs:
         # gating on non-conformities at all (`fail-on: ""`), which is the normal shape for a
         # measuring tier. Failing here rather than in the step that computed it is what lets
         # the report and the artifacts be written before the job goes red.
+        # COVERAGE first of all: a grid computed over pages nobody captured is not an
+        # incomplete grid, it is a grid about something else.
+        if [ '${{ inputs.require-sample }}' = 'true' ] && [ '${{ steps.covered.outputs.ok }}' != 'true' ]; then
+          echo "::error::ultra11y: a page declared in .ultra11yrc.json produced no capture — the run did not look at everything it reports on. See the pages named above."
+          exit 1
+        fi
         if [ '${{ inputs.require-decided }}' = 'true' ] && [ '${{ steps.decided.outputs.ok }}' != 'true' ]; then
           echo "::error::ultra11y: the criterion grid is incomplete — some criteria are still « to assess ». Adjudicate them, or declare them in the file named by undecidable-file, with a reason."
           exit 1

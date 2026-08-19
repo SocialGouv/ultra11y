@@ -5,7 +5,7 @@
 // The canonical WCAG report is keyed by 3-segment success criteria (1.4.3); a pack
 // report by the pack's own 2-segment ids (RGAA 8.3) — the id grammar is per-standard
 // so the version token "WCAG 2.2 —" can never be mistaken for a criterion.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AuditResult, Lang } from "./types.js";
 import { hasSC } from "./wcag.js";
@@ -13,6 +13,7 @@ import { type StandardId, CORE, criterionCoverage, isCore, loadPack, hasId, idCa
 import { buildWorklist, applyVerdicts, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import { isPagesReport } from "./pages-report.js";
+import { PAGES_DIR } from "./snapshot.js";
 
 export interface CheckResult {
   ok: boolean;
@@ -324,6 +325,77 @@ function sectionBody(md: string, n: number): string {
 // long as enough else passes, and it is precisely the criteria nobody could decide that a
 // threshold would hide. An entry states which criterion and why; an entry with no reason
 // fails the gate, because "documented" has to mean something.
+
+// ---- the COVERAGE gate ------------------------------------------------------------------
+//
+// `--require-decided` asks whether every criterion carries a verdict. This asks the question one
+// level below it, and it is the one that went unasked for a long time: a sweep that loses pages
+// produces a report that is simply SHORTER, and a shorter deliverable reads exactly like a
+// complete one. Measured on a real run — a hung probe killed two specs, a serial group took
+// fifteen more with it, and the RGAA report shipped with 20 of the 35 declared pages, green,
+// with nothing anywhere naming the missing fifteen or saying that any were missing.
+//
+// A declared page with no capture is not a page that passed. It is a page nobody looked at.
+
+/** One declared page that produced no capture. */
+export interface UncapturedPage {
+  id: string;
+  name: string;
+  url: string;
+}
+
+export interface SampleCoverage {
+  ok: boolean;
+  issues: string[];
+  /** Declared pages with no snapshot under `.ultra11y/pages/`. */
+  missing: UncapturedPage[];
+  declared: number;
+  captured: number;
+}
+
+/** Hold the sample a repository DECLARES against the snapshots a run actually produced.
+ *
+ *  Reads `.ultra11yrc.json` for the declaration and the pages directory for the captures, so it
+ *  answers for the working tree rather than for an audit JSON that may have been produced
+ *  elsewhere. A repository that declares no sample has nothing to answer — a gate that fails on
+ *  its own absence is a gate that gets turned off. */
+export function checkSampleCaptured(root = ".", lang: Lang = "en"): SampleCoverage {
+  const fr = lang === "fr";
+  let declared: { id: string; name?: string; url?: string }[] = [];
+  try {
+    const cfg = JSON.parse(readFileSync(join(root, ".ultra11yrc.json"), "utf8")) as {
+      sample?: { pages?: { id: string; name?: string; url?: string }[] };
+    };
+    declared = cfg.sample?.pages ?? [];
+  } catch {
+    return { ok: true, issues: [], missing: [], declared: 0, captured: 0 };
+  }
+  if (!declared.length) return { ok: true, issues: [], missing: [], declared: 0, captured: 0 };
+
+  let captured = new Set<string>();
+  try {
+    captured = new Set(
+      readdirSync(join(root, PAGES_DIR), { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name)
+        .filter((id) => existsSync(join(root, PAGES_DIR, id, "dom.html"))),
+    );
+  } catch {
+    /* no pages directory at all — every declared page is missing, which is what we report */
+  }
+  const missing = declared.filter((p) => !captured.has(p.id)).map((p) => ({ id: p.id, name: p.name ?? p.id, url: p.url ?? "" }));
+
+  const issues: string[] = [];
+  if (missing.length) {
+    const kept = declared.length - missing.length;
+    issues.push(
+      fr
+        ? `${kept}/${declared.length} page(s) déclarée(s) ont été capturées. Aucune capture pour : ${missing.map((m) => `${m.name} (${m.id})`).join(", ")}. Une page déclarée sans capture n'est pas une page conforme, c'est une page que personne n'a regardée.`
+        : `${kept}/${declared.length} declared page(s) were captured. No capture for: ${missing.map((m) => `${m.name} (${m.id})`).join(", ")}. A declared page with no capture is not a page that passed — it is a page nobody looked at.`,
+    );
+  }
+  return { ok: issues.length === 0, issues, missing, declared: declared.length, captured: captured.size };
+}
 
 /** Numeric-segment order, so 2.1 comes before 10.1. */
 function byCriterionId(a: string, b: string): number {
