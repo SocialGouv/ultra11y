@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.13.0](https://github.com/maxgfr/ultra11y/compare/v5.12.0...v5.13.0) (2026-08-19)
+
+
+### Features
+
+* **audit:** let a clean axe pass close the one criterion axe actually decides ([b2bc8f0](https://github.com/maxgfr/ultra11y/commit/b2bc8f02dced974097cdcd5f7d15447a94957c9f))
+
 # [5.12.0](https://github.com/maxgfr/ultra11y/compare/v5.11.3...v5.12.0) (2026-08-19)
 
 
