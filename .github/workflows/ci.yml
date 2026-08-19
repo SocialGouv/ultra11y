@@ -234,8 +234,29 @@ jobs:
 
   action:
     runs-on: ubuntu-latest
+    # A flaky install step once hung this job for 3h27 (GitHub's default job timeout is
+    # 6h); nothing here legitimately needs more than ~10 minutes.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      # The browser tier is the repository's own, pinned by pnpm-lock.yaml, so the scan
+      # below resolves @playwright/test + @axe-core/playwright at the SAME versions whose
+      # browsers `playwright install` then downloads. The previous
+      # `npm i --no-save --omit=dev @playwright/test @axe-core/playwright` installed
+      # NOTHING once those packages became devDependencies of this repo: npm applies
+      # --omit=dev to named specs already declared there ("up to date"), so
+      # `scan --runtime auto` silently degraded to Docker — whose container cannot reach
+      # 127.0.0.1 on the host (ERR_CONNECTION_REFUSED), and the job went red on every push.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       # Report-only over a fixture with known defects. `sarif: false` keeps the job free of
       # `security-events: write`, so it runs on a fork's PR too.
@@ -309,14 +330,10 @@ jobs:
 
       # The page-by-page half: a real browser over a served page, snapshotted, folded into the
       # audit and rendered as per-page dossiers. This is the path the whole feature exists for,
-      # and the one no unit test can reach.
-      # `scan --runtime auto` resolves Playwright from the working directory, so the browser
-      # tier has to live in THIS repo's tree. `--omit=dev` keeps npm from also pulling the
-      # whole devDependency tree (semantic-release, vitest, tsup…) that this job never uses.
+      # and the one no unit test can reach. The packages were installed by `pnpm install`
+      # above; what is still missing is only the browser binary itself.
       - name: Install the browser tier
-        run: |
-          npm i --no-audit --no-fund --no-save --omit=dev @playwright/test @axe-core/playwright
-          npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Serve a two-page site
         run: |
@@ -341,6 +358,12 @@ jobs:
           fail-on: ""
           sarif: "false"
           comment: "false"
+          # The target is a HOST loopback URL — a Docker container can never reach it, so
+          # this scan MUST run on the local tier. With `auto` (the default) a broken local
+          # install degrades silently to Docker and dies on ERR_CONNECTION_REFUSED, which is
+          # exactly how this job stayed red for a day; forcing `local` turns the same
+          # regression into an explicit "local tier unavailable" failure.
+          runtime: local
           crawl: http://127.0.0.1:8931/
           crawl-max: "5"
           artifact-name: action-e2e-pages
