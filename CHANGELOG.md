@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.11.3](https://github.com/maxgfr/ultra11y/compare/v5.11.2...v5.11.3) (2026-08-19)
+
+
+### Bug Fixes
+
+* **payload:** stop throwing away the doctype between the browser and the disk ([7ac68f3](https://github.com/maxgfr/ultra11y/commit/7ac68f3206b339f2c11be9eea46ab89a25eec5b6))
+
 ## [5.11.2](https://github.com/maxgfr/ultra11y/compare/v5.11.1...v5.11.2) (2026-08-18)
 
 
