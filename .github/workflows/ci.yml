@@ -247,7 +247,10 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright install chromium
+      # ^ NO --with-deps: on the Azure runners apt hangs for 30min+ whenever their
+      # ubuntu mirror misbehaves (measured twice today, once for 3h27), while the
+      # GitHub image already ships every library chromium-for-testing needs.
       # ULTRA11Y_REQUIRE_BROWSER turns a silent skip into a failure. The tests skip by design
       # where no browser is installed; here one is installed on purpose, so a skip would make
       # the whole file decoration — the exact «green but inactive» failure this tier catches.
@@ -364,7 +367,11 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install the browser tier
-        run: pnpm exec playwright install --with-deps chromium
+        # NO --with-deps: it shells out to apt, which on the Azure runners hangs for
+        # 30min+ whenever their ubuntu mirror (azure.archive.ubuntu.com) misbehaves —
+        # measured twice today, once for 3h27. The GitHub ubuntu image ships Chrome
+        # stable and its libraries, which is everything chromium-for-testing needs.
+        run: pnpm exec playwright install chromium
 
       - name: Serve a two-page site
         run: |
