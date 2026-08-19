@@ -137,9 +137,18 @@ const S = {
     testsCol: "Tests",
     conformingCol: "C",
     nonConformingCol: "NC",
-    toAssessCol: "À évaluer",
     scoreboardNote:
-      "`C` conforme · `NC` non conforme · « À évaluer » : personne ne l'a encore tranché — ni conforme ni non conforme. Pas de pourcentage ici : un taux calculé sur les seuls critères décidés se lit comme une note de page, et vaut la même chose sur une bonne page que sur une mauvaise. Le taux et sa couverture sont dans la fiche par page de l'artefact.",
+      "`C` conforme · `NC` non conforme. Pas de pourcentage ici : un taux calculé sur les seuls critères décidés se lit comme une note de page, et vaut la même chose sur une bonne page que sur une mauvaise. Le taux et sa couverture sont dans la fiche par page de l'artefact.",
+    undecidedTitle: "Critères non tranchés",
+    undecidedNote:
+      "Ces critères ne sont NI conformes NI non conformes : personne ne les a encore tranchés, donc ils ne comptent nulle part ci-dessus. Un bilan page par page n'est complet que lorsque cette section est vide — adjugez-les (`verify --manual`), mesurez-les (`scan`), ou déclarez-les dans le fichier `undecidable` avec leur motif.",
+    undecidedAllPages: (n: number) => `Sur **toutes** les pages : ${n} critère(s).`,
+    blockingNc: "🔴 Non-conformités bloquantes",
+    nonBlockingNc: "🟠🟡 Non-conformités non bloquantes",
+    noBlockingNc: "Aucune non-conformité bloquante sur cette page.",
+    orphansTitle: "Constats rattachés à aucune page",
+    orphansNote:
+      "Code partagé, ou fichier hors de toute route : rien ne dit sur quelle page ils se manifestent, donc ils ne sont jamais répartis d'office. Ils comptent dans l'audit global et se corrigent comme les autres.",
     noPages:
       "Aucune page dans le périmètre de ce run : le balayage n'a produit aucun instantané. Ce n'est pas un bilan vide, c'est un bilan absent — les critères au rendu restent à évaluer.",
     pagesDetailNote:
@@ -199,9 +208,18 @@ const S = {
     testsCol: "Tests",
     conformingCol: "C",
     nonConformingCol: "NC",
-    toAssessCol: "To assess",
     scoreboardNote:
-      "`C` conforming · `NC` non-conforming · “To assess”: nobody has ruled on it yet — neither conforming nor not. No percentage here: a rate over the decided criteria alone reads as a page score, and reads the same on a good page as on a bad one. The rate and its coverage live in the artifact's per-page sheet.",
+      "`C` conforming · `NC` non-conforming. No percentage here: a rate over the decided criteria alone reads as a page score, and reads the same on a good page as on a bad one. The rate and its coverage live in the artifact's per-page sheet.",
+    undecidedTitle: "Undecided criteria",
+    undecidedNote:
+      "These are NEITHER conforming NOR non-conforming: nobody has ruled on them yet, so they count nowhere above. A page-by-page report is complete only when this section is empty — adjudicate them (`verify --manual`), measure them (`scan`), or declare them in the `undecidable` file with their reason.",
+    undecidedAllPages: (n: number) => `On **every** page: ${n} criterion(ia).`,
+    blockingNc: "🔴 Blocking non-conformities",
+    nonBlockingNc: "🟠🟡 Non-blocking non-conformities",
+    noBlockingNc: "No blocking non-conformity on this page.",
+    orphansTitle: "Findings attributed to no page",
+    orphansNote:
+      "Shared code, or a file outside every route: nothing says which page they show up on, so they are never spread across pages. They count in the overall audit and are fixed like any other.",
     noPages:
       "No page in this run's scope: the sweep produced no snapshot. This is not an empty scoreboard, it is a missing one — the rendering criteria stay to assess.",
     pagesDetailNote:
@@ -227,6 +245,15 @@ const COMMENT_ROWS = 10;
  *  src/tickets/providers/github.ts; the report surface was never clamped at all, so a wide
  *  audit posted a body the API rejected with a 422 and the run reported "comment failed". */
 const COMMENT_LIMIT = 65_536;
+
+/** The size GitHub actually measures. A French RGAA comment is ~4 % larger in UTF-8 than in
+ *  UTF-16 code units — every « é », every em dash, every severity emoji — so a document that
+ *  fits `.length` can still be 66 KB on the wire. Counting the encoded bytes is the
+ *  conservative reading of the same limit, and it can only ever make the clamp bite sooner. */
+const BYTES = new TextEncoder();
+function sizeOf(s: string): number {
+  return BYTES.encode(s).length;
+}
 
 /** One (criterion, rule, selector) defect, however many times it occurs. */
 export interface FindingGroup {
@@ -387,12 +414,12 @@ function reportSectionsBody(
   for (const section of ordered) {
     const text = section.text.trimEnd();
     // +2 for the blank line that joins it to what precedes.
-    if (dropped.length || spent + text.length + 2 > budget) {
+    if (dropped.length || spent + sizeOf(text) + 2 > budget) {
       dropped.push(section.heading.replace(/^##\s*/, ""));
       continue;
     }
     body.push(text, "");
-    spent += text.length + 2;
+    spent += sizeOf(text) + 2;
   }
   return { body, dropped };
 }
@@ -438,13 +465,13 @@ export function prComment(result: AuditResult, opts: AnnotateOptions & { runUrl?
   // no comment at all.
   // The body is the REPORT's own sections — same document, same words, same order — kept while
   // the budget lasts and dropped whole otherwise. The head and the tail are never candidates.
-  const fixed = [...head, ...tail].join("\n").length;
+  const fixed = sizeOf([...head, ...tail].join("\n"));
   const { body, dropped } = reportSectionsBody(result, standard, lang, Math.max(0, COMMENT_LIMIT - fixed - 512));
   const notes: string[] = [];
   if (dropped.length) notes.push(s.sectionsDropped(dropped), "");
 
   const assembled = [...head, ...body, ...notes, ...tail].join("\n").trimEnd();
-  if (assembled.length <= COMMENT_LIMIT) return assembled;
+  if (sizeOf(assembled) <= COMMENT_LIMIT) return assembled;
 
   // The report could not be cut small enough — a single section larger than the whole budget.
   // Fall back to the digest this comment carried before: the distinct defects and a link, which
@@ -460,7 +487,7 @@ export function prComment(result: AuditResult, opts: AnnotateOptions & { runUrl?
     return [...head, ...digest, ...tail].join("\n").trimEnd();
   };
   let rows = Math.min(COMMENT_ROWS, grouped.length);
-  while (rows > 0 && assemble(rows).length > COMMENT_LIMIT) rows--;
+  while (rows > 0 && sizeOf(assemble(rows)) > COMMENT_LIMIT) rows--;
   return assemble(rows);
 }
 
@@ -500,16 +527,46 @@ export function perPageTable(result: AuditResult, standard: StandardId = CORE, l
  *  the artifact's per-page sheet, next to the coverage sentence that qualifies it. */
 function scoreboardTable(result: AuditResult, derived: PageResult[], standard: StandardId, s: (typeof S)[Lang], lang: Lang): string[] {
   const out: string[] = [
-    `| ${s.page} | ${s.basis} | ${s.conformingCol} | ${s.nonConformingCol} | ${s.toAssessCol} | 🔴 | 🟠 | 🟡 |`,
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    `| ${s.page} | ${s.basis} | ${s.conformingCol} | ${s.nonConformingCol} | 🔴 | 🟠 | 🟡 |`,
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
   ];
   for (const pg of derived) {
     const n = (sev: Severity): number => severityCount(pg, sev);
     const t = pageTally(pageCriterionRows(result, pg, standard, lang));
     out.push(
-      `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${t.c} | ${t.nc} | ${t.manual} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
+      `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${t.c} | ${t.nc} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
     );
   }
+  return out;
+}
+
+/** THE CRITERIA NOBODY HAS RULED ON — named, not counted in a column.
+ *
+ *  The scoreboard used to carry an « À évaluer » number per page, and a number in a column is
+ *  something a reader learns to skip: measured on a real sweep, every row said 9 and the report
+ *  shipped for weeks without anyone acting on it. A page-by-page verdict is only complete when
+ *  nothing is undecided, so the honest rendering is not a third column — it is a block that
+ *  disappears entirely when the grid is full, and NAMES what is open when it is not.
+ *
+ *  Criteria open on EVERY page are stated once. Under a per-page norm that is the usual shape
+ *  (a criterion the engine cannot decide is undecided everywhere), and repeating it on
+ *  thirty-seven rows is how a short, actionable list becomes a wall. */
+function undecidedBlock(result: AuditResult, derived: PageResult[], standard: StandardId, s: (typeof S)[Lang], lang: Lang): string[] {
+  const perPage = derived.map((pg) => ({
+    page: pg,
+    open: pageCriterionRows(result, pg, standard, lang)
+      .filter((r) => r.status === "manual")
+      .map((r) => r.id),
+  }));
+  if (!perPage.some((p) => p.open.length)) return [];
+  const everywhere = perPage[0]!.open.filter((id) => perPage.every((p) => p.open.includes(id)));
+  const out: string[] = [`> ⚠️ **${s.undecidedTitle}** — ${s.undecidedNote}`, ""];
+  if (everywhere.length) out.push(`- ${s.undecidedAllPages(everywhere.length)} ${everywhere.map((id) => `\`${id}\``).join(" · ")}`);
+  for (const { page, open } of perPage) {
+    const own = open.filter((id) => !everywhere.includes(id));
+    if (own.length) out.push(`- **${page.name}** : ${own.map((id) => `\`${id}\``).join(" · ")}`);
+  }
+  out.push("");
   return out;
 }
 
@@ -590,19 +647,43 @@ function pageBlock(result: AuditResult, page: PageResult, standard: StandardId, 
   //
   // Grouped, never listed: one design-system defect repeated on twenty rows is ONE thing to
   // fix, and twenty identical lines is how a comment becomes unreadable and then gets muzzled.
+  // BLOCKING FIRST, AND SEPARATELY. A single table sorted by severity reads as one list of
+  // things to do, and the reader has to check an icon on every row to find the ones that
+  // actually stop a user. They are different work — a blocking non-conformity is a page
+  // somebody cannot use — so they get their own heading, and the clamp below can never take
+  // one: it comes off the non-blocking half first, and off the blocking half never.
   const defects = groupFindings(
     page.findings.filter((f) => !f.advisory),
     standard,
     lang,
     baseDir,
   );
-  if (defects.length) {
-    out.push("", `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} |`, "| --- | --- | --- | ---: |");
-    for (const g of defects.slice(0, PAGE_DEFECTS_SHOWN)) {
-      out.push(`| ${ICON[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`);
-    }
-    if (defects.length > PAGE_DEFECTS_SHOWN) out.push("", s.pageMoreDefects(defects.length - PAGE_DEFECTS_SHOWN));
-  }
+  const blocking = defects.filter((g) => g.severity === "bloquant");
+  const rest = defects.filter((g) => g.severity !== "bloquant");
+  // BLOCKING SERVED FIRST, out of one budget. The cap is what keeps a 40-defect page from
+  // burying the other thirty-six, and it stays — what changes is WHO it takes from: the
+  // blocking half draws first, and only the remainder is offered to the rest. Each half says
+  // what it held back, so neither ever trails off in silence.
+  const shownBlocking = Math.min(blocking.length, PAGE_DEFECTS_SHOWN);
+  const shownRest = Math.min(rest.length, Math.max(0, PAGE_DEFECTS_SHOWN - shownBlocking));
+  const half = (rows: FindingGroup[], shown: number, title: string): string[] => {
+    if (!rows.length) return [];
+    const lines = [
+      "",
+      `**${title}**`,
+      "",
+      `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} |`,
+      "| --- | --- | --- | ---: |",
+      ...rows
+        .slice(0, shown)
+        .map(
+          (g) => `| ${ICON[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`,
+        ),
+    ];
+    if (rows.length > shown) lines.push("", s.pageMoreDefects(rows.length - shown));
+    return lines;
+  };
+  out.push(...half(blocking, shownBlocking, s.blockingNc), ...half(rest, shownRest, s.nonBlockingNc));
   out.push("", "</details>");
   return out.join("\n");
 }
@@ -635,6 +716,42 @@ function fullGridBlock(result: AuditResult, derived: PageResult[], standard: Sta
   for (const row of rows) {
     out.push(`| ${cell(row.label)} | ${derived.map((p) => GRID_MARK[status.get(row.id)?.get(p.id) ?? "manual"]).join(" | ")} |`);
   }
+  out.push("", "</details>");
+  return out;
+}
+
+/** THE FINDINGS NO PAGE COULD CLAIM, shown rather than merely counted.
+ *
+ *  Honesty rule 1 (src/pages.ts) refuses to spread an unattributable finding across pages, so a
+ *  page-by-page document has nowhere to put it. Until now it said so in one sentence and left
+ *  the defects themselves to the code digest — a SECOND sticky comment. With the digest gone,
+ *  that sentence would be the only trace of them: « 6 constats ne sont rattachés à aucune
+ *  page », and no file, no line, no description anywhere in the document.
+ *
+ *  So they get a block of their own, folded, in the same shape as a page's: shared code and
+ *  files outside every route are still code somebody has to fix. */
+function orphansBlock(result: AuditResult, standard: StandardId, s: (typeof S)[Lang], lang: Lang, baseDir: string): string[] {
+  const orphans = unattributedFindings(result).filter((f) => !f.advisory);
+  if (!orphans.length) return [];
+  const cell = (v: string): string => v.replace(/\|/g, "\\|");
+  const groups = groupFindings(orphans, standard, lang, baseDir);
+  const counts = SEV_ORDER.map((sev) => `${ICON[sev]} ${orphans.filter((f) => f.severity === sev).length}`).join(" · ");
+  const out: string[] = [
+    "<details>",
+    `<summary><b>${s.orphansTitle}</b> — ${counts}</summary>`,
+    // GFM only renders Markdown inside <details> after a blank line.
+    "",
+    `> ${s.orphansNote}`,
+    "",
+    `| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} | ${s.occurrences} |`,
+    "| --- | --- | --- | --- | ---: |",
+  ];
+  for (const g of groups.slice(0, MAX_ROWS)) {
+    out.push(
+      `| ${ICON[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`,
+    );
+  }
+  if (groups.length > MAX_ROWS) out.push("", s.more(groups.length - MAX_ROWS));
   out.push("", "</details>");
   return out;
 }
@@ -716,7 +833,13 @@ export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runU
     const body: string[] = [...scoreboardTable(result, derived.slice(0, nRows), standard, s, lang), ""];
     if (nRows < derived.length) body.push(s.scoreboardClamped(derived.length - nRows), "");
     body.push(...basisCaveats(result, derived, s, lang));
+    // What nobody has ruled on, NAMED. Empty — and therefore invisible — on a complete grid,
+    // which is the state this whole document is meant to reach.
+    body.push(...undecidedBlock(result, derived, standard, s, lang));
     if (redirected.length) body.push(...renderRedirected(redirected, lang), "");
+    // The defects no page could claim. This comment is now the ONLY one posted, so they are
+    // shown here or they are shown nowhere.
+    body.push(...orphansBlock(result, standard, s, lang, baseDir), "");
     // The full grid, folded away so the scoreboard stays what a reviewer reads first. It is
     // the biggest thing in the document — 106 criteria × 35 pages — so it is also the first
     // thing the size clamp gives up, WHOLE and with a line saying where to find it.
@@ -734,8 +857,8 @@ export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runU
   let nRows = derived.length;
   // The grid goes first when it does not fit: it is the one part that is reproducible in full
   // from the artifact, while the scoreboard and the defect blocks are not.
-  if (assemble(nBlocks, nRows).length <= COMMENT_LIMIT) return assemble(nBlocks, nRows);
-  while (nBlocks > 0 && assemble(nBlocks, nRows, false).length > COMMENT_LIMIT) nBlocks--;
-  while (nRows > 0 && assemble(nBlocks, nRows, false).length > COMMENT_LIMIT) nRows--;
+  if (sizeOf(assemble(nBlocks, nRows)) <= COMMENT_LIMIT) return assemble(nBlocks, nRows);
+  while (nBlocks > 0 && sizeOf(assemble(nBlocks, nRows, false)) > COMMENT_LIMIT) nBlocks--;
+  while (nRows > 0 && sizeOf(assemble(nBlocks, nRows, false)) > COMMENT_LIMIT) nRows--;
   return assemble(nBlocks, nRows, false);
 }

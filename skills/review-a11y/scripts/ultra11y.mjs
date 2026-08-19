@@ -61816,8 +61816,15 @@ var S = {
     testsCol: "Tests",
     conformingCol: "C",
     nonConformingCol: "NC",
-    toAssessCol: "\xC0 \xE9valuer",
-    scoreboardNote: "`C` conforme \xB7 `NC` non conforme \xB7 \xAB \xC0 \xE9valuer \xBB : personne ne l'a encore tranch\xE9 \u2014 ni conforme ni non conforme. Pas de pourcentage ici : un taux calcul\xE9 sur les seuls crit\xE8res d\xE9cid\xE9s se lit comme une note de page, et vaut la m\xEAme chose sur une bonne page que sur une mauvaise. Le taux et sa couverture sont dans la fiche par page de l'artefact.",
+    scoreboardNote: "`C` conforme \xB7 `NC` non conforme. Pas de pourcentage ici : un taux calcul\xE9 sur les seuls crit\xE8res d\xE9cid\xE9s se lit comme une note de page, et vaut la m\xEAme chose sur une bonne page que sur une mauvaise. Le taux et sa couverture sont dans la fiche par page de l'artefact.",
+    undecidedTitle: "Crit\xE8res non tranch\xE9s",
+    undecidedNote: "Ces crit\xE8res ne sont NI conformes NI non conformes : personne ne les a encore tranch\xE9s, donc ils ne comptent nulle part ci-dessus. Un bilan page par page n'est complet que lorsque cette section est vide \u2014 adjugez-les (`verify --manual`), mesurez-les (`scan`), ou d\xE9clarez-les dans le fichier `undecidable` avec leur motif.",
+    undecidedAllPages: (n) => `Sur **toutes** les pages : ${n} crit\xE8re(s).`,
+    blockingNc: "\u{1F534} Non-conformit\xE9s bloquantes",
+    nonBlockingNc: "\u{1F7E0}\u{1F7E1} Non-conformit\xE9s non bloquantes",
+    noBlockingNc: "Aucune non-conformit\xE9 bloquante sur cette page.",
+    orphansTitle: "Constats rattach\xE9s \xE0 aucune page",
+    orphansNote: "Code partag\xE9, ou fichier hors de toute route : rien ne dit sur quelle page ils se manifestent, donc ils ne sont jamais r\xE9partis d'office. Ils comptent dans l'audit global et se corrigent comme les autres.",
     noPages: "Aucune page dans le p\xE9rim\xE8tre de ce run : le balayage n'a produit aucun instantan\xE9. Ce n'est pas un bilan vide, c'est un bilan absent \u2014 les crit\xE8res au rendu restent \xE0 \xE9valuer.",
     pagesDetailNote: "Un bloc par page portant au moins une non-conformit\xE9, et seulement ses crit\xE8res **non conformes** \u2014 la grille compl\xE8te (tous les crit\xE8res de chaque page, avec leurs tests et leurs captures) vit dans l'artefact.",
     pagesClamped: (n) => `_Le d\xE9tail de ${n} page(s) a \xE9t\xE9 retir\xE9 de ce commentaire pour tenir dans la limite de GitHub \u2014 l'artefact les porte toutes._`,
@@ -61867,8 +61874,15 @@ var S = {
     testsCol: "Tests",
     conformingCol: "C",
     nonConformingCol: "NC",
-    toAssessCol: "To assess",
-    scoreboardNote: "`C` conforming \xB7 `NC` non-conforming \xB7 \u201CTo assess\u201D: nobody has ruled on it yet \u2014 neither conforming nor not. No percentage here: a rate over the decided criteria alone reads as a page score, and reads the same on a good page as on a bad one. The rate and its coverage live in the artifact's per-page sheet.",
+    scoreboardNote: "`C` conforming \xB7 `NC` non-conforming. No percentage here: a rate over the decided criteria alone reads as a page score, and reads the same on a good page as on a bad one. The rate and its coverage live in the artifact's per-page sheet.",
+    undecidedTitle: "Undecided criteria",
+    undecidedNote: "These are NEITHER conforming NOR non-conforming: nobody has ruled on them yet, so they count nowhere above. A page-by-page report is complete only when this section is empty \u2014 adjudicate them (`verify --manual`), measure them (`scan`), or declare them in the `undecidable` file with their reason.",
+    undecidedAllPages: (n) => `On **every** page: ${n} criterion(ia).`,
+    blockingNc: "\u{1F534} Blocking non-conformities",
+    nonBlockingNc: "\u{1F7E0}\u{1F7E1} Non-blocking non-conformities",
+    noBlockingNc: "No blocking non-conformity on this page.",
+    orphansTitle: "Findings attributed to no page",
+    orphansNote: "Shared code, or a file outside every route: nothing says which page they show up on, so they are never spread across pages. They count in the overall audit and are fixed like any other.",
     noPages: "No page in this run's scope: the sweep produced no snapshot. This is not an empty scoreboard, it is a missing one \u2014 the rendering criteria stay to assess.",
     pagesDetailNote: "One block per page carrying at least one non-conformity, and only its **non-conforming** criteria \u2014 the full grid (every criterion of every page, with its tests and its screenshot) lives in the artifact.",
     pagesClamped: (n) => `_The detail of ${n} page(s) was dropped from this comment to fit GitHub's limit \u2014 the artifact carries them all._`,
@@ -61884,6 +61898,10 @@ var S = {
 var MAX_ROWS = 50;
 var COMMENT_ROWS = 10;
 var COMMENT_LIMIT = 65536;
+var BYTES = new TextEncoder();
+function sizeOf(s) {
+  return BYTES.encode(s).length;
+}
 function groupFindings(findings, standard, lang, baseDir) {
   const groups = /* @__PURE__ */ new Map();
   for (const f of findings) {
@@ -61967,12 +61985,12 @@ function reportSectionsBody(result, standard, lang, budget, prefer) {
   let spent = 0;
   for (const section of ordered) {
     const text = section.text.trimEnd();
-    if (dropped.length || spent + text.length + 2 > budget) {
+    if (dropped.length || spent + sizeOf(text) + 2 > budget) {
       dropped.push(section.heading.replace(/^##\s*/, ""));
       continue;
     }
     body3.push(text, "");
-    spent += text.length + 2;
+    spent += sizeOf(text) + 2;
   }
   return { body: body3, dropped };
 }
@@ -61997,12 +62015,12 @@ function prComment(result, opts = {}) {
   const tail = [];
   if (opts.artifactName) tail.push(s.artifact(opts.artifactName), "");
   if (opts.runUrl) tail.push(s.runLink(opts.runUrl), "");
-  const fixed = [...head, ...tail].join("\n").length;
+  const fixed = sizeOf([...head, ...tail].join("\n"));
   const { body: body3, dropped } = reportSectionsBody(result, standard, lang, Math.max(0, COMMENT_LIMIT - fixed - 512));
   const notes = [];
   if (dropped.length) notes.push(s.sectionsDropped(dropped), "");
   const assembled = [...head, ...body3, ...notes, ...tail].join("\n").trimEnd();
-  if (assembled.length <= COMMENT_LIMIT) return assembled;
+  if (sizeOf(assembled) <= COMMENT_LIMIT) return assembled;
   const assemble = (rows2) => {
     const digest = [];
     if (grouped.length) {
@@ -62014,7 +62032,7 @@ function prComment(result, opts = {}) {
     return [...head, ...digest, ...tail].join("\n").trimEnd();
   };
   let rows = Math.min(COMMENT_ROWS, grouped.length);
-  while (rows > 0 && assemble(rows).length > COMMENT_LIMIT) rows--;
+  while (rows > 0 && sizeOf(assemble(rows)) > COMMENT_LIMIT) rows--;
   return assemble(rows);
 }
 function perPageTable(result, standard = CORE2, lang = "en") {
@@ -62027,16 +62045,32 @@ function perPageTable(result, standard = CORE2, lang = "en") {
 }
 function scoreboardTable(result, derived, standard, s, lang) {
   const out2 = [
-    `| ${s.page} | ${s.basis} | ${s.conformingCol} | ${s.nonConformingCol} | ${s.toAssessCol} | \u{1F534} | \u{1F7E0} | \u{1F7E1} |`,
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"
+    `| ${s.page} | ${s.basis} | ${s.conformingCol} | ${s.nonConformingCol} | \u{1F534} | \u{1F7E0} | \u{1F7E1} |`,
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: |"
   ];
   for (const pg of derived) {
     const n = (sev) => severityCount(pg, sev);
     const t3 = pageTally(pageCriterionRows(result, pg, standard, lang));
     out2.push(
-      `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${t3.c} | ${t3.nc} | ${t3.manual} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
+      `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${t3.c} | ${t3.nc} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
     );
   }
+  return out2;
+}
+function undecidedBlock(result, derived, standard, s, lang) {
+  const perPage = derived.map((pg) => ({
+    page: pg,
+    open: pageCriterionRows(result, pg, standard, lang).filter((r) => r.status === "manual").map((r) => r.id)
+  }));
+  if (!perPage.some((p) => p.open.length)) return [];
+  const everywhere = perPage[0].open.filter((id) => perPage.every((p) => p.open.includes(id)));
+  const out2 = [`> \u26A0\uFE0F **${s.undecidedTitle}** \u2014 ${s.undecidedNote}`, ""];
+  if (everywhere.length) out2.push(`- ${s.undecidedAllPages(everywhere.length)} ${everywhere.map((id) => `\`${id}\``).join(" \xB7 ")}`);
+  for (const { page, open } of perPage) {
+    const own = open.filter((id) => !everywhere.includes(id));
+    if (own.length) out2.push(`- **${page.name}** : ${own.map((id) => `\`${id}\``).join(" \xB7 ")}`);
+  }
+  out2.push("");
   return out2;
 }
 function severityCount(pg, sev) {
@@ -62084,13 +62118,26 @@ function pageBlock(result, page, standard, lang, baseDir) {
     lang,
     baseDir
   );
-  if (defects.length) {
-    out2.push("", `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} |`, "| --- | --- | --- | ---: |");
-    for (const g of defects.slice(0, PAGE_DEFECTS_SHOWN)) {
-      out2.push(`| ${ICON5[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`);
-    }
-    if (defects.length > PAGE_DEFECTS_SHOWN) out2.push("", s.pageMoreDefects(defects.length - PAGE_DEFECTS_SHOWN));
-  }
+  const blocking = defects.filter((g) => g.severity === "bloquant");
+  const rest = defects.filter((g) => g.severity !== "bloquant");
+  const shownBlocking = Math.min(blocking.length, PAGE_DEFECTS_SHOWN);
+  const shownRest = Math.min(rest.length, Math.max(0, PAGE_DEFECTS_SHOWN - shownBlocking));
+  const half = (rows2, shown, title2) => {
+    if (!rows2.length) return [];
+    const lines = [
+      "",
+      `**${title2}**`,
+      "",
+      `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} |`,
+      "| --- | --- | --- | ---: |",
+      ...rows2.slice(0, shown).map(
+        (g) => `| ${ICON5[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`
+      )
+    ];
+    if (rows2.length > shown) lines.push("", s.pageMoreDefects(rows2.length - shown));
+    return lines;
+  };
+  out2.push(...half(blocking, shownBlocking, s.blockingNc), ...half(rest, shownRest, s.nonBlockingNc));
   out2.push("", "</details>");
   return out2.join("\n");
 }
@@ -62112,6 +62159,31 @@ function fullGridBlock(result, derived, standard, s, lang) {
   for (const row of rows) {
     out2.push(`| ${cell(row.label)} | ${derived.map((p) => GRID_MARK[status.get(row.id)?.get(p.id) ?? "manual"]).join(" | ")} |`);
   }
+  out2.push("", "</details>");
+  return out2;
+}
+function orphansBlock(result, standard, s, lang, baseDir) {
+  const orphans = unattributedFindings(result).filter((f) => !f.advisory);
+  if (!orphans.length) return [];
+  const cell = (v) => v.replace(/\|/g, "\\|");
+  const groups = groupFindings(orphans, standard, lang, baseDir);
+  const counts = SEV_ORDER4.map((sev) => `${ICON5[sev]} ${orphans.filter((f) => f.severity === sev).length}`).join(" \xB7 ");
+  const out2 = [
+    "<details>",
+    `<summary><b>${s.orphansTitle}</b> \u2014 ${counts}</summary>`,
+    // GFM only renders Markdown inside <details> after a blank line.
+    "",
+    `> ${s.orphansNote}`,
+    "",
+    `| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} | ${s.occurrences} |`,
+    "| --- | --- | --- | --- | ---: |"
+  ];
+  for (const g of groups.slice(0, MAX_ROWS)) {
+    out2.push(
+      `| ${ICON5[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`
+    );
+  }
+  if (groups.length > MAX_ROWS) out2.push("", s.more(groups.length - MAX_ROWS));
   out2.push("", "</details>");
   return out2;
 }
@@ -62148,7 +62220,9 @@ function pagesComment(result, opts = {}) {
     const body3 = [...scoreboardTable(result, derived.slice(0, nRows2), standard, s, lang), ""];
     if (nRows2 < derived.length) body3.push(s.scoreboardClamped(derived.length - nRows2), "");
     body3.push(...basisCaveats(result, derived, s, lang));
+    body3.push(...undecidedBlock(result, derived, standard, s, lang));
     if (redirected.length) body3.push(...renderRedirected(redirected, lang), "");
+    body3.push(...orphansBlock(result, standard, s, lang, baseDir), "");
     if (withGrid) body3.push(...fullGridBlock(result, derived, standard, s, lang), "");
     else body3.push(s.gridDropped, "");
     if (blocks.length) {
@@ -62160,9 +62234,9 @@ function pagesComment(result, opts = {}) {
   };
   let nBlocks = blocks.length;
   let nRows = derived.length;
-  if (assemble(nBlocks, nRows).length <= COMMENT_LIMIT) return assemble(nBlocks, nRows);
-  while (nBlocks > 0 && assemble(nBlocks, nRows, false).length > COMMENT_LIMIT) nBlocks--;
-  while (nRows > 0 && assemble(nBlocks, nRows, false).length > COMMENT_LIMIT) nRows--;
+  if (sizeOf(assemble(nBlocks, nRows)) <= COMMENT_LIMIT) return assemble(nBlocks, nRows);
+  while (nBlocks > 0 && sizeOf(assemble(nBlocks, nRows, false)) > COMMENT_LIMIT) nBlocks--;
+  while (nRows > 0 && sizeOf(assemble(nBlocks, nRows, false)) > COMMENT_LIMIT) nRows--;
   return assemble(nBlocks, nRows, false);
 }
 
