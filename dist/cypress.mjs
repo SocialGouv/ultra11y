@@ -166,6 +166,16 @@ function buildPayload(collected, url, runner, opts, screenshot, probes) {
       runner,
       viewport: collected.viewport,
       capturedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      // `documentElement.outerHTML` starts at `<html>`, so the DOM alone drops the doctype and
+      // RGAA 8.1 — « chaque page web est-elle définie par un type de document ? » — has nothing
+      // to look at. The collector captures it separately; this is where it was being thrown
+      // away one step later. Measured: 105 of 106 criteria decided, and the one left was 8.1,
+      // whose brief read « this capture predates doctype recording ».
+      //
+      // `!== undefined`, never a truthiness test: an EMPTY doctype is a page that genuinely has
+      // none, which is the non-conformity itself. Collapsing it into "not recorded" would hide
+      // a failing page behind « à évaluer ».
+      ...collected.doctype !== void 0 ? { doctype: collected.doctype } : {},
       ...opts.auth !== void 0 ? { auth: opts.auth } : {},
       ...opts.sources ? { sources: opts.sources } : {},
       ...opts.notes ? { notes: opts.notes } : {}
