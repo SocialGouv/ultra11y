@@ -60,7 +60,10 @@ adjudicates. So the engine's clean run is a starting point, never a verdict — 
 >    no status without a recorded, justified verdict. To make that a gate rather than a hope,
 >    `check --in <audit.json> --require-decided` fails while anything is still to assess, and
 >    `--allow-undecided <file>` takes the criteria you genuinely cannot decide, each with its
->    reason (a named list, never a threshold).
+>    reason (a named list, never a threshold). `--require-decided=pages` holds EVERY page's own
+>    grid to the same bar: a criterion failing on one route is settled for the run and may still
+>    be nobody's verdict on the routes it never fired on, which is what a per-page deliverable is
+>    actually judged on.
 > 5. **Look the criterion up; never recall it.** `criteria [--standard <pack>] <id>` — or
 >    `ultra11y_criteria` over MCP — returns the criterion's own wording, its **numbered
 >    tests**, and the glossary definitions those tests cite. RGAA 8.3 is not "the page needs a
