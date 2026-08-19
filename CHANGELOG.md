@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.15.1](https://github.com/maxgfr/ultra11y/compare/v5.15.0...v5.15.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* **ledger:** say so when a ledger is written without the captures ([70af5bf](https://github.com/maxgfr/ultra11y/commit/70af5bf7c42a719752118f61edf138fcd0b8baeb))
+
 # [5.15.0](https://github.com/maxgfr/ultra11y/compare/v5.14.4...v5.15.0) (2026-08-19)
 
 
