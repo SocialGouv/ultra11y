@@ -19,7 +19,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { runAudit } from "../src/audit.js";
-import { PAGES_DIR } from "../src/snapshot.js";
+import { PAGES_DIR, readSnapshots } from "../src/snapshot.js";
+import { derivePages, pageScopesFrom } from "../src/pages.js";
 
 const DOM = `<!doctype html><html lang="fr"><head><title>Accueil</title></head><body><main><h1>Egapro</h1><p>Bonjour</p></main></body></html>`;
 
@@ -31,7 +32,9 @@ function pageWithAxe(axe: unknown): ReturnType<typeof runAudit> {
   writeFileSync(join(dir, "meta.json"), JSON.stringify({ v: 1, id: "accueil", name: "Accueil", url: "https://exemple.fr/" }));
   writeFileSync(join(dir, "dom.html"), `<!-- ultra11y:capture v=1 page=accueil url=https://exemple.fr/ -->\n${DOM}\n`);
   if (axe !== undefined) writeFileSync(join(dir, "axe.json"), JSON.stringify(axe));
-  return runAudit({ inputs: [join(dir, "dom.html")] });
+  const r = runAudit({ inputs: [join(dir, "dom.html")] });
+  r.scope.pages = pageScopesFrom(readSnapshots(root));
+  return r;
 }
 
 const violation = (over: Record<string, unknown> = {}) => ({
@@ -115,5 +118,26 @@ describe("an axe pass that found nothing", () => {
 
   it("reports the criteria it covered, so the partial-audit banner stops naming them", () => {
     expect(pageWithAxe(clean).scope.scan?.testedScs ?? []).toContain("1.4.3");
+  });
+});
+
+// ---- and it has to survive the per-page projection ---------------------------------------
+//
+// A criterion closed because nothing of its kind exists ANYWHERE in scope is closed on every
+// page: there is no media on this page precisely because there is none on any of them. The
+// per-page projection re-decides each criterion from the page's own findings and used to drop
+// that verdict on the floor — every media, table and form criterion came back « à évaluer » per
+// page while the audit-wide grid had them settled. Measured on a three-page sample: 75 of 106
+// RGAA criteria open per page against 26 for the run.
+describe("a conformity reached for want of a subject holds on every page", () => {
+  it("is not re-opened by the per-page projection", () => {
+    const r = pageWithAxe({ ran: true, violations: [] });
+    const scope = r.scope.pages ?? [];
+    expect(scope.length, "the fixture must put a page in scope").toBeGreaterThan(0);
+    const [page] = derivePages(r, scope);
+    const media = page!.criteria.find((c) => c.id === "1.2.1");
+    expect(r.criteria.find((c) => c.id === "1.2.1")?.inapplicable, "precondition").toBe(true);
+    expect(media?.status, "no media anywhere in scope means none on this page either").toBe("C");
+    expect(media?.inapplicable).toBe(true);
   });
 });

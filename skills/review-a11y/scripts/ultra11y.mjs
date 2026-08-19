@@ -54373,6 +54373,7 @@ function pageStatus(c2, pageFindings, basis) {
   if (pageFindings.some((f) => !f.advisory)) return "NC";
   if (c2.status === "manual") return "manual";
   if (c2.status === "NA") return "NA";
+  if (c2.inapplicable) return c2.status;
   if (c2.decidedBy === "agent" || c2.decidedBy === "scan") return c2.status;
   if (automatability(c2.id) !== "static") return "manual";
   return basis === "snapshot" ? "C" : "manual";
@@ -54390,13 +54391,17 @@ function derivePages(result, pages) {
     const own = result.findings.filter((f) => f.page === p.id);
     const criteria = result.criteria.map((c2) => {
       const pf = own.filter((f) => f.criteriaId === c2.id);
+      const status = pageStatus(c2, pf, p.basis);
       return {
         id: c2.id,
         guideline: c2.guideline,
-        status: pageStatus(c2, pf, p.basis),
+        status,
         findings: pf,
         ...c2.justification ? { justification: c2.justification } : {},
-        ...c2.decidedBy ? { decidedBy: c2.decidedBy } : {}
+        ...c2.decidedBy ? { decidedBy: c2.decidedBy } : {},
+        // Carried, not recomputed: a finding on THIS page proves the subject exists after all,
+        // and `pageStatus` has already turned that into an NC above.
+        ...c2.inapplicable && status === c2.status ? { inapplicable: true } : {}
       };
     });
     const { rate, decided, total } = pct(criteria);

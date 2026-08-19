@@ -165,7 +165,16 @@ function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScop
   // A non-normative recommendation can never flip a criterion to NC — same rule as core.
   if (pageFindings.some((f) => !f.advisory)) return "NC";
   if (c.status === "manual") return "manual"; // the engine cannot decide it anywhere
-  if (c.status === "NA") return "NA"; // not applicable in scope ⇒ not applicable here
+  if (c.status === "NA") return "NA"; // legacy audits only — the engine no longer emits it
+  // NOTHING OF THAT KIND EXISTS ANYWHERE IN SCOPE, so there is none on this page either.
+  //
+  // Checked BEFORE rule 3 below, and it is not an exception to it: rule 3 refuses to conclude
+  // from silence, and this is not silence — it is a scope-wide absence the engine can point at,
+  // carrying the justification that names the subject it looked for. Left to fall through, every
+  // media, table and form criterion came back « à évaluer » on each page while the run-wide grid
+  // had them settled: measured on a three-page sample, 75 of 106 RGAA criteria open per page
+  // against 26 for the run.
+  if (c.inapplicable) return c.status;
 
   // A verdict SOMEBODY RECORDED is not silence, and rule 3 below is only about silence.
   //
@@ -225,13 +234,17 @@ export function derivePages(result: AuditResult, pages: PageScope[]): PageResult
     const own = result.findings.filter((f) => f.page === p.id);
     const criteria: CriterionResult[] = result.criteria.map((c) => {
       const pf = own.filter((f) => f.criteriaId === c.id);
+      const status = pageStatus(c, pf, p.basis);
       return {
         id: c.id,
         guideline: c.guideline,
-        status: pageStatus(c, pf, p.basis),
+        status,
         findings: pf,
         ...(c.justification ? { justification: c.justification } : {}),
         ...(c.decidedBy ? { decidedBy: c.decidedBy } : {}),
+        // Carried, not recomputed: a finding on THIS page proves the subject exists after all,
+        // and `pageStatus` has already turned that into an NC above.
+        ...(c.inapplicable && status === c.status ? { inapplicable: true } : {}),
       };
     });
     const { rate, decided, total } = pct(criteria);
