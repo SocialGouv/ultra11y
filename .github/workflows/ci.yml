@@ -226,8 +226,9 @@ jobs:
   # no business slowing the unit suite down.
   browser-tier:
     runs-on: ubuntu-latest
-    # Generous: the browser download alone can take ~6 minutes on a slow CDN day.
-    timeout-minutes: 15
+    # Sized to the slowest real CDN day, not the average one: this job's browser download
+    # has taken anywhere from ~1min to >15min, and a timeout here reads as a code failure.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -248,8 +249,9 @@ jobs:
   action:
     runs-on: ubuntu-latest
     # A flaky install step once hung this job for 3h27 (GitHub's default job timeout is
-    # 6h); nothing here legitimately needs more than ~10 minutes.
-    timeout-minutes: 20
+    # 6h); the real work needs ~10 minutes, but the browser download varies with the CDN
+    # (observed 1-15min+), so the ceiling is sized to the slow day, not the average one.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
 
