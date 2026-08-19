@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.12.0](https://github.com/maxgfr/ultra11y/compare/v5.11.3...v5.12.0) (2026-08-19)
+
+
+### Features
+
+* **audit:** report a criterion with nothing to evaluate as conforming, not as a third column ([5673afd](https://github.com/maxgfr/ultra11y/commit/5673afd395af3eadc45ea0ff5578d2824e2df532))
+* **e2e:** run axe inside the suite that already reached the page, and make one command answer one standard ([8d1aab1](https://github.com/maxgfr/ultra11y/commit/8d1aab123092ecd824c815fbf28dc998f5303b5a))
+* **report:** make the pull-request comment the report itself, and give the report the per-page rate ([2876de2](https://github.com/maxgfr/ultra11y/commit/2876de248c55ed0509c2c1cf34ec1639c3149961))
+
 ## [5.11.3](https://github.com/maxgfr/ultra11y/compare/v5.11.2...v5.11.3) (2026-08-19)
 
 
