@@ -31,6 +31,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { type AdjudicationFile, type AdjudicationItem, type AgentFinding, buildAdjudicationWorklist, type Evidence, readCitation } from "./adjudicate.js";
+import { PAGES_DIR } from "./snapshot.js";
 import { CORE, type StandardId } from "./standards/index.js";
 import type { AuditResult } from "./types.js";
 import { SCHEMA_VERSION } from "./types.js";
@@ -125,6 +126,25 @@ export function readLedger(path: string): VerdictLedger | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** Would a ledger written from THIS harvest be replayable? Names what is missing when not.
+ *
+ *  A ledger entry is keyed on a fingerprint of the evidence the verdict was ruled against, and
+ *  the harvest RE-READS the audited files from disk. So a verdict recorded where the audit's
+ *  page captures are absent is fingerprinted over a strictly smaller evidence set than the one
+ *  CI will rebuild — and it is stale on arrival, every time, silently.
+ *
+ *  Measured while adjudicating a real repository from a checkout with no `.ultra11y/pages/`:
+ *  RGAA 12.3 was recorded over 13 evidence items where the run harvests 22. The entry looked
+ *  perfectly well-formed, the fold accepted it, the file was committed and reviewed — and the
+ *  replay dropped it as stale on every subsequent run, with nothing anywhere saying why.
+ *
+ *  Returns the page ids the audit says it read and whose capture is not on disk. Empty when
+ *  there is nothing to warn about — including on a source-only audit, which legitimately has
+ *  no captures to miss. */
+export function unreadableCaptures(audit: AuditResult, cwd = "."): string[] {
+  return (audit.scope.pagesAudited ?? []).filter((id) => !existsSync(join(cwd, PAGES_DIR, id, "dom.html")));
 }
 
 export function writeLedger(path: string, ledger: VerdictLedger): void {

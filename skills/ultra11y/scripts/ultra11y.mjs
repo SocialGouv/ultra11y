@@ -58678,6 +58678,9 @@ function readLedger(path) {
     return void 0;
   }
 }
+function unreadableCaptures(audit2, cwd = ".") {
+  return (audit2.scope.pagesAudited ?? []).filter((id) => !existsSync21(join36(cwd, PAGES_DIR, id, "dom.html")));
+}
 function writeLedger(path, ledger) {
   mkdirSync10(dirname10(path), { recursive: true });
   const sorted = { ...ledger, entries: [...ledger.entries].sort((a, b) => a.criteriaId.localeCompare(b.criteriaId, "en", { numeric: true })) };
@@ -68713,6 +68716,11 @@ function applyAdjudicationFile(p, adj, lang) {
   writeFileSync20(auditPath, JSON.stringify(r.audit, null, 2) + "\n");
   const ledgerOut = ledgerTarget(p, adj.standard);
   if (ledgerOut) {
+    const blind = unreadableCaptures(r.audit);
+    if (blind.length)
+      console.error(
+        lang === "fr" ? `\u26A0 Registre \xE9crit sans les instantan\xE9s de ${blind.length} page(s) que cet audit dit avoir lues (${blind.slice(0, 5).join(", ")}${blind.length > 5 ? "\u2026" : ""}). L'\xE9vidence moissonn\xE9e ici est plus petite que celle qu'un run reconstruira, donc ces verdicts seront d\xE9clar\xE9s P\xC9RIM\xC9S au rejeu. Adjugez l\xE0 o\xF9 \`.ultra11y/pages/\` existe.` : `\u26A0 Ledger written without the snapshots of ${blind.length} page(s) this audit says it read (${blind.slice(0, 5).join(", ")}${blind.length > 5 ? "\u2026" : ""}). The evidence harvested here is smaller than the one a run will rebuild, so these verdicts will be dropped as STALE on replay. Adjudicate where \`.ultra11y/pages/\` exists.`
+      );
     const refused = new Set(r.rejectedCriteria);
     const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
     const fresh = entriesFrom(adj, accepted, r.audit.date);
@@ -68845,6 +68853,11 @@ async function cmdJudge(p) {
 `);
   const ledgerOut = ledgerTarget(p, adj.standard);
   if (ledgerOut) {
+    const blind = unreadableCaptures(r.audit);
+    if (blind.length)
+      console.error(
+        lang === "fr" ? `\u26A0 Registre \xE9crit sans les instantan\xE9s de ${blind.length} page(s) que cet audit dit avoir lues (${blind.slice(0, 5).join(", ")}${blind.length > 5 ? "\u2026" : ""}). L'\xE9vidence moissonn\xE9e ici est plus petite que celle qu'un run reconstruira, donc ces verdicts seront d\xE9clar\xE9s P\xC9RIM\xC9S au rejeu. Adjugez l\xE0 o\xF9 \`.ultra11y/pages/\` existe.` : `\u26A0 Ledger written without the snapshots of ${blind.length} page(s) this audit says it read (${blind.slice(0, 5).join(", ")}${blind.length > 5 ? "\u2026" : ""}). The evidence harvested here is smaller than the one a run will rebuild, so these verdicts will be dropped as STALE on replay. Adjudicate where \`.ultra11y/pages/\` exists.`
+      );
     const refused = new Set(r.rejectedCriteria);
     const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
     const fresh = entriesFrom(adj, accepted, r.audit.date);

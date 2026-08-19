@@ -50,7 +50,7 @@ import {
   hydrateAdjudication,
   type AdjudicationFile,
 } from "./adjudicate.js";
-import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, type VerdictLedger, writeLedger } from "./ledger.js";
+import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, unreadableCaptures, type VerdictLedger, writeLedger } from "./ledger.js";
 import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable, localTierStatus } from "./scan-local.js";
@@ -2940,6 +2940,25 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
   // next replay, which is the whole thing the gate exists to prevent.
   const ledgerOut = ledgerTarget(p, adj.standard);
   if (ledgerOut) {
+    // A LEDGER WRITTEN WITHOUT THE CAPTURES IS STALE ON ARRIVAL.
+    //
+    // The fingerprint is over the evidence the harvest READ FROM DISK, so recording a verdict
+    // where the audit's page captures are absent fingerprints a strictly smaller set than the
+    // one CI rebuilds — and the replay drops it as stale, every run, silently. Measured on a
+    // real repository: RGAA 12.3 recorded over 13 evidence items where the run harvests 22.
+    // The entry looked well-formed, the fold accepted it, it was committed and reviewed, and
+    // it never once replayed.
+    //
+    // A warning, not a refusal: the verdict itself is sound and still lands on THIS audit, and
+    // a caller who genuinely has no captures (a source-only repository) has nothing to fix.
+    // What must not happen is writing it and saying nothing.
+    const blind = unreadableCaptures(r.audit);
+    if (blind.length)
+      console.error(
+        lang === "fr"
+          ? `⚠ Registre écrit sans les instantanés de ${blind.length} page(s) que cet audit dit avoir lues (${blind.slice(0, 5).join(", ")}${blind.length > 5 ? "…" : ""}). L'évidence moissonnée ici est plus petite que celle qu'un run reconstruira, donc ces verdicts seront déclarés PÉRIMÉS au rejeu. Adjugez là où \`.ultra11y/pages/\` existe.`
+          : `⚠ Ledger written without the snapshots of ${blind.length} page(s) this audit says it read (${blind.slice(0, 5).join(", ")}${blind.length > 5 ? "…" : ""}). The evidence harvested here is smaller than the one a run will rebuild, so these verdicts will be dropped as STALE on replay. Adjudicate where \`.ultra11y/pages/\` exists.`,
+      );
     const refused = new Set(r.rejectedCriteria);
     const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
     const fresh = entriesFrom(adj, accepted, r.audit.date);
@@ -3129,6 +3148,25 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   // run can replay it for free.
   const ledgerOut = ledgerTarget(p, adj.standard);
   if (ledgerOut) {
+    // A LEDGER WRITTEN WITHOUT THE CAPTURES IS STALE ON ARRIVAL.
+    //
+    // The fingerprint is over the evidence the harvest READ FROM DISK, so recording a verdict
+    // where the audit's page captures are absent fingerprints a strictly smaller set than the
+    // one CI rebuilds — and the replay drops it as stale, every run, silently. Measured on a
+    // real repository: RGAA 12.3 recorded over 13 evidence items where the run harvests 22.
+    // The entry looked well-formed, the fold accepted it, it was committed and reviewed, and
+    // it never once replayed.
+    //
+    // A warning, not a refusal: the verdict itself is sound and still lands on THIS audit, and
+    // a caller who genuinely has no captures (a source-only repository) has nothing to fix.
+    // What must not happen is writing it and saying nothing.
+    const blind = unreadableCaptures(r.audit);
+    if (blind.length)
+      console.error(
+        lang === "fr"
+          ? `⚠ Registre écrit sans les instantanés de ${blind.length} page(s) que cet audit dit avoir lues (${blind.slice(0, 5).join(", ")}${blind.length > 5 ? "…" : ""}). L'évidence moissonnée ici est plus petite que celle qu'un run reconstruira, donc ces verdicts seront déclarés PÉRIMÉS au rejeu. Adjugez là où \`.ultra11y/pages/\` existe.`
+          : `⚠ Ledger written without the snapshots of ${blind.length} page(s) this audit says it read (${blind.slice(0, 5).join(", ")}${blind.length > 5 ? "…" : ""}). The evidence harvested here is smaller than the one a run will rebuild, so these verdicts will be dropped as STALE on replay. Adjudicate where \`.ultra11y/pages/\` exists.`,
+      );
     const refused = new Set(r.rejectedCriteria);
     const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
     const fresh = entriesFrom(adj, accepted, r.audit.date);

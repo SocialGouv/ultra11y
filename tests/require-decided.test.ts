@@ -7,7 +7,12 @@
 // had filled in.
 import { describe, expect, it } from "vitest";
 
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { checkDecided, isUndecidedFile } from "../src/check.js";
+import { unreadableCaptures } from "../src/ledger.js";
 import type { AuditResult, CriterionResult, Finding } from "../src/types.js";
 import { INAPPLICABLE_STATUS } from "../src/types.js";
 
@@ -198,5 +203,33 @@ describe("check --require-decided=pages", () => {
     // Declared at the run level, the same criterion must not come back through the page door —
     // an exception a reader signed off once should not have to be signed off per route.
     expect(checkDecided(a, "wcag", "en", { pages: true, allow }).ok).toBe(true);
+  });
+});
+
+// A LEDGER WRITTEN WITHOUT THE CAPTURES IS STALE ON ARRIVAL.
+//
+// The fingerprint is over the evidence the harvest READ FROM DISK. Recording a verdict where
+// the audit's page captures are absent fingerprints a strictly smaller set than the one CI
+// rebuilds, so the replay drops it as stale — every run, silently. Measured on a real
+// repository: RGAA 12.3 recorded over 13 evidence items where the run harvests 22. The entry
+// looked well-formed, the fold accepted it, it was committed and reviewed, and it never once
+// replayed. `unreadableCaptures` is what lets the caller be told.
+describe("unreadableCaptures", () => {
+  const withPagesAudited = (ids: string[]): AuditResult => ({ scope: { inputs: ["src"], files: 1, pagesAudited: ids } }) as unknown as AuditResult;
+
+  it("names the pages the audit read whose capture is not on disk", () => {
+    expect(unreadableCaptures(withPagesAudited(["accueil", "aide"]), mkdtempSync(join(tmpdir(), "u11y-blind-")))).toEqual(["accueil", "aide"]);
+  });
+
+  it("says nothing for a source-only audit — it has no capture to miss", () => {
+    expect(unreadableCaptures(withPagesAudited([]))).toEqual([]);
+    expect(unreadableCaptures({ scope: { inputs: ["src"], files: 1 } } as unknown as AuditResult)).toEqual([]);
+  });
+
+  it("says nothing when the captures ARE on disk", () => {
+    const root = mkdtempSync(join(tmpdir(), "u11y-seeing-"));
+    mkdirSync(join(root, ".ultra11y", "pages", "accueil"), { recursive: true });
+    writeFileSync(join(root, ".ultra11y", "pages", "accueil", "dom.html"), '<!doctype html><html lang="fr"></html>');
+    expect(unreadableCaptures(withPagesAudited(["accueil"]), root)).toEqual([]);
   });
 });
