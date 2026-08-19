@@ -16,7 +16,7 @@ import { SCHEMA_VERSION } from "./types.js";
 import { discover } from "./discover.js";
 import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
-import { attachSignals } from "./snapshot.js";
+import { attachSignals, snapshotPageId } from "./snapshot.js";
 import { loadConfig } from "./config.js";
 import { type Harvested, harvestSubjects, isSnapshotFile, PACK_SUBJECTS, pageOfDoc, SC_SUBJECTS } from "./adjudicate-subjects.js";
 import type { Doc } from "./parse/html.js";
@@ -908,6 +908,24 @@ export function applyAdjudication(
     } else if (v === "manual") {
       if (!it.reason || !MANUAL_REASONS.has(it.reason))
         blame(it.criteriaId, `criterion ${it.criteriaId}: a manual verdict requires reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`);
+      // `needs-rendered-dom` IS A DEFERRAL TO THE RENDERED TIER, and it is unfounded once the
+      // rendered page is on disk.
+      //
+      // The worklist already tells the adjudicator so, in both languages: « `needs-rendered-dom`
+      // reste la bonne réponse pour un critère dont aucune capture ne porte le sujet, et pour
+      // lui seul ». Nothing enforced it, so a pass could hand the criterion back to a tier that
+      // has already run and the criterion stayed « à évaluer » forever. Measured on egapro:
+      // RGAA 3.1 came back `needs-rendered-dom` on an audit carrying 37 captures, with its own
+      // evidence anchored in `.ultra11y/pages/<id>/dom.html` — the very files it said it needed.
+      //
+      // Refused, so the criterion returns to the next pass carrying the refusal. `undecidable`
+      // stays available and is the honest answer when the capture genuinely does not settle it
+      // — what is refused is the deferral, not the difficulty.
+      else if (it.reason === "needs-rendered-dom" && it.evidence.some((e) => snapshotPageId(e.file) !== undefined))
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: "needs-rendered-dom", but this criterion's own evidence is anchored in a page capture — the rendered page is on disk under .ultra11y/pages/<id>/ (dom.html, styles.json, boxes.json, axtree.json, screen.png). Decide it from those files, or answer "undecidable" and say what the capture does not settle.`,
+        );
     } else {
       // Name the vocabulary in the rejection. The caller is usually a model that has just
       // spent a whole worklist filling this file; "unknown verdict" alone told it nothing

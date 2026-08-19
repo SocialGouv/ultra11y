@@ -58249,6 +58249,11 @@ function applyAdjudication(audit2, adj, opts = {}) {
     } else if (v === "manual") {
       if (!it.reason || !MANUAL_REASONS.has(it.reason))
         blame(it.criteriaId, `criterion ${it.criteriaId}: a manual verdict requires reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`);
+      else if (it.reason === "needs-rendered-dom" && it.evidence.some((e) => snapshotPageId(e.file) !== void 0))
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: "needs-rendered-dom", but this criterion's own evidence is anchored in a page capture \u2014 the rendered page is on disk under .ultra11y/pages/<id>/ (dom.html, styles.json, boxes.json, axtree.json, screen.png). Decide it from those files, or answer "undecidable" and say what the capture does not settle.`
+        );
     } else {
       blame(it.criteriaId, `criterion ${it.criteriaId}: unknown verdict "${String(v)}" \u2014 expected one of ${VERDICTS.join(" | ")}`);
     }

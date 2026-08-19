@@ -159,3 +159,43 @@ describe("verdict spelling is not a decision", () => {
     expect(r.issues.join("\n")).toMatch(/NA verdict requires a justification/);
   });
 });
+
+// `needs-rendered-dom` IS A DEFERRAL, AND IT IS UNFOUNDED ONCE THE PAGE IS ON DISK.
+//
+// The worklist tells the adjudicator so in both languages — « la bonne réponse pour un critère
+// dont AUCUNE capture ne porte le sujet, et pour lui seul » — and nothing enforced it. Measured
+// on egapro: RGAA 3.1 came back `needs-rendered-dom` on an audit carrying 37 captures, with its
+// own evidence anchored in `.ultra11y/pages/<id>/dom.html` — the very files it said it needed.
+// The criterion then stayed « à évaluer » across three passes, handed back each time to a tier
+// that had already run.
+describe("the gate refuses a deferral to a tier that has already run", () => {
+  const item = (evidenceFile: string): AdjudicationItem =>
+    ({
+      criteriaId: "1.4.1",
+      automatability: "needs-rendering",
+      verdict: "manual",
+      reason: "needs-rendered-dom",
+      evidence: [{ file: evidenceFile, line: 2, selector: "a.fr-link", snippet: '<a class="fr-link">Contenu</a>' }],
+      citations: [],
+    }) as unknown as AdjudicationItem;
+
+  const refusal = (evidenceFile: string): string => {
+    const base = runAudit({ inputs: [PAGE] });
+    const r = applyAdjudication(
+      base,
+      { tool: "ultra11y", kind: "adjudication", schemaVersion: 2, standard: "wcag", auditDate: "2026-08-19", items: [item(evidenceFile)] } as AdjudicationFile,
+      {
+        cwd: dir,
+      },
+    );
+    return r.issues.join("\n");
+  };
+
+  it("refuses it when the criterion's own evidence sits in a page capture", () => {
+    expect(refusal(".ultra11y/pages/accueil/dom.html")).toMatch(/needs-rendered-dom.*page capture/s);
+  });
+
+  it("accepts it when no capture carries the subject — the answer it exists for", () => {
+    expect(refusal("src/components/Foo.tsx")).not.toMatch(/page capture/);
+  });
+});
