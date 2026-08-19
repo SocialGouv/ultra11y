@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.14.2](https://github.com/maxgfr/ultra11y/compare/v5.14.1...v5.14.2) (2026-08-19)
+
+
+### Bug Fixes
+
+* **adjudicate:** refuse a non-conformity nobody can open, and never crash rendering one ([884d272](https://github.com/maxgfr/ultra11y/commit/884d272dd7dcc8d87191e4e478fff1dc61d48f00))
+
 ## [5.14.1](https://github.com/maxgfr/ultra11y/compare/v5.14.0...v5.14.1) (2026-08-19)
 
 
