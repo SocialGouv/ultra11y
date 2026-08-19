@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.14.1](https://github.com/maxgfr/ultra11y/compare/v5.14.0...v5.14.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* **scan:** auto only picks the local tier when a browser is actually there ([068e58c](https://github.com/maxgfr/ultra11y/commit/068e58cb7174f1326311fae000faef0e9db7a148))
+
 # [5.14.0](https://github.com/maxgfr/ultra11y/compare/v5.13.1...v5.14.0) (2026-08-19)
 
 
