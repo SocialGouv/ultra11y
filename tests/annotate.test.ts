@@ -169,13 +169,16 @@ describe("the pull-request digest", () => {
     expect(prComment(audit([F()], decided()), { lang: "en" })).toContain("**80 % (4/5)**");
   });
 
-  it("is a digest, not the job summary — ten groups at most, and it says how many it left out", () => {
+  it("carries the report's own sections, so the comment and the artifact are one document", () => {
+    // It used to be a document of its own — a digest written separately from the audit it
+    // summarised. Two documents about one run drift, and a reviewer who opens the artifact
+    // after reading the comment should recognise what they are looking at.
     const many = Array.from({ length: 25 }, (_, i) => F({ selectorHint: `sel-${i}`, file: `p${i}.html` }));
     const md = prComment(audit(many, decided()), { lang: "en" });
-    expect(md.split("\n").filter((l) => l.startsWith("| 🔴 bloquant |"))).toHaveLength(10);
-    expect(md).toContain("… and 15 more group(s) — see the job summary.");
-    // The per-page scoreboard belongs to the long surface; the digest must not carry it.
-    expect(md).not.toContain("Page-by-page scoreboard");
+    expect(md).toMatch(/^## 1\. /m);
+    expect(md).toMatch(/^## 2\. /m);
+    // …and it is still the comment: the verdict and the rate lead, before any section.
+    expect(md.indexOf("automatic pass rate")).toBeLessThan(md.indexOf("## 1."));
   });
 
   it("links the run and names the artifact only when the caller says one exists", () => {
@@ -201,17 +204,21 @@ describe("the pull-request digest", () => {
   it("stays under GitHub's 65 536-character body limit, and says what it dropped", () => {
     const md = prComment(audit(pathological(), decided()), { lang: "en", runUrl: "https://gh/run/1" });
     expect(md.length).toBeLessThanOrEqual(65_536);
-    expect(md).toContain("dropped from this comment to fit GitHub's limit");
+    // Whole sections, named — never a byte slice. A reader can go and find each one in the
+    // artifact, which is the difference between a shorter document and a mutilated one.
+    expect(md).toMatch(/dropped from this comment to fit GitHub's (?:64 KiB )?limit/);
     // Whatever was dropped, the verdict and the way out survive.
     expect(md).toContain("🔴");
     expect(md).toContain("https://gh/run/1");
   });
 
-  it("clamps by whole rows — the document never ends on a half-written table", () => {
+  it("clamps by whole blocks — the document never ends on a half-written table", () => {
     const lines = prComment(audit(pathological(), decided()), { lang: "en" }).split("\n");
     expect(lines[lines.length - 1]).not.toMatch(/^\|/);
-    // Every row that survived is a complete one: six cells, seven pipes.
-    for (const l of lines.filter((x) => x.startsWith("| 🔴"))) expect(l.split("|")).toHaveLength(8);
+    // Every table row that survived is a complete one — the invariant a byte-offset cut breaks.
+    for (const l of lines.filter((x) => x.trimStart().startsWith("|"))) {
+      expect(l.trimEnd().endsWith("|"), `half-written row: ${l}`).toBe(true);
+    }
   });
 });
 

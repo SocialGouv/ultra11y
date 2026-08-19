@@ -54524,11 +54524,275 @@ function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   return out2.join("\n");
 }
 
+// src/pages-report.ts
+var PAGES_REPORT_MARKER = "ultra11y:pages-report";
+function pagesReportMarker(standard) {
+  return `<!-- ${PAGES_REPORT_MARKER} v="1" standard="${standard}" -->`;
+}
+function isPagesReport(md) {
+  return md.slice(0, 400).includes(`<!-- ${PAGES_REPORT_MARKER}`);
+}
+var MARK2 = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
+var L4 = {
+  fr: {
+    docTitle: "Rapport d'accessibilit\xE9 page par page",
+    indexTitle: "Rapport page par page \u2014 index",
+    date: "Date",
+    standard: "R\xE9f\xE9rentiel",
+    pagesCount: "Pages",
+    page: "Page",
+    url: "URL",
+    basis: "Base",
+    snapshot: "instantan\xE9",
+    source: "source",
+    capturedAt: "Captur\xE9 le",
+    viewport: "Fen\xEAtre",
+    producer: "Producteur",
+    auth: "Authentification requise",
+    rate: "Taux de r\xE9ussite automatique (v\xE9rifications statiques)",
+    // The index has its own, shorter header — the sheet's label is a full sentence and would
+    // wreck an eight-column table. Kept as a SEPARATE key: editing `rate` in place would
+    // silently reword the sheet bullet too.
+    rateShort: "Taux (crit\xE8res d\xE9cid\xE9s)",
+    rateNote: "sous-ensemble d\xE9cidable : C \xF7 (C + NC)",
+    tally: (c2, nc, na, m) => `${c2} conforme(s) \xB7 ${nc} non conforme(s) \xB7 ${na} non applicable(s) \xB7 ${m} \xE0 \xE9valuer`,
+    coverage: (decided, total) => `Couverture : ${decided}/${total} crit\xE8re(s) \xE9valu\xE9(s) \u2014 le taux ci-dessus ne porte que sur eux, et ne dit rien des ${total - decided} autres.`,
+    tests: "Tests",
+    screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`,
+    noScreenshot: "Aucune capture d'\xE9cran pour cette page (le producteur n'en a pas fourni) \u2014 le tier pixel est donc inactif ici.",
+    gridTitle: "Grille des crit\xE8res",
+    gridNote: "`C` conforme \xB7 `NC` non conforme \xB7 `\u2014` non applicable \xB7 `?` \xE0 \xE9valuer.",
+    criterion: "Crit\xE8re",
+    status: "Statut",
+    ncTitle: "Non-conformit\xE9s",
+    recTitle: "Recommandations (non normatives)",
+    recNote: "Bonnes pratiques sans test normatif en \xE9chec : elles ne rendent aucun crit\xE8re non conforme et n'entrent pas dans le taux.",
+    noNc: "Aucune non-conformit\xE9 d\xE9tect\xE9e sur cette page par le moteur. Les crit\xE8res \xAB \xE0 \xE9valuer \xBB restent \xE0 trancher.",
+    sourceWarn: "Cette page n'a **pas** d'instantan\xE9 : ses constats proviennent du code. L'absence de constat n'y vaut donc PAS conformit\xE9 \u2014 les crit\xE8res non d\xE9cid\xE9s restent \xAB \xE0 \xE9valuer \xBB.",
+    manualWarn: "Un crit\xE8re \xAB \xE0 \xE9valuer \xBB n'est ni conforme ni non conforme : personne ne l'a encore tranch\xE9. Les crit\xE8res de jugement s'adjugent avec `verify --manual`, ceux \xAB \xE0 restituer \xBB avec `scan`.",
+    unattributed: (n) => `${n} constat(s) ne sont rattach\xE9s \xE0 aucune page (code partag\xE9, fichier hors routes). Ils sont compt\xE9s dans l'audit global et ne sont jamais r\xE9partis d'office sur les pages.`,
+    sheet: "Fiche",
+    blocking: "Bloquant",
+    major: "Majeur",
+    minor: "Mineur",
+    indexNote: "Une fiche par page. `X % (d/t)` : le taux ne porte que sur les `d` crit\xE8res d\xE9cid\xE9s sur `t` \u2014 il ne dit rien des autres. `\u2014` signifie qu'aucun crit\xE8re n'a \xE9t\xE9 d\xE9cid\xE9 sur cette page, et ne vaut donc NI conformit\xE9 NI non-conformit\xE9."
+  },
+  en: {
+    docTitle: "Page-by-page accessibility report",
+    indexTitle: "Page-by-page report \u2014 index",
+    date: "Date",
+    standard: "Standard",
+    pagesCount: "Pages",
+    page: "Page",
+    url: "URL",
+    basis: "Basis",
+    snapshot: "snapshot",
+    source: "source",
+    capturedAt: "Captured at",
+    viewport: "Viewport",
+    producer: "Producer",
+    auth: "Authentication required",
+    rate: "Automatic static-check pass rate",
+    rateShort: "Rate (decided criteria)",
+    rateNote: "decidable subset: C \xF7 (C + NC)",
+    tally: (c2, nc, na, m) => `${c2} conforming \xB7 ${nc} non-conforming \xB7 ${na} not applicable \xB7 ${m} to assess`,
+    coverage: (decided, total) => `Coverage: ${decided}/${total} criteria assessed \u2014 the rate above covers only those, and says nothing about the other ${total - decided}.`,
+    tests: "Tests",
+    screenshotAlt: (n) => `Screenshot of the ${n} page`,
+    noScreenshot: "No screenshot for this page (the producer supplied none) \u2014 the pixel tier is therefore inactive here.",
+    gridTitle: "Criteria grid",
+    gridNote: "`C` conforming \xB7 `NC` non-conforming \xB7 `\u2014` not applicable \xB7 `?` to assess.",
+    criterion: "Criterion",
+    status: "Status",
+    ncTitle: "Non-conformities",
+    recTitle: "Recommendations (non-normative)",
+    recNote: "Good practices with no failing normative test: they never make a criterion non-conforming and do not enter the rate.",
+    noNc: "No non-conformity detected on this page by the engine. The criteria left to assess are still open.",
+    sourceWarn: "This page has **no** snapshot: its findings come from the code. The absence of a finding therefore does NOT mean conforming \u2014 undecided criteria stay \u201Cto assess\u201D.",
+    manualWarn: "A criterion \u201Cto assess\u201D is neither conforming nor non-conforming: nobody has ruled on it yet. Judgment criteria are adjudicated with `verify --manual`, needs-rendering ones with `scan`.",
+    unattributed: (n) => `${n} finding(s) are attributed to no page (shared code, file outside any route). They are counted in the overall audit and are never spread across pages.`,
+    sheet: "Sheet",
+    blocking: "Blocking",
+    major: "Major",
+    minor: "Minor",
+    indexNote: "One sheet per page. `X % (d/t)`: the rate covers only the `d` criteria decided out of `t` \u2014 it says nothing about the others. `\u2014` means no criterion was decided on this page, so it is NEITHER conformity NOR non-conformity."
+  }
+};
+function pageCriterionRows(result, page, standard, lang) {
+  if (isCore(standard)) {
+    return [...page.criteria].sort((a, b) => compareSC(a.id, b.id)).map((c2) => ({
+      id: c2.id,
+      label: `${c2.id} ${scTitle(c2.id, lang) ?? ""}`.trim(),
+      group: c2.guideline,
+      status: c2.status,
+      tests: [],
+      decidedBy: c2.decidedBy,
+      ...c2.inapplicable ? { inapplicable: true } : {}
+    }));
+  }
+  const pack = loadPack(standard);
+  const byId2 = new Map(derivePackResults(pageView(result, page), standard).map((r) => [r.id, r]));
+  return pack.criteria.map((pc) => ({
+    id: pc.id,
+    label: `${pc.id} \u2014 ${titlePlain(pack, pc, lang)}`,
+    group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim(),
+    status: byId2.get(pc.id)?.status ?? "manual",
+    tests: packTestIds(pack, pc.id),
+    decidedBy: byId2.get(pc.id)?.decidedBy,
+    ...byId2.get(pc.id)?.inapplicable ? { inapplicable: true } : {}
+  }));
+}
+function pagesForStandard(result, pages, standard, lang) {
+  if (isCore(standard)) return pages;
+  return pages.map((p) => {
+    const rows = pageCriterionRows(result, p, standard, lang);
+    const cov = pageCoverage(rows);
+    return {
+      ...p,
+      criteria: rows.map((r) => ({
+        id: r.id,
+        guideline: r.group,
+        status: r.status,
+        findings: [],
+        ...r.decidedBy ? { decidedBy: r.decidedBy } : {}
+      })),
+      conformancePct: pageRatePct(rows),
+      decided: cov.decided,
+      total: cov.total
+    };
+  });
+}
+function pageTally(rows) {
+  return {
+    c: rows.filter((r) => r.status === "C").length,
+    nc: rows.filter((r) => r.status === "NC").length,
+    // No row carries `NA` any more (INAPPLICABLE_STATUS); this counts the conformities
+    // reached for want of a subject, and it is a SUBSET of `c` rather than a fourth bucket.
+    na: rows.filter((r) => r.inapplicable).length,
+    manual: rows.filter((r) => r.status === "manual").length
+  };
+}
+function pageTallyNote(t3, lang) {
+  return L4[lang].tally(t3.c, t3.nc, t3.na, t3.manual);
+}
+function pageCoverage(rows) {
+  const t3 = pageTally(rows);
+  return { decided: t3.c + t3.nc, total: rows.length };
+}
+function pageRatePct(rows) {
+  const { c: c2, nc } = pageTally(rows);
+  return c2 + nc === 0 ? null : Math.round(c2 / (c2 + nc) * 100);
+}
+function renderPageReport(result, page, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const h2 = opts.heading ?? "##";
+  const s = L4[lang];
+  const out2 = [];
+  out2.push(`${h2} ${page.name}${page.auth ? " \u{1F512}" : ""}`, "");
+  const meta2 = [];
+  meta2.push(`- **${s.url}** : \`${page.url}\``);
+  meta2.push(`- **${s.basis}** : ${basisLabel(page.basis, lang)}`);
+  if (page.auth) meta2.push(`- **${s.auth}** : \u2705`);
+  out2.push(...meta2);
+  const rows = pageCriterionRows(result, page, standard, lang);
+  const t3 = pageTally(rows);
+  const cov = pageCoverage(rows);
+  const rate = pageRatePct(rows);
+  out2.push(`- **${s.rate}** : **${rate === null ? "\u2014" : `${rate} %`}** _(${s.rateNote})_`);
+  out2.push(`- ${pageTallyNote(t3, lang)}`);
+  out2.push(`- ${s.coverage(cov.decided, cov.total)}`, "");
+  if (page.basis !== "snapshot") out2.push(`> \u26A0\uFE0F ${s.sourceWarn}`, "");
+  const shot = opts.screenshots?.get(page.id);
+  if (shot) out2.push(`![${s.screenshotAlt(page.name)}](${shot})`, "");
+  else out2.push(`_${s.noScreenshot}_`, "");
+  const refused = opts.evidenceNotice?.(page.id) ?? [];
+  if (refused.length) out2.push(...refused, "");
+  const withTests = rows.some((r) => r.tests.length);
+  out2.push(`${h2}# ${s.gridTitle}`, "", `> ${s.gridNote}`, "");
+  out2.push(withTests ? `| ${s.criterion} | ${s.tests} | ${s.status} |` : `| ${s.criterion} | ${s.status} |`);
+  out2.push(withTests ? "| --- | --- | --- |" : "| --- | --- |");
+  let group = "";
+  for (const row of rows) {
+    if (row.group !== group) {
+      group = row.group;
+      out2.push(withTests ? `| **${group}** | | |` : `| **${group}** | |`);
+    }
+    const mark = row.decidedBy === "agent" && row.status === "C" ? `${MARK2[row.status]}*` : MARK2[row.status];
+    if (withTests) out2.push(`| ${row.label} | ${row.tests.map((t4) => `\`${t4}\``).join(" ")} | ${mark} |`);
+    else out2.push(`| ${row.label} | ${mark} |`);
+  }
+  out2.push("", `> ${s.manualWarn}`, "");
+  if (rows.some((r) => r.decidedBy === "agent" && r.status === "C")) out2.push(`> ${agentMarkNote(lang)}`, "");
+  const units = prdUnits(pageView(result, page), standard, lang);
+  const ncUnits = units.filter((u) => !u.advisory);
+  const advUnits = units.filter((u) => u.advisory);
+  const unit = { heading: `${h2}##`, collapse: true, ...opts.cropFor ? { cropFor: opts.cropFor } : {} };
+  out2.push(`${h2}# ${s.ncTitle}`, "");
+  if (!ncUnits.length) out2.push(s.noNc, "");
+  else for (const u of ncUnits) out2.push(...renderAuditorUnit(u, standard, lang, unit));
+  if (advUnits.length) {
+    out2.push(`${h2}# \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
+    for (const u of advUnits) out2.push(...renderAuditorUnit(u, standard, lang, unit));
+  }
+  return out2.join("\n");
+}
+function header2(result, pages, standard, lang, title2) {
+  const s = L4[lang];
+  return [
+    pagesReportMarker(standard),
+    "",
+    `# ${title2}`,
+    "",
+    `- **${s.date}** : ${result.date}`,
+    `- **${s.standard}** : ${isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name}`,
+    `- **${s.pagesCount}** : ${pages.length}`,
+    ""
+  ];
+}
+function renderPagesIndex(result, pages, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const s = L4[lang];
+  const out2 = header2(result, pages, standard, lang, s.indexTitle);
+  out2.push(`> ${s.indexNote}`, "");
+  out2.push(`| ${s.page} | ${s.url} | ${s.basis} | ${s.rateShort} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
+  out2.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
+  for (const p of pages) {
+    const rows = pageCriterionRows(result, p, standard, lang);
+    const cov = pageCoverage(rows);
+    const nc = [...p.findings, ...(result.packFindings ?? []).filter((f) => f.page === p.id)].filter((f) => !f.advisory);
+    const href = opts.hrefs?.get(p.id);
+    out2.push(
+      `| ${p.name}${p.auth ? " \u{1F512}" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} | ${nc.filter((f) => f.severity === "bloquant").length} | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`
+    );
+  }
+  out2.push("");
+  const orphans = unattributedFindings(result);
+  if (orphans.length) out2.push(`> ${s.unattributed(orphans.length)}`, "");
+  return out2.join("\n");
+}
+function renderPagesDocument(result, pages, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const out2 = [renderPagesIndex(result, pages, { ...opts, standard, lang })];
+  for (const p of pages) out2.push(renderPageReport(result, p, { ...opts, standard, lang, heading: "##" }));
+  return out2.join("\n");
+}
+function renderPageDocument(result, page, opts = {}) {
+  const standard = opts.standard ?? CORE2;
+  const lang = opts.lang ?? "en";
+  const s = L4[lang];
+  const out2 = [pagesReportMarker(standard), "", `# ${s.docTitle} \u2014 ${page.name}`, "", `- **${s.date}** : ${result.date}`, ""];
+  out2.push(renderPageReport(result, page, { ...opts, standard, lang, heading: "##" }));
+  return out2.join("\n");
+}
+
 // src/report.ts
 var ICON3 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
 var SEV_ORDER3 = ["bloquant", "majeur", "mineur"];
 var PER_PAGE_MAX = 30;
-var L4 = {
+var L5 = {
   fr: {
     title: (std) => `Rapport d'audit d'accessibilit\xE9 \u2014 ${std}`,
     wcagStd: "WCAG 2.2 niveau AA",
@@ -54554,6 +54818,12 @@ var L4 = {
     cTitle: "3. Crit\xE8res conformes (C)",
     cAgentTitle: "Conformes par adjudication de l'agent (jugement, non prouv\xE9 par le moteur)",
     cAgentNote: "Ces crit\xE8res ont \xE9t\xE9 tranch\xE9s par l'agent IA \xE0 partir des \xE9vidences cit\xE9es, non d\xE9cid\xE9s par le moteur d\xE9terministe. Ils sont gat\xE9s (chaque verdict cite une \xE9vidence r\xE9solvable) mais restent un jugement : ils ne sont pas compt\xE9s dans le taux de r\xE9ussite automatique ci-dessus.",
+    pageRatesTitle: "Taux par page",
+    pageRatesNote: "Une ligne par page : la base sur laquelle elle a \xE9t\xE9 jug\xE9e, et son taux avec le d\xE9nominateur sur lequel il est calcul\xE9.",
+    pageCol: "Page",
+    urlCol: "URL",
+    basisCol: "Base",
+    rateCol: "Taux",
     naTitle: "4. Crit\xE8res conformes faute de sujet",
     naNote: "Rien de ce type n'existe dans le p\xE9rim\xE8tre audit\xE9 : aucun tableau, aucun m\xE9dia, aucun champ selon le crit\xE8re. Ces crit\xE8res sont conformes \u2014 rien ne les contredit \u2014 mais rien n'a \xE9t\xE9 v\xE9rifi\xE9 non plus. Chacun dit ce qui a \xE9t\xE9 cherch\xE9 et sur quel p\xE9rim\xE8tre, pour que l'affirmation reste r\xE9futable.",
     manualTitle: "5. Crit\xE8res \xE0 adjuger (jugement / rendu) \u2014 non d\xE9cid\xE9s par le moteur statique",
@@ -54611,6 +54881,12 @@ var L4 = {
     cTitle: "3. Conforming criteria (C)",
     cAgentTitle: "Conforming by agent adjudication (judgement, not proven by the engine)",
     cAgentNote: "These criteria were ruled on by the AI agent from the evidence it cited, not decided by the deterministic engine. They are gated (every verdict cites resolvable evidence) but remain a judgement: they are not counted in the automatic pass rate above.",
+    pageRatesTitle: "Per-page rate",
+    pageRatesNote: "One row per page: the basis it was judged on, and its rate with the denominator it was computed over.",
+    pageCol: "Page",
+    urlCol: "URL",
+    basisCol: "Basis",
+    rateCol: "Rate",
     naTitle: "4. Conforming for want of a subject",
     naNote: "Nothing of that kind exists in the audited scope: no table, no media, no form control, depending on the criterion. These are conforming \u2014 nothing contradicts them \u2014 but nothing was verified either. Each says what was looked for and over how much, so the claim stays falsifiable.",
     manualTitle: "5. Criteria to adjudicate (judgment / rendering) \u2014 not decided by the static engine",
@@ -54664,7 +54940,7 @@ function untestedNeedsRendering(r) {
 function partialAuditBanner(lang, untested = NEEDS_RENDERING.map((c2) => c2.sc)) {
   const set = new Set(untested);
   const labels = NEEDS_RENDERING.filter((c2) => set.has(c2.sc)).map((c2) => c2.label[lang]);
-  return L4[lang].partialAudit(labels.join(", "));
+  return L5[lang].partialAudit(labels.join(", "));
 }
 function tallyRows(rows) {
   return {
@@ -54689,8 +54965,57 @@ function reportCoverage(groups) {
   const t3 = reportTotals(groups);
   return { decided: t3.c + t3.nc, total: t3.c + t3.nc + t3.manual };
 }
+function splitReportSections(md) {
+  const lines = md.split("\n");
+  const preamble = [];
+  const sections = [];
+  let current = null;
+  let fence = null;
+  const push = (l) => {
+    if (current) current.push(l);
+    else preamble.push(l);
+  };
+  for (const line of lines) {
+    const f = /^\s*(```+|~~~+)/.exec(line);
+    if (f) {
+      const mark = f[1];
+      if (fence === null) fence = mark[0].repeat(mark.length);
+      else if (mark.startsWith(fence[0]) && mark.length >= fence.length) fence = null;
+      push(line);
+      continue;
+    }
+    if (fence === null && line.startsWith("## ")) {
+      current = [line];
+      const own = current;
+      sections.push({
+        heading: line,
+        lines: own,
+        get text() {
+          return own.join("\n");
+        }
+      });
+      continue;
+    }
+    push(line);
+  }
+  return { preamble, sections };
+}
+function renderPageRates(r, pages, standard, lang) {
+  if (!pages.length) return [];
+  const s = L5[lang];
+  const out2 = [`## \u{1F4CB} ${s.pageRatesTitle}`, "", `> ${s.pageRatesNote}`, ""];
+  out2.push(`| ${s.pageCol} | ${s.urlCol} | ${s.basisCol} | ${s.rateCol} |`);
+  out2.push("| --- | --- | --- | --- |");
+  for (const p of pages) {
+    const rows = pageCriterionRows(r, p, standard, lang);
+    const cov = pageCoverage(rows);
+    out2.push(`| ${p.name}${p.auth ? " \u{1F512}" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} |`);
+  }
+  out2.push("");
+  return out2;
+}
 function render(r, lang, opts) {
-  const s = L4[lang];
+  const s = L5[lang];
   const out2 = [];
   out2.push(`# ${s.title(opts.std)}`, "");
   out2.push(`- **${s.date}** : ${r.date}`);
@@ -54736,6 +55061,7 @@ function render(r, lang, opts) {
   }
   const pageScope = pagesOf(r);
   if (pageScope.length) attributePages(r, pageScope);
+  if (pageScope.length) out2.push(...renderPageRates(r, derivePages(r, pageScope), opts.standard, lang));
   if (pageScope.length) out2.push(renderPageGrid(r, pageScope, opts.standard, lang));
   if (pageScope.length) {
     const derived = derivePages(r, pageScope);
@@ -54821,12 +55147,12 @@ function reportGroups(r, lang = "en") {
   return r.guidelines.map((g) => ({ key: g.key, title: guidelineTitle(g.key, lang) ?? g.title, rows: byGuideline.get(g.key) ?? [] }));
 }
 function renderReport(r, lang = "en", outDir, cropFor) {
-  const s = L4[lang];
+  const s = L5[lang];
   return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups: reportGroups(r, lang), standard: CORE2, outDir, ...cropFor ? { cropFor } : {} });
 }
 function packReportGroups(r, pack, lang = "en") {
   const derived = derivePackResults(r, pack.key);
-  const s = L4[lang];
+  const s = L5[lang];
   const naReason = lang === "fr" ? "Aucun crit\xE8re de succ\xE8s WCAG mapp\xE9 n'est applicable dans le p\xE9rim\xE8tre." : "No mapped WCAG success criterion is applicable in scope.";
   const byTheme = /* @__PURE__ */ new Map();
   for (const pr of derived) {
@@ -54851,7 +55177,7 @@ function renderPackReport(r, pack, lang = "en", outDir, cropFor) {
   const std = `${pack.name} ${pack.baseVersion}`;
   return render(r, lang, {
     std,
-    groupHead: L4[lang].byTheme,
+    groupHead: L5[lang].byTheme,
     groups: packReportGroups(r, pack, lang),
     derivedOf: std,
     standard: pack.key,
@@ -54977,7 +55303,7 @@ function unattributedTitle(label = "WCAG") {
 function labelsFor(severity, advisory, tag) {
   return advisory ? ["accessibility", tag, "recommendation", severity] : ["accessibility", tag, severity];
 }
-var L5 = {
+var L6 = {
   fr: {
     fix: "Correction",
     occ: "Occurrence(s)",
@@ -55006,7 +55332,7 @@ var L5 = {
   }
 };
 function renderRemediationBody(unit, lang) {
-  const t3 = L5[lang];
+  const t3 = L6[lang];
   const lines = [];
   if (unit.refs.length) lines.push(`**WCAG** : ${unit.refs.join(", ")}`, "");
   for (const fx of [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))]) lines.push(`**${t3.fix}** : ${fx}`);
@@ -55022,7 +55348,7 @@ function renderCriterionBody(unit, standard, lang, opts = {}) {
   return renderAuditorUnit(unit, standard, lang, { ...opts.technical !== void 0 ? { technical: opts.technical } : {} }).join("\n").trimEnd();
 }
 function pagePreamble(page, lang, basisWarning) {
-  const t3 = L5[lang];
+  const t3 = L6[lang];
   const out2 = [`**${t3.page}** : ${page.name}`, `**${t3.url}** : ${page.url}`];
   if (page.auth) out2.push(`**${t3.auth}** : ${t3.yes}`);
   out2.push("");
@@ -55030,14 +55356,14 @@ function pagePreamble(page, lang, basisWarning) {
   return out2;
 }
 function filePreamble(file, lang) {
-  const t3 = L5[lang];
+  const t3 = L6[lang];
   return [`**${t3.file}** : \`${file}\``, "", `> ${t3.fileNote}`, ""];
 }
 function clampBody(body3, limit, lang) {
   if (body3.length <= limit) return body3;
   const notice = `
 
-${L5[lang].truncated(L5[lang].prdPath)}`;
+${L6[lang].truncated(L6[lang].prdPath)}`;
   const budget = limit - notice.length;
   const head = body3.slice(0, Math.max(0, budget));
   const cut = head.lastIndexOf("\n## ");
@@ -55712,7 +56038,7 @@ function detectFrameworks(deps, has2) {
   for (const [pkg, label] of Object.entries(KNOWN_LIBS)) if (dep(pkg)) componentLibraries.push(label);
   return { frameworks, componentLibraries };
 }
-var L6 = {
+var L7 = {
   fr: {
     title: "Obtenir du HTML rendu \xE0 auditer (render)",
     why: "Auditer les sources JSX d'une biblioth\xE8que de composants donne des faux n\xE9gatifs : il faut auditer le HTML r\xE9ellement produit.",
@@ -55743,7 +56069,7 @@ var L6 = {
   }
 };
 function renderPlan(d, lang = "fr") {
-  const s = L6[lang];
+  const s = L7[lang];
   const out2 = [`# ${s.title}`, "", `> ${s.why}`, ""];
   if (d.componentLibraries.length) out2.push(`> \u{1F9E9} ${s.libNote(d.componentLibraries.join(", "))}`, "");
   out2.push(`## ${s.detected}`, "");
@@ -56347,270 +56673,6 @@ function groundItems(items, opts = {}) {
     }
   }
   return s;
-}
-
-// src/pages-report.ts
-var PAGES_REPORT_MARKER = "ultra11y:pages-report";
-function pagesReportMarker(standard) {
-  return `<!-- ${PAGES_REPORT_MARKER} v="1" standard="${standard}" -->`;
-}
-function isPagesReport(md) {
-  return md.slice(0, 400).includes(`<!-- ${PAGES_REPORT_MARKER}`);
-}
-var MARK2 = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
-var L7 = {
-  fr: {
-    docTitle: "Rapport d'accessibilit\xE9 page par page",
-    indexTitle: "Rapport page par page \u2014 index",
-    date: "Date",
-    standard: "R\xE9f\xE9rentiel",
-    pagesCount: "Pages",
-    page: "Page",
-    url: "URL",
-    basis: "Base",
-    snapshot: "instantan\xE9",
-    source: "source",
-    capturedAt: "Captur\xE9 le",
-    viewport: "Fen\xEAtre",
-    producer: "Producteur",
-    auth: "Authentification requise",
-    rate: "Taux de r\xE9ussite automatique (v\xE9rifications statiques)",
-    // The index has its own, shorter header — the sheet's label is a full sentence and would
-    // wreck an eight-column table. Kept as a SEPARATE key: editing `rate` in place would
-    // silently reword the sheet bullet too.
-    rateShort: "Taux (crit\xE8res d\xE9cid\xE9s)",
-    rateNote: "sous-ensemble d\xE9cidable : C \xF7 (C + NC)",
-    tally: (c2, nc, na, m) => `${c2} conforme(s) \xB7 ${nc} non conforme(s) \xB7 ${na} non applicable(s) \xB7 ${m} \xE0 \xE9valuer`,
-    coverage: (decided, total) => `Couverture : ${decided}/${total} crit\xE8re(s) \xE9valu\xE9(s) \u2014 le taux ci-dessus ne porte que sur eux, et ne dit rien des ${total - decided} autres.`,
-    tests: "Tests",
-    screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`,
-    noScreenshot: "Aucune capture d'\xE9cran pour cette page (le producteur n'en a pas fourni) \u2014 le tier pixel est donc inactif ici.",
-    gridTitle: "Grille des crit\xE8res",
-    gridNote: "`C` conforme \xB7 `NC` non conforme \xB7 `\u2014` non applicable \xB7 `?` \xE0 \xE9valuer.",
-    criterion: "Crit\xE8re",
-    status: "Statut",
-    ncTitle: "Non-conformit\xE9s",
-    recTitle: "Recommandations (non normatives)",
-    recNote: "Bonnes pratiques sans test normatif en \xE9chec : elles ne rendent aucun crit\xE8re non conforme et n'entrent pas dans le taux.",
-    noNc: "Aucune non-conformit\xE9 d\xE9tect\xE9e sur cette page par le moteur. Les crit\xE8res \xAB \xE0 \xE9valuer \xBB restent \xE0 trancher.",
-    sourceWarn: "Cette page n'a **pas** d'instantan\xE9 : ses constats proviennent du code. L'absence de constat n'y vaut donc PAS conformit\xE9 \u2014 les crit\xE8res non d\xE9cid\xE9s restent \xAB \xE0 \xE9valuer \xBB.",
-    manualWarn: "Un crit\xE8re \xAB \xE0 \xE9valuer \xBB n'est ni conforme ni non conforme : personne ne l'a encore tranch\xE9. Les crit\xE8res de jugement s'adjugent avec `verify --manual`, ceux \xAB \xE0 restituer \xBB avec `scan`.",
-    unattributed: (n) => `${n} constat(s) ne sont rattach\xE9s \xE0 aucune page (code partag\xE9, fichier hors routes). Ils sont compt\xE9s dans l'audit global et ne sont jamais r\xE9partis d'office sur les pages.`,
-    sheet: "Fiche",
-    blocking: "Bloquant",
-    major: "Majeur",
-    minor: "Mineur",
-    indexNote: "Une fiche par page. `X % (d/t)` : le taux ne porte que sur les `d` crit\xE8res d\xE9cid\xE9s sur `t` \u2014 il ne dit rien des autres. `\u2014` signifie qu'aucun crit\xE8re n'a \xE9t\xE9 d\xE9cid\xE9 sur cette page, et ne vaut donc NI conformit\xE9 NI non-conformit\xE9."
-  },
-  en: {
-    docTitle: "Page-by-page accessibility report",
-    indexTitle: "Page-by-page report \u2014 index",
-    date: "Date",
-    standard: "Standard",
-    pagesCount: "Pages",
-    page: "Page",
-    url: "URL",
-    basis: "Basis",
-    snapshot: "snapshot",
-    source: "source",
-    capturedAt: "Captured at",
-    viewport: "Viewport",
-    producer: "Producer",
-    auth: "Authentication required",
-    rate: "Automatic static-check pass rate",
-    rateShort: "Rate (decided criteria)",
-    rateNote: "decidable subset: C \xF7 (C + NC)",
-    tally: (c2, nc, na, m) => `${c2} conforming \xB7 ${nc} non-conforming \xB7 ${na} not applicable \xB7 ${m} to assess`,
-    coverage: (decided, total) => `Coverage: ${decided}/${total} criteria assessed \u2014 the rate above covers only those, and says nothing about the other ${total - decided}.`,
-    tests: "Tests",
-    screenshotAlt: (n) => `Screenshot of the ${n} page`,
-    noScreenshot: "No screenshot for this page (the producer supplied none) \u2014 the pixel tier is therefore inactive here.",
-    gridTitle: "Criteria grid",
-    gridNote: "`C` conforming \xB7 `NC` non-conforming \xB7 `\u2014` not applicable \xB7 `?` to assess.",
-    criterion: "Criterion",
-    status: "Status",
-    ncTitle: "Non-conformities",
-    recTitle: "Recommendations (non-normative)",
-    recNote: "Good practices with no failing normative test: they never make a criterion non-conforming and do not enter the rate.",
-    noNc: "No non-conformity detected on this page by the engine. The criteria left to assess are still open.",
-    sourceWarn: "This page has **no** snapshot: its findings come from the code. The absence of a finding therefore does NOT mean conforming \u2014 undecided criteria stay \u201Cto assess\u201D.",
-    manualWarn: "A criterion \u201Cto assess\u201D is neither conforming nor non-conforming: nobody has ruled on it yet. Judgment criteria are adjudicated with `verify --manual`, needs-rendering ones with `scan`.",
-    unattributed: (n) => `${n} finding(s) are attributed to no page (shared code, file outside any route). They are counted in the overall audit and are never spread across pages.`,
-    sheet: "Sheet",
-    blocking: "Blocking",
-    major: "Major",
-    minor: "Minor",
-    indexNote: "One sheet per page. `X % (d/t)`: the rate covers only the `d` criteria decided out of `t` \u2014 it says nothing about the others. `\u2014` means no criterion was decided on this page, so it is NEITHER conformity NOR non-conformity."
-  }
-};
-function pageCriterionRows(result, page, standard, lang) {
-  if (isCore(standard)) {
-    return [...page.criteria].sort((a, b) => compareSC(a.id, b.id)).map((c2) => ({
-      id: c2.id,
-      label: `${c2.id} ${scTitle(c2.id, lang) ?? ""}`.trim(),
-      group: c2.guideline,
-      status: c2.status,
-      tests: [],
-      decidedBy: c2.decidedBy,
-      ...c2.inapplicable ? { inapplicable: true } : {}
-    }));
-  }
-  const pack = loadPack(standard);
-  const byId2 = new Map(derivePackResults(pageView(result, page), standard).map((r) => [r.id, r]));
-  return pack.criteria.map((pc) => ({
-    id: pc.id,
-    label: `${pc.id} \u2014 ${titlePlain(pack, pc, lang)}`,
-    group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim(),
-    status: byId2.get(pc.id)?.status ?? "manual",
-    tests: packTestIds(pack, pc.id),
-    decidedBy: byId2.get(pc.id)?.decidedBy,
-    ...byId2.get(pc.id)?.inapplicable ? { inapplicable: true } : {}
-  }));
-}
-function pagesForStandard(result, pages, standard, lang) {
-  if (isCore(standard)) return pages;
-  return pages.map((p) => {
-    const rows = pageCriterionRows(result, p, standard, lang);
-    const cov = pageCoverage(rows);
-    return {
-      ...p,
-      criteria: rows.map((r) => ({
-        id: r.id,
-        guideline: r.group,
-        status: r.status,
-        findings: [],
-        ...r.decidedBy ? { decidedBy: r.decidedBy } : {}
-      })),
-      conformancePct: pageRatePct(rows),
-      decided: cov.decided,
-      total: cov.total
-    };
-  });
-}
-function pageTally(rows) {
-  return {
-    c: rows.filter((r) => r.status === "C").length,
-    nc: rows.filter((r) => r.status === "NC").length,
-    // No row carries `NA` any more (INAPPLICABLE_STATUS); this counts the conformities
-    // reached for want of a subject, and it is a SUBSET of `c` rather than a fourth bucket.
-    na: rows.filter((r) => r.inapplicable).length,
-    manual: rows.filter((r) => r.status === "manual").length
-  };
-}
-function pageTallyNote(t3, lang) {
-  return L7[lang].tally(t3.c, t3.nc, t3.na, t3.manual);
-}
-function pageCoverage(rows) {
-  const t3 = pageTally(rows);
-  return { decided: t3.c + t3.nc, total: rows.length };
-}
-function pageRatePct(rows) {
-  const { c: c2, nc } = pageTally(rows);
-  return c2 + nc === 0 ? null : Math.round(c2 / (c2 + nc) * 100);
-}
-function renderPageReport(result, page, opts = {}) {
-  const standard = opts.standard ?? CORE2;
-  const lang = opts.lang ?? "en";
-  const h2 = opts.heading ?? "##";
-  const s = L7[lang];
-  const out2 = [];
-  out2.push(`${h2} ${page.name}${page.auth ? " \u{1F512}" : ""}`, "");
-  const meta2 = [];
-  meta2.push(`- **${s.url}** : \`${page.url}\``);
-  meta2.push(`- **${s.basis}** : ${basisLabel(page.basis, lang)}`);
-  if (page.auth) meta2.push(`- **${s.auth}** : \u2705`);
-  out2.push(...meta2);
-  const rows = pageCriterionRows(result, page, standard, lang);
-  const t3 = pageTally(rows);
-  const cov = pageCoverage(rows);
-  const rate = pageRatePct(rows);
-  out2.push(`- **${s.rate}** : **${rate === null ? "\u2014" : `${rate} %`}** _(${s.rateNote})_`);
-  out2.push(`- ${pageTallyNote(t3, lang)}`);
-  out2.push(`- ${s.coverage(cov.decided, cov.total)}`, "");
-  if (page.basis !== "snapshot") out2.push(`> \u26A0\uFE0F ${s.sourceWarn}`, "");
-  const shot = opts.screenshots?.get(page.id);
-  if (shot) out2.push(`![${s.screenshotAlt(page.name)}](${shot})`, "");
-  else out2.push(`_${s.noScreenshot}_`, "");
-  const refused = opts.evidenceNotice?.(page.id) ?? [];
-  if (refused.length) out2.push(...refused, "");
-  const withTests = rows.some((r) => r.tests.length);
-  out2.push(`${h2}# ${s.gridTitle}`, "", `> ${s.gridNote}`, "");
-  out2.push(withTests ? `| ${s.criterion} | ${s.tests} | ${s.status} |` : `| ${s.criterion} | ${s.status} |`);
-  out2.push(withTests ? "| --- | --- | --- |" : "| --- | --- |");
-  let group = "";
-  for (const row of rows) {
-    if (row.group !== group) {
-      group = row.group;
-      out2.push(withTests ? `| **${group}** | | |` : `| **${group}** | |`);
-    }
-    const mark = row.decidedBy === "agent" && row.status === "C" ? `${MARK2[row.status]}*` : MARK2[row.status];
-    if (withTests) out2.push(`| ${row.label} | ${row.tests.map((t4) => `\`${t4}\``).join(" ")} | ${mark} |`);
-    else out2.push(`| ${row.label} | ${mark} |`);
-  }
-  out2.push("", `> ${s.manualWarn}`, "");
-  if (rows.some((r) => r.decidedBy === "agent" && r.status === "C")) out2.push(`> ${agentMarkNote(lang)}`, "");
-  const units = prdUnits(pageView(result, page), standard, lang);
-  const ncUnits = units.filter((u) => !u.advisory);
-  const advUnits = units.filter((u) => u.advisory);
-  const unit = { heading: `${h2}##`, collapse: true, ...opts.cropFor ? { cropFor: opts.cropFor } : {} };
-  out2.push(`${h2}# ${s.ncTitle}`, "");
-  if (!ncUnits.length) out2.push(s.noNc, "");
-  else for (const u of ncUnits) out2.push(...renderAuditorUnit(u, standard, lang, unit));
-  if (advUnits.length) {
-    out2.push(`${h2}# \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
-    for (const u of advUnits) out2.push(...renderAuditorUnit(u, standard, lang, unit));
-  }
-  return out2.join("\n");
-}
-function header2(result, pages, standard, lang, title2) {
-  const s = L7[lang];
-  return [
-    pagesReportMarker(standard),
-    "",
-    `# ${title2}`,
-    "",
-    `- **${s.date}** : ${result.date}`,
-    `- **${s.standard}** : ${isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name}`,
-    `- **${s.pagesCount}** : ${pages.length}`,
-    ""
-  ];
-}
-function renderPagesIndex(result, pages, opts = {}) {
-  const standard = opts.standard ?? CORE2;
-  const lang = opts.lang ?? "en";
-  const s = L7[lang];
-  const out2 = header2(result, pages, standard, lang, s.indexTitle);
-  out2.push(`> ${s.indexNote}`, "");
-  out2.push(`| ${s.page} | ${s.url} | ${s.basis} | ${s.rateShort} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
-  out2.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
-  for (const p of pages) {
-    const rows = pageCriterionRows(result, p, standard, lang);
-    const cov = pageCoverage(rows);
-    const nc = [...p.findings, ...(result.packFindings ?? []).filter((f) => f.page === p.id)].filter((f) => !f.advisory);
-    const href = opts.hrefs?.get(p.id);
-    out2.push(
-      `| ${p.name}${p.auth ? " \u{1F512}" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} | ${nc.filter((f) => f.severity === "bloquant").length} | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`
-    );
-  }
-  out2.push("");
-  const orphans = unattributedFindings(result);
-  if (orphans.length) out2.push(`> ${s.unattributed(orphans.length)}`, "");
-  return out2.join("\n");
-}
-function renderPagesDocument(result, pages, opts = {}) {
-  const standard = opts.standard ?? CORE2;
-  const lang = opts.lang ?? "en";
-  const out2 = [renderPagesIndex(result, pages, { ...opts, standard, lang })];
-  for (const p of pages) out2.push(renderPageReport(result, p, { ...opts, standard, lang, heading: "##" }));
-  return out2.join("\n");
-}
-function renderPageDocument(result, page, opts = {}) {
-  const standard = opts.standard ?? CORE2;
-  const lang = opts.lang ?? "en";
-  const s = L7[lang];
-  const out2 = [pagesReportMarker(standard), "", `# ${s.docTitle} \u2014 ${page.name}`, "", `- **${s.date}** : ${result.date}`, ""];
-  out2.push(renderPageReport(result, page, { ...opts, standard, lang, heading: "##" }));
-  return out2.join("\n");
 }
 
 // src/check.ts
@@ -61527,6 +61589,7 @@ var S = {
     artifact: (name2) => `Rapport complet (HTML, captures annot\xE9es) : artefact **${name2}** du run.`,
     runLink: (url) => `[Voir le run et son r\xE9sum\xE9 de job](${url})`,
     clamped: (n) => `_${n} groupe(s) retir\xE9(s) de ce commentaire pour tenir dans la limite de GitHub \u2014 le r\xE9sum\xE9 de job les porte tous._`,
+    sectionsDropped: (names) => `_Sections retir\xE9es de ce commentaire pour tenir dans la limite de GitHub (64 Kio), en entier et jamais tronqu\xE9es : ${names.map((n) => `**${n}**`).join(" \xB7 ")}. Elles sont dans le rapport de l'artefact, \xE0 l'identique._`,
     unanchored: (n) => `${n} constat(s) rattach\xE9(s) \xE0 une URL, sans ligne de code \xE0 annoter \u2014 voir le rapport.`,
     unattributed: (n) => `${n} constat(s) ne sont rattach\xE9s \xE0 aucune page (code partag\xE9, fichier hors routes) \u2014 compt\xE9s dans l'audit global, jamais r\xE9partis d'office.`,
     sourceBasis: "Une page marqu\xE9e \xAB source \xBB n'a pas d'instantan\xE9 : l'absence de constat n'y vaut PAS conformit\xE9. Ses crit\xE8res non d\xE9cid\xE9s restent \xAB \xE0 \xE9valuer \xBB, ils ne basculent jamais en conformes par silence.",
@@ -61577,6 +61640,7 @@ var S = {
     artifact: (name2) => `Full report (HTML, annotated crops): artifact **${name2}** of this run.`,
     runLink: (url) => `[See the run and its job summary](${url})`,
     clamped: (n) => `_${n} group(s) dropped from this comment to fit GitHub's limit \u2014 the job summary carries them all._`,
+    sectionsDropped: (names) => `_Sections dropped from this comment to fit GitHub's 64 KiB limit, whole and never truncated: ${names.map((n) => `**${n}**`).join(" \xB7 ")}. They are in the artifact's report, identical._`,
     unanchored: (n) => `${n} finding(s) keyed to a URL, with no code line to annotate \u2014 see the report.`,
     unattributed: (n) => `${n} finding(s) are attributed to no page (shared code, file outside any route) \u2014 counted in the overall audit, never spread across pages.`,
     sourceBasis: 'A page marked "source" has no snapshot: the absence of a finding there does NOT mean conforming. Its undecided criteria stay \u201Cto assess\u201D; they never turn conforming by silence.',
@@ -61671,6 +61735,29 @@ function stepSummary(result, opts = {}) {
   out2.push(perPageTable(result, standard, lang));
   return out2.join("\n");
 }
+function reportSectionsBody(result, standard, lang, budget, prefer) {
+  let md;
+  try {
+    md = isCore(standard) ? renderReport(result, lang) : renderPackReport(result, loadPack(standard), lang);
+  } catch {
+    return { body: [], dropped: [] };
+  }
+  const { sections } = splitReportSections(md);
+  const ordered = prefer ? [...sections.filter((x) => prefer.test(x.heading)), ...sections.filter((x) => !prefer.test(x.heading))] : sections;
+  const body3 = [];
+  const dropped = [];
+  let spent = 0;
+  for (const section of ordered) {
+    const text = section.text.trimEnd();
+    if (dropped.length || spent + text.length + 2 > budget) {
+      dropped.push(section.heading.replace(/^##\s*/, ""));
+      continue;
+    }
+    body3.push(text, "");
+    spent += text.length + 2;
+  }
+  return { body: body3, dropped };
+}
 function prComment(result, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
@@ -61692,15 +61779,21 @@ function prComment(result, opts = {}) {
   const tail = [];
   if (opts.artifactName) tail.push(s.artifact(opts.artifactName), "");
   if (opts.runUrl) tail.push(s.runLink(opts.runUrl), "");
+  const fixed = [...head, ...tail].join("\n").length;
+  const { body: body3, dropped } = reportSectionsBody(result, standard, lang, Math.max(0, COMMENT_LIMIT - fixed - 512));
+  const notes = [];
+  if (dropped.length) notes.push(s.sectionsDropped(dropped), "");
+  const assembled = [...head, ...body3, ...notes, ...tail].join("\n").trimEnd();
+  if (assembled.length <= COMMENT_LIMIT) return assembled;
   const assemble = (rows2) => {
-    const body3 = [];
+    const digest = [];
     if (grouped.length) {
-      body3.push(s.grouped(grouped.length, all.length), "");
-      body3.push(...groupTable(grouped.slice(0, rows2), s), "");
+      digest.push(s.grouped(grouped.length, all.length), "");
+      digest.push(...groupTable(grouped.slice(0, rows2), s), "");
       const omitted = grouped.length - rows2;
-      if (omitted > 0) body3.push(rows2 < COMMENT_ROWS ? s.clamped(omitted) : s.moreGroups(omitted), "");
+      if (omitted > 0) digest.push(rows2 < COMMENT_ROWS ? s.clamped(omitted) : s.moreGroups(omitted), "");
     }
-    return [...head, ...body3, ...tail].join("\n").trimEnd();
+    return [...head, ...digest, ...tail].join("\n").trimEnd();
   };
   let rows = Math.min(COMMENT_ROWS, grouped.length);
   while (rows > 0 && assemble(rows).length > COMMENT_LIMIT) rows--;

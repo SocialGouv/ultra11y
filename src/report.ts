@@ -6,13 +6,14 @@
 // (never silently C).
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { AuditResult, Finding, Lang, Severity, Status } from "./types.js";
+import type { AuditResult, Finding, Lang, PageResult, Severity, Status } from "./types.js";
 import { guidelineTitle, scTitle } from "./wcag.js";
 import { prdUnits, partitionUnits } from "./prd.js";
 import { renderAuditorUnit, type AuditorCropLookup } from "./auditor.js";
 import { resolveMessage } from "./messages.js";
-import { attributePages, derivePages, pagesOf, renderPageGrid, renderRedirected } from "./pages.js";
+import { attributePages, basisLabel, derivePages, formatRate, pagesOf, renderPageGrid, renderRedirected } from "./pages.js";
 import { PAGES_DIR } from "./snapshot.js";
+import { pageCoverage, pageCriterionRows, pageRatePct } from "./pages-report.js";
 import {
   type StandardId,
   CORE,
@@ -65,6 +66,12 @@ const L = {
     cAgentTitle: "Conformes par adjudication de l'agent (jugement, non prouvé par le moteur)",
     cAgentNote:
       "Ces critères ont été tranchés par l'agent IA à partir des évidences citées, non décidés par le moteur déterministe. Ils sont gatés (chaque verdict cite une évidence résolvable) mais restent un jugement : ils ne sont pas comptés dans le taux de réussite automatique ci-dessus.",
+    pageRatesTitle: "Taux par page",
+    pageRatesNote: "Une ligne par page : la base sur laquelle elle a été jugée, et son taux avec le dénominateur sur lequel il est calculé.",
+    pageCol: "Page",
+    urlCol: "URL",
+    basisCol: "Base",
+    rateCol: "Taux",
     naTitle: "4. Critères conformes faute de sujet",
     naNote:
       "Rien de ce type n'existe dans le périmètre audité : aucun tableau, aucun média, aucun champ selon le critère. Ces critères sont conformes — rien ne les contredit — mais rien n'a été vérifié non plus. Chacun dit ce qui a été cherché et sur quel périmètre, pour que l'affirmation reste réfutable.",
@@ -134,6 +141,12 @@ const L = {
     cAgentTitle: "Conforming by agent adjudication (judgement, not proven by the engine)",
     cAgentNote:
       "These criteria were ruled on by the AI agent from the evidence it cited, not decided by the deterministic engine. They are gated (every verdict cites resolvable evidence) but remain a judgement: they are not counted in the automatic pass rate above.",
+    pageRatesTitle: "Per-page rate",
+    pageRatesNote: "One row per page: the basis it was judged on, and its rate with the denominator it was computed over.",
+    pageCol: "Page",
+    urlCol: "URL",
+    basisCol: "Basis",
+    rateCol: "Rate",
     naTitle: "4. Conforming for want of a subject",
     naNote:
       "Nothing of that kind exists in the audited scope: no table, no media, no form control, depending on the criterion. These are conforming — nothing contradicts them — but nothing was verified either. Each says what was looked for and over how much, so the claim stays falsifiable.",
@@ -295,6 +308,80 @@ export function reportCoverage(groups: ReportGroup[]): { decided: number; total:
   return { decided: t.c + t.nc, total: t.c + t.nc + t.manual };
 }
 
+/** One `##` section of a rendered report, kept WHOLE.
+ *
+ *  `lines` is exactly what was rendered — heading included — so a consumer that keeps a
+ *  section shows the artifact's own words rather than a re-rendering that could disagree with
+ *  the document a reader opens next. */
+export interface ReportSection {
+  heading: string;
+  lines: string[];
+  get text(): string;
+}
+
+/** Split a rendered report into its preamble and its `##` sections.
+ *
+ *  For any surface with a byte budget. Cutting a rendered document at an OFFSET lands mid-table
+ *  (GFM renders the rest as prose) or inside an unterminated fence, where everything after it is
+ *  swallowed into code — so a comment that must fit drops whole sections instead, and says which.
+ *
+ *  Fence-aware on purpose: a report embeds the audited source as evidence, and audited source is
+ *  allowed to contain a line starting with `## `. Treating one as a boundary would split a
+ *  document in the middle of the proof for a non-conformity. */
+export function splitReportSections(md: string): { preamble: string[]; sections: ReportSection[] } {
+  const lines = md.split("\n");
+  const preamble: string[] = [];
+  const sections: ReportSection[] = [];
+  let current: string[] | null = null;
+  let fence: string | null = null;
+  const push = (l: string): void => {
+    if (current) current.push(l);
+    else preamble.push(l);
+  };
+  for (const line of lines) {
+    const f = /^\s*(```+|~~~+)/.exec(line);
+    if (f) {
+      const mark = f[1]!;
+      if (fence === null) fence = mark[0]!.repeat(mark.length);
+      else if (mark.startsWith(fence[0]!) && mark.length >= fence.length) fence = null;
+      push(line);
+      continue;
+    }
+    if (fence === null && line.startsWith("## ")) {
+      current = [line];
+      const own = current;
+      sections.push({
+        heading: line,
+        lines: own,
+        get text() {
+          return own.join("\n");
+        },
+      });
+      continue;
+    }
+    push(line);
+  }
+  return { preamble, sections };
+}
+
+/** The per-page rate table, as its own report section. Shares every helper with the per-page
+ *  dossier's index (src/pages-report.ts), so the number here and the number there are the same
+ *  computation and not two that happen to agree today. */
+function renderPageRates(r: AuditResult, pages: PageResult[], standard: StandardId, lang: Lang): string[] {
+  if (!pages.length) return [];
+  const s = L[lang];
+  const out: string[] = [`## 📋 ${s.pageRatesTitle}`, "", `> ${s.pageRatesNote}`, ""];
+  out.push(`| ${s.pageCol} | ${s.urlCol} | ${s.basisCol} | ${s.rateCol} |`);
+  out.push("| --- | --- | --- | --- |");
+  for (const p of pages) {
+    const rows = pageCriterionRows(r, p, standard, lang);
+    const cov = pageCoverage(rows);
+    out.push(`| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} |`);
+  }
+  out.push("");
+  return out;
+}
+
 // Shared renderer over normalized groups/rows — keeps the WCAG and pack reports identical
 // in shape. `groupHead` labels the synthesis column ("WCAG guideline" / "theme"). `standard`
 // drives the NC section below (`prdUnits`/`renderAuditorUnit` are standard-aware).
@@ -393,6 +480,13 @@ function render(
   // "clean", the one thing this tool must never say by accident. The call is an idempotent
   // enrichment: it only fills `page` where something establishes it, and never overwrites.
   if (pageScope.length) attributePages(r, pageScope);
+  // « Taux par page » — one row per page with the BASIS it was judged on and the rate with its
+  // denominator. It was only ever in the per-page dossier's index, which is a second file: the
+  // report a reviewer reads, and the comment that carries the report, both had the matrix and
+  // the defect lists but never the one line that says how much of each page was actually
+  // decided. Drawn from `pageCriterionRows`/`pageRatePct` — the index's own helpers — so the
+  // two tables cannot disagree.
+  if (pageScope.length) out.push(...renderPageRates(r, derivePages(r, pageScope), opts.standard, lang));
   if (pageScope.length) out.push(renderPageGrid(r, pageScope, opts.standard, lang));
 
   // « Constats par page » — per-page synthesis (name + URL + auth badge + NC/advisory

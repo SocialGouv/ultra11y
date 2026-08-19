@@ -22,7 +22,7 @@ import { findingsAtOrAbove } from "./baseline.js";
 import { resolveMessage, resolveRemediation } from "./messages.js";
 import { findingsForStandard, packCriteriaForFinding } from "./standards/derive.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
-import { packReportGroups, reportCoverage, reportGroups } from "./report.js";
+import { packReportGroups, renderPackReport, renderReport, reportCoverage, reportGroups, splitReportSections } from "./report.js";
 import type { AuditResult, Finding, Lang, PageResult, Severity, Status } from "./types.js";
 import { isUrlPath, repoRelative } from "./util.js";
 import {
@@ -122,6 +122,10 @@ const S = {
     artifact: (name: string) => `Rapport complet (HTML, captures annotées) : artefact **${name}** du run.`,
     runLink: (url: string) => `[Voir le run et son résumé de job](${url})`,
     clamped: (n: number) => `_${n} groupe(s) retiré(s) de ce commentaire pour tenir dans la limite de GitHub — le résumé de job les porte tous._`,
+    sectionsDropped: (names: string[]) =>
+      `_Sections retirées de ce commentaire pour tenir dans la limite de GitHub (64 Kio), en entier et jamais tronquées : ${names
+        .map((n) => `**${n}**`)
+        .join(" · ")}. Elles sont dans le rapport de l'artefact, à l'identique._`,
     unanchored: (n: number) => `${n} constat(s) rattaché(s) à une URL, sans ligne de code à annoter — voir le rapport.`,
     unattributed: (n: number) =>
       `${n} constat(s) ne sont rattachés à aucune page (code partagé, fichier hors routes) — comptés dans l'audit global, jamais répartis d'office.`,
@@ -180,6 +184,10 @@ const S = {
     artifact: (name: string) => `Full report (HTML, annotated crops): artifact **${name}** of this run.`,
     runLink: (url: string) => `[See the run and its job summary](${url})`,
     clamped: (n: number) => `_${n} group(s) dropped from this comment to fit GitHub's limit — the job summary carries them all._`,
+    sectionsDropped: (names: string[]) =>
+      `_Sections dropped from this comment to fit GitHub's 64 KiB limit, whole and never truncated: ${names
+        .map((n) => `**${n}**`)
+        .join(" · ")}. They are in the artifact's report, identical._`,
     unanchored: (n: number) => `${n} finding(s) keyed to a URL, with no code line to annotate — see the report.`,
     unattributed: (n: number) =>
       `${n} finding(s) are attributed to no page (shared code, file outside any route) — counted in the overall audit, never spread across pages.`,
@@ -334,6 +342,60 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
   return out.join("\n");
 }
 
+/** THE COMMENT'S BODY IS THE REPORT'S OWN SECTIONS.
+ *
+ *  A pull-request comment used to be a document of its own — a digest, written separately from
+ *  the audit it summarised. Two documents about one run drift, and a reader who opens the
+ *  artifact after reading the comment should recognise what they are looking at.
+ *
+ *  So the body is the report, rendered once and split into its `##` sections, kept in report
+ *  order while the budget lasts. What does not fit is dropped WHOLE and NAMED — a heading a
+ *  reader can go and find in the artifact — never sliced at a byte offset, which lands
+ *  mid-table or inside a fence.
+ *
+ *  The report's own preamble is skipped: the comment's head already carries the date, the
+ *  scope and the rate, and says them in the verdict's voice.
+ *
+ *  `budget` is what is left after the head and the tail, both of which are never candidates
+ *  for dropping — a comment that fits but says nothing about where to look is worse than no
+ *  comment at all. */
+function reportSectionsBody(
+  result: AuditResult,
+  standard: StandardId,
+  lang: Lang,
+  budget: number,
+  /** Headings to take FIRST, still in report order. Not a reordering of the audit: the two
+   *  comments answer different questions of the same document, and the one that answers
+   *  "which pages conform" must not lose the page sections to a budget spent on the defect
+   *  list. What is dropped is named either way. */
+  prefer?: RegExp,
+): { body: string[]; dropped: string[] } {
+  let md: string;
+  try {
+    md = isCore(standard) ? renderReport(result, lang) : renderPackReport(result, loadPack(standard), lang);
+  } catch {
+    // A rendering failure must never cost the comment. The caller still has its head and tail,
+    // which carry the verdict and the link — the two things a reviewer cannot do without.
+    return { body: [], dropped: [] };
+  }
+  const { sections } = splitReportSections(md);
+  const ordered = prefer ? [...sections.filter((x) => prefer.test(x.heading)), ...sections.filter((x) => !prefer.test(x.heading))] : sections;
+  const body: string[] = [];
+  const dropped: string[] = [];
+  let spent = 0;
+  for (const section of ordered) {
+    const text = section.text.trimEnd();
+    // +2 for the blank line that joins it to what precedes.
+    if (dropped.length || spent + text.length + 2 > budget) {
+      dropped.push(section.heading.replace(/^##\s*/, ""));
+      continue;
+    }
+    body.push(text, "");
+    spent += text.length + 2;
+  }
+  return { body, dropped };
+}
+
 /** The pull-request digest.
  *
  *  Deliberately NOT the job summary. A reviewer wants the verdict, how much of the standard
@@ -373,17 +435,29 @@ export function prComment(result: AuditResult, opts: AnnotateOptions & { runUrl?
   // that comes down until the whole document fits, and the verdict, the rate and the link are
   // never candidates: a comment that fits but says nothing about where to look is worse than
   // no comment at all.
-  const assemble = (rows: number): string => {
-    const body: string[] = [];
-    if (grouped.length) {
-      body.push(s.grouped(grouped.length, all.length), "");
-      body.push(...groupTable(grouped.slice(0, rows), s), "");
-      const omitted = grouped.length - rows;
-      if (omitted > 0) body.push(rows < COMMENT_ROWS ? s.clamped(omitted) : s.moreGroups(omitted), "");
-    }
-    return [...head, ...body, ...tail].join("\n").trimEnd();
-  };
+  // The body is the REPORT's own sections — same document, same words, same order — kept while
+  // the budget lasts and dropped whole otherwise. The head and the tail are never candidates.
+  const fixed = [...head, ...tail].join("\n").length;
+  const { body, dropped } = reportSectionsBody(result, standard, lang, Math.max(0, COMMENT_LIMIT - fixed - 512));
+  const notes: string[] = [];
+  if (dropped.length) notes.push(s.sectionsDropped(dropped), "");
 
+  const assembled = [...head, ...body, ...notes, ...tail].join("\n").trimEnd();
+  if (assembled.length <= COMMENT_LIMIT) return assembled;
+
+  // The report could not be cut small enough — a single section larger than the whole budget.
+  // Fall back to the digest this comment carried before: the distinct defects and a link, which
+  // is the least a reviewer needs. Never a byte-slice of the report.
+  const assemble = (rows: number): string => {
+    const digest: string[] = [];
+    if (grouped.length) {
+      digest.push(s.grouped(grouped.length, all.length), "");
+      digest.push(...groupTable(grouped.slice(0, rows), s), "");
+      const omitted = grouped.length - rows;
+      if (omitted > 0) digest.push(rows < COMMENT_ROWS ? s.clamped(omitted) : s.moreGroups(omitted), "");
+    }
+    return [...head, ...digest, ...tail].join("\n").trimEnd();
+  };
   let rows = Math.min(COMMENT_ROWS, grouped.length);
   while (rows > 0 && assemble(rows).length > COMMENT_LIMIT) rows--;
   return assemble(rows);
@@ -626,6 +700,17 @@ export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runU
   // document at a byte offset lands mid-row and GFM then renders a broken table. The detail
   // goes first because the scoreboard is the half that cannot be reconstructed from the
   // artifact link alone.
+  // THIS COMMENT KEEPS ITS OWN PROJECTION, deliberately — unlike the digest above, which is
+  // now the report's own sections verbatim.
+  //
+  // The report's page sections answer the same question, but not in the form a comment needs,
+  // and each difference came from a measured failure: a page is scored in COUNTS because a
+  // rate computed over decided-only criteria printed "50 %" on every page, good and bad; the
+  // occurrences of one defect are FOLDED because 684 of them once made a wall nobody read; the
+  // grid sits behind a `<details>` with a blank line after the summary, without which GFM
+  // renders the table as prose. What keeps the two documents one is that both now draw the
+  // same per-page rate table from the same helpers (see renderPageRates in src/report.ts), and
+  // every status here comes from `pageCriterionRows` — the rows the artifact's sheet renders.
   const assemble = (nBlocks: number, nRows: number, withGrid = true): string => {
     const body: string[] = [...scoreboardTable(result, derived.slice(0, nRows), standard, s, lang), ""];
     if (nRows < derived.length) body.push(s.scoreboardClamped(derived.length - nRows), "");
