@@ -504,27 +504,27 @@ jobs:
           ULTRA11Y_PR_COMMENT: "1"
           ULTRA11Y_PR_COMMENT_KIND: pages
           ULTRA11Y_ARTIFACT_NAME: action-e2e-pages
-          # NO PULL REQUEST IN VIEW, whatever event this workflow is running on.
-          #
-          # The assertion below reads « skipped », and skipped is what `pushPrComment` reports
-          # when `prNumberFromEnv` finds no pull request. That was true when this step only ever
-          # ran on a push — and false the first time CI ran on a `pull_request`, where
-          # GITHUB_REF is `refs/pull/<n>/merge`: the engine found a PR, reached for `gh`, and
-          # failed on the missing token, so the log said « impossible » and the step went red on
-          # a change that had nothing to do with it. Overriding the ref here makes the premise
-          # true by construction on every event, and keeps the step about what it is for: that
-          # the kind threads from the environment through the shipped bundle.
-          GITHUB_REF: refs/heads/ci-comment-render
         run: |
           set -euo pipefail
-          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" report --in audits/audit-latest.json \
-            --standard rgaa --lang fr --format github > /dev/null 2> comment.log
+          # NO PULL REQUEST IN VIEW, whatever event this workflow is running on.
+          #
+          # The assertions below read « skipped », which is what `pushPrComment` reports when
+          # `prNumberFromEnv` finds no pull request. That held while this step only ever ran on
+          # a push, and broke the first time CI ran on a `pull_request`: GITHUB_REF is then
+          # `refs/pull/<n>/merge`, so the engine found a PR, reached for `gh`, failed on the
+          # missing token, and the step went red on a change that had nothing to do with it.
+          #
+          # `env -u` and not a step-level `env:` — a step's env map does not reliably override
+          # a runner-provided default variable, and the version that tried it still read the
+          # pull request. Unsetting it for the child process is not a matter of precedence.
+          render() { env -u GITHUB_REF -u ULTRA11Y_PR node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" report \
+            --in audits/audit-latest.json --standard rgaa --lang fr --format github > /dev/null 2> "$1"; }
+          render comment.log
           # With no pull request in view the post is skipped — and reaching "skipped" is exactly
           # what proves the render ran first, since it is rendered before it is pushed.
           grep -qi "ignoré\|skipped" comment.log || { echo "::error::the pages comment path did not run"; cat comment.log; exit 1; }
           # A kind the engine does not know must fall back to the digest, never to silence.
-          ULTRA11Y_PR_COMMENT_KIND=nonsense node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" report \
-            --in audits/audit-latest.json --standard rgaa --lang fr --format github > /dev/null 2> fallback.log
+          ULTRA11Y_PR_COMMENT_KIND=nonsense render fallback.log
           grep -qi "ignoré\|skipped" fallback.log || { echo "::error::an unknown comment-kind silenced the comment"; cat fallback.log; exit 1; }
 
       # THE COMPENSATING CONTROL. The action's `HTML report` step degrades to a ::warning:: on
