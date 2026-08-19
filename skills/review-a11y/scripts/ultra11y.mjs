@@ -59694,7 +59694,9 @@ function localAvailable(cwd) {
     const req = createRequire(resolve12(cwd, "package.json"));
     req.resolve(PW_SPEC);
     req.resolve(AXE_SPEC);
-    return true;
+    const pw = req(PW_SPEC);
+    const bin = pw.chromium?.executablePath?.();
+    return typeof bin !== "string" || bin.length === 0 ? true : existsSync24(bin);
   } catch {
     return false;
   }

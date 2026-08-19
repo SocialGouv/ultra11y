@@ -3,6 +3,7 @@
 // `scripts/ultra11y.mjs` as a real subprocess (`node scripts/ultra11y.mjs <cmd>`),
 // exactly as a user runs it, and assert on exit codes / stdout / on-disk artifacts.
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -108,11 +109,17 @@ export function hasLocalPlaywright(cwd: string = REPO_ROOT): boolean {
   } catch {
     return false;
   }
-  // A resolvable Playwright still needs its browser binary — probe with `--version`+launch check.
-  const r = spawnSync(process.execPath, ["-e", "require('@playwright/test').chromium.executablePath()"], {
+  // A resolvable Playwright still needs its BROWSER BINARY, and `executablePath()` returns the
+  // path it WOULD use whether or not anything is there — so calling it proved only that the
+  // package was installed. That was harmless while Playwright was absent from this repository
+  // and the guard was false anyway; the moment it became a devDependency, every `--runtime
+  // local` test switched itself on in a CI job that installs no browser, and failed on a launch
+  // rather than skipping. The guard has to test the thing it guards.
+  const r = spawnSync(process.execPath, ["-e", "process.stdout.write(require('@playwright/test').chromium.executablePath())"], {
     cwd,
     encoding: "utf8",
     timeout: 10_000,
   });
-  return r.status === 0 && (r.stdout ?? "").length >= 0;
+  const path = (r.stdout ?? "").trim();
+  return r.status === 0 && path.length > 0 && existsSync(path);
 }

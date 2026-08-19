@@ -59,14 +59,29 @@ interface LocalDeps {
 const PW_SPEC = "@playwright/test";
 const AXE_SPEC = "@axe-core/playwright";
 
-/** Resolvable WITHOUT loading (cheap auto-detection): @playwright/test + @axe-core/playwright
- *  both resolve from `--cwd`. */
+/** Is the LOCAL tier actually usable from `cwd`? Drives `runtime: auto`.
+ *
+ *  Both packages must resolve — and the browser BINARY must be on disk. The second half is not
+ *  belt-and-braces: `npm i @playwright/test` installs the package, `npx playwright install`
+ *  installs the browsers, and the two are separate steps that CI images routinely do only one
+ *  of. Resolution alone therefore says "local is available" on a machine that cannot launch
+ *  anything, and `auto` — whose whole contract is to degrade to Docker when the local tier is
+ *  not there — instead picks it and dies on the launch.
+ *
+ *  Measured on this repository the day Playwright became a devDependency: three `--runtime
+ *  local` tests and the action's own crawl job switched themselves on in jobs that install no
+ *  browser, and failed rather than degrading. `executablePath()` is a pure path computation, so
+ *  this stays cheap: no launch, no download, one `stat`. */
 export function localAvailable(cwd: string): boolean {
   try {
     const req = createRequire(resolve(cwd, "package.json"));
     req.resolve(PW_SPEC);
     req.resolve(AXE_SPEC);
-    return true;
+    const pw = req(PW_SPEC) as { chromium?: { executablePath?: () => string } };
+    const bin = pw.chromium?.executablePath?.();
+    // No path at all ⇒ a Playwright that cannot tell us; treat as available and let the launch
+    // report its own failure, rather than refusing a tier that might work.
+    return typeof bin !== "string" || bin.length === 0 ? true : existsSync(bin);
   } catch {
     return false;
   }
