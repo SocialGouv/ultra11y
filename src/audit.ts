@@ -24,6 +24,7 @@ import type { DepGraph } from "./graph/graph.js";
 import { discover } from "./discover.js";
 import { GRAPH_ONLY_EXT } from "./glob.js";
 import { readText, today } from "./util.js";
+import { INAPPLICABLE_STATUS } from "./types.js";
 
 export type DedupMode = "exact" | "normalized" | "off";
 
@@ -658,12 +659,15 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
     // kept distinct from an engine one so a reader can tell what was proved from source and
     // what was proved on a page — and distinct from `agent`, which is a judgement call.
     let decidedBy: CriterionResult["decidedBy"] | undefined;
+    // Conforming for want of a subject, rather than because anything was checked.
+    let inapplicable = false;
 
     if (c.automatability === "static") {
       const applicable = acc.applicable.get(c.sc) ?? false;
       if (!applicable) {
-        status = "NA";
-        justification = "No element in scope is concerned by this success criterion.";
+        status = INAPPLICABLE_STATUS;
+        inapplicable = true;
+        justification = "No element in scope is concerned by this success criterion — nothing contradicts it, and nothing of that kind exists here.";
       } else if (normativeFs.length > 0) {
         status = "NC";
       } else {
@@ -674,9 +678,11 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       status = "NC";
     } else if (SUBJECT_MATTER[c.sc] !== undefined && !(acc.applicable.get(c.sc) ?? false)) {
       // The criterion's SUBJECT MATTER is absent from the entire scope, so there is nothing to
-      // judge and nothing to render — « not applicable » is the accurate verdict, not « to
-      // assess ». Never a `C`: this says the criterion does not apply, never that it is met.
-      status = "NA";
+      // judge and nothing to render — and nothing to contradict it either. Reported as
+      // conforming (INAPPLICABLE_STATUS), carrying the justification that names what was
+      // looked for and how much was read, so the claim stays falsifiable.
+      status = INAPPLICABLE_STATUS;
+      inapplicable = true;
       justification = subjectMatterReason(c.sc, acc.fileCount);
     } else if (SUBJECT_MATTER[c.sc] === undefined && acc.fileCount > 0 && subjectsAbsent(subjectsForSc(c.sc), acc.subjectsSeen)) {
       // Every element this criterion is ABOUT is absent from the whole scope. Same verdict as
@@ -692,8 +698,9 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       // mention of `devicemotion` in a script all keep their family open. A harvest subject
       // aimed at collecting EVIDENCE is not the same instrument as a predicate aimed at
       // deciding APPLICABILITY, and letting the coarser one overrule the finer would trade a
-      // careful "still applicable" for a careless NA.
-      status = "NA";
+      // careful "still applicable" for a careless close.
+      status = INAPPLICABLE_STATUS;
+      inapplicable = true;
       justification = subjectAbsenceReason(c.sc, subjectsForSc(c.sc), acc.fileCount);
     } else if (c.automatability === "needs-rendering" && renderedProves(c.sc, acc)) {
       // The rendered tier measured it, on every page, and found nothing. That is a verdict.
@@ -707,7 +714,15 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       justification = partialProbeReason(c.sc, acc);
       residualRisks.push({ criteriaId: c.sc, reason: residualReason(c.automatability, c.sc), automatability: c.automatability });
     }
-    criteria.push({ id: c.sc, guideline: c.guideline, status, findings: fs, ...(justification ? { justification } : {}), ...(decidedBy ? { decidedBy } : {}) });
+    criteria.push({
+      id: c.sc,
+      guideline: c.guideline,
+      status,
+      findings: fs,
+      ...(justification ? { justification } : {}),
+      ...(decidedBy ? { decidedBy } : {}),
+      ...(inapplicable ? { inapplicable: true } : {}),
+    });
   }
 
   const guidelines: GuidelineTally[] = allGuidelines().map((g) => {
@@ -717,6 +732,11 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       title: g.title,
       c: inG.filter((c) => c.status === "C").length,
       nc: inG.filter((c) => c.status === "NC").length,
+      // Always 0: no criterion carries `NA` any more (INAPPLICABLE_STATUS). The field stays
+      // because the shape is published and consumers read it; counting the absence-closed
+      // conformities here instead would break the one property a tally owes its reader —
+      // that c + nc + na + manual is the number of criteria. Those are conformities, and
+      // they are counted as such; `CriterionResult.inapplicable` is where the distinction is.
       na: inG.filter((c) => c.status === "NA").length,
       manual: inG.filter((c) => c.status === "manual").length,
     };

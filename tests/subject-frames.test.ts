@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import { runAudit } from "../src/audit.js";
 import { buildAdjudicationWorklist } from "../src/adjudicate.js";
 import { derivePackResults } from "../src/standards/index.js";
+import { INAPPLICABLE_STATUS } from "../src/types.js";
 
 const dir = mkdtempSync(join(tmpdir(), "u11y-frames-"));
 function page(name: string, body: string): string {
@@ -48,13 +49,13 @@ describe("theme 2 is shown the frames it is about", () => {
   it("rules both NOT APPLICABLE when the application has no frame at all", () => {
     // A page with no <iframe> has nothing to answer, and « à évaluer » would say only that
     // nobody looked. The ARIA attributes it does carry must not keep the theme open.
-    expect(rgaa(NO_FRAME, "2.1")?.status).toBe("NA");
-    expect(rgaa(NO_FRAME, "2.2")?.status).toBe("NA");
+    expect(rgaa(NO_FRAME, "2.1")?.status).toBe(INAPPLICABLE_STATUS);
+    expect(rgaa(NO_FRAME, "2.2")?.status).toBe(INAPPLICABLE_STATUS);
   });
 
   it("reopens the theme the moment a frame appears", () => {
-    expect(rgaa(WITH_FRAME, "2.1")?.status).not.toBe("NA");
-    expect(rgaa(WITH_FRAME, "2.2")?.status).not.toBe("NA");
+    expect(rgaa(WITH_FRAME, "2.1")?.status).not.toBe(INAPPLICABLE_STATUS);
+    expect(rgaa(WITH_FRAME, "2.2")?.status).not.toBe(INAPPLICABLE_STATUS);
   });
 
   it("stops handing theme 2 the whole ARIA harvest", () => {

@@ -14,6 +14,7 @@ import {
 } from "../src/standards/index.js";
 import { hasSC, knownScStatus } from "../src/wcag.js";
 import type { AuditResult, Finding } from "../src/types.js";
+import { INAPPLICABLE_STATUS } from "../src/types.js";
 
 const finding = (criteriaId: string, ruleId = "x"): Finding => ({
   ruleId,
@@ -163,7 +164,7 @@ describe("derivePackResults (WCAG → pack projection)", () => {
     expect(byId.get("1.1")?.status).toBe("C");
     // A criterion whose SCs are absent from the audit → NA.
     const na = results.find((r) => r.scs.every((sc) => sc !== "3.1.1" && sc !== "1.1.1"));
-    expect(na?.status).toBe("NA");
+    expect(na?.status).toBe(INAPPLICABLE_STATUS);
   });
 
   it("flags a criterion whose ENTIRE WCAG mapping is out-of-core/removed as manual + outOfScope, never a silent NA", () => {

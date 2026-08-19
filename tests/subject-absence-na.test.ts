@@ -25,6 +25,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { runAudit } from "../src/audit.js";
 import { derivePackResults } from "../src/standards/index.js";
+import { INAPPLICABLE_STATUS } from "../src/types.js";
 
 let root: string;
 beforeEach(() => {
@@ -56,7 +57,7 @@ describe("a criterion whose subject is absent from the whole scope is NOT APPLIC
     const r = audit(BARE);
     // Non-text content and images of text (no image anywhere), link purpose (no link).
     for (const id of ["1.1.1", "1.4.5", "2.4.4"]) {
-      expect(sc(r, id)?.status, `${id} should be NA on a page that contains none of its subject`).toBe("NA");
+      expect(sc(r, id)?.status, `${id} should be NA on a page that contains none of its subject`).toBe(INAPPLICABLE_STATUS);
     }
   });
 
@@ -72,9 +73,9 @@ describe("a criterion whose subject is absent from the whole scope is NOT APPLIC
 
   it("keeps the criterion open the moment its subject appears", () => {
     const withLink = audit(BARE.replace("<p>Éditeur", '<p><a href="/cgu">Conditions</a> — Éditeur'));
-    expect(sc(withLink, "2.4.4")?.status).not.toBe("NA");
+    expect(sc(withLink, "2.4.4")?.status).not.toBe(INAPPLICABLE_STATUS);
     const withImage = audit(BARE.replace("<p>Éditeur", '<img src="/logo.png" alt="Egapro"><p>Éditeur'));
-    expect(sc(withImage, "1.1.1")?.status).not.toBe("NA");
+    expect(sc(withImage, "1.1.1")?.status).not.toBe(INAPPLICABLE_STATUS);
   });
 
   it("refuses to conclude from a subject whose emptiness proves nothing", () => {
@@ -84,9 +85,9 @@ describe("a criterion whose subject is absent from the whole scope is NOT APPLIC
     // `sensoryText` matches a vocabulary — « ci-dessous », « to the right » — so a page saying
     // « cliquez sur l'icône en forme de loupe » harvests nothing while failing 1.3.3 outright.
     const r = audit(BARE);
-    expect(sc(r, "3.1.2")?.status).not.toBe("NA");
-    expect(sc(r, "4.1.3")?.status).not.toBe("NA");
-    expect(sc(r, "1.3.3")?.status).not.toBe("NA");
+    expect(sc(r, "3.1.2")?.status).not.toBe(INAPPLICABLE_STATUS);
+    expect(sc(r, "4.1.3")?.status).not.toBe(INAPPLICABLE_STATUS);
+    expect(sc(r, "1.3.3")?.status).not.toBe(INAPPLICABLE_STATUS);
   });
 
   it("never overrules a hand-written applicability predicate", () => {
@@ -96,7 +97,7 @@ describe("a criterion whose subject is absent from the whole scope is NOT APPLIC
     // open. One criterion, one authority: the finer instrument wins, even when it is the one
     // saying « still applicable ».
     const withTrack = audit(BARE.replace("<p>Éditeur", '<video><track kind="captions"></video><p>Éditeur'));
-    expect(sc(withTrack, "1.2.2")?.status).not.toBe("NA");
+    expect(sc(withTrack, "1.2.2")?.status).not.toBe(INAPPLICABLE_STATUS);
   });
 
   it("proves nothing from an empty scope", () => {
@@ -106,9 +107,9 @@ describe("a criterion whose subject is absent from the whole scope is NOT APPLIC
     const r = runAudit({ inputs: [join(root, "does-not-exist.html")] });
     expect(r.scope.files).toBe(0);
     expect(r.scope.subjectsSeen).toBeUndefined();
-    expect(sc(r, "1.1.1")?.status).not.toBe("NA");
-    expect(sc(r, "2.4.4")?.status).not.toBe("NA");
-    expect(derivePackResults(r, "rgaa").find((c) => c.id === "5.1")?.status).not.toBe("NA");
+    expect(sc(r, "1.1.1")?.status).not.toBe(INAPPLICABLE_STATUS);
+    expect(sc(r, "2.4.4")?.status).not.toBe(INAPPLICABLE_STATUS);
+    expect(derivePackResults(r, "rgaa").find((c) => c.id === "5.1")?.status).not.toBe(INAPPLICABLE_STATUS);
   });
 });
 
@@ -117,23 +118,23 @@ describe("the country standard inherits it — that is where a reader actually c
     const r = audit(BARE);
     // Theme 5 is tables, end to end. A page with no <table> has nothing to answer.
     for (const id of ["5.1", "5.2", "5.3", "5.4", "5.5", "5.6", "5.7", "5.8"]) {
-      expect(rgaa(r, id)?.status, `RGAA ${id} should be NA on a page with no table`).toBe("NA");
+      expect(rgaa(r, id)?.status, `RGAA ${id} should be NA on a page with no table`).toBe(INAPPLICABLE_STATUS);
     }
     // Theme 6 is links; theme 1 is images.
-    expect(rgaa(r, "6.1")?.status).toBe("NA");
-    expect(rgaa(r, "1.1")?.status).toBe("NA");
+    expect(rgaa(r, "6.1")?.status).toBe(INAPPLICABLE_STATUS);
+    expect(rgaa(r, "1.1")?.status).toBe(INAPPLICABLE_STATUS);
   });
 
   it("reopens the theme as soon as the page carries one", () => {
     const withTable = audit(BARE.replace("<p>Éditeur", "<table><tr><td>1</td></tr></table><p>Éditeur"));
-    expect(rgaa(withTable, "5.1")?.status).not.toBe("NA");
+    expect(rgaa(withTable, "5.1")?.status).not.toBe(INAPPLICABLE_STATUS);
   });
 
   it("leaves a criterion open when only SOME of its subjects are absent", () => {
     // RGAA 1.1 is images; RGAA 9.1 is headings, whose emptiness proves nothing about
     // applicability. A page with no image closes the first and not the second.
     const r = audit(BARE);
-    expect(rgaa(r, "1.1")?.status).toBe("NA");
-    expect(rgaa(r, "9.1")?.status).not.toBe("NA");
+    expect(rgaa(r, "1.1")?.status).toBe(INAPPLICABLE_STATUS);
+    expect(rgaa(r, "9.1")?.status).not.toBe(INAPPLICABLE_STATUS);
   });
 });

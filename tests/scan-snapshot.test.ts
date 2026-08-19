@@ -7,6 +7,7 @@ import { PAGES_DIR, readSnapshot, COLLECT_SNAPSHOT } from "../src/snapshot.js";
 import { pageScopesFrom, derivePages } from "../src/pages.js";
 import { runAudit } from "../src/audit.js";
 import type { AuditResult } from "../src/types.js";
+import { INAPPLICABLE_STATUS } from "../src/types.js";
 
 // `scan` drives a browser over each page but used to keep only the findings. A page with no
 // snapshot is `basis: "attributed"` (src/pages.ts honesty rule 2), so its criteria can never
@@ -144,7 +145,7 @@ describe("mergeSnapshotAudit", () => {
   it("upgrades NA to C when the snapshot puts the criterion in scope and it passes", () => {
     const b = base();
     // A fragment has no <html>, so Page Titled / Language of Page are NA in the base audit.
-    expect(b.criteria.find((c) => c.id === "3.1.1")?.status).toBe("NA");
+    expect(b.criteria.find((c) => c.id === "3.1.1")?.status).toBe(INAPPLICABLE_STATUS);
     const merged = mergeSnapshotAudit(b, snapAuditOf('<html lang="fr"><head><title>Accueil</title></head><body><main>x</main></body></html>'));
     const sc = merged.criteria.find((c) => c.id === "3.1.1");
     expect(sc?.status).toBe("C");

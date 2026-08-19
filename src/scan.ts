@@ -691,6 +691,7 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
     merged.findings.push(f);
     if (!f.advisory) {
       c.status = "NC";
+      delete c.inapplicable; // a finding is proof the subject is in scope after all
       delete c.justification;
     }
   }
@@ -698,11 +699,15 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
   // untouched so a pack projection sees the snapshot's hits too.
   if (snap.packFindings?.length) merged.packFindings = [...(merged.packFindings ?? []), ...snap.packFindings];
 
+  // A criterion the static pass closed for want of a subject, which the snapshot then MEASURED.
+  // Both read `C`, so the discriminator is the flag, not the status: what has to go is the
+  // "nothing of that kind here" justification, which a rendered page has just falsified.
   for (const c of merged.criteria) {
-    if (c.status !== "NA") continue;
+    if (!c.inapplicable) continue;
     if (snapById.get(c.id)?.status === "C") {
       c.status = "C";
-      delete c.justification; // the NA reason ("no relevant element") no longer holds
+      delete c.inapplicable;
+      delete c.justification; // "no relevant element in scope" no longer holds
     }
   }
 

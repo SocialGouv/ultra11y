@@ -8,6 +8,7 @@ import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from
 // src/types.ts
 var VERSION = "5.11.3";
 var SCHEMA_VERSION = 2;
+var INAPPLICABLE_STATUS = "C";
 
 // src/audit.ts
 import { createHash as createHash4 } from "crypto";
@@ -48638,11 +48639,13 @@ function finalize(acc, inputs, extra = {}) {
     let status;
     let justification;
     let decidedBy;
+    let inapplicable = false;
     if (c2.automatability === "static") {
       const applicable = acc.applicable.get(c2.sc) ?? false;
       if (!applicable) {
-        status = "NA";
-        justification = "No element in scope is concerned by this success criterion.";
+        status = INAPPLICABLE_STATUS;
+        inapplicable = true;
+        justification = "No element in scope is concerned by this success criterion \u2014 nothing contradicts it, and nothing of that kind exists here.";
       } else if (normativeFs.length > 0) {
         status = "NC";
       } else {
@@ -48651,10 +48654,12 @@ function finalize(acc, inputs, extra = {}) {
     } else if (normativeFs.length > 0) {
       status = "NC";
     } else if (SUBJECT_MATTER[c2.sc] !== void 0 && !(acc.applicable.get(c2.sc) ?? false)) {
-      status = "NA";
+      status = INAPPLICABLE_STATUS;
+      inapplicable = true;
       justification = subjectMatterReason(c2.sc, acc.fileCount);
     } else if (SUBJECT_MATTER[c2.sc] === void 0 && acc.fileCount > 0 && subjectsAbsent(subjectsForSc(c2.sc), acc.subjectsSeen)) {
-      status = "NA";
+      status = INAPPLICABLE_STATUS;
+      inapplicable = true;
       justification = subjectAbsenceReason(c2.sc, subjectsForSc(c2.sc), acc.fileCount);
     } else if (c2.automatability === "needs-rendering" && renderedProves(c2.sc, acc)) {
       status = "C";
@@ -48665,7 +48670,15 @@ function finalize(acc, inputs, extra = {}) {
       justification = partialProbeReason(c2.sc, acc);
       residualRisks.push({ criteriaId: c2.sc, reason: residualReason(c2.automatability, c2.sc), automatability: c2.automatability });
     }
-    criteria.push({ id: c2.sc, guideline: c2.guideline, status, findings: fs2, ...justification ? { justification } : {}, ...decidedBy ? { decidedBy } : {} });
+    criteria.push({
+      id: c2.sc,
+      guideline: c2.guideline,
+      status,
+      findings: fs2,
+      ...justification ? { justification } : {},
+      ...decidedBy ? { decidedBy } : {},
+      ...inapplicable ? { inapplicable: true } : {}
+    });
   }
   const guidelines = allGuidelines().map((g) => {
     const inG = criteria.filter((c2) => c2.guideline === g.number);
@@ -48674,6 +48687,11 @@ function finalize(acc, inputs, extra = {}) {
       title: g.title,
       c: inG.filter((c2) => c2.status === "C").length,
       nc: inG.filter((c2) => c2.status === "NC").length,
+      // Always 0: no criterion carries `NA` any more (INAPPLICABLE_STATUS). The field stays
+      // because the shape is published and consumers read it; counting the absence-closed
+      // conformities here instead would break the one property a tally owes its reader —
+      // that c + nc + na + manual is the number of criteria. Those are conformities, and
+      // they are counted as such; `CriterionResult.inapplicable` is where the distinction is.
       na: inG.filter((c2) => c2.status === "NA").length,
       manual: inG.filter((c2) => c2.status === "manual").length
     };
@@ -53246,11 +53264,11 @@ import { mkdirSync as mkdirSync6, writeFileSync as writeFileSync7 } from "fs";
 import { join as join31 } from "path";
 
 // src/standards/derive.ts
-function aggregate2(statuses) {
-  if (statuses.includes("NC")) return "NC";
-  if (statuses.includes("C")) return "C";
-  if (statuses.includes("manual")) return "manual";
-  return "NA";
+function aggregate2(results) {
+  if (results.some((r) => r.status === "NC")) return "NC";
+  if (results.some((r) => r.status === "C" && !r.inapplicable)) return "C";
+  if (results.some((r) => r.status === "manual")) return "manual";
+  return INAPPLICABLE_STATUS;
 }
 function ruleMatches(ruleId, patterns) {
   for (const p of patterns) {
@@ -53291,11 +53309,19 @@ function applySecondaryMappings(base, pc, enabled, sources, defaultLocale) {
   for (const m of active) for (const f of sources) if (f.ruleId === m.ruleId) added.push(tagSecondary(f, pickLocale(m.note, defaultLocale)));
   if (!added.length) return base;
   const findings = [...base.findings, ...added];
-  if (added.some((f) => !f.advisory)) return { id: pc.id, theme: pc.theme, status: aggregate2([base.status, "NC"]), findings, scs: base.scs };
+  if (added.some((f) => !f.advisory))
+    return {
+      id: pc.id,
+      theme: pc.theme,
+      status: aggregate2([{ status: base.status, inapplicable: base.inapplicable }, { status: "NC" }]),
+      findings,
+      scs: base.scs
+    };
   return { ...base, findings };
 }
 function judgmentGuard(r, pc) {
   if (!pc.judgment || r.status !== "C") return r;
+  if (r.inapplicable) return r;
   return { ...r, status: "manual", judgment: true };
 }
 function derivePackResults(audit2, packKey) {
@@ -53317,11 +53343,12 @@ function derivePackResults(audit2, packKey) {
     const packFs = myPackFindings.filter((f) => pc.wcag.includes(f.criteriaId));
     const allFindings = [...scResults.flatMap((r) => r.findings), ...packFs].map((f) => overrideFinding(f, overrides));
     if (!pc.appliesTo) {
-      const status2 = scResults.length ? aggregate2(scResults.map((r) => r.status)) : "NA";
+      const status2 = scResults.length ? aggregate2(scResults) : INAPPLICABLE_STATUS;
       if (status2 === "manual" && subjectAbsent(pc)) {
-        return { id: pc.id, theme: pc.theme, status: "NA", findings: allFindings, scs: pc.wcag };
+        return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS, findings: allFindings, scs: pc.wcag, inapplicable: true };
       }
-      return { id: pc.id, theme: pc.theme, status: status2, findings: allFindings, scs: pc.wcag };
+      const inapplicable2 = status2 === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));
+      return { id: pc.id, theme: pc.theme, status: status2, findings: allFindings, scs: pc.wcag, ...inapplicable2 ? { inapplicable: true } : {} };
     }
     const findings = allFindings.filter((f) => ruleMatches(f.ruleId, pc.appliesTo.ruleIds));
     const normativeFindings = findings.filter((f) => !f.advisory);
@@ -53331,11 +53358,12 @@ function derivePackResults(audit2, packKey) {
     if (scResults.some((r) => r.status === "NC")) {
       return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag, scopedOut: true };
     }
-    const status = scResults.length ? aggregate2(scResults.map((r) => r.status)) : "NA";
+    const status = scResults.length ? aggregate2(scResults) : INAPPLICABLE_STATUS;
     if (status === "manual" && subjectAbsent(pc)) {
-      return { id: pc.id, theme: pc.theme, status: "NA", findings, scs: pc.wcag };
+      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS, findings, scs: pc.wcag, inapplicable: true };
     }
-    return { id: pc.id, theme: pc.theme, status, findings, scs: pc.wcag };
+    const inapplicable = status === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));
+    return { id: pc.id, theme: pc.theme, status, findings, scs: pc.wcag, ...inapplicable ? { inapplicable: true } : {} };
   };
   const enabledSecondary = (pack.secondaryMappings ?? []).filter((m) => m.enabled === true);
   const secondarySources = enabledSecondary.length ? [...audit2.criteria.flatMap((c2) => c2.findings), ...myPackFindings] : [];
@@ -54482,7 +54510,8 @@ var L4 = {
     cTitle: "3. Crit\xE8res conformes (C)",
     cAgentTitle: "Conformes par adjudication de l'agent (jugement, non prouv\xE9 par le moteur)",
     cAgentNote: "Ces crit\xE8res ont \xE9t\xE9 tranch\xE9s par l'agent IA \xE0 partir des \xE9vidences cit\xE9es, non d\xE9cid\xE9s par le moteur d\xE9terministe. Ils sont gat\xE9s (chaque verdict cite une \xE9vidence r\xE9solvable) mais restent un jugement : ils ne sont pas compt\xE9s dans le taux de r\xE9ussite automatique ci-dessus.",
-    naTitle: "4. Crit\xE8res non applicables (NA)",
+    naTitle: "4. Crit\xE8res conformes faute de sujet",
+    naNote: "Rien de ce type n'existe dans le p\xE9rim\xE8tre audit\xE9 : aucun tableau, aucun m\xE9dia, aucun champ selon le crit\xE8re. Ces crit\xE8res sont conformes \u2014 rien ne les contredit \u2014 mais rien n'a \xE9t\xE9 v\xE9rifi\xE9 non plus. Chacun dit ce qui a \xE9t\xE9 cherch\xE9 et sur quel p\xE9rim\xE8tre, pour que l'affirmation reste r\xE9futable.",
     manualTitle: "5. Crit\xE8res \xE0 adjuger (jugement / rendu) \u2014 non d\xE9cid\xE9s par le moteur statique",
     manualWarn: "Adjugez-les avec `verify --manual` (l'agent d\xE9cide depuis la source, de fa\xE7on gat\xE9e) ; les crit\xE8res de rendu passent par `scan`. Aucun ne doit \xEAtre marqu\xE9 \xAB conforme \xBB sans justification enregistr\xE9e et gat\xE9e.",
     testsToRule: "tests \xE0 trancher",
@@ -54538,7 +54567,8 @@ var L4 = {
     cTitle: "3. Conforming criteria (C)",
     cAgentTitle: "Conforming by agent adjudication (judgement, not proven by the engine)",
     cAgentNote: "These criteria were ruled on by the AI agent from the evidence it cited, not decided by the deterministic engine. They are gated (every verdict cites resolvable evidence) but remain a judgement: they are not counted in the automatic pass rate above.",
-    naTitle: "4. Not-applicable criteria (NA)",
+    naTitle: "4. Conforming for want of a subject",
+    naNote: "Nothing of that kind exists in the audited scope: no table, no media, no form control, depending on the criterion. These are conforming \u2014 nothing contradicts them \u2014 but nothing was verified either. Each says what was looked for and over how much, so the claim stays falsifiable.",
     manualTitle: "5. Criteria to adjudicate (judgment / rendering) \u2014 not decided by the static engine",
     manualWarn: "Adjudicate these with `verify --manual` (the agent decides from source, gated); rendering criteria go to `scan`. None may be marked \u201Cconforming\u201D without a recorded, gated justification.",
     testsToRule: "tests to rule on",
@@ -54596,7 +54626,7 @@ function tallyRows(rows) {
   return {
     c: rows.filter((x) => x.status === "C").length,
     nc: rows.filter((x) => x.status === "NC").length,
-    na: rows.filter((x) => x.status === "NA").length,
+    na: rows.filter((x) => x.inapplicable).length,
     manual: rows.filter((x) => x.status === "manual").length
   };
 }
@@ -54613,7 +54643,7 @@ function reportTotals(groups) {
 }
 function reportCoverage(groups) {
   const t3 = reportTotals(groups);
-  return { decided: t3.c + t3.nc, total: t3.c + t3.nc + t3.na + t3.manual };
+  return { decided: t3.c + t3.nc, total: t3.c + t3.nc + t3.manual };
 }
 function render(r, lang, opts) {
   const s = L4[lang];
@@ -54699,7 +54729,7 @@ function render(r, lang, opts) {
     }
   }
   out2.push(`## ${s.cTitle}`, "");
-  const conform = rows.filter((x) => x.status === "C");
+  const conform = rows.filter((x) => x.status === "C" && !x.inapplicable);
   const byEngine = conform.filter((x) => x.decidedBy !== "agent");
   const byAgent = conform.filter((x) => x.decidedBy === "agent");
   if (!conform.length) out2.push(s.nothing, "");
@@ -54711,7 +54741,9 @@ function render(r, lang, opts) {
     }
   }
   out2.push(`## ${s.naTitle}`, "");
-  const na = rows.filter((x) => x.status === "NA");
+  const na = rows.filter((x) => x.inapplicable);
+  out2.push(na.length ? `> ${s.naNote}
+` : "");
   out2.push(na.length ? na.map((x) => `- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}`).join("\n") : s.nothing, "");
   out2.push(`## ${s.manualTitle}`, "", `> ${s.manualWarn}`, "");
   const manual = rows.filter((x) => x.status === "manual");
@@ -54737,7 +54769,8 @@ function reportGroups(r, lang = "en") {
       status: c2.status,
       findings: c2.findings,
       justification: c2.justification,
-      decidedBy: c2.decidedBy
+      decidedBy: c2.decidedBy,
+      ...c2.inapplicable ? { inapplicable: true } : {}
     };
     (byGuideline.get(c2.guideline) ?? byGuideline.set(c2.guideline, []).get(c2.guideline)).push(row);
   }
@@ -54760,9 +54793,10 @@ function packReportGroups(r, pack, lang = "en") {
       status: pr.status,
       findings: pr.findings,
       ...pr.decidedBy ? { decidedBy: pr.decidedBy } : {},
-      // outOfScope / scopedOut criteria are "manual" (not NA) with their own dedicated
-      // justification — never mixed with the ordinary NA reason (see the manual section above).
-      ...pr.outOfScope ? { justification: s.outOfScope } : pr.scopedOut ? { justification: s.scopedOut } : pr.judgment ? { justification: s.judgment } : pr.status === "NA" ? { justification: naReason } : {}
+      ...pr.inapplicable ? { inapplicable: true } : {},
+      // outOfScope / scopedOut criteria are "manual" with their own dedicated justification —
+      // never mixed with the "nothing of that kind here" reason (see the manual section above).
+      ...pr.outOfScope ? { justification: s.outOfScope } : pr.scopedOut ? { justification: s.scopedOut } : pr.judgment ? { justification: s.judgment } : pr.inapplicable ? { justification: naReason } : {}
     };
     (byTheme.get(pr.theme) ?? byTheme.set(pr.theme, []).get(pr.theme)).push(row);
   }
@@ -57983,8 +58017,9 @@ function applyAdjudication(audit2, adj, opts = {}) {
       continue;
     }
     applied++;
-    c2.status = it.verdict;
+    c2.status = it.verdict === "NA" ? INAPPLICABLE_STATUS : it.verdict;
     c2.decidedBy = "agent";
+    delete c2.inapplicable;
     if (it.verdict === "C" || it.verdict === "NA") c2.justification = it.justification.trim();
     if (it.verdict === "NC") {
       const fs2 = it.findings.map((f) => agentFinding(it.criteriaId, f));
@@ -59249,14 +59284,16 @@ function mergeSnapshotAudit(base, snap) {
     merged.findings.push(f);
     if (!f.advisory) {
       c2.status = "NC";
+      delete c2.inapplicable;
       delete c2.justification;
     }
   }
   if (snap.packFindings?.length) merged.packFindings = [...merged.packFindings ?? [], ...snap.packFindings];
   for (const c2 of merged.criteria) {
-    if (c2.status !== "NA") continue;
+    if (!c2.inapplicable) continue;
     if (snapById.get(c2.id)?.status === "C") {
       c2.status = "C";
+      delete c2.inapplicable;
       delete c2.justification;
     }
   }

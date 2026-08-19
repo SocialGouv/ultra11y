@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { escapeCommentValue, parseCaptureProvenance, unescapeCommentValue } from "../src/capture.js";
 import { parseSource } from "../src/parse/source.js";
 import { runAudit } from "../src/audit.js";
+import { INAPPLICABLE_STATUS } from "../src/types.js";
 
 const FIX = new URL("./fixtures/", import.meta.url).pathname;
 
@@ -102,8 +103,8 @@ describe("runAudit — capture ingestion & attribution", () => {
 
   it("serializes captures as fragments, so page-scoped SCs stay NA (no false page NCs)", () => {
     const statusOf = (id: string) => r.criteria.find((c) => c.id === id)?.status;
-    expect(statusOf("2.4.2")).toBe("NA"); // Page Titled — no <html>/<title> in a fragment
-    expect(statusOf("3.1.1")).toBe("NA"); // Language of Page — idem
+    expect(statusOf("2.4.2")).toBe(INAPPLICABLE_STATUS); // Page Titled — no <html>/<title> in a fragment
+    expect(statusOf("3.1.1")).toBe(INAPPLICABLE_STATUS); // Language of Page — idem
     expect(statusOf("4.1.2")).toBe("NC"); // the icon button IS caught
   });
 });

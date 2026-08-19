@@ -24,7 +24,7 @@ describe("renderReport (WCAG 2.2 AA markdown)", () => {
     expect(md).toContain("## 1. Synthèse par règle WCAG");
     expect(md).toContain("## 2. Non-conformités (par priorité)");
     expect(md).toContain("## 3. Critères conformes (C)");
-    expect(md).toContain("## 4. Critères non applicables (NA)");
+    expect(md).toContain("## 4. Critères conformes faute de sujet");
     expect(md).toContain("## 5. Critères à adjuger (jugement / rendu) — non décidés par le moteur statique");
     expect(md).toMatch(/Taux de réussite automatique[^*]*\*\* : \d+%/);
   });

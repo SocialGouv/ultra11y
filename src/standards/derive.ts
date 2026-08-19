@@ -7,6 +7,7 @@ import type { AuditResult, CriterionResult, Status, Finding, Severity } from "..
 import { CORE_KEY, loadPack } from "./registry.js";
 import { knownScStatus } from "../wcag.js";
 import type { LocaleString, PackCriterion, PackOverride, SecondaryMapping, StandardPack } from "./types.js";
+import { INAPPLICABLE_STATUS } from "../types.js";
 
 export interface PackCriterionResult {
   id: string;
@@ -34,15 +35,28 @@ export interface PackCriterionResult {
   // conformity the engine PROVED from one an agent RULED — they are not the same claim.
   justification?: string;
   decidedBy?: "engine" | "agent" | "scan";
+  /** Conforming because nothing of its kind is in scope, not because anything was verified.
+   *  Mirrors CriterionResult.inapplicable — see INAPPLICABLE_STATUS. */
+  inapplicable?: boolean;
 }
 
 // NC dominates (a real failure anywhere fails the criterion); then a decided C; then
-// manual (residual); else NA. Mirrors the core's aggregation.
-function aggregate(statuses: Status[]): Status {
-  if (statuses.includes("NC")) return "NC";
-  if (statuses.includes("C")) return "C";
-  if (statuses.includes("manual")) return "manual";
-  return "NA";
+// manual (residual); else nothing of that kind exists here. Mirrors the core's aggregation.
+//
+// A mapped success criterion that came back inapplicable already reads `C` (see
+// INAPPLICABLE_STATUS), so the last line is reached only by a pack criterion mapping onto no
+// success criterion at all — same answer, same reason.
+function aggregate(results: Pick<CriterionResult, "status" | "inapplicable">[]): Status {
+  if (results.some((r) => r.status === "NC")) return "NC";
+  // A VERIFIED conformity only. An absence-closed one reads `C` too (INAPPLICABLE_STATUS) and
+  // must NOT outrank a sibling still to assess: a pack criterion mapping onto one criterion
+  // nothing was found for and one nobody has ruled on is undecided, not conforming. Getting
+  // this wrong is the precise shape of "conforming because nobody looked" — measured on RGAA
+  // 6.1, which mapped onto an image criterion closed for absence and a link criterion still
+  // open, and came back conforming on a page whose links had never been read.
+  if (results.some((r) => r.status === "C" && !r.inapplicable)) return "C";
+  if (results.some((r) => r.status === "manual")) return "manual";
+  return INAPPLICABLE_STATUS;
 }
 
 /** Does a finding's ruleId satisfy one of a criterion's applicability patterns?
@@ -134,7 +148,14 @@ function applySecondaryMappings(
   const findings = [...base.findings, ...added];
   // A normative secondary finding drives NC (aggregate: NC dominates), and supersedes an
   // out-of-scope/scoped-out base verdict; an advisory-only one just rides along for display.
-  if (added.some((f) => !f.advisory)) return { id: pc.id, theme: pc.theme, status: aggregate([base.status, "NC"]), findings, scs: base.scs };
+  if (added.some((f) => !f.advisory))
+    return {
+      id: pc.id,
+      theme: pc.theme,
+      status: aggregate([{ status: base.status, inapplicable: base.inapplicable }, { status: "NC" }]),
+      findings,
+      scs: base.scs,
+    };
   return { ...base, findings };
 }
 
@@ -152,6 +173,12 @@ function applySecondaryMappings(
  *  criterion, and an `NA` means nothing in scope is concerned — both stay. */
 function judgmentGuard(r: PackCriterionResult, pc: PackCriterion): PackCriterionResult {
   if (!pc.judgment || r.status !== "C") return r;
+  // …unless there is nothing of that kind in scope. The guard exists because the RGAA question
+  // is usually BROADER than the success criteria it maps onto, so inheriting their `C` would
+  // answer a narrower question than the one asked. A broader question still needs a subject:
+  // with no table on the site, "is every complex table's summary relevant?" has nothing to bite
+  // on, and reopening it prints a row of work that does not exist.
+  if (r.inapplicable) return r;
   return { ...r, status: "manual" as Status, judgment: true };
 }
 
@@ -204,11 +231,14 @@ export function derivePackResults(audit: AuditResult, packKey: string): PackCrit
     // recommendation) and the SC statuses aggregate directly. The SC status already
     // excludes advisory findings (src/audit.ts finalize), so the aggregate is NC-clean.
     if (!pc.appliesTo) {
-      const status: Status = scResults.length ? aggregate(scResults.map((r) => r.status)) : "NA";
+      const status: Status = scResults.length ? aggregate(scResults) : INAPPLICABLE_STATUS;
       if (status === "manual" && subjectAbsent(pc)) {
-        return { id: pc.id, theme: pc.theme, status: "NA" as Status, findings: allFindings, scs: pc.wcag };
+        return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS as Status, findings: allFindings, scs: pc.wcag, inapplicable: true };
       }
-      return { id: pc.id, theme: pc.theme, status, findings: allFindings, scs: pc.wcag };
+      // Conforming for want of a subject only when EVERY success criterion it maps onto was —
+      // one that was actually verified makes this a verified conformity, not an empty one.
+      const inapplicable = status === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));
+      return { id: pc.id, theme: pc.theme, status, findings: allFindings, scs: pc.wcag, ...(inapplicable ? { inapplicable: true } : {}) };
     }
 
     // Applicability-aware projection: a finding attaches ONLY if its rule is one this
@@ -231,11 +261,12 @@ export function derivePackResults(audit: AuditResult, packKey: string): PackCrit
     }
     // Otherwise the ordinary non-NC aggregate (C / manual / NA) over the mapped SCs, with
     // any advisory findings kept on the result so the pack view surfaces them.
-    const status: Status = scResults.length ? aggregate(scResults.map((r) => r.status)) : "NA";
+    const status: Status = scResults.length ? aggregate(scResults) : INAPPLICABLE_STATUS;
     if (status === "manual" && subjectAbsent(pc)) {
-      return { id: pc.id, theme: pc.theme, status: "NA" as Status, findings, scs: pc.wcag };
+      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS as Status, findings, scs: pc.wcag, inapplicable: true };
     }
-    return { id: pc.id, theme: pc.theme, status, findings, scs: pc.wcag };
+    const inapplicable = status === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));
+    return { id: pc.id, theme: pc.theme, status, findings, scs: pc.wcag, ...(inapplicable ? { inapplicable: true } : {}) };
   };
 
   // Secondary crosswalk projections (opt-in, config-enabled). Sourced from EVERY audit

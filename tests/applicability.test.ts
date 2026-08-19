@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { runAudit } from "../src/audit.js";
 import { derivePackResults } from "../src/standards/index.js";
 import type { Status } from "../src/types.js";
+import { INAPPLICABLE_STATUS } from "../src/types.js";
 
 // A judgment or rendering criterion used to have exactly two outcomes: NC when a rule fired,
 // « to assess » otherwise. So a repository with no audio and no video still reported all five
@@ -40,7 +41,7 @@ const FORM_SCS = ["1.3.5", "3.3.1", "3.3.2", "3.3.3", "3.3.4", "3.3.7", "3.3.8"]
 describe("time-based media (WCAG 1.2.x)", () => {
   it("closes every media criterion as NA when nothing in scope carries media", () => {
     const r = audit(doc("<p>Text only.</p>"));
-    for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).toBe("NA");
+    for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).toBe(INAPPLICABLE_STATUS);
   });
 
   it("justifies each NA by naming what was searched for, so a reader can falsify it", () => {
@@ -68,7 +69,7 @@ describe("time-based media (WCAG 1.2.x)", () => {
   ] as const) {
     it(`keeps the media criteria open when the page has ${label}`, () => {
       const r = audit(doc(markup));
-      for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).not.toBe("NA");
+      for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).not.toBe(INAPPLICABLE_STATUS);
     });
   }
 
@@ -85,7 +86,7 @@ describe("time-based media (WCAG 1.2.x)", () => {
   ] as const) {
     it(`still closes the media criteria as NA with ${label}`, () => {
       const r = audit(doc(markup));
-      for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).toBe("NA");
+      for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).toBe(INAPPLICABLE_STATUS);
     });
   }
 
@@ -97,14 +98,14 @@ describe("time-based media (WCAG 1.2.x)", () => {
     writeFileSync(a, doc("<p>Text only.</p>"));
     writeFileSync(b, doc('<video src="v.mp4"></video>'));
     const r = runAudit({ inputs: [a, b] });
-    for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).not.toBe("NA");
+    for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).not.toBe(INAPPLICABLE_STATUS);
   });
 });
 
 describe("user input (WCAG 3.3.x + 1.3.5)", () => {
   it("closes the form criteria as NA when nothing in scope takes input", () => {
     const r = audit(doc("<p>Read-only content.</p>"));
-    for (const sc of FORM_SCS) expect(statusOf(r, sc), `SC ${sc}`).toBe("NA");
+    for (const sc of FORM_SCS) expect(statusOf(r, sc), `SC ${sc}`).toBe(INAPPLICABLE_STATUS);
     expect(justificationOf(r, "3.3.1")).toMatch(/no user input in scope/i);
   });
 
@@ -118,7 +119,7 @@ describe("user input (WCAG 3.3.x + 1.3.5)", () => {
   ] as const) {
     it(`keeps the form criteria open when the page has ${label}`, () => {
       const r = audit(doc(markup));
-      for (const sc of FORM_SCS) expect(statusOf(r, sc), `SC ${sc}`).not.toBe("NA");
+      for (const sc of FORM_SCS) expect(statusOf(r, sc), `SC ${sc}`).not.toBe(INAPPLICABLE_STATUS);
     });
   }
 });
@@ -126,22 +127,39 @@ describe("user input (WCAG 3.3.x + 1.3.5)", () => {
 describe("motion actuation (WCAG 2.5.4)", () => {
   it("is NA when no device-motion API is used", () => {
     const r = audit(doc("<p>Static.</p>"));
-    expect(statusOf(r, "2.5.4")).toBe("NA");
+    expect(statusOf(r, "2.5.4")).toBe(INAPPLICABLE_STATUS);
     expect(justificationOf(r, "2.5.4")).toMatch(/no motion actuation in scope/i);
   });
 
   for (const api of ["devicemotion", "deviceorientation", "DeviceOrientationEvent", "new Accelerometer()"]) {
     it(`stays open when the source mentions ${api}`, () => {
       const r = audit(doc(`<script>${api}</script>`));
-      expect(statusOf(r, "2.5.4")).not.toBe("NA");
+      expect(statusOf(r, "2.5.4")).not.toBe(INAPPLICABLE_STATUS);
     });
   }
 });
 
-describe("an NA never replaces a real verdict", () => {
-  it("never turns into a C — NA says the criterion does not apply, not that it is met", () => {
+describe("a criterion closed for want of a subject still says so", () => {
+  it("reads conforming, but is flagged and justified rather than merely asserted", () => {
+    // The tool reports two answers, not four (INAPPLICABLE_STATUS). What separates this
+    // conformity from "nobody looked" is not the label — it is the flag that marks it and the
+    // justification that names the subject looked for and the scope it was looked for in.
     const r = audit(doc("<p>Text only.</p>"));
-    for (const sc of [...MEDIA_SCS, ...FORM_SCS, "2.5.4"]) expect(statusOf(r, sc), `SC ${sc}`).not.toBe("C");
+    for (const sc of [...MEDIA_SCS, ...FORM_SCS, "2.5.4"]) {
+      const c = r.criteria.find((x) => x.id === sc);
+      expect(c?.status, `SC ${sc}`).toBe(INAPPLICABLE_STATUS);
+      expect(c?.inapplicable, `SC ${sc} must be marked as closed for absence`).toBe(true);
+      expect((c?.justification ?? "").length, `SC ${sc} must say what it looked for`).toBeGreaterThan(0);
+    }
+  });
+
+  it("never outranks a sibling nobody has ruled on", () => {
+    // The failure this guards is exact: RGAA 6.1 maps onto an image criterion closed for
+    // absence AND a link criterion still open. Letting the first win would publish "conforming"
+    // over links no one had read — conforming because nobody looked, in one aggregation.
+    const r = audit(doc('<p>Voir <a href="/aide">la page d\'aide</a>.</p>'));
+    const c61 = derivePackResults(r, "rgaa").find((c) => c.id === "6.1");
+    expect(c61?.status).toBe("manual");
   });
 
   it("loses to a normative finding: a criterion a rule failed stays NC", () => {
@@ -149,7 +167,7 @@ describe("an NA never replaces a real verdict", () => {
     // also keeps the media criteria open, so nothing here can be NA by accident.
     const r = audit(doc('<video src="v.mp4" autoplay></video>'));
     expect(statusOf(r, "2.2.2")).toBe("NC");
-    for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).not.toBe("NA");
+    for (const sc of MEDIA_SCS) expect(statusOf(r, sc), `SC ${sc}`).not.toBe(INAPPLICABLE_STATUS);
   });
 
   it("leaves the criteria about the whole document exactly as they were", () => {
@@ -160,35 +178,43 @@ describe("an NA never replaces a real verdict", () => {
     // 2.4.4 is NOT one of them, and that is the point of the harvest-subject layer: link
     // purpose is about LINKS, and a page with none has nothing to judge. It used to sit here
     // because the engine had no way to ask "does this page contain a link at all?".
-    expect(statusOf(r, "2.4.4")).toBe("NA");
+    expect(statusOf(r, "2.4.4")).toBe(INAPPLICABLE_STATUS);
   });
 
-  it("keeps every NA out of the automatic pass rate", () => {
+  it("counts in the pass rate, and never as a non-conformity", () => {
+    // These ARE conformities now, so they belong in C ÷ (C+NC) — the owner's rule for this
+    // tool. The invariant that must not move is the direction: an absent subject can never
+    // manufacture a failure, and no criterion carries `NA` any more.
     const bare = audit(doc("<p>Text only.</p>"));
-    // conformancePct is C ÷ (C+NC): a pile of new NAs must not move it.
     expect(bare.conformancePct).toBe(100);
-    expect(bare.criteria.filter((c) => c.status === "NA").length).toBeGreaterThan(10);
+    expect(bare.criteria.filter((c) => c.status === "NA")).toEqual([]);
+    expect(bare.criteria.filter((c) => c.inapplicable).length).toBeGreaterThan(10);
+    for (const c of bare.criteria.filter((x) => x.inapplicable)) expect(c.status).not.toBe("NC");
   });
 });
 
-describe("the RGAA projection carries the NA through", () => {
-  it("reports theme 4 (Multimédia) criteria as not applicable on a media-free page", () => {
+describe("the RGAA projection carries it through", () => {
+  it("closes theme 4 (Multimédia) on a media-free page, flagged for what it is", () => {
     const r = audit(doc("<p>Texte seulement.</p>"));
-    const derived = derivePackResults(r, "rgaa");
-    const theme4 = derived.filter((c) => c.id.startsWith("4."));
+    const theme4 = derivePackResults(r, "rgaa").filter((c) => c.id.startsWith("4."));
 
-    expect(theme4.filter((c) => c.status === "NA").length).toBeGreaterThan(0);
-    // …and none of them was quietly upgraded to conforming.
-    expect(theme4.every((c) => c.status !== "C")).toBe(true);
+    const closed = theme4.filter((c) => c.inapplicable);
+    expect(closed.length).toBeGreaterThan(0);
+    for (const c of closed) expect(c.status).toBe(INAPPLICABLE_STATUS);
+    // A page with no media can never fail a media criterion.
+    expect(theme4.every((c) => c.status !== "NC")).toBe(true);
   });
 
   it("shrinks the « to assess » bucket rather than the non-conformity one", () => {
     const bare = derivePackResults(audit(doc("<p>Texte seulement.</p>")), "rgaa");
-    const naCount = bare.filter((c) => c.status === "NA").length;
+    const closed = bare.filter((c) => c.inapplicable).length;
     const manualCount = bare.filter((c) => c.status === "manual").length;
+    const ncCount = bare.filter((c) => c.status === "NC").length;
 
-    expect(naCount).toBeGreaterThan(1); // before this change, only RGAA 4.10 could be NA
-    expect(naCount + manualCount).toBeLessThanOrEqual(106);
+    expect(closed).toBeGreaterThan(1);
+    expect(ncCount).toBe(0); // nothing on this page fails anything
+    expect(closed + manualCount).toBeLessThanOrEqual(106);
+    expect(bare.filter((c) => c.status === "NA")).toEqual([]);
   });
 });
 
@@ -223,7 +249,7 @@ describe("every criterion left to assess says why, and where its evidence comes 
       expect(r.residualRisks.find((x) => x.criteriaId === sc)?.reason, `SC ${sc}`).toMatch(/no automated tier decides this/i);
     }
     expect(r.residualRisks.some((x) => x.criteriaId === "1.4.5")).toBe(false);
-    expect(r.criteria.find((c) => c.id === "1.4.5")?.status).toBe("NA");
+    expect(r.criteria.find((c) => c.id === "1.4.5")?.status).toBe(INAPPLICABLE_STATUS);
   });
 
   it("carries a runnable command wherever one would actually help", () => {

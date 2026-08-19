@@ -12,6 +12,26 @@ export type Severity = "bloquant" | "majeur" | "mineur";
 // C = conforme, NC = non conforme, NA = non applicable, manual = à évaluer
 // (needs-rendering / judgment criteria the engine cannot decide on its own).
 export type Status = "C" | "NC" | "NA" | "manual";
+
+/** WHAT THE ENGINE REPORTS WHEN THERE IS NOTHING OF THAT KIND TO EVALUATE.
+ *
+ *  A criterion whose subject does not exist anywhere in scope — the table criteria on a site
+ *  with no table, the media criteria on a site with no media — used to come back `NA`, its own
+ *  third column. It no longer does: the owner's rule for this tool is that a criterion nothing
+ *  contradicts is CONFORMING, and a reader working through a grid should meet two answers, not
+ *  four.
+ *
+ *  What is NOT lost is why. Every criterion closed this way still carries the justification
+ *  that names the subject looked for and the size of the scope it was looked for in, so the
+ *  claim stays falsifiable — which is the only thing that separates "conforming" from
+ *  "nobody checked". The three guardrails that governed the NA verdict govern this one
+ *  unchanged (src/audit.ts): only subjects whose emptiness PROVES absence qualify, absence is
+ *  folded across the whole scope, and an empty scope proves nothing.
+ *
+ *  `NA` stays in the type because the outside world still speaks it — a verdict ledger written
+ *  before this change, an Ara export, a model's adjudication — and every one of those is folded
+ *  to this value on the way in rather than rejected. */
+export const INAPPLICABLE_STATUS = "C" as const satisfies Status;
 export type Automatability = "static" | "needs-rendering" | "judgment";
 export type ParserKind = "html" | "css" | "jsx" | "cross";
 
@@ -262,6 +282,15 @@ export interface CriterionResult {
   // a needs-rendering residual to C/NC (src/scan.ts mergeDynamic). Optional/additive — no
   // SCHEMA_VERSION bump; older AuditResult JSON (no `decidedBy`) reads as engine-decided.
   decidedBy?: "engine" | "agent" | "scan";
+  /** This criterion is conforming because NOTHING OF ITS KIND IS IN SCOPE, not because
+   *  anything was verified — see INAPPLICABLE_STATUS.
+   *
+   *  It exists so the distinction stays machine-readable now that the two share a status. The
+   *  snapshot merge needs it: a criterion closed for absence must be REOPENED the moment a
+   *  rendered page puts its subject back in scope, and its "nothing of that kind here"
+   *  justification must go with it — a stale one would have the report explaining that a site
+   *  has no images directly above the images it found. */
+  inapplicable?: boolean;
 }
 
 // ---- rendered signals (page snapshots) ---------------------------------------------------

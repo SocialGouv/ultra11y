@@ -172,11 +172,16 @@ describe("the rendered tier concludes only what it measured everywhere", () => {
     for (const sc of ["1.4.5", "2.1.2", "2.3.1", "2.4.11", "2.5.8"]) {
       // The property is that this TIER never claims them, not that they stay undecided: a
       // criterion whose subject matter is provably absent from the source (2.3.1 on a page
-      // with no animation) is legitimately NA, and that verdict comes from the applicability
-      // table, not from a measurement. What must never happen is a conformity out of silence.
+      // with no animation) is legitimately closed by the applicability table, and that
+      // conformity comes from an absence the engine can point at — not from a measurement.
+      // What must never happen is a conformity out of SILENCE, so the test is on the source
+      // of the verdict, not on its label.
       const c = of(r, sc);
-      expect(c?.status, `${sc} must never be concluded conformant here`).not.toBe("C");
       expect(c?.decidedBy, `${sc} is measured by no rendered rule`).not.toBe("scan");
+      if (c?.status === "C") {
+        expect(c.inapplicable, `${sc} may only be conformant here for want of a subject`).toBe(true);
+        expect((c.justification ?? "").length, `${sc} must say what it looked for`).toBeGreaterThan(0);
+      }
     }
   });
 

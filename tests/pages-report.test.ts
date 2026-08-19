@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PAGES_DIR } from "../src/snapshot.js";
 import type { AuditResult, PageResult, PageScope } from "../src/types.js";
+import { formatRate } from "../src/pages.js";
 
 // The per-page REPORT (issue #4052): the grid answers "which criteria fail across pages?",
 // the report answers "what is the state of THIS page?". The tests below pin the two
@@ -196,14 +197,14 @@ describe("the index", () => {
   });
 
   it("renders `—`, never a number, for a page on which nothing was decided", () => {
-    const nothingDecided = { ...derived[0]!, criteria: derived[0]!.criteria.map((c) => ({ ...c, status: "manual" as const })) };
-    const one = renderPagesIndex(result, [{ ...nothingDecided, conformancePct: null, decided: 0, total: nothingDecided.criteria.length }], {
-      standard: "rgaa",
-      lang: "fr",
-    });
-    const row = one.split("\n").find((l) => l.startsWith("| Page d'accueil |"))!;
-    expect(row).toContain("— (0/106)");
-    expect(row).not.toMatch(/\| 100 % /);
+    // 100 % over an empty denominator reads as a perfect page and is the mechanism behind a
+    // scoreboard of flawless rows nobody assessed. Asserted on `formatRate`, which is what
+    // every surface calls: the index recomputes its own coverage from the audit (see
+    // `pageCriterionRows`), so handing it a doctored page object would test the fixture and
+    // not the rule.
+    expect(formatRate(null, 0, 106)).toBe("— (0/106)");
+    expect(formatRate(null, 0, 106)).not.toMatch(/%/);
+    expect(formatRate(100, 23, 106)).toBe("100 % (23/106)");
   });
 
   it("names the short rate column in both languages", () => {

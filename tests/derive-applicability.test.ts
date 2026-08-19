@@ -62,8 +62,17 @@ describe("RGAA applicability — an image-alt NC no longer over-projects", () =>
     const pack = loadPack("rgaa");
     for (const id of ["8.4", "8.6", "13.3", "13.4", "4.10"]) {
       expect(pack.criteria.find((c) => c.id === id)?.judgment, `RGAA ${id} must be flagged judgment`).toBe(true);
+    }
+    // The guard bites where the criterion HAS a subject to be broader about: this page carries
+    // a language, a title and a link, so those questions are still open.
+    for (const id of ["8.4", "8.6", "13.3", "13.4"]) {
       expect(statusOf(rows, id), `RGAA ${id} must never be C`).not.toBe("C");
     }
+    // …and it does not bite where there is no subject at all. 4.10 asks whether automatically
+    // triggered SOUND is controllable; this page has no media, so there is nothing to control
+    // and nothing to rule on. Reopening it would print a row of work that does not exist.
+    expect(statusOf(rows, "4.10")).toBe("C");
+    expect(rows.find((r) => r.id === "4.10")?.inapplicable).toBe(true);
     // The mechanical siblings are untouched: presence of a language / of a title really is
     // what the engine checked, so they stay decidable.
     for (const id of ["8.3", "8.5"]) {

@@ -39,6 +39,7 @@ import {
 } from "./standards/index.js";
 import { guidanceForCriterion } from "./guidance/index.js";
 import { guidanceExampleBlock } from "./prd.js";
+import { INAPPLICABLE_STATUS } from "./types.js";
 
 /** Cap on CONTENT CLASSES shown per criterion — not on anchors.
  *
@@ -1050,8 +1051,14 @@ export function applyAdjudication(
       continue;
     }
     applied++;
-    c.status = it.verdict as Status;
+    // An `NA` verdict — from a model, or from a ledger written before this tool stopped
+    // reporting a third column — means "nothing of that kind is in scope", which this engine
+    // now reports as conforming (INAPPLICABLE_STATUS). Folded on the way in rather than
+    // refused: the claim is unchanged, only the label it lands under.
+    c.status = (it.verdict === "NA" ? INAPPLICABLE_STATUS : it.verdict) as Status;
     c.decidedBy = "agent";
+    // Whatever it was closed for before, it now carries a ruling of its own.
+    delete c.inapplicable;
     if (it.verdict === "C" || it.verdict === "NA") c.justification = it.justification.trim();
     if (it.verdict === "NC") {
       const fs: Finding[] = it.findings.map((f) => agentFinding(it.criteriaId, f));

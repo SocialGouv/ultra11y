@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { runAudit } from "../src/audit.js";
 import type { Status } from "../src/types.js";
+import { INAPPLICABLE_STATUS } from "../src/types.js";
 
 const FIX = new URL("./fixtures/", import.meta.url).pathname;
 const statusOf = (r: ReturnType<typeof runAudit>, id: string): Status | undefined => r.criteria.find((c) => c.id === id)?.status;
@@ -64,7 +65,7 @@ describe("runAudit — conforming page", () => {
   });
 
   it("marks static SCs with no relevant elements as NA", () => {
-    expect(statusOf(r, "1.4.2")).toBe("NA"); // Audio Control — no audio/video on the good page
+    expect(statusOf(r, "1.4.2")).toBe(INAPPLICABLE_STATUS); // Audio Control — no audio/video on the good page
   });
 
   it("proves NA on the interaction criteria whose construct is absent from the source", () => {
@@ -72,7 +73,7 @@ describe("runAudit — conforming page", () => {
     // exist, so their absence from the source is a real observation rather than silence —
     // which is what separates these from 3.1.2, where a missing `lang` proves nothing.
     for (const sc of ["2.1.4", "2.2.1", "2.2.2", "2.3.1", "2.5.1", "2.5.2", "2.5.7"]) {
-      expect(statusOf(r, sc), `${sc} on a page with none of its subject matter`).toBe("NA");
+      expect(statusOf(r, sc), `${sc} on a page with none of its subject matter`).toBe(INAPPLICABLE_STATUS);
     }
     // …and the claim says what was searched for, so a reader can falsify it.
     expect(r.criteria.find((c) => c.id === "2.1.4")?.justification).toMatch(/single-printable-character key comparison/);

@@ -77,13 +77,15 @@ const CRITERIA = [
   { id: "1.4.3", guideline: "1.4", status: "C", findings: [] },
   { id: "2.4.7", guideline: "2.4", status: "C", findings: [] },
   { id: "1.4.11", guideline: "1.4", status: "manual", findings: [] },
-  { id: "3.3.2", guideline: "3.3", status: "NA", findings: [] },
+  // Conforming for want of a subject: no form control on the page, so nothing to instruct.
+  // Reads `C` like any other conformity and is flagged for what it is (INAPPLICABLE_STATUS).
+  { id: "3.3.2", guideline: "3.3", status: "C", inapplicable: true, findings: [] },
 ] as unknown as AuditResult["criteria"];
 const GUIDELINES = [
   { key: "1.1", title: "Text Alternatives", c: 0, nc: 1, na: 0, manual: 0 },
   { key: "1.4", title: "Distinguishable", c: 1, nc: 0, na: 0, manual: 1 },
   { key: "2.4", title: "Navigable", c: 1, nc: 0, na: 0, manual: 0 },
-  { key: "3.3", title: "Input Assistance", c: 0, nc: 0, na: 1, manual: 0 },
+  { key: "3.3", title: "Input Assistance", c: 1, nc: 0, na: 1, manual: 0 },
 ] as unknown as AuditResult["guidelines"];
 const decided = (over: Partial<AuditResult> = {}): Partial<AuditResult> => ({ criteria: CRITERIA, guidelines: GUIDELINES, ...over });
 
@@ -91,15 +93,16 @@ describe("job summary", () => {
   it("reports the headline rate and the finding count", () => {
     const md = stepSummary(audit([F()], decided()), { lang: "en" });
     expect(md).toContain("ultra11y");
-    expect(md).toContain("80 % (3/5)");
+    expect(md).toContain("80 % (4/5)");
     expect(md).toContain("1");
   });
 
   // THE #16 FAILURE, at the run grain. `conformancePct` is 80 on this fixture whatever the
-  // criteria say, and the headline used to print it naked. Three decided out of five is the
-  // fact a reviewer needs in order to know what the 80 % is a percentage OF.
+  // criteria say, and the headline used to print it naked. Four decided out of five is the
+  // fact a reviewer needs in order to know what the 80 % is a percentage OF — four, because a
+  // criterion closed for want of a subject is decided (INAPPLICABLE_STATUS), not pending.
   it("never prints the rate without its denominator", () => {
-    expect(stepSummary(audit([F()], decided()), { lang: "en" })).toContain("**80 % (3/5)**");
+    expect(stepSummary(audit([F()], decided()), { lang: "en" })).toContain("**80 % (4/5)**");
   });
 
   // …and an audit that decided nothing has no rate at all, rather than a flattering one.
@@ -112,7 +115,7 @@ describe("job summary", () => {
   it("marks a conformity an agent RULED, so it is never read as one the engine proved", () => {
     const ruled = CRITERIA.map((c, i) => (i === 1 ? { ...c, decidedBy: "agent" as const } : c));
     const md = stepSummary(audit([F()], decided({ criteria: ruled })), { lang: "en" });
-    expect(md).toContain("**80 % (3/5)***");
+    expect(md).toContain("**80 % (4/5)***");
     expect(md).toContain("`C*`");
   });
 
@@ -163,7 +166,7 @@ describe("the pull-request digest", () => {
   });
 
   it("carries the rate with its denominator, like every other surface", () => {
-    expect(prComment(audit([F()], decided()), { lang: "en" })).toContain("**80 % (3/5)**");
+    expect(prComment(audit([F()], decided()), { lang: "en" })).toContain("**80 % (4/5)**");
   });
 
   it("is a digest, not the job summary — ten groups at most, and it says how many it left out", () => {

@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { checkDecided, isUndecidedFile } from "../src/check.js";
 import type { AuditResult, CriterionResult } from "../src/types.js";
+import { INAPPLICABLE_STATUS } from "../src/types.js";
 
 const audit = (criteria: Pick<CriterionResult, "id" | "status">[]): AuditResult =>
   ({
@@ -109,6 +110,6 @@ describe("a not-applicable verdict is not a conformity, and is not gated like on
     const r = applyAdjudication(audit, { tool: "ultra11y", kind: "adjudication", schemaVersion: 2, standard: "wcag", auditDate: audit.date, items });
 
     expect(r.issues.join("\n")).not.toMatch(/must cite at least one/);
-    expect(r.audit.criteria.find((c) => c.id === "2.4.4")?.status).toBe("NA");
+    expect(r.audit.criteria.find((c) => c.id === "2.4.4")?.status).toBe(INAPPLICABLE_STATUS);
   });
 });

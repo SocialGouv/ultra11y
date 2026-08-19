@@ -65,7 +65,9 @@ const L = {
     cAgentTitle: "Conformes par adjudication de l'agent (jugement, non prouvé par le moteur)",
     cAgentNote:
       "Ces critères ont été tranchés par l'agent IA à partir des évidences citées, non décidés par le moteur déterministe. Ils sont gatés (chaque verdict cite une évidence résolvable) mais restent un jugement : ils ne sont pas comptés dans le taux de réussite automatique ci-dessus.",
-    naTitle: "4. Critères non applicables (NA)",
+    naTitle: "4. Critères conformes faute de sujet",
+    naNote:
+      "Rien de ce type n'existe dans le périmètre audité : aucun tableau, aucun média, aucun champ selon le critère. Ces critères sont conformes — rien ne les contredit — mais rien n'a été vérifié non plus. Chacun dit ce qui a été cherché et sur quel périmètre, pour que l'affirmation reste réfutable.",
     manualTitle: "5. Critères à adjuger (jugement / rendu) — non décidés par le moteur statique",
     manualWarn:
       "Adjugez-les avec `verify --manual` (l'agent décide depuis la source, de façon gatée) ; les critères de rendu passent par `scan`. Aucun ne doit être marqué « conforme » sans justification enregistrée et gatée.",
@@ -132,7 +134,9 @@ const L = {
     cAgentTitle: "Conforming by agent adjudication (judgement, not proven by the engine)",
     cAgentNote:
       "These criteria were ruled on by the AI agent from the evidence it cited, not decided by the deterministic engine. They are gated (every verdict cites resolvable evidence) but remain a judgement: they are not counted in the automatic pass rate above.",
-    naTitle: "4. Not-applicable criteria (NA)",
+    naTitle: "4. Conforming for want of a subject",
+    naNote:
+      "Nothing of that kind exists in the audited scope: no table, no media, no form control, depending on the criterion. These are conforming — nothing contradicts them — but nothing was verified either. Each says what was looked for and over how much, so the claim stays falsifiable.",
     manualTitle: "5. Criteria to adjudicate (judgment / rendering) — not decided by the static engine",
     manualWarn:
       "Adjudicate these with `verify --manual` (the agent decides from source, gated); rendering criteria go to `scan`. None may be marked “conforming” without a recorded, gated justification.",
@@ -234,6 +238,9 @@ export interface ReportRow {
   // conformity the engine PROVED is never presented as the same thing as one an agent
   // RULED — see the split in section 3 and the header rate.
   decidedBy?: "engine" | "agent" | "scan";
+  /** Conforming because nothing of its kind is in scope — see INAPPLICABLE_STATUS. Section 4
+   *  collects these, so section 3 stays the criteria something was actually verified about. */
+  inapplicable?: boolean;
 }
 
 export interface ReportGroup {
@@ -251,10 +258,14 @@ export interface ReportTally {
 
 /** The §1 synthesis arithmetic over one group's rows. */
 export function tallyRows(rows: ReportRow[]): ReportTally {
+  // `c` counts every conformity, including the ones reached for want of a subject; `na`
+  // reports how many of those there were. It is therefore a SUBSET of `c`, never a fourth
+  // column: c + nc + manual is the criterion count, and a reader adding all four would
+  // otherwise overshoot it. Section 4 lists exactly the criteria `na` counts.
   return {
     c: rows.filter((x) => x.status === "C").length,
     nc: rows.filter((x) => x.status === "NC").length,
-    na: rows.filter((x) => x.status === "NA").length,
+    na: rows.filter((x) => x.inapplicable).length,
     manual: rows.filter((x) => x.status === "manual").length,
   };
 }
@@ -278,7 +289,10 @@ export function reportTotals(groups: ReportGroup[]): ReportTally {
  *  run-wide rate resolves its `(decided/total)` here. */
 export function reportCoverage(groups: ReportGroup[]): { decided: number; total: number } {
   const t = reportTotals(groups);
-  return { decided: t.c + t.nc, total: t.c + t.nc + t.na + t.manual };
+  // c + nc + manual, and NOT + na: `na` counts the conformities reached for want of a subject,
+  // which are already inside `c` (see tallyRows). Adding it would put every such criterion in
+  // the denominator twice and quietly deflate every rate that reads this.
+  return { decided: t.c + t.nc, total: t.c + t.nc + t.manual };
 }
 
 // Shared renderer over normalized groups/rows — keeps the WCAG and pack reports identical
@@ -450,7 +464,7 @@ function render(
   // of conformities nobody had verified. The gate makes an agent C evidence-bound; this
   // keeps it legible as an agent's judgement all the way to the reader.
   out.push(`## ${s.cTitle}`, "");
-  const conform = rows.filter((x) => x.status === "C");
+  const conform = rows.filter((x) => x.status === "C" && !x.inapplicable);
   const byEngine = conform.filter((x) => x.decidedBy !== "agent");
   const byAgent = conform.filter((x) => x.decidedBy === "agent");
   if (!conform.length) out.push(s.nothing, "");
@@ -462,9 +476,16 @@ function render(
     }
   }
 
-  // 4. not applicable
+  // 4. conforming for want of a subject.
+  //
+  // These read `C` like any other (INAPPLICABLE_STATUS), and they are — nothing contradicts
+  // them. What separates them from section 3 is that nothing was verified either: there was
+  // no table, no media, no form control to look at. Kept in their own section, each with the
+  // justification naming what was looked for and how much was read, because that is the one
+  // thing that makes the claim falsifiable rather than merely asserted.
   out.push(`## ${s.naTitle}`, "");
-  const na = rows.filter((x) => x.status === "NA");
+  const na = rows.filter((x) => x.inapplicable);
+  out.push(na.length ? `> ${s.naNote}\n` : "");
   out.push(na.length ? na.map((x) => `- ${x.label}${x.justification ? ` — _${x.justification}_` : ""}`).join("\n") : s.nothing, "");
 
   // 5. manual worklist. Under a country standard this is where nearly the whole audit lives
@@ -502,6 +523,7 @@ export function reportGroups(r: AuditResult, lang: Lang = "en"): ReportGroup[] {
       findings: c.findings,
       justification: c.justification,
       decidedBy: c.decidedBy,
+      ...(c.inapplicable ? { inapplicable: true } : {}),
     };
     (byGuideline.get(c.guideline) ?? byGuideline.set(c.guideline, []).get(c.guideline)!).push(row);
   }
@@ -532,15 +554,16 @@ export function packReportGroups(r: AuditResult, pack: StandardPack, lang: Lang 
       status: pr.status,
       findings: pr.findings,
       ...(pr.decidedBy ? { decidedBy: pr.decidedBy } : {}),
-      // outOfScope / scopedOut criteria are "manual" (not NA) with their own dedicated
-      // justification — never mixed with the ordinary NA reason (see the manual section above).
+      ...(pr.inapplicable ? { inapplicable: true } : {}),
+      // outOfScope / scopedOut criteria are "manual" with their own dedicated justification —
+      // never mixed with the "nothing of that kind here" reason (see the manual section above).
       ...(pr.outOfScope
         ? { justification: s.outOfScope }
         : pr.scopedOut
           ? { justification: s.scopedOut }
           : pr.judgment
             ? { justification: s.judgment }
-            : pr.status === "NA"
+            : pr.inapplicable
               ? { justification: naReason }
               : {}),
     };
