@@ -879,6 +879,18 @@ export function applyAdjudication(
     } else if (v === "NC") {
       if (!it.findings || it.findings.length === 0) blame(it.criteriaId, `criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding`);
       for (const f of it.findings ?? []) {
+        // AN NC NOBODY CAN OPEN IS NOT A FINDING. Checked before the normativeRef, because a
+        // finding with no file cannot be grounded at all — there is nothing to go and read.
+        // Measured once: a model returned an NC with no `file`, the fold minted it anyway, and
+        // it reached `repoRelative`, which crashed on `undefined.split` and took SARIF, the
+        // annotations, the comment, the report, the HTML and the artifact upload with it.
+        if (typeof f.file !== "string" || !f.file.trim()) {
+          blame(
+            it.criteriaId,
+            `criterion ${it.criteriaId}: an NC finding must name the file it was observed in — nobody can act on a non-conformity with no location`,
+          );
+          continue;
+        }
         // FAIL-CLOSED: every NC finding must cite a precise, resolvable test of the active
         // standard. A good practice with no normative test is a recommendation, not an NC.
         if (!f.normativeRef || !f.normativeRef.trim()) {
@@ -905,7 +917,15 @@ export function applyAdjudication(
     // Recommendations are independent of the verdict (a C criterion may still carry a good
     // practice) and are grounded exactly like an NC finding — no normativeRef required, as
     // a recommendation has no normative test by definition.
-    for (const rec of it.recommendations ?? []) toGround(it.criteriaId, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
+    for (const rec of it.recommendations ?? []) {
+      // Same contract, same reason: a recommendation is rendered through the very surfaces an
+      // NC is, so one with no location breaks them just as thoroughly.
+      if (typeof rec.file !== "string" || !rec.file.trim()) {
+        blame(it.criteriaId, `criterion ${it.criteriaId}: a recommendation must name the file it was observed in`);
+        continue;
+      }
+      toGround(it.criteriaId, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
+    }
   }
 
   // Content-level grounding of every agent NC finding, every C/NA citation, and every

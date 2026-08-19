@@ -19918,6 +19918,7 @@ function isUrlPath(file) {
   return /^https?:\/\//i.test(file);
 }
 function repoRelative(file, baseDir) {
+  if (typeof file !== "string" || !file) return "";
   const posix3 = file.split("\\").join("/").replace(/^\.\//, "");
   const base = baseDir.split("\\").join("/").replace(/\/+$/, "");
   if (base && posix3.startsWith(`${base}/`)) return posix3.slice(base.length + 1);
@@ -58072,6 +58073,13 @@ function applyAdjudication(audit2, adj, opts = {}) {
     } else if (v === "NC") {
       if (!it.findings || it.findings.length === 0) blame(it.criteriaId, `criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding`);
       for (const f of it.findings ?? []) {
+        if (typeof f.file !== "string" || !f.file.trim()) {
+          blame(
+            it.criteriaId,
+            `criterion ${it.criteriaId}: an NC finding must name the file it was observed in \u2014 nobody can act on a non-conformity with no location`
+          );
+          continue;
+        }
         if (!f.normativeRef || !f.normativeRef.trim()) {
           blame(it.criteriaId, `criterion ${it.criteriaId}: an NC finding requires a normativeRef citing the failed test of the active standard`);
         } else if (!normativeRefResolves(f.normativeRef, adj.standard, isCore(adj.standard) ? void 0 : it.criteriaId)) {
@@ -58088,7 +58096,13 @@ function applyAdjudication(audit2, adj, opts = {}) {
     } else {
       blame(it.criteriaId, `criterion ${it.criteriaId}: unknown verdict "${String(v)}" \u2014 expected one of ${VERDICTS.join(" | ")}`);
     }
-    for (const rec of it.recommendations ?? []) toGround(it.criteriaId, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
+    for (const rec of it.recommendations ?? []) {
+      if (typeof rec.file !== "string" || !rec.file.trim()) {
+        blame(it.criteriaId, `criterion ${it.criteriaId}: a recommendation must name the file it was observed in`);
+        continue;
+      }
+      toGround(it.criteriaId, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
+    }
   }
   const grounding = { grounded: 0, moved: 0, failed: 0, issues: [] };
   for (const [criteriaId, inputs] of groundInputs) {

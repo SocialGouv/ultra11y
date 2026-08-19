@@ -36,6 +36,13 @@ export function isUrlPath(file: string): boolean {
  *  under `baseDir`; leave it as-is when it does not, rather than inventing a path that
  *  resolves nowhere. */
 export function repoRelative(file: string, baseDir: string): string {
+  // A finding with no file at all. It should never reach here — the adjudication fold refuses
+  // an NC that names none — but an AuditResult can also be hand-written or produced by an
+  // external tool's adapter, and neither goes through that gate. Measured once: one such
+  // finding threw here and took SARIF, the annotations, the pull-request comment, the report,
+  // the HTML and the artifact upload with it, because every one of those steps runs after.
+  // A rendering surface that explodes on bad input tells its reader nothing at all.
+  if (typeof file !== "string" || !file) return "";
   const posix = file.split("\\").join("/").replace(/^\.\//, "");
   const base = baseDir.split("\\").join("/").replace(/\/+$/, "");
   if (base && posix.startsWith(`${base}/`)) return posix.slice(base.length + 1);
