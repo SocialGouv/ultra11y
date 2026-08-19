@@ -366,6 +366,44 @@ jobs:
             console.log("pages:", p.map(x => x.id + " " + x.conformancePct + "%").join(", "));
           '
 
+      # …and through the ACTION's own input, which is the surface a consumer actually wires.
+      # The CLI checks below prove the logic; this proves the WIRING — input to step to Gate.
+      # They are different failures, and the second one is invisible: an input that never
+      # reaches its step leaves a job green forever, which is how a gate gets trusted for
+      # months while doing nothing.
+      - name: Declare a page this run never captured
+        run: |
+          cat > .ultra11yrc.json <<'RC'
+          { "standard": "rgaa", "sample": { "pages": [
+            { "id": "accueil", "name": "Accueil", "url": "http://127.0.0.1:8931/" },
+            { "id": "jamais-balayee", "name": "Jamais balayée", "url": "http://127.0.0.1:8931/nope.html" }
+          ] } }
+          RC
+
+      - name: The action's require-sample input fails the job on it
+        id: coverage-gate
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/conforming
+          standard: rgaa
+          since: ""
+          fail-on: ""
+          sarif: "false"
+          comment: "false"
+          report: "false"
+          html: "false"
+          require-sample: "true"
+          artifact-name: action-e2e-coverage
+
+      - name: …and it is the gate that failed, not a crash
+        run: |
+          set -euo pipefail
+          rm -f .ultra11yrc.json
+          [ "${{ steps.coverage-gate.outcome }}" = "failure" ] || {
+            echo "::error::require-sample left the job green on a sample declaring an uncaptured page"; exit 1; }
+          echo "the action's coverage gate engaged and failed the job, as it must"
+
       # THE COVERAGE GATE, both ways. A gate is only worth having if it can also FAIL, and a
       # green-but-inactive one is the exact failure it exists to prevent — the run it was built
       # for shipped 20 of 35 declared pages, green, naming none of the missing fifteen.
