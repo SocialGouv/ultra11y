@@ -59185,10 +59185,23 @@ var PROBE_FIELDS = [
   { key: "inputOverflowSpacing", engine: "input-overflow-spacing" },
   { key: "liveRegion", engine: "live-region" }
 ];
+function loopbackToHostGateway(target) {
+  const m = /^http:\/\/(localhost|127(?:\.\d{1,3}){3})(:\d+)?(\/.*)?$/i.exec(target);
+  if (!m) return { url: target, addHost: false };
+  return { url: `http://host.docker.internal${m[2] ?? ""}${m[3] ?? ""}`, addHost: true };
+}
 function runRunner(target, isFile, tag, snapshot = true) {
+  const hostTarget = target;
   const args2 = ["run", "--rm"];
   if (!snapshot) args2.push("-e", "ULTRA11Y_SNAPSHOT=0");
   if (isFile) args2.push("-v", `${resolve11(target)}:${MOUNT}:ro`);
+  else {
+    const gw = loopbackToHostGateway(target);
+    if (gw.addHost && process.platform === "linux") {
+      args2.push("--add-host", "host.docker.internal:host-gateway");
+    }
+    target = gw.url;
+  }
   args2.push(tag, isFile ? MOUNT : target);
   let stdout;
   try {
@@ -59199,7 +59212,12 @@ function runRunner(target, isFile, tag, snapshot = true) {
     throw new Error(`docker run failed \u2014 ${detail}`);
   }
   const line = stdout.trim().split("\n").filter(Boolean).pop() ?? "{}";
-  return JSON.parse(line);
+  const out2 = JSON.parse(line);
+  if (loopbackToHostGateway(hostTarget).addHost && out2.url) {
+    const hostSchemeName = hostTarget.match(/^http:\/\/[^:/]+/)?.[0] ?? hostTarget;
+    out2.url = out2.url.replace(/^http:\/\/host\.docker\.internal(?=:\d+|\/|$)/i, hostSchemeName);
+  }
+  return out2;
 }
 function hostPageOf(url, target) {
   if (!url) return target;

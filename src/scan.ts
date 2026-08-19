@@ -251,10 +251,34 @@ const PROBE_FIELDS: { key: keyof RunnerOutput; engine: Exclude<DynamicEngine, "a
   { key: "liveRegion", engine: "live-region" },
 ];
 
+/** Rewrite a HOST loopback URL into one a container can reach. `docker run` gets no
+ *  `--network host`, so the container's 127.0.0.1 is its own — a scan of
+ *  `http://localhost:3000` (the action's `start:` + `urls:` shape) died on
+ *  ERR_CONNECTION_REFUSED while the app ran the whole time, which is how this
+ *  repository's CI stayed red for a day. `host.docker.internal` is natively resolved by
+ *  Docker Desktop (macOS/Windows); on Linux the caller adds
+ *  `--add-host host.docker.internal:host-gateway`. https:// loopback is deliberately NOT
+ *  rewritten: the container would fail the self-signed certificate anyway. */
+export function loopbackToHostGateway(target: string): { url: string; addHost: boolean } {
+  const m = /^http:\/\/(localhost|127(?:\.\d{1,3}){3})(:\d+)?(\/.*)?$/i.exec(target);
+  if (!m) return { url: target, addHost: false };
+  return { url: `http://host.docker.internal${m[2] ?? ""}${m[3] ?? ""}`, addHost: true };
+}
+
 function runRunner(target: string, isFile: boolean, tag: string, snapshot = true): RunnerOutput {
+  const hostTarget = target;
   const args = ["run", "--rm"];
   if (!snapshot) args.push("-e", "ULTRA11Y_SNAPSHOT=0");
   if (isFile) args.push("-v", `${resolve(target)}:${MOUNT}:ro`);
+  else {
+    // The container must reach the HOST's loopback through host.docker.internal; on
+    // Linux that name needs the host-gateway mapping Docker Desktop provides natively.
+    const gw = loopbackToHostGateway(target);
+    if (gw.addHost && process.platform === "linux") {
+      args.push("--add-host", "host.docker.internal:host-gateway");
+    }
+    target = gw.url;
+  }
   args.push(tag, isFile ? MOUNT : target);
   let stdout: string;
   try {
@@ -272,7 +296,17 @@ function runRunner(target: string, isFile: boolean, tag: string, snapshot = true
     throw new Error(`docker run failed — ${detail}`);
   }
   const line = stdout.trim().split("\n").filter(Boolean).pop() ?? "{}";
-  return JSON.parse(line) as RunnerOutput;
+  const out = JSON.parse(line) as RunnerOutput;
+  // Report what a HOST reader can open: the runner finished on host.docker.internal, and
+  // every downstream citation (hostPageOf, snapshot identity) derives from out.url. Only
+  // the HOSTNAME is restored — the port stays from the container URL, which was copied
+  // from the target, so pasting a full origin would double it
+  // (`http://127.0.0.1:8931:8931/…`).
+  if (loopbackToHostGateway(hostTarget).addHost && out.url) {
+    const hostSchemeName = hostTarget.match(/^http:\/\/[^:/]+/)?.[0] ?? hostTarget;
+    out.url = out.url.replace(/^http:\/\/host\.docker\.internal(?=:\d+|\/|$)/i, hostSchemeName);
+  }
+  return out;
 }
 
 /** Map the runner's reported page back to a HOST-meaningful citation: the container mount
