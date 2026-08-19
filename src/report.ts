@@ -14,6 +14,7 @@ import { resolveMessage } from "./messages.js";
 import { attributePages, basisLabel, derivePages, formatRate, pagesOf, renderPageGrid, renderRedirected } from "./pages.js";
 import { PAGES_DIR } from "./snapshot.js";
 import { pageCoverage, pageCriterionRows, pageRatePct } from "./pages-report.js";
+import { mdText } from "./md.js";
 import {
   type StandardId,
   CORE,
@@ -542,7 +543,7 @@ function render(
       for (const f of nc.slice(0, PER_PAGE_MAX)) {
         const crits = pack ? packCriteriaForFinding(pack, f) : [];
         const label = crits.length ? crits.join(", ") : f.criteriaId; // graceful fallback to the WCAG SC
-        out.push(`  - [${label}] \`${f.selectorHint}\` — ${resolveMessage(f, lang)}`);
+        out.push(`  - [${label}] \`${f.selectorHint}\` — ${mdText(resolveMessage(f, lang))}`);
       }
       // A cap that says nothing reads as a complete list. Say what was left out, in the same
       // house style as the other scope caveats above — the count is right there in the heading,

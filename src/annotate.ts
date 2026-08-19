@@ -38,6 +38,7 @@ import {
   unattributedFindings,
 } from "./pages.js";
 import { pageCriterionRows, pageTally, pageTallyNote } from "./pages-report.js";
+import { mdText } from "./md.js";
 
 export interface AnnotateOptions {
   standard?: StandardId;
@@ -294,7 +295,7 @@ function groupTableHead(s: (typeof S)[Lang]): string[] {
 function groupRow(g: FindingGroup): string {
   // Pipes inside a cell would break the table.
   const cell = (v: string): string => v.replace(/\|/g, "\\|");
-  return `| ${ICON[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(g.message)} | ${g.occurrences} | ${g.pages || "—"} |`;
+  return `| ${ICON[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} | ${g.pages || "—"} |`;
 }
 
 function groupTable(rows: FindingGroup[], s: (typeof S)[Lang]): string[] {
@@ -598,7 +599,7 @@ function pageBlock(result: AuditResult, page: PageResult, standard: StandardId, 
   if (defects.length) {
     out.push("", `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} |`, "| --- | --- | --- | ---: |");
     for (const g of defects.slice(0, PAGE_DEFECTS_SHOWN)) {
-      out.push(`| ${ICON[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(g.message)} | ${g.occurrences} |`);
+      out.push(`| ${ICON[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`);
     }
     if (defects.length > PAGE_DEFECTS_SHOWN) out.push("", s.pageMoreDefects(defects.length - PAGE_DEFECTS_SHOWN));
   }

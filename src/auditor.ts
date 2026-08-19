@@ -12,6 +12,7 @@ import { prdUnits, partitionUnits, effortOf, guidanceFor, guidanceExampleBlock, 
 import { getSC, guidelineTitle, principleTitle, techniques as scTechniques } from "./wcag.js";
 import { resolveMessage, resolveRemediation, resolveNote } from "./messages.js";
 import { type StandardId, isCore, loadPack, packTestIds, standardLabel, themeName, vocabularyFor } from "./standards/index.js";
+import { mdText } from "./md.js";
 
 const SEV_ORDER: Severity[] = ["bloquant", "majeur", "mineur"];
 const ICON: Record<Severity, string> = { bloquant: "🔴", majeur: "🟠", mineur: "🟡" };
@@ -214,7 +215,7 @@ const ADVISORY_ICON = "💡";
  *  shape is otherwise identical — only the leading marker differs. */
 export function occurrenceLine(f: Finding, lang: Lang, opts: { marker: "checkbox" | "advisory" }): string {
   const marker = opts.marker === "checkbox" ? "[ ]" : ADVISORY_ICON;
-  return `- ${marker} \`${f.file}:${f.line}\` (\`${f.selectorHint}\`) — ${resolveMessage(f, lang)}`;
+  return `- ${marker} \`${f.file}:${f.line}\` (\`${f.selectorHint}\`) — ${mdText(resolveMessage(f, lang))}`;
 }
 
 /** The `↳` related-occurrence sub-bullet, shared by auditor.ts and prd.ts. `selector: false`
@@ -245,14 +246,14 @@ export function renderAuditorUnit(unit: PrdUnit, standard: StandardId, lang: Lan
   // sub-list — so verify.ts's worklist never captures a recommendation as an NC claim. Its
   // POSITION (before any newly-introduced heading) is load-bearing for the parser.
   out.push("");
-  out.push(`**${s.finding} (${m.conformanceTerms.nonConformant})** : ${m.occurrences} ${s.occ} — ${m.messages.join(" ; ")}`);
-  if (m.fixes.length) out.push(`**${s.expected} (${m.conformanceTerms.conformant})** : ${m.fixes.join(" ; ")}`);
+  out.push(`**${s.finding} (${m.conformanceTerms.nonConformant})** : ${m.occurrences} ${s.occ} — ${m.messages.map(mdText).join(" ; ")}`);
+  if (m.fixes.length) out.push(`**${s.expected} (${m.conformanceTerms.conformant})** : ${m.fixes.map(mdText).join(" ; ")}`);
   out.push(`**${s.verification}** : ${s.verify}`, "");
   for (const group of m.groups) {
     // A GROUP HEADER, when several occurrences share a rule and a selector. It is deliberately
     // NOT checkbox-shaped: `verify` must see one item per claimed non-conformity, not one per
     // group, so the fold changes what the reader scans and never what the gate adjudicates.
-    if (group.count > 1) out.push(`- **\`${group.lead.selectorHint}\`** — ${resolveMessage(group.lead, lang)} · ×${group.count}`);
+    if (group.count > 1) out.push(`- **\`${group.lead.selectorHint}\`** — ${mdText(resolveMessage(group.lead, lang))} · ×${group.count}`);
     for (const f of group.findings) {
       // Members of a real group are indented under it; a lone occurrence stays flush, so an
       // ungrouped block is byte-identical to what it was before collapsing existed.
@@ -393,7 +394,7 @@ function renderTechnicalSection(ncView: PrdUnit, unit: PrdUnit, standard: Standa
 
   // Expected change — deduped remediation texts + the shared before/after guidance example.
   out.push(`**${s.change}**`, "");
-  for (const fx of uniq(ncView.findings.map((f) => resolveRemediation(f, lang)))) out.push(`- ${fx}`);
+  for (const fx of uniq(ncView.findings.map((f) => resolveRemediation(f, lang)))) out.push(`- ${mdText(fx)}`);
   out.push("");
   out.push(...guidanceExampleBlock(guidanceFor(unit, standard), lang));
 
@@ -453,8 +454,8 @@ function renderAdvisoryUnit(unit: PrdUnit, standard: StandardId, lang: Lang, opt
   const messages = uniq(unit.findings.map((f) => resolveMessage(f, lang)));
   const fixes = uniq(unit.findings.map((f) => resolveRemediation(f, lang)));
   out.push("");
-  out.push(`**${s.observation}** : ${unit.findings.length} ${s.occ} — ${messages.join(" ; ")}`);
-  if (fixes.length) out.push(`**${s.suggestion}** : ${fixes.join(" ; ")}`);
+  out.push(`**${s.observation}** : ${unit.findings.length} ${s.occ} — ${messages.map(mdText).join(" ; ")}`);
+  if (fixes.length) out.push(`**${s.suggestion}** : ${fixes.map(mdText).join(" ; ")}`);
   out.push("");
   for (const f of unit.findings) {
     out.push(occurrenceLine(f, lang, { marker: "checkbox" }));

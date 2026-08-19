@@ -288,7 +288,10 @@ describe("the page comment says what is actually wrong, not only which criterion
   it("says what the defect IS, in words a reviewer can act on", () => {
     const md = pagesComment(withDefects(), { lang: "fr" });
     expect(md).toContain("image sans alternative textuelle");
-    expect(md).toContain("<dd> hors de tout <dl>");
+    // …and the tags it names SURVIVE the trip. Written bare into Markdown, GitHub parses them
+    // away and the reader gets « hors de tout » with both elements deleted (src/md.ts).
+    expect(md).toContain("`<dd>` hors de tout `<dl>`");
+    expect(md.replace(/`[^`]*`/g, "")).not.toContain("<dd>");
   });
 
   it("carries the selector, so the element is identifiable in a rendered page", () => {
