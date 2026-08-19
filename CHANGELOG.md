@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.13.1](https://github.com/maxgfr/ultra11y/compare/v5.13.0...v5.13.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* **pages:** a conformity reached for want of a subject holds on every page ([b88eed5](https://github.com/maxgfr/ultra11y/commit/b88eed510a012624c74a435abd9ee74fe822f5de))
+
 # [5.13.0](https://github.com/maxgfr/ultra11y/compare/v5.12.0...v5.13.0) (2026-08-19)
 
 
