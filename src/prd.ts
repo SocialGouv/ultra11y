@@ -22,6 +22,7 @@ import {
 import { guidanceEntriesFor } from "./guidance/resolve.js";
 import type { GuidanceEntry } from "./guidance/types.js";
 import { renderAuditorBacklog, renderAuditorPerCriterion, occurrenceLine, relatedLine } from "./auditor.js";
+import { mdText } from "./md.js";
 
 const SEV_ORDER: Severity[] = ["bloquant", "majeur", "mineur"];
 const SEV_RANK: Record<Severity, number> = { bloquant: 0, majeur: 1, mineur: 2 };
@@ -216,7 +217,7 @@ function unitBlock(unit: PrdUnit, lang: Lang, heading: string, standard: Standar
   const refs = unit.refs.length ? `  ·  WCAG ${unit.refs.join(", ")}` : "";
   out.push(`${heading} ${ICON[unit.severity]} ${unit.label}${refs}`, "");
   const fixes = [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))];
-  for (const fx of fixes) out.push(`- _${s.fix} :_ ${fx}`);
+  for (const fx of fixes) out.push(`- _${s.fix} :_ ${mdText(fx)}`);
   const { bucket, points } = effortOf(unit);
   out.push(`- _${s.effort} :_ ${bucket} (${points} pts)`, "");
   out.push(...guidanceExampleBlock(guidanceFor(unit, standard), lang));

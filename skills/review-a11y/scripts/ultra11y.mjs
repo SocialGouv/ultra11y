@@ -53759,6 +53759,23 @@ function guidanceEntriesFor(standard, criterionId, wcagRefs) {
   return resolveGuidance(standard, criterionId, wcagRefs).map((r) => r.entry);
 }
 
+// src/md.ts
+var CODE_SPAN = /`[^`]*`/g;
+var TAG = /<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?\/?>/g;
+function mdText(s) {
+  let out2 = "";
+  let last = 0;
+  CODE_SPAN.lastIndex = 0;
+  for (let m = CODE_SPAN.exec(s); m; m = CODE_SPAN.exec(s)) {
+    out2 += escapeTags(s.slice(last, m.index)) + m[0];
+    last = m.index + m[0].length;
+  }
+  return out2 + escapeTags(s.slice(last));
+}
+function escapeTags(s) {
+  return s.replace(TAG, (tag) => `\`${tag}\``);
+}
+
 // src/auditor.ts
 var SEV_ORDER = ["bloquant", "majeur", "mineur"];
 var ICON = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
@@ -53879,7 +53896,7 @@ function subHeading(heading) {
 var ADVISORY_ICON = "\u{1F4A1}";
 function occurrenceLine(f, lang, opts) {
   const marker = opts.marker === "checkbox" ? "[ ]" : ADVISORY_ICON;
-  return `- ${marker} \`${f.file}:${f.line}\` (\`${f.selectorHint}\`) \u2014 ${resolveMessage(f, lang)}`;
+  return `- ${marker} \`${f.file}:${f.line}\` (\`${f.selectorHint}\`) \u2014 ${mdText(resolveMessage(f, lang))}`;
 }
 function relatedLine(related, lang, opts) {
   const sel = opts.selector ? ` (\`${related.selectorHint}\`)` : "";
@@ -53894,11 +53911,11 @@ function renderAuditorUnit(unit, standard, lang, opts = {}) {
   out2.push(`> ${m.normativeNote}`, "");
   for (const f of m.fields) out2.push(`**${f.label}** : ${f.value}`);
   out2.push("");
-  out2.push(`**${s.finding} (${m.conformanceTerms.nonConformant})** : ${m.occurrences} ${s.occ} \u2014 ${m.messages.join(" ; ")}`);
-  if (m.fixes.length) out2.push(`**${s.expected} (${m.conformanceTerms.conformant})** : ${m.fixes.join(" ; ")}`);
+  out2.push(`**${s.finding} (${m.conformanceTerms.nonConformant})** : ${m.occurrences} ${s.occ} \u2014 ${m.messages.map(mdText).join(" ; ")}`);
+  if (m.fixes.length) out2.push(`**${s.expected} (${m.conformanceTerms.conformant})** : ${m.fixes.map(mdText).join(" ; ")}`);
   out2.push(`**${s.verification}** : ${s.verify}`, "");
   for (const group of m.groups) {
-    if (group.count > 1) out2.push(`- **\`${group.lead.selectorHint}\`** \u2014 ${resolveMessage(group.lead, lang)} \xB7 \xD7${group.count}`);
+    if (group.count > 1) out2.push(`- **\`${group.lead.selectorHint}\`** \u2014 ${mdText(resolveMessage(group.lead, lang))} \xB7 \xD7${group.count}`);
     for (const f of group.findings) {
       const indent = group.count > 1 ? "  " : "";
       out2.push(indent + occurrenceLine(f, lang, { marker: "checkbox" }));
@@ -53978,7 +53995,7 @@ function renderTechnicalSection(ncView, unit, standard, lang, opts) {
   }
   if (pageLines.length) out2.push(`**${s.pages}**`, "", ...pageLines, "");
   out2.push(`**${s.change}**`, "");
-  for (const fx of uniq(ncView.findings.map((f) => resolveRemediation(f, lang)))) out2.push(`- ${fx}`);
+  for (const fx of uniq(ncView.findings.map((f) => resolveRemediation(f, lang)))) out2.push(`- ${mdText(fx)}`);
   out2.push("");
   out2.push(...guidanceExampleBlock(guidanceFor(unit, standard), lang));
   out2.push(`**${s.ac}**`, "");
@@ -54021,8 +54038,8 @@ function renderAdvisoryUnit(unit, standard, lang, opts) {
   const messages = uniq(unit.findings.map((f) => resolveMessage(f, lang)));
   const fixes = uniq(unit.findings.map((f) => resolveRemediation(f, lang)));
   out2.push("");
-  out2.push(`**${s.observation}** : ${unit.findings.length} ${s.occ} \u2014 ${messages.join(" ; ")}`);
-  if (fixes.length) out2.push(`**${s.suggestion}** : ${fixes.join(" ; ")}`);
+  out2.push(`**${s.observation}** : ${unit.findings.length} ${s.occ} \u2014 ${messages.map(mdText).join(" ; ")}`);
+  if (fixes.length) out2.push(`**${s.suggestion}** : ${fixes.map(mdText).join(" ; ")}`);
   out2.push("");
   for (const f of unit.findings) {
     out2.push(occurrenceLine(f, lang, { marker: "checkbox" }));
@@ -54223,7 +54240,7 @@ function unitBlock(unit, lang, heading, standard) {
   const refs = unit.refs.length ? `  \xB7  WCAG ${unit.refs.join(", ")}` : "";
   out2.push(`${heading} ${ICON2[unit.severity]} ${unit.label}${refs}`, "");
   const fixes = [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))];
-  for (const fx of fixes) out2.push(`- _${s.fix} :_ ${fx}`);
+  for (const fx of fixes) out2.push(`- _${s.fix} :_ ${mdText(fx)}`);
   const { bucket, points } = effortOf(unit);
   out2.push(`- _${s.effort} :_ ${bucket} (${points} pts)`, "");
   out2.push(...guidanceExampleBlock(guidanceFor(unit, standard), lang));
@@ -55205,7 +55222,7 @@ function render(r, lang, opts) {
       for (const f of nc.slice(0, PER_PAGE_MAX)) {
         const crits = pack ? packCriteriaForFinding(pack, f) : [];
         const label = crits.length ? crits.join(", ") : f.criteriaId;
-        out2.push(`  - [${label}] \`${f.selectorHint}\` \u2014 ${resolveMessage(f, lang)}`);
+        out2.push(`  - [${label}] \`${f.selectorHint}\` \u2014 ${mdText(resolveMessage(f, lang))}`);
       }
       if (nc.length > PER_PAGE_MAX) out2.push(`  - _${s.perPageMore(nc.length - PER_PAGE_MAX, nc.length)}_`);
       out2.push("");
@@ -55448,10 +55465,10 @@ function renderRemediationBody(unit, lang) {
   const t3 = L6[lang];
   const lines = [];
   if (unit.refs.length) lines.push(`**WCAG** : ${unit.refs.join(", ")}`, "");
-  for (const fx of [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))]) lines.push(`**${t3.fix}** : ${fx}`);
+  for (const fx of [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))]) lines.push(`**${t3.fix}** : ${mdText(fx)}`);
   lines.push("", `**${t3.occ} (${unit.findings.length})**`, "");
   for (const f of unit.findings) {
-    lines.push(`- [ ] \`${f.file}:${f.line}\` (\`${f.selectorHint}\`) \u2014 ${resolveMessage(f, lang)}`);
+    lines.push(`- [ ] \`${f.file}:${f.line}\` (\`${f.selectorHint}\`) \u2014 ${mdText(resolveMessage(f, lang))}`);
     if (f.related) lines.push(`  - ${t3.def} : \`${f.related.file}:${f.related.line}\` (\`${f.related.selectorHint}\`)`);
   }
   return lines.join("\n");
@@ -61903,7 +61920,7 @@ function groupTableHead(s) {
 }
 function groupRow(g) {
   const cell = (v) => v.replace(/\|/g, "\\|");
-  return `| ${ICON5[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(g.message)} | ${g.occurrences} | ${g.pages || "\u2014"} |`;
+  return `| ${ICON5[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} | ${g.pages || "\u2014"} |`;
 }
 function groupTable(rows, s) {
   return [...groupTableHead(s), ...rows.map(groupRow)];
@@ -62070,7 +62087,7 @@ function pageBlock(result, page, standard, lang, baseDir) {
   if (defects.length) {
     out2.push("", `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} |`, "| --- | --- | --- | ---: |");
     for (const g of defects.slice(0, PAGE_DEFECTS_SHOWN)) {
-      out2.push(`| ${ICON5[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(g.message)} | ${g.occurrences} |`);
+      out2.push(`| ${ICON5[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`);
     }
     if (defects.length > PAGE_DEFECTS_SHOWN) out2.push("", s.pageMoreDefects(defects.length - PAGE_DEFECTS_SHOWN));
   }
