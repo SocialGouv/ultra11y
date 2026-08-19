@@ -1115,6 +1115,27 @@ export function applyAdjudication(
   return { ok: issues.length === 0, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, grounding };
 }
 
+/** A severity the ENGINE understands, from whatever the model wrote.
+ *
+ *  `AgentFinding.severity` is typed `Severity`, and the type is a promise about our own code,
+ *  not about a JSON file a model produced — or a verdict ledger replaying one it produced
+ *  months ago. A run wrote `"moderate"`, axe's vocabulary, which a model reaches for naturally;
+ *  it travelled through every renderer keyed on the three French levels and came out as
+ *  « undefined moderate » in a pull-request comment, with no icon and no ordering. The same
+ *  value would have produced an empty SARIF level and an unsorted annotation.
+ *
+ *  axe's four levels map the way `severityFromImpact` already maps them, so a model using them
+ *  gets what it meant. Anything else falls back to the SAME default an absent severity gets —
+ *  never to `mineur`, which would silently downgrade a non-conformity because a model misspelt
+ *  a word. */
+export function agentSeverity(v: unknown, advisory: boolean): Severity {
+  if (v === "bloquant" || v === "majeur" || v === "mineur") return v;
+  if (v === "critical" || v === "serious") return "bloquant";
+  if (v === "moderate") return "majeur";
+  if (v === "minor") return "mineur";
+  return advisory ? "mineur" : NC_SEVERITY_DEFAULT;
+}
+
 function agentFinding(criteriaId: string, f: AgentFinding, advisory = false): Finding {
   return {
     ruleId: `agent:${criteriaId}`,
@@ -1123,7 +1144,7 @@ function agentFinding(criteriaId: string, f: AgentFinding, advisory = false): Fi
     line: f.line,
     col: 1,
     selectorHint: f.selector ?? "",
-    severity: f.severity ?? (advisory ? "mineur" : NC_SEVERITY_DEFAULT),
+    severity: agentSeverity(f.severity, advisory),
     message: f.message,
     remediation: getSC(criteriaId)?.understanding ? `See WCAG ${criteriaId}.` : "Address the reported non-conformity.",
     snippet: f.snippet ?? "",
