@@ -424,12 +424,38 @@ export interface RenderSignals {
 
 /** A page in scope, recorded on the AuditResult so the grid can be rebuilt from the JSON
  *  alone — no snapshots on disk, no browser. */
+/** What a run actually MEASURED on ONE page — the evidence behind a per-page verdict.
+ *
+ *  The scope-wide fold (`renderedProves`, src/audit.ts) asks "was this measured on EVERY page?"
+ *  and answers one status for the whole run. That is the right question for the run and the
+ *  wrong one for a page: a criterion whose rules all ran on THIS page and raised nothing here
+ *  is conforming HERE, whatever fired three routes away. Recording the coverage per page is
+ *  what lets a page-by-page grid be complete without asking a model to re-judge every cell.
+ *
+ *  ABSENT MEANS UNKNOWN, never "nothing was measured" — same contract as `scope.pagesAudited`.
+ *  An audit written before this field existed must conclude nothing from it, so every reader
+ *  below treats `undefined` as "keep the criterion open". */
+export interface PageCoverage {
+  /** This page's DOM was parsed and folded, so the WHOLE static rule set ran against it. */
+  dom?: boolean;
+  /** An axe pass ran here, so every `axe:*` rule ran here. */
+  axe?: boolean;
+  /** Rendered rules (src/rules/rendered.ts) whose required signals were present on this page. */
+  rules?: string[];
+  /** Success criteria a LIVE PROBE measured here (zoom, 320px reflow, text spacing, Tab,
+   *  hover). A probe that did not run measured nothing — its silence is never a verdict. */
+  scs?: string[];
+}
+
 export interface PageScope {
   id: string; // stable page id (a snapshot directory name)
   name: string;
   url: string;
   auth?: boolean;
   route?: string;
+  /** Stamped by `pagesOf()` from `scope.pageCoverage` — never persisted here, so the JSON
+   *  carries one coverage map instead of repeating it inside every page entry. */
+  coverage?: PageCoverage;
   // Source files that rendered this page. Used to attribute SOURCE findings to it.
   sources?: string[];
   notes?: string;
@@ -550,6 +576,12 @@ export interface AuditResult {
     // read 100 %. An audit written before this field existed leaves it undefined, which is read
     // as "unknown" and changes nothing — the distinction is undefined vs [], not empty vs unset.
     pagesAudited?: string[];
+    // What this run MEASURED on each page, keyed by page id — the evidence a per-page verdict
+    // stands on. Written by `finalize` from the same accounting `renderedProves` folds
+    // scope-wide, and stamped onto each `PageScope` by `pagesOf()`. A map rather than a field
+    // per page so a 37-page audit carries one object instead of repeating the rule lists.
+    // Optional/additive: absent means UNKNOWN and closes nothing (see PageCoverage).
+    pageCoverage?: Record<string, PageCoverage>;
     // Set when dynamic scan results were merged in: which needs-rendering SCs the scan's
     // engines/probes actually MEASURED (verdict coverage — independent of whether anything
     // was found). Docker runner: 320px reflow only; the local runtime adds zoom / text

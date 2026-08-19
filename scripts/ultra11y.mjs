@@ -39347,6 +39347,53 @@ function scForAxe(ruleId, tags) {
   return AXE_WCAG[ruleId] ?? scFromWcagTags(tags) ?? FALLBACK_SC;
 }
 
+// src/coverage.ts
+function renderedProvesOn(sc, cov) {
+  if (!cov) return false;
+  if (cov.scs?.includes(sc)) return true;
+  if (AXE_DECIDES[sc] && cov.axe) return true;
+  const rules = renderedRulesFor(sc);
+  if (!rules.length) return false;
+  return rules.every((ruleId) => cov.rules?.includes(ruleId) === true);
+}
+function unionCoverage(audit2) {
+  const all = Object.values(audit2.scope.pageCoverage ?? {});
+  if (!all.length) return void 0;
+  return {
+    dom: all.some((c2) => c2.dom === true),
+    axe: all.some((c2) => c2.axe === true),
+    rules: [...new Set(all.flatMap((c2) => c2.rules ?? []))].sort(),
+    scs: [...new Set(all.flatMap((c2) => c2.scs ?? []))].sort()
+  };
+}
+function intersectCoverage(audit2) {
+  const entries = Object.values(audit2.scope.pageCoverage ?? {});
+  if (!entries.length) return void 0;
+  const onEvery = (pick2) => [...new Set(entries.flatMap((c2) => pick2(c2) ?? []))].filter((id) => entries.every((c2) => (pick2(c2) ?? []).includes(id))).sort();
+  return {
+    dom: entries.every((c2) => c2.dom === true),
+    axe: entries.every((c2) => c2.axe === true),
+    rules: onEvery((c2) => c2.rules),
+    scs: onEvery((c2) => c2.scs)
+  };
+}
+function coverageFor(audit2, pageId) {
+  return pageId === void 0 ? intersectCoverage(audit2) : audit2.scope.pageCoverage?.[pageId];
+}
+function ruleRanOn(ruleId, cov, scs) {
+  if (ruleId.startsWith("axe:")) return cov.axe === true;
+  if (ruleId.startsWith("dyn-")) return scs.some((sc) => cov.scs?.includes(sc) === true);
+  if (RENDERED_SIGNAL_RULES.includes(ruleId)) return cov.rules?.includes(ruleId) === true;
+  return cov.dom === true;
+}
+function criterionMeasuredOn(ruleIds2, scs, cov, ran) {
+  if (!cov || !ran || !ruleIds2?.length) return false;
+  if (ruleIds2.some((p) => p === "*" || p.endsWith(":*") || p.endsWith("-*"))) return false;
+  const inThisRun = ruleIds2.filter((id) => ruleRanOn(id, ran, scs));
+  if (!inThisRun.length) return false;
+  return inThisRun.every((id) => ruleRanOn(id, cov, scs));
+}
+
 // src/adjudicate-subjects.ts
 var VOLATILE = [
   [/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, "<date>"],
@@ -48594,16 +48641,33 @@ function foldDoc(acc, doc, graph) {
   acc.fileCount++;
 }
 function renderedProves(sc, acc) {
-  if (acc.pageIds.size === 0) return false;
-  const probed = acc.probedScs.get(sc);
-  if (probed && probed.size === acc.pageIds.size) return true;
-  if (AXE_DECIDES[sc] && acc.axeRan.size === acc.pageIds.size) return true;
-  const rules = renderedRulesFor(sc);
-  if (!rules.length) return false;
-  return rules.every((ruleId) => {
-    const ran = acc.renderedRan.get(ruleId);
-    return ran !== void 0 && acc.pageIds.size === [...acc.pageIds].filter((p) => ran.has(p)).length;
-  });
+  return renderedProvesOn(sc, scopeCoverage(acc));
+}
+function scopeCoverage(acc) {
+  if (acc.pageIds.size === 0) return void 0;
+  const onEvery = (m) => [...m.entries()].filter(([, pages]) => pages.size === acc.pageIds.size).map(([k]) => k);
+  return {
+    dom: true,
+    axe: acc.axeRan.size === acc.pageIds.size,
+    rules: onEvery(acc.renderedRan),
+    scs: onEvery(acc.probedScs)
+  };
+}
+function pageCoverageOf(acc) {
+  const out2 = {};
+  const on = (m, page) => [...m.entries()].filter(([, pages]) => pages.has(page)).map(([k]) => k).sort();
+  for (const id of [...acc.pageIds].sort()) {
+    const rules = on(acc.renderedRan, id);
+    const scs = on(acc.probedScs, id);
+    out2[id] = {
+      // Its DOM was parsed and folded, so the whole static rule set ran against it.
+      dom: true,
+      ...acc.axeRan.has(id) ? { axe: true } : {},
+      ...rules.length ? { rules } : {},
+      ...scs.length ? { scs } : {}
+    };
+  }
+  return out2;
 }
 function partialProbeReason(sc, acc) {
   const probed = acc.probedScs.get(sc);
@@ -48785,7 +48849,10 @@ function finalize(acc, inputs, extra = {}) {
       // The pages this run genuinely read. Written UNCONDITIONALLY — `[]` is the whole point,
       // because "this audit read no page" is exactly the claim a source-only run needs to make,
       // and an omit-when-empty field would say nothing precisely then. See scope.pagesAudited.
-      pagesAudited: [...new Set(acc.captures.map((c2) => c2.provenance.page).filter((x) => !!x))].sort()
+      pagesAudited: [...new Set(acc.captures.map((c2) => c2.provenance.page).filter((x) => !!x))].sort(),
+      // What each page was MEASURED by. Omitted when no snapshot was folded, so a source-only
+      // audit is byte-for-byte unchanged — and, per PageCoverage, absence closes nothing.
+      ...acc.pageIds.size ? { pageCoverage: pageCoverageOf(acc) } : {}
     },
     guidelines,
     criteria,
@@ -53373,14 +53440,26 @@ function applySecondaryMappings(base, pc, enabled, sources, defaultLocale) {
     };
   return { ...base, findings };
 }
+function measuredRescue(r, pc, cov, ran, pageId) {
+  if (r.status !== "manual" || pc.judgment || r.outOfScope) return r;
+  if (!criterionMeasuredOn(pc.appliesTo?.ruleIds, pc.wcag, cov, ran)) return r;
+  const { scopedOut: _scopedOut, judgment: _judgment, ...rest } = r;
+  return { ...rest, status: "C", decidedBy: "scan", justification: measuredReason(pc, pageId) };
+}
+function measuredReason(pc, pageId) {
+  const rules = (pc.appliesTo?.ruleIds ?? []).join(", ");
+  return pageId === void 0 ? `Measured on every page in scope: ${rules} ran and raised nothing. Conformity here is a MEASUREMENT, not a judgement \u2014 a page any of these rules had not run on would have kept this criterion open.` : `Measured on this page: ${rules} ran against its rendered snapshot and raised nothing. Conformity here is a MEASUREMENT, not a judgement, and it is about THIS page \u2014 the criterion may be non-conforming elsewhere in scope.`;
+}
 function judgmentGuard(r, pc) {
   if (!pc.judgment || r.status !== "C") return r;
   if (r.inapplicable) return r;
   return { ...r, status: "manual", judgment: true };
 }
-function derivePackResults(audit2, packKey) {
+function derivePackResults(audit2, packKey, pageId) {
   const pack = loadPack(packKey);
   const byScId = new Map(audit2.criteria.map((c2) => [c2.id, c2]));
+  const cov = coverageFor(audit2, pageId);
+  const ran = unionCoverage(audit2);
   const myPackFindings = (audit2.packFindings ?? []).filter((f) => f.ruleId.startsWith(`pack:${packKey}:`));
   const overrides = pack.overrides;
   const seen = audit2.scope.subjectsSeen;
@@ -53438,7 +53517,8 @@ function derivePackResults(audit2, packKey) {
       };
     }
     const base = judgmentGuard(deriveBase(pc), pc);
-    return enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
+    const derived = enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
+    return measuredRescue(derived, pc, cov, ran, pageId);
   });
 }
 function findingsForStandard(audit2, standard) {
@@ -54329,7 +54409,9 @@ function pagesOf(result) {
   const ids = new Set(checked.map((p) => p.id));
   const urls = new Set(checked.map((p) => p.url));
   const extra = pageScopesFromSample(result.scope.sample).filter((p) => !ids.has(p.id) && !urls.has(p.url));
-  return [...checked, ...extra];
+  const cov = result.scope.pageCoverage;
+  const stamped = cov ? [...checked, ...extra].map((p) => cov[p.id] ? { ...p, coverage: cov[p.id] } : p) : [...checked, ...extra];
+  return stamped.map((p) => p.basis === "snapshot" ? p : p.coverage ? { ...p, coverage: void 0 } : p);
 }
 function pathMatch2(a, b) {
   const x = a.split("\\").join("/");
@@ -54370,14 +54452,25 @@ function attributePages(result, pages) {
 function unattributedFindings(result) {
   return [...result.findings, ...result.packFindings ?? []].filter((f) => !f.page);
 }
-function pageStatus(c2, pageFindings, basis) {
+function pageStatus(c2, pageFindings, basis, coverage) {
   if (pageFindings.some((f) => !f.advisory)) return "NC";
   if (c2.status === "manual") return "manual";
   if (c2.status === "NA") return "NA";
   if (c2.inapplicable) return c2.status;
   if (c2.decidedBy === "agent" || c2.decidedBy === "scan") return c2.status;
+  if (basis === "snapshot" && automatability(c2.id) === "needs-rendering" && renderedProvesOn(c2.id, coverage)) return "C";
   if (automatability(c2.id) !== "static") return "manual";
   return basis === "snapshot" ? "C" : "manual";
+}
+function measuredHereReason(sc, cov) {
+  if (cov?.scs?.includes(sc)) {
+    return `Measured in a real browser ON THIS PAGE \u2014 the probe acted on it (zoom, 320px viewport, text-spacing override, Tab, hover) and observed nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
+  }
+  if (cov?.axe) {
+    return `Measured by axe-core ON THIS PAGE \u2014 it ran in the browser against this page's DOM and reported nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
+  }
+  const rules = renderedRulesFor(sc);
+  return `Measured on this page's rendered snapshot: ${rules.join(", ")} ran against its computed styles and boxes and raised nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
 }
 function pct(criteria) {
   const c2 = criteria.filter((x) => x.status === "C").length;
@@ -54392,14 +54485,17 @@ function derivePages(result, pages) {
     const own = result.findings.filter((f) => f.page === p.id);
     const criteria = result.criteria.map((c2) => {
       const pf = own.filter((f) => f.criteriaId === c2.id);
-      const status = pageStatus(c2, pf, p.basis);
+      const status = pageStatus(c2, pf, p.basis, p.coverage);
+      const measured = status === "C" && c2.status !== "C" && c2.decidedBy === void 0;
+      const decidedBy = c2.decidedBy ?? (measured ? "scan" : void 0);
+      const justification = measured ? measuredHereReason(c2.id, p.coverage) : c2.justification;
       return {
         id: c2.id,
         guideline: c2.guideline,
         status,
         findings: pf,
-        ...c2.justification ? { justification: c2.justification } : {},
-        ...c2.decidedBy ? { decidedBy: c2.decidedBy } : {},
+        ...justification ? { justification } : {},
+        ...decidedBy ? { decidedBy } : {},
         // Carried, not recomputed: a finding on THIS page proves the subject exists after all,
         // and `pageStatus` has already turned that into an NC above.
         ...c2.inapplicable && status === c2.status ? { inapplicable: true } : {}
@@ -54493,7 +54589,7 @@ function pageGridModel(result, derived, standard, lang) {
   }
   const pack = loadPack(standard);
   const rows = pack.criteria.map((pc) => ({ id: pc.id, label: pc.id, group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim() }));
-  for (const p of derived) for (const pc of derivePackResults(pageView(result, p), standard)) put(pc.id, p.id, pc.status);
+  for (const p of derived) for (const pc of derivePackResults(pageView(result, p), standard, p.id)) put(pc.id, p.id, pc.status);
   return { rows, status };
 }
 function renderRedirected(redirected, lang = "en") {
@@ -54648,7 +54744,7 @@ function pageCriterionRows(result, page, standard, lang) {
     }));
   }
   const pack = loadPack(standard);
-  const byId2 = new Map(derivePackResults(pageView(result, page), standard).map((r) => [r.id, r]));
+  const byId2 = new Map(derivePackResults(pageView(result, page), standard, page.id).map((r) => [r.id, r]));
   return pack.criteria.map((pc) => ({
     id: pc.id,
     label: `${pc.id} \u2014 ${titlePlain(pack, pc, lang)}`,
@@ -59495,6 +59591,8 @@ function recomputeTallies2(merged) {
 function mergeSnapshotAudit(base, snap) {
   const merged = JSON.parse(JSON.stringify(base));
   merged.scope.pagesAudited = [.../* @__PURE__ */ new Set([...base.scope.pagesAudited ?? [], ...snap.scope.pagesAudited ?? []])].sort();
+  const cov = { ...base.scope.pageCoverage ?? {}, ...snap.scope.pageCoverage ?? {} };
+  if (Object.keys(cov).length) merged.scope.pageCoverage = cov;
   const byId2 = new Map(merged.criteria.map((c2) => [c2.id, c2]));
   const snapById = new Map(snap.criteria.map((c2) => [c2.id, c2]));
   for (const f of snap.findings) {
@@ -69002,7 +69100,7 @@ function diffAgainstExternal(p, result, scope, standard, lang, file) {
   const ours = /* @__PURE__ */ new Map();
   for (const page of derivePages(result, scope)) {
     const m = /* @__PURE__ */ new Map();
-    for (const c2 of derivePackResults(pageView(result, page), standard)) m.set(c2.id, c2.status);
+    for (const c2 of derivePackResults(pageView(result, page), standard, page.id)) m.set(c2.id, c2.status);
     ours.set(page.id, m);
   }
   const d = diffSides({ byPage: ours }, sideOfExternal(ext2));

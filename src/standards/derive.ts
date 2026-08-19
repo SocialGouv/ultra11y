@@ -3,7 +3,8 @@
 // the results of the WCAG SCs it maps to and fold them with the same NC-dominates rule.
 // Presentation-only: the canonical, gated verdict lives on the WCAG core.
 import { subjectsAbsent, subjectsForPackCriterion } from "../adjudicate-subjects.js";
-import type { AuditResult, CriterionResult, Status, Finding, Severity } from "../types.js";
+import { coverageFor, criterionMeasuredOn, unionCoverage } from "../coverage.js";
+import type { AuditResult, CriterionResult, PageCoverage, Status, Finding, Severity } from "../types.js";
 import { CORE_KEY, loadPack } from "./registry.js";
 import { knownScStatus } from "../wcag.js";
 import type { LocaleString, PackCriterion, PackOverride, SecondaryMapping, StandardPack } from "./types.js";
@@ -171,6 +172,56 @@ function applySecondaryMappings(
  *
  *  Only `C` is intercepted: an `NC` was evidenced by a rule that really fired on this
  *  criterion, and an `NA` means nothing in scope is concerned — both stay. */
+/** THE ONE THING A MEASUREMENT MAY DO TO A DERIVED VERDICT: rescue an UNDECIDED criterion.
+ *
+ *  `appliesTo.ruleIds` is the pack's own statement of what a criterion can be non-conformant
+ *  on. Turned around, it also says what DECIDES it: every one of those rules ran against this
+ *  page and none of them fired ⇒ the page conforms — measured, not inferred from silence.
+ *  Without it a projection can only repeat the RUN's verdict, so a criterion failing on one
+ *  route re-opens « à évaluer » on the thirty-six routes the same rules had just cleared.
+ *  Measured on a real RGAA sweep: 7 of the home page's 9 undecided criteria were exactly that.
+ *
+ *  A RESCUE AND NOT A SHORTCUT, deliberately, and applied LAST. Written as an early branch
+ *  inside `deriveBase` it also caught criteria the derivation had already settled, and turned
+ *  RGAA 4.10 — conforming for want of any audio in the whole scope — into a plain `C` that
+ *  `judgmentGuard` then reopened as « à évaluer ». A criterion that already carries a verdict
+ *  keeps it; this only ever touches `manual`.
+ *
+ *  Three refusals:
+ *   • `judgment` criteria. « All its rules were silent » does not answer a question about
+ *     PERTINENCE, which is the whole reason `judgmentGuard` exists. Read from the PACK, not
+ *     from the derived flag: that flag is only set when the guard actually intercepted a `C`.
+ *   • `outOfScope`: no core success criterion to project from at all, which no measurement fixes.
+ *   • an ADJUDICATED verdict never reaches here — the adjudication branch returns before this.
+ *     An agent that ruled « undecidable » examined the criterion and said so; a rule that
+ *     measured something narrower must not overturn it. That is what keeps RGAA 11.9 (« chaque
+ *     intitulé de bouton est-il PERTINENT ? ») open when all the engine proved is that the
+ *     buttons have names. */
+function measuredRescue(
+  r: PackCriterionResult,
+  pc: PackCriterion,
+  cov: PageCoverage | undefined,
+  ran: PageCoverage | undefined,
+  pageId: string | undefined,
+): PackCriterionResult {
+  if (r.status !== "manual" || pc.judgment || r.outOfScope) return r;
+  if (!criterionMeasuredOn(pc.appliesTo?.ruleIds, pc.wcag, cov, ran)) return r;
+  // The stale explanations go with the stale status: `scopedOut` and `judgment` say why the
+  // criterion STAYED open, and it no longer is.
+  const { scopedOut: _scopedOut, judgment: _judgment, ...rest } = r;
+  return { ...rest, status: "C" as Status, decidedBy: "scan" as const, justification: measuredReason(pc, pageId) };
+}
+
+/** Why a criterion conforms HERE when the run as a whole did not settle it: because every rule
+ *  that could fail it ran and reported nothing. Names the rules, so the claim stays falsifiable
+ *  — a reader can check that they really ran against this page's snapshot. */
+function measuredReason(pc: PackCriterion, pageId: string | undefined): string {
+  const rules = (pc.appliesTo?.ruleIds ?? []).join(", ");
+  return pageId === undefined
+    ? `Measured on every page in scope: ${rules} ran and raised nothing. Conformity here is a MEASUREMENT, not a judgement — a page any of these rules had not run on would have kept this criterion open.`
+    : `Measured on this page: ${rules} ran against its rendered snapshot and raised nothing. Conformity here is a MEASUREMENT, not a judgement, and it is about THIS page — the criterion may be non-conforming elsewhere in scope.`;
+}
+
 function judgmentGuard(r: PackCriterionResult, pc: PackCriterion): PackCriterionResult {
   if (!pc.judgment || r.status !== "C") return r;
   // …unless there is nothing of that kind in scope. The guard exists because the RGAA question
@@ -182,9 +233,15 @@ function judgmentGuard(r: PackCriterionResult, pc: PackCriterion): PackCriterion
   return { ...r, status: "manual" as Status, judgment: true };
 }
 
-export function derivePackResults(audit: AuditResult, packKey: string): PackCriterionResult[] {
+export function derivePackResults(audit: AuditResult, packKey: string, pageId?: string): PackCriterionResult[] {
   const pack = loadPack(packKey);
   const byScId = new Map(audit.criteria.map((c) => [c.id, c]));
+  // WHAT WAS MEASURED, and where. `pageId` focuses the projection on one page — the per-page
+  // grid and the per-page sheet pass it — and its absence means the whole run, where the
+  // answer is the INTERSECTION across every page ("measured everywhere, or nothing"). Both
+  // read the same fold, so a page cannot claim a conformity the run's own grid denies.
+  const cov = coverageFor(audit, pageId);
+  const ran = unionCoverage(audit);
   // Declarative pack-rule findings belonging to THIS pack (namespaced pack:<key>:). They
   // ride in the audit's dedicated `packFindings` list (never the core criteria), and are
   // routed onto a criterion here via the same appliesTo/ruleMatches machinery as engine
@@ -301,7 +358,8 @@ export function derivePackResults(audit: AuditResult, packKey: string): PackCrit
       };
     }
     const base = judgmentGuard(deriveBase(pc), pc);
-    return enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
+    const derived = enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
+    return measuredRescue(derived, pc, cov, ran, pageId);
   });
 }
 

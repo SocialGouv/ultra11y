@@ -4,7 +4,18 @@
 // judgment, surfaced as residual risks). `report` renders this; Claude completes
 // the manual criteria.
 import { createHash } from "node:crypto";
-import type { AuditResult, CriterionResult, DynamicEngine, Finding, RenderSignals, ResidualRisk, Severity, Status, GuidelineTally } from "./types.js";
+import type {
+  AuditResult,
+  CriterionResult,
+  DynamicEngine,
+  Finding,
+  PageCoverage,
+  RenderSignals,
+  ResidualRisk,
+  Severity,
+  Status,
+  GuidelineTally,
+} from "./types.js";
 import { VERSION, SCHEMA_VERSION } from "./types.js";
 import { allSC, allGuidelines } from "./wcag.js";
 import { parseSource } from "./parse/source.js";
@@ -13,6 +24,7 @@ import { attr, elementsByTag, type Doc, type CaptureProvenance } from "./parse/h
 import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir, readCaptureDir, capturesForSources } from "./capture.js";
 import { isFullDocument } from "./rules/rule.js";
 import { renderedRulesFor, renderedRulesRan, renderedTestedScs } from "./rules/rendered.js";
+import { renderedProvesOn } from "./coverage.js";
 import { AXE_DECIDES, PROBE_SEVERITY, PROBE_WCAG, isAxeAdvisory, scForAxe, severityFromImpact } from "./axe-map.js";
 import { subjectsAbsent, subjectsForSc, subjectsPresentIn } from "./adjudicate-subjects.js";
 import { runRules } from "./rules/registry.js";
@@ -579,22 +591,50 @@ interface FinalizeExtra {
  *  What it deliberately does NOT do is conclude from a rule that DECLINED. A rule that read
  *  nothing measured nothing, and `SIGNALS_REQUIRED` is what tells the two apart. */
 function renderedProves(sc: string, acc: Accum): boolean {
-  if (acc.pageIds.size === 0) return false;
-  // A LIVE PROBE is the other way a criterion gets measured, and for several it is the only
-  // way: zoom, reflow, text spacing, hover and focus visibility are properties of a page
-  // being acted on, which no digest can settle. Same rule as the snapshot tier — every page
-  // in scope, or nothing.
-  const probed = acc.probedScs.get(sc);
-  if (probed && probed.size === acc.pageIds.size) return true;
-  // AXE, on every page in scope, for the handful of criteria it is the canonical decider of
-  // (AXE_DECIDES). Same rule as the probes and the digest tier: every page, or nothing.
-  if (AXE_DECIDES[sc] && acc.axeRan.size === acc.pageIds.size) return true;
-  const rules = renderedRulesFor(sc);
-  if (!rules.length) return false;
-  return rules.every((ruleId) => {
-    const ran = acc.renderedRan.get(ruleId);
-    return ran !== undefined && acc.pageIds.size === [...acc.pageIds].filter((p) => ran.has(p)).length;
-  });
+  return renderedProvesOn(sc, scopeCoverage(acc));
+}
+
+/** The coverage the WHOLE run may conclude from: the INTERSECTION across every page in scope.
+ *
+ *  One page whose collector truncated, whose style digest failed verification or whose
+ *  stylesheet was cross-origin, and the rule drops out for the entire scope. The fold is an
+ *  AND, never an OR — which is why this is an intersection and not a union.
+ *
+ *  Undefined with no page in scope. Returning an empty record there would report `axe: true`
+ *  by the vacuous "axe ran on all zero pages", and every AXE_DECIDES criterion would come back
+ *  conforming on a source-only audit. */
+function scopeCoverage(acc: Accum): PageCoverage | undefined {
+  if (acc.pageIds.size === 0) return undefined;
+  const onEvery = <K>(m: Map<K, Set<string>>): K[] => [...m.entries()].filter(([, pages]) => pages.size === acc.pageIds.size).map(([k]) => k);
+  return {
+    dom: true,
+    axe: acc.axeRan.size === acc.pageIds.size,
+    rules: onEvery(acc.renderedRan),
+    scs: onEvery(acc.probedScs),
+  };
+}
+
+/** What each page in scope was measured by — the per-page half of `scopeCoverage`, persisted
+ *  on the audit so a grid can be rebuilt from the JSON alone, offline and with no browser. */
+function pageCoverageOf(acc: Accum): Record<string, PageCoverage> {
+  const out: Record<string, PageCoverage> = {};
+  const on = <K>(m: Map<K, Set<string>>, page: string): K[] =>
+    [...m.entries()]
+      .filter(([, pages]) => pages.has(page))
+      .map(([k]) => k)
+      .sort();
+  for (const id of [...acc.pageIds].sort()) {
+    const rules = on(acc.renderedRan, id);
+    const scs = on(acc.probedScs, id);
+    out[id] = {
+      // Its DOM was parsed and folded, so the whole static rule set ran against it.
+      dom: true,
+      ...(acc.axeRan.has(id) ? { axe: true } : {}),
+      ...(rules.length ? { rules } : {}),
+      ...(scs.length ? { scs } : {}),
+    };
+  }
+  return out;
 }
 
 /** Why a rendering criterion stayed open when a probe DID run — just not everywhere.
@@ -846,6 +886,9 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       // because "this audit read no page" is exactly the claim a source-only run needs to make,
       // and an omit-when-empty field would say nothing precisely then. See scope.pagesAudited.
       pagesAudited: [...new Set(acc.captures.map((c) => c.provenance.page).filter((x): x is string => !!x))].sort(),
+      // What each page was MEASURED by. Omitted when no snapshot was folded, so a source-only
+      // audit is byte-for-byte unchanged — and, per PageCoverage, absence closes nothing.
+      ...(acc.pageIds.size ? { pageCoverage: pageCoverageOf(acc) } : {}),
     },
     guidelines,
     criteria,

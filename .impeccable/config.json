@@ -17,6 +17,15 @@
         ],
         "createdAt": "2026-08-12T17:15:29.325Z",
         "reason": "Claude: fixture file for an a11y auditor — bare <img> with no alt is the deliberate defect the test asserts on (tests/cli.test.ts:500, pre-existing, only reindexed by this edit)"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/audit.ts"
+        ],
+        "createdAt": "2026-08-19T18:11:38.016Z",
+        "reason": "src/audit.ts is the static a11y engine, not a UI: L292 is prose in SUBJECT_NOUNS naming the elements the harvest searches for (\"<img>, <svg>, <picture>, <object>, <input type=image>\"), not markup that ships. Predates this change."
       }
     ]
   }
