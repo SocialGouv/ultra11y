@@ -1,5 +1,13 @@
 name: CI
 
+# A superseded push's run is dead weight: cancel it instead of letting two runs of the
+# same ref race for a runner and double the bill. (The Release workflow serialises on
+# its own group WITHOUT cancelling — a semantic-release killed mid-publish can leave a
+# tag with no release and an unpublished npm version.)
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
@@ -9,17 +17,18 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         # 22 is the floor (engines.node >=22.18, what @babel/parser 8 requires);
         # 24 is current. The published bundle's Node 22 floor is covered by runtime-node-floor.
         node-version: [22, 24]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
@@ -51,12 +60,13 @@ jobs:
   install-bundle:
     runs-on: ubuntu-latest
     name: install-bundle (skill installs whole, not just SKILL.md)
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -171,10 +181,11 @@ jobs:
   runtime-node-floor:
     runs-on: ubuntu-latest
     name: runtime (Node 22 floor, install-free bundle)
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -215,10 +226,12 @@ jobs:
   # no business slowing the unit suite down.
   browser-tier:
     runs-on: ubuntu-latest
+    # Generous: the browser download alone can take ~6 minutes on a slow CDN day.
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -238,7 +251,7 @@ jobs:
     # 6h); nothing here legitimately needs more than ~10 minutes.
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The browser tier is the repository's own, pinned by pnpm-lock.yaml, so the scan
       # below resolves @playwright/test + @axe-core/playwright at the SAME versions whose
@@ -248,9 +261,9 @@ jobs:
       # --omit=dev to named specs already declared there ("up to date"), so
       # `scan --runtime auto` silently degraded to Docker — whose container cannot reach
       # 127.0.0.1 on the host (ERR_CONNECTION_REFUSED), and the job went red on every push.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -539,7 +552,7 @@ jobs:
       # its root for that to be one double-click. Only a real round trip proves it.
       - name: Upload what the action produced
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: action-e2e
           path: |
@@ -547,7 +560,7 @@ jobs:
             .ultra11y/pages/
           if-no-files-found: warn
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: action-e2e
           path: ${{ runner.temp }}/dl

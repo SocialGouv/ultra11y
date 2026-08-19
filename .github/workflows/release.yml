@@ -23,6 +23,13 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
+# Serialise releases, never cancel one: the publish chain (bump commit → tag → GitHub
+# release → npm OIDC publish) is not atomic, and a semantic-release killed mid-flight
+# leaves a tag with no release or an unpublished version that the next run then has to
+# reconcile by hand. Two pushes landing close together QUEUE, they don't race.
+concurrency:
+  group: release
+
 permissions:
   contents: write # push the bump commit + tag, create the release
   issues: write
@@ -33,14 +40,14 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history + tags, required to analyze commits since last release
           persist-credentials: true # let @semantic-release/git push the bump commit
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
