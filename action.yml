@@ -188,7 +188,7 @@ inputs:
     required: false
     default: 'false'
   require-decided:
-    description: 'Fail the job while ANY criterion of the active standard is still « to assess ». Off by default. This is a different question from `fail-on`, which governs NON-CONFORMITIES: a run can find nothing wrong and still have decided almost nothing, and it reports success either way — measured on a real pull request, 94 of 106 criteria came back « à évaluer » in a green job, because an adjudication that lands nothing only warns. Turn this on once a ledger or an adjudication tier is in place, and pair it with `undecidable-file` for the criteria that genuinely cannot be decided.'
+    description: 'Fail the job while ANY criterion of the active standard is still « to assess ». `false` (default) never fails; `true` holds the RUN''s grid to it; `pages` also holds EVERY page''s own grid to it. This is a different question from `fail-on`, which governs NON-CONFORMITIES: a run can find nothing wrong and still have decided almost nothing, and it reports success either way — measured on a real pull request, 94 of 106 criteria came back « à évaluer » in a green job, because an adjudication that lands nothing only warns. `pages` is the bar a page-by-page deliverable is actually judged on, and it is strictly higher: a criterion failing on one route is settled for the RUN and may still be nobody''s verdict on the routes it never fired on — measured on the same repository, 104/106 decided for the run and 8 to 11 open on each of its 37 pages. Turn this on once a ledger or an adjudication tier is in place, and pair it with `undecidable-file` for the criteria that genuinely cannot be decided.'
     required: false
     default: 'false'
   undecidable-file:
@@ -851,13 +851,19 @@ runs:
     # with an incomplete grid is go and read which criteria are missing.
     - name: Completeness gate
       id: decided
-      if: inputs.require-decided == 'true'
+      if: inputs.require-decided == 'true' || inputs.require-decided == 'pages'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
+        # Read from the environment, never interpolated: a caller is free to wire an event
+        # payload into an input, and a quote in it would escape into this shell.
+        SCOPE: ${{ inputs.require-decided }}
       run: |
-        args=(--in audits/audit-latest.json --require-decided --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}')
+        # `pages` holds every PAGE's grid to the same bar as the run's — the bar a page-by-page
+        # deliverable is actually judged on, and strictly higher than the run's own.
+        if [ "$SCOPE" = 'pages' ]; then decided='--require-decided=pages'; else decided='--require-decided'; fi
+        args=(--in audits/audit-latest.json "$decided" --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}')
         if [ -n '${{ inputs.undecidable-file }}' ]; then args+=(--allow-undecided '${{ inputs.undecidable-file }}'); fi
         if node "$ENGINE" check "${args[@]}"; then
           echo "ok=true" >> "$GITHUB_OUTPUT"
@@ -1036,7 +1042,7 @@ runs:
 
     # The gate runs LAST, so a failing audit has already produced every surface above.
     - name: Gate
-      if: inputs.fail-on != '' || inputs.require-decided == 'true' || inputs.require-sample == 'true'
+      if: inputs.fail-on != '' || inputs.require-decided == 'true' || inputs.require-decided == 'pages' || inputs.require-sample == 'true'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1052,7 +1058,7 @@ runs:
           echo "::error::ultra11y: a page declared in .ultra11yrc.json produced no capture — the run did not look at everything it reports on. See the pages named above."
           exit 1
         fi
-        if [ '${{ inputs.require-decided }}' = 'true' ] && [ '${{ steps.decided.outputs.ok }}' != 'true' ]; then
+        if [ '${{ inputs.require-decided }}' != 'false' ] && [ '${{ inputs.require-decided }}' != '' ] && [ '${{ steps.decided.outputs.ok }}' != 'true' ]; then
           echo "::error::ultra11y: the criterion grid is incomplete — some criteria are still « to assess ». Adjudicate them, or declare them in the file named by undecidable-file, with a reason."
           exit 1
         fi

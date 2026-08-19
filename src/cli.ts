@@ -401,7 +401,12 @@ Options:
                      .ultra11y/pages/. Coverage, one level below --require-decided: a sweep that
                      loses pages produces a report that is merely SHORTER, and a shorter
                      deliverable reads exactly like a complete one.
-  --require-decided  check: fail while ANY criterion of the standard is still « to assess ».
+  --require-decided[=pages]
+                     check: fail while ANY criterion of the standard is still « to assess ».
+                     '=pages' also holds EVERY page's own grid to the same bar — a criterion
+                     failing on one route is settled for the run and may still be undecided on
+                     the routes it never fired on, which is what a per-page deliverable is
+                     judged on.
                      Needs --in. A green job does not otherwise mean the grid was filled:
                      --fail-on governs non-conformities, and an adjudication that lands
                      nothing only warns.
@@ -2491,7 +2496,18 @@ function cmdCheck(p: ParsedArgs): number {
   // --require-decided gates the AUDIT, not the report: it asks whether every criterion of the
   // active standard carries a verdict. It therefore needs --in and not --report, and stands on
   // its own — a project can demand a complete grid long before it publishes a deliverable.
-  const requireDecided = p.flags["require-decided"] === true;
+  // `--require-decided` on its own asks the RUN's grid; `--require-decided pages` also asks
+  // every page's. They are different questions: a criterion non-conforming somewhere is settled
+  // for the run and may still be nobody's verdict on the pages the failure did not fire on, so
+  // a per-page deliverable can be incomplete under a complete run grid. Measured on egapro:
+  // 104/106 for the run, 8 to 11 open on each of its 37 pages.
+  const decidedFlag = p.flags["require-decided"];
+  const requireDecided = decidedFlag === true || decidedFlag === "pages" || decidedFlag === "true";
+  const requireDecidedPages = decidedFlag === "pages";
+  if (typeof decidedFlag === "string" && decidedFlag !== "pages" && decidedFlag !== "true") {
+    console.error(`ultra11y check: --require-decided takes no value, or 'pages' — got '${decidedFlag}'.`);
+    return 2;
+  }
   // Same reasoning for coverage: whether the sweep captured every declared page is a fact
   // about the working tree, answerable long before there is a deliverable to validate.
   const requireSample = p.flags["require-sample"] === true;
@@ -2546,7 +2562,7 @@ function cmdCheck(p: ParsedArgs): number {
       return 2;
     }
   }
-  const decided = requireDecided && audit ? checkDecided(audit, standard, lang, { allow }) : null;
+  const decided = requireDecided && audit ? checkDecided(audit, standard, lang, { allow, pages: requireDecidedPages }) : null;
   // COVERAGE, one level below completeness: did the run capture every page it says it audits?
   // Needs no audit JSON — it holds the repository's declared sample against the snapshots on
   // disk, which is what a sweep either produced or did not.
