@@ -103,7 +103,12 @@ describe("the page-by-page comment", () => {
     const md = pagesComment(audit(), { standard: "rgaa", lang: "fr" });
     const scoreboard = md.slice(md.indexOf("| Page |"), md.indexOf("<details>") >>> 0 || md.length);
     expect(scoreboard).not.toMatch(/\d+\s?%/);
-    expect(md).toContain("À évaluer");
+    // Two columns, C and NC — and NO third one for what nobody ruled on. A number in a column
+    // is something a reader learns to skip; the undecided criteria are NAMED instead, in a
+    // block that disappears entirely once the grid is complete.
+    expect(scoreboard).toContain("| C | NC |");
+    expect(scoreboard).not.toContain("À évaluer");
+    expect(md).toContain("Critères non tranchés");
     // And the legend says what the columns are, so the counts are not left to inference.
     expect(md).toMatch(/Pas de pourcentage ici/);
   });
@@ -133,10 +138,12 @@ describe("the page-by-page comment", () => {
     const one = { scope: { inputs: [], files: 1, pages: only } } as Partial<AuditResult>;
     const rgaa = pagesComment(audit(one), { standard: "rgaa", lang: "fr" });
     const core = pagesComment(audit(one), { lang: "fr" });
-    const toAssess = (md: string): number => Number(/\| instantané \| (\d+) \| (\d+) \| (\d+) \|/.exec(md)?.[3]);
-    // RGAA has 106 criteria to the core's 55, so the "to assess" column must differ — the same
-    // number under both standards is the bug.
-    expect(toAssess(rgaa)).toBeGreaterThan(toAssess(core));
+    // RGAA has 106 criteria to the core's 55, so the projection must count against the pack's
+    // own set. The scoreboard no longer carries a "to assess" column, so the discriminator is
+    // the block that NAMES what is open: more criteria under RGAA than under the core. The
+    // same number under both standards is the bug this pins.
+    const openCount = (md: string): number => (md.match(/^- \*\*.+\*\* : `|^- .*critère\(s\)\./gm) ?? []).length + (md.match(/`\d+(?:\.\d+)+`/g) ?? []).length;
+    expect(openCount(rgaa)).toBeGreaterThan(openCount(core));
   });
 
   it("agrees with its own detail block on what the page's standing is", () => {
@@ -144,13 +151,12 @@ describe("the page-by-page comment", () => {
     // the scoreboard is in scope order while the blocks are sorted worst-first.
     const only: PageScope[] = [{ id: "contact", name: "Contact", url: "https://x/contact", sources: ["app/contact/page.tsx"], basis: "snapshot" }];
     const md = pagesComment(audit({ scope: { inputs: [], files: 1, pages: only } } as Partial<AuditResult>), { standard: "rgaa", lang: "fr" });
-    const row = /\| instantané \| (\d+) \| (\d+) \| (\d+) \|/.exec(md);
+    const row = /\| instantané \| (\d+) \| (\d+) \|/.exec(md);
     const tally = /(\d+) conforme\(s\) · (\d+) non conforme\(s\) · (\d+) non applicable\(s\) · (\d+) à évaluer/.exec(md);
     expect(row).not.toBeNull();
     expect(tally).not.toBeNull();
     expect(row?.[1]).toBe(tally?.[1]); // C
     expect(row?.[2]).toBe(tally?.[2]); // NC
-    expect(row?.[3]).toBe(tally?.[4]); // to assess
   });
 
   it("explains a count the criteria cannot account for, instead of an empty block", () => {
@@ -322,5 +328,74 @@ describe("the page comment says what is actually wrong, not only which criterion
     expect(md.length).toBeLessThan(65_536);
     // …and it says what it did not print, rather than trailing off.
     expect(md).toMatch(/autre|more/i);
+  });
+});
+
+// THE COMMENT IS NOW THE ONLY ONE POSTED, so everything a reviewer needs has to be in it.
+//
+// egapro ran two stickies — a code digest and this grid — and two full report artifacts, and a
+// reader who wanted « the accessibility report of this run » had to guess which. Collapsing to
+// one producer is only safe if this document stops relying on the other one existing: the
+// defects no page could claim were named ONLY in the digest, and the undecided criteria were a
+// number in a column nobody acted on.
+describe("the single deliverable", () => {
+  it("names the criteria nobody ruled on, instead of counting them in a column", () => {
+    const md = pagesComment(audit(), { standard: "rgaa", lang: "fr" });
+    expect(md).toContain("Critères non tranchés");
+    // Stated ONCE when it is the same everywhere — thirty-seven identical rows is a wall.
+    expect(md).toMatch(/Sur \*\*toutes\*\* les pages : \d+ critère\(s\)\./);
+  });
+
+  it("says nothing at all when the grid is complete", () => {
+    // The block must DISAPPEAR on a full grid: a section that is always there, even empty,
+    // teaches the reader to scroll past it — which is exactly what happened to the column it
+    // replaces. Every criterion decided here, so there is nothing to name.
+    // STATIC criteria, deliberately: they are the ones a snapshot page can earn by silence
+    // (src/pages.ts honesty rule 3), which is what "complete" looks like without a model.
+    const nc = F({ page: "contact", criteriaId: "2.4.2", ruleId: "title-missing-empty" });
+    const complete = audit({ criteria: [C("2.4.2", "NC", [nc]), C("3.1.1", "C")], findings: [nc] } as Partial<AuditResult>);
+    expect(pagesComment(complete, { lang: "fr" })).not.toContain("Critères non tranchés");
+    // …and the same document DOES name them the moment one criterion is left open.
+    const withOpen = audit({ criteria: [C("2.4.2", "NC", [nc]), C("3.1.1", "manual")], findings: [nc] } as Partial<AuditResult>);
+    expect(pagesComment(withOpen, { lang: "fr" })).toContain("Critères non tranchés");
+  });
+
+  it("shows the defects no page could claim, rather than only counting them", () => {
+    const orphan = F({ file: "src/shared/Header.tsx", selectorHint: "img.logo", message: "logo sans alternative" });
+    const md = pagesComment(audit({ criteria: [C("1.1.1", "NC", [orphan])], findings: [orphan] } as Partial<AuditResult>), { lang: "fr" });
+    expect(md).toContain("Constats rattachés à aucune page");
+    expect(md).toContain("src/shared/Header.tsx");
+    expect(md).toContain("logo sans alternative");
+  });
+
+  it("separates blocking from non-blocking, and serves blocking first", () => {
+    const blocking = F({ page: "contact", file: "src/b.html", selectorHint: "img.b", message: "défaut bloquant" });
+    const minor = F({ page: "contact", file: "src/c.html", selectorHint: "a.c", severity: "mineur", message: "défaut mineur" });
+    const md = pagesComment(audit({ criteria: [C("1.1.1", "NC", [blocking, minor])], findings: [blocking, minor] } as Partial<AuditResult>), { lang: "fr" });
+    expect(md).toContain("🔴 Non-conformités bloquantes");
+    expect(md).toContain("🟠🟡 Non-conformités non bloquantes");
+    expect(md.indexOf("🔴 Non-conformités bloquantes")).toBeLessThan(md.indexOf("🟠🟡 Non-conformités non bloquantes"));
+    expect(md.indexOf("défaut bloquant")).toBeLessThan(md.indexOf("défaut mineur"));
+  });
+
+  it("gives blocking defects the budget before the non-blocking ones", () => {
+    // Eight distinct blocking defects and one minor: the blocking half fills the budget, and
+    // what it held back is stated. The minor one may be crowded out — that is the point.
+    const many = Array.from({ length: 8 }, (_, i) => F({ page: "contact", file: `src/b${i}.html`, selectorHint: `img.b${i}`, message: `bloquant ${i}` }));
+    const minor = F({ page: "contact", file: "src/z.html", selectorHint: "a.z", severity: "mineur", message: "mineur unique" });
+    const all = [...many, minor];
+    const md = pagesComment(audit({ criteria: [C("1.1.1", "NC", all)], findings: all } as Partial<AuditResult>), { lang: "fr" });
+    expect(md).toContain("bloquant 0");
+    expect(md).toMatch(/autre\(s\) défaut\(s\) distinct\(s\)/);
+  });
+
+  it("clamps on the bytes GitHub actually receives, not on UTF-16 units", () => {
+    // A French RGAA comment is ~4 % larger in UTF-8 — every « é », every em dash, every
+    // severity emoji. A document that fits `.length` can still be 66 KB on the wire.
+    const wide = Array.from({ length: 60 }, (_, i) =>
+      F({ page: "contact", file: `src/é${i}.html`, line: i + 1, selectorHint: `img.é${i}`, message: `défaut « ${i} » — non conforme 🔴`.repeat(30) }),
+    );
+    const md = pagesComment(audit({ criteria: [C("1.1.1", "NC", wide)], findings: wide } as Partial<AuditResult>), { lang: "fr" });
+    expect(new TextEncoder().encode(md).length).toBeLessThanOrEqual(65_536);
   });
 });
