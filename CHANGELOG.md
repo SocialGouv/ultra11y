@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.14.4](https://github.com/maxgfr/ultra11y/compare/v5.14.3...v5.14.4) (2026-08-19)
+
+
+### Bug Fixes
+
+* **scan:** say why the local tier was refused before degrading to Docker ([07c8478](https://github.com/maxgfr/ultra11y/commit/07c84785e82b4d1ffcb30becf0bbe892c94660eb))
+* **scan:** the docker tier can reach host loopback URLs via host-gateway ([1d405f1](https://github.com/maxgfr/ultra11y/commit/1d405f1ed683ca127548592f85c17fea2485224d))
+
 ## [5.14.3](https://github.com/maxgfr/ultra11y/compare/v5.14.2...v5.14.3) (2026-08-19)
 
 
