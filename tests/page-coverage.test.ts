@@ -111,6 +111,25 @@ describe("present coverage", () => {
     expect(pages.map((p) => `${p.id}:${p.criteria[0]?.status}`)).toEqual(["accueil:C", "aide:manual"]);
   });
 
+  it("closes a criterion the RUN could not settle either, on the page that measured it", () => {
+    // The scope-wide fold is « measured on EVERY page, or nothing », so a probe that skipped
+    // one route leaves the criterion « to assess » for the whole run. That verdict says nothing
+    // about the routes that WERE measured, and the branch has to sit above the run-wide
+    // `manual` short-circuit — whose premise ("the engine cannot decide it anywhere") is
+    // precisely what a page-level measurement refutes.
+    const partial = { accueil: FULL.accueil!, aide: { dom: true } };
+    const a = audit([{ id: "1.4.3", guideline: "1.4", status: "manual", findings: [] }], partial);
+    const pages = derivePages(a, pagesOf(a));
+    expect(pages.map((p) => `${p.id}:${p.criteria[0]?.status}`)).toEqual(["accueil:C", "aide:manual"]);
+  });
+
+  it("defers to a recorded verdict, even one that says « undecidable »", () => {
+    // An agent that ruled the criterion open examined it and said so; a rule measuring
+    // something narrower must not overturn that.
+    const a = audit([{ id: "1.4.3", guideline: "1.4", status: "manual", decidedBy: "agent", findings: [] }], FULL);
+    expect(derivePages(a, pagesOf(a))[0]?.criteria[0]?.status).toBe("manual");
+  });
+
   it("never concludes for a page whose DOM this audit did not read", () => {
     // `pagesOf` downgrades a page this audit never read to "not-audited" AND strips its
     // coverage, so a stale record cannot re-publish the verdicts of a sweep that did not run.
