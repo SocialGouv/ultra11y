@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 // Ownership marker: `ultra11y install --opencode` refuses to overwrite a plugin file that
 // does not carry it, so a user's own ultra11y.js is never clobbered.
 const ULTRA11Y_OPENCODE_PLUGIN = "ULTRA11Y_OPENCODE_PLUGIN";
-const ULTRA11Y_PLUGIN_VERSION = "5.14.2";
+const ULTRA11Y_PLUGIN_VERSION = "5.14.3";
 
 const here = dirname(fileURLToPath(import.meta.url));
 

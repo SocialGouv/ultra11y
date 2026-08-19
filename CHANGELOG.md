@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.14.3](https://github.com/maxgfr/ultra11y/compare/v5.14.2...v5.14.3) (2026-08-19)
+
+
+### Bug Fixes
+
+* **check,action:** stop the coverage gate disarming itself, and stop discarding what an adjudication cost ([8716f5e](https://github.com/maxgfr/ultra11y/commit/8716f5e0b696451ffb8699baf34b536e1851b1a6))
+
 ## [5.14.2](https://github.com/maxgfr/ultra11y/compare/v5.14.1...v5.14.2) (2026-08-19)
 
 
