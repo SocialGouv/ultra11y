@@ -1000,6 +1000,30 @@ runs:
     #
     # The condition covers BOTH producers: rendering a front door and then not uploading it
     # would be the one failure mode worse than not rendering it at all.
+    # THE LEDGER TRAVELS WITH THE REPORT.
+    #
+    # An adjudication pass costs real money and its whole output is the verdict ledger — which
+    # is written to `.ultra11y/verdicts/`, a directory this action does not upload. So a
+    # consumer who turned adjudication on, paid for it, and did not happen to add an upload step
+    # of their own got the verdicts computed and then discarded at job end, every run, with
+    # nothing saying so. Copied beside the report so the artifact carries what the run decided,
+    # ready to be read and committed.
+    - name: Carry the verdict ledger into the artifact
+      if: (inputs.report == 'true' || inputs.html == 'true') && inputs.ledger != '' && inputs.ledger != 'false'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        LEDGER: ${{ inputs.ledger }}
+        STANDARD: ${{ inputs.standard }}
+      run: |
+        path="$LEDGER"
+        if [ "$path" = 'true' ]; then path=".ultra11y/verdicts/${STANDARD}.json"; fi
+        if [ -f "$path" ]; then
+          mkdir -p audits
+          cp "$path" "audits/verdicts-${STANDARD}.json"
+          echo "ultra11y: the verdict ledger travels in the artifact as verdicts-${STANDARD}.json."
+        fi
+
     - name: Upload the report
       id: upload
       if: inputs.report == 'true' || inputs.html == 'true'

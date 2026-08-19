@@ -362,13 +362,35 @@ export interface SampleCoverage {
 export function checkSampleCaptured(root = ".", lang: Lang = "en"): SampleCoverage {
   const fr = lang === "fr";
   let declared: { id: string; name?: string; url?: string }[] = [];
+  const rc = join(root, ".ultra11yrc.json");
+  let raw: string;
   try {
-    const cfg = JSON.parse(readFileSync(join(root, ".ultra11yrc.json"), "utf8")) as {
-      sample?: { pages?: { id: string; name?: string; url?: string }[] };
-    };
-    declared = cfg.sample?.pages ?? [];
+    raw = readFileSync(rc, "utf8");
   } catch {
+    // NO CONFIG AT ALL — nothing is declared, so there is nothing to answer for. This is the
+    // one silence that may pass: a gate that fails on its own absence is a gate that gets
+    // turned off.
     return { ok: true, issues: [], missing: [], declared: 0, captured: 0 };
+  }
+  try {
+    const cfg = JSON.parse(raw) as { sample?: { pages?: { id: string; name?: string; url?: string }[] } };
+    declared = cfg.sample?.pages ?? [];
+  } catch (e) {
+    // A CONFIG THAT EXISTS AND CANNOT BE READ is the opposite case, and it must not pass. The
+    // file is where the sample is declared, so an unparseable one means this gate does not know
+    // what the run was supposed to cover — and answering "covered" to that is how a gate
+    // disarms itself at exactly the moment something is wrong.
+    return {
+      ok: false,
+      issues: [
+        fr
+          ? `.ultra11yrc.json est présent mais illisible (${e instanceof Error ? e.message : String(e)}) — impossible de savoir quelles pages ce run devait couvrir. La porte de couverture ne peut pas répondre, et ne répondra donc pas « couvert ».`
+          : `.ultra11yrc.json is present but unreadable (${e instanceof Error ? e.message : String(e)}) — there is no way to know which pages this run was meant to cover. The coverage gate cannot answer, so it does not answer "covered".`,
+      ],
+      missing: [],
+      declared: 0,
+      captured: 0,
+    };
   }
   if (!declared.length) return { ok: true, issues: [], missing: [], declared: 0, captured: 0 };
 

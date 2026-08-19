@@ -56864,11 +56864,26 @@ function sectionBody(md, n) {
 function checkSampleCaptured(root = ".", lang = "en") {
   const fr = lang === "fr";
   let declared = [];
+  const rc = join34(root, ".ultra11yrc.json");
+  let raw;
   try {
-    const cfg = JSON.parse(readFileSync18(join34(root, ".ultra11yrc.json"), "utf8"));
-    declared = cfg.sample?.pages ?? [];
+    raw = readFileSync18(rc, "utf8");
   } catch {
     return { ok: true, issues: [], missing: [], declared: 0, captured: 0 };
+  }
+  try {
+    const cfg = JSON.parse(raw);
+    declared = cfg.sample?.pages ?? [];
+  } catch (e) {
+    return {
+      ok: false,
+      issues: [
+        fr ? `.ultra11yrc.json est pr\xE9sent mais illisible (${e instanceof Error ? e.message : String(e)}) \u2014 impossible de savoir quelles pages ce run devait couvrir. La porte de couverture ne peut pas r\xE9pondre, et ne r\xE9pondra donc pas \xAB couvert \xBB.` : `.ultra11yrc.json is present but unreadable (${e instanceof Error ? e.message : String(e)}) \u2014 there is no way to know which pages this run was meant to cover. The coverage gate cannot answer, so it does not answer "covered".`
+      ],
+      missing: [],
+      declared: 0,
+      captured: 0
+    };
   }
   if (!declared.length) return { ok: true, issues: [], missing: [], declared: 0, captured: 0 };
   let captured = /* @__PURE__ */ new Set();

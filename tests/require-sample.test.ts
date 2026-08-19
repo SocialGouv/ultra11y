@@ -84,3 +84,22 @@ describe("checkSampleCaptured", () => {
     expect(r.ok).toBe(true);
   });
 });
+
+describe("the gate does not disarm itself", () => {
+  it("refuses to answer when the config exists but cannot be parsed", () => {
+    // The green-but-inactive family, in the gate built to catch it. An absent config means
+    // nothing is declared and there is nothing to answer for; a config that is THERE and
+    // unreadable means the gate does not know what the run was supposed to cover — and
+    // answering "covered" to that is a gate disarming itself exactly when something is wrong.
+    const root = mkdtempSync(join(tmpdir(), "u11y-cover-bad-"));
+    writeFileSync(join(root, ".ultra11yrc.json"), "{ this is not json");
+    const r = checkSampleCaptured(root, "fr");
+    expect(r.ok).toBe(false);
+    expect(r.issues.join(" ")).toMatch(/illisible/i);
+  });
+
+  it("still passes when there is no config at all", () => {
+    const root = mkdtempSync(join(tmpdir(), "u11y-cover-none2-"));
+    expect(checkSampleCaptured(root, "fr").ok).toBe(true);
+  });
+});
