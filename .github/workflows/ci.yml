@@ -201,6 +201,37 @@ jobs:
   # its shape; nothing ever ran it. A composite action is bash — arrays, `set -e`, conditionals
   # and heredoc-free quoting — and none of that is provable by reading the YAML. This job is to
   # the Action what `install-bundle` is to the skills: use the real thing, end to end.
+  # THE BROWSER TIER, DRIVEN FOR REAL.
+  #
+  # Everything else here tests `checkA11y`, `sweepSample` and the live probes against a FAKE
+  # page — an object with the right method names that resolves instantly and refuses nothing.
+  # Both defects that reached a real repository walked straight through three thousand such
+  # tests: `probeHover` called `page.hover()` with no timeout (Playwright's default is «wait
+  # forever», so a trigger that never became actionable hung the caller's suite until ITS
+  # timeout killed it — twenty of thirty-five pages lost, green), and axe was never run by this
+  # tier at all, which no fake page can reveal.
+  #
+  # Its own job: it is the only one here that needs a browser binary, and a 150 MB download has
+  # no business slowing the unit suite down.
+  browser-tier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      # ULTRA11Y_REQUIRE_BROWSER turns a silent skip into a failure. The tests skip by design
+      # where no browser is installed; here one is installed on purpose, so a skip would make
+      # the whole file decoration — the exact «green but inactive» failure this tier catches.
+      - name: checkA11y, the probes and axe against real Chromium
+        env:
+          ULTRA11Y_REQUIRE_BROWSER: "1"
+        run: pnpm run test:browser
+
   action:
     runs-on: ubuntu-latest
     steps:

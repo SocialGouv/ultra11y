@@ -595,14 +595,20 @@ async function runAxe(page, mode) {
   if (mode === false) return void 0;
   const demanded = mode === true;
   let AxeBuilder;
-  try {
-    const req = createRequire2(join(process.cwd(), "package.json"));
-    const mod = req("@axe-core/playwright");
-    AxeBuilder = mod.default ?? mod;
-  } catch (e) {
+  let lastError;
+  for (const from of [join(process.cwd(), "package.json"), import.meta.url]) {
+    try {
+      const mod = createRequire2(from)("@axe-core/playwright");
+      AxeBuilder = mod.default ?? mod;
+      break;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  if (!AxeBuilder) {
     if (demanded) {
       console.warn(
-        `ultra11y: axe was requested but @axe-core/playwright could not be resolved from ${process.cwd()} \u2014 ${e instanceof Error ? e.message : String(e)}. Install it, or set \`axe: false\`. The criteria axe decides stay to assess.`
+        `ultra11y: axe was requested but @axe-core/playwright could not be resolved from ${process.cwd()} nor from this package \u2014 ${lastError instanceof Error ? lastError.message : String(lastError)}. Install it, or set \`axe: false\`. The criteria axe decides stay to assess.`
       );
     }
     return void 0;

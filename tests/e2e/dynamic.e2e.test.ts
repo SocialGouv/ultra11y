@@ -82,8 +82,12 @@ describe("e2e: dynamic-tier delta — scan --merge upgrades the residual criteri
 // Needs a real browser (layout: scrollWidth/clientWidth) → runs ONLY where a local
 // Playwright + Chromium resolve from the repo. Skipped (not failed) otherwise: the
 // synthetic-RunnerOutput fold logic is proven browser-free in tests/scan.test.ts.
+// The shape `scan --json` actually emits is a DynamicFinding: it carries `engine` (the probe or
+// `axe`) and never `ruleId` — the `dyn-*` rule ids only appear once the result is MERGED into an
+// audit. These assertions were written against the merged shape and, until this repository had a
+// local Playwright runtime, never ran to say so.
 interface DynFinding {
-  ruleId: string;
+  engine?: string;
   criteriaId: string;
   severity: string;
   message: string;
@@ -95,10 +99,10 @@ const runLocal = hasLocalPlaywright(REPO_ROOT);
 
 describe("e2e: stateful scan — a FILLED input inside a table cell clips at 320px/200%/text-spacing", () => {
   it.skipIf(!runLocal)("flags the clipping input (input-overflow → 1.4.10/1.4.4/1.4.12, with the table-cell note)", () => {
-    const r = runCli(["scan", FIX.inputInCellClip, "--runtime", "local", "--cwd", REPO_ROOT, "--json"]);
+    const r = runCli(["scan", FIX.inputInCellClip, "--runtime", "local", "--cwd", REPO_ROOT, "--json"], { cwd: mkTmp() });
     expect(r.code).toBe(0);
     const dyn = JSON.parse(r.stdout) as DynResult;
-    const overflow = dyn.findings.filter((f) => f.ruleId.startsWith("dyn-input-overflow"));
+    const overflow = dyn.findings.filter((f) => (f.engine ?? "").startsWith("input-overflow"));
     expect(overflow.length).toBeGreaterThan(0);
     // maps onto the reflow / zoom / spacing SCs
     const scs = new Set(overflow.map((f) => f.criteriaId));
@@ -108,17 +112,17 @@ describe("e2e: stateful scan — a FILLED input inside a table cell clips at 320
   });
 
   it.skipIf(!runLocal)("the clean counterpart (growing field) fires NO input-overflow finding", () => {
-    const r = runCli(["scan", FIX.inputInCellClean, "--runtime", "local", "--cwd", REPO_ROOT, "--json"]);
+    const r = runCli(["scan", FIX.inputInCellClean, "--runtime", "local", "--cwd", REPO_ROOT, "--json"], { cwd: mkTmp() });
     expect(r.code).toBe(0);
     const dyn = JSON.parse(r.stdout) as DynResult;
-    expect(dyn.findings.some((f) => f.ruleId.startsWith("dyn-input-overflow"))).toBe(false);
+    expect(dyn.findings.some((f) => (f.engine ?? "").startsWith("input-overflow"))).toBe(false);
   });
 
   it.skipIf(!runLocal)("--no-interact turns the stateful probes off (no input-overflow, no live-region)", () => {
-    const r = runCli(["scan", FIX.inputInCellClip, "--runtime", "local", "--cwd", REPO_ROOT, "--no-interact", "--json"]);
+    const r = runCli(["scan", FIX.inputInCellClip, "--runtime", "local", "--cwd", REPO_ROOT, "--no-interact", "--json"], { cwd: mkTmp() });
     expect(r.code).toBe(0);
     const dyn = JSON.parse(r.stdout) as DynResult;
-    expect(dyn.findings.some((f) => f.ruleId.startsWith("dyn-input-overflow"))).toBe(false);
-    expect(dyn.findings.some((f) => f.ruleId === "dyn-live-region")).toBe(false);
+    expect(dyn.findings.some((f) => (f.engine ?? "").startsWith("input-overflow"))).toBe(false);
+    expect(dyn.findings.some((f) => f.engine === "live-region")).toBe(false);
   });
 });

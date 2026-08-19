@@ -90,15 +90,27 @@ async function runAxe(page: PlaywrightPage, mode: boolean | "auto" | undefined):
   const demanded = mode === true;
   // biome-ignore lint/suspicious/noExplicitAny: the builder's shape is axe's, which is not a dependency here
   let AxeBuilder: any;
-  try {
-    const req = createRequire(join(process.cwd(), "package.json"));
-    const mod = req("@axe-core/playwright");
-    AxeBuilder = mod.default ?? mod;
-  } catch (e) {
+  // PROJECT FIRST, then relative to this module — the same order the Playwright fixture above
+  // and `scan --runtime local` use, and for the same reason: module-relative alone works for an
+  // ordinary `node_modules/ultra11y` install but yields nothing whenever the package is linked,
+  // pnpm-hoisted elsewhere, or in a monorepo. Anchoring on the cwd ALONE is just as wrong in the
+  // other direction — a suite that changes directory to write its snapshot then resolves nothing
+  // at all, and the pass evaporates silently because the default is `auto`.
+  let lastError: unknown;
+  for (const from of [join(process.cwd(), "package.json"), import.meta.url]) {
+    try {
+      const mod = createRequire(from)("@axe-core/playwright");
+      AxeBuilder = mod.default ?? mod;
+      break;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  if (!AxeBuilder) {
     if (demanded) {
       console.warn(
-        `ultra11y: axe was requested but @axe-core/playwright could not be resolved from ${process.cwd()} — ${
-          e instanceof Error ? e.message : String(e)
+        `ultra11y: axe was requested but @axe-core/playwright could not be resolved from ${process.cwd()} nor from this package — ${
+          lastError instanceof Error ? lastError.message : String(lastError)
         }. Install it, or set \`axe: false\`. The criteria axe decides stay to assess.`,
       );
     }

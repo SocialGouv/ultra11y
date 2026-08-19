@@ -48,6 +48,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:perf": "vitest run --config vitest.perf.config.ts",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
     "bench": "node scripts/bench.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome ci .",
@@ -81,7 +82,9 @@
     "htmlparser2": "^12.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@biomejs/biome": "^2.5.1",
+    "@playwright/test": "^1.62.1",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",
