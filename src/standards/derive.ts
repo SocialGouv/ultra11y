@@ -172,6 +172,17 @@ function applySecondaryMappings(
  *
  *  Only `C` is intercepted: an `NC` was evidenced by a rule that really fired on this
  *  criterion, and an `NA` means nothing in scope is concerned — both stay. */
+function judgmentGuard(r: PackCriterionResult, pc: PackCriterion): PackCriterionResult {
+  if (!pc.judgment || r.status !== "C") return r;
+  // …unless there is nothing of that kind in scope. The guard exists because the RGAA question
+  // is usually BROADER than the success criteria it maps onto, so inheriting their `C` would
+  // answer a narrower question than the one asked. A broader question still needs a subject:
+  // with no table on the site, "is every complex table's summary relevant?" has nothing to bite
+  // on, and reopening it prints a row of work that does not exist.
+  if (r.inapplicable) return r;
+  return { ...r, status: "manual" as Status, judgment: true };
+}
+
 /** THE ONE THING A MEASUREMENT MAY DO TO A DERIVED VERDICT: rescue an UNDECIDED criterion.
  *
  *  `appliesTo.ruleIds` is the pack's own statement of what a criterion can be non-conformant
@@ -220,17 +231,6 @@ function measuredReason(pc: PackCriterion, pageId: string | undefined): string {
   return pageId === undefined
     ? `Measured on every page in scope: ${rules} ran and raised nothing. Conformity here is a MEASUREMENT, not a judgement — a page any of these rules had not run on would have kept this criterion open.`
     : `Measured on this page: ${rules} ran against its rendered snapshot and raised nothing. Conformity here is a MEASUREMENT, not a judgement, and it is about THIS page — the criterion may be non-conforming elsewhere in scope.`;
-}
-
-function judgmentGuard(r: PackCriterionResult, pc: PackCriterion): PackCriterionResult {
-  if (!pc.judgment || r.status !== "C") return r;
-  // …unless there is nothing of that kind in scope. The guard exists because the RGAA question
-  // is usually BROADER than the success criteria it maps onto, so inheriting their `C` would
-  // answer a narrower question than the one asked. A broader question still needs a subject:
-  // with no table on the site, "is every complex table's summary relevant?" has nothing to bite
-  // on, and reopening it prints a row of work that does not exist.
-  if (r.inapplicable) return r;
-  return { ...r, status: "manual" as Status, judgment: true };
 }
 
 export function derivePackResults(audit: AuditResult, packKey: string, pageId?: string): PackCriterionResult[] {

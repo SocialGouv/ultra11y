@@ -53440,6 +53440,11 @@ function applySecondaryMappings(base, pc, enabled, sources, defaultLocale) {
     };
   return { ...base, findings };
 }
+function judgmentGuard(r, pc) {
+  if (!pc.judgment || r.status !== "C") return r;
+  if (r.inapplicable) return r;
+  return { ...r, status: "manual", judgment: true };
+}
 function measuredRescue(r, pc, cov, ran, pageId) {
   if (r.status !== "manual" || pc.judgment || r.outOfScope) return r;
   if (!criterionMeasuredOn(pc.appliesTo?.ruleIds, pc.wcag, cov, ran)) return r;
@@ -53449,11 +53454,6 @@ function measuredRescue(r, pc, cov, ran, pageId) {
 function measuredReason(pc, pageId) {
   const rules = (pc.appliesTo?.ruleIds ?? []).join(", ");
   return pageId === void 0 ? `Measured on every page in scope: ${rules} ran and raised nothing. Conformity here is a MEASUREMENT, not a judgement \u2014 a page any of these rules had not run on would have kept this criterion open.` : `Measured on this page: ${rules} ran against its rendered snapshot and raised nothing. Conformity here is a MEASUREMENT, not a judgement, and it is about THIS page \u2014 the criterion may be non-conforming elsewhere in scope.`;
-}
-function judgmentGuard(r, pc) {
-  if (!pc.judgment || r.status !== "C") return r;
-  if (r.inapplicable) return r;
-  return { ...r, status: "manual", judgment: true };
 }
 function derivePackResults(audit2, packKey, pageId) {
   const pack = loadPack(packKey);
