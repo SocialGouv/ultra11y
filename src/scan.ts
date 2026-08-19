@@ -715,6 +715,13 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
   // audited pages to "not-audited" — the inverse of the guard, and a false statement in the
   // opposite direction. Union, so neither half can erase the other's.
   merged.scope.pagesAudited = [...new Set([...(base.scope.pagesAudited ?? []), ...(snap.scope.pagesAudited ?? [])])].sort();
+  // …and for the same reason, the COVERAGE the snapshot run recorded. It is the only half that
+  // has any: the base read source files, so it measured no page. Dropping it here would leave
+  // every rendering criterion « to assess » on pages this run had just probed — the evidence
+  // would exist and the projection would have no way to reach it. The snapshot run wins per
+  // page (it is the one that measured), and a page only the base knew of keeps its record.
+  const cov = { ...(base.scope.pageCoverage ?? {}), ...(snap.scope.pageCoverage ?? {}) };
+  if (Object.keys(cov).length) merged.scope.pageCoverage = cov;
   const byId = new Map(merged.criteria.map((c) => [c.id, c]));
   const snapById = new Map(snap.criteria.map((c) => [c.id, c]));
 

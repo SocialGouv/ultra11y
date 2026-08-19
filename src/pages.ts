@@ -23,7 +23,9 @@
 //      scored 100% on "does each image have a relevant alternative?". See `pageStatus`.
 import { snapshotPageId } from "./snapshot.js";
 import { CORE, type StandardId, derivePackResults, isCore, loadPack, themeName } from "./standards/index.js";
-import type { AuditResult, CriterionResult, Finding, Lang, PageResult, PageScope, Status, ScanRedirect } from "./types.js";
+import type { AuditResult, CriterionResult, Finding, Lang, PageCoverage, PageResult, PageScope, Status, ScanRedirect } from "./types.js";
+import { renderedProvesOn } from "./coverage.js";
+import { renderedRulesFor } from "./rules/rendered.js";
 import { isUrlPath } from "./util.js";
 import { automatability, compareSC, scTitle } from "./wcag.js";
 
@@ -79,7 +81,18 @@ export function pagesOf(result: AuditResult): PageScope[] {
   const ids = new Set(checked.map((p) => p.id));
   const urls = new Set(checked.map((p) => p.url));
   const extra = pageScopesFromSample(result.scope.sample).filter((p) => !ids.has(p.id) && !urls.has(p.url));
-  return [...checked, ...extra];
+  // WHAT EACH PAGE WAS MEASURED BY, stamped here and nowhere else. The coverage is persisted as
+  // one map on the scope (so the JSON does not repeat a rule list per page) and every consumer
+  // reads it through the page it belongs to — the same single funnel that already downgrades a
+  // basis nothing backs. A page with no record keeps `coverage` undefined, which concludes
+  // nothing (see PageCoverage).
+  const cov = result.scope.pageCoverage;
+  const stamped = cov ? [...checked, ...extra].map((p) => (cov[p.id] ? { ...p, coverage: cov[p.id] } : p)) : [...checked, ...extra];
+  // A page this audit did not read has no measurement to its name, whatever a stale coverage
+  // map says: the basis guard above and this one answer the same question and must not
+  // disagree — otherwise a source-only re-run would re-publish the verdicts of a sweep it
+  // never performed.
+  return stamped.map((p) => (p.basis === "snapshot" ? p : p.coverage ? { ...p, coverage: undefined } : p));
 }
 
 /** Capture provenance is repo-relative ("app/page.tsx"); a finding's file may be cwd-relative
@@ -161,7 +174,7 @@ export function unattributedFindings(result: AuditResult): Finding[] {
 
 /** The status a criterion holds ON one page. See the two honesty rules at the top, and the
  *  third one enforced here. */
-function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScope["basis"]): Status {
+function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScope["basis"], coverage?: PageCoverage): Status {
   // A non-normative recommendation can never flip a criterion to NC — same rule as core.
   if (pageFindings.some((f) => !f.advisory)) return "NC";
   if (c.status === "manual") return "manual"; // the engine cannot decide it anywhere
@@ -192,6 +205,21 @@ function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScop
   // labelled as a scope-wide decision where it is rendered.
   if (c.decidedBy === "agent" || c.decidedBy === "scan") return c.status;
 
+  // A MEASUREMENT ON THIS PAGE IS NOT SILENCE EITHER — and this is the branch that makes a
+  // complete page grid reachable at all.
+  //
+  // The scope-wide verdict is an AND over every page ("measured everywhere, or nothing", see
+  // renderedProves): one contrast failure on one route and the criterion is NC for the whole
+  // run. Projected back onto a page where that failure did not fire, rule 3 below then read the
+  // absence as silence and returned « to assess » — on a page the probes had actually zoomed,
+  // reflowed, tabbed through and measured. Measured on egapro: 12 criteria NC run-wide, and 7
+  // of them re-opened « à évaluer » on the home page, which is 7 of its 9 undecided cells.
+  //
+  // So: if the rendered tier measured THIS criterion on THIS page and raised nothing here, the
+  // page conforms on it. That is the same claim `finalize` makes scope-wide, with the same
+  // fold, restricted to one page — never a conclusion drawn from a rule that did not run.
+  if (basis === "snapshot" && automatability(c.id) === "needs-rendering" && renderedProvesOn(c.id, coverage)) return "C";
+
   // 3. SILENCE ONLY DECIDES WHAT THE ENGINE CAN DECIDE.
   //
   // A scope-wide `NC` on a JUDGMENT criterion does not mean the engine can rule on it — it
@@ -209,6 +237,20 @@ function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScop
   // Decidable, and clean on this page — but only a snapshot proves the rules actually ran
   // against THIS page's DOM.
   return basis === "snapshot" ? "C" : "manual";
+}
+
+/** Why THIS page conforms on a criterion the run as a whole did not settle: because the
+ *  rendered tier measured it here. Names the instrument, so the claim stays falsifiable —
+ *  a reader can go and check that the probe or the rule really ran on this snapshot. */
+function measuredHereReason(sc: string, cov: PageCoverage | undefined): string {
+  if (cov?.scs?.includes(sc)) {
+    return `Measured in a real browser ON THIS PAGE — the probe acted on it (zoom, 320px viewport, text-spacing override, Tab, hover) and observed nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
+  }
+  if (cov?.axe) {
+    return `Measured by axe-core ON THIS PAGE — it ran in the browser against this page's DOM and reported nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
+  }
+  const rules = renderedRulesFor(sc);
+  return `Measured on this page's rendered snapshot: ${rules.join(", ")} ran against its computed styles and boxes and raised nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
 }
 
 /** Pass rate over the criteria this page actually decided — same C ÷ (C + NC) basis as core.
@@ -234,14 +276,22 @@ export function derivePages(result: AuditResult, pages: PageScope[]): PageResult
     const own = result.findings.filter((f) => f.page === p.id);
     const criteria: CriterionResult[] = result.criteria.map((c) => {
       const pf = own.filter((f) => f.criteriaId === c.id);
-      const status = pageStatus(c, pf, p.basis);
+      const status = pageStatus(c, pf, p.basis, p.coverage);
+      // A `C` this page earned from its OWN measurement, on a criterion the run as a whole did
+      // not settle, is a scan verdict and must say so — `decidedBy` is what tells a reader (and
+      // `derivePackResults`) that a status was measured rather than inferred from silence. Its
+      // justification is re-derived too: the scope-wide one says why the criterion stayed OPEN
+      // ("probed on 19 of the 20 pages"), which is the opposite of what happened here.
+      const measured = status === "C" && c.status !== "C" && c.decidedBy === undefined;
+      const decidedBy = c.decidedBy ?? (measured ? "scan" : undefined);
+      const justification = measured ? measuredHereReason(c.id, p.coverage) : c.justification;
       return {
         id: c.id,
         guideline: c.guideline,
         status,
         findings: pf,
-        ...(c.justification ? { justification: c.justification } : {}),
-        ...(c.decidedBy ? { decidedBy: c.decidedBy } : {}),
+        ...(justification ? { justification } : {}),
+        ...(decidedBy ? { decidedBy } : {}),
         // Carried, not recomputed: a finding on THIS page proves the subject exists after all,
         // and `pageStatus` has already turned that into an NC above.
         ...(c.inapplicable && status === c.status ? { inapplicable: true } : {}),
@@ -400,7 +450,7 @@ export function pageGridModel(result: AuditResult, derived: PageResult[], standa
 
   const pack = loadPack(standard);
   const rows = pack.criteria.map((pc) => ({ id: pc.id, label: pc.id, group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim() }));
-  for (const p of derived) for (const pc of derivePackResults(pageView(result, p), standard)) put(pc.id, p.id, pc.status);
+  for (const p of derived) for (const pc of derivePackResults(pageView(result, p), standard, p.id)) put(pc.id, p.id, pc.status);
   return { rows, status };
 }
 

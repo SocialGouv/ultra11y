@@ -201,7 +201,7 @@ export function pageCriterionRows(result: AuditResult, page: PageResult, standar
       }));
   }
   const pack = loadPack(standard);
-  const byId = new Map(derivePackResults(pageView(result, page), standard).map((r) => [r.id, r]));
+  const byId = new Map(derivePackResults(pageView(result, page), standard, page.id).map((r) => [r.id, r]));
   return pack.criteria.map((pc) => ({
     id: pc.id,
     label: `${pc.id} — ${titlePlain(pack, pc, lang)}`,

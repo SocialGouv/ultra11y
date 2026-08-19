@@ -3701,7 +3701,7 @@ function diffAgainstExternal(p: ParsedArgs, result: AuditResult, scope: PageScop
   const ours = new Map<string, Map<string, Status>>();
   for (const page of derivePages(result, scope)) {
     const m = new Map<string, Status>();
-    for (const c of derivePackResults(pageView(result, page), standard)) m.set(c.id, c.status);
+    for (const c of derivePackResults(pageView(result, page), standard, page.id)) m.set(c.id, c.status);
     ours.set(page.id, m);
   }
 
