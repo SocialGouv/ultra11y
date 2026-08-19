@@ -59,6 +59,37 @@ interface LocalDeps {
 const PW_SPEC = "@playwright/test";
 const AXE_SPEC = "@axe-core/playwright";
 
+/** Why the LOCAL tier is (un)usable from `cwd` — the one line a reader of a
+ *  `runtime: auto` log gets before the Docker fallback takes over. A silent degrade is
+ *  indistinguishable from a working fallback, so the reason must NAME what to install. */
+export type LocalTierStatus = { ok: true } | { ok: false; reason: string };
+
+/** The same probe as `localAvailable`, keeping the reason instead of collapsing it to a
+ *  boolean. Drives the `runtime: auto` decision AND the message printed when it degrades
+ *  to Docker. */
+export function localTierStatus(cwd: string): LocalTierStatus {
+  const req = createRequire(resolve(cwd, "package.json"));
+  for (const spec of [PW_SPEC, AXE_SPEC]) {
+    try {
+      req.resolve(spec);
+    } catch {
+      return { ok: false, reason: `${spec} does not resolve from ${cwd}` };
+    }
+  }
+  try {
+    const pw = req(PW_SPEC) as { chromium?: { executablePath?: () => string } };
+    const bin = pw.chromium?.executablePath?.();
+    // No path at all ⇒ a Playwright that cannot tell us; treat as available and let the
+    // launch report its own failure, rather than refusing a tier that might work.
+    if (typeof bin === "string" && bin.length > 0 && !existsSync(bin)) {
+      return { ok: false, reason: `no browser binary at ${bin} — run \`npx playwright install chromium\`` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: `${PW_SPEC} failed to load: ${(e as Error).message.split("\n")[0]}` };
+  }
+}
+
 /** Is the LOCAL tier actually usable from `cwd`? Drives `runtime: auto`.
  *
  *  Both packages must resolve — and the browser BINARY must be on disk. The second half is not
@@ -73,18 +104,7 @@ const AXE_SPEC = "@axe-core/playwright";
  *  browser, and failed rather than degrading. `executablePath()` is a pure path computation, so
  *  this stays cheap: no launch, no download, one `stat`. */
 export function localAvailable(cwd: string): boolean {
-  try {
-    const req = createRequire(resolve(cwd, "package.json"));
-    req.resolve(PW_SPEC);
-    req.resolve(AXE_SPEC);
-    const pw = req(PW_SPEC) as { chromium?: { executablePath?: () => string } };
-    const bin = pw.chromium?.executablePath?.();
-    // No path at all ⇒ a Playwright that cannot tell us; treat as available and let the launch
-    // report its own failure, rather than refusing a tier that might work.
-    return typeof bin !== "string" || bin.length === 0 ? true : existsSync(bin);
-  } catch {
-    return false;
-  }
+  return localTierStatus(cwd).ok;
 }
 
 /** Load Playwright `chromium` + the `AxeBuilder` class from the target project. */

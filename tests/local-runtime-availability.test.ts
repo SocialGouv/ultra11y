@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { localAvailable } from "../src/scan-local.js";
+import { localAvailable, localTierStatus } from "../src/scan-local.js";
 
 /** A project that RESOLVES both packages, whose Playwright reports a browser path that may or
  *  may not exist. Written as real modules so `createRequire` resolves them for real. */
@@ -50,5 +50,31 @@ describe("localAvailable", () => {
     const bare = mkdtempSync(join(tmpdir(), "u11y-local-bare-"));
     writeFileSync(join(bare, "package.json"), JSON.stringify({ name: "p", version: "1.0.0" }));
     expect(localAvailable(bare)).toBe(false);
+  });
+});
+
+describe("localTierStatus", () => {
+  // `runtime: auto` degrades to Docker when the local tier is refused, and a silent
+  // degrade is indistinguishable from a working fallback — the CI stayed red for a day
+  // on exactly that. The status must therefore NAME what is missing, so the one log line
+  // a reader gets answers "what do I install" without re-deriving the probe.
+  it("names the package that failed to resolve", () => {
+    const root = mkdtempSync(join(tmpdir(), "u11y-status-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "p", version: "1.0.0" }));
+    const s = localTierStatus(root);
+    expect(s.ok).toBe(false);
+    if (!s.ok) expect(s.reason).toContain("@playwright/test");
+  });
+
+  it("names the missing browser binary when the packages resolve", () => {
+    const s = localTierStatus(project(false));
+    expect(s.ok).toBe(false);
+    if (!s.ok) expect(s.reason).toMatch(/playwright install|browser/i);
+  });
+
+  it("is ok exactly where localAvailable is true, and consistent on both halves", () => {
+    expect(localTierStatus(project(true)).ok).toBe(true);
+    expect(localTierStatus(project(true)).ok).toBe(localAvailable(project(true)));
+    expect(localTierStatus(project(false)).ok).toBe(localAvailable(project(false)));
   });
 });

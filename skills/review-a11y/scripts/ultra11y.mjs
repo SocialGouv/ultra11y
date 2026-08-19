@@ -59718,17 +59718,28 @@ function localTestedScs(interact) {
 }
 var PW_SPEC = "@playwright/test";
 var AXE_SPEC = "@axe-core/playwright";
-function localAvailable(cwd) {
+function localTierStatus(cwd) {
+  const req = createRequire(resolve12(cwd, "package.json"));
+  for (const spec of [PW_SPEC, AXE_SPEC]) {
+    try {
+      req.resolve(spec);
+    } catch {
+      return { ok: false, reason: `${spec} does not resolve from ${cwd}` };
+    }
+  }
   try {
-    const req = createRequire(resolve12(cwd, "package.json"));
-    req.resolve(PW_SPEC);
-    req.resolve(AXE_SPEC);
     const pw = req(PW_SPEC);
     const bin = pw.chromium?.executablePath?.();
-    return typeof bin !== "string" || bin.length === 0 ? true : existsSync24(bin);
-  } catch {
-    return false;
+    if (typeof bin === "string" && bin.length > 0 && !existsSync24(bin)) {
+      return { ok: false, reason: `no browser binary at ${bin} \u2014 run \`npx playwright install chromium\`` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: `${PW_SPEC} failed to load: ${e.message.split("\n")[0]}` };
   }
+}
+function localAvailable(cwd) {
+  return localTierStatus(cwd).ok;
 }
 function resolveLocalDeps(cwd) {
   let chromium;
@@ -68668,8 +68679,13 @@ async function cmdScan(p) {
   if (runtimeFlag === "local") useLocal = true;
   else if (runtimeFlag === "docker") useLocal = false;
   else if (localAvailable(cwd)) useLocal = true;
-  else if (dockerAvailable()) useLocal = false;
-  else {
+  else if (dockerAvailable()) {
+    useLocal = false;
+    const s = localTierStatus(cwd);
+    console.error(
+      lang === "fr" ? `ultra11y scan : tier local indisponible${s.ok ? "" : ` (${s.reason})`} \u2014 bascule sur Docker. Passez --runtime local pour en faire une erreur.` : `ultra11y scan: local tier unavailable${s.ok ? "" : ` (${s.reason})`} \u2014 falling back to Docker. Pass --runtime local to make this an error instead.`
+    );
+  } else {
     console.error(
       lang === "fr" ? "ultra11y scan : aucun runtime disponible \u2014 ni Playwright local (passez --cwd vers un projet avec @playwright/test + @axe-core/playwright install\xE9s), ni Docker. Voir --runtime." : "ultra11y scan: no runtime available \u2014 neither a local Playwright (pass --cwd at a project with @playwright/test + @axe-core/playwright installed) nor Docker. See --runtime."
     );

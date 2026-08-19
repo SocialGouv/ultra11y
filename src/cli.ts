@@ -53,7 +53,7 @@ import {
 import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, type VerdictLedger, writeLedger } from "./ledger.js";
 import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
-import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable } from "./scan-local.js";
+import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable, localTierStatus } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
 import { createAdapter } from "./external/registry.js";
 import { diffSides, sideOfExternal, type DiffBucket } from "./external/diff.js";
@@ -3244,8 +3244,17 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
   if (runtimeFlag === "local") useLocal = true;
   else if (runtimeFlag === "docker") useLocal = false;
   else if (localAvailable(cwd)) useLocal = true;
-  else if (dockerAvailable()) useLocal = false;
-  else {
+  else if (dockerAvailable()) {
+    useLocal = false;
+    // A silent degrade is indistinguishable from a working fallback — name what was
+    // missing, so the one line a reader gets answers "what do I install".
+    const s = localTierStatus(cwd);
+    console.error(
+      lang === "fr"
+        ? `ultra11y scan : tier local indisponible${s.ok ? "" : ` (${s.reason})`} — bascule sur Docker. Passez --runtime local pour en faire une erreur.`
+        : `ultra11y scan: local tier unavailable${s.ok ? "" : ` (${s.reason})`} — falling back to Docker. Pass --runtime local to make this an error instead.`,
+    );
+  } else {
     console.error(
       lang === "fr"
         ? "ultra11y scan : aucun runtime disponible — ni Playwright local (passez --cwd vers un projet avec @playwright/test + @axe-core/playwright installés), ni Docker. Voir --runtime."
