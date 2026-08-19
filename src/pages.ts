@@ -177,6 +177,25 @@ export function unattributedFindings(result: AuditResult): Finding[] {
 function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScope["basis"], coverage?: PageCoverage): Status {
   // A non-normative recommendation can never flip a criterion to NC — same rule as core.
   if (pageFindings.some((f) => !f.advisory)) return "NC";
+  // A MEASUREMENT ON THIS PAGE IS NOT SILENCE — and this is the branch that makes a complete
+  // page grid reachable at all.
+  //
+  // The scope-wide verdict is an AND over every page ("measured everywhere, or nothing", see
+  // renderedProves), so it says NOTHING about a page it did not measure everywhere: one
+  // contrast failure on one route makes the criterion NC for the whole run, and a probe that
+  // skipped one route leaves it « to assess » for all of them. Projected back onto a page, both
+  // outcomes read as silence and came back « to assess » — on pages the probes had actually
+  // zoomed, reflowed, tabbed through and measured. Measured on egapro: 7 of the home page's 9
+  // undecided criteria were exactly that.
+  //
+  // So: if the rendered tier measured THIS criterion on THIS page and raised nothing here, the
+  // page conforms on it. Same claim `finalize` makes scope-wide, same fold, one page.
+  //
+  // IT SITS ABOVE the run-wide `manual` short-circuit, because that line's premise — "the
+  // engine cannot decide it anywhere" — is exactly what a page-level measurement refutes. And
+  // it defers to `decidedBy`: an agent that ruled « undecidable » examined the criterion and
+  // said so, and a rule measuring something narrower must not overturn that.
+  if (c.decidedBy === undefined && basis === "snapshot" && automatability(c.id) === "needs-rendering" && renderedProvesOn(c.id, coverage)) return "C";
   if (c.status === "manual") return "manual"; // the engine cannot decide it anywhere
   if (c.status === "NA") return "NA"; // legacy audits only — the engine no longer emits it
   // NOTHING OF THAT KIND EXISTS ANYWHERE IN SCOPE, so there is none on this page either.
@@ -204,21 +223,6 @@ function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScop
   // nothing to do with. That is what makes a complete page grid reachable at all, and it is
   // labelled as a scope-wide decision where it is rendered.
   if (c.decidedBy === "agent" || c.decidedBy === "scan") return c.status;
-
-  // A MEASUREMENT ON THIS PAGE IS NOT SILENCE EITHER — and this is the branch that makes a
-  // complete page grid reachable at all.
-  //
-  // The scope-wide verdict is an AND over every page ("measured everywhere, or nothing", see
-  // renderedProves): one contrast failure on one route and the criterion is NC for the whole
-  // run. Projected back onto a page where that failure did not fire, rule 3 below then read the
-  // absence as silence and returned « to assess » — on a page the probes had actually zoomed,
-  // reflowed, tabbed through and measured. Measured on egapro: 12 criteria NC run-wide, and 7
-  // of them re-opened « à évaluer » on the home page, which is 7 of its 9 undecided cells.
-  //
-  // So: if the rendered tier measured THIS criterion on THIS page and raised nothing here, the
-  // page conforms on it. That is the same claim `finalize` makes scope-wide, with the same
-  // fold, restricted to one page — never a conclusion drawn from a rule that did not run.
-  if (basis === "snapshot" && automatability(c.id) === "needs-rendering" && renderedProvesOn(c.id, coverage)) return "C";
 
   // 3. SILENCE ONLY DECIDES WHAT THE ENGINE CAN DECIDE.
   //
