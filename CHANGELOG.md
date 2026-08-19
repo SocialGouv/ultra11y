@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.15.0](https://github.com/maxgfr/ultra11y/compare/v5.14.4...v5.15.0) (2026-08-19)
+
+
+### Bug Fixes
+
+* **adjudicate:** normalise a severity the model invented ([a590773](https://github.com/maxgfr/ultra11y/commit/a59077371a481c9411e22a5e15845769f63aae1e))
+* **adjudicate:** refuse a deferral to a tier that has already run ([46436ca](https://github.com/maxgfr/ultra11y/commit/46436cae27ab788cb71a5ad6a7a879f11be30ce5))
+* **pages:** let a page-level measurement outrank the run's « to assess » ([e52b1a9](https://github.com/maxgfr/ultra11y/commit/e52b1a98a1ce42e882839a7c5d5ff42a5968c19e))
+* **report:** stop GitHub swallowing the elements a message names ([a0377c3](https://github.com/maxgfr/ultra11y/commit/a0377c366a2362b6ec75f92b330d657209891210))
+
+
+### Features
+
+* **check:** hold every PAGE's grid to the completeness bar, not just the run's ([46d3a71](https://github.com/maxgfr/ultra11y/commit/46d3a71b1bc091c41c887846ee4efcb907a7028a))
+* **comment:** make the page-by-page comment the whole deliverable ([88c7313](https://github.com/maxgfr/ultra11y/commit/88c73138be25affa419272ec4976bc9e69785ab6))
+* **pages:** decide a criterion on the page that measured it ([13d14c3](https://github.com/maxgfr/ultra11y/commit/13d14c3aff6055411482e9b00f38306d9071994f))
+
 ## [5.14.4](https://github.com/maxgfr/ultra11y/compare/v5.14.3...v5.14.4) (2026-08-19)
 
 
