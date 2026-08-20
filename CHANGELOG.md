@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.22.1](https://github.com/maxgfr/ultra11y/compare/v5.22.0...v5.22.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* **adjudicate:** point the brief at the stylesheet, and stop the trap probe accusing an untagged element ([bff81f5](https://github.com/maxgfr/ultra11y/commit/bff81f560a2e3fa1a6c0a09da4f209de180ddf2d))
+* **adjudicate:** the machine-readable contract states the rule the gate refuses on ([05d986c](https://github.com/maxgfr/ultra11y/commit/05d986c7fd890ddc81b8bddf7842840d47af9dbc))
+
 # [5.22.0](https://github.com/maxgfr/ultra11y/compare/v5.21.0...v5.22.0) (2026-08-20)
 
 
