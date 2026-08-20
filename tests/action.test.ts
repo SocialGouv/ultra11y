@@ -381,6 +381,27 @@ describe("the adjudication tier", () => {
     expect(api?.run, "--max would truncate the worklist").not.toContain("--max ");
   });
 
+  // The agent tier is billed PER ITEM — a full RGAA worklist runs to ~90 — and it had no way
+  // to pick a model at all: `adjudicate-model` reached the API tier only, so the expensive
+  // mode was the one stuck on the harness default.
+  it("lets the agent tier pick its model, which is how a run gets cheaper", () => {
+    const worklists = adjudicationSteps().filter((s) => s.id?.startsWith("worklist"));
+    expect(worklists.length, "one worklist per pass").toBe(3);
+    for (const w of worklists) {
+      expect(w.env?.MODEL, `${w.name} does not read the model`).toContain("inputs.adjudicate-model");
+      expect(w.run, `${w.name} does not pass it on`).toContain("--model $MODEL");
+      // Caller-controlled, and about to be written to $GITHUB_OUTPUT where a newline would
+      // start a line of somebody else's choosing. Validated, not trusted.
+      expect(w.run, `${w.name} does not validate the id`).toContain("[!A-Za-z0-9._:/-]");
+      expect(w.run).toContain("args=$cargs");
+    }
+    // Every agent step takes the assembled string, so no pass is left on the default.
+    for (const a of adjudicationSteps().filter((s) => s.uses?.startsWith("anthropics/claude-code-action@"))) {
+      expect(String(a.with?.claude_args)).toMatch(/steps\.worklist\d?\.outputs\.args/);
+    }
+    expect(ACTION.inputs["adjudicate-model"]?.description, "the input still says API-only").toContain("BOTH");
+  });
+
   it("pins claude-code-action, because `uses:` cannot take an expression", () => {
     const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
     expect(agent?.uses).toMatch(/^anthropics\/claude-code-action@v\d+$/);
@@ -456,8 +477,12 @@ describe("the adjudication tier", () => {
 
   // Nobody is watching this run. claude-code-action sets no default turn limit.
   it("bounds the unattended agent run", () => {
+    // claude-code-action sets no default and nobody is watching this step. The flag now lives
+    // in the string the worklist step assembles, because `--model` beside it is optional.
+    const worklist = adjudicationSteps().find((s) => s.id === "worklist");
+    expect(worklist?.run).toContain("--max-turns $turns");
     const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
-    expect(agent?.with?.claude_args).toContain("--max-turns");
+    expect(agent?.with?.claude_args).toContain("steps.worklist.outputs.args");
   });
 
   // A fixed cap is a cliff, not a bound: the runbook is sequential and each criterion costs
@@ -468,8 +493,9 @@ describe("the adjudication tier", () => {
     const worklist = adjudicationSteps().find((s) => s.id === "worklist");
     expect(worklist?.run, "the worklist step must count the items").toContain("--json");
     expect(worklist?.run).toContain("turns=");
+    expect(worklist?.run).toContain("turns=");
     const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
-    expect(agent?.with?.claude_args).toContain("steps.worklist.outputs.turns");
+    expect(agent?.with?.claude_args).toContain("steps.worklist.outputs.args");
     // …and stay overridable, because a derived default is still a guess.
     expect(ACTION.inputs["adjudicate-max-turns"]).toBeTruthy();
     expect(ACTION.inputs["adjudicate-max-turns"]?.default).toBe("");

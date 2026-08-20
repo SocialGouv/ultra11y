@@ -176,7 +176,7 @@ inputs:
     required: false
     default: ''
   adjudicate-model:
-    description: 'Model id for `adjudicate: api`. Empty follows $ULTRA11Y_LLM_MODEL, then the engine default.'
+    description: 'Model id for BOTH adjudication tiers. `api` passes it to the Messages call; `agent` passes it to claude-code-action, which is how an agent run picks a cheaper model than the harness default — a full RGAA worklist is ~90 items and the tier is billed per item. Empty follows $ULTRA11Y_LLM_MODEL for the API tier, then each tier''s own default.'
     required: false
     default: ''
   gate-adjudicated:
@@ -549,6 +549,8 @@ runs:
         STANDARD: ${{ inputs.standard }}
         LANG_OPT: ${{ inputs.lang }}
         MAX_TURNS: ${{ inputs.adjudicate-max-turns }}
+        # Read from the environment, like every other caller-controlled input in this file.
+        MODEL: ${{ inputs.adjudicate-model }}
       run: |
         node "$ENGINE" verify --manual --in audits/audit-latest.json --out audits \
           --standard "$STANDARD" --lang "$LANG_OPT" --json > /tmp/ultra11y-worklist.json
@@ -572,6 +574,26 @@ runs:
           if [ "$turns" -lt 60 ]; then turns=60; fi
         fi
         echo "turns=$turns" >> "$GITHUB_OUTPUT"
+
+        # THE WHOLE ARGUMENT STRING, assembled here rather than written inline on the `uses:`
+        # step, because `--model` is optional and a `with:` value cannot grow a flag
+        # conditionally. Without this the agent tier had no way to pick a model at all: the
+        # input existed but reached only the API tier, so the mode that is billed per item —
+        # a full RGAA worklist runs to ~90 — was the mode stuck on the harness default.
+        #
+        # The id is validated rather than trusted: it is caller-controlled, and it is about to
+        # be written to $GITHUB_OUTPUT, where a newline would start a line of someone else's
+        # choosing.
+        cargs="--allowedTools Read,Grep,Glob,Edit,Write --max-turns $turns"
+        if [ -n "${MODEL:-}" ]; then
+          case "$MODEL" in
+            *[!A-Za-z0-9._:/-]*)
+              echo "::warning::ultra11y: adjudicate-model='$MODEL' is not a model id — ignoring it and letting claude-code-action choose."
+              ;;
+            *) cargs="$cargs --model $MODEL" ;;
+          esac
+        fi
+        echo "args=$cargs" >> "$GITHUB_OUTPUT"
         # What is still open. A later pass reads this to decide whether it has anything to do:
         # a run that decided everything must not pay for a second adjudicator to discover it.
         echo "remaining=$n" >> "$GITHUB_OUTPUT"
@@ -600,7 +622,7 @@ runs:
         anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
         claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
         github_token: ${{ github.token }}
-        claude_args: '--allowedTools Read,Grep,Glob,Edit,Write --max-turns ${{ steps.worklist.outputs.turns }}'
+        claude_args: ${{ steps.worklist.outputs.args }}
         prompt: |
           You are running head-less in CI, with Read, Grep, Glob, Edit and Write — no shell.
           Adjudicate an accessibility audit, and do nothing else.
@@ -737,6 +759,8 @@ runs:
         STANDARD: ${{ inputs.standard }}
         LANG_OPT: ${{ inputs.lang }}
         MAX_TURNS: ${{ inputs.adjudicate-max-turns }}
+        # Read from the environment, like every other caller-controlled input in this file.
+        MODEL: ${{ inputs.adjudicate-model }}
       run: |
         node "$ENGINE" verify --manual --in audits/audit-latest.json --out audits \
           --standard "$STANDARD" --lang "$LANG_OPT" --json > /tmp/ultra11y-worklist.json
@@ -744,6 +768,26 @@ runs:
         n=$(node -p 'try{JSON.parse(require("fs").readFileSync("/tmp/ultra11y-worklist.json","utf8")).count||0}catch{0}')
         if [ -n "$MAX_TURNS" ]; then turns="$MAX_TURNS"; else turns=$(( n * 4 + 40 )); if [ "$turns" -lt 60 ]; then turns=60; fi; fi
         echo "turns=$turns" >> "$GITHUB_OUTPUT"
+
+        # THE WHOLE ARGUMENT STRING, assembled here rather than written inline on the `uses:`
+        # step, because `--model` is optional and a `with:` value cannot grow a flag
+        # conditionally. Without this the agent tier had no way to pick a model at all: the
+        # input existed but reached only the API tier, so the mode that is billed per item —
+        # a full RGAA worklist runs to ~90 — was the mode stuck on the harness default.
+        #
+        # The id is validated rather than trusted: it is caller-controlled, and it is about to
+        # be written to $GITHUB_OUTPUT, where a newline would start a line of someone else's
+        # choosing.
+        cargs="--allowedTools Read,Grep,Glob,Edit,Write --max-turns $turns"
+        if [ -n "${MODEL:-}" ]; then
+          case "$MODEL" in
+            *[!A-Za-z0-9._:/-]*)
+              echo "::warning::ultra11y: adjudicate-model='$MODEL' is not a model id — ignoring it and letting claude-code-action choose."
+              ;;
+            *) cargs="$cargs --model $MODEL" ;;
+          esac
+        fi
+        echo "args=$cargs" >> "$GITHUB_OUTPUT"
         echo "remaining=$n" >> "$GITHUB_OUTPUT"
         echo "ultra11y: pass 2 — $n criterion(ia) still undecided, budget $turns turns."
 
@@ -754,7 +798,7 @@ runs:
         anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
         claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
         github_token: ${{ github.token }}
-        claude_args: '--allowedTools Read,Grep,Glob,Edit,Write --max-turns ${{ steps.worklist2.outputs.turns }}'
+        claude_args: ${{ steps.worklist2.outputs.args }}
         prompt: |
           You are running head-less in CI, with Read, Grep, Glob, Edit and Write — no shell.
           Adjudicate an accessibility audit, and do nothing else.
@@ -823,6 +867,8 @@ runs:
         STANDARD: ${{ inputs.standard }}
         LANG_OPT: ${{ inputs.lang }}
         MAX_TURNS: ${{ inputs.adjudicate-max-turns }}
+        # Read from the environment, like every other caller-controlled input in this file.
+        MODEL: ${{ inputs.adjudicate-model }}
       run: |
         node "$ENGINE" verify --manual --in audits/audit-latest.json --out audits \
           --standard "$STANDARD" --lang "$LANG_OPT" --json > /tmp/ultra11y-worklist.json
@@ -830,6 +876,26 @@ runs:
         n=$(node -p 'try{JSON.parse(require("fs").readFileSync("/tmp/ultra11y-worklist.json","utf8")).count||0}catch{0}')
         if [ -n "$MAX_TURNS" ]; then turns="$MAX_TURNS"; else turns=$(( n * 4 + 40 )); if [ "$turns" -lt 60 ]; then turns=60; fi; fi
         echo "turns=$turns" >> "$GITHUB_OUTPUT"
+
+        # THE WHOLE ARGUMENT STRING, assembled here rather than written inline on the `uses:`
+        # step, because `--model` is optional and a `with:` value cannot grow a flag
+        # conditionally. Without this the agent tier had no way to pick a model at all: the
+        # input existed but reached only the API tier, so the mode that is billed per item —
+        # a full RGAA worklist runs to ~90 — was the mode stuck on the harness default.
+        #
+        # The id is validated rather than trusted: it is caller-controlled, and it is about to
+        # be written to $GITHUB_OUTPUT, where a newline would start a line of someone else's
+        # choosing.
+        cargs="--allowedTools Read,Grep,Glob,Edit,Write --max-turns $turns"
+        if [ -n "${MODEL:-}" ]; then
+          case "$MODEL" in
+            *[!A-Za-z0-9._:/-]*)
+              echo "::warning::ultra11y: adjudicate-model='$MODEL' is not a model id — ignoring it and letting claude-code-action choose."
+              ;;
+            *) cargs="$cargs --model $MODEL" ;;
+          esac
+        fi
+        echo "args=$cargs" >> "$GITHUB_OUTPUT"
         echo "remaining=$n" >> "$GITHUB_OUTPUT"
         echo "ultra11y: pass 3 — $n criterion(ia) still undecided, budget $turns turns."
 
@@ -840,7 +906,7 @@ runs:
         anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
         claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
         github_token: ${{ github.token }}
-        claude_args: '--allowedTools Read,Grep,Glob,Edit,Write --max-turns ${{ steps.worklist3.outputs.turns }}'
+        claude_args: ${{ steps.worklist3.outputs.args }}
         prompt: |
           You are running head-less in CI, with Read, Grep, Glob, Edit and Write — no shell.
           Adjudicate an accessibility audit, and do nothing else.
