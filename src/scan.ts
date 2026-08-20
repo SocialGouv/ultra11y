@@ -793,6 +793,19 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
   // page (it is the one that measured), and a page only the base knew of keeps its record.
   const cov = { ...(base.scope.pageCoverage ?? {}), ...(snap.scope.pageCoverage ?? {}) };
   if (Object.keys(cov).length) merged.scope.pageCoverage = cov;
+  // …and the RUN-WIDE stamp of the same evidence, for the same reason once more.
+  //
+  // `scope.scan.testedScs` answers "was this criterion measured ANYWHERE in this run?", and it
+  // is what `untestedNeedsRendering` reads to decide whether to print « Audit partiel — les
+  // critères à restituer n'ont pas été testés ». Dropping it here made a report contradict its
+  // own grid: measured on CI over a two-page site, `pageCoverage` carried `axe: true` and all
+  // six rendered-* rules on both pages, the per-page grid decided RGAA 3.2, and the banner two
+  // paragraphs above still said the text contrast had not been tested.
+  //
+  // A union, never a replacement: a Docker scan merged earlier in the same run has its own
+  // entry, and the snapshot half must add to it rather than speak over it.
+  const scs = new Set([...(base.scope.scan?.testedScs ?? []), ...(snap.scope.scan?.testedScs ?? [])]);
+  if (scs.size) merged.scope.scan = { testedScs: [...scs].sort() };
   const byId = new Map(merged.criteria.map((c) => [c.id, c]));
   const snapById = new Map(snap.criteria.map((c) => [c.id, c]));
 

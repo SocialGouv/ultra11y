@@ -59763,6 +59763,8 @@ function mergeSnapshotAudit(base, snap) {
   merged.scope.pagesAudited = [.../* @__PURE__ */ new Set([...base.scope.pagesAudited ?? [], ...snap.scope.pagesAudited ?? []])].sort();
   const cov = { ...base.scope.pageCoverage ?? {}, ...snap.scope.pageCoverage ?? {} };
   if (Object.keys(cov).length) merged.scope.pageCoverage = cov;
+  const scs = /* @__PURE__ */ new Set([...base.scope.scan?.testedScs ?? [], ...snap.scope.scan?.testedScs ?? []]);
+  if (scs.size) merged.scope.scan = { testedScs: [...scs].sort() };
   const byId2 = new Map(merged.criteria.map((c2) => [c2.id, c2]));
   const snapById = new Map(snap.criteria.map((c2) => [c2.id, c2]));
   for (const f of snap.findings) {

@@ -136,6 +136,46 @@ describe("mergeSnapshotAudit", () => {
     return runAudit({ inputs: [join(dir, "dom.html")] });
   };
 
+  // THE BANNER MUST NOT CONTRADICT THE GRID IT SITS ABOVE.
+  //
+  // `mergeSnapshotAudit` unions `pagesAudited` and `pageCoverage` from the snapshot run — and
+  // silently dropped `scope.scan.testedScs`, the stamp `untestedNeedsRendering` reads. So a
+  // real `scan --merge` produced a report whose page grid said RGAA 3.2 conforming and whose
+  // banner, two paragraphs above, said « le contraste du texte n'a pas été testé ». Observed
+  // on CI over a two-page site: pageCoverage carried `axe: true` and all six rendered-* rules
+  // on both pages, and testedScs carried only the probe list.
+  //
+  // The snapshot run is the ONLY half with any coverage to contribute — the base read source
+  // files and measured no page — which is the same reasoning the two unions beside it already
+  // carry.
+  /** A snapshot audit with real signals — the shape `scan --merge` actually produces, and the
+   *  only one whose rendered tier measures anything. */
+  const measuredSnapAudit = (): AuditResult => {
+    const root = tmp();
+    writeRunnerSnapshot(root, out({ violations: [], probed: ["1.4.4", "1.4.10"] }), "https://exemple.fr/");
+    return runAudit({ inputs: [join(root, PAGES_DIR, "accueil", "dom.html")] });
+  };
+
+  it("carries the snapshot run's coverage stamp, so the partial-audit banner tells the truth", () => {
+    const snapAudit = measuredSnapAudit();
+    const measured = snapAudit.scope.scan?.testedScs ?? [];
+    expect(measured, "the snapshot audit measured the rendered tier").not.toEqual([]);
+    // The four the CI run reported as untested while its own grid decided them.
+    expect(measured).toEqual(expect.arrayContaining(["1.3.4", "1.4.1", "1.4.11", "1.4.3"]));
+    const merged = mergeSnapshotAudit(base(), snapAudit);
+    for (const sc of measured) {
+      expect(merged.scope.scan?.testedScs ?? [], `${sc} was measured on the snapshot and lost in the merge`).toContain(sc);
+    }
+  });
+
+  it("keeps what the base already had — a union, never a replacement", () => {
+    const b = base();
+    b.scope.scan = { testedScs: ["9.9.9"] }; // a tier merged earlier in the same run
+    const merged = mergeSnapshotAudit(b, measuredSnapAudit());
+    expect(merged.scope.scan?.testedScs).toContain("9.9.9");
+    expect(merged.scope.scan?.testedScs).toContain("1.4.3");
+  });
+
   it("makes a criterion NC on a non-advisory finding raised on the snapshot", () => {
     const merged = mergeSnapshotAudit(base(), snapAuditOf('<html lang="fr"><head><title>x</title></head><body><img src="a.png"></body></html>'));
     expect(merged.criteria.find((c) => c.id === "1.1.1")?.status).toBe("NC");
