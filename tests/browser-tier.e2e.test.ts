@@ -187,4 +187,24 @@ describe.runIf(true)("the browser tier, driven for real", () => {
     expect(r.criteria.find((c) => c.id === "1.4.3")?.status).toBe("C");
     expect(r.scope.scan?.testedScs ?? []).toContain("1.4.3");
   }, 120_000);
+
+  // THE KEYBOARD-TRAP PROBE, AGAINST A REAL TAB RING — the only place it can be proved.
+  //
+  // Its unit tests drive a scripted fake page, which proves the decision logic and nothing about
+  // whether `focusSetupExpr` tags anything, whether `page.keyboard.press("Tab")` moves focus, or
+  // whether the active element comes back tagged. A probe wrong in any of those ways records
+  // 2.1.2 as measured, finds nothing, and hands RGAA 12.9 a conformity nobody established —
+  // « green but inactive », which is the failure this whole file exists to catch.
+  it("walks the tab ring in a real browser, and lets 2.1.2 close on the measurement", async () => {
+    if (!browserAvailable) return;
+    await check({ probes: true });
+    const probes = JSON.parse(readFileSync(join(root, PAGES_DIR, "fiche", "probes.json"), "utf8"));
+    expect(probes.probed, "the ring was walked, so its silence may be read as conformity").toContain("2.1.2");
+    // This page has no trap: four native focusables, no script, nothing that swallows Tab.
+    expect(probes.keyboardTrap ?? [], "a page with no trap must produce no hit").toEqual([]);
+
+    const r = runAudit({ inputs: [join(root, PAGES_DIR, "fiche", "dom.html")] });
+    expect(r.criteria.find((c) => c.id === "2.1.2")?.status, "measured on every page in scope, and nothing found").toBe("C");
+    expect(r.scope.scan?.testedScs ?? []).toContain("2.1.2");
+  }, 120_000);
 });
