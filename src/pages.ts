@@ -489,6 +489,25 @@ export function renderRedirected(redirected: ScanRedirect[], lang: Lang = "en"):
   return out;
 }
 
+/** One page's standing over the rows of the grid it is printed on — same C ÷ (C + NC) basis
+ *  as everywhere else, and the same NULL for "nothing decided". Taking it from the grid model
+ *  rather than from `PageResult` is what makes the header a summary of the body under a pack
+ *  as well as under the core: `PageResult` only ever carries the WCAG projection.
+ *
+ *  Returned as the argument tuple `formatRate` takes, so no caller can pair a rate with
+ *  somebody else's denominator. */
+export function gridRate(rows: { id: string }[], status: Map<string, Map<string, Status>>, pageId: string): [number | null, number, number] {
+  let c = 0;
+  let nc = 0;
+  for (const row of rows) {
+    const st = status.get(row.id)?.get(pageId);
+    if (st === "C") c++;
+    else if (st === "NC") nc++;
+  }
+  const decided = c + nc;
+  return [decided === 0 ? null : Math.round((c / decided) * 100), decided, rows.length];
+}
+
 /** The Markdown grid: one row per criterion, one column per page. */
 export function renderPageGrid(result: AuditResult, pages: PageScope[], standard: StandardId = CORE, lang: Lang = "en"): string {
   const s = L[lang];
@@ -504,10 +523,17 @@ export function renderPageGrid(result: AuditResult, pages: PageScope[], standard
 
   const head = [isCore(standard) ? s.criterion : s.criterion, ...derived.map((p) => `${p.name}${p.auth ? " 🔒" : ""}`)];
   out.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
-  out.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(p.conformancePct, p.decided, p.total)}**`).join(" | ")} |`);
+  // THE MODEL FIRST, because the rate is a summary OF THIS GRID and has to be computed from
+  // the rows it is printed above. It was read off `PageResult` instead — which is always the
+  // WCAG core projection — so under a pack the header and the body answered different
+  // questions: measured on a two-page RGAA run, the grid listed all 106 criteria and then
+  // announced « 89 % (9/55) », while the same page's own dossier said 47/106. Same command,
+  // same page, two denominators; and this grid is what `comment-kind: pages` pastes onto a
+  // pull request, so the wrong one was the one people read.
+  const { rows, status } = pageGridModel(result, derived, standard, lang);
+  out.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id))}**`).join(" | ")} |`);
   out.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
 
-  const { rows, status } = pageGridModel(result, derived, standard, lang);
   let group = "";
   for (const row of rows) {
     if (row.group !== group) {

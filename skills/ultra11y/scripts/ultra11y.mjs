@@ -54623,6 +54623,17 @@ function renderRedirected(redirected, lang = "en") {
   }
   return out2;
 }
+function gridRate(rows, status, pageId) {
+  let c2 = 0;
+  let nc = 0;
+  for (const row of rows) {
+    const st = status.get(row.id)?.get(pageId);
+    if (st === "C") c2++;
+    else if (st === "NC") nc++;
+  }
+  const decided = c2 + nc;
+  return [decided === 0 ? null : Math.round(c2 / decided * 100), decided, rows.length];
+}
 function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   const s = L3[lang];
   const out2 = [];
@@ -54636,9 +54647,9 @@ function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   if (derived.some((p) => p.basis === "attributed")) out2.push(`> \u26A0\uFE0F ${s.basisNote}`, "");
   const head = [isCore(standard) ? s.criterion : s.criterion, ...derived.map((p) => `${p.name}${p.auth ? " \u{1F512}" : ""}`)];
   out2.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
-  out2.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(p.conformancePct, p.decided, p.total)}**`).join(" | ")} |`);
-  out2.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
   const { rows, status } = pageGridModel(result, derived, standard, lang);
+  out2.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id))}**`).join(" | ")} |`);
+  out2.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
   let group = "";
   for (const row of rows) {
     if (row.group !== group) {
@@ -62977,12 +62988,16 @@ function scoreboardBlocks(result, standard, lang, sheetHref) {
   const scope = pagesOf(result);
   if (!scope.length) return [];
   const derived = derivePages(result, scope);
-  const rows = derived.map((p) => [
-    { text: `${p.name}${p.auth ? " \u{1F512}" : ""}`, ...sheetHref ? { href: sheetHref(p.id) } : {} },
-    { text: p.url, mono: true },
-    { text: basisLabel(p.basis, lang) },
-    { text: formatRate(p.conformancePct, p.decided, p.total), align: "end" }
-  ]);
+  const rows = derived.map((p) => {
+    const criteria = pageCriterionRows(result, p, standard, lang);
+    const cov = pageCoverage(criteria);
+    return [
+      { text: `${p.name}${p.auth ? " \u{1F512}" : ""}`, ...sheetHref ? { href: sheetHref(p.id) } : {} },
+      { text: p.url, mono: true },
+      { text: basisLabel(p.basis, lang) },
+      { text: formatRate(pageRatePct(criteria), cov.decided, cov.total), align: "end" }
+    ];
+  });
   const out2 = [
     { kind: "heading", level: 2, text: t3.perPage, id: "pages" },
     {
