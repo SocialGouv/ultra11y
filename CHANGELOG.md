@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.21.0](https://github.com/maxgfr/ultra11y/compare/v5.20.0...v5.21.0) (2026-08-20)
+
+
+### Features
+
+* **ci:** the action provides the browser tier it needs ([576bf07](https://github.com/maxgfr/ultra11y/commit/576bf0709ec2f9cd0ba0a2b22ead377f2c3c0ddf))
+
 # [5.20.0](https://github.com/maxgfr/ultra11y/compare/v5.19.1...v5.20.0) (2026-08-20)
 
 
