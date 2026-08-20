@@ -618,6 +618,19 @@ runs:
     - name: Adjudicate with an agent — Claude Code
       if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent'
       uses: anthropics/claude-code-action@v1
+      # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
+      # always honoured, and the one tier that could not. A `uses:` step has no `if node …
+      # else warning` to wrap it in, so when the model call died the whole composite action
+      # died with it: measured on a keyed run, claude-code-action returned `is_error` after a
+      # single turn and every step below it was SKIPPED — the Markdown report, the HTML
+      # report, the per-page dossiers, the artifact upload and the residue warning, all of
+      # them already computed or about to be, all of them lost. The job reported a failed
+      # accessibility audit when what had failed was one API call.
+      #
+      # The failure is not swallowed, it is relocated: the fold below finds the verdicts file
+      # unfilled, and it is the fold that decides — a warning by default, an error when
+      # `gate-adjudicated` says this job's red may rest on what a model ruled.
+      continue-on-error: true
       with:
         anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
         claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -794,6 +807,19 @@ runs:
     - name: Adjudicate with an agent — pass 2, Claude Code
       if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0'
       uses: anthropics/claude-code-action@v1
+      # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
+      # always honoured, and the one tier that could not. A `uses:` step has no `if node …
+      # else warning` to wrap it in, so when the model call died the whole composite action
+      # died with it: measured on a keyed run, claude-code-action returned `is_error` after a
+      # single turn and every step below it was SKIPPED — the Markdown report, the HTML
+      # report, the per-page dossiers, the artifact upload and the residue warning, all of
+      # them already computed or about to be, all of them lost. The job reported a failed
+      # accessibility audit when what had failed was one API call.
+      #
+      # The failure is not swallowed, it is relocated: the fold below finds the verdicts file
+      # unfilled, and it is the fold that decides — a warning by default, an error when
+      # `gate-adjudicated` says this job's red may rest on what a model ruled.
+      continue-on-error: true
       with:
         anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
         claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -902,6 +928,19 @@ runs:
     - name: Adjudicate with an agent — pass 3, Claude Code
       if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0'
       uses: anthropics/claude-code-action@v1
+      # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
+      # always honoured, and the one tier that could not. A `uses:` step has no `if node …
+      # else warning` to wrap it in, so when the model call died the whole composite action
+      # died with it: measured on a keyed run, claude-code-action returned `is_error` after a
+      # single turn and every step below it was SKIPPED — the Markdown report, the HTML
+      # report, the per-page dossiers, the artifact upload and the residue warning, all of
+      # them already computed or about to be, all of them lost. The job reported a failed
+      # accessibility audit when what had failed was one API call.
+      #
+      # The failure is not swallowed, it is relocated: the fold below finds the verdicts file
+      # unfilled, and it is the fold that decides — a warning by default, an error when
+      # `gate-adjudicated` says this job's red may rest on what a model ruled.
+      continue-on-error: true
       with:
         anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
         claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}

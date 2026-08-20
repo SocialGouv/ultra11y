@@ -24,6 +24,8 @@ const ACTION = parse(RAW) as {
       if?: string;
       with?: Record<string, string>;
       env?: Record<string, string>;
+      // Hyphenated, so it needs quoting here as well as at the use site.
+      "continue-on-error"?: boolean;
     }[];
   };
 };
@@ -400,6 +402,28 @@ describe("the adjudication tier", () => {
       expect(String(a.with?.claude_args)).toMatch(/steps\.worklist\d?\.outputs\.args/);
     }
     expect(ACTION.inputs["adjudicate-model"]?.description, "the input still says API-only").toContain("BOTH");
+  });
+
+  // MEASURED on the first keyed run this repository ever performed: claude-code-action came
+  // back `is_error` after a single turn, and every step below it was SKIPPED — the Markdown
+  // report, the HTML report, the per-page dossiers, the artifact upload and the residue
+  // warning, all of them already computed or about to be. The job reported a failed
+  // accessibility audit when what had failed was one API call.
+  //
+  // The API tier had always honoured "an adjudication that fails is not an audit that fails",
+  // because a `run:` step can wrap itself in `if … else warning`. A `uses:` step cannot, and
+  // that is the whole reason this needs its own guard.
+  it("never lets a failed model call take the audit down with it", () => {
+    const agents = adjudicationSteps().filter((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
+    expect(agents.length, "one agent step per pass").toBe(3);
+    for (const a of agents) {
+      expect(a["continue-on-error"], `step "${a.name}" kills the run when the model call fails`).toBe(true);
+    }
+    // The failure is relocated, not swallowed: the fold decides what it costs, and it is the
+    // fold that knows about gate-adjudicated.
+    for (const f of adjudicationSteps().filter((s) => s.name?.includes("fold"))) {
+      expect(f.run).toContain("inputs.gate-adjudicated");
+    }
   });
 
   it("pins claude-code-action, because `uses:` cannot take an expression", () => {
