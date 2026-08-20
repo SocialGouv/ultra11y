@@ -1,15 +1,21 @@
 # The ADJUDICATION tier, exercised for real — the half `ci.yml` cannot prove.
 #
-# `ci.yml` proves the keyless path: with no ANTHROPIC_API_KEY the tier evaporates and the
-# audit still ships. It stops there on purpose, because the keyed path costs money on every
-# run (roughly $0.20 per WCAG run, $0.50 per RGAA one — the worklist is re-sent whole each
-# time, and no batch is large enough to earn prompt caching). Putting that on every push
-# would bill a fleet of PRs for a signal that changes rarely.
+# `ci.yml` proves the keyless path: with no credential the tier evaporates and the audit still
+# ships. It stops there on purpose, because the keyed path costs money on every run (roughly
+# $0.20 per WCAG run, $0.50 per RGAA one — the worklist is re-sent whole each time, and no
+# batch is large enough to earn prompt caching). Putting that on every push would bill a fleet
+# of PRs for a signal that changes rarely.
 #
 # So it is dispatched by hand, and it reports the number that actually separates the two
 # modes: how many criteria stayed `manual`. That is where the API mode decloses — it rules
 # from harvested evidence alone (capped at 30 items per criterion, snippets truncated), while
 # the agent mode can open the files, which is what "link purpose IN CONTEXT" really asks for.
+#
+# It is also the ONLY place `anthropics/claude-code-action` runs in this repository. The
+# composite action resolves the credential TWICE, by two different mechanisms — the
+# tier-resolution step reads it from the process environment in bash, the `uses:` step reads
+# it through the `env` expression context — and only a keyed run exercises the second. That is
+# why this file exists rather than a comment asserting the path is fine.
 name: Adjudication (keyed)
 
 on:
@@ -26,26 +32,57 @@ on:
         options: [wcag, rgaa]
         default: rgaa
 
+# `contents: read` is enough BECAUSE the composite action hands claude-code-action the job's
+# own `github.token`. Without that it would mint a GitHub App token over OIDC and this job
+# would need `id-token: write` — a dependency worth naming here, since it is decided in a file
+# this one only reaches through `uses: ./`.
 permissions:
   contents: read
 
 jobs:
   adjudicate:
     runs-on: ubuntu-latest
+    # Three agent passes over a ~90-item RGAA worklist is the long case; nothing here
+    # legitimately runs for hours, and GitHub's default ceiling is six of them.
+    timeout-minutes: 60
     env:
+      # BOTH credentials, because the two modes do not accept the same one. `api` calls the
+      # Messages API, which takes an ANTHROPIC_API_KEY and nothing else; `agent` shells out to
+      # claude-code-action, which also accepts the OAuth token a Pro/Max subscriber mints with
+      # `claude setup-token`. Wiring only the first made `mode: agent` unrunnable for a
+      # subscriber with no API key at all — and that is the common case for this repository.
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v7
 
-      - name: Refuse early if the secret is missing
+      # The engine is the committed zero-dep bundle, so there is nothing to install — but
+      # there IS a floor: package.json declares `engines.node >= 22.18.0`, and a job that
+      # never pins Node inherits whatever the runner image happens to ship that week.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Refuse early if the credential this mode needs is missing
+        env:
+          MODE: ${{ inputs.mode }}
         run: |
-          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-            echo "::error::this workflow exists to exercise the KEYED path; set the ANTHROPIC_API_KEY secret"
+          # Split by mode, because the two tiers do not accept the same credential and a
+          # blanket "ANTHROPIC_API_KEY or bust" locks an OAuth-only repository out of the very
+          # path it came here to test.
+          if [ "$MODE" != 'agent' ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::error::mode=$MODE exercises the API tier, which accepts nothing but ANTHROPIC_API_KEY — set that secret, or dispatch with mode=agent"
+            exit 1
+          fi
+          if [ "$MODE" != 'api' ] && [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+            echo "::error::mode=$MODE exercises the agent tier; set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN (\`claude setup-token\`)"
             exit 1
           fi
 
-      # The baseline: what the deterministic engine alone leaves undecided. Every number
-      # below is read against this one.
+      # The baseline: what the deterministic engine alone leaves undecided. Every number below
+      # is read against this one — and it is valid for BOTH modes, because each `uses: ./`
+      # below re-audits the fixture from scratch (`Audit the code` carries no `if:` and writes
+      # audits/audit-latest.json with --out audits), so each mode starts from this same grid.
       - name: Measure the unruled criteria BEFORE adjudication
         id: before
         run: |
@@ -69,6 +106,20 @@ jobs:
           adjudicate: api
           artifact-name: adjudication-api
 
+      # Measured HERE, not at the end. The agent step below is a fresh `uses: ./` whose own
+      # audit step rewrites audits/audit-latest.json from scratch, discarding these verdicts —
+      # so a single reading taken after both steps reports the agent pass twice and labels the
+      # result `both`. Two tiers, two measurements.
+      - name: What the API tier decided
+        id: after_api
+        if: inputs.mode == 'api' || inputs.mode == 'both'
+        run: |
+          node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
+            --standard '${{ inputs.standard }}' --out /tmp/after-api --json > /tmp/after-api.json
+          n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/after-api.json","utf8")).count')
+          echo "manual=$n" >> "$GITHUB_OUTPUT"
+          echo "unruled after api: $n"
+
       - name: Adjudicate with an agent
         if: inputs.mode == 'agent' || inputs.mode == 'both'
         uses: ./
@@ -82,20 +133,41 @@ jobs:
           adjudicate: agent
           artifact-name: adjudication-agent
 
-      # The metric. A tier that ruled on nothing is a tier that cost money to change nothing,
-      # and it should be visible as such rather than buried in a green check.
-      - name: Report what the tier actually decided
+      - name: What the agent tier decided
+        id: after_agent
+        if: inputs.mode == 'agent' || inputs.mode == 'both'
         run: |
           node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
-            --standard '${{ inputs.standard }}' --out /tmp/after --json > /tmp/after.json
-          after=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/after.json","utf8")).count')
-          before='${{ steps.before.outputs.manual }}'
-          echo "### Adjudication (${{ inputs.mode }}, ${{ inputs.standard }})" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| | criteria left to assess |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| --- | ---: |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| before | $before |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| after | $after |" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$after" -ge "$before" ]; then
-            echo "::warning::the adjudication decided nothing — $before criteria before, $after after"
-          fi
+            --standard '${{ inputs.standard }}' --out /tmp/after-agent --json > /tmp/after-agent.json
+          n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/after-agent.json","utf8")).count')
+          echo "manual=$n" >> "$GITHUB_OUTPUT"
+          echo "unruled after agent: $n"
+
+      # The metric. A tier that ruled on nothing is a tier that cost money to change nothing,
+      # and it should be visible as such rather than buried in a green check. `always()` so a
+      # tier that died still leaves its baseline on the summary.
+      - name: Report what each tier actually decided
+        if: always()
+        env:
+          BEFORE: ${{ steps.before.outputs.manual }}
+          AFTER_API: ${{ steps.after_api.outputs.manual }}
+          AFTER_AGENT: ${{ steps.after_agent.outputs.manual }}
+        run: |
+          {
+            echo "### Adjudication (${{ inputs.mode }}, ${{ inputs.standard }})"
+            echo ""
+            echo "| tier | criteria left to assess |"
+            echo "| --- | ---: |"
+            echo "| before (engine alone) | ${BEFORE:-—} |"
+            if [ -n "${AFTER_API:-}" ]; then echo "| after \`api\` | $AFTER_API |"; fi
+            if [ -n "${AFTER_AGENT:-}" ]; then echo "| after \`agent\` | $AFTER_AGENT |"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for pair in "api:${AFTER_API:-}" "agent:${AFTER_AGENT:-}"; do
+            tier=${pair%%:*}
+            after=${pair#*:}
+            if [ -z "$after" ]; then continue; fi
+            if [ "$after" -ge "${BEFORE:-0}" ]; then
+              echo "::warning::the $tier adjudication decided nothing — ${BEFORE:-?} criteria before, $after after"
+            fi
+          done
