@@ -8,8 +8,9 @@
 // standard from the one it asked for.
 import { describe, expect, it } from "vitest";
 
-import { derivePages, pageScopesFrom, renderPageGrid } from "../src/pages.js";
+import { derivePages, pageScopesFrom, pageView, renderPageGrid } from "../src/pages.js";
 import { pageCoverage, pageCriterionRows, pageRatePct, pagesForStandard } from "../src/pages-report.js";
+import { derivePackResults, loadPack } from "../src/standards/index.js";
 import type { AuditResult } from "../src/types.js";
 import { runAudit } from "../src/audit.js";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
@@ -97,5 +98,76 @@ describe("the Markdown grid's rate is a summary of the grid, not of another stan
     const [page] = derivePages(result, scope);
     expect(rateCell("wcag")).toContain(`(${page!.decided}/${page!.total})`);
     expect(rateCell("wcag")).toContain("/55)");
+  });
+});
+
+// "Does an RGAA run test all 106 criteria?" is not answered by a grid with 106 rows — that
+// only proves the table is the right size. It is answered by every id the PACK declares
+// reaching a status, exactly once, on every page, with nothing dropped, nothing duplicated
+// and nothing invented. The failure this guards against is the quiet one: a projection that
+// silently omits a criterion produces a report that is merely SHORTER, and a shorter
+// deliverable reads exactly like a complete one.
+describe("an RGAA projection puts EVERY criterion the pack declares through the mill", () => {
+  const result = auditWithPage();
+  const scope = result.scope.pages ?? [];
+  const declared = loadPack("rgaa").criteria.map((c) => c.id);
+  const STATUSES = ["C", "NC", "NA", "manual"];
+
+  it("declares 106, so the rest of this describe means something", () => {
+    expect(declared.length).toBe(106);
+    expect(new Set(declared).size, "the pack declares an id twice").toBe(106);
+  });
+
+  it("gives each of them a status on the page, exactly once", () => {
+    const [page] = pagesForStandard(result, derivePages(result, scope), "rgaa", "fr");
+    const seen = page!.criteria.map((c) => c.id);
+    expect(new Set(seen).size, "a criterion is projected twice").toBe(seen.length);
+    expect([...seen].sort()).toEqual([...declared].sort());
+    for (const c of page!.criteria) {
+      expect(STATUSES, `${c.id} carries "${c.status}"`).toContain(c.status);
+    }
+  });
+
+  it("counts them all, and counts nothing else", () => {
+    const [page] = pagesForStandard(result, derivePages(result, scope), "rgaa", "fr");
+    const t = { C: 0, NC: 0, NA: 0, manual: 0 };
+    for (const c of page!.criteria) t[c.status as keyof typeof t]++;
+    expect(t.C + t.NC + t.NA + t.manual).toBe(106);
+    // `decided` is the rate's denominator and must never exceed the population.
+    expect(page!.total).toBe(106);
+    expect(page!.decided).toBeLessThanOrEqual(106);
+    expect(page!.decided).toBe(t.C + t.NC);
+  });
+
+  // THE ROW LIST IS NOT THE PROOF. `pageCriterionRows` walks `pack.criteria` and looks each
+  // status up in the projection, defaulting to `"manual"` when it is absent — so the grid is
+  // structurally 106 rows long whatever the projection does, and a criterion the projection
+  // dropped would quietly read « à évaluer » instead of disappearing. That fallback is the
+  // right direction to fail in, and it is exactly why counting rows proves nothing about
+  // coverage. The projection itself has to answer for all 106.
+  it('has the PROJECTION cover all 106, without leaning on the `?? "manual"` fallback', () => {
+    const [p0] = derivePages(result, scope);
+    const projected = derivePackResults(pageView(result, p0!), "rgaa", p0!.id);
+    const ids = projected.map((r) => r.id);
+    expect(new Set(ids).size, "the projection emits a criterion twice").toBe(ids.length);
+    expect([...ids].sort()).toEqual([...declared].sort());
+    for (const r of projected) expect(STATUSES, `${r.id} carries "${r.status}"`).toContain(r.status);
+  });
+
+  // …and the same for the RUN's grid, which is the projection without a page id.
+  it("covers all 106 on the run's own grid too", () => {
+    const ids = derivePackResults(result, "rgaa").map((r) => r.id);
+    expect([...ids].sort()).toEqual([...declared].sort());
+  });
+
+  it("says the same thing through pageCriterionRows, which the dossier and the grid share", () => {
+    const [p0] = derivePages(result, scope);
+    const rows = pageCriterionRows(result, p0!, "rgaa", "fr");
+    expect(rows.length).toBe(106);
+    expect([...rows.map((r) => r.id)].sort()).toEqual([...declared].sort());
+    const cov = pageCoverage(rows);
+    expect(cov.total).toBe(106);
+    const pct = pageRatePct(rows);
+    expect(pct === null || (pct >= 0 && pct <= 100)).toBe(true);
   });
 });
