@@ -7,21 +7,26 @@ content on hover (1.4.13), target size (2.5.8). The dynamic tier decides them by
 
 - **`--runtime local`** (recommended): resolves Playwright + `@axe-core/playwright`
   **at runtime**, from `--cwd` first and from ultra11y's own install second (no Docker, no
-  global install). Both are dependencies of this package, so a project that installed ultra11y
-  alone still gets the tier; a project that pins its own Playwright keeps it, because `--cwd`
-  is tried first. Adds the residual-criteria **probes** (below).
+  global install). A project that pins its own Playwright keeps it, because `--cwd` is tried
+  first. Adds the residual-criteria **probes** (below).
 - **`--runtime docker`**: runs axe-core in a Docker image auto-built on first use (runner +
   Dockerfile embedded in the bundle). No host deps beyond Docker. Axe + 320px reflow only.
 - **`--runtime auto`** (default): local if Playwright resolves **and** a browser binary is on
-  disk, else Docker, else an actionable error. Since the packages ship with ultra11y, what
-  decides `auto` in practice is the browser, not the modules.
+  disk, else Docker, else an actionable error.
 
 ## Prerequisites
 
-- **local**: a Chromium browser — `npx playwright install chromium`. The two npm packages
-  (`@playwright/test`, `@axe-core/playwright`) come with ultra11y and need no separate install;
-  installing them in the audited project is still supported and takes precedence, which is what
-  a repository with its own pinned Playwright wants.
+- **local**: a Chromium browser (`npx playwright install chromium`), plus the two npm packages
+  — and **where they have to live depends on how you run the engine**:
+
+  | Channel | `@playwright/test` + `@axe-core/playwright` |
+  |---|---|
+  | ultra11y as an npm dependency (`ultra11y/playwright`, `pnpm exec ultra11y`) | **come with it** — they are its own `dependencies`. Nothing to install. |
+  | the standalone skill bundle (`node scripts/ultra11y.mjs` from an installed skill) | **must be in the audited project**, reachable from `--cwd`. An installed skill is a directory of files with no `node_modules` beside it, so the second anchor finds nothing there. |
+
+  Either way, a project that installs them itself wins: `--cwd` is tried first, which is what a
+  repository with its own pinned Playwright wants. When neither anchor resolves, `auto` degrades
+  to Docker and says which package it could not find.
 - **docker**: Docker running.
 
 The rest of the skill (static audit) needs neither.
