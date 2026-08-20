@@ -270,6 +270,20 @@ jobs:
         run: pnpm run test:browser
 
   action:
+    # HAND-DISPATCHED ONLY. This is the heaviest job in the file — it installs the browser
+    # tier, serves a site, crawls it and drives four full invocations of the shipped action —
+    # and it was running on every push and every pull request.
+    #
+    # Know what this costs, because it is not free: `action.yml` is consumed as
+    # `maxgfr/ultra11y@vN` by other repositories, its bash cannot be proved by reading YAML,
+    # and the contract tests in tests/action.test.ts PARSE it rather than run it. A composite
+    # action can be green in every one of them and still broken for every consumer — which is
+    # exactly what happened the day `npm i --omit=dev` silently installed nothing. This job is
+    # the only thing here that would have caught it, and it now only runs when someone asks.
+    #
+    # So: run it by hand (Actions → CI → Run workflow) before releasing anything that touches
+    # `action.yml`, or re-enable it by deleting this `if:`.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # A flaky install step once hung this job for 3h27 (GitHub's default job timeout is
     # 6h); the real work needs ~10 minutes, and the browser download is cached below, so

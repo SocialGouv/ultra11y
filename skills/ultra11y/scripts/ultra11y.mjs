@@ -54612,7 +54612,7 @@ function pageGridModel(result, derived, standard, lang) {
 function renderRedirected(redirected, lang = "en") {
   const fr = lang === "fr";
   const out2 = [
-    fr ? `> \u26A0\uFE0F **${redirected.length} page(s) de l'\xE9chantillon n'ont pas \xE9t\xE9 enregistr\xE9es** \u2014 le navigateur n'est pas rest\xE9 sur l'adresse demand\xE9e. Les enregistrer aurait d\xE9crit un autre \xE9cran sous le nom demand\xE9. Elles ne comptent donc ni comme conformes ni comme non conformes : elles manquent.` : `> \u26A0\uFE0F **${redirected.length} sample page(s) were not recorded** \u2014 the browser did not stay on the address asked for. Recording them would have described another screen under the requested name. They count as neither conforming nor non-conforming: they are missing.`,
+    fr ? `> \u26A0\uFE0F **${redirected.length} page(s) n'ont pas \xE9t\xE9 enregistr\xE9es** \u2014 le navigateur n'est pas rest\xE9 sur l'adresse demand\xE9e. Les enregistrer aurait d\xE9crit un autre \xE9cran sous le nom demand\xE9. Elles ne comptent donc ni comme conformes ni comme non conformes : elles manquent.` : `> \u26A0\uFE0F **${redirected.length} page(s) were not recorded** \u2014 the browser did not stay on the address asked for. Recording them would have described another screen under the requested name. They count as neither conforming nor non-conforming: they are missing.`,
     "",
     fr ? "| Page | Demand\xE9 | Atteint | Motif |" : "| Page | Requested | Landed | Reason |",
     "| --- | --- | --- | --- |"
@@ -59019,12 +59019,23 @@ function nameFromUrl(url) {
   if (!words) return "Accueil";
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
+function canonicalUrl(url) {
+  try {
+    const u = new URL(url);
+    u.hash = "";
+    u.pathname = u.pathname.replace(/(^|\/)index\.x?html?$/i, "$1");
+    return u.href;
+  } catch {
+    return url;
+  }
+}
 async function crawlUrls(start2, opts) {
   const depth = opts.depth ?? 1;
   const max = opts.max ?? 50;
   const order = [];
-  const seen = /* @__PURE__ */ new Set([start2]);
-  const queue = [{ url: start2, d: 0 }];
+  const first = canonicalUrl(start2);
+  const seen = /* @__PURE__ */ new Set([first]);
+  const queue = [{ url: first, d: 0 }];
   while (queue.length > 0 && order.length < max) {
     const { url, d } = queue.shift();
     order.push(url);
@@ -59036,9 +59047,10 @@ async function crawlUrls(start2, opts) {
       continue;
     }
     for (const link of extractLinks(html, url)) {
-      if (seen.has(link)) continue;
-      seen.add(link);
-      queue.push({ url: link, d: d + 1 });
+      const canon = canonicalUrl(link);
+      if (seen.has(canon)) continue;
+      seen.add(canon);
+      queue.push({ url: canon, d: d + 1 });
     }
   }
   return order;
