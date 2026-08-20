@@ -24,6 +24,8 @@ const ACTION = parse(RAW) as {
       if?: string;
       with?: Record<string, string>;
       env?: Record<string, string>;
+      // Hyphenated, so it needs quoting here as well as at the use site.
+      "continue-on-error"?: boolean;
     }[];
   };
 };
@@ -177,7 +179,16 @@ describe("the bash is safe under `set -e`", () => {
 describe("the adjudication tier", () => {
   /** Every surface that RENDERS from the adjudicated audit. They must all run after the
    *  verdicts are folded in, or the adjudication reaches nothing. */
-  const CONSUMERS = ["Per-page report", "SARIF", "Annotations", "File tracker tickets", "Markdown report", "HTML report", "Completeness gate"];
+  const CONSUMERS = [
+    "Per-page report",
+    "SARIF",
+    "Annotations",
+    "File tracker tickets",
+    "Markdown report",
+    "HTML report",
+    "Completeness gate",
+    "left to assess",
+  ];
 
   const adjudicationSteps = (): typeof ACTION.runs.steps => ACTION.runs.steps.filter((s) => s.name?.startsWith("Adjudicate"));
 
@@ -275,14 +286,143 @@ describe("the adjudication tier", () => {
     }
   });
 
-  it("absorbs an adjudication failure instead of killing the audit job", () => {
+  it("absorbs an adjudication failure instead of killing the audit job — on EVERY pass", () => {
     // The fold is fail-closed: one rate-limited batch refuses the whole apply. That must cost
     // the verdicts, never the report that was already produced above.
-    const folding = adjudicationSteps().filter((s) => s.run?.includes("judge") || s.run?.includes("verify --apply"));
-    expect(folding.length).toBe(2);
+    //
+    // Selected on `--apply`, not on the literal `verify --apply`: passes 2 and 3 assemble
+    // their arguments into an array and call `verify "\${args[@]}"`, so the old selector
+    // matched pass 1's COMMENT and nothing else. It reported two folding steps out of four —
+    // and the two it never saw were precisely the two that ignored `gate-adjudicated`, which
+    // is to say the test was green about the half of the code that was wrong.
+    const folding = adjudicationSteps().filter((s) => s.run?.includes("--apply"));
+    const agentFolds = folding.filter((s) => s.name?.includes("agent"));
+    // One fold per agent pass — `adjudicate-passes` documents three — plus the API tier's.
+    expect(agentFolds.length, "an agent pass was added without a fold, or a fold lost its --apply").toBe(3);
+    expect(folding.length).toBe(agentFolds.length + 1);
     for (const step of folding) {
       expect(step.run, `step "${step.name}" propagates its failure`).toContain("::warning::");
       expect(step.run, `step "${step.name}" ignores gate-adjudicated`).toContain("inputs.gate-adjudicated");
+    }
+  });
+
+  // `adjudicate-passes: 0` used to run all three passes and bill for them: the gates were
+  // written as `!= '1'` and `!= '1' && != '2'`, so every value that was not literally 1 or 2
+  // fell through to the most expensive branch. A count is a floor as well as a ceiling.
+  it("gates the extra passes on the count they are, not on the count they are not", () => {
+    const worklists = adjudicationSteps().filter((s) => s.name?.includes("worklist") || s.id?.startsWith("worklist"));
+    const later = worklists.filter((s) => /pass [23]/.test(s.name ?? ""));
+    expect(later.length, "the second and third passes must each have a worklist step").toBe(2);
+    for (const step of later) {
+      expect(step.if, `step "${step.name}" is gated negatively`).not.toContain("adjudicate-passes != ");
+      expect(step.if, `step "${step.name}" does not name the counts it runs for`).toContain("adjudicate-passes == ");
+    }
+  });
+
+  // Two inputs are read by `if:` expressions that can only match fixed strings, so an
+  // unrecognised value does not degrade to the default — the gate never matches, and a later
+  // step then concludes from the empty output it left behind. `require-decided: yes` made the
+  // job fail with "the criterion grid is incomplete" over a grid nothing had measured, because
+  // `Completeness gate` matches 'true'|'pages' while `Gate` tested `!= 'false' && != ''`.
+  it("refuses a value its own gates cannot match, rather than acting on the wrong one", () => {
+    const engine = ACTION.runs.steps.find((s) => s.id === "engine");
+    expect(engine, "the first step must still be the engine resolver").toBeTruthy();
+    // Read from the environment, like every other caller-controlled input in this file.
+    expect(engine?.env?.REQUIRE_DECIDED).toContain("inputs.require-decided");
+    expect(engine?.env?.ADJUDICATE_PASSES).toContain("inputs.adjudicate-passes");
+    for (const token of ["require-decided=", "adjudicate-passes="]) {
+      expect(engine?.run, `the preflight never names ${token}`).toContain(token);
+    }
+    // It refuses, it does not warn: both inputs exist to make a run STRICTER, and a misspelt
+    // strictness that quietly does nothing is the failure they were added to remove.
+    expect(engine?.run).toContain("exit 1");
+  });
+
+  // The two gates that read `require-decided` have to agree on what it is. They did not: one
+  // matched 'true'|'pages', the other anything that was not 'false' or empty.
+  it("reads require-decided the same way in the gate that measures and the gate that fails", () => {
+    const measuring = ACTION.runs.steps.find((s) => s.name === "Completeness gate");
+    const gate = ACTION.runs.steps.find((s) => s.name === "Gate");
+    expect(measuring?.if).toContain("inputs.require-decided == 'true'");
+    expect(measuring?.if).toContain("inputs.require-decided == 'pages'");
+    expect(gate?.if).toContain("inputs.require-decided == 'true'");
+    expect(gate?.if).toContain("inputs.require-decided == 'pages'");
+  });
+
+  // THE DEFAULTS ARE THE DANGEROUS CASE. `adjudicate-passes` is 1 and `require-decided` is
+  // false, so an adjudication that ran out of turns used to end the job green with half the
+  // grid unruled — and on a green job an unruled criterion reads exactly like a passing one.
+  // Measured on a real pull request: 94 of 106 criteria came back « à évaluer » under a check
+  // that said success.
+  it("names what it did not rule on, whatever the inputs say", () => {
+    const residue = ACTION.runs.steps.find((s) => s.id === "residue");
+    expect(residue, "the action must always measure its own residue").toBeTruthy();
+    // Gated on the TIER having run, and on nothing else — not on require-decided, not on a
+    // pass count, not on fail-on.
+    expect(residue?.if).toBe("steps.adjudication.outputs.on == 'true'");
+    expect(residue?.run).toContain("verify --manual");
+    expect(residue?.run).toContain("::warning::");
+    // It names the criteria, not just a count: "12 left to assess" is not actionable.
+    expect(residue?.run).toContain("ids");
+    // …and it does not clobber the worklist the passes above were handed.
+    expect(residue?.run).not.toContain("--out audits");
+  });
+
+  it("measures the residue AFTER the last fold, or it measures nothing", () => {
+    const at = (needle: string): number => ACTION.runs.steps.findIndex((s) => s.name?.includes(needle));
+    expect(at("pass 3, fold")).toBeGreaterThan(0);
+    expect(idx("left to assess")).toBeGreaterThan(at("pass 3, fold"));
+    // …and before the gate that may fail the job on it.
+    expect(idx("left to assess")).toBeLessThan(idx("Gate"));
+  });
+
+  // The API tier must not cap its own worklist: `judge --max` bounds spend and would silently
+  // leave the tail unruled, which is the same omission by another route.
+  it("never caps the API tier's worklist", () => {
+    const api = adjudicationSteps().find((s) => s.run?.includes("judge"));
+    expect(api?.run, "--max would truncate the worklist").not.toContain("--max ");
+  });
+
+  // The agent tier is billed PER ITEM — a full RGAA worklist runs to ~90 — and it had no way
+  // to pick a model at all: `adjudicate-model` reached the API tier only, so the expensive
+  // mode was the one stuck on the harness default.
+  it("lets the agent tier pick its model, which is how a run gets cheaper", () => {
+    const worklists = adjudicationSteps().filter((s) => s.id?.startsWith("worklist"));
+    expect(worklists.length, "one worklist per pass").toBe(3);
+    for (const w of worklists) {
+      expect(w.env?.MODEL, `${w.name} does not read the model`).toContain("inputs.adjudicate-model");
+      expect(w.run, `${w.name} does not pass it on`).toContain("--model $MODEL");
+      // Caller-controlled, and about to be written to $GITHUB_OUTPUT where a newline would
+      // start a line of somebody else's choosing. Validated, not trusted.
+      expect(w.run, `${w.name} does not validate the id`).toContain("[!A-Za-z0-9._:/-]");
+      expect(w.run).toContain("args=$cargs");
+    }
+    // Every agent step takes the assembled string, so no pass is left on the default.
+    for (const a of adjudicationSteps().filter((s) => s.uses?.startsWith("anthropics/claude-code-action@"))) {
+      expect(String(a.with?.claude_args)).toMatch(/steps\.worklist\d?\.outputs\.args/);
+    }
+    expect(ACTION.inputs["adjudicate-model"]?.description, "the input still says API-only").toContain("BOTH");
+  });
+
+  // MEASURED on the first keyed run this repository ever performed: claude-code-action came
+  // back `is_error` after a single turn, and every step below it was SKIPPED — the Markdown
+  // report, the HTML report, the per-page dossiers, the artifact upload and the residue
+  // warning, all of them already computed or about to be. The job reported a failed
+  // accessibility audit when what had failed was one API call.
+  //
+  // The API tier had always honoured "an adjudication that fails is not an audit that fails",
+  // because a `run:` step can wrap itself in `if … else warning`. A `uses:` step cannot, and
+  // that is the whole reason this needs its own guard.
+  it("never lets a failed model call take the audit down with it", () => {
+    const agents = adjudicationSteps().filter((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
+    expect(agents.length, "one agent step per pass").toBe(3);
+    for (const a of agents) {
+      expect(a["continue-on-error"], `step "${a.name}" kills the run when the model call fails`).toBe(true);
+    }
+    // The failure is relocated, not swallowed: the fold decides what it costs, and it is the
+    // fold that knows about gate-adjudicated.
+    for (const f of adjudicationSteps().filter((s) => s.name?.includes("fold"))) {
+      expect(f.run).toContain("inputs.gate-adjudicated");
     }
   });
 
@@ -361,8 +501,12 @@ describe("the adjudication tier", () => {
 
   // Nobody is watching this run. claude-code-action sets no default turn limit.
   it("bounds the unattended agent run", () => {
+    // claude-code-action sets no default and nobody is watching this step. The flag now lives
+    // in the string the worklist step assembles, because `--model` beside it is optional.
+    const worklist = adjudicationSteps().find((s) => s.id === "worklist");
+    expect(worklist?.run).toContain("--max-turns $turns");
     const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
-    expect(agent?.with?.claude_args).toContain("--max-turns");
+    expect(agent?.with?.claude_args).toContain("steps.worklist.outputs.args");
   });
 
   // A fixed cap is a cliff, not a bound: the runbook is sequential and each criterion costs
@@ -373,8 +517,9 @@ describe("the adjudication tier", () => {
     const worklist = adjudicationSteps().find((s) => s.id === "worklist");
     expect(worklist?.run, "the worklist step must count the items").toContain("--json");
     expect(worklist?.run).toContain("turns=");
+    expect(worklist?.run).toContain("turns=");
     const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
-    expect(agent?.with?.claude_args).toContain("steps.worklist.outputs.turns");
+    expect(agent?.with?.claude_args).toContain("steps.worklist.outputs.args");
     // …and stay overridable, because a derived default is still a guess.
     expect(ACTION.inputs["adjudicate-max-turns"]).toBeTruthy();
     expect(ACTION.inputs["adjudicate-max-turns"]?.default).toBe("");
@@ -777,11 +922,14 @@ describe("the agent tier can go round again on what is still undecided", () => {
     expect(String(passStep(3, "Claude Code").if)).toContain("steps.worklist3.outputs.remaining != '0'");
   });
 
-  it("honours the cap: two passes stop at two, one pass never starts a second", () => {
-    expect(String(passStep(2, "worklist").if)).toContain("inputs.adjudicate-passes != '1'");
-    const third = String(passStep(3, "worklist").if);
-    expect(third).toContain("inputs.adjudicate-passes != '1'");
-    expect(third).toContain("inputs.adjudicate-passes != '2'");
+  it("honours the cap AND the floor: each pass names the counts it runs for", () => {
+    // Written as `!= '1'` and `!= '1' && != '2'`, the cap held but there was no floor:
+    // `adjudicate-passes: 0` — or an empty string, or a typo — matched neither exclusion and
+    // ran all three passes, billing a model for the most expensive branch on the input that
+    // asks for the least. Stated positively, the gate can only fire on a count that exists,
+    // and the preflight in `Resolve the engine` refuses the rest before any of this runs.
+    expect(String(passStep(2, "worklist").if)).toContain("(inputs.adjudicate-passes == '2' || inputs.adjudicate-passes == '3')");
+    expect(String(passStep(3, "worklist").if)).toContain("inputs.adjudicate-passes == '3'");
   });
 
   it("folds after every pass, through the same gate as the first", () => {
@@ -796,5 +944,73 @@ describe("the agent tier can go round again on what is still undecided", () => {
     // Same degradation policy as the first fold: an adjudication that decides nothing is a
     // grid that stays « to assess », not a build that breaks.
     for (const n of [2, 3]) expect(String(passStep(n, "fold").run)).toContain("::warning::");
+  });
+});
+
+// The keyed path is the half ci.yml cannot prove: the composite action resolves its
+// credential TWICE by two different mechanisms — bash reads the process environment, the
+// `uses:` step reads the `env` expression context — and only a run with a real credential
+// exercises the second. This workflow is the only thing in the repository that does, so its
+// shape is worth pinning even though it is dispatched by hand.
+describe("the keyed adjudication workflow can actually reach the tier it exists to test", () => {
+  const WF = parse(readFileSync(join(ROOT, ".github/workflows/adjudication.yml"), "utf8")) as {
+    jobs: Record<
+      string,
+      {
+        "timeout-minutes"?: number;
+        env?: Record<string, string>;
+        steps: { id?: string; name?: string; uses?: string; run?: string; if?: string; with?: Record<string, string> }[];
+      }
+    >;
+  };
+  const job = (): NonNullable<(typeof WF.jobs)[string]> => {
+    const j = WF.jobs.adjudicate;
+    if (!j) throw new Error("adjudication.yml has no `adjudicate` job");
+    return j;
+  };
+
+  // Wiring only ANTHROPIC_API_KEY locked an OAuth-only repository out of `mode: agent` —
+  // the mode that needs no API key at all, and the common case for a team already running
+  // Claude Code. The workflow refused at its second step and the tier was never reached.
+  it("wires both credentials, because the two tiers do not accept the same one", () => {
+    const env = job().env ?? {};
+    expect(env.ANTHROPIC_API_KEY).toContain("secrets.ANTHROPIC_API_KEY");
+    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toContain("secrets.CLAUDE_CODE_OAUTH_TOKEN");
+  });
+
+  it("requires the API key only for the tier that cannot do without it", () => {
+    const refuse = job().steps.find((s) => s.name?.startsWith("Refuse early"));
+    expect(refuse, "the workflow must still refuse a run it cannot perform").toBeTruthy();
+    const run = String(refuse?.run);
+    // agent → either credential; api → the key and nothing else.
+    expect(run).toContain("\"$MODE\" != 'agent'");
+    expect(run).toContain("\"$MODE\" != 'api'");
+    expect(run).toContain("CLAUDE_CODE_OAUTH_TOKEN");
+  });
+
+  // The engine is the committed zero-dep bundle, so nothing is installed — but package.json
+  // declares engines.node >= 22.18, and a job that pins no Node runs on whatever the runner
+  // image ships that week.
+  it("pins Node, like every other workflow that runs the engine", () => {
+    expect(job().steps.some((s) => s.uses?.startsWith("actions/setup-node@"))).toBe(true);
+  });
+
+  it("carries a timeout, so a wedged model call cannot burn six hours", () => {
+    expect(job()["timeout-minutes"]).toBeGreaterThan(0);
+  });
+
+  // `mode: both` measured the agent pass twice and called it both: the agent step is a fresh
+  // `uses: ./` whose own audit step rewrites audits/audit-latest.json from scratch, so the
+  // API verdicts are gone by the time a single trailing measurement runs.
+  it("measures each tier where its verdicts still exist", () => {
+    const steps = job().steps;
+    const at = (needle: string): number => steps.findIndex((s) => s.name?.includes(needle));
+    const apiRun = at("Adjudicate with the API");
+    const apiRead = at("What the API tier decided");
+    const agentRun = at("Adjudicate with an agent");
+    expect(apiRun, "the API tier must still run").toBeGreaterThanOrEqual(0);
+    expect(apiRead, "the API tier must be measured").toBeGreaterThan(apiRun);
+    expect(apiRead, "the API tier must be measured BEFORE the agent re-audits over it").toBeLessThan(agentRun);
+    expect(at("What the agent tier decided")).toBeGreaterThan(agentRun);
   });
 });

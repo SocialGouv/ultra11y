@@ -26,6 +26,8 @@ concurrency: act-refresh
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    # one corpus fetch plus the matrix rebuild; nothing here needs GitHub's six-hour default.
+    timeout-minutes: 30
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:

@@ -301,12 +301,19 @@ export function scoreboardBlocks(result: AuditResult, standard: StandardId, lang
   const scope = pagesOf(result);
   if (!scope.length) return [];
   const derived = derivePages(result, scope);
-  const rows = derived.map((p) => [
-    { text: `${p.name}${p.auth ? " 🔒" : ""}`, ...(sheetHref ? { href: sheetHref(p.id) } : {}) },
-    { text: p.url, mono: true },
-    { text: basisLabel(p.basis, lang) },
-    { text: formatRate(p.conformancePct, p.decided, p.total), align: "end" as const },
-  ]);
+  // Through the standard-aware helpers, exactly like `renderPageRates` in src/report.ts:
+  // `PageResult.conformancePct` is the WCAG core projection, so under a pack this cell used to
+  // quote a rate out of 55 beside a document counting 106.
+  const rows = derived.map((p) => {
+    const criteria = pageCriterionRows(result, p, standard, lang);
+    const cov = pageCoverage(criteria);
+    return [
+      { text: `${p.name}${p.auth ? " 🔒" : ""}`, ...(sheetHref ? { href: sheetHref(p.id) } : {}) },
+      { text: p.url, mono: true },
+      { text: basisLabel(p.basis, lang) },
+      { text: formatRate(pageRatePct(criteria), cov.decided, cov.total), align: "end" as const },
+    ];
+  });
   const out: Block[] = [
     { kind: "heading", level: 2, text: t.perPage, id: "pages" },
     {

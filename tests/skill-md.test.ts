@@ -134,12 +134,29 @@ describe("skill docs stay in sync with the CLI", () => {
   // `below-the-fold` in a delivered report and looks it up. A reason the engine can emit and
   // the reference does not name is a word the reader cannot resolve — and the table said
   // "twelve" for a whole release while the engine had its own ideas.
+  // A SKILL.md tells an agent to go and read rule N. Nothing checked that rule N was the rule
+  // meant: both pointers to the `--lang` obligation said "Core rule 5" while `--lang` is
+  // rule 7 and rule 5 is "Look the criterion up; never recall it". An agent that follows the
+  // pointer lands on an unrelated instruction and the obligation quietly evaporates — the
+  // failure mode a cross-reference exists to prevent.
+  it.each(SKILL_NAMES)("%s resolves every 'Core rule N' pointer to a rule that exists", (name) => {
+    const text = skills[name]!.body;
+    const rules = new Set<string>();
+    // The block is a blockquote of "> 1. **Title**…" lines; sub-rules like "3b" are numbered
+    // too, but nothing points at one, so the plain integers are what has to resolve.
+    for (const m of text.matchAll(/^>\s*(\d+)\.\s/gm)) rules.add(m[1]!);
+    expect(rules.size, `${name} declares no Core rules`).toBeGreaterThan(0);
+    for (const m of text.matchAll(/Core rule (\d+)/g)) {
+      expect(rules.has(m[1]!), `${name} points at Core rule ${m[1]} — it declares ${[...rules].join(", ")}`).toBe(true);
+    }
+  });
+
   it("names every evidence refusal reason in references/pages.md", () => {
     const doc = refBodies["pages.md"] ?? "";
     for (const skip of EVIDENCE_SKIPS) expect(doc.includes(`\`${skip}\``), `references/pages.md never names \`${skip}\``).toBe(true);
   });
 
-  it("pins the '53 static checks' prose claim to the real ALL_RULES count", () => {
+  it("pins the 'N static checks' prose claim to the real ALL_RULES count", () => {
     const count = ALL_RULES.length;
     for (const [name, text] of [
       ["SKILL.md", skills.ultra11y!.raw], // the claim is in the frontmatter description

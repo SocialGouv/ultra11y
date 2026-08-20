@@ -152,6 +152,47 @@ describe("mergeSnapshotAudit", () => {
     expect(sc?.justification).toBeUndefined(); // the "no relevant element" reason no longer holds
   });
 
+  // THE MIRROR OF THE TEST ABOVE, and the case it was missing. When the snapshot ALSO closes
+  // the criterion for want of a subject — no <video> in the source, none on the rendered page
+  // either — both halves read `C` and only the FLAG tells them apart. Testing the status
+  // instead stripped `inapplicable` and the justification from every such criterion.
+  //
+  // Two consequences, both silent. The `C` became the bare uncited conformity this engine
+  // refuses everywhere else. And `pageStatus` reads that flag to hold "a conformity reached
+  // for want of a subject holds on every page": without it those criteria fell through to the
+  // rule that only `static` criteria earn a verdict by silence, and came back « to assess »
+  // on EVERY page. Measured on a two-page RGAA crawl, the run reported a complete 106/106 grid
+  // while each page carried 10 criteria that could never be adjudicated, there being nothing
+  // there to adjudicate.
+  it("keeps a conformity reached FOR WANT OF A SUBJECT when the snapshot has no subject either", () => {
+    const b = base();
+    const before = b.criteria.find((c) => c.id === "1.2.1")!;
+    expect(before.status, "the source has no time-based media").toBe(INAPPLICABLE_STATUS);
+    expect(before.inapplicable).toBe(true);
+    expect(before.justification, "the claim must arrive citable").toBeTruthy();
+
+    // A full document, and still not a single <video>/<audio> anywhere.
+    const merged = mergeSnapshotAudit(b, snapAuditOf('<html lang="fr"><head><title>Accueil</title></head><body><main><h1>x</h1></main></body></html>'));
+    const after = merged.criteria.find((c) => c.id === "1.2.1")!;
+    expect(after.status).toBe(INAPPLICABLE_STATUS);
+    expect(after.inapplicable, "the snapshot measured nothing — it just had no subject either").toBe(true);
+    expect(after.justification).toBe(before.justification);
+  });
+
+  // …and the flag surviving is what the page projection needs: without it, a criterion nobody
+  // could ever rule on sits « to assess » on every page of the deliverable.
+  it("so the criterion still holds on the page, instead of asking for a verdict nobody can give", () => {
+    const root = tmp();
+    writeRunnerSnapshot(root, out(), "https://exemple.fr/");
+    const dir = join(root, PAGES_DIR, "accueil");
+    const merged = mergeSnapshotAudit(base(), runAudit({ inputs: [join(dir, "dom.html")] }));
+    merged.scope.pages = pageScopesFrom([readSnapshot(dir)!]);
+    merged.scope.pagesAudited = ["accueil"];
+    const [page] = derivePages(merged, merged.scope.pages);
+    expect(page!.basis, "the page must be snapshot-based for this to mean anything").toBe("snapshot");
+    expect(page!.criteria.find((c) => c.id === "1.2.1")?.status).toBe(INAPPLICABLE_STATUS);
+  });
+
   it("never lets the snapshot REMOVE applicability — a C in the base survives a snapshot that is NA", () => {
     const b = base();
     const c311 = b.criteria.find((x) => x.id === "3.1.1")!;

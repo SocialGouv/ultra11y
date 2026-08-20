@@ -691,6 +691,23 @@ export interface ParsedArgs {
   unknown: string[];
 }
 
+/** Is this token the NEXT FLAG rather than the previous flag's value?
+ *
+ *  Several value flags take an OPTIONAL value — `--ledger` bare means the standard's default
+ *  path, `--require-decided` bare means the run's grid — and the bare form is almost always
+ *  followed by another flag. Consumed blindly, the next flag became the value:
+ *  `verify --apply … --ledger --lang fr` wrote a 33 KB verdict ledger to a file literally
+ *  named `--lang`, never wrote `.ultra11y/verdicts/rgaa.json`, and — `--lang` having been
+ *  eaten — printed the run in the wrong language. Nothing failed and nothing warned; the next
+ *  run simply paid for the whole adjudication again, which is the cost the ledger exists to
+ *  remove.
+ *
+ *  Only `--` counts. A single dash is the stdin positional, and a value may legitimately be
+ *  negative or start with one. */
+function looksLikeFlag(token: string | undefined): boolean {
+  return token?.startsWith("--") ?? false;
+}
+
 export function parseArgs(argv: string[]): ParsedArgs {
   const [command, ...rest] = argv;
   const valueFlags = valueFlagsFor(command ?? "");
@@ -708,7 +725,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       const inlineVal = eq === -1 ? undefined : a.slice(eq + 1);
       let val: string | boolean;
       if (inlineVal !== undefined) val = inlineVal;
-      else if (valueFlags.has(key)) val = rest[++i] ?? "";
+      else if (valueFlags.has(key) && !looksLikeFlag(rest[i + 1])) val = rest[++i] ?? "";
       else val = true;
       const prev = flags[key];
       if (LIST_FLAGS.has(key) && typeof prev === "string" && typeof val === "string") {

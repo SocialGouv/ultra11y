@@ -314,7 +314,7 @@ node scripts/ultra11y.mjs pack check ./packs/section508.json                  # 
 ```
 Add `--standard rgaa` to `report`/`prd`/`criteria`/`check`/`verify` for a country standard,
 `--pack ./pack.json` to load one at runtime, and `--json` anywhere for machine output.
-`--lang` follows the conversation (pass it explicitly — Core rule 5).
+`--lang` follows the conversation (pass it explicitly — Core rule 7).
 
 ## The loop: audit → render → judge → fix → re-audit
 
@@ -347,7 +347,7 @@ drive the judgment and content stages:
    per NC criterion) and `prd` (the same blocks as an actionable backlog; `tickets`
    filing one GitHub issue per criterion with that identical block) are two views of the
    ONE building block, in the language of this conversation (pass `--lang` explicitly —
-   Core rule 5).
+   Core rule 7).
 
 6. **Hand the change over to `review-a11y`, in a subagent.** Once the deliverable is out,
    the code you just fixed still has to be reviewed as a *change*, and that is the other
