@@ -453,6 +453,56 @@ jobs:
             console.log("pages:", p.map(x => x.id + " " + x.conformancePct + "%").join(", "));
           '
 
+      # THE BROWSER TIER THE ACTION BUILDS FOR ITSELF — the path a real consumer takes.
+      #
+      # Every step above runs with this repository's OWN Playwright resolved from its
+      # node_modules, so `browser: auto` correctly finds a tier and skips installing. That
+      # proves the leave-it-alone half and nothing else. A consumer of
+      # `uses: maxgfr/ultra11y@v5` has no such node_modules — the action is a bare checkout —
+      # which is the case that silently lost every rendering criterion, and the case no unit
+      # test can stage because it parses the YAML rather than running it.
+      #
+      # `browser: install` forces the build regardless of what resolves here, so this step
+      # exercises exactly that: npm into a scratch prefix, `playwright install chromium`, and a
+      # scan that resolves Playwright from `--cwd <prefix>` instead of from the repo.
+      - name: The action builds its own browser tier, and scans with it
+        uses: ./
+        with:
+          paths: tests/fixtures/conforming
+          standard: rgaa
+          since: ""
+          fail-on: ""
+          sarif: "false"
+          comment: "false"
+          runtime: local
+          browser: install
+          urls: http://127.0.0.1:8931/
+          artifact-name: action-e2e-browser-tier
+
+      - name: The tier it built is the one the scan used
+        run: |
+          # The prefix exists and carries BOTH packages — a partial install that still let the
+          # scan fall through to the repo's own Playwright would pass every other assertion
+          # here while proving nothing.
+          for pkg in "@playwright/test" "@axe-core/playwright"; do
+            test -d "$RUNNER_TEMP/ultra11y-browser/node_modules/$pkg" \
+              || { echo "::error::the action did not install $pkg into its scratch prefix"; exit 1; }
+          done
+          test -d "$RUNNER_TEMP/ultra11y-browser/node_modules/.bin" || true
+          # And the scan really produced a rendered verdict through it: a snapshot with the
+          # measurement beside it, which is what makes a rendering criterion decidable at all.
+          test -f .ultra11y/pages/accueil/probes.json \
+            || { echo "::error::no probes.json — the tier was installed but the scan did not measure through it"; exit 1; }
+          test -f .ultra11y/pages/accueil/axe.json \
+            || { echo "::error::no axe.json — axe did not run through the installed tier"; exit 1; }
+          node -e '
+            const a = JSON.parse(require("fs").readFileSync("audits/audit-latest.json", "utf8"));
+            const cov = (a.scope.pageCoverage || {})["accueil"] || {};
+            if (!cov.axe) { console.error("::error::pageCoverage.axe is not set — axe did not run"); process.exit(1); }
+            if (!(cov.scs || []).length) { console.error("::error::no probed criteria recorded"); process.exit(1); }
+            console.log("browser tier built by the action measured:", (cov.scs || []).join(", "));
+          '
+
       # …and through the ACTION's own input, which is the surface a consumer actually wires.
       # The CLI checks below prove the logic; this proves the WIRING — input to step to Gate.
       # They are different failures, and the second one is invisible: an input that never

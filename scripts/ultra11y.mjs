@@ -66779,7 +66779,7 @@ Usage:
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
-  ultra11y status   [--json] [--project]        (doctor: which agents will run the review by themselves)
+  ultra11y status   [--json] [--project] [--browser [--cwd <dir>]]   (doctor: which agents run the review; --browser asks whether the scan tier resolves here)
   ultra11y dev      [--port <n>] [--root <dir>] [--standard <pack>] [--lang auto|en|fr]   (dev side-car: live overlay + per-page dashboard)
   ultra11y dev      --next [--port <n>]        (write the Next overlay component, then wire one line into your layout)
 
@@ -67302,6 +67302,10 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "agents-md",
   "all",
   "project",
+  // `status`: ALSO ask whether the browser tier resolves here — the question `scan --runtime
+  // local` answers for itself, exposed so a caller (the GitHub Action) can branch on it
+  // instead of re-deriving it in shell.
+  "browser",
   "no-skills"
 ]);
 var KNOWN_FLAGS = /* @__PURE__ */ new Set([...VALUE_FLAGS2, ...BOOLEAN_FLAGS]);
@@ -68127,14 +68131,20 @@ function reportInstall(results, verb) {
 }
 function cmdStatus(p) {
   const rows = statusReport({ project: p.flags.project === true });
+  const browser = p.flags.browser === true ? localTierStatus(typeof p.flags.cwd === "string" && p.flags.cwd ? p.flags.cwd : ".") : void 0;
   if (p.flags.json === true) {
-    console.log(JSON.stringify({ version: VERSION, targets: rows }, null, 2));
+    console.log(JSON.stringify({ version: VERSION, targets: rows, ...browser ? { browser } : {} }, null, 2));
     return 0;
   }
   console.log(`ultra11y ${VERSION}`);
   for (const r of rows) {
     console.log(`  ${r.target.padEnd(12)} ${r.wired ? "wired    " : "not wired"}  ${r.path}`);
     if (r.note) console.log(`  ${"".padEnd(12)} ${r.note}`);
+  }
+  if (browser) {
+    console.log(
+      `  ${"browser".padEnd(12)} ${browser.ok ? "available" : "unavailable"}  ${browser.ok ? "@playwright/test + @axe-core/playwright" : browser.reason}`
+    );
   }
   return 0;
 }

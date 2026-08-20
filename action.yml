@@ -36,7 +36,7 @@ inputs:
     required: false
     default: 'false'
   urls:
-    description: 'Space-separated URLs to scan with a real browser (computed contrast, focus, zoom, reflow). Needs the app running (see `start`/`wait-on`) AND a browser tier: either a Chromium binary for the Playwright that ships with ultra11y (or the repo''s own), or Docker on the runner. Leave empty to audit the code only.'
+    description: 'Space-separated URLs to scan with a real browser (computed contrast, focus, zoom, reflow). Needs the app running (see `start`/`wait-on`); the browser tier itself is provided for you by default — see `browser`, which installs Playwright + a Chromium binary unless your repository already pins its own (or you force `runtime: docker`). Leave empty to audit the code only.'
     required: false
     default: ''
   sample:
@@ -61,6 +61,10 @@ inputs:
     default: '0'
   runtime:
     description: 'Browser tier for the page scan: `auto` (default — Playwright + @axe-core/playwright, the repo''s own when it has them and ultra11y''s otherwise, provided a browser binary is on disk; else a Docker image), `local`, or `docker`. Worth setting explicitly when the scan MUST have the local tier: an authenticated scan (`storage-state`, or a `storageState` on a sample page) is local-only, and on `auto` a runner with no Chromium binary silently degrades to Docker, which then refuses the run.'
+    required: false
+    default: 'auto'
+  browser:
+    description: 'Whether this action PROVIDES the browser tier the scan needs: `auto` (default) installs `@playwright/test` + `@axe-core/playwright` and a Chromium binary into the runner temp directory, but ONLY when the working directory does not already resolve them; `install` always installs; `off` never does. This exists because the tier does not travel with the action: `scan --runtime local` resolves Playwright from the audited project first and from ultra11y''s own install second, and consumed as `uses: maxgfr/ultra11y@vN` that second anchor is a checkout with no node_modules beside it. So a repository that does not pin Playwright itself got no local tier, degraded to Docker, and silently lost every rendering criterion — contrast, zoom, reflow, text spacing. `auto` leaves a project that pins its own alone, deliberately: two copies of Playwright in one process hand out `Page` objects the other one''s fixtures do not recognise. Costs ~30-60s on a cold runner; the Chromium download is cacheable with actions/cache on `~/.cache/ms-playwright`.'
     required: false
     default: 'auto'
   storage-state:
@@ -385,6 +389,68 @@ runs:
     # Every scanned page is also PERSISTED as a snapshot unless `snapshot: false`. That is not
     # a nicety: a page known only by its URL cannot earn a conforming verdict (the static
     # rules never ran against its DOM), so without it the per-page grid is almost empty.
+    # THE BROWSER TIER DOES NOT TRAVEL WITH THE ACTION, and that was a silent hole.
+    #
+    # `scan --runtime local` resolves `@playwright/test` + `@axe-core/playwright` from the
+    # audited project first and from ultra11y's own install second (src/scan-local.ts
+    # `resolveAnchors`). Consumed as `uses: maxgfr/ultra11y@vN`, that second anchor is
+    # `$GITHUB_ACTION_PATH/scripts/ultra11y.mjs` — a checkout with NO node_modules beside it.
+    # So a consumer who simply wrote `crawl: http://localhost:3000` resolved nothing, degraded
+    # to Docker, and lost every rendering criterion — while the `urls` input promised them "a
+    # Chromium binary for the Playwright that ships with ultra11y".
+    #
+    # It asks the ENGINE whether it needs to act (`status --browser`), which is the very
+    # function `scan` will act on. Re-deriving "does Playwright resolve?" in shell would be a
+    # second answer, and it would eventually disagree with the command it exists to serve.
+    - name: Provide the browser tier
+      id: browsertier
+      if: (inputs.urls != '' || inputs.sample == 'true' || inputs.sitemap != '' || inputs.crawl != '') && inputs.browser != 'off' && inputs.runtime != 'docker'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+        MODE: ${{ inputs.browser }}
+      run: |
+        echo "cwd=" >> "$GITHUB_OUTPUT"
+
+        # A project that pins its OWN Playwright keeps it, and that is not politeness: two
+        # copies in one process hand out `Page` objects the other one's fixtures do not
+        # recognise. `install` skips the question and always builds a tier.
+        if [ "$MODE" != 'install' ]; then
+          if node "$ENGINE" status --browser --cwd . --json | node -e 'process.exit(JSON.parse(require("fs").readFileSync(0,"utf8")).browser.ok ? 0 : 1)'; then
+            echo "ultra11y: the working directory already resolves the browser tier — leaving it alone."
+            exit 0
+          fi
+        fi
+
+        # PINNED TO THE ACTION'S OWN MANIFEST. `playwright install` downloads the browsers a
+        # given Playwright version expects; a floating package spec would fetch one version's
+        # package and another's binaries.
+        pw=$(node -p "require('$GITHUB_ACTION_PATH/package.json').dependencies['@playwright/test']")
+        axe=$(node -p "require('$GITHUB_ACTION_PATH/package.json').dependencies['@axe-core/playwright']")
+        prefix="$RUNNER_TEMP/ultra11y-browser"
+        mkdir -p "$prefix"
+
+        # A FRESH PREFIX, never the audited repository. Installing a named package while
+        # omitting dev dependencies installs NOTHING when that package is already declared in
+        # the target's own devDependencies — npm answers "up to date" — which is exactly how
+        # this repository's CI once ran with no tier at all and degraded to a Docker container
+        # that could not reach the host. A directory that declares nothing cannot be hit by it.
+        if ! npm i --no-save --prefix "$prefix" "@playwright/test@$pw" "@axe-core/playwright@$axe" >/dev/null 2>&1; then
+          echo "::warning::ultra11y: could not install the browser tier — the scan falls back to whatever \`runtime\` resolves (Docker, or an explicit error)."
+          exit 0
+        fi
+        if ! (cd "$prefix" && npx --no-install playwright install chromium) >/dev/null 2>&1; then
+          echo "::warning::ultra11y: installed the packages but no Chromium binary — the scan falls back to whatever \`runtime\` resolves."
+          exit 0
+        fi
+
+        # Never fatal, at any step above. A tier we could not build is a scan that degrades the
+        # way it always did; failing the job here would turn a missing optional capability into
+        # a red build for people who never asked for it.
+        echo "cwd=$prefix" >> "$GITHUB_OUTPUT"
+        echo "ultra11y: browser tier ready in $prefix (@playwright/test@$pw)."
+
     - name: Scan the pages
       if: inputs.urls != '' || inputs.sample == 'true' || inputs.sitemap != '' || inputs.crawl != ''
       shell: bash
@@ -393,8 +459,13 @@ runs:
         ENGINE: ${{ steps.engine.outputs.path }}
         RUNTIME: ${{ inputs.runtime }}
         STORAGE_STATE: ${{ inputs.storage-state }}
+        # Empty unless the step above actually built one — `--cwd` is the resolution anchor and
+        # nothing else (snapshots keep going to the working directory), so pointing it at the
+        # scratch prefix only changes WHERE Playwright is found.
+        BROWSER_CWD: ${{ steps.browsertier.outputs.cwd }}
       run: |
         args=(--merge audits/audit-latest.json --out audits)
+        if [ -n "$BROWSER_CWD" ]; then args+=(--cwd "$BROWSER_CWD"); fi
         if [ '${{ inputs.snapshot }}' != 'true' ]; then args+=(--no-snapshot); fi
         # Read from the environment, never interpolated into the script — see the note on the
         # adjudication step: an input is caller-controlled data, and a quote in it would

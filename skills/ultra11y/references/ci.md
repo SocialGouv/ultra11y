@@ -367,6 +367,42 @@ crawl is never a job that merely looks hung.
 served HTML, and a listing that links a source file makes the browser start a download instead
 of a navigation — which stops the scan.
 
+### The browser tier comes with the action now (`browser`)
+
+The tier does not travel with the action, and that used to be a silent hole. `scan --runtime
+local` resolves `@playwright/test` + `@axe-core/playwright` from the audited project first and
+from ultra11y's own install second — and consumed as `uses: maxgfr/ultra11y@v5`, that second
+anchor is a checkout with **no `node_modules` beside it**. So a repository that did not pin
+Playwright itself resolved nothing, degraded to Docker, and lost every rendering criterion:
+contrast, zoom, reflow, text spacing. The `urls` input meanwhile promised "a Chromium binary
+for the Playwright that ships with ultra11y". It did not ship.
+
+`browser: auto` (the default) closes it: the action asks the engine whether the tier resolves
+(`status --browser`, the same function `scan` acts on — never a shell re-derivation), and only
+if it does not, installs the two packages **pinned to the action's own manifest** plus a
+Chromium binary into `$RUNNER_TEMP`, then points `--cwd` there. `install` skips the question;
+`off` restores the old behaviour.
+
+Three things it deliberately does:
+
+- **Leaves a project that pins its own Playwright alone.** Two copies in one process hand out
+  `Page` objects the other one's fixtures do not recognise.
+- **Installs into a scratch prefix, never into your tree.** Installing a named package while
+  omitting dev dependencies installs *nothing* when that package is already in the target's own
+  devDependencies — npm answers "up to date" — which is how this repository's own CI once ran
+  with no tier at all. A directory that declares nothing cannot be hit by it.
+- **Never fails the job.** A tier it could not build is a `::warning::` and a scan that degrades
+  exactly as it did before; a missing optional capability must not turn into a red build.
+
+Cache the download to make it free after the first run:
+
+```yaml
+- uses: actions/cache@v4
+  with:
+    path: ~/.cache/ms-playwright
+    key: ms-playwright-${{ runner.os }}
+```
+
 Every scanned page is also **persisted as a snapshot** and folded into the audit
 (`snapshot: 'false'` opts out). That is not a nicety: a page known only by its URL cannot earn
 a conforming verdict — the static rules never ran against its DOM — so without it the per-page

@@ -63,10 +63,23 @@ describe("the action is well-formed", () => {
 });
 
 describe("it runs the engine that ships with it", () => {
+  // THE ENGINE ships in the action and is never fetched. A blanket ban on `npm` used to stand
+  // in for that, and it was accurate while the action installed nothing at all — but the
+  // BROWSER TIER cannot ship in a git checkout (it is a 100+ MB binary), so the action now
+  // installs Playwright when a scan needs it. The invariant that matters is unchanged and is
+  // asserted directly: nothing ever installs, or executes, ultra11y itself from a registry.
   it("resolves the bundle from GITHUB_ACTION_PATH, never from a registry", () => {
     expect(RAW).toContain("$GITHUB_ACTION_PATH/scripts/ultra11y.mjs");
-    expect(RAW).not.toMatch(/npm (i|install|exec)\s/);
     expect(RAW).not.toMatch(/npx ultra11y/);
+    expect(RAW).not.toMatch(/npm (i|install|exec)\s[^\n]*ultra11y/);
+  });
+
+  it("installs nothing but the browser tier, and nothing into the audited repository", () => {
+    const installs = RAW.match(/npm (?:i|install)\s[^\n]*/g) ?? [];
+    for (const line of installs) {
+      expect(line, "an npm install in this action must be the browser tier").toMatch(/@playwright\/test|@axe-core\/playwright/);
+      expect(line, "and must land in a scratch prefix, never in the consumer's tree").toContain("--prefix");
+    }
   });
 
   it("ships that bundle in the repository", () => {
@@ -188,6 +201,67 @@ describe("it publishes the page dimension as outputs", () => {
       expect(m, `${key} is not wired to a step output`).toBeTruthy();
       expect(ids.has(m![1] as string), `${key} names step "${m![1]}", which does not exist`).toBe(true);
     }
+  });
+});
+
+// THE BROWSER TIER, SHIPPED RATHER THAN ASSUMED.
+//
+// `scan --runtime local` resolves Playwright from the audited project first and from
+// ultra11y's own install second. Run as `uses: maxgfr/ultra11y@v5`, that second anchor is a
+// checkout with NO node_modules beside it — so a consumer who simply writes `crawl:` got no
+// local tier, degraded to Docker, and silently lost every rendering criterion. The action
+// installed nothing, while the `urls` input promised "a Chromium binary for the Playwright
+// that ships with ultra11y".
+describe("the action can provide its own browser tier", () => {
+  const step = (): (typeof ACTION.runs.steps)[number] | undefined => ACTION.runs.steps.find((s) => s.name?.includes("browser tier"));
+
+  it("takes a `browser` input, defaulting to auto", () => {
+    expect(ACTION.inputs.browser).toBeTruthy();
+    expect(ACTION.inputs.browser?.default).toBe("auto");
+  });
+
+  it("runs only when a scan was actually asked for", () => {
+    const cond = step()?.if ?? "";
+    for (const key of ["urls", "sample", "sitemap", "crawl"]) expect(cond, `the step must be gated on ${key}`).toContain(key);
+    expect(cond).toContain("browser");
+  });
+
+  it("asks the ENGINE whether it needs to install, never a shell re-derivation", () => {
+    // A second implementation of "does Playwright resolve?" is a second answer, and it will
+    // eventually disagree with the one `scan` acts on.
+    expect(step()?.run).toContain("status --browser");
+  });
+
+  it("installs into a scratch prefix, never into the audited repository", () => {
+    // `npm i --omit=dev <pkg>` installs NOTHING for a package already in the target's
+    // devDependencies — the trap that once left this repo's own CI with no tier at all. A
+    // fresh prefix declares nothing, so it cannot be hit.
+    expect(step()?.run).toContain("--prefix");
+    expect(step()?.run).toContain("RUNNER_TEMP");
+    expect(step()?.run).not.toContain("--omit=dev");
+  });
+
+  it("pins the versions to the action's own manifest, so the browsers match the packages", () => {
+    expect(step()?.run).toContain("GITHUB_ACTION_PATH");
+    expect(step()?.run).toContain("package.json");
+  });
+
+  it("downloads a browser binary, which is the half a package install does not bring", () => {
+    expect(step()?.run).toContain("playwright install");
+  });
+
+  it("hands the scan the prefix it installed into", () => {
+    const scan = ACTION.runs.steps.find((s) => s.name === "Scan the pages");
+    expect(scan?.run).toContain("--cwd");
+  });
+
+  it("runs before the scan — a tier provided afterwards provides nothing", () => {
+    expect(idx("browser tier")).toBeGreaterThan(-1);
+    expect(idx("browser tier")).toBeLessThan(idx("Scan the pages"));
+  });
+
+  it("never fails the job over it: a tier it could not build degrades to the runtime's own fallback", () => {
+    expect(step()?.run).toMatch(/continue|::warning::/);
   });
 });
 

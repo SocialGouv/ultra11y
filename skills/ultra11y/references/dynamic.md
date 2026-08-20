@@ -23,6 +23,11 @@ content on hover (1.4.13), target size (2.5.8). The dynamic tier decides them by
   |---|---|
   | ultra11y as an npm dependency (`ultra11y/playwright`, `pnpm exec ultra11y`) | **come with it** — they are its own `dependencies`. Nothing to install. |
   | the standalone skill bundle (`node scripts/ultra11y.mjs` from an installed skill) | **must be in the audited project**, reachable from `--cwd`. An installed skill is a directory of files with no `node_modules` beside it, so the second anchor finds nothing there. |
+  | the **GitHub Action** (`uses: maxgfr/ultra11y@vN`) | **the action installs them for you** (`browser: auto`, the default) into the runner temp directory, plus a Chromium binary, and points `--cwd` at it. Same blind spot as the skill bundle — the action is a checkout with no `node_modules` — but here it is closed rather than documented. A repository that pins its own Playwright is left alone. |
+
+  Which of those you are in is answerable: `status --browser [--cwd <dir>]` asks the very
+  function `scan --runtime local` acts on, and reports `ok` plus, when it is not, WHICH package
+  or binary is missing. That is what the action branches on, rather than re-deriving it.
 
   Either way, a project that installs them itself wins: `--cwd` is tried first, which is what a
   repository with its own pinned Playwright wants. When neither anchor resolves, `auto` degrades

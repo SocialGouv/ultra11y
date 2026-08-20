@@ -143,7 +143,7 @@ Usage:
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
-  ultra11y status   [--json] [--project]        (doctor: which agents will run the review by themselves)
+  ultra11y status   [--json] [--project] [--browser [--cwd <dir>]]   (doctor: which agents run the review; --browser asks whether the scan tier resolves here)
   ultra11y dev      [--port <n>] [--root <dir>] [--standard <pack>] [--lang auto|en|fr]   (dev side-car: live overlay + per-page dashboard)
   ultra11y dev      --next [--port <n>]        (write the Next overlay component, then wire one line into your layout)
 
@@ -683,6 +683,10 @@ const BOOLEAN_FLAGS = new Set([
   "agents-md",
   "all",
   "project",
+  // `status`: ALSO ask whether the browser tier resolves here — the question `scan --runtime
+  // local` answers for itself, exposed so a caller (the GitHub Action) can branch on it
+  // instead of re-deriving it in shell.
+  "browser",
   "no-skills",
 ]);
 const KNOWN_FLAGS: ReadonlySet<string> = new Set<string>([...VALUE_FLAGS, ...BOOLEAN_FLAGS]);
@@ -1871,14 +1875,28 @@ function reportInstall(results: ReturnType<typeof installForTargets>, verb: stri
  *  is otherwise invisible until a commit that should have been stopped goes through. */
 function cmdStatus(p: ParsedArgs): number {
   const rows = statusReport({ project: p.flags.project === true });
+  // --browser: CAN THE SCAN TIER RUN HERE? Asked of the engine, answered by the very function
+  // `scan --runtime local` acts on (`localTierStatus`), so a caller that branches on this
+  // cannot end up disagreeing with the command it is branching for. A second implementation
+  // of "does Playwright resolve?" — in a shell script, say — is a second answer.
+  //
+  // Opt-in, because resolving two packages and stat-ing a browser binary is work the harness
+  // doctor has no reason to do. Exit code stays 0 either way: this is a QUESTION, and a doctor
+  // that exits non-zero is one nobody can put in an `if`.
+  const browser = p.flags.browser === true ? localTierStatus(typeof p.flags.cwd === "string" && p.flags.cwd ? p.flags.cwd : ".") : undefined;
   if (p.flags.json === true) {
-    console.log(JSON.stringify({ version: VERSION, targets: rows }, null, 2));
+    console.log(JSON.stringify({ version: VERSION, targets: rows, ...(browser ? { browser } : {}) }, null, 2));
     return 0;
   }
   console.log(`ultra11y ${VERSION}`);
   for (const r of rows) {
     console.log(`  ${r.target.padEnd(12)} ${r.wired ? "wired    " : "not wired"}  ${r.path}`);
     if (r.note) console.log(`  ${"".padEnd(12)} ${r.note}`);
+  }
+  if (browser) {
+    console.log(
+      `  ${"browser".padEnd(12)} ${browser.ok ? "available" : "unavailable"}  ${browser.ok ? "@playwright/test + @axe-core/playwright" : browser.reason}`,
+    );
   }
   return 0;
 }
