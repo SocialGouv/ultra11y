@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.19.0](https://github.com/maxgfr/ultra11y/compare/v5.18.2...v5.19.0) (2026-08-20)
+
+
+### Features
+
+* **ci:** the keyed dispatch can ask for a second and third pass ([774f5d0](https://github.com/maxgfr/ultra11y/commit/774f5d00b4fc61031687252c6e9102c32e1bd58d))
+
 ## [5.18.2](https://github.com/maxgfr/ultra11y/compare/v5.18.1...v5.18.2) (2026-08-20)
 
 
