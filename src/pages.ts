@@ -464,13 +464,18 @@ export function pageGridModel(result: AuditResult, derived: PageResult[], standa
  *  there is re-added to the grid with the same basis as one really visited. Removing it is
  *  correct and insufficient: the report would then just be shorter than the sample the
  *  project declares, and a silently shorter report reads as a complete one. So the drop is
- *  stated — which page, where it went, and why — because that is what makes it fixable. */
+ *  stated — which page, where it went, and why — because that is what makes it fixable.
+ *
+ *  The notice says "page(s)", not "sample page(s)": a crawl refuses pages too — a followed
+ *  link that answers 404 — and there is no sample behind those. Naming one in an auditor's
+ *  document that never declared a sample is a small false statement in a document whose
+ *  whole value is that it makes none. */
 export function renderRedirected(redirected: ScanRedirect[], lang: Lang = "en"): string[] {
   const fr = lang === "fr";
   const out: string[] = [
     fr
-      ? `> ⚠️ **${redirected.length} page(s) de l'échantillon n'ont pas été enregistrées** — le navigateur n'est pas resté sur l'adresse demandée. Les enregistrer aurait décrit un autre écran sous le nom demandé. Elles ne comptent donc ni comme conformes ni comme non conformes : elles manquent.`
-      : `> ⚠️ **${redirected.length} sample page(s) were not recorded** — the browser did not stay on the address asked for. Recording them would have described another screen under the requested name. They count as neither conforming nor non-conforming: they are missing.`,
+      ? `> ⚠️ **${redirected.length} page(s) n'ont pas été enregistrées** — le navigateur n'est pas resté sur l'adresse demandée. Les enregistrer aurait décrit un autre écran sous le nom demandé. Elles ne comptent donc ni comme conformes ni comme non conformes : elles manquent.`
+      : `> ⚠️ **${redirected.length} page(s) were not recorded** — the browser did not stay on the address asked for. Recording them would have described another screen under the requested name. They count as neither conforming nor non-conforming: they are missing.`,
     "",
     fr ? "| Page | Demandé | Atteint | Motif |" : "| Page | Requested | Landed | Reason |",
     "| --- | --- | --- | --- |",

@@ -786,9 +786,15 @@ describe("the action is EXECUTED by CI, not only parsed", () => {
   // Everything above reads action.yml. But a composite action is bash — arrays, `set -e`,
   // quoting — and none of that is provable by reading YAML. The `action` job uses the real
   // thing end to end; without it, this whole file could stay green while the action was
-  // broken for every consumer.
+  // broken for every consumer — which is what happened the day `npm i --omit=dev` silently
+  // installed nothing.
+  //
+  // That job is now HAND-DISPATCHED: it is the heaviest in the file and the owner did not
+  // want it on every push. The assertions below still hold the job's shape, and the last one
+  // pins the gate itself — so the day someone widens or narrows it, they do it on purpose.
   const CI = parse(readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8")) as {
-    jobs: Record<string, { steps: { name?: string; uses?: string; run?: string; with?: Record<string, string> }[] }>;
+    on?: Record<string, unknown>;
+    jobs: Record<string, { if?: string; steps: { name?: string; uses?: string; run?: string; with?: Record<string, string> }[] }>;
   };
 
   const actionJob = (): { steps: { name?: string; uses?: string; run?: string; with?: Record<string, string> }[] } => {
@@ -796,6 +802,12 @@ describe("the action is EXECUTED by CI, not only parsed", () => {
     if (!job) throw new Error("ci.yml has no `action` job — the shipped action would be parsed but never executed");
     return job;
   };
+
+  it("runs only when somebody asks, and the workflow still offers that button", () => {
+    expect(CI.jobs.action?.if, "the `action` job's trigger changed").toBe("github.event_name == 'workflow_dispatch'");
+    // A dispatch-only job in a workflow with no dispatch trigger is a job that can never run.
+    expect(Object.keys(CI.on ?? {}), "ci.yml has no workflow_dispatch to run it from").toContain("workflow_dispatch");
+  });
 
   it("has a job that runs `uses: ./`", () => {
     expect(actionJob().steps.filter((s) => s.uses === "./").length).toBeGreaterThanOrEqual(1);

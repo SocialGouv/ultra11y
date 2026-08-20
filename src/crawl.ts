@@ -83,6 +83,28 @@ export function nameFromUrl(url: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** `/index.html` and `/` are the same document on every conventional server, and a crawl
+ *  reaches both: the entry point is `/` while the site's own nav links to `/index.html`.
+ *  Left distinct they become two pages in the deliverable — the same screen audited twice,
+ *  two identical columns in the grid, and its criteria weighted double in every per-page
+ *  aggregate. Measured on a three-page test site: four pages reported, two of them the home
+ *  page.
+ *
+ *  Only the DIRECTORY-INDEX filenames, and only as a whole path segment. Whatever else a
+ *  server may alias is its own business: guessing there would merge two pages that really
+ *  are different, and a page merged away is a page nobody audits — the worse error of the
+ *  two, and a silent one. */
+export function canonicalUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.hash = "";
+    u.pathname = u.pathname.replace(/(^|\/)index\.x?html?$/i, "$1");
+    return u.href;
+  } catch {
+    return url; // not a URL — the caller's own string is the best identity available
+  }
+}
+
 export interface CrawlOpts {
   fetchHtml: (url: string) => Promise<string>;
   depth?: number;
@@ -95,8 +117,9 @@ export async function crawlUrls(start: string, opts: CrawlOpts): Promise<string[
   const depth = opts.depth ?? 1;
   const max = opts.max ?? 50;
   const order: string[] = [];
-  const seen = new Set<string>([start]);
-  const queue: { url: string; d: number }[] = [{ url: start, d: 0 }];
+  const first = canonicalUrl(start);
+  const seen = new Set<string>([first]);
+  const queue: { url: string; d: number }[] = [{ url: first, d: 0 }];
 
   while (queue.length > 0 && order.length < max) {
     const { url, d } = queue.shift()!;
@@ -109,9 +132,10 @@ export async function crawlUrls(start: string, opts: CrawlOpts): Promise<string[
       continue;
     }
     for (const link of extractLinks(html, url)) {
-      if (seen.has(link)) continue;
-      seen.add(link);
-      queue.push({ url: link, d: d + 1 });
+      const canon = canonicalUrl(link);
+      if (seen.has(canon)) continue;
+      seen.add(canon);
+      queue.push({ url: canon, d: d + 1 });
     }
   }
   return order;

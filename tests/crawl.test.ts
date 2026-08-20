@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseSitemapUrls, extractLinks, crawlUrls } from "../src/crawl.js";
+import { parseSitemapUrls, extractLinks, crawlUrls, canonicalUrl } from "../src/crawl.js";
 
 describe("parseSitemapUrls", () => {
   it("extracts every <loc> from a urlset, trimming whitespace", () => {
@@ -53,6 +53,60 @@ describe("crawlUrls", () => {
   });
   it("honours the max-pages cap regardless of depth", async () => {
     const urls = await crawlUrls("https://exemple.fr/", { fetchHtml, depth: 5, max: 2 });
+    expect(urls).toEqual(["https://exemple.fr/", "https://exemple.fr/a"]);
+  });
+});
+
+// A crawl reaches the home page twice on almost every real site: the entry point is `/` and
+// the site's own nav links to `/index.html`. Measured on a three-page test site, the
+// deliverable came back with FOUR pages — two of them the same screen, two identical columns
+// in the grid, and its criteria weighted double in every per-page aggregate.
+describe("canonicalUrl", () => {
+  it("folds the directory index onto its directory", () => {
+    expect(canonicalUrl("https://exemple.fr/index.html")).toBe("https://exemple.fr/");
+    expect(canonicalUrl("https://exemple.fr/index.htm")).toBe("https://exemple.fr/");
+    expect(canonicalUrl("https://exemple.fr/blog/index.html")).toBe("https://exemple.fr/blog/");
+    expect(canonicalUrl("https://exemple.fr/INDEX.HTML")).toBe("https://exemple.fr/");
+  });
+
+  it("strips the fragment, which is the same page by definition", () => {
+    expect(canonicalUrl("https://exemple.fr/a#contenu")).toBe("https://exemple.fr/a");
+  });
+
+  // The narrow rule is deliberate: merging two pages that really are different is the worse
+  // error of the two, because a page merged away is a page nobody audits — and silently.
+  it("touches nothing else", () => {
+    for (const url of [
+      "https://exemple.fr/a",
+      "https://exemple.fr/index.html.old",
+      "https://exemple.fr/reindex.html",
+      "https://exemple.fr/a?index.html",
+      "https://exemple.fr/produits/index.php",
+    ]) {
+      expect(canonicalUrl(url)).toBe(url);
+    }
+  });
+
+  it("hands back a string it cannot parse, rather than losing it", () => {
+    expect(canonicalUrl("pas une url")).toBe("pas une url");
+  });
+});
+
+describe("crawlUrls folds the home page's two addresses into one", () => {
+  const pages: Record<string, string> = {
+    "https://exemple.fr/": '<a href="/index.html">Accueil</a><a href="/a">a</a>',
+    "https://exemple.fr/a": '<a href="/index.html">Accueil</a>',
+  };
+  const fetchHtml = async (url: string): Promise<string> => pages[url] ?? "";
+
+  it("never queues /index.html beside /", async () => {
+    const urls = await crawlUrls("https://exemple.fr/", { fetchHtml, depth: 3, max: 50 });
+    expect(urls).toEqual(["https://exemple.fr/", "https://exemple.fr/a"]);
+  });
+
+  it("…and starting FROM /index.html lands on the same identity", async () => {
+    const urls = await crawlUrls("https://exemple.fr/index.html", { fetchHtml, depth: 3, max: 50 });
+    expect(urls[0]).toBe("https://exemple.fr/");
     expect(urls).toEqual(["https://exemple.fr/", "https://exemple.fr/a"]);
   });
 });
