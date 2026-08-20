@@ -31,6 +31,10 @@ on:
         type: choice
         options: [wcag, rgaa]
         default: rgaa
+      model:
+        description: 'Model id for the tier under test. Empty lets each tier choose its own default.'
+        type: string
+        default: ''
 
 # `contents: read` is enough BECAUSE the composite action hands claude-code-action the job's
 # own `github.token`. Without that it would mint a GitHub App token over OIDC and this job
@@ -104,6 +108,7 @@ jobs:
           sarif: "false"
           comment: "false"
           adjudicate: api
+          adjudicate-model: ${{ inputs.model }}
           artifact-name: adjudication-api
 
       # Measured HERE, not at the end. The agent step below is a fresh `uses: ./` whose own
@@ -131,6 +136,7 @@ jobs:
           sarif: "false"
           comment: "false"
           adjudicate: agent
+          adjudicate-model: ${{ inputs.model }}
           artifact-name: adjudication-agent
 
       - name: What the agent tier decided
