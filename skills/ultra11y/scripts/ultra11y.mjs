@@ -67064,6 +67064,9 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
 ]);
 var KNOWN_FLAGS = /* @__PURE__ */ new Set([...VALUE_FLAGS2, ...BOOLEAN_FLAGS]);
 var LIST_FLAGS = /* @__PURE__ */ new Set(["include", "exclude", "ext"]);
+function looksLikeFlag(token) {
+  return token?.startsWith("--") ?? false;
+}
 function parseArgs(argv) {
   const [command, ...rest] = argv;
   const valueFlags = valueFlagsFor(command ?? "");
@@ -67078,7 +67081,7 @@ function parseArgs(argv) {
       const inlineVal = eq === -1 ? void 0 : a.slice(eq + 1);
       let val;
       if (inlineVal !== void 0) val = inlineVal;
-      else if (valueFlags.has(key)) val = rest[++i2] ?? "";
+      else if (valueFlags.has(key) && !looksLikeFlag(rest[i2 + 1])) val = rest[++i2] ?? "";
       else val = true;
       const prev = flags2[key];
       if (LIST_FLAGS.has(key) && typeof prev === "string" && typeof val === "string") {

@@ -57,6 +57,34 @@ describe("parseArgs", () => {
     expect(parseArgs(["audit", "src", "--ext", "tsx", "--ext", "jsx"]).flags.ext).toBe("tsx,jsx");
     expect(parseArgs(["audit", "src", "--out", "a", "--out", "b"]).flags.out).toBe("b");
   });
+
+  // MEASURED, on a real RGAA run of this repository:
+  //   verify --apply … --ledger --lang fr
+  // `--ledger` takes an OPTIONAL value (bare = the standard's default path), so it ate
+  // `--lang` and wrote a 33 KB verdict ledger to a file literally named `--lang`.
+  // `.ultra11y/verdicts/rgaa.json` was never written, and `--lang fr` having been consumed,
+  // the whole run printed in English. Nothing failed and nothing warned — the next run simply
+  // paid the entire adjudication again, which is the one cost the ledger exists to remove.
+  it("does not swallow the NEXT FLAG as an optional flag's value", () => {
+    const p = parseArgs(["verify", "--apply", "v.json", "--ledger", "--lang", "fr"]);
+    expect(p.flags.ledger, "--ledger ate the next flag").toBe(true);
+    expect(p.flags.lang, "--lang never survived to be read").toBe("fr");
+  });
+
+  it("still takes a real value, and a bare flag at the end of argv", () => {
+    expect(parseArgs(["verify", "--ledger", "custom.json"]).flags.ledger).toBe("custom.json");
+    // At the END of argv there is no next token to mistake for a value, so this keeps the
+    // behaviour it always had: the empty string. `ledgerTarget` reads both it and `true` as
+    // "bare — use the standard's default path", so the two forms are one instruction.
+    expect(parseArgs(["verify", "--ledger"]).flags.ledger).toBe("");
+    // `--key=value` is unaffected: the value never comes from the next token.
+    expect(parseArgs(["verify", "--ledger=x.json", "--lang", "fr"]).flags.ledger).toBe("x.json");
+  });
+
+  it("leaves a single dash alone — it is the stdin positional, not a flag", () => {
+    const p = parseArgs(["audit", "--out", "-"]);
+    expect(p.flags.out, "'-' is a legitimate value").toBe("-");
+  });
 });
 
 describe("main — help / version / unknown", () => {
