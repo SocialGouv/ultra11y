@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.17.0](https://github.com/maxgfr/ultra11y/compare/v5.16.0...v5.17.0) (2026-08-20)
+
+
+### Bug Fixes
+
+* **action:** a failed model call no longer takes the whole audit down ([e02c21e](https://github.com/maxgfr/ultra11y/commit/e02c21e38760749c63e3b8c23b7a4720a80c07f7))
+* **action:** no criterion leaves the adjudication tier unaccounted for ([a00bcb6](https://github.com/maxgfr/ultra11y/commit/a00bcb6fb42e2477c56cc716af86d5090692ca2b))
+* **ci:** the keyed adjudication runs on an OAuth token, and measures each tier ([b0f77d4](https://github.com/maxgfr/ultra11y/commit/b0f77d47aa82319e22c00319ae3fc3a4d6e647a4))
+* **cli:** a value flag no longer swallows the next flag ([5158fc9](https://github.com/maxgfr/ultra11y/commit/5158fc914276647ae32313dd5416bf3e2ed3ce1b))
+* **pages:** the grid's rate counts the standard the grid renders ([65c4f9a](https://github.com/maxgfr/ultra11y/commit/65c4f9ab0bedb96a8cb1f64e631cf4923cf46115))
+* **scan:** a conformity reached for want of a subject survives the merge ([2279c62](https://github.com/maxgfr/ultra11y/commit/2279c626b155a2d73e9d84f41f20934960bca613))
+
+
+### Features
+
+* **action:** adjudicate-model reaches the agent tier, not just the API one ([a929a7f](https://github.com/maxgfr/ultra11y/commit/a929a7f72a3dae626d32e59a1420033d841bb4fa))
+* **ci:** the keyed dispatch chooses the model it pays for ([cb6729d](https://github.com/maxgfr/ultra11y/commit/cb6729d9bfc3586518e06f49ede76d66652b83e4))
+
 # [5.16.0](https://github.com/maxgfr/ultra11y/compare/v5.15.1...v5.16.0) (2026-08-20)
 
 
