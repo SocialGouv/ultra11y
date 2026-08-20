@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.16.0](https://github.com/maxgfr/ultra11y/compare/v5.15.1...v5.16.0) (2026-08-20)
+
+
+### Features
+
+* **deps:** ship the browser tier's own packages instead of asking for them ([6226c47](https://github.com/maxgfr/ultra11y/commit/6226c475680d2f60091335726dcde531aa1bb031))
+
 ## [5.15.1](https://github.com/maxgfr/ultra11y/compare/v5.15.0...v5.15.1) (2026-08-19)
 
 
