@@ -1,6 +1,7 @@
-// `scan --runtime local` — the dynamic tier WITHOUT Docker. Resolves a host/target
-// Playwright + @axe-core/playwright AT RUNTIME (createRequire, a node: builtin) from
-// `--cwd`, so the zero-dep static engine bundle never gains a static browser import.
+// `scan --runtime local` — the dynamic tier WITHOUT Docker. Resolves Playwright +
+// @axe-core/playwright AT RUNTIME (createRequire, a node: builtin) from `--cwd` first and
+// from this package second, so the zero-dep static engine bundle never gains a static
+// browser import while a project that installed ultra11y alone still gets the tier.
 // It runs the SAME axe-core pass as the Docker RUNNER, then the residual-criteria
 // probes axe cannot decide (focus visibility, 200% zoom, text spacing, content on
 // hover, target size). The Docker RUNNER / docker/* files are untouched (docker-sync).
@@ -59,6 +60,46 @@ interface LocalDeps {
 const PW_SPEC = "@playwright/test";
 const AXE_SPEC = "@axe-core/playwright";
 
+/** Where a runtime dependency may live, in the order that must be tried.
+ *
+ *  THE TARGET PROJECT FIRST, then this package — the same order `src/integrations/playwright.ts`
+ *  uses, and for the same two reasons. A repository that pins its own Playwright must keep it:
+ *  two copies in one process hand out `Page` objects the other one's fixtures do not recognise.
+ *  And a repository that has none must still get the tier, now that `@playwright/test` and
+ *  `@axe-core/playwright` are dependencies of ultra11y instead of something every caller had to
+ *  duplicate into its own manifest. Anchoring on `cwd` ALONE was the older contract, and it made
+ *  `--runtime local` unavailable to exactly the projects that had not read the prerequisites. */
+function resolveAnchors(cwd: string): string[] {
+  return [resolve(cwd, "package.json"), import.meta.url];
+}
+
+/** Load `spec` from the target project, else from this package. Rethrows the LAST failure, so
+ *  the message names the spec the caller asked for rather than the first anchor that missed. */
+function requireRuntime(cwd: string, spec: string): Any {
+  let last: unknown;
+  for (const from of resolveAnchors(cwd)) {
+    try {
+      return createRequire(from)(spec);
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last instanceof Error ? last : new Error(String(last));
+}
+
+/** Can `spec` be resolved from either anchor? Resolution only — never loads the module, so
+ *  probing the tier stays as cheap as it was when it only looked at `cwd`. */
+function resolvesRuntime(cwd: string, spec: string): boolean {
+  return resolveAnchors(cwd).some((from) => {
+    try {
+      createRequire(from).resolve(spec);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+
 /** Why the LOCAL tier is (un)usable from `cwd` — the one line a reader of a
  *  `runtime: auto` log gets before the Docker fallback takes over. A silent degrade is
  *  indistinguishable from a working fallback, so the reason must NAME what to install. */
@@ -68,16 +109,13 @@ export type LocalTierStatus = { ok: true } | { ok: false; reason: string };
  *  boolean. Drives the `runtime: auto` decision AND the message printed when it degrades
  *  to Docker. */
 export function localTierStatus(cwd: string): LocalTierStatus {
-  const req = createRequire(resolve(cwd, "package.json"));
   for (const spec of [PW_SPEC, AXE_SPEC]) {
-    try {
-      req.resolve(spec);
-    } catch {
-      return { ok: false, reason: `${spec} does not resolve from ${cwd}` };
+    if (!resolvesRuntime(cwd, spec)) {
+      return { ok: false, reason: `${spec} resolves neither from ${cwd} nor from ultra11y itself` };
     }
   }
   try {
-    const pw = req(PW_SPEC) as { chromium?: { executablePath?: () => string } };
+    const pw = requireRuntime(cwd, PW_SPEC) as { chromium?: { executablePath?: () => string } };
     const bin = pw.chromium?.executablePath?.();
     // No path at all ⇒ a Playwright that cannot tell us; treat as available and let the
     // launch report its own failure, rather than refusing a tier that might work.
@@ -112,15 +150,14 @@ export function resolveLocalDeps(cwd: string): LocalDeps {
   let chromium: Any;
   let AxeBuilder: Any;
   try {
-    const req = createRequire(resolve(cwd, "package.json"));
-    const pw = req(PW_SPEC);
-    const axeMod = req(AXE_SPEC);
+    const pw = requireRuntime(cwd, PW_SPEC);
+    const axeMod = requireRuntime(cwd, AXE_SPEC);
     chromium = pw.chromium;
     AxeBuilder = axeMod.default ?? axeMod;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(
-      `Playwright not resolvable from "${cwd}". Pass --cwd <dir> at a project with @playwright/test + @axe-core/playwright installed (e.g. --cwd packages/app), or use --runtime docker. (${msg})`,
+      `Playwright resolves neither from "${cwd}" nor from ultra11y itself. Both are dependencies of this package, so the usual cause is the standalone engine bundle running with no node_modules beside it: pass --cwd <dir> at a project that has @playwright/test + @axe-core/playwright (e.g. --cwd packages/app), or use --runtime docker. (${msg})`,
     );
   }
   if (!chromium || typeof AxeBuilder !== "function") {

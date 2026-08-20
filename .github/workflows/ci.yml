@@ -276,6 +276,8 @@ jobs:
       # --omit=dev to named specs already declared there ("up to date"), so
       # `scan --runtime auto` silently degraded to Docker — whose container cannot reach
       # 127.0.0.1 on the host (ERR_CONNECTION_REFUSED), and the job went red on every push.
+      # Both are runtime `dependencies` now, so that particular trap cannot recur; the plain
+      # `pnpm install` below is still what pins them, and the browser is still its own step.
       - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v7

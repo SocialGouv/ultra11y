@@ -5,18 +5,23 @@ contrast (1.4.3), focus visible (2.4.7), reflow/zoom (1.4.4/1.4.10), text spacin
 content on hover (1.4.13), target size (2.5.8). The dynamic tier decides them by running
 **axe-core in a real headless browser** (Playwright). Two runtimes, same finding shape:
 
-- **`--runtime local`** (recommended): resolves a host/target Playwright + `@axe-core/playwright`
-  **at runtime** from `--cwd` (no Docker, no global install). Most projects with Playwright
-  e2e tests already have both deps. Adds the residual-criteria **probes** (below).
+- **`--runtime local`** (recommended): resolves Playwright + `@axe-core/playwright`
+  **at runtime**, from `--cwd` first and from ultra11y's own install second (no Docker, no
+  global install). Both are dependencies of this package, so a project that installed ultra11y
+  alone still gets the tier; a project that pins its own Playwright keeps it, because `--cwd`
+  is tried first. Adds the residual-criteria **probes** (below).
 - **`--runtime docker`**: runs axe-core in a Docker image auto-built on first use (runner +
   Dockerfile embedded in the bundle). No host deps beyond Docker. Axe + 320px reflow only.
-- **`--runtime auto`** (default): local if Playwright resolves from `--cwd`, else Docker, else
-  an actionable error.
+- **`--runtime auto`** (default): local if Playwright resolves **and** a browser binary is on
+  disk, else Docker, else an actionable error. Since the packages ship with ultra11y, what
+  decides `auto` in practice is the browser, not the modules.
 
 ## Prerequisites
 
-- **local**: a project reachable from `--cwd` with `@playwright/test` + `@axe-core/playwright`
-  installed, and a Chromium browser (`npx playwright install chromium`).
+- **local**: a Chromium browser — `npx playwright install chromium`. The two npm packages
+  (`@playwright/test`, `@axe-core/playwright`) come with ultra11y and need no separate install;
+  installing them in the audited project is still supported and takes precedence, which is what
+  a repository with its own pinned Playwright wants.
 - **docker**: Docker running.
 
 The rest of the skill (static audit) needs neither.

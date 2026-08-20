@@ -8,9 +8,15 @@ importers:
 
   .:
     dependencies:
+      '@axe-core/playwright':
+        specifier: ^4.13.0
+        version: 4.13.0(playwright-core@1.62.1)
       '@babel/parser':
         specifier: ^8.0.0
         version: 8.0.0
+      '@playwright/test':
+        specifier: ^1.62.1
+        version: 1.62.1
       domhandler:
         specifier: ^6.0.1
         version: 6.0.1
@@ -18,15 +24,9 @@ importers:
         specifier: ^12.0.0
         version: 12.0.0
     devDependencies:
-      '@axe-core/playwright':
-        specifier: ^4.13.0
-        version: 4.13.0(playwright-core@1.62.1)
       '@biomejs/biome':
         specifier: ^2.5.1
         version: 2.5.1
-      '@playwright/test':
-        specifier: ^1.62.1
-        version: 1.62.1
       '@semantic-release/changelog':
         specifier: ^6.0.3
         version: 6.0.3(semantic-release@25.0.8(typescript@6.0.3))

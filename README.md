@@ -442,7 +442,7 @@ node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd . --m
 node scripts/ultra11y.mjs report --in audits/audit-latest.json --out audits
 ```
 
-Only the Docker runtime needs Docker; `--runtime local` needs a project with `@playwright/test` + `@axe-core/playwright`. The rest of the skill is zero-dependency. The Docker runner + Dockerfile are embedded in the engine and mirrored under `docker/` (with a `docker-compose.yml`). See `skills/ultra11y/references/dynamic.md`.
+Only the Docker runtime needs Docker. `--runtime local` needs a Chromium binary (`npx playwright install chromium`) and nothing else: `@playwright/test` and `@axe-core/playwright` are dependencies of the package, and the audited project's own copies take precedence when it has them. The engine bundle itself stays dependency-free. The Docker runner + Dockerfile are embedded in the engine and mirrored under `docker/` (with a `docker-compose.yml`). See `skills/ultra11y/references/dynamic.md`.
 
 Typical audit flow:
 

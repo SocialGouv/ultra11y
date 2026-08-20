@@ -36,7 +36,7 @@ inputs:
     required: false
     default: 'false'
   urls:
-    description: 'Space-separated URLs to scan with a real browser (computed contrast, focus, zoom, reflow). Needs the app running (see `start`/`wait-on`) AND a browser tier: either @playwright/test + @axe-core/playwright installed in the repo, or Docker on the runner. Leave empty to audit the code only.'
+    description: 'Space-separated URLs to scan with a real browser (computed contrast, focus, zoom, reflow). Needs the app running (see `start`/`wait-on`) AND a browser tier: either a Chromium binary for the Playwright that ships with ultra11y (or the repo''s own), or Docker on the runner. Leave empty to audit the code only.'
     required: false
     default: ''
   sample:
@@ -60,7 +60,7 @@ inputs:
     required: false
     default: '20'
   runtime:
-    description: 'Browser tier for the page scan: `auto` (default — the repo''s own @playwright/test + @axe-core/playwright when both resolve, else a Docker image), `local`, or `docker`. Worth setting explicitly when the scan MUST have the local tier: an authenticated scan (`storage-state`, or a `storageState` on a sample page) is local-only, and on `auto` a missing dependency silently degrades to Docker, which then refuses the run.'
+    description: 'Browser tier for the page scan: `auto` (default — Playwright + @axe-core/playwright, the repo''s own when it has them and ultra11y''s otherwise, provided a browser binary is on disk; else a Docker image), `local`, or `docker`. Worth setting explicitly when the scan MUST have the local tier: an authenticated scan (`storage-state`, or a `storageState` on a sample page) is local-only, and on `auto` a runner with no Chromium binary silently degrades to Docker, which then refuses the run.'
     required: false
     default: 'auto'
   storage-state:

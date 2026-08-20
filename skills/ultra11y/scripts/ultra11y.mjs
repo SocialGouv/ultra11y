@@ -59894,17 +59894,38 @@ function localTestedScs(interact) {
 }
 var PW_SPEC = "@playwright/test";
 var AXE_SPEC = "@axe-core/playwright";
-function localTierStatus(cwd) {
-  const req = createRequire(resolve12(cwd, "package.json"));
-  for (const spec of [PW_SPEC, AXE_SPEC]) {
+function resolveAnchors(cwd) {
+  return [resolve12(cwd, "package.json"), import.meta.url];
+}
+function requireRuntime(cwd, spec) {
+  let last;
+  for (const from of resolveAnchors(cwd)) {
     try {
-      req.resolve(spec);
+      return createRequire(from)(spec);
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last instanceof Error ? last : new Error(String(last));
+}
+function resolvesRuntime(cwd, spec) {
+  return resolveAnchors(cwd).some((from) => {
+    try {
+      createRequire(from).resolve(spec);
+      return true;
     } catch {
-      return { ok: false, reason: `${spec} does not resolve from ${cwd}` };
+      return false;
+    }
+  });
+}
+function localTierStatus(cwd) {
+  for (const spec of [PW_SPEC, AXE_SPEC]) {
+    if (!resolvesRuntime(cwd, spec)) {
+      return { ok: false, reason: `${spec} resolves neither from ${cwd} nor from ultra11y itself` };
     }
   }
   try {
-    const pw = req(PW_SPEC);
+    const pw = requireRuntime(cwd, PW_SPEC);
     const bin = pw.chromium?.executablePath?.();
     if (typeof bin === "string" && bin.length > 0 && !existsSync24(bin)) {
       return { ok: false, reason: `no browser binary at ${bin} \u2014 run \`npx playwright install chromium\`` };
@@ -59921,15 +59942,14 @@ function resolveLocalDeps(cwd) {
   let chromium;
   let AxeBuilder;
   try {
-    const req = createRequire(resolve12(cwd, "package.json"));
-    const pw = req(PW_SPEC);
-    const axeMod = req(AXE_SPEC);
+    const pw = requireRuntime(cwd, PW_SPEC);
+    const axeMod = requireRuntime(cwd, AXE_SPEC);
     chromium = pw.chromium;
     AxeBuilder = axeMod.default ?? axeMod;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(
-      `Playwright not resolvable from "${cwd}". Pass --cwd <dir> at a project with @playwright/test + @axe-core/playwright installed (e.g. --cwd packages/app), or use --runtime docker. (${msg})`
+      `Playwright resolves neither from "${cwd}" nor from ultra11y itself. Both are dependencies of this package, so the usual cause is the standalone engine bundle running with no node_modules beside it: pass --cwd <dir> at a project that has @playwright/test + @axe-core/playwright (e.g. --cwd packages/app), or use --runtime docker. (${msg})`
     );
   }
   if (!chromium || typeof AxeBuilder !== "function") {
