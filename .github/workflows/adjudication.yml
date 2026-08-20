@@ -49,6 +49,11 @@ on:
         description: "Turn budget for the agent tier. Empty derives it from the worklist; a number pins it; 'unlimited' removes the bound entirely (the job's timeout then becomes the only stop)."
         type: string
         default: ''
+      passes:
+        description: "How many times the agent tier goes round on what is still undecided. The fold is per-verdict, so a later pass only ever costs the residue of the one before it — and stops early when there is none."
+        type: choice
+        options: ["1", "2", "3"]
+        default: "1"
       timeout:
         description: 'Job ceiling in minutes. GitHub kills a hosted-runner job at 360 whatever this says; only a self-hosted runner goes beyond.'
         type: number
@@ -133,6 +138,7 @@ jobs:
           adjudicate: api
           adjudicate-model: ${{ inputs.model }}
           adjudicate-max-turns: ${{ inputs.max-turns }}
+          adjudicate-passes: ${{ inputs.passes }}
           artifact-name: adjudication-api
 
       # Measured HERE, not at the end. The agent step below is a fresh `uses: ./` whose own
@@ -162,6 +168,7 @@ jobs:
           adjudicate: agent
           adjudicate-model: ${{ inputs.model }}
           adjudicate-max-turns: ${{ inputs.max-turns }}
+          adjudicate-passes: ${{ inputs.passes }}
           artifact-name: adjudication-agent
 
       - name: What the agent tier decided
