@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.19.1](https://github.com/maxgfr/ultra11y/compare/v5.19.0...v5.19.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* **ci:** `type: number` is not a workflow_dispatch input, and made the keyed run undispatchable ([d3cfafb](https://github.com/maxgfr/ultra11y/commit/d3cfafb449fc2908c4730e783c1b585e86e8b51d))
+
 # [5.19.0](https://github.com/maxgfr/ultra11y/compare/v5.18.2...v5.19.0) (2026-08-20)
 
 
