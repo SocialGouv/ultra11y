@@ -47,6 +47,14 @@
 # the agent tier would do it at twenty dollars a go. Pair it with `ledger` so the next run
 # replays the verdicts instead of buying them again.
 #
+# ONE PASS IS NOT ENOUGH, AND THAT IS THE DESIGN RATHER THAN A DEFECT. Measured on run
+# 32416252443 (Haiku, RGAA, the fixed engine): pass 1 ruled 35 of 38 and the gate refused three
+# — 9.4 as an uncited `C`, 10.14 and 12.11 as `needs-rendered-dom` over capture-anchored
+# evidence. Each refusal travels back with the criterion, and pass 2 closed all three on 60
+# turns; pass 3 found nothing left to do and cost nothing. That round trip IS the mechanism:
+# the gate does not merely reject, it tells the next adjudicator what was wrong. So `passes`
+# defaults to 3.
+#
 # So it is dispatched by hand, and it reports the number that actually separates the two
 # modes: how many criteria stayed `manual`. That is where the API mode decloses — it rules
 # from harvested evidence alone (capped at 30 items per criterion, snippets truncated), while
@@ -81,10 +89,10 @@ on:
         type: string
         default: ''
       passes:
-        description: "How many times the agent tier goes round on what is still undecided. The fold is per-verdict, so a later pass only ever costs the residue of the one before it — and stops early when there is none."
+        description: "How many times the agent tier goes round on what is still undecided. The fold is per-verdict, so a later pass only ever costs the residue of the one before it — and stops early when there is none. Three by default because `require-decided` is on: one pass is not enough on this fixture and a run that stopped there would go red for a reason that had nothing to do with the code."
         type: choice
         options: ["1", "2", "3"]
-        default: "1"
+        default: "3"
       timeout:
         description: 'Job ceiling in minutes. GitHub kills a hosted-runner job at 360 whatever this says; only a self-hosted runner goes beyond.'
         type: string
