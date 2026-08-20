@@ -426,6 +426,22 @@ describe("the adjudication tier", () => {
     }
   });
 
+  // Removing the bound has to mean REMOVING THE FLAG, not passing a very large number:
+  // claude-code-action sets no default of its own, so an absent `--max-turns` is what an
+  // unbounded run actually looks like. What still stops it is the job's own timeout, and above
+  // that GitHub's hard six-hour ceiling on a hosted runner.
+  it("lets a caller remove the bound, and refuses a value that is neither", () => {
+    for (const w of adjudicationSteps().filter((s) => s.id?.startsWith("worklist"))) {
+      const run = String(w.run);
+      expect(run, `${w.name} has no 'unlimited' branch`).toContain('unlimited|0) turns=""');
+      // The flag is appended only when a budget survived that branch.
+      expect(run).toContain('if [ -n "${turns:-}" ]; then cargs="$cargs --max-turns $turns"; fi');
+      // …and a typo is refused rather than silently treated as unbounded, which would be the
+      // expensive reading of a mistake.
+      expect(run).toContain("is neither a turn count nor 'unlimited'");
+    }
+  });
+
   it("pins claude-code-action, because `uses:` cannot take an expression", () => {
     const agent = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
     expect(agent?.uses).toMatch(/^anthropics\/claude-code-action@v\d+$/);
@@ -954,10 +970,12 @@ describe("the agent tier can go round again on what is still undecided", () => {
 // shape is worth pinning even though it is dispatched by hand.
 describe("the keyed adjudication workflow can actually reach the tier it exists to test", () => {
   const WF = parse(readFileSync(join(ROOT, ".github/workflows/adjudication.yml"), "utf8")) as {
+    on?: { workflow_dispatch?: { inputs?: Record<string, { default?: unknown; type?: string }> } };
     jobs: Record<
       string,
       {
-        "timeout-minutes"?: number;
+        // An expression now: the dispatch sets its own ceiling. See the timeout test.
+        "timeout-minutes"?: number | string;
         env?: Record<string, string>;
         steps: { id?: string; name?: string; uses?: string; run?: string; if?: string; with?: Record<string, string> }[];
       }
@@ -996,7 +1014,16 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
   });
 
   it("carries a timeout, so a wedged model call cannot burn six hours", () => {
-    expect(job()["timeout-minutes"]).toBeGreaterThan(0);
+    // Dispatch-controlled, because `max-turns: unlimited` makes this the only thing that
+    // stops the run — so what has to hold is that the INPUT it reads defaults to a real
+    // ceiling, not merely that the key is present.
+    expect(String(WF.jobs.adjudicate?.["timeout-minutes"])).toBe("${{ inputs.timeout }}");
+    const declared = WF.on?.workflow_dispatch?.inputs?.timeout;
+    expect(typeof declared?.default, "the ceiling must be a number, not a string").toBe("number");
+    expect(declared?.default as number).toBeGreaterThan(0);
+    // 360 is GitHub's own hard stop on a hosted runner; a default above it would be a promise
+    // this workflow cannot keep.
+    expect(declared?.default as number).toBeLessThanOrEqual(360);
   });
 
   // `mode: both` measured the agent pass twice and called it both: the agent step is a fresh
