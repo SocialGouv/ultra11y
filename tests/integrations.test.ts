@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { RANK, THRESHOLD, failingFindings, formatFailure, buildPayload, slugify, gate, type FindingLike } from "../src/integrations/payload.js";
 import { playwrightFixture, cypressPlugin, cypressCommands } from "../src/e2e.js";
@@ -179,6 +179,33 @@ describe("packaging", () => {
 
   it("ships dist/ in the published tarball", () => {
     expect(pkg.files).toContain("dist");
+  });
+
+  it("ships no chunk nothing imports — tsup keeps `clean: false` on this entry", () => {
+    // `check:build` diffs the tracked dist files, which catches a MODIFIED chunk and a NEW
+    // one but never a stale EXTRA. tsup.config.ts keeps `clean: false` for the dist entry, so
+    // when a shared chunk's content hash changes its predecessor stays on disk, gets
+    // committed, and SHIPS — `dist` is in `files[]`. One did: `payload-DzQb84Kw.d.ts`, an
+    // older API (no `axe?: boolean | "auto"`) that no entry point had imported for months.
+    // A consumer never resolves it, so nothing breaks; it is simply a second, wrong answer
+    // to "what does this package's type surface look like", published alongside the right one.
+    const entries = new Set<string>();
+    for (const sub of ["./playwright", "./cypress", "./cypress/plugin"]) {
+      const e = pkg.exports[sub] as Record<string, string>;
+      for (const key of ["default", "types"]) entries.add(basename(e[key]!));
+    }
+    const files = readdirSync(join(ROOT, "dist"));
+    const referenced = new Set<string>();
+    for (const f of files) {
+      for (const m of readFileSync(join(ROOT, "dist", f), "utf8").matchAll(/from\s+["']\.\/([\w.-]+)["']/g)) {
+        const spec = m[1]!;
+        referenced.add(spec);
+        // a .d.ts imports './payload-X.js'; the declaration on disk is './payload-X.d.ts'
+        if (f.endsWith(".d.ts") && spec.endsWith(".js")) referenced.add(`${spec.slice(0, -3)}.d.ts`);
+      }
+    }
+    const orphans = files.filter((f) => !entries.has(f) && !referenced.has(f));
+    expect(orphans, "dist/ carries a chunk nothing imports — delete it").toEqual([]);
   });
 
   it("has a built artefact behind every declared subpath", () => {

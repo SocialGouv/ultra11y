@@ -17,3 +17,14 @@ coverage/
 # skills/.../references/verify.md on case-insensitive filesystems)
 /VERIFY.todo.json
 /VERIFY.md
+
+# adjudication worklist output — the twin of VERIFY.* above, and anchored for the same
+# reason. `verify --manual --out .` writes these at whatever directory it was run from, so a
+# run against this repository's own sources leaves them here. They were tracked once
+# (ADJUDICATE.md, ADJUDICATE.todo.json, ADJUDICATE.verdicts.json, adjudicate/1.1.1.md,
+# adjudicate/1.2.1.md, from a 2026-08-11 run over 2 criteria); nothing read them — the Action
+# writes and reads audits/ADJUDICATE.*, a different path entirely.
+/ADJUDICATE.md
+/ADJUDICATE.todo.json
+/ADJUDICATE.verdicts.json
+/adjudicate/
