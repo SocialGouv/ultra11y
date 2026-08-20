@@ -18,7 +18,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { runAudit } from "../src/audit.js";
-import { buildAdjudicationWorklist, formatAdjudication } from "../src/adjudicate.js";
+import { buildAdjudicationWorklist, formatAdjudication, unrenderedResidual } from "../src/adjudicate.js";
 import { PAGES_DIR, SNAPSHOT_VERSION, writeSnapshot } from "../src/snapshot.js";
 
 const DOM = `<!doctype html><html lang="fr"><head><title>Aide</title></head><body><main><h1>Aide</h1><p style="color:#767676;background:#fff">Texte</p><a href="/c">Contact</a></main></body></html>`;
@@ -65,5 +65,56 @@ describe("the brief says the rendered DOM is available, when it is", () => {
     // The note must not appear on a source-only audit: there, `needs-rendered-dom` IS the
     // correct answer, and saying otherwise would push an adjudicator to guess.
     expect(brief(sourceOnly())).not.toMatch(/RENDU DISPONIBLE|styles\.json/);
+  });
+});
+
+// THE MIRROR, AND THE MORE EXPENSIVE FAILURE OF THE TWO.
+//
+// The gate above catches a deferral to a tier that has already run. This one catches the
+// opposite: a run where the tier NEVER ran. Measured on the 2026-08-20 RGAA cascade — three
+// passes, 311 turns, $24.90 — seven criteria came back `needs-rendered-dom` and every one of
+// them was RIGHT, because the workflow audited sources only and no page was ever snapshotted.
+// Nothing in the run said so. The bill was paid to be told that a step nobody had run had not
+// run.
+//
+// Advisory, never a gate here: a source-only audit is a legitimate thing to want, and the
+// worklist is not where a project's scope gets decided. `check --require-rendered` is the
+// opt-in that fails.
+describe("the worklist says when NOTHING was rendered", () => {
+  const worklistFor = (input: string) => {
+    const audit = runAudit({ inputs: [input] });
+    return { audit, items: buildAdjudicationWorklist(audit, { standard: "rgaa" }) };
+  };
+
+  it("names every needs-rendering criterion nobody could have measured", () => {
+    const { audit, items } = worklistFor(sourceOnly());
+    const open = unrenderedResidual(audit, items);
+    expect(open.length).toBeGreaterThan(0);
+    // The criteria the 2026-08-20 run was left with, mapped through the RGAA pack.
+    expect(open).toEqual(expect.arrayContaining(["3.2", "10.4", "10.11", "10.12"]));
+  });
+
+  it("says nothing once a page's real DOM has been read", () => {
+    const { audit, items } = worklistFor(join(withSnapshots(), "aide", "dom.html"));
+    expect(unrenderedResidual(audit, items)).toEqual([]);
+  });
+
+  it("puts the warning, and the ids, in the brief", () => {
+    const { audit, items } = worklistFor(sourceOnly());
+    const md = formatAdjudication(items, "fr", "rgaa", { unrendered: unrenderedResidual(audit, items) });
+    expect(md).toMatch(/aucune page.*instantan|scan/i);
+    expect(md).toContain("`3.2`");
+  });
+
+  it("says it in English too, and names the command that closes it", () => {
+    const { audit, items } = worklistFor(sourceOnly());
+    const md = formatAdjudication(items, "en", "rgaa", { unrendered: unrenderedResidual(audit, items) });
+    expect(md).toMatch(/no page.*snapshot/i);
+    expect(md).toContain("scan");
+  });
+
+  it("adds nothing to a brief that was not given the list", () => {
+    const { items } = worklistFor(sourceOnly());
+    expect(formatAdjudication(items, "fr", "rgaa")).not.toMatch(/aucune page n'a été/i);
   });
 });

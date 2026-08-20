@@ -105,17 +105,41 @@ export function canonicalUrl(url: string): string {
   }
 }
 
+/** A crawl bound, read from a caller that is allowed to say "no bound".
+ *
+ *  `0` is the sentinel, and an absent value now means the same thing: **unbounded**. The old
+ *  defaults (50 pages, 2 hops) truncated a sweep in silence, and a deliverable shorter than
+ *  the site it claims to audit reads exactly like a complete one — which is the failure mode
+ *  this whole tool exists to prevent. A bound is now something you ASK for.
+ *
+ *  A negative or non-finite value is unbounded too, rather than an error: it can only reach
+ *  here from a caller doing arithmetic on its own input, and refusing the run over it would
+ *  cost more than covering more pages does. */
+export function crawlBound(n: number | undefined): number {
+  return n === undefined || !Number.isFinite(n) || n <= 0 ? Number.POSITIVE_INFINITY : n;
+}
+
 export interface CrawlOpts {
   fetchHtml: (url: string) => Promise<string>;
+  /** Link hops to follow. Absent or 0 ⇒ unbounded (see `crawlBound`). */
   depth?: number;
+  /** Cap on pages visited. Absent or 0 ⇒ unbounded (see `crawlBound`). */
   max?: number;
+  /** Called as each page is reached, with the running count. An unbounded crawl must never
+   *  be a silent one — it is the only thing between a reader and a job that looks hung. The
+   *  library holds no opinion about where the line goes, so the caller supplies this. */
+  onPage?: (url: string, n: number) => void;
 }
 
 /** Breadth-first crawl from `start`, following same-origin links in served HTML.
- *  Visits the start URL first; bounded by `depth` (link hops) and `max` (pages). */
+ *
+ *  Visits the start URL first. `depth` (link hops) and `max` (pages) bound it when the caller
+ *  asks; unbounded by default. Termination does not depend on either: the frontier is
+ *  same-origin only and every URL is de-duplicated by its CANONICAL form, so a cycle — or a
+ *  site that links `/` and `/index.html` at once — is visited exactly once. */
 export async function crawlUrls(start: string, opts: CrawlOpts): Promise<string[]> {
-  const depth = opts.depth ?? 1;
-  const max = opts.max ?? 50;
+  const depth = crawlBound(opts.depth);
+  const max = crawlBound(opts.max);
   const order: string[] = [];
   const first = canonicalUrl(start);
   const seen = new Set<string>([first]);
@@ -124,6 +148,7 @@ export async function crawlUrls(start: string, opts: CrawlOpts): Promise<string[
   while (queue.length > 0 && order.length < max) {
     const { url, d } = queue.shift()!;
     order.push(url);
+    opts.onPage?.(url, order.length);
     if (d >= depth) continue;
     let html = "";
     try {

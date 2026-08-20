@@ -39,7 +39,7 @@ import { buildGraphStreaming } from "./graph/build.js";
 import { discover } from "./discover.js";
 import { toPosix, GRAPH_ONLY_EXT } from "./glob.js";
 import { runCriteria, renderCriteriaReference } from "./criteria.js";
-import { checkSampleCaptured, checkDecided, checkReport, checkSemantic, isUndecidedFile, type UndecidedFile } from "./check.js";
+import { checkSampleCaptured, checkDecided, checkRendered, checkReport, checkSemantic, isUndecidedFile, type UndecidedFile } from "./check.js";
 import { buildWorklist, writeWorklist, applyVerdicts, VERIFY_MAX, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import {
@@ -48,6 +48,7 @@ import {
   writeAdjudication,
   applyAdjudication,
   hydrateAdjudication,
+  unrenderedResidual,
   type AdjudicationFile,
 } from "./adjudicate.js";
 import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, unreadableCaptures, type VerdictLedger, writeLedger } from "./ledger.js";
@@ -81,7 +82,7 @@ import {
 } from "./snapshot.js";
 import { attributePages, derivePages, pageScopesFrom, pageView, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
 import { pagesForStandard, renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
-import { crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
+import { crawlBound, crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
 import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
 import { resolveStandard, getPack, isCore, CORE, derivePackResults, type StandardId } from "./standards/index.js";
@@ -132,7 +133,7 @@ Usage:
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
-  ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
+  ultra11y pages    --in <audit.json> [--standard <pack>] [--json [--out <dir>]] [--lang auto|en|fr]   (the per-page criterion grid; --json --out also writes <dir>/pages.json)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
   ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
@@ -401,6 +402,11 @@ Options:
                      .ultra11y/pages/. Coverage, one level below --require-decided: a sweep that
                      loses pages produces a report that is merely SHORTER, and a shorter
                      deliverable reads exactly like a complete one.
+  --require-rendered check: fail while a criterion that NEEDS a rendered page is still « to
+                     assess » and this run snapshotted no page at all. Asks about the
+                     INSTRUMENT, not the answer: a run that rendered a page and still could
+                     not settle a criterion passes. Needs --in <audit.json>; honours
+                     --allow-undecided.
   --require-decided[=pages]
                      check: fail while ANY criterion of the standard is still « to assess ».
                      '=pages' also holds EVERY page's own grid to the same bar — a criterion
@@ -426,8 +432,8 @@ Options:
   --merge <file>     scan: fold dynamic findings into this AuditResult JSON
   --sitemap <url>    scan: scan every URL listed in a sitemap.xml
   --crawl <url>      scan: BFS same-origin links from a start URL (served HTML)
-  --depth <n>        scan: crawl link-hop depth from the start URL          (default: 2)
-  --max <n>          scan: cap on pages scanned (sitemap/crawl)             (default: 50)
+  --depth <n>        scan: crawl link-hop depth from the start URL   (default: no limit; 0 = no limit)
+  --max <n>          scan: cap on pages scanned (sitemap/crawl)      (default: no limit; 0 = no limit)
   --runtime <mode>   scan: local (host/target Playwright, no Docker) | docker | auto
                      (default: auto — local if Playwright resolves from --cwd, else Docker)
   --local            scan: alias of --runtime local
@@ -650,6 +656,7 @@ const BOOLEAN_FLAGS = new Set([
   // `check`: fail while any criterion of the standard is still « to assess ».
   "require-decided",
   "require-sample",
+  "require-rendered",
   "manual",
   // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
   // verdict discards the whole adjudication. The default is per-verdict.
@@ -872,10 +879,14 @@ function emitCiFormat(result: AuditResult, format: CiFormat, standard: StandardI
     // digest under the historical marker: an unset — or misspelled — variable must degrade to
     // the behaviour every existing workflow already depends on, never to silence.
     const kind = commentKindFrom(process.env.ULTRA11Y_PR_COMMENT_KIND);
-    const render = kind === "pages" ? pagesComment : prComment;
+    // `full` is the page document carrying the digest's actionable half as well — one sticky,
+    // under its own marker, for a workflow that wants a single comment at the end with
+    // everything in it rather than two a reviewer has to reconcile.
+    const render = kind === "pages" || kind === "full" ? pagesComment : prComment;
     const body = render(result, {
       standard,
       lang,
+      kind,
       // The run is known before the artifact exists, so the link is always safe. The artifact
       // NAME is only set by the action when it actually uploads one — naming an artifact that
       // was never uploaded sends the reader to a page that does not exist.
@@ -1283,7 +1294,13 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
 
   let urls: string[];
   try {
-    urls = sitemap ? parseSitemapUrls(await fetchHtml(sitemap)).slice(0, max ?? 50) : await crawlUrls(crawl!, { fetchHtml, depth: depth ?? 2, max });
+    // Unbounded unless asked (`crawlBound`): discovery that silently stopped at 50 URLs wrote
+    // a `sample.pages` block shorter than the site, and every later `scan --sample` inherited
+    // that truncation without a word.
+    const cap = crawlBound(max);
+    urls = sitemap
+      ? ((u) => (Number.isFinite(cap) ? u.slice(0, cap) : u))(parseSitemapUrls(await fetchHtml(sitemap)))
+      : await crawlUrls(crawl!, { fetchHtml, depth, max, onPage: (url, n) => console.error(`ultra11y pages discover: ${n} — ${url}`) });
   } catch (e) {
     console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
@@ -1416,13 +1433,21 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
 
   if (p.flags.json) {
     // Projected onto the ACTIVE standard, like every rendered surface — see pagesForStandard.
-    console.log(
-      JSON.stringify(
-        { pages: pagesForStandard(result, derivePages(result, scope), standard, lang), unattributed: unattributedFindings(result).length },
-        null,
-        2,
-      ),
-    );
+    const doc = { pages: pagesForStandard(result, derivePages(result, scope), standard, lang), unattributed: unattributedFindings(result).length };
+    const json = JSON.stringify(doc, null, 2);
+    console.log(json);
+    // AND ON DISK, WHEN THERE IS A DIRECTORY TO PUT IT IN.
+    //
+    // The grid, the sheets and the HTML are all documents for a human. This is the same
+    // projection for a machine — a later job, a badge, a dashboard — and stdout alone cannot
+    // serve it: in CI the caller is a composite action step, an action output is size-capped,
+    // and a criterion × page matrix is not a scalar. So `--json --out <dir>` also writes
+    // `<dir>/pages.json`, which the artifact then carries beside the sheets it mirrors.
+    const outDir = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "";
+    if (outDir) {
+      mkdirSync(outDir, { recursive: true });
+      writeFileSync(join(outDir, "pages.json"), `${json}\n`);
+    }
     return 0;
   }
 
@@ -2528,9 +2553,12 @@ function cmdCheck(p: ParsedArgs): number {
   // Same reasoning for coverage: whether the sweep captured every declared page is a fact
   // about the working tree, answerable long before there is a deliverable to validate.
   const requireSample = p.flags["require-sample"] === true;
+  // And one level below THAT: were the criteria needing a browser given one at all? A
+  // property of the audit, like completeness — so it needs `--in`, not a report.
+  const requireRendered = p.flags["require-rendered"] === true;
   const rep = p.flags.report;
   if (typeof rep !== "string" || !rep) {
-    if (!requireDecided && !requireSample) {
+    if (!requireDecided && !requireSample && !requireRendered) {
       console.error("ultra11y check: --report <md> is required.");
       return 2;
     }
@@ -2561,6 +2589,10 @@ function cmdCheck(p: ParsedArgs): number {
     console.error("ultra11y check: --require-decided needs --in <audit.json> — completeness is a property of the audit, not of the report.");
     return 2;
   }
+  if (requireRendered && !audit) {
+    console.error("ultra11y check: --require-rendered needs --in <audit.json> — what a run rendered is a property of the audit, not of the report.");
+    return 2;
+  }
   // The declared-undecidable list, when one is given. Deliberately a NAMED list rather than a
   // tolerance: a threshold passes whatever it has to in order to stay green, and the criteria
   // it would hide are exactly the ones nobody could decide.
@@ -2584,6 +2616,8 @@ function cmdCheck(p: ParsedArgs): number {
   // Needs no audit JSON — it holds the repository's declared sample against the snapshots on
   // disk, which is what a sweep either produced or did not.
   const covered = requireSample ? checkSampleCaptured(".", lang) : null;
+  // THE INSTRUMENT, one level below coverage: were the criteria needing a browser given one?
+  const renderedGate = requireRendered && audit ? checkRendered(audit, standard, lang, { allow }) : null;
   const res = md ? checkReport(md, standard, lang, { audit }) : { ok: true, issues: [] };
   // --semantic: the support-level gate ON TOP of the structural check. Fails closed —
   // a green exit must always mean the gate engaged (family P0: never green-but-inactive).
@@ -2597,9 +2631,23 @@ function cmdCheck(p: ParsedArgs): number {
           lang,
         })
       : null;
-  const ok = res.ok && (sem === null || sem.ok) && (decided === null || decided.ok) && (covered === null || covered.ok);
+  const ok =
+    res.ok && (sem === null || sem.ok) && (decided === null || decided.ok) && (covered === null || covered.ok) && (renderedGate === null || renderedGate.ok);
   if (p.flags.json) {
-    console.log(JSON.stringify({ ...res, ok, ...(sem ? { semantic: sem } : {}), ...(decided ? { decided } : {}), ...(covered ? { covered } : {}) }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          ...res,
+          ok,
+          ...(sem ? { semantic: sem } : {}),
+          ...(decided ? { decided } : {}),
+          ...(covered ? { covered } : {}),
+          ...(renderedGate ? { rendered: renderedGate } : {}),
+        },
+        null,
+        2,
+      ),
+    );
   } else if (!p.flags.quiet) {
     if (decided) {
       // Say what the gate engaged on, green or red. A completeness gate that reports only its
@@ -2625,6 +2673,15 @@ function cmdCheck(p: ParsedArgs): number {
           : `✓ Sample covered: all ${covered.declared} declared page(s) have a capture.`,
       );
     }
+    if (renderedGate?.ok) {
+      // Same rule: say what it engaged on. It has two green shapes and they mean different
+      // things — pages were rendered, or there was no rendering criterion left to answer for.
+      console.log(
+        lang === "fr"
+          ? `✓ Rendu : ${renderedGate.pagesAudited} page(s) réellement auditée(s) — les critères de rendu ont eu un navigateur.`
+          : `✓ Rendered: ${renderedGate.pagesAudited} page(s) actually audited — the rendering criteria were given a browser.`,
+      );
+    }
     if (ok)
       console.log(
         sem
@@ -2635,7 +2692,9 @@ function cmdCheck(p: ParsedArgs): number {
             ? "✓ Rapport valide : sections, critères cités et justifications NA cohérents."
             : "✓ Report valid: sections, cited criteria and NA justifications are consistent.",
       );
-    else for (const i of [...res.issues, ...(sem?.issues ?? []), ...(decided?.issues ?? []), ...(covered?.issues ?? [])]) console.error(`✗ ${i}`);
+    else
+      for (const i of [...res.issues, ...(sem?.issues ?? []), ...(decided?.issues ?? []), ...(covered?.issues ?? []), ...(renderedGate?.issues ?? [])])
+        console.error(`✗ ${i}`);
   }
   return ok ? 0 : 1;
 }
@@ -2752,7 +2811,23 @@ function cmdVerify(p: ParsedArgs): number {
       return 2;
     }
     const adjItems = buildAdjudicationWorklist(audit, { standard });
-    const w = writeAdjudication(adjItems, out, { standard, auditDate: audit.date, lang });
+    // NOTHING WAS RENDERED, AND THE WORKLIST IS ABOUT TO PRETEND OTHERWISE.
+    //
+    // Said here, before a model is handed anything, because this is the last moment it costs
+    // nothing. On the 2026-08-20 RGAA cascade the same information arrived after three passes
+    // and $24.90, as seven correct `needs-rendered-dom` verdicts nobody could act on. A
+    // warning, not a refusal: a source-only audit is a legitimate thing to want, and the gate
+    // for those who want it to fail is `check --require-rendered`.
+    const unrendered = unrenderedResidual(audit, adjItems);
+    const w = writeAdjudication(adjItems, out, { standard, auditDate: audit.date, lang, unrendered });
+    if (unrendered.length) {
+      const ids = unrendered.join(" · ");
+      console.error(
+        lang === "fr"
+          ? `ultra11y verify : ${unrendered.length} critère(s) exigent une page rendue et aucune page n'a été instantanée — ils resteront « à évaluer » quoi qu'il arrive. Lancez \`ultra11y scan <url> --merge ${inFlag}\` d'abord. Concernés : ${ids}`
+          : `ultra11y verify: ${unrendered.length} criterion(ia) need a rendered page and no page was snapshotted — they will stay "to assess" whatever happens. Run \`ultra11y scan <url> --merge ${inFlag}\` first. Affected: ${ids}`,
+      );
+    }
     if (adjItems.every((it) => it.evidence.length === 0)) {
       console.error(
         lang === "fr"
@@ -3439,9 +3514,14 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     } else if (sitemap || crawl) {
       const depth = typeof p.flags.depth === "string" ? Number(p.flags.depth) : undefined;
       const max = typeof p.flags.max === "string" ? Number(p.flags.max) : undefined;
+      // A sweep is unbounded by default, so it has to SAY what it is walking. On stderr, so
+      // `--json` on stdout stays machine-readable, and one line per page: without it a crawl
+      // of a large site is indistinguishable from a hung job, which is the only real cost of
+      // dropping the cap.
+      const onPage = (url: string, n: number): void => console.error(`ultra11y scan: page ${n} — ${url}`);
       dynamic = useLocal
-        ? await runCrawlScanLocal({ sitemap, crawl, depth, max, cwd, storageState, lang, interact, interactClicks, snapshotRoot })
-        : await runCrawlScan({ sitemap, crawl, depth, max, snapshotRoot });
+        ? await runCrawlScanLocal({ sitemap, crawl, depth, max, onPage, cwd, storageState, lang, interact, interactClicks, snapshotRoot })
+        : await runCrawlScan({ sitemap, crawl, depth, max, onPage, snapshotRoot });
     } else {
       const targets = p.positionals.filter((a) => a !== "-");
       if (targets.length === 0) {

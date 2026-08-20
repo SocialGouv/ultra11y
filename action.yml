@@ -52,13 +52,13 @@ inputs:
     required: false
     default: ''
   crawl-depth:
-    description: 'Link hops to follow from `crawl`.'
+    description: 'Link hops to follow from `crawl`. `0` (the default) follows them all. The crawl terminates on its own invariants rather than on this number: it never leaves the origin, and every URL is de-duplicated by its canonical form, so a cycle is visited once.'
     required: false
-    default: '2'
+    default: '0'
   crawl-max:
-    description: 'Cap on the number of pages taken from `sitemap`/`crawl`.'
+    description: 'Cap on the number of pages taken from `sitemap`/`crawl`. `0` (the default) means no cap — a sweep that stopped at 20 produced a report merely SHORTER than the site, and a shorter deliverable reads exactly like a complete one. Set a number when the runner budget matters more than coverage: a large site is unbounded runner time and an unbounded artifact, and `evidence-max` guards only the crops. Every page reached is logged with its running count, so an unbounded crawl is never a job that merely looks hung.'
     required: false
-    default: '20'
+    default: '0'
   runtime:
     description: 'Browser tier for the page scan: `auto` (default — Playwright + @axe-core/playwright, the repo''s own when it has them and ultra11y''s otherwise, provided a browser binary is on disk; else a Docker image), `local`, or `docker`. Worth setting explicitly when the scan MUST have the local tier: an authenticated scan (`storage-state`, or a `storageState` on a sample page) is local-only, and on `auto` a runner with no Chromium binary silently degrades to Docker, which then refuses the run.'
     required: false
@@ -104,7 +104,7 @@ inputs:
     required: false
     default: 'false'
   comment-kind:
-    description: 'WHICH document the comment carries: `digest` (default) names the distinct defects of the code audit; `pages` posts the page-by-page grid — one row per page with its rate and severities, then the non-conforming criteria of each failing page. Each kind has its OWN sticky marker, so a workflow whose code gate and page sweep both comment on one pull request keeps both comments instead of the second overwriting the first. `pages` needs pages in scope (a scan, a snapshot sweep) — with none it says so rather than posting an empty scoreboard.'
+    description: 'WHICH document the comment carries: `digest` (default) names the distinct defects of the code audit; `pages` posts the page-by-page grid — one row per page with its rate and severities, then the non-conforming criteria of each failing page; `full` posts ONE comment carrying both — the page-by-page grid AND the distinct defects with their locations — for a run that wants a single comment at the end with everything in it. Each kind has its OWN sticky marker, so a workflow whose code gate and page sweep both comment on one pull request keeps both comments instead of the second overwriting the first, and turning `full` on never adopts or overwrites a sticky the other two already placed. `pages` and `full` need pages in scope (a scan, a snapshot sweep) — with none they say so rather than posting an empty scoreboard.'
     required: false
     default: 'digest'
   report:
@@ -191,6 +191,10 @@ inputs:
     description: 'Fail the job while ANY criterion of the active standard is still « to assess ». `false` (default) never fails; `true` holds the RUN''s grid to it; `pages` also holds EVERY page''s own grid to it. This is a different question from `fail-on`, which governs NON-CONFORMITIES: a run can find nothing wrong and still have decided almost nothing, and it reports success either way — measured on a real pull request, 94 of 106 criteria came back « à évaluer » in a green job, because an adjudication that lands nothing only warns. `pages` is the bar a page-by-page deliverable is actually judged on, and it is strictly higher: a criterion failing on one route is settled for the RUN and may still be nobody''s verdict on the routes it never fired on — measured on the same repository, 104/106 decided for the run and 8 to 11 open on each of its 37 pages. Turn this on once a ledger or an adjudication tier is in place, and pair it with `undecidable-file` for the criteria that genuinely cannot be decided.'
     required: false
     default: 'false'
+  require-rendered:
+    description: 'Fail the job while a criterion that NEEDS a rendered page is still « to assess » AND this run snapshotted no page at all. One level below `require-sample`: that one asks whether the run looked at every page it declares, this one asks whether the criteria that need a browser were given one. It asks about the INSTRUMENT, never about the answer — a run that rendered a page and still could not settle a criterion passes, because that is the honest residual this tool exists to preserve. Measured on a real keyed cascade: three passes, 311 turns and $24.90 to be told that seven criteria needed a rendered DOM, on a workflow that audited sources only and had snapshotted nothing. Pair it with `urls`/`crawl`/`sitemap`/`sample`, and with `undecidable-file` for the criteria you genuinely cannot render.'
+    required: false
+    default: 'false'
   undecidable-file:
     description: 'Path to the criteria this project declares it cannot decide — `{"entries":[{"criteriaId":"…","reason":"…"}]}`. Deliberately a NAMED list and not a tolerance: a percentage passes whatever it must to stay green, and what it hides is exactly the criteria nobody could decide. An entry with no reason fails the gate, and so does one whose criterion has since been decided — an exception must not outlive what it excused. Each declared criterion is printed in the job log with its reason.'
     required: false
@@ -216,6 +220,28 @@ outputs:
   html-single-path:
     description: 'Path of the detachable single-file HTML report (printable to PDF), when `html` is enabled.'
     value: ${{ steps.html.outputs.single-path }}
+  # THE PAGE DIMENSION, published.
+  #
+  # Everything above is repo-global: two scalars and a set of paths. A per-page norm is
+  # answered page by page, and a caller wanting a badge, a follow-up job or a dashboard had to
+  # re-parse an artifact it cannot even address while the run is still in flight.
+  #
+  # The PATH is the contract for the grid, never the grid itself: a criterion × page matrix is
+  # not a scalar, a step output is size-capped, and truncating one into an output would be a
+  # silent lie about coverage — the exact failure mode this tool exists to prevent. The two
+  # counts beside it are safe to publish because they cannot be misread.
+  pages-json-path:
+    description: 'Path of the machine-readable per-page grid (`{ pages: [{ id, name, url, basis, criteria: [{ id, status, decidedBy }], conformancePct, decided, total }], unattributed }`), when `pages-report` is enabled and a page was in scope. Empty otherwise.'
+    value: ${{ steps.pages.outputs.json-path }}
+  pages-report-path:
+    description: 'Path of the per-page dossier directory (`index.md` plus one sheet per page, and their HTML mirrors when `html` is on). Empty when no page was in scope.'
+    value: ${{ steps.pages.outputs.report-path }}
+  pages-count:
+    description: 'Number of pages in scope. `0` means nothing was scanned or snapshotted — which is a different statement from a clean sweep, and the two must not be read alike.'
+    value: ${{ steps.pages.outputs.count }}
+  pages-failing:
+    description: 'Number of pages carrying at least one non-conforming criterion of the active standard. Never a pass rate: a page can be failing on one criterion and undecided on forty.'
+    value: ${{ steps.pages.outputs.failing }}
   artifact-name:
     description: 'Name the report artifact was uploaded under — resolved, so a caller need not re-derive the default.'
     value: ${{ inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard) }}
@@ -240,6 +266,8 @@ runs:
       env:
         REQUIRE_DECIDED: ${{ inputs.require-decided }}
         ADJUDICATE_PASSES: ${{ inputs.adjudicate-passes }}
+        REQUIRE_RENDERED: ${{ inputs.require-rendered }}
+        COMMENT_KIND: ${{ inputs.comment-kind }}
       run: |
         echo "path=$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" >> "$GITHUB_OUTPUT"
         node "$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" --version
@@ -273,6 +301,26 @@ runs:
           1|2|3|'') ;;
           *)
             echo "::error::ultra11y: adjudicate-passes='${ADJUDICATE_PASSES}' is not a count — expected 1, 2 or 3."
+            exit 1
+            ;;
+        esac
+        # Same family, same reason: `require-rendered` is compared literally against 'true' by
+        # its own step AND by the final gate, so `yes` would run neither and the caller would
+        # be told nothing at all about a strictness they asked for.
+        case "${REQUIRE_RENDERED:-}" in
+          true|false|'') ;;
+          *)
+            echo "::error::ultra11y: require-rendered='${REQUIRE_RENDERED}' is not a value — expected 'true' or 'false'."
+            exit 1
+            ;;
+        esac
+        # And the comment kind, which the engine reads as a plain string: an unrecognised value
+        # degrades to the digest, so a caller asking for `full` and typing `ful` would get the
+        # code digest and never know the page grid was missing.
+        case "${COMMENT_KIND:-}" in
+          digest|pages|full|'') ;;
+          *)
+            echo "::error::ultra11y: comment-kind='${COMMENT_KIND}' is not a kind — expected 'digest', 'pages' or 'full'."
             exit 1
             ;;
         esac
@@ -1128,19 +1176,82 @@ runs:
           echo "::warning::ultra11y: the criterion grid is incomplete — see the criteria named above. The job fails at the gate step."
         fi
 
+    # THE INSTRUMENT GATE, one level below coverage: were the criteria that need a browser
+    # given one? `require-decided` asks whether every criterion carries a verdict and
+    # `require-sample` whether the run looked at every page it declares; neither notices a run
+    # where the rendering tier never ran at all. Measured on a real keyed cascade: three
+    # passes, 311 turns and $24.90 spent to be told that seven criteria needed a rendered DOM,
+    # by a workflow that audited sources only and had snapshotted nothing.
+    - name: Render gate
+      id: renderedgate
+      if: inputs.require-rendered == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+      run: |
+        args=(--in audits/audit-latest.json --require-rendered --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}')
+        if [ -n '${{ inputs.undecidable-file }}' ]; then args+=(--allow-undecided '${{ inputs.undecidable-file }}'); fi
+        if node "$ENGINE" check "${args[@]}"; then
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::ultra11y: criteria needing a rendered page are undecided and nothing was rendered — pass urls/crawl/sitemap/sample. The job fails at the gate step."
+        fi
+
     # The per-page DOSSIERS — one sheet per page (its screenshot, every criterion of the
     # standard, each non-conformity), plus an index. Uploaded with the rest of audits/.
     - name: Per-page report
+      id: pages
       if: inputs.pages-report == 'true'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
       run: |
+        # The dossiers. `--evidence` and `--html` follow the SAME inputs the compliance report
+        # obeys — they did not, and the result was a documented artifact layout that did not
+        # exist: `references/ci.md` promised `audits/pages/index.html`, and the page sheets
+        # cited `dom.html:412 (div.card)` with no picture while the report beside them carried
+        # annotated crops of those very defects.
+        args=(--in audits/audit-latest.json --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}')
+        sheets=("${args[@]}" --format report --split page --out audits/pages)
+        if [ '${{ inputs.evidence }}' = 'true' ]; then
+          sheets+=(--evidence)
+          if [ -n '${{ inputs.evidence-max }}' ]; then sheets+=(--evidence-max '${{ inputs.evidence-max }}'); fi
+        fi
+        if [ '${{ inputs.html }}' = 'true' ]; then sheets+=(--html); fi
+
         # No page in scope is not a failure — it just means nothing was scanned or snapshotted.
-        node "$ENGINE" pages --in audits/audit-latest.json --standard '${{ inputs.standard }}' \
-          --lang '${{ inputs.lang }}' --format report --split page --out audits/pages || \
+        # The outputs below then stay empty/0, which is the honest answer and NOT the same
+        # statement as a clean sweep.
+        {
+          echo "json-path="
+          echo "report-path="
+          echo "count=0"
+          echo "failing=0"
+        } >> "$GITHUB_OUTPUT"
+
+        if ! node "$ENGINE" pages "${sheets[@]}"; then
           echo "ultra11y: no page in scope — skipping the per-page report."
+          exit 0
+        fi
+
+        # The same projection, for a machine. `--json --out` writes <dir>/pages.json beside
+        # the sheets it mirrors, so the artifact carries one file a later job can read without
+        # re-deriving anything — and the action publishes its PATH, never its contents: a
+        # criterion × page matrix is not a scalar and a step output is size-capped.
+        node "$ENGINE" pages "${args[@]}" --json --out audits > /dev/null
+
+        node -e '
+          const j = JSON.parse(require("fs").readFileSync("audits/pages.json", "utf8"));
+          const failing = j.pages.filter((p) => p.criteria.some((c) => c.status === "NC")).length;
+          const out = require("fs");
+          out.appendFileSync(process.env.GITHUB_OUTPUT, "json-path=audits/pages.json\n");
+          out.appendFileSync(process.env.GITHUB_OUTPUT, "report-path=audits/pages\n");
+          out.appendFileSync(process.env.GITHUB_OUTPUT, "count=" + j.pages.length + "\n");
+          out.appendFileSync(process.env.GITHUB_OUTPUT, "failing=" + failing + "\n");
+        '
 
     - name: SARIF → code scanning
       if: inputs.sarif == 'true'
@@ -1298,7 +1409,7 @@ runs:
 
     # The gate runs LAST, so a failing audit has already produced every surface above.
     - name: Gate
-      if: inputs.fail-on != '' || inputs.require-decided == 'true' || inputs.require-decided == 'pages' || inputs.require-sample == 'true'
+      if: inputs.fail-on != '' || inputs.require-decided == 'true' || inputs.require-decided == 'pages' || inputs.require-sample == 'true' || inputs.require-rendered == 'true'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1312,6 +1423,13 @@ runs:
         # incomplete grid, it is a grid about something else.
         if [ '${{ inputs.require-sample }}' = 'true' ] && [ '${{ steps.covered.outputs.ok }}' != 'true' ]; then
           echo "::error::ultra11y: a page declared in .ultra11yrc.json produced no capture — the run did not look at everything it reports on. See the pages named above."
+          exit 1
+        fi
+        # THE INSTRUMENT, before completeness: a criterion left « to assess » because nobody
+        # rendered anything is not an adjudication problem, and reporting it as one sends the
+        # reader to adjudicate what no reading of the source can settle.
+        if [ '${{ inputs.require-rendered }}' = 'true' ] && [ '${{ steps.renderedgate.outputs.ok }}' != 'true' ]; then
+          echo "::error::ultra11y: criteria that need a rendered page are undecided and this run snapshotted no page. Pass urls/crawl/sitemap/sample so the scan tier runs, or declare them in the file named by undecidable-file, with a reason."
           exit 1
         fi
         if [ '${{ inputs.require-decided }}' != 'false' ] && [ '${{ inputs.require-decided }}' != '' ] && [ '${{ steps.decided.outputs.ok }}' != 'true' ]; then

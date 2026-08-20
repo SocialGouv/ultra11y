@@ -12,6 +12,14 @@
 #          the API tier, and that is the point of it rather than a fault: it OPENS the files
 #          each criterion cites, which is what "link purpose IN CONTEXT" actually asks for.
 #
+# THE 80 IN THAT MEASUREMENT WAS ITSELF A DEFECT, and it is fixed below: the run audited
+# sources only, so the rendering criteria reached the model at all — and came back
+# `needs-rendered-dom`, correctly and expensively. This workflow now serves the fixture and
+# scans it before adjudicating, which is what the composite does for every consumer. Measured
+# on run 32385981037 (Haiku, 3 passes): the worklist starts at 41 instead of 80, the run takes
+# 10 minutes instead of 30, and 7 criteria are left — none of them a rendering one. The cheap
+# way to cut this bill is not a cheaper model; it is measuring what a browser can measure.
+#
 # Putting either on every push would bill a fleet of PRs for a signal that changes rarely; the
 # agent tier would do it at twenty dollars a go. Pair it with `ledger` so the next run replays
 # the verdicts instead of buying them again.
@@ -95,6 +103,37 @@ jobs:
         with:
           node-version: 24
 
+      # THE BROWSER TIER, so the rendering criteria are given a browser instead of being
+      # rediscovered as `needs-rendered-dom` at the end of a paid cascade.
+      #
+      # It comes from the REPOSITORY'S OWN lockfile — `@playwright/test` and
+      # `@axe-core/playwright` are dependencies here — so `scan --runtime local` resolves the
+      # same versions whose browsers `playwright install` downloads. This is the pattern the
+      # `action` job in ci.yml already proves; `npm i --no-save --omit=dev <pkg>` installs
+      # NOTHING for a package already declared in devDependencies, which is how this repository
+      # silently degraded to Docker once before.
+      - uses: pnpm/action-setup@v6
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install the browser tier
+        run: pnpm exec playwright install --with-deps chromium
+
+      # The fixture, SERVED. `tests/fixtures/realworld` is what this workflow adjudicates, and
+      # a file on disk is not a rendered page: `landing.html` has to be a document a browser
+      # actually built before contrast, zoom, reflow and text spacing mean anything.
+      #
+      # Not the directory index: python's listing links `LoginForm.tsx`, and navigating to it
+      # makes Chromium start a download instead of a navigation, which fails the scan. The
+      # entry is the page itself.
+      - name: Serve the fixture
+        run: |
+          nohup python3 -m http.server 8932 --directory tests/fixtures/realworld > /tmp/fixture.log 2>&1 &
+          deadline=$(( SECONDS + 30 ))
+          until curl -sSf -o /dev/null http://127.0.0.1:8932/landing.html; do
+            if [ $SECONDS -ge $deadline ]; then echo "::error::the fixture server never came up"; exit 1; fi
+            sleep 1
+          done
+
       - name: Refuse early if the credential this mode needs is missing
         env:
           MODE: ${{ inputs.mode }}
@@ -118,12 +157,19 @@ jobs:
       - name: Measure the unruled criteria BEFORE adjudication
         id: before
         run: |
+          # THE BASELINE HAS TO INCLUDE THE SCAN, or the delta below credits the model with
+          # work a browser did. Each `uses: ./` step re-audits AND re-scans from scratch, so
+          # the number a tier starts from is the post-render one — measured on this fixture:
+          # 80 criteria to adjudicate from source alone, 41 once the page is scanned. Reading
+          # the agent tier against 80 would report 39 criteria it never touched.
           node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
+          node scripts/ultra11y.mjs scan http://127.0.0.1:8932/landing.html --runtime local --cwd "$PWD" \
+            --merge audits/audit-latest.json --out audits
           node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
             --standard '${{ inputs.standard }}' --out /tmp/before --json > /tmp/before.json
           n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/before.json","utf8")).count')
           echo "manual=$n" >> "$GITHUB_OUTPUT"
-          echo "unruled before: $n"
+          echo "unruled before (source + rendered page): $n"
 
       - name: Adjudicate with the API
         if: inputs.mode == 'api' || inputs.mode == 'both'
@@ -140,6 +186,14 @@ jobs:
           adjudicate-max-turns: ${{ inputs.max-turns }}
           adjudicate-passes: ${{ inputs.passes }}
           artifact-name: adjudication-api
+          # RENDER BEFORE ADJUDICATING. The composite runs `Scan the pages` before the
+          # adjudication tier on purpose, so by the time a model is asked anything, computed
+          # contrast, 320px reflow, 200% zoom and text spacing are already measured — and the
+          # criteria that need them never reach the worklist. `local`, never `auto`: Docker
+          # cannot reach the host's loopback, and an `auto` that degrades there fails with an
+          # obscure ERR_CONNECTION_REFUSED instead of an explicit missing-tier error.
+          urls: http://127.0.0.1:8932/landing.html
+          runtime: local
 
       # Measured HERE, not at the end. The agent step below is a fresh `uses: ./` whose own
       # audit step rewrites audits/audit-latest.json from scratch, discarding these verdicts —
@@ -170,6 +224,12 @@ jobs:
           adjudicate-max-turns: ${{ inputs.max-turns }}
           adjudicate-passes: ${{ inputs.passes }}
           artifact-name: adjudication-agent
+          # Same rendered page as the API tier above, so the two modes are compared over the
+          # same evidence. Measured before this: 80 criteria to adjudicate from source alone,
+          # 41 once the page is scanned — and of the seven the 2026-08-20 cascade was left
+          # holding, six close on the measurement and only 10.1 still needs a reading.
+          urls: http://127.0.0.1:8932/landing.html
+          runtime: local
 
       - name: What the agent tier decided
         id: after_agent

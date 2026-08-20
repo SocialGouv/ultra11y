@@ -24,7 +24,14 @@ import { ghExec, ghErrorReason } from "./gh-cli.js";
  *  `digest` renders the historical marker BYTE FOR BYTE. A sticky already posted must keep
  *  being edited in place; re-keying it would leave the old comment orphaned on the PR and
  *  post a duplicate beside it. */
-export type CommentKind = "digest" | "pages";
+/** `full` is the third: ONE document carrying both halves, under its own marker.
+ *
+ *  The two above are each true and neither is the whole thing, and because each keys its own
+ *  sticky, a workflow that wants both posts two comments a reviewer has to reconcile. `full`
+ *  is for the run that wants a single comment at the end with everything in it — the page-by-
+ *  page grid AND the distinct defects with their locations. Its own key, so turning it on
+ *  never adopts or overwrites a sticky either of the others already placed. */
+export type CommentKind = "digest" | "pages" | "full";
 
 /** The hidden key identifying this tool's comment for a given standard and kind.
  *
@@ -46,7 +53,7 @@ export function stickyBody(markdown: string, standard: StandardId, kind: Comment
  *  document every existing workflow already posts. A typo that silenced the comment entirely
  *  would look exactly like a clean run. */
 export function commentKindFrom(value: string | undefined): CommentKind {
-  return value === "pages" ? "pages" : "digest";
+  return value === "pages" || value === "full" ? value : "digest";
 }
 
 /** The pull request to comment on: an explicit override, else the number GitHub Actions puts

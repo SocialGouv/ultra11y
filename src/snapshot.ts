@@ -274,6 +274,12 @@ export function readSnapshot(dir: string): Snapshot | null {
   const boxes = readJson<BoxDigest>(join(dir, "boxes.json"));
   const axtree = readJson<AxNode>(join(dir, "axtree.json"));
   const css = readJson<CssDigest>(join(dir, "css.json"));
+  // `writeSnapshot` writes these two and `attachSignals` reads them off disk, but this reader
+  // used to drop them — so a round-trip through `readSnapshot` silently lost the measurement
+  // half of the artefact, and any consumer holding a `Snapshot` (rather than a `Doc`) saw a
+  // page that had never been probed. Read what we write.
+  const probes = readJson<SnapshotProbes>(join(dir, "probes.json"));
+  const axe = readJson<NonNullable<RenderSignals["axe"]>>(join(dir, "axe.json"));
   const shot = join(dir, "screen.png");
   return {
     meta: v.meta,
@@ -282,6 +288,8 @@ export function readSnapshot(dir: string): Snapshot | null {
     ...(boxes ? { boxes } : {}),
     ...(axtree ? { axtree } : {}),
     ...(css ? { css } : {}),
+    ...(probes ? { probes } : {}),
+    ...(axe ? { axe } : {}),
     ...(existsSync(shot) ? { screenshot: "screen.png" } : {}),
   };
 }

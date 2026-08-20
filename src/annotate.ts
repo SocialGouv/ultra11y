@@ -39,6 +39,7 @@ import {
 } from "./pages.js";
 import { pageCriterionRows, pageTally, pageTallyNote } from "./pages-report.js";
 import { mdText } from "./md.js";
+import type { CommentKind } from "./pr-comment.js";
 
 export interface AnnotateOptions {
   standard?: StandardId;
@@ -106,6 +107,11 @@ const S = {
     more: (n: number) => `… et ${n} autre(s).`,
     moreGroups: (n: number) => `… et ${n} autre(s) groupe(s) — voir le résumé de job.`,
     perPage: "Bilan page par page",
+    pageCriteriaTitle: (name: string) => `${name} — le détail critère par critère`,
+    conformingList: "Conformes",
+    nonConformingList: "Non conformes",
+    toAssessList: "À évaluer",
+    naList: "Non applicables",
     page: "Page",
     count: "Constats",
     basis: "Base",
@@ -158,6 +164,9 @@ const S = {
     scoreboardClamped: (n: number) => `_${n} page(s) retirée(s) du tableau pour tenir dans la limite de GitHub — l'artefact les porte toutes._`,
     pageDefects: "Défauts",
     fullGrid: "Grille complète — chaque critère du référentiel, page par page",
+    allDefects: "Défauts distincts — où corriger",
+    allDefectsNote:
+      "Un défaut distinct = une (règle, critère, sélecteur) ; les occurrences répétées sont repliées. C'est la moitié « actionnable » du digest, reprise ici pour que ce commentaire soit le seul à lire.",
     gridLegend: "`C` conforme · `NC` non conforme · `—` non applicable · `?` à évaluer",
     gridDropped: "_La grille complète ne tient pas dans un commentaire GitHub (64 Kio) — elle est dans la fiche par page du livrable._",
     pageMoreDefects: (n: number) => `_… et ${n} autre(s) défaut(s) distinct(s) sur cette page — voir la fiche de page dans l'artefact._`,
@@ -177,6 +186,11 @@ const S = {
     more: (n: number) => `… and ${n} more.`,
     moreGroups: (n: number) => `… and ${n} more group(s) — see the job summary.`,
     perPage: "Page-by-page scoreboard",
+    pageCriteriaTitle: (name: string) => `${name} — criterion by criterion`,
+    conformingList: "Conforming",
+    nonConformingList: "Non-conforming",
+    toAssessList: "To assess",
+    naList: "Not applicable",
     page: "Page",
     count: "Findings",
     basis: "Basis",
@@ -228,6 +242,9 @@ const S = {
     scoreboardClamped: (n: number) => `_${n} page(s) dropped from the table to fit GitHub's limit — the artifact carries them all._`,
     pageDefects: "Defects",
     fullGrid: "Full grid — every criterion of the standard, page by page",
+    allDefects: "Distinct defects — where to fix",
+    allDefectsNote:
+      "One distinct defect = one (rule, criterion, selector); repeated occurrences are folded. This is the digest's actionable half, carried here so this comment is the only one to read.",
     gridLegend: "`C` conforming · `NC` non-conforming · `—` not applicable · `?` to assess",
     gridDropped: "_The full grid does not fit in a GitHub comment (64 KiB) — it is in the deliverable's per-page sheet._",
     pageMoreDefects: (n: number) => `_… and ${n} more distinct defect(s) on this page — see its sheet in the artifact._`,
@@ -507,7 +524,50 @@ export function perPageTable(result: AuditResult, standard: StandardId = CORE, l
   attributePages(result, scope);
   const derived = derivePages(result, scope);
   // The summary has a 1 MiB budget: it never clamps, and passes every page.
-  return [`### ${s.perPage}`, "", ...scoreboardTable(result, derived, standard, s, lang), "", ...basisCaveats(result, derived, s, lang)].join("\n");
+  return [
+    `### ${s.perPage}`,
+    "",
+    ...scoreboardTable(result, derived, standard, s, lang),
+    "",
+    ...basisCaveats(result, derived, s, lang),
+    ...derived.flatMap((pg) => [...namedCriteriaBlock(result, pg, standard, s, lang), ""]),
+  ].join("\n");
+}
+
+/** WHICH criteria, not how many — one folded block per page.
+ *
+ *  The scoreboard beside it counts, and counting is the right shape for a scoreboard: three
+ *  numbers a reader cannot misread. It is the wrong shape for acting. « 65 / 6 » on a row says
+ *  nothing about which six, and the ids lived only in the artifact — which means, in practice,
+ *  nowhere: a reviewer reads the job summary and does not download a 4 MB zip to find out that
+ *  the six are 3.2, 3.3, 10.4, 10.11, 10.12 and 12.8.
+ *
+ *  Every status comes from `pageCriterionRows` — the very rows the artifact's per-page sheet
+ *  renders — so the summary and the deliverable cannot disagree about a single cell. Ids only,
+ *  not titles: this is an index into the report, and 106 titles per page is a wall.
+ *
+ *  The conforming list is here for the same reason the full grid is in the comment: under a
+ *  per-page norm most of the deliverable IS what conforms, and a document that shows only
+ *  failures cannot be read as a statement of conformity at all. */
+function namedCriteriaBlock(result: AuditResult, page: PageResult, standard: StandardId, s: (typeof S)[Lang], lang: Lang): string[] {
+  const rows = pageCriterionRows(result, page, standard, lang);
+  if (!rows.length) return [];
+  const ids = (status: Status): string[] => rows.filter((r) => r.status === status).map((r) => `\`${r.id}\``);
+  const line = (label: string, list: string[]): string[] => (list.length ? [`- **${label}** (${list.length}) : ${list.join(" · ")}`] : []);
+  return [
+    "<details>",
+    `<summary>${s.pageCriteriaTitle(page.name)}${page.auth ? " 🔒" : ""}</summary>`,
+    // GFM only renders Markdown inside <details> after a blank line; without it the list
+    // ships to the reader as one run-on paragraph.
+    "",
+    // Failures first — that is the work — then what stands, then what nobody has ruled on.
+    ...line(s.nonConformingList, ids("NC")),
+    ...line(s.conformingList, ids("C")),
+    ...line(s.toAssessList, ids("manual")),
+    ...line(s.naList, ids("NA")),
+    "",
+    "</details>",
+  ];
 }
 
 /** The scoreboard's rows. Extracted so the job summary and the page-by-page pull-request
@@ -756,6 +816,44 @@ function orphansBlock(result: AuditResult, standard: StandardId, s: (typeof S)[L
   return out;
 }
 
+/** EVERY DISTINCT DEFECT OF THE RUN, folded — the digest's actionable half, in the page
+ *  document.
+ *
+ *  `kind: "full"` exists because the two comments are each true and neither is the whole
+ *  thing: `digest` says what is broken and where, `pages` says which pages conform and on
+ *  which criteria, and a workflow that wants both posts two stickies a reviewer must
+ *  reconcile. The page blocks above already carry each page's own defects; this block carries
+ *  the run's, including the ones no page could claim, so the document answers "where do I go
+ *  and change something?" without a second comment.
+ *
+ *  Same grouping, same columns and same cap as the job summary's table — one implementation of
+ *  "a distinct defect", so the two surfaces cannot disagree about how many there are. */
+function allDefectsBlock(result: AuditResult, standard: StandardId, s: (typeof S)[Lang], lang: Lang, baseDir: string): string[] {
+  const all = findingsForStandard(result, standard).filter((f) => !f.advisory);
+  if (!all.length) return [];
+  const cell = (v: string): string => v.replace(/\|/g, "\\|");
+  const groups = groupFindings(all, standard, lang, baseDir);
+  const counts = SEV_ORDER.map((sev) => `${ICON[sev]} ${all.filter((f) => f.severity === sev).length}`).join(" · ");
+  const out: string[] = [
+    "<details>",
+    `<summary><b>${s.allDefects}</b> — ${groups.length} / ${all.length} · ${counts}</summary>`,
+    // GFM only renders Markdown inside <details> after a blank line.
+    "",
+    `> ${s.allDefectsNote}`,
+    "",
+    `| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} | ${s.occurrences} |`,
+    "| --- | --- | --- | --- | ---: |",
+  ];
+  for (const g of groups.slice(0, MAX_ROWS)) {
+    out.push(
+      `| ${ICON[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`,
+    );
+  }
+  if (groups.length > MAX_ROWS) out.push("", s.more(groups.length - MAX_ROWS));
+  out.push("", "</details>");
+  return out;
+}
+
 /** The marks the grid draws. Same vocabulary as the per-page sheet's. */
 const GRID_MARK: Record<Status, string> = { C: "C", NC: "NC", NA: "—", manual: "?" };
 
@@ -771,8 +869,12 @@ const GRID_MARK: Record<Status, string> = { C: "C", NC: "NC", NA: "—", manual:
  *  Nothing is decided here either. The scoreboard is the projection the job summary draws,
  *  and each page's non-conformities come from `pageCriterionRows` — the very rows the per-page
  *  sheet renders into the artifact. */
-export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runUrl?: string; artifactName?: string } = {}): string {
+export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runUrl?: string; artifactName?: string; kind?: CommentKind } = {}): string {
   const standard = opts.standard ?? CORE;
+  // `full` is this document plus the digest's actionable half. Anything else renders exactly
+  // what `pages` always rendered, byte for byte — a sticky already posted must keep being
+  // edited in place, not re-keyed and duplicated.
+  const withDefects = opts.kind === "full";
   const lang = opts.lang ?? "en";
   const s = S[lang];
   const baseDir = opts.baseDir ?? process.cwd();
@@ -845,6 +947,10 @@ export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runU
     // thing the size clamp gives up, WHOLE and with a line saying where to find it.
     if (withGrid) body.push(...fullGridBlock(result, derived, standard, s, lang), "");
     else body.push(s.gridDropped, "");
+    // The run's distinct defects, under `kind: "full"` only. After the grid so a reviewer
+    // meets the verdict before the worklist, and before the per-page blocks because it is the
+    // half that says where to go and change something.
+    if (withDefects) body.push(...allDefectsBlock(result, standard, s, lang, baseDir), "");
     if (blocks.length) {
       body.push(`> ${s.pagesDetailNote}`, "");
       body.push(...blocks.slice(0, nBlocks).flatMap((b) => [b, ""]));

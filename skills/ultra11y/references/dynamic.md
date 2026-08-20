@@ -201,12 +201,54 @@ named interaction steps). It is deliberately **not** implemented: nothing in the
 execute it — every browser path is `goto`-only — so a JSON step DSL would reimplement, worse,
 what a Playwright spec calling `checkA11y` already does.
 
+### Cover the whole site: the crawl is unbounded by default
+
+`--max` and `--depth` bound the crawl **when you ask them to**; absent — or `0` — there is no
+bound at all. A sweep that silently stopped at 50 pages produced a report merely SHORTER than
+the site, and a shorter deliverable reads exactly like a complete one. Termination does not
+depend on the cap: the frontier never leaves the origin and every URL is de-duplicated by its
+canonical form, so a cycle (or a site linking `/` and `/index.html` at once) is visited once.
+
+Every page reached is announced on stderr with its running count, so an unbounded crawl is
+never a job that merely looks hung — and `--json` on stdout stays machine-readable.
+
+```
+node scripts/ultra11y.mjs scan --crawl https://example.com --json          # the whole site
+node scripts/ultra11y.mjs scan --crawl https://example.com --max 50        # bound it explicitly
+```
+
+A crawl follows links in the served HTML, including ones that are not pages: a directory
+listing that links a `.tsx` file makes the browser start a download instead of a navigation,
+and the scan stops there. Point `--crawl` at a real entry page, or pass the URLs.
+
 ## Every scanned page is also a SNAPSHOT
 
 `scan` does not only keep findings: each page it visits is persisted to
 `.ultra11y/pages/<id>/` (DOM + computed styles + boxes + stylesheets + a viewport
 screenshot). The browser is already on the page, so this costs one `evaluate`. `--no-snapshot`
 opts out.
+
+### …and what it MEASURED, not only what it saw
+
+The snapshot also carries `probes.json` and `axe.json`: which success criteria the live probes
+actually ran on this page, and the axe pass that ran beside them. That is the half that decides
+anything, and it used to be thrown away at write time.
+
+The consequence was narrow and expensive. `renderedProvesOn` (`src/coverage.ts`) grants a
+conforming verdict from `pageCoverage.scs` / `.axe`, both derived from those two files, so a
+scanned page could report a rendering **violation** and could never conclude **conformity**:
+1.4.4, 1.4.10, 1.4.12 have no offline rule at all, and 1.4.3's canonical decider is axe. On a
+real RGAA run, 3.2 / 10.4 / 10.11 / 10.12 came back « à évaluer » on a page the probes had
+zoomed, reflowed and tabbed through.
+
+`probed` is the load-bearing field and it is written honestly: a probe that threw, a viewport
+that would not resize, a text-spacing override that would not apply — none of them reach it.
+The 320 px resize and the spacing override are part of their own measurement, so a probe read
+at the wrong viewport is not recorded (and never raises a reflow non-conformity measured at
+1280 px). The Docker runtime records `["1.4.10"]`, which is exactly what it measures.
+
+Measured on a two-file fixture: **80 criteria to adjudicate from source alone, 41 once a single
+page was scanned.**
 
 That artefact is not a convenience — it is what makes a URL a real per-page verdict:
 
@@ -230,6 +272,27 @@ Collected later, the snapshot would record our own instrumentation instead of th
 With `--merge`, the freshly written snapshots are audited and folded into the result in the
 same run, and `scope.pages` is recorded — so `pages` and `report` speak page by page
 immediately, not on the next `audit`.
+
+## Render BEFORE you adjudicate
+
+A `needs-rendering` criterion handed to an adjudicator on a source-only audit has exactly one
+honest answer, `needs-rendered-dom`, and getting it costs a model pass. Measured on one keyed
+RGAA cascade: three passes, 311 turns and $24.90, ending with seven criteria correctly reported
+as needing a rendered DOM — on a workflow that had snapshotted nothing.
+
+Two surfaces now say so before the money is spent, and neither guesses:
+
+- **`verify --manual`** names them in the log and in `ADJUDICATE.md` when the worklist carries
+  rendering criteria and no page's real DOM was read. Advisory: a source-only audit is a
+  legitimate thing to want.
+- **`check --in <audit.json> --require-rendered`** turns that into a gate, in the family of
+  `--require-decided` (every criterion has a verdict) and `--require-sample` (every declared
+  page was looked at). It asks about the INSTRUMENT, never the answer: a run that rendered a
+  page and still could not settle 1.4.5 passes — that is the honest residual, and failing on it
+  would push a project to manufacture a verdict. It honours `--allow-undecided`.
+
+`orchestrate` carries the same warning into `RUNBOOK.md`, above the phase table, with the scan
+command already written out.
 
 ## Limits
 

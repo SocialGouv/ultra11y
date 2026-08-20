@@ -675,22 +675,50 @@ async function runOnPage(
     // live-region) run LAST so their DOM side effects can never leak into the stress
     // measurements; `--no-interact` (opts.interact === false) skips fill/dialogs/live-region
     // entirely — the exact pre-stateful behaviour.
-    const focusVisible = await probeFocusVisible(page).catch(() => empty);
-    const hover = await probeHover(page).catch(() => empty);
+    // WHICH CRITERIA THIS PAGE WAS ACTUALLY MEASURED ON.
+    //
+    // Every probe below is guarded so that one failing degrades to "no findings" rather than
+    // zeroing the page — and that guard is indistinguishable, to anything reading the result,
+    // from a probe that ran and found nothing. Downstream the difference is everything:
+    // `renderedProvesOn` (src/coverage.ts) reads this list to decide whether silence on a
+    // criterion may be read as conformity. So each probe records itself here only when it
+    // really ran, and a probe that threw records nothing.
+    const probed: string[] = [];
+    const ran = async <T>(sc: string, fallback: T, run: () => Promise<T>): Promise<T> => {
+      try {
+        const r = await run();
+        probed.push(sc);
+        return r;
+      } catch {
+        return fallback;
+      }
+    };
+    const focusVisible = await ran("2.4.7", empty, () => probeFocusVisible(page));
+    const hover = await ran("1.4.13", empty, () => probeHover(page));
     const l = opts.lang;
     if (opts.interact) await page.evaluate(FILL_INPUTS_STEP).catch(() => {});
-    const reflowZoom = (await page.evaluate(REFLOW_ZOOM_PROBE).catch(() => [])) as ProbeHit[];
+    const reflowZoom = await ran("1.4.4", [] as ProbeHit[], async () => (await page.evaluate(REFLOW_ZOOM_PROBE)) as ProbeHit[]);
     const inputOverflowZoom = opts.interact
       ? ((await page.evaluate(inputOverflowZoomExpr(INPUT_OVERFLOW_DETAIL.zoom[l], CELL_SUFFIX[l])).catch(() => [])) as ProbeHit[])
       : [];
-    await page.setViewportSize({ width: 320, height: 800 }).catch(() => {});
-    const reflow = (await page.evaluate(REFLOW_PROBE).catch(() => ({ horizontalScroll: false }))) as { horizontalScroll: boolean };
+    // THE RESIZE IS PART OF THE MEASUREMENT, not a step before it. A `setViewportSize` that
+    // failed leaves the probe reading a 1280px layout, and a horizontal scroll seen there
+    // would be filed as a 320px reflow failure — a non-conformity this engine would have
+    // manufactured out of its own instrumentation failing.
+    const reflow = await ran("1.4.10", { horizontalScroll: false }, async () => {
+      await page.setViewportSize({ width: 320, height: 800 });
+      return (await page.evaluate(REFLOW_PROBE)) as { horizontalScroll: boolean };
+    });
     const inputOverflowReflow = opts.interact
       ? ((await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.reflow[l], CELL_SUFFIX[l])).catch(() => [])) as ProbeHit[])
       : [];
     await page.setViewportSize({ width: 1280, height: 900 }).catch(() => {});
-    await page.addStyleTag({ content: TEXT_SPACING_CSS }).catch(() => {});
-    const textSpacing = (await page.evaluate(TEXT_SPACING_PROBE).catch(() => [])) as ProbeHit[];
+    // Same reasoning: without the override applied, this probe measures the page's own
+    // spacing, and its silence says nothing at all about 1.4.12.
+    const textSpacing = await ran("1.4.12", [] as ProbeHit[], async () => {
+      await page.addStyleTag({ content: TEXT_SPACING_CSS });
+      return (await page.evaluate(TEXT_SPACING_PROBE)) as ProbeHit[];
+    });
     const inputOverflowSpacing = opts.interact
       ? ((await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.spacing[l], CELL_SUFFIX[l])).catch(() => [])) as ProbeHit[])
       : [];
@@ -716,6 +744,10 @@ async function runOnPage(
       inputOverflowZoom,
       inputOverflowSpacing,
       liveRegion,
+      // Sorted so the persisted artefact is byte-stable run to run: probes finish in whatever
+      // order they finish, and a snapshot that differs only by list order would show up as a
+      // change in every diff of a committed `.ultra11y/pages` tree.
+      probed: [...probed].sort(),
       ...(snapshot ? { snapshot: { ...snapshot, ...(screenshot ? { screenshot } : {}) } } : {}),
     };
   } finally {

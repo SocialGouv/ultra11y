@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseSitemapUrls, extractLinks, crawlUrls, canonicalUrl } from "../src/crawl.js";
+import { parseSitemapUrls, extractLinks, crawlUrls, canonicalUrl, crawlBound } from "../src/crawl.js";
 
 describe("parseSitemapUrls", () => {
   it("extracts every <loc> from a urlset, trimming whitespace", () => {
@@ -54,6 +54,49 @@ describe("crawlUrls", () => {
   it("honours the max-pages cap regardless of depth", async () => {
     const urls = await crawlUrls("https://exemple.fr/", { fetchHtml, depth: 5, max: 2 });
     expect(urls).toEqual(["https://exemple.fr/", "https://exemple.fr/a"]);
+  });
+
+  // A BOUND IS SOMETHING YOU ASK FOR.
+  //
+  // The old defaults (50 pages, 2 hops) truncated a sweep in silence, and a deliverable
+  // shorter than the site reads exactly like a complete one — the failure mode this tool
+  // exists to prevent. Unbounded is now the default, and `0` says it explicitly. Termination
+  // comes from the crawl's own invariants, not from the cap: same origin, and de-duplication
+  // by canonical URL.
+  it("crawls the whole site when no bound is given", async () => {
+    const urls = await crawlUrls("https://exemple.fr/", { fetchHtml });
+    expect(urls).toEqual(["https://exemple.fr/", "https://exemple.fr/a", "https://exemple.fr/b", "https://exemple.fr/c"]);
+  });
+  it("reads 0 as 'no bound', for max and for depth alike", async () => {
+    const urls = await crawlUrls("https://exemple.fr/", { fetchHtml, depth: 0, max: 0 });
+    expect(urls).toEqual(["https://exemple.fr/", "https://exemple.fr/a", "https://exemple.fr/b", "https://exemple.fr/c"]);
+  });
+  it("still terminates on a cycle, because identity is the canonical URL", async () => {
+    const loop: Record<string, string> = {
+      "https://exemple.fr/": `<a href="/x">x</a>`,
+      "https://exemple.fr/x": `<a href="/">home</a><a href="/index.html">home again</a><a href="/x#top">self</a>`,
+    };
+    const urls = await crawlUrls("https://exemple.fr/", { fetchHtml: async (u) => loop[u] ?? "", depth: 0, max: 0 });
+    expect(urls).toEqual(["https://exemple.fr/", "https://exemple.fr/x"]);
+  });
+
+  // An unbounded crawl must never be a silent one: it is the only thing standing between a
+  // reader and a job that looks hung. The reporter is the caller's, so the library keeps no
+  // opinion about where the line goes.
+  it("reports each page as it is reached, with its running count", async () => {
+    const seen: string[] = [];
+    await crawlUrls("https://exemple.fr/", { fetchHtml, onPage: (url, n) => seen.push(`${n} ${url}`) });
+    expect(seen).toEqual(["1 https://exemple.fr/", "2 https://exemple.fr/a", "3 https://exemple.fr/b", "4 https://exemple.fr/c"]);
+  });
+});
+
+describe("crawlBound", () => {
+  it("reads absent, 0 and negative as unbounded, and a positive number as itself", () => {
+    expect(crawlBound(undefined)).toBe(Number.POSITIVE_INFINITY);
+    expect(crawlBound(0)).toBe(Number.POSITIVE_INFINITY);
+    expect(crawlBound(-1)).toBe(Number.POSITIVE_INFINITY);
+    expect(crawlBound(Number.NaN)).toBe(Number.POSITIVE_INFINITY);
+    expect(crawlBound(20)).toBe(20);
   });
 });
 

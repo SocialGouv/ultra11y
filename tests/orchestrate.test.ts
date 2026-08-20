@@ -8,6 +8,7 @@ import { main } from "../src/cli.js";
 import { BATCH_SIZE, SMALL_WORKLIST, listPhases, orchestrateRun } from "../src/orchestrate.js";
 import { agentContracts, phaseSpec } from "../src/orchestrate-templates.js";
 import { type VerifyItem, writeWorklist } from "../src/verify.js";
+import type { AuditResult } from "../src/types.js";
 
 const ENGINE = "/opt/skills/ultra11y/scripts/ultra11y.mjs";
 
@@ -241,6 +242,43 @@ describe("orchestrate — contracts & runbook", () => {
     expect(rb).toContain(ENGINE);
     expect(rb).toContain("adjudicator.md");
     expect(rb).toContain("refuter.md");
+  });
+
+  // RENDER BEFORE YOU ADJUDICATE — said in the runbook, because the runbook is what an agent
+  // without a Workflow tool actually follows. A criterion needing a browser cannot be settled
+  // by reading source, so every pass over it costs a model and returns `needs-rendered-dom`.
+  // Measured on a real cascade: three passes, 311 turns and $24.90 to learn that.
+  describe("it says to render first, when nothing has been rendered", () => {
+    const withAudit = (audit: Partial<AuditResult>): string => {
+      const run = makeRun({ adjudicate: 2 });
+      // A worklist whose items need a browser — the shape `verify --manual` produces on a
+      // source-only audit of anything with a stylesheet.
+      const todo = JSON.parse(readFileSync(join(run, "ADJUDICATE.todo.json"), "utf8")) as { items: { automatability: string }[] };
+      for (const it of todo.items) it.automatability = "needs-rendering";
+      writeFileSync(join(run, "ADJUDICATE.todo.json"), JSON.stringify(todo));
+      writeFileSync(join(run, "audit-latest.json"), JSON.stringify({ scope: { inputs: [], files: 1, pagesAudited: [] }, ...audit }));
+      orchestrateRun(run, ENGINE);
+      return readFileSync(join(run, "orchestration", "RUNBOOK.md"), "utf8");
+    };
+
+    it("opens on the scan command, with the criteria named", () => {
+      const rb = withAudit({});
+      expect(rb).toMatch(/Render before you adjudicate/i);
+      expect(rb).toContain("scan <url>");
+      expect(rb).toContain("`1.1.1`");
+      // Above the phase table: it changes what every phase below costs.
+      expect(rb.indexOf("Render before you adjudicate")).toBeLessThan(rb.indexOf("## Phase status"));
+    });
+
+    it("says nothing once a page's real DOM has been read", () => {
+      expect(withAudit({ scope: { inputs: [], files: 1, pagesAudited: ["accueil"] } } as Partial<AuditResult>)).not.toMatch(/Render before you adjudicate/i);
+    });
+
+    it("still emits a runbook when the run has no audit to read", () => {
+      const run = makeRun({ adjudicate: 2 });
+      expect(orchestrateRun(run, ENGINE).exitCode).toBe(0);
+      expect(readFileSync(join(run, "orchestration", "RUNBOOK.md"), "utf8")).not.toMatch(/Render before you adjudicate/i);
+    });
   });
 
   it("golden shape (paths normalized)", () => {

@@ -276,6 +276,14 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   headless browser and, on the local runtime, probes focus visibility, 200% zoom, text
   spacing and content-on-hover, with bounded stateful interactions and authenticated pages;
   read **`references/dynamic.md`**.
+- **"Close the criteria that came back `needs-rendered-dom`"** → they did not need a better
+  model, they needed a browser. `scan` persists WHAT IT MEASURED beside each snapshot
+  (`probes.json`, `axe.json`), so a page it zoomed, reflowed and tabbed through can come back
+  **conforming** rather than « à évaluer » — RGAA 3.2/3.3/10.4/10.11/10.12 close on the
+  measurement, and 10.1/12.8 become adjudicable from the real DOM. `verify --manual` warns
+  before you spend a pass, `check --require-rendered` refuses, and the crawl is **unbounded by
+  default** (`--max 0` / `--depth 0`), announcing every page it reaches. Read
+  **`references/dynamic.md`** and **`references/pages.md`**.
 
 ## Orchestration — route by harness
 
@@ -300,6 +308,8 @@ node scripts/ultra11y.mjs audit "dist/**/*.html"                             # t
 node scripts/ultra11y.mjs render --setup                                     # install the capture harvester (tests → .ultra11y/captures)
 node scripts/ultra11y.mjs audit --require-captures                           # gate the components with no rendered capture
 node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd . --merge audits/audit-latest.json
+node scripts/ultra11y.mjs check --in audits/audit-latest.json --require-rendered              # gate: a rendering criterion left open by a run that rendered nothing
+node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --json --out audits  # the per-page grid, for a machine (audits/pages.json)
 node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --in audits/audit-latest.json --manual --out audits
 node scripts/ultra11y.mjs verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json --out audits
 node scripts/ultra11y.mjs orchestrate --run audits                           # fan the judgment phases out (--eco for the sequential path)
@@ -324,6 +334,17 @@ drive the judgment and content stages:
 1. **Audit** the source (`audit … --graph`) for a first map; on library-rendered code,
    **audit the render** (`render` → build/SSR → `audit`) for reliable verdicts (otherwise
    the scope-risk note reminds you).
+1b. **RENDER BEFORE YOU ADJUDICATE — this step is not optional when a rendering criterion is
+   open.** `scan <url|file> --runtime local --merge audits/audit-latest.json --out audits`
+   (or `scan --sample`) drives a real browser, persists each page to `.ultra11y/pages/<id>/`
+   **with what it measured** (`probes.json`, `axe.json`), and folds it in. Skipping it does not
+   leave those criteria merely open — it makes them *undecidable by anyone*: no reading of the
+   source settles computed contrast, 200 % zoom, 320 px reflow or text spacing, so every
+   adjudication pass over them costs a model and returns `needs-rendered-dom`. Measured on one
+   RGAA run over a two-file fixture: **80 criteria to adjudicate from source alone, 41 once a
+   single page was scanned** — and of the seven a three-pass, $24.90 cascade was left holding,
+   six closed on the measurement. `verify --manual` now says so before you spend anything, and
+   `check --in <audit.json> --require-rendered` makes it a gate.
 2. **Adjudicate & refute** with `verify`, two worklists. (a) `verify --manual --in audit.json`
    emits `ADJUDICATE.todo.json` — one item per residual *judgment* criterion, pre-loaded with the
    engine's harvested evidence — which the AI agent rules on (`C`/`NC`/`NA`, or `manual` with a

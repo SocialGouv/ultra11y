@@ -15,8 +15,18 @@ That difference is not cosmetic. It is what makes a whole class of criteria deci
   boxes.json    bounding boxes, same join key
   css.json      the page's own stylesheets (rules + declarations), NOT element-indexed
   axtree.json   the accessibility tree, when a producer supplies it (no rule reads it yet)
+  probes.json   what the LIVE probes measured here — and `probed`, which ones actually ran
+  axe.json      the axe pass that ran beside them (`ran: true` is what makes its silence usable)
   screen.png    viewport screenshot (pixel tier)
 ```
+
+The last two are the measurement half, and they are what lets a page CONCLUDE rather than
+merely report. `renderedProvesOn` reads `pageCoverage.scs` / `.axe`, both derived from them, so
+a page with no `probes.json` can raise a rendering non-conformity and can never earn a
+rendering conformity — 1.4.4, 1.4.10 and 1.4.12 have no offline rule at all, and 1.4.3's
+canonical decider is axe. `probed` is written only for a probe that really ran: one that threw,
+a viewport that would not resize, an override that would not apply — none of them reach it,
+because their silence is not a measurement.
 
 `audit` ingests `.ultra11y/pages` automatically, exactly as it ingests `.ultra11y/captures`
 (`--no-captures` opts out of both). Nothing new to run:
@@ -163,7 +173,16 @@ status *on each page*. The engine's verdict is scope-wide. `pages` bridges the t
 ```
 node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa
 node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --json
+node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --json --out audits
+#   → also writes audits/pages.json — the same projection, for a machine
 ```
+
+`--json --out <dir>` writes `<dir>/pages.json` beside the sheets it mirrors. The grid, the
+dossiers and the HTML are documents for a person; this is the one file a later job, a badge or
+a dashboard can read without re-deriving anything, and stdout alone cannot serve them — in CI
+the caller is a composite action step, and a criterion × page matrix does not fit in an action
+output. Its shape is `{ pages: [{ id, name, url, basis, criteria: [{ id, status, decidedBy }],
+conformancePct, decided, total }], unattributed }`.
 
 One row per criterion (the pack's own under `--standard`), one column per page:
 `C` conforming · `NC` non-conforming · `—` not applicable · `?` to assess. The same grid is

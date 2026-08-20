@@ -12,7 +12,7 @@ const ACTION = parse(RAW) as {
   name: string;
   description: string;
   inputs: Record<string, { description: string; default?: string; required?: boolean }>;
-  outputs: Record<string, { value: string }>;
+  outputs: Record<string, { value: string; description?: string }>;
   runs: {
     using: string;
     steps: {
@@ -124,8 +124,88 @@ describe("it covers both halves of the ask: the code and the pages", () => {
     expect(step).toBeTruthy();
     expect(step?.run).toContain("--format report");
     expect(step?.run).toContain("--split page");
-    // A run with no page in scope is not a failure — it means nothing was scanned.
-    expect(step?.run).toContain("||");
+    // A run with no page in scope is not a failure — it means nothing was scanned. The step
+    // swallows the engine's non-zero and says so, rather than reddening a job that simply had
+    // no pages to report on.
+    expect(step?.run).toMatch(/no page in scope/);
+    expect(step?.run).toMatch(/exit 0/);
+  });
+
+  // THE ARTIFACT MUST CONTAIN WHAT THE DOCS SAY IT CONTAINS.
+  //
+  // `references/ci.md` has documented `audits/pages/index.html + page-<id>.html` in the
+  // artifact tree, and the step never passed `--html`; it never passed `--evidence` either, so
+  // the page sheets cited `dom.html:412 (div.card)` with no picture while the compliance
+  // report beside them carried annotated crops of the same defects. A documented artifact
+  // layout that does not exist is a promise the reader discovers is empty.
+  it("honours `html` and `evidence` in the per-page dossiers too, as the docs promise", () => {
+    const step = ACTION.runs.steps.find((s) => s.name === "Per-page report");
+    expect(step?.run).toContain("--html");
+    expect(step?.run).toContain("--evidence");
+  });
+
+  it("writes the per-page grid as machine-readable JSON beside the sheets", () => {
+    const step = ACTION.runs.steps.find((s) => s.name === "Per-page report");
+    expect(step?.run).toContain("pages.json");
+  });
+
+  // Unbounded by default: a sweep that silently stopped at 20 pages produced a report merely
+  // SHORTER than the site, and a shorter deliverable reads exactly like a complete one.
+  it("crawls without a cap unless the caller asks for one", () => {
+    expect(ACTION.inputs["crawl-max"]?.default).toBe("0");
+    expect(ACTION.inputs["crawl-depth"]?.default).toBe("0");
+  });
+});
+
+// WHAT A LATER JOB CAN READ. The action published two repo-global scalars and nothing about
+// pages, so a caller wanting a badge, a dashboard or a follow-up job had to re-parse an
+// artifact it could not address while the run was still in flight.
+describe("it publishes the page dimension as outputs", () => {
+  const OUT = ACTION.outputs;
+
+  it("names the per-page JSON and the dossier directory", () => {
+    expect(OUT["pages-json-path"]).toBeTruthy();
+    expect(OUT["pages-report-path"]).toBeTruthy();
+  });
+
+  it("publishes the counts a gate or a badge can read without downloading anything", () => {
+    expect(OUT["pages-count"]).toBeTruthy();
+    expect(OUT["pages-failing"]).toBeTruthy();
+  });
+
+  // A criterion × page matrix is not a scalar and a step output is size-capped: the PATH is
+  // the honest contract, and truncating a grid into an output would be a silent lie.
+  it("publishes the path to the grid, never the grid itself", () => {
+    for (const key of ["pages-json-path", "pages-report-path"]) {
+      expect(OUT[key]?.description ?? "").toMatch(/path/i);
+    }
+  });
+
+  it("wires every one of them to a step that exists", () => {
+    const ids = new Set(ACTION.runs.steps.map((s) => s.id).filter(Boolean));
+    for (const key of ["pages-json-path", "pages-report-path", "pages-count", "pages-failing"]) {
+      const m = /steps\.([a-z0-9_-]+)\.outputs/.exec(OUT[key]?.value ?? "");
+      expect(m, `${key} is not wired to a step output`).toBeTruthy();
+      expect(ids.has(m![1] as string), `${key} names step "${m![1]}", which does not exist`).toBe(true);
+    }
+  });
+});
+
+describe("the render gate and the one-comment mode are reachable from the action", () => {
+  it("takes `require-rendered`, off by default like its two siblings", () => {
+    expect(ACTION.inputs["require-rendered"]).toBeTruthy();
+    expect(ACTION.inputs["require-rendered"]?.default).toBe("false");
+  });
+
+  it("runs it as a gate step, and only when asked", () => {
+    const step = ACTION.runs.steps.find((s) => s.name?.includes("Render gate"));
+    expect(step).toBeTruthy();
+    expect(step?.if).toContain("require-rendered");
+    expect(step?.run).toContain("--require-rendered");
+  });
+
+  it("documents `full` as a comment kind", () => {
+    expect(ACTION.inputs["comment-kind"]?.description).toContain("full");
   });
 });
 
@@ -187,6 +267,7 @@ describe("the adjudication tier", () => {
     "Markdown report",
     "HTML report",
     "Completeness gate",
+    "Render gate",
     "left to assess",
   ];
 
