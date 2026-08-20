@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.20.0](https://github.com/maxgfr/ultra11y/compare/v5.19.1...v5.20.0) (2026-08-20)
+
+
+### Bug Fixes
+
+* **scan:** carry the snapshot run's coverage stamp through the merge ([e6f2ed7](https://github.com/maxgfr/ultra11y/commit/e6f2ed729d0cc28f4b89647d3c317a8a34b50712))
+
+
+### Features
+
+* **scan:** decide the rendering criteria in the run, and report conformity page by page ([18a90e3](https://github.com/maxgfr/ultra11y/commit/18a90e3891a0a3720930c0aacd7c22cc4ad5a42a))
+
 ## [5.19.1](https://github.com/maxgfr/ultra11y/compare/v5.19.0...v5.19.1) (2026-08-20)
 
 
