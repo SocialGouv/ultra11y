@@ -12,6 +12,14 @@
 #          the API tier, and that is the point of it rather than a fault: it OPENS the files
 #          each criterion cites, which is what "link purpose IN CONTEXT" actually asks for.
 #
+# THE 80 IN THAT MEASUREMENT WAS ITSELF A DEFECT, and it is fixed below: the run audited
+# sources only, so the rendering criteria reached the model at all — and came back
+# `needs-rendered-dom`, correctly and expensively. This workflow now serves the fixture and
+# scans it before adjudicating, which is what the composite does for every consumer. Measured
+# on run 32385981037 (Haiku, 3 passes): the worklist starts at 41 instead of 80, the run takes
+# 10 minutes instead of 30, and 7 criteria are left — none of them a rendering one. The cheap
+# way to cut this bill is not a cheaper model; it is measuring what a browser can measure.
+#
 # Putting either on every push would bill a fleet of PRs for a signal that changes rarely; the
 # agent tier would do it at twenty dollars a go. Pair it with `ledger` so the next run replays
 # the verdicts instead of buying them again.
@@ -186,7 +194,6 @@ jobs:
           # obscure ERR_CONNECTION_REFUSED instead of an explicit missing-tier error.
           urls: http://127.0.0.1:8932/landing.html
           runtime: local
-          comment-kind: full
 
       # Measured HERE, not at the end. The agent step below is a fresh `uses: ./` whose own
       # audit step rewrites audits/audit-latest.json from scratch, discarding these verdicts —
@@ -223,7 +230,6 @@ jobs:
           # holding, six close on the measurement and only 10.1 still needs a reading.
           urls: http://127.0.0.1:8932/landing.html
           runtime: local
-          comment-kind: full
 
       - name: What the agent tier decided
         id: after_agent
