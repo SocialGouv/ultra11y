@@ -783,6 +783,27 @@ export const SUBJECTS: Record<string, Subject> = {
           hAt(d, l.line, "css", `CSS rule keyed on a pointer/keyboard state — does the hover half have a focus twin? ${l.text}`, `cssstate|${l.text}`),
         ),
       );
+      // …AND WHERE TO GO WHEN THE RULE IS NOT IN THIS FILE. An external stylesheet is not a
+      // document this engine parses (`.css` is absent from glob.ts DEFAULT_EXT — engine scope is
+      // markup), so a site whose tooltip lives in `styles.css` hands the adjudicator the trigger
+      // and the panel and NOTHING about how either becomes visible. It has Read and Grep; what
+      // it lacked was the address. Only emitted when this document really carries additional
+      // content, so a page with a stylesheet and no tooltip stays silent.
+      if (out.length) {
+        for (const link of elementsByTag(d, "link")) {
+          const rel = (attr(link, "rel") ?? "").toLowerCase();
+          if (!rel.split(/\s+/).includes("stylesheet")) continue;
+          const href = attr(link, "href") ?? "";
+          out.push(
+            h(
+              d,
+              link,
+              `stylesheet "${href}" — this page reveals additional content and the rule that does it is NOT in this file. Open the stylesheet and check the \`:hover\` selectors for a \`:focus\`/\`:focus-within\` twin.`,
+              `stylesheet|${href}`,
+            ),
+          );
+        }
+      }
       return out;
     }),
 

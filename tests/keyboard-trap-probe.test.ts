@@ -31,7 +31,7 @@ function fakePage(count: number, ring: (string | null)[]) {
       // The setup expression returns the focusable count; the where-probe returns the ring.
       if (expr.includes("data-u11y-fp")) return count;
       const key = ring[Math.min(i, ring.length) - 1] ?? null;
-      return key === null ? null : { key, selector: `#${key}`, html: `<button id="${key}">` };
+      return key === null ? null : { key, tagged: !key.startsWith("?"), selector: `#${key}`, html: `<button id="${key}">` };
     },
   };
 }
@@ -57,6 +57,13 @@ describe("probeKeyboardTrap", () => {
     // A listbox stepping through its options holds focus for a press and then moves on. Calling
     // that a trap would manufacture a blocker out of a widget behaving normally.
     expect(await probeKeyboardTrap(fakePage(4, ["a", "b", "b", "c", "d", null]))).toEqual([]);
+  });
+
+  it("refuses to accuse an element the setup pass never tagged", async () => {
+    // An untagged element is identified by its selector alone, and a selector is not an
+    // identity: two links in one list share one. Comparing them would report a trap on a page
+    // whose focus was moving perfectly well. `?` marks an untagged key in this fake.
+    expect(await probeKeyboardTrap(fakePage(4, ["?x", "?x", "?x", "?x", "?x"]))).toEqual([]);
   });
 
   it("never calls a single-focusable page a trap — Tab has nowhere else to go", async () => {

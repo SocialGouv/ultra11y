@@ -310,7 +310,7 @@ var FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
   const e = document.activeElement;
   if (!e || e === document.body || e === document.documentElement) return null;
   const key = e.getAttribute && e.getAttribute('data-u11y-f');
-  return { key: key || __sel(e), selector: __sel(e), html: __html(e) };
+  return { key: key || __sel(e), tagged: !!key, selector: __sel(e), html: __html(e) };
 })()`;
 async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
   const count = await page.evaluate(focusSetupExpr("", limits.maxFocusables));
@@ -325,13 +325,13 @@ async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
     await page.keyboard.press("Tab");
     const now = await page.evaluate(FOCUS_WHERE_PROBE);
     if (!now) break;
-    if (prev && now.key === prev.key) {
+    if (prev?.tagged && now.tagged && now.key === prev.key) {
       let stuck = true;
       for (let k = 0; k < confirmPresses && stuck; k++) {
         if (deadline?.out()) break;
         await page.keyboard.press("Tab");
         const again = await page.evaluate(FOCUS_WHERE_PROBE);
-        stuck = again !== null && again.key === now.key;
+        stuck = again !== null && again.tagged === true && again.key === now.key;
       }
       if (stuck) {
         hits.push({
@@ -345,7 +345,6 @@ async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
     if (seen.has(now.key)) break;
     seen.add(now.key);
     prev = now;
-    if (hits.length >= 4) break;
   }
   return hits;
 }
@@ -432,8 +431,7 @@ async function runLiveProbes(page, opts = {}) {
     }
   };
   if (!canResize) skip("1.4.10", "the page object cannot resize its viewport");
-  if (!canType) skip("2.4.7", "the page object exposes no keyboard");
-  if (!canType) skip("2.1.2", "the page object exposes no keyboard");
+  if (!canType) for (const sc of ["2.4.7", "2.1.2"]) skip(sc, "the page object exposes no keyboard");
   if (!canHover) skip("1.4.13", "the page object cannot hover");
   if (!canStyle) skip("1.4.12", "the page object cannot inject a stylesheet");
   if (want("1.4.4")) {

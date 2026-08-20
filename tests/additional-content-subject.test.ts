@@ -51,6 +51,23 @@ describe("the additionalContent subject harvests what 10.14 and 12.11 are about"
     expect(n.some((x) => /focus twin/.test(x))).toBe(true);
   });
 
+  it("points at the external stylesheet, because `.css` is not a document this engine parses", () => {
+    // `glob.ts` DEFAULT_EXT has no `.css`: engine scope is markup. A site whose tooltip lives in
+    // styles.css therefore hands the adjudicator the trigger and the panel and NOTHING about how
+    // either becomes visible. It has Read and Grep; what it lacked was the address.
+    const n = notes(
+      `<head><link rel="stylesheet" href="/styles.css"></head><body><main><button aria-describedby="t">A</button><span role="tooltip" id="t">T</span></main></body>`,
+    );
+    expect(n.some((x) => /stylesheet "\/styles\.css"/.test(x))).toBe(true);
+    expect(n.some((x) => /focus-within/.test(x))).toBe(true);
+  });
+
+  it("…and does NOT, on a page with a stylesheet and nothing to reveal", () => {
+    // Otherwise every page on earth earns an anchor on 10.14, and the criterion is handed a
+    // `<link>` as the evidence it is meant to rule on.
+    expect(notes(`<head><link rel="stylesheet" href="/styles.css"></head><body><main><h1>T</h1></main></body>`)).toEqual([]);
+  });
+
   it("stays quiet on a page with no additional content at all", () => {
     expect(notes(`<main><h1>Titre</h1><p>Texte</p></main>`)).toEqual([]);
   });

@@ -279,11 +279,16 @@ export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimi
 // `null` means focus has left the ring — body, documentElement, or nothing at all, which is
 // what Playwright reports once Tab hands focus back to the browser chrome. That is the NORMAL
 // end of a tab ring, never a trap, and conflating the two would report every well-behaved page.
+//
+// `tagged` decides whether the caller may COMPARE two observations. An element the setup pass
+// never tagged is identified by its selector alone, and a selector is not an identity: two links
+// in the same list share one, so a walk that compared them would report a trap on a page whose
+// focus was moving perfectly well. Untagged means « cannot accuse ».
 export const FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
   const e = document.activeElement;
   if (!e || e === document.body || e === document.documentElement) return null;
   const key = e.getAttribute && e.getAttribute('data-u11y-f');
-  return { key: key || __sel(e), selector: __sel(e), html: __html(e) };
+  return { key: key || __sel(e), tagged: !!key, selector: __sel(e), html: __html(e) };
 })()`;
 
 /** RGAA 12.9 / WCAG 2.1.2 — can the keyboard always LEAVE?
@@ -308,23 +313,24 @@ export async function probeKeyboardTrap(page: Any, limits: ProbeLimits = PROBE_D
   const seen = new Set<string>();
   const confirmPresses = 2;
   const limit = Math.min(count + 2, limits.maxFocusables + 10);
-  let prev: { key: string; selector: string; html: string } | null = null;
+  type Where = { key: string; tagged?: boolean; selector: string; html: string };
+  let prev: Where | null = null;
   for (let i = 0; i < limit; i++) {
     if (deadline?.out()) break;
     await page.keyboard.press("Tab");
-    const now = (await page.evaluate(FOCUS_WHERE_PROBE)) as { key: string; selector: string; html: string } | null;
+    const now = (await page.evaluate(FOCUS_WHERE_PROBE)) as Where | null;
     // Focus left the page. The ring ended the way it should; nothing to report and nothing
     // left to walk.
     if (!now) break;
-    if (prev && now.key === prev.key) {
+    if (prev?.tagged && now.tagged && now.key === prev.key) {
       // Stuck for one press. Confirm before accusing: press again, and only call it a trap if
       // focus is STILL on the same element every time.
       let stuck = true;
       for (let k = 0; k < confirmPresses && stuck; k++) {
         if (deadline?.out()) break;
         await page.keyboard.press("Tab");
-        const again = (await page.evaluate(FOCUS_WHERE_PROBE)) as { key: string; selector: string } | null;
-        stuck = again !== null && again.key === now.key;
+        const again = (await page.evaluate(FOCUS_WHERE_PROBE)) as Where | null;
+        stuck = again !== null && again.tagged === true && again.key === now.key;
       }
       if (stuck) {
         hits.push({
@@ -340,7 +346,6 @@ export async function probeKeyboardTrap(page: Any, limits: ProbeLimits = PROBE_D
     if (seen.has(now.key)) break;
     seen.add(now.key);
     prev = now;
-    if (hits.length >= 4) break;
   }
   return hits;
 }
@@ -460,8 +465,7 @@ export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?:
     }
   };
   if (!canResize) skip("1.4.10", "the page object cannot resize its viewport");
-  if (!canType) skip("2.4.7", "the page object exposes no keyboard");
-  if (!canType) skip("2.1.2", "the page object exposes no keyboard");
+  if (!canType) for (const sc of ["2.4.7", "2.1.2"]) skip(sc, "the page object exposes no keyboard");
   if (!canHover) skip("1.4.13", "the page object cannot hover");
   if (!canStyle) skip("1.4.12", "the page object cannot inject a stylesheet");
   // ORDER IS DELIBERATE: cheap and deterministic first, interactive last.

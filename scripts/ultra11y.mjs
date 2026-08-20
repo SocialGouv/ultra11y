@@ -39953,6 +39953,21 @@ var SUBJECTS = {
         (l) => hAt(d, l.line, "css", `CSS rule keyed on a pointer/keyboard state \u2014 does the hover half have a focus twin? ${l.text}`, `cssstate|${l.text}`)
       )
     );
+    if (out2.length) {
+      for (const link of elementsByTag(d, "link")) {
+        const rel2 = (attr(link, "rel") ?? "").toLowerCase();
+        if (!rel2.split(/\s+/).includes("stylesheet")) continue;
+        const href = attr(link, "href") ?? "";
+        out2.push(
+          h(
+            d,
+            link,
+            `stylesheet "${href}" \u2014 this page reveals additional content and the rule that does it is NOT in this file. Open the stylesheet and check the \`:hover\` selectors for a \`:focus\`/\`:focus-within\` twin.`,
+            `stylesheet|${href}`
+          )
+        );
+      }
+    }
     return out2;
   }),
   // Content pinned over the page — what can obscure a focused element.
@@ -60073,7 +60088,7 @@ var FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
   const e = document.activeElement;
   if (!e || e === document.body || e === document.documentElement) return null;
   const key = e.getAttribute && e.getAttribute('data-u11y-f');
-  return { key: key || __sel(e), selector: __sel(e), html: __html(e) };
+  return { key: key || __sel(e), tagged: !!key, selector: __sel(e), html: __html(e) };
 })()`;
 async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
   const count = await page.evaluate(focusSetupExpr("", limits.maxFocusables));
@@ -60088,13 +60103,13 @@ async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
     await page.keyboard.press("Tab");
     const now = await page.evaluate(FOCUS_WHERE_PROBE);
     if (!now) break;
-    if (prev && now.key === prev.key) {
+    if (prev?.tagged && now.tagged && now.key === prev.key) {
       let stuck = true;
       for (let k = 0; k < confirmPresses && stuck; k++) {
         if (deadline?.out()) break;
         await page.keyboard.press("Tab");
         const again = await page.evaluate(FOCUS_WHERE_PROBE);
-        stuck = again !== null && again.key === now.key;
+        stuck = again !== null && again.tagged === true && again.key === now.key;
       }
       if (stuck) {
         hits.push({
@@ -60108,7 +60123,6 @@ async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
     if (seen.has(now.key)) break;
     seen.add(now.key);
     prev = now;
-    if (hits.length >= 4) break;
   }
   return hits;
 }
