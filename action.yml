@@ -172,7 +172,7 @@ inputs:
     required: false
     default: '1'
   adjudicate-max-turns:
-    description: 'Turn budget for `adjudicate: agent`. Empty (default) derives it from the worklist — 4 turns per criterion plus headroom — because the runbook is sequential and each criterion costs real tool calls. Set it only to override that: a budget too small costs the criteria it did not reach (the fold is per-verdict), so the remainder simply stays to assess.'
+    description: 'Turn budget for `adjudicate: agent`. Empty derives it from the worklist (4 turns per item plus 40, floored at 60). A number pins it. `unlimited` (or 0) drops the flag, which is what claude-code-action treats as no bound at all — the job then runs until its own `timeout-minutes`, and never past GitHub''s hard 6h ceiling on a hosted runner. Prefer `adjudicate-passes` to an unbounded run: the fold is per-verdict, so a run that ran out of budget keeps everything it decided and the next pass takes the residue, whereas a job killed on time produces nothing, the fold never having run.'
     required: false
     default: ''
   adjudicate-model:
@@ -567,13 +567,28 @@ runs:
         # 4 turns per item plus 40 of headroom, floored at 60 so a tiny worklist still has
         # room to read around what it cites. An explicit `adjudicate-max-turns` wins.
         n=$(node -p 'try{JSON.parse(require("fs").readFileSync("/tmp/ultra11y-worklist.json","utf8")).count||0}catch{0}')
-        if [ -n "$MAX_TURNS" ]; then
-          turns="$MAX_TURNS"
-        else
-          turns=$(( n * 4 + 40 ))
-          if [ "$turns" -lt 60 ]; then turns=60; fi
-        fi
-        echo "turns=$turns" >> "$GITHUB_OUTPUT"
+        # `unlimited` (or 0) removes the flag entirely rather than passing a huge number:
+        # claude-code-action sets no default of its own, so an absent `--max-turns` IS the
+        # unbounded run. What still stops it is the job's own `timeout-minutes`, and above
+        # that GitHub's hard six-hour ceiling on a hosted runner — there is no way to run
+        # longer than that except on a self-hosted runner (five days).
+        #
+        # Worth knowing before reaching for it: an under-budgeted run is not a cliff. The fold
+        # is per-verdict, so every verdict already produced still lands and only the items the
+        # agent never reached keep `verdict: null`. `adjudicate-passes` then picks the residue
+        # up with a fresh budget. Unbounded turns trade that bounded, resumable shape for a
+        # single run that can spend until the job is killed — and a killed job produces no
+        # verdicts at all, because the fold never runs.
+        case "${MAX_TURNS:-}" in
+          unlimited|0) turns="" ;;
+          "") turns=$(( n * 4 + 40 )); if [ "$turns" -lt 60 ]; then turns=60; fi ;;
+          *[!0-9]*)
+            echo "::error::ultra11y: adjudicate-max-turns='${MAX_TURNS}' is neither a turn count nor 'unlimited'."
+            exit 1
+            ;;
+          *) turns="$MAX_TURNS" ;;
+        esac
+        echo "turns=${turns:-unlimited}" >> "$GITHUB_OUTPUT"
 
         # THE WHOLE ARGUMENT STRING, assembled here rather than written inline on the `uses:`
         # step, because `--model` is optional and a `with:` value cannot grow a flag
@@ -584,7 +599,8 @@ runs:
         # The id is validated rather than trusted: it is caller-controlled, and it is about to
         # be written to $GITHUB_OUTPUT, where a newline would start a line of someone else's
         # choosing.
-        cargs="--allowedTools Read,Grep,Glob,Edit,Write --max-turns $turns"
+        cargs="--allowedTools Read,Grep,Glob,Edit,Write"
+        if [ -n "${turns:-}" ]; then cargs="$cargs --max-turns $turns"; fi
         if [ -n "${MODEL:-}" ]; then
           case "$MODEL" in
             *[!A-Za-z0-9._:/-]*)
@@ -597,7 +613,7 @@ runs:
         # What is still open. A later pass reads this to decide whether it has anything to do:
         # a run that decided everything must not pay for a second adjudicator to discover it.
         echo "remaining=$n" >> "$GITHUB_OUTPUT"
-        echo "ultra11y: $n criteria to adjudicate, budget $turns turns."
+        echo "ultra11y: $n criteria to adjudicate, budget ${turns:-unlimited} turns."
 
     # The version is pinned in the literal below because GitHub refuses an expression in
     # `uses:` — it cannot be an input, so it is a dependency this action owns and bumps.
@@ -779,8 +795,19 @@ runs:
           --standard "$STANDARD" --lang "$LANG_OPT" --json > /tmp/ultra11y-worklist.json
         node "$ENGINE" orchestrate --run audits --phase adjudicate --eco
         n=$(node -p 'try{JSON.parse(require("fs").readFileSync("/tmp/ultra11y-worklist.json","utf8")).count||0}catch{0}')
-        if [ -n "$MAX_TURNS" ]; then turns="$MAX_TURNS"; else turns=$(( n * 4 + 40 )); if [ "$turns" -lt 60 ]; then turns=60; fi; fi
-        echo "turns=$turns" >> "$GITHUB_OUTPUT"
+        # Same budget contract as pass 1: `unlimited` (or 0) removes the flag rather than
+        # passing a large number, because an absent `--max-turns` is what claude-code-action
+        # reads as no bound at all.
+        case "${MAX_TURNS:-}" in
+          unlimited|0) turns="" ;;
+          "") turns=$(( n * 4 + 40 )); if [ "$turns" -lt 60 ]; then turns=60; fi ;;
+          *[!0-9]*)
+            echo "::error::ultra11y: adjudicate-max-turns='${MAX_TURNS}' is neither a turn count nor 'unlimited'."
+            exit 1
+            ;;
+          *) turns="$MAX_TURNS" ;;
+        esac
+        echo "turns=${turns:-unlimited}" >> "$GITHUB_OUTPUT"
 
         # THE WHOLE ARGUMENT STRING, assembled here rather than written inline on the `uses:`
         # step, because `--model` is optional and a `with:` value cannot grow a flag
@@ -791,7 +818,8 @@ runs:
         # The id is validated rather than trusted: it is caller-controlled, and it is about to
         # be written to $GITHUB_OUTPUT, where a newline would start a line of someone else's
         # choosing.
-        cargs="--allowedTools Read,Grep,Glob,Edit,Write --max-turns $turns"
+        cargs="--allowedTools Read,Grep,Glob,Edit,Write"
+        if [ -n "${turns:-}" ]; then cargs="$cargs --max-turns $turns"; fi
         if [ -n "${MODEL:-}" ]; then
           case "$MODEL" in
             *[!A-Za-z0-9._:/-]*)
@@ -900,8 +928,19 @@ runs:
           --standard "$STANDARD" --lang "$LANG_OPT" --json > /tmp/ultra11y-worklist.json
         node "$ENGINE" orchestrate --run audits --phase adjudicate --eco
         n=$(node -p 'try{JSON.parse(require("fs").readFileSync("/tmp/ultra11y-worklist.json","utf8")).count||0}catch{0}')
-        if [ -n "$MAX_TURNS" ]; then turns="$MAX_TURNS"; else turns=$(( n * 4 + 40 )); if [ "$turns" -lt 60 ]; then turns=60; fi; fi
-        echo "turns=$turns" >> "$GITHUB_OUTPUT"
+        # Same budget contract as pass 1: `unlimited` (or 0) removes the flag rather than
+        # passing a large number, because an absent `--max-turns` is what claude-code-action
+        # reads as no bound at all.
+        case "${MAX_TURNS:-}" in
+          unlimited|0) turns="" ;;
+          "") turns=$(( n * 4 + 40 )); if [ "$turns" -lt 60 ]; then turns=60; fi ;;
+          *[!0-9]*)
+            echo "::error::ultra11y: adjudicate-max-turns='${MAX_TURNS}' is neither a turn count nor 'unlimited'."
+            exit 1
+            ;;
+          *) turns="$MAX_TURNS" ;;
+        esac
+        echo "turns=${turns:-unlimited}" >> "$GITHUB_OUTPUT"
 
         # THE WHOLE ARGUMENT STRING, assembled here rather than written inline on the `uses:`
         # step, because `--model` is optional and a `with:` value cannot grow a flag
@@ -912,7 +951,8 @@ runs:
         # The id is validated rather than trusted: it is caller-controlled, and it is about to
         # be written to $GITHUB_OUTPUT, where a newline would start a line of someone else's
         # choosing.
-        cargs="--allowedTools Read,Grep,Glob,Edit,Write --max-turns $turns"
+        cargs="--allowedTools Read,Grep,Glob,Edit,Write"
+        if [ -n "${turns:-}" ]; then cargs="$cargs --max-turns $turns"; fi
         if [ -n "${MODEL:-}" ]; then
           case "$MODEL" in
             *[!A-Za-z0-9._:/-]*)

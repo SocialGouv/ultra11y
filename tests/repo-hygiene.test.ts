@@ -60,7 +60,9 @@ describe("every workflow states its blast radius and its ceiling", () => {
         f,
         parse(readFileSync(join(DIR, f), "utf8")) as {
           permissions?: unknown;
-          jobs: Record<string, { permissions?: unknown; "timeout-minutes"?: number }>;
+          on?: { workflow_dispatch?: { inputs?: Record<string, { default?: unknown }> } };
+          // A number, or a `${{ inputs.x }}` expression — see the ceiling test below.
+          jobs: Record<string, { permissions?: unknown; "timeout-minutes"?: number | string }>;
         },
       ] as const,
   );
@@ -82,8 +84,19 @@ describe("every workflow states its blast radius and its ceiling", () => {
   // like a code failure. `ee6625e` said "every job now carries a timeout-minutes"; five did
   // not, including the one that pushes to main and publishes to npm.
   it.each(workflows)("%s gives every job a timeout", (_name, wf) => {
+    // A literal number, or an expression reading a dispatch input that ITSELF defaults to a
+    // number. The second form is what lets a hand-dispatched run raise its own ceiling; it is
+    // only a real ceiling if the default is one, so the input is followed rather than trusted.
+    const bounded = (v: unknown): boolean => {
+      if (typeof v === "number") return v > 0;
+      if (typeof v !== "string") return false;
+      const m = v.match(/^\$\{\{\s*inputs\.([A-Za-z0-9_-]+)\s*\}\}$/);
+      if (!m) return false;
+      const declared = wf.on?.workflow_dispatch?.inputs?.[m[1]!];
+      return typeof declared?.default === "number" && declared.default > 0;
+    };
     const naked = Object.entries(wf.jobs ?? {})
-      .filter(([, j]) => typeof j["timeout-minutes"] !== "number")
+      .filter(([, j]) => !bounded(j["timeout-minutes"]))
       .map(([id]) => id);
     expect(naked, "these jobs run against GitHub's six-hour default").toEqual([]);
   });

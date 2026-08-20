@@ -1,10 +1,20 @@
 # The ADJUDICATION tier, exercised for real — the half `ci.yml` cannot prove.
 #
 # `ci.yml` proves the keyless path: with no credential the tier evaporates and the audit still
-# ships. It stops there on purpose, because the keyed path costs money on every run (roughly
-# $0.20 per WCAG run, $0.50 per RGAA one — the worklist is re-sent whole each time, and no
-# batch is large enough to earn prompt caching). Putting that on every push would bill a fleet
-# of PRs for a signal that changes rarely.
+# ships. It stops there on purpose, because the keyed path costs money on every run — and the
+# two tiers do not cost remotely the same:
+#
+#   api    ~$0.20 per WCAG run, ~$0.50 per RGAA one. One Messages call per batch of 8 criteria
+#          over harvested evidence; the worklist is re-sent whole each time and no batch is
+#          large enough to earn prompt caching.
+#   agent  MEASURED at $21.22 for one RGAA run over tests/fixtures/realworld — 80 criteria,
+#          243 turns, 30 minutes, on Sonnet (run 32363798488). Two orders of magnitude above
+#          the API tier, and that is the point of it rather than a fault: it OPENS the files
+#          each criterion cites, which is what "link purpose IN CONTEXT" actually asks for.
+#
+# Putting either on every push would bill a fleet of PRs for a signal that changes rarely; the
+# agent tier would do it at twenty dollars a go. Pair it with `ledger` so the next run replays
+# the verdicts instead of buying them again.
 #
 # So it is dispatched by hand, and it reports the number that actually separates the two
 # modes: how many criteria stayed `manual`. That is where the API mode decloses — it rules
@@ -35,6 +45,14 @@ on:
         description: 'Model id for the tier under test. Empty lets each tier choose its own default.'
         type: string
         default: ''
+      max-turns:
+        description: "Turn budget for the agent tier. Empty derives it from the worklist; a number pins it; 'unlimited' removes the bound entirely (the job's timeout then becomes the only stop)."
+        type: string
+        default: ''
+      timeout:
+        description: 'Job ceiling in minutes. GitHub kills a hosted-runner job at 360 whatever this says; only a self-hosted runner goes beyond.'
+        type: number
+        default: 60
 
 # `contents: read` is enough BECAUSE the composite action hands claude-code-action the job's
 # own `github.token`. Without that it would mint a GitHub App token over OIDC and this job
@@ -46,9 +64,14 @@ permissions:
 jobs:
   adjudicate:
     runs-on: ubuntu-latest
-    # Three agent passes over a ~90-item RGAA worklist is the long case; nothing here
-    # legitimately runs for hours, and GitHub's default ceiling is six of them.
-    timeout-minutes: 60
+    # Dispatch-controlled, because with `max-turns: unlimited` this becomes the ONLY thing
+    # that stops the run.
+    #
+    # 360 is not a ceiling this file gets to choose: GitHub terminates a job on a hosted
+    # runner at six hours of execution whatever `timeout-minutes` says, and there is no input
+    # anywhere that lifts it. A longer run needs a self-hosted runner, where the limit is five
+    # days. Setting a bigger number here does not buy time, it only hides where the run died.
+    timeout-minutes: ${{ inputs.timeout }}
     env:
       # BOTH credentials, because the two modes do not accept the same one. `api` calls the
       # Messages API, which takes an ANTHROPIC_API_KEY and nothing else; `agent` shells out to
@@ -109,6 +132,7 @@ jobs:
           comment: "false"
           adjudicate: api
           adjudicate-model: ${{ inputs.model }}
+          adjudicate-max-turns: ${{ inputs.max-turns }}
           artifact-name: adjudication-api
 
       # Measured HERE, not at the end. The agent step below is a fresh `uses: ./` whose own
@@ -137,6 +161,7 @@ jobs:
           comment: "false"
           adjudicate: agent
           adjudicate-model: ${{ inputs.model }}
+          adjudicate-max-turns: ${{ inputs.max-turns }}
           artifact-name: adjudication-agent
 
       - name: What the agent tier decided
