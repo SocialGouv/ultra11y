@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.18.1](https://github.com/maxgfr/ultra11y/compare/v5.18.0...v5.18.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* **scan:** a crawled URL that answered an error is not a page of the site ([ee21f00](https://github.com/maxgfr/ultra11y/commit/ee21f00cdc0813315731bd5808a3c6c033758d96))
+
 # [5.18.0](https://github.com/maxgfr/ultra11y/compare/v5.17.0...v5.18.0) (2026-08-20)
 
 
