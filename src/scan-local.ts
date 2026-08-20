@@ -32,7 +32,7 @@ import {
   TEXT_SPACING_PROBE,
 } from "./probes.js";
 import { sampleScope } from "./sample.js";
-import { COLLECT_SNAPSHOT, type CollectedPage } from "./snapshot.js";
+import { COLLECT_SNAPSHOT, type CollectedPage, slugifyPageId } from "./snapshot.js";
 import { today } from "./util.js";
 
 export const LOCAL_ENGINE = "axe-core@playwright (local)";
@@ -784,6 +784,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
   const browser = await launchChromium(chromium);
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];
+  const redirected: ScanRedirect[] = [];
   try {
     for (const url of urls) {
       const out = await runOnPage(browser, AxeBuilder, url, false, {
@@ -793,6 +794,29 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
         lang,
         snapshot: Boolean(opts.snapshotRoot),
       });
+      // A CRAWLED URL THAT ANSWERED AN ERROR IS NOT A PAGE OF THE SITE.
+      //
+      // The sample scan has refused these since it existed, for the reason its own comment
+      // gives: a page filed under a name nobody looked at is a false conformance claim. The
+      // URL path never applied the same rule, so a crawl that followed a broken link audited
+      // the SERVER'S ERROR PAGE and scored it. Measured on a three-page test site with one
+      // dead link: the deliverable carried a fourth page called « Error response » at 97 %
+      // RGAA, and its criteria counted towards the run.
+      //
+      // Refused rather than merely skipped: `renderRedirected` states the drop — which URL,
+      // what it answered — because a report that is simply SHORTER reads exactly like a
+      // complete one, and a dead link is a fixable bug in the site rather than in the audit.
+      if (out.httpStatus !== undefined && out.httpStatus >= 400) {
+        redirected.push({
+          id: slugifyPageId(url),
+          name: url,
+          requested: url,
+          landed: out.landedUrl ?? out.url,
+          reason: "http-status",
+          status: out.httpStatus,
+        });
+        continue;
+      }
       findings.push(...toDynamicResult(out, url, lang, LOCAL_ENGINE).findings);
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, url) : undefined;
       if (id) snapshots.push(id);
@@ -808,6 +832,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
     findings,
     testedScs: localTestedScs(interact),
     ...(snapshots.length ? { snapshots } : {}),
+    ...(redirected.length ? { redirected } : {}),
   };
 }
 

@@ -60370,6 +60370,7 @@ async function runScanManyLocal(urls, opts) {
   const browser = await launchChromium(chromium);
   const findings = [];
   const snapshots = [];
+  const redirected = [];
   try {
     for (const url of urls) {
       const out2 = await runOnPage(browser, AxeBuilder, url, false, {
@@ -60379,6 +60380,17 @@ async function runScanManyLocal(urls, opts) {
         lang,
         snapshot: Boolean(opts.snapshotRoot)
       });
+      if (out2.httpStatus !== void 0 && out2.httpStatus >= 400) {
+        redirected.push({
+          id: slugifyPageId(url),
+          name: url,
+          requested: url,
+          landed: out2.landedUrl ?? out2.url,
+          reason: "http-status",
+          status: out2.httpStatus
+        });
+        continue;
+      }
       findings.push(...toDynamicResult(out2, url, lang, LOCAL_ENGINE).findings);
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, url) : void 0;
       if (id) snapshots.push(id);
@@ -60393,7 +60405,8 @@ async function runScanManyLocal(urls, opts) {
     date: today(),
     findings,
     testedScs: localTestedScs(interact),
-    ...snapshots.length ? { snapshots } : {}
+    ...snapshots.length ? { snapshots } : {},
+    ...redirected.length ? { redirected } : {}
   };
 }
 async function runSampleScanLocal(pages, opts) {
