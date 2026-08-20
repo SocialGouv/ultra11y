@@ -56,8 +56,8 @@ on:
         default: "1"
       timeout:
         description: 'Job ceiling in minutes. GitHub kills a hosted-runner job at 360 whatever this says; only a self-hosted runner goes beyond.'
-        type: number
-        default: 60
+        type: string
+        default: "60"
 
 # `contents: read` is enough BECAUSE the composite action hands claude-code-action the job's
 # own `github.token`. Without that it would mint a GitHub App token over OIDC and this job
@@ -76,7 +76,7 @@ jobs:
     # runner at six hours of execution whatever `timeout-minutes` says, and there is no input
     # anywhere that lifts it. A longer run needs a self-hosted runner, where the limit is five
     # days. Setting a bigger number here does not buy time, it only hides where the run died.
-    timeout-minutes: ${{ inputs.timeout }}
+    timeout-minutes: ${{ fromJSON(inputs.timeout) }}
     env:
       # BOTH credentials, because the two modes do not accept the same one. `api` calls the
       # Messages API, which takes an ANTHROPIC_API_KEY and nothing else; `agent` shells out to
