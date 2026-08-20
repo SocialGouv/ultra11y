@@ -51,6 +51,44 @@ describe("judgeBatch", () => {
     expect(calls[0]!.tool_choice).toEqual({ type: "tool", name: "record_verdicts" });
   });
 
+  // The one knob that lets this tier point somewhere other than api.anthropic.com — a
+  // gateway, a corporate proxy, a recorded stand-in. It was implemented and untested, which
+  // is the state in which a refactor removes something quietly: every existing test injects
+  // `fetchImpl` and so never looks at the URL at all.
+  it("honours an explicit base URL, then ANTHROPIC_BASE_URL, then the real API", async () => {
+    const items = [item("1.1.1")];
+    const seen: string[] = [];
+    const impl = (async (url: string) => {
+      seen.push(url);
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => toolReply([])(),
+        text: async () => "",
+      } as unknown as Response;
+    }) as unknown as typeof fetch;
+
+    await judgeBatch(items, "p", { apiKey: "k", fetchImpl: impl, baseUrl: "https://gateway.interne" });
+    expect(seen.at(-1)).toBe("https://gateway.interne/v1/messages");
+
+    const previous = process.env.ANTHROPIC_BASE_URL;
+    process.env.ANTHROPIC_BASE_URL = "http://127.0.0.1:8971";
+    try {
+      await judgeBatch(items, "p", { apiKey: "k", fetchImpl: impl });
+      expect(seen.at(-1), "the environment override is ignored").toBe("http://127.0.0.1:8971/v1/messages");
+      // An explicit option still wins over the environment.
+      await judgeBatch(items, "p", { apiKey: "k", fetchImpl: impl, baseUrl: "https://gateway.interne" });
+      expect(seen.at(-1)).toBe("https://gateway.interne/v1/messages");
+    } finally {
+      if (previous === undefined) delete process.env.ANTHROPIC_BASE_URL;
+      else process.env.ANTHROPIC_BASE_URL = previous;
+    }
+
+    await judgeBatch(items, "p", { apiKey: "k", fetchImpl: impl });
+    expect(seen.at(-1), "the default must stay the real API").toBe("https://api.anthropic.com/v1/messages");
+  });
+
   it("drops a verdict for a criterion nobody asked about", async () => {
     const items = [item("1.1.1")];
     const { impl } = fakeFetch(toolReply([{ criteriaId: "42.9", verdict: "C", justification: "x" }]));
