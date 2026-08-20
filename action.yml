@@ -234,9 +234,48 @@ runs:
     - name: Resolve the engine
       id: engine
       shell: bash
+      # Read from the environment for the same reason the adjudication tier does: an input
+      # reaches a reusable action from a caller's workflow, which is free to wire an event
+      # payload into it.
+      env:
+        REQUIRE_DECIDED: ${{ inputs.require-decided }}
+        ADJUDICATE_PASSES: ${{ inputs.adjudicate-passes }}
       run: |
         echo "path=$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" >> "$GITHUB_OUTPUT"
         node "$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" --version
+
+        # PREFLIGHT on the inputs whose gates compare them LITERALLY. For these, an
+        # unrecognised value does not degrade to the default — the gate simply never matches,
+        # and something downstream then draws a conclusion from the empty output it left
+        # behind. Both of these were live:
+        #
+        #   require-decided: yes → `Completeness gate` matches 'true'|'pages' and so never
+        #     ran; `steps.decided.outputs.ok` stayed empty; and `Gate`, which tested
+        #     `!= 'false' && != ''`, failed the job with "the criterion grid is incomplete"
+        #     over a grid nothing had measured. The two gates disagreed on what the input
+        #     even is, and the caller was told the wrong thing about their own audit.
+        #
+        #   adjudicate-passes: 0 → passes 2 and 3 were gated on `!= '1'` and
+        #     `!= '1' && != '2'`, so every value that was not literally 1 or 2 ran all three
+        #     passes and billed a model for them — the exact opposite of what '0' asks for.
+        #
+        # Refusing here rather than warning: both inputs exist to make a run STRICTER, and a
+        # misspelt strictness that quietly does nothing is the failure mode they were added
+        # to remove.
+        case "${REQUIRE_DECIDED:-}" in
+          true|false|pages|'') ;;
+          *)
+            echo "::error::ultra11y: require-decided='${REQUIRE_DECIDED}' is not a value — expected 'true' (the run's grid), 'pages' (every page's grid) or 'false'."
+            exit 1
+            ;;
+        esac
+        case "${ADJUDICATE_PASSES:-}" in
+          1|2|3|'') ;;
+          *)
+            echo "::error::ultra11y: adjudicate-passes='${ADJUDICATE_PASSES}' is not a count — expected 1, 2 or 3."
+            exit 1
+            ;;
+        esac
 
     - name: Start the application
       if: inputs.start != '' && (inputs.urls != '' || inputs.sample == 'true' || inputs.sitemap != '' || inputs.crawl != '')
@@ -690,7 +729,7 @@ runs:
     # is the criterion's own `manual` reason.
     - name: Adjudicate with an agent — pass 2, worklist
       id: worklist2
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-passes != '1' && steps.worklist.outputs.remaining != '0'
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && (inputs.adjudicate-passes == '2' || inputs.adjudicate-passes == '3') && steps.worklist.outputs.remaining != '0'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -760,11 +799,23 @@ runs:
           if [ '${{ inputs.ledger }}' = 'true' ]; then args+=(--ledger ".ultra11y/verdicts/${{ inputs.standard }}.json"); else args+=(--ledger '${{ inputs.ledger }}'); fi
           args+=(--standard '${{ inputs.standard }}')
         fi
-        node "$ENGINE" verify "${args[@]}" || echo "::warning::ultra11y: pass 2 landed nothing — the remaining criteria stay to assess."
+        # THE SAME REFUSAL AS PASS 1. `gate-adjudicated` says "this job's red/green may rest on
+        # what a model ruled"; a later pass that swallowed its own failure would hand the gate
+        # a grid missing exactly the criteria the extra passes existed to fill, and call it
+        # complete. A partial adjudication is not a smaller one — it is a different claim
+        # about the same audit.
+        if node "$ENGINE" verify "${args[@]}"; then
+          echo "ultra11y: pass 2 applied."
+        elif [ '${{ inputs.gate-adjudicated }}' = 'true' ]; then
+          echo "::error::ultra11y: pass 2 landed nothing and gate-adjudicated is on — refusing to gate on a partial adjudication."
+          exit 1
+        else
+          echo "::warning::ultra11y: pass 2 landed nothing — the remaining criteria stay to assess."
+        fi
 
     - name: Adjudicate with an agent — pass 3, worklist
       id: worklist3
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0' && inputs.adjudicate-passes != '1' && inputs.adjudicate-passes != '2'
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0' && inputs.adjudicate-passes == '3'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -822,7 +873,67 @@ runs:
           if [ '${{ inputs.ledger }}' = 'true' ]; then args+=(--ledger ".ultra11y/verdicts/${{ inputs.standard }}.json"); else args+=(--ledger '${{ inputs.ledger }}'); fi
           args+=(--standard '${{ inputs.standard }}')
         fi
-        node "$ENGINE" verify "${args[@]}" || echo "::warning::ultra11y: pass 3 landed nothing — the remaining criteria stay to assess."
+        # THE SAME REFUSAL AS PASS 1. `gate-adjudicated` says "this job's red/green may rest on
+        # what a model ruled"; a later pass that swallowed its own failure would hand the gate
+        # a grid missing exactly the criteria the extra passes existed to fill, and call it
+        # complete. A partial adjudication is not a smaller one — it is a different claim
+        # about the same audit.
+        if node "$ENGINE" verify "${args[@]}"; then
+          echo "ultra11y: pass 3 applied."
+        elif [ '${{ inputs.gate-adjudicated }}' = 'true' ]; then
+          echo "::error::ultra11y: pass 3 landed nothing and gate-adjudicated is on — refusing to gate on a partial adjudication."
+          exit 1
+        else
+          echo "::warning::ultra11y: pass 3 landed nothing — the remaining criteria stay to assess."
+        fi
+
+    # NO CRITERION LEAVES THIS ACTION UNACCOUNTED FOR.
+    #
+    # The adjudication tier is allowed to fall short, and every way it can is legitimate: a
+    # turn budget runs out, a fold refuses a verdict that was not grounded, a criterion is
+    # genuinely undecidable without a rendered measurement nobody took. What is NOT legitimate
+    # is finishing quietly. With the defaults — `adjudicate-passes: 1`, `require-decided:
+    # false` — a run could rule on half the grid and report success, and on a green job the
+    # half nobody ruled on reads exactly like the half that passed. Measured on a real pull
+    # request: 94 of 106 criteria came back « à évaluer » under a green check.
+    #
+    # So the residue is ALWAYS measured and ALWAYS named, whatever the inputs say. It warns
+    # rather than fails, because whether an incomplete grid should be fatal is exactly what
+    # `require-decided` is for; this step only removes the option of not knowing.
+    #
+    # Its own `--out` is a throwaway directory: `audits/ADJUDICATE.*` is the worklist the
+    # passes above consumed, and re-deriving it in place would overwrite the record of what
+    # they were handed.
+    - name: What the adjudication left to assess
+      id: residue
+      if: steps.adjudication.outputs.on == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+        STANDARD: ${{ inputs.standard }}
+        LANG_OPT: ${{ inputs.lang }}
+      run: |
+        node "$ENGINE" verify --manual --in audits/audit-latest.json --out /tmp/ultra11y-residue \
+          --standard "$STANDARD" --lang "$LANG_OPT" --json > /tmp/ultra11y-residue.json || true
+
+        read -r n ids <<EOF
+        $(node -p 'try{const j=JSON.parse(require("fs").readFileSync("/tmp/ultra11y-residue.json","utf8"));const i=(j.items||[]).map(x=>x.criteriaId);(j.count||0)+" "+i.join(", ")}catch{"0 "}')
+        EOF
+        echo "remaining=${n:-0}" >> "$GITHUB_OUTPUT"
+
+        {
+          echo "### ultra11y — adjudication residue (${STANDARD})"
+          echo ""
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        if [ "${n:-0}" -eq 0 ]; then
+          echo "ultra11y: every criterion of the grid carries a verdict."
+          echo "Every criterion of the grid carries a verdict." >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "${n} criterion(s) still to assess: ${ids}" >> "$GITHUB_STEP_SUMMARY"
+          echo "::warning::ultra11y: ${n} criterion(s) are still « to assess » after the adjudication tier: ${ids}. Raise \`adjudicate-passes\` (up to 3) to go round again on the residue, and declare the genuinely undecidable ones in the file named by \`undecidable-file\`, each with a reason. Set \`require-decided\` to make an incomplete grid fail the job."
+        fi
 
     # COVERAGE — did the run look at every page it says it audits?
     #
@@ -1033,7 +1144,7 @@ runs:
     - name: Upload the report
       id: upload
       if: inputs.report == 'true' || inputs.html == 'true'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard) }}
         path: ${{ inputs.working-directory }}/audits/
