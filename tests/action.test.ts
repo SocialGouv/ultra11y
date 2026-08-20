@@ -1029,13 +1029,15 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     // Dispatch-controlled, because `max-turns: unlimited` makes this the only thing that
     // stops the run — so what has to hold is that the INPUT it reads defaults to a real
     // ceiling, not merely that the key is present.
-    expect(String(WF.jobs.adjudicate?.["timeout-minutes"])).toBe("${{ inputs.timeout }}");
+    expect(String(WF.jobs.adjudicate?.["timeout-minutes"])).toBe("${{ fromJSON(inputs.timeout) }}");
     const declared = WF.on?.workflow_dispatch?.inputs?.timeout;
-    expect(typeof declared?.default, "the ceiling must be a number, not a string").toBe("number");
-    expect(declared?.default as number).toBeGreaterThan(0);
+    // A STRING, because every workflow_dispatch input is one — asserting `number` here is
+    // what pushed `type: number` into the workflow and made it undispatchable.
+    expect(declared?.type ?? "string").toBe("string");
+    expect(Number(declared?.default)).toBeGreaterThan(0);
     // 360 is GitHub's own hard stop on a hosted runner; a default above it would be a promise
     // this workflow cannot keep.
-    expect(declared?.default as number).toBeLessThanOrEqual(360);
+    expect(Number(declared?.default)).toBeLessThanOrEqual(360);
   });
 
   // `mode: both` measured the agent pass twice and called it both: the agent step is a fresh

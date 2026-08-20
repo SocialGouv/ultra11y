@@ -60,7 +60,7 @@ describe("every workflow states its blast radius and its ceiling", () => {
         f,
         parse(readFileSync(join(DIR, f), "utf8")) as {
           permissions?: unknown;
-          on?: { workflow_dispatch?: { inputs?: Record<string, { default?: unknown }> } };
+          on?: { workflow_dispatch?: { inputs?: Record<string, { default?: unknown; type?: string }> } };
           // A number, or a `${{ inputs.x }}` expression — see the ceiling test below.
           jobs: Record<string, { permissions?: unknown; "timeout-minutes"?: number | string }>;
         },
@@ -79,6 +79,22 @@ describe("every workflow states its blast radius and its ceiling", () => {
     expect(declared).toBe(true);
   });
 
+  // MEASURED, the expensive way: `type: number` was declared on a workflow_dispatch input,
+  // every YAML parser accepted it, and GitHub rejected the whole workflow at DISPATCH time —
+  // no jobs, no log, a two-second failure. The keyed adjudication was undispatchable for as
+  // long as it took to notice.
+  //
+  // workflow_dispatch takes `string` (the default), `choice`, `boolean` and `environment`,
+  // and nothing else — `number` belongs to workflow_call, which is the trap. A number is
+  // passed as a string and read with `fromJSON`.
+  it.each(workflows)("%s declares only input types workflow_dispatch accepts", (_name, wf) => {
+    const DISPATCH_INPUT_TYPES = ["string", "choice", "boolean", "environment"];
+    for (const [id, spec] of Object.entries(wf.on?.workflow_dispatch?.inputs ?? {})) {
+      if (spec.type === undefined) continue; // omitted means string
+      expect(DISPATCH_INPUT_TYPES, `input \`${id}\` declares type \`${spec.type}\``).toContain(spec.type);
+    }
+  });
+
   // GitHub's default ceiling is six hours. Measured on this repository: an install step wedged
   // on a network flake ran for 3h27 before anyone looked, and read in the run list exactly
   // like a code failure. `ee6625e` said "every job now carries a timeout-minutes"; five did
@@ -87,13 +103,15 @@ describe("every workflow states its blast radius and its ceiling", () => {
     // A literal number, or an expression reading a dispatch input that ITSELF defaults to a
     // number. The second form is what lets a hand-dispatched run raise its own ceiling; it is
     // only a real ceiling if the default is one, so the input is followed rather than trusted.
+    const positive = (v: unknown): boolean => Number(v) > 0 && Number.isFinite(Number(v));
     const bounded = (v: unknown): boolean => {
       if (typeof v === "number") return v > 0;
       if (typeof v !== "string") return false;
-      const m = v.match(/^\$\{\{\s*inputs\.([A-Za-z0-9_-]+)\s*\}\}$/);
+      // `${{ inputs.x }}` or `${{ fromJSON(inputs.x) }}` — the second is what a dispatch
+      // input needs, since every one of them arrives as a STRING (see the type test below).
+      const m = v.match(/^\$\{\{\s*(?:fromJSON\()?\s*inputs\.([A-Za-z0-9_-]+)\s*\)?\s*\}\}$/);
       if (!m) return false;
-      const declared = wf.on?.workflow_dispatch?.inputs?.[m[1]!];
-      return typeof declared?.default === "number" && declared.default > 0;
+      return positive(wf.on?.workflow_dispatch?.inputs?.[m[1]!]?.default);
     };
     const naked = Object.entries(wf.jobs ?? {})
       .filter(([, j]) => !bounded(j["timeout-minutes"]))
