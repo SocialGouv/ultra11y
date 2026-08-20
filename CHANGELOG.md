@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.18.2](https://github.com/maxgfr/ultra11y/compare/v5.18.1...v5.18.2) (2026-08-20)
+
+
+### Bug Fixes
+
+* **crawl:** the home page has two addresses and they are one page ([b1bc1f2](https://github.com/maxgfr/ultra11y/commit/b1bc1f2ee757cfc2325ef3e2e3d4219f58616a12))
+
 ## [5.18.1](https://github.com/maxgfr/ultra11y/compare/v5.18.0...v5.18.1) (2026-08-20)
 
 
