@@ -384,6 +384,31 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
   );
 }
 
+/** THE CRITERIA THIS RUN COULD NOT POSSIBLY HAVE DECIDED — because nothing was rendered.
+ *
+ *  `applyAdjudication` already refuses a `needs-rendered-dom` verdict whose own evidence sits
+ *  in a page capture: that is a deferral to a tier which has already run. This is the mirror,
+ *  and it was the more expensive failure of the two. Measured on the 2026-08-20 RGAA cascade —
+ *  three passes, 311 turns, $24.90 — seven criteria came back `needs-rendered-dom` and every
+ *  one of them was RIGHT: the workflow audited sources only, and no page was ever snapshotted.
+ *  Nothing in the run said so, so the bill bought the news that a step nobody had run had not
+ *  run.
+ *
+ *  `scope.pagesAudited` is the evidence, and `undefined` is read as UNKNOWN rather than as
+ *  none: an audit written before that field existed knows nothing either way, and a warning
+ *  that fires on "unknown" is a warning people learn to scroll past. So the answer is empty
+ *  unless we can say positively that no page's real DOM was read.
+ *
+ *  Advisory by construction — it returns a list, it does not refuse anything. A source-only
+ *  audit is a legitimate thing to want, and a worklist is not where a project's scope gets
+ *  decided; `check --require-rendered` is the opt-in that fails. */
+export function unrenderedResidual(audit: AuditResult, items: AdjudicationItem[]): string[] {
+  const audited = audit.scope.pagesAudited;
+  const readSomePage = audited === undefined ? (audit.scope.pages ?? []).length > 0 : audited.length > 0;
+  if (readSomePage) return [];
+  return items.filter((it) => it.automatability === "needs-rendering").map((it) => it.criteriaId);
+}
+
 /** Read a citation whichever way it was written.
  *
  *  The contract asks for `{file, line, …}`, and a real run wrote `"src/Foo.tsx:15"` instead —
@@ -1225,6 +1250,8 @@ const T = {
     snippetLabel: "`snippet` à copier dans la citation",
     renderedAvailable:
       "**RENDU DISPONIBLE.** Cet audit a ingéré des captures de page : le rendu de la page est sur le disque, sous `.ultra11y/pages/<id>/` — `dom.html` (le DOM sérialisé par le navigateur), `styles.json` (les styles calculés), `boxes.json` (les boîtes et positions), `axtree.json` (l'arbre d'accessibilité) et `screen.png`. Un critère « à restituer » — information par la couleur, opérabilité clavier d'un script, geste au pointeur — se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. `needs-rendered-dom` reste la bonne réponse pour un critère dont aucune capture ne porte le sujet, et pour lui seul.",
+    nothingRendered: (ids: string[]): string =>
+      `**AUCUN RENDU DANS CETTE PORTÉE.** ${ids.length} critère(s) exigent une page rendue, et aucune page n'a été instantanée ici : personne ne peut les trancher depuis la source, et \`needs-rendered-dom\` est pour eux la seule réponse honnête. Rendez AVANT d'adjuger — \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) — puis reconstruisez cette liste : la mesure en ferme la plupart sans modèle, donc sans facture. Concernés : ${ids.map((id) => `\`${id}\``).join(" · ")}`,
     incomplete: "LECTURE INCOMPLÈTE — un « C » sera refusé sur ce critère",
     none: "(aucune évidence automatique — décidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "À vérifier manuellement",
@@ -1258,6 +1285,8 @@ const T = {
     snippetLabel: "`snippet` to copy into the citation",
     renderedAvailable:
       "**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under `.ultra11y/pages/<id>/` — `dom.html` (the DOM the browser serialized), `styles.json` (computed styles), `boxes.json` (boxes and positions), `axtree.json` (the accessibility tree) and `screen.png`. A needs-rendering criterion — information by colour, keyboard operability of a script, a pointer gesture — is decided FROM THOSE FILES: read them as you would read the source. `needs-rendered-dom` stays the right answer for a criterion no capture carries the subject of, and for that alone.",
+    nothingRendered: (ids: string[]): string =>
+      `**NOTHING WAS RENDERED IN THIS SCOPE.** ${ids.length} criteria need a rendered page, and no page was snapshotted here: nobody can settle them from source, and \`needs-rendered-dom\` is the only honest answer for them. Render BEFORE adjudicating — \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) — then rebuild this worklist: the measurement closes most of them with no model in the loop, and so with no bill. Affected: ${ids.map((id) => `\`${id}\``).join(" · ")}`,
     incomplete: "INCOMPLETE READING — a C will be refused on this criterion",
     none: "(no automatic evidence — decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
@@ -1389,7 +1418,7 @@ export function formatAdjudication(
   items: AdjudicationItem[],
   lang: Lang = "en",
   standard: StandardId = CORE,
-  opts: { preamble?: boolean; cwd?: string } = {},
+  opts: { preamble?: boolean; cwd?: string; unrendered?: string[] } = {},
 ): string {
   const s = T[lang];
   // Display only — the gate always reads the complete sibling set.
@@ -1410,6 +1439,16 @@ export function formatAdjudication(
   // `needs-rendered-dom` IS the correct answer and saying otherwise would invite a guess.
   if (opts.preamble !== false && items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
     out.push(`> ${s.renderedAvailable}`, "");
+  }
+  // AND WHEN THERE IS NONE, SAY SO — with the ids, and with the command that closes them.
+  //
+  // The note above fires on what the harvest CONTAINS; this one on what the run never
+  // produced (`unrenderedResidual`). They are mutually exclusive by construction, and the
+  // silence between them was what let a $24.90 cascade spend three passes discovering that
+  // nothing had been rendered. Opt-in on the caller's side so a brief rendered without an
+  // audit in hand (a per-criterion sheet, a test) stays byte-identical.
+  if (opts.preamble !== false && opts.unrendered?.length) {
+    out.push(`> ${s.nothingRendered(opts.unrendered)}`, "");
   }
   if (pack && opts.preamble !== false) out.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
@@ -1508,7 +1547,7 @@ export interface WriteAdjudicationResult {
 export function writeAdjudication(
   items: AdjudicationItem[],
   outDir: string,
-  opts: { standard: StandardId; auditDate: string; lang?: Lang },
+  opts: { standard: StandardId; auditDate: string; lang?: Lang; unrendered?: string[] },
 ): WriteAdjudicationResult {
   mkdirSync(outDir, { recursive: true });
   const todoPath = join(outDir, "ADJUDICATE.todo.json");
@@ -1523,7 +1562,7 @@ export function writeAdjudication(
     items,
   };
   writeFileSync(todoPath, JSON.stringify(file, null, 2) + "\n");
-  writeFileSync(mdPath, formatAdjudication(items, opts.lang ?? "en", opts.standard));
+  writeFileSync(mdPath, formatAdjudication(items, opts.lang ?? "en", opts.standard, { ...(opts.unrendered?.length ? { unrendered: opts.unrendered } : {}) }));
 
   // THE SPLIT SURFACE, for an adjudicator that cannot shell out.
   //

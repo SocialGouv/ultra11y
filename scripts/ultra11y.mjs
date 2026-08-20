@@ -37378,6 +37378,8 @@ function readSnapshot(dir) {
   const boxes = readJson2(join25(dir, "boxes.json"));
   const axtree = readJson2(join25(dir, "axtree.json"));
   const css = readJson2(join25(dir, "css.json"));
+  const probes = readJson2(join25(dir, "probes.json"));
+  const axe = readJson2(join25(dir, "axe.json"));
   const shot = join25(dir, "screen.png");
   return {
     meta: v.meta,
@@ -37386,6 +37388,8 @@ function readSnapshot(dir) {
     ...boxes ? { boxes } : {},
     ...axtree ? { axtree } : {},
     ...css ? { css } : {},
+    ...probes ? { probes } : {},
+    ...axe ? { axe } : {},
     ...existsSync12(shot) ? { screenshot: "screen.png" } : {}
   };
 }
@@ -55372,7 +55376,7 @@ function stickyBody(markdown, standard, kind = "digest") {
 ${markdown}`;
 }
 function commentKindFrom(value) {
-  return value === "pages" ? "pages" : "digest";
+  return value === "pages" || value === "full" ? value : "digest";
 }
 function prNumberFromEnv(env = process.env) {
   const explicit = Number.parseInt(env.ULTRA11Y_PR ?? "", 10);
@@ -57088,6 +57092,43 @@ function checkDecided(audit2, standard = CORE2, lang = "en", opts = {}) {
   }
   return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length, ...pages ? { pages } : {} };
 }
+function checkRendered(audit2, standard = CORE2, lang = "en", opts = {}) {
+  const fr = lang === "fr";
+  const issues = [];
+  const declared = /* @__PURE__ */ new Map();
+  for (const e of opts.allow?.entries ?? []) {
+    if (!e.criteriaId) continue;
+    if (!e.reason?.trim()) {
+      issues.push(
+        fr ? `Crit\xE8re ${e.criteriaId} d\xE9clar\xE9 ind\xE9cidable sans motif \u2014 un crit\xE8re laiss\xE9 ouvert doit dire pourquoi.` : `Criterion ${e.criteriaId} is declared undecidable with no reason \u2014 an open criterion must say why.`
+      );
+      continue;
+    }
+    declared.set(e.criteriaId, e);
+  }
+  const audited = audit2.scope.pagesAudited;
+  const pagesAudited = audited?.length ?? 0;
+  const unknown = audited === void 0 && (audit2.scope.pages ?? []).length > 0;
+  if (pagesAudited > 0 || unknown) {
+    return { ok: issues.length === 0, issues, open: [], allowed: [], pagesAudited };
+  }
+  const rendering = renderingCriteriaOpen(audit2, standard);
+  const open = rendering.filter((id) => !declared.has(id)).sort(byCriterionId);
+  const allowed = rendering.filter((id) => declared.has(id)).map((id) => declared.get(id));
+  if (open.length) {
+    issues.push(
+      fr ? `${open.length} crit\xE8re(s) exigent une page rendue et aucune page n'a \xE9t\xE9 instantan\xE9e : ${open.join(", ")}. Lancez \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) avant d'adjuger \u2014 la mesure en ferme la plupart sans mod\xE8le.` : `${open.length} criterion(ia) need a rendered page and no page was snapshotted: ${open.join(", ")}. Run \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) before adjudicating \u2014 the measurement closes most of them with no model in the loop.`
+    );
+  }
+  return { ok: issues.length === 0, issues, open, allowed, pagesAudited };
+}
+function renderingCriteriaOpen(audit2, standard) {
+  if (isCore(standard)) {
+    return audit2.criteria.filter((c2) => c2.status === "manual" && automatability(c2.id) === "needs-rendering").map((c2) => c2.id);
+  }
+  const pack = loadPack(standard);
+  return derivePackResults(audit2, standard).filter((pc) => pc.status === "manual").filter((pc) => (getCriterion(pack, pc.id)?.wcag ?? pc.scs).some((sc) => automatability(sc) === "needs-rendering")).map((pc) => pc.id);
+}
 function openPerPage(audit2, standard, lang) {
   const scope = pagesOf(audit2);
   if (!scope.length) return [];
@@ -58015,6 +58056,12 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
     (r) => blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? void 0, harvestSubjects(subjectsForSc2(r.criteriaId), docs), limits)
   );
 }
+function unrenderedResidual(audit2, items) {
+  const audited = audit2.scope.pagesAudited;
+  const readSomePage = audited === void 0 ? (audit2.scope.pages ?? []).length > 0 : audited.length > 0;
+  if (readSomePage) return [];
+  return items.filter((it) => it.automatability === "needs-rendering").map((it) => it.criteriaId);
+}
 function readCitation(c2) {
   if (typeof c2 !== "string") return c2;
   const at = c2.lastIndexOf(":");
@@ -58460,6 +58507,7 @@ var T2 = {
     alsoAt: "aussi en",
     snippetLabel: "`snippet` \xE0 copier dans la citation",
     renderedAvailable: "**RENDU DISPONIBLE.** Cet audit a ing\xE9r\xE9 des captures de page : le rendu de la page est sur le disque, sous `.ultra11y/pages/<id>/` \u2014 `dom.html` (le DOM s\xE9rialis\xE9 par le navigateur), `styles.json` (les styles calcul\xE9s), `boxes.json` (les bo\xEEtes et positions), `axtree.json` (l'arbre d'accessibilit\xE9) et `screen.png`. Un crit\xE8re \xAB \xE0 restituer \xBB \u2014 information par la couleur, op\xE9rabilit\xE9 clavier d'un script, geste au pointeur \u2014 se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. `needs-rendered-dom` reste la bonne r\xE9ponse pour un crit\xE8re dont aucune capture ne porte le sujet, et pour lui seul.",
+    nothingRendered: (ids) => `**AUCUN RENDU DANS CETTE PORT\xC9E.** ${ids.length} crit\xE8re(s) exigent une page rendue, et aucune page n'a \xE9t\xE9 instantan\xE9e ici : personne ne peut les trancher depuis la source, et \`needs-rendered-dom\` est pour eux la seule r\xE9ponse honn\xEAte. Rendez AVANT d'adjuger \u2014 \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) \u2014 puis reconstruisez cette liste : la mesure en ferme la plupart sans mod\xE8le, donc sans facture. Concern\xE9s : ${ids.map((id) => `\`${id}\``).join(" \xB7 ")}`,
     incomplete: "LECTURE INCOMPL\xC8TE \u2014 un \xAB C \xBB sera refus\xE9 sur ce crit\xE8re",
     none: "(aucune \xE9vidence automatique \u2014 d\xE9cidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "\xC0 v\xE9rifier manuellement",
@@ -58491,6 +58539,7 @@ var T2 = {
     alsoAt: "also at",
     snippetLabel: "`snippet` to copy into the citation",
     renderedAvailable: "**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under `.ultra11y/pages/<id>/` \u2014 `dom.html` (the DOM the browser serialized), `styles.json` (computed styles), `boxes.json` (boxes and positions), `axtree.json` (the accessibility tree) and `screen.png`. A needs-rendering criterion \u2014 information by colour, keyboard operability of a script, a pointer gesture \u2014 is decided FROM THOSE FILES: read them as you would read the source. `needs-rendered-dom` stays the right answer for a criterion no capture carries the subject of, and for that alone.",
+    nothingRendered: (ids) => `**NOTHING WAS RENDERED IN THIS SCOPE.** ${ids.length} criteria need a rendered page, and no page was snapshotted here: nobody can settle them from source, and \`needs-rendered-dom\` is the only honest answer for them. Render BEFORE adjudicating \u2014 \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) \u2014 then rebuild this worklist: the measurement closes most of them with no model in the loop, and so with no bill. Affected: ${ids.map((id) => `\`${id}\``).join(" \xB7 ")}`,
     incomplete: "INCOMPLETE READING \u2014 a C will be refused on this criterion",
     none: "(no automatic evidence \u2014 decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
@@ -58538,6 +58587,9 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   const out2 = opts.preamble === false ? [] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
   if (opts.preamble !== false && items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
     out2.push(`> ${s.renderedAvailable}`, "");
+  }
+  if (opts.preamble !== false && opts.unrendered?.length) {
+    out2.push(`> ${s.nothingRendered(opts.unrendered)}`, "");
   }
   if (pack && opts.preamble !== false) out2.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
@@ -58612,7 +58664,7 @@ function writeAdjudication(items, outDir, opts) {
     items
   };
   writeFileSync10(todoPath, JSON.stringify(file, null, 2) + "\n");
-  writeFileSync10(mdPath, formatAdjudication(items, opts.lang ?? "en", opts.standard));
+  writeFileSync10(mdPath, formatAdjudication(items, opts.lang ?? "en", opts.standard, { ...opts.unrendered?.length ? { unrendered: opts.unrendered } : {} }));
   const verdictsPath = join35(outDir, "ADJUDICATE.verdicts.json");
   writeFileSync10(verdictsPath, JSON.stringify({ ...file, items: slimAdjudicationItems(items) }, null, 2) + "\n");
   const itemsDir = join35(outDir, "adjudicate");
@@ -59029,9 +59081,12 @@ function canonicalUrl(url) {
     return url;
   }
 }
+function crawlBound(n) {
+  return n === void 0 || !Number.isFinite(n) || n <= 0 ? Number.POSITIVE_INFINITY : n;
+}
 async function crawlUrls(start2, opts) {
-  const depth = opts.depth ?? 1;
-  const max = opts.max ?? 50;
+  const depth = crawlBound(opts.depth);
+  const max = crawlBound(opts.max);
   const order = [];
   const first = canonicalUrl(start2);
   const seen = /* @__PURE__ */ new Set([first]);
@@ -59039,6 +59094,7 @@ async function crawlUrls(start2, opts) {
   while (queue.length > 0 && order.length < max) {
     const { url, d } = queue.shift();
     order.push(url);
+    opts.onPage?.(url, order.length);
     if (d >= depth) continue;
     let html = "";
     try {
@@ -59323,6 +59379,16 @@ function pageIdFor(url) {
   const base = url.split(/[\\/]/).pop() ?? url;
   return slugifyPageId(base.replace(/\.x?html?$/i, "")) || "page";
 }
+function probesOf(out2) {
+  return {
+    ...out2.focusVisible ? { focusVisible: out2.focusVisible } : {},
+    ...out2.hover ? { hover: out2.hover } : {},
+    ...out2.reflowZoom ? { reflowZoom: out2.reflowZoom } : {},
+    ...out2.textSpacing ? { textSpacing: out2.textSpacing } : {},
+    reflow: out2.reflow,
+    probed: out2.probed ?? []
+  };
+}
 function writeRunnerSnapshot(root, out2, target, page) {
   const collected = out2.snapshot;
   if (!collected?.dom) return void 0;
@@ -59347,6 +59413,23 @@ function writeRunnerSnapshot(root, out2, target, page) {
       ...collected.styles ? { styles: collected.styles } : {},
       ...collected.boxes ? { boxes: collected.boxes } : {},
       ...collected.css ? { css: collected.css } : {},
+      // WHAT THE BROWSER MEASURED, PERSISTED BESIDE WHAT IT SERIALIZED.
+      //
+      // The browser is the only place these answers exist, and the audit that folds them runs
+      // later, in another process, over the whole `.ultra11y/pages` tree — a measurement that
+      // lives only in this process's memory decides nothing. Dropping them is what made a
+      // scanned page able to report a rendering violation and never able to conclude
+      // conformity: `renderedProvesOn` reads `pageCoverage.scs` / `.axe`, and both are derived
+      // from these two files alone.
+      //
+      // `probed` gates the lot. Written unconditionally when the producer reported one — an
+      // empty list is a real statement ("nothing was measured here"), and omitting the file
+      // instead would be indistinguishable from a producer that predates the field.
+      ...out2.probed ? { probes: probesOf(out2) } : {},
+      // `ran: true` is the axe counterpart of `probed`: the pass happened, so its silence on
+      // the criteria AXE_DECIDES is usable. A RunnerOutput always carries `violations` because
+      // a runner always runs axe — that is the one instrument neither runtime skips.
+      axe: { violations: out2.violations, ran: true },
       ...collected.screenshot ? { screenshotBase64: collected.screenshot } : {}
     });
   } catch {
@@ -59392,6 +59475,7 @@ function runRunner(target, isFile, tag, snapshot = true) {
   }
   const line = stdout.trim().split("\n").filter(Boolean).pop() ?? "{}";
   const out2 = JSON.parse(line);
+  out2.probed = [...DOCKER_TESTED_SCS];
   if (loopbackToHostGateway(hostTarget).addHost && out2.url) {
     const hostSchemeName = hostTarget.match(/^http:\/\/[^:/]+/)?.[0] ?? hostTarget;
     out2.url = out2.url.replace(/^http:\/\/host\.docker\.internal(?=:\d+|\/|$)/i, hostSchemeName);
@@ -59491,12 +59575,15 @@ async function fetchHtml(url) {
   }
 }
 async function discoverUrls(opts) {
-  const max = opts.max ?? 50;
+  const max = crawlBound(opts.max);
   if (opts.sitemap) {
-    return parseSitemapUrls(await fetchHtml(opts.sitemap)).slice(0, max);
+    const urls = parseSitemapUrls(await fetchHtml(opts.sitemap));
+    const kept = Number.isFinite(max) ? urls.slice(0, max) : urls;
+    kept.forEach((u, i2) => opts.onPage?.(u, i2 + 1));
+    return kept;
   }
   if (opts.crawl) {
-    return crawlUrls(opts.crawl, { fetchHtml, depth: opts.depth ?? 2, max });
+    return crawlUrls(opts.crawl, { fetchHtml, depth: opts.depth, max: opts.max, ...opts.onPage ? { onPage: opts.onPage } : {} });
   }
   return [];
 }
@@ -60310,22 +60397,34 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
       tags: v.tags,
       nodes: v.nodes.slice(0, 10).map((n) => ({ target: n.target.map(String), html: (n.html || "").slice(0, 200) }))
     }));
-    const focusVisible = await probeFocusVisible(page).catch(() => empty);
-    const hover = await probeHover(page).catch(() => empty);
+    const probed = [];
+    const ran = async (sc, fallback, run2) => {
+      try {
+        const r = await run2();
+        probed.push(sc);
+        return r;
+      } catch {
+        return fallback;
+      }
+    };
+    const focusVisible = await ran("2.4.7", empty, () => probeFocusVisible(page));
+    const hover = await ran("1.4.13", empty, () => probeHover(page));
     const l = opts.lang;
     if (opts.interact) await page.evaluate(FILL_INPUTS_STEP).catch(() => {
     });
-    const reflowZoom = await page.evaluate(REFLOW_ZOOM_PROBE).catch(() => []);
+    const reflowZoom = await ran("1.4.4", [], async () => await page.evaluate(REFLOW_ZOOM_PROBE));
     const inputOverflowZoom = opts.interact ? await page.evaluate(inputOverflowZoomExpr(INPUT_OVERFLOW_DETAIL.zoom[l], CELL_SUFFIX[l])).catch(() => []) : [];
-    await page.setViewportSize({ width: 320, height: 800 }).catch(() => {
+    const reflow = await ran("1.4.10", { horizontalScroll: false }, async () => {
+      await page.setViewportSize({ width: 320, height: 800 });
+      return await page.evaluate(REFLOW_PROBE);
     });
-    const reflow = await page.evaluate(REFLOW_PROBE).catch(() => ({ horizontalScroll: false }));
     const inputOverflowReflow = opts.interact ? await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.reflow[l], CELL_SUFFIX[l])).catch(() => []) : [];
     await page.setViewportSize({ width: 1280, height: 900 }).catch(() => {
     });
-    await page.addStyleTag({ content: TEXT_SPACING_CSS }).catch(() => {
+    const textSpacing = await ran("1.4.12", [], async () => {
+      await page.addStyleTag({ content: TEXT_SPACING_CSS });
+      return await page.evaluate(TEXT_SPACING_PROBE);
     });
-    const textSpacing = await page.evaluate(TEXT_SPACING_PROBE).catch(() => []);
     const inputOverflowSpacing = opts.interact ? await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.spacing[l], CELL_SUFFIX[l])).catch(() => []) : [];
     if (opts.interact) await page.evaluate(RESTORE_INPUTS_STEP).catch(() => {
     });
@@ -60345,6 +60444,10 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
       inputOverflowZoom,
       inputOverflowSpacing,
       liveRegion,
+      // Sorted so the persisted artefact is byte-stable run to run: probes finish in whatever
+      // order they finish, and a snapshot that differs only by list order would show up as a
+      // change in every diff of a committed `.ultra11y/pages` tree.
+      probed: [...probed].sort(),
       ...snapshot ? { snapshot: { ...snapshot, ...screenshot ? { screenshot } : {} } } : {}
     };
   } finally {
@@ -61892,6 +61995,11 @@ var S = {
     more: (n) => `\u2026 et ${n} autre(s).`,
     moreGroups: (n) => `\u2026 et ${n} autre(s) groupe(s) \u2014 voir le r\xE9sum\xE9 de job.`,
     perPage: "Bilan page par page",
+    pageCriteriaTitle: (name2) => `${name2} \u2014 le d\xE9tail crit\xE8re par crit\xE8re`,
+    conformingList: "Conformes",
+    nonConformingList: "Non conformes",
+    toAssessList: "\xC0 \xE9valuer",
+    naList: "Non applicables",
     page: "Page",
     count: "Constats",
     basis: "Base",
@@ -61932,6 +62040,8 @@ var S = {
     scoreboardClamped: (n) => `_${n} page(s) retir\xE9e(s) du tableau pour tenir dans la limite de GitHub \u2014 l'artefact les porte toutes._`,
     pageDefects: "D\xE9fauts",
     fullGrid: "Grille compl\xE8te \u2014 chaque crit\xE8re du r\xE9f\xE9rentiel, page par page",
+    allDefects: "D\xE9fauts distincts \u2014 o\xF9 corriger",
+    allDefectsNote: "Un d\xE9faut distinct = une (r\xE8gle, crit\xE8re, s\xE9lecteur) ; les occurrences r\xE9p\xE9t\xE9es sont repli\xE9es. C'est la moiti\xE9 \xAB actionnable \xBB du digest, reprise ici pour que ce commentaire soit le seul \xE0 lire.",
     gridLegend: "`C` conforme \xB7 `NC` non conforme \xB7 `\u2014` non applicable \xB7 `?` \xE0 \xE9valuer",
     gridDropped: "_La grille compl\xE8te ne tient pas dans un commentaire GitHub (64 Kio) \u2014 elle est dans la fiche par page du livrable._",
     pageMoreDefects: (n) => `_\u2026 et ${n} autre(s) d\xE9faut(s) distinct(s) sur cette page \u2014 voir la fiche de page dans l'artefact._`,
@@ -61950,6 +62060,11 @@ var S = {
     more: (n) => `\u2026 and ${n} more.`,
     moreGroups: (n) => `\u2026 and ${n} more group(s) \u2014 see the job summary.`,
     perPage: "Page-by-page scoreboard",
+    pageCriteriaTitle: (name2) => `${name2} \u2014 criterion by criterion`,
+    conformingList: "Conforming",
+    nonConformingList: "Non-conforming",
+    toAssessList: "To assess",
+    naList: "Not applicable",
     page: "Page",
     count: "Findings",
     basis: "Basis",
@@ -61990,6 +62105,8 @@ var S = {
     scoreboardClamped: (n) => `_${n} page(s) dropped from the table to fit GitHub's limit \u2014 the artifact carries them all._`,
     pageDefects: "Defects",
     fullGrid: "Full grid \u2014 every criterion of the standard, page by page",
+    allDefects: "Distinct defects \u2014 where to fix",
+    allDefectsNote: "One distinct defect = one (rule, criterion, selector); repeated occurrences are folded. This is the digest's actionable half, carried here so this comment is the only one to read.",
     gridLegend: "`C` conforming \xB7 `NC` non-conforming \xB7 `\u2014` not applicable \xB7 `?` to assess",
     gridDropped: "_The full grid does not fit in a GitHub comment (64 KiB) \u2014 it is in the deliverable's per-page sheet._",
     pageMoreDefects: (n) => `_\u2026 and ${n} more distinct defect(s) on this page \u2014 see its sheet in the artifact._`,
@@ -62142,7 +62259,34 @@ function perPageTable(result, standard = CORE2, lang = "en") {
   if (!scope.length) return "";
   attributePages(result, scope);
   const derived = derivePages(result, scope);
-  return [`### ${s.perPage}`, "", ...scoreboardTable(result, derived, standard, s, lang), "", ...basisCaveats(result, derived, s, lang)].join("\n");
+  return [
+    `### ${s.perPage}`,
+    "",
+    ...scoreboardTable(result, derived, standard, s, lang),
+    "",
+    ...basisCaveats(result, derived, s, lang),
+    ...derived.flatMap((pg) => [...namedCriteriaBlock(result, pg, standard, s, lang), ""])
+  ].join("\n");
+}
+function namedCriteriaBlock(result, page, standard, s, lang) {
+  const rows = pageCriterionRows(result, page, standard, lang);
+  if (!rows.length) return [];
+  const ids = (status) => rows.filter((r) => r.status === status).map((r) => `\`${r.id}\``);
+  const line = (label, list) => list.length ? [`- **${label}** (${list.length}) : ${list.join(" \xB7 ")}`] : [];
+  return [
+    "<details>",
+    `<summary>${s.pageCriteriaTitle(page.name)}${page.auth ? " \u{1F512}" : ""}</summary>`,
+    // GFM only renders Markdown inside <details> after a blank line; without it the list
+    // ships to the reader as one run-on paragraph.
+    "",
+    // Failures first — that is the work — then what stands, then what nobody has ruled on.
+    ...line(s.nonConformingList, ids("NC")),
+    ...line(s.conformingList, ids("C")),
+    ...line(s.toAssessList, ids("manual")),
+    ...line(s.naList, ids("NA")),
+    "",
+    "</details>"
+  ];
 }
 function scoreboardTable(result, derived, standard, s, lang) {
   const out2 = [
@@ -62288,9 +62432,35 @@ function orphansBlock(result, standard, s, lang, baseDir) {
   out2.push("", "</details>");
   return out2;
 }
+function allDefectsBlock(result, standard, s, lang, baseDir) {
+  const all = findingsForStandard(result, standard).filter((f) => !f.advisory);
+  if (!all.length) return [];
+  const cell = (v) => v.replace(/\|/g, "\\|");
+  const groups = groupFindings(all, standard, lang, baseDir);
+  const counts = SEV_ORDER4.map((sev) => `${ICON5[sev]} ${all.filter((f) => f.severity === sev).length}`).join(" \xB7 ");
+  const out2 = [
+    "<details>",
+    `<summary><b>${s.allDefects}</b> \u2014 ${groups.length} / ${all.length} \xB7 ${counts}</summary>`,
+    // GFM only renders Markdown inside <details> after a blank line.
+    "",
+    `> ${s.allDefectsNote}`,
+    "",
+    `| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} | ${s.occurrences} |`,
+    "| --- | --- | --- | --- | ---: |"
+  ];
+  for (const g of groups.slice(0, MAX_ROWS)) {
+    out2.push(
+      `| ${ICON5[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`
+    );
+  }
+  if (groups.length > MAX_ROWS) out2.push("", s.more(groups.length - MAX_ROWS));
+  out2.push("", "</details>");
+  return out2;
+}
 var GRID_MARK = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
 function pagesComment(result, opts = {}) {
   const standard = opts.standard ?? CORE2;
+  const withDefects = opts.kind === "full";
   const lang = opts.lang ?? "en";
   const s = S[lang];
   const baseDir = opts.baseDir ?? process.cwd();
@@ -62326,6 +62496,7 @@ function pagesComment(result, opts = {}) {
     body3.push(...orphansBlock(result, standard, s, lang, baseDir), "");
     if (withGrid) body3.push(...fullGridBlock(result, derived, standard, s, lang), "");
     else body3.push(s.gridDropped, "");
+    if (withDefects) body3.push(...allDefectsBlock(result, standard, s, lang, baseDir), "");
     if (blocks.length) {
       body3.push(`> ${s.pagesDetailNote}`, "");
       body3.push(...blocks.slice(0, nBlocks2).flatMap((b) => [b, ""]));
@@ -64224,13 +64395,27 @@ Return (structured output): \`{ "verdicts": [{ "n", "verdict", "note" }] }\` \u2
 ${footer}`
   };
 }
-function runbookMd(phases, runAbs, engineAbs) {
+function runbookMd(phases, runAbs, engineAbs, unrendered = []) {
   const status = phases.map((p) => `| ${p.name} | \`${p.worklist}\` | ${p.ready ? `ready (${p.items} item(s))` : "not ready"} | \`${p.prerequisite}\` |`).join("\n");
   const engine = `node ${engineAbs}`;
+  const renderFirst = unrendered.length ? `
+> \u26A0\uFE0F **Render before you adjudicate.** ${unrendered.length} criterion(ia) in this run need a rendered page and
+> nothing has been snapshotted: no reading of the source can settle them, and every pass over them
+> costs a model and returns \`needs-rendered-dom\`. Run the scan first \u2014 it decides most of them with
+> no model in the loop \u2014 then re-emit this runbook:
+>
+> \`\`\`
+> ${engine} scan <url> --runtime local --merge ${join47(runAbs, "audit-latest.json")} --out ${runAbs}
+> ${engine} verify --manual --in ${join47(runAbs, "audit-latest.json")} --out ${runAbs}
+> ${engine} orchestrate --run ${runAbs}
+> \`\`\`
+>
+> Concerned: ${unrendered.map((id) => `\`${id}\``).join(" \xB7 ")}
+` : "";
   return `# ultra11y \u2014 sequential RUNBOOK (eco / no-subagent fallback)
 
 Run: \`${runAbs}\` \xB7 Engine: \`${engine}\`
-
+${renderFirst}
 Generated by \`ultra11y orchestrate\` from the CURRENT run state. This sequential path is
 correctness-identical to the multi-agent workflows \u2014 same worklists, same contracts, same
 fail-closed gates; only wall-clock differs. Fan-out is an optimization, not a requirement.
@@ -64305,6 +64490,15 @@ function listPhases(runDir, engineAbs) {
     }
   ];
 }
+function unrenderedInRun(run2) {
+  try {
+    const audit2 = JSON.parse(readFileSync30(join48(run2, "audit-latest.json"), "utf8"));
+    const todo = JSON.parse(readFileSync30(join48(run2, "ADJUDICATE.todo.json"), "utf8"));
+    return unrenderedResidual(audit2, todo.items ?? []);
+  } catch {
+    return [];
+  }
+}
 function orchestrateRun(runDir, engineAbs, opts = {}) {
   const run2 = resolve13(runDir);
   if (!existsSync32(run2)) {
@@ -64369,7 +64563,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
     }
   }
   const rb = join48(orchDir, "RUNBOOK.md");
-  writeFileSync19(rb, runbookMd(phases, run2, engineAbs));
+  writeFileSync19(rb, runbookMd(phases, run2, engineAbs, unrenderedInRun(run2)));
   written.push(rb);
   return { exitCode: 0, written, notices, errors: [], phases };
 }
@@ -66573,7 +66767,7 @@ Usage:
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin \u2192 .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
-  ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   (the per-page criterion grid)
+  ultra11y pages    --in <audit.json> [--standard <pack>] [--json [--out <dir>]] [--lang auto|en|fr]   (the per-page criterion grid; --json --out also writes <dir>/pages.json)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
   ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
@@ -66842,6 +67036,11 @@ Options:
                      .ultra11y/pages/. Coverage, one level below --require-decided: a sweep that
                      loses pages produces a report that is merely SHORTER, and a shorter
                      deliverable reads exactly like a complete one.
+  --require-rendered check: fail while a criterion that NEEDS a rendered page is still \xAB to
+                     assess \xBB and this run snapshotted no page at all. Asks about the
+                     INSTRUMENT, not the answer: a run that rendered a page and still could
+                     not settle a criterion passes. Needs --in <audit.json>; honours
+                     --allow-undecided.
   --require-decided[=pages]
                      check: fail while ANY criterion of the standard is still \xAB to assess \xBB.
                      '=pages' also holds EVERY page's own grid to the same bar \u2014 a criterion
@@ -66867,8 +67066,8 @@ Options:
   --merge <file>     scan: fold dynamic findings into this AuditResult JSON
   --sitemap <url>    scan: scan every URL listed in a sitemap.xml
   --crawl <url>      scan: BFS same-origin links from a start URL (served HTML)
-  --depth <n>        scan: crawl link-hop depth from the start URL          (default: 2)
-  --max <n>          scan: cap on pages scanned (sitemap/crawl)             (default: 50)
+  --depth <n>        scan: crawl link-hop depth from the start URL   (default: no limit; 0 = no limit)
+  --max <n>          scan: cap on pages scanned (sitemap/crawl)      (default: no limit; 0 = no limit)
   --runtime <mode>   scan: local (host/target Playwright, no Docker) | docker | auto
                      (default: auto \u2014 local if Playwright resolves from --cwd, else Docker)
   --local            scan: alias of --runtime local
@@ -67074,6 +67273,7 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   // `check`: fail while any criterion of the standard is still « to assess ».
   "require-decided",
   "require-sample",
+  "require-rendered",
   "manual",
   // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
   // verdict discards the whole adjudication. The default is per-verdict.
@@ -67209,10 +67409,11 @@ function emitCiFormat(result, format, standard, lang, failOn) {
   }
   if (process.env.ULTRA11Y_PR_COMMENT === "1") {
     const kind = commentKindFrom(process.env.ULTRA11Y_PR_COMMENT_KIND);
-    const render2 = kind === "pages" ? pagesComment : prComment;
+    const render2 = kind === "pages" || kind === "full" ? pagesComment : prComment;
     const body3 = render2(result, {
       standard,
       lang,
+      kind,
       // The run is known before the artifact exists, so the link is always safe. The artifact
       // NAME is only set by the action when it actually uploads one — naming an artifact that
       // was never uploaded sends the reader to a page that does not exist.
@@ -67507,7 +67708,8 @@ async function cmdPagesDiscover(p) {
   };
   let urls;
   try {
-    urls = sitemap ? parseSitemapUrls(await fetchHtml2(sitemap)).slice(0, max ?? 50) : await crawlUrls(crawl, { fetchHtml: fetchHtml2, depth: depth ?? 2, max });
+    const cap = crawlBound(max);
+    urls = sitemap ? ((u) => Number.isFinite(cap) ? u.slice(0, cap) : u)(parseSitemapUrls(await fetchHtml2(sitemap))) : await crawlUrls(crawl, { fetchHtml: fetchHtml2, depth, max, onPage: (url, n) => console.error(`ultra11y pages discover: ${n} \u2014 ${url}`) });
   } catch (e) {
     console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
@@ -67614,13 +67816,15 @@ async function cmdPages(p) {
     return diffAgainstExternal(p, result, scope, standard, lang, p.flags.diff);
   }
   if (p.flags.json) {
-    console.log(
-      JSON.stringify(
-        { pages: pagesForStandard(result, derivePages(result, scope), standard, lang), unattributed: unattributedFindings(result).length },
-        null,
-        2
-      )
-    );
+    const doc = { pages: pagesForStandard(result, derivePages(result, scope), standard, lang), unattributed: unattributedFindings(result).length };
+    const json = JSON.stringify(doc, null, 2);
+    console.log(json);
+    const outDir2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "";
+    if (outDir2) {
+      mkdirSync18(outDir2, { recursive: true });
+      writeFileSync20(join51(outDir2, "pages.json"), `${json}
+`);
+    }
     return 0;
   }
   const format = typeof p.flags.format === "string" ? p.flags.format : "grid";
@@ -68460,9 +68664,10 @@ function cmdCheck(p) {
     return 2;
   }
   const requireSample = p.flags["require-sample"] === true;
+  const requireRendered = p.flags["require-rendered"] === true;
   const rep = p.flags.report;
   if (typeof rep !== "string" || !rep) {
-    if (!requireDecided && !requireSample) {
+    if (!requireDecided && !requireSample && !requireRendered) {
       console.error("ultra11y check: --report <md> is required.");
       return 2;
     }
@@ -68491,6 +68696,10 @@ function cmdCheck(p) {
     console.error("ultra11y check: --require-decided needs --in <audit.json> \u2014 completeness is a property of the audit, not of the report.");
     return 2;
   }
+  if (requireRendered && !audit2) {
+    console.error("ultra11y check: --require-rendered needs --in <audit.json> \u2014 what a run rendered is a property of the audit, not of the report.");
+    return 2;
+  }
   let allow;
   const allowFlag = p.flags["allow-undecided"];
   if (typeof allowFlag === "string" && allowFlag) {
@@ -68508,6 +68717,7 @@ function cmdCheck(p) {
   }
   const decided = requireDecided && audit2 ? checkDecided(audit2, standard, lang, { allow, pages: requireDecidedPages }) : null;
   const covered = requireSample ? checkSampleCaptured(".", lang) : null;
+  const renderedGate = requireRendered && audit2 ? checkRendered(audit2, standard, lang, { allow }) : null;
   const res = md ? checkReport(md, standard, lang, { audit: audit2 }) : { ok: true, issues: [] };
   const sem = p.flags.semantic === true && typeof rep === "string" && rep ? checkSemantic(md, {
     reportPath: rep,
@@ -68515,9 +68725,22 @@ function cmdCheck(p) {
     standard,
     lang
   }) : null;
-  const ok = res.ok && (sem === null || sem.ok) && (decided === null || decided.ok) && (covered === null || covered.ok);
+  const ok = res.ok && (sem === null || sem.ok) && (decided === null || decided.ok) && (covered === null || covered.ok) && (renderedGate === null || renderedGate.ok);
   if (p.flags.json) {
-    console.log(JSON.stringify({ ...res, ok, ...sem ? { semantic: sem } : {}, ...decided ? { decided } : {}, ...covered ? { covered } : {} }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          ...res,
+          ok,
+          ...sem ? { semantic: sem } : {},
+          ...decided ? { decided } : {},
+          ...covered ? { covered } : {},
+          ...renderedGate ? { rendered: renderedGate } : {}
+        },
+        null,
+        2
+      )
+    );
   } else if (!p.flags.quiet) {
     if (decided) {
       const allowedNote = decided.allowed.length ? lang === "fr" ? ` (${decided.allowed.length} crit\xE8re(s) d\xE9clar\xE9(s) ind\xE9cidable(s) : ${decided.allowed.map((a) => `${a.criteriaId} \u2014 ${a.reason}`).join(" \xB7 ")})` : ` (${decided.allowed.length} criterion(ia) declared undecidable: ${decided.allowed.map((a) => `${a.criteriaId} \u2014 ${a.reason}`).join(" \xB7 ")})` : "";
@@ -68531,11 +68754,18 @@ function cmdCheck(p) {
         lang === "fr" ? `\u2713 \xC9chantillon couvert : les ${covered.declared} page(s) d\xE9clar\xE9e(s) ont une capture.` : `\u2713 Sample covered: all ${covered.declared} declared page(s) have a capture.`
       );
     }
+    if (renderedGate?.ok) {
+      console.log(
+        lang === "fr" ? `\u2713 Rendu : ${renderedGate.pagesAudited} page(s) r\xE9ellement audit\xE9e(s) \u2014 les crit\xE8res de rendu ont eu un navigateur.` : `\u2713 Rendered: ${renderedGate.pagesAudited} page(s) actually audited \u2014 the rendering criteria were given a browser.`
+      );
+    }
     if (ok)
       console.log(
         sem ? lang === "fr" ? `\u2713 Rapport valide + gate s\xE9mantique engag\xE9e : ${sem.total} verdict(s), ${sem.grounded} ancr\xE9(s) dans la source${sem.moved ? ` (${sem.moved} d\xE9plac\xE9(s))` : ""}.` : `\u2713 Report valid + semantic gate engaged: ${sem.total} verdict(s), ${sem.grounded} grounded in source${sem.moved ? ` (${sem.moved} moved)` : ""}.` : lang === "fr" ? "\u2713 Rapport valide : sections, crit\xE8res cit\xE9s et justifications NA coh\xE9rents." : "\u2713 Report valid: sections, cited criteria and NA justifications are consistent."
       );
-    else for (const i2 of [...res.issues, ...sem?.issues ?? [], ...decided?.issues ?? [], ...covered?.issues ?? []]) console.error(`\u2717 ${i2}`);
+    else
+      for (const i2 of [...res.issues, ...sem?.issues ?? [], ...decided?.issues ?? [], ...covered?.issues ?? [], ...renderedGate?.issues ?? []])
+        console.error(`\u2717 ${i2}`);
   }
   return ok ? 0 : 1;
 }
@@ -68625,7 +68855,14 @@ function cmdVerify(p) {
       return 2;
     }
     const adjItems = buildAdjudicationWorklist(audit2, { standard });
-    const w = writeAdjudication(adjItems, out2, { standard, auditDate: audit2.date, lang });
+    const unrendered = unrenderedResidual(audit2, adjItems);
+    const w = writeAdjudication(adjItems, out2, { standard, auditDate: audit2.date, lang, unrendered });
+    if (unrendered.length) {
+      const ids = unrendered.join(" \xB7 ");
+      console.error(
+        lang === "fr" ? `ultra11y verify : ${unrendered.length} crit\xE8re(s) exigent une page rendue et aucune page n'a \xE9t\xE9 instantan\xE9e \u2014 ils resteront \xAB \xE0 \xE9valuer \xBB quoi qu'il arrive. Lancez \`ultra11y scan <url> --merge ${inFlag}\` d'abord. Concern\xE9s : ${ids}` : `ultra11y verify: ${unrendered.length} criterion(ia) need a rendered page and no page was snapshotted \u2014 they will stay "to assess" whatever happens. Run \`ultra11y scan <url> --merge ${inFlag}\` first. Affected: ${ids}`
+      );
+    }
     if (adjItems.every((it) => it.evidence.length === 0)) {
       console.error(
         lang === "fr" ? `ultra11y verify : aucune \xE9vidence n'a pu \xEAtre extraite (${audit2.scope.inputs.join(", ")} introuvable ?) \u2014 lancez --manual depuis le r\xE9pertoire de l'audit.` : `ultra11y verify: no evidence could be harvested (${audit2.scope.inputs.join(", ")} not found?) \u2014 run --manual from the audit's directory.`
@@ -69077,7 +69314,8 @@ async function cmdScan(p) {
     } else if (sitemap || crawl) {
       const depth = typeof p.flags.depth === "string" ? Number(p.flags.depth) : void 0;
       const max = typeof p.flags.max === "string" ? Number(p.flags.max) : void 0;
-      dynamic = useLocal ? await runCrawlScanLocal({ sitemap, crawl, depth, max, cwd, storageState, lang, interact, interactClicks, snapshotRoot }) : await runCrawlScan({ sitemap, crawl, depth, max, snapshotRoot });
+      const onPage = (url, n) => console.error(`ultra11y scan: page ${n} \u2014 ${url}`);
+      dynamic = useLocal ? await runCrawlScanLocal({ sitemap, crawl, depth, max, onPage, cwd, storageState, lang, interact, interactClicks, snapshotRoot }) : await runCrawlScan({ sitemap, crawl, depth, max, onPage, snapshotRoot });
     } else {
       const targets = p.positionals.filter((a) => a !== "-");
       if (targets.length === 0) {

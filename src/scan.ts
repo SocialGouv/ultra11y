@@ -14,9 +14,18 @@ import type { AuditResult, DynamicEngine, DynamicFinding, DynamicResult, Finding
 import { lineStartsOf, lineColAt } from "./parse/html.js";
 import { allGuidelines } from "./wcag.js";
 import { PROBE_SEVERITY, PROBE_WCAG, scForAxe, severityFromImpact, isAxeAdvisory } from "./axe-map.js";
-import { parseSitemapUrls, crawlUrls } from "./crawl.js";
+import { parseSitemapUrls, crawlUrls, crawlBound } from "./crawl.js";
 import { sampleScope } from "./sample.js";
-import { COLLECT_SNAPSHOT, SNAPSHOT_VERSION, slugifyPageId, validateSnapshotMeta, writeSnapshot, type CollectedPage, type SnapshotMeta } from "./snapshot.js";
+import {
+  COLLECT_SNAPSHOT,
+  SNAPSHOT_VERSION,
+  slugifyPageId,
+  validateSnapshotMeta,
+  writeSnapshot,
+  type CollectedPage,
+  type SnapshotMeta,
+  type SnapshotProbes,
+} from "./snapshot.js";
 import { today } from "./util.js";
 
 export const IMAGE_TAG = "ultra11y-dyn:1";
@@ -167,6 +176,17 @@ export interface RunnerOutput {
   inputOverflowZoom?: ProbeHit[];
   inputOverflowSpacing?: ProbeHit[];
   liveRegion?: ProbeHit[];
+  // WHICH SUCCESS CRITERIA THIS RUN ACTUALLY MEASURED ON THIS PAGE — the load-bearing half.
+  //
+  // A probe array is silent for two different reasons: the probe ran and found nothing, or the
+  // probe never ran (no keyboard, a viewport that would not resize, a budget spent). Only the
+  // first is a measurement, and `renderedProvesOn` (src/coverage.ts) reads exactly this list
+  // to decide whether silence may be read as conformity. A criterion whose probe was skipped
+  // must never appear here.
+  probed?: string[];
+  // Why a probe did not run, when it did not. Carried for the report and the log, never for a
+  // verdict: it is the complement of `probed`, not a second source of truth.
+  skipped?: { sc: string; why: string }[];
   // The PRISTINE page as the browser built it (COLLECT_SNAPSHOT + a viewport screenshot,
   // base64). Absent when snapshotting was off or the collection failed — in which case the
   // page keeps its findings but earns no snapshot, and therefore no conforming-by-silence.
@@ -191,6 +211,25 @@ function pageIdFor(url: string): string {
   if (isUrl) return slugifyPageId(url);
   const base = url.split(/[\\/]/).pop() ?? url;
   return slugifyPageId(base.replace(/\.x?html?$/i, "")) || "page";
+}
+
+/** The runner's probe results, in the shape the snapshot format publishes.
+ *
+ *  A straight projection — no filtering, no inference. `probed` arrives from the producer
+ *  because the producer is the only thing that knows whether a probe ran at all: a caller
+ *  reading `textSpacing: []` cannot tell "measured, nothing clipped" from "never applied the
+ *  override". The stateful probes (input overflow, live region) are deliberately absent: they
+ *  measure a page that has been TYPED INTO, and the snapshot beside them is the pristine one,
+ *  so filing them here would attach a measurement to a document that never had that state. */
+function probesOf(out: RunnerOutput): SnapshotProbes {
+  return {
+    ...(out.focusVisible ? { focusVisible: out.focusVisible } : {}),
+    ...(out.hover ? { hover: out.hover } : {}),
+    ...(out.reflowZoom ? { reflowZoom: out.reflowZoom } : {}),
+    ...(out.textSpacing ? { textSpacing: out.textSpacing } : {}),
+    reflow: out.reflow,
+    probed: out.probed ?? [],
+  };
 }
 
 /** Persist a runner's collected page as a snapshot under `<root>/.ultra11y/pages/<id>/`,
@@ -230,6 +269,23 @@ export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: str
       ...(collected.styles ? { styles: collected.styles } : {}),
       ...(collected.boxes ? { boxes: collected.boxes } : {}),
       ...(collected.css ? { css: collected.css } : {}),
+      // WHAT THE BROWSER MEASURED, PERSISTED BESIDE WHAT IT SERIALIZED.
+      //
+      // The browser is the only place these answers exist, and the audit that folds them runs
+      // later, in another process, over the whole `.ultra11y/pages` tree — a measurement that
+      // lives only in this process's memory decides nothing. Dropping them is what made a
+      // scanned page able to report a rendering violation and never able to conclude
+      // conformity: `renderedProvesOn` reads `pageCoverage.scs` / `.axe`, and both are derived
+      // from these two files alone.
+      //
+      // `probed` gates the lot. Written unconditionally when the producer reported one — an
+      // empty list is a real statement ("nothing was measured here"), and omitting the file
+      // instead would be indistinguishable from a producer that predates the field.
+      ...(out.probed ? { probes: probesOf(out) } : {}),
+      // `ran: true` is the axe counterpart of `probed`: the pass happened, so its silence on
+      // the criteria AXE_DECIDES is usable. A RunnerOutput always carries `violations` because
+      // a runner always runs axe — that is the one instrument neither runtime skips.
+      axe: { violations: out.violations, ran: true },
       ...(collected.screenshot ? { screenshotBase64: collected.screenshot } : {}),
     });
   } catch {
@@ -297,6 +353,12 @@ function runRunner(target: string, isFile: boolean, tag: string, snapshot = true
   }
   const line = stdout.trim().split("\n").filter(Boolean).pop() ?? "{}";
   const out = JSON.parse(line) as RunnerOutput;
+  // WHAT THIS RUNTIME ACTUALLY MEASURED, stated here rather than in the container. The Docker
+  // RUNNER is kept byte-identical to docker/runner.mjs (docker-sync test), so it does not get
+  // to grow fields; and it needs none — it runs axe and one 320px reflow check, which is
+  // exactly DOCKER_TESTED_SCS. Claiming any more would hand `renderedProvesOn` a conformity
+  // nothing on this path measured.
+  out.probed = [...DOCKER_TESTED_SCS];
   // Report what a HOST reader can open: the runner finished on host.docker.internal, and
   // every downstream citation (hostPageOf, snapshot identity) derives from out.url. Only
   // the HOSTNAME is restored — the port stays from the container URL, which was copied
@@ -438,18 +500,27 @@ async function fetchHtml(url: string): Promise<string> {
 export interface DiscoverOpts {
   sitemap?: string; // sitemap.xml URL — scan every <loc>
   crawl?: string; // start URL — BFS the served HTML for same-origin links
-  depth?: number; // crawl: link hops from the start URL  (default 2)
-  max?: number; // cap on pages scanned                  (default 50)
+  depth?: number; // crawl: link hops from the start URL  (absent or 0 ⇒ unbounded)
+  max?: number; // cap on pages scanned                  (absent or 0 ⇒ unbounded)
+  /** Progress, forwarded to `crawlUrls`. An unbounded sweep must say what it is doing. */
+  onPage?: (url: string, n: number) => void;
 }
 
-/** Resolve the page URLs to scan from a sitemap or by crawling (zero-dep). */
+/** Resolve the page URLs to scan from a sitemap or by crawling (zero-dep).
+ *
+ *  Unbounded unless the caller bounds it (`crawlBound`): a sweep that silently stopped at 50
+ *  pages produced a report that was merely SHORTER than the site, and a shorter deliverable
+ *  reads exactly like a complete one. */
 export async function discoverUrls(opts: DiscoverOpts): Promise<string[]> {
-  const max = opts.max ?? 50;
+  const max = crawlBound(opts.max);
   if (opts.sitemap) {
-    return parseSitemapUrls(await fetchHtml(opts.sitemap)).slice(0, max);
+    const urls = parseSitemapUrls(await fetchHtml(opts.sitemap));
+    const kept = Number.isFinite(max) ? urls.slice(0, max) : urls;
+    kept.forEach((u, i) => opts.onPage?.(u, i + 1));
+    return kept;
   }
   if (opts.crawl) {
-    return crawlUrls(opts.crawl, { fetchHtml, depth: opts.depth ?? 2, max });
+    return crawlUrls(opts.crawl, { fetchHtml, depth: opts.depth, max: opts.max, ...(opts.onPage ? { onPage: opts.onPage } : {}) });
   }
   return [];
 }

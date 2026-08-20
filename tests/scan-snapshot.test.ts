@@ -246,3 +246,103 @@ describe("docker/runner.mjs stays a real module", () => {
     expect(() => new Function(`return async () => { ${readFileSync(file, "utf8").replace(/^import .*/gm, "")} }`)).not.toThrow();
   });
 });
+
+// THE MEASUREMENT `scan` USED TO THROW AWAY.
+//
+// `scan` runs axe and, on the local runtime, probes 200% zoom, 320px reflow, text spacing,
+// focus visibility and content-on-hover — then built its Snapshot from `collected` alone and
+// dropped every one of those results. The whole downstream chain was already waiting for them:
+// `writeSnapshot` writes probes.json/axe.json, `attachSignals` reads them back, `audit` turns
+// them into `scope.pageCoverage.{scs,axe}`, and `renderedProvesOn` (src/coverage.ts) reads
+// exactly those two fields to grant a conforming verdict.
+//
+// So a scanned page could report a rendering VIOLATION and could never conclude CONFORMITY:
+// measured on a real RGAA run, 3.2 / 10.4 / 10.11 / 10.12 came back « à évaluer » on a page the
+// probes had zoomed, reflowed and tabbed through. These tests pin both directions — a probe
+// that ran decides, a probe that did not run decides nothing.
+describe("scan persists what the rendered tier needs", () => {
+  const measured = (): RunnerOutput =>
+    out({
+      violations: [],
+      focusVisible: [],
+      hover: [],
+      reflowZoom: [],
+      textSpacing: [],
+      reflow: { horizontalScroll: false },
+      probed: ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13"],
+    });
+
+  it("writes probes.json and axe.json beside the DOM", () => {
+    const root = tmp();
+    writeRunnerSnapshot(root, measured(), "https://exemple.fr/");
+    const dir = join(root, PAGES_DIR, "accueil");
+    expect(existsSync(join(dir, "probes.json"))).toBe(true);
+    expect(existsSync(join(dir, "axe.json"))).toBe(true);
+    expect(JSON.parse(readFileSync(join(dir, "probes.json"), "utf8")).probed).toEqual(["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13"]);
+    expect(JSON.parse(readFileSync(join(dir, "axe.json"), "utf8")).ran).toBe(true);
+  });
+
+  it("round-trips them through readSnapshot", () => {
+    const root = tmp();
+    writeRunnerSnapshot(root, measured(), "https://exemple.fr/");
+    const snap = readSnapshot(join(root, PAGES_DIR, "accueil"));
+    expect(snap?.probes?.probed).toContain("1.4.10");
+    expect(snap?.axe?.ran).toBe(true);
+  });
+
+  it("records the measurement as per-page coverage on the audit", () => {
+    const root = tmp();
+    writeRunnerSnapshot(root, measured(), "https://exemple.fr/");
+    const audit = runAudit({ inputs: [join(root, PAGES_DIR, "accueil", "dom.html")] });
+    const cov = audit.scope.pageCoverage?.accueil;
+    expect(cov?.axe).toBe(true);
+    expect(cov?.scs).toEqual(expect.arrayContaining(["1.4.4", "1.4.10", "1.4.12", "2.4.7"]));
+  });
+
+  it("lets a probed criterion conclude CONFORMING on the page it was measured on", () => {
+    const root = tmp();
+    writeRunnerSnapshot(root, measured(), "https://exemple.fr/");
+    const scope = pageScopesFrom([readSnapshot(join(root, PAGES_DIR, "accueil"))!]);
+    const audit = runAudit({ inputs: [join(root, PAGES_DIR, "accueil", "dom.html")] });
+    const page = derivePages(audit, scope)[0]!;
+    for (const sc of ["1.4.4", "1.4.10", "1.4.12", "2.4.7"]) {
+      expect(page.criteria.find((c) => c.id === sc)?.status, `${sc} was measured here and raised nothing`).toBe("C");
+    }
+    // axe is the canonical decider of 1.4.3 (AXE_DECIDES) — and it ran.
+    expect(page.criteria.find((c) => c.id === "1.4.3")?.status).toBe("C");
+  });
+
+  // THE OTHER DIRECTION, and the one that keeps this from becoming a machine for manufacturing
+  // conformity: a page whose probes never ran must stay undecided. Absence of measurement is
+  // not a clean measurement.
+  it("leaves the same criteria to assess when nothing was probed", () => {
+    const root = tmp();
+    writeRunnerSnapshot(root, out(), "https://exemple.fr/");
+    const scope = pageScopesFrom([readSnapshot(join(root, PAGES_DIR, "accueil"))!]);
+    const audit = runAudit({ inputs: [join(root, PAGES_DIR, "accueil", "dom.html")] });
+    const page = derivePages(audit, scope)[0]!;
+    for (const sc of ["1.4.4", "1.4.10", "1.4.12"]) {
+      expect(page.criteria.find((c) => c.id === sc)?.status, `${sc} was never measured`).toBe("manual");
+    }
+  });
+
+  // A probe the local runtime SKIPPED (no keyboard, no resize, a budget that ran out) must not
+  // reach `probed`. The producer is the only place that knows, so the contract is pinned here
+  // — and this is the Docker runtime's exact shape, which measures 1.4.10 and nothing else.
+  //
+  // 1.4.12 is the criterion that isolates the contract: text spacing has NO rendered rule
+  // (`renderedRulesFor` is empty) and no axe decider, so `probed` is the only thing that can
+  // ever settle it. 2.4.7 would not do — a stylesheet digest decides it offline through
+  // `rendered-focus-not-visible`, with no probe in sight.
+  it("never records a criterion whose probe did not run", () => {
+    const root = tmp();
+    writeRunnerSnapshot(root, out({ probed: ["1.4.10"] }), "https://exemple.fr/");
+    const snap = readSnapshot(join(root, PAGES_DIR, "accueil"));
+    expect(snap?.probes?.probed).toEqual(["1.4.10"]);
+    const audit = runAudit({ inputs: [join(root, PAGES_DIR, "accueil", "dom.html")] });
+    const page = derivePages(audit, pageScopesFrom([snap!]))[0]!;
+    expect(page.criteria.find((c) => c.id === "1.4.10")?.status).toBe("C");
+    expect(page.criteria.find((c) => c.id === "1.4.12")?.status).toBe("manual");
+    expect(page.criteria.find((c) => c.id === "1.4.4")?.status).toBe("manual");
+  });
+});

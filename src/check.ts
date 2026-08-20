@@ -8,8 +8,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AuditResult, Lang } from "./types.js";
-import { hasSC } from "./wcag.js";
-import { type StandardId, CORE, criterionCoverage, isCore, loadPack, hasId, idCaptureSource, derivePackResults } from "./standards/index.js";
+import { automatability, hasSC } from "./wcag.js";
+import { type StandardId, CORE, criterionCoverage, getCriterion, isCore, loadPack, hasId, idCaptureSource, derivePackResults } from "./standards/index.js";
 import { buildWorklist, applyVerdicts, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import { isPagesReport, pageCriterionRows } from "./pages-report.js";
@@ -564,6 +564,89 @@ export function checkDecided(
     );
   }
   return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length, ...(pages ? { pages } : {}) };
+}
+
+export interface RenderedCoverage {
+  ok: boolean;
+  issues: string[];
+  /** Rendering criteria still « to assess » that nothing in this run could have measured. */
+  open: string[];
+  /** Rendering criteria still open but declared, with their stated reason. */
+  allowed: UndecidedAllowance[];
+  /** Pages whose real DOM this audit read. Zero is what makes the gate fire. */
+  pagesAudited: number;
+}
+
+/** THE INSTRUMENT GATE — were the criteria that need a browser given one?
+ *
+ *  `--require-decided` asks whether every criterion carries a verdict; `--require-sample` asks
+ *  whether the run looked at every page it declares. This asks the question underneath both,
+ *  and it is the one that went unasked. Measured on the 2026-08-20 RGAA cascade — three passes,
+ *  311 turns, $24.90 — seven criteria came back `needs-rendered-dom` and every one of them was
+ *  RIGHT: the workflow audited sources only and no page was ever snapshotted. The job was
+ *  green, the report said « à évaluer », and nothing anywhere said *because nobody rendered
+ *  anything* — so two further passes were bought to rediscover it.
+ *
+ *  It asks about the INSTRUMENT, never about the answer. A run that rendered a page and still
+ *  could not settle 1.4.5 passes: that is the honest residual this whole tool exists to
+ *  preserve, and failing on it would push a project to manufacture a verdict. What fails is
+ *  a rendering criterion left open by a run where the tier never ran at all.
+ *
+ *  `scope.pagesAudited === undefined` is UNKNOWN, not none — an audit written before that
+ *  field existed cannot answer, and a gate that fails on "unknown" is one that gets turned
+ *  off on the next run. */
+export function checkRendered(audit: AuditResult, standard: StandardId = CORE, lang: Lang = "en", opts: { allow?: UndecidedFile } = {}): RenderedCoverage {
+  const fr = lang === "fr";
+  const issues: string[] = [];
+
+  const declared = new Map<string, UndecidedAllowance>();
+  for (const e of opts.allow?.entries ?? []) {
+    if (!e.criteriaId) continue;
+    if (!e.reason?.trim()) {
+      issues.push(
+        fr
+          ? `Critère ${e.criteriaId} déclaré indécidable sans motif — un critère laissé ouvert doit dire pourquoi.`
+          : `Criterion ${e.criteriaId} is declared undecidable with no reason — an open criterion must say why.`,
+      );
+      continue;
+    }
+    declared.set(e.criteriaId, e);
+  }
+
+  const audited = audit.scope.pagesAudited;
+  const pagesAudited = audited?.length ?? 0;
+  const unknown = audited === undefined && (audit.scope.pages ?? []).length > 0;
+  if (pagesAudited > 0 || unknown) {
+    return { ok: issues.length === 0, issues, open: [], allowed: [], pagesAudited };
+  }
+
+  const rendering = renderingCriteriaOpen(audit, standard);
+  const open = rendering.filter((id) => !declared.has(id)).sort(byCriterionId);
+  const allowed = rendering.filter((id) => declared.has(id)).map((id) => declared.get(id)!);
+  if (open.length) {
+    issues.push(
+      fr
+        ? `${open.length} critère(s) exigent une page rendue et aucune page n'a été instantanée : ${open.join(", ")}. Lancez \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) avant d'adjuger — la mesure en ferme la plupart sans modèle.`
+        : `${open.length} criterion(ia) need a rendered page and no page was snapshotted: ${open.join(", ")}. Run \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) before adjudicating — the measurement closes most of them with no model in the loop.`,
+    );
+  }
+  return { ok: issues.length === 0, issues, open, allowed, pagesAudited };
+}
+
+/** The active standard's still-undecided criteria whose WCAG class is `needs-rendering`.
+ *
+ *  A pack criterion inherits the WORST class among the success criteria it maps to — the same
+ *  fold `buildAdjudicationWorklist` applies — because a criterion needing a rendered DOM for
+ *  any one of them needs one, full stop. */
+function renderingCriteriaOpen(audit: AuditResult, standard: StandardId): string[] {
+  if (isCore(standard)) {
+    return audit.criteria.filter((c) => c.status === "manual" && automatability(c.id) === "needs-rendering").map((c) => c.id);
+  }
+  const pack = loadPack(standard);
+  return derivePackResults(audit, standard)
+    .filter((pc) => pc.status === "manual")
+    .filter((pc) => (getCriterion(pack, pc.id)?.wcag ?? pc.scs).some((sc) => automatability(sc) === "needs-rendering"))
+    .map((pc) => pc.id);
 }
 
 /** Every page in scope, with the criteria still « to assess » on it — BEFORE any allowance is

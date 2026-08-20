@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { AdjudicationFile } from "./adjudicate.js";
+import { unrenderedResidual, type AdjudicationFile, type AdjudicationItem } from "./adjudicate.js";
+import type { AuditResult } from "./types.js";
 import { agentContracts, phaseWorkflowScript, runbookMd } from "./orchestrate-templates.js";
 import type { VerifyItem } from "./verify.js";
 
@@ -102,6 +103,23 @@ export interface OrchestrateResult {
   phases: PhaseInfo[];
 }
 
+/** The criteria this run cannot possibly decide, because it rendered nothing — read from the
+ *  run directory's own two files.
+ *
+ *  BEST-EFFORT BY DESIGN. `orchestrate` emits a runbook; it is not a gate, and a run directory
+ *  missing an audit or carrying a half-written worklist must still get its runbook. Anything
+ *  unreadable answers "nothing to warn about" rather than failing the emission — the warning is
+ *  a kindness, and a kindness that can break the tool is not one. */
+function unrenderedInRun(run: string): string[] {
+  try {
+    const audit = JSON.parse(readFileSync(join(run, "audit-latest.json"), "utf8")) as AuditResult;
+    const todo = JSON.parse(readFileSync(join(run, "ADJUDICATE.todo.json"), "utf8")) as { items?: AdjudicationItem[] };
+    return unrenderedResidual(audit, todo.items ?? []);
+  } catch {
+    return [];
+  }
+}
+
 export function orchestrateRun(runDir: string, engineAbs: string, opts: OrchestrateOptions = {}): OrchestrateResult {
   const run = resolve(runDir);
   if (!existsSync(run)) {
@@ -179,7 +197,7 @@ export function orchestrateRun(runDir: string, engineAbs: string, opts: Orchestr
   }
 
   const rb = join(orchDir, "RUNBOOK.md");
-  writeFileSync(rb, runbookMd(phases, run, engineAbs));
+  writeFileSync(rb, runbookMd(phases, run, engineAbs, unrenderedInRun(run)));
   written.push(rb);
 
   return { exitCode: 0, written, notices, errors: [], phases };

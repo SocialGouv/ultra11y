@@ -303,7 +303,8 @@ with the action's `comment-kind` (`ULTRA11Y_PR_COMMENT_KIND`):
 | kind | what it posts |
 |---|---|
 | `digest` (default) | The verdict, the coverage, and the distinct defects — one row per (criterion, rule, selector), so 472 occurrences of one design-system defect are one row. Then a link. |
-| `pages` | The page-by-page grid: one row per page with its basis, its rate **and its denominator**, and its severities; then a collapsed block per failing page listing its non-conforming criteria. Needs pages in scope; with none it says so rather than posting an empty scoreboard. |
+| `pages` | The page-by-page grid: one row per page with its basis, its rate **and its denominator**, and its severities; then the FULL criterion × page grid (`C` / `NC` / `—` / `?`, collapsed), the criteria nobody has ruled on **named**, and a collapsed block per failing page listing its non-conforming criteria and where to fix them. Needs pages in scope; with none it says so rather than posting an empty scoreboard. |
+| `full` | Both, in **one** comment under its own marker: everything `pages` posts, plus the run's distinct defects with their locations — the digest's actionable half. For a workflow that wants a single comment at the end with everything in it rather than two a reviewer has to reconcile. Same scope requirement as `pages`. |
 
 **The marker carries both the standard and the kind**, so a WCAG run and an RGAA run keep
 separate comments — and so do the code digest and the page grid of one standard. That last
@@ -352,26 +353,77 @@ list can come from three places, and none of them has to be written by hand:
     start: npm run start
     wait-on: http://localhost:3000
     sitemap: http://localhost:3000/sitemap.xml   # …or `crawl:` …or `urls:` …or `sample: 'true'`
-    crawl-max: '20'
+    crawl-max: '0'                               # 0 (the default) = no cap
 ```
+
+**`crawl-max` and `crawl-depth` default to `0`, which means no bound.** A sweep that silently
+stopped at 20 pages produced a report merely SHORTER than the site, and a shorter deliverable
+reads exactly like a complete one. Set a number when the runner budget matters more than
+coverage — a large site is unbounded runner time and an unbounded artifact, and `evidence-max`
+guards only the crops. Every page reached is logged with its running count, so an unbounded
+crawl is never a job that merely looks hung.
+
+**Point the scan at the pages, not at a directory listing.** A crawl follows the links in the
+served HTML, and a listing that links a source file makes the browser start a download instead
+of a navigation — which stops the scan.
 
 Every scanned page is also **persisted as a snapshot** and folded into the audit
 (`snapshot: 'false'` opts out). That is not a nicety: a page known only by its URL cannot earn
 a conforming verdict — the static rules never ran against its DOM — so without it the per-page
 grid is almost empty and the job reports far less than it measured.
 
-Two surfaces come out of it:
+Four surfaces come out of it:
 
 - **The scoreboard**, in the job summary and the sticky PR comment: one row per page with its
   rate and its blocking/major/minor counts, plus a `basis` column. That column is not
   decoration — a page marked *source* has no snapshot, so its silence is not conformity.
   It appears on a clean run too, which is exactly when a reviewer wants to see *which* pages
   passed.
+- **The criteria, NAMED, under each page** — in the job summary, folded: what conforms, what
+  does not, what nobody has ruled on, by id. Counts are the right shape for a scoreboard and
+  the wrong one for acting: « 65 / 6 » says nothing about *which* six, and until now the ids
+  lived only in an artifact nobody downloads. Every status comes from the same
+  `pageCriterionRows` the dossiers render, so the summary and the deliverable cannot disagree.
 - **The per-page dossiers**, in the uploaded artifact (`pages-report: 'true'`, the default):
   `audits/pages/index.md` plus one sheet per page — its screenshot, every criterion of the
   standard with its status on that page, and each non-conformity as the ordinary auditor block.
+  They honour `evidence` and `html` like the compliance report does, so the annotated crops and
+  the `page-<id>.html` mirrors are really in the artifact.
+- **`audits/pages.json`**, the same projection for a machine — `{ pages: [{ id, name, url,
+  basis, criteria: [{ id, status, decidedBy }], conformancePct, decided, total }],
+  unattributed }`.
 
-A run with no page in scope is not a failure: the report step says so and the job carries on.
+The action publishes the page dimension as **outputs** too, so a later job needs neither the
+artifact nor a re-derivation: `pages-json-path`, `pages-report-path`, `pages-count` and
+`pages-failing`. The two paths are paths on purpose — a criterion × page matrix is not a scalar,
+a step output is size-capped, and truncating a grid into one would be a silent lie about
+coverage.
+
+A run with no page in scope is not a failure: the report step says so, the outputs stay
+empty/`0`, and the job carries on. `0` pages is a different statement from a clean sweep, and
+the two must not be read alike.
+
+### The render gate (`require-rendered`)
+
+`require-decided` asks whether every criterion carries a verdict; `require-sample` asks whether
+the run looked at every page it declares. `require-rendered` asks the question underneath both:
+were the criteria that need a browser given one?
+
+```yaml
+- uses: maxgfr/ultra11y@v5
+  with:
+    standard: rgaa
+    crawl: http://localhost:3000
+    runtime: local
+    require-rendered: 'true'
+```
+
+It fails while a rendering criterion is still « to assess » **and** the run snapshotted no page
+at all. It asks about the INSTRUMENT, never the answer: a run that rendered a page and still
+could not settle 1.4.5 passes — that is the honest residual, and failing on it would push a
+project to manufacture a verdict. Measured on a real keyed cascade: three passes, 311 turns and
+$24.90 spent to be told that seven criteria needed a rendered DOM, by a workflow that audited
+sources only. Pair it with `undecidable-file` for the criteria you genuinely cannot render.
 
 ### Pages behind a login (`storage-state`)
 
@@ -418,13 +470,20 @@ audits/
 ├── ultra11y-<std>-<date>.html        ← the whole audit in ONE file, printable to PDF
 ├── <std>-<date>.md                   ← the Markdown report, illustrated by the same crops
 ├── audit-latest.json                 ← the machine-readable audit (unchanged)
+├── pages.json                        ← the per-page grid, for a machine (`pages-json-path`)
 ├── assets/
 │   ├── <page-id>.png                 ← the page screenshot
 │   └── <page-id>/<hash>.png          ← one annotated crop per distinct defect on that page
 └── pages/
     ├── index.md + page-<id>.md       ← the per-page dossiers (unchanged)
-    └── index.html + page-<id>.html   ← the same, navigable
+    └── index.html + page-<id>.html   ← the same, navigable (needs `html: 'true'`)
 ```
+
+The HTML sheets and the crops in `pages/` were documented here before the step produced them:
+it passed neither `--html` nor `--evidence`, so `pages/index.html` did not exist and every page
+sheet cited `dom.html:412 (div.card)` with no picture while the compliance report beside it
+carried annotated crops of the same defects. The step now follows the same `html` and
+`evidence` inputs the report does.
 
 Two conventions share `assets/` and that is deliberate: `<page-id>.png` is the whole page,
 `<page-id>/` holds the crops OF that page. Renaming either would break the Markdown sheets
