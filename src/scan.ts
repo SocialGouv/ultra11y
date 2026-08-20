@@ -741,15 +741,33 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
   if (snap.packFindings?.length) merged.packFindings = [...(merged.packFindings ?? []), ...snap.packFindings];
 
   // A criterion the static pass closed for want of a subject, which the snapshot then MEASURED.
-  // Both read `C`, so the discriminator is the flag, not the status: what has to go is the
-  // "nothing of that kind here" justification, which a rendered page has just falsified.
+  // Both read `C`, so the discriminator is the FLAG, not the status — and testing the status
+  // is exactly what this loop used to do. The snapshot pages have no time-based media either,
+  // so they closed 1.2.1 the same way the source did, `C` + `inapplicable`; reading only the
+  // status, the merge took that for a measurement and stripped the flag from every criterion
+  // both halves had closed for want of a subject.
+  //
+  // Two things then broke, both silently. The `C` lost the justification that made it
+  // falsifiable, becoming the bare uncited conformity this engine refuses everywhere else. And
+  // `pageStatus` reads `inapplicable` to hold "a conformity reached for want of a subject
+  // holds on every page" — without the flag those criteria fell through to the honesty rule
+  // that only `static` criteria earn a verdict by silence, and came back « à évaluer » on
+  // EVERY page. Measured on a two-page RGAA crawl: the run reported a complete 106/106 grid
+  // while each page carried 10 criteria nobody could ever adjudicate, because there was
+  // nothing there to adjudicate.
   for (const c of merged.criteria) {
     if (!c.inapplicable) continue;
-    if (snapById.get(c.id)?.status === "C") {
-      c.status = "C";
-      delete c.inapplicable;
-      delete c.justification; // "no relevant element in scope" no longer holds
-    }
+    const measured = snapById.get(c.id);
+    // Only a snapshot that reached `C` WITHOUT the flag has falsified "nothing of that kind
+    // here" — that one looked at the rendered page and found the subject.
+    if (!measured || measured.status !== "C" || measured.inapplicable) continue;
+    c.status = "C";
+    delete c.inapplicable;
+    // Keep the claim citable: adopt what the measuring half said, rather than leaving a `C`
+    // with nothing behind it.
+    if (measured.justification) c.justification = measured.justification;
+    else delete c.justification;
+    if (measured.decidedBy) c.decidedBy = measured.decidedBy;
   }
 
   const nowNc = new Set(snap.findings.filter((f) => !f.advisory).map((f) => f.criteriaId));

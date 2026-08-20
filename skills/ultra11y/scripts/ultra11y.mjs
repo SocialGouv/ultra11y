@@ -59669,11 +59669,13 @@ function mergeSnapshotAudit(base, snap) {
   if (snap.packFindings?.length) merged.packFindings = [...merged.packFindings ?? [], ...snap.packFindings];
   for (const c2 of merged.criteria) {
     if (!c2.inapplicable) continue;
-    if (snapById.get(c2.id)?.status === "C") {
-      c2.status = "C";
-      delete c2.inapplicable;
-      delete c2.justification;
-    }
+    const measured = snapById.get(c2.id);
+    if (!measured || measured.status !== "C" || measured.inapplicable) continue;
+    c2.status = "C";
+    delete c2.inapplicable;
+    if (measured.justification) c2.justification = measured.justification;
+    else delete c2.justification;
+    if (measured.decidedBy) c2.decidedBy = measured.decidedBy;
   }
   const nowNc = new Set(snap.findings.filter((f) => !f.advisory).map((f) => f.criteriaId));
   merged.residualRisks = merged.residualRisks.filter((r) => !nowNc.has(r.criteriaId));
