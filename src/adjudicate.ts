@@ -902,7 +902,11 @@ export function applyAdjudication(
         }
       }
     } else if (v === "NC") {
-      if (!it.findings || it.findings.length === 0) blame(it.criteriaId, `criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding`);
+      if (!it.findings || it.findings.length === 0)
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding — { file, line, message, snippet, normativeRef } pointing at a real anchor from this criterion's own evidence`,
+        );
       for (const f of it.findings ?? []) {
         // AN NC NOBODY CAN OPEN IS NOT A FINDING. Checked before the normativeRef, because a
         // finding with no file cannot be grounded at all — there is nothing to go and read.
@@ -912,7 +916,7 @@ export function applyAdjudication(
         if (typeof f.file !== "string" || !f.file.trim()) {
           blame(
             it.criteriaId,
-            `criterion ${it.criteriaId}: an NC finding must name the file it was observed in — nobody can act on a non-conformity with no location`,
+            `criterion ${it.criteriaId}: an NC finding must name the file it was observed in — nobody can act on a non-conformity with no location. An absence is still observed somewhere: cite the element and the page you observed it on, with the file, line and snippet copied from this criterion's own evidence. If the subject exists nowhere in scope, the verdict is NA with a justification, not NC.`,
           );
           continue;
         }
@@ -964,7 +968,10 @@ export function applyAdjudication(
       // Same contract, same reason: a recommendation is rendered through the very surfaces an
       // NC is, so one with no location breaks them just as thoroughly.
       if (typeof rec.file !== "string" || !rec.file.trim()) {
-        blame(it.criteriaId, `criterion ${it.criteriaId}: a recommendation must name the file it was observed in`);
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: a recommendation must name the file it was observed in — copy a file and line from this criterion's own evidence, or drop the recommendation`,
+        );
         continue;
       }
       toGround(it.criteriaId, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
@@ -1252,6 +1259,10 @@ const T = {
       "**RENDU DISPONIBLE.** Cet audit a ingéré des captures de page : le rendu de la page est sur le disque, sous `.ultra11y/pages/<id>/` — `dom.html` (le DOM sérialisé par le navigateur), `styles.json` (les styles calculés), `boxes.json` (les boîtes et positions), `axtree.json` (l'arbre d'accessibilité) et `screen.png`. Un critère « à restituer » — information par la couleur, opérabilité clavier d'un script, geste au pointeur — se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. `needs-rendered-dom` reste la bonne réponse pour un critère dont aucune capture ne porte le sujet, et pour lui seul.",
     nothingRendered: (ids: string[]): string =>
       `**AUCUN RENDU DANS CETTE PORTÉE.** ${ids.length} critère(s) exigent une page rendue, et aucune page n'a été instantanée ici : personne ne peut les trancher depuis la source, et \`needs-rendered-dom\` est pour eux la seule réponse honnête. Rendez AVANT d'adjuger — \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) — puis reconstruisez cette liste : la mesure en ferme la plupart sans modèle, donc sans facture. Concernés : ${ids.map((id) => `\`${id}\``).join(" · ")}`,
+    briefContract:
+      "> **CONTRAT DE VERDICT** — le pli est FERMÉ : un verdict auquel il manque son champ obligatoire est refusé, et son critère retourne « à évaluer » en portant le refus. Renseignez le verdict de CE critère, ici :",
+    absenceRule:
+      "> **UNE NC EN FORME D'ABSENCE S'ANCRE QUAND MÊME.** « Il n'y a pas de second système de navigation », « il n'y a pas de moteur de recherche », « aucun message d'erreur ne suggère le format attendu » : une absence se CONSTATE quelque part. Citez l'élément et la page où vous l'avez constatée — le `<nav>`, le `<header>`, le formulaire — avec son `file`, sa `line` et son `snippet`. Une NC sans `file` est refusée aussi sûrement qu'un `C` sans citations. Et si le sujet du critère n'existe nulle part dans le périmètre audité, le verdict n'est pas `NC` : c'est `NA`, avec sa justification.",
     incomplete: "LECTURE INCOMPLÈTE — un « C » sera refusé sur ce critère",
     none: "(aucune évidence automatique — décidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "À vérifier manuellement",
@@ -1287,6 +1298,10 @@ const T = {
       "**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under `.ultra11y/pages/<id>/` — `dom.html` (the DOM the browser serialized), `styles.json` (computed styles), `boxes.json` (boxes and positions), `axtree.json` (the accessibility tree) and `screen.png`. A needs-rendering criterion — information by colour, keyboard operability of a script, a pointer gesture — is decided FROM THOSE FILES: read them as you would read the source. `needs-rendered-dom` stays the right answer for a criterion no capture carries the subject of, and for that alone.",
     nothingRendered: (ids: string[]): string =>
       `**NOTHING WAS RENDERED IN THIS SCOPE.** ${ids.length} criteria need a rendered page, and no page was snapshotted here: nobody can settle them from source, and \`needs-rendered-dom\` is the only honest answer for them. Render BEFORE adjudicating — \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) — then rebuild this worklist: the measurement closes most of them with no model in the loop, and so with no bill. Affected: ${ids.map((id) => `\`${id}\``).join(" · ")}`,
+    briefContract:
+      "> **VERDICT CONTRACT** — the fold is FAIL-CLOSED: a verdict missing its required field is refused, and its criterion goes back to « to assess » carrying the refusal. Record THIS criterion's verdict, here:",
+    absenceRule:
+      "> **AN NC SHAPED LIKE AN ABSENCE STILL HAS TO BE ANCHORED.** « There is no second navigation system », « there is no search engine », « no error message suggests the expected format »: an absence is OBSERVED somewhere. Cite the element and the page you observed it on — the `<nav>`, the `<header>`, the form — with its `file`, `line` and `snippet`. An NC with no `file` is refused exactly as surely as a `C` with no citations. And when the criterion's subject exists nowhere in the audited scope, the verdict is not `NC`: it is `NA`, with its justification.",
     incomplete: "INCOMPLETE READING — a C will be refused on this criterion",
     none: "(no automatic evidence — decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
@@ -1407,13 +1422,17 @@ function plainTest(s: string): string {
   return s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
 }
 
-/** `preamble: false` renders the criterion sections ALONE.
+/** `preamble: false` renders the criterion sections with a COMPRESSED contract instead of the
+ *  full preamble.
  *
- *  The preamble names the file to write into and the command to fold with, which is right for
- *  the one combined document and wrong for a per-criterion brief: repeated 96 times it is 96
- *  copies of instructions that contradict a CI adjudicator's toolset (it has no shell) and
- *  point at the wrong file. The briefs carry evidence and protocol; the instructions live once,
- *  in the worklist's `contract` field and the dispatch contract. */
+ *  The full preamble names the file to write into (`ADJUDICATE.todo.json`) and the shell command
+ *  to fold with, and both are wrong on a per-criterion brief: the CI adjudicator has no shell and
+ *  is told not to open that file. That is why the briefs used to carry no preamble at all — and
+ *  it went one step too far. The RULES are not instructions about files; they are the definition
+ *  of a valid verdict, and dropping them left the CI adjudicator ruling without ever being shown
+ *  what the gate would refuse. So `preamble: false` now keeps the verdict vocabulary, the
+ *  grounding rule, the absence rule and the pack warning, and drops only the two lines that were
+ *  ever really harness-specific. */
 export function formatAdjudication(
   items: AdjudicationItem[],
   lang: Lang = "en",
@@ -1424,7 +1443,24 @@ export function formatAdjudication(
   // Display only — the gate always reads the complete sibling set.
   const { showAlsoAt: shown } = adjudicationLimits(opts.cwd);
   const pack = isCore(standard) ? undefined : loadPack(standard);
-  const out: string[] = opts.preamble === false ? [] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
+  // THE CONTRACT TRAVELS WITH THE BRIEF.
+  //
+  // `preamble: false` used to mean "no contract at all". That became a defect the day CI started
+  // telling its adjudicator to read ONLY `adjudicate/<criteriaId>.md`: the verdict vocabulary,
+  // the C-needs-citations / NC-needs-a-file rule and the pack's `normativeRef` warning all lived
+  // in the preamble of the one file the agent is explicitly forbidden to open. Measured on run
+  // 32385981037 (Haiku, RGAA, 3 passes over tests/fixtures/realworld): 12.1 and 12.5 came back
+  // NC with no `file`, 11.11 and 11.12 came back `needs-rendered-dom` on capture-anchored
+  // evidence — four gate refusals, and all four of them rules the brief never carried. The
+  // adjudicator was not ignoring the contract; it had never been shown one.
+  //
+  // So a per-criterion brief now opens with the same contract, compressed: the four verdicts,
+  // the grounding rule and the absence rule. The two notes below are keyed on THESE items, so a
+  // one-item brief gets the note when its own evidence earns it, and stays silent otherwise.
+  const out: string[] =
+    opts.preamble === false
+      ? [s.briefContract, "", ...s.verdicts, "", s.rule, "", s.absenceRule, ""]
+      : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", s.then, ""];
   // THE RENDERED PAGE, WHEN THERE IS ONE.
   //
   // A `needs-rendering` criterion used to arrive with one instruction — answer
@@ -1437,7 +1473,10 @@ export function formatAdjudication(
   // Keyed on the harvest itself rather than on a flag: if an anchor points into a capture, the
   // capture is there. On a source-only audit the note stays silent, because there
   // `needs-rendered-dom` IS the correct answer and saying otherwise would invite a guess.
-  if (opts.preamble !== false && items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
+  // Keyed on the items in hand, so it is correct on a one-criterion brief too: the gate refuses
+  // `needs-rendered-dom` exactly when THAT criterion's own evidence is capture-anchored, and this
+  // is the same predicate. Before, the note only ever reached the combined document.
+  if (items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
     out.push(`> ${s.renderedAvailable}`, "");
   }
   // AND WHEN THERE IS NONE, SAY SO — with the ids, and with the command that closes them.
@@ -1447,10 +1486,12 @@ export function formatAdjudication(
   // silence between them was what let a $24.90 cascade spend three passes discovering that
   // nothing had been rendered. Opt-in on the caller's side so a brief rendered without an
   // audit in hand (a per-criterion sheet, a test) stays byte-identical.
-  if (opts.preamble !== false && opts.unrendered?.length) {
+  if (opts.unrendered?.length) {
     out.push(`> ${s.nothingRendered(opts.unrendered)}`, "");
   }
-  if (pack && opts.preamble !== false) out.push(`> ${s.packIntro(pack.name)}`, "");
+  // The pack warning belongs in EVERY brief, not only the combined one: `normativeRef` is
+  // per-criterion, and a WCAG id looks so much like an RGAA one that the mistake is the default.
+  if (pack) out.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
     out.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` — ${it.title}` : ""}  _(${it.automatability})_`);
     const pop = it.population;
@@ -1583,8 +1624,17 @@ export function writeAdjudication(
   writeFileSync(verdictsPath, JSON.stringify({ ...file, items: slimAdjudicationItems(items) }, null, 2) + "\n");
   const itemsDir = join(outDir, "adjudicate");
   mkdirSync(itemsDir, { recursive: true });
+  // The per-criterion brief gets its OWN slice of the unrendered residue. A criterion that needs
+  // a browser nobody ran must say so on the sheet the adjudicator actually reads — otherwise the
+  // one honest `needs-rendered-dom` in the run looks like a guess, and the run before it spent
+  // three passes discovering by hand what this line states for free.
+  const unrendered = new Set(opts.unrendered ?? []);
   for (const it of items) {
-    writeFileSync(join(itemsDir, `${it.criteriaId}.md`), formatAdjudication([it], opts.lang ?? "en", opts.standard, { preamble: false }));
+    const mine = unrendered.has(it.criteriaId) ? [it.criteriaId] : [];
+    writeFileSync(
+      join(itemsDir, `${it.criteriaId}.md`),
+      formatAdjudication([it], opts.lang ?? "en", opts.standard, { preamble: false, ...(mine.length ? { unrendered: mine } : {}) }),
+    );
   }
   return { todoPath, mdPath, verdictsPath, itemsDir, count: items.length };
 }

@@ -616,12 +616,39 @@ describe("the adjudication tier", () => {
     expect(prompt).toContain("audits/adjudicate/");
     // The dispatch contract still governs the verdicts themselves.
     expect(prompt).toContain("adjudicator.md");
-    // It must be told to IGNORE the runbook's commands, since it has no shell and this
-    // workflow folds for it. A prompt that merely omits them leaves the runbook free to
-    // reintroduce them — the agent reads the contract file too.
+    // It must resolve the conflict in ITS OWN favour, since it has no shell and this workflow
+    // folds for it. A prompt that merely omits the commands leaves the contract file free to
+    // reintroduce them — the agent reads that file too, and is told to.
     expect(prompt).toMatch(/no shell/i);
-    expect(prompt).toMatch(/Ignore any instruction[\s\S]*to run a command/i);
+    expect(prompt).toMatch(/this prompt wins/i);
+    expect(prompt).toMatch(/never run the engine/i);
     expect(prompt).toMatch(/do not commit/i);
+  });
+
+  // THE SYMMETRY THE PROMPT DID NOT STATE, AND THE FOUR CRITERIA IT COST.
+  //
+  // The prompt argued at length that an uncited `C` is refused, and said nothing at all about
+  // the mirror rule. Measured on run 32385981037 (Haiku, RGAA, 3 passes): 12.1 and 12.5 came
+  // back `NC` with no `file` — « there is no second navigation system » is an absence, and
+  // nothing told the adjudicator that an absence is still observed on an element of a page.
+  it("states the NC contract as loudly as the C one, in every pass", () => {
+    const prompts = adjudicationSteps()
+      .filter((s) => s.uses?.startsWith("anthropics/claude-code-action@"))
+      .map((s) => String(s.with?.prompt ?? ""));
+    expect(prompts.length).toBe(3); // pass 1, 2, 3
+    for (const [i, prompt] of prompts.entries()) {
+      expect(prompt, `pass ${i + 1}: an NC needs a file`).toMatch(/`NC`[\s\S]{0,400}`file`/);
+      expect(prompt, `pass ${i + 1}: an absence is still anchored`).toMatch(/absence/i);
+      expect(prompt, `pass ${i + 1}: NA is the answer when the subject is absent from scope`).toMatch(/`NA`/);
+      expect(prompt, `pass ${i + 1}: needs-rendered-dom is refused over a capture`).toMatch(/\.ultra11y\/pages/);
+    }
+  });
+
+  // A `normativeRef` under a pack is that pack's numbered test. A WCAG id looks alike, denotes
+  // an unrelated test and is rejected by the fold — so the prompt has to name the trap.
+  it("warns that a normativeRef is the criterion's own numbered test, not a WCAG id", () => {
+    const first = adjudicationSteps().find((s) => s.uses?.startsWith("anthropics/claude-code-action@"));
+    expect(String(first?.with?.prompt ?? "")).toMatch(/normativeRef[\s\S]{0,300}WCAG id/i);
   });
 
   // The agent's allowlist and the file it is asked to fill have to stay consistent: the fold

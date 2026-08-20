@@ -124,9 +124,10 @@ describe("partial-audit advisory banner (Task 5 — needs-rendering-aware covera
     findings: [reflowFinding],
     testedScs: ["1.4.10"],
   };
-  // Everything an automated tier can credit: the live-browser probes PLUS the criteria the
-  // offline snapshot tier decides (1.3.4, 1.4.1, 1.4.3, 1.4.11, 2.4.7).
-  const EVERY_CREDITABLE_SC = ["1.3.4", "1.4.1", "1.4.10", "1.4.11", "1.4.12", "1.4.13", "1.4.3", "1.4.4", "2.4.7", "4.1.3"];
+  // Everything an automated tier can credit: the live-browser probes (2.1.2 among them since
+  // the keyboard-trap probe landed) PLUS the criteria the offline snapshot tier decides
+  // (1.3.4, 1.4.1, 1.4.3, 1.4.11, 2.4.7).
+  const EVERY_CREDITABLE_SC = ["1.3.4", "1.4.1", "1.4.10", "1.4.11", "1.4.12", "1.4.13", "1.4.3", "1.4.4", "2.1.2", "2.4.7", "4.1.3"];
   // A local run with interactions measures the full live-browser set.
   const localScan: DynamicResult = {
     tool: "ultra11y",
@@ -134,7 +135,7 @@ describe("partial-audit advisory banner (Task 5 — needs-rendering-aware covera
     target: "https://example.fr",
     date: "2026-07-13",
     findings: [reflowFinding],
-    testedScs: ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13", "4.1.3"],
+    testedScs: ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13", "2.1.2", "4.1.3"],
   };
   // …and the snapshot tier supplies the rest, offline.
   const snapshotScan: DynamicResult = {
@@ -159,12 +160,16 @@ describe("partial-audit advisory banner (Task 5 — needs-rendering-aware covera
   });
 
   // The banner must never name a criterion no tier can credit, or it becomes permanent: no run
-  // could clear it, so a reader learns to ignore the whole advisory. Those five carry a
+  // could clear it, so a reader learns to ignore the whole advisory. Those carry a
   // per-criterion reason instead (src/audit.ts RESIDUAL_TRAIL).
+  //
+  // 2.1.2 is deliberately absent from this list now: `probeKeyboardTrap` walks the tab ring, so
+  // a run CAN clear it, and the banner naming it is what tells a reader the walk never happened.
   it("never names a criterion no automated tier measures", () => {
-    for (const sc of ["1.4.5", "2.1.2", "2.3.1", "2.4.11", "2.5.8"]) {
+    for (const sc of ["1.4.5", "2.3.1", "2.4.11", "2.5.8"]) {
       expect(untestedNeedsRendering(bad), `SC ${sc}`).not.toContain(sc);
     }
+    expect(untestedNeedsRendering(bad), "2.1.2 became measurable and must be creditable").toContain("2.1.2");
   });
 
   it("does NOT appear on the core WCAG report", () => {

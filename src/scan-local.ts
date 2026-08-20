@@ -26,6 +26,7 @@ import {
   REMOVE_TEXT_SPACING_STEP,
   probeFocusVisible,
   probeHover,
+  probeKeyboardTrap,
   REFLOW_PROBE,
   REFLOW_ZOOM_PROBE,
   TEXT_SPACING_CSS,
@@ -43,7 +44,11 @@ export const LOCAL_ENGINE = "axe-core@playwright (local)";
 // interactions are on (`--no-interact` skips that probe). Stamped on every local
 // DynamicResult so the partial-audit advisory reflects real coverage — the Docker subset
 // lives in scan.ts (DOCKER_TESTED_SCS).
-const LOCAL_TESTED_SCS: readonly string[] = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13"];
+// 2.1.2 joined the list the day `probeKeyboardTrap` landed. It is load-bearing: this is the
+// array `renderedProvesOn` reads to decide whether an empty probe result may be read as
+// conformity, so a probe that runs without saying so here measures a criterion and then leaves
+// it « to assess » — the exact failure this file's comments describe elsewhere.
+const LOCAL_TESTED_SCS: readonly string[] = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13", "2.1.2"];
 export function localTestedScs(interact: boolean): string[] {
   return interact ? [...LOCAL_TESTED_SCS, "4.1.3"] : [...LOCAL_TESTED_SCS];
 }
@@ -694,6 +699,11 @@ async function runOnPage(
       }
     };
     const focusVisible = await ran("2.4.7", empty, () => probeFocusVisible(page));
+    // Straight after the focus walk, on the same pristine DOM and reusing the tagging it has
+    // just laid down. Before the inputs are filled and before any viewport change: a tab ring
+    // measured at 320px, or with every field carrying injected text, is not the ring a keyboard
+    // user meets.
+    const keyboardTrap = await ran("2.1.2", empty, () => probeKeyboardTrap(page));
     const hover = await ran("1.4.13", empty, () => probeHover(page));
     const l = opts.lang;
     if (opts.interact) await page.evaluate(FILL_INPUTS_STEP).catch(() => {});
@@ -738,6 +748,7 @@ async function runOnPage(
       reflow,
       focusVisible: dialogFocus.length ? [...focusVisible, ...dialogFocus] : focusVisible,
       hover,
+      keyboardTrap,
       reflowZoom,
       textSpacing,
       inputOverflowReflow,

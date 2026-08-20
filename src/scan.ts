@@ -169,6 +169,7 @@ export interface RunnerOutput {
   reflowZoom?: ProbeHit[];
   textSpacing?: ProbeHit[];
   hover?: ProbeHit[];
+  keyboardTrap?: ProbeHit[];
   // Stateful probes (local runtime, interactions ON) — a filled input clipped under each
   // stress, and content updated by a safe interaction outside any live region. Optional +
   // Docker-never-sets, exactly like the residual probes above.
@@ -301,6 +302,7 @@ const PROBE_FIELDS: { key: keyof RunnerOutput; engine: Exclude<DynamicEngine, "a
   { key: "reflowZoom", engine: "reflow-zoom" },
   { key: "textSpacing", engine: "text-spacing" },
   { key: "hover", engine: "hover" },
+  { key: "keyboardTrap", engine: "keyboard-trap" },
   { key: "inputOverflowReflow", engine: "input-overflow-reflow" },
   { key: "inputOverflowZoom", engine: "input-overflow-zoom" },
   { key: "inputOverflowSpacing", engine: "input-overflow-spacing" },

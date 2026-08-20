@@ -160,8 +160,12 @@ export function orchestrateRun(runDir: string, engineAbs: string, opts: Orchestr
   const notices: string[] = [];
 
   // Contracts: every role, every call (idempotent overwrite) — they double as the
-  // RUNBOOK's self-pass checklists, so eco mode needs them too.
-  for (const [name, content] of Object.entries(agentContracts(run, engineAbs))) {
+  // RUNBOOK's self-pass checklists, so eco mode needs them too. It gets its OWN: the fan-out
+  // contract addresses a subagent handed `ITEMS=` that RETURNS structured output, and neither
+  // exists on the sequential path — least of all in CI, where the adjudicator has no shell and
+  // writes a file. Emitting the fan-out text there and then telling an agent to obey it VERBATIM
+  // is two contradictory sets of instructions, which is what a small model breaks on.
+  for (const [name, content] of Object.entries(agentContracts(run, engineAbs, { eco: opts.eco === true }))) {
     const p = join(agentsDir, `${name}.md`);
     writeFileSync(p, content);
     written.push(p);

@@ -704,6 +704,88 @@ export const SUBJECTS: Record<string, Subject> = {
         ),
     ),
 
+  // ADDITIONAL CONTENT — the thing that appears when a component is hovered, focused or
+  // activated, and the subject RGAA 10.14 and 12.11 are entirely about.
+  //
+  // It had no harvester at all, and the two criteria were mapped onto `focusables` +
+  // `pointerHandlers` instead. On a page whose tooltip is pure CSS that harvests exactly
+  // nothing to do with the question: measured on tests/fixtures/realworld, both criteria
+  // reached a paid adjudicator carrying one anchor between them — `e.preventDefault();` from a
+  // React submit handler — and were asked whether the site's hover content is keyboard
+  // reachable. No model can answer that, and the honest verdict (`undecidable`) leaves the
+  // criterion « à évaluer » forever.
+  //
+  // So harvest the CANDIDATES, from the four shapes additional content actually takes, and let
+  // the adjudicator read the rendered page for the rest:
+  //   - an explicit `role="tooltip"`, and whatever describes a control (`aria-describedby`,
+  //     `aria-details`) — the trigger/target pair `probeHover` also keys on;
+  //   - a disclosure: `aria-expanded` on the trigger, `aria-controls` naming the panel;
+  //   - the native pair, `<details>`/`<summary>`;
+  //   - the popover API (`popover`, `popovertarget`).
+  // The TRIGGER goes in beside its target, because 12.11 asks whether the component can be
+  // reached at all and 10.14 asks whether activating it reveals the content — both questions
+  // about the trigger, neither answerable from the panel alone.
+  additionalContent: (docs) =>
+    docs.flatMap((d) => {
+      const byId = new Map<string, El>();
+      for (const e of d.elements) {
+        const id = attr(e, "id");
+        if (id && !byId.has(id)) byId.set(id, e);
+      }
+      const out: Harvested[] = [];
+      const seen = new Set<number>();
+      const push = (e: El, note: string, cls: string): void => {
+        if (seen.has(e.start)) return;
+        seen.add(e.start);
+        out.push(h(d, e, note, cls));
+      };
+      // The panels, named by what points at them.
+      for (const e of d.elements) {
+        if (attr(e, "role") === "tooltip")
+          push(e, `<${e.tag}> role="tooltip" text="${t(e, 60)}" — revealed how, and reachable with the keyboard?`, `tooltip|${t(e, 40)}`);
+        if (attr(e, "popover") !== undefined) push(e, `<${e.tag}> popover="${attr(e, "popover") ?? ""}" text="${t(e, 60)}"`, `popover|${t(e, 40)}`);
+      }
+      // The triggers, and the panel each one points at.
+      for (const e of d.elements) {
+        for (const rel of ["aria-describedby", "aria-details", "aria-controls", "popovertarget"]) {
+          const ref = (attr(e, rel) ?? "").trim().split(/\s+/)[0];
+          if (!ref) continue;
+          const target = byId.get(ref);
+          if (!target) continue;
+          // `aria-expanded` goes on the SAME line rather than into a second anchor: the element
+          // is reported once (dedup by offset), so a trigger that is both a disclosure and a
+          // describedby owner would otherwise lose whichever relation came second.
+          const expanded = attr(e, "aria-expanded");
+          push(
+            e,
+            `<${e.tag}> ${rel}="${ref}"${expanded !== undefined ? ` aria-expanded="${expanded}"` : ""} text="${t(e, 40)}" — the component whose hover/focus/activation reveals #${ref}`,
+            `trigger|${e.tag}|${rel}|${ref}`,
+          );
+          push(
+            target,
+            `<${target.tag}> #${ref} — additional content pointed at by a ${rel} on <${e.tag}>: visible on hover only, or on focus too?`,
+            `revealed|${ref}`,
+          );
+        }
+        if (attr(e, "aria-expanded") !== undefined) {
+          push(e, `<${e.tag}> aria-expanded="${attr(e, "aria-expanded") ?? ""}" text="${t(e, 40)}" — disclosure trigger`, `disclosure|${e.tag}|${t(e, 40)}`);
+        }
+      }
+      for (const e of elementsByTag(d, "details", "summary")) {
+        push(e, `<${e.tag}> text="${t(e, 60)}" — native disclosure`, `details|${e.tag}|${t(e, 40)}`);
+      }
+      // AND THE STYLESHEET RULE THAT DOES IT, which is what makes 10.14 « via les styles CSS
+      // uniquement » a question about CSS rather than about markup. A `:hover` rule with no
+      // `:focus`/`:focus-within` twin is the non-conformity itself; both together are the
+      // conformity. Neither is visible in the DOM, and the adjudicator has to be shown the rule.
+      out.push(
+        ...linesOf(d, /:(?:hover|focus|focus-within|focus-visible)\b/).map((l) =>
+          hAt(d, l.line, "css", `CSS rule keyed on a pointer/keyboard state — does the hover half have a focus twin? ${l.text}`, `cssstate|${l.text}`),
+        ),
+      );
+      return out;
+    }),
+
   // Content pinned over the page — what can obscure a focused element.
   stickies: (docs) =>
     docs.flatMap((d) => [
@@ -751,7 +833,9 @@ export const SC_SUBJECTS: Record<string, string[]> = {
   "1.4.10": ["readingOrder"],
   "1.4.11": ["colourPairs"],
   "1.4.12": ["readingOrder"],
-  "1.4.13": ["aria", "stickies"],
+  // Content on Hover or Focus. Its subject IS the additional content — `aria` and `stickies`
+  // were standing in for a harvester that did not exist yet.
+  "1.4.13": ["additionalContent", "aria", "stickies"],
   "2.1.1": ["pointerHandlers", "focusables"],
   "2.1.2": ["focusables", "pointerHandlers"],
   "2.1.4": ["shortcuts"],
@@ -851,7 +935,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "12.8": ["focusOrder"],
     "12.9": ["focusables", "pointerHandlers"],
     "12.10": ["shortcuts"],
-    "12.11": ["pointerHandlers", "focusables"],
+    "12.11": ["additionalContent", "pointerHandlers", "focusables"],
     // Theme 4 — multimedia. 4.10 (is automatically-triggered sound controllable?) maps onto
     // WCAG 1.4.2, which is `static` and therefore has no subject of its own — but the pack
     // flags 4.10 `judgment`, so judgmentGuard reopens it and it would arrive with nothing.
@@ -878,7 +962,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "10.11": ["readingOrder"],
     "10.12": ["readingOrder"],
     "10.13": ["aria", "stickies"],
-    "10.14": ["focusables", "pointerHandlers"],
+    "10.14": ["additionalContent", "focusables", "pointerHandlers"],
     // Theme 13 — consultation.
     "13.1": ["timers"],
     "13.3": ["downloadDocs"],

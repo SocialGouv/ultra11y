@@ -54,7 +54,7 @@ function fakePage(overrides: Record<string, unknown> = {}) {
 describe("runLiveProbes", () => {
   it("names the criteria it actually probed", async () => {
     const r = await runLiveProbes(fakePage());
-    expect(r.probed.sort()).toEqual(["1.4.10", "1.4.12", "1.4.13", "1.4.4", "2.4.7"]);
+    expect(r.probed.sort()).toEqual(["1.4.10", "1.4.12", "1.4.13", "1.4.4", "2.1.2", "2.4.7"]);
   });
 
   it("restores the caller's viewport after narrowing it to 320px", async () => {

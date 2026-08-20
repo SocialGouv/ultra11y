@@ -23,7 +23,13 @@ export const FIX = {
   inputInCellClip: join(FIXTURES, "dynamic", "input-in-cell-clip.html"),
   inputInCellClean: join(FIXTURES, "dynamic", "input-in-cell-clean.html"),
   loginForm: join(FIXTURES, "realworld", "LoginForm.tsx"),
-  landing: join(FIXTURES, "realworld", "landing.html"),
+  // `realworld/` grew from one page into a small SITE — a shared header (menu + search form),
+  // a footer, a sitemap page, a contact form and a stylesheet — because the criteria it is
+  // adjudicated against in CI are about an « ensemble de pages »: two navigation systems (12.1),
+  // a search engine reachable identically (12.5), CSS-only content revealed on hover AND on
+  // focus (10.14, 12.11). One page could not pose those questions, let alone answer them.
+  landing: join(FIXTURES, "realworld", "index.html"),
+  siteRoot: join(FIXTURES, "realworld"),
 };
 
 export interface CliResult {

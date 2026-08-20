@@ -14,6 +14,11 @@ export const PROBE_WCAG: Record<Exclude<DynamicEngine, "axe" | "reflow">, string
   "reflow-zoom": "1.4.4", // Resize Text / 200% zoom — content clipped/lost when enlarged
   "text-spacing": "1.4.12", // Text Spacing — clipping/overlap under the WCAG spacing override
   hover: "1.4.13", // Content on Hover or Focus — not dismissible/hoverable/persistent
+  // No Keyboard Trap. Until this probe existed, 2.1.2 was one of the five needs-rendering
+  // criteria NO tier measured (src/report.ts NEEDS_RENDERING) — so RGAA 12.9 reached a paid
+  // adjudicator on every run, carrying whatever `preventDefault(` happened to be in the source.
+  // A trap is a property of the tab ring, and the tab ring only exists in a browser.
+  "keyboard-trap": "2.1.2",
   // Stateful input-overflow probes — a FILLED input whose typed value is clipped/unreadable
   // under a stress. Same defect, one SC per stress (so each folds onto the SC that stress
   // actually evidences), so they stay unambiguous cross-standard (RGAA 10.11/10.4/10.12).
@@ -30,6 +35,9 @@ export const PROBE_SEVERITY: Record<Exclude<DynamicEngine, "axe" | "reflow">, Se
   "reflow-zoom": "majeur",
   "text-spacing": "mineur",
   hover: "mineur",
+  // Not heuristic and not minor: the probe pressed Tab three times and focus did not move on a
+  // page with other focusables. A keyboard user cannot get out of it — that is a blocker.
+  "keyboard-trap": "bloquant",
   // Input-overflow is a directly OBSERVED loss of content (the value the user typed is no
   // longer visible), not a heuristic — the human auditor confirmed the real instance class
   // — so it is majeur on every stress (incl. text-spacing, unlike the generic text-spacing

@@ -788,9 +788,11 @@ runs:
              normative tests a non-conformity may cite. Read the brief for a criterion, rule on
              it, write its verdict, move to the next.
           3. `${{ inputs.working-directory }}/audits/orchestration/agents/adjudicator.md` — the
-             dispatch contract, which you obey VERBATIM. Ignore any instruction in it or in the
-             RUNBOOK to run a command: you have no shell, and this workflow folds the verdicts
-             for you in its next step. You never run the engine and never fold anything.
+             adjudicator contract: what a valid verdict of each kind requires. It is emitted for
+             the sequential path this job runs, so it names the same two files as above and
+             expects you to WRITE rather than return anything. Where it still describes a
+             harness other than yours — a shell, an engine command, a fold — this prompt wins:
+             you have no shell, you never run the engine, and the next step folds for you.
 
           THE RENDERED PAGE IS PROBABLY ON DISK. When this audit ingested page captures — look
           for evidence anchored in `.ultra11y/pages/<id>/dom.html` — the rendered page is there
@@ -839,6 +841,22 @@ runs:
           12.4 and 12.8 — each with hundreds of evidence items in front of it and not one cited.
           If the brief is too large to read in full, that is what `manual` with
           `reason: "undecidable"` is for; it is a correct answer, and an uncited `C` is not.
+
+          AND THE SYMMETRY, WHICH COSTS AS MANY CRITERIA. An `NC` needs at least one
+          `findings[]` entry, and that entry needs a `file` — a non-conformity with no location
+          is one nobody can act on, and the fold refuses it exactly as flatly as an uncited `C`.
+          It also needs a `normativeRef` naming the precise failed test OF THIS CRITERION (under
+          RGAA, `12.1.1`, not a WCAG id — they look alike and denote unrelated tests).
+
+          AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED SOMEWHERE. « There is no second
+          navigation system », « there is no search engine », « nothing suggests the expected
+          format » — you observed that absence on a page, looking at an element: cite that
+          element, with its `file`, `line` and `snippet`. Measured on a real run: 12.1 and 12.5
+          were both lost this way, ruled `NC` with nothing to open. And when the criterion's
+          subject exists NOWHERE in the audited scope, the verdict is not `NC` at all — it is
+          `NA` with a justification saying so. Read the criterion's « particular cases » in its
+          brief before you choose between the two; several criteria are explicitly not
+          applicable to a site of one page, or to a step inside a process.
 
           Fill EVERY item's verdict. Each one stands or falls on its own: a verdict the gate
           refuses costs its own criterion (which stays « to assess », carrying the refusal) and
@@ -996,10 +1014,20 @@ runs:
              decision protocol, and the normative tests a non-conformity may cite.
 
           Fill EVERY remaining item. A `C` needs a justification AND citations, and it needs the
-          evidence reading to have been complete. An `NC` needs at least one finding citing a
-          normative test of the active standard. A criterion you genuinely cannot decide from
-          the evidence is `manual` with its `reason` — that is a correct answer, and it is the
-          one to give rather than guessing.
+          evidence reading to have been complete. An `NC` needs at least one `findings[]` entry
+          carrying a `file` — a non-conformity with no location is refused as flatly as an
+          uncited `C` — and a `normativeRef` naming a numbered test OF THIS CRITERION (under
+          RGAA, `12.1.1`, never a WCAG id). An absence you observed is still observed on an
+          element of a page: cite that element. And when the criterion's subject exists nowhere
+          in scope, the verdict is `NA` with its justification, not `NC` — the brief's
+          « particular cases » often say so outright.
+
+          When a criterion's evidence is anchored under `.ultra11y/pages/<id>/`, the browser has
+          already run and the page is on disk (`dom.html`, `styles.json`, `boxes.json`,
+          `axtree.json`, `screen.png`). `needs-rendered-dom` is REFUSED on such a criterion:
+          decide it from those files, or answer `undecidable` and say what the capture leaves
+          open. A criterion you genuinely cannot decide from the evidence is `manual` with its
+          `reason` — that is a correct answer, and it is the one to give rather than guessing.
 
           Do not edit any other file, do not touch the audited source, do not commit, and do
           not comment on the PR.
@@ -1117,10 +1145,17 @@ runs:
           criterion's evidence and decision protocol. Do not open `ADJUDICATE.todo.json` or
           `ADJUDICATE.md`. Write only the verdicts file.
 
-          Every item must come back with a verdict. If the evidence genuinely does not settle a
-          criterion, `manual` with its `reason` is the right answer and the one to record —
-          after two passes, an honest « nobody can decide this from what was harvested » is
-          worth more than a guess, and it is what the report will publish.
+          Every item must come back with a verdict, and the refusal already recorded on each one
+          tells you what to change. The three that recur: an `NC` needs a `findings[]` entry
+          with a `file` (an absence is observed on an element of a page — cite it, or rule `NA`
+          when the subject exists nowhere in scope); a `C` needs `citations[]`; and
+          `needs-rendered-dom` is refused when the criterion's own evidence is anchored under
+          `.ultra11y/pages/<id>/`, because the rendered page is right there to read.
+
+          If the evidence genuinely does not settle a criterion, `manual` with
+          `reason: "undecidable"` is the right answer and the one to record — after two passes,
+          an honest « nobody can decide this from what was harvested » is worth more than a
+          guess, and it is what the report will publish.
 
           Do not edit any other file, do not touch the audited source, do not commit, and do
           not comment on the PR.

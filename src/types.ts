@@ -653,6 +653,7 @@ export type DynamicEngine =
   | "reflow-zoom"
   | "text-spacing"
   | "hover"
+  | "keyboard-trap"
   | "input-overflow-reflow"
   | "input-overflow-zoom"
   | "input-overflow-spacing"

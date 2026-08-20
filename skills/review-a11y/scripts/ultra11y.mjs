@@ -39175,6 +39175,11 @@ var PROBE_WCAG = {
   // Text Spacing — clipping/overlap under the WCAG spacing override
   hover: "1.4.13",
   // Content on Hover or Focus — not dismissible/hoverable/persistent
+  // No Keyboard Trap. Until this probe existed, 2.1.2 was one of the five needs-rendering
+  // criteria NO tier measured (src/report.ts NEEDS_RENDERING) — so RGAA 12.9 reached a paid
+  // adjudicator on every run, carrying whatever `preventDefault(` happened to be in the source.
+  // A trap is a property of the tab ring, and the tab ring only exists in a browser.
+  "keyboard-trap": "2.1.2",
   // Stateful input-overflow probes — a FILLED input whose typed value is clipped/unreadable
   // under a stress. Same defect, one SC per stress (so each folds onto the SC that stress
   // actually evidences), so they stay unambiguous cross-standard (RGAA 10.11/10.4/10.12).
@@ -39192,6 +39197,9 @@ var PROBE_SEVERITY = {
   "reflow-zoom": "majeur",
   "text-spacing": "mineur",
   hover: "mineur",
+  // Not heuristic and not minor: the probe pressed Tab three times and focus did not move on a
+  // page with other focusables. A keyboard user cannot get out of it — that is a blocker.
+  "keyboard-trap": "bloquant",
   // Input-overflow is a directly OBSERVED loss of content (the value the user typed is no
   // longer visible), not a heuristic — the human auditor confirmed the real instance class
   // — so it is majeur on every stress (incl. text-spacing, unlike the generic text-spacing
@@ -39876,6 +39884,77 @@ var SUBJECTS = {
       )
     )
   ),
+  // ADDITIONAL CONTENT — the thing that appears when a component is hovered, focused or
+  // activated, and the subject RGAA 10.14 and 12.11 are entirely about.
+  //
+  // It had no harvester at all, and the two criteria were mapped onto `focusables` +
+  // `pointerHandlers` instead. On a page whose tooltip is pure CSS that harvests exactly
+  // nothing to do with the question: measured on tests/fixtures/realworld, both criteria
+  // reached a paid adjudicator carrying one anchor between them — `e.preventDefault();` from a
+  // React submit handler — and were asked whether the site's hover content is keyboard
+  // reachable. No model can answer that, and the honest verdict (`undecidable`) leaves the
+  // criterion « à évaluer » forever.
+  //
+  // So harvest the CANDIDATES, from the four shapes additional content actually takes, and let
+  // the adjudicator read the rendered page for the rest:
+  //   - an explicit `role="tooltip"`, and whatever describes a control (`aria-describedby`,
+  //     `aria-details`) — the trigger/target pair `probeHover` also keys on;
+  //   - a disclosure: `aria-expanded` on the trigger, `aria-controls` naming the panel;
+  //   - the native pair, `<details>`/`<summary>`;
+  //   - the popover API (`popover`, `popovertarget`).
+  // The TRIGGER goes in beside its target, because 12.11 asks whether the component can be
+  // reached at all and 10.14 asks whether activating it reveals the content — both questions
+  // about the trigger, neither answerable from the panel alone.
+  additionalContent: (docs) => docs.flatMap((d) => {
+    const byId2 = /* @__PURE__ */ new Map();
+    for (const e of d.elements) {
+      const id = attr(e, "id");
+      if (id && !byId2.has(id)) byId2.set(id, e);
+    }
+    const out2 = [];
+    const seen = /* @__PURE__ */ new Set();
+    const push = (e, note, cls) => {
+      if (seen.has(e.start)) return;
+      seen.add(e.start);
+      out2.push(h(d, e, note, cls));
+    };
+    for (const e of d.elements) {
+      if (attr(e, "role") === "tooltip")
+        push(e, `<${e.tag}> role="tooltip" text="${t(e, 60)}" \u2014 revealed how, and reachable with the keyboard?`, `tooltip|${t(e, 40)}`);
+      if (attr(e, "popover") !== void 0) push(e, `<${e.tag}> popover="${attr(e, "popover") ?? ""}" text="${t(e, 60)}"`, `popover|${t(e, 40)}`);
+    }
+    for (const e of d.elements) {
+      for (const rel2 of ["aria-describedby", "aria-details", "aria-controls", "popovertarget"]) {
+        const ref = (attr(e, rel2) ?? "").trim().split(/\s+/)[0];
+        if (!ref) continue;
+        const target = byId2.get(ref);
+        if (!target) continue;
+        const expanded = attr(e, "aria-expanded");
+        push(
+          e,
+          `<${e.tag}> ${rel2}="${ref}"${expanded !== void 0 ? ` aria-expanded="${expanded}"` : ""} text="${t(e, 40)}" \u2014 the component whose hover/focus/activation reveals #${ref}`,
+          `trigger|${e.tag}|${rel2}|${ref}`
+        );
+        push(
+          target,
+          `<${target.tag}> #${ref} \u2014 additional content pointed at by a ${rel2} on <${e.tag}>: visible on hover only, or on focus too?`,
+          `revealed|${ref}`
+        );
+      }
+      if (attr(e, "aria-expanded") !== void 0) {
+        push(e, `<${e.tag}> aria-expanded="${attr(e, "aria-expanded") ?? ""}" text="${t(e, 40)}" \u2014 disclosure trigger`, `disclosure|${e.tag}|${t(e, 40)}`);
+      }
+    }
+    for (const e of elementsByTag(d, "details", "summary")) {
+      push(e, `<${e.tag}> text="${t(e, 60)}" \u2014 native disclosure`, `details|${e.tag}|${t(e, 40)}`);
+    }
+    out2.push(
+      ...linesOf(d, /:(?:hover|focus|focus-within|focus-visible)\b/).map(
+        (l) => hAt(d, l.line, "css", `CSS rule keyed on a pointer/keyboard state \u2014 does the hover half have a focus twin? ${l.text}`, `cssstate|${l.text}`)
+      )
+    );
+    return out2;
+  }),
   // Content pinned over the page — what can obscure a focused element.
   stickies: (docs) => docs.flatMap((d) => [
     ...d.elements.filter((e) => /position\s*:\s*(?:fixed|sticky)/.test(attr(e, "style") ?? "")).map((e) => h(d, e, `pinned element (inline): ${(attr(e, "style") ?? "").slice(0, 60)} \u2014 can it cover a focused element?`, `sticky|${selectorFor(e)}`)),
@@ -39909,7 +39988,9 @@ var SC_SUBJECTS = {
   "1.4.10": ["readingOrder"],
   "1.4.11": ["colourPairs"],
   "1.4.12": ["readingOrder"],
-  "1.4.13": ["aria", "stickies"],
+  // Content on Hover or Focus. Its subject IS the additional content — `aria` and `stickies`
+  // were standing in for a harvester that did not exist yet.
+  "1.4.13": ["additionalContent", "aria", "stickies"],
   "2.1.1": ["pointerHandlers", "focusables"],
   "2.1.2": ["focusables", "pointerHandlers"],
   "2.1.4": ["shortcuts"],
@@ -40002,7 +40083,7 @@ var PACK_SUBJECTS = {
     "12.8": ["focusOrder"],
     "12.9": ["focusables", "pointerHandlers"],
     "12.10": ["shortcuts"],
-    "12.11": ["pointerHandlers", "focusables"],
+    "12.11": ["additionalContent", "pointerHandlers", "focusables"],
     // Theme 4 — multimedia. 4.10 (is automatically-triggered sound controllable?) maps onto
     // WCAG 1.4.2, which is `static` and therefore has no subject of its own — but the pack
     // flags 4.10 `judgment`, so judgmentGuard reopens it and it would arrive with nothing.
@@ -40029,7 +40110,7 @@ var PACK_SUBJECTS = {
     "10.11": ["readingOrder"],
     "10.12": ["readingOrder"],
     "10.13": ["aria", "stickies"],
-    "10.14": ["focusables", "pointerHandlers"],
+    "10.14": ["additionalContent", "focusables", "pointerHandlers"],
     // Theme 13 — consultation.
     "13.1": ["timers"],
     "13.3": ["downloadDocs"],
@@ -48486,7 +48567,7 @@ var RESIDUAL_TRAIL = {
   // Rendering criteria no automated tier measures — say so, rather than pointing at `scan` and
   // letting the reader discover it changes nothing.
   "1.4.5": "No automated tier decides this: whether text is presented as an image is a reading of each image's content. Adjudicate it (`verify --manual`) against the images the audit lists.",
-  "2.1.2": "No automated tier decides this: escaping a keyboard trap has to be attempted by hand, on each focusable region.",
+  "2.1.2": "Needs a live browser: the tab ring is walked and every focusable is checked for one Tab cannot move off \u2014 `scan <url> --runtime local --merge <audit.json>`. A region only a pointer can open (a custom widget behind a click) still has to be attempted by hand.",
   "2.3.1": "No automated tier decides this: flashing has to be observed over time on the rendered page.",
   "2.4.11": "No automated tier decides this: whether a focused element stays unobscured depends on the sticky headers and overlays in play on each screen."
 };
@@ -55074,6 +55155,7 @@ var NEEDS_RENDERING = [
   { sc: "1.4.11", label: { fr: "contraste des composants", en: "non-text contrast" } },
   { sc: "1.4.12", label: { fr: "espacement du texte", en: "text spacing" } },
   { sc: "1.4.13", label: { fr: "contenu au survol", en: "content on hover" } },
+  { sc: "2.1.2", label: { fr: "pi\xE8ge au clavier", en: "keyboard trap" } },
   { sc: "2.4.7", label: { fr: "visibilit\xE9 du focus", en: "focus visibility" } },
   { sc: "4.1.3", label: { fr: "r\xE9gions live", en: "live regions" } }
 ];
@@ -58285,12 +58367,16 @@ function applyAdjudication(audit2, adj, opts = {}) {
         }
       }
     } else if (v === "NC") {
-      if (!it.findings || it.findings.length === 0) blame(it.criteriaId, `criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding`);
+      if (!it.findings || it.findings.length === 0)
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding \u2014 { file, line, message, snippet, normativeRef } pointing at a real anchor from this criterion's own evidence`
+        );
       for (const f of it.findings ?? []) {
         if (typeof f.file !== "string" || !f.file.trim()) {
           blame(
             it.criteriaId,
-            `criterion ${it.criteriaId}: an NC finding must name the file it was observed in \u2014 nobody can act on a non-conformity with no location`
+            `criterion ${it.criteriaId}: an NC finding must name the file it was observed in \u2014 nobody can act on a non-conformity with no location. An absence is still observed somewhere: cite the element and the page you observed it on, with the file, line and snippet copied from this criterion's own evidence. If the subject exists nowhere in scope, the verdict is NA with a justification, not NC.`
           );
           continue;
         }
@@ -58317,7 +58403,10 @@ function applyAdjudication(audit2, adj, opts = {}) {
     }
     for (const rec of it.recommendations ?? []) {
       if (typeof rec.file !== "string" || !rec.file.trim()) {
-        blame(it.criteriaId, `criterion ${it.criteriaId}: a recommendation must name the file it was observed in`);
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: a recommendation must name the file it was observed in \u2014 copy a file and line from this criterion's own evidence, or drop the recommendation`
+        );
         continue;
       }
       toGround(it.criteriaId, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
@@ -58508,6 +58597,8 @@ var T2 = {
     snippetLabel: "`snippet` \xE0 copier dans la citation",
     renderedAvailable: "**RENDU DISPONIBLE.** Cet audit a ing\xE9r\xE9 des captures de page : le rendu de la page est sur le disque, sous `.ultra11y/pages/<id>/` \u2014 `dom.html` (le DOM s\xE9rialis\xE9 par le navigateur), `styles.json` (les styles calcul\xE9s), `boxes.json` (les bo\xEEtes et positions), `axtree.json` (l'arbre d'accessibilit\xE9) et `screen.png`. Un crit\xE8re \xAB \xE0 restituer \xBB \u2014 information par la couleur, op\xE9rabilit\xE9 clavier d'un script, geste au pointeur \u2014 se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. `needs-rendered-dom` reste la bonne r\xE9ponse pour un crit\xE8re dont aucune capture ne porte le sujet, et pour lui seul.",
     nothingRendered: (ids) => `**AUCUN RENDU DANS CETTE PORT\xC9E.** ${ids.length} crit\xE8re(s) exigent une page rendue, et aucune page n'a \xE9t\xE9 instantan\xE9e ici : personne ne peut les trancher depuis la source, et \`needs-rendered-dom\` est pour eux la seule r\xE9ponse honn\xEAte. Rendez AVANT d'adjuger \u2014 \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) \u2014 puis reconstruisez cette liste : la mesure en ferme la plupart sans mod\xE8le, donc sans facture. Concern\xE9s : ${ids.map((id) => `\`${id}\``).join(" \xB7 ")}`,
+    briefContract: "> **CONTRAT DE VERDICT** \u2014 le pli est FERM\xC9 : un verdict auquel il manque son champ obligatoire est refus\xE9, et son crit\xE8re retourne \xAB \xE0 \xE9valuer \xBB en portant le refus. Renseignez le verdict de CE crit\xE8re, ici :",
+    absenceRule: "> **UNE NC EN FORME D'ABSENCE S'ANCRE QUAND M\xCAME.** \xAB Il n'y a pas de second syst\xE8me de navigation \xBB, \xAB il n'y a pas de moteur de recherche \xBB, \xAB aucun message d'erreur ne sugg\xE8re le format attendu \xBB : une absence se CONSTATE quelque part. Citez l'\xE9l\xE9ment et la page o\xF9 vous l'avez constat\xE9e \u2014 le `<nav>`, le `<header>`, le formulaire \u2014 avec son `file`, sa `line` et son `snippet`. Une NC sans `file` est refus\xE9e aussi s\xFBrement qu'un `C` sans citations. Et si le sujet du crit\xE8re n'existe nulle part dans le p\xE9rim\xE8tre audit\xE9, le verdict n'est pas `NC` : c'est `NA`, avec sa justification.",
     incomplete: "LECTURE INCOMPL\xC8TE \u2014 un \xAB C \xBB sera refus\xE9 sur ce crit\xE8re",
     none: "(aucune \xE9vidence automatique \u2014 d\xE9cidez depuis la source, ou laissez `manual` avec une raison)",
     questions: "\xC0 v\xE9rifier manuellement",
@@ -58540,6 +58631,8 @@ var T2 = {
     snippetLabel: "`snippet` to copy into the citation",
     renderedAvailable: "**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under `.ultra11y/pages/<id>/` \u2014 `dom.html` (the DOM the browser serialized), `styles.json` (computed styles), `boxes.json` (boxes and positions), `axtree.json` (the accessibility tree) and `screen.png`. A needs-rendering criterion \u2014 information by colour, keyboard operability of a script, a pointer gesture \u2014 is decided FROM THOSE FILES: read them as you would read the source. `needs-rendered-dom` stays the right answer for a criterion no capture carries the subject of, and for that alone.",
     nothingRendered: (ids) => `**NOTHING WAS RENDERED IN THIS SCOPE.** ${ids.length} criteria need a rendered page, and no page was snapshotted here: nobody can settle them from source, and \`needs-rendered-dom\` is the only honest answer for them. Render BEFORE adjudicating \u2014 \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) \u2014 then rebuild this worklist: the measurement closes most of them with no model in the loop, and so with no bill. Affected: ${ids.map((id) => `\`${id}\``).join(" \xB7 ")}`,
+    briefContract: "> **VERDICT CONTRACT** \u2014 the fold is FAIL-CLOSED: a verdict missing its required field is refused, and its criterion goes back to \xAB to assess \xBB carrying the refusal. Record THIS criterion's verdict, here:",
+    absenceRule: "> **AN NC SHAPED LIKE AN ABSENCE STILL HAS TO BE ANCHORED.** \xAB There is no second navigation system \xBB, \xAB there is no search engine \xBB, \xAB no error message suggests the expected format \xBB: an absence is OBSERVED somewhere. Cite the element and the page you observed it on \u2014 the `<nav>`, the `<header>`, the form \u2014 with its `file`, `line` and `snippet`. An NC with no `file` is refused exactly as surely as a `C` with no citations. And when the criterion's subject exists nowhere in the audited scope, the verdict is not `NC`: it is `NA`, with its justification.",
     incomplete: "INCOMPLETE READING \u2014 a C will be refused on this criterion",
     none: "(no automatic evidence \u2014 decide from source, or leave `manual` with a reason)",
     questions: "To verify manually",
@@ -58584,14 +58677,14 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   const s = T2[lang];
   const { showAlsoAt: shown } = adjudicationLimits(opts.cwd);
   const pack = isCore(standard) ? void 0 : loadPack(standard);
-  const out2 = opts.preamble === false ? [] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.then, ""];
-  if (opts.preamble !== false && items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
+  const out2 = opts.preamble === false ? [s.briefContract, "", ...s.verdicts, "", s.rule, "", s.absenceRule, ""] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", s.then, ""];
+  if (items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
     out2.push(`> ${s.renderedAvailable}`, "");
   }
-  if (opts.preamble !== false && opts.unrendered?.length) {
+  if (opts.unrendered?.length) {
     out2.push(`> ${s.nothingRendered(opts.unrendered)}`, "");
   }
-  if (pack && opts.preamble !== false) out2.push(`> ${s.packIntro(pack.name)}`, "");
+  if (pack) out2.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
     out2.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` \u2014 ${it.title}` : ""}  _(${it.automatability})_`);
     const pop = it.population;
@@ -58669,8 +58762,13 @@ function writeAdjudication(items, outDir, opts) {
   writeFileSync10(verdictsPath, JSON.stringify({ ...file, items: slimAdjudicationItems(items) }, null, 2) + "\n");
   const itemsDir = join35(outDir, "adjudicate");
   mkdirSync9(itemsDir, { recursive: true });
+  const unrendered = new Set(opts.unrendered ?? []);
   for (const it of items) {
-    writeFileSync10(join35(itemsDir, `${it.criteriaId}.md`), formatAdjudication([it], opts.lang ?? "en", opts.standard, { preamble: false }));
+    const mine = unrendered.has(it.criteriaId) ? [it.criteriaId] : [];
+    writeFileSync10(
+      join35(itemsDir, `${it.criteriaId}.md`),
+      formatAdjudication([it], opts.lang ?? "en", opts.standard, { preamble: false, ...mine.length ? { unrendered: mine } : {} })
+    );
   }
   return { todoPath, mdPath, verdictsPath, itemsDir, count: items.length };
 }
@@ -59442,6 +59540,7 @@ var PROBE_FIELDS = [
   { key: "reflowZoom", engine: "reflow-zoom" },
   { key: "textSpacing", engine: "text-spacing" },
   { key: "hover", engine: "hover" },
+  { key: "keyboardTrap", engine: "keyboard-trap" },
   { key: "inputOverflowReflow", engine: "input-overflow-reflow" },
   { key: "inputOverflowZoom", engine: "input-overflow-zoom" },
   { key: "inputOverflowSpacing", engine: "input-overflow-spacing" },
@@ -59970,6 +60069,49 @@ async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, dead
   }
   return hits;
 }
+var FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
+  const e = document.activeElement;
+  if (!e || e === document.body || e === document.documentElement) return null;
+  const key = e.getAttribute && e.getAttribute('data-u11y-f');
+  return { key: key || __sel(e), selector: __sel(e), html: __html(e) };
+})()`;
+async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
+  const count = await page.evaluate(focusSetupExpr("", limits.maxFocusables));
+  if (!count || count < 2) return [];
+  const hits = [];
+  const seen = /* @__PURE__ */ new Set();
+  const confirmPresses = 2;
+  const limit = Math.min(count + 2, limits.maxFocusables + 10);
+  let prev = null;
+  for (let i2 = 0; i2 < limit; i2++) {
+    if (deadline?.out()) break;
+    await page.keyboard.press("Tab");
+    const now = await page.evaluate(FOCUS_WHERE_PROBE);
+    if (!now) break;
+    if (prev && now.key === prev.key) {
+      let stuck = true;
+      for (let k = 0; k < confirmPresses && stuck; k++) {
+        if (deadline?.out()) break;
+        await page.keyboard.press("Tab");
+        const again = await page.evaluate(FOCUS_WHERE_PROBE);
+        stuck = again !== null && again.key === now.key;
+      }
+      if (stuck) {
+        hits.push({
+          selector: now.selector,
+          html: now.html,
+          detail: `Le focus reste sur cet \xE9l\xE9ment apr\xE8s ${1 + confirmPresses} appuis sur Tab, alors que la page compte ${count} \xE9l\xE9ments focalisables \u2014 pi\xE8ge au clavier (2.1.2).`
+        });
+        break;
+      }
+    }
+    if (seen.has(now.key)) break;
+    seen.add(now.key);
+    prev = now;
+    if (hits.length >= 4) break;
+  }
+  return hits;
+}
 async function probeHover(page, limits = PROBE_DEFAULTS, deadline) {
   const triggers = await page.evaluate(HOVER_SETUP_PROBE);
   const hits = [];
@@ -60002,7 +60144,7 @@ async function probeHover(page, limits = PROBE_DEFAULTS, deadline) {
 
 // src/scan-local.ts
 var LOCAL_ENGINE = "axe-core@playwright (local)";
-var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13"];
+var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13", "2.1.2"];
 function localTestedScs(interact) {
   return interact ? [...LOCAL_TESTED_SCS, "4.1.3"] : [...LOCAL_TESTED_SCS];
 }
@@ -60410,6 +60552,7 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
       }
     };
     const focusVisible = await ran("2.4.7", empty, () => probeFocusVisible(page));
+    const keyboardTrap = await ran("2.1.2", empty, () => probeKeyboardTrap(page));
     const hover = await ran("1.4.13", empty, () => probeHover(page));
     const l = opts.lang;
     if (opts.interact) await page.evaluate(FILL_INPUTS_STEP).catch(() => {
@@ -60440,6 +60583,7 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
       reflow,
       focusVisible: dialogFocus.length ? [...focusVisible, ...dialogFocus] : focusVisible,
       hover,
+      keyboardTrap,
       reflowZoom,
       textSpacing,
       inputOverflowReflow,
@@ -64355,8 +64499,60 @@ function phaseWorkflowScript(ph, runAbs, engineAbs, batchSize) {
     ``
   ].join("\n");
 }
-function agentContracts(runAbs, engineAbs) {
+var VERDICT_RULES = `2. Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold, and its criterion goes back to \xAB to assess \xBB carrying the refusal):
+   - \`C\` (conforming) \u2014 REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this criterion's own evidence; an anchor that is not in that list is treated as fabricated). A criterion presented with NO evidence at all cannot be \`C\` \u2014 it is \`manual\` (\`undecidable\`), or \`NA\` if nothing in scope is concerned.
+   - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected, and so is a finding with no \`file\` at all. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the criterion's OWN numbered tests, listed in its brief under \xAB tests to rule on \xBB. A WCAG id looks alike, denotes an unrelated test, and is rejected.
+   - \`NA\` (not applicable) \u2014 REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
+   - \`manual\` (still undecidable) \u2014 REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide it, and no capture in this run carries its subject) or \`undecidable\` (the evidence cannot settle it either way).
+3. AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. \xAB No second navigation system \xBB, \xAB no search engine \xBB, \xAB no error message suggests the expected format \xBB \u2014 an absence is OBSERVED somewhere: cite the element and the page you observed it on. And when the criterion's subject exists nowhere in the audited scope, the verdict is \`NA\` with its justification, never \`NC\`.
+4. THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidence is anchored under \`.ultra11y/pages/<id>/\`, the browser already ran: \`dom.html\`, \`styles.json\`, \`boxes.json\`, \`axtree.json\` and \`screen.png\` are there to read. \`needs-rendered-dom\` is refused on such a criterion \u2014 decide it from those files, or answer \`undecidable\` and say what the capture does not settle.
+5. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with its reason \u2014 that is a valid, honest verdict, and it is worth more than a verdict the gate throws away.`;
+function ecoAdjudicatorContract(runAbs) {
+  return `# Contract: adjudicator (sequential / --eco)
+
+You adjudicate the residual judgment criteria of an ultra11y audit \u2014 the ones the deterministic engine could not decide (alt-text relevance, link purpose in context, reading order\u2026). The ACTIVE STANDARD is recorded in the worklist's \`standard\` field: under a country standard (e.g. \`rgaa\`) the items are that standard's OWN criteria, each carrying its numbered tests \u2014 not WCAG success criteria.
+
+There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one at a time, in order.
+
+## Which files \u2014 your prompt decides, and it wins over this document
+
+- **With a shell.** Read \`${join47(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join47(runAbs, "ADJUDICATE.todo.json")} --in ${join47(runAbs, "audit-latest.json")} --out ${runAbs}\`.
+- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join47(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join47(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
+
+## For EACH criterion
+
+1. Read its brief. \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) \u2014 open the cited files at the cited lines whenever the snippet alone cannot decide. Copy the \`snippet\` from the brief rather than retyping it.
+${VERDICT_RULES}
+
+Every item comes back with a verdict. Each one stands or falls on its own: a refusal costs THAT criterion and leaves every other verdict standing \u2014 so work through the list steadily, and never guess to fill a gap.
+
+Do not edit any other file, do not touch the audited source, do not commit, and do not comment on any pull request.
+`;
+}
+function ecoRefuterContract(runAbs) {
+  return `# Contract: refuter (sequential / --eco)
+
+You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
+
+There is no fan-out here and no ITEMS selection: you handle EVERY entry of \`${join47(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`), one at a time, writing your verdict into that same file.
+
+For EACH entry:
+
+1. Open \`file\` at \`line\` and read the cited element (\`selector\`) in its real context.
+2. Judge the claim against the source:
+   - \`supported\` \u2014 the cited code violates the criterion exactly as claimed.
+   - \`partial\` \u2014 a real issue, but the claim overstates it (wrong element, wrong scope, exaggerated count).
+   - \`unsupported\` \u2014 the source does not establish the claim.
+   - \`refuted\` \u2014 the source contradicts the claim.
+   When unsure, choose the HARSHER verdict \u2014 a false pass is worse than a false fail.
+3. \`note\` is REQUIRED \u2014 one line grounded in what you read (quote or paraphrase the decisive code).
+
+Then fold: \`ultra11y verify --apply ${join47(runAbs, "VERIFY.todo.json")} --report <the report .md>\`. Without a shell, leave the fold to whoever gave you the file.
+`;
+}
+function agentContracts(runAbs, engineAbs, opts = {}) {
   const footer = ONE_WRITER_FOOTER.replaceAll("<RUN>", runAbs);
+  if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs) };
   return {
     adjudicator: `# Contract: adjudicator
 
@@ -64536,7 +64732,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
   mkdirSync17(agentsDir, { recursive: true });
   const written = [];
   const notices = [];
-  for (const [name2, content] of Object.entries(agentContracts(run2, engineAbs))) {
+  for (const [name2, content] of Object.entries(agentContracts(run2, engineAbs, { eco: opts.eco === true }))) {
     const p = join48(agentsDir, `${name2}.md`);
     writeFileSync19(p, content);
     written.push(p);

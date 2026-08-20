@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contact et compte — Orbit, hébergement statique</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+    <header>
+      <nav aria-label="Navigation principale">
+        <ul>
+          <li><a href="/">Accueil</a></li>
+          <li><a href="/tarifs.html">Tarifs</a></li>
+          <li><a href="/contact.html" aria-current="page">Contact</a></li>
+        </ul>
+      </nav>
+      <form action="/recherche" method="get" role="search">
+        <label for="recherche">Rechercher sur le site</label>
+        <input id="recherche" name="recherche" type="search" />
+        <button type="submit">Rechercher</button>
+      </form>
+    </header>
+
+    <main id="contenu">
+      <h1>Contact et gestion du compte</h1>
+
+      <!-- RGAA 11.11 : chaque champ contrôlé annonce le TYPE et le FORMAT attendus, et donne un
+           EXEMPLE de valeur — les deux tests du critère, l'un et l'autre. `pattern` + `title`
+           font le contrôle côté navigateur ; `aria-describedby` porte la suggestion là où un
+           lecteur d'écran l'annonce avec le champ. -->
+      <h2>Nous écrire</h2>
+      <form action="/contact" method="post">
+        <p>
+          <label for="courriel">Adresse e-mail</label>
+          <input
+            id="courriel"
+            name="courriel"
+            type="email"
+            autocomplete="email"
+            aria-describedby="courriel-aide"
+            required
+          />
+          <span id="courriel-aide" class="aide">
+            Format attendu : une adresse e-mail complète, avec l’arobase et le domaine.
+            Exemple : prenom.nom@exemple.fr.
+          </span>
+        </p>
+
+        <p>
+          <label for="telephone">Numéro de téléphone</label>
+          <input
+            id="telephone"
+            name="telephone"
+            type="tel"
+            autocomplete="tel"
+            pattern="0[1-9][0-9]{8}"
+            title="Dix chiffres, sans espace ni indicatif international"
+            aria-describedby="telephone-aide"
+          />
+          <span id="telephone-aide" class="aide">
+            Format attendu : dix chiffres, sans espace ni indicatif. Exemple : 0142685900.
+          </span>
+        </p>
+
+        <p>
+          <label for="message">Votre message</label>
+          <textarea id="message" name="message" rows="5" aria-describedby="message-aide" required></textarea>
+          <span id="message-aide" class="aide">
+            Vingt caractères au moins. Exemple : « Bonjour, je souhaite migrer trois sites. »
+          </span>
+        </p>
+
+        <button type="submit">Envoyer le message</button>
+      </form>
+
+      <!-- RGAA 11.12 : un formulaire qui SUPPRIME des données. Sa validation n'est pas
+           définitive — elle ouvre une étape de vérification où la demande est relue, corrigée
+           ou annulée, et le délai de rétractation la rend récupérable après coup. C'est le
+           test 11.12.1, et il se tranche sur ce texte-ci. -->
+      <h2>Supprimer votre compte</h2>
+      <form action="/compte/suppression" method="post">
+        <p>
+          La suppression efface vos sites et vos sauvegardes. Le bouton ci-dessous n’efface
+          rien : il ouvre une page de vérification où votre demande est affichée en entier,
+          modifiable et annulable. Après validation, le compte reste récupérable pendant
+          trente jours depuis un lien envoyé par e-mail.
+        </p>
+        <p>
+          <label for="motif">Motif de la suppression (facultatif)</label>
+          <textarea id="motif" name="motif" rows="3"></textarea>
+        </p>
+        <button type="submit">Vérifier ma demande de suppression</button>
+      </form>
+    </main>
+
+    <footer>
+      <nav aria-label="Navigation de pied de page">
+        <ul>
+          <li><a href="/plan.html">Plan du site</a></li>
+          <li><a href="/mentions-legales.html">Mentions légales</a></li>
+        </ul>
+      </nav>
+      <p>© 2026 Orbit.</p>
+    </footer>
+  </body>
+</html>

@@ -62,7 +62,10 @@ describe("a live probe is the other way a criterion gets measured", () => {
   // Zoom, reflow, text spacing, hover and focus visibility are properties of a page being
   // ACTED ON. No digest settles them, so before the probes they could only ever stay « to
   // assess » — on egapro, that was most of theme 10, run after run.
-  const probed = { probed: ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.4.7"] };
+  // The full local-tier list — `src/scan-local.ts` LOCAL_TESTED_SCS. 2.1.2 joined it when the
+  // keyboard-trap probe landed, and this fixture has to follow, or the banner assertion below
+  // measures a sweep no runtime performs.
+  const probed = { probed: ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7"] };
 
   it("concludes C when the probe ran on every page and observed nothing", () => {
     const r = auditPages(2, () => ({ probes: probed }));
@@ -99,13 +102,13 @@ describe("a live probe is the other way a criterion gets measured", () => {
     // five digest criteria and the report told its reader nothing had been tested.
     const r = auditPages(2, () => ({ probes: probed }));
     const tested = new Set(r.scope.scan?.testedScs ?? []);
-    for (const sc of ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.4.7"]) {
+    for (const sc of ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7"]) {
       expect(tested.has(sc), `${sc} was probed on every page but is absent from scope.scan.testedScs`).toBe(true);
     }
     // …and 4.1.3 is STILL named, correctly: no probe measures a live region. Deciding it
     // means clicking something and watching what gets announced, which is a mutation — the
     // probes are read-only by contract, so that one belongs to `scan --interact-clicks`. A
-    // suite-driven sweep therefore closes four of the five and says so about the fifth.
+    // suite-driven sweep therefore closes every other one and says so about that one.
     expect(untestedNeedsRendering(r)).toEqual(["4.1.3"]);
   });
 

@@ -42,7 +42,7 @@ export function renderedProvesOn(sc: string, cov: PageCoverage | undefined): boo
   // AXE, for the handful of criteria it is the canonical decider of (AXE_DECIDES).
   if (AXE_DECIDES[sc] && cov.axe) return true;
   const rules = renderedRulesFor(sc);
-  // A criterion NO rule measures (1.4.5, 2.1.2, 2.3.1, 2.4.11, 2.5.8) can never be concluded
+  // A criterion NO rule measures (1.4.5, 2.3.1, 2.4.11, 2.5.8) can never be concluded
   // here — its silence is not a measurement, and reading it as one is exactly the failure this
   // tier exists to avoid.
   if (!rules.length) return false;

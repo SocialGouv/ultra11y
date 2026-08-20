@@ -271,6 +271,80 @@ export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimi
   return hits;
 }
 
+// 2.1.2 No Keyboard Trap — where the ACTIVE element is, and whether it is still inside the
+// page. `focusSetupExpr` has already tagged the focusable ring with `data-u11y-f`; this reads
+// the tag back, so the walk below identifies an element without re-querying the document on
+// every step.
+//
+// `null` means focus has left the ring — body, documentElement, or nothing at all, which is
+// what Playwright reports once Tab hands focus back to the browser chrome. That is the NORMAL
+// end of a tab ring, never a trap, and conflating the two would report every well-behaved page.
+export const FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
+  const e = document.activeElement;
+  if (!e || e === document.body || e === document.documentElement) return null;
+  const key = e.getAttribute && e.getAttribute('data-u11y-f');
+  return { key: key || __sel(e), selector: __sel(e), html: __html(e) };
+})()`;
+
+/** RGAA 12.9 / WCAG 2.1.2 — can the keyboard always LEAVE?
+ *
+ *  The one rendering criterion this tool documented as measured by no tier at all (see
+ *  src/report.ts NEEDS_RENDERING), and the reason RGAA 12.9 reached a paid adjudicator on every
+ *  run carrying nothing but a React `preventDefault` line to rule on. A trap is not a property
+ *  of the source; it is a property of the tab ring, and the tab ring only exists in a browser.
+ *
+ *  The measurement is deliberately narrow, because a wrong NC here is expensive: focus is
+ *  TRAPPED when Tab is pressed and the active element does not change, on a page that has more
+ *  than one focusable — confirmed over `confirmPresses` further presses so a control that
+ *  swallows one keystroke (a listbox stepping through its options) is not reported as a cage.
+ *  Everything else — focus leaving for the browser chrome, the ring wrapping round to its first
+ *  element — is a page behaving correctly, and returns no hit. */
+export async function probeKeyboardTrap(page: Any, limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<ProbeHit[]> {
+  const count = (await page.evaluate(focusSetupExpr("", limits.maxFocusables))) as number;
+  // One focusable cannot be a trap: Tab has nowhere else to go, and that is the page's shape
+  // rather than a cage. Zero cannot either.
+  if (!count || count < 2) return [];
+  const hits: ProbeHit[] = [];
+  const seen = new Set<string>();
+  const confirmPresses = 2;
+  const limit = Math.min(count + 2, limits.maxFocusables + 10);
+  let prev: { key: string; selector: string; html: string } | null = null;
+  for (let i = 0; i < limit; i++) {
+    if (deadline?.out()) break;
+    await page.keyboard.press("Tab");
+    const now = (await page.evaluate(FOCUS_WHERE_PROBE)) as { key: string; selector: string; html: string } | null;
+    // Focus left the page. The ring ended the way it should; nothing to report and nothing
+    // left to walk.
+    if (!now) break;
+    if (prev && now.key === prev.key) {
+      // Stuck for one press. Confirm before accusing: press again, and only call it a trap if
+      // focus is STILL on the same element every time.
+      let stuck = true;
+      for (let k = 0; k < confirmPresses && stuck; k++) {
+        if (deadline?.out()) break;
+        await page.keyboard.press("Tab");
+        const again = (await page.evaluate(FOCUS_WHERE_PROBE)) as { key: string; selector: string } | null;
+        stuck = again !== null && again.key === now.key;
+      }
+      if (stuck) {
+        hits.push({
+          selector: now.selector,
+          html: now.html,
+          detail: `Le focus reste sur cet élément après ${1 + confirmPresses} appuis sur Tab, alors que la page compte ${count} éléments focalisables — piège au clavier (2.1.2).`,
+        });
+        // One cage is the finding; walking further inside it only produces the same hit again.
+        break;
+      }
+    }
+    // The ring wrapped round to somewhere already visited: a complete, escapable cycle.
+    if (seen.has(now.key)) break;
+    seen.add(now.key);
+    prev = now;
+    if (hits.length >= 4) break;
+  }
+  return hits;
+}
+
 export async function probeHover(page: Any, limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<ProbeHit[]> {
   const triggers = (await page.evaluate(HOVER_SETUP_PROBE)) as { key: string; target: string; selector: string }[];
   const hits: ProbeHit[] = [];
@@ -336,7 +410,16 @@ export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?:
   const canStyle = typeof page.addStyleTag === "function";
   const size = (canResize ? (page.viewportSize() ?? null) : null) as { width: number; height: number } | null;
   const restore = size ?? { width: 1280, height: 900 };
-  const out: LiveProbeResult = { focusVisible: [], hover: [], reflowZoom: [], textSpacing: [], reflow: { horizontalScroll: false }, probed: [], skipped: [] };
+  const out: LiveProbeResult = {
+    focusVisible: [],
+    hover: [],
+    keyboardTrap: [],
+    reflowZoom: [],
+    textSpacing: [],
+    reflow: { horizontalScroll: false },
+    probed: [],
+    skipped: [],
+  };
   const skip = (sc: string, why: string): void => {
     out.skipped?.push({ sc, why });
   };
@@ -378,6 +461,7 @@ export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?:
   };
   if (!canResize) skip("1.4.10", "the page object cannot resize its viewport");
   if (!canType) skip("2.4.7", "the page object exposes no keyboard");
+  if (!canType) skip("2.1.2", "the page object exposes no keyboard");
   if (!canHover) skip("1.4.13", "the page object cannot hover");
   if (!canStyle) skip("1.4.12", "the page object cannot inject a stylesheet");
   // ORDER IS DELIBERATE: cheap and deterministic first, interactive last.
@@ -435,6 +519,17 @@ export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?:
       out.probed.push("2.4.7");
     }
   }
+  // AFTER focus visibility, and for the same reason it comes late: it walks the tab ring, which
+  // is one of the two measurements that cost seconds. It also reuses the tagging that
+  // `probeFocusVisible` has just laid down, so on the common path it costs the walk and not the
+  // setup.
+  if (want("2.1.2") && canType) {
+    const r = await bounded("2.1.2", () => probeKeyboardTrap(page, limits, deadline));
+    if (r) {
+      out.keyboardTrap = r;
+      out.probed.push("2.1.2");
+    }
+  }
   if (want("1.4.13") && canHover && canType) {
     const r = await bounded("1.4.13", () => probeHover(page, limits, deadline));
     if (r) {
@@ -460,6 +555,9 @@ export const REMOVE_TEXT_SPACING_STEP = `(() => {
 export interface LiveProbeResult {
   focusVisible: ProbeHit[];
   hover: ProbeHit[];
+  /** 2.1.2 — focus that Tab cannot move off. Empty AND `probed` carrying "2.1.2" is the only
+   *  combination that means "the ring was walked and it always let go". */
+  keyboardTrap: ProbeHit[];
   reflowZoom: ProbeHit[];
   textSpacing: ProbeHit[];
   reflow: { horizontalScroll: boolean };

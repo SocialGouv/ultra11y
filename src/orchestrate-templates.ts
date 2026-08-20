@@ -178,8 +178,91 @@ export function phaseWorkflowScript(ph: PhaseInfo, runAbs: string, engineAbs: st
   ].join("\n");
 }
 
-export function agentContracts(runAbs: string, engineAbs: string): Record<string, string> {
+/** ECO IS A DIFFERENT HARNESS, AND THE CONTRACT HAS TO SAY SO.
+ *
+ *  The fan-out contract addresses a subagent spawned by a Workflow tool: it is handed
+ *  `ITEMS=<id,…>`, it reads the full `ADJUDICATE.todo.json`, and it RETURNS a structured object
+ *  the orchestrator folds. None of that exists on the `--eco` path, which is the one CI takes:
+ *  there the adjudicator has Read/Grep/Glob/Edit/Write and no shell, it is told NOT to open
+ *  `ADJUDICATE.todo.json` (half a megabyte), it reads one `adjudicate/<id>.md` per criterion,
+ *  and its only output is an EDIT of `ADJUDICATE.verdicts.json`.
+ *
+ *  Emitting the fan-out contract there and then telling the agent to obey it VERBATIM — which
+ *  is what the composite action's prompt says — hands a small model two sets of instructions
+ *  that contradict each other on the file to read, the file to write, the item selection and
+ *  the output channel. Measured on run 32385981037 (Haiku, RGAA, 3 passes): 3 of 41 criteria
+ *  came back with no verdict at all. So `--eco` gets a contract written for the harness it
+ *  actually runs in. */
+
+/** THE RULING RULES ARE THE SAME IN EVERY HARNESS — only the paperwork differs.
+ *
+ *  Kept as one string and shared by both eco contracts below, so the fan-out contract and the
+ *  sequential one can never drift into two different definitions of what a `C` requires. */
+const VERDICT_RULES = `2. Rule it (the apply gate is FAIL-CLOSED — a verdict missing its required field does not fold, and its criterion goes back to « to assess » carrying the refusal):
+   - \`C\` (conforming) — REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this criterion's own evidence; an anchor that is not in that list is treated as fabricated). A criterion presented with NO evidence at all cannot be \`C\` — it is \`manual\` (\`undecidable\`), or \`NA\` if nothing in scope is concerned.
+   - \`NC\` (non-conforming) — REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected, and so is a finding with no \`file\` at all. \`normativeRef\` MUST cite the precise failed test — under a country standard, one of the criterion's OWN numbered tests, listed in its brief under « tests to rule on ». A WCAG id looks alike, denotes an unrelated test, and is rejected.
+   - \`NA\` (not applicable) — REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
+   - \`manual\` (still undecidable) — REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide it, and no capture in this run carries its subject) or \`undecidable\` (the evidence cannot settle it either way).
+3. AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. « No second navigation system », « no search engine », « no error message suggests the expected format » — an absence is OBSERVED somewhere: cite the element and the page you observed it on. And when the criterion's subject exists nowhere in the audited scope, the verdict is \`NA\` with its justification, never \`NC\`.
+4. THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidence is anchored under \`.ultra11y/pages/<id>/\`, the browser already ran: \`dom.html\`, \`styles.json\`, \`boxes.json\`, \`axtree.json\` and \`screen.png\` are there to read. \`needs-rendered-dom\` is refused on such a criterion — decide it from those files, or answer \`undecidable\` and say what the capture does not settle.
+5. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with its reason — that is a valid, honest verdict, and it is worth more than a verdict the gate throws away.`;
+
+/** The sequential adjudicator — `--eco`, no fan-out.
+ *
+ *  Two shapes, because eco covers two harnesses and the difference is only WHICH FILE. A local
+ *  session has a shell and edits the big worklist; a CI adjudicator has Read/Grep/Glob/Edit/Write
+ *  and works from the split surface `writeAdjudication` always emits beside it. Both are named,
+ *  and the caller's prompt decides — which is the sentence that stops a model obeying this
+ *  document into a file it was just told not to open. */
+function ecoAdjudicatorContract(runAbs: string): string {
+  return `# Contract: adjudicator (sequential / --eco)
+
+You adjudicate the residual judgment criteria of an ultra11y audit — the ones the deterministic engine could not decide (alt-text relevance, link purpose in context, reading order…). The ACTIVE STANDARD is recorded in the worklist's \`standard\` field: under a country standard (e.g. \`rgaa\`) the items are that standard's OWN criteria, each carrying its numbered tests — not WCAG success criteria.
+
+There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one at a time, in order.
+
+## Which files — your prompt decides, and it wins over this document
+
+- **With a shell.** Read \`${join(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join(runAbs, "ADJUDICATE.todo.json")} --in ${join(runAbs, "audit-latest.json")} --out ${runAbs}\`.
+- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` — they run to hundreds of kilobytes and will swamp your context. Read \`${join(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join(runAbs, "ADJUDICATE.verdicts.json")}\` — the ONLY file you write. Someone else folds; you never run the engine.
+
+## For EACH criterion
+
+1. Read its brief. \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) — open the cited files at the cited lines whenever the snippet alone cannot decide. Copy the \`snippet\` from the brief rather than retyping it.
+${VERDICT_RULES}
+
+Every item comes back with a verdict. Each one stands or falls on its own: a refusal costs THAT criterion and leaves every other verdict standing — so work through the list steadily, and never guess to fill a gap.
+
+Do not edit any other file, do not touch the audited source, do not commit, and do not comment on any pull request.
+`;
+}
+
+/** The sequential refuter — same removals: no ITEMS, no structured output, no orchestrator. */
+function ecoRefuterContract(runAbs: string): string {
+  return `# Contract: refuter (sequential / --eco)
+
+You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
+
+There is no fan-out here and no ITEMS selection: you handle EVERY entry of \`${join(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`), one at a time, writing your verdict into that same file.
+
+For EACH entry:
+
+1. Open \`file\` at \`line\` and read the cited element (\`selector\`) in its real context.
+2. Judge the claim against the source:
+   - \`supported\` — the cited code violates the criterion exactly as claimed.
+   - \`partial\` — a real issue, but the claim overstates it (wrong element, wrong scope, exaggerated count).
+   - \`unsupported\` — the source does not establish the claim.
+   - \`refuted\` — the source contradicts the claim.
+   When unsure, choose the HARSHER verdict — a false pass is worse than a false fail.
+3. \`note\` is REQUIRED — one line grounded in what you read (quote or paraphrase the decisive code).
+
+Then fold: \`ultra11y verify --apply ${join(runAbs, "VERIFY.todo.json")} --report <the report .md>\`. Without a shell, leave the fold to whoever gave you the file.
+`;
+}
+
+export function agentContracts(runAbs: string, engineAbs: string, opts: { eco?: boolean } = {}): Record<string, string> {
   const footer = ONE_WRITER_FOOTER.replaceAll("<RUN>", runAbs);
+  if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs) };
   return {
     adjudicator: `# Contract: adjudicator
 

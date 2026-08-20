@@ -306,6 +306,49 @@ async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, dead
   }
   return hits;
 }
+var FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
+  const e = document.activeElement;
+  if (!e || e === document.body || e === document.documentElement) return null;
+  const key = e.getAttribute && e.getAttribute('data-u11y-f');
+  return { key: key || __sel(e), selector: __sel(e), html: __html(e) };
+})()`;
+async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
+  const count = await page.evaluate(focusSetupExpr("", limits.maxFocusables));
+  if (!count || count < 2) return [];
+  const hits = [];
+  const seen = /* @__PURE__ */ new Set();
+  const confirmPresses = 2;
+  const limit = Math.min(count + 2, limits.maxFocusables + 10);
+  let prev = null;
+  for (let i = 0; i < limit; i++) {
+    if (deadline?.out()) break;
+    await page.keyboard.press("Tab");
+    const now = await page.evaluate(FOCUS_WHERE_PROBE);
+    if (!now) break;
+    if (prev && now.key === prev.key) {
+      let stuck = true;
+      for (let k = 0; k < confirmPresses && stuck; k++) {
+        if (deadline?.out()) break;
+        await page.keyboard.press("Tab");
+        const again = await page.evaluate(FOCUS_WHERE_PROBE);
+        stuck = again !== null && again.key === now.key;
+      }
+      if (stuck) {
+        hits.push({
+          selector: now.selector,
+          html: now.html,
+          detail: `Le focus reste sur cet \xE9l\xE9ment apr\xE8s ${1 + confirmPresses} appuis sur Tab, alors que la page compte ${count} \xE9l\xE9ments focalisables \u2014 pi\xE8ge au clavier (2.1.2).`
+        });
+        break;
+      }
+    }
+    if (seen.has(now.key)) break;
+    seen.add(now.key);
+    prev = now;
+    if (hits.length >= 4) break;
+  }
+  return hits;
+}
 async function probeHover(page, limits = PROBE_DEFAULTS, deadline) {
   const triggers = await page.evaluate(HOVER_SETUP_PROBE);
   const hits = [];
@@ -346,7 +389,16 @@ async function runLiveProbes(page, opts = {}) {
   const canStyle = typeof page.addStyleTag === "function";
   const size = canResize ? page.viewportSize() ?? null : null;
   const restore = size ?? { width: 1280, height: 900 };
-  const out = { focusVisible: [], hover: [], reflowZoom: [], textSpacing: [], reflow: { horizontalScroll: false }, probed: [], skipped: [] };
+  const out = {
+    focusVisible: [],
+    hover: [],
+    keyboardTrap: [],
+    reflowZoom: [],
+    textSpacing: [],
+    reflow: { horizontalScroll: false },
+    probed: [],
+    skipped: []
+  };
   const skip = (sc, why) => {
     out.skipped?.push({ sc, why });
   };
@@ -381,6 +433,7 @@ async function runLiveProbes(page, opts = {}) {
   };
   if (!canResize) skip("1.4.10", "the page object cannot resize its viewport");
   if (!canType) skip("2.4.7", "the page object exposes no keyboard");
+  if (!canType) skip("2.1.2", "the page object exposes no keyboard");
   if (!canHover) skip("1.4.13", "the page object cannot hover");
   if (!canStyle) skip("1.4.12", "the page object cannot inject a stylesheet");
   if (want("1.4.4")) {
@@ -422,6 +475,13 @@ async function runLiveProbes(page, opts = {}) {
     if (r) {
       out.focusVisible = r;
       out.probed.push("2.4.7");
+    }
+  }
+  if (want("2.1.2") && canType) {
+    const r = await bounded("2.1.2", () => probeKeyboardTrap(page, limits, deadline));
+    if (r) {
+      out.keyboardTrap = r;
+      out.probed.push("2.1.2");
     }
   }
   if (want("1.4.13") && canHover && canType) {

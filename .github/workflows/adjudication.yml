@@ -7,22 +7,45 @@
 #   api    ~$0.20 per WCAG run, ~$0.50 per RGAA one. One Messages call per batch of 8 criteria
 #          over harvested evidence; the worklist is re-sent whole each time and no batch is
 #          large enough to earn prompt caching.
-#   agent  MEASURED at $21.22 for one RGAA run over tests/fixtures/realworld — 80 criteria,
-#          243 turns, 30 minutes, on Sonnet (run 32363798488). Two orders of magnitude above
-#          the API tier, and that is the point of it rather than a fault: it OPENS the files
-#          each criterion cites, which is what "link purpose IN CONTEXT" actually asks for.
+#   agent  MEASURED at $21.22 for one RGAA run on Sonnet over a source-only audit (run
+#          32363798488): 80 criteria, 243 turns, 30 minutes. Two orders of magnitude above the
+#          API tier, and that is the point of it rather than a fault: it OPENS the files each
+#          criterion cites, which is what "link purpose IN CONTEXT" actually asks for.
 #
 # THE 80 IN THAT MEASUREMENT WAS ITSELF A DEFECT, and it is fixed below: the run audited
 # sources only, so the rendering criteria reached the model at all — and came back
-# `needs-rendered-dom`, correctly and expensively. This workflow now serves the fixture and
-# scans it before adjudicating, which is what the composite does for every consumer. Measured
-# on run 32385981037 (Haiku, 3 passes): the worklist starts at 41 instead of 80, the run takes
-# 10 minutes instead of 30, and 7 criteria are left — none of them a rendering one. The cheap
-# way to cut this bill is not a cheaper model; it is measuring what a browser can measure.
+# `needs-rendered-dom`, correctly and expensively. This workflow serves the fixture and scans it
+# before adjudicating, which is what the composite does for every consumer. Measured on run
+# 32385981037 (Haiku, 3 passes): the worklist started at 41 instead of 80, the run took 10
+# minutes instead of 30, and 7 criteria were left — 10.14, 11.11, 11.12, 12.1, 12.5, 12.9, 12.11.
 #
-# Putting either on every push would bill a fleet of PRs for a signal that changes rarely; the
-# agent tier would do it at twenty dollars a go. Pair it with `ledger` so the next run replays
-# the verdicts instead of buying them again.
+# EVERY ONE OF THOSE SEVEN WAS A TOOL FAILURE, not a model one, and the fix was never a bigger
+# model. Haiku is what this workflow is dispatched with, deliberately: what a cheap adjudicator
+# cannot do is the measure of what the tool failed to hand it.
+#
+#   12.1, 12.5     ruled NC with no `file`, and refused. Their NC is shaped like an ABSENCE
+#                  (« no second navigation system »), and nothing in the per-criterion brief
+#                  said an absence is still observed on an element of a page — because the
+#                  brief carried no verdict contract at all (it was rendered `preamble: false`,
+#                  which dropped the very rules the gate enforces).
+#   11.11, 11.12   ruled `needs-rendered-dom` over capture-anchored evidence, and refused. Same
+#                  root cause: the note saying the rendered page is on disk lived in the
+#                  preamble the brief did not carry.
+#   12.9           never answered. Its subject is a keyboard trap, and the harvest handed it one
+#                  anchor: `e.preventDefault();` from a React submit handler. A trap is a
+#                  property of the tab ring, so `probeKeyboardTrap` now walks it — 12.9 closes
+#                  on the measurement, with no model in the loop.
+#   10.14, 12.11   never answered, and could not have been: their subject is CSS-revealed
+#                  additional content and no harvester levied any. `additionalContent` does now.
+#
+# So the fixture is a small SITE, not one page — a menu, a search form, a sitemap page, a
+# contact form with format hints and a review step, and a CSS tooltip revealed on hover AND on
+# focus. Criteria about an « ensemble de pages » cannot be posed, let alone answered, on a
+# single document.
+#
+# Putting either tier on every push would bill a fleet of PRs for a signal that changes rarely;
+# the agent tier would do it at twenty dollars a go. Pair it with `ledger` so the next run
+# replays the verdicts instead of buying them again.
 #
 # So it is dispatched by hand, and it reports the number that actually separates the two
 # modes: how many criteria stayed `manual`. That is where the API mode decloses — it rules
@@ -66,6 +89,14 @@ on:
         description: 'Job ceiling in minutes. GitHub kills a hosted-runner job at 360 whatever this says; only a self-hosted runner goes beyond.'
         type: string
         default: "60"
+      require-decided:
+        description: 'Fail the job while ANY criterion of the grid is still « à évaluer ». On by default, and that is the point of this workflow: a run that leaves seven criteria unruled and reports success is how seven criteria stayed unruled for a month. Turn it off only to MEASURE a residue you already expect.'
+        type: boolean
+        default: true
+      undecidable-file:
+        description: 'Path to a committed list of criteria this fixture genuinely cannot decide, each with its reason. Empty by default, and it should stay empty: every entry is a criterion the tool failed to give evidence for, and the fix belongs in the engine rather than in an exemption.'
+        type: string
+        default: ''
 
 # `contents: read` is enough BECAUSE the composite action hands claude-code-action the job's
 # own `github.token`. Without that it would mint a GitHub App token over OIDC and this job
@@ -115,21 +146,39 @@ jobs:
       - uses: pnpm/action-setup@v6
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      # The browsers live outside the pnpm store (~/.cache/ms-playwright) and weigh ~170MB —
+      # the one download this job makes that the package cache does not cover. Keyed on the
+      # lockfile, exactly like `browser-tier` and `action` in ci.yml, so a cache hit skips it.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install the browser tier
-        run: pnpm exec playwright install --with-deps chromium
+        # NO --with-deps, for the reason the other two browser jobs in this repository give:
+        # it shells out to apt, which on the Azure runners hangs for 30min+ whenever their
+        # ubuntu mirror misbehaves — measured twice in one day, once for 3h27. The GitHub
+        # ubuntu image already ships every library chromium-for-testing needs.
+        run: pnpm exec playwright install chromium
 
-      # The fixture, SERVED. `tests/fixtures/realworld` is what this workflow adjudicates, and
-      # a file on disk is not a rendered page: `landing.html` has to be a document a browser
-      # actually built before contrast, zoom, reflow and text spacing mean anything.
+      # THE FIXTURE IS A SITE, and it is served whole.
       #
-      # Not the directory index: python's listing links `LoginForm.tsx`, and navigating to it
-      # makes Chromium start a download instead of a navigation, which fails the scan. The
-      # entry is the page itself.
-      - name: Serve the fixture
+      # `tests/fixtures/realworld` used to be one page, and a third of the criteria this
+      # workflow adjudicates cannot be posed on one page: RGAA 12.1 asks whether an « ensemble
+      # de pages » has two navigation systems, 12.5 whether the search engine is reachable
+      # identically ACROSS pages, 12.2 and 12.4 whether the navigation sits in the same place on
+      # each. Handed a single document, the adjudicator ruled NC on an absence it could not
+      # anchor, and the gate refused it — correctly, and at the price of a paid pass.
+      #
+      # `/` is the entry now, and it resolves to `index.html`, so python never renders its
+      # directory listing — which is what used to link `LoginForm.tsx` and make Chromium start
+      # a download instead of a navigation. No page links to that file either, for the same
+      # reason: it is audited as SOURCE, never crawled.
+      - name: Serve the fixture site
         run: |
           nohup python3 -m http.server 8932 --directory tests/fixtures/realworld > /tmp/fixture.log 2>&1 &
           deadline=$(( SECONDS + 30 ))
-          until curl -sSf -o /dev/null http://127.0.0.1:8932/landing.html; do
+          until curl -sSf -o /dev/null http://127.0.0.1:8932/; do
             if [ $SECONDS -ge $deadline ]; then echo "::error::the fixture server never came up"; exit 1; fi
             sleep 1
           done
@@ -160,10 +209,20 @@ jobs:
           # THE BASELINE HAS TO INCLUDE THE SCAN, or the delta below credits the model with
           # work a browser did. Each `uses: ./` step re-audits AND re-scans from scratch, so
           # the number a tier starts from is the post-render one — measured on this fixture:
-          # 80 criteria to adjudicate from source alone, 41 once the page is scanned. Reading
-          # the agent tier against 80 would report 39 criteria it never touched.
+          # 80 criteria to adjudicate from source alone, 41 once a page is scanned, 38 once the
+          # keyboard-trap probe closes 12.9. Reading the agent tier against 80 would report 42
+          # criteria it never touched.
+          #
+          # THE AUDIT RUNS TWICE, and that is not a slip. The first pass has no captures to read;
+          # the scan then writes `.ultra11y/pages/`, and the second pass ingests them — which is
+          # what anchors a criterion's evidence in the rendered DOM instead of only in the
+          # source. It is exactly what the composite action does internally, and a baseline that
+          # skipped it would measure a different grid from the one each tier is handed.
           node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan http://127.0.0.1:8932/landing.html --runtime local --cwd "$PWD" \
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 8 --runtime local --cwd "$PWD" \
+            --merge audits/audit-latest.json --out audits
+          node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 8 --runtime local --cwd "$PWD" \
             --merge audits/audit-latest.json --out audits
           node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
             --standard '${{ inputs.standard }}' --out /tmp/before --json > /tmp/before.json
@@ -188,11 +247,16 @@ jobs:
           artifact-name: adjudication-api
           # RENDER BEFORE ADJUDICATING. The composite runs `Scan the pages` before the
           # adjudication tier on purpose, so by the time a model is asked anything, computed
-          # contrast, 320px reflow, 200% zoom and text spacing are already measured — and the
-          # criteria that need them never reach the worklist. `local`, never `auto`: Docker
-          # cannot reach the host's loopback, and an `auto` that degrades there fails with an
-          # obscure ERR_CONNECTION_REFUSED instead of an explicit missing-tier error.
-          urls: http://127.0.0.1:8932/landing.html
+          # contrast, 320px reflow, 200% zoom, text spacing and the tab ring are already
+          # measured — and the criteria that need them never reach the worklist. `local`, never
+          # `auto`: Docker cannot reach the host's loopback, and an `auto` that degrades there
+          # fails with an obscure ERR_CONNECTION_REFUSED instead of an explicit missing-tier
+          # error.
+          #
+          # `crawl`, not `urls`: the site-level criteria are decided across pages, so a scan
+          # that renders one of them leaves the other four unmeasured and the grid says so.
+          crawl: http://127.0.0.1:8932/
+          crawl-max: "8"
           runtime: local
 
       # Measured HERE, not at the end. The agent step below is a fresh `uses: ./` whose own
@@ -224,22 +288,38 @@ jobs:
           adjudicate-max-turns: ${{ inputs.max-turns }}
           adjudicate-passes: ${{ inputs.passes }}
           artifact-name: adjudication-agent
-          # Same rendered page as the API tier above, so the two modes are compared over the
-          # same evidence. Measured before this: 80 criteria to adjudicate from source alone,
-          # 41 once the page is scanned — and of the seven the 2026-08-20 cascade was left
-          # holding, six close on the measurement and only 10.1 still needs a reading.
-          urls: http://127.0.0.1:8932/landing.html
+          # Same rendered pages as the API tier above, so the two modes are compared over the
+          # same evidence.
+          crawl: http://127.0.0.1:8932/
+          crawl-max: "8"
           runtime: local
+          # THE GATE THIS WHOLE WORKFLOW EXISTS FOR. Without it the job reports success on a
+          # grid nobody filled — which is precisely what happened on run 32385981037: green,
+          # with seven criteria « à évaluer » and a warning nobody was watching. It goes on the
+          # AGENT step alone; the `api` step above is the comparison tier and gating it would
+          # stop the run before the tier under test had even started.
+          require-decided: ${{ inputs.require-decided }}
+          undecidable-file: ${{ inputs.undecidable-file }}
 
+      # `always()`, and that is now load-bearing rather than tidy: `require-decided` on the step
+      # above turns an incomplete grid into a FAILED step, and without this the run would go red
+      # while saying nothing at all about which criteria are open — the one fact anybody reading
+      # a red adjudication needs. The condition it used to carry is folded in.
       - name: What the agent tier decided
         id: after_agent
-        if: inputs.mode == 'agent' || inputs.mode == 'both'
+        if: always() && (inputs.mode == 'agent' || inputs.mode == 'both')
         run: |
+          if [ ! -f audits/audit-latest.json ]; then
+            echo "::warning::no audit was produced — the agent tier died before writing one"
+            exit 0
+          fi
           node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
             --standard '${{ inputs.standard }}' --out /tmp/after-agent --json > /tmp/after-agent.json
           n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/after-agent.json","utf8")).count')
+          ids=$(node -p 'const j=JSON.parse(require("fs").readFileSync("/tmp/after-agent.json","utf8"));(j.items||[]).map(x=>x.criteriaId).join(", ")')
           echo "manual=$n" >> "$GITHUB_OUTPUT"
-          echo "unruled after agent: $n"
+          echo "ids=$ids" >> "$GITHUB_OUTPUT"
+          echo "unruled after agent: $n${ids:+ — $ids}"
 
       # The metric. A tier that ruled on nothing is a tier that cost money to change nothing,
       # and it should be visible as such rather than buried in a green check. `always()` so a
@@ -250,6 +330,7 @@ jobs:
           BEFORE: ${{ steps.before.outputs.manual }}
           AFTER_API: ${{ steps.after_api.outputs.manual }}
           AFTER_AGENT: ${{ steps.after_agent.outputs.manual }}
+          AGENT_IDS: ${{ steps.after_agent.outputs.ids }}
         run: |
           {
             echo "### Adjudication (${{ inputs.mode }}, ${{ inputs.standard }})"
@@ -259,6 +340,15 @@ jobs:
             echo "| before (engine alone) | ${BEFORE:-—} |"
             if [ -n "${AFTER_API:-}" ]; then echo "| after \`api\` | $AFTER_API |"; fi
             if [ -n "${AFTER_AGENT:-}" ]; then echo "| after \`agent\` | $AFTER_AGENT |"; fi
+            if [ -n "${AGENT_IDS:-}" ]; then
+              echo ""
+              echo "Still « à évaluer » after the agent tier: ${AGENT_IDS}."
+              echo ""
+              echo "Each one is a criterion the TOOL failed to settle, not a model that gave up:"
+              echo "either its harvest carries no anchor on the subject the criterion asks about,"
+              echo "or its brief never stated the rule the gate then refused it on. Read the"
+              echo "refusal printed above before reaching for another pass or a bigger model."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
           for pair in "api:${AFTER_API:-}" "agent:${AFTER_AGENT:-}"; do

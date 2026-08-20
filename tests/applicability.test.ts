@@ -245,7 +245,11 @@ describe("every criterion left to assess says why, and where its evidence comes 
   it("says plainly when NO automated tier decides a criterion, instead of pointing at `scan`", () => {
     // 1.4.5 is no longer here: its subject is images, and this fixture has none, so it is now
     // « non applicable » and carries no residual risk at all.
-    for (const sc of ["2.1.2", "2.3.1", "2.4.11"]) {
+    //
+    // 2.1.2 left this list the day `probeKeyboardTrap` landed — a tier DOES decide it now, so
+    // its reason points at `scan` like every other measured criterion. It is asserted below,
+    // with the ones that carry a runnable command, which is the whole difference.
+    for (const sc of ["2.3.1", "2.4.11"]) {
       expect(r.residualRisks.find((x) => x.criteriaId === sc)?.reason, `SC ${sc}`).toMatch(/no automated tier decides this/i);
     }
     expect(r.residualRisks.some((x) => x.criteriaId === "1.4.5")).toBe(false);
@@ -253,7 +257,7 @@ describe("every criterion left to assess says why, and where its evidence comes 
   });
 
   it("carries a runnable command wherever one would actually help", () => {
-    for (const sc of ["1.4.3", "1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.4.7", "4.1.3"]) {
+    for (const sc of ["1.4.3", "1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "4.1.3"]) {
       expect(r.residualRisks.find((x) => x.criteriaId === sc)?.reason, `SC ${sc}`).toMatch(/`[^`]*(scan|verify)[^`]*`/);
     }
   });
