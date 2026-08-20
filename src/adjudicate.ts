@@ -185,8 +185,8 @@ export function adjudicationContract(): AdjudicationContract {
     manualReasons: [...MANUAL_REASON_VALUES],
     requires: {
       C: "a non-empty justification AND citations[] naming the harvested evidence it cleared (each anchor resolvable and drawn from this criterion's own evidence, and about the same kind of element the harvest recorded there — copy the evidence's own `snippet` rather than retyping the element); a criterion with no harvested evidence cannot be C at all",
-      NA: "a non-empty justification",
-      NC: "at least one groundable finding, each citing a normativeRef that resolves against the active standard",
+      NA: "a non-empty justification, and citations[] whenever evidence was presented — a criterion whose subject exists NOWHERE in the audited scope is NA, never NC",
+      NC: "at least one groundable finding, each naming the `file` it was observed in (an NC with no location is refused as flatly as an uncited C — and a non-conformity that rests on an ABSENCE is still observed on an element of a page, so cite that element) and each citing a normativeRef that resolves against the active standard",
       manual: `a reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`,
     },
   };

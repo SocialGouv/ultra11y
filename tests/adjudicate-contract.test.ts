@@ -199,3 +199,19 @@ describe("the gate refuses a deferral to a tier that has already run", () => {
     expect(refusal("src/components/Foo.tsx")).not.toMatch(/page capture/);
   });
 });
+
+// THE CONTRACT IS READ BY THE THING THAT WRITES THE VERDICTS, so every rule the gate enforces
+// has to be in it. `requires.NC` used to name the normativeRef and nothing else — and on run
+// 32385981037 the two criteria that died did so for the OTHER reason: an NC with no `file`.
+describe("the machine-readable contract names every rule the gate refuses on", () => {
+  it("says an NC finding must carry its file, and that an absence is still anchored", () => {
+    const c = adjudicationContract();
+    expect(c.requires.NC).toMatch(/`file`/);
+    expect(c.requires.NC).toMatch(/ABSENCE/i);
+    expect(c.requires.NC).toMatch(/normativeRef/);
+  });
+
+  it("says NA — not NC — is the verdict when the subject is absent from scope", () => {
+    expect(adjudicationContract().requires.NA).toMatch(/NA, never NC/);
+  });
+});
