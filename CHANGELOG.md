@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.22.0](https://github.com/maxgfr/ultra11y/compare/v5.21.0...v5.22.0) (2026-08-20)
+
+
+### Features
+
+* **adjudicate:** give the cheap adjudicator the contract and the evidence it was missing ([612ef12](https://github.com/maxgfr/ultra11y/commit/612ef12fdf56d2a32a6be56238ba050c837384d0))
+
 # [5.21.0](https://github.com/maxgfr/ultra11y/compare/v5.20.0...v5.21.0) (2026-08-20)
 
 
