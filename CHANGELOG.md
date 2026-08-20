@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.18.0](https://github.com/maxgfr/ultra11y/compare/v5.17.0...v5.18.0) (2026-08-20)
+
+
+### Features
+
+* **action:** let a caller take the bound off the turn budget, and say what a run costs ([8633484](https://github.com/maxgfr/ultra11y/commit/8633484cd5d413baa9946082a03de0b4985ecb70))
+
 # [5.17.0](https://github.com/maxgfr/ultra11y/compare/v5.16.0...v5.17.0) (2026-08-20)
 
 
