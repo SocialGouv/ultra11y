@@ -14,6 +14,16 @@ on:
   pull_request:
   workflow_dispatch: {}
 
+# The only workflow here that declared none, so its GITHUB_TOKEN inherited whatever the
+# repository default happens to be — read/write on a repository that never narrowed it.
+# Nothing in this file needs more than the checkout: the `action` job runs the shipped action
+# with `sarif: false` and `comment: false` (so no `security-events: write`, no
+# `pull-requests: write`), the artifact upload/download pair authenticates with the run's own
+# token rather than a scope, and `install-bundle` only talks to the npm registry. A job that
+# later needs more should say so on the job, not inherit it from the repository settings.
+permissions:
+  contents: read
+
 jobs:
   build-test:
     runs-on: ubuntu-latest

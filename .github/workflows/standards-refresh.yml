@@ -35,6 +35,8 @@ concurrency: standards-refresh
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    # several upstream fetches plus every derived dataset; nothing here needs GitHub's six-hour default.
+    timeout-minutes: 45
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -75,10 +77,16 @@ jobs:
         id: detect
         run: |
           set -euo pipefail
-          if git diff --quiet; then
+          # `git status --porcelain`, not `git diff --quiet`: the latter compares TRACKED
+          # files only, so a refresh whose whole point was to vendor a NEW source — a new
+          # standards pack, a new locale, a new derived dataset — reports "unchanged" and
+          # pushes nothing. The bare diff is exactly blind to the case this job exists for,
+          # and the run goes green having thrown the work away.
+          if [ -z "$(git status --porcelain)" ]; then
             echo "vendored sources and derived datasets unchanged"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
+            git status --short
             git --no-pager diff --stat
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi

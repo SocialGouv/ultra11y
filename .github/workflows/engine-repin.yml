@@ -24,6 +24,8 @@ concurrency: engine-repin
 jobs:
   repin:
     runs-on: ubuntu-latest
+    # vendor sync, snapshot regeneration and the full gate; nothing here needs GitHub's six-hour default.
+    timeout-minutes: 30
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
