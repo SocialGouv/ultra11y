@@ -83,7 +83,14 @@ beforeAll(async () => {
   // SERVED, not `file://`. axe-core refuses a file URL ("Please use browser.newContext()"),
   // and a served page is what every real caller has anyway — a fixture that differs from
   // production in the one property under test is not a fixture, it is a second bug.
-  server = createServer((_req, res) => {
+  server = createServer((req, res) => {
+    // One dead route, because the tier's behaviour on an ERROR page is itself under test and
+    // a server that only ever says 200 cannot show it.
+    if (req.url === "/introuvable") {
+      res.writeHead(404, { "content-type": "text/html; charset=utf-8" });
+      res.end("<!doctype html><html><head><title>Error response</title></head><body><h1>404</h1></body></html>");
+      return;
+    }
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(PAGE);
   });
@@ -116,6 +123,32 @@ async function check(opts: Record<string, unknown> = {}) {
 }
 
 describe.runIf(true)("the browser tier, driven for real", () => {
+  // A CRAWL FOLLOWS LINKS, AND LINKS ROT. The sample scan has refused an error page since it
+  // existed — filing one under a requested name is a false conformance claim — but the URL
+  // path, which is what `--crawl` and `scan <urls>` both use, never applied the same rule.
+  // Measured on a three-page site with one dead link: the deliverable carried a fourth page
+  // called « Error response » at 97 % RGAA, snapshotted, its criteria counting towards the
+  // run's own grid.
+  //
+  // Refused AND named: `renderRedirected` states the drop, because a report that is merely
+  // shorter reads exactly like a complete one — and a dead link is a bug in the site, which
+  // is fixable, rather than in the audit.
+  it("refuses a crawled URL that answered an error, and says which one", async () => {
+    if (!browserAvailable) return;
+    const { runScanManyLocal } = await import("../src/scan-local.js");
+    const out = await runScanManyLocal([`${origin}/introuvable`, origin], { cwd: process.cwd(), snapshotRoot: root, interact: false });
+
+    expect(out.redirected, "the 404 was audited as a page of the site").toHaveLength(1);
+    const [dropped] = out.redirected!;
+    expect(dropped!.reason).toBe("http-status");
+    expect(dropped!.status).toBe(404);
+    expect(dropped!.requested).toContain("/introuvable");
+
+    // …and only the page that answered was snapshotted and reported on.
+    expect(out.snapshots ?? []).toHaveLength(1);
+    expect(out.findings.every((f) => !String(f.page ?? "").includes("introuvable"))).toBe(true);
+  }, 120_000);
+
   it("records a snapshot a later audit can re-read offline", async () => {
     if (!browserAvailable) return;
     await check();
