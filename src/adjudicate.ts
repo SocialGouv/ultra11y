@@ -130,6 +130,10 @@ export interface AdjudicationItem {
    *  can report a failure it saw, but it cannot clear what it never looked at. */
   evidenceComplete?: boolean;
   evidenceTruncated?: { shown: number; total: number };
+  /** The markup the harvest actually found, as flat tokens (see `Harvested.markup`). Read by
+   *  the brief to say which of the criterion's numbered tests the evidence TOUCHES — never to
+   *  say which it does not. Derived, so `hydrateAdjudication` restores it with the evidence. */
+  markup?: string[];
   verdict: CriterionVerdict; // the agent fills this
   justification: string; // REQUIRED for C and NA
   reason: string | null; // REQUIRED for a still-`manual` verdict ("needs-rendered-dom" | "undecidable")
@@ -269,7 +273,10 @@ export function adjudicationLimits(cwd?: string): AdjudicationLimits {
  *  pages are 97 distinct (text, href) pairs; 47 images are 8 distinct (alt, src) pairs. One
  *  representative per class, with its occurrence count, is therefore the WHOLE population,
  *  said once per distinct thing — which is what makes an honest `C` reachable at all. */
-function collapse(harvested: Harvested[], limits: AdjudicationLimits): { evidence: Evidence[]; population: EvidencePopulation; complete: boolean } {
+function collapse(
+  harvested: Harvested[],
+  limits: AdjudicationLimits,
+): { evidence: Evidence[]; population: EvidencePopulation; complete: boolean; markup: string[] } {
   const byClass = new Map<string, Harvested[]>();
   for (const item of harvested) {
     const g = byClass.get(item.cls);
@@ -300,6 +307,11 @@ function collapse(harvested: Harvested[], limits: AdjudicationLimits): { evidenc
       pages: new Set(harvested.map((x) => pageOfDoc(x.ev.file)).filter((x) => x !== undefined)).size,
     },
     complete: groups.length <= limits.maxClasses,
+    // Over the WHOLE harvest, not the shown representatives: the cap drops classes, and a
+    // mechanism that exists in the audited scope must not stop being reported because its
+    // class fell past the limit. This only ever LIGHTS a test up, so erring wide is the safe
+    // direction — see `testMarkupTokens`.
+    markup: [...new Set(harvested.flatMap((x) => x.markup ?? []))].sort(),
   };
 }
 
@@ -310,12 +322,13 @@ function blankItem(
   harvested: Harvested[],
   limits: AdjudicationLimits,
 ): AdjudicationItem {
-  const { evidence, population, complete } = collapse(harvested, limits);
+  const { evidence, population, complete, markup } = collapse(harvested, limits);
   return {
     criteriaId,
     automatability,
     ...(title ? { title } : {}),
     evidence,
+    ...(markup.length ? { markup } : {}),
     population,
     evidenceComplete: complete,
     ...(complete ? {} : { evidenceTruncated: { shown: evidence.length, total: population.classes } }),
@@ -1290,6 +1303,9 @@ const T = {
       `Référentiel actif : **${name}**. Les items ci-dessous sont des critères ${name}, pas des critères de succès WCAG. Un \`normativeRef\` DOIT citer un test du critère de l'item (par ex. \`11.2.1\`) — un id WCAG y ressemble mais désigne un tout autre test et sera rejeté.`,
     packTests: (name: string, id: string) => `Tests ${name} ${id} à trancher`,
     methodology: "Méthodologie de test officielle",
+    touched: "la source moissonnée porte ce mécanisme",
+    touchedLegend:
+      "« ⬤ » signale les tests dont le MÉCANISME apparaît dans la source moissonnée (la balise ou l'attribut que le test nomme lui-même). C'est une aide à la lecture, pas un verdict : **l'absence de marque n'affirme rien** — un test non marqué reste à trancher comme les autres, et beaucoup de tests portent sur autre chose que du balisage (un intitulé visible, un bouton adjacent, un comportement).",
     inheritedDecide: (sc: string) =>
       `Règle de décision (héritée du critère de succès WCAG ${sc}, qui pose une question plus large — le texte du référentiel prime)`,
     officialSource: (name: string, id: string) => `Texte officiel du critère ${name} ${id}`,
@@ -1336,6 +1352,9 @@ const T = {
       `Active standard: **${name}**. The items below are ${name} criteria, not WCAG success criteria. A \`normativeRef\` MUST cite a test OF THE ITEM'S CRITERION (e.g. \`11.2.1\`) — a WCAG id looks alike but denotes an unrelated test and will be rejected.`,
     packTests: (name: string, id: string) => `${name} ${id} tests to rule on`,
     methodology: "Official test methodology",
+    touched: "the harvested source carries this mechanism",
+    touchedLegend:
+      "« ⬤ » marks the tests whose MECHANISM appears in the harvested source (the tag or attribute the test itself names). It is a reading aid, not a verdict: **an unmarked test asserts nothing** — it is still yours to rule on, and plenty of tests are about something other than markup (a visible label, an adjacent button, a behaviour).",
     inheritedDecide: (sc: string) =>
       `Decision rule (inherited from WCAG success criterion ${sc}, which asks a broader question — the standard's own text prevails)`,
     officialSource: (name: string, id: string) => `Official text of ${name} criterion ${id}`,
@@ -1455,6 +1474,46 @@ function glossaryBlock(pack: StandardPack, crit: PackCriterion | undefined, lang
  *  What the sentence says matters as much as when it appears: the vendored text decides, a
  *  lookup may only lift an ambiguity, and no web page is ever a `normativeRef` — the gate
  *  would refuse one anyway, and this is where the refusal is explained rather than met. */
+/** THE MARKUP A NUMBERED TEST IS WRITTEN ABOUT, read off the test's own wording.
+ *
+ *  RGAA tests name their mechanism in code spans, and those are the only code spans in the
+ *  sentence: « Chaque balise `<label>` permet-elle… », « Chaque étiquette implémentée via
+ *  l'attribut WAI-ARIA `aria-label`… », « Chaque bouton de type `image` (balise `<input>` avec
+ *  l'attribut `type="image"`) ». The standard therefore already says, per test, what to look
+ *  for — no table mapping 258 tests onto anything has to be curated, and none can go stale
+ *  when DINUM edits a test.
+ *
+ *  Three shapes are recognised and everything else is ignored: `<tag>` → the tag,
+ *  `attr="value"` → the attribute and, for the value-bearing ones, `attr=value`, and a bare
+ *  hyphenated attribute (`aria-labelledby`, `autocomplete`). A span whose value is a family
+ *  rather than a literal (`type="image/…"`) keeps only its attribute name.
+ *
+ *  Deliberately not exhaustive. A test whose subject is prose — « un intitulé visible », « un
+ *  bouton adjacent » — yields nothing, and yields nothing rather than a guess. */
+export function testMarkupTokens(lines: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const line of lines) {
+    for (const m of line.matchAll(/`([^`]+)`/g)) {
+      const span = (m[1] ?? "").trim();
+      const tag = /^<\s*([a-zA-Z][a-zA-Z0-9-]*)\s*\/?>$/.exec(span);
+      if (tag?.[1]) {
+        out.add(tag[1].toLowerCase());
+        continue;
+      }
+      const pair = /^([a-zA-Z-]+)\s*=\s*["“]?([^"”]*)["”]?$/.exec(span);
+      if (pair?.[1]) {
+        const name = pair[1].toLowerCase();
+        const value = (pair[2] ?? "").trim().toLowerCase();
+        out.add(name);
+        if (value && !value.includes("…") && !value.includes("...")) out.add(`${name}=${value}`);
+        continue;
+      }
+      if (/^[a-z]+(-[a-z]+)+$/.test(span)) out.add(span.toLowerCase());
+    }
+  }
+  return [...out];
+}
+
 function sourceBlock(s: (typeof T)[Lang], name: string, id: string, url: string | undefined, web: boolean): string[] {
   if (!url) return [];
   const out = [`> **${s.officialSource(name, id)}** — ${url}`, ""];
@@ -1633,13 +1692,35 @@ export function formatAdjudication(
       const tests = crit?.tests ?? {};
       const keys = Object.keys(tests);
       if (keys.length) {
+        // WHICH TESTS THE HARVEST ACTUALLY TOUCHES — additive, and only ever additive.
+        //
+        // RGAA 11.2 asks the same question six times over six labelling mechanisms; on a page
+        // that labels every field with `<label>`, four of those tests are about markup that
+        // exists nowhere in scope, and the brief used to present all six identically. The
+        // marker is computed by intersecting the markup the TEST names (read off its own
+        // wording) with the markup the HARVEST found (read off the parsed source) — both
+        // facts, neither a judgement.
+        //
+        // It can only ADD attention. An unmarked test is never called inapplicable: the
+        // legend says so outright, because the one unrecoverable error here would be an
+        // adjudicator skipping a test that does apply and publishing a false conformity in a
+        // legal deliverable. So a missed mechanism costs a marker, never a verdict.
+        const found = new Set(it.markup ?? []);
+        const touched = new Map<string, boolean>();
+        for (const k of keys) {
+          const wanted = testMarkupTokens(tests[k] ?? []);
+          touched.set(k, wanted.length > 0 && wanted.some((tok) => found.has(tok)));
+        }
+        const anyTouched = [...touched.values()].some(Boolean);
         out.push(`> **${s.packTests(pack.name, it.criteriaId)}**`, "");
+        if (anyTouched) out.push(`> ${s.touchedLegend}`, "");
         for (const k of keys) {
           const lines = tests[k] ?? [];
           // A RGAA test can carry sub-conditions ("… vérifie-t-il ces conditions ?" followed
           // by the list). Number the test once and indent its conditions, rather than
           // repeating the id and reading like N separate tests.
-          out.push(`- \`${it.criteriaId}.${k}\` ${plainTest(lines[0] ?? "")}`);
+          const mark = anyTouched && touched.get(k) ? ` ⬤ _(${s.touched})_` : "";
+          out.push(`- \`${it.criteriaId}.${k}\`${mark} ${plainTest(lines[0] ?? "")}`);
           for (const line of lines.slice(1)) out.push(`  - ${plainTest(line)}`);
           // AND HOW THAT TEST IS ACTUALLY RUN, in the standard's own words. The test states
           // what is required; this states the procedure — find these elements, check this of
@@ -1816,6 +1897,7 @@ export function hydrateAdjudication(adj: AdjudicationFile, audit: AuditResult, o
     if (!full) continue;
     it.evidence = full.evidence;
     if (full.evidenceTruncated) it.evidenceTruncated = full.evidenceTruncated;
+    if (full.markup?.length) it.markup = full.markup;
     // The completeness facts travel with the evidence: the `C` gate reads `evidenceComplete`,
     // and leaving it undefined on a re-hydrated item would let an incomplete reading clear a
     // criterion through the slim path that the inline path refuses.

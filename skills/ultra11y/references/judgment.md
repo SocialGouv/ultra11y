@@ -131,6 +131,12 @@ ever derive `manual`. Each item carries, inline:
   for that test, step by step (RGAA documents all 258 of its tests). The test states WHAT is
   required; this states HOW it is verified, in the referential's own words. This is the
   decision rule under a pack, and it is why the WCAG protocol above is not borrowed here;
+- a **⬤** on the tests whose MECHANISM appears in the harvested source — the tag or attribute
+  the test names itself, matched against the markup the harvest actually found. RGAA 11.2 asks
+  the same question over six labelling mechanisms; on a page that labels with `<label>`, one of
+  the six is marked. It is **strictly additive**: an unmarked test asserts nothing and is still
+  yours to rule on, and the brief says so, because an adjudicator skipping a test that does
+  apply publishes a false conformity no downstream gate can catch;
 - its **technical note** and **particular cases**;
 - its **implementation guidance** (before/after), previously reserved for criteria that
   already had a finding;

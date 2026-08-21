@@ -55,6 +55,17 @@ const stable = (s: string): string => VOLATILE.reduce((acc, [re, to]) => acc.rep
 export interface Harvested {
   ev: Evidence;
   cls: string;
+  /** THE MARKUP THIS ANCHOR ACTUALLY CARRIES — its tag, the attributes it sets to a non-empty
+   *  value, and the value itself for the two attributes a standard writes tests about by
+   *  value (`role`, `type`). Derived from the parsed element, never from the note's prose.
+   *
+   *  It exists so a brief can say WHICH of a criterion's numbered tests the harvest actually
+   *  touches. RGAA 11.2 asks the same question six times over six different labelling
+   *  mechanisms — `<label>`, `title`, `aria-label`, `aria-labelledby`, a visible label, an
+   *  adjacent button — and every one of them harvests under the same subject (`controls`),
+   *  so subject granularity separates none of them. What separates them is the markup on the
+   *  element, and that is a fact about the source rather than a judgement about the test. */
+  markup?: string[];
   /** Source offset of the anchor. Identity, not output: `file:line:selector` is NOT unique —
    *  forty links minified onto one line share all three — so de-duplicating on it silently
    *  collapsed distinct elements into one and undercounted every population that came from a
@@ -72,11 +83,35 @@ const selectorFor = (el: El): string => {
 
 /** An anchor on an element. `cls` is the content identity; when omitted the note is used,
  *  which is right for every subject whose note already spells out what makes it distinct. */
-function h(doc: Doc, el: El, note: string, cls?: string): Harvested {
+/** Attributes whose VALUE is normative vocabulary a standard writes tests against — RGAA 1.1
+ *  distinguishes `role="img"` from any other role, and `<input type="image">` from any other
+ *  input. Every other attribute contributes its NAME only: `aria-label` is the mechanism, its
+ *  text is what the agent judges. */
+const VALUE_BEARING_ATTRS = new Set(["role", "type"]);
+
+/** The markup an element carries, as flat tokens — see `Harvested.markup`.
+ *
+ *  Generic on purpose: computed from the parsed element for EVERY subject, so no harvester
+ *  has to be taught about it and no per-test table has to be curated. An attribute set to the
+ *  empty string contributes nothing, which is the whole point — `aria-label=""` is the
+ *  absence of that mechanism, not its presence. */
+function markupOf(el: El, extra?: string[]): string[] {
+  const out = new Set<string>([el.tag.toLowerCase(), ...(extra ?? [])]);
+  for (const [name, value] of Object.entries(el.attribs)) {
+    if (typeof value !== "string" || value.trim() === "") continue;
+    const key = name.toLowerCase();
+    out.add(key);
+    if (VALUE_BEARING_ATTRS.has(key)) out.add(`${key}=${value.trim().toLowerCase()}`);
+  }
+  return [...out];
+}
+
+function h(doc: Doc, el: El, note: string, cls?: string, markupExtra?: string[]): Harvested {
   return {
     ev: { file: doc.file, line: el.line, selector: selectorFor(el), snippet: elSnippet(doc, el, 160), note },
     cls: stable(cls ?? `${el.tag}|${note}`),
     at: el.start,
+    markup: markupOf(el, markupExtra),
   };
 }
 
@@ -199,6 +234,18 @@ function labelFor(doc: Doc, el: El): string {
   return wrapping ? t(wrapping, 40) : "";
 }
 
+/** `<label>` as a MARKUP TOKEN on the labelled control.
+ *
+ *  A `<label for=…>` is a different element from the field it names, so the field's own
+ *  attributes never mention it — and RGAA 11.2.1 is written about exactly that element. This
+ *  is the one place a token has to be attributed across a relationship rather than read off
+ *  the element, so it is stated here rather than smuggled into the generic `markupOf`. */
+function labelElementTokens(doc: Doc, el: El): string[] {
+  const id = attr(el, "id");
+  if (id && elementsByTag(doc, "label").some((l) => attr(l, "for") === id)) return ["label"];
+  return ancestors(el).some((a) => a.tag === "label") ? ["label"] : [];
+}
+
 /** The page a snapshot document belongs to (`.ultra11y/pages/<id>/dom.html`), else undefined
  *  for a source file. Carried on the evidence so a class can say WHERE it appears. */
 export function pageOfDoc(file: string): string | undefined {
@@ -274,6 +321,7 @@ export const SUBJECTS: Record<string, Subject> = {
           e,
           `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" required=${attr(e, "required") !== undefined} describedby="${attr(e, "aria-describedby") ?? ""}"`,
           `control|${e.tag}|${attr(e, "type") ?? ""}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`,
+          labelElementTokens(d, e),
         ),
       ),
     ),

@@ -11,7 +11,14 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAudit } from "../src/audit.js";
-import { buildAdjudicationWorklist, applyAdjudication, formatAdjudication, type AdjudicationFile, type AdjudicationItem } from "../src/adjudicate.js";
+import {
+  buildAdjudicationWorklist,
+  applyAdjudication,
+  formatAdjudication,
+  testMarkupTokens,
+  type AdjudicationFile,
+  type AdjudicationItem,
+} from "../src/adjudicate.js";
 import { derivePackResults, getCriterion, loadPack } from "../src/standards/index.js";
 
 const dir = mkdtempSync(join(tmpdir(), "u11y-adj-pack-"));
@@ -191,11 +198,78 @@ describe("folding a pack adjudication back", () => {
 
 describe("the rendered worklist is self-sufficient", () => {
   const md = () => formatAdjudication(rgaaItems(), "fr", "rgaa");
+  /** One criterion's brief — the shape `adjudicate/<criteriaId>.md` carries, and the one a CI
+   *  adjudicator actually reads. */
+  const onlyBrief = (id: string) =>
+    formatAdjudication(
+      rgaaItems().filter((i) => i.criteriaId === id),
+      "fr",
+      "rgaa",
+    );
 
   it("shows the criterion's own numbered tests, in full", () => {
     const t = md();
     expect(t).toContain("11.2.1");
     expect(t).toMatch(/fonction exacte/); // real test wording, not a summary
+  });
+
+  // WHICH TESTS THE HARVEST TOUCHES. The fixture labels every field with a `<label>` element:
+  // no `title`, no `aria-label`, no `aria-labelledby`, no adjacent button. So of RGAA 11.2's
+  // six labelling mechanisms exactly one is present in scope, and the brief used to show all
+  // six identically.
+  it("marks the tests whose mechanism is actually present in the harvested source", () => {
+    const t = onlyBrief("11.2");
+    const marked = t
+      .split("\n")
+      .map((l) => /^- `(11\.2\.\d)`/.exec(l))
+      .filter((m): m is RegExpExecArray => m !== null)
+      .map((m) => [m[1]!, m.input.includes("⬤")] as const);
+    expect(Object.fromEntries(marked)).toEqual({
+      "11.2.1": true, // « Chaque balise `<label>` … » — the fixture's mechanism
+      "11.2.2": false, // `title`
+      "11.2.3": false, // `aria-label`
+      "11.2.4": false, // `aria-labelledby`
+      "11.2.5": true, // its conditions name `<label>` among others
+      "11.2.6": false, // an adjacent button — prose, and absent
+    });
+  });
+
+  it("splits RGAA 1.1's image species — `<img>` is here, `<svg>`/`<object>`/`<canvas>` are not", () => {
+    const t = onlyBrief("1.1");
+    expect(t).toMatch(/^- `1\.1\.1` ⬤/m);
+    for (const k of [2, 5, 6, 7, 8]) expect(t, `1.1.${k}`).not.toMatch(new RegExp(`^- \`1\\.1\\.${k}\` ⬤`, "m"));
+  });
+
+  // THE SAFETY PROPERTY, and the reason this marker can exist at all. An adjudicator that
+  // skips a test because it looked inapplicable publishes a false conformity in a legal
+  // deliverable — an error no gate downstream can catch. So the marker is additive: it says
+  // where a mechanism WAS found and never that one was not, and the legend says so in the
+  // brief rather than only here.
+  it("never tells the adjudicator a test does not apply", () => {
+    const t = onlyBrief("11.2");
+    expect(t).toMatch(/l'absence de marque n'affirme rien/);
+    // Scoped to the tests block: « NA — non applicable » is the verdict vocabulary the
+    // contract has always carried, and it is about the CRITERION. What must never appear is
+    // the marker pronouncing on a TEST.
+    const block = t.slice(t.indexOf("Tests RGAA 11.2"), t.indexOf("Cas particuliers"));
+    expect(block).not.toMatch(/non applicable|ne s'applique pas|à ignorer|inapplicable|sans objet/i);
+  });
+
+  it("stays silent altogether on a criterion whose harvest touches none of its tests", () => {
+    // No marker anywhere ⇒ no legend either: a legend explaining a symbol that never appears
+    // is noise on a document read by a model paying for its context.
+    const t = onlyBrief("13.2");
+    expect(t).not.toContain("⬤");
+    expect(t).not.toMatch(/signale les tests dont le MÉCANISME/);
+  });
+
+  it("reads the mechanism off the test's OWN wording, so no curated table can go stale", () => {
+    // Three shapes, and prose yields nothing rather than a guess.
+    expect(testMarkupTokens(["Chaque balise `<label>` …"])).toEqual(["label"]);
+    expect(testMarkupTokens(['… avec l’attribut `type="image"`'])).toEqual(["type", "type=image"]);
+    expect(testMarkupTokens(["… l’attribut WAI-ARIA `aria-labelledby` …"])).toEqual(["aria-labelledby"]);
+    expect(testMarkupTokens(['… (balise `<object>` avec l’attribut `type="image/…"`)'])).toEqual(["object", "type"]);
+    expect(testMarkupTokens(["Chaque bouton adjacent au champ de formulaire …"])).toEqual([]);
   });
 
   // THE INSTRUMENT, and the reason the WCAG protocol is not borrowed here. `ADJUDICATION` is

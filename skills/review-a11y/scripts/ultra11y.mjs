@@ -44608,11 +44608,23 @@ var selectorFor = (el) => {
   const cls = el.attribs.class ? `.${el.attribs.class.trim().split(/\s+/)[0]}` : "";
   return `${el.tag}${id}${cls}`;
 };
-function h(doc, el, note, cls) {
+var VALUE_BEARING_ATTRS = /* @__PURE__ */ new Set(["role", "type"]);
+function markupOf(el, extra) {
+  const out2 = /* @__PURE__ */ new Set([el.tag.toLowerCase(), ...extra ?? []]);
+  for (const [name2, value] of Object.entries(el.attribs)) {
+    if (typeof value !== "string" || value.trim() === "") continue;
+    const key = name2.toLowerCase();
+    out2.add(key);
+    if (VALUE_BEARING_ATTRS.has(key)) out2.add(`${key}=${value.trim().toLowerCase()}`);
+  }
+  return [...out2];
+}
+function h(doc, el, note, cls, markupExtra) {
   return {
     ev: { file: doc.file, line: el.line, selector: selectorFor(el), snippet: snippet(doc, el, 160), note },
     cls: stable(cls ?? `${el.tag}|${note}`),
-    at: el.start
+    at: el.start,
+    markup: markupOf(el, markupExtra)
   };
 }
 function hAt(doc, line, selector, note, cls) {
@@ -44700,6 +44712,11 @@ function labelFor(doc, el) {
   const wrapping = ancestors(el).find((a) => a.tag === "label");
   return wrapping ? t(wrapping, 40) : "";
 }
+function labelElementTokens(doc, el) {
+  const id = attr(el, "id");
+  if (id && elementsByTag(doc, "label").some((l) => attr(l, "for") === id)) return ["label"];
+  return ancestors(el).some((a) => a.tag === "label") ? ["label"] : [];
+}
 function pageOfDoc(file) {
   const m = /(?:^|\/)\.ultra11y\/pages\/([^/]+)\//.exec(file.replace(/\\/g, "/"));
   return m ? m[1] : void 0;
@@ -44752,7 +44769,8 @@ var SUBJECTS = {
         d,
         e,
         `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" required=${attr(e, "required") !== void 0} describedby="${attr(e, "aria-describedby") ?? ""}"`,
-        `control|${e.tag}|${attr(e, "type") ?? ""}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`
+        `control|${e.tag}|${attr(e, "type") ?? ""}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`,
+        labelElementTokens(d, e)
       )
     )
   ),
@@ -58947,16 +58965,22 @@ function collapse2(harvested, limits) {
       files: new Set(harvested.map((x) => x.ev.file)).size,
       pages: new Set(harvested.map((x) => pageOfDoc(x.ev.file)).filter((x) => x !== void 0)).size
     },
-    complete: groups.length <= limits.maxClasses
+    complete: groups.length <= limits.maxClasses,
+    // Over the WHOLE harvest, not the shown representatives: the cap drops classes, and a
+    // mechanism that exists in the audited scope must not stop being reported because its
+    // class fell past the limit. This only ever LIGHTS a test up, so erring wide is the safe
+    // direction — see `testMarkupTokens`.
+    markup: [...new Set(harvested.flatMap((x) => x.markup ?? []))].sort()
   };
 }
 function blankItem(criteriaId, automatability2, title2, harvested, limits) {
-  const { evidence, population, complete } = collapse2(harvested, limits);
+  const { evidence, population, complete, markup } = collapse2(harvested, limits);
   return {
     criteriaId,
     automatability: automatability2,
     ...title2 ? { title: title2 } : {},
     evidence,
+    ...markup.length ? { markup } : {},
     population,
     evidenceComplete: complete,
     ...complete ? {} : { evidenceTruncated: { shown: evidence.length, total: population.classes } },
@@ -59486,6 +59510,8 @@ var T2 = {
     packIntro: (name2) => `R\xE9f\xE9rentiel actif : **${name2}**. Les items ci-dessous sont des crit\xE8res ${name2}, pas des crit\xE8res de succ\xE8s WCAG. Un \`normativeRef\` DOIT citer un test du crit\xE8re de l'item (par ex. \`11.2.1\`) \u2014 un id WCAG y ressemble mais d\xE9signe un tout autre test et sera rejet\xE9.`,
     packTests: (name2, id) => `Tests ${name2} ${id} \xE0 trancher`,
     methodology: "M\xE9thodologie de test officielle",
+    touched: "la source moissonn\xE9e porte ce m\xE9canisme",
+    touchedLegend: "\xAB \u2B24 \xBB signale les tests dont le M\xC9CANISME appara\xEEt dans la source moissonn\xE9e (la balise ou l'attribut que le test nomme lui-m\xEAme). C'est une aide \xE0 la lecture, pas un verdict : **l'absence de marque n'affirme rien** \u2014 un test non marqu\xE9 reste \xE0 trancher comme les autres, et beaucoup de tests portent sur autre chose que du balisage (un intitul\xE9 visible, un bouton adjacent, un comportement).",
     inheritedDecide: (sc) => `R\xE8gle de d\xE9cision (h\xE9rit\xE9e du crit\xE8re de succ\xE8s WCAG ${sc}, qui pose une question plus large \u2014 le texte du r\xE9f\xE9rentiel prime)`,
     officialSource: (name2, id) => `Texte officiel du crit\xE8re ${name2} ${id}`,
     webLookup: "Le texte ci-dessus est celui du r\xE9f\xE9rentiel : c'est LUI qui tranche. Si une formulation reste ambigu\xEB et que vous disposez d'un outil web, vous POUVEZ consulter la page officielle ci-dessus pour la lever \u2014 jamais pour la contredire, jamais pour \xE9largir un test, et une page web n'est jamais un `normativeRef` : seules les r\xE9f\xE9rences normatives list\xE9es ci-dessous en sont.",
@@ -59525,6 +59551,8 @@ var T2 = {
     packIntro: (name2) => `Active standard: **${name2}**. The items below are ${name2} criteria, not WCAG success criteria. A \`normativeRef\` MUST cite a test OF THE ITEM'S CRITERION (e.g. \`11.2.1\`) \u2014 a WCAG id looks alike but denotes an unrelated test and will be rejected.`,
     packTests: (name2, id) => `${name2} ${id} tests to rule on`,
     methodology: "Official test methodology",
+    touched: "the harvested source carries this mechanism",
+    touchedLegend: "\xAB \u2B24 \xBB marks the tests whose MECHANISM appears in the harvested source (the tag or attribute the test itself names). It is a reading aid, not a verdict: **an unmarked test asserts nothing** \u2014 it is still yours to rule on, and plenty of tests are about something other than markup (a visible label, an adjacent button, a behaviour).",
     inheritedDecide: (sc) => `Decision rule (inherited from WCAG success criterion ${sc}, which asks a broader question \u2014 the standard's own text prevails)`,
     officialSource: (name2, id) => `Official text of ${name2} criterion ${id}`,
     webLookup: "The text above is the standard's own, and it is what decides. If a wording stays ambiguous and you have a web tool, you MAY consult the official page above to settle it \u2014 never to contradict it, never to widen a test, and a web page is never a `normativeRef`: only the normative references listed below are.",
@@ -59552,6 +59580,29 @@ function glossaryBlock(pack, crit, lang) {
   }
   out2.push("");
   return any ? out2 : [];
+}
+function testMarkupTokens(lines) {
+  const out2 = /* @__PURE__ */ new Set();
+  for (const line of lines) {
+    for (const m of line.matchAll(/`([^`]+)`/g)) {
+      const span = (m[1] ?? "").trim();
+      const tag = /^<\s*([a-zA-Z][a-zA-Z0-9-]*)\s*\/?>$/.exec(span);
+      if (tag?.[1]) {
+        out2.add(tag[1].toLowerCase());
+        continue;
+      }
+      const pair = /^([a-zA-Z-]+)\s*=\s*["“]?([^"”]*)["”]?$/.exec(span);
+      if (pair?.[1]) {
+        const name2 = pair[1].toLowerCase();
+        const value = (pair[2] ?? "").trim().toLowerCase();
+        out2.add(name2);
+        if (value && !value.includes("\u2026") && !value.includes("...")) out2.add(`${name2}=${value}`);
+        continue;
+      }
+      if (/^[a-z]+(-[a-z]+)+$/.test(span)) out2.add(span.toLowerCase());
+    }
+  }
+  return [...out2];
 }
 function sourceBlock(s, name2, id, url, web) {
   if (!url) return [];
@@ -59629,10 +59680,19 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
       const tests = crit?.tests ?? {};
       const keys = Object.keys(tests);
       if (keys.length) {
+        const found = new Set(it.markup ?? []);
+        const touched = /* @__PURE__ */ new Map();
+        for (const k of keys) {
+          const wanted = testMarkupTokens(tests[k] ?? []);
+          touched.set(k, wanted.length > 0 && wanted.some((tok) => found.has(tok)));
+        }
+        const anyTouched = [...touched.values()].some(Boolean);
         out2.push(`> **${s.packTests(pack.name, it.criteriaId)}**`, "");
+        if (anyTouched) out2.push(`> ${s.touchedLegend}`, "");
         for (const k of keys) {
           const lines = tests[k] ?? [];
-          out2.push(`- \`${it.criteriaId}.${k}\` ${plainTest(lines[0] ?? "")}`);
+          const mark = anyTouched && touched.get(k) ? ` \u2B24 _(${s.touched})_` : "";
+          out2.push(`- \`${it.criteriaId}.${k}\`${mark} ${plainTest(lines[0] ?? "")}`);
           for (const line of lines.slice(1)) out2.push(`  - ${plainTest(line)}`);
           const method = crit?.methodology?.[k];
           if (method?.trim()) {
@@ -59720,6 +59780,7 @@ function hydrateAdjudication(adj, audit2, opts = {}) {
     if (!full) continue;
     it.evidence = full.evidence;
     if (full.evidenceTruncated) it.evidenceTruncated = full.evidenceTruncated;
+    if (full.markup?.length) it.markup = full.markup;
     if (full.population) it.population = full.population;
     it.evidenceComplete = full.evidenceComplete;
   }
