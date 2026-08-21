@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.23.0](https://github.com/maxgfr/ultra11y/compare/v5.22.1...v5.23.0) (2026-08-21)
+
+
+### Features
+
+* **standards:** decide the doctype criterion, which no engine could reach ([609c2bf](https://github.com/maxgfr/ultra11y/commit/609c2bf3a377e12f7510b5a6b8038ab0a242ffac))
+
 ## [5.22.1](https://github.com/maxgfr/ultra11y/compare/v5.22.0...v5.22.1) (2026-08-20)
 
 
