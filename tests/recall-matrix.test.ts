@@ -41,6 +41,10 @@ const SEED: Record<string, string> = {
   // multimedia
   "media-no-track": `<main><video src="v.mp4" controls></video></main>`,
   "autoplay-media": `<main><audio src="a.mp3" autoplay></audio></main>`,
+  // presentational markup (RGAA 10.1 — advisory on WCAG 1.3.1, normative in the pack)
+  "presentational-element": `<main><center>Titre</center></main>`,
+  "presentational-attribute": `<main><p align="center">Texte</p></main>`,
+  "presentational-spacing": `<main><p>P a r i s</p></main>`,
   // tables (1.3.1)
   "data-table-no-headers": `<main><table><tr><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></table></main>`,
   "table-caption-missing": `<main><table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table></main>`,

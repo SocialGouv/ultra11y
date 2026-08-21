@@ -311,7 +311,10 @@ var wcag_default = {
         "th-no-data-cells",
         "radio-checkbox-group-ungrouped",
         "table-empty-data-cell",
-        "css-generated-content-informative"
+        "css-generated-content-informative",
+        "presentational-element",
+        "presentational-attribute",
+        "presentational-spacing"
       ],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships.html",
       techniques: [
@@ -38119,6 +38122,36 @@ var MSG_CATALOG = {
       en: () => `Remove user-scalable=no and maximum-scale (or set maximum-scale \u2265 2) from the viewport content.`
     }
   },
+  "presentational-element": {
+    message: {
+      fr: (p) => `<${p.tag}> est une balise de pr\xE9sentation \u2014 la mise en forme doit passer par CSS (test RGAA 10.1.1).`,
+      en: (p) => `<${p.tag}> is a presentational element \u2014 styling belongs in CSS (RGAA test 10.1.1).`
+    },
+    remediation: {
+      fr: (p) => `Remplacez <${p.tag}> par un \xE9l\xE9ment porteur de sens (ou un <span>/<div> neutre) et d\xE9placez la mise en forme dans la feuille de styles.`,
+      en: (p) => `Replace <${p.tag}> with a meaningful element (or a neutral <span>/<div>) and move the styling to the stylesheet.`
+    }
+  },
+  "presentational-attribute": {
+    message: {
+      fr: (p) => `Attribut de pr\xE9sentation ${p.attr} sur <${p.tag}> \u2014 la mise en forme doit passer par CSS (test RGAA 10.1.2).`,
+      en: (p) => `Presentational attribute ${p.attr} on <${p.tag}> \u2014 styling belongs in CSS (RGAA test 10.1.2).`
+    },
+    remediation: {
+      fr: (p) => `Retirez ${p.attr} de <${p.tag}> et exprimez la m\xEAme mise en forme dans la feuille de styles.`,
+      en: (p) => `Remove ${p.attr} from <${p.tag}> and express the same styling in the stylesheet.`
+    }
+  },
+  "presentational-spacing": {
+    message: {
+      fr: (p) => p.how === "spelled-out" ? `Mot dont les lettres sont s\xE9par\xE9es par des espaces \u2014 restitu\xE9 lettre \xE0 lettre par un lecteur d'\xE9cran (test RGAA 10.1.3).` : `Suite d'espaces ins\xE9cables utilis\xE9e comme mise en page (test RGAA 10.1.3).`,
+      en: (p) => p.how === "spelled-out" ? `A word whose letters are separated by spaces \u2014 a screen reader reads it out letter by letter (RGAA test 10.1.3).` : `A run of non-breaking spaces used as layout (RGAA test 10.1.3).`
+    },
+    remediation: {
+      fr: (p) => p.how === "spelled-out" ? `\xC9crivez le mot normalement et obtenez l'espacement avec letter-spacing en CSS.` : `Remplacez les espaces ins\xE9cables par une mise en page CSS (grille, colonnes, marges).`,
+      en: (p) => p.how === "spelled-out" ? `Write the word normally and get the spacing from CSS letter-spacing.` : `Replace the non-breaking spaces with CSS layout (grid, columns, margins).`
+    }
+  },
   "css-generated-content-informative": {
     message: {
       fr: (p) => `Contenu g\xE9n\xE9r\xE9 en CSS porteur de texte (content: "${p.text}") : invisible pour les technologies d'assistance.`,
@@ -39586,6 +39619,20 @@ var rgaa_default = {
       }
     }
   ],
+  overrides: {
+    "presentational-element": {
+      advisory: false,
+      severity: "majeur"
+    },
+    "presentational-attribute": {
+      advisory: false,
+      severity: "majeur"
+    },
+    "presentational-spacing": {
+      advisory: false,
+      severity: "majeur"
+    }
+  },
   themes: [
     {
       number: 1,
@@ -41567,7 +41614,7 @@ var rgaa_default = {
       techniques: ["G140", "F32", "F33", "F34", "F48", "C6", "C8", "C18", "C22"],
       wcag: ["1.3.1", "1.3.2"],
       appliesTo: {
-        ruleIds: []
+        ruleIds: ["presentational-attribute", "presentational-element", "presentational-spacing"]
       }
     },
     {
@@ -44125,6 +44172,30 @@ function keyValuePairs(doc) {
   }
   return out2;
 }
+var PRESENTATIONAL_MARKUP_TAGS = /* @__PURE__ */ new Set(["basefont", "big", "blink", "center", "font", "marquee", "s", "strike", "tt"]);
+var PRESENTATIONAL_MARKUP_ATTRS = /* @__PURE__ */ new Set([
+  "align",
+  "alink",
+  "background",
+  "bgcolor",
+  "border",
+  "cellpadding",
+  "cellspacing",
+  "char",
+  "charoff",
+  "clear",
+  "compact",
+  "color",
+  "frameborder",
+  "hspace",
+  "link",
+  "marginheight",
+  "marginwidth",
+  "text",
+  "valign",
+  "vlink",
+  "vspace"
+]);
 var DOWNLOAD_HREF = /\.(pdf|docx?|xlsx?)(?:[?#]|$)/i;
 var STATUS_CLASS = /(error|status|message|alert|notif|toast|feedback|live)/i;
 var ROUTER_IMPORT = /['"](?:react-router(?:-dom)?|next\/(?:router|navigation)|vue-router|@remix-run\/[\w-]+|@tanstack\/[\w-]*router|@sveltejs\/kit|\$app\/(?:navigation|stores))['"]/;
@@ -44482,12 +44553,62 @@ var SUBJECTS = {
     )
   ]),
   // A change of context triggered by focus or by changing a value.
+  // RGAA 7.4 / WCAG 3.2.1-3.2.2. The handlers are half the subject; the OTHER half is what a
+  // script does once it runs, and that is where a context change actually happens: submitting a
+  // form, navigating, opening a window. Looking only for onFocus/onBlur/onChange left the
+  // criterion with an empty harvest on any codebase that binds its handlers in JavaScript
+  // rather than in markup — which is most of them — and an empty harvest is a criterion the
+  // adjudicator can only guess at.
   contextChange: (docs) => docs.flatMap((d) => [
     ...linesOf(d, /\bon(?:Focus|Blur)\s*=/).map(
       (l) => hAt(d, l.line, "handler", `focus handler \u2014 does it change context (navigate, submit, move focus)? ${l.text}`, `onfocus|${l.text}`)
     ),
     ...linesOf(d, /\bonChange\s*=/).map(
       (l) => hAt(d, l.line, "handler", `change handler \u2014 does changing the value itself change context? ${l.text}`, `onchange|${l.text}`)
+    ),
+    ...linesOf(d, /\.submit\s*\(|\brequestSubmit\s*\(/).map(
+      (l) => hAt(d, l.line, "submit", `script submits a form \u2014 is the user warned, or is it a button they pressed? ${l.text}`, `submit|${l.text}`)
+    ),
+    ...linesOf(d, /\blocation\s*\.\s*(?:href|assign|replace)\b|\blocation\s*=|\brouter\s*\.\s*(?:push|replace|navigate)\s*\(/).map(
+      (l) => hAt(d, l.line, "navigate", `script navigates \u2014 is the change announced before it happens? ${l.text}`, `navigate|${l.text}`)
+    ),
+    ...linesOf(d, /\bwindow\s*\.\s*open\s*\(/).map(
+      (l) => hAt(d, l.line, "open", `script opens a window \u2014 is it the user's action? ${l.text}`, `open|${l.text}`)
+    )
+  ]),
+  // RGAA 10.1 — the markup the standard forbids outright. The ENGINE decides this criterion
+  // (src/rules/presentation.ts), so the adjudicator normally never sees it; this exists so the
+  // criterion is never handed over with nothing to read, and so a reader asking « what is this
+  // criterion about here? » gets the elements rather than the page's layout order.
+  presentationalMarkup: (docs) => docs.flatMap(
+    (d) => d.elements.filter((e) => PRESENTATIONAL_MARKUP_TAGS.has(e.tag) || Object.keys(e.attribs).some((a) => PRESENTATIONAL_MARKUP_ATTRS.has(a.toLowerCase()))).map(
+      (e) => h(
+        d,
+        e,
+        `presentational markup: <${e.tag}> \u2014 styling belongs in the stylesheet (RGAA tests 10.1.1 / 10.1.2)`,
+        `presentational|${e.tag}|${Object.keys(e.attribs).sort().join(",")}`
+      )
+    )
+  ),
+  // RGAA 13.2 — « l'ouverture d'une nouvelle fenêtre ne doit pas être déclenchée sans action de
+  // l'utilisateur ». Its own subject, because inheriting `contextChange` through WCAG 3.2.1
+  // handed it focus and change handlers: a real question, and a DIFFERENT one. Measured on run
+  // 32508717451: 13.2 reached the adjudicator with nothing to read, the gate refused its `C`
+  // twice for citing nothing, and it took a third pass to close.
+  //
+  // Three ways a window opens: a `target` that is not the current browsing context, a script
+  // calling `window.open`, and a meta refresh. The first and third are markup; the second is a
+  // literal API call that survives minification.
+  newWindow: (docs) => docs.flatMap((d) => [
+    ...d.elements.filter((e) => {
+      const t3 = (attr(e, "target") ?? "").toLowerCase();
+      return t3 !== "" && t3 !== "_self" && t3 !== "_parent" && t3 !== "_top";
+    }).map(
+      (e) => h(d, e, `target="${attr(e, "target")}" \u2014 opens outside this context; is it the user's action, and is it announced?`, `target|${attr(e, "target")}`)
+    ),
+    ...d.elements.filter((e) => e.tag === "meta" && (attr(e, "http-equiv") ?? "").toLowerCase() === "refresh").map((e) => h(d, e, `meta refresh: content="${attr(e, "content")}" \u2014 a navigation nobody asked for`, `metarefresh|${attr(e, "content")}`)),
+    ...linesOf(d, /\bwindow\s*\.\s*open\s*\(/).map(
+      (l) => hAt(d, l.line, "open", `window.open \u2014 is it reached only from a user action? ${l.text}`, `open|${l.text}`)
     )
   ]),
   // Reading order: anything that moves meaning-bearing content away from DOM order.
@@ -44766,7 +44887,13 @@ var PACK_SUBJECTS = {
     "7.5": ["liveRegions"],
     // Theme 10 — presentation. These ask what survives when CSS is off, what the stylesheet
     // reorders, and what is hidden on purpose.
-    "10.1": ["readingOrder"],
+    //
+    // 10.1 is the exception, and it was mis-pointed: its three tests are the closed list of
+    // forbidden presentational ELEMENTS and ATTRIBUTES plus spaces used as layout, which is
+    // markup — not reading order. `readingOrder` harvested nothing for it, so the criterion
+    // reached the adjudicator with an empty brief and could not be ruled on at all. The engine
+    // decides it now (src/rules/presentation.ts); this names what a reader would look at.
+    "10.1": ["presentationalMarkup"],
     "10.2": ["hiddenContent", "structure"],
     "10.3": ["readingOrder", "structure"],
     "10.4": ["readingOrder"],
@@ -44779,6 +44906,9 @@ var PACK_SUBJECTS = {
     "10.14": ["additionalContent", "focusables", "pointerHandlers"],
     // Theme 13 — consultation.
     "13.1": ["timers"],
+    // 13.2 asks about a window OPENING, which is not the context-change question it inherited
+    // from WCAG 3.2.1. See `newWindow`.
+    "13.2": ["newWindow"],
     "13.3": ["downloadDocs"],
     "13.4": ["downloadDocs"],
     "13.7": ["motion"],
@@ -44788,7 +44918,17 @@ var PACK_SUBJECTS = {
     "13.11": ["pointerHandlers"]
   }
 };
-var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set(["images", "tables", "lists", "links", "controls", "autocomplete", "errors", "frames"]);
+var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set([
+  "images",
+  "tables",
+  "lists",
+  "links",
+  "controls",
+  "autocomplete",
+  "errors",
+  "frames",
+  "downloadDocs"
+]);
 var subjectsForSc = (sc) => SC_SUBJECTS[sc] ?? [];
 function subjectsForPackCriterion(standard, id, scs) {
   const own = PACK_SUBJECTS[standard]?.[id];
@@ -47362,7 +47502,96 @@ var cssGeneratedContentInformative = {
     return out2;
   }
 };
-var presentationRules = [metaViewportZoomBlock, cssGeneratedContentInformative];
+var PRESENTATIONAL_TAGS = /* @__PURE__ */ new Set(["basefont", "big", "blink", "center", "font", "marquee", "s", "strike", "tt"]);
+var PRESENTATIONAL_ATTRS = /* @__PURE__ */ new Set([
+  "align",
+  "alink",
+  "background",
+  "bgcolor",
+  "border",
+  "cellpadding",
+  "cellspacing",
+  "char",
+  "charoff",
+  "clear",
+  "compact",
+  "color",
+  "frameborder",
+  "hspace",
+  "link",
+  "marginheight",
+  "marginwidth",
+  "text",
+  "valign",
+  "vlink",
+  "vspace"
+]);
+var DIMENSION_OK = /* @__PURE__ */ new Set(["img", "object", "embed", "canvas", "svg", "video", "iframe", "source", "input"]);
+var SIZE_OK = /* @__PURE__ */ new Set(["select"]);
+function intrinsic(el) {
+  return el.tag === el.tag.toLowerCase() && !el.tag.includes("-");
+}
+function inSvg(el) {
+  for (let p = el; p; p = p.parent) if (p.tag === "svg") return true;
+  return false;
+}
+var presentationalElement = {
+  id: "presentational-element",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  advisory: true,
+  run(doc) {
+    return doc.elements.filter((el) => intrinsic(el) && PRESENTATIONAL_TAGS.has(el.tag)).map((el) => ({ criteriaId: "1.3.1", el, msgId: "presentational-element", params: { tag: el.tag } }));
+  }
+};
+var presentationalAttribute = {
+  id: "presentational-attribute",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  advisory: true,
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!intrinsic(el) || inSvg(el)) continue;
+      for (const name2 of Object.keys(el.attribs)) {
+        const n = name2.toLowerCase();
+        const hit = PRESENTATIONAL_ATTRS.has(n) || (n === "width" || n === "height") && !DIMENSION_OK.has(el.tag) || n === "size" && !SIZE_OK.has(el.tag);
+        if (!hit) continue;
+        out2.push({ criteriaId: "1.3.1", el, msgId: "presentational-attribute", params: { attr: n, tag: el.tag } });
+        break;
+      }
+    }
+    return out2;
+  }
+};
+var SPELLED_OUT = new RegExp("(?:\\p{L}[ \\u00a0]){4,}\\p{L}", "u");
+var NBSP_RUN = /\u00a0{3,}/u;
+var SPACING_EXEMPT = /* @__PURE__ */ new Set(["pre", "code", "kbd", "samp", "textarea", "script", "style", "svg"]);
+var presentationalSpacing = {
+  id: "presentational-spacing",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  advisory: true,
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!intrinsic(el) || SPACING_EXEMPT.has(el.tag) || inSvg(el)) continue;
+      const direct = el.children.filter((c2) => c2.type === "text").map((c2) => c2.data).join("");
+      if (!direct.trim()) continue;
+      const how = SPELLED_OUT.test(direct) ? "spelled-out" : NBSP_RUN.test(direct) ? "nbsp-run" : void 0;
+      if (!how) continue;
+      out2.push({ criteriaId: "1.3.1", el, msgId: "presentational-spacing", params: { how, tag: el.tag } });
+    }
+    return out2;
+  }
+};
+var presentationRules = [
+  metaViewportZoomBlock,
+  cssGeneratedContentInformative,
+  presentationalElement,
+  presentationalAttribute,
+  presentationalSpacing
+];
 
 // src/rules/colors.ts
 var SKIP_TAGS2 = /* @__PURE__ */ new Set(["script", "style", "head", "title", "meta", "noscript", "link"]);
@@ -53698,7 +53927,7 @@ function derivePackResults(audit2, packKey, pageId) {
       return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag };
     }
     const status = scResults.length ? aggregate2(scResults) : INAPPLICABLE_STATUS;
-    if (status === "manual" && subjectAbsent(pc)) {
+    if (status !== "NC" && subjectAbsent(pc)) {
       return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS, findings, scs: pc.wcag, inapplicable: true };
     }
     const inapplicable = status === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));
@@ -58721,7 +58950,16 @@ var T2 = {
     briefContract: "> **CONTRAT DE VERDICT** \u2014 le pli est FERM\xC9 : un verdict auquel il manque son champ obligatoire est refus\xE9, et son crit\xE8re retourne \xAB \xE0 \xE9valuer \xBB en portant le refus. Renseignez le verdict de CE crit\xE8re, ici :",
     absenceRule: "> **UNE NC EN FORME D'ABSENCE S'ANCRE QUAND M\xCAME.** \xAB Il n'y a pas de second syst\xE8me de navigation \xBB, \xAB il n'y a pas de moteur de recherche \xBB, \xAB aucun message d'erreur ne sugg\xE8re le format attendu \xBB : une absence se CONSTATE quelque part. Citez l'\xE9l\xE9ment et la page o\xF9 vous l'avez constat\xE9e \u2014 le `<nav>`, le `<header>`, le formulaire \u2014 avec son `file`, sa `line` et son `snippet`. Une NC sans `file` est refus\xE9e aussi s\xFBrement qu'un `C` sans citations. Et si le sujet du crit\xE8re n'existe nulle part dans le p\xE9rim\xE8tre audit\xE9, le verdict n'est pas `NC` : c'est `NA`, avec sa justification.",
     incomplete: "LECTURE INCOMPL\xC8TE \u2014 un \xAB C \xBB sera refus\xE9 sur ce crit\xE8re",
-    none: "(aucune \xE9vidence automatique \u2014 d\xE9cidez depuis la source, ou laissez `manual` avec une raison)",
+    // WHAT AN EMPTY HARVEST MAY BE ANSWERED WITH, said outright.
+    //
+    // It used to read « décidez depuis la source, ou laissez `manual` avec une raison », which
+    // invites the one answer the gate always refuses: a `C` with nothing to cite. Measured on
+    // run 32508717451 (Sonnet, RGAA, 3 passes): 10.1 and 13.2 both arrived with an empty
+    // harvest, both were ruled `C`, and the gate refused them — twice for 13.2, three times for
+    // 10.1, which never closed. The model was not being careless; it was told to decide, and it
+    // decided. So the two answers that ARE accepted are named, and the difference between them
+    // is spelled out, because it is a real one.
+    none: "**AUCUNE \xC9VIDENCE MOISSONN\xC9E POUR CE CRIT\xC8RE.** Un `C` sera REFUS\xC9 ici quelle que soit la justification : la porte exige au moins une citation, et il n'y a rien \xE0 citer. Deux r\xE9ponses sont accept\xE9es, et elles ne disent pas la m\xEAme chose \u2014 `NA` : rien dans le p\xE9rim\xE8tre audit\xE9 n'est concern\xE9 (aucun script, aucun document, aucun composant de ce type) ; `manual` avec `reason: \"undecidable\"` : le sujet existe peut-\xEAtre, mais rien ici ne permet de le voir.",
     questions: "\xC0 v\xE9rifier manuellement",
     decide: "R\xE8gle de d\xE9cision",
     na: "Non applicable si",
@@ -58755,7 +58993,7 @@ var T2 = {
     briefContract: "> **VERDICT CONTRACT** \u2014 the fold is FAIL-CLOSED: a verdict missing its required field is refused, and its criterion goes back to \xAB to assess \xBB carrying the refusal. Record THIS criterion's verdict, here:",
     absenceRule: "> **AN NC SHAPED LIKE AN ABSENCE STILL HAS TO BE ANCHORED.** \xAB There is no second navigation system \xBB, \xAB there is no search engine \xBB, \xAB no error message suggests the expected format \xBB: an absence is OBSERVED somewhere. Cite the element and the page you observed it on \u2014 the `<nav>`, the `<header>`, the form \u2014 with its `file`, `line` and `snippet`. An NC with no `file` is refused exactly as surely as a `C` with no citations. And when the criterion's subject exists nowhere in the audited scope, the verdict is not `NC`: it is `NA`, with its justification.",
     incomplete: "INCOMPLETE READING \u2014 a C will be refused on this criterion",
-    none: "(no automatic evidence \u2014 decide from source, or leave `manual` with a reason)",
+    none: '**NO EVIDENCE WAS HARVESTED FOR THIS CRITERION.** A `C` will be REFUSED here however good the justification: the gate requires at least one citation and there is nothing to cite. Two answers are accepted, and they say different things \u2014 `NA`: nothing in the audited scope is concerned (no script, no document, no component of that kind); `manual` with `reason: "undecidable"`: the subject may exist, but nothing here lets you see it.',
     questions: "To verify manually",
     decide: "Decision rule",
     na: "Not applicable when",

@@ -212,6 +212,20 @@
       }
     }
   ],
+  "overrides": {
+    "presentational-element": {
+      "advisory": false,
+      "severity": "majeur"
+    },
+    "presentational-attribute": {
+      "advisory": false,
+      "severity": "majeur"
+    },
+    "presentational-spacing": {
+      "advisory": false,
+      "severity": "majeur"
+    }
+  },
   "themes": [
     {
       "number": 1,
@@ -2193,7 +2207,7 @@
       "techniques": ["G140", "F32", "F33", "F34", "F48", "C6", "C8", "C18", "C22"],
       "wcag": ["1.3.1", "1.3.2"],
       "appliesTo": {
-        "ruleIds": []
+        "ruleIds": ["presentational-attribute", "presentational-element", "presentational-spacing"]
       }
     },
     {

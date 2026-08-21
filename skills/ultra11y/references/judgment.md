@@ -117,7 +117,7 @@ Then `node scripts/ultra11y.mjs verify --apply VERIFY.todo.json` is green again 
 ## Under a country standard, the worklist speaks that standard
 
 `verify --manual --standard rgaa` keys the worklist by **RGAA criteria**, not WCAG success
-criteria — which is the granularity that matters, since 59 of RGAA's 106 criteria can only
+criteria — which is the granularity that matters, since 58 of RGAA's 106 criteria can only
 ever derive `manual`. Each item carries, inline:
 
 - the criterion's **numbered tests, in full** (`11.2.1` … `11.2.6`) — what actually has to be

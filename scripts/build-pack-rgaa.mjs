@@ -310,7 +310,10 @@ async function main() {
   // (link explicitness, WCAG 2.4.4). ADVISORY: it surfaces as a recommendation in the RGAA
   // projection and NEVER makes 6.1 non-conformant. This proves a pack ships its OWN
   // detection without forking the engine (see skills/ultra11y/references/packs.md).
-  const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|epub|mp3|mp4|avi|mov";
+  // Kept in step with the engine instead of retyped: two hand-maintained copies of a rule-id
+// list are two chances for the pack to claim an instrument the engine does not ship.
+const PRESENTATIONAL_RULE_IDS = ["presentational-element", "presentational-attribute", "presentational-spacing"];
+const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|epub|mp3|mp4|avi|mov";
   const rules = [
     {
       id: "download-link-format",
@@ -423,6 +426,28 @@ async function main() {
     c.appliesTo = { ruleIds: [...new Set([...c.appliesTo.ruleIds, `pack:rgaa:${rule.id}`])].sort() };
   }
 
+  // ---- RGAA 10.1 — the engine's presentational-markup rules, and their normativity ----
+  //
+  // 10.1's three tests are « these must be absent », over lists the RGAA closes itself: the
+  // glossary entry « Présentation de l'information » names the forbidden elements and
+  // attributes. The engine ships the instruments (src/rules/presentation.ts); the pack says
+  // they decide THIS criterion, and re-normativizes them.
+  //
+  // They ship ADVISORY because `<center>` is obsolete HTML rather than a WCAG failure —
+  // nothing about it breaks assistive technology, and reporting a WCAG 1.3.1 non-conformity
+  // for it would be wrong. Under the RGAA it is a plain failure of test 10.1.1, so the pack
+  // flips it here. This is what `overrides` is for, and it is the first use of it.
+  //
+  // Before this, 10.1 had NO instrument and inherited `readingOrder` through WCAG 1.3.2 — a
+  // subject that answers a different question — so it reached the adjudicator with an empty
+  // harvest. Measured on run 32508717451 (Sonnet, RGAA, 3 passes): the model ruled `C` three
+  // times, the gate refused all three for citing nothing, and 10.1 was the ONE criterion of
+  // the 106 left « à évaluer », on the run and on every page.
+  const presentational = criteria.find((x) => x.id === "10.1");
+  if (!presentational) throw new Error("build-pack-rgaa: RGAA 10.1 is missing from the referential");
+  presentational.appliesTo = { ruleIds: [...new Set([...presentational.appliesTo.ruleIds, ...PRESENTATIONAL_RULE_IDS])].sort() };
+  const overrides = Object.fromEntries(PRESENTATIONAL_RULE_IDS.map((id) => [id, { advisory: false, severity: "majeur" }]));
+
   const pack = {
     key: "rgaa",
     name: "RGAA",
@@ -505,6 +530,7 @@ async function main() {
       },
     ],
     rules,
+    overrides,
     themes,
     criteria,
   };

@@ -345,7 +345,19 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
     // Otherwise the ordinary non-NC aggregate (C / manual / NA) over the mapped SCs, with
     // any advisory findings kept on the result so the pack view surfaces them.
     const status: Status = scResults.length ? aggregate(scResults) : INAPPLICABLE_STATUS;
-    if (status === "manual" && subjectAbsent(pc)) {
+    // NOTHING OF THAT KIND IS IN SCOPE — asked of any verdict but NC.
+    //
+    // It used to be asked only of `manual`, which quietly missed the case that matters most on
+    // a judgment criterion: `aggregate` ranks a verified `C` above `manual`, so one mapped SC
+    // coming back conforming makes the whole aggregate `C` — and `judgmentGuard` then reopens
+    // that `C` as « à évaluer », because a derived conformity cannot answer a broader question.
+    // The criterion ends up open even though its subject does not exist anywhere in scope.
+    // Measured on RGAA 13.3/13.4 (« ce document bureautique a-t-il une version accessible ? »)
+    // over a site with nothing downloadable: permanently « à évaluer », and the only way to
+    // close them was to pay a model to answer « there are no documents ».
+    //
+    // NC is excluded and stays excluded: something actually fired, so the subject is there.
+    if (status !== "NC" && subjectAbsent(pc)) {
       return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS as Status, findings, scs: pc.wcag, inapplicable: true };
     }
     const inapplicable = status === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));

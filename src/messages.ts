@@ -712,6 +712,48 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
       en: () => `Remove user-scalable=no and maximum-scale (or set maximum-scale ≥ 2) from the viewport content.`,
     },
   },
+  "presentational-element": {
+    message: {
+      fr: (p) => `<${p.tag}> est une balise de présentation — la mise en forme doit passer par CSS (test RGAA 10.1.1).`,
+      en: (p) => `<${p.tag}> is a presentational element — styling belongs in CSS (RGAA test 10.1.1).`,
+    },
+    remediation: {
+      fr: (p) => `Remplacez <${p.tag}> par un élément porteur de sens (ou un <span>/<div> neutre) et déplacez la mise en forme dans la feuille de styles.`,
+      en: (p) => `Replace <${p.tag}> with a meaningful element (or a neutral <span>/<div>) and move the styling to the stylesheet.`,
+    },
+  },
+  "presentational-attribute": {
+    message: {
+      fr: (p) => `Attribut de présentation ${p.attr} sur <${p.tag}> — la mise en forme doit passer par CSS (test RGAA 10.1.2).`,
+      en: (p) => `Presentational attribute ${p.attr} on <${p.tag}> — styling belongs in CSS (RGAA test 10.1.2).`,
+    },
+    remediation: {
+      fr: (p) => `Retirez ${p.attr} de <${p.tag}> et exprimez la même mise en forme dans la feuille de styles.`,
+      en: (p) => `Remove ${p.attr} from <${p.tag}> and express the same styling in the stylesheet.`,
+    },
+  },
+  "presentational-spacing": {
+    message: {
+      fr: (p) =>
+        p.how === "spelled-out"
+          ? `Mot dont les lettres sont séparées par des espaces — restitué lettre à lettre par un lecteur d'écran (test RGAA 10.1.3).`
+          : `Suite d'espaces insécables utilisée comme mise en page (test RGAA 10.1.3).`,
+      en: (p) =>
+        p.how === "spelled-out"
+          ? `A word whose letters are separated by spaces — a screen reader reads it out letter by letter (RGAA test 10.1.3).`
+          : `A run of non-breaking spaces used as layout (RGAA test 10.1.3).`,
+    },
+    remediation: {
+      fr: (p) =>
+        p.how === "spelled-out"
+          ? `Écrivez le mot normalement et obtenez l'espacement avec letter-spacing en CSS.`
+          : `Remplacez les espaces insécables par une mise en page CSS (grille, colonnes, marges).`,
+      en: (p) =>
+        p.how === "spelled-out"
+          ? `Write the word normally and get the spacing from CSS letter-spacing.`
+          : `Replace the non-breaking spaces with CSS layout (grid, columns, margins).`,
+    },
+  },
   "css-generated-content-informative": {
     message: {
       fr: (p) => `Contenu généré en CSS porteur de texte (content: "${p.text}") : invisible pour les technologies d'assistance.`,

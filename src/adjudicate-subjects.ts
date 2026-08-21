@@ -149,6 +149,34 @@ function keyValuePairs(doc: Doc): { key: El; label: string; value: string }[] {
   return out;
 }
 
+// The RGAA's own closed lists (glossary « Présentation de l'information »), kept here only to
+// SURFACE candidates for a reader; the verdict comes from src/rules/presentation.ts, which
+// applies the conditional parts (width/height, size, the <u> caveat) that this does not.
+const PRESENTATIONAL_MARKUP_TAGS = new Set(["basefont", "big", "blink", "center", "font", "marquee", "s", "strike", "tt"]);
+const PRESENTATIONAL_MARKUP_ATTRS = new Set([
+  "align",
+  "alink",
+  "background",
+  "bgcolor",
+  "border",
+  "cellpadding",
+  "cellspacing",
+  "char",
+  "charoff",
+  "clear",
+  "compact",
+  "color",
+  "frameborder",
+  "hspace",
+  "link",
+  "marginheight",
+  "marginwidth",
+  "text",
+  "valign",
+  "vlink",
+  "vspace",
+]);
+
 const DOWNLOAD_HREF = /\.(pdf|docx?|xlsx?)(?:[?#]|$)/i;
 const STATUS_CLASS = /(error|status|message|alert|notif|toast|feedback|live)/i;
 const ROUTER_IMPORT =
@@ -631,6 +659,12 @@ export const SUBJECTS: Record<string, Subject> = {
     ]),
 
   // A change of context triggered by focus or by changing a value.
+  // RGAA 7.4 / WCAG 3.2.1-3.2.2. The handlers are half the subject; the OTHER half is what a
+  // script does once it runs, and that is where a context change actually happens: submitting a
+  // form, navigating, opening a window. Looking only for onFocus/onBlur/onChange left the
+  // criterion with an empty harvest on any codebase that binds its handlers in JavaScript
+  // rather than in markup — which is most of them — and an empty harvest is a criterion the
+  // adjudicator can only guess at.
   contextChange: (docs) =>
     docs.flatMap((d) => [
       ...linesOf(d, /\bon(?:Focus|Blur)\s*=/).map((l) =>
@@ -638,6 +672,60 @@ export const SUBJECTS: Record<string, Subject> = {
       ),
       ...linesOf(d, /\bonChange\s*=/).map((l) =>
         hAt(d, l.line, "handler", `change handler — does changing the value itself change context? ${l.text}`, `onchange|${l.text}`),
+      ),
+      ...linesOf(d, /\.submit\s*\(|\brequestSubmit\s*\(/).map((l) =>
+        hAt(d, l.line, "submit", `script submits a form — is the user warned, or is it a button they pressed? ${l.text}`, `submit|${l.text}`),
+      ),
+      ...linesOf(d, /\blocation\s*\.\s*(?:href|assign|replace)\b|\blocation\s*=|\brouter\s*\.\s*(?:push|replace|navigate)\s*\(/).map((l) =>
+        hAt(d, l.line, "navigate", `script navigates — is the change announced before it happens? ${l.text}`, `navigate|${l.text}`),
+      ),
+      ...linesOf(d, /\bwindow\s*\.\s*open\s*\(/).map((l) =>
+        hAt(d, l.line, "open", `script opens a window — is it the user's action? ${l.text}`, `open|${l.text}`),
+      ),
+    ]),
+
+  // RGAA 10.1 — the markup the standard forbids outright. The ENGINE decides this criterion
+  // (src/rules/presentation.ts), so the adjudicator normally never sees it; this exists so the
+  // criterion is never handed over with nothing to read, and so a reader asking « what is this
+  // criterion about here? » gets the elements rather than the page's layout order.
+  presentationalMarkup: (docs) =>
+    docs.flatMap((d) =>
+      d.elements
+        .filter((e) => PRESENTATIONAL_MARKUP_TAGS.has(e.tag) || Object.keys(e.attribs).some((a) => PRESENTATIONAL_MARKUP_ATTRS.has(a.toLowerCase())))
+        .map((e) =>
+          h(
+            d,
+            e,
+            `presentational markup: <${e.tag}> — styling belongs in the stylesheet (RGAA tests 10.1.1 / 10.1.2)`,
+            `presentational|${e.tag}|${Object.keys(e.attribs).sort().join(",")}`,
+          ),
+        ),
+    ),
+
+  // RGAA 13.2 — « l'ouverture d'une nouvelle fenêtre ne doit pas être déclenchée sans action de
+  // l'utilisateur ». Its own subject, because inheriting `contextChange` through WCAG 3.2.1
+  // handed it focus and change handlers: a real question, and a DIFFERENT one. Measured on run
+  // 32508717451: 13.2 reached the adjudicator with nothing to read, the gate refused its `C`
+  // twice for citing nothing, and it took a third pass to close.
+  //
+  // Three ways a window opens: a `target` that is not the current browsing context, a script
+  // calling `window.open`, and a meta refresh. The first and third are markup; the second is a
+  // literal API call that survives minification.
+  newWindow: (docs) =>
+    docs.flatMap((d) => [
+      ...d.elements
+        .filter((e) => {
+          const t = (attr(e, "target") ?? "").toLowerCase();
+          return t !== "" && t !== "_self" && t !== "_parent" && t !== "_top";
+        })
+        .map((e) =>
+          h(d, e, `target="${attr(e, "target")}" — opens outside this context; is it the user's action, and is it announced?`, `target|${attr(e, "target")}`),
+        ),
+      ...d.elements
+        .filter((e) => e.tag === "meta" && (attr(e, "http-equiv") ?? "").toLowerCase() === "refresh")
+        .map((e) => h(d, e, `meta refresh: content="${attr(e, "content")}" — a navigation nobody asked for`, `metarefresh|${attr(e, "content")}`)),
+      ...linesOf(d, /\bwindow\s*\.\s*open\s*\(/).map((l) =>
+        hAt(d, l.line, "open", `window.open — is it reached only from a user action? ${l.text}`, `open|${l.text}`),
       ),
     ]),
 
@@ -973,7 +1061,13 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "7.5": ["liveRegions"],
     // Theme 10 — presentation. These ask what survives when CSS is off, what the stylesheet
     // reorders, and what is hidden on purpose.
-    "10.1": ["readingOrder"],
+    //
+    // 10.1 is the exception, and it was mis-pointed: its three tests are the closed list of
+    // forbidden presentational ELEMENTS and ATTRIBUTES plus spaces used as layout, which is
+    // markup — not reading order. `readingOrder` harvested nothing for it, so the criterion
+    // reached the adjudicator with an empty brief and could not be ruled on at all. The engine
+    // decides it now (src/rules/presentation.ts); this names what a reader would look at.
+    "10.1": ["presentationalMarkup"],
     "10.2": ["hiddenContent", "structure"],
     "10.3": ["readingOrder", "structure"],
     "10.4": ["readingOrder"],
@@ -986,6 +1080,9 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "10.14": ["additionalContent", "focusables", "pointerHandlers"],
     // Theme 13 — consultation.
     "13.1": ["timers"],
+    // 13.2 asks about a window OPENING, which is not the context-change question it inherited
+    // from WCAG 3.2.1. See `newWindow`.
+    "13.2": ["newWindow"],
     "13.3": ["downloadDocs"],
     "13.4": ["downloadDocs"],
     "13.7": ["motion"],
@@ -1032,7 +1129,24 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
 // hand-written applicability predicates in src/audit.ts, which are more careful than any
 // subject here and which win outright where they exist. The pack criteria that map onto them
 // inherit the NA through the derivation, so nothing is lost by leaving them out.
-export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set(["images", "tables", "lists", "links", "controls", "autocomplete", "errors", "frames"]);
+// `downloadDocs` earns its place by the same test as the rest: it collects an element species
+// by tag and attribute — `a[href]` whose target is an office document — so « no office document
+// is linked anywhere in scope » is a fact a reader can check, not a heuristic's silence. It
+// closes RGAA 13.3 and 13.4, whose question (« is there an accessible version? ») is a question
+// about nothing when there is nothing to download. Its recall is not perfect — a document
+// served from an extensionless URL is missed — which is true of every subject here and is why
+// absence is only ever read as « nothing of that kind is in scope », never as conformance.
+export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
+  "images",
+  "tables",
+  "lists",
+  "links",
+  "controls",
+  "autocomplete",
+  "errors",
+  "frames",
+  "downloadDocs",
+]);
 
 /** The subjects that decide a success criterion. Empty ⇒ the criterion has none declared,
  *  which `tests/harvest-coverage.test.ts` refuses for any criterion the engine hands over. */

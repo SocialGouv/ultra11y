@@ -10,7 +10,7 @@
 //   - `automatability` per WCAG success criterion (src/data/wcag.json): 3 static,
 //     14 needs-rendering, 38 judgment — the 3/14/38 arithmetic quoted across the tool.
 //   - `appliesTo.ruleIds` per pack criterion: which engine rules can evidence it. EMPTY is
-//     a statement, not a gap — 58 of RGAA's 106 criteria say "no engine rule can attest
+//     a statement, not a gap — 56 of RGAA's 106 criteria say "no engine rule can attest
 //     this", and that fact is the single most useful thing in an audit plan.
 //   - `judgment: true` per pack criterion: the criterion asks more than its mapped SCs, so
 //     `judgmentGuard` in derive.ts refuses to let it inherit a Conforming verdict.

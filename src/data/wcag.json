@@ -295,7 +295,10 @@
         "th-no-data-cells",
         "radio-checkbox-group-ungrouped",
         "table-empty-data-cell",
-        "css-generated-content-informative"
+        "css-generated-content-informative",
+        "presentational-element",
+        "presentational-attribute",
+        "presentational-spacing"
       ],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships.html",
       "techniques": [

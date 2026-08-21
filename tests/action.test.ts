@@ -326,7 +326,7 @@ describe("the bash is safe under `set -e`", () => {
   });
 });
 
-// The judgment criteria — 38 of the 55 WCAG ones, 59 of RGAA's 106 — that no static pass can
+// The judgment criteria — 38 of the 55 WCAG ones, 58 of RGAA's 106 — that no static pass can
 // decide. In a coding agent the agent rules on them; in CI nobody does, so without this tier
 // they stay « à évaluer » forever and the published conformance rate is partial by
 // construction. Everything here is opt-in, and everything degrades.

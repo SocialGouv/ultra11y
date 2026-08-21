@@ -200,7 +200,7 @@ nothing.
 ```
 
 Steps 2 and 5 are the ones that make it a rule engine rather than a linter. Skipping step 2
-means auditing without knowing that 59 of 106 criteria were never going to be decided by a
+means auditing without knowing that 58 of 106 criteria were never going to be decided by a
 tool; skipping the lookups in step 5 means ruling on criteria from memory.
 
 **A criterion nobody tested is untested, never conformant.** Every tool description repeats

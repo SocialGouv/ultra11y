@@ -1264,7 +1264,16 @@ const T = {
     absenceRule:
       "> **UNE NC EN FORME D'ABSENCE S'ANCRE QUAND MÊME.** « Il n'y a pas de second système de navigation », « il n'y a pas de moteur de recherche », « aucun message d'erreur ne suggère le format attendu » : une absence se CONSTATE quelque part. Citez l'élément et la page où vous l'avez constatée — le `<nav>`, le `<header>`, le formulaire — avec son `file`, sa `line` et son `snippet`. Une NC sans `file` est refusée aussi sûrement qu'un `C` sans citations. Et si le sujet du critère n'existe nulle part dans le périmètre audité, le verdict n'est pas `NC` : c'est `NA`, avec sa justification.",
     incomplete: "LECTURE INCOMPLÈTE — un « C » sera refusé sur ce critère",
-    none: "(aucune évidence automatique — décidez depuis la source, ou laissez `manual` avec une raison)",
+    // WHAT AN EMPTY HARVEST MAY BE ANSWERED WITH, said outright.
+    //
+    // It used to read « décidez depuis la source, ou laissez `manual` avec une raison », which
+    // invites the one answer the gate always refuses: a `C` with nothing to cite. Measured on
+    // run 32508717451 (Sonnet, RGAA, 3 passes): 10.1 and 13.2 both arrived with an empty
+    // harvest, both were ruled `C`, and the gate refused them — twice for 13.2, three times for
+    // 10.1, which never closed. The model was not being careless; it was told to decide, and it
+    // decided. So the two answers that ARE accepted are named, and the difference between them
+    // is spelled out, because it is a real one.
+    none: "**AUCUNE ÉVIDENCE MOISSONNÉE POUR CE CRITÈRE.** Un `C` sera REFUSÉ ici quelle que soit la justification : la porte exige au moins une citation, et il n'y a rien à citer. Deux réponses sont acceptées, et elles ne disent pas la même chose — `NA` : rien dans le périmètre audité n'est concerné (aucun script, aucun document, aucun composant de ce type) ; `manual` avec `reason: \"undecidable\"` : le sujet existe peut-être, mais rien ici ne permet de le voir.",
     questions: "À vérifier manuellement",
     decide: "Règle de décision",
     na: "Non applicable si",
@@ -1303,7 +1312,7 @@ const T = {
     absenceRule:
       "> **AN NC SHAPED LIKE AN ABSENCE STILL HAS TO BE ANCHORED.** « There is no second navigation system », « there is no search engine », « no error message suggests the expected format »: an absence is OBSERVED somewhere. Cite the element and the page you observed it on — the `<nav>`, the `<header>`, the form — with its `file`, `line` and `snippet`. An NC with no `file` is refused exactly as surely as a `C` with no citations. And when the criterion's subject exists nowhere in the audited scope, the verdict is not `NC`: it is `NA`, with its justification.",
     incomplete: "INCOMPLETE READING — a C will be refused on this criterion",
-    none: "(no automatic evidence — decide from source, or leave `manual` with a reason)",
+    none: '**NO EVIDENCE WAS HARVESTED FOR THIS CRITERION.** A `C` will be REFUSED here however good the justification: the gate requires at least one citation and there is nothing to cite. Two answers are accepted, and they say different things — `NA`: nothing in the audited scope is concerned (no script, no document, no component of that kind); `manual` with `reason: "undecidable"`: the subject may exist, but nothing here lets you see it.',
     questions: "To verify manually",
     decide: "Decision rule",
     na: "Not applicable when",
