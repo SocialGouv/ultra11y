@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAudit } from "../src/audit.js";
 import { buildAdjudicationWorklist, applyAdjudication, formatAdjudication, type AdjudicationFile, type AdjudicationItem } from "../src/adjudicate.js";
-import { derivePackResults } from "../src/standards/index.js";
+import { derivePackResults, getCriterion, loadPack } from "../src/standards/index.js";
 
 const dir = mkdtempSync(join(tmpdir(), "u11y-adj-pack-"));
 const PAGE = join(dir, "page.html");
@@ -196,6 +196,90 @@ describe("the rendered worklist is self-sufficient", () => {
     const t = md();
     expect(t).toContain("11.2.1");
     expect(t).toMatch(/fonction exacte/); // real test wording, not a summary
+  });
+
+  // THE INSTRUMENT, and the reason the WCAG protocol is not borrowed here. `ADJUDICATION` is
+  // keyed by success criterion — 52 keys, every one of them three segments — so a lookup on
+  // an RGAA id (two segments) could only ever miss, and for a long time the pack brief
+  // carried the numbered tests with nothing that said how to read them.
+  it("renders the standard's OWN test methodology under each test", () => {
+    const t = md();
+    expect(t).toContain("Méthodologie de test officielle");
+    // 11.2.1's real procedure, verbatim from DINUM's methodologies.json.
+    expect(t).toMatch(/Retrouver dans le document les champs de formulaire dont l’étiquette est fournie par un élément/);
+  });
+
+  it("does NOT borrow a WCAG decision rule for a criterion that has its own methodology", () => {
+    // Every RGAA criterion documents every one of its tests (258/258), so the crosswalk
+    // fallback never fires here — and a borrowed rule must never pass for the standard's own.
+    expect(md()).not.toContain("Règle de décision (héritée");
+  });
+
+  it("labels the borrowed rule as inherited when a criterion has no methodology of its own", () => {
+    // A pack that ships no methodology (a freshly authored Section 508 / EN 301 549) still
+    // gets an instrument — announced as the WCAG success criterion's, never as its own.
+    const crit = getCriterion(loadPack("rgaa"), "11.2")!;
+    const saved = crit.methodology;
+    delete (crit as { methodology?: unknown }).methodology;
+    try {
+      const t = formatAdjudication(
+        rgaaItems().filter((i) => i.criteriaId === "11.2"),
+        "fr",
+        "rgaa",
+      );
+      expect(t).toMatch(/Règle de décision \(héritée du critère de succès WCAG (2\.4\.6|2\.5\.3|3\.3\.2)/);
+    } finally {
+      (crit as { methodology?: unknown }).methodology = saved;
+    }
+  });
+
+  it("cites the criterion's official page, and says a web page is never a normativeRef", () => {
+    const withWeb = formatAdjudication(rgaaItems(), "fr", "rgaa", { web: true });
+    expect(withWeb).toContain("https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#11.2");
+    expect(withWeb).toMatch(/n'est jamais un `normativeRef`/);
+  });
+
+  // The URL is a FACT (where the vendored text came from) and always renders; the invitation
+  // to go read it is an INSTRUCTION, and it is only true where a web tool exists. In CI the
+  // adjudicator holds Read/Grep/Glob/Edit/Write, and offering it a tool it cannot call spends
+  // turns it needs for the 96 criteria in front of it.
+  it("keeps the URL but drops the web invitation when the harness has no web tool", () => {
+    const noWeb = md();
+    expect(noWeb).toContain("https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#11.2");
+    expect(noWeb).not.toMatch(/vous POUVEZ consulter la page officielle/);
+    // …and that is the ONLY difference between the two briefs.
+    const kept = new Set(noWeb.split("\n"));
+    const extra = formatAdjudication(rgaaItems(), "fr", "rgaa", { web: true })
+      .split("\n")
+      .filter((l) => l !== "" && !kept.has(l));
+    expect(extra.every((l) => l.includes("normativeRef"))).toBe(true);
+  });
+
+  // WITH NO WEB TOOL, THE BRIEF IS STILL COMPLETE. This is the load-bearing property of the
+  // whole design: the standard travels vendored — criteria, numbered tests, official test
+  // methodology, glossary, technical notes, particular cases — so an adjudicator that cannot
+  // reach the network rules from the referential's own text and not from recollection. The
+  // URL is an aid to a reader, never a dependency of the decision.
+  it("carries everything needed to rule OFFLINE, with no web tool at all", () => {
+    const t = formatAdjudication(
+      rgaaItems().filter((i) => i.criteriaId === "11.2"),
+      "fr",
+      "rgaa",
+    );
+    // The criterion, in the standard's own words.
+    expect(t).toContain("Chaque étiquette associée à un champ de formulaire est-elle pertinente");
+    // Every one of its numbered tests…
+    for (const k of [1, 2, 3, 4, 5, 6]) expect(t, `test 11.2.${k}`).toContain(`11.2.${k}`);
+    // …each with the official procedure for running it.
+    expect(t.match(/Méthodologie de test officielle/g)?.length).toBe(6);
+    // The normatively-defined terms those tests are written in.
+    expect(t).toContain("Intitulé visible");
+    // The exceptions the standard itself attaches to them.
+    expect(t).toContain("Cas particuliers");
+    // And the references a verdict may cite — the criterion's own tests, nothing else.
+    expect(t).toMatch(/les tests RGAA de ce critère, et eux seuls/);
+    // Nothing in the ruling material is behind a link.
+    expect(t).not.toMatch(/consultez|voir la page|see the page/i);
   });
 
   it("proposes ONLY citable references the gate will accept", () => {

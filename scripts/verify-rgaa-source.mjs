@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // DEV-ONLY (not in `bin`, not bundled, never run by tests — needs network). Proves that
-// the vendored RGAA source (scripts/vendor/rgaa/criteres.json + glossaire.json), which
-// scripts/build-pack-rgaa.mjs derives the shipped pack from, is still faithful to the
+// the vendored RGAA source (scripts/vendor/rgaa/criteres.json + glossaire.json +
+// methodologies.json), which scripts/build-pack-rgaa.mjs derives the shipped pack from, is
+// still faithful to the
 // official DINUM source (github.com/DISIC/accessibilite.numerique.gouv.fr, RGAA 4.1.2,
-// same raw path as build-pack-rgaa.mjs's BASE). Does a DEEP, per-criterion / per-glossary-
-// entry diff (not just a whole-file hash) so drift reads as "critère 4.2: tests differs"
-// rather than an opaque "files differ". Refreshes scripts/vendor/rgaa/SOURCE.json with a
+// same raw path as build-pack-rgaa.mjs's BASE). Does a DEEP, per-criterion /
+// per-glossary-entry / per-test diff (not just a whole-file hash) so drift reads as
+// "critère 4.2: tests differs" rather than an opaque "files differ". Refreshes scripts/vendor/rgaa/SOURCE.json with a
 // provenance record on every run (clean or drifted) so the last verification is traceable.
 //   node scripts/verify-rgaa-source.mjs
 import { writeFileSync, readFileSync } from "node:fs";
@@ -20,7 +21,7 @@ const REPO = "accessibilite.numerique.gouv.fr";
 const BRANCH = "main";
 const UPSTREAM_DIR = "RGAA"; // same path as build-pack-rgaa.mjs's BASE
 const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${UPSTREAM_DIR}`;
-const FILES = ["criteres.json", "glossaire.json"];
+const FILES = ["criteres.json", "glossaire.json", "methodologies.json"];
 
 const sha256 = (s) => createHash("sha256").update(s).digest("hex");
 
@@ -89,6 +90,21 @@ function diffGlossary(upstream, vendored) {
   return drift.sort();
 }
 
+// Per-test diff over the official méthodologie de test (keyed by full test id, "11.2.1").
+// The pack re-keys these under their criterion, so a silent upstream edit here changes what
+// an adjudicator is told to DO without changing a single criterion's wording.
+function diffMethodologies(upstream, vendored) {
+  const drift = [];
+  for (const id of new Set([...Object.keys(upstream), ...Object.keys(vendored)])) {
+    const a = upstream[id];
+    const b = vendored[id];
+    if (a === undefined) drift.push(`méthodologie ${id} : présente dans le vendored, absente en amont`);
+    else if (b === undefined) drift.push(`méthodologie ${id} : présente en amont, absente du vendored`);
+    else if (a !== b) drift.push(`méthodologie ${id} : texte différent`);
+  }
+  return drift.sort();
+}
+
 async function main() {
   const upstreamText = {};
   for (const name of FILES) upstreamText[name] = await fetchText(name);
@@ -98,6 +114,7 @@ async function main() {
   const drift = [
     ...diffCriteria(JSON.parse(upstreamText["criteres.json"]), JSON.parse(vendoredText["criteres.json"])),
     ...diffGlossary(JSON.parse(upstreamText["glossaire.json"]), JSON.parse(vendoredText["glossaire.json"])),
+    ...diffMethodologies(JSON.parse(upstreamText["methodologies.json"]), JSON.parse(vendoredText["methodologies.json"])),
   ];
 
   const upstreamCommit = await fetchUpstreamCommit();

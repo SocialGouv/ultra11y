@@ -151,6 +151,18 @@ export function validatePack(raw: unknown, opts: ValidateOpts = {}): PackValidat
     else idRe = new RegExp(p.idPattern);
   }
 
+  // Optional `criterionUrl` template (src/standards/types.ts StandardPack.criterionUrl).
+  // Must be an https URL carrying exactly one `{id}` placeholder: the brief renders the
+  // result as a link an adjudicator may follow, so a pack must not be able to point one at
+  // an arbitrary scheme, and a template with no placeholder would send every criterion to
+  // the same page.
+  if (p.criterionUrl !== undefined) {
+    const t = p.criterionUrl;
+    if (typeof t !== "string" || t.trim() === "") err("criterionUrl", "criterionUrl must be a non-empty string template");
+    else if (!t.startsWith("https://")) err("criterionUrl", "criterionUrl must be an https:// URL template");
+    else if (!t.includes("{id}")) err("criterionUrl", "criterionUrl must contain the `{id}` placeholder");
+  }
+
   const themes = Array.isArray(p.themes) ? (p.themes as Record<string, unknown>[]) : null;
   if (!themes) err("themes", "themes must be an array");
   const themeNumbers = new Set<number>();
@@ -204,6 +216,24 @@ export function validatePack(raw: unknown, opts: ValidateOpts = {}): PackValidat
           if (typeof r !== "string" || r.trim() === "")
             err(`criteria[${i}].appliesTo.ruleIds[${k}]`, `criterion "${String(id)}" appliesTo.ruleIds must be non-empty strings`);
         });
+      }
+    }
+    // Optional official TEST METHODOLOGY (src/standards/types.ts PackCriterion.methodology).
+    // Present → must be a flat { [testKey]: string } whose keys are test numbers this
+    // criterion actually declares: a methodology keyed to a test that does not exist would
+    // render under nothing, and is either a re-key bug or a fabricated procedure.
+    if (c?.methodology !== undefined) {
+      const m = c.methodology;
+      if (!m || typeof m !== "object" || Array.isArray(m)) {
+        err(`criteria[${i}].methodology`, `criterion "${String(id)}" methodology must be an object { [testKey]: string }`);
+      } else {
+        const tests = c?.tests && typeof c.tests === "object" && !Array.isArray(c.tests) ? (c.tests as Record<string, unknown>) : {};
+        for (const [k, v] of Object.entries(m as Record<string, unknown>)) {
+          if (typeof v !== "string" || v.trim() === "")
+            err(`criteria[${i}].methodology.${k}`, `criterion "${String(id)}" methodology.${k} must be a non-empty string`);
+          if (!Object.hasOwn(tests, k))
+            err(`criteria[${i}].methodology.${k}`, `criterion "${String(id)}" has a methodology for test ${k}, which it does not declare`);
+        }
       }
     }
     const wcag = Array.isArray(c?.wcag) ? (c.wcag as unknown[]) : null;

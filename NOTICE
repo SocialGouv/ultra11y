@@ -84,14 +84,16 @@ d'Amélioration de l'Accessibilité (RGAA), version 4.1.2, published by the
 Direction interministérielle du numérique (DINUM / DISIC) of the French government.
 
 Source: https://github.com/DISIC/accessibilite.numerique.gouv.fr
-        (RGAA/criteres.json, RGAA/glossaire.json)
+        (RGAA/criteres.json, RGAA/glossaire.json, RGAA/methodologies.json)
 
 The RGAA content is published under the Licence Ouverte / Open License 2.0
 (Etalab): https://www.etalab.gouv.fr/licence-ouverte-open-licence/
 
 ultra11y restructures this content into a standards pack (composing dotted
 criterion ids, deriving plain-text titles, mapping each criterion to bare WCAG
-success-criterion ids, stripping glossary HTML) but does not alter its meaning.
+success-criterion ids, stripping glossary HTML, re-keying each official test
+methodology under the criterion whose test it documents) but does not alter its
+meaning.
 Attribution: « RGAA 4.1.2 — DINUM ».
 
 ================================================================================

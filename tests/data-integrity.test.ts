@@ -47,6 +47,38 @@ describe("RGAA pack dataset integrity", () => {
     }
   });
 
+  // THE OFFICIAL TEST METHODOLOGY, one per numbered test. This is the instrument a pack
+  // criterion is adjudicated with — without it the brief falls back on the WCAG success
+  // criterion's decision rule, which routinely answers a broader question. RGAA documents
+  // every one of its tests, so anything short of total coverage here is a build regression
+  // (a re-key bug, or a vendored file that came back truncated), not an upstream gap.
+  it("every numbered test carries the standard's own methodology, and none is orphaned", () => {
+    let tests = 0;
+    let documented = 0;
+    for (const c of rgaa.criteria) {
+      const keys = Object.keys(c.tests ?? {});
+      expect(keys.length, `${c.id} declares no test`).toBeGreaterThan(0);
+      tests += keys.length;
+      for (const k of keys) {
+        const m = c.methodology?.[k];
+        expect(typeof m, `methodology of ${c.id}.${k}`).toBe("string");
+        expect((m ?? "").trim().length, `methodology of ${c.id}.${k} is empty`).toBeGreaterThan(0);
+        documented++;
+      }
+      // A methodology keyed to a test the criterion does not declare would render under
+      // nothing at all — the silent half of a re-key bug.
+      for (const k of Object.keys(c.methodology ?? {})) {
+        expect(Object.hasOwn(c.tests ?? {}, k), `${c.id} documents a test ${k} it does not declare`).toBe(true);
+      }
+    }
+    expect(tests).toBe(258);
+    expect(documented).toBe(258);
+  });
+
+  it("publishes each criterion's official page as a single-placeholder https template", () => {
+    expect(rgaa.criterionUrl).toBe("https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#{id}");
+  });
+
   it("the removed 4.1.1 Parsing (RGAA 8.1's only mapping) classifies as exactly 'removed' — strict, nothing unknown tolerated", () => {
     expect(knownScStatus("4.1.1")).toBe("removed");
     expect(knownScStatus("9.9.9")).toBeUndefined(); // a fabricated id is UNKNOWN, not a status

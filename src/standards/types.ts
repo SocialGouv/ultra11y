@@ -22,6 +22,16 @@ export interface PackCriterion {
   title: LocaleString;
   titlePlain: LocaleString;
   tests?: Record<string, string[]>;
+  // The standard's OWN test methodology, keyed by the same test numbers as `tests`: the
+  // step-by-step procedure the referential publishes for each test. `tests` states WHAT is
+  // required; this states HOW it is verified, in the standard's words rather than a
+  // paraphrase. RGAA ships one for all 258 of its tests (DINUM's methodologies.json).
+  //
+  // It is what makes a pack criterion self-sufficient for an adjudicator: without it, a
+  // country-standard brief could only borrow the decision rule of a WCAG success criterion
+  // that asks a broader — sometimes different — question. Optional and additive, like
+  // `appliesTo`: a pack that ships none is unaffected.
+  methodology?: Record<string, string>;
   techniques?: string[];
   technicalNote?: string[];
   particularCases?: string[];
@@ -219,6 +229,13 @@ export interface StandardPack {
   source: string;
   attribution: string;
   idPattern: string; // regex (string) the pack's criterion ids match
+  // Where the standard PUBLISHES a criterion, as a template with a single `{id}` placeholder
+  // (e.g. "https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#{id}"). The
+  // adjudication brief cites it so a reader — a model with a web tool, or a human reviewing
+  // the brief — can reach the normative page this criterion was derived from. Optional: a
+  // pack that declares none simply carries no link, and nothing France-specific is ever
+  // hard-coded in the engine.
+  criterionUrl?: string;
   vocabulary?: PackVocabulary; // localized auditor-display terms (optional; defaults apply)
   sampleMethodology?: SampleMethodology; // normative required page kinds (optional; advisory lint)
   // Declarative pack-only detection (optional). Each rule runs AFTER the core engine

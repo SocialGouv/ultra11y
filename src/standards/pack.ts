@@ -54,6 +54,12 @@ export function packTestIds(pack: StandardPack, id: string): string[] {
   return tests ? Object.keys(tests).map((k) => `${id}.${k}`) : [];
 }
 
+/** Where the standard publishes this criterion, from the pack's `criterionUrl` template.
+ *  Undefined when the pack declares none — the engine never guesses a URL for a standard. */
+export function criterionUrl(pack: StandardPack, id: string): string | undefined {
+  return pack.criterionUrl ? pack.criterionUrl.replaceAll("{id}", id) : undefined;
+}
+
 export function resolveGlossary(packKey: string, anchor: string): GlossaryEntry | undefined {
   return packGlossary(packKey)?.[anchor];
 }

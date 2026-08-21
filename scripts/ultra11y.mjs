@@ -39419,6 +39419,7 @@ var rgaa_default = {
   source: "https://github.com/DISIC/accessibilite.numerique.gouv.fr",
   attribution: "RGAA 4.1.2 \xA9 DINUM (Direction interminist\xE9rielle du num\xE9rique) \u2014 Licence Ouverte / Etalab 2.0",
   idPattern: "^\\d+\\.\\d+$",
+  criterionUrl: "https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#{id}",
   vocabulary: {
     theme: {
       fr: "Th\xE9matique"
@@ -39774,6 +39775,16 @@ var rgaa_default = {
           "Un m\xE9canisme permet \xE0 l\u2019utilisateur de remplacer l\u2019\xE9l\xE9ment `<canvas>` par un [contenu alternatif](#contenu-alternatif)."
         ]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les images structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<img>` ou d\u2019un \xE9l\xE9ment poss\xE9dant l\u2019attribut WAI-ARIA `role="img"`\xA0;\n2. Pour chaque image, d\xE9terminer si l\u2019image est porteuse d\u2019information\xA0;\n3. Dans le cas o\xF9 il s\u2019agit d\u2019un \xE9l\xE9ment `<img>`, v\xE9rifier que l\u2019image est pourvue au moins d\u2019une alternative textuelle parmi les suivantes\xA0:\n   - Passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby`\xA0;\n   - Contenu de l\u2019attribut WAI-ARIA `aria-label`\xA0;\n   - Contenu de l\u2019attribut `alt`\xA0;\n   - Contenu de l\u2019attribut `title`.\n4. Dans le cas o\xF9 il s\u2019agit d\u2019un \xE9l\xE9ment poss\xE9dant l\u2019attribut WAI-ARIA `role="img"`, v\xE9rifier que l\u2019image est pourvue au moins d\u2019une alternative textuelle parmi les suivantes\xA0:\n   - Passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby`\xA0;\n   - Contenu de l\u2019attribut WAI-ARIA `aria-label`.\n5. Si au moins une alternative textuelle est trouv\xE9e, **le test est valid\xE9**.',
+        "2": "1. Retrouver dans le document les \xE9l\xE9ments `<area>`\xA0;\n2. Pour chaque \xE9l\xE9ment `<area>`, d\xE9terminer si la zone r\xE9active est porteuse d\u2019information\xA0;\n3. V\xE9rifier que la zone r\xE9active est pourvue au moins d\u2019une alternative textuelle parmi les suivantes\xA0:\n   - Contenu de l\u2019attribut WAI-ARIA `aria-label`\xA0;\n   - Contenu de l\u2019attribut `alt`\xA0;\n4. Si au moins une alternative textuelle est trouv\xE9e, **le test est valid\xE9**.",
+        "3": '1. Retrouver dans le document les \xE9l\xE9ments `<input>` pourvus de l\u2019attribut `type="image"`\xA0;\n2. Pour chaque \xE9l\xE9ment `<input>` pourvu de l\u2019attribut type="image", d\xE9terminer si l\u2019image utilis\xE9e est porteuse d\u2019information\xA0;\n3. V\xE9rifier que l\u2019\xE9l\xE9ment `<input>` est pourvu au moins d\u2019une alternative textuelle parmi les suivantes\xA0:\n   - Passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby`\xA0;\n   - Contenu de l\u2019attribut WAI-ARIA `aria-label`\xA0;\n   - Contenu de l\u2019attribut `alt`\xA0;\n   - Contenu de l\u2019attribut `title`.\n4. Si au moins une alternative textuelle est trouv\xE9e, **le test est valid\xE9**.',
+        "4": "1. Retrouver dans le document les \xE9l\xE9ments `<img>` pourvus de l\u2019attribut `ismap`\xA0;\n2. Pour chaque \xE9l\xE9ment `<img>` pourvu de l\u2019attribut `ismap`, v\xE9rifier la pr\xE9sence d\u2019un lien ou d\u2019un ensemble de liens (ou bien d\u2019un autre type de composant d\u2019interface qui jouerait un r\xF4le similaire comme une liste de s\xE9lection, par exemple) permettant d\u2019acc\xE9der aux m\xEAmes ressources que lorsque l\u2019image fait l\u2019objet d\u2019un clic.\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "5": '1. Retrouver dans le document les \xE9l\xE9ments `<svg>`\xA0;\n2. Pour chaque \xE9l\xE9ment `<svg>`, d\xE9terminer si l\u2019image est porteuse d\u2019information\xA0;\n3. S\u2019assurer que l\u2019\xE9l\xE9ment `<svg>` est pourvu d\u2019un attribut WAI-ARIA `role="img"`\xA0;\n4. Si ce n\u2019est pas le cas, le test est invalid\xE9.\n5. Le cas \xE9ch\xE9ant, v\xE9rifier que l\u2019\xE9l\xE9ment `<svg>` est pourvu au moins d\u2019une alternative textuelle parmi les suivantes\xA0:\n   - Contenu de l\u2019\xE9l\xE9ment `<title>` ;\n   - Passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby`\xA0;\n   - Contenu de l\u2019attribut WAI-ARIA `aria-label`\xA0;\n6. Si au moins une alternative textuelle est trouv\xE9e, **le test est valid\xE9**.',
+        "6": "1. Retrouver dans le document les balises ouvrantes `<object>` pourvues de l'attribut `type=\"image/\u2026\"`\xA0;\n2. Pour chaque balise ouvrante `<object>` pourvue de l'attribut `type=\"image/\u2026\"`, d\xE9terminer si l\u2019image utilis\xE9e est porteuse d'information\xA0;\n3. V\xE9rifier que l\u2019\xE9l\xE9ment `<object>` est pourvu d\u2019un attribut WAI-ARIA `role=\"img\"` ;\n4. V\xE9rifier que l\u2019\xE9l\xE9ment `<object>` est pourvu au moins d\u2019une alternative textuelle parmi les suivantes\xA0:\n   - Passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby`\xA0;\n   - Contenu de l\u2019attribut WAI-ARIA `aria-label`\xA0;\n   - Contenu de l\u2019attribut `title`.\n5. Si au moins une alternative textuelle est trouv\xE9e, **le test est valid\xE9**\xA0;\n6. Sinon, v\xE9rifier que l'\xE9l\xE9ment `<object>` est\xA0:\n   - Soit imm\xE9diatement suivi d'un lien ou bouton adjacent permettant d'acc\xE9der \xE0 un contenu alternatif\xA0;\n   - Soit un m\xE9canisme permet \xE0 l'utilisateur de remplacer l'\xE9l\xE9ment `<object>` par un contenu alternatif.\n7. Si c'est le cas, **le test est valid\xE9**.",
+        "7": '1. Pour chaque \xE9l\xE9ment `<embed>` pourvu de l\u2019attribut `type="image/\u2026"`, d\xE9terminer si l\u2019image utilis\xE9e est porteuse d\u2019information\xA0;\n2. V\xE9rifier que l\u2019\xE9l\xE9ment `<embed>` est pourvu d\u2019un attribut WAI-ARIA `role="img"` ;\n3. V\xE9rifier que l\u2019\xE9l\xE9ment `<embed>` est pourvu au moins d\u2019une alternative textuelle parmi les suivantes\xA0:\n   - Passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby`\xA0;\n   - Contenu de l\u2019attribut WAI-ARIA `aria-label`\xA0;\n   - Contenu de l\u2019attribut `title`.\n4. Si au moins une alternative textuelle est trouv\xE9e, **le test est valid\xE9**\xA0;\n5. Sinon, v\xE9rifier que l\u2019\xE9l\xE9ment `<embed>` est\xA0:\n   - Soit imm\xE9diatement suivi d\u2019un lien ou bouton adjacent permettant d\u2019acc\xE9der \xE0 un contenu alternatif\xA0;\n   - Soit un m\xE9canisme permet \xE0 l\u2019utilisateur de remplacer l\u2019\xE9l\xE9ment `<embed>` par un contenu alternatif.\n6. Si c\u2019est le cas, **le test est valid\xE9**.',
+        "8": "1. Retrouver dans le document les \xE9l\xE9ments `<canvas>`\xA0;\n2. Pour chaque \xE9l\xE9ment `<canvas>`, d\xE9terminer si l\u2019image utilis\xE9e est porteuse d\u2019information\xA0;\n3. V\xE9rifier que l\u2019\xE9l\xE9ment `<canvas>` est pourvu d\u2019un attribut WAI-ARIA `role=\"img\"` ;\n4. V\xE9rifier que la balise ouvrante `<canvas>` est pourvue au moins d\u2019une alternative textuelle parmi les suivantes\xA0:\n   - Passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby`\xA0;\n   - Contenu de l\u2019attribut WAI-ARIA `aria-label`.\n5. Si au moins une alternative textuelle est trouv\xE9e, **le test est valid\xE9**.\n6. Si les \xE9tapes 3 et 4 ne sont pas satisfaites, v\xE9rifier que l\u2019\xE9l\xE9ment `<canvas>` est\xA0:\n   - Soit pourvu d\u2019un contenu alternatif pr\xE9sent entre les balises `<canvas>` et `</canvas>`\xA0;\n   - Soit imm\xE9diatement suivi d\u2019un lien ou bouton adjacent permettant d\u2019acc\xE9der \xE0 un contenu alternatif\xA0;\n   - Soit un m\xE9canisme permet \xE0 l\u2019utilisateur de remplacer l\u2019\xE9l\xE9ment `<canvas>` par un contenu alternatif.\n7. Si c\u2019est le cas, **le test est valid\xE9**.\n\nNote : si l'\xE9l\xE9ment `<canvas>` dispose d'un r\xF4le `img`, son alternative ne peut  \xEAtre fournie que par les techniques list\xE9es \xE0 l'\xE9tape 4."
+      },
       techniques: ["H36", "H37", "H53", "F65", "H24"],
       wcag: ["1.1.1"],
       appliesTo: {
@@ -39836,6 +39847,14 @@ var rgaa_default = {
           'La balise `<embed>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;',
           "La balise `<embed>` et ses enfants sont d\xE9pourvus d\u2019[alternative textuelle](#alternative-textuelle-image)."
         ]
+      },
+      methodology: {
+        "1": '1. Retrouver dans le document les images d\xE9coratives d\xE9pourvues de l\xE9gende structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<img>`\xA0;\n2. Pour chaque image, v\xE9rifier que l\u2019image ne poss\xE8de pas d\u2019attributs `aria-labelledby`, `aria-label` ou `title` et qu\u2019elle poss\xE8de\xA0:\n   - Soit un attribut `alt` vide (`alt=""`)\xA0;\n   - Soit un attribut WAI-ARIA `aria-hidden="true"` ou `role="presentation"`.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "2": '1. Retrouver dans le document les images d\xE9coratives structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<area>` (sans attribut `href`)\xA0;\n2. Pour chaque image, v\xE9rifier que l\u2019\xE9l\xE9ment `<area>` ne poss\xE8de pas d\u2019attributs `aria-labelledby`, `aria-label` ou `title` et qu\u2019il poss\xE8de\xA0:\n   - Soit un attribut `alt` vide (`alt=""`)\xA0;\n   - Soit un attribut WAI-ARIA `aria-hidden="true"` ou `role="presentation"`.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "3": '1. Retrouver dans le document les images d\xE9coratives structur\xE9es d\xE9pourvues de l\xE9gende au moyen d\u2019un \xE9l\xE9ment `<object>` (avec un attribut `type="image/\u2026"`)\xA0;\n2. Pour chaque image, v\xE9rifier que la balise ouvrante `<object>` ne poss\xE8de pas d\u2019attributs `aria-labelledby`, `aria-label` ou `title` et qu\u2019elle\xA0:\n   - Poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;\n   - Et est d\xE9pourvue d\u2019alternative textuelle\xA0;\n   - Et est d\xE9pourvue d\u2019un contenu alternatif pr\xE9sent entre les balises `<object>` et `</object>`.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "4": '1. Retrouver dans le document les images d\xE9coratives d\xE9pourvues de l\xE9gende structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<svg>`\xA0;\n2. Pour chaque image, v\xE9rifier que l\u2019\xE9l\xE9ment `<svg>` ne poss\xE8de pas d\u2019attributs `aria-labelledby` ou `aria-label` et qu\u2019il\xA0:\n   - Poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;\n   - Et est d\xE9pourvu d\u2019alternative textuelle (ainsi que ses \xE9l\xE9ments enfants)\xA0;\n   - Et ne contient pas d\u2019\xE9l\xE9ments `<title>` et `<desc>` \xE0 moins que vides de contenu\xA0;\n   - Et est d\xE9pourvu d\u2019attribut `title` (ainsi que ses \xE9l\xE9ments enfants).\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "5": '1. Retrouver dans le document les images d\xE9coratives d\xE9pourvues de l\xE9gende structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<canvas>`\xA0;\n2. Pour chaque image, v\xE9rifier que l\u2019\xE9l\xE9ment `<canvas>` ne poss\xE8de pas d\u2019attributs `aria-labelledby`, `aria-label` ou `title` et qu\u2019il\xA0:\n   - Poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;\n   - Et est d\xE9pourvu d\u2019alternative textuelle\xA0;\n   - Et est d\xE9pourvu d\u2019un contenu alternatif pr\xE9sent entre les balises `<canvas>` et `</canvas>`.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "6": '1. Retrouver dans le document les images d\xE9coratives d\xE9pourvues de l\xE9gende structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<embed>` (avec un attribut `type="image/\u2026"`)\xA0;\n2. Pour chaque image, v\xE9rifier que l\u2019\xE9l\xE9ment `<embed>` ne poss\xE8de pas d\u2019attributs `aria-labelledby`, `aria-label` ou `title` et qu\u2019il\xA0:\n   - Poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;\n   - Et est d\xE9pourvu d\u2019alternative textuelle\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.'
       },
       techniques: ["H67", "G196", "C9", "F39", "F38", "ARIA4", "ARIA10"],
       technicalNote: [
@@ -39913,6 +39932,17 @@ var rgaa_default = {
           "Pour chaque image [porteuse d\u2019information](#image-porteuse-d-information) et ayant une [alternative textuelle](#alternative-textuelle-image), l\u2019[alternative textuelle](#alternative-textuelle-image) est-elle [courte et concise](#alternative-courte-et-concise) (hors cas particuliers)\xA0?"
         ]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les images structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<img>` (ou d\u2019un \xE9l\xE9ment poss\xE9dant l\u2019attribut WAI-ARIA `role="img"`) pourvues d\u2019une alternative textuelle\xA0;\n2. Pour chaque image, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "2": "1. Retrouver dans le document les \xE9l\xE9ments `<area>` pourvus d\u2019une alternative textuelle\xA0;\n2. Pour chaque \xE9l\xE9ment `<area>`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.",
+        "3": '1. Retrouver dans le document les \xE9l\xE9ments `<input>` pourvus de l\u2019attribut `type="image"` et d\u2019une alternative textuelle\xA0;\n2. Pour chaque \xE9l\xE9ment `<input>` pourvu de l\u2019attribut `type="image"`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "4": '1. Retrouver dans le document les \xE9l\xE9ments `<object>` pourvus de l\u2019attribut `type="image/\u2026"` et d\u2019une alternative textuelle\xA0;\n2. Pour chaque \xE9l\xE9ment `<object>` pourvu de l\u2019attribut `type="image/\u2026"`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "5": '1. Retrouver dans le document les \xE9l\xE9ments `<embed>` pourvus de l\u2019attribut `type="image/\u2026"` et d\u2019une alternative textuelle\xA0;\n2. Pour chaque \xE9l\xE9ment `<embed>` pourvu de l\u2019attribut `type="image/\u2026"`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "6": "1. Retrouver dans le document les \xE9l\xE9ments `<svg>` pourvus d\u2019une alternative textuelle\xA0;\n2. Pour chaque \xE9l\xE9ment `<svg>`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.",
+        "7": "1. Retrouver dans le document les \xE9l\xE9ments `<canvas>` pourvus d\u2019une alternative textuelle\xA0;\n2. Pour chaque \xE9l\xE9ment `<canvas>`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.",
+        "8": "1. Retrouver dans le document les \xE9l\xE9ments `<canvas>` pourvus d\u2019un contenu alternatif entre les balises `<canvas>` et `</canvas>`\xA0;\n2. Pour chaque \xE9l\xE9ment `<canvas>`, v\xE9rifier que le contenu alternatif est correctement restitu\xE9 par les technologies d\u2019assistance\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.",
+        "9": "1. Retrouver dans le document les images pourvues d\u2019une alternative textuelle\xA0;\n2. Pour chaque image, v\xE9rifier l\u2019alternative textuelle est courte et concise\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**."
+      },
       techniques: ["G94", "G95", "F30", "F71", "G196", "ARIA6", "ARIA9", "ARIA10"],
       particularCases: [
         "Il existe une gestion de cas particuliers lorsque l\u2019image est utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test). Dans cette situation, o\xF9 il n\u2019est pas possible de donner une alternative pertinente sans d\xE9truire l\u2019objet du CAPTCHA ou du test, le crit\xE8re est non applicable.",
@@ -39986,6 +40016,15 @@ var rgaa_default = {
           "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les images structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<img>` pourvues d\u2019une alternative textuelle et utilis\xE9es comme CAPTCHA ou comme image-test\xA0;\n2. Pour chaque image, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les \xE9l\xE9ments `<area>` pourvus d\u2019une alternative textuelle et utilis\xE9s comme CAPTCHA ou comme image-test\xA0;\n2. Pour chaque \xE9l\xE9ment `<area>`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.",
+        "3": '1. Retrouver dans le document les \xE9l\xE9ments `<input>` pourvus de l\u2019attribut `type="image"` et d\u2019une alternative textuelle, et utilis\xE9s comme CAPTCHA ou comme image-test\xA0;\n2. Pour chaque \xE9l\xE9ment `<input>` pourvu de l\u2019attribut `type="image"`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "4": '1. Retrouver dans le document les \xE9l\xE9ments `<object>` pourvus de l\u2019attribut `type="image/\u2026"` et d\u2019une alternative textuelle, et utilis\xE9s comme CAPTCHA ou comme image-test\xA0;\n2. Pour chaque \xE9l\xE9ment `<object>` pourvu de l\u2019attribut `type="image/\u2026"`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "5": '1. Retrouver dans le document les \xE9l\xE9ments `<embed>` pourvus de l\u2019attribut `type="image/\u2026"` et d\u2019une alternative textuelle, et utilis\xE9s comme CAPTCHA ou comme image-test\xA0;\n2. Pour chaque \xE9l\xE9ment `<embed>` pourvu de l\u2019attribut `type="image/\u2026"`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "6": "1. Retrouver dans le document les \xE9l\xE9ments `<svg>` pourvus d\u2019une alternative textuelle et utilis\xE9s comme CAPTCHA ou comme image-test\xA0;\n2. Pour chaque \xE9l\xE9ment `<svg>`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.",
+        "7": "1. Retrouver dans le document les \xE9l\xE9ments `<canvas>` pourvus d\u2019une alternative textuelle et utilis\xE9s comme CAPTCHA ou comme image-test\xA0;\n2. Pour chaque \xE9l\xE9ment `<canvas>`, v\xE9rifier que l\u2019alternative textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**."
+      },
       techniques: ["G100", "G143"],
       wcag: ["1.1.1"],
       appliesTo: {
@@ -40012,6 +40051,10 @@ var rgaa_default = {
           "Il existe une autre forme de [CAPTCHA](#captcha) non graphique, au moins\xA0;",
           "Il existe une autre solution d\u2019acc\xE8s \xE0 la fonctionnalit\xE9 s\xE9curis\xE9e par le [CAPTCHA](#captcha)."
         ]
+      },
+      methodology: {
+        "1": '1. Retrouver dans le document les images (\xE9l\xE9ments `<img>`, `<area>`, `<object>`, `<embed>`, `<svg>`, `<canvas>` ou poss\xE9dant un attribut WAI-ARIA `role="img"`) utilis\xE9s comme CAPTCHA ou comme image-test\xA0;\n2. Pour chaque image, v\xE9rifier qu\u2019il existe\xA0:\n   - Soit une autre forme de CAPTCHA non graphique, au moins\xA0;\n   - Soit une autre solution d\u2019acc\xE8s \xE0 la fonctionnalit\xE9 qui est s\xE9curis\xE9e par le CAPTCHA.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "2": '1. Retrouver dans le document les boutons associ\xE9s \xE0 une image (\xE9l\xE9ments `<input>` avec l\u2019attribut `type="image"`) utilis\xE9s comme CAPTCHA ou comme image-test\xA0;\n2. Pour chaque bouton associ\xE9 \xE0 une image, v\xE9rifier qu\u2019il existe\xA0:\n   - Soit une autre forme de CAPTCHA non graphique, au moins\xA0;\n   - Soit une autre solution d\u2019acc\xE8s \xE0 la fonctionnalit\xE9 qui est s\xE9curis\xE9e par le CAPTCHA.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.'
       },
       techniques: ["G144"],
       wcag: ["1.1.1"],
@@ -40085,6 +40128,18 @@ var rgaa_default = {
           "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
         ]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les images structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<img>` (ou d\u2019un \xE9l\xE9ment poss\xE9dant l\u2019attribut WAI-ARIA `role="img"`) porteuses d\u2019information qui n\xE9cessitent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque image, v\xE9rifier qu\u2019il existe\xA0:\n   - Soit un attribut longdesc qui donne l\u2019adresse (url) d\u2019une page ou d\u2019un emplacement dans la page contenant la description d\xE9taill\xE9e\xA0;\n   - Soit une alternative textuelle contenant la r\xE9f\xE9rence \xE0 une description d\xE9taill\xE9e adjacente \xE0 l\u2019image\xA0;\n   - Soit un lien ou un bouton adjacent permettant d\u2019acc\xE9der \xE0 la description d\xE9taill\xE9e.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "2": '1. Retrouver dans le document les \xE9l\xE9ments `<object>` pourvus de l\u2019attribut `type="image/\u2026"`, porteurs d\u2019information qui n\xE9cessitent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque \xE9l\xE9ment `<object>` pourvu de l\u2019attribut `type="image/\u2026"`, v\xE9rifier qu\u2019il existe\xA0:\n   - Soit une alternative textuelle contenant la r\xE9f\xE9rence \xE0 une description d\xE9taill\xE9e adjacente \xE0 l\u2019image\xA0;\n   - Soit un lien ou un bouton adjacent permettant d\u2019acc\xE9der \xE0 la description d\xE9taill\xE9e.\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment `<object>` pourvu de l\u2019attribut `type="image/\u2026"`, **le test est valid\xE9**.',
+        "3": '1. Retrouver dans le document les \xE9l\xE9ments `<embed>` pourvus de l\u2019attribut `type="image/\u2026"`, porteurs d\u2019information qui n\xE9cessitent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque \xE9l\xE9ment `<embed>` pourvu de l\u2019attribut `type="image/\u2026"`, v\xE9rifier qu\u2019il existe\xA0:\n   - Soit une alternative textuelle contenant la r\xE9f\xE9rence \xE0 une description d\xE9taill\xE9e adjacente \xE0 l\u2019image\xA0;\n   - Soit un lien ou un bouton adjacent permettant d\u2019acc\xE9der \xE0 la description d\xE9taill\xE9e.\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment `<embed>` pourvu de l\u2019attribut `type="image/\u2026"`, **le test est valid\xE9**.',
+        "4": '1. Retrouver dans le document les \xE9l\xE9ments `<input>` pourvus de l\u2019attribut `type="image"`, porteurs d\u2019information qui n\xE9cessitent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque \xE9l\xE9ment `<input>` pourvu de l\u2019attribut `type="image"`, v\xE9rifier qu\u2019il existe\xA0:\n   - Soit une alternative textuelle contenant la r\xE9f\xE9rence \xE0 une description d\xE9taill\xE9e adjacente \xE0 l\u2019image\xA0;\n   - Soit un lien ou un bouton adjacent permettant d\u2019acc\xE9der \xE0 la description d\xE9taill\xE9e\xA0;\n   - Soit un attribut WAI-ARIA aria-describedby associant un passage de texte faisant office de description d\xE9taill\xE9e.\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment `<input>` pourvu de l\u2019attribut `type="image"`, **le test est valid\xE9**.',
+        "5": "1. Retrouver dans le document les \xE9l\xE9ments `<svg>` porteurs d\u2019information qui n\xE9cessitent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque \xE9l\xE9ment `<svg>`, v\xE9rifier qu\u2019il existe\xA0:\n   - Soit un attribut WAI-ARIA `aria-label` contenant l\u2019alternative textuelle et une r\xE9f\xE9rence \xE0 une description d\xE9taill\xE9e adjacente\xA0;\n   - Soit un attribut WAI-ARIA `aria-labelledby` associant un passage de texte faisant office d\u2019alternative textuelle et un autre faisant office de description d\xE9taill\xE9e\xA0;\n   - Soit un attribut WAI-ARIA `aria-describedby` associant un passage de texte faisant office de description d\xE9taill\xE9e\xA0;\n   - Soit un lien ou un bouton adjacent permettant d\u2019acc\xE9der \xE0 la description d\xE9taill\xE9e.\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment `<svg>`, **le test est valid\xE9**.",
+        "6": "1. Retrouver dans le document les \xE9l\xE9ments `<svg>` porteurs d\u2019information dont la description d\xE9taill\xE9e est fournie au moyen d\u2019un attribut `aria-label`, `aria-labelledby` ou `aria-describedby`\xA0;\n2. Pour chaque \xE9l\xE9ment `<svg>`, v\xE9rifier que le contenu de la description d\xE9taill\xE9e est correctement restitu\xE9 par les technologies d\u2019assistance\xA0;\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment `<svg>`, **le test est valid\xE9**.",
+        "7": "1. Retrouver dans le document les \xE9l\xE9ments `<canvas>` porteurs d\u2019information qui n\xE9cessitent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque \xE9l\xE9ment `<canvas>`, v\xE9rifier qu\u2019il existe\xA0:\n   - Soit un attribut WAI-ARIA aria-label contenant l\u2019alternative textuelle et une r\xE9f\xE9rence \xE0 une description d\xE9taill\xE9e adjacente\xA0;\n   - Soit un attribut WAI-ARIA aria-labelledby associant un passage de texte faisant office d\u2019alternative textuelle et un autre faisant office de description d\xE9taill\xE9e\xA0;\n   - Soit un contenu textuel entre `<canvas>` et `</canvas>` faisant r\xE9f\xE9rence \xE0 une description d\xE9taill\xE9e adjacente \xE0 l\u2019image bitmap\xA0;\n   - Soit un contenu textuel entre `<canvas>` et `</canvas>` faisant office de description d\xE9taill\xE9e\xA0;\n   - Soit un lien ou un bouton adjacent permettant d\u2019acc\xE9der \xE0 la description d\xE9taill\xE9e.\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment `<canvas>`, **le test est valid\xE9**.",
+        "8": "1. Retrouver dans le document les \xE9l\xE9ments `<canvas>` porteurs d\u2019information dont la description d\xE9taill\xE9e est fournie au moyen d\u2019un attribut `aria-label`, `aria-labelledby` ou `aria-describedby`\xA0;\n2. Pour chaque \xE9l\xE9ment `<canvas>`, v\xE9rifier que le contenu de la description d\xE9taill\xE9e est correctement restitu\xE9 par les technologies d\u2019assistance\xA0;\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment `<canvas>`, **le test est valid\xE9**.",
+        "9": '1. Retrouver dans le document les images (\xE9l\xE9ments `<img>`, `<input>` avec l\u2019attribut `type="image"`, `<area>`, `<object>`, `<embed>`, `<svg>`, `<canvas>` ou poss\xE9dant un attribut WAI-ARIA `role="img"`) porteuses d\u2019information dont la description d\xE9taill\xE9e utilise un attribut WAI-ARIA `aria-describedby`\xA0;\n2. Pour chaque image, v\xE9rifier que le contenu de la description d\xE9taill\xE9e est correctement restitu\xE9 par les technologies d\u2019assistance\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "10": '1. Retrouver dans le document les \xE9l\xE9ments pourvus d\u2019un attribut WAI-ARIA `role="img"` porteurs d\u2019information qui n\xE9cessitent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque \xE9l\xE9ment `role="img"`, v\xE9rifier qu\u2019il existe\xA0:\n   - Soit un attribut WAI-ARIA `aria-label` contenant l\u2019alternative textuelle et une r\xE9f\xE9rence \xE0 une description d\xE9taill\xE9e adjacente\xA0;\n   - Soit un attribut WAI-ARIA `aria-labelledby` associant un passage de texte faisant office d\u2019alternative textuelle et un autre faisant office de description d\xE9taill\xE9e\xA0;\n   - Soit un attribut WAI-ARIA `aria-describedby` associant un passage de texte faisant office de description d\xE9taill\xE9e\xA0;\n   - Soit un lien ou un bouton adjacent permettant d\u2019acc\xE9der \xE0 la description d\xE9taill\xE9e.\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment `role="img"`, **le test est valid\xE9**.'
+      },
       techniques: ["G92", "G74", "G73", "H45", "ARIA6"],
       technicalNote: [
         "Dans le cas du SVG, le manque de support de l\u2019\xE9l\xE9ment `<title>` et `<desc>` par les technologies d\u2019assistance cr\xE9e une difficult\xE9 dans le cas de l\u2019impl\xE9mentation de l\u2019[alternative textuelle](#alternative-textuelle-image) de l\u2019image et de sa [description d\xE9taill\xE9e](#description-detaillee-image). Dans ce cas, il est recommand\xE9 d\u2019utiliser l\u2019attribut WAI-ARIA `aria-label` pour impl\xE9menter \xE0 la fois l\u2019[alternative textuelle](#alternative-textuelle-image) courte et la r\xE9f\xE9rence \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image) adjacente ou l\u2019attribut WAI-ARIA `aria-labelledby` pour associer les passages de texte faisant office d\u2019alternative courte et de [description d\xE9taill\xE9e](#description-detaillee-image).",
@@ -40152,6 +40207,14 @@ var rgaa_default = {
           "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les images structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<img>` qui poss\xE8dent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque image, v\xE9rifier que la description d\xE9taill\xE9e est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.",
+        "2": '1. Retrouver dans le document les \xE9l\xE9ments `<input>` pourvus de l\u2019attribut `type="image"` qui poss\xE8dent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque \xE9l\xE9ment `<input>` pourvu de l\u2019attribut `type="image"`, v\xE9rifier que la description d\xE9taill\xE9e est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "3": '1. Retrouver dans le document les \xE9l\xE9ments `<object>` pourvus de l\u2019attribut `type="image/\u2026"` qui poss\xE8dent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque \xE9l\xE9ment `<object>` pourvu de l\u2019attribut `type="image/\u2026"`, v\xE9rifier que la description d\xE9taill\xE9e est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "4": '1. Retrouver dans le document les \xE9l\xE9ments `<embed>` pourvus de l\u2019attribut `type="image/\u2026"` qui poss\xE8dent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque \xE9l\xE9ment `<embed>` pourvu de l\u2019attribut `type="image/\u2026"`, v\xE9rifier que la description d\xE9taill\xE9e est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "5": "1. Retrouver dans le document les \xE9l\xE9ments `<svg>` qui poss\xE8dent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque \xE9l\xE9ment `<svg>`, v\xE9rifier que la description d\xE9taill\xE9e est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.",
+        "6": "1. Retrouver dans le document les \xE9l\xE9ments `<canvas>` qui poss\xE8dent une description d\xE9taill\xE9e\xA0;\n2. Pour chaque \xE9l\xE9ment `<canvas>`, v\xE9rifier que la description d\xE9taill\xE9e est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**."
+      },
       techniques: ["G92", "F67"],
       wcag: ["1.1.1"],
       appliesTo: {
@@ -40186,6 +40249,14 @@ var rgaa_default = {
         "6": [
           "Chaque [image texte](#image-texte) SVG (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information) et dont le texte n\u2019est pas compl\xE8tement structur\xE9 au moyen d\u2019\xE9l\xE9ments `<text>`, en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"
         ]
+      },
+      methodology: {
+        "1": '1. Retrouver dans le document les images texte structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<img>` (ou d\u2019un \xE9l\xE9ment poss\xE9dant l\u2019attribut WAI-ARIA `role="img"`)\xA0;\n2. Pour chaque image, v\xE9rifier que\xA0:\n   - Soit il existe un m\xE9canisme de remplacement\xA0;\n   - Soit l\u2019image contient un texte qui fait appel \xE0 un effet graphique qui ne peut pas \xEAtre reproduit en CSS.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "2": '1. Retrouver dans le document les boutons \u201Cimages texte\u201D (\xE9l\xE9ment `<input>` avec l\u2019attribut `type="image"`)\xA0;\n2. Pour chaque image, v\xE9rifier que\xA0:\n   - Soit il existe un m\xE9canisme de remplacement\xA0;\n   - Soit l\u2019image contient un texte qui fait appel \xE0 un effet graphique qui ne peut pas \xEAtre reproduit en CSS.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "3": '1. Retrouver dans le document les images texte objet (\xE9l\xE9ment `<object>` avec l\u2019attribut `type="image/\u2026"`)\xA0;\n2. Pour chaque image, v\xE9rifier que\xA0:\n   - Soit il existe un m\xE9canisme de remplacement\xA0;\n   - Soit l\u2019image contient un texte qui fait appel \xE0 un effet graphique qui ne peut pas \xEAtre reproduit en CSS.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "4": '1. Retrouver dans le document les images texte embarqu\xE9es (\xE9l\xE9ment `<embed>` avec l\u2019attribut `type="image/\u2026"`)\xA0;\n2. Pour chaque image, v\xE9rifier que\xA0:\n   - Soit il existe un m\xE9canisme de remplacement\xA0;\n   - Soit l\u2019image contient un texte qui fait appel \xE0 un effet graphique qui ne peut pas \xEAtre reproduit en CSS.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "5": "1. Retrouver dans le document les images texte bitmap (\xE9l\xE9ment `<canvas>`)\xA0;\n2. Pour chaque image, v\xE9rifier que\xA0:\n   - Soit il existe un m\xE9canisme de remplacement\xA0;\n   - Soit l\u2019image contient un texte qui fait appel \xE0 un effet graphique qui ne peut pas \xEAtre reproduit en CSS.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.",
+        "6": "1. Retrouver dans le document les images texte vectorielle (\xE9l\xE9ment `<svg>`) porteuse d\u2019information et dont le texte n\u2019est pas compl\xE8tement structur\xE9 au moyen d\u2019\xE9l\xE9ments `<text>`\xA0;\n2. Pour chaque image, v\xE9rifier que\xA0:\n   - Soit il existe un m\xE9canisme de remplacement\xA0;\n   - Soit l\u2019image contient un texte qui fait appel \xE0 un effet graphique qui ne peut pas \xEAtre reproduit en CSS.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**."
       },
       techniques: ["G136", "G140", "C22", "C30"],
       technicalNote: ["Le texte dans les images vectorielles \xE9tant du texte r\xE9el, il n\u2019est pas concern\xE9 par ce crit\xE8re."],
@@ -40243,6 +40314,13 @@ var rgaa_default = {
           "La [l\xE9gende](#legende-d-image) est contenue dans une balise `<figcaption>`."
         ]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les images pourvues d\u2019une l\xE9gende structur\xE9es au moyen d\u2019\xE9l\xE9ment `<img>`, d\u2019un \xE9l\xE9ment `<input>` avec l\u2019attribut `type="image"` ou d\u2019un \xE9l\xE9ment poss\xE9dant l\u2019attribut WAI-ARIA `role="img"`\xA0;\n2. Pour chaque image, v\xE9rifier que\xA0:\n   - L\u2019image et sa l\xE9gende sont contenues dans une balise `<figure>`\xA0;\n   - La balise `<figure>` poss\xE8de une propri\xE9t\xE9 WAI-ARIA `role="figure"` ou `role="group"`\xA0;\n   - La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la l\xE9gende\xA0;\n   - La l\xE9gende est contenue dans une balise `<figcaption>`.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "2": '1. Retrouver dans le document les images objet pourvues d\u2019une l\xE9gende (\xE9l\xE9ment `<object>` avec l\u2019attribut `type="image/\u2026"`)\xA0;\n2. Pour chaque image, v\xE9rifier que\xA0:\n   - L\u2019image et sa l\xE9gende sont contenues dans une balise `<figure>`\xA0;\n   - La balise `<figure>` poss\xE8de une propri\xE9t\xE9 WAI-ARIA `role="figure`" ou `role="group"`\xA0;\n   - La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la l\xE9gende\xA0;\n   - La l\xE9gende est contenue dans une balise `<figcaption>`.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "3": '1. Retrouver dans le document les images embarqu\xE9es pourvues d\u2019une l\xE9gende (\xE9l\xE9ment `<embed>` avec l\u2019attribut `type="image/\u2026"`)\xA0;\n2. Pour chaque image, v\xE9rifier que\xA0:\n   - L\u2019image et sa l\xE9gende sont contenues dans une balise `<figure>`\xA0;\n   - La balise `<figure>` poss\xE8de une propri\xE9t\xE9 WAI-ARIA `role="figure"` ou `role="group"`\xA0;\n   - La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la l\xE9gende\xA0;\n   - La l\xE9gende est contenue dans une balise `<figcaption>`.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "4": '1. Retrouver dans le document les images vectorielles pourvues d\u2019une l\xE9gende (\xE9l\xE9ment `<svg>`)\xA0;\n2. Pour chaque image, v\xE9rifier que\xA0:\n   - L\u2019image et sa l\xE9gende sont contenues dans une balise `<figure>`\xA0;\n   - La balise `<figure>` poss\xE8de une propri\xE9t\xE9 WAI-ARIA `role="figure"` ou `role="group"`\xA0;\n   - La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la l\xE9gende\xA0;\n   - La l\xE9gende est contenue dans une balise `<figcaption>`.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.',
+        "5": '1. Retrouver dans le document les images bitmap (\xE9l\xE9ment `<canvas>`)\xA0;\n2. Pour chaque image, v\xE9rifier que\xA0:\n   - L\u2019image et sa l\xE9gende sont contenues dans une balise `<figure>`\xA0;\n   - La balise `<figure>` poss\xE8de une propri\xE9t\xE9 WAI-ARIA `role="figure"` ou `role="group"`\xA0;\n   - La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la l\xE9gende\xA0;\n   - La l\xE9gende est contenue dans une balise `<figcaption>`.\n3. Si c\u2019est le cas pour chaque image, **le test est valid\xE9**.'
+      },
       techniques: ["G140", "ARIA4", "ARIA6"],
       technicalNote: [
         'L\u2019impl\xE9mentation d\u2019un attribut WAI-ARIA `role="group"` ou `role="figure"` sur l\u2019\xE9l\xE9ment parent `<figure>` est destin\xE9 \xE0 pallier le manque de support actuel des \xE9l\xE9ments `<figure>` par les technologies d\u2019assistance. L\u2019utilisation d\u2019un \xE9l\xE9ment `<figcaption>` pour associer une [l\xE9gende](#legende-d-image) \xE0 une image impose au minimum l\u2019utilisation d\u2019un attribut WAI-ARIA `aria-label` sur l\u2019\xE9l\xE9ment parent `<figure>` dont le contenu sera identique au contenu de l\u2019\xE9l\xE9ment `<figcaption>`. Pour s\u2019assurer d\u2019un support optimal, il peut \xE9galement \xEAtre fait une association explicite entre le contenu de l\u2019[alternative textuelle](#alternative-textuelle-image) de l\u2019image et le contenu de l\u2019\xE9l\xE9ment `<figcaption>`, par exemple\xA0:',
@@ -40267,6 +40345,9 @@ var rgaa_default = {
       tests: {
         "1": ["Chaque cadre (balise `<iframe>` ou `<frame>`) a-t-il un attribut `title`\xA0?"]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les cadres (\xE9l\xE9ment `<iframe>` ou `<frame>`)\xA0;\n2. Pour chaque cadre, v\xE9rifier qu\u2019il poss\xE8de un attribut `title `;\n3. Si c\u2019est le cas pour chaque cadre, **le test est valid\xE9**."
+      },
       techniques: ["H64"],
       wcag: ["4.1.2"],
       appliesTo: {
@@ -40284,6 +40365,9 @@ var rgaa_default = {
       },
       tests: {
         "1": ["Pour chaque cadre (balise `<iframe>` ou `<frame>`) ayant un attribut `title`, le contenu de cet attribut est-il pertinent\xA0?"]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les cadres (\xE9l\xE9ment `<iframe>` ou `<frame>`)\xA0;\n2. Pour chaque cadre pourvu d\u2019un attribut `title`, v\xE9rifier que son contenu est pertinent\xA0;\n3. Si c\u2019est le cas pour chaque cadre, **le test est valid\xE9**."
       },
       techniques: ["H64"],
       wcag: ["4.1.2"],
@@ -40319,6 +40403,14 @@ var rgaa_default = {
         "6": [
           "Pour chaque [m\xE9dia non temporel](#media-non-temporel) [v\xE9hiculant une information](#image-vehiculant-une-information-donnee-par-la-couleur), l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les informations donn\xE9es par la couleur dans un mot ou un ensemble de mots\xA0;\n2. Pour chacune de ces informations, v\xE9rifier qu\u2019il existe un autre moyen de r\xE9cup\xE9rer cette information (pr\xE9sence d\u2019un attribut title, d\u2019une ic\xF4ne ou d\u2019un effet graphique de forme ou de position, un effet typographique\u2026)\xA0;\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les informations donn\xE9es par la couleur dans un texte\xA0;\n2. Pour chacune de ces informations, v\xE9rifier qu\u2019il existe un autre moyen de r\xE9cup\xE9rer cette information (pr\xE9sence d\u2019un attribut title, d\u2019une ic\xF4ne ou d\u2019un effet graphique de forme ou de position, un effet typographique\u2026)\xA0;\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les informations donn\xE9es par la couleur dans une image\xA0;\n2. Pour chacune de ces informations, v\xE9rifier qu\u2019il existe un autre moyen de r\xE9cup\xE9rer cette information (pr\xE9sence d\u2019un attribut title, d\u2019une ic\xF4ne ou d\u2019un effet graphique de forme ou de position, un effet typographique\u2026)\xA0;\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**.",
+        "4": "1. Retrouver dans le document les informations donn\xE9es par la couleur dans une propri\xE9t\xE9 CSS\xA0;\n2. Pour chacune de ces informations, v\xE9rifier qu\u2019il existe un autre moyen de r\xE9cup\xE9rer cette information (pr\xE9sence d\u2019un attribut title, d\u2019une ic\xF4ne ou d\u2019un effet graphique de forme ou de position, un effet typographique\u2026)\xA0;\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**.",
+        "5": "1. Retrouver dans le document les informations donn\xE9es par la couleur dans un m\xE9dia temporel\xA0;\n2. Pour chacune de ces informations, v\xE9rifier qu\u2019il existe un autre moyen de r\xE9cup\xE9rer cette information (pr\xE9sence d\u2019un attribut title, d\u2019une ic\xF4ne ou d\u2019un effet graphique de forme ou de position, un effet typographique\u2026)\xA0;\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**.",
+        "6": "1. Retrouver dans le document les informations donn\xE9es par la couleur dans un m\xE9dia non temporel\xA0;\n2. Pour chacune de ces informations, v\xE9rifier qu\u2019il existe un autre moyen de r\xE9cup\xE9rer cette information (pr\xE9sence d\u2019un attribut title, d\u2019une ic\xF4ne ou d\u2019un effet graphique de forme ou de position, un effet typographique\u2026)\xA0;\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**."
       },
       techniques: ["G14", "G182", "G111", "G117", "G138", "G205"],
       wcag: ["1.3.1", "1.4.1"],
@@ -40359,6 +40451,13 @@ var rgaa_default = {
         "5": [
           "Dans le [m\xE9canisme qui permet d\u2019afficher un rapport de contraste](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) conforme, le rapport de contraste entre le texte et la couleur d\u2019arri\xE8re-plan est-il suffisamment \xE9lev\xE9\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les textes et les textes en image sans effet de graisse d\u2019une taille restitu\xE9e inf\xE9rieure \xE0 24px qui pourraient poser des probl\xE8mes de contraste\xA0;\n2. Pour chacun de ces textes, v\xE9rifier que\xA0:\n   - Soit le rapport de contraste entre le texte et son arri\xE8re-plan est de 4.5:1, au moins\xA0;\n   - Soit un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de contraste de 4.5:1, au moins.\n3. Si c\u2019est le cas pour chaque texte, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les textes et les textes en image en gras d\u2019une taille restitu\xE9e inf\xE9rieure \xE0 18,5px qui pourraient poser des probl\xE8mes de contraste\xA0;\n2. Pour chacun de ces textes, v\xE9rifier que\xA0:\n   - Soit le rapport de contraste entre le texte et son arri\xE8re-plan est de 4.5:1, au moins\xA0;\n   - Soit un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de contraste de 4.5:1, au moins.\n3. Si c\u2019est le cas pour chaque texte, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les textes et les textes en image sans effet de graisse d\u2019une taille restitu\xE9e sup\xE9rieure ou \xE9gale \xE0 24px qui pourraient poser des probl\xE8mes de contraste\xA0;\n2. Pour chacun de ces textes, v\xE9rifier que\xA0:\n   - Soit le rapport de contraste entre le texte et son arri\xE8re-plan est de 3:1, au moins\xA0;\n   - Soit un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de contraste de 3:1, au moins.\n3. Si c\u2019est le cas pour chaque texte, **le test est valid\xE9**.",
+        "4": "1. Retrouver dans le document les textes et les textes en image en gras d\u2019une taille restitu\xE9e sup\xE9rieure ou \xE9gale \xE0 18,5px qui pourraient poser des probl\xE8mes de contraste\xA0;\n2. Pour chacun de ces textes, v\xE9rifier que\xA0:\n   - Soit le rapport de contraste entre le texte et son arri\xE8re-plan est de 3:1, au moins\xA0;\n   - Soit un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de contraste de 3:1, au moins.\n3. Si c\u2019est le cas pour chaque texte, **le test est valid\xE9**.",
+        "5": "1. Retrouver dans le document les m\xE9canismes qui permettent d\u2019afficher un rapport de contraste conforme\xA0;\n2. Pour chacun de ces m\xE9canismes, v\xE9rifier que le rapport de contraste entre le texte et la couleur d\u2019arri\xE8re-plan est suffisamment \xE9lev\xE9\xA0;\n3. Si c\u2019est le cas pour chaque m\xE9canisme, **le test est valid\xE9**."
       },
       techniques: ["G18", "G136", "G148", "G174", "G145", "C29"],
       particularCases: [
@@ -40401,6 +40500,12 @@ var rgaa_default = {
         "4": [
           "Dans le [m\xE9canisme qui permet d\u2019afficher un rapport de contraste](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) conforme, les couleurs du composant ou des \xE9l\xE9ments graphiques porteurs d\u2019informations qui le composent, sont-elles suffisamment contrast\xE9es\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les composants d\u2019interface qui pourraient poser des probl\xE8mes de contraste\xA0;\n2. Pour chacun de ces composants, v\xE9rifier que\xA0:\n   - Soit le rapport de contraste entre les couleurs du composant dans ses diff\xE9rents \xE9tats et la couleur d\u2019arri\xE8re-plan contigu\xEB est de 3:1, au moins\xA0;\n   - Soit un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le composant avec un rapport de contraste de 3:1, au moins.\n3. Si c\u2019est le cas pour chaque composant, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les \xE9l\xE9ments graphiques qui pourraient poser des probl\xE8mes de contraste\xA0;\n2. Pour chacun de ces \xE9l\xE9ments, v\xE9rifier que\xA0:\n   - Soit le rapport de contraste entre les couleurs de l\u2019\xE9l\xE9ment graphique n\xE9cessaires \xE0 sa compr\xE9hension et la couleur d\u2019arri\xE8re-plan contigu\xEB est de 3:1, au moins\xA0;\n   - Soit un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher l\u2019\xE9l\xE9ment graphique avec un rapport de contraste de 3:1, au moins.\n3. Si c\u2019est le cas pour chaque composant, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les \xE9l\xE9ments graphiques qui pourraient poser des probl\xE8mes de contraste\xA0;\n2. Pour chacun de ces \xE9l\xE9ments, v\xE9rifier que\xA0:\n   - Soit le rapport de contraste des diff\xE9rentes couleurs contigu\xEBs de l\u2019\xE9l\xE9ment graphique entre elles, lorsqu\u2019elles sont n\xE9cessaires \xE0 sa compr\xE9hension, est de 3:1, au moins\xA0;\n   - Soit un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher l\u2019\xE9l\xE9ment graphique avec un rapport de contraste de 3:1, au moins.\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment graphique, **le test est valid\xE9**.",
+        "4": "1. Retrouver dans le document les m\xE9canismes qui permettent d\u2019afficher un rapport de contraste conforme\xA0;\n2. Pour chacun de ces m\xE9canismes, v\xE9rifier que le rapport de contraste entre les couleurs du composant ou des \xE9l\xE9ments graphiques porteurs d\u2019informations qui le composent est suffisamment \xE9lev\xE9\xA0;\n3. Si c\u2019est le cas pour chaque m\xE9canisme, **le test est valid\xE9**.\n\nNote\xA0: le crit\xE8re est non applicable dans ces situations\xA0:\n\n- Composant d'interface inactif (par exemple, un bouton avec un attribut `disabled`) sur lequel aucune action n'est possible\xA0;\n- Composant d'interface pour lequel l'apparence est g\xE9r\xE9e par les styles natifs du navigateur sans aucune modification par l'auteur (par exemple, le style au focus natif dans Chrome ou Firefox)\xA0;\n- Composant d'interface pour lequel la couleur n'est pas n\xE9cessaire pour identifier le composant ou son \xE9tat (par exemple, un groupe de liens faisant office de navigation dont la position dans la page, la taille et la couleur du texte permettent de comprendre qu'il s'agit de liens m\xEAme si la couleur du soulignement des liens avec le fond blanc n'a pas un ratio de 3:1 et que le texte lui a un ratio de 4.5:1)\xA0;\n- \xC9l\xE9ment graphique ou parties d'\xE9l\xE9ment graphique non porteur d'information ou ayant une alternative (description longue, informations identiques visibles dans la page)\xA0;\n- \xC9l\xE9ment graphique ou parties d'\xE9l\xE9ment graphique faisant partie d'un logo ou du nom de marque d'un organisme ou d'une soci\xE9t\xE9\xA0;\n- \xC9l\xE9ment graphique ou parties d'\xE9l\xE9ment graphique dont la pr\xE9sentation est essentielle \xE0 l'information v\xE9hicul\xE9e (exemple drapeaux, logotypes, photos de personnes ou de sc\xE8nes, captures d'\xE9cran, diagrammes m\xE9dicaux, carte de chaleurs)\xA0;\n- \xC9l\xE9ment graphique ou parties d'\xE9l\xE9ment graphique dynamiques dont le contraste au survol / focus est suffisant."
       },
       techniques: ["G18", "G195", "G207", "G174", "G145", "G183", "F78"],
       particularCases: [
@@ -40450,6 +40555,11 @@ var rgaa_default = {
           "Il existe une version alternative avec une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias temporels (\xE9l\xE9ments `<audio>`, `<video>` ou `<object>`) seulement audio qui n\xE9cessitent une transcription textuelle\xA0;\n2. Pour chaque m\xE9dia temporel seulement audio, v\xE9rifier la pr\xE9sence d\u2019une transcription textuelle\xA0:\n   - Soit accessible au moyen d\u2019un bouton ou d\u2019un lien adjacent (une URL ou une ancre)\xA0;\n   - Soit adjacente clairement identifiable.\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les m\xE9dias temporels (\xE9l\xE9ments `<video>` ou `<object>`) seulement vid\xE9o qui n\xE9cessitent une transcription textuelle\xA0;\n2. Pour chaque m\xE9dia temporel seulement vid\xE9o, v\xE9rifier la pr\xE9sence\xA0:\n   - Soit d\u2019une version alternative audio seulement accessible au moyen d\u2019un lien ou bouton adjacent (une URL ou une ancre)\xA0;\n   - Soit d\u2019une version alternative audio seulement adjacente\xA0;\n   - Soit d\u2019une transcription textuelle accessible au moyen d\u2019un bouton ou d\u2019un lien adjacent (une URL ou une ancre)\xA0;\n   - Soit d\u2019une transcription textuelle adjacente clairement identifiable\xA0;\n   - Soit d\u2019une audiodescription synchronis\xE9e\xA0;\n   - Soit d\u2019une version alternative avec une audiodescription synchronis\xE9e accessible au moyen d\u2019un bouton ou d'un lien adjacent (une URL ou une ancre).\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les m\xE9dias temporels (\xE9l\xE9ments `<video>` ou `<object>`) synchronis\xE9s qui n\xE9cessitent une transcription textuelle\xA0;\n2. Pour chaque m\xE9dia temporel synchronis\xE9, v\xE9rifier la pr\xE9sence\xA0:\n   - Soit d\u2019une transcription textuelle accessible au moyen d\u2019un lien ou bouton adjacent (une URL ou une ancre)\xA0;\n   - Soit d\u2019une transcription textuelle adjacente clairement identifiable\xA0;\n   - Soit d\u2019une audiodescription synchronis\xE9e\xA0;\n   - Soit d\u2019une version alternative avec une audiodescription synchronis\xE9e accessible au moyen d\u2019un bouton ou d\u2019un lien adjacent (une URL ou une ancre).\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel, **le test est valid\xE9**."
+      },
       techniques: ["G58", "G69", "G78", "G158", "G159", "G173", "G8", "G166", "H96", "SM6", "SM7"],
       particularCases: [
         "Il existe une gestion de cas particulier lorsque\xA0:",
@@ -40495,6 +40605,11 @@ var rgaa_default = {
           "L\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e de la version alternative est pertinente."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias temporels pr\xE9-enregistr\xE9s seulement audio qui poss\xE8dent une transcription textuelle\xA0;\n2. Pour chaque m\xE9dia temporel seulement audio, v\xE9rifier que transcription textuelle est pertinente\xA0;\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les m\xE9dias temporels pr\xE9-enregistr\xE9s seulement vid\xE9o qui poss\xE8dent une transcription textuelle\xA0;\n2. Pour chaque m\xE9dia temporel seulement vid\xE9o, v\xE9rifier la pertinence\xA0:\n   - Soit de la transcription textuelle\xA0;\n   - Soit de l\u2019audiodescription synchronis\xE9e\xA0;\n   - Soit de l\u2019audiodescription synchronis\xE9e de la version alternative\xA0;\n   - Soit de la version alternative audio seulement.\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les m\xE9dias temporels pr\xE9-enregistr\xE9s synchronis\xE9s\xA0;\n2. Pour chaque m\xE9dia temporel synchronis\xE9, v\xE9rifier la pertinence\xA0:\n   - Soit de la transcription textuelle\xA0;\n   - Soit de l\u2019audiodescription synchronis\xE9e\xA0;\n   - Soit de l\u2019audiodescription synchronis\xE9e de la version alternative.\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel, **le test est valid\xE9**."
+      },
       techniques: ["F30", "F67", "SM6", "SM7"],
       particularCases: ["Voir cas particuliers crit\xE8re 4.1."],
       wcag: ["1.2.1", "1.2.3"],
@@ -40521,6 +40636,10 @@ var rgaa_default = {
           'Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 poss\xE9dant des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia) diffus\xE9s via une balise `<track>`, la balise `<track>` poss\xE8de-t-elle un attribut `kind="captions"`\xA0?'
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias temporels pr\xE9-enregistr\xE9s synchronis\xE9s\xA0;\n2. Pour chaque m\xE9dia temporel synchronis\xE9, v\xE9rifier la pr\xE9sence\xA0:\n   - Soit de sous-titres synchronis\xE9s\xA0;\n   - Soit d\u2019une version alternative poss\xE9dant des sous-titres synchronis\xE9s accessible au moyen d\u2019un lien ou d\u2019un bouton adjacent.\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel, **le test est valid\xE9**.",
+        "2": '1. Retrouver dans le document les m\xE9dias temporels synchronis\xE9s poss\xE9dant des sous-titres synchronis\xE9s au moyen d\u2019un \xE9l\xE9ment `<track>`\xA0;\n2. Pour chaque m\xE9dia temporel synchronis\xE9, v\xE9rifier que la balise `<track>` poss\xE8de un attribut `kind="caption"`\xA0;\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel synchronis\xE9, **le test est valid\xE9**.'
+      },
       techniques: ["G58", "G93", "G87", "H95", "SM11", "SM12", "F74", "F75"],
       particularCases: ["Voir cas particuliers crit\xE8re 4.1."],
       wcag: ["1.2.2"],
@@ -40541,6 +40660,9 @@ var rgaa_default = {
         "1": [
           "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 ayant des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia), ces sous-titres sont-ils pertinents\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias temporels synchronis\xE9s poss\xE9dant des sous-titres synchronis\xE9s\xA0;\n2. Pour chaque m\xE9dia temporel synchronis\xE9, v\xE9rifier que les sous-titres sont\xA0:\n   - Pertinents (toutes les informations sonores importantes sont pr\xE9sentes, les dialogues notamment)\xA0;\n   - Et correctement synchronis\xE9s.\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel synchronis\xE9, **le test est valid\xE9**."
       },
       techniques: ["G93", "G87", "SM11", "SM12", "F8", "F74", "F75"],
       wcag: ["1.2.2"],
@@ -40569,6 +40691,10 @@ var rgaa_default = {
           "Il existe une version alternative avec une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias temporels pr\xE9-enregistr\xE9s seulement vid\xE9o qui n\xE9cessitent une audiodescription\xA0;\n2. Pour chaque m\xE9dia temporel seulement vid\xE9o, v\xE9rifier la pr\xE9sence\xA0:\n   - Soit d\u2019une audiodescription synchronis\xE9e\xA0;\n   - Soit d\u2019une version alternative avec une audiodescription synchronis\xE9e accessible au moyen d\u2019un bouton ou d\u2019un lien adjacent (une URL ou une ancre).\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel seulement vid\xE9o, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les m\xE9dias temporels pr\xE9-enregistr\xE9s synchronis\xE9s qui n\xE9cessitent une audiodescription\xA0;\n2. Pour chaque m\xE9dia temporel synchronis\xE9, v\xE9rifier la pr\xE9sence\xA0:\n   - Soit d\u2019une audiodescription synchronis\xE9e\xA0;\n   - Soit d\u2019une version alternative avec une audiodescription synchronis\xE9e accessible au moyen d\u2019un bouton ou d\u2019un lien adjacent (une URL ou une ancre).\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel synchronis\xE9, **le test est valid\xE9**."
+      },
       techniques: ["G8", "G58", "G78", "G173", "H96", "SM1", "SM2", "SM6", "SM7"],
       particularCases: ["Voir cas particuliers crit\xE8re 4.1."],
       wcag: ["1.2.5"],
@@ -40593,6 +40719,10 @@ var rgaa_default = {
           "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 ayant une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e, celle-ci est-elle pertinente\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias temporels seulement vid\xE9o qui poss\xE8dent une audiodescription\xA0;\n2. Pour chaque m\xE9dia temporel, v\xE9rifier que l\u2019audiodescription synchronis\xE9e est pertinente (toutes les informations visuelles qu\u2019il est possible de vocaliser dans les blancs de la bande son principale sont pr\xE9sentes, les textes incrust\xE9s notamment)\xA0;\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel seulement vid\xE9o, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les m\xE9dias temporels synchronis\xE9s qui poss\xE8dent une audiodescription\xA0;\n2. Pour chaque m\xE9dia temporel, v\xE9rifier que l\u2019audiodescription synchronis\xE9e est pertinente (toutes les informations visuelles qu\u2019il est possible de vocaliser dans les blancs de la bande son principale sont pr\xE9sentes, les textes incrust\xE9s notamment)\xA0;\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel synchronis\xE9, **le test est valid\xE9**."
+      },
       techniques: ["SM1", "SM2", "SM6", "SM7"],
       wcag: ["1.2.5"],
       appliesTo: {
@@ -40612,6 +40742,9 @@ var rgaa_default = {
         "1": [
           "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) seulement son, seulement vid\xE9o ou synchronis\xE9, le contenu textuel adjacent permet-il d\u2019identifier clairement le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) (hors cas particuliers)\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias temporels pr\xE9-enregistr\xE9s seulement vid\xE9o, audio ou synchronis\xE9s\xA0;\n2. Pour chaque m\xE9dia temporel, v\xE9rifier que\xA0:\n   - Un passage de texte (un titre ou un paragraphe, par exemple) qui pr\xE9c\xE8de ou suit imm\xE9diatement le m\xE9dia temporel, permet de l\u2019identifier\xA0;\n   - Et le passage de texte est situ\xE9 \xE0 l\u2019ext\xE9rieur du lecteur de contenu multim\xE9dia si ce dernier fait appel \xE0 la technologie Flash.\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel, **le test est valid\xE9**."
       },
       techniques: ["G68", "G100"],
       particularCases: [
@@ -40643,6 +40776,10 @@ var rgaa_default = {
           "L\u2019alternative dans la page, r\xE9f\xE9renc\xE9e par le [lien ou bouton adjacent](#lien-ou-bouton-adjacent), est accessible."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias non temporels\xA0;\n2. Pour chaque m\xE9dia non temporel, v\xE9rifier qu\u2019un lien ou un bouton adjacent, clairement identifiable\xA0:\n   - Soit contient l\u2019adresse (url) d\u2019une page contenant une alternative\xA0;\n   - Soit permet d\u2019acc\xE9der \xE0 une alternative dans la page.\n3. Si c\u2019est le cas pour chaque m\xE9dia non temporel, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les m\xE9dias non temporels associ\xE9s \xE0 une alternative\xA0;\n2. Pour chaque m\xE9dia non temporel, v\xE9rifier que\xA0:\n   - La page r\xE9f\xE9renc\xE9e par le lien ou le bouton adjacent est accessible\xA0;\n   - L\u2019alternative dans la page, r\xE9f\xE9renc\xE9e par le lien ou le bouton adjacent, est accessible.\n3. Si c\u2019est le cas pour chaque m\xE9dia non temporel, **le test est valid\xE9**.\n\nNote\xA0: le crit\xE8re est non applicable dans les situations o\xF9\xA0:\n\n- Le m\xE9dia non temporel est utilis\xE9 \xE0 des fins d\xE9coratives (c'est-\xE0-dire qu'il n'apporte aucune information)\xA0;\n- Le m\xE9dia non temporel est diffus\xE9 dans un environnement ma\xEEtris\xE9\xA0;\n- Le m\xE9dia non temporel est ins\xE9r\xE9 via JavaScript en v\xE9rifiant la pr\xE9sence et la version du plug-in, en remplacement d'un contenu alternatif d\xE9j\xE0 pr\xE9sent."
+      },
       techniques: ["H35", "H46"],
       particularCases: [
         "Il existe une gestion de cas particulier lorsque\xA0:",
@@ -40670,6 +40807,9 @@ var rgaa_default = {
           "Pour chaque [m\xE9dia non temporel](#media-non-temporel) ayant une alternative, cette alternative permet-elle d\u2019acc\xE9der au m\xEAme contenu et \xE0 des fonctionnalit\xE9s similaires\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias non temporels associ\xE9s \xE0 une alternative\xA0;\n2. Pour chaque m\xE9dia non temporel, v\xE9rifier que l\u2019alternative est pertinente (elle permet d\u2019acc\xE9der au m\xEAme contenu et \xE0 des fonctionnalit\xE9s similaires)\xA0;\n3. Si c\u2019est le cas pour chaque m\xE9dia non temporel, **le test est valid\xE9**."
+      },
       techniques: ["H46", "F30"],
       wcag: ["1.1.1"],
       appliesTo: {
@@ -40692,6 +40832,9 @@ var rgaa_default = {
           "La s\xE9quence sonore peut \xEAtre stopp\xE9e sur action de l\u2019utilisateur\xA0;",
           "Le volume de la s\xE9quence sonore peut \xEAtre contr\xF4l\xE9 par l\u2019utilisateur ind\xE9pendamment du contr\xF4le de volume du syst\xE8me."
         ]
+      },
+      methodology: {
+        "1": "1. Au chargement du document, si un son se d\xE9clenche automatiquement, v\xE9rifier que\xA0:\n   - Soit la s\xE9quence sonore a une dur\xE9e inf\xE9rieure ou \xE9gale \xE0 3 secondes\xA0;\n   - Soit un dispositif (un bouton par exemple), sur l\u2019\xE9l\xE9ment ayant d\xE9clench\xE9 le son (voir note), ou dans la page, permet de le stopper\xA0;\n   - Soit le volume de la s\xE9quence peut \xEAtre contr\xF4l\xE9 par l\u2019utilisateur, ind\xE9pendamment du contr\xF4le de volume du syst\xE8me.\n2. Si c\u2019est le cas, **le test est valid\xE9**.\n\nNote\xA0: les \xE9l\xE9ments suivants sont susceptibles de d\xE9clencher des sons au chargement de la page : \xE9l\xE9ments `<audio>`, `<video>`, `<object>`, `<embed>`, `<bgsound>` ou un code JavaScript (utilisation de la Web Audio API, par exemple)."
       },
       techniques: ["G60", "G170", "G171", "F23", "F93"],
       wcag: ["1.4.2"],
@@ -40724,6 +40867,11 @@ var rgaa_default = {
           "Une fonctionnalit\xE9 [activable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias temporels\xA0;\n2. Pour chaque m\xE9dia temporel, v\xE9rifier la pr\xE9sence des fonctionnalit\xE9s obligatoires de contr\xF4le de la consultation\xA0:\n   - Au minimum\xA0: lecture, pause ou stop\xA0;\n   - Si le m\xE9dia a du son, il doit avoir une fonctionnalit\xE9 d\u2019activation / d\xE9sactivation du son\xA0;\n   - Si le m\xE9dia a des sous-titres, il doit avoir une fonctionnalit\xE9 de contr\xF4le de l\u2019apparition/disparition des sous-titres\xA0;\n   - Si le m\xE9dia a une audiodescription, il doit avoir une fonctionnalit\xE9 de contr\xF4le de l\u2019apparition/disparition de l\u2019audiodescription.\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les m\xE9dias temporels pourvus de fonctionnalit\xE9s de contr\xF4le\xA0;\n2. Pour chaque m\xE9dia temporel, v\xE9rifier que\xA0:\n   - Soit la fonctionnalit\xE9 est accessible par le clavier et tout dispositif de pointage\xA0;\n   - Soit une fonctionnalit\xE9 accessible par le clavier et tout dispositif de pointage permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page.\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les m\xE9dias temporels pourvus de fonctionnalit\xE9s de contr\xF4le\xA0;\n2. Pour chaque m\xE9dia temporel, v\xE9rifier que\xA0:\n   - Soit la fonctionnalit\xE9 est activable par le clavier et tout dispositif de pointage\xA0;\n   - Soit une fonctionnalit\xE9 activable par le clavier et tout dispositif de pointage permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page.\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel, **le test est valid\xE9**."
+      },
       techniques: ["G4", "G90", "G202"],
       wcag: ["2.1.1", "2.1.2"],
       appliesTo: {
@@ -40750,6 +40898,10 @@ var rgaa_default = {
           "La fonctionnalit\xE9 est [activable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0;",
           "Une fonctionnalit\xE9 [activable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias non temporels pourvus de fonctionnalit\xE9s de contr\xF4le\xA0;\n2. Pour chaque m\xE9dia non temporel, v\xE9rifier que\xA0:\n   - Soit la fonctionnalit\xE9 est accessible par le clavier et tout dispositif de pointage\xA0;\n   - Soit une fonctionnalit\xE9 accessible par le clavier et tout dispositif de pointage permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page.\n3. Si c\u2019est le cas pour chaque m\xE9dia non temporel, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les m\xE9dias non temporels pourvus de fonctionnalit\xE9s de contr\xF4le\xA0;\n2. Pour chaque m\xE9dia non temporel, v\xE9rifier que\xA0:\n   - Soit la fonctionnalit\xE9 est activable par le clavier et tout dispositif de pointage\xA0;\n   - Soit une fonctionnalit\xE9 activable par le clavier et tout dispositif de pointage permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page.\n3. Si c\u2019est le cas pour chaque m\xE9dia non temporel, **le test est valid\xE9**."
       },
       techniques: ["G4", "G90"],
       wcag: ["2.1.1", "2.1.2"],
@@ -40779,6 +40931,10 @@ var rgaa_default = {
           "Un m\xE9canisme permet de remplacer le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) ou [non temporel](#media-non-temporel) par son alternative."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les m\xE9dias temporels et non temporels\xA0;\n2. Pour chaque m\xE9dia, v\xE9rifier que\xA0:\n   - Soit le nom, le r\xF4le, la valeur, le param\xE9trage et les changements d\u2019\xE9tats des composants d\u2019interfaces sont accessibles aux technologies d\u2019assistance via une API d\u2019accessibilit\xE9 (par exemple, les zones mises \xE0 jour dynamiquement dans un lecteur vid\xE9o sont correctement restitu\xE9es)\xA0;\n   - Soit une alternative compatible avec une API d\u2019accessibilit\xE9 permet d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s.\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel ou non temporel, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les m\xE9dias temporels et non temporels qui poss\xE8dent une alternative compatible avec les technologies d\u2019assistance\xA0;\n2. Pour chaque m\xE9dia, v\xE9rifier que\xA0:\n   - Soit l\u2019alternative est adjacente au m\xE9dia temporel ou non temporel\xA0;\n   - Soit l\u2019alternative est accessible au moyen d\u2019un lien ou d\u2019un bouton adjacent\xA0;\n   - Soit un m\xE9canisme permet de remplacer le m\xE9dia temporel ou non temporel par son alternative.\n3. Si c\u2019est le cas pour chaque m\xE9dia temporel ou non temporel, **le test est valid\xE9**."
+      },
       techniques: ["G10", "G135", "F15", "F54"],
       particularCases: [
         "Il existe une gestion de cas particulier lorsque\xA0le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) ou [non temporel](#media-non-temporel) est utilis\xE9 \xE0 des fins d\xE9coratives (c\u2019est-\xE0-dire qu\u2019il n\u2019apporte aucune information).",
@@ -40801,6 +40957,9 @@ var rgaa_default = {
       tests: {
         "1": ["Pour chaque [tableau de donn\xE9es complexe](#tableau-de-donnees-complexe), un [r\xE9sum\xE9](#resume-de-tableau) est-il disponible\xA0?"]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les tableaux de donn\xE9es complexes (tableau de donn\xE9es - \xE9l\xE9ment `<table>` ou \xE9l\xE9ment pourvu d\u2019un attribut WAI-ARIA `role="table"` - contenant des en-t\xEAtes qui ne sont pas r\xE9partis uniquement sur la premi\xE8re ligne et/ou la premi\xE8re colonne de la grille ou dont la port\xE9e n\u2019est pas valable pour l\u2019ensemble de la colonne ou de la ligne)\xA0;\n2. Pour chaque tableau de donn\xE9es complexe, v\xE9rifier qu\u2019un passage de texte permettant de comprendre la nature et la structure du tableau, est pr\xE9sent\xA0:\n   - Soit dans l\u2019\xE9l\xE9ment `<caption>`\xA0;\n   - Soit dans l\u2019attribut `summary` de l\u2019\xE9l\xE9ment `<table>` (dans les versions de HTML et de XHTML ant\xE9rieures \xE0 HTML 5)\xA0;\n   - Soit dans un passage de texte li\xE9 au tableau avec l\u2019attribut\xA0`aria-describedby`.\n3. Si c\u2019est le cas pour chaque tableau de donn\xE9es complexe, **le test est valid\xE9**.'
+      },
       techniques: ["H73"],
       technicalNote: [
         "La sp\xE9cification HTML propose plusieurs [m\xE9thodes pour lier un r\xE9sum\xE9 \xE0 un tableau](#table-descriptions-techniques) (tableau li\xE9 \xE0 un passage de texte avec l\u2019attribut `aria-describedby`, tableau group\xE9 dans un \xE9l\xE9ment `figure` avec un r\xE9sum\xE9 pr\xE9sent dans un \xE9l\xE9ment `figcaption` ou un \xE9l\xE9ment `p`, r\xE9sum\xE9 pr\xE9sent dans un \xE9l\xE9ment `details` contenu dans l\u2019\xE9l\xE9ment `caption`). Ces m\xE9thodes n\u2019ont pas un support suffisant pour \xEAtre utilis\xE9es actuellement."
@@ -40821,6 +40980,9 @@ var rgaa_default = {
       },
       tests: {
         "1": ["Pour chaque [tableau de donn\xE9es complexe](#tableau-de-donnees-complexe) ayant un [r\xE9sum\xE9](#resume-de-tableau), celui-ci est-il pertinent\xA0?"]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les r\xE9sum\xE9s de tableaux de donn\xE9es complexes (tels que d\xE9termin\xE9s par le test 5.1.1)\xA0;\n2. Pour chaque r\xE9sum\xE9, v\xE9rifier que son contenu est pertinent\xA0;\n3. Si c\u2019est le cas pour chaque r\xE9sum\xE9 de tableaux de donn\xE9es complexes, **le test est valid\xE9**."
       },
       techniques: ["H73"],
       wcag: ["1.3.1"],
@@ -40844,6 +41006,9 @@ var rgaa_default = {
           'La balise `<table>` poss\xE8de un attribut `role="presentation"`.'
         ]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les tableaux de mise en forme\xA0;\n2. Pour chaque tableau de mise en forme, v\xE9rifier que\xA0:\n   - L\u2019ordre d\u2019acc\xE8s aux cellules est coh\xE9rent avec le contenu\xA0;\n   - L\u2019\xE9l\xE9ment `<table>` est pourvu d\u2019un attribut WAI-ARIA `role="presentation"`.\n3. Si c\u2019est le cas pour chaque tableau de mise en forme, **le test est valid\xE9**.'
+      },
       techniques: ["F49", "ARIA4"],
       wcag: ["1.3.2", "4.1.2"],
       appliesTo: {
@@ -40864,6 +41029,9 @@ var rgaa_default = {
           "Pour chaque [tableau de donn\xE9es ayant un titre](#tableau-de-donnees-ayant-un-titre), le titre est-il correctement associ\xE9 au tableau de donn\xE9es\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les tableaux de donn\xE9es pourvus d\u2019un titre\xA0;\n2. Pour chaque titre, v\xE9rifier qu\u2019il est fourni au moyen\xA0:\n   - Soit d\u2019un \xE9l\xE9ment `<caption>`\xA0;\n   - Soit d\u2019un attribut `title`\xA0;\n   - Soit d\u2019un attribut WAI-ARIA `aria-label`\xA0;\n   - Soit d\u2019un attribut WAI-ARIA `aria-labelledby` r\xE9f\xE9ren\xE7ant un passage de texte.\n3. Si c\u2019est le cas pour chaque titre de tableau de donn\xE9es, **le test est valid\xE9**."
+      },
       techniques: ["H39"],
       wcag: ["1.3.1"],
       appliesTo: {
@@ -40883,6 +41051,9 @@ var rgaa_default = {
         "1": [
           "Pour chaque [tableau de donn\xE9es ayant un titre](#tableau-de-donnees-ayant-un-titre), ce titre permet-il d\u2019identifier le contenu du [tableau de donn\xE9es](#tableau-de-donnees) de mani\xE8re claire et concise\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les tableaux de donn\xE9es pourvus d\u2019un titre\xA0;\n2. Pour chaque titre, v\xE9rifier qu\u2019il est pertinent\xA0;\n3. Si c\u2019est le cas pour chaque titre de tableau de donn\xE9es, **le test est valid\xE9**."
       },
       techniques: ["H39"],
       wcag: ["1.3.1"],
@@ -40916,6 +41087,12 @@ var rgaa_default = {
         "4": [
           "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), chaque cellule associ\xE9e \xE0 plusieurs en-t\xEAtes est-elle structur\xE9e au moyen d\u2019une balise `<td>` ou `<th>`\xA0?"
         ]
+      },
+      methodology: {
+        "1": '1. Retrouver dans le document les tableaux de donn\xE9es\xA0;\n2. Pour chaque en-t\xEAte de colonnes s\u2019appliquant \xE0 la totalit\xE9 de la colonne, v\xE9rifier que l\u2019en-t\xEAte de colonne est structur\xE9 au moyen\xA0:\n   - Soit d\u2019un \xE9l\xE9ment `<th>`\xA0;\n   - Soit d\u2019un \xE9l\xE9ment pourvu d\u2019un attribut WAI-ARIA `role="columnheader"`.\n3. Si c\u2019est le cas pour chaque en-t\xEAte de colonne s\u2019appliquant \xE0 la totalit\xE9 de la colonne, **le test est valid\xE9**.',
+        "2": '1. Retrouver dans le document les tableaux de donn\xE9es\xA0;\n2. Pour chaque en-t\xEAte de ligne s\u2019appliquant \xE0 la totalit\xE9 de la ligne, v\xE9rifier que l\u2019en-t\xEAte de ligne est structur\xE9 au moyen\xA0:\n   - Soit d\u2019un \xE9l\xE9ment `<th>`\xA0;\n   - Soit d\u2019un \xE9l\xE9ment pourvu d\u2019un attribut WAI-ARIA `role="rowheader"`.\n3. Si c\u2019est le cas pour chaque en-t\xEAte de ligne s\u2019appliquant \xE0 la totalit\xE9 de la ligne, **le test est valid\xE9**.',
+        "3": "1. Retrouver dans le document les tableaux de donn\xE9es\xA0;\n2. Pour chaque en-t\xEAte ne s\u2019appliquant pas \xE0 la totalit\xE9 de la ligne ou de la colonne, v\xE9rifier que l\u2019en-t\xEAte de ligne est structur\xE9 au moyen d\u2019un \xE9l\xE9ment `<th>`\xA0;\n3. Si c\u2019est le cas pour chaque en-t\xEAte ne s\u2019appliquant pas \xE0 la totalit\xE9 de la ligne ou de la colonne, **le test est valid\xE9**.",
+        "4": "1. Retrouver dans le document les tableaux de donn\xE9es ;\n2. Pour chaque cellule associ\xE9e \xE0 plusieurs en-t\xEAtes est-elle structur\xE9e au moyen d\u2019une balise `<th>` ou `<td>`\xA0;\n3. Si c\u2019est le cas pour chaque en-t\xEAte ne s\u2019appliquant pas \xE0 la totalit\xE9 de la ligne ou de la colonne, **le test est valid\xE9**."
       },
       techniques: ["H51", "F91"],
       wcag: ["1.3.1"],
@@ -40961,6 +41138,13 @@ var rgaa_default = {
           'La balise poss\xE8de un attribut WAI-ARIA `role="columnheader"` pour les [en-t\xEAtes de colonne](#en-tete-de-colonne-ou-de-ligne).'
         ]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les tableaux de donn\xE9es\xA0;\n2. Pour chaque en-t\xEAte (\xE9l\xE9ment `<th>`) s\u2019appliquant \xE0 la totalit\xE9 de la ligne ou de la colonne, v\xE9rifier que l\u2019\xE9l\xE9ment `<th>` poss\xE8de\xA0:\n   - Soit un attribut `id` unique\xA0;\n   - Soit un attribut scope\xA0;\n   - Soit un attribut WAI-ARIA `role="rowheader"` ou `"columnheader"`.\n3. Si c\u2019est le cas pour chaque en-t\xEAte s\u2019appliquant \xE0 la totalit\xE9 de la ligne ou de la colonne, **le test est valid\xE9**.',
+        "2": '1. Retrouver dans le document les tableaux de donn\xE9es\xA0;\n2. Pour chaque en-t\xEAte (\xE9l\xE9ment `<th>`) s\u2019appliquant \xE0 la totalit\xE9 de la ligne ou de la colonne et pourvu d\u2019un attribut `scope`, v\xE9rifier que l\u2019attribut `scope` poss\xE8de\xA0:\n   - Soit une valeur `"row"` pour les en-t\xEAtes de ligne\xA0;\n   - Soit une valeur `"col"` pour les en-t\xEAtes de colonne.\n3. Si c\u2019est le cas pour chaque en-t\xEAte s\u2019appliquant \xE0 la totalit\xE9 de la ligne ou de la colonne et pourvu d\u2019un attribut `scope`, **le test est valid\xE9**.',
+        "3": '1. Retrouver dans le document les tableaux de donn\xE9es\xA0;\n2. Pour chaque en-t\xEAte (\xE9l\xE9ment `<th>`) ne s\u2019appliquant pas \xE0 la totalit\xE9 de la ligne ou de la colonne, v\xE9rifier que l\u2019\xE9l\xE9ment `<th>`\xA0:\n   - Poss\xE8de un attribut `id` unique\xA0;\n   - Et ne poss\xE8de pas d\u2019attribut `scope `;\n   - Et ne poss\xE8de pas d\u2019attribut WAI-ARIA `role="rowheader"` ou `"columnheader"`.\n3. Si c\u2019est le cas pour chaque en-t\xEAte ne s\u2019appliquant pas \xE0 la totalit\xE9 de la ligne ou de la colonne, **le test est valid\xE9**.',
+        "4": "1. Retrouver dans le document les tableaux de donn\xE9es\xA0;\n2. Pour chaque \xE9l\xE9ment `<td>` ou `<th>` associ\xE9 \xE0 un ou plusieurs en-t\xEAtes poss\xE9dant un attribut `id`, v\xE9rifier que\xA0:\n   - L\u2019\xE9l\xE9ment `<td>` ou `<th>` poss\xE8de un attribut `headers`\xA0;\n   - Et l\u2019attribut `headers` poss\xE8de la liste des valeurs d\u2019attribut `id` des en-t\xEAtes associ\xE9s.\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment `<td>` ou `<th>` associ\xE9 \xE0 un ou plusieurs en-t\xEAtes poss\xE9dant un attribut `id`, **le test est valid\xE9**.",
+        "5": '1. Retrouver dans le document les tableaux de donn\xE9es\xA0;\n2. Pour chaque en-t\xEAte s\u2019appliquant \xE0 la totalit\xE9 de la ligne ou de la colonne et pourvu d\u2019un attribut WAI-ARIA `role="rowheader"` ou `"columnheader"`, v\xE9rifier que l\u2019\xE9l\xE9ment poss\xE8de\xA0:\n   - Soit un attribut WAI-ARIA `role="rowheader"` pour les en-t\xEAtes de ligne\xA0;\n   - Soit un attribut WAI-ARIA `role="columnheader"` pour les en-t\xEAtes de colonne.\n3. Si c\u2019est le cas pour chaque en-t\xEAte s\u2019appliquant \xE0 la totalit\xE9 de la ligne ou de la colonne et pourvu d\u2019un attribut WAI-ARIA `role="rowheader"` ou `"columnheader"`, **le test est valid\xE9**.'
+      },
       techniques: ["H43", "H63", "F90"],
       technicalNote: [
         "Si l\u2019attribut `headers` est impl\xE9ment\xE9 sur une cellule d\xE9j\xE0 reli\xE9e \xE0 un en-t\xEAte (de ligne ou de colonne) avec l\u2019attribut `scope` (avec la valeur `col` ou `row`), c\u2019est l\u2019en-t\xEAte ou les en-t\xEAtes r\xE9f\xE9renc\xE9s par l\u2019attribut `headers` qui seront restitu\xE9s aux technologies d\u2019assistance. Les en-t\xEAtes reli\xE9s avec l\u2019attribut `scope` seront ignor\xE9s."
@@ -40988,6 +41172,9 @@ var rgaa_default = {
           'Le tableau de mise en forme (balise `<table>`) n\u2019a pas d\u2019attribut `summary` (sinon vide) et ne contient pas de balises `<caption>`, `<th>`, `<thead>`, `<tfoot>` ou de balises ayant un attribut WAI-ARIA `role="rowheader"`, `role="columnheader"`\xA0;',
           "Les cellules du tableau de mise en forme (balises `<td>`) ne poss\xE8dent pas d\u2019attributs `scope`, `headers` et `axis`."
         ]
+      },
+      methodology: {
+        "1": '1. Retrouver dans le document les tableaux de mise en forme\xA0;\n2. Pour chaque tableau de mise en forme, v\xE9rifier que\xA0:\n   - L\u2019\xE9l\xE9ment `<table>` ne poss\xE8de pas d\'attribut `summary`, d\u2019\xE9l\xE9ments enfant `<caption>`, `<thead>`, `<th>`, `<tfoot>` ou d\u2019\xE9l\xE9ments pourvus d\u2019un attribut WAI-ARIA `role="rowheader"` ou `role="columnheader"`\xA0;\n   - Les \xE9l\xE9ments `<td>` ne poss\xE8dent pas d\u2019attributs `scope`, `headers` et `axis`.\n3. Si c\u2019est le cas pour chaque tableau de mise en forme, **le test est valid\xE9**.'
       },
       techniques: ["F46"],
       wcag: ["1.3.1"],
@@ -41029,6 +41216,13 @@ var rgaa_default = {
           "Pour chaque [lien](#lien) ayant un [intitul\xE9 visible](#intitule-visible), le [nom accessible du lien](#intitule-ou-nom-accessible-de-lien) contient-il au moins l\u2019[intitul\xE9 visible](#intitule-visible) (hors cas particuliers)\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les liens texte\xA0;\n2. Pour chaque lien texte, v\xE9rifier que ce qui permet d\u2019en comprendre la fonction et la destination est\xA0:\n   - Soit l\u2019intitul\xE9 du lien seul\xA0;\n   - Soit le contexte du lien.\n3. Si c\u2019est le cas pour chaque lien texte, **le test est valid\xE9**.",
+        "2": '1. Retrouver dans le document les liens image (lien avec pour contenu un \xE9l\xE9ment `<img>` ou un \xE9l\xE9ment ayant l\u2019attribut WAI-ARIA `role="img"`, un \xE9l\xE9ment `<area>` poss\xE9dant un attribut `href`, un \xE9l\xE9ment `<object>`, un \xE9l\xE9ment `<canvas>` ou un \xE9l\xE9ment `<svg>`)\xA0;\n2. Pour chaque lien image, v\xE9rifier que ce qui permet d\u2019en comprendre la fonction et la destination est\xA0:\n   - Soit l\u2019intitul\xE9 du lien seul, fourni par l\u2019alternative textuelle de l\u2019image\xA0;\n   - Soit le contexte du lien.\n3. Si c\u2019est le cas pour chaque lien image, **le test est valid\xE9**.',
+        "3": "1. Retrouver dans le document les liens composites (lien compos\xE9 \xE0 la fois de contenu texte et d\u2019\xE9l\xE9ments de type image)\xA0;\n2. Pour chaque lien composite, v\xE9rifier que ce qui permet d\u2019en comprendre la fonction et la destination est\xA0:\n   - Soit l\u2019intitul\xE9 du lien seul, fourni par la combinaison du contenu texte et de l\u2019alternative textuelle de l\u2019image\xA0;\n   - Soit le contexte du lien.\n3. Si c\u2019est le cas pour chaque lien composite, **le test est valid\xE9**.",
+        "4": "1. Retrouver dans le document les liens SVG (\xE9l\xE9ment `<svg>` qui poss\xE8de un \xE9l\xE9ment `<a>` pourvu d\u2019un attribut `xlink-href` (SVG 1.1) ou `href` (SVG 2))\xA0;\n2. Pour chaque lien SVG, v\xE9rifier que ce qui permet d\u2019en comprendre la fonction et la destination est\xA0:\n   - Soit l\u2019intitul\xE9 du lien seul, fourni par le nom accessible de l\u2019\xE9l\xE9ment `<svg>` (r\xE9solu g\xE9n\xE9ralement \xE0 partir du contenu d\u2019un \xE9l\xE9ment `<text>`)\xA0;\n   - Soit le contexte du lien.\n3. Si c\u2019est le cas pour chaque lien SVG, **le test est valid\xE9**.",
+        "5": '1. Retrouver dans le document les liens autres que SVG dont le contenu est fourni \xE0 la fois par un intitul\xE9 visible et par le contenu soit d\u2019un attribut title ou d\u2019un attribut `aria-label` ou d\u2019un attribut `aria-labelledby`\xA0;\n2. Pour chaque lien, v\xE9rifier que le contenu de l\u2019attribut `title` ou de l\u2019attribut `aria-label` ou de l\u2019attribut `aria-labelledby` contient l\u2019intitul\xE9 visible\xA0;\n3. Si c\u2019est le cas pour chaque lien, **le test est valid\xE9** pour les liens autres que SVG.\n4. Retrouver dans le document les liens SVG dont le contenu est fourni \xE0 la fois par un intitul\xE9 visible et par le contenu soit d\u2019un attribut `aria-labelledby`, ou d\u2019un attribut `aria-label` ou d\u2019un \xE9l\xE9ment title (enfant direct de l\u2019\xE9l\xE9ment `<svg>`) ou d\u2019un attribut x-link:title (SVG 1.1) ou d\u2019un ou plusieurs \xE9l\xE9ments `<text>`;\n5. Pour chaque lien SVG, v\xE9rifier que le contenu de l\u2019attribut `aria-labelledby` ou de l\u2019attribut `aria-label` ou de l\u2019\xE9l\xE9ment `<title>` ou de l\u2019attribut `x-link:title` ou d\u2019un ou plusieurs \xE9l\xE9ments `<text>` contient l\u2019intitul\xE9 visible\xA0;\n6. Si c\u2019est le cas pour chaque lien SVG, **le test est valid\xE9** pour les liens SVG.\n7. Si le test est valid\xE9 \xE0 la fois pour les liens non SVG et pour les liens SVG, le test est globalement valid\xE9.\n\nNote\xA0: consid\xE9rant la d\xE9termination du nom accessible, il existe deux cas particuliers et une particularit\xE9 li\xE9e aux expressions math\xE9matiques\xA0:\n\n- La ponctuation et les lettres majuscules pr\xE9sentes dans le texte de l\u2019intitul\xE9 visible peuvent \xEAtre ignor\xE9es dans le nom accessible sans porter \xE0 cons\xE9quence.\n- Si le texte de l\u2019intitul\xE9 visible sert de symbole, il ne doit pas \xEAtre interpr\xE9t\xE9 litt\xE9ralement au niveau du nom accessible. Le nom doit exprimer la fonction v\xE9hicul\xE9e par le symbole (par exemple, "B" au niveau d\'un \xE9diteur de texte aura pour nom accessible "Mettre en gras", le signe ">" en fonction du contexte signifiera "Suivant" ou "Lancer la vid\xE9o"). Le cas des symboles math\xE9matiques fait cependant exception (voir le point ci-dessous).\n- Si l\'\xE9tiquette visible repr\xE9sente une expression math\xE9matique, les symboles math\xE9matiques peuvent \xEAtre repris litt\xE9ralement pour servir d\'\xE9tiquette au nom accessible (par exemple, "A>B"). Il est laiss\xE9 \xE0 l\'utilisateur le soin d\'op\xE9rer la correspondance entre l\'expression et ce qu\'il doit \xE9peler compte tenu de la connaissance qu\'il a du fonctionnement de son logiciel de saisie vocale ("A plus grand que B" ou "A sup\xE9rieur \xE0 B").'
+      },
       techniques: ["H30", "H78", "H79", "H80", "H81", "G53", "G91", "F63", "F89", "ARIA7", "ARIA8"],
       technicalNote: [
         "Lorsque l\u2019intitul\xE9 visible est compl\xE9t\xE9 par une autre expression dans le nom accessible\xA0:",
@@ -41062,6 +41256,9 @@ var rgaa_default = {
       },
       tests: {
         "1": ["Dans chaque page web, chaque [lien](#lien) a-t-il un [intitul\xE9](#intitule-ou-nom-accessible-de-lien) entre `<a>` et `</a>`\xA0?"]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les liens quels qu\u2019ils soient\xA0;\n2. Pour chaque lien, v\xE9rifier que le contenu de l\u2019\xE9l\xE9ment `<a>` (ou d\u2019un \xE9l\xE9ment pourvu d\u2019un attribut WAI-ARIA `role=link`) contient un intitul\xE9 (texte ou alternative)\xA0;\n3. Si c\u2019est le cas pour chaque lien, **le test est valid\xE9**."
       },
       techniques: ["H30", "G91", "F89"],
       technicalNote: [
@@ -41099,6 +41296,11 @@ var rgaa_default = {
           "Le nom accessible du composant contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
           "Le composant poss\xE8de un r\xF4le pertinent."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document tous les composants d\u2019interface g\xE9n\xE9r\xE9s ou contr\xF4l\xE9s au moyen de JavaScript\xA0;\n2. V\xE9rifier que\xA0:\n   - Le composant poss\xE8de un r\xF4le coh\xE9rent avec son usage (g\xE9n\xE9ralement un bouton ou un lien)\xA0;\n   - Le composant poss\xE8de un nom explicite\xA0;\n   - Le nom du composant est coh\xE9rent avec l\u2019\xE9tat de la fonctionnalit\xE9 ou des contenus contr\xF4l\xE9s (par exemple pour une fonctionnalit\xE9 permettant d\u2019afficher ou de masquer une zone de contenu).\n3. Sinon, v\xE9rifier la pr\xE9sence d\u2019un composant d\u2019interface accessible permettant d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s\xA0;\n4. Sinon, v\xE9rifier la pr\xE9sence d\u2019une alternative accessible permettant d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s.\n5. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "1. Pour chacun des composants d\u2019interface ayant valid\xE9 le test 7.1.1, v\xE9rifier que le composant d\u2019interface est correctement restitu\xE9 par les technologies d\u2019assistance\xA0;\n2. Sinon, v\xE9rifier qu\u2019une alternative accessible au composant d\u2019interface permet d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "3": "1. Pour chacun des composants d\u2019interface ayant valid\xE9 le test 7.1.1, v\xE9rifier que le composant d\u2019interface poss\xE8de\xA0:\n   - Un nom pertinent (intitul\xE9 visible)\xA0;\n   - Un r\xF4le pertinent.\n2. Si le composant d\u2019interface poss\xE8de un nom accessible, v\xE9rifier que ce nom est pertinent et contient au moins l\u2019intitul\xE9 visible.\n3. Si c\u2019est le cas, **le test est valid\xE9**."
       },
       techniques: ["G10", "G135", "G136", "F15", "F19", "F20", "F42", "F59", "F79", "ARIA4", "ARIA5", "ARIA18", "ARIA19", "SCR21"],
       technicalNote: [
@@ -41160,6 +41362,10 @@ var rgaa_default = {
           "L\u2019alternative mise \xE0 jour est pertinente."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver les alternatives aux fonctionnalit\xE9s JavaScript\xA0:\n2. Chercher dans la page, les alternatives \xE0 un composant ou une fonctionnalit\xE9 JavaScript mises \xE0 disposition.\n3. D\xE9sactiver JavaScript dans le document et retrouver les alternatives propos\xE9es.\n4. Pour chacune des alternatives propos\xE9es, v\xE9rifier qu\u2019elle permet d\u2019acc\xE9der aux m\xEAmes contenus et \xE0 des fonctionnalit\xE9s similaires.\n5. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document tous les \xE9l\xE9ments non textuels mis \xE0 jour par une fonctionnalit\xE9 JavaScript.\n2. Si l'\xE9l\xE9ment non textuel a une alternative, v\xE9rifier que\xA0:\n   - L'alternative est mise \xE0 jour lorsque le contenu non textuel est mis \xE0 jour\xA0;\n   - L'alternative mise \xE0 jour est pertinente.\n3. Si c'est le cas, **le test est valid\xE9**."
+      },
       techniques: ["G136", "F19", "F20"],
       wcag: ["1.1.1", "4.1.2"],
       appliesTo: {
@@ -41182,6 +41388,10 @@ var rgaa_default = {
           "Un \xE9l\xE9ment [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sent dans la page."
         ],
         "2": ["Un [script](#script) ne doit pas supprimer le focus d\u2019un \xE9l\xE9ment qui le re\xE7oit. Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document, tous les \xE9l\xE9ments sur lesquels est impl\xE9ment\xE9 un gestionnaire d\u2019\xE9v\xE9nements JavaScript (par exemple click, focus, mouseover, blur, keydown, touch\u2026).\n2. V\xE9rifier que l\u2019\xE9l\xE9ment est accessible au moyen du clavier\xA0:\n   - Il est atteignable avec la touche de tabulation (tab)\xA0;\n   - Si l\u2019\xE9l\xE9ment g\xE8re une action simple, il est activable au clavier avec la touche entr\xE9e (Entr\xE9e)\xA0;\n   - Si l\u2019\xE9l\xE9ment g\xE8re une action complexe, il est utilisable avec le clavier (g\xE9n\xE9ralement avec les touches de direction).\n3. Sinon, v\xE9rifier qu\u2019un \xE9l\xE9ment accessible par le clavier permettant de r\xE9aliser la m\xEAme action est pr\xE9sent dans la page.\n4. V\xE9rifier que l\u2019\xE9l\xE9ment est accessible par tout dispositif de pointage (souris, toucher, stylet\u2026).\n5. Sinon, v\xE9rifier qu\u2019un \xE9l\xE9ment accessible au moyen d\u2019un dispositif de pointage et permettant de r\xE9aliser la m\xEAme action est pr\xE9sent dans la page.\n6. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "1. Activer, l\u2019un apr\xE8s l\u2019autre, tous les \xE9l\xE9ments capables de recevoir le focus.\n2. V\xE9rifier que le focus n\u2019est pas supprim\xE9 via une fonctionnalit\xE9 JavaScript.\n3. Si c\u2019est le cas, **le test est valid\xE9**."
       },
       techniques: ["G90", "G202", "F42", "F54", "F55", "SCR2", "SCR20", "SCR29", "SCR35"],
       particularCases: [
@@ -41209,6 +41419,9 @@ var rgaa_default = {
           "Le changement de contexte est initi\xE9 par un lien explicite."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document tous les \xE9v\xE9nements JavaScript qui initient un changement de contexte, par exemple\xA0:\n   - Une mise \xE0 jour dynamique de champs de formulaire\xA0;\n   - L\u2019ouverture d\u2019une nouvelle page \xE0 l\u2019activation d\u2019une option d\u2019une liste de s\xE9lection (\xE9l\xE9ment `<select>`)\xA0;\n   - La mise \xE0 jour, via un proc\xE9d\xE9 AJAX d\u2019une partie essentielle de la page\xA0;\n   - Le lancement automatique d\u2019un lecteur vid\xE9o suite \xE0 la s\xE9lection d\u2019une playlist\xA0;\n   - La manipulation du focus ayant pour r\xE9sultat de modifier la position courante de l\u2019utilisateur dans la page.\n2. V\xE9rifier que\xA0:\n   - L\u2019utilisateur est averti par un message de l\u2019action du script et du type de changement avant son d\xE9clenchement\xA0;\n   - Ou bien le changement de contexte est initi\xE9 par un bouton (input de type submit, button ou image ou la balise button) explicite\xA0;\n   - Ou bien le changement de contexte est initi\xE9 par un lien explicite.\n3. Si c\u2019est le cas, **le test est valid\xE9**."
+      },
       techniques: ["G13", "G76", "G80", "G107", "H32", "H84", "F9", "F22", "F36", "F37", "F41", "SCR19"],
       wcag: ["3.2.1", "3.2.2"],
       appliesTo: {
@@ -41234,6 +41447,11 @@ var rgaa_default = {
         "3": [
           'Chaque [message de statut](#message-de-statut) qui indique la progression d\u2019un processus utilise-t-il l\u2019un des attributs WAI-ARIA `role="log"`, `role="progressbar"` ou `role="status"`\xA0?'
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les messages qui valent pour message de statut.\n2. Pour chacun de ces messages, d\xE9terminer la nature de l\u2019information dont est porteur le message\xA0:\n3. Si le message informe de la r\xE9ussite, du r\xE9sultat d\u2019une action ou bien de l\u2019\xE9tat d\u2019une application, v\xE9rifier que l\u2019\xE9l\xE9ment qui contient le message\xA0:\n   - Soit utilise l\u2019attribut WAI-ARIA `role=\u201Dstatus\u201D`\xA0;\n   - Soit utilise les attributs WAI-ARIA `aria-live=\u201Dpolite\u201D` et `aria-atomic=\u201Dtrue\u201D`.\n4. Si le message pr\xE9sente une suggestion, ou avertit de l\u2019existence d\u2019une erreur, v\xE9rifier que l\u2019\xE9l\xE9ment qui contient le message\xA0:\n   - Soit utilise l\u2019attribut WAI-ARIA `role=\u201Dalert\u201D`\xA0;\n   - Soit utilise les attributs `aria-live=\u201Dassertive\u201D` et `aria-atomic=\u201Dtrue\u201D`.\n5. Si le message indique la progression d\u2019un processus, v\xE9rifier que l\u2019\xE9l\xE9ment qui contient le message\xA0:\n   - Soit utilise l\u2019un des attributs WAI-ARIA `role=\u201Dlog\u201D`, `role=\u201Dprogressbar\u201D` ou `role=\u201Dstatus\u201D`\xA0;\n   - Soit utilise l\u2019attribut WAI-ARIA `aria-live=\u201Dpolite\u201D` si l\u2019intention est de signaler l\u2019\xE9quivalent d\u2019un `r\xF4le \u201Clog\u201D`\xA0;\n   - Soit utilise les attributs WAI-ARIA `aria-live=\u201Dpolite\u201D` et aria-atomic=\u201Dtrue si l\u2019intention est de signaler l\u2019\xE9quivalent d\u2019un r\xF4le \u201Cstatus\u201D.\n6. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "Tests identiques \xE0 7.5.1",
+        "3": "Tests identiques \xE0 7.5.1"
       },
       techniques: ["ARIA19", "ARIA22", "ARIA23"],
       technicalNote: [
@@ -41264,6 +41482,11 @@ var rgaa_default = {
           "Pour chaque page web poss\xE9dant une d\xE9claration de [type de document](#type-de-document), celle-ci est-elle situ\xE9e avant la balise `<html>` dans le code source\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document la balise DOCTYPE (par exemple `<!DOCTYPE html>`)\xA0;\n2. V\xE9rifier que\xA0:\n   - La balise DOCTYPE est plac\xE9e avant la balise `<html>`\xA0;\n   - Le type de document est valide.\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "Tests identiques \xE0 8.1.1",
+        "3": "Tests identiques \xE0 8.1.1"
+      },
       techniques: ["G134", "G192"],
       wcag: ["4.1.1"],
       appliesTo: {
@@ -41289,6 +41512,9 @@ var rgaa_default = {
           "Les attributs ne sont pas doubl\xE9s sur un m\xEAme \xE9l\xE9ment."
         ]
       },
+      methodology: {
+        "1": "1. Dans le menu \xAB\xA0Check\xA0\xBB, activer l\u2019option \xAB\xA0W3C Nu markup checker (all frames)\xA0\xBB.\n2. Dans la page de r\xE9sultats, v\xE9rifier que\xA0:\n   - Les balises, attributs et valeurs d\u2019attributs respectent les r\xE8gles d\u2019\xE9criture\xA0;\n   - L\u2019imbrication des balises est conforme\xA0;\n   - L\u2019ouverture et la fermeture des balises sont conformes\xA0;\n   - Les valeurs d\u2019attribut id sont uniques dans la page\xA0;\n   - Les attributs ne sont pas doubl\xE9s sur un m\xEAme \xE9l\xE9ment.\n3. Si c\u2019est le cas, **le test est valid\xE9**."
+      },
       techniques: ["H74", "H93", "H94", "F70", "F77"],
       wcag: ["4.1.1", "4.1.2"],
       appliesTo: {
@@ -41310,6 +41536,9 @@ var rgaa_default = {
           "L\u2019indication de la langue de la page (attribut `lang` et/ou `xml:lang`) est donn\xE9e pour l\u2019\xE9l\xE9ment `html`\xA0;",
           "L\u2019indication de la langue de la page (attribut `lang` et/ou `xml:lang`) est donn\xE9e sur chaque \xE9l\xE9ment de texte ou sur l\u2019un des \xE9l\xE9ments parents."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document l\u2019indication de langue par d\xE9faut\xA0;\n2. V\xE9rifier la pr\xE9sence d\u2019une indication de langue\xA0:\n   - Soit au moyen de l\u2019attribut lang sur la balise html si le code est du HTML5 ou du HTML4\xA0;\n   - Soit au moyen des attributs lang et xml:lang sur la balise html si le code est du XHTML 1.0\xA0;\n   - Soit au moyen de l\u2019attribut xml:lang sur la balise html si le code est du XHTML 1.1\xA0;\n   - Sinon, v\xE9rifier la pr\xE9sence d\u2019une indication de langue sur chaque \xE9l\xE9ment de texte ou l\u2019un de ses parents.\n3. Si c\u2019est le cas, **le test est valid\xE9**."
       },
       techniques: ["H57"],
       wcag: ["3.1.1"],
@@ -41333,6 +41562,9 @@ var rgaa_default = {
           "Le code de langue est pertinent."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document l\u2019indication de langue par d\xE9faut\xA0;\n2. V\xE9rifier la pr\xE9sence d\u2019un code de langue\xA0:\n   - Valide (conforme \xE0 la norme ISO 639-1 ou ISO 639-2 et suivantes)\xA0;\n   - Et pertinent (qui indique la langue principale du document).\n3. Si c\u2019est le cas, **le test est valid\xE9**."
+      },
       techniques: ["H57"],
       wcag: ["3.1.1"],
       appliesTo: {
@@ -41352,6 +41584,9 @@ var rgaa_default = {
       tests: {
         "1": ["Chaque page web a-t-elle un [titre de page](#titre-de-page) (balise `<title>`)\xA0?"]
       },
+      methodology: {
+        "1": "Test 8.5.1\n\n1. Retrouver dans le document le titre structur\xE9 au moyen d\u2019un \xE9l\xE9ment `<title>`\xA0;\n2. Si c\u2019est le cas, **le test est valid\xE9**."
+      },
       techniques: ["G88", "G127", "H25"],
       wcag: ["2.4.2"],
       appliesTo: {
@@ -41369,6 +41604,9 @@ var rgaa_default = {
       },
       tests: {
         "1": ["Pour chaque page web ayant un [titre de page](#titre-de-page) (balise `<title>`), le contenu de cette balise est-il pertinent\xA0?"]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document le titre structur\xE9 au moyen d\u2019un \xE9l\xE9ment `<title>`\xA0;\n2. V\xE9rifier si le contenu de l\u2019\xE9l\xE9ment `<title>` est suffisamment pertinent (il permet de retrouver la page dans l\u2019historique de navigation ou la liste des onglets).\n3. Si c\u2019est le cas, **le test est valid\xE9**."
       },
       techniques: ["G88", "G127", "H25"],
       wcag: ["2.4.2"],
@@ -41392,6 +41630,9 @@ var rgaa_default = {
           "L\u2019indication de langue est donn\xE9e sur l\u2019\xE9l\xE9ment contenant le texte (attribut `lang` et/ou `xml:lang`)\xA0;",
           "L\u2019indication de langue est donn\xE9e sur un des \xE9l\xE9ments parents (attribut `lang` et/ou `xml:lang`)"
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver les passages de texte en langue \xE9trang\xE8re, \xE0 l\u2019exception\xA0:\n   - Des noms propres\xA0;\n   - Des mots d\u2019origine \xE9trang\xE8re, pr\xE9sents dans le dictionnaire de la langue du document\xA0;\n   - Des mots d\u2019origine \xE9trang\xE8re et d\u2019usage courant dont la prononciation ne provoque pas d\u2019incompr\xE9hension.\n   - V\xE9rifier que chaque passage de texte retenu poss\xE8de une indication de langue (attribut `lang` et/ou `xml:lang` sur l\u2019\xE9l\xE9ment lui-m\xEAme ou l\u2019un de ses parents).\n2. Si c\u2019est le cas, **le test est valid\xE9**."
       },
       techniques: ["H58"],
       particularCases: [
@@ -41425,6 +41666,9 @@ var rgaa_default = {
           "Le code de langue est pertinent."
         ]
       },
+      methodology: {
+        "1": "1. Pour chaque passage de texte valid\xE9 au test 8.7.1, v\xE9rifier que\xA0:\n   - L\u2019indication de langue est valide\xA0;\n   - L\u2019indication de langue est pertinente.\n2. Si c\u2019est le cas, **le test est valid\xE9**."
+      },
       techniques: ["H58"],
       wcag: ["3.1.2"],
       appliesTo: {
@@ -41444,6 +41688,9 @@ var rgaa_default = {
         "1": [
           "Dans chaque page web les balises (\xE0 l\u2019exception de `<div>`, `<span>` et `<table>`) ne doivent pas \xEAtre utilis\xE9es [uniquement \xE0 des fins de pr\xE9sentation](#uniquement-a-des-fins-de-presentation). Cette r\xE8gle est-elle respect\xE9e\xA0?"
         ]
+      },
+      methodology: {
+        "1": '1. Retrouver dans le document l\u2019ensemble des \xE9l\xE9ments s\xE9mantiques utilis\xE9s \xE0 des fins de pr\xE9sentation\xA0;\n2. Pour chacun de ces \xE9l\xE9ments, v\xE9rifier que\xA0:\n   - L\u2019\xE9l\xE9ment est pourvu d\u2019un attribut `role="presentation"`\xA0;\n   - L\u2019utilisation de cet \xE9l\xE9ment \xE0 des fins de pr\xE9sentation reste justif\xE9e.\n3. Si c\u2019est le cas, **le test est valid\xE9**.\n\nNote\xA0: Quelques exemples, non exhaustifs de d\xE9tournement de balisage\xA0: un \xE9l\xE9ment `<div>` utilis\xE9 comme paragraphe, un titre utilis\xE9 comme l\xE9gende, un \xE9l\xE9ment `<blockquote>` ou des paragraphes vides ou encore des espaces utilis\xE9s pour cr\xE9er des effets de marges.\nL\'utilisation d\'un `role="presentation"` est formellement d\xE9conseill\xE9e, mais peut toutefois se justifier dans de rares cas. Cela peut \xEAtre acceptable sur un \xE9l\xE9ment `<blockquote>` ou un paragraphe vide, mais sera consid\xE9r\xE9 comme non-conforme sur un titre.\n\nLe cas des tableaux\xA0: \xE0 noter que ce test aborde les tableaux de pr\xE9sentation qui ne devraient finalement pas appara\xEEtre au sein de la th\xE9matique Tableaux.'
       },
       techniques: ["G115", "H88", "F43", "F92"],
       wcag: ["1.3.1"],
@@ -41470,6 +41717,10 @@ var rgaa_default = {
           "La valeur de l\u2019attribut `dir` est pertinente."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les passages de textes qui utilisent une langue qui se lit dans le sens inverse de la langue du document (comme l\u2019arabe ou l\u2019h\xE9breu pour le fran\xE7ais par exemple).\n2. Pour chaque passage de texte, v\xE9rifier que le passage de texte est contenu dans une balise qui poss\xE8de un attribut `dir`.\n3. Si c\u2019est le cas pour chaque passage de texte, **le test est valid\xE9**.",
+        "2": "1. Pour chaque passage de texte valid\xE9 au test 8.10.1, v\xE9rifier que\xA0:\n   - L\u2019indication de sens de lecture est conforme (ltr, pour le sens \xAB\xA0de gauche \xE0 droite\xA0\xBB et rtl pour le sens \xAB\xA0de droite \xE0 gauche\xA0\xBB)\xA0;\n   - L\u2019indication de sens de lecture est pertinente.\n2. Si c\u2019est le cas pour chaque passage de texte, **le test est valid\xE9**."
+      },
       techniques: ["H56"],
       wcag: ["1.3.2"],
       appliesTo: {
@@ -41495,6 +41746,11 @@ var rgaa_default = {
         "3": [
           'Dans chaque page web, chaque passage de texte constituant un [titre](#titre) est-il structur\xE9 \xE0 l\u2019aide d\u2019une balise `<hx>` ou d\u2019une balise poss\xE9dant un attribut WAI-ARIA `role="heading"` associ\xE9 \xE0 un attribut WAI-ARIA `aria-level`\xA0?'
         ]
+      },
+      methodology: {
+        "1": '1. Retrouver dans le document les titres (balise `<hx>` ou balise poss\xE9dant un attribut WAI-ARIA `role="heading"` associ\xE9 \xE0 un attribut WAI-ARIA `aria-level`)\xA0;\n2. V\xE9rifier que la hi\xE9rarchie entre les titres est pertinente\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**.',
+        "2": "1. Pour chaque titre identifi\xE9 au test 9.1.1, v\xE9rifier que son contenu est pertinent\xA0;\n2. Si c\u2019est le cas pour chaque titre, **le test est valid\xE9**.",
+        "3": '1. Pour chaque titre identifi\xE9 au test 9.1.1, v\xE9rifier que\xA0:\n   - Soit il est structur\xE9 au moyen d\u2019une balise `<hx>` (\u201Cx\u201D d\xE9signant une valeur num\xE9rique comprise entre 1 et 6);\n   - Soit il est structur\xE9 au moyen d\u2019une balise poss\xE9dant un attribut WAI-ARIA `role="heading"` et un attribut WAI-ARIA `aria-level=x` (\u201Cx\u201D d\xE9signant une valeur num\xE9rique).\n2. Si c\u2019est le cas pour chaque titre, **le test est valid\xE9**.'
       },
       techniques: ["G115", "G130", "H42", "G141", "ARIA4", "ARIA12"],
       technicalNote: [
@@ -41524,6 +41780,9 @@ var rgaa_default = {
           "La [structure du document](#structure-du-document) utilise une balise `<main>` visible unique\xA0;",
           "La [zone de pied de page](#zone-de-pied-de-page) est structur\xE9e via une balise `<footer>`."
         ]
+      },
+      methodology: {
+        "1": "1. V\xE9rifier que la zone d\u2019en-t\xEAte est structur\xE9e au moyen d\u2019un \xE9l\xE9ment `<header>`\xA0;\n2. V\xE9rifier que les zones de navigation principales et secondaires sont structur\xE9es au moyen d\u2019un \xE9l\xE9ment `<nav>`\xA0;\n3. V\xE9rifier que l\u2019\xE9l\xE9ment `<nav>` n\u2019est pas utilis\xE9 en dehors de la structuration des zones de navigation principales et secondaires\xA0;\n4. V\xE9rifier que la zone de contenu principal est structur\xE9e au moyen d\u2019un \xE9l\xE9ment `<main>`\xA0;\n5. Si le document poss\xE8de plusieurs \xE9l\xE9ments `<main>`, v\xE9rifier qu\u2019un seul de ces \xE9l\xE9ments est visible (les autres occurrences de l\u2019\xE9l\xE9ment sont pourvues d\u2019un attribut `hidden`)\xA0;\n6. V\xE9rifier que la zone de pied de page est structur\xE9e au moyen d\u2019un \xE9l\xE9ment `<footer>`.\n7. Si c\u2019est le cas pour chaque zone de contenu, **le test est valid\xE9**."
       },
       techniques: ["G115", "ARIA11"],
       technicalNote: [
@@ -41559,6 +41818,11 @@ var rgaa_default = {
           "Dans chaque page web, les informations regroup\xE9es sous forme de [liste](#listes) de description utilisent-elles les balises `<dl>` et `<dt>/<dd>`\xA0?"
         ]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les \xE9l\xE9ments regroup\xE9s visuellement sous la forme d\u2019une liste non ordonn\xE9e\xA0;\n2. Pour chaque liste, v\xE9rifier que la liste est structur\xE9e\xA0:\n   - Soit au moyen des \xE9l\xE9ments `<ul>` et `<li>`\xA0;\n   - Soit au moyen d\u2019\xE9l\xE9ments pourvus d\u2019attributs WAI-ARIA `role="list"` et `role="listitem"`.\n3. Si c\u2019est le cas pour chaque liste non ordonn\xE9e, **le test est valid\xE9**.',
+        "2": '1. Retrouver dans le document les \xE9l\xE9ments regroup\xE9s visuellement sous la forme d\u2019une liste ordonn\xE9e\xA0;\n2. Pour chaque liste, v\xE9rifier que la liste est structur\xE9e\xA0:\n   - Soit au moyen des \xE9l\xE9ments `<ol>` et `<li>`\xA0;\n   - Soit au moyen d\u2019\xE9l\xE9ments pourvus d\u2019attributs WAI-ARIA `role="list"` et `role="listitem"`.\n3. Si c\u2019est le cas pour chaque liste ordonn\xE9e, **le test est valid\xE9**.',
+        "3": "1. Retrouver dans le document les \xE9l\xE9ments regroup\xE9s visuellement sous la forme d\u2019une liste de description\xA0;\n2. Pour chaque liste, v\xE9rifier que la liste est structur\xE9e au moyen des \xE9l\xE9ments `<dl>`, `<dt>` et `<dd>`\xA0;\n3. Si c\u2019est le cas pour chaque liste de description, **le test est valid\xE9**."
+      },
       techniques: ["G115", "G153", "H40", "H48", "F2"],
       technicalNote: [
         'Les attributs WAI-ARIA `role="list"` et `role="listitem"` peuvent n\xE9cessiter l\u2019utilisation des attributs WAI-ARIA `aria-setsize` et `aria-posinset` dans le cas o\xF9 l\u2019ensemble de la liste n\u2019est pas disponible via le DOM g\xE9n\xE9r\xE9 au moment de la consultation.',
@@ -41581,6 +41845,10 @@ var rgaa_default = {
       tests: {
         "1": ["Dans chaque page web, chaque citation courte utilise-t-elle une balise `<q>`\xA0?"],
         "2": ["Dans chaque page web, chaque bloc de citation utilise-t-il une balise `<blockquote>`\xA0?"]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les citations courtes (ou en ligne)\xA0;\n2. Pour chaque citation, v\xE9rifier que la citation est structur\xE9e au moyen d\u2019un \xE9l\xE9ment `<q>`\xA0;\n3. Si c\u2019est le cas pour chaque citation courte, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les blocs de citation\xA0;\n2. Pour chaque bloc de citation, v\xE9rifier que le bloc de citation est structur\xE9 au moyen d\u2019un \xE9l\xE9ment `<blockquote>`\xA0;\n3. Si c\u2019est le cas pour chaque bloc de citation, **le test est valid\xE9**."
       },
       techniques: ["G115", "H49", "F2"],
       wcag: ["1.3.1"],
@@ -41611,6 +41879,11 @@ var rgaa_default = {
           "Les espaces ne sont pas utilis\xE9es pour simuler des colonnes de texte."
         ]
       },
+      methodology: {
+        "1": "1. V\xE9rifier l\u2019absence des \xE9l\xE9ments de pr\xE9sentation `<basefont>`, `<big>`, `<blink>`, `<center>`, `<font>`, `<marquee>`, `<s>`, `<strike>`, `<tt>` ;\n2. V\xE9rifier l\u2019absence de l\u2019\xE9l\xE9ment `<u>` uniquement si le DOCTYPE du document ne correspond pas \xE0 HTML 5\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "1. V\xE9rifier l\u2019absence des attributs de pr\xE9sentation\xA0: `align`, `alink`, `background`, `bgcolor`, `border`, `cellpadding`, `cellspacing`, `char`, `charoff`, `clear`, `color`, `compact`, `frameborder`, `hspace`, `link`, `marginheight`, `marginwidth`, `text`, `valign`, `vlink`, `vspace`, `size`(exception faite de l'\xE9l\xE9ment `<select>`), `width` (exception faite des \xE9l\xE9ments `<img>`, `<object>`, `<embed>`, `<canvas>` et `<svg>`), `height` (exception faite des \xE9l\xE9ments `<img>`, `<object>`, `<embed>`, `<canvas>` et `<svg>`)\xA0;\n2. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "3": "1. D\xE9sactiver les styles (CSS) du document\xA0;\n2. V\xE9rifier l\u2019absence d\u2019espaces utilis\xE9es\xA0:\n   - Entre les lettres d\u2019un mot\xA0;\n   - Pour cr\xE9er des effets de marges ou d\u2019alignement\xA0;\n   - Pour simuler des tableaux ou des colonnes.\n3. Si c\u2019est le cas, **le test est valid\xE9**."
+      },
       techniques: ["G140", "F32", "F33", "F34", "F48", "C6", "C8", "C18", "C22"],
       wcag: ["1.3.1", "1.3.2"],
       appliesTo: {
@@ -41628,6 +41901,9 @@ var rgaa_default = {
       },
       tests: {
         "1": ["Dans chaque page web, l\u2019information reste-t-elle pr\xE9sente lorsque les [feuilles de styles](#feuille-de-style) sont d\xE9sactiv\xE9es\xA0?"]
+      },
+      methodology: {
+        "1": "1. D\xE9sactiver les styles (CSS) du document\xA0;\n2. Comparer le document d\xE9pourvu de styles avec le document mis en forme\xA0;\n3. V\xE9rifier si dans le document d\xE9pourvu de styles, les contenus visibles porteurs d'information restent pr\xE9sents\xA0;\n4. Si c\u2019est le cas, **le test est valid\xE9**."
       },
       techniques: ["G140", "F3", "F87"],
       wcag: ["1.1.1", "1.3.1"],
@@ -41648,6 +41924,9 @@ var rgaa_default = {
         "1": [
           "Dans chaque page web, l\u2019information reste-t-elle [compr\xE9hensible](#comprehensible-ordre-de-lecture) lorsque les [feuilles de styles](#feuille-de-style) sont d\xE9sactiv\xE9es\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. D\xE9sactiver les styles (CSS) du document\xA0;\n2. V\xE9rifier que l\u2019ordre dans lequel les contenus sont impl\xE9ment\xE9s ne pose pas de probl\xE8me de compr\xE9hension\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**."
       },
       techniques: ["G59", "G140", "F1"],
       wcag: ["1.3.2", "2.4.3"],
@@ -41677,6 +41956,10 @@ var rgaa_default = {
           "Lors de l\u2019utilisation des fonctions de zoom graphique du navigateur\xA0;",
           "Lors de l\u2019utilisation d\u2019un [composant d\u2019interface](#composant-d-interface) propre au site permettant d\u2019agrandir le texte ou de zoomer."
         ]
+      },
+      methodology: {
+        "1": "1. V\xE9rifier dans le document si les textes restent pr\xE9sents et lisibles lorsque\xA0:\n   - Le zoom texte du navigateur est r\xE9gl\xE9 \xE0 200\u202F%\xA0;\n   - Le zoom graphique du navigateur est r\xE9gl\xE9 \xE0 200\u202F%\xA0;\n   - Les fonctionnalit\xE9s de zoom personnalis\xE9es propos\xE9 par le document sont utilis\xE9s.\n2. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "1. V\xE9rifier dans le document si les textes sont effectivement agrandis lorsque\xA0:\n   - Le zoom texte du navigateur est r\xE9gl\xE9 \xE0 200\u202F%\xA0;\n   - Le zoom graphique du navigateur est r\xE9gl\xE9 \xE0 200\u202F%\xA0;\n   - Les fonctionnalit\xE9s de zoom personnalis\xE9es propos\xE9 par le document sont utilis\xE9s.\n2. Si c\u2019est le cas, **le test est valid\xE9**."
       },
       techniques: ["G146", "G179", "F69", "F80", "SCR34", "C12", "C13", "C14", "C17", "C28"],
       particularCases: [
@@ -41710,6 +41993,11 @@ var rgaa_default = {
           "Dans chaque page web, chaque utilisation d\u2019une image pour cr\xE9er une couleur de fond d\u2019un \xE9l\xE9ment susceptible de contenir du texte, via CSS (`background`, `background-image`), est-elle accompagn\xE9e d\u2019une d\xE9claration de couleur de fond (`background`, `background-color`), au moins, h\xE9rit\xE9e d\u2019un parent\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les textes mis en couleur, \xE0 l\u2019exception des couleurs par d\xE9faut (par exemple les liens, etc.) ;\n2. D\xE9terminer l\u2019\xE9l\xE9ment qui contient le texte et v\xE9rifier la pr\xE9sence d\u2019une valeur calcul\xE9e pour la propri\xE9t\xE9 `background-color` de l\u2019\xE9l\xE9ment ;\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les textes mis en couleur, \xE0 l\u2019exception des couleurs par d\xE9faut (par exemple les liens, etc.) ;\n2. D\xE9terminer l\u2019\xE9l\xE9ment qui contient le texte et v\xE9rifier la pr\xE9sence d\u2019une valeur calcul\xE9e pour la propri\xE9t\xE9 `color` de l\u2019\xE9l\xE9ment ;\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les textes dont l\u2019arri\xE8re-plan est constitu\xE9 d\u2019une image (propri\xE9t\xE9 background-image) ;\n2. D\xE9terminer l\u2019\xE9l\xE9ment qui contient le texte et v\xE9rifier que si l\u2019image d\u2019arri\xE8re-plan est absente, le texte reste lisible ;\n3. Si c\u2019est le cas, **le test est valid\xE9**."
+      },
       techniques: ["F24"],
       wcag: ["1.4.3"],
       appliesTo: {
@@ -41733,6 +42021,9 @@ var rgaa_default = {
           "Le lien dispose d\u2019une indication visuelle au focus autre qu\u2019un changement de couleur."
         ]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les \xE9l\xE9ments de type lien (\xE9l\xE9ment `<a>` ou \xE9l\xE9ment pourvu d\u2019un attribut WAI-ARIA `role="link"`) ;\n2. Pour chaque \xE9l\xE9ment de type lien, s\u2019il peut \xEAtre confondu avec un texte normal lorsqu\u2019il est signal\xE9 uniquement par la couleur, v\xE9rifier que le contraste entre la couleur de police du lien et la couleur de police du texte environnant est de 3:1, au moins ;\n3. Cette v\xE9rification doit \xEAtre faite pour les diff\xE9rents \xE9tats du lien s\u2019ils sont pr\xE9sent\xE9s au moyen d\u2019une couleur diff\xE9rente\xA0: l\u2019\xE9tat non visit\xE9, l\u2019\xE9tat visit\xE9, l\u2019\xE9tat activ\xE9, l\u2019\xE9tat au survol et l\u2019\xE9tat \xE0 la prise de focus ;\n4. Si c\u2019est le cas pour chaque \xE9l\xE9ment de type lien, **le test est valid\xE9**.'
+      },
       techniques: ["G183", "F73"],
       wcag: ["1.4.1"],
       appliesTo: {
@@ -41755,6 +42046,9 @@ var rgaa_default = {
           "Un style du focus d\xE9fini par l\u2019auteur est visible."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les \xE9l\xE9ments susceptibles de recevoir le focus (les \xE9l\xE9ments d\u2019interface tels que les liens ou les contr\xF4les de formulaire, ainsi que tout \xE9l\xE9ment pourvu d\u2019un attribut `tabindex` d\u2019une valeur \xE9gale ou sup\xE9rieure \xE0 1)\xA0;\n2. Pour chaque \xE9l\xE9ment susceptible de recevoir le focus, v\xE9rifier que l\u2019indication visuelle de la prise de focus est pr\xE9sente (en agissant sur le contour ou le fond ou les deux) et est suffisamment contrast\xE9e (ratio de contraste \xE9gal ou sup\xE9rieur \xE0 3:1) ;\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment susceptible de recevoir le focus, **le test est valid\xE9**."
+      },
       techniques: ["G149", "G165", "G183", "G195", "F73", "F78", "SCR31", "C15"],
       wcag: ["1.4.1", "2.4.7"],
       appliesTo: {
@@ -41776,6 +42070,9 @@ var rgaa_default = {
           "Le [contenu cach\xE9](#contenu-cache) a vocation \xE0 \xEAtre ignor\xE9 par les technologies d\u2019assistance\xA0;",
           "Le [contenu cach\xE9](#contenu-cache) n\u2019a pas vocation \xE0 \xEAtre ignor\xE9 par les technologies d\u2019assistance et est rendu restituable par les technologies d\u2019assistance suite \xE0 une action de l\u2019utilisateur r\xE9alisable au clavier ou par tout dispositif de pointage sur un \xE9l\xE9ment pr\xE9c\xE9dent le contenu cach\xE9 ou suite \xE0 un repositionnement du focus dessus."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver les contenus cach\xE9s (\xE9l\xE9ments pourvus de l\u2019attribut hidden ou de l\u2019attribut WAI-ARIA aria-hidden, ou bien d\u2019une classe ou d\u2019un ensemble de styles CSS susceptibles de masquer le contenu).\n2. Pour chaque contenu cach\xE9, v\xE9rifier que\xA0:\n   - Soit le contenu cach\xE9 a vocation \xE0 \xEAtre ignor\xE9 par les technologies d\u2019assistance (un \xE9l\xE9ment statistique de visites par exemple)\xA0;\n   - Soit le contenu cach\xE9 n\u2019a pas vocation \xE0 \xEAtre ignor\xE9 par les technologies d\u2019assistance, et dans ce cas il est rendu restituable par les technologies d\u2019assistance au moyen\xA0:\n     - Soit d\u2019une action de l\u2019utilisateur r\xE9alisable au clavier ou par tout dispositif de pointage sur un \xE9l\xE9ment pr\xE9c\xE9dent le contenu cach\xE9\xA0;\n     - Soit d\u2019une fonction de programmation qui repositionne le focus sur le contenu.\n3. Si c\u2019est le cas pour chaque contenu cach\xE9, **le test est valid\xE9**."
       },
       techniques: ["G57"],
       technicalNote: [
@@ -41812,6 +42109,12 @@ var rgaa_default = {
           "Dans chaque page web, pour chaque [m\xE9dia non temporel](#media-non-temporel), l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle respect\xE9e\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les informations d\u2019un texte donn\xE9es par la forme, la taille ou la position\xA0;\n2. Pour chaque information donn\xE9e par la forme, la taille ou la position, v\xE9rifier qu\u2019il existe un autre moyen de r\xE9cup\xE9rer cette information\xA0;\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les informations d\u2019une image donn\xE9es par la forme, la taille ou la position\xA0;\n2. Pour chaque information donn\xE9e par la forme, la taille ou la position, v\xE9rifier qu\u2019il existe un autre moyen de r\xE9cup\xE9rer cette information\xA0;\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les informations d\u2019un m\xE9dia temporel donn\xE9es par la forme, la taille ou la position\xA0;\n2. Pour chaque information donn\xE9e par la forme, la taille ou la position, v\xE9rifier qu\u2019il existe un autre moyen de r\xE9cup\xE9rer cette information\xA0;\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**.",
+        "4": "1. Retrouver dans le document les informations d\u2019un m\xE9dia non temporel donn\xE9es par la forme, la taille ou la position\xA0;\n2. Pour chaque information donn\xE9e par la forme, la taille ou la position, v\xE9rifier qu\u2019il existe un autre moyen de r\xE9cup\xE9rer cette information\xA0;\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**."
+      },
       techniques: ["G96", "G140", "F14", "F26"],
       wcag: ["1.3.3", "1.4.1"],
       appliesTo: {
@@ -41841,6 +42144,12 @@ var rgaa_default = {
           "Dans chaque page web, pour chaque [m\xE9dia non temporel](#media-non-temporel), l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les informations d\u2019un texte donn\xE9es par la forme, la taille ou la position\xA0;\n2. Pour chaque information donn\xE9e par la forme, la taille ou la position, v\xE9rifier que le moyen alternatif de r\xE9cup\xE9rer cette information est pertinent, c\u2019est-\xE0-dire qu\u2019il permet de transmettre l\u2019information dans tous les contextes de consultation et pour tous les utilisateurs.\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les informations d\u2019une image donn\xE9es par la forme, la taille ou la position\xA0;\n2. Pour chaque information donn\xE9e par la forme, la taille ou la position, v\xE9rifier que le moyen alternatif de r\xE9cup\xE9rer cette information est pertinent, c\u2019est-\xE0-dire qu\u2019il permet de transmettre l\u2019information dans tous les contextes de consultation et pour tous les utilisateurs.\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les informations d\u2019un m\xE9dia temporel donn\xE9es par la forme, la taille ou la position\xA0;\n2. Pour chaque information donn\xE9e par la forme, la taille ou la position, v\xE9rifier que le moyen alternatif de r\xE9cup\xE9rer cette information est pertinent, c\u2019est-\xE0-dire qu\u2019il permet de transmettre l\u2019information dans tous les contextes de consultation et pour tous les utilisateurs.\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**.",
+        "4": "1. Retrouver dans le document les informations d\u2019un m\xE9dia non temporel donn\xE9es par la forme, la taille ou la position\xA0;\n2. Pour chaque information donn\xE9e par la forme, la taille ou la position, v\xE9rifier que le moyen alternatif de r\xE9cup\xE9rer cette information est pertinent, c\u2019est-\xE0-dire qu\u2019il permet de transmettre l\u2019information dans tous les contextes de consultation et pour tous les utilisateurs.\n3. Si c\u2019est le cas pour chaque information, **le test est valid\xE9**."
+      },
       techniques: ["G96", "G140", "F14", "F26"],
       wcag: ["1.3.3", "1.4.1"],
       appliesTo: {
@@ -41863,6 +42172,10 @@ var rgaa_default = {
         "2": [
           "Pour chaque page web, lorsque le contenu dont le sens de lecture est vertical est affich\xE9 dans une fen\xEAtre r\xE9duite \xE0 une hauteur de 256\u202Fpx, l\u2019ensemble des informations et des fonctionnalit\xE9s sont-elles disponibles sans aucun d\xE9filement vertical (hors cas particuliers)\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document si son contenu est con\xE7u pour d\xE9filer verticalement (le sens de lecture du texte est horizontal), les informations et fonctionnalit\xE9s\xA0;\n2. R\xE9duire la fen\xEAtre d\u2019affichage \xE0 une largeur de 320\u202Fpx et v\xE9rifier que les informations et les fonctionnalit\xE9s restent disponibles sans aucun d\xE9filement horizontal\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document si son contenu est con\xE7u pour d\xE9filer horizontalement (le sens de lecture du texte est vertical), les informations et fonctionnalit\xE9s\xA0;\n2. R\xE9duire la fen\xEAtre d\u2019affichage \xE0 une hauteur de 256\u202Fpx et v\xE9rifier que les informations et les fonctionnalit\xE9s restent disponibles sans aucun d\xE9filement vertical\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**."
       },
       techniques: ["C34", "C37"],
       technicalNote: ["Lorsqu'il est ici question de pixel, il s'agit du pixel CSS tel que d\xE9fini par le W3C https://www.w3.org/TR/css3-values/"],
@@ -41899,6 +42212,9 @@ var rgaa_default = {
           "L\u2019espacement des mots (`word-spacing`) est augment\xE9 jusqu\u2019\xE0 0,16 fois la taille de la police."
         ]
       },
+      methodology: {
+        "1": "1. Modifier les styles du document en donnant\xA0:\n   - Une valeur de 1.5 \xE0 la propri\xE9t\xE9 `line-height` de tous les \xE9l\xE9ments du document\xA0;\n   - Une valeur de 2em \xE0 la propri\xE9t\xE9 `margin-bottom` des \xE9l\xE9ments `<p>`\xA0;\n   - Une valeur de 0.12em \xE0 la propri\xE9t\xE9 `letter-spacing` de tous les \xE9l\xE9ments du document\xA0;\n   - Une valeur de 0.16em \xE0 la propri\xE9t\xE9 `word-spacing` de tous les \xE9l\xE9ments du document\xA0;\n2. Pour chaque passage de texte, v\xE9rifier qu\u2019il reste lisible, \xE0 l\u2019exception\xA0:\n   - Des sous-titres directement int\xE9gr\xE9s \xE0 une vid\xE9o\xA0;\n   - Des images texte\xA0;\n   - Des textes au sein d\u2019une balise `<canvas>`.\n3. Si c\u2019est le cas pour chaque passage de texte, **le test est valid\xE9**.\n\nNote : une impl\xE9mentation de ces r\xE8gles de modification est disponible dans les ressources du crit\xE8re de succ\xE8s WCAG 1.4.12 (https://github.com/alastc/adaptation-scripts/blob/master/scripts/text-adaptation.js)."
+      },
       techniques: ["C8", "C21", "C35", "C36"],
       particularCases: [
         "Font exception \xE0 ce crit\xE8re, les contenus pour lesquels l\u2019utilisateur n\u2019a pas de possibilit\xE9 de personnalisation\xA0:",
@@ -41934,6 +42250,11 @@ var rgaa_default = {
           "Le contenu additionnel reste visible jusqu\u2019\xE0 ce qu\u2019il ne soit plus valide."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les contenus additionnels devenant visible \xE0 la prise de focus ou au survol d\u2019un composant d\u2019interface, \xE0 l\u2019exception\xA0:\n   - Des contenus additionnels contr\xF4l\xE9s par l\u2019agent utilisateur (par exemple, les infobulles associ\xE9es \xE0 l\u2019attribut `title` ou \xE0 la validation native d\u2019un formulaire\xA0;\n   - Des contenus additionnels devenant visibles par une activation de l\u2019utilisateur (par exemple, une fen\xEAtre de dialogue).\n2. Pour chaque contenu additionnel, v\xE9rifier que\xA0:\n   - Soit le contenu additionnel est positionn\xE9 de fa\xE7on \xE0 ce qu\u2019il ne g\xEAne pas la consultation des autres contenus informatifs sur lesquels il viendrait se superposer (y compris le composant d\u2019interface qui a d\xE9clench\xE9 son apparition), quelles que soient les conditions de consultation (y compris lors de l\u2019utilisation d\u2019un m\xE9canisme de zoom)\xA0;\n   - Soit un m\xE9canisme (au clavier) permet de faire dispara\xEEtre le contenu additionnel (par exemple, la touche Echap).\n3. Si c\u2019est le cas pour chaque contenu additionnel, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les contenus additionnels devenant visible au survol d\u2019un composant d\u2019interface, \xE0 l\u2019exception\xA0:\n   - Des contenus additionnels contr\xF4l\xE9s par l\u2019agent utilisateur (par exemple, les infobulles associ\xE9es \xE0 l\u2019attribut title ou \xE0 la validation native d\u2019un formulaire)\xA0;\n   - Des contenus additionnels devenant visibles par une activation de l\u2019utilisateur (par exemple, une fen\xEAtre de dialogue).\n2. Pour chaque contenu additionnel, v\xE9rifier qu\u2019il peut \xEAtre survol\xE9 par le pointeur de la souris sans dispara\xEEtre\xA0;\n3. Si c\u2019est le cas pour chaque contenu additionnel, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les contenus additionnels devenant visible \xE0 la prise de focus ou au survol d\u2019un composant d\u2019interface, \xE0 l\u2019exception\xA0:\n   - Des contenus additionnels contr\xF4l\xE9s par l\u2019agent utilisateur (par exemple, les infobulles associ\xE9es \xE0 l\u2019attribut `title` ou \xE0 la validation native d\u2019un formulaire)\xA0;\n   - Des contenus additionnels devenant visibles par une activation de l\u2019utilisateur (par exemple, une fen\xEAtre de dialogue).\n2. Pour chaque contenu additionnel, v\xE9rifier qu\u2019il reste visible\xA0:\n   - Jusqu\u2019\xE0 ce que l\u2019utilisateur retire le pointeur souris ou le focus du contenu additionnel ou du composant d\u2019interface ayant d\xE9clench\xE9 son apparition\xA0;\n   - Jusqu\u2019\xE0 ce l\u2019utilisateur d\xE9clenche le m\xE9canisme pr\xE9vu pour faire dispara\xEEtre le contenu additionnel\xA0;\n   - Jusqu\u2019\xE0 ce que l\u2019information propos\xE9e par le contenu additionnel ne soit plus valide (par exemple un contenu additionnel signalant l\u2019\xE9tat \u201Coccup\xE9\u201D du composant d\u2019interface que l\u2019utilisateur souhaite activer ou encore un message d\u2019erreur signal\xE9 sous la forme d\u2019un contenu additionnel tant que l\u2019utilisateur n\u2019a pas rectifi\xE9 sa saisie).\n3. Si c\u2019est le cas pour chaque contenu additionnel, **le test est valid\xE9**."
+      },
       techniques: ["F95"],
       particularCases: [
         "Lorsque le contenu additionnel est contr\xF4l\xE9 par l\u2019agent utilisateur (par exemple, attribut `title` ou validation native de formulaire) ou correspond \xE0 une fen\xEAtre modale conforme au [motif de conception](#motif-de-conception) WAI-ARIA `dialog`, le crit\xE8re 10.13 est non applicable.",
@@ -41966,6 +42287,10 @@ var rgaa_default = {
           "Les contenus additionnels apparaissent \xE9galement au survol du composant\xA0;",
           "Les contenus additionnels apparaissent \xE9galement par le biais de l\u2019activation ou du survol d\u2019un autre composant."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les contenus additionnels devenant visible au survol d\u2019un composant d\u2019interface au moyen d\u2019un m\xE9canisme CSS (`pseudo-classe :hover`)\xA0;\n2. Pour chaque contenu additionnel, v\xE9rifier que les contenus additionnels apparaissent \xE9galement\xA0:\n   - \xC0 l\u2019activation du composant au moyen du clavier ou de tout autre dispositif de pointage\xA0;\n   - \xC0 la prise de focus du composant\xA0;\n   - \xC0 l\u2019activation ou \xE0 la prise de focus d\u2019un autre composant.\n3. Si c\u2019est le cas pour chaque contenu additionnel, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les contenus additionnels devenant visible \xE0 la prise de focus d\u2019un composant d\u2019interface au moyen d\u2019un m\xE9canisme CSS (`pseudo-classe :focus`)\xA0;\n2. Pour chaque contenu additionnel, v\xE9rifier que les contenus additionnels apparaissent \xE9galement\xA0:\n\n- \xC0 l\u2019activation du composant au moyen du clavier ou de tout autre dispositif de pointage\xA0;\n- Au survol du composant\xA0;\n- \xC0 l\u2019activation ou du survol d\u2019un autre composant.\n\n3. Si c\u2019est le cas pour chaque contenu additionnel, **le test est valid\xE9**."
       },
       techniques: ["G202"],
       wcag: ["2.1.1"],
@@ -42002,6 +42327,11 @@ var rgaa_default = {
           "Le [champ de formulaire](#champ-de-saisie-de-formulaire) est accompagn\xE9 d\u2019un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) accol\xE9 au champ qui devient visible \xE0 la prise de focus permettant de comprendre la nature de la saisie attendue\xA0;",
           "Le [champ de formulaire](#champ-de-saisie-de-formulaire) est accompagn\xE9 d\u2019un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) visible accol\xE9 au champ permettant de comprendre la nature de la saisie attendue."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les champs de formulaire\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que le champ de formulaire\xA0:\n   - Poss\xE8de un attribut WAI-ARIA `aria-labelledby` r\xE9f\xE9ren\xE7ant un passage de texte identifi\xE9\xA0;\n   - Poss\xE8de un attribut WAI-ARIA `aria-label`\xA0;\n   - Est associ\xE9 \xE0 un \xE9l\xE9ment `<label>` ayant un attribut `for`\xA0;\n   - Poss\xE8de un attribut `title`\xA0;\n   - Un bouton adjacent au champ de formulaire lui fournit une \xE9tiquette visible et un \xE9l\xE9ment `<label>` visuellement cach\xE9 ou un attribut WAI-ARIA `aria-label`, `aria-labelledby` ou `title` lui fournit un nom accessible.\n3. Si c\u2019est le cas pour champ de formulaire, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les champs de formulaire associ\xE9 \xE0 un \xE9l\xE9ment `<label>`\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que\xA0:\n   - Le champ de formulaire poss\xE8de un attribut `id`\xA0;\n   - La valeur de l\u2019attribut `for` de l\u2019\xE9l\xE9ment `<label>` est \xE9gale \xE0 la valeur de l\u2019attribut `id`.\n3. Si c\u2019est le cas pour champ de formulaire, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les champs de formulaire dont l\u2019\xE9tiquette n\u2019est pas visible ou \xE0 proximit\xE9 (masqu\xE9e, utilisation de l\u2019attribut aria-label) ou n\u2019est pas accol\xE9e au champ (utilisation de l\u2019attribut `aria-labelledby`)\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que le champ de formulaire\xA0:\n   - soit poss\xE8de un attribut `title` dont le contenu permet de comprendre la nature de la saisie attendue\xA0;\n   - est accompagn\xE9 d\u2019un passage de texte accol\xE9 au champ qui devient visible \xE0 la prise de focus permettant de comprendre la nature de la saisie attendue\xA0;\n   - est accompagn\xE9 d\u2019un passage de texte visible accol\xE9 au champ permettant de comprendre la nature de la saisie attendue."
       },
       techniques: ["G82", "G131", "H44", "H65", "F68", "F82", "F86", "ARIA6", "ARIA9", "ARIA14", "ARIA16"],
       wcag: ["1.3.1", "2.4.6", "3.3.2", "4.1.2"],
@@ -42054,6 +42384,14 @@ var rgaa_default = {
           "Chaque bouton adjacent au [champ de formulaire](#champ-de-saisie-de-formulaire) qui fournit une \xE9tiquette visible permet-il de conna\xEEtre la fonction exacte du [champ de formulaire](#champ-de-saisie-de-formulaire) auquel il est associ\xE9\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les champs de formulaire dont l\u2019\xE9tiquette est fournie par un \xE9l\xE9ment `<label>`\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que le contenu de l\u2019\xE9l\xE9ment est pertinent\xA0;\n3. Si c\u2019est le cas pour chaque champ de formulaire, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les champs de formulaire dont l\u2019\xE9tiquette est fournie par un attribut `title`\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que le contenu de l\u2019attribut est pertinent\xA0;\n3. Si c\u2019est le cas pour chaque champ de formulaire, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les champs de formulaire dont l\u2019\xE9tiquette est fournie par un attribut WAI-ARIA `aria-label`\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que le contenu de l\u2019attribut est pertinent\xA0;\n3. Si c\u2019est le cas pour chaque champ de formulaire, **le test est valid\xE9**.",
+        "4": "1. Retrouver dans le document les champs de formulaire dont l\u2019\xE9tiquette est fournie par un attribut WAI-ARIA `aria-labelledby`\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que le contenu du passage de texte r\xE9f\xE9renc\xE9 est pertinent\xA0;\n3. Si c\u2019est le cas pour chaque champ de formulaire, **le test est valid\xE9**.",
+        "5": "1. Retrouver dans le document les champs de formulaire dont l\u2019\xE9tiquette est fournie \xE0 la fois par un intitul\xE9 visible et par le contenu soit d\u2019un \xE9l\xE9ment `<label>`, soit d\u2019un attribut `title` ou d\u2019un attribut `aria-label` ou d\u2019un attribut `aria-labelledby`\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que le contenu de l\u2019\xE9l\xE9ment `<label>` ou de l\u2019attribut `title` ou de l\u2019attribut `aria-label` ou de l\u2019attribut `aria-labelledby` contient l\u2019intitul\xE9 visible\xA0;\n3. Si c\u2019est le cas pour chaque champ de formulaire, **le test est valid\xE9**.",
+        "6": "1. Retrouver dans le document les champs de formulaire dont l\u2019\xE9tiquette visible est fournie par un bouton adjacent\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que le contenu visible du bouton est pertinent\xA0;\n3. Si c\u2019est le cas pour chaque champ de formulaire, **le test est valid\xE9**."
+      },
       techniques: ["G82", "G131", "H44", "H65", "ARIA6", "ARIA9", "ARIA14", "ARIA16"],
       particularCases: [
         "Il existe une gestion de cas particuliers pour le test 11.2.5 lorsque\xA0:",
@@ -42083,6 +42421,10 @@ var rgaa_default = {
         "2": [
           "Chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) associ\xE9e \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire) ayant la m\xEAme fonction et r\xE9p\xE9t\xE9e dans un ensemble de pages est-elle [coh\xE9rente](#etiquettes-coherentes)\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les champs de formulaire ayant une m\xEAme fonction (par exemple plusieurs champs d\u2019adresse)\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que les \xE9tiquettes sont coh\xE9rentes (elles permettent de comprendre qu\u2019il s\u2019agit de saisies de natures identiques)\xA0;\n3. Si c\u2019est le cas pour chaque champ de formulaire, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans l\u2019ensemble des pages consid\xE9r\xE9es les champs de formulaire ayant une m\xEAme fonction (par exemple le champ de saisie d\u2019un moteur de recherche ou le champ de saisie d\u2019inscription \xE0 une newsletter)\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que les \xE9tiquettes sont coh\xE9rentes (elles permettent de comprendre qu\u2019il s\u2019agit de saisies de natures identiques)\xA0;\n3. Si c\u2019est le cas pour chaque champ de formulaire de l\u2019ensemble des pages consid\xE9r\xE9es, **le test est valid\xE9**."
       },
       techniques: ["F31"],
       wcag: ["3.2.4"],
@@ -42114,6 +42456,11 @@ var rgaa_default = {
           "L\u2019\xE9tiquette est visuellement [accol\xE9e](#accoles-etiquette-et-champ-accoles) imm\xE9diatement au-dessous ou \xE0 gauche du [champ de formulaire](#champ-de-saisie-de-formulaire) lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de droite \xE0 gauche."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les champs de formulaire\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier qu\u2019il est accol\xE9 \xE0 son \xE9tiquette\xA0;\n3. Si c\u2019est le cas pour chaque champ de formulaire, **le test est valid\xE9**.",
+        "2": '1. Retrouver dans le document les champs de formulaire qui ne sont pas des \xE9l\xE9ments `<input>` de type `checkbox` ou de type `radio` ou des \xE9l\xE9ments ayant un attribut WAI-ARIA `role="checkbox"`, `role="radio"` ou `role="switch`";\n2. Pour chaque champ de formulaire, v\xE9rifier que l\u2019\xE9tiquette est visuellement accol\xE9e\xA0:\n   - Imm\xE9diatement au-dessus ou \xE0 gauche du champ de formulaire lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de gauche \xE0 droite\xA0;\n   - Imm\xE9diatement au-dessus ou \xE0 droite du champ de formulaire lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de droite \xE0 gauche.\n3. Si c\u2019est le cas pour chaque champ de formulaire, **le test est valid\xE9**.',
+        "3": '1. Retrouver dans le document les champs de formulaire qui sont `<input>` de type `checkbox` ou de type `radio` ou des \xE9l\xE9ments ayant un attribut WAI-ARIA `role="checkbox"`, `role="radio"` ou `role="switch`";\n2. Pour chaque champ de formulaire, v\xE9rifier que l\u2019\xE9tiquette est visuellement accol\xE9e\xA0:\n   - Imm\xE9diatement au-dessous ou \xE0 droite du champ de formulaire lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de gauche \xE0 droite\xA0;\n   - Imm\xE9diatement au-dessous ou \xE0 gauche du champ de formulaire lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de droite \xE0 gauche.\n3. Si c\u2019est le cas pour chaque champ de formulaire, **le test est valid\xE9**.'
+      },
       techniques: ["G162"],
       particularCases: [
         "Les tests 11.4.2 et 11.4.3 seront consid\xE9r\xE9s comme non applicables\xA0:",
@@ -42144,6 +42491,9 @@ var rgaa_default = {
           'Les [champs de m\xEAme nature](#champs-de-meme-nature) de type radio (`<input type="radio">`) ou balises poss\xE9dant un attribut WAI-ARIA `role="radio"`) sont regroup\xE9s dans une balise poss\xE9dant un attribut WAI-ARIA `role="radiogroup"` ou `role="group"`.'
         ]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les champs de formulaire de m\xEAme nature (par exemple un groupe de saisie d\u2019informations d\u2019identit\xE9, une s\xE9rie de cases \xE0 cocher, une saisie de date sur plusieurs champs successifs\u2026)\xA0;\n2. Pour chaque groupe de champs de formulaire de m\xEAme nature, v\xE9rifier que ces champs de m\xEAme nature sont regroup\xE9s\xA0:\n   - Soit dans un \xE9l\xE9ment `<fieldset>`\xA0;\n   - Soit dans un \xE9l\xE9ment poss\xE9dant un attribut WAI-ARIA `role="group"`\xA0;\n   - Soit dans un \xE9l\xE9ment poss\xE9dant un attribut WAI-ARIA `role="radiogroup"` ou `"group"`, s\u2019il s\u2019agit d\u2019\xE9l\xE9ments `<input>` de type `radio` ( ou d\u2019\xE9l\xE9ments poss\xE9dant un attribut WAI-ARIA `role="radio"`).\n3. Si c\u2019est le cas pour chaque groupe de champs de formulaire de m\xEAme nature, **le test est valid\xE9**.'
+      },
       techniques: ["H71", "ARIA17"],
       wcag: ["1.3.1", "3.3.2"],
       appliesTo: {
@@ -42162,6 +42512,9 @@ var rgaa_default = {
       tests: {
         "1": ["Chaque regroupement de [champs de m\xEAme nature](#champs-de-meme-nature) poss\xE8de-t-il une [l\xE9gende](#legende)\xA0?"]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les groupes de champs de formulaire de m\xEAme nature\xA0;\n2. Pour chaque groupe de champs de formulaire de m\xEAme nature, v\xE9rifier que\xA0:\n   - Si le regroupement utilise un \xE9l\xE9ment `<fieldset>`, l\u2019\xE9l\xE9ment `<fieldset>` poss\xE8de un \xE9l\xE9ment `<legend>`\xA0;\n   - Si l\u2019\xE9l\xE9ment de regroupement utilise un attribut WAI-ARIA `role="group"` ou `"radiogroup"`, il poss\xE8de un attribut WAI-ARIA `aria-label` ou `aria-labelledby`.\n3. Sinon, pour chacun des champs de m\xEAme nature, v\xE9rifier la pr\xE9sence\xA0:\n   - Soit d\u2019un attribut title permettant de d\xE9terminer l\u2019appartenance du champ au groupement de champ\xA0;\n   - Soit d\u2019un attribut `aria-label` permettant de d\xE9terminer l\u2019appartenance du champ au groupement de champ\xA0;\n   - Soit d\u2019un attribut `aria-labelledby` qui r\xE9f\xE9rence un passage de texte permettant de d\xE9terminer l\u2019appartenance du champ au groupement de champ\xA0;\n   - Soit d\u2019un attribut `aria-describedby` qui r\xE9f\xE9rence un passage de texte permettant de d\xE9terminer l\u2019appartenance du champ au groupement de champ.\n4. Si c\u2019est le cas pour chaque groupe de champs de formulaire ou pour chacun des champs de m\xEAme nature, **le test est valid\xE9**.'
+      },
       techniques: ["H71", "ARIA17"],
       wcag: ["1.3.1", "3.3.2"],
       appliesTo: {
@@ -42179,6 +42532,9 @@ var rgaa_default = {
       },
       tests: {
         "1": ["Chaque [l\xE9gende](#legende) associ\xE9e \xE0 un regroupement de [champs de m\xEAme nature](#champs-de-meme-nature) est-elle pertinente\xA0?"]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les groupes de champs de formulaire de m\xEAme nature\xA0;\n2. Pour chaque groupe de champs de formulaire de m\xEAme nature ou pour chacun des champs de m\xEAme nature qui dispose d\u2019une l\xE9gende, v\xE9rifier que le texte de cette l\xE9gende est pertinent\xA0;\n3. Si c\u2019est le cas pour chaque groupe de champs de formulaire ou pour chacun des champs de m\xEAme nature, **le test est valid\xE9**."
       },
       techniques: ["H71", "ARIA17"],
       wcag: ["1.3.1", "3.3.2"],
@@ -42201,6 +42557,11 @@ var rgaa_default = {
         ],
         "2": ["Dans chaque balise `<select>`, chaque balise `<optgroup>` poss\xE8de-t-elle un attribut `label`\xA0?"],
         "3": ["Pour chaque balise `<optgroup>` ayant un attribut `label`, le contenu de l\u2019attribut `label` est-il pertinent\xA0?"]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les listes de s\xE9lection (\xE9l\xE9ment `<select>`)\xA0;\n2. Pour chaque liste de s\xE9lection proposant des groupes d\u2019items de m\xEAme nature, v\xE9rifier que ces items sont regroup\xE9s au moyen d\u2019\xE9l\xE9ments `<optgroup>`\xA0;\n3. Si c\u2019est le cas pour chaque liste de s\xE9lection proposant des groupes d\u2019items de m\xEAme nature, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les listes de s\xE9lection (\xE9l\xE9ment `<select>`) qui poss\xE8dent des \xE9l\xE9ments `<optgroup>`\xA0;\n2. Pour chaque \xE9l\xE9ment `<optgroup>`, v\xE9rifier qu\u2019il poss\xE8de un attribut `label`\xA0;\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment `<optgroup>`, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les listes de s\xE9lection (\xE9l\xE9ment `<select>`) qui poss\xE8dent des \xE9l\xE9ments `<optgroup>` pourvus d\u2019un attribut `label`\xA0;\n2. Pour chaque attribut `label`, v\xE9rifier que son contenu est pertinent\xA0;\n3. Si c\u2019est le cas pour chaque attribut `label`, **le test est valid\xE9**."
       },
       techniques: ["H85"],
       technicalNote: [
@@ -42239,6 +42600,10 @@ var rgaa_default = {
           "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` d\u2019une balise `<input>` de type `image` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
           "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les boutons pr\xE9sents au sein d\u2019un formulaire\xA0;\n2. Pour chaque bouton, v\xE9rifier que son intitul\xE9 visible et son nom accessible sont pertinents\xA0;\n3. Si c\u2019est le cas pour chaque bouton, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les boutons pr\xE9sents au sein d\u2019un formulaire\xA0;\n2. Pour chaque bouton, v\xE9rifier que son nom accessible contient au moins son intitul\xE9 visible\xA0;\n3. Si c\u2019est le cas pour chaque bouton, **le test est valid\xE9**."
       },
       techniques: ["H36", "H91", "ARIA6", "ARIA9", "ARIA14", "ARIA16"],
       particularCases: ["Pour le test 11.9.2, voir cas particuliers crit\xE8re 11.2."],
@@ -42293,6 +42658,15 @@ var rgaa_default = {
           "Une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire est visible et situ\xE9e dans le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 au champ."
         ]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les champs de formulaire obligatoires\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que pr\xE9alablement \xE0 la validation du formulaire\xA0:\n   - Soit une indication de champ obligatoire est visible et permet d\u2019identifier nomm\xE9ment le champ concern\xE9\xA0;\n   - Soit le champ poss\xE8de un attribut `aria-required="true"` ou `required`.\n3. Si c\u2019est le cas pour chaque champ de formulaire obligatoire, **le test est valid\xE9**.',
+        "2": '1. Retrouver dans le document les champs de formulaire obligatoires qui poss\xE8dent un attribut `aria-required="true"` ou `required`\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que pr\xE9alablement \xE0 la validation du formulaire\xA0:\n   - Soit une indication de champ obligatoire est visible et situ\xE9e dans l\u2019\xE9tiquette associ\xE9e au champ\xA0;\n   - Soit une indication de champ obligatoire est visible et situ\xE9e dans le passage de texte associ\xE9 au champ.\n3. Si c\u2019est le cas pour chaque champ de formulaire obligatoire qui poss\xE8dent un attribut `aria-required="true"` ou `required`, **le test est valid\xE9**.',
+        "3": '1. Retrouver dans le document les messages d\u2019erreur indiquant l\u2019absence de saisie d\u2019un champ obligatoire\xA0;\n2. Pour chaque message d\u2019erreur, v\xE9rifier que\xA0:\n   - Soit le message d\u2019erreur est visible et permet d\u2019identifier nomm\xE9ment le champ concern\xE9\xA0;\n   - Soit le champ obligatoire associ\xE9 au message d\u2019erreur poss\xE8de un attribut `aria-invalid="true"`.\n3. Si c\u2019est le cas pour chaque message d\u2019erreur indiquant l\u2019absence de saisie d\u2019un champ obligatoire, **le test est valid\xE9**.',
+        "4": '1. Retrouver dans le document les champs de formulaire obligatoires qui poss\xE8dent un attribut `aria-invalid="true"`\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que\xA0:\n   - Soit le message d\u2019erreur indiquant le caract\xE8re invalide de la saisie est visible et situ\xE9 dans l\u2019\xE9tiquette associ\xE9e au champ\xA0;\n   - Soit le message d\u2019erreur indiquant le caract\xE8re invalide de la saisie est visible et situ\xE9 dans le passage de texte associ\xE9 au champ.\n3. Si c\u2019est le cas pour chaque champ de formulaire obligatoire qui poss\xE8de un attribut `aria-invalid="true"`, **le test est valid\xE9**.',
+        "5": "1. Retrouver dans le document les champs de formulaire obligatoires auxquels est associ\xE9e une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que l\u2019instruction ou l\u2019indication du type de donn\xE9es et/ou de format obligatoire est pr\xE9alablement \xE0 la validation du formulaire\xA0:\n   - Soit visible et permet d\u2019identifier nomm\xE9ment le champ concern\xE9\xA0;\n   - Soit visible dans l\u2019\xE9tiquette ou le passage de texte associ\xE9 au champ.\n3. Si c\u2019est le cas pour chaque champ de formulaire obligatoire auquel est associ\xE9e une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire, **le test est valid\xE9**.",
+        "6": '1. Retrouver dans le document les messages d\u2019erreur fournissant une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire d\u2019un champ\xA0;\n2. Pour chaque message d\u2019erreur, v\xE9rifier que\xA0:\n   - Soit le message d\u2019erreur est visible et permet d\u2019identifier nomm\xE9ment le champ concern\xE9\xA0;\n   - Soit le champ associ\xE9 au message d\u2019erreur poss\xE8de un attribut `aria-invalid="true"`.\n3. Si c\u2019est le cas pour chaque message d\u2019erreur indiquant l\u2019absence de saisie d\u2019un champ obligatoire, **le test est valid\xE9**.',
+        "7": '1. Retrouver dans le document les champs de formulaire qui poss\xE8dent un attribut `aria-invalid="true"`\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que\xA0:\n   - Soit une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire est visible et situ\xE9e dans l\u2019\xE9l\xE9ment `<label>` associ\xE9 au champ\xA0;\n   - Soit une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire est visible et situ\xE9e dans le passage de texte associ\xE9 au champ.\n3. Si c\u2019est le cas pour chaque champ de formulaire qui poss\xE8de un attribut `aria-invalid="true"`, **le test est valid\xE9**.'
+      },
       techniques: [
         "G83",
         "G84",
@@ -42343,6 +42717,10 @@ var rgaa_default = {
         "1": ["Pour chaque erreur de saisie, les types et les formats de donn\xE9es sont-ils sugg\xE9r\xE9s, si n\xE9cessaire\xA0?"],
         "2": ["Pour chaque erreur de saisie, des exemples de valeurs attendues sont-ils sugg\xE9r\xE9s, si n\xE9cessaire\xA0?"]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les messages d\u2019erreur\xA0;\n2. Pour chaque message d\u2019erreur, v\xE9rifier que les types et les formats de donn\xE9es attendus sont sugg\xE9r\xE9s\xA0;\n3. Si c\u2019est le cas pour chaque message d\u2019erreur , **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les messages d\u2019erreur\xA0;\n2. Pour chaque message d\u2019erreur, v\xE9rifier que des exemples de valeurs attendues sont sugg\xE9r\xE9s\xA0;\n3. Si c\u2019est le cas pour chaque message d\u2019erreur , **le test est valid\xE9**."
+      },
       techniques: ["G84", "G85", "G89", "G177", "H89"],
       technicalNote: [
         "Certains types de contr\xF4les en HTML5 proposent des messages d\u2019aide \xE0 la saisie automatique\xA0: par exemple le type `email` affiche un message du type \xAB\xA0veuillez saisir une adresse e-mail valide\xA0\xBB dans le cas o\xF9 l\u2019adresse e-mail saisie ne correspond pas au format attendu. Ces messages sont personnalisables via l\u2019API Constraint Validation, ce qui permet de personnaliser les messages d\u2019erreur et de valider le crit\xE8re. L\u2019attribut `pattern` permet d\u2019effectuer automatiquement des contr\xF4les de format (via des expressions r\xE9guli\xE8res) et affiche un message d\u2019aide personnalisable via l\u2019attribut `title`\xA0: ce dispositif valide \xE9galement le crit\xE8re."
@@ -42374,6 +42752,10 @@ var rgaa_default = {
           "Un m\xE9canisme de demande de confirmation explicite de la suppression ou de la modification, via un [champ de formulaire](#champ-de-saisie-de-formulaire) ou une \xE9tape suppl\xE9mentaire, est propos\xE9."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les formulaires qui modifient ou suppriment des donn\xE9es, ou qui transmettent des r\xE9ponses \xE0 un test ou un examen, ou dont la validation a des cons\xE9quences financi\xE8res ou juridiques\xA0;\n2. Pour chaque formulaire, v\xE9rifier que l\u2019utilisateur peut\xA0:\n   - Soit modifier ou annuler les donn\xE9es et les actions effectu\xE9es sur ces donn\xE9es apr\xE8s la validation du formulaire\xA0;\n   - Soit v\xE9rifier et corriger les donn\xE9es avant la validation d\u2019un formulaire en plusieurs \xE9tapes\xA0;\n   - Soit disposer d\u2019un m\xE9canisme de confirmation explicite (par exemple, une case \xE0 cocher ou une \xE9tape suppl\xE9mentaire).\n3. Si c\u2019est le cas pour chaque formulaire retrouv\xE9, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les formulaires qui modifient ou suppriment des donn\xE9es \xE0 caract\xE8re financier, juridique ou personnel\xA0;\n2. Pour chaque formulaire, v\xE9rifier que l\u2019utilisateur dispose\xA0:\n   - Soit d\u2019un m\xE9canisme qui permet de r\xE9cup\xE9rer les donn\xE9es supprim\xE9es ou modifi\xE9es\xA0;\n   - Soit d\u2019un m\xE9canisme de demande de confirmation explicite de la suppression ou de la modification (par exemple, une case \xE0 cocher ou une \xE9tape suppl\xE9mentaire).\n3. Si c\u2019est le cas pour chaque formulaire retrouv\xE9, **le test est valid\xE9**."
+      },
       techniques: ["G98", "G99", "G155", "G164", "G168"],
       wcag: ["3.3.4"],
       appliesTo: {
@@ -42396,6 +42778,9 @@ var rgaa_default = {
           "L\u2019attribut `autocomplete` est pourvu d\u2019une valeur pr\xE9sente dans la [liste des valeurs possibles pour l\u2019attribut `autocomplete`](#liste-des-valeurs-possibles-pour-l-attribut-autocomplete) associ\xE9s \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire)\xA0;",
           "La valeur indiqu\xE9e pour l\u2019attribut `autocomplete` est pertinente au regard du type d\u2019information attendu."
         ]
+      },
+      methodology: {
+        "1": '1. Retrouver dans le document les champs de formulaire qui se rapportent \xE0 une information concernant l\u2019utilisateur (nom, pr\xE9nom, num\xE9ro de t\xE9l\xE9phone, etc.)\xA0;\n2. Pour chaque champ de formulaire, v\xE9rifier que\xA0:\n   - Le champ de formulaire poss\xE8de un attribut `autocomplete`\xA0;\n   - L\u2019attribut `autocomplete` est pourvu d\u2019une valeur pr\xE9sente dans la <a rel="noreferrer noopener" target="_blank" title="liste des valeurs possibles - en anglais - nouvelle fen\xEAtre" href="https://www.w3.org/TR/html52/sec-forms.html#autofill-processing-model">liste des valeurs possibles</a>\xA0;\n   - La valeur indiqu\xE9e pour l\u2019attribut `autocomplete` est pertinente au regard du type d\u2019information attendu.\n3. Si c\u2019est le cas pour chaque champ de formulaire retrouv\xE9, **le test est valid\xE9**.'
       },
       techniques: ["H98"],
       technicalNote: [
@@ -42424,6 +42809,9 @@ var rgaa_default = {
           "Un [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) et un [plan du site](#page-plan-du-site) sont pr\xE9sents."
         ]
       },
+      methodology: {
+        "1": "1. Pour chaque ensemble de pages du site, v\xE9rifier la pr\xE9sence\xA0:\n   - Soit d\u2019un menu de navigation et d\u2019un plan du site\xA0;\n   - Soit d\u2019un menu de navigation et d\u2019un moteur de recherche\xA0;\n   - Soit d\u2019un moteur de recherche et d\u2019un plan du site.\n2. Si c\u2019est le cas pour chaque ensemble de pages du site, **le test est valid\xE9**."
+      },
       techniques: ["G63", "G64", "G161"],
       particularCases: [
         "Il existe une gestion de cas particulier lorsque le site web est constitu\xE9 d\u2019une seule page ou d\u2019un nombre tr\xE8s limit\xE9 de pages (cf. note). Dans ce cas-l\xE0, le crit\xE8re est non applicable.",
@@ -42450,6 +42838,9 @@ var rgaa_default = {
           "Le [menu et les barres de navigation](#menu-et-barre-de-navigation) sont toujours \xE0 la m\xEAme place dans la pr\xE9sentation\xA0;",
           "Le [menu et les barres de navigation](#menu-et-barre-de-navigation) se pr\xE9sentent toujours dans le m\xEAme ordre relatif dans le code source."
         ]
+      },
+      methodology: {
+        "1": "1. Choisir une page de l\u2019\xE9chantillon appartenant au m\xEAme ensemble que la page en cours d\u2019audit\xA0;\n2. Comparer visuellement les deux pages et v\xE9rifier que le menu ou les barres de navigation sont toujours \xE0 la m\xEAme place dans la pr\xE9sentation\xA0;\n3. Comparer le code source (g\xE9n\xE9r\xE9 c\xF4t\xE9 client) des deux pages et v\xE9rifier que le menu ou les barres de navigation se pr\xE9sentent toujours dans le m\xEAme ordre relatif dans la structure\xA0;\n4. Si c\u2019est le cas, **le test est valid\xE9**.\n\nNote\xA0: le crit\xE8re est non applicable dans les situations o\xF9\xA0:\n\n- Les pages d'un ensemble de pages sont le r\xE9sultat ou une partie d'un processus (un processus de paiement ou de prise de commande, par exemple)\xA0;\n- La page est la page d'accueil\xA0;\n- Le site web est constitu\xE9 d'une seule page."
       },
       techniques: ["G61", "F66"],
       particularCases: [
@@ -42478,6 +42869,11 @@ var rgaa_default = {
         "2": ["Les liens du [plan du site](#page-plan-du-site) sont-ils fonctionnels\xA0?"],
         "3": ["Les liens du [plan du site](#page-plan-du-site) renvoient-ils bien vers les pages indiqu\xE9es par l\u2019intitul\xE9\xA0?"]
       },
+      methodology: {
+        "1": "1. V\xE9rifier que le plan du site est repr\xE9sentatif de l\u2019architecture g\xE9n\xE9rale du site (cf. note)\xA0;\n2. Si c\u2019est le cas, **le test est valid\xE9**.\n\nNote\xA0: Un plan du site trop complexe ou trop profond n'est pas recommand\xE9 pour aider \xE0 la navigation. Il n'est pas obligatoire que toutes les pages soient pr\xE9sentes dans le plan du site si elles peuvent \xEAtre atteintes, par exemple, \xE0 partir de la page d'accueil d'une rubrique ou d'un catalogue.",
+        "2": "1. Pour tous les liens du plan du site, v\xE9rifier qu\u2019ils sont fonctionnels\xA0;\n2. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "3": "1. Pour tous les liens du plan du site, v\xE9rifier qu\u2019ils sont \xE0 jour (ni obsol\xE8tes ni en erreur) et conduisent \xE0 la page indiqu\xE9e par leur intitul\xE9\xA0;\n2. Si c\u2019est le cas, **le test est valid\xE9**."
+      },
       techniques: ["G63"],
       wcag: ["2.4.5"],
       appliesTo: {
@@ -42503,6 +42899,11 @@ var rgaa_default = {
         "3": [
           "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalit\xE9 vers la [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) se pr\xE9sente-t-elle toujours dans le m\xEAme ordre relatif dans le code source\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. Choisir une page de l\u2019\xE9chantillon appartenant au m\xEAme ensemble que la page en cours d\u2019audit\xA0;\n2. Comparer le code source (g\xE9n\xE9r\xE9 c\xF4t\xE9 client) des deux pages et v\xE9rifier que le moyen d\u2019acc\xE8s au plan du site est toujours le m\xEAme (un lien ou un bouton, par exemple)\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "1. Choisir une page de l\u2019\xE9chantillon appartenant au m\xEAme ensemble que la page en cours d\u2019audit\xA0;\n2. Comparer le code source (g\xE9n\xE9r\xE9 c\xF4t\xE9 client) des deux pages et v\xE9rifier que le moyen d\u2019acc\xE8s au plan du site est toujours \xE0 la m\xEAme place dans la structure (par rapport \xE0 l\u2019ordre relatif des \xE9l\xE9ments de la page, par exemple il est toujours en haut de page)\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "3": "1. Choisir une page de l\u2019\xE9chantillon appartenant au m\xEAme ensemble que la page en cours d\u2019audit\xA0;\n2. Comparer visuellement les deux pages et v\xE9rifier que le moyen d\u2019acc\xE8s au plan du site est toujours \xE0 la m\xEAme place dans la pr\xE9sentation\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**."
       },
       techniques: ["G61", "G63"],
       wcag: ["2.4.5", "3.2.3"],
@@ -42530,6 +42931,11 @@ var rgaa_default = {
           "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalit\xE9 vers le [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) se pr\xE9sente-t-elle toujours dans le m\xEAme ordre relatif dans le code source\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. Choisir une page de l\u2019\xE9chantillon appartenant au m\xEAme ensemble que la page en cours d\u2019audit\xA0;\n2. Comparer le code source (g\xE9n\xE9r\xE9 c\xF4t\xE9 client) des deux pages et v\xE9rifier que le moyen d\u2019acc\xE8s au moteur de recherche est toujours le m\xEAme (un champ de formulaire, par exemple)\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "1. Choisir une page de l\u2019\xE9chantillon appartenant au m\xEAme ensemble que la page en cours d\u2019audit\xA0;\n2. Comparer visuellement les deux pages et v\xE9rifier que le moyen d\u2019acc\xE8s au moteur de recherche est toujours \xE0 la m\xEAme place dans la pr\xE9sentation\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "3": "1. Choisir une page de l\u2019\xE9chantillon appartenant au m\xEAme ensemble que la page en cours d\u2019audit\xA0;\n2. Comparer le code source (g\xE9n\xE9r\xE9 c\xF4t\xE9 client) des deux pages et v\xE9rifier que le moyen d\u2019acc\xE8s au moteur de recherche est toujours \xE0 la m\xEAme place dans la structure (par rapport \xE0 l\u2019ordre relatif des \xE9l\xE9ments de la page, par exemple il est toujours en haut de page)\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**."
+      },
       techniques: ["G61", "F66"],
       wcag: ["3.2.3"],
       appliesTo: {
@@ -42554,6 +42960,9 @@ var rgaa_default = {
           "La zone peut \xEAtre \xE9vit\xE9e par le biais d\u2019un [lien d\u2019\xE9vitement](#liens-d-evitement-ou-d-acces-rapide) pr\xE9c\xE9dent directement la zone dans l\u2019ordre du code source\xA0;",
           "La zone peut \xEAtre atteinte par le biais d\u2019un [lien d\u2019acc\xE8s rapide](#liens-d-evitement-ou-d-acces-rapide) visible ou, \xE0 d\xE9faut, visible \xE0 la prise de focus."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les zones de regroupement de contenus (zones d\u2019en-t\xEAte, de navigation principale, de contenu principal, de pied de page et de moteur de recherche)\xA0;\n2. Pour chaque zone, v\xE9rifier que la zone\xA0:\n   - Soit poss\xE8de un r\xF4le WAI-ARIA de type landmark correspondant \xE0 sa nature\xA0;\n   - Soit poss\xE8de un titre de hi\xE9rarchie dont le contenu permet de comprendre la nature du contenu de la zone\xA0;\n   - Soit peut \xEAtre masqu\xE9e au moyen d\u2019un bouton pr\xE9c\xE9dant directement la zone dans l\u2019ordre du code source\xA0;\n   - Soit peut \xEAtre \xE9vit\xE9e au moyen d\u2019un lien d\u2019\xE9vitement pr\xE9c\xE9dant directement la zone dans l\u2019ordre du code source\xA0;\n   - Soit peut \xEAtre atteinte au moyen d\u2019un lien d\u2019acc\xE8s rapide soit visible par d\xE9faut, soit visible \xE0 la prise de focus lors d\u2019une tabulation.\n3. Si c\u2019est le cas pour chaque zone de regroupement de contenus, **le test est valid\xE9**."
       },
       techniques: ["H69", "G115", "ARIA4", "ARIA11"],
       wcag: ["1.3.1", "2.4.1", "4.1.2"],
@@ -42582,6 +42991,10 @@ var rgaa_default = {
           "Le lien est fonctionnel."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document la zone de contenu principal (indiqu\xE9e par l\u2019\xE9l\xE9ment main visible)\xA0;\n2. V\xE9rifier que la zone\xA0:\n   - Soit peut \xEAtre \xE9vit\xE9e au moyen d\u2019un lien d\u2019\xE9vitement pr\xE9c\xE9dant directement la zone dans l\u2019ordre du code source\xA0;\n   - Soit peut \xEAtre atteinte au moyen d\u2019un lien d\u2019acc\xE8s rapide visible \xE0 la prise de focus lors d\u2019une tabulation.\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document la zone de contenu principal (indiqu\xE9e par l\u2019\xE9l\xE9ment main visible)\xA0;\n2. V\xE9rifier que le lien d\u2019\xE9vitement ou d\u2019acc\xE8s rapide \xE0 la zone est\xA0:\n   - Situ\xE9 \xE0 la m\xEAme place dans la pr\xE9sentation\xA0;\n   - Pr\xE9sent toujours dans le m\xEAme ordre relatif dans le code source (g\xE9n\xE9r\xE9 c\xF4t\xE9 client)\xA0;\n   - Visible \xE0 la prise de focus lors d\u2019une tabulation ;\n   - Fonctionnel.\n3. Si c\u2019est le cas, **le test est valid\xE9**.\n\nNote\xA0: lorsque le site web est constitu\xE9 d'une seule page, l'obligation de la pr\xE9sence d'un lien d'acc\xE8s rapide est li\xE9e au contexte de la page (pr\xE9sence ou absence de navigation ou de contenus additionnels, par exemple). Le crit\xE8re peut \xEAtre consid\xE9r\xE9 comme non applicable lorsqu'il est av\xE9r\xE9 qu'un lien d'acc\xE8s rapide est inutile."
+      },
       techniques: ["G1", "G59", "G123", "G124", "SCR28", "F66"],
       particularCases: [
         "Il existe une gestion de cas particuliers lorsque le site web est constitu\xE9 d\u2019une seule page.",
@@ -42607,6 +43020,10 @@ var rgaa_default = {
           "Pour chaque [script](#script) qui met \xE0 jour ou ins\xE8re un contenu, l\u2019[ordre de tabulation](#ordre-de-tabulation) reste-t-il [coh\xE9rent](#comprehensible-ordre-de-lecture)\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. Parcourir dans le document l\u2019ensemble des contenus au moyen de la touche de tabulation vers l\u2019avant (touche Tab) et vers l\u2019arri\xE8re (touches Maj+Tab)\xA0;\n2. V\xE9rifier que l\u2019ordre de d\xE9placement du focus reste coh\xE9rent relativement au contenu consid\xE9r\xE9 (par exemple, l\u2019ordre de tabulation dans une fen\xEAtre modale ne doit consid\xE9rer que les \xE9l\xE9ments d\u2019interface pr\xE9sents au sein de cette fen\xEAtre)\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**.\n\nNote\xA0: il n'est pas obligatoire que la tabulation suive l'ordre de lecture naturel (de gauche \xE0 droite et de haut en bas par exemple) tant que les \xE9l\xE9ments sont accessibles dans un ordre coh\xE9rent.",
+        "2": "1. Retrouver dans le document l\u2019ensemble des contenus ins\xE9r\xE9s au moyen d\u2019un script (affichage d\u2019\xE9l\xE9ments masqu\xE9s, mise jour de contenu via AJAX par exemple)\xA0;\n2. Positionner la tabulation sur l\u2019\xE9l\xE9ment d\xE9clencheur et l\u2019activer\xA0;\n3. Apr\xE8s l\u2019affichage du contenu mis \xE0 jour, v\xE9rifier que la tabulation reste coh\xE9rente (repositionnement correct du focus)\xA0;\n4. Si c\u2019est le cas, **le test est valid\xE9**."
+      },
       techniques: ["G59", "H4", "F44", "F85", "SCR26", "SCR27", "SCR37", "C27"],
       wcag: ["2.4.3"],
       appliesTo: {
@@ -42628,6 +43045,9 @@ var rgaa_default = {
           "Il est possible d\u2019atteindre l\u2019\xE9l\xE9ment suivant ou pr\xE9c\xE9dent pouvant recevoir le focus avec la touche de tabulation\xA0;",
           "L\u2019utilisateur est inform\xE9 d\u2019un m\xE9canisme fonctionnel permettant d\u2019atteindre au clavier l\u2019\xE9l\xE9ment suivant ou pr\xE9c\xE9dent pouvant recevoir le focus."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document l\u2019ensemble des \xE9l\xE9ments d\u2019interface susceptibles de recevoir le focus (au moyen de la tabulation ou au moyen d\u2019un script)\xA0;\n2. Pour chaque \xE9l\xE9ment d\u2019interface, v\xE9rifier que l\u2019utilisateur peut atteindre l\u2019\xE9l\xE9ment suivant ou pr\xE9c\xE9dent pouvant recevoir le focus\xA0:\n   - Soit au moyen de la touche de tabulation (Tab ou Maj+Tab)\xA0;\n   - Soit au moyen d\u2019une autre interaction clavier dont l\u2019utilisateur est inform\xE9 (par exemple, les fl\xE8ches de direction).\n3. Si c\u2019est le cas pour chaque \xE9l\xE9ment d\u2019interface, **le test est valid\xE9**.\n\nNote\xA0: certains \xE9l\xE9ments d'interface complexes, comme un groupe de boutons radio, une liste de s\xE9lection et tous les composants d\xE9velopp\xE9s avec WAI-ARIA font appel \xE0 des navigations optimis\xE9es qui utilisent g\xE9n\xE9ralement les fl\xE8ches de direction pour passer d'une partie du composant \xE0 l'autre. Par exemple, dans un groupe de boutons radio les options sont navigables avec les fl\xE8ches de direction. De m\xEAme dans un syst\xE8me d'onglets l'utilisateur active les onglets avec les fl\xE8ches de direction. Le test sur le pi\xE8ge au clavier se limite alors \xE0 v\xE9rifier que le composant est atteint avec la tabulation et qu'il est possible de passer au composant suivant ou revenir au composant pr\xE9c\xE9dent."
       },
       techniques: ["G21", "H91", "F10"],
       wcag: ["2.1.1", "2.1.2"],
@@ -42652,6 +43072,9 @@ var rgaa_default = {
           "Dans le cas d\u2019un [composant d\u2019interface](#composant-d-interface) utilisateur, le [raccourci clavier](#raccourci-clavier) qui lui est associ\xE9 ne peut \xEAtre activ\xE9 que si le focus clavier est sur ce composant."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document l\u2019ensemble des raccourcis clavier propos\xE9s \xE0 l\u2019utilisateur\xA0;\n2. Pour chaque raccourci clavier, v\xE9rifier que\xA0:\n   - Soit un m\xE9canisme est disponible pour d\xE9sactiver le raccourci clavier\xA0;\n   - Soit un m\xE9canisme est disponible pour configurer la touche de raccourci clavier au moyen des touches de modification (Ctrl, Alt, Maj, etc.)\xA0;\n   - Soit, dans le cas d\u2019un composant d\u2019interface utilisateur, le raccourci clavier qui lui est associ\xE9 ne peut \xEAtre activ\xE9 que si le focus clavier est sur ce composant.\n3. Si c\u2019est le cas pour chaque raccourci clavier, **le test est valid\xE9**."
+      },
       techniques: ["F99", "G217"],
       wcag: ["2.1.4"],
       appliesTo: {
@@ -42671,6 +43094,9 @@ var rgaa_default = {
         "1": [
           "Dans chaque page web, les contenus additionnels apparaissant au survol, \xE0 la prise de focus ou \xE0 l\u2019activation d\u2019un [composant d\u2019interface](#composant-d-interface) sont-ils si n\xE9cessaire atteignables au clavier\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document l\u2019ensemble des contenus additionnels apparaissant au survol, \xE0 la prise de focus ou \xE0 l\u2019activation d\u2019un composant d\u2019interface\xA0;\n2. Pour chaque contenu additionnel, s\u2019il contient des composants d\u2019interface avec lesquels l\u2019utilisateur peut interagir au clavier (par exemple, une infobulle personnalis\xE9e qui propose un lien dans son contenu), v\xE9rifier que ces composants d\u2019interface sont atteignables au clavier\xA0;\n3. Si c\u2019est le cas pour chaque contenu additionnel, **le test est valid\xE9**."
       },
       techniques: [],
       technicalNote: [
@@ -42713,6 +43139,12 @@ var rgaa_default = {
           "La limite de temps avant la fin de la session est de vingt heures au moins."
         ]
       },
+      methodology: {
+        "1": '1. Retrouver dans le document les rafra\xEEchissements initi\xE9s dans le contenu par un \xE9l\xE9ment `<object>`, `<embed>`, `<svg>`, `<canvas>` ou par un \xE9l\xE9ment `<meta http-equiv="refresh" content="[compteur]">` (dans l\u2019\xE9l\xE9ment `<head>` de la page)\xA0;\n2. Pour chaque rafra\xEEchissement, v\xE9rifier que\xA0:\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme permet \xE0 l\u2019utilisateur de stopper et de relancer le rafra\xEEchissement\xA0;\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019augmenter la limite de temps entre deux rafra\xEEchissements de dix fois, au moins\xA0;\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme qui avertit l\u2019utilisateur de l\u2019imminence du rafra\xEEchissement, laisse 20 secondes, au moins, \xE0 l\u2019utilisateur, pour augmenter la limite de temps avant le prochain rafra\xEEchissement\xA0;\n   - Soit la limite de temps entre deux rafra\xEEchissements est de vingt heures, au moins.\n3. Si c\u2019est le cas, **le test est valid\xE9**.',
+        "2": '1. Retrouver dans le document une redirection automatique initi\xE9e par un \xE9l\xE9ment `<meta http-equiv="refresh" content="0;URL=\'[URL cibl\xE9e]\'" />`\xA0;\n2. V\xE9rifier que la redirection est imm\xE9diate\xA0;\n3. Si c\u2019est le cas, **le test est valid\xE9**.',
+        "3": "1. Retrouver dans le document les redirections automatiques initi\xE9es par un script (sous la forme d\u2019un d\xE9compte par exemple)\xA0;\n2. Pour chaque redirection automatique, v\xE9rifier que\xA0:\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme permet \xE0 l\u2019utilisateur de stopper et relancer la redirection\xA0;\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019augmenter la limite de temps avant le rafra\xEEchissement de dix fois, au moins\xA0;\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme qui avertit l\u2019utilisateur de l\u2019imminence du rafra\xEEchissement, laisse 20 secondes, au moins, \xE0 l\u2019utilisateur, pour augmenter la limite de temps avant le prochain rafra\xEEchissement\xA0;\n   - Soit la limite de temps avant la redirection est de vingt heures, au moins.\n3. Si c\u2019est le cas, **le test est valid\xE9**.",
+        "4": "1. Retrouver dans le document les proc\xE9d\xE9s limitant le temps d\u2019une session (par exemple, apr\xE8s une authentification)\xA0;\n2. Pour chaque proc\xE9d\xE9, v\xE9rifier que\xA0:\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme permet \xE0 l\u2019utilisateur de supprimer la limite de temps\xA0;\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019augmenter la limite de temps\xA0;\n   - Soit la limite de temps est de vingt heures, au moins.\n3. Si c\u2019est le cas, **le test est valid\xE9**.\n\nNote\xA0: lorsque la limite de temps est essentielle, notamment lorsqu'elle ne pourrait pas \xEAtre supprim\xE9e sans changer fondamentalement le contenu ou les fonctionnalit\xE9s li\xE9es au contenu, le crit\xE8re est non applicable. Par exemple, le rafra\xEEchissement d'un flux RSS dans une page n'est pas une limite de temps essentielle\xA0; le crit\xE8re est applicable. En revanche, une redirection automatique qui am\xE8ne vers la nouvelle version d'une page \xE0 partir d'une url obsol\xE8te est essentielle\xA0; le crit\xE8re est non applicable."
+      },
       techniques: ["F40", "F41", "F58", "F61", "G75", "G76", "G110", "G133", "G180", "G186", "G198", "H76", "SCR1", "SCR16", "SCR36", "SVR1"],
       particularCases: [
         "Il existe une gestion de cas particuliers lorsque la limite de temps est essentielle, notamment lorsqu\u2019elle ne pourrait pas \xEAtre supprim\xE9e sans changer fondamentalement le contenu ou les fonctionnalit\xE9s li\xE9es au contenu.",
@@ -42737,6 +43169,9 @@ var rgaa_default = {
           "Dans chaque page web, l\u2019ouverture d\u2019une nouvelle fen\xEAtre ne doit pas \xEAtre d\xE9clench\xE9e sans action de l\u2019utilisateur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
         ]
       },
+      methodology: {
+        "1": "1. V\xE9rifier qu\u2019\xE0 l\u2019ouverture du document, aucune nouvelle fen\xEAtre (pop-up ou pop-under, par exemple) n\u2019est ouverte.\n2. Si c\u2019est le cas, **le test est valid\xE9**."
+      },
       techniques: ["F55", "G107"],
       wcag: ["3.2.1"],
       appliesTo: {
@@ -42759,6 +43194,9 @@ var rgaa_default = {
           "Il en existe une version alternative en t\xE9l\xE9chargement compatible avec l'accessibilit\xE9 ;",
           "Il en existe une version alternative au format HTML compatible avec l'accessibilit\xE9."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les liens et les contr\xF4les de formulaire (un bouton de formulaire ou un formulaire de t\xE9l\xE9chargement par exemple) permettant de t\xE9l\xE9charger un fichier au format bureautique\xA0;\n2. Pour chaque fichier au format bureautique, v\xE9rifier la pr\xE9sence d\u2019une version alternative pr\xE9sent\xE9e comme accessible\xA0:\n   - Pour les documents au format .pdf, analyser le fichier avec l\u2019outil PAC (PDF Accessibility Checker) et v\xE9rifier l\u2019absence d\u2019erreur d\u2019accessibilit\xE9 dans le document (cf. note)\xA0;\n   - Pour les documents au format .doc ou .docx, analyser le fichier avec l\u2019outil de v\xE9rification d\u2019accessibilit\xE9 de Microsoft Office (\xE0 partir de la version 2010) et v\xE9rifier l\u2019absence d\u2019erreur d\u2019accessibilit\xE9 (cf. note)\xA0;\n   - Pour les documents au format .odt, analyser le document avec l\u2019\xE9diteur OpenOffice et v\xE9rifier que l\u2019ensemble des contenus est conforme avec la liste des crit\xE8res \xAB\xA0Liste document bureautique en t\xE9l\xE9chargement\xA0\xBB (cf. note pour une m\xE9thode alternative)\xA0;\n   - Pour les documents au format EPUB/DAISY, analyser le document avec un \xE9diteur EPUB/DAISY et v\xE9rifier que l\u2019ensemble des contenus est conforme avec la liste des crit\xE8res \xAB\xA0Liste document bureautique en t\xE9l\xE9chargement\xA0\xBB.\n   - Pour les documents eux-m\xEAmes au format .html, analyser l\u2019accessibilit\xE9 du document.\n3. Si c\u2019est le cas pour chaque fichier au format bureautique, **le test est valid\xE9**.\n\nNote au sujet de l'outil PAC\xA0: l'outil analyse le document PDF du point de vue de l'accessibilit\xE9 mais \xE9galement de crit\xE8res de qualit\xE9 (par exemple la norme PDF/UA). Seules les erreurs relatives \xE0 des crit\xE8res pr\xE9sents dans la liste des crit\xE8res \xAB Liste document bureautique en t\xE9l\xE9chargement \xBB rendent le crit\xE8re \xAB Non conforme \xBB. Par ailleurs, cet outil ne fonctionne que sur la plateforme Windows. Sur Mac, le contr\xF4le doit se faire manuellement.\n\nNote au sujet Microsoft Office\xA0: le logiciel offre un v\xE9rificateur d'accessibilit\xE9 en standard, (accessible via le menu \xAB Fichier > Informations > V\xE9rifier la pr\xE9sence de probl\xE8mes > V\xE9rifier l'accessibilit\xE9 \xBB). Ce v\xE9rificateur peut \xEAtre consid\xE9rablement am\xE9lior\xE9 via le plugin Word Accessibility Plug-in (voir dans la section Outils). Ce plugin ne fonctionne que sur Windows. Sur Mac, le contr\xF4le doit se faire manuellement.\n\nNote au sujet des documents au format .odt\xA0: OpenOffice et LibreOffice ne poss\xE8dent pas de v\xE9rificateur d'accessibilit\xE9. Une m\xE9thode plus rapide qu'une analyse manuelle peut consister \xE0 enregistrer le document au format .docx et le v\xE9rifier via le v\xE9rificateur d'accessibilit\xE9 de Microsoft Office 2010. Attention cependant\xA0: cette m\xE9thode rapide est \xE0 r\xE9server aux documents tr\xE8s simples car certaines informations li\xE9es \xE0 l'accessibilit\xE9 ne sont pas correctement transcod\xE9es. C'est le cas des indications de langue, de certaines alternatives d'images ou d'en-t\xEAtes fusionn\xE9es sur les tableaux par exemple.\n\nNote au sujet du format EPUB\xA0: l'utilitaire Ace by DAISY App permet d'effectuer le travail de validation d'un fichier EPUB 3 de mani\xE8re efficace.\n\nNote au sujet des documents d\xE9rog\xE9s\xA0: le r\xE9f\xE9rentiel propose un statut de d\xE9rogation dans certains cas (cf. guide d'accompagnement). Dans ce cas, les tests ne sont pas \xE0 r\xE9aliser, la version accessible \xE9tant fournie sur demande de l'utilisateur.\n\nNote \xE0 l'attention des personnes de droit priv\xE9 mentionn\xE9es aux 2\xB0 \xE0 4\xB0 du I de l\u2019article 47 de la loi du 11 f\xE9vrier 2005\xA0: si les fichiers bureautiques (ex\xA0: PDF, documents Microsoft ou LibreOffice, etc.) ont \xE9t\xE9 publi\xE9s avant le 23 septembre 2018 (sauf si ce sont des documents n\xE9cessaires pour accomplir une d\xE9marche administrative relevant des t\xE2ches effectu\xE9es par l'organisme concern\xE9), ils sont exempt\xE9s de l\u2019obligation d\u2019accessibilit\xE9."
       },
       techniques: ["F15", "G10", "G135"],
       particularCases: [
@@ -42788,6 +43226,9 @@ var rgaa_default = {
           "La version alternative au format HTML est pertinente et offre la m\xEAme information."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les fichiers en t\xE9l\xE9chargement au format bureautique accompagn\xE9 de leur version alternative accessible\xA0;\n2. Pour chaque couple de fichiers, ouvrir les deux documents (le document d\u2019origine et le document accessible) et v\xE9rifier que les deux documents apportent la m\xEAme information\xA0;\n3. Si c\u2019est le cas pour chaque couple de fichiers, **le test est valid\xE9**."
+      },
       techniques: ["F15", "G10", "G135"],
       wcag: ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
       appliesTo: {
@@ -42811,6 +43252,9 @@ var rgaa_default = {
           "Une d\xE9finition est donn\xE9e par le contexte adjacent."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les contenus cryptiques (art ASCII, \xE9motic\xF4ne, syntaxe cryptique)\xA0;\n2. Pour chaque contenu cryptique, v\xE9rifier que\xA0:\n   - Soit une d\xE9finition est disponible au moyen d\u2019un attribut `title`, sur un lien, un contr\xF4le de formulaire, une abr\xE9viation (\xE9l\xE9ment `<abbr>`) par exemple\xA0;\n   - Soit une d\xE9finition est donn\xE9e dans le contexte adjacent (imm\xE9diatement avant ou apr\xE8s).\n3. Si c\u2019est le cas pour chaque contenu cryptique, **le test est valid\xE9**."
+      },
       techniques: ["F71", "F70", "G135", "H86"],
       wcag: ["1.1.1"],
       appliesTo: {
@@ -42832,6 +43276,9 @@ var rgaa_default = {
           "Le contenu de l\u2019attribut `title` est pertinent\xA0;",
           "La d\xE9finition donn\xE9e par le contexte adjacent est pertinente."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les contenus cryptiques (art ASCII, \xE9motic\xF4ne, syntaxe cryptique)\xA0;\n2. Pour chaque contenu cryptique, v\xE9rifier que la d\xE9finition donn\xE9e est pertinente.\n3. Si c\u2019est le cas pour chaque contenu cryptique, **le test est valid\xE9**."
       },
       techniques: ["F71", "F72", "H86"],
       wcag: ["1.1.1"],
@@ -42865,6 +43312,11 @@ var rgaa_default = {
           "La surface totale cumul\xE9e des effets est inf\xE9rieure ou \xE9gale \xE0 21824 pixels."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les contenus clignotants ou qui provoquent des effets de flash de type image anim\xE9e, vid\xE9o (cf. note) ou animation (\xE9l\xE9ments `<img>`, `<svg>`, `<canvas>`, `<embed>`, `<object>` ou `<video>`)\xA0;\n2. Pour chaque contenu clignotant ou provoquant des effets de flash, v\xE9rifier que\xA0:\n   - Soit la fr\xE9quence de l\u2019effet est inf\xE9rieur \xE0 3 par seconde\xA0;\n   - Soit la surface cumul\xE9e est inf\xE9rieure \xE0 21824 pixels.\n3. Si c\u2019est le cas pour chaque contenu clignotant ou provoquant des effets de flash, **le test est valid\xE9**.\n\nNote\xA0: l'\xE9valuation de ce crit\xE8re peut \xEAtre complexe. Lorsque l'effet est g\xE9r\xE9 par un script ou au moyen de CSS, l'analyse du code est suffisante. L'outil PEAT permet d'analyser les vid\xE9os au format .avi, par exemple. Un exemple de vid\xE9o ayant provoqu\xE9 des crises d'\xE9pilepsie peut \xEAtre consult\xE9 ici\xA0: London 2012 Olympics Seizure (https://www.youtube.com/watch?v=vs0hfhSje9M).",
+        "2": "1. Retrouver dans le document les contenus clignotants ou qui provoquent des effets de flash obtenus au moyen d\u2019un script\xA0;\n2. Pour chaque contenu clignotant ou provoquant des effets de flash, v\xE9rifier que\xA0:\n   - Soit la fr\xE9quence de l\u2019effet est inf\xE9rieur \xE0 3 par seconde\xA0;\n   - Soit la surface cumul\xE9e est inf\xE9rieure \xE0 21824 pixels.\n3. Si c\u2019est le cas pour chaque contenu clignotant ou provoquant des effets de flash, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les contenus clignotants ou qui provoquent des effets de flash obtenus au moyen d\u2019une animation CSS\xA0;\n2. Pour chaque contenu clignotant ou provoquant des effets de flash, v\xE9rifier que\xA0:\n   - Soit la fr\xE9quence de l\u2019effet est inf\xE9rieur \xE0 3 par seconde\xA0;\n   - Soit la surface cumul\xE9e est inf\xE9rieure \xE0 21824 pixels.\n3. Si c\u2019est le cas pour chaque contenu clignotant ou provoquant des effets de flash, **le test est valid\xE9**."
+      },
       techniques: ["G15", "G19", "G176"],
       wcag: ["2.3.1"],
       appliesTo: {
@@ -42896,6 +43348,10 @@ var rgaa_default = {
           "L\u2019utilisateur peut afficher la totalit\xE9 de l\u2019information sans le clignotement."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les contenus en mouvement (obtenus au moyen d\u2019une image, d\u2019un script ou d\u2019un effet CSS) d\xE9clench\xE9s automatiquement au chargement de la page ou lors de l\u2019affichage d\u2019un contenu (cf. note) ;\n2. Pour chaque contenu, v\xE9rifier que :\n   - Soit la dur\xE9e du mouvement est inf\xE9rieure \xE0 5\u202Fsecondes\xA0;\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme (un bouton, par exemple) permet d\u2019arr\xEAter et de relancer le mouvement\xA0;\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme (un bouton, par exemple) permet de cacher et d\u2019afficher \xE0 nouveau le contenu en mouvement\xA0;\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme (un bouton, par exemple) permet d\u2019afficher la totalit\xE9 du contenu sans mouvement.\n3. Si c\u2019est le cas pour chaque contenu en mouvement, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les contenus clignotants (obtenus au moyen d\u2019une image, d\u2019un script ou d\u2019un effet CSS) d\xE9clench\xE9s automatiquement au chargement de la page ou lors de l\u2019affichage d\u2019un contenu (cf. note).\n2. Pour chaque contenu, v\xE9rifier que\xA0:\n   - Soit la dur\xE9e du clignotement est inf\xE9rieure \xE0 5\u202Fsecondes\xA0;\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme (un bouton, par exemple) permet d\u2019arr\xEAter et de relancer le clignotement\xA0;\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme (un bouton, par exemple) permet de cacher et d\u2019afficher \xE0 nouveau le contenu clignotant\xA0;\n   - Soit la pr\xE9sence d\u2019un m\xE9canisme (un bouton, par exemple) permet d\u2019afficher la totalit\xE9 du contenu clignotant.\n3. Si c\u2019est le cas pour chaque contenu clignotant, **le test est valid\xE9**.\n\nNote\xA0: l'arr\xEAt ou la mise en pause d'un contenu en mouvement ou clignotant au moyen de la prise de focus (par exemple, l'effet est suspendu uniquement pendant la prise de focus) n'est pas consid\xE9r\xE9 comme un proc\xE9d\xE9 conforme. Dans certains cas, le mouvement ne peut pas \xEAtre arr\xEAt\xE9, par exemple dans le cas d'une barre de progression, dans ce cas, le crit\xE8re est non applicable."
+      },
       techniques: ["F4", "F7", "F16", "F47", "F50", "G4", "G11", "G152", "G186", "G187", "G191", "SCR22", "SCR33", "SCR36", "SM11", "SM12"],
       wcag: ["2.2.1", "2.2.2"],
       appliesTo: {
@@ -42917,6 +43373,9 @@ var rgaa_default = {
           "La consultation est possible quel que soit le mode d\u2019orientation de l\u2019\xE9cran\xA0;",
           "Le contenu propos\xE9 reste le m\xEAme quel que soit le mode d\u2019orientation de l\u2019\xE9cran utilis\xE9 m\xEAme si sa pr\xE9sentation et le moyen d\u2019y acc\xE9der peut diff\xE9rer."
         ]
+      },
+      methodology: {
+        "1": "1. Consulter le document dans un mode d\u2019orientation portrait puis dans un mode d\u2019orientation paysage\xA0;\n2. V\xE9rifier que\xA0:\n   - La consultation est possible quel que soit le mode d\u2019orientation de l\u2019\xE9cran.\n   - Le contenu propos\xE9 reste le m\xEAme quel que soit le mode d\u2019orientation de l\u2019\xE9cran utilis\xE9 m\xEAme si sa pr\xE9sentation et le moyen d\u2019y acc\xE9der peut diff\xE9rer.\n3. Si c\u2019est le cas, **le test est valid\xE9**.\n\nNote\xA0: il existe des interfaces pour lesquelles l'orientation du p\xE9riph\xE9rique est essentielle \xE0 leur utilisation. Dans ces situations, le crit\xE8re est non applicable. Il peut s'agir d'interfaces de jeu, de piano, de d\xE9p\xF4t de ch\xE8ques bancaires, etc. Si l'interface est le seul moyen d'acc\xE9der au service propos\xE9, une alternative devrait \xEAtre mise en place pour pallier cette carence."
       },
       techniques: [],
       particularCases: [
@@ -42946,6 +43405,10 @@ var rgaa_default = {
           "Dans chaque page web, chaque fonctionnalit\xE9 utilisable ou disponible suite \xE0 un geste bas\xE9 sur le suivi d\u2019une trajectoire sur l\u2019\xE9cran est-elle \xE9galement utilisable ou disponible suite \xE0 un contact en un point unique de l\u2019\xE9cran (hors cas particuliers)."
         ]
       },
+      methodology: {
+        "1": "1. Retrouver dans le document les fonctionnalit\xE9s utilisables ou disponibles au moyen d\u2019une interaction au toucher de type contact multipoint\xA0;\n2. Pour chaque fonctionnalit\xE9, v\xE9rifier qu\u2019elle reste disponible au moyen d\u2019une interaction au toucher de type contact en un point unique de l\u2019\xE9cran (par exemple, la possibilit\xE9 de consulter les \xE9l\xE9ments d\u2019une liste par un mouvement de balayage horizontal droit ou gauche doit aussi \xEAtre disponible au moyen de boutons \u201Cpr\xE9c\xE9dent\u201D et \u201Csuivant\u201D ou encore un geste de pincer et zoomer qui peut \xEAtre alternativement r\xE9alis\xE9 au moyen de boutons \u201Cplus\u201D et \u201Cmoins\u201D)\xA0;\n3. Si c\u2019est le cas pour chaque fonctionnalit\xE9 utilisable ou disponible au moyen d\u2019une interaction au toucher de type contact multipoint, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les fonctionnalit\xE9s utilisables ou disponibles au moyen d\u2019une interaction au toucher qui implique le suivi d\u2019une trajectoire sur l\u2019\xE9cran\xA0;\n2. Pour chaque fonctionnalit\xE9, v\xE9rifier qu\u2019elle reste disponible au moyen d\u2019une interaction au toucher de type contact en un point unique de l\u2019\xE9cran (par exemple, la possibilit\xE9 de composer son mot de passe en suivant une trajectoire sur un clavier virtuel doit aussi \xEAtre disponible au moyen de pressions successives sur les touches du clavier)\xA0;\n3. Si c\u2019est le cas pour chaque fonctionnalit\xE9 utilisable ou disponible au moyen d\u2019une interaction au toucher qui implique le suivi d\u2019une trajectoire sur l\u2019\xE9cran, **le test est valid\xE9**.\n\nIl existe une gestion de cas particuliers dans deux types de situation\xA0:\n\n- Le crit\xE8re ne s'applique qu'\xE0 des fonctionnalit\xE9s mises en place par l'auteur du site. Il ne concerne donc pas les gestes requis par l'agent utilisateur ou le syst\xE8me d'exploitation.\n- Le crit\xE8re ne s'applique pas aux fonctionnalit\xE9s dont la r\xE9alisation d'un geste complexe est essentielle (ex\xE9cuter le trac\xE9 d'une signature, par exemple)."
+      },
       techniques: ["G215", "G216"],
       particularCases: [
         "Il existe une gestion de cas particuliers dans deux types de situation\xA0:",
@@ -42973,6 +43436,9 @@ var rgaa_default = {
           "L\u2019action est d\xE9clench\xE9e au moment o\xF9 le dispositif de pointage est [press\xE9 ou pos\xE9](#presse-ou-pose) puis annul\xE9e lorsque le dispositif de pointage est [rel\xE2ch\xE9 ou relev\xE9](#relache-ou-releve)\xA0;",
           "Un m\xE9canisme est disponible pour abandonner (avant ach\xE8vement de l\u2019action) ou annuler (apr\xE8s ach\xE8vement) l\u2019ex\xE9cution de l\u2019action."
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les actions d\xE9clench\xE9es au moyen d\u2019un dispositif de pointage sur un point unique de l\u2019\xE9cran\xA0;\n2. Pour chaque action, v\xE9rifier que\xA0:\n   - Soit l\u2019action est d\xE9clench\xE9e au moment o\xF9 le dispositif de pointage est rel\xE2ch\xE9 ou relev\xE9\xA0;\n   - Soit l\u2019action est d\xE9clench\xE9e au moment o\xF9 le dispositif de pointage est press\xE9 ou pos\xE9 puis annul\xE9e lorsque le dispositif de pointage est rel\xE2ch\xE9 ou relev\xE9\xA0;\n   - Soit il existe un m\xE9canisme pour abandonner (avant ach\xE8vement de l\u2019action) ou annuler (apr\xE8s ach\xE8vement) l\u2019ex\xE9cution de l\u2019action\xA0; par exemple, lors d\u2019une interaction de type glisser-d\xE9poser un rel\xE2chement du dispositif de pointage doit permettre d\u2019abandonner l\u2019interaction en cours et une fois la zone de d\xE9p\xF4t atteinte, l\u2019utilisateur doit rester en mesure d\u2019annuler son op\xE9ration de d\xE9p\xF4t au moyen d\u2019un dialogue de confirmation (choix de confirmer ou d\u2019annuler le d\xE9p\xF4t) ou par le fait de pouvoir replacer l\u2019\xE9l\xE9ment d\xE9pos\xE9 \xE0 sa position initiale.\n3. Si c\u2019est le cas pour chaque action d\xE9clench\xE9e au moyen d\u2019un dispositif de pointage sur un point unique de l\u2019\xE9cran, **le test est valid\xE9**."
       },
       techniques: [],
       technicalNote: [
@@ -43007,6 +43473,11 @@ var rgaa_default = {
         "3": [
           "L\u2019utilisateur a-t-il la possibilit\xE9 de d\xE9sactiver la d\xE9tection du mouvement pour \xE9viter un d\xE9clenchement accidentel de la fonctionnalit\xE9 (hors cas particuliers)\xA0?"
         ]
+      },
+      methodology: {
+        "1": "1. Retrouver dans le document les fonctionnalit\xE9s disponibles en bougeant l\u2019appareil\xA0;\n2. Pour chaque fonctionnalit\xE9, v\xE9rifier qu\u2019elle peut \xEAtre accomplie au moyen de composants d\u2019interface utilisateur\xA0;\n3. Si c\u2019est le cas pour chaque fonctionnalit\xE9 disponible en bougeant l\u2019appareil, **le test est valid\xE9**.",
+        "2": "1. Retrouver dans le document les fonctionnalit\xE9s disponibles en faisant un geste en direction de l\u2019appareil\xA0;\n2. Pour chaque fonctionnalit\xE9, v\xE9rifier qu\u2019elle peut \xEAtre accomplie au moyen de composants d\u2019interface utilisateur\xA0;\n3. Si c\u2019est le cas pour chaque fonctionnalit\xE9 disponible en faisant un geste en direction de l\u2019appareil, **le test est valid\xE9**.",
+        "3": "1. Retrouver dans le document les fonctionnalit\xE9s disponibles en mettant en mouvement l\u2019appareil\xA0;\n2. V\xE9rifier si l\u2019utilisateur \xE0 la possibilit\xE9 de d\xE9sactiver la d\xE9tection du mouvement\xA0;\n3. Si c\u2019est le cas, pour chaque fonctionnalit\xE9, v\xE9rifier qu\u2019elle ne peut pas \xEAtre d\xE9clench\xE9e\xA0;\n4. Si c\u2019est le cas pour chaque fonctionnalit\xE9 disponible en mettant en mouvement l\u2019appareil, **le test est valid\xE9**."
       },
       techniques: [],
       particularCases: [
@@ -43580,6 +44051,12 @@ function validatePack(raw, opts = {}) {
     if (bad) err2("idPattern", `idPattern ${bad}`);
     else idRe = new RegExp(p.idPattern);
   }
+  if (p.criterionUrl !== void 0) {
+    const t3 = p.criterionUrl;
+    if (typeof t3 !== "string" || t3.trim() === "") err2("criterionUrl", "criterionUrl must be a non-empty string template");
+    else if (!t3.startsWith("https://")) err2("criterionUrl", "criterionUrl must be an https:// URL template");
+    else if (!t3.includes("{id}")) err2("criterionUrl", "criterionUrl must contain the `{id}` placeholder");
+  }
   const themes = Array.isArray(p.themes) ? p.themes : null;
   if (!themes) err2("themes", "themes must be an array");
   const themeNumbers = /* @__PURE__ */ new Set();
@@ -43628,6 +44105,20 @@ function validatePack(raw, opts = {}) {
           if (typeof r !== "string" || r.trim() === "")
             err2(`criteria[${i2}].appliesTo.ruleIds[${k}]`, `criterion "${String(id)}" appliesTo.ruleIds must be non-empty strings`);
         });
+      }
+    }
+    if (c2?.methodology !== void 0) {
+      const m = c2.methodology;
+      if (!m || typeof m !== "object" || Array.isArray(m)) {
+        err2(`criteria[${i2}].methodology`, `criterion "${String(id)}" methodology must be an object { [testKey]: string }`);
+      } else {
+        const tests = c2?.tests && typeof c2.tests === "object" && !Array.isArray(c2.tests) ? c2.tests : {};
+        for (const [k, v] of Object.entries(m)) {
+          if (typeof v !== "string" || v.trim() === "")
+            err2(`criteria[${i2}].methodology.${k}`, `criterion "${String(id)}" methodology.${k} must be a non-empty string`);
+          if (!Object.hasOwn(tests, k))
+            err2(`criteria[${i2}].methodology.${k}`, `criterion "${String(id)}" has a methodology for test ${k}, which it does not declare`);
+        }
       }
     }
     const wcag = Array.isArray(c2?.wcag) ? c2.wcag : null;
@@ -49475,6 +49966,9 @@ function titlePlain(pack, c2, lang) {
 function packTestIds(pack, id) {
   const tests = getCriterion(pack, id)?.tests;
   return tests ? Object.keys(tests).map((k) => `${id}.${k}`) : [];
+}
+function criterionUrl(pack, id) {
+  return pack.criterionUrl ? pack.criterionUrl.replaceAll("{id}", id) : void 0;
 }
 function resolveGlossary(packKey, anchor) {
   return packGlossary(packKey)?.[anchor];
@@ -56872,10 +57366,20 @@ function formatPackCriterion(pack, c2, lang = "en") {
   const testKeys = Object.keys(c2.tests ?? {});
   if (testKeys.length) {
     out2.push(`${lang === "fr" ? "Tests" : "Tests"} :`);
-    for (const k of testKeys) for (const line of c2.tests[k]) out2.push(`  ${c2.id}.${k} ${line.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1")}`);
+    for (const k of testKeys) {
+      for (const line of c2.tests[k]) out2.push(`  ${c2.id}.${k} ${line.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1")}`);
+      const method = c2.methodology?.[k];
+      if (method?.trim()) {
+        out2.push(
+          `    ${lang === "fr" ? "M\xE9thodologie" : "Methodology"} : ${method.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1").replace(/\s+/g, " ").trim()}`
+        );
+      }
+    }
   }
   if (c2.technicalNote?.length) out2.push(`${lang === "fr" ? "Note technique" : "Technical note"} : ${c2.technicalNote.join(" ")}`);
   if (c2.particularCases?.length) out2.push(`${lang === "fr" ? "Cas particuliers" : "Particular cases"} : ${c2.particularCases.join(" ")}`);
+  const url = criterionUrl(pack, c2.id);
+  if (url) out2.push(`${lang === "fr" ? "Texte officiel" : "Official text"} : ${url}`);
   return out2.join("\n");
 }
 function packThemeList(pack, lang) {
@@ -58360,6 +58864,14 @@ function adjudicationText(sc, lang) {
     questions: p.questions.map((q) => q[lang])
   };
 }
+function adjudicationForWcagRefs(scs, lang) {
+  const out2 = [];
+  for (const sc of scs) {
+    const p = adjudicationText(sc, lang);
+    if (p) out2.push({ sc, ...p });
+  }
+  return out2;
+}
 
 // src/adjudicate.ts
 var ADJUDICATE_MAX_EVIDENCE_CLASSES = 1200;
@@ -58964,8 +59476,13 @@ var T2 = {
     decide: "R\xE8gle de d\xE9cision",
     na: "Non applicable si",
     refs: "R\xE9f\xE9rences normatives mobilisables (techniques/\xE9checs W3C de ce crit\xE8re)",
+    packRefs: (name2) => `R\xE9f\xE9rences normatives mobilisables (les tests ${name2} de ce crit\xE8re, et eux seuls)`,
     packIntro: (name2) => `R\xE9f\xE9rentiel actif : **${name2}**. Les items ci-dessous sont des crit\xE8res ${name2}, pas des crit\xE8res de succ\xE8s WCAG. Un \`normativeRef\` DOIT citer un test du crit\xE8re de l'item (par ex. \`11.2.1\`) \u2014 un id WCAG y ressemble mais d\xE9signe un tout autre test et sera rejet\xE9.`,
     packTests: (name2, id) => `Tests ${name2} ${id} \xE0 trancher`,
+    methodology: "M\xE9thodologie de test officielle",
+    inheritedDecide: (sc) => `R\xE8gle de d\xE9cision (h\xE9rit\xE9e du crit\xE8re de succ\xE8s WCAG ${sc}, qui pose une question plus large \u2014 le texte du r\xE9f\xE9rentiel prime)`,
+    officialSource: (name2, id) => `Texte officiel du crit\xE8re ${name2} ${id}`,
+    webLookup: "Le texte ci-dessus est celui du r\xE9f\xE9rentiel : c'est LUI qui tranche. Si une formulation reste ambigu\xEB et que vous disposez d'un outil web, vous POUVEZ consulter la page officielle ci-dessus pour la lever \u2014 jamais pour la contredire, jamais pour \xE9largir un test, et une page web n'est jamais un `normativeRef` : seules les r\xE9f\xE9rences normatives list\xE9es ci-dessous en sont.",
     technicalNote: "Note technique",
     particularCases: "Cas particuliers",
     glossary: "Termes d\xE9finis par le r\xE9f\xE9rentiel"
@@ -58998,8 +59515,13 @@ var T2 = {
     decide: "Decision rule",
     na: "Not applicable when",
     refs: "Normative references you may cite (this criterion's W3C techniques/failures)",
+    packRefs: (name2) => `Normative references you may cite (this criterion's own ${name2} tests, and nothing else)`,
     packIntro: (name2) => `Active standard: **${name2}**. The items below are ${name2} criteria, not WCAG success criteria. A \`normativeRef\` MUST cite a test OF THE ITEM'S CRITERION (e.g. \`11.2.1\`) \u2014 a WCAG id looks alike but denotes an unrelated test and will be rejected.`,
     packTests: (name2, id) => `${name2} ${id} tests to rule on`,
+    methodology: "Official test methodology",
+    inheritedDecide: (sc) => `Decision rule (inherited from WCAG success criterion ${sc}, which asks a broader question \u2014 the standard's own text prevails)`,
+    officialSource: (name2, id) => `Official text of ${name2} criterion ${id}`,
+    webLookup: "The text above is the standard's own, and it is what decides. If a wording stays ambiguous and you have a web tool, you MAY consult the official page above to settle it \u2014 never to contradict it, never to widen a test, and a web page is never a `normativeRef`: only the normative references listed below are.",
     technicalNote: "Technical note",
     particularCases: "Particular cases",
     glossary: "Terms the standard defines"
@@ -59008,6 +59530,7 @@ var T2 = {
 var MAX_REFS = 12;
 var MAX_GLOSSARY_TERMS = 8;
 var MAX_GLOSSARY_CHARS = 600;
+var MAX_METHODOLOGY_CHARS = 900;
 function glossaryBlock(pack, crit, lang) {
   const anchors = glossaryAnchorsOf(crit).slice(0, MAX_GLOSSARY_TERMS);
   if (!anchors.length) return [];
@@ -59023,6 +59546,12 @@ function glossaryBlock(pack, crit, lang) {
   }
   out2.push("");
   return any ? out2 : [];
+}
+function sourceBlock(s, name2, id, url, web) {
+  if (!url) return [];
+  const out2 = [`> **${s.officialSource(name2, id)}** \u2014 ${url}`, ""];
+  if (web) out2.push(`> ${s.webLookup}`, "");
+  return out2;
 }
 function packGuidanceBlock(standard, criterionId, lang) {
   const entries = guidanceForCriterion(standard, criterionId);
@@ -59065,18 +59594,32 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
       }
       out2.push("");
     }
-    const protocol = ADJUDICATION[it.criteriaId];
-    if (protocol) {
-      out2.push(`> **${s.decide}** \u2014 ${protocol.decide[lang]}`, "");
-      if (protocol.na) out2.push(`> **${s.na}** \u2014 ${protocol.na[lang]}`, "");
-      if (protocol.questions.length) {
-        out2.push(`> ${s.questions}:`, "");
-        for (const q of protocol.questions) out2.push(`- ${q[lang]}`);
-        out2.push("");
+    const crit = pack ? getCriterion(pack, it.criteriaId) : void 0;
+    if (pack) {
+      if (!crit?.methodology || Object.keys(crit.methodology).length === 0) {
+        for (const p of adjudicationForWcagRefs(crit?.wcag ?? [], lang)) {
+          out2.push(`> **${s.inheritedDecide(p.sc)}** \u2014 ${p.decide}`, "");
+          if (p.na) out2.push(`> **${s.na}** \u2014 ${p.na}`, "");
+          if (p.questions.length) {
+            out2.push(`> ${s.questions}:`, "");
+            for (const q of p.questions) out2.push(`- ${q}`);
+            out2.push("");
+          }
+        }
+      }
+    } else {
+      const protocol = ADJUDICATION[it.criteriaId];
+      if (protocol) {
+        out2.push(`> **${s.decide}** \u2014 ${protocol.decide[lang]}`, "");
+        if (protocol.na) out2.push(`> **${s.na}** \u2014 ${protocol.na[lang]}`, "");
+        if (protocol.questions.length) {
+          out2.push(`> ${s.questions}:`, "");
+          for (const q of protocol.questions) out2.push(`- ${q[lang]}`);
+          out2.push("");
+        }
       }
     }
     if (pack) {
-      const crit = getCriterion(pack, it.criteriaId);
       const tests = crit?.tests ?? {};
       const keys = Object.keys(tests);
       if (keys.length) {
@@ -59085,6 +59628,11 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
           const lines = tests[k] ?? [];
           out2.push(`- \`${it.criteriaId}.${k}\` ${plainTest(lines[0] ?? "")}`);
           for (const line of lines.slice(1)) out2.push(`  - ${plainTest(line)}`);
+          const method = crit?.methodology?.[k];
+          if (method?.trim()) {
+            const flat = plainTest(method).replace(/\s+/g, " ").trim();
+            out2.push(`  - _${s.methodology}_ : ${flat.length > MAX_METHODOLOGY_CHARS ? `${flat.slice(0, MAX_METHODOLOGY_CHARS)}\u2026` : flat}`);
+          }
         }
         out2.push("");
       }
@@ -59092,8 +59640,10 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
       if (crit?.particularCases?.length) out2.push(`> **${s.particularCases}** \u2014 ${crit.particularCases.map(plainTest).join(" ")}`, "");
       out2.push(...glossaryBlock(pack, crit, lang));
       out2.push(...packGuidanceBlock(standard, it.criteriaId, lang));
-      if (keys.length) out2.push(`> ${s.refs}: ${keys.map((k) => `\`${it.criteriaId}.${k}\``).join(", ")}`, "");
+      out2.push(...sourceBlock(s, pack.name, it.criteriaId, criterionUrl(pack, it.criteriaId), opts.web === true));
+      if (keys.length) out2.push(`> ${s.packRefs(pack.name)}: ${keys.map((k) => `\`${it.criteriaId}.${k}\``).join(", ")}`, "");
     } else {
+      out2.push(...sourceBlock(s, "WCAG", it.criteriaId, understanding(it.criteriaId), opts.web === true));
       const refs = techniquesFor(it.criteriaId);
       if (refs.length) {
         out2.push(`> ${s.refs}: ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` \u2026 (\`criteria ${it.criteriaId}\`)` : ""}`, "");
@@ -59116,7 +59666,13 @@ function writeAdjudication(items, outDir, opts) {
     items
   };
   writeFileSync10(todoPath, JSON.stringify(file, null, 2) + "\n");
-  writeFileSync10(mdPath, formatAdjudication(items, opts.lang ?? "en", opts.standard, { ...opts.unrendered?.length ? { unrendered: opts.unrendered } : {} }));
+  writeFileSync10(
+    mdPath,
+    formatAdjudication(items, opts.lang ?? "en", opts.standard, {
+      ...opts.unrendered?.length ? { unrendered: opts.unrendered } : {},
+      ...opts.web ? { web: true } : {}
+    })
+  );
   const verdictsPath = join35(outDir, "ADJUDICATE.verdicts.json");
   writeFileSync10(verdictsPath, JSON.stringify({ ...file, items: slimAdjudicationItems(items) }, null, 2) + "\n");
   const itemsDir = join35(outDir, "adjudicate");
@@ -59126,7 +59682,11 @@ function writeAdjudication(items, outDir, opts) {
     const mine = unrendered.has(it.criteriaId) ? [it.criteriaId] : [];
     writeFileSync10(
       join35(itemsDir, `${it.criteriaId}.md`),
-      formatAdjudication([it], opts.lang ?? "en", opts.standard, { preamble: false, ...mine.length ? { unrendered: mine } : {} })
+      formatAdjudication([it], opts.lang ?? "en", opts.standard, {
+        preamble: false,
+        ...mine.length ? { unrendered: mine } : {},
+        ...opts.web ? { web: true } : {}
+      })
     );
   }
   return { todoPath, mdPath, verdictsPath, itemsDir, count: items.length };
@@ -64880,12 +65440,12 @@ There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one
 
 ## Which files \u2014 your prompt decides, and it wins over this document
 
-- **With a shell.** Read \`${join47(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join47(runAbs, "ADJUDICATE.todo.json")} --in ${join47(runAbs, "audit-latest.json")} --out ${runAbs}\`.
+- **With a shell.** Read \`${join47(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join47(runAbs, "ADJUDICATE.todo.json")} --in ${join47(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
 - **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join47(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join47(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
 
 ## For EACH criterion
 
-1. Read its brief. \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) \u2014 open the cited files at the cited lines whenever the snippet alone cannot decide. Copy the \`snippet\` from the brief rather than retyping it.
+1. Read its brief in full \u2014 it carries BOTH halves of the decision: the criterion's official wording with its numbered tests, the standard's own test methodology, the technical note, the particular cases and the glossary terms; and \`evidence[]\`, source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`). Open the cited files at the cited lines whenever the snippet alone cannot decide, and copy the \`snippet\` from the brief rather than retyping it.
 ${VERDICT_RULES}
 
 Every item comes back with a verdict. Each one stands or falls on its own: a refusal costs THAT criterion and leaves every other verdict standing \u2014 so work through the list steadily, and never guess to fill a gap.
@@ -64926,10 +65486,11 @@ Worklist: \`${join47(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: 
 
 For EACH of your criteria:
 
-1. Read its worklist entry. \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) harvested from the audited code \u2014 open the cited files at the cited lines whenever the snippet alone cannot decide.
+1. Read its worklist entry for the EVIDENCE: \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) harvested from the audited code \u2014 open the cited files at the cited lines whenever the snippet alone cannot decide.
+1b. Read \`${join47(runAbs, "adjudicate")}/<criteriaId>.md\` for the CRITERION ITSELF \u2014 its official wording, its numbered tests with the standard's own test methodology, the technical note, the particular cases and the glossary terms the tests are defined in terms of. The worklist JSON carries none of that: it holds the evidence and the slots your verdict goes into, and ruling on a country standard from the criterion's title alone is how a verdict ends up citing a test it never read. That brief also cites the standard's official page for the criterion: if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
 2. Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold):
    - \`C\` (conforming) \u2014 REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this item's own \`evidence[]\`; an anchor that is not in that list is treated as fabricated). A criterion whose \`evidence[]\` is empty cannot be \`C\` at all \u2014 it is \`manual\` (\`undecidable\`), or \`NA\` if nothing in scope is concerned.
-   - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the item's OWN tests, which the worklist lists for you under \xAB tests to rule on \xBB.
+   - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the item's OWN tests, which its brief lists for you under \xAB tests to rule on \xBB. A WCAG id looks alike, denotes an unrelated test, and is rejected.
    - \`NA\` (not applicable) \u2014 REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
    - \`manual\` (still undecidable) \u2014 REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide, e.g. computed contrast) or \`undecidable\` (the evidence cannot settle it either way).
 3. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with a reason \u2014 that is a valid, honest verdict; the scan tier or a human picks it up.
@@ -65207,11 +65768,7 @@ function scView(id, lang, includeGuidance) {
 function packCriterionView(pack, c2, lang, includeGuidance) {
   const plain2 = titlePlain(pack, c2, lang);
   const raw = c2.title?.[lang] ?? c2.title?.[pack.defaultLocale];
-  const adjudication = [];
-  for (const sc of c2.wcag) {
-    const p = adjudicationText(sc, lang);
-    if (p) adjudication.push({ sc, ...p });
-  }
+  const adjudication = adjudicationForWcagRefs(c2.wcag, lang);
   return {
     kind: "pack",
     id: c2.id,
@@ -65220,7 +65777,11 @@ function packCriterionView(pack, c2, lang, includeGuidance) {
     // The markup is kept, not stripped: `[terme](#ancre)` is what points at the normative
     // glossary definitions attached below.
     ...raw && raw !== plain2 ? { titleRaw: raw } : {},
-    tests: Object.entries(c2.tests ?? {}).map(([k, lines]) => ({ id: `${c2.id}.${k}`, lines })),
+    tests: Object.entries(c2.tests ?? {}).map(([k, lines]) => ({
+      id: `${c2.id}.${k}`,
+      lines,
+      ...c2.methodology?.[k] ? { methodology: c2.methodology[k] } : {}
+    })),
     techniques: c2.techniques ?? [],
     wcag: c2.wcag.map((sc) => {
       const core = getSC(sc);
@@ -65236,6 +65797,7 @@ function packCriterionView(pack, c2, lang, includeGuidance) {
     appliesTo: c2.appliesTo?.ruleIds ?? [],
     coverage: criterionCoverage(pack.key, c2.id),
     glossary: glossaryViews(pack, c2),
+    ...criterionUrl(pack, c2.id) ? { officialUrl: criterionUrl(pack, c2.id) } : {},
     adjudication,
     guidance: includeGuidance ? resolveGuidance(pack.key, c2.id).map((r) => guidanceView(r, lang)) : []
   };
@@ -67688,6 +68250,12 @@ Options:
                      verdict content-level against the cited source
   --manual           verify: with --in <audit.json>, emit an adjudication worklist over the
                      audit's residual (judgment / needs-rendering) criteria for the agent to rule
+  --web / --no-web   verify --manual: whether each brief may INVITE a lookup of the
+                     criterion's official page (the URL itself is always printed).
+                     Default: on, except under CI \u2014 where the adjudicator holds
+                     Read/Grep/Glob/Edit/Write and offering a web tool only costs turns.
+                     The vendored normative text always decides, and no web page is ever
+                     an acceptable normativeRef
   --lang auto|en|fr  output language                (default: auto \u2014 conversation/repo
                      language: an AI caller should pass --lang explicitly to match the
                      chat; unset resolves repo <html lang> \u2192 standard's default locale \u2192 en)
@@ -67840,6 +68408,10 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
   // verdict discards the whole adjudication. The default is per-verdict.
   "strict",
+  // `verify --manual`: whether the brief may invite a web lookup of the criterion's official
+  // page. Default: on outside CI, off under it — see `webAllowed`.
+  "web",
+  "no-web",
   "no-technical",
   "override",
   "local",
@@ -67926,6 +68498,11 @@ function readInputFile(path, cmd, flag) {
     );
     return null;
   }
+}
+function webAllowed(flags2) {
+  if (flags2["no-web"] === true) return false;
+  if (flags2.web === true) return true;
+  return !process.env.CI;
 }
 function stdOf(p, cmd) {
   try {
@@ -69427,8 +70004,9 @@ function cmdVerify(p) {
       return 2;
     }
     const adjItems = buildAdjudicationWorklist(audit2, { standard });
+    const web = webAllowed(p.flags);
     const unrendered = unrenderedResidual(audit2, adjItems);
-    const w = writeAdjudication(adjItems, out2, { standard, auditDate: audit2.date, lang, unrendered });
+    const w = writeAdjudication(adjItems, out2, { standard, auditDate: audit2.date, lang, unrendered, web });
     if (unrendered.length) {
       const ids = unrendered.join(" \xB7 ");
       console.error(
@@ -69440,11 +70018,21 @@ function cmdVerify(p) {
         lang === "fr" ? `ultra11y verify : aucune \xE9vidence n'a pu \xEAtre extraite (${audit2.scope.inputs.join(", ")} introuvable ?) \u2014 lancez --manual depuis le r\xE9pertoire de l'audit.` : `ultra11y verify: no evidence could be harvested (${audit2.scope.inputs.join(", ")} not found?) \u2014 run --manual from the audit's directory.`
       );
     }
-    if (p.flags.json) console.log(JSON.stringify({ mdPath: w.mdPath, todoPath: w.todoPath, count: w.count, items: adjItems }, null, 2));
+    if (p.flags.json)
+      console.log(
+        JSON.stringify(
+          { mdPath: w.mdPath, todoPath: w.todoPath, itemsDir: w.itemsDir, verdictsPath: w.verdictsPath, count: w.count, items: adjItems },
+          null,
+          2
+        )
+      );
     else
       console.log(
         lang === "fr" ? `${w.count} crit\xE8re(s) \xE0 adjuger \u2192 ${w.mdPath}, ${w.todoPath}` : `${w.count} criterion(ia) to adjudicate \u2192 ${w.mdPath}, ${w.todoPath}`
       );
+    console.error(
+      lang === "fr" ? `  Le texte de chaque crit\xE8re (tests num\xE9rot\xE9s, m\xE9thodologie de test du r\xE9f\xE9rentiel, glossaire) est dans ${w.itemsDir}/<crit\xE8re>.md \u2014 lisez-le avant de trancher.` : `  Each criterion's own text (numbered tests, the standard's test methodology, glossary) is in ${w.itemsDir}/<criterion>.md \u2014 read it before ruling.`
+    );
     return 0;
   }
   const rep = p.flags.report;

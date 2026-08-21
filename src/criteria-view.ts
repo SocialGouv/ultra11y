@@ -9,12 +9,13 @@
 // data. A criterion rendered by `criteria --standard rgaa 8.3` and one returned by
 // `ultra11y_criteria { standard: "rgaa", sc: "8.3" }` cannot drift, because the human string
 // in `text` is produced by the very formatter the CLI prints.
-import { adjudicationText } from "./adjudication-data.js";
+import { adjudicationForWcagRefs, adjudicationText } from "./adjudication-data.js";
 import { resolveGuidance, type ResolvedGuidance } from "./guidance/resolve.js";
 import { formatPackCriterion, formatSC } from "./criteria.js";
 import {
   allCriteria,
   criterionCoverage,
+  criterionUrl,
   getCriterion,
   glossaryAnchorsOf,
   isCore,
@@ -133,7 +134,10 @@ export interface PackCriterionView {
   theme: { number: number; name?: string };
   title: string;
   titleRaw?: string;
-  tests: { id: string; lines: string[] }[];
+  // Each numbered test, with the standard's OWN test procedure for it when it publishes one
+  // (RGAA does, for all 258). `lines` says what the test asks; `methodology` says how it is
+  // run — and under a country standard that is the decision rule, not a nicety.
+  tests: { id: string; lines: string[]; methodology?: string }[];
   techniques: string[];
   wcag: { sc: string; title?: string; level?: string; automatability?: string; inCore: boolean }[];
   technicalNote: string[];
@@ -142,6 +146,8 @@ export interface PackCriterionView {
   appliesTo: string[];
   coverage: Coverage;
   glossary: GlossaryTermView[];
+  /** Where the standard publishes this criterion, when the pack declares a template. */
+  officialUrl?: string;
   adjudication: AdjudicationView[];
   guidance: GuidanceView[];
 }
@@ -193,11 +199,10 @@ function scView(id: string, lang: Lang, includeGuidance: boolean): ScCriterionVi
 function packCriterionView(pack: StandardPack, c: PackCriterion, lang: Lang, includeGuidance: boolean): PackCriterionView {
   const plain = titlePlain(pack, c, lang);
   const raw = c.title?.[lang] ?? c.title?.[pack.defaultLocale];
-  const adjudication: AdjudicationView[] = [];
-  for (const sc of c.wcag) {
-    const p = adjudicationText(sc, lang);
-    if (p) adjudication.push({ sc, ...p });
-  }
+  // Inherited through the WCAG crosswalk — the pack's ids are two-segment and the protocol
+  // dataset is keyed by success criterion. Shared with the adjudication brief so the page a
+  // reader looks up and the brief a model rules from cannot state different rules.
+  const adjudication: AdjudicationView[] = adjudicationForWcagRefs(c.wcag, lang);
   return {
     kind: "pack",
     id: c.id,
@@ -206,7 +211,11 @@ function packCriterionView(pack: StandardPack, c: PackCriterion, lang: Lang, inc
     // The markup is kept, not stripped: `[terme](#ancre)` is what points at the normative
     // glossary definitions attached below.
     ...(raw && raw !== plain ? { titleRaw: raw } : {}),
-    tests: Object.entries(c.tests ?? {}).map(([k, lines]) => ({ id: `${c.id}.${k}`, lines })),
+    tests: Object.entries(c.tests ?? {}).map(([k, lines]) => ({
+      id: `${c.id}.${k}`,
+      lines,
+      ...(c.methodology?.[k] ? { methodology: c.methodology[k] } : {}),
+    })),
     techniques: c.techniques ?? [],
     wcag: c.wcag.map((sc) => {
       const core = getSC(sc);
@@ -222,6 +231,7 @@ function packCriterionView(pack: StandardPack, c: PackCriterion, lang: Lang, inc
     appliesTo: c.appliesTo?.ruleIds ?? [],
     coverage: criterionCoverage(pack.key, c.id)!,
     glossary: glossaryViews(pack, c),
+    ...(criterionUrl(pack, c.id) ? { officialUrl: criterionUrl(pack, c.id)! } : {}),
     adjudication,
     guidance: includeGuidance ? resolveGuidance(pack.key, c.id).map((r) => guidanceView(r, lang)) : [],
   };

@@ -61,6 +61,11 @@ criteria the engine cannot decide):
 
 The same protocol is published as a standalone page, `references/adjudication.md`, generated
 from that dataset — read it when you want the whole picture rather than one worklist item.
+
+**It is keyed by WCAG success criterion, and under a country standard it is not the
+instrument.** A pack criterion has its own — see the next section. It is inherited through the
+crosswalk only by a pack criterion that carries none, and the brief says so when that happens:
+an SC routinely asks a broader question than the criterion mapped onto it.
 They are prompts, not verdicts: you still answer from the evidence and record
 `C`/`NC`/`NA`/`manual` (+ a recommendation where a good practice has no failing normative
 test).
@@ -79,7 +84,7 @@ test).
 |---|---|
 | `ADJUDICATE.todo.json` · `ADJUDICATE.md` | a session **with a shell**: evidence inline, edit in place, fold yourself |
 | `ADJUDICATE.verdicts.json` | the **only file to write** when you have no shell — verdicts, no evidence |
-| `adjudicate/<criteriaId>.md` | one small brief per criterion: its evidence, its protocol, its citable tests |
+| `adjudicate/<criteriaId>.md` | one small brief per criterion: its evidence, the criterion's own wording and tests (with the standard's test methodology), its glossary terms and its citable tests |
 
 Why the split exists, measured rather than assumed: under RGAA the worklist is 96 criteria
 carrying 1590 harvested anchors — **536 KB** of JSON and **466 KB** of Markdown. An agent given
@@ -122,6 +127,10 @@ ever derive `manual`. Each item carries, inline:
 
 - the criterion's **numbered tests, in full** (`11.2.1` … `11.2.6`) — what actually has to be
   ruled on;
+- under each test, the standard's **official test methodology** — the procedure it publishes
+  for that test, step by step (RGAA documents all 258 of its tests). The test states WHAT is
+  required; this states HOW it is verified, in the referential's own words. This is the
+  decision rule under a pack, and it is why the WCAG protocol above is not borrowed here;
 - its **technical note** and **particular cases**;
 - its **implementation guidance** (before/after), previously reserved for criteria that
   already had a finding;
@@ -136,6 +145,17 @@ the acceptable references per item, and anything else is rejected.
 Verdicts fold into `packAdjudication`, not onto the WCAG criteria: a pack decision must not
 rewrite the core verdict, and since WCAG 1.1.1 alone fans out to 19 RGAA criteria, folding by
 success criterion would let those criteria overwrite one another.
+
+Each brief also cites the **official page** for its criterion
+(`https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#11.2` for RGAA; the W3C
+Understanding page for the WCAG core). The URL is always printed — it says where the vendored
+text came from. Whether the brief also *invites* you to go read it depends on the harness:
+`verify --manual` offers it by default and suppresses it under CI, where the adjudicator holds
+Read/Grep/Glob/Edit/Write and no network (`--web` / `--no-web` override either way).
+
+**A web lookup can only lift an ambiguity of wording.** The vendored text is the normative
+one and it is what decides; a page you fetched never contradicts it, never widens a test, and
+is never an acceptable `normativeRef` — only the references the brief lists are.
 
 Look a defined term up on its own with `criteria --standard rgaa --glossary <term>`.
 

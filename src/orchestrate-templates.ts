@@ -223,12 +223,12 @@ There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one
 
 ## Which files — your prompt decides, and it wins over this document
 
-- **With a shell.** Read \`${join(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join(runAbs, "ADJUDICATE.todo.json")} --in ${join(runAbs, "audit-latest.json")} --out ${runAbs}\`.
+- **With a shell.** Read \`${join(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join(runAbs, "ADJUDICATE.todo.json")} --in ${join(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it — never to contradict the vendored text, and a web page is never a \`normativeRef\`.
 - **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` — they run to hundreds of kilobytes and will swamp your context. Read \`${join(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join(runAbs, "ADJUDICATE.verdicts.json")}\` — the ONLY file you write. Someone else folds; you never run the engine.
 
 ## For EACH criterion
 
-1. Read its brief. \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) — open the cited files at the cited lines whenever the snippet alone cannot decide. Copy the \`snippet\` from the brief rather than retyping it.
+1. Read its brief in full — it carries BOTH halves of the decision: the criterion's official wording with its numbered tests, the standard's own test methodology, the technical note, the particular cases and the glossary terms; and \`evidence[]\`, source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`). Open the cited files at the cited lines whenever the snippet alone cannot decide, and copy the \`snippet\` from the brief rather than retyping it.
 ${VERDICT_RULES}
 
 Every item comes back with a verdict. Each one stands or falls on its own: a refusal costs THAT criterion and leaves every other verdict standing — so work through the list steadily, and never guess to fill a gap.
@@ -272,10 +272,11 @@ Worklist: \`${join(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: "a
 
 For EACH of your criteria:
 
-1. Read its worklist entry. \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) harvested from the audited code — open the cited files at the cited lines whenever the snippet alone cannot decide.
+1. Read its worklist entry for the EVIDENCE: \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) harvested from the audited code — open the cited files at the cited lines whenever the snippet alone cannot decide.
+1b. Read \`${join(runAbs, "adjudicate")}/<criteriaId>.md\` for the CRITERION ITSELF — its official wording, its numbered tests with the standard's own test methodology, the technical note, the particular cases and the glossary terms the tests are defined in terms of. The worklist JSON carries none of that: it holds the evidence and the slots your verdict goes into, and ruling on a country standard from the criterion's title alone is how a verdict ends up citing a test it never read. That brief also cites the standard's official page for the criterion: if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it — never to contradict the vendored text, and a web page is never a \`normativeRef\`.
 2. Rule it (the apply gate is FAIL-CLOSED — a verdict missing its required field does not fold):
    - \`C\` (conforming) — REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this item's own \`evidence[]\`; an anchor that is not in that list is treated as fabricated). A criterion whose \`evidence[]\` is empty cannot be \`C\` at all — it is \`manual\` (\`undecidable\`), or \`NA\` if nothing in scope is concerned.
-   - \`NC\` (non-conforming) — REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test — under a country standard, one of the item's OWN tests, which the worklist lists for you under « tests to rule on ».
+   - \`NC\` (non-conforming) — REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test — under a country standard, one of the item's OWN tests, which its brief lists for you under « tests to rule on ». A WCAG id looks alike, denotes an unrelated test, and is rejected.
    - \`NA\` (not applicable) — REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
    - \`manual\` (still undecidable) — REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide, e.g. computed contrast) or \`undecidable\` (the evidence cannot settle it either way).
 3. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with a reason — that is a valid, honest verdict; the scan tier or a human picks it up.

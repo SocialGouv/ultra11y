@@ -492,6 +492,12 @@ Options:
                      verdict content-level against the cited source
   --manual           verify: with --in <audit.json>, emit an adjudication worklist over the
                      audit's residual (judgment / needs-rendering) criteria for the agent to rule
+  --web / --no-web   verify --manual: whether each brief may INVITE a lookup of the
+                     criterion's official page (the URL itself is always printed).
+                     Default: on, except under CI — where the adjudicator holds
+                     Read/Grep/Glob/Edit/Write and offering a web tool only costs turns.
+                     The vendored normative text always decides, and no web page is ever
+                     an acceptable normativeRef
   --lang auto|en|fr  output language                (default: auto — conversation/repo
                      language: an AI caller should pass --lang explicitly to match the
                      chat; unset resolves repo <html lang> → standard's default locale → en)
@@ -661,6 +667,10 @@ const BOOLEAN_FLAGS = new Set([
   // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
   // verdict discards the whole adjudication. The default is per-verdict.
   "strict",
+  // `verify --manual`: whether the brief may invite a web lookup of the criterion's official
+  // page. Default: on outside CI, off under it — see `webAllowed`.
+  "web",
+  "no-web",
   "no-technical",
   "override",
   "local",
@@ -794,6 +804,22 @@ function readInputFile(path: string, cmd: string, flag: string): string | null {
 }
 
 /** Resolve `--standard`; prints the error and returns null on an unknown standard. */
+/** Whether an adjudication brief may invite a web lookup of the criterion's official page.
+ *
+ *  `--web` and `--no-web` are both explicit and win in either direction. With neither, the
+ *  answer is read off the environment: CI runners set `CI`, and there the adjudicator is
+ *  handed Read/Grep/Glob/Edit/Write and no network — telling it to consult a page it cannot
+ *  fetch buys nothing and spends turns it needs elsewhere. Everywhere else — a coding agent,
+ *  a local session — a web tool is usually there, so the offer is worth making.
+ *
+ *  Note this only ever gates ONE SENTENCE. The criterion's URL is printed either way: it
+ *  says where the vendored normative text came from, which is a fact and not an instruction. */
+function webAllowed(flags: Record<string, string | boolean>): boolean {
+  if (flags["no-web"] === true) return false;
+  if (flags.web === true) return true;
+  return !process.env.CI;
+}
+
 function stdOf(p: ParsedArgs, cmd: string): StandardId | null {
   try {
     return resolveStandard(p.flags.standard);
@@ -2829,6 +2855,12 @@ function cmdVerify(p: ParsedArgs): number {
       return 2;
     }
     const adjItems = buildAdjudicationWorklist(audit, { standard });
+    // MAY THIS BRIEF INVITE A WEB LOOKUP? The criterion's official URL is printed either
+    // way — it is a fact about where the vendored text came from. The sentence telling an
+    // adjudicator it may go read it is an instruction, and it is only true where a web tool
+    // exists. In CI the adjudicator has Read/Grep/Glob/Edit/Write, so the default follows
+    // the environment and `--web` / `--no-web` overrides it either direction.
+    const web = webAllowed(p.flags);
     // NOTHING WAS RENDERED, AND THE WORKLIST IS ABOUT TO PRETEND OTHERWISE.
     //
     // Said here, before a model is handed anything, because this is the last moment it costs
@@ -2837,7 +2869,7 @@ function cmdVerify(p: ParsedArgs): number {
     // warning, not a refusal: a source-only audit is a legitimate thing to want, and the gate
     // for those who want it to fail is `check --require-rendered`.
     const unrendered = unrenderedResidual(audit, adjItems);
-    const w = writeAdjudication(adjItems, out, { standard, auditDate: audit.date, lang, unrendered });
+    const w = writeAdjudication(adjItems, out, { standard, auditDate: audit.date, lang, unrendered, web });
     if (unrendered.length) {
       const ids = unrendered.join(" · ");
       console.error(
@@ -2853,11 +2885,28 @@ function cmdVerify(p: ParsedArgs): number {
           : `ultra11y verify: no evidence could be harvested (${audit.scope.inputs.join(", ")} not found?) — run --manual from the audit's directory.`,
       );
     }
-    if (p.flags.json) console.log(JSON.stringify({ mdPath: w.mdPath, todoPath: w.todoPath, count: w.count, items: adjItems }, null, 2));
+    if (p.flags.json)
+      console.log(
+        JSON.stringify(
+          { mdPath: w.mdPath, todoPath: w.todoPath, itemsDir: w.itemsDir, verdictsPath: w.verdictsPath, count: w.count, items: adjItems },
+          null,
+          2,
+        ),
+      );
     else
       console.log(
         lang === "fr" ? `${w.count} critère(s) à adjuger → ${w.mdPath}, ${w.todoPath}` : `${w.count} criterion(ia) to adjudicate → ${w.mdPath}, ${w.todoPath}`,
       );
+    // NAME THE FILE THAT CARRIES THE CRITERION. The two documents above hold the evidence and
+    // the slots a verdict goes into; the criterion's own wording — its numbered tests, the
+    // standard's test methodology, its glossary terms — lives in the per-criterion briefs, and
+    // outside CI nothing ever said so. Ruling on a criterion from the name in a JSON item is
+    // ruling from memory, which is the one thing this whole pipeline exists to prevent.
+    console.error(
+      lang === "fr"
+        ? `  Le texte de chaque critère (tests numérotés, méthodologie de test du référentiel, glossaire) est dans ${w.itemsDir}/<critère>.md — lisez-le avant de trancher.`
+        : `  Each criterion's own text (numbered tests, the standard's test methodology, glossary) is in ${w.itemsDir}/<criterion>.md — read it before ruling.`,
+    );
     return 0;
   }
 

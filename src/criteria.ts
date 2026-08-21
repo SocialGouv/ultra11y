@@ -12,6 +12,7 @@ import {
   listPacks,
   packsForSc,
   packGlossary,
+  criterionUrl,
   getCriterion as getPackCriterion,
   listTheme as listPackTheme,
   titlePlain as packTitlePlain,
@@ -76,10 +77,25 @@ export function formatPackCriterion(pack: StandardPack, c: PackCriterion, lang: 
   const testKeys = Object.keys(c.tests ?? {});
   if (testKeys.length) {
     out.push(`${lang === "fr" ? "Tests" : "Tests"} :`);
-    for (const k of testKeys) for (const line of c.tests![k]!) out.push(`  ${c.id}.${k} ${line.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1")}`);
+    for (const k of testKeys) {
+      for (const line of c.tests![k]!) out.push(`  ${c.id}.${k} ${line.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1")}`);
+      // "What does criterion X mean" is answered as much by HOW it is tested as by what it
+      // asks. The standard publishes both; only the question used to reach this lookup.
+      const method = c.methodology?.[k];
+      if (method?.trim()) {
+        out.push(
+          `    ${lang === "fr" ? "Méthodologie" : "Methodology"} : ${method
+            .replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1")
+            .replace(/\s+/g, " ")
+            .trim()}`,
+        );
+      }
+    }
   }
   if (c.technicalNote?.length) out.push(`${lang === "fr" ? "Note technique" : "Technical note"} : ${c.technicalNote.join(" ")}`);
   if (c.particularCases?.length) out.push(`${lang === "fr" ? "Cas particuliers" : "Particular cases"} : ${c.particularCases.join(" ")}`);
+  const url = criterionUrl(pack, c.id);
+  if (url) out.push(`${lang === "fr" ? "Texte officiel" : "Official text"} : ${url}`);
   return out.join("\n");
 }
 

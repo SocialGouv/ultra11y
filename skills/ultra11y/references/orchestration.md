@@ -5,6 +5,11 @@ residual criterion, `VERIFY.todo.json` one per detected non-conformity. Neither 
 cross-item dependencies, so both fan out cleanly across subagents — and both work exactly as
 well done sequentially. This is a wall-clock optimization, never a correctness requirement.
 
+An adjudicating subagent needs **both** files: `ADJUDICATE.todo.json` for the evidence and the
+slots its verdict goes into, and `adjudicate/<criteriaId>.md` for the criterion itself — its
+official wording, its numbered tests and, under a country standard, that standard's own test
+methodology. The JSON carries none of the normative text, and the emitted contracts say so.
+
 `orchestrate` emits the orchestration from the worklists that CURRENTLY exist, with absolute
 paths and the real item ids baked in:
 

@@ -20,8 +20,8 @@ import { attachSignals, snapshotPageId } from "./snapshot.js";
 import { loadConfig } from "./config.js";
 import { type Harvested, harvestSubjects, isSnapshotFile, PACK_SUBJECTS, pageOfDoc, SC_SUBJECTS } from "./adjudicate-subjects.js";
 import type { Doc } from "./parse/html.js";
-import { ADJUDICATION } from "./adjudication-data.js";
-import { scTitle, getSC, hasSC, techniquesFor, allSC, guidelineTitle } from "./wcag.js";
+import { ADJUDICATION, adjudicationForWcagRefs } from "./adjudication-data.js";
+import { scTitle, getSC, hasSC, techniquesFor, allSC, guidelineTitle, understanding } from "./wcag.js";
 import { groundFinding, type GroundingSummary } from "./grounding.js";
 import {
   type StandardId,
@@ -31,6 +31,7 @@ import {
   hasId,
   getCriterion,
   derivePackResults,
+  criterionUrl,
   glossaryAnchorsOf,
   resolveGlossary,
   titlePlain as packTitlePlain,
@@ -1278,9 +1279,16 @@ const T = {
     decide: "Règle de décision",
     na: "Non applicable si",
     refs: "Références normatives mobilisables (techniques/échecs W3C de ce critère)",
+    packRefs: (name: string) => `Références normatives mobilisables (les tests ${name} de ce critère, et eux seuls)`,
     packIntro: (name: string) =>
       `Référentiel actif : **${name}**. Les items ci-dessous sont des critères ${name}, pas des critères de succès WCAG. Un \`normativeRef\` DOIT citer un test du critère de l'item (par ex. \`11.2.1\`) — un id WCAG y ressemble mais désigne un tout autre test et sera rejeté.`,
     packTests: (name: string, id: string) => `Tests ${name} ${id} à trancher`,
+    methodology: "Méthodologie de test officielle",
+    inheritedDecide: (sc: string) =>
+      `Règle de décision (héritée du critère de succès WCAG ${sc}, qui pose une question plus large — le texte du référentiel prime)`,
+    officialSource: (name: string, id: string) => `Texte officiel du critère ${name} ${id}`,
+    webLookup:
+      "Le texte ci-dessus est celui du référentiel : c'est LUI qui tranche. Si une formulation reste ambiguë et que vous disposez d'un outil web, vous POUVEZ consulter la page officielle ci-dessus pour la lever — jamais pour la contredire, jamais pour élargir un test, et une page web n'est jamais un `normativeRef` : seules les références normatives listées ci-dessous en sont.",
     technicalNote: "Note technique",
     particularCases: "Cas particuliers",
     glossary: "Termes définis par le référentiel",
@@ -1317,9 +1325,16 @@ const T = {
     decide: "Decision rule",
     na: "Not applicable when",
     refs: "Normative references you may cite (this criterion's W3C techniques/failures)",
+    packRefs: (name: string) => `Normative references you may cite (this criterion's own ${name} tests, and nothing else)`,
     packIntro: (name: string) =>
       `Active standard: **${name}**. The items below are ${name} criteria, not WCAG success criteria. A \`normativeRef\` MUST cite a test OF THE ITEM'S CRITERION (e.g. \`11.2.1\`) — a WCAG id looks alike but denotes an unrelated test and will be rejected.`,
     packTests: (name: string, id: string) => `${name} ${id} tests to rule on`,
+    methodology: "Official test methodology",
+    inheritedDecide: (sc: string) =>
+      `Decision rule (inherited from WCAG success criterion ${sc}, which asks a broader question — the standard's own text prevails)`,
+    officialSource: (name: string, id: string) => `Official text of ${name} criterion ${id}`,
+    webLookup:
+      "The text above is the standard's own, and it is what decides. If a wording stays ambiguous and you have a web tool, you MAY consult the official page above to settle it — never to contradict it, never to widen a test, and a web page is never a `normativeRef`: only the normative references listed below are.",
     technicalNote: "Technical note",
     particularCases: "Particular cases",
     glossary: "Terms the standard defines",
@@ -1392,6 +1407,13 @@ export function renderAdjudicationReference(lang: Lang = "en"): string {
 const MAX_GLOSSARY_TERMS = 8;
 const MAX_GLOSSARY_CHARS = 600;
 
+/** Characters of an official test methodology the brief prints. RGAA documents all 258 of
+ *  its tests and the procedures run 200-900 characters each, so a criterion with eight tests
+ *  can carry several kilobytes — read by a model that pays for its context, and batched eight
+ *  criteria at a time by `judge`. Generous enough that a whole procedure normally fits, hard
+ *  enough that one long one cannot swamp the evidence it is there to help read. */
+const MAX_METHODOLOGY_CHARS = 900;
+
 // `glossaryAnchorsOf` now lives in src/standards/pack.ts, next to the glossary it reads —
 // the criteria lookup and the MCP reference tools need it too, and none of them should
 // have to import the adjudication engine to get at a pure function over a criterion.
@@ -1413,6 +1435,25 @@ function glossaryBlock(pack: StandardPack, crit: PackCriterion | undefined, lang
   }
   out.push("");
   return any ? out : [];
+}
+
+/** WHERE THE CRITERION IS PUBLISHED, and what a web lookup is allowed to do with it.
+ *
+ *  The URL is a FACT and is always rendered: it names the page the vendored text was derived
+ *  from, which is as useful to a human reviewing a brief as to a model. The invitation to go
+ *  read it is not a fact but an instruction, and it is only true where a web tool exists —
+ *  in CI the adjudicator holds Read/Grep/Glob/Edit/Write and nothing else, and proposing a
+ *  tool it cannot call costs turns it needs for the 96 criteria in front of it. So the
+ *  sentence is gated on `web` and the caller decides (see `--web` / `--no-web`).
+ *
+ *  What the sentence says matters as much as when it appears: the vendored text decides, a
+ *  lookup may only lift an ambiguity, and no web page is ever a `normativeRef` — the gate
+ *  would refuse one anyway, and this is where the refusal is explained rather than met. */
+function sourceBlock(s: (typeof T)[Lang], name: string, id: string, url: string | undefined, web: boolean): string[] {
+  if (!url) return [];
+  const out = [`> **${s.officialSource(name, id)}** — ${url}`, ""];
+  if (web) out.push(`> ${s.webLookup}`, "");
+  return out;
 }
 
 /** The pack's own implementation guidance for this criterion (before/after examples). Used by
@@ -1446,7 +1487,7 @@ export function formatAdjudication(
   items: AdjudicationItem[],
   lang: Lang = "en",
   standard: StandardId = CORE,
-  opts: { preamble?: boolean; cwd?: string; unrendered?: string[] } = {},
+  opts: { preamble?: boolean; cwd?: string; unrendered?: string[]; web?: boolean } = {},
 ): string {
   const s = T[lang];
   // Display only — the gate always reads the complete sibling set.
@@ -1539,14 +1580,43 @@ export function formatAdjudication(
       }
       out.push("");
     }
-    const protocol = ADJUDICATION[it.criteriaId];
-    if (protocol) {
-      out.push(`> **${s.decide}** — ${protocol.decide[lang]}`, "");
-      if (protocol.na) out.push(`> **${s.na}** — ${protocol.na[lang]}`, "");
-      if (protocol.questions.length) {
-        out.push(`> ${s.questions}:`, "");
-        for (const q of protocol.questions) out.push(`- ${q[lang]}`);
-        out.push("");
+    const crit = pack ? getCriterion(pack, it.criteriaId) : undefined;
+    // THE DECISION RULE — the standard's own first, WCAG's only as a labelled fallback.
+    //
+    // `ADJUDICATION` is keyed by WCAG success criterion: 52 keys, all three-segment. A pack
+    // criterion id has two, so this lookup could only ever miss under `--standard rgaa` —
+    // and it did, on every one of the 96 criteria an RGAA audit hands over. The brief shipped
+    // the numbered tests and no instrument for reading them.
+    //
+    // Under a pack the instrument is the standard's OWN méthodologie de test, rendered under
+    // each test below: it says how THAT test is verified, in the referential's words. Only a
+    // criterion that carries none falls back on the mapped SCs' protocols — and then it is
+    // announced as inherited, because an SC routinely asks a broader question than the
+    // criterion mapped onto it (RGAA 8.6 asks whether the page title is *relevant*; WCAG
+    // 2.4.2 only that one exists). Same discipline as `resolveGuidance`, which never lets an
+    // inherited example pass for the national standard's own doctrine.
+    if (pack) {
+      if (!crit?.methodology || Object.keys(crit.methodology).length === 0) {
+        for (const p of adjudicationForWcagRefs(crit?.wcag ?? [], lang)) {
+          out.push(`> **${s.inheritedDecide(p.sc)}** — ${p.decide}`, "");
+          if (p.na) out.push(`> **${s.na}** — ${p.na}`, "");
+          if (p.questions.length) {
+            out.push(`> ${s.questions}:`, "");
+            for (const q of p.questions) out.push(`- ${q}`);
+            out.push("");
+          }
+        }
+      }
+    } else {
+      const protocol = ADJUDICATION[it.criteriaId];
+      if (protocol) {
+        out.push(`> **${s.decide}** — ${protocol.decide[lang]}`, "");
+        if (protocol.na) out.push(`> **${s.na}** — ${protocol.na[lang]}`, "");
+        if (protocol.questions.length) {
+          out.push(`> ${s.questions}:`, "");
+          for (const q of protocol.questions) out.push(`- ${q[lang]}`);
+          out.push("");
+        }
       }
     }
     // The references a NC on this criterion may legitimately cite. `verify --apply` rejects
@@ -1554,7 +1624,6 @@ export function formatAdjudication(
     // accepts — under a pack that is the criterion's own numbered tests, never a W3C
     // technique code (which the pack gate has always refused).
     if (pack) {
-      const crit = getCriterion(pack, it.criteriaId);
       const tests = crit?.tests ?? {};
       const keys = Object.keys(tests);
       if (keys.length) {
@@ -1566,6 +1635,17 @@ export function formatAdjudication(
           // repeating the id and reading like N separate tests.
           out.push(`- \`${it.criteriaId}.${k}\` ${plainTest(lines[0] ?? "")}`);
           for (const line of lines.slice(1)) out.push(`  - ${plainTest(line)}`);
+          // AND HOW THAT TEST IS ACTUALLY RUN, in the standard's own words. The test states
+          // what is required; this states the procedure — find these elements, check this of
+          // each, and the test passes iff. It is the instrument a country-standard criterion
+          // used to lack entirely, and it belongs under its own test rather than in a block
+          // of its own: eight procedures listed apart from the eight tests they belong to is
+          // a matching exercise nobody should have to do while ruling.
+          const method = crit?.methodology?.[k];
+          if (method?.trim()) {
+            const flat = plainTest(method).replace(/\s+/g, " ").trim();
+            out.push(`  - _${s.methodology}_ : ${flat.length > MAX_METHODOLOGY_CHARS ? `${flat.slice(0, MAX_METHODOLOGY_CHARS)}…` : flat}`);
+          }
         }
         out.push("");
       }
@@ -1573,8 +1653,13 @@ export function formatAdjudication(
       if (crit?.particularCases?.length) out.push(`> **${s.particularCases}** — ${crit.particularCases.map(plainTest).join(" ")}`, "");
       out.push(...glossaryBlock(pack, crit, lang));
       out.push(...packGuidanceBlock(standard, it.criteriaId, lang));
-      if (keys.length) out.push(`> ${s.refs}: ${keys.map((k) => `\`${it.criteriaId}.${k}\``).join(", ")}`, "");
+      out.push(...sourceBlock(s, pack.name, it.criteriaId, criterionUrl(pack, it.criteriaId), opts.web === true));
+      // Labelled for the standard in play. The core's wording names W3C techniques, which is
+      // exactly what the pack gate refuses — printing it over a list of RGAA test ids told
+      // the adjudicator the ids were something they are not.
+      if (keys.length) out.push(`> ${s.packRefs(pack.name)}: ${keys.map((k) => `\`${it.criteriaId}.${k}\``).join(", ")}`, "");
     } else {
+      out.push(...sourceBlock(s, "WCAG", it.criteriaId, understanding(it.criteriaId), opts.web === true));
       const refs = techniquesFor(it.criteriaId);
       if (refs.length) {
         out.push(`> ${s.refs}: ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` … (\`criteria ${it.criteriaId}\`)` : ""}`, "");
@@ -1597,7 +1682,7 @@ export interface WriteAdjudicationResult {
 export function writeAdjudication(
   items: AdjudicationItem[],
   outDir: string,
-  opts: { standard: StandardId; auditDate: string; lang?: Lang; unrendered?: string[] },
+  opts: { standard: StandardId; auditDate: string; lang?: Lang; unrendered?: string[]; web?: boolean },
 ): WriteAdjudicationResult {
   mkdirSync(outDir, { recursive: true });
   const todoPath = join(outDir, "ADJUDICATE.todo.json");
@@ -1612,7 +1697,13 @@ export function writeAdjudication(
     items,
   };
   writeFileSync(todoPath, JSON.stringify(file, null, 2) + "\n");
-  writeFileSync(mdPath, formatAdjudication(items, opts.lang ?? "en", opts.standard, { ...(opts.unrendered?.length ? { unrendered: opts.unrendered } : {}) }));
+  writeFileSync(
+    mdPath,
+    formatAdjudication(items, opts.lang ?? "en", opts.standard, {
+      ...(opts.unrendered?.length ? { unrendered: opts.unrendered } : {}),
+      ...(opts.web ? { web: true } : {}),
+    }),
+  );
 
   // THE SPLIT SURFACE, for an adjudicator that cannot shell out.
   //
@@ -1642,7 +1733,11 @@ export function writeAdjudication(
     const mine = unrendered.has(it.criteriaId) ? [it.criteriaId] : [];
     writeFileSync(
       join(itemsDir, `${it.criteriaId}.md`),
-      formatAdjudication([it], opts.lang ?? "en", opts.standard, { preamble: false, ...(mine.length ? { unrendered: mine } : {}) }),
+      formatAdjudication([it], opts.lang ?? "en", opts.standard, {
+        preamble: false,
+        ...(mine.length ? { unrendered: mine } : {}),
+        ...(opts.web ? { web: true } : {}),
+      }),
     );
   }
   return { todoPath, mdPath, verdictsPath, itemsDir, count: items.length };

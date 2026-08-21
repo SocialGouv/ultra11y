@@ -359,6 +359,15 @@ drive the judgment and content stages:
    `references/focus-and-logic.md`) and the per-rule traps in `references/false-positives.md`.
    Both worklists fan out (`orchestrate --run <dir> --phase adjudicate|verify-report` —
    see **Orchestration — route by harness**); the `--apply` fold always stays with you.
+   **Rule each criterion against its OWN text, not your memory of it.** `verify --manual` also
+   writes one small brief per criterion (`adjudicate/<criteriaId>.md`) carrying the criterion's
+   official wording, its numbered tests and — under a country standard — that standard's own
+   **test methodology** (RGAA publishes one for all 258 of its tests), plus its glossary terms,
+   technical note and particular cases. Read that brief; under `--standard rgaa` it is RGAA
+   that decides, never the WCAG success criterion behind it. Each brief also cites the
+   criterion's official page: if a wording stays ambiguous and you have a web tool you may go
+   read it — never to contradict the vendored text, and a web page is never an acceptable
+   `normativeRef` (`--no-web` drops the offer; CI drops it by default).
 3. **Fix** by priority: `fix --write --iterate` for the mechanical part (anti-regression
    gate), then hand-apply the judgment/content fixes (alt, labels, structure) guided by
    `references/correction.md`.

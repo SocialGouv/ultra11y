@@ -6,7 +6,8 @@
 // of its criteria onto WCAG success criteria (bare SC ids). The WCAG↔rule coverage
 // lives in the core (scripts/build-standards.mjs). The RGAA content is Licence
 // Ouverte / Etalab 2.0 — see NOTICE. The official source is vendored under
-// scripts/vendor/rgaa/ so the build is reproducible offline.
+// scripts/vendor/rgaa/ (criteres.json, glossaire.json, methodologies.json) so the
+// build is reproducible offline.
 //   node scripts/build-pack-rgaa.mjs            # build from the vendored source
 //   node scripts/build-pack-rgaa.mjs --offline  # alias (the source is always local)
 //   node scripts/build-pack-rgaa.mjs --fetch     # refresh the vendored source from DINUM, then build
@@ -75,6 +76,22 @@ const flattenNode = (v) => {
   return [];
 };
 const toArr = (v) => flattenNode(v);
+
+// The official méthodologie de test for one criterion, keyed by the criterion's OWN test
+// numbers so it renders directly under the test it explains: `{ "1": "1. Retrouver…", … }`.
+// DINUM's file is flat and keyed by full test id ("11.2.1"), so this is the re-key.
+//
+// Returns undefined when the criterion has none, and the field is then absent from the pack
+// rather than present-and-empty: `methodology` is optional on PackCriterion, and an empty
+// object would make every consumer test for two shapes instead of one.
+function methodologyOf(methodologies, id, tests) {
+  const out = {};
+  for (const k of Object.keys(tests || {})) {
+    const text = methodologies[`${id}.${k}`];
+    if (typeof text === "string" && text.trim()) out[k] = text.trim();
+  }
+  return Object.keys(out).length ? { methodology: out } : undefined;
+}
 
 // crude HTML -> plaintext for glossary bodies
 const deHtml = (s) =>
@@ -245,6 +262,12 @@ const RULE_TO_CRITERIA = {
 async function main() {
   const criteres = await source("criteres.json");
   const glossaire = await source("glossaire.json");
+  // THE OFFICIAL TEST METHODOLOGY — the third file DINUM publishes beside the other two,
+  // keyed by TEST id ("11.2.1"), and the one thing an adjudicator was never given. The
+  // criterion's wording says WHAT is required; this says HOW it is tested, step by step, in
+  // the referential's own words. Vendored like the rest so it reaches CI, an offline run and
+  // a model prompt without a network call — see `methodology` in src/standards/types.ts.
+  const methodologies = await source("methodologies.json");
 
   const glossary = {};
   for (const e of glossaire.glossary) glossary[slug(e.title)] = { title: e.title, body: deHtml(e.body) };
@@ -267,6 +290,7 @@ async function main() {
         title: { fr: criterium.title },
         titlePlain: { fr: plain(criterium.title) },
         tests: criterium.tests || {},
+        ...(methodologyOf(methodologies, id, criterium.tests) ?? {}),
         techniques: [...techniques],
         ...(criterium.technicalNote ? { technicalNote: toArr(criterium.technicalNote) } : {}),
         ...(criterium.particularCases ? { particularCases: toArr(criterium.particularCases) } : {}),
@@ -462,6 +486,9 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
     source: "https://github.com/DISIC/accessibilite.numerique.gouv.fr",
     attribution: "RGAA 4.1.2 © DINUM (Direction interministérielle du numérique) — Licence Ouverte / Etalab 2.0",
     idPattern: "^\\d+\\.\\d+$",
+    // Where DINUM publishes each criterion. Cited by the adjudication brief so a reader can
+    // reach the normative page — the vendored text above stays the authority either way.
+    criterionUrl: "https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#{id}",
     // Auditor-display vocabulary (FR): the nouns an RGAA auditor reads. Rendered by the
     // `prd` auditor block + GitHub issues; see src/standards/vocabulary.ts.
     vocabulary: {
@@ -572,9 +599,22 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
     throw new Error(`build-pack-rgaa: ${stringified.length} normative text(s) stringified to "[object Object]" — extend flattenNode: ${stringified.join(", ")}`);
   }
 
+  // THE METHODOLOGY TABLE MUST NOT GO STALE EITHER. A methodology whose test id does not
+  // exist in the referential is a curation mistake upstream OR a re-key bug here, and it
+  // would ship as dead weight in every bundle. A test with no methodology is legitimate
+  // (DINUM does not document every one), so that is counted, not refused.
+  const testIds = new Set();
+  for (const c of criteria) for (const k of Object.keys(c.tests ?? {})) testIds.add(`${c.id}.${k}`);
+  const orphans = Object.keys(methodologies).filter((k) => !testIds.has(k));
+  if (orphans.length) {
+    throw new Error(`build-pack-rgaa: ${orphans.length} methodology(ies) name a test the referential does not have: ${orphans.join(", ")}`);
+  }
+  const documented = criteria.reduce((n, c) => n + Object.keys(c.methodology ?? {}).length, 0);
+
   const noWcag = criteria.filter((c) => c.wcag.length === 0).map((c) => c.id);
   console.log(`build-pack-rgaa: ${themes.length} themes, ${criteria.length} criteria → src/data/standards/rgaa.json`);
   console.log(`build-pack-rgaa: glossary ${Object.keys(glossary).length} entries → src/data/standards/rgaa.glossary.json`);
+  console.log(`build-pack-rgaa: official test methodology on ${documented}/${testIds.size} tests`);
   console.log(`build-pack-rgaa: criteria with no WCAG mapping (pack-local): ${noWcag.length ? noWcag.join(", ") : "none"} (${noWcag.length})`);
 }
 
