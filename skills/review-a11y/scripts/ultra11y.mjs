@@ -45436,7 +45436,8 @@ var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set([
   "autocomplete",
   "errors",
   "frames",
-  "downloadDocs"
+  "downloadDocs",
+  "newWindow"
 ]);
 var subjectsForSc = (sc) => SC_SUBJECTS[sc] ?? [];
 function subjectsForPackCriterion(standard, id, scs) {

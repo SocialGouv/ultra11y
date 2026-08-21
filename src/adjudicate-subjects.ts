@@ -1184,6 +1184,29 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
 // about nothing when there is nothing to download. Its recall is not perfect — a document
 // served from an extensionless URL is missed — which is true of every subject here and is why
 // absence is only ever read as « nothing of that kind is in scope », never as conformance.
+//
+// `newWindow` earns its place the same way, and it is worth spelling out because the criterion
+// it closes has a single test. RGAA 13.2.1 asks one thing — « vérifier qu'à l'ouverture du
+// document, aucune nouvelle fenêtre n'est ouverte » — and a browser has exactly three ways to
+// do it: a `target` that leaves this browsing context, a `<meta http-equiv="refresh">`, and a
+// literal `window.open(`. Two are markup and the third survives minification, so a page that
+// FAILS 13.2 cannot harvest nothing. Its recall is imperfect in the same way every subject here
+// is — `open` reached through an alias is missed — which is why the absence still reads only as
+// « nothing of that kind is in scope », never as conformance.
+//
+// Measured on tests/fixtures/realworld, crawled and scanned, engine v5.25.0: 13.2 was one of
+// only two criteria still reaching the adjudicator with `evidenceComplete` and a population of
+// zero. The engine already knew the answer and was billing a model to restate it — on the run
+// this comment was written from, both were ruled NA on the first pass with no gate refusal,
+// which is the definition of a paid turn that decided nothing.
+//
+// THE OTHER ONE, 7.4, STAYS OUT, and the asymmetry is the whole point of the rule above.
+// `contextChange` does not enumerate the ways a browser CAN change context, it enumerates the
+// ways we have seen a script do it — `.submit(`, `location.href`, `router.push`, a handful of
+// handler attributes. A component that navigates through a router the list does not name
+// (`history.push`, a custom `navigate()`, `location.reload()`) fails 7.4 and matches none of
+// them. Its silence is what a failing page looks like, so admitting it would buy a cheap NA at
+// the price of a hidden non-conformity.
 export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   "images",
   "tables",
@@ -1194,6 +1217,7 @@ export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   "errors",
   "frames",
   "downloadDocs",
+  "newWindow",
 ]);
 
 /** The subjects that decide a success criterion. Empty ⇒ the criterion has none declared,
