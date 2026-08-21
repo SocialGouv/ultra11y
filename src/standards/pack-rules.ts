@@ -9,7 +9,7 @@ import type { El, Doc } from "../parse/html.js";
 import { descendants, visibleText, snippet as sourceSnippet } from "../parse/html.js";
 import { isFullDocument, selectorOf } from "../rules/rule.js";
 import type { Finding } from "../types.js";
-import type { StandardPack, PackRule, MatchNode, MatchAttr, MatchText } from "./types.js";
+import type { StandardPack, PackRule, MatchDoc, MatchNode, MatchAttr, MatchText } from "./types.js";
 
 // Mirrors the validator's depth cap (src/standards/validate.ts MAX_MATCH_DEPTH): a
 // registered pack is already validated, so the interpreter never sees over-deep nesting —
@@ -99,6 +99,44 @@ function toFinding(doc: Doc, el: El, rule: PackRule, packKey: string): Finding {
   };
 }
 
+/** The value a document-level signal holds on this doc, or `undefined` when the doc does not
+ *  carry it at all — a source file, or a capture written before the field existed.
+ *
+ *  `undefined` is the load-bearing return. It is NOT the empty string: « the collector looked
+ *  and the page had none » and « nobody ever looked » are different claims, and only the first
+ *  is evidence. Everything downstream — whether the rule fires, and whether it may claim to
+ *  have measured this page — hangs off that distinction. */
+function docSignal(doc: Doc, signal: MatchDoc["signal"]): string | undefined {
+  switch (signal) {
+    case "doctype":
+      return doc.signals?.doctype;
+    default:
+      return undefined;
+  }
+}
+
+/** Did this document-level rule RUN here? Only when the signal it reads is present. Exported
+ *  because the audit fold records it as page coverage (src/audit.ts), and `measuredRescue`
+ *  then reads that coverage to decide whether silence means conformity — so a rule that
+ *  declined must never be credited. */
+export function docRuleRan(doc: Doc, rule: PackRule): boolean {
+  return rule.doc !== undefined && docSignal(doc, rule.doc.signal) !== undefined;
+}
+
+function matchDoc(value: string, d: MatchDoc): boolean {
+  switch (d.op) {
+    // The recorded empty string: the collector looked, and the page declared nothing.
+    case "absent":
+      return value === "";
+    case "matches":
+      return d.value !== undefined && compile(d.value).test(value);
+    case "lacks":
+      return d.value !== undefined && !compile(d.value).test(value);
+    default:
+      return false;
+  }
+}
+
 /** Run every declarative rule of `pack` over `doc`, returning the namespaced findings
  *  (empty when the pack ships no rules). Standard-agnostic: the audit pass runs this for
  *  every registered pack; each pack's findings surface only in ITS OWN projection. */
@@ -108,6 +146,16 @@ export function runPackRules(doc: Doc, pack: StandardPack): Finding[] {
   const out: Finding[] = [];
   const fullDoc = isFullDocument(doc);
   for (const rule of rules) {
+    // A DOCUMENT-level rule: no element to select, so it is asked once and anchors its finding
+    // on the root. It declines outright on a doc that does not carry its signal.
+    if (rule.doc) {
+      const value = docSignal(doc, rule.doc.signal);
+      if (value === undefined) continue;
+      const root = doc.elements[0];
+      if (root && matchDoc(value, rule.doc)) out.push(toFinding(doc, root, rule, pack.key));
+      continue;
+    }
+    if (!rule.match) continue;
     if (rule.match.scope === "page" && !fullDoc) continue;
     for (const el of doc.elements) {
       if (matchNode(el, rule.match, 1)) out.push(toFinding(doc, el, rule, pack.key));

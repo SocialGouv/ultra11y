@@ -30,7 +30,7 @@ import { subjectsAbsent, subjectsForSc, subjectsPresentIn } from "./adjudicate-s
 import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
 import { listPacks } from "./standards/registry.js";
-import { runPackRules } from "./standards/pack-rules.js";
+import { docRuleRan, runPackRules } from "./standards/pack-rules.js";
 import { buildGraphAndDocs } from "./graph/build.js";
 import type { DepGraph } from "./graph/graph.js";
 import { discover } from "./discover.js";
@@ -507,6 +507,19 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
       const seen = acc.renderedRan.get(ruleId) ?? new Set<string>();
       seen.add(pageId);
       acc.renderedRan.set(ruleId, seen);
+    }
+    // A pack's DOCUMENT-level rules are signal-gated exactly like the rendered ones, so they
+    // are credited the same way: on the pages whose capture carried the signal they read, and
+    // on no others. Without this a criterion the pack decides from a doctype would be treated
+    // as measured wherever a DOM was parsed — and cleared on the pages nobody captured.
+    for (const pack of listPacks()) {
+      for (const rule of pack.rules ?? []) {
+        if (!docRuleRan(doc, rule)) continue;
+        const id = `pack:${pack.key}:${rule.id}`;
+        const seen = acc.renderedRan.get(id) ?? new Set<string>();
+        seen.add(pageId);
+        acc.renderedRan.set(id, seen);
+      }
     }
     // What a browser MEASURED on this page, by acting on it. `probed` is what makes the
     // silence meaningful: a criterion with no hit is conforming only where the probe ran.

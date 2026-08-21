@@ -25,6 +25,7 @@
 //      question — "is this instrument part of this run at all?" — and never decides a status.
 import { AXE_DECIDES } from "./axe-map.js";
 import { renderedRulesFor, RENDERED_SIGNAL_RULES } from "./rules/rendered.js";
+import { docSignalRuleIds } from "./standards/registry.js";
 import type { AuditResult, PageCoverage } from "./types.js";
 
 /** Did the rendered tier prove this success criterion, given one coverage record?
@@ -102,10 +103,15 @@ export function coverageFor(audit: AuditResult, pageId?: string): PageCoverage |
  *                 can decline on a page whose digest was incomplete;
  *   • anything else is a static engine rule, and the static set runs in full against every
  *                 document the audit parsed — so reading this page's DOM ran all of them. */
-function ruleRanOn(ruleId: string, cov: PageCoverage, scs: string[]): boolean {
+function ruleRanOn(ruleId: string, cov: PageCoverage, scs: string[], docRules: Set<string>): boolean {
   if (ruleId.startsWith("axe:")) return cov.axe === true;
   if (ruleId.startsWith("dyn-")) return scs.some((sc) => cov.scs?.includes(sc) === true);
   if (RENDERED_SIGNAL_RULES.includes(ruleId)) return cov.rules?.includes(ruleId) === true;
+  // A pack rule over a DOCUMENT-LEVEL signal is gated the same way a rendered rule is: it can
+  // only have run where the capture recorded its signal. Falling through to `cov.dom` would
+  // credit it on every page whose DOM was parsed — including the ones where it declined, which
+  // is precisely where the criterion must stay open.
+  if (docRules.has(ruleId)) return cov.rules?.includes(ruleId) === true;
   return cov.dom === true;
 }
 
@@ -128,7 +134,10 @@ function ruleRanOn(ruleId: string, cov: PageCoverage, scs: string[]): boolean {
 export function criterionMeasuredOn(ruleIds: string[] | undefined, scs: string[], cov: PageCoverage | undefined, ran: PageCoverage | undefined): boolean {
   if (!cov || !ran || !ruleIds?.length) return false;
   if (ruleIds.some((p) => p === "*" || p.endsWith(":*") || p.endsWith("-*"))) return false;
-  const inThisRun = ruleIds.filter((id) => ruleRanOn(id, ran, scs));
+  // Resolved once per criterion rather than once per (rule, page): this is asked tens of
+  // thousands of times on a full sweep, and the registry does not change inside the fold.
+  const docRules = docSignalRuleIds();
+  const inThisRun = ruleIds.filter((id) => ruleRanOn(id, ran, scs, docRules));
   if (!inThisRun.length) return false;
-  return inThisRun.every((id) => ruleRanOn(id, cov, scs));
+  return inThisRun.every((id) => ruleRanOn(id, cov, scs, docRules));
 }

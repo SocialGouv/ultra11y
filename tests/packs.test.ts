@@ -167,16 +167,77 @@ describe("derivePackResults (WCAG → pack projection)", () => {
     expect(na?.status).toBe(INAPPLICABLE_STATUS);
   });
 
+  // A pack whose single criterion maps ONLY onto the removed WCAG 4.1.1 — the engine has no
+  // core SC to project a verdict from. `withRule` decides whether the pack also brings its own
+  // instrument for it, which is the entire difference between the two cases below.
+  function orphanPack(key: string, withRule: boolean) {
+    return {
+      key,
+      name: "Orphan",
+      org: "O",
+      country: "US",
+      baseVersion: "1",
+      wcagVersion: "2.2",
+      locales: ["en"],
+      defaultLocale: "en",
+      license: "x",
+      source: "x",
+      attribution: "x",
+      idPattern: "^\\d+\\.\\d+$",
+      ...(withRule
+        ? {
+            rules: [
+              {
+                id: "doc-absent",
+                criterion: "8.1",
+                wcag: ["4.1.1"],
+                severity: "majeur",
+                doc: { signal: "doctype", op: "absent" },
+                message: { en: "m", fr: "m" },
+                remediation: { en: "x", fr: "x" },
+              },
+            ],
+          }
+        : {}),
+      themes: [{ number: 8, name: { en: "T" }, count: 1 }],
+      criteria: [
+        {
+          id: "8.1",
+          theme: 8,
+          title: { en: "Doctype" },
+          titlePlain: { en: "Doctype" },
+          wcag: ["4.1.1"],
+          appliesTo: { ruleIds: withRule ? [`pack:${key}:doc-absent`] : [] },
+        },
+      ],
+    };
+  }
+
   it("flags a criterion whose ENTIRE WCAG mapping is out-of-core/removed as manual + outOfScope, never a silent NA", () => {
-    // RGAA 8.1 (doctype) maps ONLY to the removed 4.1.1 Parsing — the engine has no core
-    // SC to project a verdict from, so it must surface as an explicit out-of-scope manual
-    // check, not disappear as an ordinary "not applicable".
+    // No core SC to project from AND no instrument of its own: the engine cannot measure it at
+    // all, so it must surface as an explicit out-of-scope manual check rather than disappear
+    // as an ordinary "not applicable".
+    registerRuntimePack(orphanPack("orph", false));
+    const c = derivePackResults(synthetic(), "orph").find((r) => r.id === "8.1");
+    expect(c?.status).toBe("manual");
+    expect(c?.outOfScope).toBe(true);
+  });
+
+  it("but NOT when the pack brings its own instrument — out of scope is about what can be measured, not about the crosswalk", () => {
+    // The same orphaned mapping, plus a declarative rule of the pack's own. « Out of engine
+    // scope » would now be false: the measurement exists, it simply does not come from WCAG.
+    // This is RGAA 8.1's real shape, and calling it unmeasurable cost that grid its 106th
+    // criterion on every run.
+    registerRuntimePack(orphanPack("orphrule", true));
+    const c = derivePackResults(synthetic(), "orphrule").find((r) => r.id === "8.1");
+    expect(c?.outOfScope).toBeUndefined();
+    // Undecided rather than conforming: nothing captured a page here, so the rule never ran.
+    expect(c?.status).toBe("manual");
+    expect(c?.inapplicable).toBeUndefined();
+  });
+
+  it("an ordinary in-core-but-absent-from-audit criterion stays a plain NA, with no outOfScope flag", () => {
     const results = derivePackResults(synthetic(), "rgaa");
-    const byId = new Map(results.map((r) => [r.id, r]));
-    const doctype = byId.get("8.1");
-    expect(doctype?.status).toBe("manual");
-    expect(doctype?.outOfScope).toBe(true);
-    // an ordinary in-core-but-absent-from-audit criterion stays a plain NA, no outOfScope flag
     const na = results.find((r) => r.scs.every((sc) => sc !== "3.1.1" && sc !== "1.1.1"));
     expect(na?.outOfScope).toBeUndefined();
   });

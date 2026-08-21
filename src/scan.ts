@@ -257,6 +257,12 @@ export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: str
     url,
     runner: "scan",
     ...(collected.viewport ? { viewport: collected.viewport } : {}),
+    // The doctype, which `dom` cannot carry: `documentElement.outerHTML` starts at <html>.
+    // The collector reads it and every OTHER producer forwards it; this one dropped it, so a
+    // scanned page arrived with the field absent — "nobody looked" — and RGAA 8.1 stayed « à
+    // évaluer » on exactly the pages a browser had just opened. Same shape of defect as the
+    // probes/axe drop this function used to have: measured, then thrown away on the way out.
+    ...(collected.doctype !== undefined ? { doctype: collected.doctype } : {}),
     ...(page?.auth !== undefined ? { auth: page.auth } : {}),
     ...(page?.notes ? { notes: page.notes } : {}),
   };

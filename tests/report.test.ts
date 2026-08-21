@@ -9,7 +9,7 @@ import { renderedTestedScs } from "../src/rules/rendered.js";
 import { DOCKER_TESTED_SCS, mergeDynamic } from "../src/scan.js";
 import { localTestedScs } from "../src/scan-local.js";
 import { prdUnits, partitionUnits } from "../src/prd.js";
-import { derivePackResults, loadPack, packConformancePct } from "../src/standards/index.js";
+import { derivePackResults, loadPack, packConformancePct, registerRuntimePack } from "../src/standards/index.js";
 import type { AuditResult, DynamicResult, Finding } from "../src/types.js";
 
 const FIX = new URL("./fixtures/", import.meta.url).pathname;
@@ -240,18 +240,42 @@ describe("renderPackReport (derived RGAA view)", () => {
     expect(md).toMatch(/RGAA \d+\.\d+ —/); // pack-keyed criterion labels
   });
 
-  it("surfaces RGAA 8.1 (doctype → removed 4.1.1) in the manual section with a dedicated out-of-scope justification, never mixed with NA", () => {
+  // RGAA 8.1 (doctype) used to be the report's out-of-scope example: it maps only onto the
+  // REMOVED WCAG 4.1.1, so no core SC could ever give it a verdict. It now carries the pack's
+  // own `doctype-missing` rule, and this audit is source-only — nothing captured a page, so
+  // the rule never ran. That is « à évaluer », and for the honest reason: not "the engine
+  // cannot measure this", but "the engine did not measure it HERE".
+  it("keeps a criterion its instrument never ran on in the manual section, never among the NA", () => {
     const naSection = md.slice(md.indexOf("## 4."), md.indexOf("## 5."));
     expect(naSection).not.toContain("RGAA 8.1");
     const manualSection = md.slice(md.indexOf("## 5."));
     expect(manualSection).toContain("RGAA 8.1");
-    expect(manualSection).toMatch(/RGAA 8\.1 —.*— _Hors périmètre moteur/);
   });
 
-  it("renders the out-of-scope justification in English too", () => {
-    const en = renderPackReport(bad, loadPack("rgaa"), "en");
-    const manualSection = en.slice(en.indexOf("## 5."));
-    expect(manualSection).toMatch(/RGAA 8\.1 —.*— _Out of engine scope/);
+  // The out-of-scope justification is still rendered — for a pack criterion that genuinely has
+  // no instrument. Exercised on a synthetic pack now that RGAA has none left.
+  it("renders a dedicated out-of-scope justification, in both languages", () => {
+    const orphan = {
+      key: "orphrep",
+      name: "Orph",
+      org: "O",
+      country: "US",
+      baseVersion: "1",
+      wcagVersion: "2.2",
+      locales: ["en"],
+      defaultLocale: "en",
+      license: "x",
+      source: "x",
+      attribution: "x",
+      idPattern: "^\\d+\\.\\d+$",
+      themes: [{ number: 8, name: { en: "Mandatory", fr: "Obligatoires" }, count: 1 }],
+      criteria: [{ id: "8.1", theme: 8, title: { en: "Doctype" }, titlePlain: { en: "Doctype" }, wcag: ["4.1.1"], appliesTo: { ruleIds: [] } }],
+    };
+    registerRuntimePack(orphan);
+    const fr = renderPackReport(bad, loadPack("orphrep"), "fr");
+    expect(fr.slice(fr.indexOf("## 5."))).toMatch(/Orph 8\.1 —.*— _Hors périmètre moteur/);
+    const en = renderPackReport(bad, loadPack("orphrep"), "en");
+    expect(en.slice(en.indexOf("## 5."))).toMatch(/Orph 8\.1 —.*— _Out of engine scope/);
   });
 
   // Task 5 (Phase 4): the pack view's NC section renders the SAME auditor block too

@@ -111,6 +111,10 @@ export interface CollectedPage {
   lang?: string;
   url?: string;
   viewport?: SnapshotViewport;
+  /** The document's doctype declaration, verbatim, or `""` when the browser parsed none.
+   *  `dom` is `documentElement.outerHTML`, which does not contain it, so this is the only
+   *  place it survives the trip out of the browser (see SnapshotMeta.doctype). */
+  doctype?: string;
 }
 
 // ---- page identity --------------------------------------------------------------------
@@ -186,6 +190,7 @@ export function validateSnapshotMeta(raw: unknown): SnapshotValidation {
   if (m.auth !== undefined && typeof m.auth !== "boolean") err("meta.auth", "auth must be a boolean");
   if (m.route !== undefined && typeof m.route !== "string") err("meta.route", "route must be a string");
   if (m.notes !== undefined && typeof m.notes !== "string") err("meta.notes", "notes must be a string");
+  if (m.doctype !== undefined && typeof m.doctype !== "string") err("meta.doctype", "doctype must be a string");
   if (m.sources !== undefined && (!Array.isArray(m.sources) || m.sources.some((s) => typeof s !== "string")))
     err("meta.sources", "sources must be an array of strings");
 
@@ -203,6 +208,14 @@ export function validateSnapshotMeta(raw: unknown): SnapshotValidation {
       ...(m.viewport && typeof m.viewport === "object" ? { viewport: m.viewport as SnapshotViewport } : {}),
       ...(typeof m.capturedAt === "string" ? { capturedAt: m.capturedAt } : {}),
       ...(typeof m.runner === "string" ? { runner: m.runner } : {}),
+      // THE FIELD THIS WHITELIST USED TO EAT. Every producer records the doctype — the
+      // collector reads it, the Playwright/Cypress path and `scan` both forward it — and it
+      // died here, silently, on the way in AND on the way back off disk (this function guards
+      // both). So `SnapshotMeta.doctype` was always absent, which the harvest correctly reads
+      // as « this capture never looked » — and RGAA 8.1, whose entire subject is that string,
+      // was unanswerable on every page of every project. A rebuild-from-whitelist drops what
+      // it does not name, so adding a field to the type is only ever half the change.
+      ...(typeof m.doctype === "string" ? { doctype: m.doctype } : {}),
       ...(Array.isArray(m.sources) ? { sources: m.sources as string[] } : {}),
       ...(typeof m.notes === "string" ? { notes: m.notes } : {}),
     },

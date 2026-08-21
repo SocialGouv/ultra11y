@@ -37297,6 +37297,7 @@ function validateSnapshotMeta(raw) {
   if (m.auth !== void 0 && typeof m.auth !== "boolean") err2("meta.auth", "auth must be a boolean");
   if (m.route !== void 0 && typeof m.route !== "string") err2("meta.route", "route must be a string");
   if (m.notes !== void 0 && typeof m.notes !== "string") err2("meta.notes", "notes must be a string");
+  if (m.doctype !== void 0 && typeof m.doctype !== "string") err2("meta.doctype", "doctype must be a string");
   if (m.sources !== void 0 && (!Array.isArray(m.sources) || m.sources.some((s) => typeof s !== "string")))
     err2("meta.sources", "sources must be an array of strings");
   if (issues.length) return { ok: false, issues };
@@ -37313,6 +37314,14 @@ function validateSnapshotMeta(raw) {
       ...m.viewport && typeof m.viewport === "object" ? { viewport: m.viewport } : {},
       ...typeof m.capturedAt === "string" ? { capturedAt: m.capturedAt } : {},
       ...typeof m.runner === "string" ? { runner: m.runner } : {},
+      // THE FIELD THIS WHITELIST USED TO EAT. Every producer records the doctype — the
+      // collector reads it, the Playwright/Cypress path and `scan` both forward it — and it
+      // died here, silently, on the way in AND on the way back off disk (this function guards
+      // both). So `SnapshotMeta.doctype` was always absent, which the harvest correctly reads
+      // as « this capture never looked » — and RGAA 8.1, whose entire subject is that string,
+      // was unanswerable on every page of every project. A rebuild-from-whitelist drops what
+      // it does not name, so adding a field to the type is only ever half the change.
+      ...typeof m.doctype === "string" ? { doctype: m.doctype } : {},
       ...Array.isArray(m.sources) ? { sources: m.sources } : {},
       ...typeof m.notes === "string" ? { notes: m.notes } : {}
     }
@@ -39359,6 +39368,4646 @@ function scForAxe(ruleId, tags) {
   return AXE_WCAG[ruleId] ?? scFromWcagTags(tags) ?? FALLBACK_SC;
 }
 
+// src/standards/registry.ts
+import { AsyncLocalStorage } from "async_hooks";
+
+// src/data/standards/rgaa.json
+var rgaa_default = {
+  key: "rgaa",
+  name: "RGAA",
+  fullName: "R\xE9f\xE9rentiel g\xE9n\xE9ral d\u2019am\xE9lioration de l\u2019accessibilit\xE9",
+  org: "DINUM",
+  country: "FR",
+  baseVersion: "4.1.2",
+  wcagVersion: "2.1",
+  locales: ["fr"],
+  defaultLocale: "fr",
+  license: "Licence Ouverte / Etalab 2.0",
+  source: "https://github.com/DISIC/accessibilite.numerique.gouv.fr",
+  attribution: "RGAA 4.1.2 \xA9 DINUM (Direction interminist\xE9rielle du num\xE9rique) \u2014 Licence Ouverte / Etalab 2.0",
+  idPattern: "^\\d+\\.\\d+$",
+  vocabulary: {
+    theme: {
+      fr: "Th\xE9matique"
+    },
+    criterion: {
+      fr: "Crit\xE8re"
+    },
+    test: {
+      fr: "Test"
+    },
+    conformant: {
+      fr: "Conforme (C)"
+    },
+    nonConformant: {
+      fr: "Non conforme (NC)"
+    },
+    notApplicable: {
+      fr: "Non applicable (NA)"
+    },
+    auditorHeading: {
+      fr: "Crit\xE8re d\u2019accessibilit\xE9"
+    }
+  },
+  sampleMethodology: {
+    requiredKinds: [
+      {
+        id: "accueil",
+        label: {
+          fr: "Page d\u2019accueil"
+        },
+        keywords: ["accueil", "home", "index", "racine", "homepage"]
+      },
+      {
+        id: "contact",
+        label: {
+          fr: "Contact"
+        },
+        keywords: ["contact", "nous contacter", "nous ecrire", "coordonnees"]
+      },
+      {
+        id: "mentions-legales",
+        label: {
+          fr: "Mentions l\xE9gales"
+        },
+        keywords: ["mentions legales", "mentions", "legal notice", "legal"]
+      },
+      {
+        id: "declaration-accessibilite",
+        label: {
+          fr: "D\xE9claration d\u2019accessibilit\xE9"
+        },
+        keywords: ["declaration d accessibilite", "declaration accessibilite", "accessibilite", "accessibility statement", "accessibility"]
+      },
+      {
+        id: "plan-du-site",
+        label: {
+          fr: "Plan du site"
+        },
+        keywords: ["plan du site", "sitemap", "site map"]
+      },
+      {
+        id: "aide",
+        label: {
+          fr: "Aide"
+        },
+        keywords: ["aide", "help", "faq", "assistance"]
+      },
+      {
+        id: "authentification",
+        label: {
+          fr: "Authentification"
+        },
+        keywords: ["authentification", "authentication", "connexion", "identification", "login", "log in", "sign in", "se connecter", "auth"]
+      },
+      {
+        id: "pages-representatives",
+        label: {
+          fr: "Pages repr\xE9sentatives"
+        },
+        keywords: ["representative", "representatif", "representatives", "gabarit", "template", "modele", "formulaire", "recherche", "resultats"]
+      },
+      {
+        id: "elements-transverses",
+        label: {
+          fr: "\xC9l\xE9ments transverses"
+        },
+        keywords: ["transverse", "transversaux", "en-tete", "entete", "header", "navigation", "menu", "pied de page", "footer"]
+      }
+    ]
+  },
+  secondaryMappings: [
+    {
+      ruleId: "dyn-live-region",
+      criterion: "7.4",
+      note: {
+        fr: "Rel\xE8ve aussi de 7.4 (changement de contexte) selon le classement Ara ; projection WCAG-fid\xE8le = 7.5.",
+        en: "Also classified under 7.4 (change of context) per Ara; the WCAG-faithful projection is 7.5."
+      },
+      enabled: false
+    }
+  ],
+  rules: [
+    {
+      id: "download-link-format",
+      criterion: "6.1",
+      wcag: ["2.4.4"],
+      severity: "mineur",
+      advisory: true,
+      match: {
+        tag: "a",
+        attrs: [
+          {
+            name: "href",
+            op: "matches",
+            value: "\\.(pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|epub|mp3|mp4|avi|mov)(\\?|#|$)"
+          }
+        ],
+        text: {
+          op: "lacks",
+          value: "(pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|epub|mp3|mp4|avi|mov|\\d+\\s*(ko|mo|go|kb|mb|gb|octets?|bytes?))"
+        }
+      },
+      message: {
+        en: "Download link whose visible text states neither the file format nor its size.",
+        fr: "Lien de t\xE9l\xE9chargement dont l\u2019intitul\xE9 ne pr\xE9cise ni le format ni le poids du fichier."
+      },
+      remediation: {
+        en: "State the file format and size in the link text, e.g. \u201CAnnual report (PDF, 2 MB)\u201D.",
+        fr: "Indiquez le format et le poids du fichier dans l\u2019intitul\xE9 du lien, par exemple \xAB Rapport annuel (PDF, 2 Mo) \xBB."
+      }
+    },
+    {
+      id: "optgroup-without-label",
+      criterion: "11.8",
+      wcag: ["1.3.1"],
+      severity: "majeur",
+      match: {
+        tag: "optgroup",
+        attrs: [
+          {
+            name: "label",
+            op: "absent"
+          }
+        ]
+      },
+      message: {
+        en: "<optgroup> without a label attribute \u2014 the group of options is unnamed (RGAA test 11.8.2).",
+        fr: "<optgroup> sans attribut label \u2014 le regroupement d\u2019options n\u2019est pas nomm\xE9 (test RGAA 11.8.2)."
+      },
+      remediation: {
+        en: 'Add label="\u2026" naming what the options in this group have in common, e.g. <optgroup label="Europe">.',
+        fr: 'Ajoutez label="\u2026" nommant ce que les options du groupe ont en commun, par ex. <optgroup label="Europe">.'
+      }
+    },
+    {
+      id: "dir-value-invalid",
+      criterion: "8.10",
+      wcag: ["1.3.2"],
+      severity: "majeur",
+      match: {
+        attrs: [
+          {
+            name: "dir",
+            op: "present"
+          },
+          {
+            name: "dir",
+            op: "matches",
+            value: "^(?!(rtl|ltr|auto)$).+$"
+          }
+        ]
+      },
+      message: {
+        en: "dir attribute with a value that is not rtl, ltr or auto \u2014 the reading direction change is not declared conformantly (RGAA test 8.10.2).",
+        fr: "Attribut dir dont la valeur n\u2019est ni rtl, ni ltr, ni auto \u2014 le changement de sens de lecture n\u2019est pas d\xE9clar\xE9 conform\xE9ment (test RGAA 8.10.2)."
+      },
+      remediation: {
+        en: 'Use dir="rtl" or dir="ltr" (or dir="auto"), matching the reading direction of the text it carries.',
+        fr: 'Utilisez dir="rtl" ou dir="ltr" (ou dir="auto"), en accord avec le sens de lecture du texte port\xE9.'
+      }
+    },
+    {
+      id: "doctype-missing",
+      criterion: "8.1",
+      wcag: ["4.1.1"],
+      severity: "majeur",
+      doc: {
+        signal: "doctype",
+        op: "absent"
+      },
+      message: {
+        en: "The captured page declares no document type \u2014 the browser parsed no <!DOCTYPE> ahead of <html> (RGAA test 8.1.1).",
+        fr: "La page captur\xE9e ne d\xE9clare aucun type de document \u2014 le navigateur n\u2019a analys\xE9 aucun <!DOCTYPE> avant <html> (test RGAA 8.1.1)."
+      },
+      remediation: {
+        en: "Emit <!DOCTYPE html> as the first line of the document, before <html>. A doctype placed after <html>, or malformed, is ignored by the parser and counts as absent.",
+        fr: "\xC9mettez <!DOCTYPE html> en premi\xE8re ligne du document, avant <html>. Un doctype plac\xE9 apr\xE8s <html>, ou malform\xE9, est ignor\xE9 par l\u2019analyseur et compte comme absent."
+      }
+    }
+  ],
+  themes: [
+    {
+      number: 1,
+      name: {
+        fr: "Images"
+      },
+      count: 9
+    },
+    {
+      number: 2,
+      name: {
+        fr: "Cadres"
+      },
+      count: 2
+    },
+    {
+      number: 3,
+      name: {
+        fr: "Couleurs"
+      },
+      count: 3
+    },
+    {
+      number: 4,
+      name: {
+        fr: "Multim\xE9dia"
+      },
+      count: 13
+    },
+    {
+      number: 5,
+      name: {
+        fr: "Tableaux"
+      },
+      count: 8
+    },
+    {
+      number: 6,
+      name: {
+        fr: "Liens"
+      },
+      count: 2
+    },
+    {
+      number: 7,
+      name: {
+        fr: "Scripts"
+      },
+      count: 5
+    },
+    {
+      number: 8,
+      name: {
+        fr: "\xC9l\xE9ments obligatoires"
+      },
+      count: 10
+    },
+    {
+      number: 9,
+      name: {
+        fr: "Structuration de l\u2019information"
+      },
+      count: 4
+    },
+    {
+      number: 10,
+      name: {
+        fr: "Pr\xE9sentation de l\u2019information"
+      },
+      count: 14
+    },
+    {
+      number: 11,
+      name: {
+        fr: "Formulaires"
+      },
+      count: 13
+    },
+    {
+      number: 12,
+      name: {
+        fr: "Navigation"
+      },
+      count: 11
+    },
+    {
+      number: 13,
+      name: {
+        fr: "Consultation"
+      },
+      count: 12
+    }
+  ],
+  criteria: [
+    {
+      id: "1.1",
+      theme: 1,
+      title: {
+        fr: "Chaque [image porteuse d\u2019information](#image-porteuse-d-information) a-t-elle une [alternative textuelle](#alternative-textuelle-image)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque image porteuse d\u2019information a-t-elle une alternative textuelle\xA0?"
+      },
+      tests: {
+        "1": [
+          'Chaque image (balise `<img>` ou balise poss\xE9dant l\u2019attribut WAI-ARIA `role="img"`) [porteuse d\u2019information](#image-porteuse-d-information) a-t-elle une [alternative textuelle](#alternative-textuelle-image)\xA0?'
+        ],
+        "2": [
+          "Chaque [zone](#zone-d-une-image-reactive) d\u2019une [image r\xE9active](#image-reactive) (balise `<area>`) [porteuse d\u2019information](#image-porteuse-d-information) a-t-elle une [alternative textuelle](#alternative-textuelle-image)\xA0?"
+        ],
+        "3": [
+          'Chaque bouton de type `image` (balise `<input>` avec l\u2019attribut `type="image"`) a-t-il une [alternative textuelle](#alternative-textuelle-image)\xA0?'
+        ],
+        "4": [
+          "Chaque [zone cliquable](#zone-cliquable) d\u2019une image r\xE9active c\xF4t\xE9 serveur est-elle doubl\xE9e d\u2019un m\xE9canisme utilisable quel que soit le dispositif de pointage utilis\xE9 et permettant d\u2019acc\xE9der \xE0 la m\xEAme destination\xA0?"
+        ],
+        "5": [
+          "Chaque image vectorielle (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information), v\xE9rifie-t-elle ces conditions\xA0?",
+          'La balise `<svg>` poss\xE8de un attribut WAI-ARIA `role="img"`\xA0;',
+          "La balise `<svg>` a une [alternative textuelle](#alternative-textuelle-image)."
+        ],
+        "6": [
+          'Chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), v\xE9rifie-t-elle une de ces conditions\xA0?',
+          'La balise `<object>` poss\xE8de une [alternative textuelle](#alternative-textuelle-image) et un attribut `role="img"`\xA0;',
+          "L\u2019\xE9l\xE9ment `<object>` est imm\xE9diatement suivi d\u2019un [lien ou bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 un [contenu alternatif](#contenu-alternatif)\xA0;",
+          "Un m\xE9canisme permet \xE0 l\u2019utilisateur de remplacer l\u2019\xE9l\xE9ment `<object>` par un [contenu alternatif](#contenu-alternatif)."
+        ],
+        "7": [
+          'Chaque image embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), v\xE9rifie-t-elle une de ces conditions\xA0?',
+          'La balise `<embed>` poss\xE8de une [alternative textuelle](#alternative-textuelle-image) et un attribut `role="img"`\xA0;',
+          "L\u2019\xE9l\xE9ment `<embed>` est imm\xE9diatement suivi d\u2019un [lien ou bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 un [contenu alternatif](#contenu-alternatif)\xA0;",
+          "Un m\xE9canisme permet \xE0 l\u2019utilisateur de remplacer l\u2019\xE9l\xE9ment `<embed>` par un [contenu alternatif](#contenu-alternatif)."
+        ],
+        "8": [
+          "Chaque image bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information), v\xE9rifie-t-elle une de ces conditions\xA0?",
+          'La balise `<canvas>` poss\xE8de une [alternative textuelle](#alternative-textuelle-image) et un attribut `role="img"`\xA0;',
+          "Un [contenu alternatif](#contenu-alternatif) est pr\xE9sent entre les balises `<canvas>` et `</canvas>`\xA0;",
+          "L\u2019\xE9l\xE9ment `<canvas>` est imm\xE9diatement suivi d\u2019un [lien ou bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 un [contenu alternatif](#contenu-alternatif)\xA0;",
+          "Un m\xE9canisme permet \xE0 l\u2019utilisateur de remplacer l\u2019\xE9l\xE9ment `<canvas>` par un [contenu alternatif](#contenu-alternatif)."
+        ]
+      },
+      techniques: ["H36", "H37", "H53", "F65", "H24"],
+      wcag: ["1.1.1"],
+      appliesTo: {
+        ruleIds: [
+          "axe:area-alt",
+          "axe:image-alt",
+          "axe:input-image-alt",
+          "axe:object-alt",
+          "axe:role-img-alt",
+          "axe:svg-img-alt",
+          "canvas-fallback-missing",
+          "chart-no-accessible-name",
+          "img-alt-missing",
+          "input-image-alt-missing",
+          "object-embed-no-name"
+        ]
+      }
+    },
+    {
+      id: "1.2",
+      theme: 1,
+      title: {
+        fr: "Chaque [image de d\xE9coration](#image-de-decoration) est-elle correctement ignor\xE9e par les technologies d\u2019assistance\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque image de d\xE9coration est-elle correctement ignor\xE9e par les technologies d\u2019assistance\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque image (balise `<img>`) [de d\xE9coration](#image-de-decoration), sans [l\xE9gende](#legende-d-image), v\xE9rifie-t-elle une de ces conditions\xA0?",
+          'La balise `<img>` poss\xE8de un attribut `alt` vide (`alt=""`) et est d\xE9pourvue de tout autre attribut permettant de fournir une [alternative textuelle](#alternative-textuelle-image)\xA0;',
+          'La balise `<img>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"` ou `role="presentation"`.'
+        ],
+        "2": [
+          "Chaque [zone non cliquable](#zone-non-cliquable) (balise `<area>` sans attribut `href`) [de d\xE9coration](#image-de-decoration), v\xE9rifie-t-elle une de ces conditions\xA0?",
+          'La balise `<area>` poss\xE8de un attribut `alt` vide (`alt=""`) et est d\xE9pourvue de tout autre attribut permettant de fournir une [alternative textuelle](#alternative-textuelle-image)\xA0;',
+          'La balise `<area>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"` ou `role="presentation"`.'
+        ],
+        "3": [
+          'Chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [de d\xE9coration](#image-de-decoration), sans [l\xE9gende](#legende-d-image), v\xE9rifie-t-elle ces conditions\xA0?',
+          'La balise `<object>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;',
+          "La balise `<object>` est d\xE9pourvue d\u2019alternative textuelle\xA0;",
+          "Il n\u2019y a aucun texte faisant office d\u2019alternative textuelle entre `<object>` et `</object>`."
+        ],
+        "4": [
+          "Chaque image vectorielle (balise `<svg>`) [de d\xE9coration](#image-de-decoration), sans [l\xE9gende](#legende-d-image), v\xE9rifie-t-elle ces conditions\xA0?",
+          'La balise `<svg>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;',
+          "La balise `<svg>` et ses enfants sont d\xE9pourvus d\u2019[alternative textuelle](#alternative-textuelle-image)\xA0;",
+          "Les balises `<title>` et `<desc>` sont absentes ou vides\xA0;",
+          "La balise `<svg>` et ses enfants sont d\xE9pourvus d\u2019attribut `title`."
+        ],
+        "5": [
+          "Chaque image bitmap (balise `<canvas>`) [de d\xE9coration](#image-de-decoration), sans [l\xE9gende](#legende-d-image), v\xE9rifie-t-elle ces conditions\xA0?",
+          'La balise `<canvas>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;',
+          "La balise `<canvas>` et ses enfants sont d\xE9pourvus d\u2019[alternative textuelle](#alternative-textuelle-image)\xA0;",
+          "Il n\u2019y a aucun texte faisant office d\u2019[alternative textuelle](#alternative-textuelle-image) entre `<canvas>` et `</canvas>`."
+        ],
+        "6": [
+          'Chaque image embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) [de d\xE9coration](#image-de-decoration), sans [l\xE9gende](#legende-d-image), v\xE9rifie-t-elle ces conditions\xA0?',
+          'La balise `<embed>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;',
+          "La balise `<embed>` et ses enfants sont d\xE9pourvus d\u2019[alternative textuelle](#alternative-textuelle-image)."
+        ]
+      },
+      techniques: ["H67", "G196", "C9", "F39", "F38", "ARIA4", "ARIA10"],
+      technicalNote: [
+        "Lorsqu'une image est associ\xE9e \xE0 une [l\xE9gende](#legende-d-image), la note technique WCAG recommande de pr\xE9voir syst\xE9matiquement une [alternative textuelle](#alternative-textuelle-image) (cf. crit\xE8re 1.9). Dans ce cas le crit\xE8re 1.2 est non applicable.",
+        "Dans le cas d'une image vectorielle (balise `<svg>`) de d\xE9coration qui serait affich\xE9e au travers d'un \xE9l\xE9ment `<use href=\"\u2026\">` enfant de l'\xE9l\xE9ment `<svg>`, le test 1.2.4 s'appliquera \xE9galement \xE0 l'\xE9l\xE9ment `<svg>` associ\xE9e par le biais de l'\xE9l\xE9ment `<use>`.",
+        'Un attribut WAI-ARIA `role="presentation"` peut \xEAtre utilis\xE9 sur les images de d\xE9coration et les zones non cliquables de d\xE9coration. Le r\xF4le `"none"` introduit en ARIA 1.1 et synonyme du r\xF4le `"presentation"` peut \xEAtre aussi utilis\xE9. Il reste pr\xE9f\xE9rable cependant d\'utiliser le r\xF4le `"presentation"` en attendant un support satisfaisant du r\xF4le `"none"`.'
+      ],
+      wcag: ["1.1.1", "4.1.2"],
+      appliesTo: {
+        ruleIds: ["axe:image-redundant-alt", "decorative-alt-misuse"]
+      }
+    },
+    {
+      id: "1.3",
+      theme: 1,
+      title: {
+        fr: "Pour chaque image [porteuse d\u2019information](#image-porteuse-d-information) ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque image porteuse d\u2019information ayant une alternative textuelle, cette alternative est-elle pertinente (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          'Chaque image (balise `<img>` ou balise poss\xE9dant l\u2019attribut WAI-ARIA `role="img"`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente (hors cas particuliers)\xA0?',
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
+        ],
+        "2": [
+          "Pour chaque [zone](#zone-d-une-image-reactive) (balise `<area>`) d\u2019une [image r\xE9active](#image-reactive) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente (hors cas particuliers)\xA0?",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
+        ],
+        "3": [
+          'Pour chaque [bouton](#bouton-formulaire) de type `image` (balise `<input>` avec l\u2019attribut `type="image"`), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente (hors cas particuliers)\xA0?',
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
+        ],
+        "4": [
+          'Pour chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente (hors cas particuliers)\xA0?',
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
+        ],
+        "5": [
+          'Pour chaque image embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente (hors cas particuliers)\xA0?',
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
+        ],
+        "6": [
+          "Pour chaque image vectorielle (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente (hors cas particuliers)\xA0?",
+          "S\u2019il est pr\xE9sent, le contenu de l'\xE9l\xE9ment `<title>` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
+        ],
+        "7": [
+          "Pour chaque image bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente (hors cas particuliers)\xA0?",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
+        ],
+        "8": [
+          "Pour chaque image bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information) et ayant  un [contenu alternatif](#contenu-alternatif) entre `<canvas>` et `</canvas>`, ce [contenu alternatif](#contenu-alternatif) est-il [correctement restitu\xE9 par les technologies d\u2019assistance](#correctement-restitue-par-les-technologies-d-assistance)\xA0?"
+        ],
+        "9": [
+          "Pour chaque image [porteuse d\u2019information](#image-porteuse-d-information) et ayant une [alternative textuelle](#alternative-textuelle-image), l\u2019[alternative textuelle](#alternative-textuelle-image) est-elle [courte et concise](#alternative-courte-et-concise) (hors cas particuliers)\xA0?"
+        ]
+      },
+      techniques: ["G94", "G95", "F30", "F71", "G196", "ARIA6", "ARIA9", "ARIA10"],
+      particularCases: [
+        "Il existe une gestion de cas particuliers lorsque l\u2019image est utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test). Dans cette situation, o\xF9 il n\u2019est pas possible de donner une alternative pertinente sans d\xE9truire l\u2019objet du CAPTCHA ou du test, le crit\xE8re est non applicable.",
+        "Note\xA0: le cas des CAPTCHA et des images-test est trait\xE9 de mani\xE8re sp\xE9cifique par le crit\xE8re 1.4."
+      ],
+      wcag: ["1.1.1", "4.1.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "1.4",
+      theme: 1,
+      title: {
+        fr: "Pour chaque image utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative permet-elle d\u2019identifier la nature et la fonction de l\u2019image\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque image utilis\xE9e comme CAPTCHA ou comme image-test, ayant une alternative textuelle, cette alternative permet-elle d\u2019identifier la nature et la fonction de l\u2019image\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque image (balise `<img>`) utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente\xA0?",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
+        ],
+        "2": [
+          "Pour chaque zone (balise `<area>`) d\u2019une image r\xE9active utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente\xA0?",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
+        ],
+        "3": [
+          'Pour chaque [bouton](#bouton-formulaire) de type image (balise `<input>` avec l\u2019attribut `type="image"`) utilis\xE9 comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente\xA0?',
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
+        ],
+        "4": [
+          'Pour chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente\xA0?',
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
+        ],
+        "5": [
+          'Pour chaque image embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente\xA0?',
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
+        ],
+        "6": [
+          "Pour chaque image vectorielle (balise `<svg>`) utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente\xA0?",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
+        ],
+        "7": [
+          "Pour chaque image bitmap (balise `<canvas>`) utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente\xA0?",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
+        ]
+      },
+      techniques: ["G100", "G143"],
+      wcag: ["1.1.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "1.5",
+      theme: 1,
+      title: {
+        fr: "Pour chaque image utilis\xE9e comme [CAPTCHA](#captcha), une solution d\u2019acc\xE8s alternatif au contenu ou \xE0 la fonction du CAPTCHA est-elle pr\xE9sente\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque image utilis\xE9e comme CAPTCHA, une solution d\u2019acc\xE8s alternatif au contenu ou \xE0 la fonction du CAPTCHA est-elle pr\xE9sente\xA0?"
+      },
+      tests: {
+        "1": [
+          'Chaque image (balises `<img>`, `<area>`, `<object>`, `<embed>`, `<svg>`, `<canvas>` ou poss\xE9dant un attribut WAI-ARIA `role="img"`) utilis\xE9e comme [CAPTCHA](#captcha) v\xE9rifie-t-elle une de ces conditions\xA0?',
+          "Il existe une autre forme de [CAPTCHA](#captcha) non graphique, au moins\xA0;",
+          "Il existe une autre solution d\u2019acc\xE8s \xE0 la fonctionnalit\xE9 qui est s\xE9curis\xE9e par le [CAPTCHA](#captcha)."
+        ],
+        "2": [
+          'Chaque bouton associ\xE9 \xE0 une image (balise `input` avec l\u2019attribut `type="image"`) utilis\xE9e comme [CAPTCHA](#captcha) v\xE9rifie-t-il une de ces conditions\xA0?',
+          "Il existe une autre forme de [CAPTCHA](#captcha) non graphique, au moins\xA0;",
+          "Il existe une autre solution d\u2019acc\xE8s \xE0 la fonctionnalit\xE9 s\xE9curis\xE9e par le [CAPTCHA](#captcha)."
+        ]
+      },
+      techniques: ["G144"],
+      wcag: ["1.1.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "1.6",
+      theme: 1,
+      title: {
+        fr: "Chaque image [porteuse d\u2019information](#image-porteuse-d-information) a-t-elle, si n\xE9cessaire, une [description d\xE9taill\xE9e](#description-detaillee-image)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque image porteuse d\u2019information a-t-elle, si n\xE9cessaire, une description d\xE9taill\xE9e\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque image (balise `<img>`) [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "Il existe un attribut `longdesc` qui donne l\u2019adresse (URL) d\u2019une page ou d\u2019un emplacement dans la page contenant la [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
+          "Il existe une [alternative textuelle](#alternative-textuelle-image) contenant la r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image\xA0;",
+          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
+        ],
+        "2": [
+          'Chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?',
+          "Il existe un attribut `longdesc` qui donne l\u2019adresse (URL) d\u2019une page ou d\u2019un emplacement dans la page contenant la [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
+          "Il existe une [alternative textuelle](#alternative-textuelle-image) contenant la r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image\xA0;",
+          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
+        ],
+        "3": [
+          "Chaque image embarqu\xE9e (balise `<embed>`) [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "Il existe un attribut `longdesc` qui donne l\u2019adresse (URL) d\u2019une page ou d\u2019un emplacement dans la page contenant la [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
+          "Il existe une [alternative textuelle](#alternative-textuelle-image) contenant la r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image\xA0;",
+          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
+        ],
+        "4": [
+          'Chaque [bouton](#bouton-formulaire) de type image (balise `<input>` avec l\u2019attribut `type="image"`) [porteur d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-il une de ces conditions\xA0?',
+          "Il existe un attribut `longdesc` qui donne l\u2019adresse (URL) d\u2019une page ou d\u2019un emplacement dans la page contenant la [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
+          "Il existe une [alternative textuelle](#alternative-textuelle-image) contenant la r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image\xA0;",
+          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
+        ],
+        "5": [
+          "Chaque image vectorielle (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "Il existe un attribut WAI-ARIA `aria-label` contenant l\u2019alternative textuelle et une r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente\xA0;",
+          "Il existe un attribut WAI-ARIA `aria-labelledby` associant un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) faisant office d\u2019alternative textuelle et un autre faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
+          "Il existe un attribut WAI-ARIA `aria-describedby` associant un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
+          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
+        ],
+        "6": [
+          "Pour chaque image vectorielle (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), la r\xE9f\xE9rence \xE9ventuelle \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image) dans l\u2019attribut WAI-ARIA `aria-label` et la [description d\xE9taill\xE9e](#description-detaillee-image) associ\xE9e par l\u2019attribut WAI-ARIA `aria-labelledby` ou `aria-describedby` sont-elles correctement restitu\xE9es par les technologies d\u2019assistance\xA0?"
+        ],
+        "7": [
+          "Chaque image bitmap (balise `<canvas>`), [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "Il existe un attribut WAI-ARIA `aria-label` contenant l\u2019alternative textuelle et une r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente\xA0;",
+          "Il existe un attribut WAI-ARIA `aria-labelledby` associant un passage de texte faisant office d\u2019alternative textuelle et un autre faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
+          "Il existe un contenu textuel entre `<canvas>` et `</canvas>` faisant r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image bitmap\xA0;",
+          "Il existe un contenu textuel entre `<canvas>` et `</canvas>` faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
+          "Il existe un [lien ou bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
+        ],
+        "8": [
+          "Pour chaque image bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information), qui impl\xE9mente une r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente, cette r\xE9f\xE9rence est-elle correctement restitu\xE9e par les technologies d\u2019assistance\xA0?"
+        ],
+        "9": [
+          'Pour chaque image (balise `<img>`, `<input>` avec l\u2019attribut `type="image"`, `<area>`, `<object>`, `<embed>`, `<svg>`, `<canvas>`, ou poss\xE9dant un attribut WAI-ARIA `role="img"`) [porteuse d\u2019information](#image-porteuse-d-information), qui est accompagn\xE9e d\u2019une [description d\xE9taill\xE9e](#description-detaillee-image) et qui utilise un attribut WAI-ARIA `aria-describedby`, l\u2019attribut WAI-ARIA `aria-describedby` associe-t-il la [description d\xE9taill\xE9e](#description-detaillee-image)\xA0?'
+        ],
+        "10": [
+          'Chaque balise poss\xE9dant un attribut WAI-ARIA `role="img"` [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?',
+          "Il existe un attribut WAI-ARIA `aria-label` contenant l\u2019[alternative textuelle](#alternative-textuelle-image) et une r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente\xA0;",
+          "Il existe un attribut WAI-ARIA `aria-labelledby` associant un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) faisant office d\u2019[alternative textuelle](#alternative-textuelle-image) et un autre faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
+          "Il existe un attribut WAI-ARIA `aria-describedby` associant un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
+          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
+        ]
+      },
+      techniques: ["G92", "G74", "G73", "H45", "ARIA6"],
+      technicalNote: [
+        "Dans le cas du SVG, le manque de support de l\u2019\xE9l\xE9ment `<title>` et `<desc>` par les technologies d\u2019assistance cr\xE9e une difficult\xE9 dans le cas de l\u2019impl\xE9mentation de l\u2019[alternative textuelle](#alternative-textuelle-image) de l\u2019image et de sa [description d\xE9taill\xE9e](#description-detaillee-image). Dans ce cas, il est recommand\xE9 d\u2019utiliser l\u2019attribut WAI-ARIA `aria-label` pour impl\xE9menter \xE0 la fois l\u2019[alternative textuelle](#alternative-textuelle-image) courte et la r\xE9f\xE9rence \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image) adjacente ou l\u2019attribut WAI-ARIA `aria-labelledby` pour associer les passages de texte faisant office d\u2019alternative courte et de [description d\xE9taill\xE9e](#description-detaillee-image).",
+        "L\u2019utilisation de l\u2019attribut WAI-ARIA aria-describedby n\u2019est pas recommand\xE9e pour lier une image (`<img>`, `<object>`, `<embed>`, `<canvas>`) a\u0300 sa [description d\xE9taill\xE9e](#description-detaillee-image), par manque de support des technologies d\u2019assistance. N\xE9anmoins, lorsqu\u2019il est utilis\xE9, l\u2019attribut devra n\xE9cessairement faire r\xE9f\xE9rence \xE0 l\u2019`id` de la zone contenant la [description d\xE9taill\xE9e](#description-detaillee-image).",
+        'La [description d\xE9taill\xE9e](#description-detaillee-image) adjacente peut \xEAtre impl\xE9ment\xE9e via une balise `<figcaption>`, dans ce cas le crit\xE8re 1.9 doit \xEAtre v\xE9rifi\xE9 (utilisation de `<figure>` et des attributs WAI-ARIA `role="figure"` et `aria-label`, notamment).',
+        "L'attribut `longdesc` qui constitue une des conditions du test 1.6.1 (et dont la pertinence est v\xE9rifi\xE9e avec le test 1.7.1) est d\xE9sormais consid\xE9r\xE9 comme obsol\xE8te par la sp\xE9cification HTML en cours. La v\xE9rification de cet attribut ne sera donc requise que pour les versions de la sp\xE9cification HTML ant\xE9rieure \xE0 HTML 5."
+      ],
+      wcag: ["1.1.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "1.7",
+      theme: 1,
+      title: {
+        fr: "Pour chaque image [porteuse d\u2019information](#image-porteuse-d-information) ayant une [description d\xE9taill\xE9e](#description-detaillee-image), cette description est-elle pertinente\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque image porteuse d\u2019information ayant une description d\xE9taill\xE9e, cette description est-elle pertinente\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque image (balise `<img>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle ces conditions\xA0?",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) via l\u2019adresse r\xE9f\xE9renc\xE9e dans l\u2019attribut `longdesc` est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
+          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
+        ],
+        "2": [
+          'Chaque [bouton](#bouton-formulaire) de type image (balise `<input>` avec l\u2019attribut `type="image"`) [porteur d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-il ces conditions\xA0?',
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
+          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
+        ],
+        "3": [
+          'Chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle ces conditions\xA0?',
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019[image objet](#image-objet) est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
+          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
+        ],
+        "4": [
+          'Chaque image embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle ces conditions\xA0?',
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image embarqu\xE9e est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
+          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
+        ],
+        "5": [
+          "Chaque image vectorielle (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle ces conditions\xA0?",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par le texte contenu dans la balise `<desc>` ou `<title>` est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) adjacente contenue dans la balise `<desc>` est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
+          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
+        ],
+        "6": [
+          "Chaque image bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle ces conditions\xA0?",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par le texte contenu entre `<canvas>` et `</canvas>` est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) contenue entre `<canvas>` et `</canvas>` est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image bitmap est pertinente\xA0;",
+          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
+          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
+        ]
+      },
+      techniques: ["G92", "F67"],
+      wcag: ["1.1.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "1.8",
+      theme: 1,
+      title: {
+        fr: "Chaque [image texte](#image-texte) [porteuse d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque image texte porteuse d\u2019information, en l\u2019absence d\u2019un m\xE9canisme de remplacement, doit si possible \xEAtre remplac\xE9e par du texte styl\xE9. Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          'Chaque [image texte](#image-texte) (balise `<img>` ou poss\xE9dant un attribut WAI-ARIA `role="img"`) [porteuse d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?'
+        ],
+        "2": [
+          'Chaque bouton \xAB\xA0[image texte](#image-texte)\xA0\xBB (balise `<input>` avec l\u2019attribut `type="image"`) [porteur d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9 par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?'
+        ],
+        "3": [
+          'Chaque [image texte](#image-texte) objet (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?'
+        ],
+        "4": [
+          'Chaque [image texte](#image-texte) embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?'
+        ],
+        "5": [
+          "Chaque [image texte](#image-texte) bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"
+        ],
+        "6": [
+          "Chaque [image texte](#image-texte) SVG (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information) et dont le texte n\u2019est pas compl\xE8tement structur\xE9 au moyen d\u2019\xE9l\xE9ments `<text>`, en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"
+        ]
+      },
+      techniques: ["G136", "G140", "C22", "C30"],
+      technicalNote: ["Le texte dans les images vectorielles \xE9tant du texte r\xE9el, il n\u2019est pas concern\xE9 par ce crit\xE8re."],
+      particularCases: [
+        "Pour ce crit\xE8re, il existe une gestion de cas particulier lorsque le texte fait partie du logo, d\u2019une d\xE9nomination commerciale, d\u2019un [CAPTCHA](#captcha), d\u2019une [image-test](#image-test) ou d\u2019une image dont l\u2019exactitude graphique serait consid\xE9r\xE9e comme essentielle \xE0 la bonne transmission de l\u2019information v\xE9hicul\xE9e par l\u2019image. Dans ces situations, le crit\xE8re est non applicable pour ces \xE9l\xE9ments."
+      ],
+      wcag: ["1.4.5"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "1.9",
+      theme: 1,
+      title: {
+        fr: "Chaque [l\xE9gende d\u2019image](#legende-d-image) est-elle, si n\xE9cessaire, correctement reli\xE9e \xE0 l\u2019image correspondante\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque l\xE9gende d\u2019image est-elle, si n\xE9cessaire, correctement reli\xE9e \xE0 l\u2019image correspondante\xA0?"
+      },
+      tests: {
+        "1": [
+          'Chaque image pourvue d\u2019une [l\xE9gende](#legende-d-image) (balise `<img>`, `<input>` avec l\u2019attribut `type="image"` ou poss\xE9dant un attribut WAI-ARIA `role="img"` associ\xE9e \xE0 une [l\xE9gende](#legende-d-image) adjacente), v\xE9rifie-t-elle, si n\xE9cessaire, ces conditions\xA0?',
+          'L\u2019image (balise `<img>`, `<input>` avec l\u2019attribut `type="image"` ou poss\xE9dant un attribut WAI-ARIA `role="img"`) et sa [l\xE9gende](#legende-d-image) adjacente sont contenues dans une balise `<figure>`\xA0;',
+          'La balise `<figure>` poss\xE8de un attribut WAI-ARIA `role="figure"` ou `role="group"`\xA0;',
+          "La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la [l\xE9gende](#legende-d-image)\xA0;",
+          "La [l\xE9gende](#legende-d-image) est contenue dans une balise `<figcaption>`."
+        ],
+        "2": [
+          'Chaque [image objet](#image-objet) pourvue d\u2019une [l\xE9gende](#legende-d-image) (balise `<object>` avec l\u2019attribut `type="image/\u2026"` associ\xE9e \xE0 une [l\xE9gende](#legende-d-image) adjacente), v\xE9rifie-t-elle, si n\xE9cessaire, ces conditions\xA0?',
+          "L\u2019[image objet](#image-objet) et sa [l\xE9gende](#legende-d-image) adjacente sont contenues dans une balise `<figure>`\xA0;",
+          'La balise `<figure>` poss\xE8de un attribut WAI-ARIA `role="figure"` ou `role="group"`\xA0;',
+          "La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la [l\xE9gende](#legende-d-image)\xA0;",
+          "La [l\xE9gende](#legende-d-image) est contenue dans une balise `<figcaption>`."
+        ],
+        "3": [
+          "Chaque image embarqu\xE9e pourvue d\u2019une [l\xE9gende](#legende-d-image) (balise `<embed>` associ\xE9e \xE0 une [l\xE9gende](#legende-d-image) adjacente), v\xE9rifie-t-elle, si n\xE9cessaire, ces conditions\xA0?",
+          "L\u2019image embarqu\xE9e (balise `<embed>`) et sa [l\xE9gende](#legende-d-image) adjacente sont contenues dans une balise `<figure>`\xA0;",
+          'La balise `<figure>` poss\xE8de un attribut WAI-ARIA `role="figure"` ou `role="group"`\xA0;',
+          "La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la [l\xE9gende](#legende-d-image)\xA0;",
+          "La [l\xE9gende](#legende-d-image) est contenue dans une balise `<figcaption>`."
+        ],
+        "4": [
+          "Chaque image vectorielle pourvue d\u2019une [l\xE9gende](#legende-d-image) (balise `<svg>` associ\xE9e \xE0 une [l\xE9gende](#legende-d-image) adjacente), v\xE9rifie-t-elle, si n\xE9cessaire, ces conditions\xA0?",
+          "L\u2019image vectorielle (balise `<svg>`) et sa [l\xE9gende](#legende-d-image) adjacente sont contenues dans une balise `<figure>`\xA0;",
+          'La balise `<figure>` poss\xE8de un attribut WAI-ARIA `role="figure"` ou `role="group"`\xA0;',
+          "La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la [l\xE9gende](#legende-d-image)\xA0;",
+          "La [l\xE9gende](#legende-d-image) est contenue dans une balise `<figcaption>`."
+        ],
+        "5": [
+          "Chaque image bitmap pourvue d\u2019une [l\xE9gende](#legende-d-image) (balise `<canvas>` associ\xE9e \xE0 une [l\xE9gende](#legende-d-image) adjacente), v\xE9rifie-t-elle, si n\xE9cessaire, ces conditions\xA0?",
+          "L\u2019image bitmap (balise `<canvas>`) et sa [l\xE9gende](#legende-d-image) adjacente sont contenues dans une balise `<figure>`\xA0;",
+          'La balise `<figure>` poss\xE8de un attribut WAI-ARIA `role="figure"` ou `role="group"`\xA0;',
+          "La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la [l\xE9gende](#legende-d-image)\xA0;",
+          "La [l\xE9gende](#legende-d-image) est contenue dans une balise `<figcaption>`."
+        ]
+      },
+      techniques: ["G140", "ARIA4", "ARIA6"],
+      technicalNote: [
+        'L\u2019impl\xE9mentation d\u2019un attribut WAI-ARIA `role="group"` ou `role="figure"` sur l\u2019\xE9l\xE9ment parent `<figure>` est destin\xE9 \xE0 pallier le manque de support actuel des \xE9l\xE9ments `<figure>` par les technologies d\u2019assistance. L\u2019utilisation d\u2019un \xE9l\xE9ment `<figcaption>` pour associer une [l\xE9gende](#legende-d-image) \xE0 une image impose au minimum l\u2019utilisation d\u2019un attribut WAI-ARIA `aria-label` sur l\u2019\xE9l\xE9ment parent `<figure>` dont le contenu sera identique au contenu de l\u2019\xE9l\xE9ment `<figcaption>`. Pour s\u2019assurer d\u2019un support optimal, il peut \xE9galement \xEAtre fait une association explicite entre le contenu de l\u2019[alternative textuelle](#alternative-textuelle-image) de l\u2019image et le contenu de l\u2019\xE9l\xE9ment `<figcaption>`, par exemple\xA0:',
+        '`<img src="image.png" alt="Photo\xA0: soleil couchant" /><figcaption>Photo\xA0: cr\xE9dit xxx</figcaption>`',
+        "Les attributs WAI-ARIA `aria-labelledby` et `aria-describedby` ne peuvent pas \xEAtre utilis\xE9s actuellement par manque de support par les technologies d\u2019assistance.",
+        "Note\xA0: les images l\xE9gend\xE9es doivent par ailleurs respecter le crit\xE8re 1.1 et le crit\xE8re 1.3 relatifs aux images porteuses d\u2019information."
+      ],
+      wcag: ["1.1.1", "4.1.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "2.1",
+      theme: 2,
+      title: {
+        fr: "Chaque [cadre](#cadre) a-t-il un [titre de cadre](#titre-de-cadre)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque cadre a-t-il un titre de cadre\xA0?"
+      },
+      tests: {
+        "1": ["Chaque cadre (balise `<iframe>` ou `<frame>`) a-t-il un attribut `title`\xA0?"]
+      },
+      techniques: ["H64"],
+      wcag: ["4.1.2"],
+      appliesTo: {
+        ruleIds: ["axe:frame-title", "axe:frame-title-unique", "iframe-title-missing"]
+      }
+    },
+    {
+      id: "2.2",
+      theme: 2,
+      title: {
+        fr: "Pour chaque [cadre](#cadre) ayant un [titre de cadre](#titre-de-cadre), ce titre de cadre est-il pertinent\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque cadre ayant un titre de cadre, ce titre de cadre est-il pertinent\xA0?"
+      },
+      tests: {
+        "1": ["Pour chaque cadre (balise `<iframe>` ou `<frame>`) ayant un attribut `title`, le contenu de cet attribut est-il pertinent\xA0?"]
+      },
+      techniques: ["H64"],
+      wcag: ["4.1.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "3.1",
+      theme: 3,
+      title: {
+        fr: "Dans chaque page web, l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque mot ou ensemble de mots dont la mise en couleur est porteuse d\u2019information, l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ],
+        "2": [
+          "Pour chaque indication de couleur donn\xE9e par un texte, l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ],
+        "3": [
+          "Pour chaque image [v\xE9hiculant une information](#image-vehiculant-une-information-donnee-par-la-couleur), l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ],
+        "4": [
+          "Pour chaque [propri\xE9t\xE9 CSS d\xE9terminant une couleur](#propriete-css-determinant-une-couleur) et [v\xE9hiculant une information](#image-vehiculant-une-information-donnee-par-la-couleur), l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ],
+        "5": [
+          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) [v\xE9hiculant une information](#image-vehiculant-une-information-donnee-par-la-couleur), l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ],
+        "6": [
+          "Pour chaque [m\xE9dia non temporel](#media-non-temporel) [v\xE9hiculant une information](#image-vehiculant-une-information-donnee-par-la-couleur), l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ]
+      },
+      techniques: ["G14", "G182", "G111", "G117", "G138", "G205"],
+      wcag: ["1.3.1", "1.4.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "3.2",
+      theme: 3,
+      title: {
+        fr: "Dans chaque page web, le [contraste](#contraste) entre la couleur du texte et la couleur de son arri\xE8re-plan est-il suffisamment \xE9lev\xE9 (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, le contraste entre la couleur du texte et la couleur de son arri\xE8re-plan est-il suffisamment \xE9lev\xE9 (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, le texte et le texte en image sans effet de graisse d\u2019une taille restitu\xE9e inf\xE9rieure \xE0 24px v\xE9rifient-ils une de ces conditions (hors cas particuliers)\xA0?",
+          "Le rapport de [contraste](#contraste) entre le texte et son arri\xE8re-plan est de 4.5:1, au moins\xA0;",
+          "Un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de [contraste](#contraste) de 4.5:1, au moins."
+        ],
+        "2": [
+          "Dans chaque page web, le texte et le texte en image en gras d\u2019une taille restitu\xE9e inf\xE9rieure \xE0 18,5px v\xE9rifient-ils une de ces conditions (hors cas particuliers)\xA0?",
+          "Le rapport de [contraste](#contraste) entre le texte et son arri\xE8re-plan est de 4.5:1, au moins\xA0;",
+          "Un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de [contraste](#contraste) de 4.5:1, au moins."
+        ],
+        "3": [
+          "Dans chaque page web, le texte et le texte en image sans effet de graisse d\u2019une taille restitu\xE9e sup\xE9rieure ou \xE9gale \xE0 24px v\xE9rifient-ils une de ces conditions (hors cas particuliers)\xA0?",
+          "Le rapport de [contraste](#contraste) entre le texte et son arri\xE8re-plan est de 3:1, au moins\xA0;",
+          "Un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de [contraste](#contraste) de 3:1, au moins."
+        ],
+        "4": [
+          "Dans chaque page web, le texte et le texte en image en gras d\u2019une taille restitu\xE9e sup\xE9rieure ou \xE9gale \xE0 18,5px v\xE9rifient-ils une de ces conditions (hors cas particuliers)\xA0?",
+          "Le rapport de [contraste](#contraste) entre le texte et son arri\xE8re-plan est de 3:1, au moins\xA0;",
+          "Un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de [contraste](#contraste) de 3:1, au moins."
+        ],
+        "5": [
+          "Dans le [m\xE9canisme qui permet d\u2019afficher un rapport de contraste](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) conforme, le rapport de contraste entre le texte et la couleur d\u2019arri\xE8re-plan est-il suffisamment \xE9lev\xE9\xA0?"
+        ]
+      },
+      techniques: ["G18", "G136", "G148", "G174", "G145", "C29"],
+      particularCases: [
+        "Dans ces situations, les crit\xE8res sont non applicables pour ces \xE9l\xE9ments\xA0:",
+        "- Le texte fait partie d\u2019un logo ou d\u2019un nom de marque d\u2019un organisme ou d\u2019une soci\xE9t\xE9\xA0;",
+        "- Le texte ou l\u2019image de texte est purement d\xE9coratif\xA0;",
+        "- Le texte fait partie d\u2019une image v\xE9hiculant une information mais le texte lui-m\xEAme n\u2019apporte aucune information essentielle\xA0;",
+        "- Le texte ou l\u2019image de texte fait partie d\u2019un \xE9l\xE9ment d\u2019interface sur lequel aucune action n\u2019est possible (par exemple un bouton avec l\u2019attribut `disabled`)."
+      ],
+      wcag: ["1.4.3"],
+      appliesTo: {
+        ruleIds: ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
+      }
+    },
+    {
+      id: "3.3",
+      theme: 3,
+      title: {
+        fr: "Dans chaque page web, les couleurs utilis\xE9es dans les [composants d\u2019interface](#composant-d-interface) ou les \xE9l\xE9ments graphiques porteurs d\u2019informations sont-elles suffisamment contrast\xE9es (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les couleurs utilis\xE9es dans les composants d\u2019interface ou les \xE9l\xE9ments graphiques porteurs d\u2019informations sont-elles suffisamment contrast\xE9es (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, le rapport de [contraste](#contraste) entre les couleurs d\u2019un [composant d\u2019interface](#composant-d-interface) dans ses diff\xE9rents \xE9tats et la [couleur d\u2019arri\xE8re-plan contigu\xEB](#couleur-d-arriere-plan-contigue-et-couleur-contigue) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "Le rapport de [contraste](#contraste) est de 3:1, au moins\xA0;",
+          "Un [m\xE9canisme](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) permet un rapport de [contraste](#contraste) de 3:1, au moins."
+        ],
+        "2": [
+          "Dans chaque page web, le rapport de [contraste](#contraste) des diff\xE9rentes couleurs composant un [\xE9l\xE9ment graphique](#element-graphique), lorsqu\u2019elles sont n\xE9cessaires \xE0 sa compr\xE9hension, et la [couleur d\u2019arri\xE8re-plan contigu\xEB](#couleur-d-arriere-plan-contigue-et-couleur-contigue), v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "Le rapport de [contraste](#contraste) est de 3:1, au moins\xA0;",
+          "Un [m\xE9canisme](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) permet un rapport de [contraste](#contraste) de 3:1, au moins."
+        ],
+        "3": [
+          "Dans chaque page web, le rapport de [contraste](#contraste) des diff\xE9rentes [couleurs contigu\xEBs](#couleur-d-arriere-plan-contigue-et-couleur-contigue) entre elles d\u2019un [\xE9l\xE9ment graphique](#element-graphique), lorsqu\u2019elles sont n\xE9cessaires \xE0 sa compr\xE9hension, v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "Le rapport de [contraste](#contraste) est de 3:1, au moins\xA0;",
+          "Un [m\xE9canisme](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) permet un rapport de [contraste](#contraste) de 3:1, au moins."
+        ],
+        "4": [
+          "Dans le [m\xE9canisme qui permet d\u2019afficher un rapport de contraste](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) conforme, les couleurs du composant ou des \xE9l\xE9ments graphiques porteurs d\u2019informations qui le composent, sont-elles suffisamment contrast\xE9es\xA0?"
+        ]
+      },
+      techniques: ["G18", "G195", "G207", "G174", "G145", "G183", "F78"],
+      particularCases: [
+        "Les cas suivants sont non applicables pour ce crit\xE8re\xA0:",
+        "- Composant d\u2019interface inactif (par exemple, un bouton avec un attribut `disabled`) sur lequel aucune action n\u2019est possible\xA0;",
+        "- Composant d\u2019interface pour lequel l\u2019apparence est g\xE9r\xE9e par les styles natifs du navigateur sans aucune modification par l\u2019auteur (par exemple, le style au focus natif dans Chrome ou Firefox)\xA0;",
+        "- Composant d\u2019interface pour lequel la couleur n\u2019est pas n\xE9cessaire pour identifier le composant ou son \xE9tat (par exemple, un groupe de liens faisant office de navigation dont la position dans la page, la taille et la couleur du texte permettent de comprendre qu\u2019il s\u2019agit de liens m\xEAme si la couleur du soulignement des liens avec le fond blanc n\u2019a pas un ratio de 3:1 et que le texte lui a un ratio de 4.5:1)\xA0;",
+        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique non porteur d\u2019information ou ayant une alternative (description longue, informations identiques visibles dans la page)\xA0;",
+        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique faisant partie d\u2019un logo ou du nom de marque d\u2019un organisme ou d\u2019une soci\xE9t\xE9\xA0;",
+        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique dont la pr\xE9sentation est essentielle \xE0 l\u2019information v\xE9hicul\xE9e (par exemple, drapeaux, logotypes, photos de personnes ou de sc\xE8nes, captures d\u2019\xE9cran, diagrammes m\xE9dicaux, carte de chaleurs)\xA0;",
+        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique dynamiques dont le contraste au survol / focus est suffisant."
+      ],
+      wcag: ["1.4.11"],
+      appliesTo: {
+        ruleIds: ["rendered-nontext-contrast"]
+      }
+    },
+    {
+      id: "4.1",
+      theme: 4,
+      title: {
+        fr: "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, une [transcription textuelle](#transcription-textuelle-media-temporel) ou une [audiodescription](#audiodescription-synchronisee-media-temporel) (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque m\xE9dia temporel pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, une transcription textuelle ou une audiodescription (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement audio, v\xE9rifie-t-il, si n\xE9cessaire, l\u2019une de ces conditions (hors cas particuliers)\xA0?",
+          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)\xA0;",
+          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) adjacente clairement identifiable."
+        ],
+        "2": [
+          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement vid\xE9o v\xE9rifie-t-il, si n\xE9cessaire, l\u2019une de ces conditions (hors cas particuliers)\xA0?",
+          "Il existe une [version alternative \xAB\xA0audio seulement\xA0\xBB](#version-alternative-audio-seulement) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)\xA0;",
+          "Il existe une [version alternative \xAB\xA0audio seulement\xA0\xBB](#version-alternative-audio-seulement) adjacente clairement identifiable\xA0;",
+          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)\xA0;",
+          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) adjacente clairement identifiable\xA0;",
+          "Il existe une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e\xA0;",
+          "Il existe une version alternative avec une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)."
+        ],
+        "3": [
+          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 v\xE9rifie-t-il, si n\xE9cessaire, une de ces conditions (hors cas particuliers)\xA0?",
+          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)\xA0;",
+          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) adjacente clairement identifiable\xA0;",
+          "Il existe une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e\xA0;",
+          "Il existe une version alternative avec une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)."
+        ]
+      },
+      techniques: ["G58", "G69", "G78", "G158", "G159", "G173", "G8", "G166", "H96", "SM6", "SM7"],
+      particularCases: [
+        "Il existe une gestion de cas particulier lorsque\xA0:",
+        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est utilis\xE9 \xE0 des fins d\xE9coratives (c\u2019est-\xE0-dire qu\u2019il n\u2019apporte aucune information)\xA0;",
+        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est lui-m\xEAme une alternative \xE0 un contenu de la page (une vid\xE9o en langue des signes ou la vocalisation d\u2019un texte, par exemple)\xA0;",
+        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est utilis\xE9 pour acc\xE9der \xE0 une version agrandie\xA0;",
+        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est utilis\xE9 comme un [CAPTCHA](#captcha)\xA0;",
+        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) fait partie d\u2019un test qui deviendrait inutile si la [transcription textuelle](#transcription-textuelle-media-temporel), les [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia) ou l\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) \xE9taient communiqu\xE9s\xA0;",
+        "- Pour les services de l\u2019\xC9tat, les collectivit\xE9s territoriales et leurs \xE9tablissements\xA0: si le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) a \xE9t\xE9 publi\xE9 entre le 23 septembre 2019 et le 23 septembre 2020 sur un site internet, intranet ou extranet cr\xE9\xE9 depuis le 23 septembre 2018, il est exempt\xE9 de l\u2019obligation d\u2019accessibilit\xE9\xA0;",
+        "- Pour les personnes de droit priv\xE9 mentionn\xE9es aux 2\xB0 \xE0 4\xB0 du I de l\u2019article 47 de la loi du 11 f\xE9vrier 2005\xA0: si le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) a \xE9t\xE9 publi\xE9 avant le 23 septembre 2020, il est exempt\xE9 de l\u2019obligation d\u2019accessibilit\xE9.",
+        "Dans ces situations, le crit\xE8re est non applicable.",
+        "Ce cas particulier s\u2019applique \xE9galement aux crit\xE8res 4.2, 4.3, 4.5."
+      ],
+      wcag: ["1.2.1", "1.2.3"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "4.2",
+      theme: 4,
+      title: {
+        fr: "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 ayant une [transcription textuelle](#transcription-textuelle-media-temporel) ou une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e, celles-ci sont-elles pertinentes (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque m\xE9dia temporel pr\xE9-enregistr\xE9 ayant une transcription textuelle ou une audiodescription synchronis\xE9e, celles-ci sont-elles pertinentes (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement audio, ayant une [transcription textuelle](#transcription-textuelle-media-temporel), celle-ci est-elle pertinente (hors cas particuliers)\xA0?"
+        ],
+        "2": [
+          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement vid\xE9o v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "La [transcription textuelle](#transcription-textuelle-media-temporel) est pertinente\xA0;",
+          "L\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e est pertinente\xA0;",
+          "L\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e de la version alternative est pertinente\xA0;",
+          "La version alternative audio seulement est pertinente."
+        ],
+        "3": [
+          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "La [transcription textuelle](#transcription-textuelle-media-temporel) est pertinente\xA0;",
+          "L\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e est pertinente\xA0;",
+          "L\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e de la version alternative est pertinente."
+        ]
+      },
+      techniques: ["F30", "F67", "SM6", "SM7"],
+      particularCases: ["Voir cas particuliers crit\xE8re 4.1."],
+      wcag: ["1.2.1", "1.2.3"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "4.3",
+      theme: 4,
+      title: {
+        fr: "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia) (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque m\xE9dia temporel synchronis\xE9 pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, des sous-titres synchronis\xE9s (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 v\xE9rifie-t-il, si n\xE9cessaire, l\u2019une de ces conditions (hors cas particuliers)\xA0?",
+          "Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 poss\xE8de des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia)\xA0;",
+          "Il existe une version alternative poss\xE9dant des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)."
+        ],
+        "2": [
+          'Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 poss\xE9dant des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia) diffus\xE9s via une balise `<track>`, la balise `<track>` poss\xE8de-t-elle un attribut `kind="captions"`\xA0?'
+        ]
+      },
+      techniques: ["G58", "G93", "G87", "H95", "SM11", "SM12", "F74", "F75"],
+      particularCases: ["Voir cas particuliers crit\xE8re 4.1."],
+      wcag: ["1.2.2"],
+      appliesTo: {
+        ruleIds: ["axe:audio-caption", "axe:video-caption", "media-no-track"]
+      }
+    },
+    {
+      id: "4.4",
+      theme: 4,
+      title: {
+        fr: "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 ayant des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia), ces sous-titres sont-ils pertinents\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque m\xE9dia temporel synchronis\xE9 pr\xE9-enregistr\xE9 ayant des sous-titres synchronis\xE9s, ces sous-titres sont-ils pertinents\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 ayant des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia), ces sous-titres sont-ils pertinents\xA0?"
+        ]
+      },
+      techniques: ["G93", "G87", "SM11", "SM12", "F8", "F74", "F75"],
+      wcag: ["1.2.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "4.5",
+      theme: 4,
+      title: {
+        fr: "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque m\xE9dia temporel pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, une audiodescription synchronis\xE9e (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement vid\xE9o v\xE9rifie-t-il, si n\xE9cessaire, une de ces conditions (hors cas particuliers)\xA0?",
+          "Il existe une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e\xA0;",
+          "Il existe une version alternative avec une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e."
+        ],
+        "2": [
+          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 v\xE9rifie-t-il, si n\xE9cessaire, une de ces conditions (hors cas particuliers)\xA0?",
+          "Il existe une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e\xA0;",
+          "Il existe une version alternative avec une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e."
+        ]
+      },
+      techniques: ["G8", "G58", "G78", "G173", "H96", "SM1", "SM2", "SM6", "SM7"],
+      particularCases: ["Voir cas particuliers crit\xE8re 4.1."],
+      wcag: ["1.2.5"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "4.6",
+      theme: 4,
+      title: {
+        fr: "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 ayant une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e, celle-ci est-elle pertinente\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque m\xE9dia temporel pr\xE9-enregistr\xE9 ayant une audiodescription synchronis\xE9e, celle-ci est-elle pertinente\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement vid\xE9o ayant une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e, celle-ci est-elle pertinente\xA0?"
+        ],
+        "2": [
+          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 ayant une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e, celle-ci est-elle pertinente\xA0?"
+        ]
+      },
+      techniques: ["SM1", "SM2", "SM6", "SM7"],
+      wcag: ["1.2.5"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "4.7",
+      theme: 4,
+      title: {
+        fr: "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est-il clairement identifiable (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque m\xE9dia temporel est-il clairement identifiable (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) seulement son, seulement vid\xE9o ou synchronis\xE9, le contenu textuel adjacent permet-il d\u2019identifier clairement le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) (hors cas particuliers)\xA0?"
+        ]
+      },
+      techniques: ["G68", "G100"],
+      particularCases: [
+        "Il existe une gestion de cas particulier lorsque le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est utilis\xE9 \xE0 des fins d\xE9coratives (c\u2019est-\xE0-dire qu\u2019il n\u2019apporte aucune information). Dans cette situation, le crit\xE8re est non applicable."
+      ],
+      wcag: ["1.1.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "4.8",
+      theme: 4,
+      title: {
+        fr: "Chaque [m\xE9dia non temporel](#media-non-temporel) a-t-il, si n\xE9cessaire, une alternative (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque m\xE9dia non temporel a-t-il, si n\xE9cessaire, une alternative (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [m\xE9dia non temporel](#media-non-temporel) v\xE9rifie-t-il, si n\xE9cessaire, une de ces conditions (hors cas particuliers)\xA0?",
+          "Un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent), clairement identifiable, permet d\u2019acc\xE9der \xE0 une page contenant une alternative\xA0;",
+          "Un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent), clairement identifiable, permet d\u2019acc\xE9der \xE0 une alternative dans la page."
+        ],
+        "2": [
+          "Chaque [m\xE9dia non temporel](#media-non-temporel) associ\xE9 \xE0 une alternative v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "La page r\xE9f\xE9renc\xE9e par le [lien ou bouton adjacent](#lien-ou-bouton-adjacent) est accessible\xA0;",
+          "L\u2019alternative dans la page, r\xE9f\xE9renc\xE9e par le [lien ou bouton adjacent](#lien-ou-bouton-adjacent), est accessible."
+        ]
+      },
+      techniques: ["H35", "H46"],
+      particularCases: [
+        "Il existe une gestion de cas particulier lorsque\xA0:",
+        "- Le [m\xE9dia non temporel](#media-non-temporel) est utilis\xE9 \xE0 des fins d\xE9coratives (c\u2019est-\xE0-dire qu\u2019il n\u2019apporte aucune information)\xA0;",
+        "- Le [m\xE9dia non temporel](#media-non-temporel) est diffus\xE9 dans un [environnement ma\xEEtris\xE9](#environnement-maitrise)\xA0;",
+        "- Le [m\xE9dia non temporel](#media-non-temporel) est ins\xE9r\xE9 via JavaScript en v\xE9rifiant la pr\xE9sence et la version du plug-in, en remplacement d\u2019un [contenu alternatif](#contenu-alternatif) d\xE9j\xE0 pr\xE9sent.",
+        "Dans ces situations, le crit\xE8re est non applicable."
+      ],
+      wcag: ["1.1.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "4.9",
+      theme: 4,
+      title: {
+        fr: "Pour chaque [m\xE9dia non temporel](#media-non-temporel) ayant une alternative, cette alternative est-elle pertinente\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque m\xE9dia non temporel ayant une alternative, cette alternative est-elle pertinente\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque [m\xE9dia non temporel](#media-non-temporel) ayant une alternative, cette alternative permet-elle d\u2019acc\xE9der au m\xEAme contenu et \xE0 des fonctionnalit\xE9s similaires\xA0?"
+        ]
+      },
+      techniques: ["H46", "F30"],
+      wcag: ["1.1.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "4.10",
+      theme: 4,
+      title: {
+        fr: "Chaque son d\xE9clench\xE9 automatiquement est-il [contr\xF4lable](#controle-son-declenche-automatiquement) par l\u2019utilisateur\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque son d\xE9clench\xE9 automatiquement est-il contr\xF4lable par l\u2019utilisateur\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque s\xE9quence sonore d\xE9clench\xE9e automatiquement via une balise `<object>`, `<video>`, `<audio>`, `<embed>`, `<bgsound>` ou un code JavaScript v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "La s\xE9quence sonore a une dur\xE9e inf\xE9rieure ou \xE9gale \xE0 3 secondes\xA0;",
+          "La s\xE9quence sonore peut \xEAtre stopp\xE9e sur action de l\u2019utilisateur\xA0;",
+          "Le volume de la s\xE9quence sonore peut \xEAtre contr\xF4l\xE9 par l\u2019utilisateur ind\xE9pendamment du contr\xF4le de volume du syst\xE8me."
+        ]
+      },
+      techniques: ["G60", "G170", "G171", "F23", "F93"],
+      wcag: ["1.4.2"],
+      appliesTo: {
+        ruleIds: ["autoplay-media", "axe:no-autoplay-audio"]
+      },
+      judgment: true
+    },
+    {
+      id: "4.11",
+      theme: 4,
+      title: {
+        fr: "La consultation de chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est-elle, si n\xE9cessaire, [contr\xF4lable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0?"
+      },
+      titlePlain: {
+        fr: "La consultation de chaque m\xE9dia temporel est-elle, si n\xE9cessaire, contr\xF4lable par le clavier et tout dispositif de pointage\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) a-t-il, si n\xE9cessaire, les fonctionnalit\xE9s de [contr\xF4le de sa consultation](#controle-de-la-consultation-d-un-media-temporel)\xA0?"
+        ],
+        "2": [
+          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise), chaque fonctionnalit\xE9 v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "La fonctionnalit\xE9 est [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0;",
+          "Une fonctionnalit\xE9 [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page."
+        ],
+        "3": [
+          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise), chaque fonctionnalit\xE9 v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "La fonctionnalit\xE9 est [activable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0;",
+          "Une fonctionnalit\xE9 [activable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page."
+        ]
+      },
+      techniques: ["G4", "G90", "G202"],
+      wcag: ["2.1.1", "2.1.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "4.12",
+      theme: 4,
+      title: {
+        fr: "La consultation de chaque [m\xE9dia non temporel](#media-non-temporel) est-elle [contr\xF4lable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0?"
+      },
+      titlePlain: {
+        fr: "La consultation de chaque m\xE9dia non temporel est-elle contr\xF4lable par le clavier et tout dispositif de pointage\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque [m\xE9dia non temporel](#media-non-temporel), chaque fonctionnalit\xE9 v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "La fonctionnalit\xE9 est [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0;",
+          "Une fonctionnalit\xE9 [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page."
+        ],
+        "2": [
+          "Pour chaque [m\xE9dia non temporel](#media-non-temporel), chaque fonctionnalit\xE9 v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "La fonctionnalit\xE9 est [activable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0;",
+          "Une fonctionnalit\xE9 [activable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page."
+        ]
+      },
+      techniques: ["G4", "G90"],
+      wcag: ["2.1.1", "2.1.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "4.13",
+      theme: 4,
+      title: {
+        fr: "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) et [non temporel](#media-non-temporel) est-il [compatible avec les technologies d\u2019assistance](#compatible-avec-les-technologies-d-assistance) (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque m\xE9dia temporel et non temporel est-il compatible avec les technologies d\u2019assistance (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) et [non temporel](#media-non-temporel) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "Le nom, le r\xF4le, la valeur, le param\xE9trage et les changements d\u2019\xE9tats des composants d\u2019interfaces sont accessibles aux technologies d\u2019assistance via une API d\u2019accessibilit\xE9\xA0;",
+          "Une alternative [compatible avec une API d\u2019accessibilit\xE9](#compatible-avec-les-technologies-d-assistance) permet d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s."
+        ],
+        "2": [
+          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) et [non temporel](#media-non-temporel) qui poss\xE8de une alternative [compatible avec les technologies d\u2019assistance](#compatible-avec-les-technologies-d-assistance), v\xE9rifie-t-il une de ces conditions\xA0?",
+          "L\u2019alternative est adjacente au [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) ou [non temporel](#media-non-temporel)\xA0;",
+          "L\u2019alternative est accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)\xA0;",
+          "Un m\xE9canisme permet de remplacer le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) ou [non temporel](#media-non-temporel) par son alternative."
+        ]
+      },
+      techniques: ["G10", "G135", "F15", "F54"],
+      particularCases: [
+        "Il existe une gestion de cas particulier lorsque\xA0le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) ou [non temporel](#media-non-temporel) est utilis\xE9 \xE0 des fins d\xE9coratives (c\u2019est-\xE0-dire qu\u2019il n\u2019apporte aucune information).",
+        "Dans ces situations, le crit\xE8re est non applicable."
+      ],
+      wcag: ["4.1.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "5.1",
+      theme: 5,
+      title: {
+        fr: "Chaque [tableau de donn\xE9es complexe](#tableau-de-donnees-complexe) a-t-il un [r\xE9sum\xE9](#resume-de-tableau)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque tableau de donn\xE9es complexe a-t-il un r\xE9sum\xE9\xA0?"
+      },
+      tests: {
+        "1": ["Pour chaque [tableau de donn\xE9es complexe](#tableau-de-donnees-complexe), un [r\xE9sum\xE9](#resume-de-tableau) est-il disponible\xA0?"]
+      },
+      techniques: ["H73"],
+      technicalNote: [
+        "La sp\xE9cification HTML propose plusieurs [m\xE9thodes pour lier un r\xE9sum\xE9 \xE0 un tableau](#table-descriptions-techniques) (tableau li\xE9 \xE0 un passage de texte avec l\u2019attribut `aria-describedby`, tableau group\xE9 dans un \xE9l\xE9ment `figure` avec un r\xE9sum\xE9 pr\xE9sent dans un \xE9l\xE9ment `figcaption` ou un \xE9l\xE9ment `p`, r\xE9sum\xE9 pr\xE9sent dans un \xE9l\xE9ment `details` contenu dans l\u2019\xE9l\xE9ment `caption`). Ces m\xE9thodes n\u2019ont pas un support suffisant pour \xEAtre utilis\xE9es actuellement."
+      ],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "5.2",
+      theme: 5,
+      title: {
+        fr: "Pour chaque [tableau de donn\xE9es complexe](#tableau-de-donnees-complexe) ayant un [r\xE9sum\xE9](#resume-de-tableau), celui-ci est-il pertinent\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque tableau de donn\xE9es complexe ayant un r\xE9sum\xE9, celui-ci est-il pertinent\xA0?"
+      },
+      tests: {
+        "1": ["Pour chaque [tableau de donn\xE9es complexe](#tableau-de-donnees-complexe) ayant un [r\xE9sum\xE9](#resume-de-tableau), celui-ci est-il pertinent\xA0?"]
+      },
+      techniques: ["H73"],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "5.3",
+      theme: 5,
+      title: {
+        fr: "Pour chaque [tableau de mise en forme](#tableau-de-mise-en-forme), le contenu lin\xE9aris\xE9 reste-t-il compr\xE9hensible\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque tableau de mise en forme, le contenu lin\xE9aris\xE9 reste-t-il compr\xE9hensible\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [tableau de mise en forme](#tableau-de-mise-en-forme) v\xE9rifie-t-il ces conditions\xA0?",
+          "Le contenu lin\xE9aris\xE9 reste compr\xE9hensible\xA0;",
+          'La balise `<table>` poss\xE8de un attribut `role="presentation"`.'
+        ]
+      },
+      techniques: ["F49", "ARIA4"],
+      wcag: ["1.3.2", "4.1.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "5.4",
+      theme: 5,
+      title: {
+        fr: "Pour chaque [tableau de donn\xE9es ayant un titre](#tableau-de-donnees-ayant-un-titre), le titre est-il correctement associ\xE9 au tableau de donn\xE9es\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque tableau de donn\xE9es ayant un titre, le titre est-il correctement associ\xE9 au tableau de donn\xE9es\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque [tableau de donn\xE9es ayant un titre](#tableau-de-donnees-ayant-un-titre), le titre est-il correctement associ\xE9 au tableau de donn\xE9es\xA0?"
+        ]
+      },
+      techniques: ["H39"],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: ["table-caption-missing"]
+      }
+    },
+    {
+      id: "5.5",
+      theme: 5,
+      title: {
+        fr: "Pour chaque [tableau de donn\xE9es ayant un titre](#tableau-de-donnees-ayant-un-titre), celui-ci est-il pertinent\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque tableau de donn\xE9es ayant un titre, celui-ci est-il pertinent\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque [tableau de donn\xE9es ayant un titre](#tableau-de-donnees-ayant-un-titre), ce titre permet-il d\u2019identifier le contenu du [tableau de donn\xE9es](#tableau-de-donnees) de mani\xE8re claire et concise\xA0?"
+        ]
+      },
+      techniques: ["H39"],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "5.6",
+      theme: 5,
+      title: {
+        fr: "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), chaque [en-t\xEAte de colonne](#en-tete-de-colonne-ou-de-ligne) et chaque [en-t\xEAte de ligne](#en-tete-de-colonne-ou-de-ligne) sont-ils correctement d\xE9clar\xE9s\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque tableau de donn\xE9es, chaque en-t\xEAte de colonne et chaque en-t\xEAte de ligne sont-ils correctement d\xE9clar\xE9s\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), chaque [en-t\xEAte de colonne](#en-tete-de-colonne-ou-de-ligne) s\u2019appliquant \xE0 la totalit\xE9 de la colonne v\xE9rifie-t-il une de ces conditions\xA0?",
+          "L\u2019[en-t\xEAte de colonnes](#en-tete-de-colonne-ou-de-ligne) est structur\xE9 au moyen d\u2019une balise `<th>`\xA0;",
+          'L\u2019[en-t\xEAte de colonnes](#en-tete-de-colonne-ou-de-ligne) est structur\xE9 au moyen d\u2019une balise pourvue d\u2019un attribut WAI-ARIA `role="columnheader"`.'
+        ],
+        "2": [
+          "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), chaque [en-t\xEAte de ligne](#en-tete-de-colonne-ou-de-ligne) s\u2019appliquant \xE0 la totalit\xE9 de la ligne v\xE9rifie-t-il une de ces conditions\xA0?",
+          "L\u2019[en-t\xEAte de lignes](#en-tete-de-colonne-ou-de-ligne) est structur\xE9 au moyen d\u2019une balise `<th>`\xA0;",
+          'L\u2019[en-t\xEAte de lignes](#en-tete-de-colonne-ou-de-ligne) est structur\xE9 au moyen d\u2019une balise pourvue d\u2019un attribut WAI-ARIA `role="rowheader"`.'
+        ],
+        "3": [
+          "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), chaque en-t\xEAte ne s\u2019appliquant pas \xE0 la totalit\xE9 de la ligne ou de la colonne est-il structur\xE9 au moyen d\u2019une balise `<th>`\xA0?"
+        ],
+        "4": [
+          "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), chaque cellule associ\xE9e \xE0 plusieurs en-t\xEAtes est-elle structur\xE9e au moyen d\u2019une balise `<td>` ou `<th>`\xA0?"
+        ]
+      },
+      techniques: ["H51", "F91"],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: ["axe:empty-table-header", "axe:td-has-header", "axe:th-has-data-cells", "data-table-no-headers"]
+      }
+    },
+    {
+      id: "5.7",
+      theme: 5,
+      title: {
+        fr: "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), la technique appropri\xE9e permettant d\u2019associer chaque cellule avec ses [en-t\xEAtes](#en-tete-de-colonne-ou-de-ligne) est-elle utilis\xE9e (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque tableau de donn\xE9es, la technique appropri\xE9e permettant d\u2019associer chaque cellule avec ses en-t\xEAtes est-elle utilis\xE9e (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque contenu de balise `<th>` s\u2019appliquant \xE0 la totalit\xE9 de la ligne ou de la colonne, la balise `<th>` respecte-t-elle une de ces conditions (hors cas particuliers)\xA0?",
+          "La balise `<th>` poss\xE8de un attribut `id` unique\xA0;",
+          "La balise `<th>` poss\xE8de un attribut `scope`\xA0;",
+          'La balise `<th>` poss\xE8de un attribut WAI-ARIA `role="rowheader"` ou `role="columnheader"`.'
+        ],
+        "2": [
+          "Pour chaque contenu de balise `<th>` s\u2019appliquant \xE0 la totalit\xE9 de la ligne ou de la colonne et poss\xE9dant un attribut `scope`, la balise `<th>` v\xE9rifie-t-elle une de ces conditions\xA0?",
+          'La balise `<th>` poss\xE8de un attribut `scope` avec la valeur `"row"` pour les [en-t\xEAtes de ligne](#en-tete-de-colonne-ou-de-ligne)\xA0;',
+          'La balise `<th>` poss\xE8de un attribut `scope` avec la valeur `"col"` pour les [en-t\xEAtes de colonne](#en-tete-de-colonne-ou-de-ligne).'
+        ],
+        "3": [
+          "Pour chaque contenu de balise `<th>` ne s\u2019appliquant pas \xE0 la totalit\xE9 de la ligne ou de la colonne, la balise `<th>` v\xE9rifie-t-elle ces conditions\xA0?",
+          "La balise `<th>` ne poss\xE8de pas d\u2019attribut `scope`\xA0;",
+          'La balise `<th>` ne poss\xE8de pas d\u2019attribut WAI-ARIA `role="rowheader"` ou `role="columnheader"`\xA0;',
+          "La balise `<th>` poss\xE8de un attribut `id` unique."
+        ],
+        "4": [
+          "Pour chaque contenu de balise `<td>` ou `<th>` associ\xE9e \xE0 un ou plusieurs en-t\xEAtes poss\xE9dant un attribut `id`, la balise v\xE9rifie-t-elle ces conditions\xA0?",
+          "La balise poss\xE8de un attribut `headers`\xA0;",
+          "L\u2019attribut `headers` poss\xE8de la liste des valeurs d\u2019attribut `id` des [en-t\xEAtes](#en-tete-de-colonne-ou-de-ligne) associ\xE9s."
+        ],
+        "5": [
+          'Pour chaque balise pourvue d\u2019un attribut WAI-ARIA `role="rowheader"` ou `role="columnheader"` dont le contenu s\u2019applique \xE0 la totalit\xE9 de la ligne ou de la colonne, la balise v\xE9rifie-t-elle une de ces conditions\xA0?',
+          'La balise poss\xE8de un attribut WAI-ARIA `role="rowheader"` pour les [en-t\xEAtes de ligne](#en-tete-de-colonne-ou-de-ligne)\xA0;',
+          'La balise poss\xE8de un attribut WAI-ARIA `role="columnheader"` pour les [en-t\xEAtes de colonne](#en-tete-de-colonne-ou-de-ligne).'
+        ]
+      },
+      techniques: ["H43", "H63", "F90"],
+      technicalNote: [
+        "Si l\u2019attribut `headers` est impl\xE9ment\xE9 sur une cellule d\xE9j\xE0 reli\xE9e \xE0 un en-t\xEAte (de ligne ou de colonne) avec l\u2019attribut `scope` (avec la valeur `col` ou `row`), c\u2019est l\u2019en-t\xEAte ou les en-t\xEAtes r\xE9f\xE9renc\xE9s par l\u2019attribut `headers` qui seront restitu\xE9s aux technologies d\u2019assistance. Les en-t\xEAtes reli\xE9s avec l\u2019attribut `scope` seront ignor\xE9s."
+      ],
+      particularCases: [
+        "Dans le cas de tableaux de donn\xE9es ayant des en-t\xEAtes sur une seule ligne ou une seule colonne, les en-t\xEAtes peuvent \xEAtre structur\xE9s \xE0 l\u2019aide de balise `<th>` sans attribut `scope`."
+      ],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: ["axe:scope-attr-valid", "axe:td-headers-attr", "data-table-no-headers", "sortable-header-no-aria-sort", "table-empty-data-cell"]
+      }
+    },
+    {
+      id: "5.8",
+      theme: 5,
+      title: {
+        fr: "Chaque [tableau de mise en forme](#tableau-de-mise-en-forme) ne doit pas utiliser d\u2019\xE9l\xE9ments propres aux  [tableaux de donn\xE9es](#tableau-de-donnees). Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque tableau de mise en forme ne doit pas utiliser d\u2019\xE9l\xE9ments propres aux  tableaux de donn\xE9es. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [tableau de mise en forme](#tableau-de-mise-en-forme) (balise `<table>`) v\xE9rifie-t-il ces conditions\xA0?",
+          'Le tableau de mise en forme (balise `<table>`) n\u2019a pas d\u2019attribut `summary` (sinon vide) et ne contient pas de balises `<caption>`, `<th>`, `<thead>`, `<tfoot>` ou de balises ayant un attribut WAI-ARIA `role="rowheader"`, `role="columnheader"`\xA0;',
+          "Les cellules du tableau de mise en forme (balises `<td>`) ne poss\xE8dent pas d\u2019attributs `scope`, `headers` et `axis`."
+        ]
+      },
+      techniques: ["F46"],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: ["axe:table-fake-caption", "layout-table-data-markup"]
+      }
+    },
+    {
+      id: "6.1",
+      theme: 6,
+      title: {
+        fr: "Chaque [lien](#lien) est-il explicite (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque lien est-il explicite (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [lien texte](#lien-texte) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) seul permet d\u2019en comprendre la fonction et la destination\xA0;",
+          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) additionn\xE9 au [contexte du lien](#contexte-du-lien) permet d\u2019en comprendre la fonction et la destination."
+        ],
+        "2": [
+          "Chaque [lien image](#lien-image) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) seul permet d\u2019en comprendre la fonction et la destination\xA0;",
+          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) additionn\xE9 au [contexte du lien](#contexte-du-lien) permet d\u2019en comprendre la fonction et la destination."
+        ],
+        "3": [
+          "Chaque [lien composite](#lien-composite) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) seul permet d\u2019en comprendre la fonction et la destination\xA0;",
+          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) additionn\xE9 au [contexte du lien](#contexte-du-lien) permet d\u2019en comprendre la fonction et la destination."
+        ],
+        "4": [
+          "Chaque [lien SVG](#lien-svg) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) seul permet d\u2019en comprendre la fonction et la destination\xA0;",
+          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) additionn\xE9 au [contexte du lien](#contexte-du-lien) permet d\u2019en comprendre la fonction et la destination."
+        ],
+        "5": [
+          "Pour chaque [lien](#lien) ayant un [intitul\xE9 visible](#intitule-visible), le [nom accessible du lien](#intitule-ou-nom-accessible-de-lien) contient-il au moins l\u2019[intitul\xE9 visible](#intitule-visible) (hors cas particuliers)\xA0?"
+        ]
+      },
+      techniques: ["H30", "H78", "H79", "H80", "H81", "G53", "G91", "F63", "F89", "ARIA7", "ARIA8"],
+      technicalNote: [
+        "Lorsque l\u2019intitul\xE9 visible est compl\xE9t\xE9 par une autre expression dans le nom accessible\xA0:",
+        "- WCAG insiste sur le placement de l\u2019intitul\xE9 visible au d\xE9but du nom accessible sans toutefois r\xE9server l\u2019exclusivit\xE9 de cet emplacement\xA0;",
+        "- WCAG consid\xE8re comme un cas d\u2019\xE9chec une correspondance non exacte de la cha\xEEne de caract\xE8res de l\u2019intitul\xE9 visible au sein du nom accessible.",
+        "Par exemple, si l\u2019on consid\xE8re l\u2019intitul\xE9 visible \xAB\xA0Commander maintenant\xA0\xBB compl\xE9t\xE9 dans le nom accessible par l\u2019expression \xAB\xA0produit X\xA0\xBB, on peut avoir les diff\xE9rents cas suivants\xA0:",
+        "- \xAB\xA0Commander maintenant produit X\xA0\xBB est valide (bonne pratique)\xA0;",
+        "- \xAB\xA0Produit X : commander maintenant\xA0\xBB est valide\xA0;",
+        "- \xAB\xA0Commander produit X maintenant\xA0\xBB est non valide."
+      ],
+      particularCases: [
+        "Il existe une gestion de cas particuliers pour les tests 6.1.1, 6.1.2, 6.1.3 et 6.1.4 lorsque le lien est [ambigu pour tout le monde](#ambigu-pour-tout-le-monde). Dans cette situation, o\xF9 il n\u2019est pas possible de rendre le lien explicite dans son contexte, le crit\xE8re est non applicable.",
+        "Il existe une gestion de cas particuliers pour le test 6.1.5 lorsque\xA0:",
+        "- La ponctuation et les lettres majuscules sont pr\xE9sentes dans le texte de l\u2019[intitul\xE9 visible](#intitule-visible)\xA0: elles peuvent \xEAtre ignor\xE9es dans le nom accessible sans porter \xE0 cons\xE9quence\xA0;",
+        "- Le texte de l\u2019[intitul\xE9 visible](#intitule-visible) sert de symbole\xA0: le texte ne doit pas \xEAtre interpr\xE9t\xE9 litt\xE9ralement au niveau du nom accessible. Le nom doit exprimer la fonction v\xE9hicul\xE9e par le symbole (par exemple, \u201CB\u201D au niveau d\u2019un \xE9diteur de texte aura pour nom accessible \u201CMettre en gras\u201D, le signe \u201C>\u201D en fonction du contexte signifiera \u201CSuivant\u201D ou \u201CLancer la vid\xE9o\u201D). Le cas des symboles math\xE9matiques fait cependant exception (voir la note ci-dessous).",
+        "Note\xA0: si l\u2019\xE9tiquette visible repr\xE9sente une expression math\xE9matique, les symboles math\xE9matiques peuvent \xEAtre repris litt\xE9ralement pour servir d\u2019\xE9tiquette au nom accessible (ex.\xA0: \u201CA>B\u201D). Il est laiss\xE9 \xE0 l\u2019utilisateur le soin d\u2019op\xE9rer la correspondance entre l\u2019expression et ce qu\u2019il doit \xE9peler compte tenu de la connaissance qu\u2019il a du fonctionnement de son logiciel de saisie vocale (\u201CA plus grand que B\u201D ou \u201CA sup\xE9rieur \xE0 B\u201D)."
+      ],
+      wcag: ["1.1.1", "2.4.4", "2.5.3"],
+      appliesTo: {
+        ruleIds: ["pack:rgaa:download-link-format"]
+      }
+    },
+    {
+      id: "6.2",
+      theme: 6,
+      title: {
+        fr: "Dans chaque page web, chaque [lien](#lien) a-t-il un [intitul\xE9](#intitule-ou-nom-accessible-de-lien)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, chaque lien a-t-il un intitul\xE9\xA0?"
+      },
+      tests: {
+        "1": ["Dans chaque page web, chaque [lien](#lien) a-t-il un [intitul\xE9](#intitule-ou-nom-accessible-de-lien) entre `<a>` et `</a>`\xA0?"]
+      },
+      techniques: ["H30", "G91", "F89"],
+      technicalNote: [
+        "Une ancre n\u2019est pas un lien m\xEAme si pendant longtemps l\u2019\xE9l\xE9ment `<a>` a servi de support \xE0 cette technique. Elle n\u2019est donc pas concern\xE9e par le pr\xE9sent crit\xE8re."
+      ],
+      wcag: ["1.1.1", "2.4.4"],
+      appliesTo: {
+        ruleIds: ["axe:link-name", "icon-only-control-unnamed", "link-empty-name"]
+      }
+    },
+    {
+      id: "7.1",
+      theme: 7,
+      title: {
+        fr: "Chaque [script](#script) est-il, si n\xE9cessaire, [compatible avec les technologies d\u2019assistance](#compatible-avec-les-technologies-d-assistance)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque script est-il, si n\xE9cessaire, compatible avec les technologies d\u2019assistance\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [script](#script) qui g\xE9n\xE8re ou contr\xF4le un [composant d\u2019interface](#composant-d-interface) v\xE9rifie-t-il, si n\xE9cessaire, une de ces conditions\xA0?",
+          "Le [nom, le r\xF4le, la valeur, le param\xE9trage et les changements d\u2019\xE9tats](#le-nom-le-role-la-valeur-le-parametrage-et-les-changements-d-etats) sont accessibles aux technologies d\u2019assistance via une API d\u2019accessibilit\xE9\xA0;",
+          "Un [composant d\u2019interface](#composant-d-interface) accessible permettant d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s est pr\xE9sent dans la page\xA0;",
+          "Une [alternative](#alternative-a-script) accessible permet d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s."
+        ],
+        "2": [
+          "Chaque [script](#script) qui g\xE9n\xE8re ou contr\xF4le un [composant d\u2019interface](#composant-d-interface) respecte-t-il une de ces conditions\xA0?",
+          "Le [composant d\u2019interface](#composant-d-interface) est [correctement restitu\xE9](#correctement-restitue-par-les-technologies-d-assistance) par les technologies d\u2019assistance\xA0;",
+          "Une [alternative](#alternative-a-script) accessible permet d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s."
+        ],
+        "3": [
+          "Chaque [script](#script) qui g\xE9n\xE8re ou contr\xF4le un [composant d\u2019interface](#composant-d-interface) v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
+          "Le composant poss\xE8de un nom pertinent\xA0;",
+          "Le nom accessible du composant contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
+          "Le composant poss\xE8de un r\xF4le pertinent."
+        ]
+      },
+      techniques: ["G10", "G135", "G136", "F15", "F19", "F20", "F42", "F59", "F79", "ARIA4", "ARIA5", "ARIA18", "ARIA19", "SCR21"],
+      technicalNote: [
+        "Le crit\xE8re 7.1 impl\xE9mente la notion de \xAB\xA0compatible avec les technologies d\u2019assistance\xA0\xBB telle que d\xE9finie par les WCAG, ainsi que le recours \xE0 WAI-ARIA pour rendre un composant ou une fonctionnalit\xE9 accessible. Le bon usage de WAI-ARIA est v\xE9rifi\xE9 via les tests 7.1.1, 7.1.2, 7.1.3.",
+        "Note importante\xA0: dans un environnement HTML5, beaucoup de composants peuvent n\xE9cessiter JavaScript pour fonctionner\xA0; en cons\xE9quence la fourniture d\u2019une alternative \xE0 un composant JavaScript qui ne pourrait pas \xEAtre rendu accessible devra b\xE9n\xE9ficier d\u2019une m\xE9thode sp\xE9cifique au composant en cause, permettant de le remplacer par une alternative accessible (et de le r\xE9activer). Cela signifie que la d\xE9sactivation de JavaScript pour l\u2019ensemble de la page ne sera pas accept\xE9e comme une m\xE9thode valable, \xE0 moins qu\u2019elle ne remette pas en cause l\u2019utilisation des autres composants."
+      ],
+      particularCases: [
+        "Il existe une gestion de cas particuliers pour le test 7.1.3 lorsque\xA0:",
+        "- La ponctuation et les lettres majuscules sont pr\xE9sentes dans le texte de l\u2019intitul\xE9 visible : elles peuvent \xEAtre ignor\xE9es dans le nom accessible sans porter \xE0 cons\xE9quence\xA0;",
+        "- Le texte de l\u2019intitul\xE9 visible sert de symbole : le texte ne doit pas \xEAtre interpr\xE9t\xE9 litt\xE9ralement au niveau du nom accessible. Le nom doit exprimer la fonction v\xE9hicul\xE9e par le symbole (par exemple, \u201CB\u201D au niveau d\u2019un \xE9diteur de texte aura pour nom accessible \u201CMettre en gras\u201D, le signe \u201C>\u201D en fonction du contexte signifiera \u201CSuivant\u201D ou \u201CLancer la vid\xE9o\u201D). Le cas des symboles math\xE9matiques fait cependant exception (voir la note ci-dessous).",
+        "Note\xA0: si l\u2019\xE9tiquette visible repr\xE9sente une expression math\xE9matique, les symboles math\xE9matiques peuvent \xEAtre repris litt\xE9ralement pour servir d\u2019\xE9tiquette au nom accessible (ex.\xA0: \u201CA>B\u201D). Il est laiss\xE9 \xE0 l\u2019utilisateur le soin d\u2019op\xE9rer la correspondance entre l\u2019expression et ce qu\u2019il doit \xE9peler compte tenu de la connaissance qu\u2019il a du fonctionnement de son logiciel de saisie vocale (\u201CA plus grand que B\u201D ou \u201CA sup\xE9rieur \xE0 B\u201D)."
+      ],
+      wcag: ["2.5.3", "4.1.2"],
+      appliesTo: {
+        ruleIds: [
+          "aria-hidden-focusable",
+          "aria-ref-missing-id",
+          "aria-required-children",
+          "axe:aria-allowed-attr",
+          "axe:aria-allowed-role",
+          "axe:aria-hidden-focus",
+          "axe:aria-required-attr",
+          "axe:aria-required-children",
+          "axe:aria-required-parent",
+          "axe:aria-roles",
+          "axe:aria-valid-attr",
+          "axe:aria-valid-attr-value",
+          "axe:nested-interactive",
+          "axe:presentation-role-conflict",
+          "cross-prop-drilled-name-lost",
+          "disabled-context-content",
+          "invalid-aria-role",
+          "nested-interactive",
+          "redundant-aria"
+        ]
+      }
+    },
+    {
+      id: "7.2",
+      theme: 7,
+      title: {
+        fr: "Pour chaque [script](#script) ayant une [alternative](#alternative-a-script), cette alternative est-elle pertinente\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque script ayant une alternative, cette alternative est-elle pertinente\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [script](#script) d\xE9butant par la balise `<script>` et ayant une [alternative](#alternative-a-script) v\xE9rifie-t-il une de ces conditions\xA0?",
+          "L\u2019[alternative](#alternative-a-script) entre `<noscript>` et `</noscript>` permet d\u2019acc\xE9der \xE0 des contenus et des fonctionnalit\xE9s similaires\xA0;",
+          "La page affich\xE9e, lorsque JavaScript est d\xE9sactiv\xE9, permet d\u2019acc\xE9der \xE0 des contenus et des fonctionnalit\xE9s similaires\xA0;",
+          "La page alternative permet d\u2019acc\xE9der \xE0 des contenus et des fonctionnalit\xE9s similaires\xA0;",
+          "Le langage de script c\xF4t\xE9 serveur permet d\u2019acc\xE9der \xE0 des contenus et des fonctionnalit\xE9s similaires\xA0;",
+          "L\u2019alternative pr\xE9sente dans la page permet d\u2019acc\xE9der \xE0 des contenus et des fonctionnalit\xE9s similaires."
+        ],
+        "2": [
+          "Chaque \xE9l\xE9ment non textuel mis \xE0 jour par un [script](#script) (dans la page, ou dans un [cadre](#cadre)) et ayant une [alternative](#alternative-a-script) v\xE9rifie-t-il ces conditions\xA0?",
+          "L\u2019alternative de l\u2019\xE9l\xE9ment non textuel est mise \xE0 jour\xA0;",
+          "L\u2019alternative mise \xE0 jour est pertinente."
+        ]
+      },
+      techniques: ["G136", "F19", "F20"],
+      wcag: ["1.1.1", "4.1.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "7.3",
+      theme: 7,
+      title: {
+        fr: "Chaque [script](#script) est-il [contr\xF4lable par le clavier et par tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque script est-il contr\xF4lable par le clavier et par tout dispositif de pointage (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque \xE9l\xE9ment poss\xE9dant un gestionnaire d\u2019\xE9v\xE9nement contr\xF4l\xE9 par un script v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "L\u2019\xE9l\xE9ment est [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0;",
+          "Un \xE9l\xE9ment [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sent dans la page."
+        ],
+        "2": ["Un [script](#script) ne doit pas supprimer le focus d\u2019un \xE9l\xE9ment qui le re\xE7oit. Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"]
+      },
+      techniques: ["G90", "G202", "F42", "F54", "F55", "SCR2", "SCR20", "SCR29", "SCR35"],
+      particularCases: [
+        "Il existe une gestion de cas particuliers lorsque la fonctionnalit\xE9 d\xE9pend de l\u2019utilisation d\u2019un gestionnaire d\u2019\xE9v\xE9nement sans \xE9quivalent universel\xA0; par exemple, une application de dessin \xE0 main lev\xE9e ne pourra pas \xEAtre rendue contr\xF4lable au clavier. Dans ces situations, le crit\xE8re est non applicable."
+      ],
+      wcag: ["1.3.1", "2.1.1", "2.4.7"],
+      appliesTo: {
+        ruleIds: ["clickable-noninteractive"]
+      }
+    },
+    {
+      id: "7.4",
+      theme: 7,
+      title: {
+        fr: "Pour chaque [script](#script) qui initie un [changement de contexte](#changement-de-contexte), l\u2019utilisateur est-il averti ou en a-t-il le contr\xF4le\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque script qui initie un changement de contexte, l\u2019utilisateur est-il averti ou en a-t-il le contr\xF4le\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [script](#script) qui initie un [changement de contexte](#changement-de-contexte) v\xE9rifie-t-il une de ces conditions\xA0?",
+          "L\u2019utilisateur est averti par un texte de l\u2019action du script et du type de changement avant son d\xE9clenchement\xA0;",
+          "Le changement de contexte est initi\xE9 par un bouton (input de type `submit`, `button` ou `image` ou balise `<button>`) explicite\xA0;",
+          "Le changement de contexte est initi\xE9 par un lien explicite."
+        ]
+      },
+      techniques: ["G13", "G76", "G80", "G107", "H32", "H84", "F9", "F22", "F36", "F37", "F41", "SCR19"],
+      wcag: ["3.2.1", "3.2.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "7.5",
+      theme: 7,
+      title: {
+        fr: "Dans chaque page web, les [messages de statut](#message-de-statut) sont-ils correctement restitu\xE9s par les technologies d\u2019assistance\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les messages de statut sont-ils correctement restitu\xE9s par les technologies d\u2019assistance\xA0?"
+      },
+      tests: {
+        "1": [
+          'Chaque [message de statut](#message-de-statut) qui informe de la r\xE9ussite, du r\xE9sultat d\u2019une action ou bien de l\u2019\xE9tat d\u2019une application utilise-t-il l\u2019attribut WAI-ARIA `role="status"`\xA0?'
+        ],
+        "2": [
+          'Chaque [message de statut](#message-de-statut) qui pr\xE9sente une suggestion, ou avertit de l\u2019existence d\u2019une erreur utilise-t-il l\u2019attribut WAI-ARIA `role="alert"`\xA0?'
+        ],
+        "3": [
+          'Chaque [message de statut](#message-de-statut) qui indique la progression d\u2019un processus utilise-t-il l\u2019un des attributs WAI-ARIA `role="log"`, `role="progressbar"` ou `role="status"`\xA0?'
+        ]
+      },
+      techniques: ["ARIA19", "ARIA22", "ARIA23"],
+      technicalNote: [
+        "Les r\xF4les WAI-ARIA `log`, `status` et `alert` ont implicitement une valeur d\u2019attribut WAI-ARIA `aria-live` et `aria-atomic`. On pourra donc consid\xE9rer (conform\xE9ment \xE0 la sp\xE9cification WAI-ARIA 1.1) que\xA0:",
+        '- Un attribut WAI-ARIA `aria-live="polite"` associ\xE9 \xE0 un message de statut peut valoir pour un r\xF4le WAI-ARIA `log`\xA0;',
+        '- Un attribut WAI-ARIA `aria-live="polite"` et un attribut WAI-ARIA `aria-atomic="true"` associ\xE9s \xE0 un message de statut peuvent valoir pour un r\xF4le WAI-ARIA `status`\xA0;',
+        '- Un attribut WAI-ARIA `aria-live="assertive"` et un attribut WAI-ARIA `aria-atomic="true"` associ\xE9s \xE0 un message de statut peuvent valoir pour un r\xF4le WAI-ARIA `alert`.',
+        "C\u2019est sous r\xE9serve que la nature du message de statut satisfasse bien \xE0 la correspondance implicitement \xE9tablie. Dans le cas d\u2019un message de statut indiquant la progression d\u2019un processus et mat\xE9rialis\xE9 graphiquement par une barre de progression, un r\xF4le WAI-ARIA `progressbar` explicite est n\xE9cessaire."
+      ],
+      wcag: ["4.1.3"],
+      appliesTo: {
+        ruleIds: ["dyn-live-region", "live-region-conflict", "status-message-not-assertive"]
+      }
+    },
+    {
+      id: "8.1",
+      theme: 8,
+      title: {
+        fr: "Chaque page web est-elle d\xE9finie par un [type de document](#type-de-document)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque page web est-elle d\xE9finie par un type de document\xA0?"
+      },
+      tests: {
+        "1": ["Pour chaque page web, le [type de document](#type-de-document) (balise `doctype`) est-il pr\xE9sent\xA0?"],
+        "2": ["Pour chaque page web, le [type de document](#type-de-document) (balise `doctype`) est-il valide\xA0?"],
+        "3": [
+          "Pour chaque page web poss\xE9dant une d\xE9claration de [type de document](#type-de-document), celle-ci est-elle situ\xE9e avant la balise `<html>` dans le code source\xA0?"
+        ]
+      },
+      techniques: ["G134", "G192"],
+      wcag: ["4.1.1"],
+      appliesTo: {
+        ruleIds: ["pack:rgaa:doctype-missing"]
+      }
+    },
+    {
+      id: "8.2",
+      theme: 8,
+      title: {
+        fr: "Pour chaque page web, le code source g\xE9n\xE9r\xE9 est-il valide selon le [type de document](#type-de-document) sp\xE9cifi\xE9\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque page web, le code source g\xE9n\xE9r\xE9 est-il valide selon le type de document sp\xE9cifi\xE9\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque d\xE9claration de [type de document](#type-de-document), le code source g\xE9n\xE9r\xE9 de la page v\xE9rifie-t-il ces conditions\xA0?",
+          "Les balises, attributs et valeurs d\u2019attributs respectent les [r\xE8gles d\u2019\xE9criture](#regles-d-ecriture)\xA0;",
+          "L\u2019imbrication des balises est conforme\xA0;",
+          "L\u2019ouverture et la fermeture des balises sont conformes\xA0;",
+          "Les valeurs d\u2019attribut id sont uniques dans la page\xA0;",
+          "Les attributs ne sont pas doubl\xE9s sur un m\xEAme \xE9l\xE9ment."
+        ]
+      },
+      techniques: ["H74", "H93", "H94", "F70", "F77"],
+      wcag: ["4.1.1", "4.1.2"],
+      appliesTo: {
+        ruleIds: ["axe:duplicate-id", "axe:duplicate-id-active", "axe:duplicate-id-aria", "duplicate-id"]
+      }
+    },
+    {
+      id: "8.3",
+      theme: 8,
+      title: {
+        fr: "Dans chaque page web, la [langue par d\xE9faut](#langue-par-defaut) est-elle pr\xE9sente\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, la langue par d\xE9faut est-elle pr\xE9sente\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque page web, l\u2019indication de langue par d\xE9faut v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "L\u2019indication de la langue de la page (attribut `lang` et/ou `xml:lang`) est donn\xE9e pour l\u2019\xE9l\xE9ment `html`\xA0;",
+          "L\u2019indication de la langue de la page (attribut `lang` et/ou `xml:lang`) est donn\xE9e sur chaque \xE9l\xE9ment de texte ou sur l\u2019un des \xE9l\xE9ments parents."
+        ]
+      },
+      techniques: ["H57"],
+      wcag: ["3.1.1"],
+      appliesTo: {
+        ruleIds: ["axe:html-has-lang", "axe:html-xml-lang-mismatch", "html-lang-missing"]
+      }
+    },
+    {
+      id: "8.4",
+      theme: 8,
+      title: {
+        fr: "Pour chaque page web ayant une [langue par d\xE9faut](#langue-par-defaut), le [code de langue](#code-de-langue) est-il pertinent\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque page web ayant une langue par d\xE9faut, le code de langue est-il pertinent\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque page web ayant une langue par d\xE9faut, le code de langue v\xE9rifie-t-il ces conditions\xA0?",
+          "Le code de langue est valide\xA0;",
+          "Le code de langue est pertinent."
+        ]
+      },
+      techniques: ["H57"],
+      wcag: ["3.1.1"],
+      appliesTo: {
+        ruleIds: ["axe:html-lang-valid", "lang-invalid"]
+      },
+      judgment: true
+    },
+    {
+      id: "8.5",
+      theme: 8,
+      title: {
+        fr: "Chaque page web a-t-elle un [titre de page](#titre-de-page)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque page web a-t-elle un titre de page\xA0?"
+      },
+      tests: {
+        "1": ["Chaque page web a-t-elle un [titre de page](#titre-de-page) (balise `<title>`)\xA0?"]
+      },
+      techniques: ["G88", "G127", "H25"],
+      wcag: ["2.4.2"],
+      appliesTo: {
+        ruleIds: ["axe:document-title", "title-missing-empty"]
+      }
+    },
+    {
+      id: "8.6",
+      theme: 8,
+      title: {
+        fr: "Pour chaque page web ayant un [titre de page](#titre-de-page), ce titre est-il pertinent\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque page web ayant un titre de page, ce titre est-il pertinent\xA0?"
+      },
+      tests: {
+        "1": ["Pour chaque page web ayant un [titre de page](#titre-de-page) (balise `<title>`), le contenu de cette balise est-il pertinent\xA0?"]
+      },
+      techniques: ["G88", "G127", "H25"],
+      wcag: ["2.4.2"],
+      appliesTo: {
+        ruleIds: []
+      },
+      judgment: true
+    },
+    {
+      id: "8.7",
+      theme: 8,
+      title: {
+        fr: "Dans chaque page web, chaque [changement de langue](#changement-de-langue) est-il indiqu\xE9 dans le code source (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, chaque changement de langue est-il indiqu\xE9 dans le code source (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque texte \xE9crit dans une langue diff\xE9rente de la [langue par d\xE9faut](#langue-par-defaut) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "L\u2019indication de langue est donn\xE9e sur l\u2019\xE9l\xE9ment contenant le texte (attribut `lang` et/ou `xml:lang`)\xA0;",
+          "L\u2019indication de langue est donn\xE9e sur un des \xE9l\xE9ments parents (attribut `lang` et/ou `xml:lang`)"
+        ]
+      },
+      techniques: ["H58"],
+      particularCases: [
+        "Il y a une gestion de cas particuliers sur le changement de langue pour les cas suivants\xA0:",
+        "- Nom propre, le crit\xE8re est non applicable\xA0;",
+        "- Nom commun de langue \xE9trang\xE8re pr\xE9sent dans le dictionnaire officiel de la langue (voir note 1 ci-dessous) par d\xE9faut de la page web, le crit\xE8re est non applicable\xA0;",
+        "- Le terme de langue \xE9trang\xE8re soumis, via un [champ de formulaire](#champ-de-saisie-de-formulaire) et rappel\xE9 dans la page (par exemple comme indication du terme recherch\xE9 dans le cas d\u2019un moteur de recherche), le crit\xE8re est non applicable\xA0;",
+        "- Passage de texte dont la langue ne peut pas \xEAtre d\xE9termin\xE9e : le crit\xE8re est non applicable\xA0;",
+        "- Terme ou passage de texte issus d\u2019une langue morte ou imaginaire pour laquelle il n\u2019existe pas d\u2019interpr\xE9tation vocale : le crit\xE8re est non applicable.",
+        "Note 1\xA0: le dictionnaire officiel est celui recommand\xE9 par l\u2019acad\xE9mie en charge de la langue en question. Pour la France, par exemple, le lien vers le dictionnaire officiel se trouve sur le site de l\u2019Acad\xE9mie fran\xE7aise \xE0 l\u2019adresse suivante\xA0: http://www.academie-francaise.fr/le-dictionnaire/la-9e-edition. Pour toute demande aupr\xE8s du service du dictionnaire de l\u2019Acad\xE9mie fran\xE7aise, utiliser le formulaire de contact du service du dictionnaire.",
+        "Note 2\xA0: pour les noms communs de langue \xE9trang\xE8re, absents dans le dictionnaire officiel de la langue par d\xE9faut de la page web, et qui sont pass\xE9s dans le langage commun (exemple\xA0: newsletter)\xA0: le crit\xE8re est applicable, uniquement lorsque l\u2019absence d\u2019indication de langue peut provoquer une incompr\xE9hension pour la restitution."
+      ],
+      wcag: ["3.1.2"],
+      appliesTo: {
+        ruleIds: ["inline-lang-change-missing"]
+      }
+    },
+    {
+      id: "8.8",
+      theme: 8,
+      title: {
+        fr: "Dans chaque page web, le code de langue de chaque [changement de langue](#changement-de-langue) est-il valide et pertinent\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, le code de langue de chaque changement de langue est-il valide et pertinent\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque page web, le code de langue de chaque [changement de langue](#changement-de-langue) v\xE9rifie-t-il ces conditions\xA0?",
+          "Le code de langue est valide\xA0;",
+          "Le code de langue est pertinent."
+        ]
+      },
+      techniques: ["H58"],
+      wcag: ["3.1.2"],
+      appliesTo: {
+        ruleIds: ["axe:valid-lang", "lang-invalid"]
+      }
+    },
+    {
+      id: "8.9",
+      theme: 8,
+      title: {
+        fr: "Dans chaque page web, les balises ne doivent pas \xEAtre utilis\xE9es [uniquement \xE0 des fins de pr\xE9sentation](#uniquement-a-des-fins-de-presentation). Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les balises ne doivent pas \xEAtre utilis\xE9es uniquement \xE0 des fins de pr\xE9sentation. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web les balises (\xE0 l\u2019exception de `<div>`, `<span>` et `<table>`) ne doivent pas \xEAtre utilis\xE9es [uniquement \xE0 des fins de pr\xE9sentation](#uniquement-a-des-fins-de-presentation). Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ]
+      },
+      techniques: ["G115", "H88", "F43", "F92"],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "8.10",
+      theme: 8,
+      title: {
+        fr: "Dans chaque page web, les changements du [sens de lecture](#sens-de-lecture) sont-ils signal\xE9s\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les changements du sens de lecture sont-ils signal\xE9s\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque texte dont le sens de lecture est diff\xE9rent du [sens de lecture](#sens-de-lecture) par d\xE9faut est contenu dans une balise poss\xE9dant un attribut `dir`\xA0?"
+        ],
+        "2": [
+          "Dans chaque page web, chaque changement du [sens de lecture](#sens-de-lecture) (attribut `dir`) v\xE9rifie-t-il ces conditions\xA0?",
+          "La valeur de l\u2019attribut `dir` est conforme (`rtl` ou `ltr`)\xA0;",
+          "La valeur de l\u2019attribut `dir` est pertinente."
+        ]
+      },
+      techniques: ["H56"],
+      wcag: ["1.3.2"],
+      appliesTo: {
+        ruleIds: ["pack:rgaa:dir-value-invalid"]
+      }
+    },
+    {
+      id: "9.1",
+      theme: 9,
+      title: {
+        fr: "Dans chaque page web, l\u2019information est-elle structur\xE9e par l\u2019utilisation appropri\xE9e de [titres](#titre)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, l\u2019information est-elle structur\xE9e par l\u2019utilisation appropri\xE9e de titres\xA0?"
+      },
+      tests: {
+        "1": [
+          'Dans chaque page web, la hi\xE9rarchie entre les [titres](#titre) (balise `<hx>` ou balise poss\xE9dant un attribut WAI-ARIA `role="heading"` associ\xE9 \xE0 un attribut WAI-ARIA `aria-level`) est-elle pertinente\xA0?'
+        ],
+        "2": [
+          'Dans chaque page web, le contenu de chaque [titre](#titre) (balise `<hx>` ou balise poss\xE9dant un attribut WAI-ARIA `role="heading"` associ\xE9 \xE0 un attribut WAI-ARIA `aria-level`) est-il pertinent\xA0?'
+        ],
+        "3": [
+          'Dans chaque page web, chaque passage de texte constituant un [titre](#titre) est-il structur\xE9 \xE0 l\u2019aide d\u2019une balise `<hx>` ou d\u2019une balise poss\xE9dant un attribut WAI-ARIA `role="heading"` associ\xE9 \xE0 un attribut WAI-ARIA `aria-level`\xA0?'
+        ]
+      },
+      techniques: ["G115", "G130", "H42", "G141", "ARIA4", "ARIA12"],
+      technicalNote: [
+        "WAI-ARIA permet de d\xE9finir des titres via le r\xF4le `heading` et l\u2019attribut `aria-level` (indication du niveau de titre). Bien qu\u2019il soit pr\xE9f\xE9rable d\u2019utiliser l\u2019\xE9l\xE9ment de titre natif en HTML `<hx>`, l\u2019utilisation du r\xF4le WAI-ARIA `heading` est compatible avec l\u2019accessibilit\xE9."
+      ],
+      wcag: ["1.3.1", "2.4.1", "2.4.6", "4.1.2"],
+      appliesTo: {
+        ruleIds: ["axe:empty-heading", "axe:heading-order", "axe:page-has-heading-one", "empty-heading", "h1-missing", "h1-multiple", "heading-order-skip"]
+      }
+    },
+    {
+      id: "9.2",
+      theme: 9,
+      title: {
+        fr: "Dans chaque page web, la [structure du document](#structure-du-document) est-elle coh\xE9rente (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, la structure du document est-elle coh\xE9rente (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, la [structure du document](#structure-du-document) v\xE9rifie-t-elle ces conditions (hors cas particuliers)\xA0?",
+          "La [zone d\u2019en-t\xEAte de la page](#zone-d-en-tete) est structur\xE9e via une balise `<header>`\xA0;",
+          "Les [zones de navigation principales et secondaires](#menu-et-barre-de-navigation) sont structur\xE9es via une balise `<nav>`\xA0;",
+          "La balise `<nav>` est r\xE9serv\xE9e \xE0 la structuration des [zones de navigation principales et secondaires](#menu-et-barre-de-navigation)\xA0;",
+          "La [zone de contenu principal](#zone-de-contenu-principal) est structur\xE9e via une balise `<main>`\xA0;",
+          "La [structure du document](#structure-du-document) utilise une balise `<main>` visible unique\xA0;",
+          "La [zone de pied de page](#zone-de-pied-de-page) est structur\xE9e via une balise `<footer>`."
+        ]
+      },
+      techniques: ["G115", "ARIA11"],
+      technicalNote: [
+        "La balise `<main>` peut \xEAtre utilis\xE9e plusieurs fois dans le m\xEAme document HTML. N\xE9anmoins, il ne peut y avoir en permanence qu\u2019une seule balise visible et lisible par les technologies d\u2019assistances, les autres devant disposer d\u2019un attribut `hidden` ou d\u2019un style permettant de les masquer aux technologies d\u2019assistances. \xC0 noter cependant que l\u2019utilisation d\u2019un style seul restera insuffisante pour assurer l\u2019unicit\xE9 d\u2019une balise `<main>` visible en cas de d\xE9sactivation des feuilles de styles."
+      ],
+      particularCases: ["Lorsque le doctype d\xE9clar\xE9 dans la page n\u2019est pas le doctype HTML5, ce crit\xE8re est non applicable."],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: ["missing-main-landmark", "multiple-main-landmark", "nav-landmark-missing"]
+      }
+    },
+    {
+      id: "9.3",
+      theme: 9,
+      title: {
+        fr: "Dans chaque page web, chaque [liste](#listes) est-elle correctement structur\xE9e\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, chaque liste est-elle correctement structur\xE9e\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, les informations regroup\xE9es visuellement sous forme de [liste](#listes) non ordonn\xE9e v\xE9rifient-elles une de ces conditions\xA0?",
+          "La liste utilise les balises HTML `<ul>` et `<li>`\xA0;",
+          'La liste utilise les attributs WAI-ARIA `role="list"` et `role="listitem"`.'
+        ],
+        "2": [
+          "Dans chaque page web, les informations regroup\xE9es visuellement sous forme de [liste](#listes) ordonn\xE9e v\xE9rifient-elles une de ces conditions\xA0?",
+          "La liste utilise les balises HTML `<ol>` et `<li>`\xA0;",
+          'La liste utilise les attributs WAI-ARIA `role="list"` et `role="listitem"`.'
+        ],
+        "3": [
+          "Dans chaque page web, les informations regroup\xE9es sous forme de [liste](#listes) de description utilisent-elles les balises `<dl>` et `<dt>/<dd>`\xA0?"
+        ]
+      },
+      techniques: ["G115", "G153", "H40", "H48", "F2"],
+      technicalNote: [
+        'Les attributs WAI-ARIA `role="list"` et `role="listitem"` peuvent n\xE9cessiter l\u2019utilisation des attributs WAI-ARIA `aria-setsize` et `aria-posinset` dans le cas o\xF9 l\u2019ensemble de la liste n\u2019est pas disponible via le DOM g\xE9n\xE9r\xE9 au moment de la consultation.',
+        'Les attributs WAI-ARIA `role="tree"`, `role="tablist"`, `role="menu"`, `role="combobox"` et `role="listbox"` ne sont pas \xE9quivalents \xE0 une liste HTML `<ul>` ou `<ol>`.'
+      ],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: ["axe:definition-list", "axe:dlitem", "axe:list", "axe:listitem", "list-structure"]
+      }
+    },
+    {
+      id: "9.4",
+      theme: 9,
+      title: {
+        fr: "Dans chaque page web, chaque citation est-elle correctement indiqu\xE9e\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, chaque citation est-elle correctement indiqu\xE9e\xA0?"
+      },
+      tests: {
+        "1": ["Dans chaque page web, chaque citation courte utilise-t-elle une balise `<q>`\xA0?"],
+        "2": ["Dans chaque page web, chaque bloc de citation utilise-t-il une balise `<blockquote>`\xA0?"]
+      },
+      techniques: ["G115", "H49", "F2"],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "10.1",
+      theme: 10,
+      title: {
+        fr: "Dans le site web, des [feuilles de styles](#feuille-de-style) sont-elles utilis\xE9es pour contr\xF4ler la [pr\xE9sentation de l\u2019information](#presentation-de-l-information)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans le site web, des feuilles de styles sont-elles utilis\xE9es pour contr\xF4ler la pr\xE9sentation de l\u2019information\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, les balises servant \xE0 la [pr\xE9sentation de l\u2019information](#presentation-de-l-information) ne doivent pas \xEAtre pr\xE9sentes dans le code source g\xE9n\xE9r\xE9 des pages. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ],
+        "2": [
+          "Dans chaque page web, les attributs servant \xE0 la [pr\xE9sentation de l\u2019information](#presentation-de-l-information) ne doivent pas \xEAtre pr\xE9sents dans le code source g\xE9n\xE9r\xE9 des pages. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ],
+        "3": [
+          "Dans chaque page web, l\u2019utilisation des espaces v\xE9rifie-t-elle ces conditions\xA0?",
+          "Les espaces ne sont pas utilis\xE9es pour s\xE9parer les lettres d\u2019un mot\xA0;",
+          "Les espaces ne sont pas utilis\xE9es pour simuler des tableaux\xA0;",
+          "Les espaces ne sont pas utilis\xE9es pour simuler des colonnes de texte."
+        ]
+      },
+      techniques: ["G140", "F32", "F33", "F34", "F48", "C6", "C8", "C18", "C22"],
+      wcag: ["1.3.1", "1.3.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "10.2",
+      theme: 10,
+      title: {
+        fr: "Dans chaque page web, le [contenu visible](#contenu-visible) porteur d\u2019information reste-t-il pr\xE9sent lorsque les [feuilles de styles](#feuille-de-style) sont d\xE9sactiv\xE9es\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, le contenu visible porteur d\u2019information reste-t-il pr\xE9sent lorsque les feuilles de styles sont d\xE9sactiv\xE9es\xA0?"
+      },
+      tests: {
+        "1": ["Dans chaque page web, l\u2019information reste-t-elle pr\xE9sente lorsque les [feuilles de styles](#feuille-de-style) sont d\xE9sactiv\xE9es\xA0?"]
+      },
+      techniques: ["G140", "F3", "F87"],
+      wcag: ["1.1.1", "1.3.1"],
+      appliesTo: {
+        ruleIds: ["css-generated-content-informative"]
+      }
+    },
+    {
+      id: "10.3",
+      theme: 10,
+      title: {
+        fr: "Dans chaque page web, l\u2019information reste-t-elle [compr\xE9hensible](#comprehensible-ordre-de-lecture) lorsque les [feuilles de styles](#feuille-de-style) sont d\xE9sactiv\xE9es\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, l\u2019information reste-t-elle compr\xE9hensible lorsque les feuilles de styles sont d\xE9sactiv\xE9es\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, l\u2019information reste-t-elle [compr\xE9hensible](#comprehensible-ordre-de-lecture) lorsque les [feuilles de styles](#feuille-de-style) sont d\xE9sactiv\xE9es\xA0?"
+        ]
+      },
+      techniques: ["G59", "G140", "F1"],
+      wcag: ["1.3.2", "2.4.3"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "10.4",
+      theme: 10,
+      title: {
+        fr: "Dans chaque page web, le texte reste-t-il lisible lorsque la [taille des caract\xE8res](#taille-des-caracteres) est augment\xE9e jusqu\u2019\xE0 200\u202F%, au moins (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, le texte reste-t-il lisible lorsque la taille des caract\xE8res est augment\xE9e jusqu\u2019\xE0 200\u202F%, au moins (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, l\u2019augmentation de la [taille des caract\xE8res](#taille-des-caracteres) jusqu\u2019\xE0 200\u202F%, au moins, ne doit pas provoquer de perte d\u2019information. Cette r\xE8gle est-elle respect\xE9e selon une de ces conditions (hors cas particuliers)\xA0?",
+          "Lors de l\u2019utilisation de la fonction d\u2019agrandissement du texte du navigateur\xA0;",
+          "Lors de l\u2019utilisation des fonctions de zoom graphique du navigateur\xA0;",
+          "Lors de l\u2019utilisation d\u2019un [composant d\u2019interface](#composant-d-interface) propre au site permettant d\u2019agrandir le texte ou de zoomer."
+        ],
+        "2": [
+          "Dans chaque page web, l\u2019augmentation de la taille des caract\xE8res jusqu\u2019\xE0 200\u202F%, au moins, doit \xEAtre possible pour l\u2019ensemble du texte dans la page. Cette r\xE8gle est-elle respect\xE9e selon une de ces conditions (hors cas particuliers)\xA0?",
+          "Lors de l\u2019utilisation de la fonction d\u2019agrandissement du texte du navigateur\xA0;",
+          "Lors de l\u2019utilisation des fonctions de zoom graphique du navigateur\xA0;",
+          "Lors de l\u2019utilisation d\u2019un [composant d\u2019interface](#composant-d-interface) propre au site permettant d\u2019agrandir le texte ou de zoomer."
+        ]
+      },
+      techniques: ["G146", "G179", "F69", "F80", "SCR34", "C12", "C13", "C14", "C17", "C28"],
+      particularCases: [
+        "Font exception \xE0 ce crit\xE8re, les contenus pour lesquels l\u2019utilisateur n\u2019a pas de possibilit\xE9 de personnalisation\xA0:",
+        "- Les sous-titres incrust\xE9s dans une vid\xE9o\xA0;",
+        "- Les textes en image\xA0;",
+        "- Le texte au sein d\u2019une balise `<canvas>`."
+      ],
+      wcag: ["1.4.4"],
+      appliesTo: {
+        ruleIds: ["axe:meta-viewport", "axe:meta-viewport-large", "dyn-input-overflow-zoom", "dyn-reflow-zoom", "meta-viewport-zoom-block"]
+      }
+    },
+    {
+      id: "10.5",
+      theme: 10,
+      title: {
+        fr: "Dans chaque page web, les d\xE9clarations CSS de couleurs de fond d\u2019\xE9l\xE9ment et de police sont-elles correctement utilis\xE9es\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les d\xE9clarations CSS de couleurs de fond d\u2019\xE9l\xE9ment et de police sont-elles correctement utilis\xE9es\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque d\xE9claration CSS de couleurs de police (`color`), d\u2019un \xE9l\xE9ment susceptible de contenir du texte, est-elle accompagn\xE9e d\u2019une d\xE9claration de couleur de fond (`background`, `background-color`), au moins, h\xE9rit\xE9e d\u2019un parent\xA0?"
+        ],
+        "2": [
+          "Dans chaque page web, chaque d\xE9claration de couleur de fond (`background`, `background-color`), d\u2019un \xE9l\xE9ment susceptible de contenir du texte, est-elle accompagn\xE9e d\u2019une d\xE9claration de couleur de police (`color`) au moins, h\xE9rit\xE9e d\u2019un parent\xA0?"
+        ],
+        "3": [
+          "Dans chaque page web, chaque utilisation d\u2019une image pour cr\xE9er une couleur de fond d\u2019un \xE9l\xE9ment susceptible de contenir du texte, via CSS (`background`, `background-image`), est-elle accompagn\xE9e d\u2019une d\xE9claration de couleur de fond (`background`, `background-color`), au moins, h\xE9rit\xE9e d\u2019un parent\xA0?"
+        ]
+      },
+      techniques: ["F24"],
+      wcag: ["1.4.3"],
+      appliesTo: {
+        ruleIds: ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
+      }
+    },
+    {
+      id: "10.6",
+      theme: 10,
+      title: {
+        fr: "Dans chaque page web, chaque [lien dont la nature n\u2019est pas \xE9vidente](#lien-dont-la-nature-n-est-pas-evidente) est-il visible par rapport au texte environnant\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, chaque lien dont la nature n\u2019est pas \xE9vidente est-il visible par rapport au texte environnant\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque [lien texte](#lien-texte) signal\xE9 uniquement par la couleur, et dont la nature n\u2019est pas \xE9vidente, v\xE9rifie-t-il ces conditions\xA0?",
+          "La couleur du lien a un rapport de [contraste](#contraste) sup\xE9rieur ou \xE9gal \xE0 3:1 par rapport au texte environnant\xA0;",
+          "Le lien dispose d\u2019une indication visuelle au survol autre qu\u2019un changement de couleur\xA0;",
+          "Le lien dispose d\u2019une indication visuelle au focus autre qu\u2019un changement de couleur."
+        ]
+      },
+      techniques: ["G183", "F73"],
+      wcag: ["1.4.1"],
+      appliesTo: {
+        ruleIds: ["rendered-link-colour-only"]
+      }
+    },
+    {
+      id: "10.7",
+      theme: 10,
+      title: {
+        fr: "Dans chaque page web, pour chaque \xE9l\xE9ment recevant le focus, la [prise de focus](#prise-de-focus) est-elle visible\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, pour chaque \xE9l\xE9ment recevant le focus, la prise de focus est-elle visible\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque \xE9l\xE9ment recevant le focus, la [prise de focus](#prise-de-focus) v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "Le style du focus natif du navigateur n\u2019est pas supprim\xE9 ou d\xE9grad\xE9\xA0;",
+          "Un style du focus d\xE9fini par l\u2019auteur est visible."
+        ]
+      },
+      techniques: ["G149", "G165", "G183", "G195", "F73", "F78", "SCR31", "C15"],
+      wcag: ["1.4.1", "2.4.7"],
+      appliesTo: {
+        ruleIds: ["dyn-focus-visible", "rendered-focus-not-visible"]
+      }
+    },
+    {
+      id: "10.8",
+      theme: 10,
+      title: {
+        fr: "Pour chaque page web, les [contenus cach\xE9s](#contenu-cache) ont-ils vocation \xE0 \xEAtre ignor\xE9s par les technologies d\u2019assistance\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque page web, les contenus cach\xE9s ont-ils vocation \xE0 \xEAtre ignor\xE9s par les technologies d\u2019assistance\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque contenu cach\xE9 v\xE9rifie-t-il une de ces conditions\xA0?",
+          "Le [contenu cach\xE9](#contenu-cache) a vocation \xE0 \xEAtre ignor\xE9 par les technologies d\u2019assistance\xA0;",
+          "Le [contenu cach\xE9](#contenu-cache) n\u2019a pas vocation \xE0 \xEAtre ignor\xE9 par les technologies d\u2019assistance et est rendu restituable par les technologies d\u2019assistance suite \xE0 une action de l\u2019utilisateur r\xE9alisable au clavier ou par tout dispositif de pointage sur un \xE9l\xE9ment pr\xE9c\xE9dent le contenu cach\xE9 ou suite \xE0 un repositionnement du focus dessus."
+        ]
+      },
+      techniques: ["G57"],
+      technicalNote: [
+        'WAI-ARIA propose un attribut `aria-hidden` (`true` ou `false`) qui permet d\u2019inhiber la restitution d\u2019un contenu en direction des technologies d\u2019assistance, sans action sur sa visibilit\xE9 en direction des agents utilisateurs\xA0: un contenu avec `aria-hidden="true"` ne sera donc plus vocalisable, mais restera visible.',
+        "Sauf si le contenu contr\xF4l\xE9 par `aria-hidden` n\u2019a pas vocation \xE0 \xEAtre restitu\xE9 par les technologies d\u2019assistance, la valeur de l\u2019attribut `aria-hidden` doit \xEAtre coh\xE9rente avec l\u2019\xE9tat affich\xE9 ou masqu\xE9 du contenu \xE0 l\u2019\xE9cran.",
+        'La sp\xE9cification HTML5 propose un attribut `hidden` qui permet de rendre indisponible (quand l\u2019attribut `hidden` est pr\xE9sent) un contenu dans le DOM g\xE9n\xE9r\xE9 (de mani\xE8re similaire au `type="hidden"` sur un contr\xF4le de formulaire).',
+        "Il est possible d\u2019avoir des situations o\xF9 un contenu contr\xF4l\xE9 par `hidden` ou `aria-hidden` se trouve momentan\xE9ment dans un \xE9tat incoh\xE9rent avec le statut affich\xE9 ou masqu\xE9 du contenu, par exemple si l\u2019on d\xE9sire rendre disponible un \xE9l\xE9ment, mais que son affichage \xE0 l\u2019\xE9cran reste d\xE9pendant d\u2019une action ult\xE9rieure. Dans ce cas, c\u2019est l\u2019\xE9tat final du contenu qui doit \xEAtre consid\xE9r\xE9."
+      ],
+      wcag: ["1.3.2", "4.1.2"],
+      appliesTo: {
+        ruleIds: ["disabled-context-content"]
+      }
+    },
+    {
+      id: "10.9",
+      theme: 10,
+      title: {
+        fr: "Dans chaque page web, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement par la forme, taille ou position. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, pour chaque texte ou ensemble de textes, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ],
+        "2": [
+          "Dans chaque page web, pour chaque image ou ensemble d\u2019images, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ],
+        "3": [
+          "Dans chaque page web, pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise), l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ],
+        "4": [
+          "Dans chaque page web, pour chaque [m\xE9dia non temporel](#media-non-temporel), l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ]
+      },
+      techniques: ["G96", "G140", "F14", "F26"],
+      wcag: ["1.3.3", "1.4.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "10.10",
+      theme: 10,
+      title: {
+        fr: "Dans chaque page web, l\u2019information ne doit pas \xEAtre donn\xE9e [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position) uniquement. Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, l\u2019information ne doit pas \xEAtre donn\xE9e par la forme, taille ou position uniquement. Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, pour chaque texte ou ensemble de textes, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
+        ],
+        "2": [
+          "Dans chaque page web, pour chaque image ou ensemble d\u2019images, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
+        ],
+        "3": [
+          "Dans chaque page web, pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise), l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
+        ],
+        "4": [
+          "Dans chaque page web, pour chaque [m\xE9dia non temporel](#media-non-temporel), l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
+        ]
+      },
+      techniques: ["G96", "G140", "F14", "F26"],
+      wcag: ["1.3.3", "1.4.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "10.11",
+      theme: 10,
+      title: {
+        fr: "Pour chaque page web, les contenus peuvent-ils \xEAtre pr\xE9sent\xE9s sans perte d\u2019information ou de fonctionnalit\xE9 et sans avoir recours soit \xE0 un d\xE9filement vertical pour une fen\xEAtre ayant une hauteur de 256\u202Fpx, soit \xE0 un d\xE9filement horizontal pour une fen\xEAtre ayant une largeur de 320\u202Fpx (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque page web, les contenus peuvent-ils \xEAtre pr\xE9sent\xE9s sans perte d\u2019information ou de fonctionnalit\xE9 et sans avoir recours soit \xE0 un d\xE9filement vertical pour une fen\xEAtre ayant une hauteur de 256\u202Fpx, soit \xE0 un d\xE9filement horizontal pour une fen\xEAtre ayant une largeur de 320\u202Fpx (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque page web, lorsque le contenu dont le sens de lecture est horizontal est affich\xE9 dans une fen\xEAtre r\xE9duite \xE0 une largeur de 320\u202Fpx, l\u2019ensemble des informations et des fonctionnalit\xE9s sont-elles disponibles sans aucun d\xE9filement horizontal (hors cas particuliers)\xA0?"
+        ],
+        "2": [
+          "Pour chaque page web, lorsque le contenu dont le sens de lecture est vertical est affich\xE9 dans une fen\xEAtre r\xE9duite \xE0 une hauteur de 256\u202Fpx, l\u2019ensemble des informations et des fonctionnalit\xE9s sont-elles disponibles sans aucun d\xE9filement vertical (hors cas particuliers)\xA0?"
+        ]
+      },
+      techniques: ["C34", "C37"],
+      technicalNote: ["Lorsqu'il est ici question de pixel, il s'agit du pixel CSS tel que d\xE9fini par le W3C https://www.w3.org/TR/css3-values/"],
+      particularCases: [
+        "L'objectif de ce crit\xE8re est de garantir un d\xE9filement dans une unique direction pour une lecture facilit\xE9e selon le sens de l'\xE9criture.",
+        "Font exception \xE0 ce crit\xE8re, les contenus dont l'agencement requiert deux dimensions pour \xEAtre compris ou utilis\xE9s comme\xA0:",
+        "- Les images, les graphiques ou les vid\xE9os\xA0;",
+        "- Les jeux (jeux de plateforme, par exemple)\xA0;",
+        "- Les pr\xE9sentations (type diaporama, par exemple)\xA0;",
+        "- Les tableaux de donn\xE9es\xA0;",
+        "- Les interfaces o\xF9 il est n\xE9cessaire d'avoir un ascenseur horizontal lors de la manipulation de l'interface.",
+        "Note\xA0: la majorit\xE9 des navigateurs sur les syst\xE8mes d'exploitation sur mobile (Android, iOS) ne g\xE8re pas correctement la redistribution en cas de zoom. Dans ce contexte, le crit\xE8re sera consid\xE9r\xE9 comme non applicable sur ces environnements."
+      ],
+      wcag: ["1.4.10"],
+      appliesTo: {
+        ruleIds: ["dyn-input-overflow-reflow", "dyn-reflow"]
+      }
+    },
+    {
+      id: "10.12",
+      theme: 10,
+      title: {
+        fr: "Dans chaque page web, les propri\xE9t\xE9s d\u2019espacement du texte peuvent-elles \xEAtre red\xE9finies par l\u2019utilisateur sans perte de contenu ou de fonctionnalit\xE9 (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les propri\xE9t\xE9s d\u2019espacement du texte peuvent-elles \xEAtre red\xE9finies par l\u2019utilisateur sans perte de contenu ou de fonctionnalit\xE9 (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, le texte reste-t-il lisible lorsque l\u2019affichage est modifi\xE9 selon ces conditions (hors cas particuliers)\xA0?",
+          "L\u2019espacement entre les lignes (`line-height`) est augment\xE9 jusqu\u2019\xE0 1,5 fois la taille de la police\xA0;",
+          "L\u2019espacement suivant les paragraphes (balise `<p>`) est augment\xE9 jusqu\u2019\xE0 2 fois la taille de la police\xA0;",
+          "L\u2019espacement des lettres (`letter-spacing`) est augment\xE9 jusqu\u2019\xE0 0,12 fois la taille de la police\xA0;",
+          "L\u2019espacement des mots (`word-spacing`) est augment\xE9 jusqu\u2019\xE0 0,16 fois la taille de la police."
+        ]
+      },
+      techniques: ["C8", "C21", "C35", "C36"],
+      particularCases: [
+        "Font exception \xE0 ce crit\xE8re, les contenus pour lesquels l\u2019utilisateur n\u2019a pas de possibilit\xE9 de personnalisation\xA0:",
+        "- Les sous-titres directement int\xE9gr\xE9s \xE0 une vid\xE9o\xA0;",
+        "- Les images texte\xA0;",
+        "- Le texte au sein d\u2019une balise `<canvas>`."
+      ],
+      wcag: ["1.4.12"],
+      appliesTo: {
+        ruleIds: ["dyn-input-overflow-spacing", "dyn-text-spacing"]
+      }
+    },
+    {
+      id: "10.13",
+      theme: 10,
+      title: {
+        fr: "Dans chaque page web, les contenus additionnels apparaissant \xE0 la prise de focus ou au survol d\u2019un [composant d\u2019interface](#composant-d-interface) sont-ils contr\xF4lables par l\u2019utilisateur (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les contenus additionnels apparaissant \xE0 la prise de focus ou au survol d\u2019un composant d\u2019interface sont-ils contr\xF4lables par l\u2019utilisateur (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque contenu additionnel devenant visible \xE0 la prise de focus ou au survol d\u2019un [composant d\u2019interface](#composant-d-interface) peut-il \xEAtre masqu\xE9 par une action de l\u2019utilisateur sans d\xE9placer le focus ou le pointeur de la souris (hors cas particuliers)\xA0?"
+        ],
+        "2": [
+          "Chaque contenu additionnel qui apparait au survol d\u2019un [composant d\u2019interface](#composant-d-interface) peut-il \xEAtre survol\xE9 par le pointeur de la souris sans dispara\xEEtre (hors cas particuliers)\xA0?"
+        ],
+        "3": [
+          "Chaque contenu additionnel qui appara\xEEt \xE0 la prise de focus ou au survol d\u2019un [composant d\u2019interface](#composant-d-interface) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "Le contenu additionnel reste visible jusqu\u2019\xE0 ce que l\u2019utilisateur retire le pointeur souris ou le focus du contenu additionnel et du [composant d\u2019interface](#composant-d-interface) ayant d\xE9clench\xE9 son apparition\xA0;",
+          "Le contenu additionnel reste visible jusqu\u2019\xE0 ce que l\u2019utilisateur d\xE9clenche une action masquant ce contenu sans d\xE9placer le focus ou le pointeur de la souris du [composant d\u2019interface](#composant-d-interface) ayant d\xE9clench\xE9 son apparition\xA0;",
+          "Le contenu additionnel reste visible jusqu\u2019\xE0 ce qu\u2019il ne soit plus valide."
+        ]
+      },
+      techniques: ["F95"],
+      particularCases: [
+        "Lorsque le contenu additionnel est contr\xF4l\xE9 par l\u2019agent utilisateur (par exemple, attribut `title` ou validation native de formulaire) ou correspond \xE0 une fen\xEAtre modale conforme au [motif de conception](#motif-de-conception) WAI-ARIA `dialog`, le crit\xE8re 10.13 est non applicable.",
+        "Lorsque le contenu additionnel ne masque ou ne remplace aucun contenu porteur d\u2019information, le test 10.13.1 est non applicable."
+      ],
+      wcag: ["1.4.13"],
+      appliesTo: {
+        ruleIds: ["dyn-hover"]
+      }
+    },
+    {
+      id: "10.14",
+      theme: 10,
+      title: {
+        fr: "Dans chaque page web, les contenus additionnels apparaissant via les styles CSS uniquement peuvent-ils \xEAtre rendus visibles au clavier et par tout dispositif de pointage\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les contenus additionnels apparaissant via les styles CSS uniquement peuvent-ils \xEAtre rendus visibles au clavier et par tout dispositif de pointage\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, les contenus additionnels apparaissant au survol d\u2019un [composant d\u2019interface](#composant-d-interface) via les styles CSS respectent-ils si n\xE9cessaire une de ces conditions\xA0?",
+          "Les contenus additionnels apparaissent \xE9galement \xE0 l\u2019activation du composant via le clavier et tout dispositif de pointage\xA0;",
+          "Les contenus additionnels apparaissent \xE9galement \xE0 la prise de focus du composant\xA0;",
+          "Les contenus additionnels apparaissent \xE9galement par le biais de l\u2019activation ou de la prise de focus d\u2019un autre composant."
+        ],
+        "2": [
+          "Dans chaque page web, les contenus additionnels apparaissant au focus d\u2019un [composant d\u2019interface](#composant-d-interface) via les styles CSS respectent-ils si n\xE9cessaire une de ces conditions\xA0?",
+          "Les contenus additionnels apparaissent \xE9galement \xE0 l\u2019activation du composant via le clavier et tout dispositif de pointage\xA0;",
+          "Les contenus additionnels apparaissent \xE9galement au survol du composant\xA0;",
+          "Les contenus additionnels apparaissent \xE9galement par le biais de l\u2019activation ou du survol d\u2019un autre composant."
+        ]
+      },
+      techniques: ["G202"],
+      wcag: ["2.1.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "11.1",
+      theme: 11,
+      title: {
+        fr: "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) a-t-il une [\xE9tiquette](#etiquette-de-champ-de-formulaire)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque champ de formulaire a-t-il une \xE9tiquette\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) v\xE9rifie-t-il une de ces conditions\xA0?",
+          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut WAI-ARIA `aria-labelledby` r\xE9f\xE9ren\xE7ant un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) identifi\xE9\xA0;",
+          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut WAI-ARIA `aria-label`\xA0;",
+          "Une balise `<label>` ayant un attribut `for` est associ\xE9e au [champ de formulaire](#champ-de-saisie-de-formulaire)\xA0;",
+          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut `title`\xA0;",
+          "Un bouton adjacent au [champ de formulaire](#champ-de-saisie-de-formulaire) lui fournit une \xE9tiquette visible et un \xE9l\xE9ment `<label>` visuellement cach\xE9 ou un attribut WAI-ARIA `aria-label`, `aria-labelledby` ou `title` lui fournit un nom accessible."
+        ],
+        "2": [
+          "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) associ\xE9 \xE0 une balise `<label>` ayant un attribut `for`, v\xE9rifie-t-il ces conditions\xA0?",
+          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut `id`\xA0;",
+          "La valeur de l\u2019attribut `for` est \xE9gale \xE0 la valeur de l\u2019attribut `id` du [champ de formulaire](#champ-de-saisie-de-formulaire) associ\xE9."
+        ],
+        "3": [
+          "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) ayant une [\xE9tiquette](#etiquette-de-champ-de-formulaire) dont le contenu n\u2019est pas visible ou \xE0 proximit\xE9 (masqu\xE9, `aria-label`) ou qui n\u2019est pas [accol\xE9](#accoles-etiquette-et-champ-accoles) au champ (`aria-labelledby`), v\xE9rifie-t-il une de ses conditions\xA0?",
+          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut `title` dont le contenu permet de comprendre la nature de la saisie attendue\xA0;",
+          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) est accompagn\xE9 d\u2019un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) accol\xE9 au champ qui devient visible \xE0 la prise de focus permettant de comprendre la nature de la saisie attendue\xA0;",
+          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) est accompagn\xE9 d\u2019un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) visible accol\xE9 au champ permettant de comprendre la nature de la saisie attendue."
+        ]
+      },
+      techniques: ["G82", "G131", "H44", "H65", "F68", "F82", "F86", "ARIA6", "ARIA9", "ARIA14", "ARIA16"],
+      wcag: ["1.3.1", "2.4.6", "3.3.2", "4.1.2"],
+      appliesTo: {
+        ruleIds: [
+          "axe:form-field-multiple-labels",
+          "axe:label",
+          "axe:label-title-only",
+          "axe:select-name",
+          "control-label-missing",
+          "control-name-title-only",
+          "field-purpose-incomplete",
+          "form-field-multiple-labels",
+          "label-for-dangling",
+          "placeholder-as-label",
+          "select-has-option"
+        ]
+      }
+    },
+    {
+      id: "11.2",
+      theme: 11,
+      title: {
+        fr: "Chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) associ\xE9e \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire) est-elle pertinente (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque \xE9tiquette associ\xE9e \xE0 un champ de formulaire est-elle pertinente (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque balise `<label>` permet-elle de conna\xEEtre la fonction exacte du [champ de formulaire](#champ-de-saisie-de-formulaire) auquel elle est associ\xE9e\xA0?"
+        ],
+        "2": [
+          "Chaque attribut `title` permet-il de conna\xEEtre la fonction exacte du [champ de formulaire](#champ-de-saisie-de-formulaire) auquel il est associ\xE9\xA0?"
+        ],
+        "3": [
+          "Chaque \xE9tiquette impl\xE9ment\xE9e via l\u2019attribut WAI-ARIA `aria-label` permet-elle de conna\xEEtre la fonction exacte du [champ de formulaire](#champ-de-saisie-de-formulaire) auquel elle est associ\xE9e\xA0?"
+        ],
+        "4": [
+          "Chaque [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` permet-il de conna\xEEtre la fonction exacte du [champ de formulaire](#champ-de-saisie-de-formulaire) auquel il est associ\xE9\xA0?"
+        ],
+        "5": [
+          "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) ayant un [intitul\xE9 visible](#intitule-visible) v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` du [champ de formulaire](#champ-de-saisie-de-formulaire) contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) li\xE9 au [champ de formulaire](#champ-de-saisie-de-formulaire) via un attribut WAI-ARIA `aria-labelledby` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` du [champ de formulaire](#champ-de-saisie-de-formulaire) contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
+          "S\u2019il est pr\xE9sent le contenu de la balise `<label>` associ\xE9 au [champ de formulaire](#champ-de-saisie-de-formulaire) contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)."
+        ],
+        "6": [
+          "Chaque bouton adjacent au [champ de formulaire](#champ-de-saisie-de-formulaire) qui fournit une \xE9tiquette visible permet-il de conna\xEEtre la fonction exacte du [champ de formulaire](#champ-de-saisie-de-formulaire) auquel il est associ\xE9\xA0?"
+        ]
+      },
+      techniques: ["G82", "G131", "H44", "H65", "ARIA6", "ARIA9", "ARIA14", "ARIA16"],
+      particularCases: [
+        "Il existe une gestion de cas particuliers pour le test 11.2.5 lorsque\xA0:",
+        "- La ponctuation et les lettres majuscules sont pr\xE9sentes dans le texte de l\u2019[intitul\xE9 visible](#intitule-visible) : elles peuvent \xEAtre ignor\xE9es dans le nom accessible sans porter \xE0 cons\xE9quence\xA0;",
+        "- Le texte de l\u2019[intitul\xE9 visible](#intitule-visible) sert de symbole\xA0: le texte ne doit pas \xEAtre interpr\xE9t\xE9 litt\xE9ralement au niveau du nom accessible. Le nom doit exprimer la fonction v\xE9hicul\xE9e par le symbole (par exemple, \u201CB\u201D au niveau d\u2019un \xE9diteur de texte aura pour nom accessible \u201CMettre en gras\u201D, le signe \u201C>\u201D en fonction du contexte signifiera \u201CSuivant\u201D ou \u201CLancer la vid\xE9o\u201D). Le cas des symboles math\xE9matiques fait cependant exception (voir la note ci-dessous).",
+        "Note\xA0: si l\u2019\xE9tiquette visible repr\xE9sente une expression math\xE9matique, les symboles math\xE9matiques peuvent \xEAtre repris litt\xE9ralement pour servir d\u2019\xE9tiquette au nom accessible (ex.\xA0: \u201CA>B\u201D). Il est laiss\xE9 \xE0 l\u2019utilisateur le soin d\u2019op\xE9rer la correspondance entre l\u2019expression et ce qu\u2019il doit \xE9peler compte tenu de la connaissance qu\u2019il a du fonctionnement de son logiciel de saisie vocale (\u201CA plus grand que B\u201D ou \u201CA sup\xE9rieur \xE0 B\u201D).",
+        "Ce cas particulier s\u2019applique \xE9galement au test 11.9.2."
+      ],
+      wcag: ["2.4.6", "2.5.3", "3.3.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "11.3",
+      theme: 11,
+      title: {
+        fr: "Dans chaque [formulaire](#formulaire), chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) associ\xE9e \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire) ayant la m\xEAme fonction et r\xE9p\xE9t\xE9e plusieurs fois dans une m\xEAme page ou dans un [ensemble de pages](#ensemble-de-pages) est-elle [coh\xE9rente](#etiquettes-coherentes)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque formulaire, chaque \xE9tiquette associ\xE9e \xE0 un champ de formulaire ayant la m\xEAme fonction et r\xE9p\xE9t\xE9e plusieurs fois dans une m\xEAme page ou dans un ensemble de pages est-elle coh\xE9rente\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) associ\xE9e \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire) ayant la m\xEAme fonction et r\xE9p\xE9t\xE9e plusieurs fois dans une m\xEAme page est-elle [coh\xE9rente](#etiquettes-coherentes)\xA0?"
+        ],
+        "2": [
+          "Chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) associ\xE9e \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire) ayant la m\xEAme fonction et r\xE9p\xE9t\xE9e dans un ensemble de pages est-elle [coh\xE9rente](#etiquettes-coherentes)\xA0?"
+        ]
+      },
+      techniques: ["F31"],
+      wcag: ["3.2.4"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "11.4",
+      theme: 11,
+      title: {
+        fr: "Dans chaque [formulaire](#formulaire), chaque [\xE9tiquette de champ](#etiquette-de-champ-de-formulaire) et son champ associ\xE9 sont-ils [accol\xE9s](#accoles-etiquette-et-champ-accoles) (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque formulaire, chaque \xE9tiquette de champ et son champ associ\xE9 sont-ils accol\xE9s (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [\xE9tiquette de champ](#etiquette-de-champ-de-formulaire) et son [champ](#champ-de-saisie-de-formulaire) associ\xE9 sont-ils [accol\xE9s](#accoles-etiquette-et-champ-accoles)\xA0?"
+        ],
+        "2": [
+          'Chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) [accol\xE9e](#accoles-etiquette-et-champ-accoles) \xE0 un [champ](#champ-de-saisie-de-formulaire) (\xE0 l\u2019exception des cases \xE0 cocher, bouton radio ou balises ayant un attribut WAI-ARIA `role="checkbox"`, `role="radio"` ou `role="switch"`), v\xE9rifie-t-elle ces conditions (hors cas particuliers)\xA0?',
+          "L\u2019\xE9tiquette est visuellement [accol\xE9e](#accoles-etiquette-et-champ-accoles) imm\xE9diatement au-dessus ou \xE0 gauche du [champ de formulaire](#champ-de-saisie-de-formulaire) lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de gauche \xE0 droite\xA0;",
+          "L\u2019\xE9tiquette est visuellement [accol\xE9e](#accoles-etiquette-et-champ-accoles) imm\xE9diatement au-dessus ou \xE0 droite du [champ de formulaire](#champ-de-saisie-de-formulaire) lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de droite \xE0 gauche."
+        ],
+        "3": [
+          'Chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) [accol\xE9e](#accoles-etiquette-et-champ-accoles) \xE0 un [champ](#champ-de-saisie-de-formulaire) de type `checkbox` ou `radio` ou \xE0 une balise ayant un attribut WAI-ARIA `role="checkbox"`, `role="radio"` ou `role="switch"`, v\xE9rifie-t-elle ces conditions (hors cas particuliers)\xA0?',
+          "L\u2019\xE9tiquette est visuellement [accol\xE9e](#accoles-etiquette-et-champ-accoles) imm\xE9diatement au-dessous ou \xE0 droite du [champ de formulaire](#champ-de-saisie-de-formulaire) lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de gauche \xE0 droite\xA0;",
+          "L\u2019\xE9tiquette est visuellement [accol\xE9e](#accoles-etiquette-et-champ-accoles) imm\xE9diatement au-dessous ou \xE0 gauche du [champ de formulaire](#champ-de-saisie-de-formulaire) lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de droite \xE0 gauche."
+        ]
+      },
+      techniques: ["G162"],
+      particularCases: [
+        "Les tests 11.4.2 et 11.4.3 seront consid\xE9r\xE9s comme non applicables\xA0:",
+        "- Dans le cas o\xF9 l\u2019[\xE9tiquette](#etiquette-de-champ-de-formulaire) m\xE9lange une portion de texte qui se lit de droite \xE0 gauche avec une portion de texte qui se lit de gauche \xE0 droite\xA0;",
+        "- Dans le cas o\xF9 un formulaire contient des labels de plusieurs langues qui se liraient de droite \xE0 gauche et inversement. Par exemple, un formulaire de commande en arabe qui propose une liste de cases \xE0 cocher de produit en langue fran\xE7aise ou mixant des produits en langue arabe ou en langue fran\xE7aise\xA0;",
+        '- Dans le cas o\xF9 les champs de type `radio` ou `checkbox` et les balises ayant un attribut WAI-ARIA `role="checkbox"`, `role="radio"` ou `role="switch"` ne sont pas visuellement pr\xE9sent\xE9s sous forme de bouton radio ou de case \xE0 cocher\xA0;',
+        "- Dans le cas o\xF9 les champs seraient utilis\xE9s dans un contexte o\xF9 il pourrait \xEAtre l\xE9gitime, du point de vue de l\u2019exp\xE9rience utilisateur, de placer les \xE9tiquettes de mani\xE8re diff\xE9rente \xE0 celle requise dans les tests 11.4.2 et 11.4.3."
+      ],
+      wcag: ["3.3.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "11.5",
+      theme: 11,
+      title: {
+        fr: "Dans chaque [formulaire](#formulaire), les [champs de m\xEAme nature](#champs-de-meme-nature) sont-ils regroup\xE9s, si n\xE9cessaire\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque formulaire, les champs de m\xEAme nature sont-ils regroup\xE9s, si n\xE9cessaire\xA0?"
+      },
+      tests: {
+        "1": [
+          "Les [champs de m\xEAme nature](#champs-de-meme-nature) v\xE9rifient-ils l\u2019une de ces conditions, si n\xE9cessaire\xA0?",
+          "Les [champs de m\xEAme nature](#champs-de-meme-nature) sont regroup\xE9s dans une balise `<fieldset>`\xA0;",
+          'Les [champs de m\xEAme nature](#champs-de-meme-nature) sont regroup\xE9s dans une balise poss\xE9dant un attribut WAI-ARIA `role="group"`\xA0;',
+          'Les [champs de m\xEAme nature](#champs-de-meme-nature) de type radio (`<input type="radio">`) ou balises poss\xE9dant un attribut WAI-ARIA `role="radio"`) sont regroup\xE9s dans une balise poss\xE9dant un attribut WAI-ARIA `role="radiogroup"` ou `role="group"`.'
+        ]
+      },
+      techniques: ["H71", "ARIA17"],
+      wcag: ["1.3.1", "3.3.2"],
+      appliesTo: {
+        ruleIds: ["date-fields-ungrouped", "radio-checkbox-group-ungrouped"]
+      }
+    },
+    {
+      id: "11.6",
+      theme: 11,
+      title: {
+        fr: "Dans chaque [formulaire](#formulaire), chaque regroupement de [champs de m\xEAme nature](#champs-de-meme-nature) a-t-il une [l\xE9gende](#legende)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque formulaire, chaque regroupement de champs de m\xEAme nature a-t-il une l\xE9gende\xA0?"
+      },
+      tests: {
+        "1": ["Chaque regroupement de [champs de m\xEAme nature](#champs-de-meme-nature) poss\xE8de-t-il une [l\xE9gende](#legende)\xA0?"]
+      },
+      techniques: ["H71", "ARIA17"],
+      wcag: ["1.3.1", "3.3.2"],
+      appliesTo: {
+        ruleIds: ["axe:fieldset", "fieldset-legend-missing"]
+      }
+    },
+    {
+      id: "11.7",
+      theme: 11,
+      title: {
+        fr: "Dans chaque [formulaire](#formulaire), chaque [l\xE9gende](#legende) associ\xE9e \xE0 un regroupement de [champs de m\xEAme nature](#champs-de-meme-nature) est-elle pertinente\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque formulaire, chaque l\xE9gende associ\xE9e \xE0 un regroupement de champs de m\xEAme nature est-elle pertinente\xA0?"
+      },
+      tests: {
+        "1": ["Chaque [l\xE9gende](#legende) associ\xE9e \xE0 un regroupement de [champs de m\xEAme nature](#champs-de-meme-nature) est-elle pertinente\xA0?"]
+      },
+      techniques: ["H71", "ARIA17"],
+      wcag: ["1.3.1", "3.3.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "11.8",
+      theme: 11,
+      title: {
+        fr: "Dans chaque [formulaire](#formulaire), les [items de m\xEAme nature d\u2019une liste de choix](#items-de-meme-nature-d-une-liste-de-choix) sont-ils regroup\xE9s de mani\xE8re pertinente\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque formulaire, les items de m\xEAme nature d\u2019une liste de choix sont-ils regroup\xE9s de mani\xE8re pertinente\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque balise `<select>`, les [items de m\xEAme nature d\u2019une liste de choix](#items-de-meme-nature-d-une-liste-de-choix) sont-ils regroup\xE9s avec une balise `<optgroup>`, si n\xE9cessaire\xA0?"
+        ],
+        "2": ["Dans chaque balise `<select>`, chaque balise `<optgroup>` poss\xE8de-t-elle un attribut `label`\xA0?"],
+        "3": ["Pour chaque balise `<optgroup>` ayant un attribut `label`, le contenu de l\u2019attribut `label` est-il pertinent\xA0?"]
+      },
+      techniques: ["H85"],
+      technicalNote: [
+        'Il est possible d\u2019utiliser une balise ayant un attribut WAI-ARIA `role="listbox"` en remplacement d\u2019une balise `<select>`. En revanche, il est impossible de cr\xE9er des groupes d\u2019options via l\u2019utilisation de WAI-ARIA. De ce fait, une liste n\xE9cessitant un regroupement d\u2019options structur\xE9e \xE0 l\u2019aide d\u2019une balise ayant un attribut WAI-ARIA `role="listbox"` sera consid\xE9r\xE9e comme non conforme au crit\xE8re 11.8.'
+      ],
+      wcag: ["1.3.1"],
+      appliesTo: {
+        ruleIds: ["pack:rgaa:optgroup-without-label"]
+      }
+    },
+    {
+      id: "11.9",
+      theme: 11,
+      title: {
+        fr: "Dans chaque [formulaire](#formulaire), l\u2019intitul\xE9 de chaque [bouton](#bouton-formulaire) est-il pertinent (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque formulaire, l\u2019intitul\xE9 de chaque bouton est-il pertinent (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "L\u2019intitul\xE9 de chaque [bouton](#bouton-formulaire) v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) li\xE9 au bouton via un attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `value` d\u2019une balise `<input>` de type `submit`, `reset` ou `button` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de la balise `<button>` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` d\u2019une balise `<input>` de type `image` est pertinent\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent."
+        ],
+        "2": [
+          "Chaque [bouton](#bouton-formulaire) affichant un [intitul\xE9 visible](#intitule-visible) v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label `contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
+          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) li\xE9 au bouton via un attribut WAI-ARIA `aria-labelledby` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut value d\u2019une balise `<input>` de type `submit`, `reset` ou `button` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de la balise `<button>` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` d\u2019une balise `<input>` de type `image` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
+          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)."
+        ]
+      },
+      techniques: ["H36", "H91", "ARIA6", "ARIA9", "ARIA14", "ARIA16"],
+      particularCases: ["Pour le test 11.9.2, voir cas particuliers crit\xE8re 11.2."],
+      wcag: ["2.5.3", "4.1.2"],
+      appliesTo: {
+        ruleIds: ["axe:button-name", "axe:input-button-name", "button-empty-name", "cross-icon-only-unnamed", "icon-only-control-unnamed"]
+      }
+    },
+    {
+      id: "11.10",
+      theme: 11,
+      title: {
+        fr: "Dans chaque [formulaire](#formulaire), le [contr\xF4le de saisie](#controle-de-saisie-formulaire) est-il utilis\xE9 de mani\xE8re pertinente (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque formulaire, le contr\xF4le de saisie est-il utilis\xE9 de mani\xE8re pertinente (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Les [indications du caract\xE8re obligatoire](#indication-de-champ-obligatoire) de la saisie des champs v\xE9rifient-elles une de ces conditions (hors cas particuliers)\xA0?",
+          "Une [indication de champ obligatoire](#indication-de-champ-obligatoire) est visible et permet d\u2019identifier nomm\xE9ment le champ concern\xE9 pr\xE9alablement \xE0 la validation du formulaire\xA0;",
+          'Le champ obligatoire dispose de l\u2019attribut `aria-required="true"` ou `required` pr\xE9alablement \xE0 la validation du formulaire.'
+        ],
+        "2": [
+          'Les champs obligatoires ayant l\u2019attribut `aria-required="true"` ou `required` v\xE9rifient-ils une de ces conditions\xA0?',
+          "Une [indication de champ obligatoire](#indication-de-champ-obligatoire) est visible et situ\xE9e dans l\u2019\xE9tiquette associ\xE9e au champ pr\xE9alablement \xE0 la validation du formulaire\xA0;",
+          "Une [indication de champ obligatoire](#indication-de-champ-obligatoire) est visible et situ\xE9e dans le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 au champ pr\xE9alablement \xE0 la validation du formulaire."
+        ],
+        "3": [
+          "Les messages d\u2019erreur indiquant l\u2019absence de saisie d\u2019un champ obligatoire v\xE9rifient-ils une de ces conditions\xA0?",
+          "Le message d\u2019erreur indiquant l\u2019absence de saisie d\u2019un champ obligatoire est visible et permet d\u2019identifier nomm\xE9ment le champ concern\xE9\xA0;",
+          'Le champ obligatoire dispose de l\u2019attribut `aria-invalid="true"`.'
+        ],
+        "4": [
+          'Les champs obligatoires ayant l\u2019attribut `aria-invalid="true"` v\xE9rifient-ils une de ces conditions\xA0?',
+          "Le message d\u2019erreur indiquant le caract\xE8re invalide de la saisie est visible et situ\xE9 dans l\u2019\xE9tiquette associ\xE9e au champ\xA0;",
+          "Le message d\u2019erreur indiquant le caract\xE8re invalide de la saisie est visible et situ\xE9 dans le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 au champ."
+        ],
+        "5": [
+          "Les instructions et indications du type de donn\xE9es et/ou de format obligatoires v\xE9rifient-elles une de ces conditions\xA0?",
+          "Une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire est visible et permet d\u2019identifier nomm\xE9ment le champ concern\xE9 pr\xE9alablement \xE0 la validation du formulaire\xA0;",
+          "Une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire est visible dans l\u2019\xE9tiquette ou le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 au champ pr\xE9alablement \xE0 la validation du formulaire."
+        ],
+        "6": [
+          "Les messages d\u2019erreurs fournissant une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire des champs v\xE9rifient-ils une de ces conditions\xA0?",
+          "Le message d\u2019erreur fournissant une instruction ou une indication du type de donn\xE9es et/ou de format obligatoires est visible et identifie le champ concern\xE9\xA0;",
+          'Le champ dispose de l\u2019attribut `aria-invalid="true"`.'
+        ],
+        "7": [
+          'Les champs ayant l\u2019attribut `aria-invalid="true"` dont la saisie requiert un type de donn\xE9es et/ou de format obligatoires v\xE9rifient-ils une de ces conditions\xA0?',
+          "Une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire est visible et situ\xE9e dans la balise `<label>` associ\xE9e au champ\xA0;",
+          "Une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire est visible et situ\xE9e dans le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 au champ."
+        ]
+      },
+      techniques: [
+        "G83",
+        "G84",
+        "G85",
+        "G89",
+        "G184",
+        "H44",
+        "H81",
+        "H89",
+        "H90",
+        "F81",
+        "SCR18",
+        "SCR32",
+        "ARIA1",
+        "ARIA2",
+        "ARIA6",
+        "ARIA9",
+        "ARIA16",
+        "ARIA21"
+      ],
+      technicalNote: [
+        "Dans un long formulaire dont la majorit\xE9 des champs sont obligatoires, on pourrait constater que ce sont les quelques champs rest\xE9s facultatifs qui sont explicitement signal\xE9s comme tels. Dans ce cas, il faudrait s\u2019assurer que\xA0:",
+        "- Un message pr\xE9cise visuellement en haut de formulaire que \u201Ctous les champs sont obligatoires sauf ceux indiqu\xE9s comme \xE9tant facultatifs\u201D\xA0;",
+        "- Une mention \u201Cfacultatif\u201D est pr\xE9sente visuellement dans le libell\xE9 des champs facultatifs ou dans la l\xE9gende d\u2019un groupe de champs facultatifs\xA0;",
+        '- Un attribut `required` ou `aria-required="true"` reste associ\xE9 \xE0 chaque champ qui n\u2019est pas concern\xE9 par ce caract\xE8re facultatif.'
+      ],
+      particularCases: [
+        "Le test 11.10.1 et le test 11.10.2 seront consid\xE9r\xE9s comme non applicables lorsque le formulaire comporte un seul [champ de formulaire](#champ-de-saisie-de-formulaire) ou qu\u2019il indique les champs optionnels de mani\xE8re\xA0:",
+        "- Visible\xA0;",
+        "- Dans la balise `<label>` ou dans la [l\xE9gende](#legende) associ\xE9e au champ.",
+        "Dans le cas o\xF9 l\u2019ensemble des champs d\u2019un formulaire sont obligatoires, les tests 11.10.1 et 11.10.2 restent applicables."
+      ],
+      wcag: ["3.3.1", "3.3.2"],
+      appliesTo: {
+        ruleIds: ["aria-invalid-no-description", "error-not-associated"]
+      }
+    },
+    {
+      id: "11.11",
+      theme: 11,
+      title: {
+        fr: "Dans chaque [formulaire](#formulaire), le [contr\xF4le de saisie](#controle-de-saisie-formulaire) est-il accompagn\xE9, si n\xE9cessaire, de suggestions facilitant la correction des erreurs de saisie\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque formulaire, le contr\xF4le de saisie est-il accompagn\xE9, si n\xE9cessaire, de suggestions facilitant la correction des erreurs de saisie\xA0?"
+      },
+      tests: {
+        "1": ["Pour chaque erreur de saisie, les types et les formats de donn\xE9es sont-ils sugg\xE9r\xE9s, si n\xE9cessaire\xA0?"],
+        "2": ["Pour chaque erreur de saisie, des exemples de valeurs attendues sont-ils sugg\xE9r\xE9s, si n\xE9cessaire\xA0?"]
+      },
+      techniques: ["G84", "G85", "G89", "G177", "H89"],
+      technicalNote: [
+        "Certains types de contr\xF4les en HTML5 proposent des messages d\u2019aide \xE0 la saisie automatique\xA0: par exemple le type `email` affiche un message du type \xAB\xA0veuillez saisir une adresse e-mail valide\xA0\xBB dans le cas o\xF9 l\u2019adresse e-mail saisie ne correspond pas au format attendu. Ces messages sont personnalisables via l\u2019API Constraint Validation, ce qui permet de personnaliser les messages d\u2019erreur et de valider le crit\xE8re. L\u2019attribut `pattern` permet d\u2019effectuer automatiquement des contr\xF4les de format (via des expressions r\xE9guli\xE8res) et affiche un message d\u2019aide personnalisable via l\u2019attribut `title`\xA0: ce dispositif valide \xE9galement le crit\xE8re."
+      ],
+      wcag: ["3.3.3"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "11.12",
+      theme: 11,
+      title: {
+        fr: "Pour chaque [formulaire](#formulaire) qui modifie ou supprime des donne\u0301es, ou qui transmet des re\u0301ponses a\u0300 un test ou a\u0300 un examen, ou dont la validation a des conse\u0301quences financie\u0300res ou juridiques, les donne\u0301es saisies peuvent-elles \xEAtre modifi\xE9es, mises \xE0 jour ou r\xE9cup\xE9r\xE9es par l\u2019utilisateur\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque formulaire qui modifie ou supprime des donne\u0301es, ou qui transmet des re\u0301ponses a\u0300 un test ou a\u0300 un examen, ou dont la validation a des conse\u0301quences financie\u0300res ou juridiques, les donne\u0301es saisies peuvent-elles \xEAtre modifi\xE9es, mises \xE0 jour ou r\xE9cup\xE9r\xE9es par l\u2019utilisateur\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque formulaire qui modifie ou supprime des donn\xE9es, ou qui transmet des r\xE9ponses \xE0 un test ou un examen, ou dont la validation a des cons\xE9quences financi\xE8res ou juridiques, la saisie des donn\xE9es v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "L\u2019utilisateur peut [modifier ou annuler les donn\xE9es et les actions effectu\xE9es](#modifier-ou-annuler-les-donnees-et-les-actions-effectues) sur ces donn\xE9es apr\xE8s la validation du formulaire\xA0;",
+          "L\u2019utilisateur peut v\xE9rifier et corriger les donn\xE9es avant la validation d\u2019un formulaire en plusieurs \xE9tapes\xA0;",
+          'Un m\xE9canisme de confirmation explicite, via une case \xE0 cocher (balise `<input>` de type `checkbox` ou balise ayant un attribut WAI-ARIA `role="checkbox"`) ou une \xE9tape suppl\xE9mentaire, est pr\xE9sent.'
+        ],
+        "2": [
+          "Chaque formulaire dont la validation modifie ou supprime des donn\xE9es \xE0 caract\xE8re financier, juridique ou personnel v\xE9rifie-t-il une de ces conditions\xA0?",
+          "Un m\xE9canisme permet de r\xE9cup\xE9rer les donn\xE9es supprim\xE9es ou modifi\xE9es par l\u2019utilisateur\xA0;",
+          "Un m\xE9canisme de demande de confirmation explicite de la suppression ou de la modification, via un [champ de formulaire](#champ-de-saisie-de-formulaire) ou une \xE9tape suppl\xE9mentaire, est propos\xE9."
+        ]
+      },
+      techniques: ["G98", "G99", "G155", "G164", "G168"],
+      wcag: ["3.3.4"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "11.13",
+      theme: 11,
+      title: {
+        fr: "La finalit\xE9 d\u2019un champ de saisie peut-elle \xEAtre d\xE9duite pour faciliter le remplissage automatique des champs avec les donn\xE9es de l\u2019utilisateur\xA0?"
+      },
+      titlePlain: {
+        fr: "La finalit\xE9 d\u2019un champ de saisie peut-elle \xEAtre d\xE9duite pour faciliter le remplissage automatique des champs avec les donn\xE9es de l\u2019utilisateur\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) dont l\u2019objet se rapporte \xE0 une information concernant l\u2019utilisateur v\xE9rifie-t-il ces conditions\xA0?",
+          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut `autocomplete\xA0`;",
+          "L\u2019attribut `autocomplete` est pourvu d\u2019une valeur pr\xE9sente dans la [liste des valeurs possibles pour l\u2019attribut `autocomplete`](#liste-des-valeurs-possibles-pour-l-attribut-autocomplete) associ\xE9s \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire)\xA0;",
+          "La valeur indiqu\xE9e pour l\u2019attribut `autocomplete` est pertinente au regard du type d\u2019information attendu."
+        ]
+      },
+      techniques: ["H98"],
+      technicalNote: [
+        "La [liste des valeurs possibles pour l\u2019attribut `autocomplete`](#liste-des-valeurs-possibles-pour-l-attribut-autocomplete) repose sur la liste des valeurs pr\xE9sentes dans la sp\xE9cification WCAG2.1 qui reprend elle-m\xEAme la liste des valeurs de type \u201Cfield name\u201D de la sp\xE9cification HTML5.2. Le crit\xE8re WCAG demande \xE0 ce que l\u2019une de ces valeurs soit pr\xE9sente pour qualifier un champ de saisie concernant l\u2019utilisateur.",
+        'Ce que le crit\xE8re WCAG laisse implicite, ce sont les diff\xE9rentes r\xE8gles de construction possibles pour obtenir une valeur (simple ou compos\xE9e) pour l\u2019attribut `autocomplete`. C\u2019est cependant l\u2019affaire du d\xE9veloppeur de fournir \xE0 l\u2019attribut `autocomplete` une valeur ou un ensemble de valeurs valides au regard des exigences de l\u2019algorithme fourni par la sp\xE9cification HTML5.2. Ainsi, un attribut `autocomplete` ne peut contenir qu\u2019une seule valeur de type `\u201Cfield name\u201D`, comme `"name"` ou `"street-address"`. On peut avoir \xE9galement un ensemble compos\xE9 de diff\xE9rentes valeurs comme, par exemple, `autocomplete="shipping name"` ou `autocomplete="section-software shipping street-address"`\xA0: `"section-software"` renvoie \xE0 une valeur de type <span lang="en">\u201Cscope\u201D</span> et `"shipping"` \xE0 une valeur de type <span lang="en">\u201Chint set\u201D</span>, mais toujours une seule valeur de type <span lang="en">\u201Cfield name\u201D</span>.'
+      ],
+      wcag: ["1.3.5"],
+      appliesTo: {
+        ruleIds: ["axe:autocomplete-valid", "field-purpose-incomplete"]
+      }
+    },
+    {
+      id: "12.1",
+      theme: 12,
+      title: {
+        fr: "Chaque [ensemble de pages](#ensemble-de-pages) dispose-t-il de deux [syst\xE8mes de navigation](#systeme-de-navigation) diff\xE9rents, au moins (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Chaque ensemble de pages dispose-t-il de deux syst\xE8mes de navigation diff\xE9rents, au moins (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque [ensemble de pages](#ensemble-de-pages) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "Un [menu de navigation](#menu-et-barre-de-navigation) et un [plan du site](#page-plan-du-site) sont pr\xE9sents\xA0;",
+          "Un [menu de navigation](#menu-et-barre-de-navigation) et un [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) sont pr\xE9sents\xA0;",
+          "Un [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) et un [plan du site](#page-plan-du-site) sont pr\xE9sents."
+        ]
+      },
+      techniques: ["G63", "G64", "G161"],
+      particularCases: [
+        "Il existe une gestion de cas particulier lorsque le site web est constitu\xE9 d\u2019une seule page ou d\u2019un nombre tr\xE8s limit\xE9 de pages (cf. note). Dans ce cas-l\xE0, le crit\xE8re est non applicable.",
+        "Le crit\xE8re est \xE9galement non applicable pour les pages d\u2019un ensemble de pages qui sont le r\xE9sultat ou une partie d\u2019un processus (un processus de paiement ou de prise de commande, par exemple).",
+        "Note\xA0: l\u2019appr\xE9ciation d\u2019un nombre tr\xE8s limit\xE9 de pages devrait \xEAtre r\xE9serv\xE9 \xE0 un site dont l\u2019ensemble des pages sont atteignables depuis la page d\u2019accueil."
+      ],
+      wcag: ["2.4.5"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "12.2",
+      theme: 12,
+      title: {
+        fr: "Dans chaque [ensemble de pages](#ensemble-de-pages), le [menu et les barres de navigation](#menu-et-barre-de-navigation) sont-ils toujours \xE0 la m\xEAme place (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque ensemble de pages, le menu et les barres de navigation sont-ils toujours \xE0 la m\xEAme place (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque [ensemble de pages](#ensemble-de-pages), chaque page disposant d\u2019un [menu et les barres de navigation](#menu-et-barre-de-navigation) v\xE9rifie-t-elle ces conditions (hors cas particuliers)\xA0?",
+          "Le [menu et les barres de navigation](#menu-et-barre-de-navigation) sont toujours \xE0 la m\xEAme place dans la pr\xE9sentation\xA0;",
+          "Le [menu et les barres de navigation](#menu-et-barre-de-navigation) se pr\xE9sentent toujours dans le m\xEAme ordre relatif dans le code source."
+        ]
+      },
+      techniques: ["G61", "F66"],
+      particularCases: [
+        "Il existe une gestion de cas particuliers lorsque\xA0:",
+        "- La page est la page d\u2019accueil\xA0;",
+        "- Le site web est constitu\xE9 d\u2019une seule page\xA0;",
+        "- Le changement fait suite \xE0 une modification initi\xE9e par l\u2019utilisateur.",
+        "Dans ces situations, le crit\xE8re est non applicable."
+      ],
+      wcag: ["3.2.3"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "12.3",
+      theme: 12,
+      title: {
+        fr: "La [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) est-elle pertinente\xA0?"
+      },
+      titlePlain: {
+        fr: "La page \xAB\xA0plan du site\xA0\xBB est-elle pertinente\xA0?"
+      },
+      tests: {
+        "1": ["La [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) est-elle repr\xE9sentative de l\u2019architecture g\xE9n\xE9rale du site\xA0?"],
+        "2": ["Les liens du [plan du site](#page-plan-du-site) sont-ils fonctionnels\xA0?"],
+        "3": ["Les liens du [plan du site](#page-plan-du-site) renvoient-ils bien vers les pages indiqu\xE9es par l\u2019intitul\xE9\xA0?"]
+      },
+      techniques: ["G63"],
+      wcag: ["2.4.5"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "12.4",
+      theme: 12,
+      title: {
+        fr: "Dans chaque [ensemble de pages](#ensemble-de-pages), la [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) est-elle accessible \xE0 partir d\u2019une fonctionnalit\xE9 identique\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque ensemble de pages, la page \xAB\xA0plan du site\xA0\xBB est-elle accessible \xE0 partir d\u2019une fonctionnalit\xE9 identique\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque [ensemble de pages](#ensemble-de-pages), la [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) est-elle accessible \xE0 partir d\u2019une fonctionnalit\xE9 identique\xA0?"
+        ],
+        "2": [
+          "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalit\xE9 vers la [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) est-elle situ\xE9e \xE0 la m\xEAme place dans la pr\xE9sentation\xA0?"
+        ],
+        "3": [
+          "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalit\xE9 vers la [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) se pr\xE9sente-t-elle toujours dans le m\xEAme ordre relatif dans le code source\xA0?"
+        ]
+      },
+      techniques: ["G61", "G63"],
+      wcag: ["2.4.5", "3.2.3"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "12.5",
+      theme: 12,
+      title: {
+        fr: "Dans chaque [ensemble de pages](#ensemble-de-pages), le [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) est-il atteignable de mani\xE8re identique\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque ensemble de pages, le moteur de recherche est-il atteignable de mani\xE8re identique\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque [ensemble de pages](#ensemble-de-pages), le [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) est-il accessible \xE0 partir d\u2019une fonctionnalit\xE9 identique\xA0?"
+        ],
+        "2": [
+          "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalit\xE9 vers le [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) est-elle situ\xE9e \xE0 la m\xEAme place dans la pr\xE9sentation\xA0?"
+        ],
+        "3": [
+          "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalit\xE9 vers le [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) se pr\xE9sente-t-elle toujours dans le m\xEAme ordre relatif dans le code source\xA0?"
+        ]
+      },
+      techniques: ["G61", "F66"],
+      wcag: ["3.2.3"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "12.6",
+      theme: 12,
+      title: {
+        fr: "Les zones de regroupement de contenus pr\xE9sentes dans plusieurs pages web (zones d\u2019[en-t\xEAte](#zone-d-en-tete), de [navigation principale](#menu-et-barre-de-navigation), de [contenu principal](#zone-de-contenu-principal), de [pied de page](#zone-de-pied-de-page) et de [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web)) peuvent-elles \xEAtre atteintes ou \xE9vit\xE9es\xA0?"
+      },
+      titlePlain: {
+        fr: "Les zones de regroupement de contenus pr\xE9sentes dans plusieurs pages web (zones d\u2019en-t\xEAte, de navigation principale, de contenu principal, de pied de page et de moteur de recherche) peuvent-elles \xEAtre atteintes ou \xE9vit\xE9es\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web o\xF9 elles sont pr\xE9sentes, la zone d\u2019[en-t\xEAte](#zone-d-en-tete), de [navigation principale](#menu-et-barre-de-navigation), de [contenu principal](#zone-de-contenu-principal), de [pied de page](#zone-de-pied-de-page) et de [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) respectent-elles au moins une de ces conditions\xA0?",
+          "La zone poss\xE8de un r\xF4le WAI-ARIA de type [landmark](#landmarks) correspondant \xE0 sa nature\xA0;",
+          "La zone poss\xE8de un titre dont le contenu permet de comprendre la nature du contenu de la zone\xA0;",
+          "La zone peut \xEAtre masqu\xE9e par le biais d\u2019un bouton pr\xE9c\xE9dent directement la zone dans l\u2019ordre du code source\xA0;",
+          "La zone peut \xEAtre \xE9vit\xE9e par le biais d\u2019un [lien d\u2019\xE9vitement](#liens-d-evitement-ou-d-acces-rapide) pr\xE9c\xE9dent directement la zone dans l\u2019ordre du code source\xA0;",
+          "La zone peut \xEAtre atteinte par le biais d\u2019un [lien d\u2019acc\xE8s rapide](#liens-d-evitement-ou-d-acces-rapide) visible ou, \xE0 d\xE9faut, visible \xE0 la prise de focus."
+        ]
+      },
+      techniques: ["H69", "G115", "ARIA4", "ARIA11"],
+      wcag: ["1.3.1", "2.4.1", "4.1.2"],
+      appliesTo: {
+        ruleIds: ["axe:landmark-one-main", "missing-main-landmark", "multiple-main-landmark", "nav-landmark-missing", "nav-landmark-unnamed"]
+      }
+    },
+    {
+      id: "12.7",
+      theme: 12,
+      title: {
+        fr: "Dans chaque page web, un [lien d\u2019\xE9vitement ou d\u2019acc\xE8s rapide](#liens-d-evitement-ou-d-acces-rapide) \xE0 la [zone de contenu principal](#zone-de-contenu-principal) est-il pr\xE9sent (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, un lien d\u2019\xE9vitement ou d\u2019acc\xE8s rapide \xE0 la zone de contenu principal est-il pr\xE9sent (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, un lien permet-il d\u2019\xE9viter la [zone de contenu principal](#zone-de-contenu-principal) ou d\u2019y acc\xE9der (hors cas particuliers)\xA0?"
+        ],
+        "2": [
+          "Dans chaque ensemble de pages, le [lien d\u2019\xE9vitement ou d\u2019acc\xE8s rapide](#liens-d-evitement-ou-d-acces-rapide) \xE0 la [zone de contenu principal](#zone-de-contenu-principal) v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
+          "Le lien est situ\xE9 \xE0 la m\xEAme place dans la pr\xE9sentation\xA0;",
+          "Le lien se pr\xE9sente toujours dans le m\xEAme ordre relatif dans le code source\xA0;",
+          "Le lien est visible ou, \xE0 d\xE9faut, visible \xE0 la prise de focus\xA0;",
+          "Le lien est fonctionnel."
+        ]
+      },
+      techniques: ["G1", "G59", "G123", "G124", "SCR28", "F66"],
+      particularCases: [
+        "Il existe une gestion de cas particuliers lorsque le site web est constitu\xE9 d\u2019une seule page.",
+        "Dans ce cas de figure, l\u2019obligation de la pr\xE9sence d\u2019un lien d\u2019acc\xE8s rapide est li\xE9e au contexte de la page\xA0: pr\xE9sence ou absence de navigation ou de contenus additionnels, par exemple. Le crit\xE8re peut \xEAtre consid\xE9r\xE9 comme non applicable lorsqu\u2019il est av\xE9r\xE9 qu\u2019un lien d\u2019acc\xE8s rapide est inutile."
+      ],
+      wcag: ["2.4.1", "2.4.3", "3.2.3"],
+      appliesTo: {
+        ruleIds: ["axe:bypass", "axe:skip-link", "skip-link-target-missing"]
+      }
+    },
+    {
+      id: "12.8",
+      theme: 12,
+      title: {
+        fr: "Dans chaque page web, l\u2019[ordre de tabulation](#ordre-de-tabulation) est-il [coh\xE9rent](#comprehensible-ordre-de-lecture)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, l\u2019ordre de tabulation est-il coh\xE9rent\xA0?"
+      },
+      tests: {
+        "1": ["Dans chaque page web, l\u2019[ordre de tabulation](#ordre-de-tabulation) dans le contenu est-il [coh\xE9rent](#comprehensible-ordre-de-lecture)\xA0?"],
+        "2": [
+          "Pour chaque [script](#script) qui met \xE0 jour ou ins\xE8re un contenu, l\u2019[ordre de tabulation](#ordre-de-tabulation) reste-t-il [coh\xE9rent](#comprehensible-ordre-de-lecture)\xA0?"
+        ]
+      },
+      techniques: ["G59", "H4", "F44", "F85", "SCR26", "SCR27", "SCR37", "C27"],
+      wcag: ["2.4.3"],
+      appliesTo: {
+        ruleIds: ["axe:tabindex", "positive-tabindex"]
+      }
+    },
+    {
+      id: "12.9",
+      theme: 12,
+      title: {
+        fr: "Dans chaque page web, la navigation ne doit pas contenir de pi\xE8ge au clavier. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, la navigation ne doit pas contenir de pi\xE8ge au clavier. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque [\xE9l\xE9ment recevant le focus](#prise-de-focus) v\xE9rifie-t-il une de ces conditions\xA0?",
+          "Il est possible d\u2019atteindre l\u2019\xE9l\xE9ment suivant ou pr\xE9c\xE9dent pouvant recevoir le focus avec la touche de tabulation\xA0;",
+          "L\u2019utilisateur est inform\xE9 d\u2019un m\xE9canisme fonctionnel permettant d\u2019atteindre au clavier l\u2019\xE9l\xE9ment suivant ou pr\xE9c\xE9dent pouvant recevoir le focus."
+        ]
+      },
+      techniques: ["G21", "H91", "F10"],
+      wcag: ["2.1.1", "2.1.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "12.10",
+      theme: 12,
+      title: {
+        fr: "Dans chaque page web, les [raccourcis clavier](#raccourci-clavier) n\u2019utilisant qu\u2019une seule touche (lettre minuscule ou majuscule, ponctuation, chiffre ou symbole) sont-ils contr\xF4lables par l\u2019utilisateur\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les raccourcis clavier n\u2019utilisant qu\u2019une seule touche (lettre minuscule ou majuscule, ponctuation, chiffre ou symbole) sont-ils contr\xF4lables par l\u2019utilisateur\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque [raccourci clavier](#raccourci-clavier) n\u2019utilisant qu\u2019une seule touche (lettre minuscule ou majuscule, ponctuation, chiffre ou symbole) v\xE9rifie-t-il l\u2019une de ces conditions\xA0?",
+          "Un m\xE9canisme est disponible pour d\xE9sactiver le [raccourci clavier](#raccourci-clavier)\xA0;",
+          "Un m\xE9canisme est disponible pour configurer la touche de [raccourci clavier](#raccourci-clavier) au moyen des touches de modification (Ctrl, Alt, Maj, etc.)\xA0;",
+          "Dans le cas d\u2019un [composant d\u2019interface](#composant-d-interface) utilisateur, le [raccourci clavier](#raccourci-clavier) qui lui est associ\xE9 ne peut \xEAtre activ\xE9 que si le focus clavier est sur ce composant."
+        ]
+      },
+      techniques: ["F99", "G217"],
+      wcag: ["2.1.4"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "12.11",
+      theme: 12,
+      title: {
+        fr: "Dans chaque page web, les contenus additionnels apparaissant au survol, \xE0 la prise de focus ou \xE0 l\u2019activation d\u2019un [composant d\u2019interface](#composant-d-interface) sont-ils si n\xE9cessaire atteignables au clavier\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les contenus additionnels apparaissant au survol, \xE0 la prise de focus ou \xE0 l\u2019activation d\u2019un composant d\u2019interface sont-ils si n\xE9cessaire atteignables au clavier\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, les contenus additionnels apparaissant au survol, \xE0 la prise de focus ou \xE0 l\u2019activation d\u2019un [composant d\u2019interface](#composant-d-interface) sont-ils si n\xE9cessaire atteignables au clavier\xA0?"
+        ]
+      },
+      techniques: [],
+      technicalNote: [
+        "Ce crit\xE8re adresse les situations o\xF9 un contenu additionnel contient des [composants d\u2019interface](#composant-d-interface) avec lesquels il doit \xEAtre possible d\u2019interagir au clavier. Par exemple, une infobulle personnalis\xE9e qui propose un lien dans son contenu."
+      ],
+      wcag: ["2.1.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "13.1",
+      theme: 13,
+      title: {
+        fr: "Pour chaque page web, l\u2019utilisateur a-t-il le contr\xF4le de chaque limite de temps modifiant le contenu (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque page web, l\u2019utilisateur a-t-il le contr\xF4le de chaque limite de temps modifiant le contenu (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Pour chaque page web, chaque [proc\xE9d\xE9 de rafra\xEEchissement](#procede-de-rafraichissement) (balise `<object>`, balise `<embed>`, balise `<svg>`, balise `<canvas>`, balise `<meta>`) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "L\u2019utilisateur peut arr\xEAter ou relancer le rafra\xEEchissement\xA0;",
+          "L\u2019utilisateur peut augmenter la limite de temps entre deux rafra\xEEchissements de dix fois, au moins\xA0;",
+          "L\u2019utilisateur est averti de l\u2019imminence du rafra\xEEchissement et dispose de vingt secondes, au moins, pour augmenter la limite de temps avant le prochain rafra\xEEchissement\xA0;",
+          "La limite de temps entre deux rafra\xEEchissements est de vingt heures, au moins."
+        ],
+        "2": ["Pour chaque page web, chaque proc\xE9d\xE9 de [redirection](#redirection) effectu\xE9 via une balise `<meta>` est-il imm\xE9diat (hors cas particuliers)\xA0?"],
+        "3": [
+          "Pour chaque page web, chaque proc\xE9d\xE9 de [redirection](#redirection) effectu\xE9 via un [script](#script) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "L\u2019utilisateur peut arr\xEAter ou relancer la redirection\xA0;",
+          "L\u2019utilisateur peut augmenter la limite de temps avant la redirection de dix fois, au moins\xA0;",
+          "L\u2019utilisateur est averti de l\u2019imminence de la redirection et dispose de vingt secondes, au moins, pour augmenter la limite de temps avant la prochaine redirection\xA0;",
+          "La limite de temps avant la redirection est de vingt heures, au moins."
+        ],
+        "4": [
+          "Pour chaque page web, chaque proc\xE9d\xE9 limitant le temps d\u2019une session v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
+          "L\u2019utilisateur peut supprimer la limite de temps\xA0;",
+          "L\u2019utilisateur peut augmenter la limite de temps\xA0;",
+          "La limite de temps avant la fin de la session est de vingt heures au moins."
+        ]
+      },
+      techniques: ["F40", "F41", "F58", "F61", "G75", "G76", "G110", "G133", "G180", "G186", "G198", "H76", "SCR1", "SCR16", "SCR36", "SVR1"],
+      particularCases: [
+        "Il existe une gestion de cas particuliers lorsque la limite de temps est essentielle, notamment lorsqu\u2019elle ne pourrait pas \xEAtre supprim\xE9e sans changer fondamentalement le contenu ou les fonctionnalit\xE9s li\xE9es au contenu.",
+        "Dans ces situations, le crit\xE8re est non applicable. Par exemple, le rafra\xEEchissement d\u2019un flux RSS dans une page n\u2019est pas une limite de temps essentielle\xA0; le crit\xE8re est applicable. En revanche, une redirection automatique qui am\xE8ne vers la nouvelle version d\u2019une page \xE0 partir d\u2019une URL obsol\xE8te est essentielle\xA0; le crit\xE8re est non applicable."
+      ],
+      wcag: ["2.2.1", "2.2.2"],
+      appliesTo: {
+        ruleIds: ["meta-refresh-redirect"]
+      }
+    },
+    {
+      id: "13.2",
+      theme: 13,
+      title: {
+        fr: "Dans chaque page web, l\u2019ouverture d\u2019une nouvelle fen\xEAtre ne doit pas \xEAtre d\xE9clench\xE9e sans action de l\u2019utilisateur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, l\u2019ouverture d\u2019une nouvelle fen\xEAtre ne doit pas \xEAtre d\xE9clench\xE9e sans action de l\u2019utilisateur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, l\u2019ouverture d\u2019une nouvelle fen\xEAtre ne doit pas \xEAtre d\xE9clench\xE9e sans action de l\u2019utilisateur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
+        ]
+      },
+      techniques: ["F55", "G107"],
+      wcag: ["3.2.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "13.3",
+      theme: 13,
+      title: {
+        fr: "Dans chaque page web, chaque document bureautique en t\xE9l\xE9chargement poss\xE8de-t-il, si n\xE9cessaire, une [version accessible](#version-accessible-pour-un-document-en-telechargement) (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, chaque document bureautique en t\xE9l\xE9chargement poss\xE8de-t-il, si n\xE9cessaire, une version accessible (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque fonctionnalit\xE9 de t\xE9l\xE9chargement d\u2019un document bureautique v\xE9rifie-t-elle une de ces conditions\xA0?",
+          "Le document en t\xE9l\xE9chargement est compatible avec l'accessibilit\xE9 ;",
+          "Il en existe une version alternative en t\xE9l\xE9chargement compatible avec l'accessibilit\xE9 ;",
+          "Il en existe une version alternative au format HTML compatible avec l'accessibilit\xE9."
+        ]
+      },
+      techniques: ["F15", "G10", "G135"],
+      particularCases: [
+        "Il existe une gestion de cas particuliers\xA0:",
+        "- Pour les personnes de droit priv\xE9 mentionn\xE9es aux 2\xB0 \xE0 4\xB0 du I de l\u2019article 47 de la loi du 11 f\xE9vrier 2005\xA0: si les fichiers bureautiques (ex\xA0: PDF, documents Microsoft ou LibreOffice, etc.) ont \xE9t\xE9 publi\xE9s avant le 23 septembre 2018 (sauf si ce sont des documents n\xE9cessaires pour accomplir une d\xE9marche administrative relevant des t\xE2ches effectu\xE9es par l\u2019organisme concern\xE9), ils sont exempt\xE9s de l\u2019obligation d\u2019accessibilit\xE9.",
+        "Dans cette situation, le crit\xE8re est non applicable."
+      ],
+      wcag: ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
+      appliesTo: {
+        ruleIds: []
+      },
+      judgment: true
+    },
+    {
+      id: "13.4",
+      theme: 13,
+      title: {
+        fr: "Pour chaque document bureautique ayant une [version accessible](#version-accessible-pour-un-document-en-telechargement), cette version offre-t-elle la m\xEAme information\xA0?"
+      },
+      titlePlain: {
+        fr: "Pour chaque document bureautique ayant une version accessible, cette version offre-t-elle la m\xEAme information\xA0?"
+      },
+      tests: {
+        "1": [
+          "Chaque document bureautique ayant une version accessible v\xE9rifie-t-il une de ces conditions\xA0?",
+          "La version compatible avec l\u2019accessibilit\xE9 offre la m\xEAme information\xA0;",
+          "La version alternative au format HTML est pertinente et offre la m\xEAme information."
+        ]
+      },
+      techniques: ["F15", "G10", "G135"],
+      wcag: ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
+      appliesTo: {
+        ruleIds: []
+      },
+      judgment: true
+    },
+    {
+      id: "13.5",
+      theme: 13,
+      title: {
+        fr: "Dans chaque page web, chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) a-t-il une alternative\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) a-t-il une alternative\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) v\xE9rifie-t-il une de ces conditions\xA0?",
+          "Un attribut title est disponible\xA0;",
+          "Une d\xE9finition est donn\xE9e par le contexte adjacent."
+        ]
+      },
+      techniques: ["F71", "F70", "G135", "H86"],
+      wcag: ["1.1.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "13.6",
+      theme: 13,
+      title: {
+        fr: "Dans chaque page web, pour chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) ayant une alternative, cette alternative est-elle pertinente\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, pour chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) ayant une alternative, cette alternative est-elle pertinente\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) v\xE9rifie-t-il une de ces conditions\xA0?",
+          "Le contenu de l\u2019attribut `title` est pertinent\xA0;",
+          "La d\xE9finition donn\xE9e par le contexte adjacent est pertinente."
+        ]
+      },
+      techniques: ["F71", "F72", "H86"],
+      wcag: ["1.1.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "13.7",
+      theme: 13,
+      title: {
+        fr: "Dans chaque page web, [les changements brusques de luminosit\xE9 ou les effets de flash](#changement-brusque-de-luminosite-ou-effet-de-flash) sont-ils correctement utilis\xE9s\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les changements brusques de luminosit\xE9 ou les effets de flash sont-ils correctement utilis\xE9s\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque image ou \xE9l\xE9ment multim\xE9dia (balise `<video>`, balise `<img>`, balise `<svg>`, balise `<canvas>`, balise `<embed>` ou balise `<object>`) qui provoque un changement brusque de luminosite\u0301 ou un effet de flash ve\u0301rifie-t-il une de ces conditions\xA0?",
+          "La fr\xE9quence de l\u2019effet est inf\xE9rieure \xE0 3 par seconde\xA0;",
+          "La surface totale cumul\xE9e des effets est inf\xE9rieure ou \xE9gale \xE0 21824 pixels."
+        ],
+        "2": [
+          "Dans chaque page web, chaque script qui provoque [un changement brusque de luminosit\xE9 ou un effet de flash](#changement-brusque-de-luminosite-ou-effet-de-flash) v\xE9rifie-t-il une de ces conditions\xA0?",
+          "La fr\xE9quence de l\u2019effet est inf\xE9rieure \xE0 3 par seconde\xA0;",
+          "La surface totale cumul\xE9e des effets est inf\xE9rieure ou \xE9gale \xE0 21824 pixels."
+        ],
+        "3": [
+          "Dans chaque page web, chaque mise en forme CSS qui provoque [un changement brusque de luminosit\xE9 ou un effet de flash](#changement-brusque-de-luminosite-ou-effet-de-flash) v\xE9rifie-t-il une de ces conditions\xA0?",
+          "La fr\xE9quence de l\u2019effet est inf\xE9rieure \xE0 3 par seconde\xA0;",
+          "La surface totale cumul\xE9e des effets est inf\xE9rieure ou \xE9gale \xE0 21824 pixels."
+        ]
+      },
+      techniques: ["G15", "G19", "G176"],
+      wcag: ["2.3.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "13.8",
+      theme: 13,
+      title: {
+        fr: "Dans chaque page web, chaque contenu en mouvement ou clignotant est-il [contr\xF4lable](#controle-contenu-en-mouvement-ou-clignotant) par l\u2019utilisateur\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, chaque contenu en mouvement ou clignotant est-il contr\xF4lable par l\u2019utilisateur\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque contenu en mouvement d\xE9clench\xE9 automatiquement, v\xE9rifie-t-il une de ces conditions\xA0?",
+          "La dur\xE9e du mouvement est inf\xE9rieure ou \xE9gale \xE0 5\u202Fsecondes\xA0;",
+          "L\u2019utilisateur peut arr\xEAter et relancer le mouvement\xA0;",
+          "L\u2019utilisateur peut afficher et masquer le contenu en mouvement\xA0;",
+          "L\u2019utilisateur peut afficher la totalit\xE9 de l\u2019information sans le mouvement."
+        ],
+        "2": [
+          "Dans chaque page web, chaque contenu clignotant d\xE9clench\xE9 automatiquement, v\xE9rifie-t-il une de ces conditions\xA0?",
+          "La dur\xE9e du clignotement est inf\xE9rieure ou \xE9gale \xE0 5\u202Fsecondes\xA0;",
+          "L\u2019utilisateur peut arr\xEAter et relancer le clignotement\xA0;",
+          "L\u2019utilisateur peut afficher et masquer le contenu clignotant\xA0;",
+          "L\u2019utilisateur peut afficher la totalit\xE9 de l\u2019information sans le clignotement."
+        ]
+      },
+      techniques: ["F4", "F7", "F16", "F47", "F50", "G4", "G11", "G152", "G186", "G187", "G191", "SCR22", "SCR33", "SCR36", "SM11", "SM12"],
+      wcag: ["2.2.1", "2.2.2"],
+      appliesTo: {
+        ruleIds: ["autoplay-media", "axe:blink", "axe:marquee", "blink-marquee"]
+      }
+    },
+    {
+      id: "13.9",
+      theme: 13,
+      title: {
+        fr: "Dans chaque page web, le contenu propos\xE9 est-il consultable quelle que soit l\u2019orientation de l\u2019\xE9cran (portrait ou paysage) (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, le contenu propos\xE9 est-il consultable quelle que soit l\u2019orientation de l\u2019\xE9cran (portrait ou paysage) (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque contenu v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
+          "La consultation est possible quel que soit le mode d\u2019orientation de l\u2019\xE9cran\xA0;",
+          "Le contenu propos\xE9 reste le m\xEAme quel que soit le mode d\u2019orientation de l\u2019\xE9cran utilis\xE9 m\xEAme si sa pr\xE9sentation et le moyen d\u2019y acc\xE9der peut diff\xE9rer."
+        ]
+      },
+      techniques: [],
+      particularCases: [
+        "Il existe des interfaces pour lesquelles l\u2019orientation du p\xE9riph\xE9rique est essentielle \xE0 leur utilisation.",
+        "Dans ces situations, le crit\xE8re est non applicable. Il peut s\u2019agir d\u2019interfaces de jeu, de piano, de d\xE9p\xF4t de ch\xE8ques bancaires, etc.",
+        "Si l\u2019interface est le seul moyen d\u2019acc\xE9der au service propos\xE9, une alternative devrait \xEAtre mise en place pour pallier cette carence."
+      ],
+      wcag: ["1.3.4"],
+      appliesTo: {
+        ruleIds: ["rendered-orientation-lock"]
+      }
+    },
+    {
+      id: "13.10",
+      theme: 13,
+      title: {
+        fr: "Dans chaque page web, les fonctionnalit\xE9s utilisables ou disponibles au moyen d\u2019un [geste complexe](#gestes-complexes-et-gestes-simples) peuvent-elles \xEAtre \xE9galement disponibles au moyen d\u2019un [geste simple](#gestes-complexes-et-gestes-simples) (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les fonctionnalit\xE9s utilisables ou disponibles au moyen d\u2019un geste complexe peuvent-elles \xEAtre \xE9galement disponibles au moyen d\u2019un geste simple (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, chaque fonctionnalit\xE9 utilisable ou disponible suite \xE0 un contact multipoint est-elle \xE9galement utilisable ou disponible suite \xE0 un contact en un point unique de l\u2019\xE9cran (hors cas particuliers)."
+        ],
+        "2": [
+          "Dans chaque page web, chaque fonctionnalit\xE9 utilisable ou disponible suite \xE0 un geste bas\xE9 sur le suivi d\u2019une trajectoire sur l\u2019\xE9cran est-elle \xE9galement utilisable ou disponible suite \xE0 un contact en un point unique de l\u2019\xE9cran (hors cas particuliers)."
+        ]
+      },
+      techniques: ["G215", "G216"],
+      particularCases: [
+        "Il existe une gestion de cas particuliers dans deux types de situation\xA0:",
+        "- Le crit\xE8re ne s\u2019applique qu\u2019\xE0 des fonctionnalit\xE9s mises en place par l\u2019auteur du site. Il ne concerne donc pas les gestes requis par l\u2019agent utilisateur ou le syst\xE8me d\u2019exploitation\xA0;",
+        "- Le crit\xE8re ne s\u2019applique pas aux fonctionnalit\xE9s dont la r\xE9alisation d\u2019un geste complexe est essentielle (ex\xE9cuter le trac\xE9 d\u2019une signature, par exemple)."
+      ],
+      wcag: ["2.5.1"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "13.11",
+      theme: 13,
+      title: {
+        fr: "Dans chaque page web, les actions d\xE9clench\xE9es au moyen d\u2019un dispositif de pointage sur un point unique de l\u2019\xE9cran peuvent-elles faire l\u2019objet d\u2019une annulation (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les actions d\xE9clench\xE9es au moyen d\u2019un dispositif de pointage sur un point unique de l\u2019\xE9cran peuvent-elles faire l\u2019objet d\u2019une annulation (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, les actions d\xE9clench\xE9es au moyen d\u2019un dispositif de pointage sur un point unique de l\u2019\xE9cran v\xE9rifient-elles l\u2019une de ces conditions (hors cas particuliers)\xA0?",
+          "L\u2019action est d\xE9clench\xE9e au moment o\xF9 le dispositif de pointage est [rel\xE2ch\xE9 ou relev\xE9](#relache-ou-releve)\xA0;",
+          "L\u2019action est d\xE9clench\xE9e au moment o\xF9 le dispositif de pointage est [press\xE9 ou pos\xE9](#presse-ou-pose) puis annul\xE9e lorsque le dispositif de pointage est [rel\xE2ch\xE9 ou relev\xE9](#relache-ou-releve)\xA0;",
+          "Un m\xE9canisme est disponible pour abandonner (avant ach\xE8vement de l\u2019action) ou annuler (apr\xE8s ach\xE8vement) l\u2019ex\xE9cution de l\u2019action."
+        ]
+      },
+      techniques: [],
+      technicalNote: [
+        "Deux exemples de m\xE9canisme mis en place pour annuler ou abandonner une action d\xE9clench\xE9e au moyen d\u2019un dispositif de pointage sur un point unique de l\u2019\xE9cran\xA0:",
+        "- Une fen\xEAtre modale permettant d\u2019annuler l\u2019action apr\xE8s son ach\xE8vement\xA0;",
+        "- Pour une fonction de glisser/d\xE9poser, le fait d\u2019abandonner l\u2019action si l\u2019utilisateur rel\xE2che l\u2019\xE9l\xE9ment en dehors de la zone cible."
+      ],
+      particularCases: [
+        "Il existe une gestion de cas particulier lorsque la fonctionnalit\xE9 n\xE9cessite que le comportement attendu soit r\xE9alis\xE9 lors d\u2019un \xE9v\xE9nement descendant, par exemple, un \xE9mulateur de clavier dont les touches doivent s\u2019activer \xE0 la pression comme sur un clavier physique. Dans ces situations, le crit\xE8re est non applicable."
+      ],
+      wcag: ["2.5.2"],
+      appliesTo: {
+        ruleIds: []
+      }
+    },
+    {
+      id: "13.12",
+      theme: 13,
+      title: {
+        fr: "Dans chaque page web, les fonctionnalit\xE9s qui impliquent un mouvement de l\u2019appareil ou vers l\u2019appareil peuvent-elles \xEAtre satisfaites de mani\xE8re alternative (hors cas particuliers)\xA0?"
+      },
+      titlePlain: {
+        fr: "Dans chaque page web, les fonctionnalit\xE9s qui impliquent un mouvement de l\u2019appareil ou vers l\u2019appareil peuvent-elles \xEAtre satisfaites de mani\xE8re alternative (hors cas particuliers)\xA0?"
+      },
+      tests: {
+        "1": [
+          "Dans chaque page web, les fonctionnalit\xE9s disponibles en bougeant l\u2019appareil peuvent-elles \xEAtre accomplies avec des [composants d\u2019interface](#composant-d-interface) utilisateur (hors cas particuliers)\xA0?"
+        ],
+        "2": [
+          "Dans chaque page web, les fonctionnalit\xE9s disponibles en faisant un geste en direction de l\u2019appareil peuvent-elles \xEAtre accomplies avec des [composants d\u2019interface](#composant-d-interface) utilisateur (hors cas particuliers)\xA0?"
+        ],
+        "3": [
+          "L\u2019utilisateur a-t-il la possibilit\xE9 de d\xE9sactiver la d\xE9tection du mouvement pour \xE9viter un d\xE9clenchement accidentel de la fonctionnalit\xE9 (hors cas particuliers)\xA0?"
+        ]
+      },
+      techniques: [],
+      particularCases: [
+        "Il existe une gestion de cas particulier lorsque\xA0:",
+        "- Le mouvement est essentiel \xE0 l\u2019accomplissement de la fonctionnalit\xE9 (ex. podom\xE8tre)\xA0;",
+        "- La d\xE9tection du mouvement est utilis\xE9e pour contr\xF4ler une fonctionnalit\xE9 au travers d\u2019une interface compatible avec l\u2019accessibilit\xE9."
+      ],
+      wcag: ["2.5.4"],
+      appliesTo: {
+        ruleIds: []
+      }
+    }
+  ]
+};
+
+// src/data/standards/rgaa.glossary.json
+var rgaa_glossary_default = {
+  "accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage": {
+    title: "Accessible et activable par le clavier et tout dispositif de pointage",
+    body: "Un composant d\u2019interface (lien, bouton\u2026) est accessible au clavier et par tout dispositif de pointage lorsque l\u2019utilisateur peut prendre, indiff\xE9remment, le focus par un pointeur ou la touche tabulation\xA0;\n Un composant d\u2019interface (lien, bouton\u2026) est activable au clavier et par tout dispositif de pointage lorsque l\u2019utilisateur peut enclencher, indiff\xE9remment, l\u2019action pr\xE9vue par le composant d\u2019interface par une pression du pointeur ou la touche entr\xE9e du clavier\xA0;\n Attention\xA0: pour certains composants d\u2019interface comme les sliders (bouton coulissant ou rotatif\u2026), il n\u2019est pas possible de contr\xF4ler le composant par la seule touche d\u2019entr\xE9e. Dans ces situations, d\u2019autres touches (comme les touches de direction) peuvent \xEAtre utilis\xE9es. En particulier pour les \xE9l\xE9ments ayant un r\xF4le WAI-ARIA correspondant \xE0 un motif de conception il est recommand\xE9 de consid\xE9rer le document WAI-ARIA 1.1 Authoring Practices lors de leur impl\xE9mentation.\n \n Dans le r\xE9f\xE9rentiel, l\u2019expression \xAB\xA0contr\xF4lable par le clavier et tout dispositif de pointage\xA0\xBB se rapporte \xE9galement \xE0 la pr\xE9sente d\xE9finition.\n Note importante\xA0: le recours \xE0 certaines technologies peut rendre la gestion du focus trop complexe ou trop instable pour ne reposer que sur la tabulation, les touches de direction et la touche entr\xE9e. Dans ce cas, la mise \xE0 disposition de raccourcis clavier peut \xEAtre la seule solution pour rendre le composant utilisable.\n Le crit\xE8re ne peut \xEAtre consid\xE9r\xE9 comme conforme qu\u2019\xE0 la condition que les raccourcis clavier utilis\xE9s soient correctement document\xE9s, qu\u2019ils soient fonctionnels et qu\u2019ils respectent le crit\xE8re 12.10 ."
+  },
+  "accoles-etiquette-et-champ-accoles": {
+    title: "Accol\xE9s (\xE9tiquette et champ accol\xE9s)",
+    body: "Il faut que l\u2019\xE9tiquette et son champ soient visuellement proches de mani\xE8re \xE0 ce que la relation entre les deux ne puisse pas pr\xEAter \xE0 confusion."
+  },
+  "alternative-a-script": {
+    title: "Alternative (\xE0 script)",
+    body: "Texte ou proc\xE9d\xE9 associ\xE9 au script via une technique appropri\xE9e et permettant de mettre \xE0 disposition une fonction ou un contenu similaire \xE0 celui propos\xE9 par script.\n Note\xA0: lorsqu\u2019une alternative \xE0 un proc\xE9d\xE9 ou une fonctionnalit\xE9 JavaScript est propos\xE9e, le moyen d\u2019y acc\xE9der doit \xEAtre fourni par le site lui-m\xEAme. Il peut s\u2019agir d\u2019un lien ou d\u2019un bouton permettant d\u2019acc\xE9der \xE0 une page alternative fonctionnant sans JavaScript ou permettant de remplacer le(s) composant(s) par un composant alternatif fonctionnant sans JavaScript par exemple."
+  },
+  "alternative-courte-et-concise": {
+    title: "Alternative courte et concise",
+    body: "Les conditions de restitution d\u2019une alternative textuelle via des technologies d\u2019assistance (par exemple une loupe d\u2019\xE9cran) n\xE9cessitent qu\u2019elle soit la plus courte possible. Une longueur maximale de 80 caract\xE8res est fortement recommand\xE9e\xA0; elle limitera le nombre de manipulations n\xE9cessaires pour lire l\u2019alternative par les utilisateurs de plages braille ou de loupes d\u2019\xE9cran notamment."
+  },
+  "alternative-textuelle-image": {
+    title: "Alternative textuelle (image)",
+    body: '\xAB\xA0Nom accessible\xA0\xBB restitu\xE9 par les technologies d\u2019assistance pour les \xE9l\xE9ments graphiques de type\xA0:\n Image (balise <img> ou balise ouvrante poss\xE9dant un attribut WAI-ARIA role="img" )\xA0;\n Zone d\u2019image r\xE9active (balise <area> )\xA0;\n Bouton de type image (balise <input> avec l\u2019attribut type="image" )\xA0;\n Image objet (balise <object type="image/\u2026"> )\xA0;\n Image vectorielle (balise <svg> )\xA0;\n Image bitmap (balise <canvas> )\xA0;\n Image embarqu\xE9e (balise <embed> ).\n \n Dans le cas d\u2019un \xE9l\xE9ment graphique, le \xAB\xA0nom accessible\xA0\xBB est obtenu selon l\u2019ordre suivant\xA0:\n Passage de texte associ\xE9 via l\u2019attribut WAI-ARIA aria-labelledby pour les balises\xA0: <img> \xA0;\n <input type="image"> \xA0;\n <svg> \xA0;\n <object type="image/\u2026"> \xA0;\n <embed type="image/\u2026"> \xA0;\n <canvas> \xA0;\n balises poss\xE9dant un attribut WAI-ARIA role="img" .\n \n \n Sinon, contenu de l\u2019attribut WAI-ARIA aria-label pour les \xE9l\xE9ments\xA0: <img> \xA0;\n <area> \xA0;\n <input type="image"> \xA0;\n <svg> \xA0;\n <object type="image/\u2026"> \xA0;\n <embed type="image/\u2026"> \xA0;\n <canvas> \xA0;\n balises ouvrantes poss\xE9dant un attribut WAI-ARIA role="img" .\n \n \n Sinon, contenu de l\u2019attribut alt pour les balises\xA0: <img> \xA0;\n <area> \xA0;\n <input type="image"> .\n \n \n Sinon, contenu de l\u2019attribut title pour les balises\xA0: <img> \xA0;\n <input type="image"> \xA0;\n <object type="image/\u2026"> \xA0;\n <embed type="image/\u2026"> .\n \n \n \n Cet ordre doit \xEAtre utilis\xE9 pour d\xE9terminer ce qui constitue l\u2019alternative textuelle.\n N\xE9anmoins, en cas de support partiel de l\u2019algorithme de calcul du \xAB\xA0nom accessible\xA0\xBB, c\u2019est la valeur r\xE9ellement restitu\xE9e par les technologies d\u2019assistance utilis\xE9es dans l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB) qu\u2019il faudra consid\xE9rer comme alternative textuelle.\n Par exemple\xA0:\n En cas de pr\xE9sence conjointe d\u2019un attribut WAI-ARIA aria-label et d\u2019un attribut WAI-ARIA aria-labelledby sur une balise <img> , c\u2019est le passage de texte r\xE9f\xE9renc\xE9 par l\u2019attribut WAI-ARIA aria-labelledby qui doit \xEAtre consid\xE9r\xE9e comme alternative textuelle si le contenu du passage de texte est r\xE9ellement restitu\xE9 par les technologies d\u2019assistance utilis\xE9es dans l\u2019environnement de test\xA0;\n En cas de pr\xE9sence conjointe d\u2019un attribut WAI-ARIA aria-label et d\u2019un attribut alt sur une balise <img> , c\u2019est le contenu de l\u2019attribut WAI-ARIA aria-label qui doit \xEAtre consid\xE9r\xE9 comme alternative textuelle si le contenu de l\u2019attribut WAI-ARIA aria-label est r\xE9ellement restitu\xE9 par les technologies d\u2019assistance utilis\xE9es dans l\u2019environnement de test.\n \n R\xE9f\xE9rence\xA0: Accessible name and description calculation .\n RGAA consid\xE8re trois types d\u2019alternatives textuelles li\xE9es \xE0 la nature de l\u2019image\xA0:\n Pour une image porteuse d\u2019information, l\u2019alternative textuelle apporte l\u2019information n\xE9cessaire \xE0 la compr\xE9hension du contenu qu\u2019elle v\xE9hicule\xA0;\n Pour une image de d\xE9coration, aucune alternative textuelle ne doit \xEAtre restitu\xE9e\xA0;\n Pour une image CAPTCHA ou une image-test , l\u2019alternative textuelle d\xE9crit seulement la nature et la fonction de l\u2019image. En effet, l\u2019alternative textuelle ne peut apporter l\u2019information v\xE9hicul\xE9e par l\u2019image sans rendre la fonction associ\xE9e inop\xE9rante.\n \n Note 1\xA0: pour une image CAPTCHA l\u2019alternative peut \xEAtre, par exemple\xA0: \xAB\xA0Code de s\xE9curit\xE9 anti-spam\xA0\xBB ou \xAB\xA0code pour v\xE9rifier que vous \xEAtes un humain\xA0\xBB ou toute autre alternative permettant \xE0 l\u2019utilisateur de comprendre la nature et la fonction de l\u2019image.\n Note 2\xA0: pour un groupe d\u2019images, par exemple un syst\xE8me de vote constitu\xE9 de plusieurs images d\u2019\xE9toile, il est fortement conseill\xE9 d\u2019utiliser soit la premi\xE8re image du groupe pour donner une alternative coh\xE9rente au groupe d\u2019image (voir la technique WCAG2.1 G196 ), soit une balise conteneur pourvue d\u2019un r\xF4le WAI-ARIA img et d\u2019une alternative textuelle. Dans le premier cas, les autres images du groupe sont consid\xE9r\xE9es comme des images de d\xE9coration. Dans le second cas, toutes les images du groupe sont consid\xE9r\xE9es comme des images de d\xE9coration.\n Note 3\xA0: pour les image-lien, l\u2019alternative doit permettre de comprendre la fonction et la destination du lien\xA0; ce cas est trait\xE9 dans la th\xE9matique liens.\n Note 4\xA0: pour les images vectorielles (balise <svg> ) l\u2019alternative textuelle pourrait se trouver aussi pr\xE9sente dans une balise <title> ou dans une balise <text> que cette derni\xE8re balise soit ou non visible, m\xEAme si ce n\u2019est pas le r\xF4le d\xE9volu \xE0 cet \xE9l\xE9ment en SVG.\n Note 5\xA0: l\u2019utilisation de l\u2019attribut alt \xE9tant la seule technique totalement support\xE9e par les aides techniques il est recommand\xE9 de privil\xE9gier cette solution lors de la mise en \u0153uvre d\u2019une alternative \xE0 une balise <img> , <area> et <input type="image"> .\n Note 6\xA0: bien que l\u2019attribut title soit consid\xE9r\xE9 comme une possibilit\xE9 d\u2019alternative textuelle \xE0 une image, son usage peut poser probl\xE8me, notamment du fait qu\u2019une image avec un attribut alt absent ou vide est consid\xE9r\xE9e comme une image pourvue d\u2019un role=\u201Cpr\xE9sentation\u201D par WAI-ARIA\xA0: https://www.w3.org/TR/html-aam-1.0/#details-id-54 . Il faut s\u2019assurer que les assistances techniques pr\xE9sentes dans l\u2019environnement de test retenu restituent correctement l\u2019alternative propos\xE9e par l\u2019attribut title .'
+  },
+  "ambigu-pour-tout-le-monde": {
+    title: "Ambigu pour tout le monde",
+    body: "L\u2019intention ne peut \xEAtre d\xE9termin\xE9e \xE0 partir du lien et de toute l\u2019information de la page web pr\xE9sent\xE9e \xE0 l\u2019utilisateur en m\xEAme temps que ce lien (c\u2019est-\xE0-dire qu\u2019un lecteur sans limitation fonctionnelle ne conna\xEEtrait pas la fonction d\u2019un lien avant de l\u2019activer). Exemple\xA0: le mot \xAB\xA0goyave\xA0\xBB dans la phrase suivante utilis\xE9 comme lien\xA0: \xAB\xA0L\u2019une des exportations importantes est la goyave\xA0\xBB. Ce lien pourrait conduire \xE0 une d\xE9finition de la goyave, \xE0 un graphe pr\xE9sentant une liste des quantit\xE9s de goyaves export\xE9es ou \xE0 une photo de personnes r\xE9coltant la goyave. Jusqu\u2019\xE0 ce que le lien soit activ\xE9, tout utilisateur est dans l\u2019incertitude et une personne handicap\xE9e n\u2019est donc pas d\xE9savantag\xE9e."
+  },
+  "audiodescription-synchronisee-media-temporel": {
+    title: "Audiodescription synchronis\xE9e (m\xE9dia temporel)",
+    body: "Narration ajout\xE9e (via un fichier son) \xE0 une piste sonore pour d\xE9crire les d\xE9tails visuels importants qui ne peuvent \xEAtre compris \xE0 partir de la piste sonore principale seulement. L\u2019audiodescription doit \xEAtre synchronis\xE9e avec le m\xE9dia temporel par un dispositif applicatif li\xE9 au lecteur lui-m\xEAme ou fourni par le d\xE9veloppement par exemple avec JavaScript.\n Note 1\xA0: l\u2019audiodescription d\u2019une vid\xE9o fournit de l\u2019information \xE0 propos des actions, des personnages, des changements de sc\xE8nes, du texte apparaissant \xE0 l\u2019\xE9cran et d\u2019autres contenus visuels.\n Note 2\xA0: dans une audiodescription standard, la narration est ajout\xE9e durant les pauses qui existent dans le dialogue. (Voir aussi audiodescription \xE9tendue.)\n Note 3\xA0: lorsque toute l\u2019information de la vid\xE9o est d\xE9j\xE0 donn\xE9e dans la piste audio, aucune audiodescription suppl\xE9mentaire n\u2019est requise."
+  },
+  "bouton-formulaire": {
+    title: "Bouton (formulaire)",
+    body: '\xC9l\xE9ment d\u2019un formulaire qui permet d\u2019effectuer une action pr\xE9d\xE9finie. Par exemple, le bouton de soumission d\u2019un formulaire permet l\u2019envoi au serveur des informations collect\xE9es pour leur traitement. L\u2019intitul\xE9 d\u2019un bouton doit d\xE9crire l\u2019action qui r\xE9sulte de son activation (par exemple\xA0: \xAB\xA0Lancer votre recherche\xA0\xBB, \xAB\xA0Envoyer votre message\xA0\xBB).\n En HTML, il y a trois types de boutons de formulaire\xA0:\n Balise <input> de type submit , reset ou button \xA0;\n Balise <input> de type image \xA0;\n Balise <button> .\n \n Il est \xE9galement possible de restituer un bouton \xE0 l\u2019aide du r\xF4le WAI-ARIA button .\n L\u2019intitul\xE9 du bouton peut \xEAtre de six types\xA0:\n Le contenu du passage de texte associ\xE9 au bouton via l\u2019attribut WAI-ARIA aria-labelledby lorsqu\u2019il est pr\xE9sent\xA0;\n Le contenu de l\u2019attribut aria-label lorsqu\u2019il est pr\xE9sent\xA0;\n Le contenu de l\u2019attribut alt d\u2019un bouton de type image \xA0;\n Le contenu de l\u2019attribut value des boutons de type submit , reset ou button \xA0;\n Le contenu de la balise <button> \xA0;\n Le contenu de l\u2019attribut title lorsqu\u2019il est pr\xE9sent.\n \n Note importante\xA0: lorsque plusieurs de ces techniques sont pr\xE9sentes sur un m\xEAme bouton, le calcul du \xAB\xA0nom accessible\xA0\xBB, c\u2019est-\xE0-dire ce qui sera restitu\xE9, ob\xE9it \xE0 un ordre strict\xA0:\n aria-labelledby \xA0;\n Sinon aria-label \xA0;\n Sinon alt pour le cas des input image \xA0;\n Sinon value pour le cas des input submit , reset ou button \xA0;\n Sinon contenu de la balise <button> \xA0;\n Sinon title .\n \n Cet ordre doit \xEAtre utilis\xE9 pour l\u2019\xE9valuation de la pertinence du \xAB\xA0nom accessible\xA0\xBB du bouton. Par exemple, m\xEAme dans le cas de la pr\xE9sence d\u2019un title et d\u2019un passage de texte r\xE9f\xE9renc\xE9 par aria-labelledby sur le m\xEAme bouton, c\u2019est le passage de texte r\xE9f\xE9renc\xE9 par aria-labelledby qui doit \xEAtre \xE9valu\xE9.\n R\xE9f\xE9rence\xA0: Accessible name and description calculation .\n Par ailleurs, un \xAB\xA0nom accessible\xA0\xBB sera consid\xE9r\xE9 comme non-pertinent s\u2019il ne reprend pas le texte visible du bouton. Par exemple\xA0: <button aria-label="confirmer la saisie">valider la saisie</button> sera consid\xE9r\xE9 comme non conforme au crit\xE8re 11.9 .'
+  },
+  cadre: {
+    title: "Cadre",
+    body: "Cadre\xA0: \xE9l\xE9ment HTML (balise <frame> ) permettant d\u2019afficher un contenu dans la page web dans laquelle il est impl\xE9ment\xE9.\n Cadre en ligne\xA0: \xE9l\xE9ment HTML (balise <iframe> ) permettant d\u2019afficher un contenu dans la page web dans laquelle il est impl\xE9ment\xE9."
+  },
+  captcha: {
+    title: "CAPTCHA",
+    body: "Un CAPTCHA est un test utilis\xE9 pour distinguer un utilisateur humain d\u2019un ordinateur. Le test utilise souvent des images contenant du texte d\xE9form\xE9, m\xE9lang\xE9 avec d\u2019autres formes ou utilisant des jeux de couleur alt\xE9r\xE9es, que l\u2019utilisateur est invit\xE9 \xE0 retaper. D\u2019autres formes de CAPTCHA peuvent \xEAtre bas\xE9es sur des questions logiques ou des extraits sonores."
+  },
+  "champ-de-saisie-de-formulaire": {
+    title: "Champ de saisie de formulaire",
+    body: 'Objet d\u2019un formulaire permettant \xE0 l\u2019utilisateur\xA0:\n De saisir des donn\xE9es textuelles ou pr\xE9format\xE9es\xA0: input type="text" \xA0;\n input type="password" \xA0;\n input type="search" \xA0;\n input type="email" \xA0;\n input type="number" \xA0;\n input type="tel" \xA0;\n input type="url" \xA0;\n textarea .\n \n \n De s\xE9lectionner des valeurs pr\xE9d\xE9finies\xA0: input type="checkbox" \xA0;\n input type="radio" \xA0;\n input type="date" \xA0;\n input type="range" \xA0;\n input type="color" \xA0;\n input type="time" \xA0;\n input type="month" \xA0;\n input type="week" \xA0;\n input type="datetime-local" \xA0;\n select \xA0;\n datalist \xA0;\n optgroup \xA0;\n option .\n \n \n De t\xE9l\xE9charger des fichiers\xA0: input type="file" .\n \n \n Ou d\u2019afficher des r\xE9sultats\xA0: output \xA0;\n progress \xA0;\n meter .\n \n \n Les balises poss\xE9dant un r\xF4le WAI-ARIA permettant de restituer un champ de formulaire sont \xE9galement couvertes par cette d\xE9finition\xA0: progressbar \xA0;\n slider \xA0;\n spinbutton \xA0;\n textbox \xA0;\n listbox \xA0;\n searchbox \xA0;\n combobox \xA0;\n option \xA0;\n checkbox \xA0;\n radio \xA0;\n switch .\n \n \n Les objets de formulaires et r\xF4le WAI-ARIA suivants ne sont pas consid\xE9r\xE9s comme des champs de formulaires\xA0: input type="submit" \xA0;\n input type="reset" \xA0;\n input type="hidden" \xA0;\n input type="image" \xA0;\n input type="button" \xA0;\n button \xA0;\n attribut WAI-ARIA role="button" .'
+  },
+  "champs-de-meme-nature": {
+    title: "Champs de m\xEAme nature",
+    body: "Dans un formulaire, ensemble des champs pouvant \xEAtre regroup\xE9s par la nature des informations attendues. Le regroupement vise \xE0 identifier les champs devant \xEAtre trait\xE9s comme un ensemble.\n Quelques exemples\xA0:\n Trois champs successifs pour saisir une date (jour/mois/ann\xE9e)\xA0;\n Champs successifs pour un num\xE9ro de t\xE9l\xE9phone\xA0;\n Un bloc destin\xE9 \xE0 saisir l\u2019identit\xE9 et l\u2019adresse de l\u2019utilisateur, lorsque le formulaire contient plusieurs blocs de contact\xA0;\n Un ensemble de boutons radio ou de cases \xE0 cocher qui se rapportent \xE0 une question.\n \n Ces champs doivent \xEAtre regroup\xE9s lorsque les intitul\xE9s de label ne sont pas suffisants pour informer l\u2019utilisateur que les champs font partie d\u2019un regroupement."
+  },
+  "changement-brusque-de-luminosite-ou-effet-de-flash": {
+    title: "Changement brusque de luminosit\xE9 ou effet de flash",
+    body: "Alternance de luminance relative qui peut causer des crises chez certaines personnes si leur taille est suffisamment importante dans une gamme de fr\xE9quences sp\xE9cifiques."
+  },
+  "changement-de-contexte": {
+    title: "Changement de contexte",
+    body: "Changements majeurs dans le contenu d\u2019une page web qui, s\u2019ils sont faits sans que l\u2019utilisateur n\u2019en soit conscient, peuvent d\xE9sorienter l\u2019utilisateur qui ne peut voir l\u2019ensemble de la page en m\xEAme temps. Les changements de contexte comprennent les changements\xA0:\n d\u2019agent utilisateur\xA0;\n d\u2019espace de restitution\xA0;\n de focus\xA0;\n de contenu qui modifie la signification de la page web.\n \n Note\xA0: Un changement de contenu n\u2019est pas toujours un changement de contexte. Un changement dans le contenu comme le d\xE9ploiement d\u2019une arborescence, un menu dynamique ou un d\xE9placement de tabulation ne change pas n\xE9cessairement le contexte \xE0 moins qu\u2019il ne change aussi l\u2019un des \xE9l\xE9ments \xE9num\xE9r\xE9s ci-dessus (le focus, par exemple).\n Par exemple, l\u2019ouverture d\u2019une nouvelle fen\xEAtre, le d\xE9placement du focus sur un composant diff\xE9rent, le d\xE9placement vers une nouvelle page (y compris tout ce qui, pour l\u2019utilisateur, aurait l\u2019air d\u2019un d\xE9placement vers une autre page) ou la r\xE9organisation significative du contenu d\u2019une page sont autant d\u2019illustrations d\u2019un changement de contexte."
+  },
+  "changement-de-langue": {
+    title: "Changement de langue",
+    body: 'L\u2019indication des changements de langue est n\xE9cessaire pour indiquer aux technologies d\u2019assistance de modifier la restitution vocale d\u2019un \xE9l\xE9ment. Les changements de langue concernent tous les contenus, y compris les valeurs de certains attributs comme title .\n Note\xA0: il n\u2019est pas possible d\u2019indiquer des changements de langue dans une valeur d\u2019attribut elle-m\xEAme, dans ce cas le changement de langue est indiqu\xE9 sur l\u2019\xE9l\xE9ment qui contient l\u2019attribut. Par exemple un lien affect\xE9 d\u2019un title en anglais devra comporter un attribut lang="en" . Lorsque l\u2019attribut contient plusieurs passages de texte dans des langues diff\xE9rentes, le crit\xE8re est non applicable.'
+  },
+  "code-de-langue": {
+    title: "Code de langue",
+    body: 'Code de 2 caract\xE8res (ISO 639-1) ou 3 caract\xE8res (ISO 639-2 et suivants) permettant d\u2019indiquer la langue d\u2019un document ou d\u2019un passage de texte. L\u2019indication du code de langue est constitu\xE9e de deux parties s\xE9par\xE9es par un tiret sur le mod\xE8le lang="[code]-[option]" .\n [code] repr\xE9sente un code de langue valide sur 2 ou 3 caract\xE8res\xA0;\n [option] est une indication laiss\xE9e \xE0 l\u2019appr\xE9ciation de l\u2019auteur.\n \n Lorsqu\u2019un code de pays est utilis\xE9 comme option, il peut servir \xE0 indiquer une r\xE9gionalisation de la langue, l\u2019indication \u201Cen-us\u201D indique la langue am\xE9ricaine, par exemple. L\u2019indication du code de langue ne concerne que la partie [code] avant le tiret.'
+  },
+  "compatible-avec-les-technologies-d-assistance": {
+    title: "Compatible avec les technologies d\u2019assistance",
+    body: "Un contenu ou une fonctionnalit\xE9 doit \xEAtre compatible avec les technologies d\u2019assistance des utilisateurs ainsi qu\u2019avec les fonctions d\u2019accessibilit\xE9 des navigateurs et des autres agents utilisateurs via une API d\u2019accessibilit\xE9.\n Cela concerne, \xE0 la fois, la technologie, ses fonctionnalit\xE9s et ses usages\xA0:\n La fa\xE7on dont la technologie Web est utilis\xE9e doit \xEAtre compatible avec les technologies d\u2019assistance des utilisateurs. Cela signifie que la fa\xE7on dont la technologie est utilis\xE9e a \xE9t\xE9 test\xE9e dans une perspective d\u2019interop\xE9rabilit\xE9 avec des utilisateurs des technologies d\u2019assistance dans la ou les langues du contenu\xA0;\n La technologie fonctionne de fa\xE7on native dans des agents utilisateurs largement distribu\xE9s qui sont, eux-m\xEAmes, compatibles avec l\u2019accessibilit\xE9 (comme HTML et CSS) ou avec un module d\u2019extension largement distribu\xE9 qui est, lui-m\xEAme, compatible avec l\u2019accessibilit\xE9.\n \n La v\xE9rification de la compatibilit\xE9 avec les technologies d\u2019assistance n\xE9cessite de r\xE9aliser un certain nombre de tests sp\xE9cifiques \xE0 la technologie utilis\xE9e, par exemple\xA0:\n V\xE9rifier le nom, le r\xF4le, le param\xE9trage et les changements d\u2019\xE9tats des composants d\u2019interface\xA0;\n V\xE9rifier que la restitution d\u2019un composant d\u2019interface est correcte pour la ou les technologies d\u2019assistance utilis\xE9es."
+  },
+  "composant-d-interface": {
+    title: "Composant d\u2019interface",
+    body: "Un composant d\u2019interface est un \xE9l\xE9ment avec lequel l\u2019utilisateur peut interagir, par exemple un bouton, un lien, une zone de saisie. Certains composants peuvent \xEAtre plus complexes comme un menu, une fen\xEAtre de dialogue, un syst\xE8me d\u2019onglets. Enfin, un composant d\u2019interface peut \xEAtre bas\xE9 sur des \xE9l\xE9ments natifs de HTML ou d\xE9velopp\xE9s de toutes pi\xE8ces en JavaScript et des attributs WAI-ARIA. En particulier pour les \xE9l\xE9ments ayant des attributs WAI-ARIA correspondant \xE0 un motif de conception il est recommand\xE9 de consid\xE9rer le document WAI-ARIA 1.1 Authoring Practices lors de leur impl\xE9mentation."
+  },
+  "comprehensible-ordre-de-lecture": {
+    title: "Compr\xE9hensible (ordre de lecture)",
+    body: "Un contenu compr\xE9hensible est lisible (l\u2019ordre des \xE9l\xE9ments est logique) et coh\xE9rent (l\u2019encha\xEEnement de la lecture est coh\xE9rent)."
+  },
+  "contenu-alternatif": {
+    title: "Contenu alternatif",
+    body: "Contenu venant se substituer \xE0 un autre apportant la m\xEAme information mais pouvant \xEAtre pr\xE9sent\xE9 de fa\xE7on diff\xE9rente. Ce contenu peut \xEAtre de forme textuelle mais \xE9galement \xEAtre lui-m\xEAme structur\xE9 \xE0 l\u2019aide de balises. Un contenu alternatif devra respecter l\u2019ensemble des crit\xE8res du RGAA qui lui sont applicables pour \xEAtre consid\xE9r\xE9 comme une alternative accessible \xE0 l\u2019\xE9l\xE9ment qu\u2019il remplace. Exemple\xA0: un tableau de donn\xE9es peut \xEAtre le contenu alternatif d\u2019une image bitmap (balise <canvas> ) affichant un graphique statistique."
+  },
+  "contenu-cache": {
+    title: "Contenu cach\xE9",
+    body: 'Les technologies d\u2019assistance (notamment les lecteurs d\u2019\xE9cran) ne restituent pas le contenu masqu\xE9 via les propri\xE9t\xE9s\xA0:\n display avec la valeur none ( display: none )\xA0;\n visibility avec la valeur hidden ( visibility: hidden )\xA0;\n font-size avec la valeur 0 ( font-size:0 )\xA0;\n Attribut HTML5 hidden \xA0;\n Attribut WAI-ARIA aria-hidden="true" .\n \n Tous les contenus utilisant une ou plusieurs de ces propri\xE9t\xE9s et attributs sont applicables pour le crit\xE8re 10.8 .'
+  },
+  "contenu-visible": {
+    title: "Contenu visible",
+    body: "Pour le test 12.2.1 \xA0: \xAB\xA0Contenu pr\xE9sent\xA0\xBB signifie que le contenu visible reste pr\xE9sent lorsque CSS est d\xE9sactiv\xE9. Par exemple, une image porteuse d\u2019information en propri\xE9t\xE9 de fond CSS invalide ce test car l\u2019information n\u2019est plus \xAB\xA0pr\xE9sente\xA0\xBB lorsque CSS est d\xE9sactiv\xE9. En revanche, une image porteuse d\u2019information en propri\xE9t\xE9 de fond CSS mais accompagn\xE9e d\u2019un texte cach\xE9 valide ce test car l\u2019information est bien \xAB\xA0pr\xE9sente\xA0\xBB lorsque CSS est d\xE9sactiv\xE9.\n Note\xA0: la pratique qui consiste \xE0 g\xE9rer des images en propri\xE9t\xE9 de fond d\u2019\xE9l\xE9ments via CSS est formellement d\xE9conseill\xE9e, m\xEAme si elle est accompagn\xE9e d\u2019un texte cach\xE9."
+  },
+  "contexte-du-lien": {
+    title: "Contexte du lien",
+    body: "Le contexte du lien repr\xE9sente les informations suppl\xE9mentaires (on parle d\u2019informations de contexte) qui peuvent \xEAtre mises en relation par un programme informatique avec l\u2019 intitul\xE9 du lien . Les informations de contexte qui permettent de compl\xE9ter l\u2019 intitul\xE9 du lien sont les suivantes\xA0:\n Le contenu de la phrase dans laquelle le lien texte est pr\xE9sent\xA0;\n Le contenu du paragraphe (balise <p> ) dans lequel le lien texte est pr\xE9sent\xA0;\n Le contenu de l\u2019item de liste (balise <li> ) ou le contenu d\u2019un item de liste parent (balise <li> ) dans lequel le lien texte est pr\xE9sent\xA0;\n Le contenu du titre (balise <hx> ) pr\xE9c\xE9dent le lien texte\xA0;\n Le contenu de la ou les cellule(s) d\u2019en-t\xEAte de tableau (balise(s) <th> ) associ\xE9e(s) \xE0 la cellule de donn\xE9e (balise <td> ) dans laquelle le lien texte est pr\xE9sent\xA0;\n Le contenu de la cellule de donn\xE9e (balise <td> ) dans laquelle le lien texte est pr\xE9sent.\n \n Note 1\xA0: l\u2019un des 6 contextes de lien combin\xE9 \xE0 l\u2019 intitul\xE9 du lien doit permettre de comprendre la fonction et la destination du lien.\n Note 2\xA0: RGAA consid\xE8re qu\u2019une adresse e-mail de type xxx@xxx.yyy est un texte de lien suffisant pour comprendre la fonction du lien et ne requiert pas de signaler plus explicitement l\u2019action."
+  },
+  contraste: {
+    title: "Contraste",
+    body: "Opposition marqu\xE9e entre la luminosit\xE9 d\u2019une couleur de premier plan et d\u2019une couleur d\u2019arri\xE8re-plan. Le rapport de contraste est bas\xE9 sur la diff\xE9rence de luminance relative entre l\u2019arri\xE8re-plan et le premier plan selon la r\xE8gle\xA0: (L1 + 0,05) / (L2 + 0,05) o\xF9 L1 est la luminance relative la plus claire et L2 la luminance relative la plus sombre. La luminosit\xE9 est calcul\xE9e selon la formule suivante\xA0: L = 0,2126 * R + 0,7152 * G + 0,0722 * B. O\xF9 R, G et B sont d\xE9finis par\xA0:\n Si R sRGB \u2264 0,03928 alors R = R sRGB /12,92 sinon R = ((R sRGB +0,055)/1,055) ^ 2,4\xA0;\n Si G sRGB \u2264 0,03928 alors G = G sRGB /12,92 sinon G = ((G sRGB +0,055)/1,055) ^ 2,4\xA0;\n Si B sRGB \u2264 0,03928 alors B = B sRGB /12.92 sinon B = ((B sRGB +0,055)/1,055) ^ 2,4.\n \n et R sRGB, G sRGB et B sRGB sont d\xE9finis par\xA0:\n R sRGB = R8bit/255\xA0;\n G sRGB = G8bit/255\xA0;\n B sRGB = B8bit/255.\n \n Le caract\xE8re \xAB\xA0^\xA0\xBB est l\u2019op\xE9rateur de puissance.\n Note\xA0: la mesure de contraste concerne le texte, le texte en image, le texte et le texte en image dans les animations, le texte de sous-titrage et le texte incrust\xE9 dans les vid\xE9os. Pour le texte et le texte en image dans les animations, le texte de sous-titrage et le texte incrust\xE9 dans les vid\xE9os, la taille de la police doit \xEAtre mesur\xE9e par rapport \xE0 la taille d\u2019affichage par d\xE9faut (telle qu\u2019affich\xE9e). Les textes pr\xE9sents dans les \xE9l\xE9ments d\u2019une image ou d\u2019une vid\xE9o (par exemple un \xE9criteau, une affiche\u2026) ne sont pas concern\xE9s.\n Source (en anglais)\xA0: Proc\xE9dure de calcul de contraste des WCAG ."
+  },
+  "controle-contenu-en-mouvement-ou-clignotant": {
+    title: "Contr\xF4le (contenu en mouvement ou clignotant)",
+    body: "Possibilit\xE9 pour l\u2019utilisateur de contr\xF4ler l\u2019affichage ou la lecture d\u2019un contenu en mouvement ou clignotant par le clavier et la souris, au moins.\n Tous les contenus en mouvement, \xE0 l\u2019exception des m\xE9dias temporels pris en charge par la th\xE9matique multim\xE9dia, sont concern\xE9s\xA0: les images anim\xE9es (par exemple un gif anim\xE9), les contenus en mouvement propos\xE9s via une balise <object> , du code JavaScript ou des effets CSS par exemple.\n Note 1\xA0: lorsque c\u2019est appropri\xE9, la m\xE9thode de contr\xF4le devrait \xEAtre disponible comme premier \xE9l\xE9ment de la page.\n Note 2\xA0: la m\xE9thode de contr\xF4le du contenu en mouvement ou clignotant doit permettre \xE0 l\u2019utilisateur d\u2019interagir avec le reste de la page. En cons\xE9quence, l\u2019arr\xEAt ou la mise en pause via un \xE9v\xE9nement d\xE9clench\xE9 uniquement sur la prise de focus ne permet pas de valider le crit\xE8re.\n Note 3\xA0: Dans certains cas, le mouvement fait partie int\xE9grante du composant et il n\u2019est pas possible d\u2019en donner le contr\xF4le \xE0 l\u2019utilisateur, par exemple une barre de progression dont la fonction est d\u2019indiquer par un mouvement la progression d\u2019un \xE9v\xE8nement comme un t\xE9l\xE9chargement. Dans ce cas le crit\xE8re est Non Applicable."
+  },
+  "controle-de-la-consultation-d-un-media-temporel": {
+    title: "Contr\xF4le de la consultation (d\u2019un m\xE9dia temporel)",
+    body: "Possibilit\xE9 pour l\u2019utilisateur de contr\xF4ler la consultation d\u2019un m\xE9dia temporel par le clavier et tout dispositif de pointage, au moins. Les points suivants doivent \xEAtre respect\xE9s\xA0:\n Liste des fonctionnalit\xE9s obligatoires de contr\xF4le de la consultation\xA0: L\u2019objet multim\xE9dia doit toujours avoir les fonctionnalit\xE9s suivantes, au minimum\xA0: lecture, pause ou stop\xA0;\n Si l\u2019objet multim\xE9dia a du son, il doit avoir une fonctionnalit\xE9 d\u2019activation / d\xE9sactivation du son\xA0;\n Si l\u2019objet multim\xE9dia a des sous-titres non incrust\xE9s, il doit avoir une fonctionnalit\xE9 de contr\xF4le de l\u2019apparition / disparition des sous-titres\xA0;\n Si l\u2019objet multim\xE9dia a une audiodescription, il doit avoir une fonctionnalit\xE9 de contr\xF4le de l\u2019apparition / disparition de l\u2019audiodescription.\n \n \n Chaque fonctionnalit\xE9 doit \xEAtre accessible par le clavier, via la touche de tabulation, et par tout dispositif de pointage au moins.\n Chaque fonctionnalit\xE9 doit \xEAtre activable par le clavier et par tout dispositif de pointage, au moins.\n \n Note\xA0: s\u2019il n\u2019y a pas de son \xE0 un m\xE9dia temporel, il n\u2019est pas utile de mettre une fonctionnalit\xE9 d\u2019activation / d\xE9sactivation du son. Si cette fonctionnalit\xE9 est cependant pr\xE9sente et qu\u2019elle n\xE9cessite une alternative textuelle pour \xEAtre comprise par certains utilisateurs, il faut alors lui en donner une puisque l\u2019utilisateur est susceptible d\u2019y acc\xE9der et de vouloir l\u2019activer."
+  },
+  "controle-de-saisie-formulaire": {
+    title: "Contr\xF4le de saisie (formulaire)",
+    body: "Ensemble des processus qui permettent de pr\xE9venir l\u2019utilisateur des champs obligatoires, des indications de type ou de format attendus et des erreurs de saisie dans un formulaire. Ces contr\xF4les de saisie peuvent \xEAtre impl\xE9ment\xE9s par l\u2019auteur des contenus ou s\u2019appuyer sur des attributs (comme required ou pattern ), des attributs WAI-ARIA (comme aria-required ) ou des types de champ qui produisent de mani\xE8re automatique des indications de saisie ou d\u2019erreurs (comme les types url , email , date , time par exemple)."
+  },
+  "controle-son-declenche-automatiquement": {
+    title: "Contr\xF4le (son d\xE9clench\xE9 automatiquement)",
+    body: "Possibilit\xE9 pour l\u2019utilisateur d\u2019arr\xEAter ou de relancer un son d\xE9clench\xE9 automatiquement.\n Note\xA0: la m\xE9thode de contr\xF4le du son devrait \xEAtre disponible comme premier \xE9l\xE9ment de la page."
+  },
+  "correctement-restitue-par-les-technologies-d-assistance": {
+    title: "Correctement restitu\xE9 (par les technologies d\u2019assistance)",
+    body: "Lorsqu\u2019un crit\xE8re, un test ou une condition de test demande de v\xE9rifier la restitution d\u2019un dispositif, il faut s\u2019assurer que ladite restitution est compatible avec l\u2019accessibilit\xE9.\n Le test consiste \xE0 v\xE9rifier que la restitution est pertinente pour au moins une des combinaisons de l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB) utilis\xE9 pour d\xE9clarer qu\u2019un \xE9l\xE9ment, un dispositif ou une alternative est \xAB\xA0compatible avec l\u2019accessibilit\xE9\xA0\xBB.\n Par exemple\xA0: le test 1.3.8 demande de v\xE9rifier que l\u2019alternative d\u2019une image bitmap (balise <canvas> ) porteuse d\u2019information est correctement restitu\xE9e.\n On proc\xE8de alors \xE0 un test avec les outils de l\u2019environnement de test d\xE9fini pour le site.\n Si on constate que l\u2019alternative est correctement restitu\xE9e, le test est valid\xE9."
+  },
+  "couleur-d-arriere-plan-contigue-et-couleur-contigue": {
+    title: "Couleur d\u2019arri\xE8re-plan contigu\xEB et couleur contigu\xEB",
+    body: "Couleur d\u2019arri\xE8re-plan contigu\xEB\xA0: couleur d\u2019arri\xE8re-plan directement en contact avec le bord ext\xE9rieur du composant d\u2019interface ou de l\u2019 \xE9l\xE9ment graphique .\n Exemples\xA0:\n Pour un bouton blanc avec une bordure bleue sur un fond blanc, le fond blanc \xE0 l\u2019ext\xE9rieur de la bordure bleue correspond \xE0 la couleur d\u2019arri\xE8re-plan contigu\xEB\xA0;\n Pour un bouton rouge sur fond blanc, le fond blanc \xE0 l\u2019ext\xE9rieur du rouge correspond \xE0 la couleur d\u2019arri\xE8re-plan contigu\xEB\xA0;\n Pour un bouton blanc avec une bordure verte qui devient noire \xE0 la prise de focus et au survol, le fond blanc \xE0 l\u2019ext\xE9rieur de la bordure verte de l\u2019\xE9tat par d\xE9faut et de la bordure noire de l\u2019\xE9tat au survol et au focus correspond \xE0 la couleur d\u2019arri\xE8re-plan contigu\xEB.\n \n Couleur contigu\xEB\xA0: couleur directement en contact avec une autre couleur. Exemple dans un panneau de \xAB\xA0sens interdit\xA0\xBB le rouge du panneau est la couleur contigu\xEB au trait blanc au centre du panneau.\n Note 1\xA0: dans le cas de la pr\xE9sence d\u2019un d\xE9grad\xE9, c\u2019est la couleur contigu\xEB la moins contrast\xE9e du d\xE9grad\xE9 qui sera \xE0 consid\xE9rer comme la couleur contigu\xEB ou couleur d\u2019arri\xE8re-plan contigu\xEB.\n Note 2\xA0: dans le cas de la pr\xE9sence de plusieurs couleurs, c\u2019est l\u2019ensemble des couleurs qui seront \xE0 consid\xE9rer comme couleur contigu\xEB ou couleur d\u2019arri\xE8re-plan contigu\xEB."
+  },
+  "description-detaillee-image": {
+    title: "Description d\xE9taill\xE9e (image)",
+    body: 'Contenu associ\xE9 \xE0 une image en compl\xE9ment de son alternative textuelle afin de d\xE9crire en totalit\xE9 l\u2019information v\xE9hicul\xE9e par l\u2019image. La description d\xE9taill\xE9e peut \xEAtre associ\xE9e \xE0 l\u2019image via\xA0:\n Un attribut longdesc qui contient l\u2019adresse d\u2019une page ou d\u2019un emplacement dans la page contenant la description d\xE9taill\xE9e\xA0;\n Une r\xE9f\xE9rence \xE0 une description d\xE9taill\xE9e adjacente \xE0 l\u2019image dans l\u2019alternative textuelle\xA0;\n Un lien ou un bouton adjacent qui permet d\u2019acc\xE9der \xE0 la description d\xE9taill\xE9e dans la page ou dans une autre page\xA0;\n Un ou plusieurs passages de texte identifi\xE9s par un id et li\xE9s par un attribut WAI-ARIA aria-describedby sur le mod\xE8le aria-describedby="ID1 ID2 ID3\u2026" .\n \n Note 1\xA0: Si le support de l\u2019attribut aria-describedby fait d\xE9faut, il est possible d\u2019utiliser un ou plusieurs passages de texte identifi\xE9s par un id et li\xE9s par un attribut WAI-ARIA aria-labelledby \xE0 la suite de l\u2019alternative textuelle.\n Note 2\xA0: Pour assurer une compatibilit\xE9 maximum avec les agents utilisateurs, notamment Internet Explorer 11, il est recommand\xE9 d\u2019impl\xE9menter un tabindex="-1" sur les balises qui contiennent un passage de texte et qui ne sont pas des \xE9l\xE9ments interactifs (bouton, liens, \xE9l\xE9ments de formulaires, etc.).'
+  },
+  "element-graphique": {
+    title: "\xC9l\xE9ment graphique",
+    body: "\xC9l\xE9ment faisant appel \xE0 une repr\xE9sentation visuelle telle que des images, des pictogrammes ou des graphiques.\n Cet \xE9l\xE9ment peut \xEAtre compos\xE9 d\u2019une ou plusieurs parties dont la visibilit\xE9 est n\xE9cessaire \xE0 sa compr\xE9hension (par exemple chaque point sur chaque ligne d\u2019un graphique de statistiques)."
+  },
+  "en-tete-de-colonne-ou-de-ligne": {
+    title: "En-t\xEAte de colonne ou de ligne",
+    body: 'Contenu d\u2019une cellule dans un tableau de donn\xE9es (la premi\xE8re cellule d\u2019une colonne ou d\u2019une ligne, g\xE9n\xE9ralement) qui sert d\u2019intitul\xE9 pour la totalit\xE9 ou une partie des cellules de la colonne ou de la ligne. Une colonne ou une ligne peut contenir plusieurs en-t\xEAtes (en-t\xEAte interm\xE9diaire). Lorsque les en-t\xEAtes s\u2019appliquent \xE0 l\u2019ensemble d\u2019une ligne ou d\u2019une colonne, ils peuvent \xEAtre structur\xE9s avec une balise <th> ou une balise pourvue d\u2019un attribut WAI-ARIA role="rowheader" ou role="columnheader" . Dans le cas contraire, seule une balise <th> peut \xEAtre utilis\xE9e.\n Note\xA0: seule la balise <th> \xE9tant totalement support\xE9e par l\u2019ensemble des technologies d\u2019assistance, il est fortement recommand\xE9 de privil\xE9gier cette solution lors de la mise en \u0153uvre afin d\u2019\xE9viter de nombreuses v\xE9rifications dans les diff\xE9rentes combinaisons pr\xE9vues dans l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB).'
+  },
+  "ensemble-de-pages": {
+    title: "Ensemble de pages",
+    body: "Pages web li\xE9es les unes aux autres par des liens et constituant un ensemble coh\xE9rent \xE0 l\u2019int\xE9rieur d\u2019un site web. Par exemple, les pages d\u2019une rubrique sp\xE9cifique, les pages d\u2019un blog, les pages d\u2019administration d\u2019un compte client sont autant d\u2019ensembles de page.\n Note\xA0: la page d\u2019accueil d\u2019un site web peut constituer, \xE0 elle seule, un \xAB\xA0ensemble de pages\xA0\xBB du fait de son unicit\xE9."
+  },
+  "environnement-maitrise": {
+    title: "Environnement ma\xEEtris\xE9",
+    body: "Tout environnement dans lequel l\u2019acc\xE8s \xE0 l\u2019information, les technologies, les conditions d\u2019utilisation et le profil des utilisateurs peuvent \xEAtre connus et ma\xEEtris\xE9s. Les principaux \xE9l\xE9ments dont la ma\xEEtrise est essentielle sont\xA0:\n Le type et la version des navigateurs\xA0;\n Les technologies support\xE9es, leur version et leur activation (JavaScript, WAI-ARIA, Flash, Silverlight\u2026)\xA0;\n Les technologies d\u2019assistance et tout dispositif utilis\xE9 de mani\xE8re sp\xE9cifique par les utilisateurs handicap\xE9s\xA0;\n Les syst\xE8mes d\u2019exploitation et les APIs d\u2019accessibilit\xE9 support\xE9es\xA0;\n La formation des utilisateurs de technologies d\u2019assistance \xE0 l\u2019utilisation de tout dispositif particulier (interface, application en ligne\u2026).\n \n Les auteurs et les administrateurs doivent garantir la compatibilit\xE9 des technologies utilis\xE9es et de leurs usages par les utilisateurs et leurs technologies (y compris les technologies d\u2019assistance). Les services d\u2019information ou les sites Web, quel que soit leur statut, qui offrent un acc\xE8s public ne peuvent pas \xEAtre consid\xE9r\xE9s comme des environnements ma\xEEtris\xE9s."
+  },
+  "etiquette-de-champ-de-formulaire": {
+    title: "\xC9tiquette de champ de formulaire",
+    body: 'Texte \xE0 proximit\xE9 du champ de formulaire permettant d\u2019en conna\xEEtre la nature, le type ou le format des informations attendues. L\u2019\xE9tiquette peut \xEAtre associ\xE9e au champ de formulaire de plusieurs mani\xE8res\xA0:\n Par l\u2019utilisation d\u2019une balise <label> \xA0;\n Par l\u2019utilisation de l\u2019attribut WAI-ARIA aria-label \xA0;\n Par l\u2019utilisation d\u2019une liaison entre le texte et le champ par l\u2019attribut WAI-ARIA aria-labelledby \xA0;\n Par l\u2019utilisation de l\u2019attribut title .\n \n Note importante\xA0: lorsque plusieurs de ces techniques sont pr\xE9sentes sur un m\xEAme champ, le calcul du \xAB\xA0nom accessible\xA0\xBB, c\u2019est-\xE0-dire ce qui sera restitu\xE9, ob\xE9it \xE0 un ordre strict\xA0:\n aria-labelledby \xA0;\n Sinon aria-label \xA0;\n Sinon <label> \xA0;\n Sinon title .\n \n Cet ordre doit \xEAtre utilis\xE9 pour l\u2019\xE9valuation de la pertinence de l\u2019\xE9tiquette ( crit\xE8re 11.2 ). Par exemple, m\xEAme dans le cas de la pr\xE9sence d\u2019un <label> , c\u2019est le passage de texte r\xE9f\xE9renc\xE9 par aria-labelledby qui doit \xEAtre pris en compte.\n R\xE9f\xE9rence\xA0: Accessible name and description calculation .\n Note importante au sujet de l\u2019utilisation de placeholder \xA0: lorsque l\u2019attribut placeholder est pr\xE9sent, il est susceptible d\u2019\xEAtre restitu\xE9 \xE0 la place de l\u2019attribut title . Par cons\xE9quent, lorsque ces deux attributs title et placeholder sont pr\xE9sents, ils doivent \xEAtre identiques.\n Note au sujet des \xE9tiquettes li\xE9es par aria-labelledby \xA0: Il s\u2019agit d\u2019un ou de plusieurs passages de texte identifi\xE9s par des id et li\xE9s par aria-labelledby sur le mod\xE8le suivant\xA0: aria-labelledby="ID1 ID2 ID3\u2026" . Pour assurer une compatibilit\xE9 maximum avec les agents utilisateurs, notamment Internet Explorer 11, il est recommand\xE9 d\u2019impl\xE9menter un tabindex="-1" sur les passages de textes qui ne sont pas des \xE9l\xE9ments interactifs (bouton, liens, \xE9l\xE9ments de formulaires, etc.).\n Note\xA0: l\u2019attribut aria-label ne peut pas \xEAtre utilis\xE9 pour indiquer le caract\xE8re obligatoire d\u2019un champ.'
+  },
+  "etiquettes-coherentes": {
+    title: "\xC9tiquettes coh\xE9rentes",
+    body: "Les \xE9tiquettes de champs de formulaire pr\xE9sentes dans une m\xEAme page ou dans un ensemble de pages et r\xE9clamant la saisie d\u2019une m\xEAme information doivent \xEAtre formul\xE9es sans ambigu\xEFt\xE9 pour que l\u2019utilisateur sache que l\u2019information qu\u2019il doit communiquer est la m\xEAme."
+  },
+  "feuille-de-style": {
+    title: "Feuille de style",
+    body: "Le langage CSS destin\xE9 \xE0 la mise en forme des \xE9l\xE9ments du contenu (exemples\xA0: couleur du fond de la page, taille / police / couleur des caract\xE8res, positionnement de l\u2019information dans la page web\u2026). Les styles CSS peuvent \xEAtre externes (fichier CSS), embarqu\xE9s (d\xE9clar\xE9s dans l\u2019en-t\xEAte de la page) ou en ligne (d\xE9clar\xE9s via l\u2019attribut style d\u2019une balise)."
+  },
+  formulaire: {
+    title: "Formulaire",
+    body: 'Balise <form> ou balise poss\xE9dant un attribut WAI-ARIA role="form" .'
+  },
+  "gestes-complexes-et-gestes-simples": {
+    title: "Gestes complexes et gestes simples",
+    body: "Un geste simple implique un contact en un point unique de l\u2019\xE9cran. Il peut s\u2019agir d\u2019une pression ou d\u2019un clic simple, d\u2019une double-pression ou d\u2019un double-clic, d\u2019une pression prolong\xE9e.\n Un geste complexe peut \xEAtre \xE0 la fois un geste impliquant plusieurs points de contact sur l\u2019\xE9cran (exemple\xA0: un geste avec deux doigts sur l\u2019\xE9cran pour zoomer ou d\xE9zoomer une carte) et un geste bas\xE9 sur le suivi d\u2019une trajectoire sur l\u2019\xE9cran (exemple\xA0: fonction JavaScript permettant de d\xE9tection le d\xE9placement d\u2019un doigt vers la gauche ou droite sur une surface tactile pour d\xE9clencher le passage \xE0 l\u2019item pr\xE9c\xE9dent / suivant d\u2019un carrousel)."
+  },
+  "image-de-decoration": {
+    title: "Image de d\xE9coration",
+    body: 'Image n\u2019ayant aucune fonction et ne v\xE9hiculant aucune information particuli\xE8re par rapport au contenu auquel elle est associ\xE9e.\n Exemples\xA0:\n Une image pr\xE9c\xE9dant chaque item d\u2019une liste\xA0;\n Une image servant \xE0 caler la mise en page\xA0;\n Une image de coin arrondie pour habiller un bloc d\u2019information\xA0;\n Une image d\u2019illustration n\u2019apportant aucune information n\xE9cessaire \xE0 la compr\xE9hension du texte auquel elle est associ\xE9e.\n \n Note\xA0: les balises poss\xE9dant un attribut WAI-ARIA role="img" ne peuvent faire office d\u2019image de d\xE9coration qu\u2019\xE0 la condition qu\u2019elles poss\xE8dent un attribut WAI-ARIA aria-hidden="true" .'
+  },
+  "image-objet": {
+    title: "Image objet",
+    body: "Image incorpor\xE9e ou g\xE9n\xE9r\xE9e par une balise <object> ."
+  },
+  "image-porteuse-d-information": {
+    title: "Image porteuse d\u2019information",
+    body: "Image qui v\xE9hicule une information n\xE9cessaire \xE0 la compr\xE9hension du contenu auquel elle est associ\xE9e.\n Note 1\xA0: lorsque l\u2019image est le seul contenu d\u2019un lien, son alternative est l\u2019intitul\xE9 du lien. Dans ce cas, l\u2019alternative de l\u2019image devrait \xEAtre \xE9valu\xE9e avec la th\xE9matique \xAB\xA0Liens\xA0\xBB.\n Note 2\xA0: lorsqu\u2019un bouton de formulaire, ins\xE9r\xE9 avec l\u2019\xE9l\xE9ment <button> , ne contient qu\u2019une image (balise <img> , <object> , <embed> , <canvas> ou <svg> ), l\u2019alternative de l\u2019image est l\u2019intitul\xE9 du bouton. Deux cas peuvent se pr\xE9senter\xA0:\n Le bouton est contr\xF4l\xE9 par son type, par exemple, le type submit ou reset , et fait partie d\u2019un formulaire. Dans ce cas, le bouton image doit \xEAtre \xE9valu\xE9 avec la th\xE9matique \xAB\xA0Formulaires\xA0\xBB\xA0;\n Le bouton est contr\xF4l\xE9 par un dispositif JavaScript. Dans ce cas, le bouton image doit \xEAtre \xE9valu\xE9 avec la th\xE9matique \xAB\xA0Scripts\xA0\xBB."
+  },
+  "image-reactive": {
+    title: "Image r\xE9active",
+    body: 'Image r\xE9active c\xF4t\xE9 client (attribut usemap )\xA0: image divis\xE9e en zones cliquables ou neutres (attribut nohref )\xA0;\n Image r\xE9active c\xF4t\xE9 serveur (attribut ismap )\xA0: image pour laquelle le navigateur transmet au serveur les coordonn\xE9es du pointeur, chaque jeu de coordonn\xE9es correspondant \xE0 une ressource (page web). L\u2019image r\xE9active c\xF4t\xE9 serveur est extr\xEAmement rare.\n \n Note\xA0: en HTML5, l\u2019attribut ismap est obsol\xE8te et non conforme pour les boutons de type image ( input type="image" ).'
+  },
+  "image-test": {
+    title: "Image-test",
+    body: "Image servant dans un test, captcha ou une image servant de test dans un quiz ou un jeu.\n Exemple\xA0: une s\xE9rie d\u2019images pr\xE9sente un d\xE9tail issu de tableaux c\xE9l\xE8bres\xA0; il faut reconna\xEEtre le titre et le peintre de chaque tableau. Dans cette situation, il n\u2019est pas possible de donner une alternative pertinente (par exemple le nom du tableau et/ou du peintre) sans rendre le test inutilisable. L\u2019alternative doit alors se contenter de donner la possibilit\xE9 d\u2019identifier l\u2019image, par exemple \u201Cimage 1 du test\u201D."
+  },
+  "image-texte-objet": {
+    title: "Image texte objet",
+    body: "Image g\xE9n\xE9r\xE9e par la balise <object> et affichant du texte."
+  },
+  "image-texte": {
+    title: "Image texte",
+    body: "Image affichant du texte.\n Note\xA0: il n\u2019est pas recommand\xE9 d\u2019utiliser des images-textes. Lorsqu\u2019il est possible de reproduire les m\xEAmes effets en CSS, le crit\xE8re 1.8 impose que le texte soit reproduit en texte CSS, ou qu\u2019un m\xE9canisme de remplacement permette \xE0 l\u2019utilisateur de remplacer ces images par du texte styl\xE9 en CSS."
+  },
+  "image-vehiculant-une-information-donnee-par-la-couleur": {
+    title: "Image v\xE9hiculant une information (donn\xE9e par la couleur)",
+    body: "Image dont tout ou partie du contenu transmet visuellement une information par l\u2019interm\xE9diaire d\u2019une couleur uniquement."
+  },
+  "indication-de-champ-obligatoire": {
+    title: "Indication de champ obligatoire",
+    body: "Indication textuelle ou graphique (ic\xF4ne) permettant \xE0 l\u2019utilisateur de savoir que la saisie d\u2019un champ est obligatoire pr\xE9alablement \xE0 la saisie.\n Note\xA0: Dans le cas o\xF9 cette indication n\u2019est pas r\xE9alis\xE9e de mani\xE8re textuelle explicite (ic\xF4ne, \u201C*\u201D, \u201C!\u201D, etc.), l\u2019explication de la signification de cette indication doit se situer, visuellement et dans l\u2019ordre du code source, avant la premi\xE8re utilisation de l\u2019indication."
+  },
+  "indication-donnee-par-la-forme-la-taille-ou-la-position": {
+    title: "Indication donn\xE9e par la forme, la taille ou la position",
+    body: "Il peut s\u2019agir, par exemple\xA0:\n De la pr\xE9sence d\u2019un marqueur visuel, pour indiquer la page active dans un menu de navigation (indication donn\xE9e par la position)\xA0;\n D\u2019une mise en avant-plan pour indiquer un onglet actif (indication donn\xE9e par la forme)\xA0;\n D\u2019une modification de la taille de police dans un nuage de tags (indication donn\xE9e par la taille).\n \n Ou de tout autre effet graphique similaire."
+  },
+  "indication-du-type-de-donnees-et-ou-de-format": {
+    title: "Indication du type de donn\xE9es et/ou de format",
+    body: "Indication textuelle permettant \xE0 l\u2019utilisateur de savoir quel est le type de donn\xE9e et/ou le format de saisie requis par un champ obligatoire, pr\xE9alablement \xE0 son renseignement.\n Exemples\xA0:\n Courriel (format\xA0: vous@domaine.com)\xA0;\n Code postal (format\xA0: 00000)\xA0;\n Date (format\xA0: JJ/MM/AAAA)."
+  },
+  "information-donnee-par-la-couleur": {
+    title: "Information (donn\xE9e par la couleur)",
+    body: "Information transmise visuellement par l\u2019interm\xE9diaire d\u2019une couleur. L\u2019indication que les champs en rouge sont obligatoires dans un formulaire, l\u2019utilisation d\u2019un fond bleu pour indiquer la page en cours de consultation dans un menu avec le fond vert, le changement de couleur d\u2019un nom d\u2019article pour indiquer son indisponibilit\xE9 dans une liste d\u2019articles sont autant d\u2019exemples d\u2019indication donn\xE9e par la couleur.\n Lorsqu\u2019une information donn\xE9e par la couleur est accompagn\xE9e d\u2019une autre m\xE9thode \xE0 destination des utilisateurs qui ne voient pas ou per\xE7oivent mal les couleurs ou leurs associations, le crit\xE8re sera consid\xE9r\xE9 comme non applicable.\n Les moyens de transmettre une information autrement que par la couleur peuvent \xEAtre\xA0:\n Une indication textuelle visible\xA0;\n Un moyen faisant intervenir du graphisme (pictogramme, image de fond, forme, style de bordure diff\xE9rent, etc.) et par le biais d\u2019un compl\xE9ment au niveau du code ( aria-label , title , texte masqu\xE9, aria-current , etc.)\xA0;\n Un autre style typographique (gras, italique, taille de texte, autre police, etc) et par le biais d\u2019un compl\xE9ment au niveau du code ( aria-label , title , texte masqu\xE9, aria-current , etc.)."
+  },
+  "intitule-ou-nom-accessible-de-lien": {
+    title: "Intitul\xE9 (ou nom accessible) de lien",
+    body: '\xAB\xA0Nom accessible\xA0\xBB restitu\xE9 par les technologies d\u2019assistance.\n Dans le cas d\u2019un lien HTML, le \xAB\xA0nom accessible\xA0\xBB est obtenu selon l\u2019ordre suivant\xA0:\n passage de texte associ\xE9 par l\u2019attribut WAI-ARIA aria-labelledby \xA0;\n sinon, contenu de l\u2019attribut WAI-ARIA aria-label \xA0;\n sinon, contenu du lien\xA0;\n sinon, contenu de l\u2019attribut title .\n \n Cet ordre doit \xEAtre utilis\xE9 pour d\xE9terminer ce qui constitue l\u2019intitul\xE9 du lien. Par exemple\xA0:\n en cas de pr\xE9sence conjointe d\u2019un attribut WAI-ARIA aria-label et d\u2019un attribut WAI-ARIA aria-labelledby , c\u2019est le passage de texte r\xE9f\xE9renc\xE9 par l\u2019attribut WAI-ARIA aria-labelledby qui doit \xEAtre consid\xE9r\xE9 comme l\u2019intitul\xE9\xA0;\n en cas de pr\xE9sence conjointe d\u2019un attribut WAI-ARIA aria-label et d\u2019un contenu dans le lien, c\u2019est le contenu de l\u2019attribut WAI-ARIA aria-label qui doit \xEAtre consid\xE9r\xE9 comme l\u2019intitul\xE9.\n \n R\xE9f\xE9rence\xA0: Accessible name and description calculation .\n Dans le cas o\xF9 le \xAB\xA0nom accessible\xA0\xBB est obtenu \xE0 partir du contenu du lien, celui-ci sera variable en fonction des cas suivants\xA0:\n Lien texte\xA0:\n En HTML, le \xAB\xA0nom accessible\xA0\xBB correspond au texte constitu\xE9 \xE0 partir\xA0:\n du texte contenu dans le lien\xA0;\n du texte contenu dans les \xE9l\xE9ments enfants du lien.\n \n Lien image\xA0:\n En HTML, le \xAB\xA0nom accessible\xA0\xBB correspond au texte constitu\xE9 \xE0 partir de l\u2019alternative textuelle d\u2019une ou plusieurs images dans le lien du type\xA0:\n Image (\xE9l\xE9ment <img> ou balise ouvrante ayant l\u2019attribut WAI-ARIA role="img" )\xA0;\n Image objet (\xE9l\xE9ment <object> )\xA0;\n Image bitmap (\xE9l\xE9ment <canvas> )\xA0;\n Image vectorielle (\xE9l\xE9ment <svg> ).\n \n Lien composite\xA0:\n En HTML, le \xAB\xA0nom accessible\xA0\xBB correspond au texte constitu\xE9 \xE0 partir de l\u2019ensemble\xA0:\n du texte contenu dans le lien\xA0;\n du texte contenu dans les \xE9l\xE9ments enfant du lien\xA0;\n du contenu de l\u2019alternative textuelle de la ou des images comprises dans le lien.\n \n Dans le cas d\u2019un lien SVG (version 1.1), le \xAB\xA0nom accessible\xA0\xBB est obtenu comme suit\xA0:\n Passage de texte associ\xE9 par l\u2019attribut WAI-ARIA aria-labelledby \xA0;\n Sinon, contenu de l\u2019attribut WAI-ARIA aria-label \xA0;\n Sinon, contenu de l\u2019\xE9l\xE9ment <title> enfant direct du lien\xA0;\n Sinon, contenu de l\u2019attribut xlink:title \xA0;\n Sinon, contenu texte d\u2019un ou plusieurs \xE9l\xE9ments <text> .\n \n Il faut cependant \xEAtre vigilant car cet algorithme de calcul n\u2019est pas encore pris en compte et effectif au sein des diff\xE9rents lecteurs d\u2019\xE9cran. \xC0 ce jour, le support est disponible avec VoiceOver, mais incomplet ou lacunaire avec JAWS et NVDA. Si bien que le plus petit d\xE9nominateur commun sur lequel il est possible de se reposer pour fournir un intitul\xE9 au lien est l\u2019\xE9l\xE9ment <text> .\n Note 1\xA0: un intitul\xE9 de lien sera consid\xE9r\xE9 comme non-explicite dans le cas o\xF9 le \xAB\xA0nom accessible\xA0\xBB ne reprend pas l\u2019 intitul\xE9 visible du lien.\n Note 2\xA0: en raison de la configuration possible des aides techniques permettant de forcer la restitution du \xAB\xA0nom accessible\xA0\xBB issu du contenu de l\u2019attribut title au d\xE9triment du \xAB\xA0nom accessible\xA0\xBB issu du contenu du lien. Un intitul\xE9 de lien sera consid\xE9r\xE9 comme non-explicite dans le cas o\xF9 le lien poss\xE8de un attribut title dont la valeur ne reprendrait pas au moins le \xAB\xA0nom accessible\xA0\xBB issu du contenu du lien.\n Note 3\xA0: dans le cas de la pr\xE9sence de plusieurs liens ayant une destination diff\xE9rente dont le \xAB\xA0nom accessible\xA0\xBB est identique. L\u2019intitul\xE9 de lien seul sera consid\xE9r\xE9 comme non-explicite si le contexte de lien ne permet pas de les diff\xE9rencier.\n Note 4\xA0: lorsqu\u2019un lien ne comporte aucun contenu, il sera non conforme au regard du crit\xE8re 10.2 et du crit\xE8re 6.2 .\n Note 5\xA0: bien que le calcul du nom accessible d\u2019un lien tienne compte de contenus texte g\xE9n\xE9r\xE9s en CSS via les pseudo-\xE9l\xE9ments ::before et ::after , cette pratique ne doit pas \xEAtre utilis\xE9e, car elle constitue une non-conformit\xE9 au crit\xE8re 1.3.1 des WCAG 2.1 (cf. F87 ).'
+  },
+  "intitule-visible": {
+    title: "Intitul\xE9 visible",
+    body: "Texte affich\xE9 faisant office d\u2019intitul\xE9 visible \xE0 l\u2019\xE9cran au sein d\u2019un bouton ou d\u2019un lien.\n Texte affich\xE9 faisant office d\u2019 \xE9tiquette pour un champ formulaire.\n Ce texte peut \xEAtre constitu\xE9 de texte ou d\u2019une image contenant du texte."
+  },
+  "items-de-meme-nature-d-une-liste-de-choix": {
+    title: "Items de m\xEAme nature d\u2019une liste de choix",
+    body: "Dans une liste d\xE9roulante (balise <select> ), ensemble d\u2019items (balises <option> ) pouvant \xEAtre regroup\xE9s par leur nature. Le regroupement vise \xE0 identifier les items devant \xEAtre trait\xE9s comme un ensemble (par exemple, une liste de d\xE9partements regroup\xE9s par r\xE9gions)."
+  },
+  landmarks: {
+    title: "Landmarks",
+    body: 'WAI-ARIA propose des r\xF4les permettant d\u2019indiquer les zones principales (r\xE9gions) du document. Ces r\xF4les sont tr\xE8s profitables aux utilisateurs de lecteurs d\u2019\xE9cran notamment, mais \xE9galement aux utilisateurs de la navigation au clavier qui peuvent ainsi b\xE9n\xE9ficier de fonctionnalit\xE9s de navigation rapide dans la structure du document .\n Les r\xF4les doivent \xEAtre d\xE9finis dans le document en fonction de la nature de la zone\xA0:\n La zone d\u2019 en-t\xEAte doit avoir un attribut WAI-ARIA role="banner" \xA0;\n Le menu de navigation principal doit avoir un attribut WAI-ARIA role="navigation" \xA0;\n La zone de contenu principal doit avoir un attribut WAI-ARIA role="main" \xA0;\n La zone de pied de page doit avoir un attribut WAI-ARIA role="contentinfo" \xA0;\n La zone de moteur de recherche sur le site doit avoir un attribut WAI-ARIA role="search" .\n \n Note 1\xA0: Si la plupart des lecteurs d\u2019\xE9cran mettent \xE0 disposition ces fonctionnalit\xE9s, les navigateurs n\u2019ont pas encore propos\xE9 de fonctionnalit\xE9 de navigation d\xE9di\xE9e pour les utilisateurs qui ne peuvent pas utiliser la souris. La mise en place des liens d\u2019\xE9vitement reste donc \xE0 privil\xE9gier par rapport aux landmarks .\n Note 2\xA0: Les r\xF4les WAI-ARIA banner , main et contentinfo doivent \xEAtre uniques dans la page. Le r\xF4le WAI-ARIA navigation est r\xE9serv\xE9 aux zones de navigations principales et secondaires. Lorsqu\u2019il y a plusieurs r\xF4les WAI-ARIA navigation , il peut \xEAtre utile de les diff\xE9rencier en pr\xE9cisant un nom \xE0 chacune des zones via l\u2019attribut WAI-ARIA aria-label ou aria-labelledby .'
+  },
+  "langue-par-defaut": {
+    title: "Langue par d\xE9faut",
+    body: 'Indication de la langue de traitement principale du document qui peut \xEAtre pr\xE9sente sur l\u2019\xE9l\xE9ment racine html ou sur chaque \xE9l\xE9ment de la page concern\xE9 via les attributs lang et/ou xml:lang selon le sch\xE9ma suivant\xA0:\n Pour HTML jusqu\u2019\xE0 la version 4.01\xA0: attribut lang obligatoire, attribut xml:lang non support\xE9\xA0;\n Pour XHTML 1.0 servi en "text/html" \xA0: attribut lang et xml:lang obligatoires\xA0;\n Pour XHTML 1.0 servi en "application/xhtml+xml" \xA0: attribut xml:lang obligatoire, attribut lang recommand\xE9\xA0;\n Pour XHTML 1.1\xA0: attribut xml:lang obligatoire, attribut lang non support\xE9\xA0;\n Pour HTML5\xA0: attribut lang obligatoire.'
+  },
+  "le-nom-le-role-la-valeur-le-parametrage-et-les-changements-d-etats": {
+    title: "Le nom, le r\xF4le, la valeur, le param\xE9trage et les changements d\u2019\xE9tats",
+    body: 'Un composant doit avoir un r\xF4le et un nom appropri\xE9s. Ses valeurs, \xE9tats et param\xE8tres \xE9ventuels doivent \xE9galement \xEAtre accessibles et correctement transmis aux APIs d\u2019accessibilit\xE9 notamment.\n Un composant peut s\u2019appuyer sur un \xE9l\xE9ment interactif HTML ou sur un \xE9l\xE9ment non interactif surcharg\xE9 par WAI-ARIA via un r\xF4le ad hoc. Important\xA0: les boutons (balises <button> ou <input type="button"> ) lorsqu\u2019ils sont contr\xF4l\xE9s via JavaScript sont \xE0 \xE9valuer avec le crit\xE8re 7.1 .\n Le nom peut \xEAtre l\u2019intitul\xE9 du composant (l\u2019intitul\xE9 d\u2019un bouton, par exemple).\n La valeur est, par exemple, l\u2019\xE9l\xE9ment s\xE9lectionn\xE9 d\u2019une liste d\xE9roulante ou la valeur actuelle d\u2019un curseur ( slider ).\n Le r\xF4le correspond au type d\u2019\xE9l\xE9ment d\xE9fini par la sp\xE9cification HTML ou WAI-ARIA (comme la balise <button> ou l\u2019attribut WAI-ARIA role="button" ).\n Le param\xE9trage correspond aux informations particuli\xE8res d\u2019un composant, g\xE9n\xE9ralement mis \xE0 disposition par WAI-ARIA. Par exemple aria-controls est un param\xE8tre qui transmet aux APIs l\u2019information que le composant contr\xF4le tel ou tel contenu (r\xE9f\xE9renc\xE9 par son identifiant -- attribut id ).\n Les changements d\u2019\xE9tat sont \xE9galement mis \xE0 disposition par WAI-ARIA. Par exemple aria-expanded est un \xE9tat permettant de signaler aux APIs que le composant est \xAB\xA0ouvert\xA0\xBB ou \xAB\xA0ferm\xE9\xA0\xBB. \xC0 noter qu\u2019un \xE9tat peut \xE9galement \xEAtre transmis via le nom, lorsque l\u2019intitul\xE9 est chang\xE9 dynamiquement pour correspondre \xE0 l\u2019\xE9tat de la zone contr\xF4l\xE9e notamment.\n Ces param\xE8tres ne sont pas obligatoires mais peuvent \xEAtre requis s\u2019ils sont indispensables pour rendre le composant accessible. C\u2019est \xE0 l\u2019auditeur de consid\xE9rer les cas o\xF9 ces param\xE8tres sont indispensables en fonction du contexte li\xE9 \xE0 l\u2019utilisation du composant.\n L\u2019auditeur doit \xE9galement v\xE9rifier que, lorsqu\u2019ils sont pr\xE9sents, ces param\xE8tres sont correctement utilis\xE9s.\n Pour ce faire (s\u2019il juge cela pertinent compte tenu du contexte d\u2019impl\xE9mentation des composants et des choix ergonomiques mis en \u0153uvre) il peut s\u2019appuyer sur les recommandations d\u2019utilisation de WAI-ARIA pour les composants ayant des attributs WAI-ARIA correspondant \xE0 un motif de conception tel que d\xE9crit dans le document WAI-ARIA 1.1 Authoring Practices .\n Note\xA0: les r\xF4les, propri\xE9t\xE9s et \xE9tats WAI-ARIA s\u2019impl\xE9mentent via des attributs, par exemple role="banner" , aria-hidden="true" .'
+  },
+  "legende-d-image": {
+    title: "L\xE9gende d\u2019image",
+    body: "Lorsqu\u2019un texte, adjacent \xE0 une image, contient des informations sur l\u2019image (par exemple un copyright, une date, un auteur\u2026) ou est destin\xE9 \xE0 compl\xE9ter les informations apport\xE9es par l\u2019image (par exemple un texte associ\xE9 \xE0 une image dans une galerie d\u2019images), on parle de l\xE9gende d\u2019image.\n Lorsqu\u2019une image est l\xE9gend\xE9e il est n\xE9cessaire d\u2019associer la l\xE9gende de l\u2019image \xE0 l\u2019image par une relation de structure, de telle sorte que les technologies d\u2019assistance puissent traiter l\u2019image et sa l\xE9gende comme un ensemble unique.\n HTML5 propose d\u2019associer une l\xE9gende \xE0 une image via les \xE9l\xE9ments figure (l\u2019ensemble de l\u2019image et la l\xE9gende) et figcaption (la l\xE9gende).\n Une image sans l\xE9gende peut d\xE9finir\xA0:\n Une image qui n\u2019est pas ins\xE9r\xE9e dans un \xE9l\xE9ment figure \xA0;\n Une image ins\xE9r\xE9e dans un \xE9l\xE9ment figure sans \xE9l\xE9ment figcaption .\n \n Note\xA0: lorsque le texte adjacent \xE0 l\u2019image peut faire office de texte de remplacement, il n\u2019est pas obligatoire de recourir \xE0 l\u2019ensemble figure , figcaption , l\u2019image pouvant \xEAtre simplement trait\xE9e comme une image de d\xE9coration.\n Vous pouvez consulter, \xE0 ce sujet, la note en anglais Requirements for providing text to act as an alternative for images du W3C."
+  },
+  legende: {
+    title: "L\xE9gende",
+    body: "HTML propose un dispositif permettant de titrer les groupes de champs de m\xEAme nature par l\u2019interm\xE9diaire des \xE9l\xE9ments <fieldset> et <legend> .\n Il est \xE9galement possible de cr\xE9er des regroupements avec le r\xF4le WAI-ARIA group et un passage de texte, faisant office de l\xE9gende, li\xE9 par l\u2019attribut WAI-ARIA aria-labelledby ou fourni par un attribut WAI-ARIA aria-label .\n Note 1\xA0: Les regroupements de champs peuvent utiliser d\u2019autres m\xE9thodes qui associent l\u2019information du regroupement directement dans l\u2019\xE9tiquette du champ. Par exemple, par l\u2019interm\xE9diaire d\u2019un attribut title , d\u2019un attribut WAI-ARIA aria-label , d\u2019une liaison aria-labelledby faisant office d\u2019\xE9tiquette ou encore par l\u2019attribut WAI-ARIA aria-describedby associant un texte compl\xE9mentaire. Dans ce cas, le regroupement de champs devient inutile puisque les labels sont suffisamment pertinents.\n Note 2\xA0: Lorsque le formulaire est constitu\xE9 d\u2019un seul bloc d\u2019informations de m\xEAme nature (l\u2019identit\xE9 et l\u2019adresse de l\u2019utilisateur, par exemple) ou d\u2019un champ unique (un moteur de recherche, par exemple), le regroupement des champs n\u2019est pas obligatoire."
+  },
+  "lien-composite": {
+    title: "Lien composite",
+    body: 'En HTML, lien contenant \xE0 la fois du texte et un ou plusieurs enfants de type image\xA0:\n Image (balise <img> ou balise ouvrante ayant l\u2019attribut WAI-ARIA role="img" )\xA0;\n Zone cliquable (balise <area> ) poss\xE9dant un attribut href \xA0;\n Image objet (balise <object> )\xA0;\n Image bitmap (balise <canvas> )\xA0;\n Image vectorielle (balise <svg> ).\n \n Note importante\xA0: il est rappel\xE9 que l\u2019utilisation de deux liens adjacents (lien image et lien texte) et identiques constitue une g\xEAne importante pour l\u2019utilisateur. M\xEAme si cela ne constitue pas une non-conformit\xE9, cet usage devrait \xEAtre \xE9vit\xE9. Une mani\xE8re de traiter ce type de liens est d\u2019inclure l\u2019image dans le lien texte de fa\xE7on \xE0 constituer un lien composite, ce qui \xE9vitera la redondance.\n Vous pouvez consulter \xE0 ce sujet la technique H2\xA0: Combining adjacent image and text links for the same resource .'
+  },
+  "lien-dont-la-nature-n-est-pas-evidente": {
+    title: "Lien dont la nature n\u2019est pas \xE9vidente",
+    body: "Lien qui peut \xEAtre confondu avec un texte normal lorsqu\u2019il est signal\xE9 uniquement par la couleur par certains types d\u2019utilisateurs ne percevant pas ou mal les couleurs. Par exemple, dans ce texte \u201CNouvelle gr\xE8ve \xE0 la SNCF\u201D, si le mot \u201Cgr\xE8ve\u201D est un lien signal\xE9 uniquement par la couleur, sa nature peut \xEAtre ignor\xE9e par les utilisateurs ne percevant pas la couleur et acc\xE9dant au contenu CSS activ\xE9.\n Note\xA0: \u201Csignal\xE9s uniquement par la couleur\u201D signifie que le lien n\u2019est accompagn\xE9 d\u2019aucun marqueur visuel (ic\xF4ne, soulignement, bordure\u2026). En cons\xE9quence, un lien de la m\xEAme couleur que le texte environnant est concern\xE9 par ce crit\xE8re."
+  },
+  "lien-image": {
+    title: "Lien image",
+    body: 'En HTML, lien contenant uniquement un ou plusieurs enfants de type image\xA0:\n Image (balise <img> ou balise ouvrante ayant l\u2019attribut WAI-ARIA role="img" )\xA0;\n Zone cliquable (balise <area> ) poss\xE9dant un attribut href \xA0;\n Image objet (balise <object> )\xA0;\n Image bitmap (balise <canvas> )\xA0;\n Image vectorielle (balise <svg> ).'
+  },
+  "lien-ou-bouton-adjacent": {
+    title: "Lien ou bouton adjacent",
+    body: "Lien ou bouton pr\xE9sent\xE9 de mani\xE8re adjacente \xE0 un \xE9l\xE9ment dans la page. Le lien ou bouton doit \xEAtre adjacent visuellement dans la repr\xE9sentation graphique (CSS activ\xE9) et dans le code HTML. Dans le code HTML, le lien ou bouton doit se situer juste avant ou juste apr\xE8s l\u2019\xE9l\xE9ment auquel il est adjacent."
+  },
+  "lien-svg": {
+    title: "Lien SVG",
+    body: "Lien contenu dans un \xE9l\xE9ment <svg> .\n Dans le cas d\u2019un lien SVG (version 1.1), le \xAB\xA0nom accessible\xA0\xBB est obtenu comme suit\xA0:\n Passage de texte associ\xE9 par l\u2019attribut WAI-ARIA aria-labelledby \xA0;\n Sinon, contenu de l\u2019attribut WAI-ARIA aria-label \xA0;\n Sinon, contenu de l\u2019\xE9l\xE9ment <title> enfant direct du lien\xA0;\n Sinon, contenu de l\u2019attribut xlink:title \xA0;\n Sinon, contenu texte d\u2019un ou plusieurs \xE9l\xE9ments <text> .\n \n Il faut cependant \xEAtre vigilant car cet algorithme de calcul n\u2019est pas encore pris en compte et effectif au sein des diff\xE9rents lecteurs d\u2019\xE9cran. \xC0 ce jour, le support est disponible avec VoiceOver, mais incomplet ou lacunaire avec JAWS et NVDA. Si bien que le plus petit d\xE9nominateur commun sur lequel il est possible de se reposer pour fournir un intitul\xE9 au lien est l\u2019\xE9l\xE9ment <text> ."
+  },
+  "lien-texte": {
+    title: "Lien texte",
+    body: 'En HTML, lien ne contenant aucun \xE9l\xE9ment enfant de type\xA0:\n Image (balise <img> ou balise ouvrante ayant l\u2019attribut WAI-ARIA role="img" )\xA0;\n Image objet (balise <object> )\xA0;\n Image bitmap (balise <canvas> )\xA0;\n Image vectorielle (balise <svg> ).'
+  },
+  lien: {
+    title: "Lien",
+    body: 'En HTML\xA0:\n Balise <a> poss\xE9dant un attribut href \xA0;\n Balise poss\xE9dant un attribut WAI-ARIA role="link" et dont l\u2019action de navigation est prise en charge par un script.\n \n En SVG\xA0:\n Balise <a> poss\xE9dant un attribut xlink:href en SVG 1.1.'
+  },
+  "liens-d-evitement-ou-d-acces-rapide": {
+    title: "Liens d\u2019\xE9vitement ou d\u2019acc\xE8s rapide",
+    body: "Liens dont la fonction est de permettre de naviguer \xE0 l\u2019int\xE9rieur de la page (lien d\u2019\xE9vitement, lien d\u2019acc\xE8s au formulaire de recherche ou au menu\u2026). Ces liens peuvent soit permettre d\u2019acc\xE9der \xE0 une zone de la page (lien d\u2019acc\xE8s rapide) ou de sauter une zone dans la page (lien d\u2019\xE9vitement).\n Note 1\xA0: Un lien d\u2019\xE9vitement ou d\u2019acc\xE8s rapide fonctionnel est un lien dont l\u2019activation permet de reprendre la lecture et la navigation clavier \xE0 partir de la cible du lien lors de l\u2019utilisation des navigateurs et des aides techniques retenus dans l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB) de l\u2019audit.\n Note 2\xA0: les liens d\u2019\xE9vitements ou d\u2019acc\xE8s rapide doivent \xEAtre situ\xE9s \xE0 la m\xEAme place dans la pr\xE9sentation et dans le m\xEAme ordre relatif dans le code source afin de satisfaire au crit\xE8re 12.2 ."
+  },
+  "liste-des-valeurs-possibles-pour-l-attribut-autocomplete": {
+    title: "Liste des valeurs possibles pour l\u2019attribut `autocomplete`",
+    body: 'La liste des valeurs disponibles est fournie par la sp\xE9cification WCAG 2.1\xA0:\n name -- Nom complet\xA0;\n honorific-prefix -- Abr\xE9viation, civilit\xE9 ou titre\xA0;\n given-name -- Pr\xE9nom\xA0;\n additional-name -- Pr\xE9noms additionnels\xA0;\n family-name -- Nom de famille\xA0;\n honorific-suffix -- Suffixe honorifique\xA0;\n nickname -- Surnom, diminutif\xA0;\n organization-title -- Fonction, intitul\xE9 de poste\xA0;\n username -- Nom d\u2019utilisateur\xA0;\n new-password -- Nouveau mot de passe (par exemple, lors de la cr\xE9ation d\u2019un compte ou d\u2019un changement de mot de passe)\xA0;\n current-password -- Mot de passe actuel pour le compte identifi\xE9 par le champ username (par exemple, lors d\u2019une connexion)\xA0;\n organization -- Nom de l\u2019organisation correspondant \xE0 la personne, \xE0 l\u2019adresse ou \xE0 l\u2019information de contact dans les autres champs associ\xE9s avec ce champ\xA0;\n street-address -- Adresse postale (multiligne, nouvelles lignes conserv\xE9es)\xA0;\n address-line1 -- Adresse postale (une ligne par champ, ligne 1)\xA0;\n address-line2 -- Adresse postale (une ligne par champ, ligne 2)\xA0;\n address-line3 -- Adresse postale (une ligne par champ, ligne 3)\xA0;\n address-level4 -- Le niveau administratif le plus d\xE9taill\xE9, pour les adresses pourvues de quatre niveaux administratifs\xA0;\n address-level3 -- Le troisi\xE8me niveau administratif, pour les adresses pourvues d\u2019au moins trois niveaux administratifs\xA0;\n address-level2 -- Le deuxi\xE8me niveau administratif, pour les adresses pourvues d\u2019au moins deux niveaux administratifs\xA0;\n address-level1 -- Le plus large niveau administratif d\u2019une adresse, c\u2019est-\xE0-dire la province dans laquelle se trouve la localit\xE9\xA0;\n country -- Code pays\xA0;\n country-name -- Nom de pays\xA0;\n postal-code -- Code postal, code CEDEX (si le CEDEX est pr\xE9sent, ajouter \u201CCEDEX\u201D, et ce qui le suit doit \xEAtre ajout\xE9 dans le champ address-level2 )\xA0;\n cc-name -- Nom complet figurant sur le moyen de paiement\xA0;\n cc-given-name -- Pr\xE9nom figurant sur le moyen de paiement\xA0;\n cc-additional-name -- Pr\xE9noms additionnels figurant sur le moyen de paiement\xA0;\n cc-family-name -- Nom de famille figurant sur le moyen de paiement\xA0;\n cc-number -- Code identifiant le moyen de paiement (e.g., un num\xE9ro de carte bancaire)\xA0;\n cc-exp -- Date d\u2019expiration du moyen de paiement\xA0;\n cc-exp-month -- Le mois de la date d\u2019expiration du moyen de paiement\xA0;\n cc-exp-year -- L\u2019ann\xE9e de la date d\u2019expiration du moyen de paiement\xA0;\n cc-csc -- Code de s\xE9curit\xE9 du moyen de paiement (also known as the card security code (CSC), card validation code (CVC), card verification value (CVV), signature panel code (SPC), credit card ID (CCID), etc.) \xA0;\n cc-type -- Type de moyen de paiement (e.g. Visa)\xA0;\n transaction-currency -- La devise qui a la pr\xE9f\xE9rence de l\u2019utilisateur lors d\u2019une transaction\xA0;\n transaction-amount -- Le montant qui a la pr\xE9f\xE9rence de l\u2019utilisateur lors d\u2019une transaction (e.g., en r\xE9ponse \xE0 une ench\xE8re ou \xE0 un prix sold\xE9)\xA0;\n language -- Langue pr\xE9f\xE9r\xE9e\xA0;\n bday -- Date d\u2019anniversaire\xA0;\n bday-day -- Le jour de la date d\u2019anniversaire\xA0;\n bday-month -- Le mois de la date d\u2019anniversaire\xA0;\n bday-year -- L\u2019ann\xE9e de la date d\u2019anniversaire\xA0;\n sex -- Identit\xE9 de genre\xA0;\n url -- Page d\u2019accueil ou une autre page Web correspondant \xE0 l\u2019organisation, la personne, l\u2019adresse ou \xE0 l\u2019information de contact dans les autres champs associ\xE9s avec ce champ\xA0;\n photo -- Photographie, ic\xF4ne ou une autre image correspondant \xE0 l\u2019organisation, la personne, l\u2019adresse ou \xE0 l\u2019information de contact dans les autres champs associ\xE9s avec ce champ\xA0;\n tel -- Num\xE9ro de t\xE9l\xE9phone complet, y compris le code pays\xA0;\n tel-country-code -- Code pays du num\xE9ro de t\xE9l\xE9phone\xA0;\n tel-national -- Num\xE9ro de t\xE9l\xE9phone sans la partie code pays, avec un pr\xE9fixe interne au pays, s\u2019il y a lieu\xA0;\n tel-area-code -- Indicatif r\xE9gional du num\xE9ro de t\xE9l\xE9phone, avec un pr\xE9fixe interne au pays, s\u2019il y a lieu\xA0;\n tel-local -- Num\xE9ro de t\xE9l\xE9phone sans la partie code pays ni l\u2019indicatif r\xE9gional\xA0;\n tel-local-prefix -- La premi\xE8re partie du composant du num\xE9ro de t\xE9l\xE9phone qui suit l\u2019indicatif r\xE9gional, lorsque ce composant est scind\xE9 en deux parties\xA0;\n tel-local-suffix -- La seconde partie du composant du num\xE9ro de t\xE9l\xE9phone qui suit l\u2019indicatif r\xE9gional, lorsque ce composant est scind\xE9 en deux parties\xA0;\n tel-extension -- Num\xE9ro de t\xE9l\xE9phone d\u2019un poste interne\xA0;\n email -- Adresse \xE9lectronique\xA0;\n impp -- URL correspondant d\u2019un protocole de messagerie instantan\xE9e (par exemple, "aim:goim?screenname=example" ou "xmpp:fred@example.net" ).'
+  },
+  listes: {
+    title: "Listes",
+    body: 'Suite d\u2019\xE9l\xE9ments pouvant \xEAtre regroup\xE9s sous la forme d\u2019une liste structur\xE9e ordonn\xE9e, non ordonn\xE9e ou de d\xE9finition. Par exemple la suite des liens d\u2019un menu de navigation est une liste de liens non ordonn\xE9e, les diff\xE9rentes \xE9tapes d\u2019une proc\xE9dure sont une liste d\u2019\xE9l\xE9ments ordonn\xE9s, le couple terme/description d\u2019un glossaire est une liste de description. En HTML, les listes utilisent les balises suivantes\xA0:\n Liste ordonn\xE9e\xA0: balises <ol> et <li> (chaque \xE9l\xE9ment de la liste est affect\xE9 d\u2019un marqueur index\xE9)\xA0;\n Liste non ordonn\xE9e\xA0: balises <ul> et <li> (chaque \xE9l\xE9ment de la liste est affect\xE9 d\u2019un marqueur non-index\xE9\xA0;\n Liste de description\xA0: balises <dl> , <dt> (terme \xE0 d\xE9crire) et <dd> (description).\n \n Note 1\xA0: En HTML5, la balise <dl> ne repr\xE9sente plus seulement une liste de d\xE9finition, mais de mani\xE8re g\xE9n\xE9rique toute liste de description qui peut comprendre comme groupe de termes-descriptions des noms et des d\xE9finitions, des questions et r\xE9ponses, des cat\xE9gories et des sujets, etc.\n Note 2\xA0: Il est \xE9galement possible de structurer les listes \xE0 l\u2019aide des attributs WAI-ARIA role="list" et role="listitem" pour les listes ordonn\xE9es et non ordonn\xE9es.\n Note 3\xA0: la notion de \xAB\xA0regroup\xE9s visuellement sous forme de liste\xA0\xBB se caract\xE9rise par\xA0:\n La pr\xE9sence d\u2019un marqueur visuel permettant de faire comprendre qu\u2019il s\u2019agit d\u2019une liste non ordonn\xE9e par exemple - , \u2022 , \\* , etc.\xA0;\n La pr\xE9sence d\u2019un marqueur visuel permettant de faire comprendre qu\u2019il s\u2019agit d\u2019une liste ordonn\xE9e par exemple un chiffre, une lettre grecque, etc.\xA0;\n La pr\xE9sence d\u2019une s\xE9rie d\u2019\xE9l\xE9ments se suivant visuellement les uns les autres, avec une forme visuelle, une nature et un fonctionnement identique, mais sans avoir directement de marqueur visuel de liste (non ordonn\xE9e ou ordonn\xE9e), par exemple un menu de navigation.\n \n Attention cependant toutes les listes ne n\xE9cessitent pas obligatoirement une structure de liste, par exemple une s\xE9rie de termes s\xE9par\xE9s par une virgule.'
+  },
+  "mecanisme-de-remplacement": {
+    title: "M\xE9canisme de remplacement",
+    body: "M\xE9canisme g\xE9n\xE9ralement bas\xE9 sur CSS, permettant \xE0 l\u2019utilisateur de remplacer du texte par du texte en image et inversement sur le principe du style switcher. Le m\xE9canisme peut utiliser un langage de script c\xF4t\xE9 serveur ou un langage de script c\xF4t\xE9 client."
+  },
+  "mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme": {
+    title: "M\xE9canisme qui permet d\u2019afficher un rapport de contraste conforme",
+    body: "Composant d\u2019interface dont l\u2019activation permet de modifier l\u2019apparence du site ou de la page de mani\xE8re \xE0 afficher les contenus avec un ratio de contraste suffisant. Le design de ce composant d\u2019interface devra \xEAtre conforme au crit\xE8re 3.2 et au crit\xE8re 3.3 sans avoir recours lui-m\xEAme \xE0 un m\xE9canisme permettant d\u2019afficher un rapport de contraste conforme. Ce m\xE9canisme doit conserver \xE0 l\u2019identique les contenus et les fonctionnalit\xE9s du site ou de la page qu\u2019il modifie."
+  },
+  "media-non-temporel": {
+    title: "M\xE9dia non temporel",
+    body: 'Contenu qui ne se d\xE9roule pas dans le temps, consultable via un plugin (Flash, Java, Silverlight\u2026) ou via les \xE9l\xE9ments svg et canvas \xA0; par exemple, une carte interactive en Flash, une application Flash ou Java, un diaporama sont des m\xE9dias non temporels. Un m\xE9dia non temporel peut contenir des m\xE9dias temporels (un lecteur Flash qui propose une liste de vid\xE9os \xE0 consulter, par exemple).\n Note\xA0: l\u2019utilisation du param\xE8tre wmode pour un objet Flash avec les valeurs "transparent" et "opaque" invalide de fait le crit\xE8re 4.13 . En effet, l\u2019utilisation de ces valeurs a pour cons\xE9quence que l\u2019animation Flash vue du c\xF4t\xE9 des utilisateurs de lecteur d\u2019\xE9cran est invisible.'
+  },
+  "media-temporel-type-son-video-et-synchronise": {
+    title: "M\xE9dia temporel (type son, vid\xE9o et synchronis\xE9)",
+    body: 'M\xE9dia temporel seulement audio\xA0: contenu sonore (Wav, Mp3\u2026)\xA0;\n M\xE9dia temporel seulement vid\xE9o\xA0: images ou photos en mouvement ou en s\xE9quence\xA0;\n M\xE9dia temporel synchronis\xE9\xA0: flux audio ou vid\xE9o synchronis\xE9 avec un autre format pour pr\xE9senter de l\u2019information et/ou comportant des composants temporels interactifs. Un m\xE9dia temporel peut \xEAtre consult\xE9 de 2 mani\xE8res diff\xE9rentes\xA0:\n \n Fichier \xE0 t\xE9l\xE9charger consultable avec un logiciel externe \xE0 la page web\xA0;\n Contenu embarqu\xE9 dans la page web et consultable dans la page web via\xA0: Un plugin (par exemple une vid\xE9o diffus\xE9e par un lecteur Flash)\xA0;\n L\u2019\xE9l\xE9ment <video> (par exemple une vid\xE9o)\xA0;\n L\u2019\xE9l\xE9ment <audio> (par exemple un podcast)\xA0;\n L\u2019\xE9l\xE9ment <svg> (par exemple un dessin anim\xE9 vectoriel)\xA0;\n L\u2019\xE9l\xE9ment <canvas> (par exemple un dessin anim\xE9 en image bitmap)\xA0;\n L\u2019\xE9l\xE9ment <bgsound> pour diffuser un arri\xE8re-plan sonore \xE0 la page web.\n \n \n \n Un m\xE9dia temporel peut \xEAtre diffus\xE9 en temps r\xE9el ou \xEAtre propos\xE9 en lecture de mani\xE8re asynchrone (m\xE9dia pr\xE9-enregistr\xE9).\n Note 1\xA0: l\u2019utilisation du param\xE8tre wmode pour un objet Flash avec les valeurs "transparent" et "opaque" invalide de fait le crit\xE8re 4.13 . En effet, l\u2019utilisation de ces valeurs a pour cons\xE9quence que l\u2019animation Flash vue du c\xF4t\xE9 des utilisateurs de lecteur d\u2019\xE9cran est invisible.\n Note 2\xA0: les gif anim\xE9s, les animations d\u2019images r\xE9alis\xE9es par JavaScript ou CSS ne sont pas consid\xE9r\xE9s comme \xE9tant des m\xE9dias temporels.\n Note 3\xA0: l\u2019\xE9l\xE9ment <bgsound> est sp\xE9cifique \xE0 Internet Explorer et ne devrait pas \xEAtre utilis\xE9.'
+  },
+  "menu-et-barre-de-navigation": {
+    title: "Menu et barre de navigation",
+    body: "Liste de liens permettant une navigation sp\xE9cifique dans le site, dans une rubrique ou dans une collection de pages.\n Les principales barres de navigation ( crit\xE8re 12.2 ) sont\xA0:\n Un menu de navigation\xA0;\n Un fil d\u2019ariane\xA0;\n Une liste de navigation d\u2019une liste de r\xE9sultats\xA0;\n Des liens d\u2019\xE9vitement.\n \n Il existe diff\xE9rents types de menu de navigation ( crit\xE8re 12.1 et crit\xE8re 12.2 )\xA0:\n Menu de navigation principal\xA0;\n Menu de sous-rubrique\xA0;\n Menu contextuel\xA0;\n Table des mati\xE8res concernant un ensemble de pages.\n \n Note\xA0: Les liens de pied de page renvoyant vers les mentions l\xE9gales, plan du site et autres informations concernant le site ne sont pas consid\xE9r\xE9s comme un menu de navigation principal."
+  },
+  "message-de-statut": {
+    title: "Message de statut",
+    body: "Un message de statut informe l\u2019utilisateur d\u2019un changement de contenu dans la page sans interrompre son activit\xE9 principale (il n\u2019y a pas de changement de contexte par exemple un repositionnement du focus sur le message).\n Un message de statut peut informer sur\xA0:\n Le succ\xE8s ou le r\xE9sultat d\u2019une action\xA0;\n L\u2019\xE9tat occup\xE9 d\u2019une application\xA0;\n L\u2019\xE9tat de progression d\u2019un processus\xA0;\n L\u2019existence d\u2019erreur."
+  },
+  "modifier-ou-annuler-les-donnees-et-les-actions-effectues": {
+    title: "Modifier ou annuler les donn\xE9es et les actions effectu\xE9s",
+    body: "Proc\xE9d\xE9s par lesquels un utilisateur peut modifier les donn\xE9es qu\u2019il a saisies, faire annuler sa saisie ou faire annuler les actions d\xE9coulant de sa saisie par exemple annuler une commande ou un virement bancaire.\n Note\xA0: La page contenant un formulaire qui modifie ou supprime des donn\xE9es, ou qui transmet des r\xE9ponses \xE0 un test ou un examen, ou dont la validation a des cons\xE9quences financi\xE8res ou juridiques, doit indiquer explicitement la dur\xE9e pendant laquelle l\u2019utilisateur peut demander l\u2019annulation de sa saisie. Elle devra \xE9galement contenir la proc\xE9dure \xE0 effectuer pour annuler cette saisie. Cette proc\xE9dure n\u2019a pas \xE0 \xEAtre obligatoirement r\xE9alisable en ligne m\xEAme si cela reste recommand\xE9."
+  },
+  "moteur-de-recherche-interne-a-un-site-web": {
+    title: "Moteur de recherche (interne \xE0 un site web)",
+    body: "Zone donnant acc\xE8s directement (formulaire) ou indirectement (\xE9l\xE9ment d\u2019interface donnant acc\xE8s au formulaire) au moteur de recherche qui permet d\u2019effectuer des recherches sur les contenus de l\u2019ensemble du site.\n Note\xA0: Attention \xE0 ne pas confondre cette zone de recherche, unique dans le site, avec tout autre moteur de recherche permettant par exemple de faire des recherches sur une partie restreinte du site\xA0: un catalogue, les offres sur une section march\xE9s publics\u2026\n Voir la d\xE9finition technique de zone d\u2019en-t\xEAte fournie par WAI-ARIA search(role) ."
+  },
+  "motif-de-conception": {
+    title: "Motif de conception",
+    body: "Un motif de conception (Design Pattern) est un mod\xE8le d\xE9fini dans le document WAI-ARIA 1.1 Authoring Practices qui d\xE9crit la structure, les r\xF4les et propri\xE9t\xE9s et le comportement clavier que doit respecter un composant JavaScript (widget).\n Il est recommand\xE9 que les composants d\xE9velopp\xE9s en JavaScript utilisant des attributs WAI-ARIA correspondant \xE0 un motif de conception respectent celui-ci. Attention cependant, les motifs de conception ne sont pas tous adapt\xE9s \xE0 un usage non applicatif, en particulier pour les sites proposant un affichage en contexte mobile.\n Note 1\xA0: compte tenu du manque de support de certaines propri\xE9t\xE9s et de certains r\xF4les WAI-ARIA et de la grande variabilit\xE9 des situations dans lesquelles un composant JavaScript peut \xEAtre propos\xE9, il est possible d\u2019adapter des motifs de conception \xE0 des contextes ou des utilisations particuli\xE8res. Dans ce cas, le motif de conception adapt\xE9 doit\xA0:\n Respecter la structure g\xE9n\xE9rale\xA0: par exemple un ensemble de panneaux (r\xF4le WAI-ARIA tabpanel ) d\u2019un syst\xE8me d\u2019onglets est forc\xE9ment li\xE9 \xE0 un ensemble d\u2019onglets (r\xF4le WAI-ARIA tablist )\xA0;\n Utiliser en remplacement d\u2019un r\xF4le ou d\u2019une propri\xE9t\xE9 WAI-ARIA mal support\xE9, un r\xF4le ou une propri\xE9t\xE9 WAI-ARIA \xE9quivalent, offrant un comportement et une restitution similaire.\n \n Note 2\xA0: Le fait d\u2019enrichir un motif de conception de r\xF4les ou propri\xE9t\xE9s WAI-ARIA suppl\xE9mentaires dont la compatibilit\xE9 avec l\u2019accessibilit\xE9 est contr\xF4l\xE9e par le test de restitution sur l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB) ne constitue pas une adaptation d\u2019un motif de conception. Par exemple l\u2019ajout de l\u2019attribut WAI-ARIA aria-hidden sur les panneaux (r\xF4le WAI-ARIA tabpanel ) d\u2019un syst\xE8me d\u2019onglets ne d\xE9finit pas un motif de conception adapt\xE9."
+  },
+  "ordre-de-tabulation": {
+    title: "Ordre de tabulation",
+    body: "Ordre dans lequel le focus se d\xE9place (vers un \xE9l\xE9ment suivant ou vers un \xE9l\xE9ment pr\xE9c\xE9dent). L\u2019ordre naturel est celui qui est impl\xE9ment\xE9 via le code source. Lorsqu\u2019il est modifi\xE9 par l\u2019utilisation de l\u2019attribut tabindex ou par l\u2019utilisation d\u2019une commande JavaScript, c\u2019est l\u2019ordre modifi\xE9 qui fait r\xE9f\xE9rence.\n Attention\xA0: lorsqu\u2019un \xE9l\xE9ment initie un changement dans la page (changement de contexte, gestion de zones cach\xE9es, ajout de contenu, gestion de champs de formulaire\u2026) il est n\xE9cessaire d\u2019activer l\u2019\xE9l\xE9ment qui initie le changement pour tester la coh\xE9rence de l\u2019ordre de tabulation."
+  },
+  "page-plan-du-site": {
+    title: "Page \xAB\xA0plan du site\xA0\xBB",
+    body: "Page d\xE9di\xE9e pr\xE9sentant l\u2019arborescence d\u2019un site web, g\xE9n\xE9ralement sous forme de listes de liens organis\xE9es en rubriques et sous-rubriques donnant acc\xE8s \xE0 l\u2019ensemble des pages du site.\n Note 1\xA0: les liens du plan du site peuvent \xEAtre constitu\xE9s de balises <a> ou de balises <area> .\n Note 2\xA0: il n\u2019est pas n\xE9cessaire que le plan du site contienne les liens vers toutes les pages du site, en revanche il est n\xE9cessaire qu\u2019\xE0 partir du plan du site, l\u2019utilisateur puisse atteindre l\u2019ensemble des pages du site."
+  },
+  "passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby": {
+    title: "Passage de texte li\xE9 par `aria-labelledby` ou `aria-describedby`",
+    body: 'Il s\u2019agit d\u2019un ou de plusieurs passages de texte identifi\xE9s par des id dont la valeur est unique dans la page et associ\xE9s \xE0 un \xE9l\xE9ment (champ de formulaire, bouton, etc.) par les attributs WAI-ARIA aria-labelledby ou aria-describedby sur le mod\xE8le suivant\xA0: aria-labelledby="ID1 ID2 ID3\u2026" o\xF9 la valeur de l\u2019attribut utilis\xE9 est \xE9gale \xE0 la liste des valeurs d\u2019attributs id des passages de texte \xE0 associer pr\xE9sents dans la page.\n Note 1\xA0: pour assurer une compatibilit\xE9 maximum avec les agents utilisateurs, notamment Internet Explorer 11, il est recommand\xE9 d\u2019impl\xE9menter un tabindex="-1" sur les passages de textes qui ne sont pas des \xE9l\xE9ments interactifs (bouton, liens, \xE9l\xE9ments de formulaires, etc.).\n Note 2\xA0: la valeur des attributs WAI-ARIA aria-labelledby ou aria-describedby ne doivent pas cr\xE9er de r\xE9f\xE9rence r\xE9cursive (A r\xE9f\xE9rence B qui r\xE9f\xE9rence A) ou traversante (A qui r\xE9f\xE9rence B qui r\xE9f\xE9rence C).'
+  },
+  "presentation-de-l-information": {
+    title: "Pr\xE9sentation de l\u2019information",
+    body: "Restitution visuelle des contenus via un navigateur en mode graphique. La pr\xE9sentation concerne le style, la position et les dimensions des \xE9l\xE9ments HTML et de leur contenu. La pr\xE9sentation de l\u2019information doit \xEAtre r\xE9alis\xE9e via CSS. Les \xE9l\xE9ments ( basefont , big , blink , center , font , marquee , s , strike et tt ) et les attributs ( align , alink , background , bgcolor , border , cellpadding , cellspacing , char , charoff , clear , compact , color , frameborder , hspace , link , marginheight , marginwidth , text , valign , vlink , vspace ) sont interdits.\n Notes\xA0:\n Les attributs width et height utilis\xE9s sur d\u2019autres \xE9l\xE9ments que les \xE9l\xE9ments <img> , <object> , <embed> , <canvas> et <svg> sont \xE9galement interdits\xA0;\n L'attribut size utilis\xE9 sur d\u2019autres \xE9l\xE9ments que l'\xE9l\xE9ment <select> est \xE9galement interdit\xA0;\n L\u2019\xE9l\xE9ment <u> est interdit uniquement si le DOCTYPE du document ne correspond pas \xE0 HTML 5."
+  },
+  "presse-ou-pose": {
+    title: "Press\xE9 ou pos\xE9",
+    body: "Correspond aux gestionnaires d\u2019\xE9v\xE9nement JavaScript consid\xE9r\xE9s comme des \xE9v\xE9nements descendants ( mousedown , touchstart par exemple)."
+  },
+  "prise-de-focus": {
+    title: "Prise de focus",
+    body: 'La prise de focus est l\u2019\xE9tat renvoy\xE9 par un \xE9l\xE9ment qui re\xE7oit l\u2019attention suite \xE0 une action de l\u2019utilisateur. Il y a trois moyens en HTML de donner le focus \xE0 un \xE9l\xE9ment\xA0:\n En activant l\u2019\xE9l\xE9ment par un dispositif de pointage (exemple\xA0: souris)\xA0;\n En atteignant l\u2019\xE9l\xE9ment par la touche tabulation ou majuscule + tabulation\xA0;\n En activant l\u2019\xE9l\xE9ment par un raccourci clavier ( accesskey ).\n \n Certains \xE9l\xE9ments re\xE7oivent naturellement le focus, par exemple\xA0: <a href> , <area href> , <button> , <input> , <object> , <select> , <label> , <legend> , <optgroup> , <option> et <textarea> . Le comportement de l\u2019\xE9l\xE9ment, lors de la prise de focus, d\xE9pend de sa nature\xA0; un lien, par exemple, devra \xEAtre activ\xE9 apr\xE8s la prise de focus (sauf utilisation de script). En revanche, un \xE9l\xE9ment de formulaire, comme <textarea> , devra autoriser la saisie suite \xE0 la prise de focus. Les \xE9l\xE9ments <label> et <legend> ne re\xE7oivent la prise de focus que via le pointeur souris. Pour l\u2019\xE9l\xE9ment <label> , le comportement attendu est de transf\xE9rer la prise de focus sur l\u2019\xE9l\xE9ment qui lui est associ\xE9.\n Note 1\xA0: la sp\xE9cification WAI-ARIA \xE9tend le r\xF4le attribu\xE9 \xE0 l\u2019attribut tabindex en d\xE9finissant que tout \xE9l\xE9ment HTML peut acqu\xE9rir la possibilit\xE9 de recevoir le focus en lui attribuant la valeur tabindex="0" . En revanche, aucun comportement n\u2019est attribu\xE9 via la seule pr\xE9sence de tabindex . De m\xEAme, la valeur tabindex="-1" lorsqu\u2019elle est utilis\xE9e sur un \xE9l\xE9ment recevant naturellement le focus retire l\u2019\xE9l\xE9ment qui en est affect\xE9 du plan de tabulation en inhibant sa capacit\xE9 \xE0 signaler la \xAB\xA0prise de focus\xA0\xBB. L\u2019utilisation de tabindex , conform\xE9ment \xE0 la sp\xE9cification WAI-ARIA, peut valider certains tests relatifs \xE0 la gestion du focus de tabulation, notamment.\n Note 2\xA0: l\u2019indication visuelle du focus du navigateur ne doit pas \xEAtre supprim\xE9e ou d\xE9grad\xE9e sauf si un style du focus d\xE9fini par l\u2019auteur est visible et suffisamment contrast\xE9 au regard du crit\xE8re 3.3 .'
+  },
+  "procede-de-rafraichissement": {
+    title: "Proc\xE9d\xE9 de rafra\xEEchissement",
+    body: "Technique visant \xE0 modifier le contenu d\u2019un ou de plusieurs \xE9l\xE9ments de la page web. Le proc\xE9d\xE9 de rafra\xEEchissement peut s\u2019effectuer par rechargement automatique de la page ou de mani\xE8re dynamique sans rechargement de la page (via AJAX, par exemple). L\u2019utilisateur doit pouvoir contr\xF4ler chaque proc\xE9d\xE9 de rafra\xEEchissement de mani\xE8re ind\xE9pendante."
+  },
+  "propriete-css-determinant-une-couleur": {
+    title: "Propri\xE9t\xE9 CSS d\xE9terminant une couleur",
+    body: "Cela concerne les propri\xE9t\xE9s suivantes\xA0: color , background-color , background , border-color , border , outline-color , outline .\n Note\xA0: l\u2019utilisation d\u2019une image de fond pour ins\xE9rer une couleur (propri\xE9t\xE9 background:url\u2026 ) est \xE9galement concern\xE9e."
+  },
+  "raccourci-clavier": {
+    title: "Raccourci clavier",
+    body: "Un moyen de d\xE9clencher une action associ\xE9e \xE0 un composant de l\u2019interface utilisateur en appuyant sur une ou plusieurs touches.\n Note\xA0: les \xAB\xA0Access keys\xA0\xBB (attribut HTML accesskey ) sont bien des raccourcis clavier, mais ils ne sont pas concern\xE9s par le crit\xE8re 12.10 dans la mesure o\xF9 leur activation n\xE9cessite d\xE9j\xE0 l\u2019usage de touches de modification (variables suivant les navigateurs)."
+  },
+  redirection: {
+    title: "Redirection",
+    body: "Proc\xE9d\xE9 qui consiste pour l\u2019affichage d\u2019une page sur le poste client \xE0 rediriger l\u2019utilisateur vers une autre page, sur le m\xEAme domaine ou sur un domaine diff\xE9rent."
+  },
+  "regles-d-ecriture": {
+    title: "R\xE8gles d\u2019\xE9criture",
+    body: 'Le code source doit respecter les r\xE8gles suivantes en accord avec la d\xE9claration de type de document utilis\xE9e dans la page\xA0:\n Pas de balise ouvrante ou fermante sans < ou > (exemple d\u2019erreur\xA0: li>v\xE9lo )\xA0;\n pas de balise fermante avec / manquant (exemple d\u2019erreur\xA0: <li>v\xE9lo<li> )\xA0;\n pas de valeur d\u2019attribut avec des \u201C ou \u2018 manquant (exemple d\u2019erreur\xA0: alt="v\xE9lo )\xA0;\n pas de valeurs multiples d\u2019attribut s\xE9par\xE9es par un espace sans \u201C ou \u2018 (exemple d\u2019erreur\xA0: alt=mon beau v\xE9lo )\xA0;\n pas d\u2019espace manquant entre les attributs (exemple\xA0: alt=\u201Dv\xE9lo\u201Dtitle=\u201Dv\xE9lo\u201D )\xA0;\n pas de balise fermante manquante pour les \xE9l\xE9ments qui en exigent une (exemple d\u2019erreur\xA0: <object> sans </object> ).'
+  },
+  "relache-ou-releve": {
+    title: "Rel\xE2ch\xE9 ou relev\xE9",
+    body: "Correspond aux gestionnaires d\u2019\xE9v\xE9nement JavaScript consid\xE9r\xE9s comme des \xE9v\xE9nements ascendants ( mouseup , touchend par exemple)."
+  },
+  "resume-de-tableau": {
+    title: "R\xE9sum\xE9 (de tableau)",
+    body: 'Un r\xE9sum\xE9 est un passage de texte associ\xE9 \xE0 un tableau de donn\xE9es complexe. Il permet de donner des informations sur la nature et la structure du tableau afin d\u2019en faciliter l\u2019utilisation par les utilisateurs de technologies d\u2019assistance par exemple.\n Note\xA0: en HTML5, la seule technique utilisable actuellement est celle qui consiste \xE0 ins\xE9rer le r\xE9sum\xE9 directement dans le titre (balise <caption> ) en masquant le r\xE9sum\xE9 via CSS si n\xE9cessaire.\n Dans les versions pr\xE9c\xE9dentes de HTML, le r\xE9sum\xE9 peut \xEAtre ins\xE9r\xE9 via un attribut summary sur la balise <table> .\n Dans le cas d\u2019une balise avec l\u2019attribut WAI-ARIA role="table" , le r\xE9sum\xE9 doit \xEAtre fourni au moyen d\u2019un attribut aria-describedby et \xEAtre correctement restitu\xE9 par les technologies d\u2019assistance.'
+  },
+  script: {
+    title: "Script",
+    body: "Code g\xE9n\xE9ralement \xE9crit sous forme d\u2019une liste de commandes (par exemple JavaScript). Les langages interpr\xE9t\xE9s c\xF4t\xE9 client n\xE9cessitent un navigateur compatible sur lequel l\u2019ex\xE9cution du langage est active. Les commandes d\u2019un langage de script c\xF4t\xE9 client peuvent \xEAtre embarqu\xE9es ou contenues dans un fichier externe. Dans les deux cas, l\u2019insertion se fait via la balise <script> ."
+  },
+  "sens-de-lecture": {
+    title: "Sens de lecture",
+    body: 'Indique le sens de lecture du document ou d\u2019un passage de texte via l\u2019attribut dir , dir="ltr" , par exemple. Les deux valeurs reconnues sont\xA0:\n ltr ( left to right ) indique un sens de lecture de gauche \xE0 droite\xA0;\n rtl ( right to left ) indique un sens de lecture de droite \xE0 gauche.\n \n Note\xA0: en l\u2019absence d\u2019indication de sens de lecture via l\u2019attribut dir sur l\u2019\xE9l\xE9ment html , body , ou un des parents du texte analys\xE9, le sens de lecture par d\xE9faut est de gauche \xE0 droite (valeur ltr ).'
+  },
+  "site-web": {
+    title: "Site web",
+    body: "Ensemble de toutes les pages web\xA0:\n Reli\xE9es par des liens web\xA0;\n Appartenant au m\xEAme nom de domaine (ex\xA0: design.numerique.gouv.fr)\xA0;\n Qui constituent un ensemble coh\xE9rent du point de vue de l\u2019utilisateur.\n \n Cas particulier des pages web d\u2019un sous-domaine\xA0; un sous-domaine peut\xA0:\n Soit appartenir au site web attach\xE9 au nom de domaine, si l\u2019utilisateur en a une perception coh\xE9rente avec les autres pages du site web (par exemple\xA0: m\xEAme structure, m\xEAme navigation\u2026)\xA0;\n Soit ne pas appartenir au site web attach\xE9 au nom de domaine (par exemple\xA0: diff\xE9rents blogs en sous-domaine d\u2019un nom de domaine et sans relation les uns avec les autres)."
+  },
+  "sous-titres-synchronises-objet-multimedia": {
+    title: "Sous-titres synchronis\xE9s (objet multim\xE9dia)",
+    body: 'Texte des informations audio (paroles d\u2019un personnage, bruit important pour comprendre l\u2019action\u2026) pr\xE9sentes dans un m\xE9dia temporel et affich\xE9 de mani\xE8re synchrone avec le flux de l\u2019objet multim\xE9dia.\n Note 1\xA0: pour diff\xE9rencier les sources sonores (diff\xE9rents personnages, voix off\u2026), il est recommand\xE9 d\u2019utiliser un m\xE9canisme appropri\xE9 (mise entre crochets, mise en italique, annonce explicite du type \u201Cvoix off\xA0: \u2026\u201D).\n Note 2\xA0: il ne faut pas confondre le sous-titrage pour la traduction (attribut kind="subtitles" de la balise <track> en HTML5, par exemple) et le sous-titrage pour sourds et malentendants (attribut kind="captions" de la balise <track> en HTML5, par exemple). Ces deux types de sous-titrage poursuivent des buts diff\xE9rents. Seule la pr\xE9sence et la pertinence d\u2019un sous-titrage pour sourds et malentendants permet d\u2019\xEAtre conforme.'
+  },
+  "structure-du-document": {
+    title: "Structure du document",
+    body: "Ensemble d\u2019\xE9l\xE9ments permettant de d\xE9finir les grandes zones d\u2019une page HTML telles que la zone d\u2019en-t\xEAte de la page, les zones de navigation principale et secondaire, la zone de contenu principal et la zone de pied de page."
+  },
+  "systeme-de-navigation": {
+    title: "Syst\xE8me de navigation",
+    body: "Tout proc\xE9d\xE9 permettant une navigation dans le site ou dans une page, les syst\xE8mes de navigation retenus sont\xA0:\n Menu de navigation principal\xA0;\n Table des mati\xE8res\xA0;\n Plan du site\xA0;\n Moteur de recherche."
+  },
+  "tableau-de-donnees-ayant-un-titre": {
+    title: "Tableau de donn\xE9es ayant un titre",
+    body: "Tableau de donn\xE9es ayant un attribut ou contenant une balise dont le contenu fait office de titre.\n Tableau de donn\xE9es pr\xE9c\xE9d\xE9 ou suivi d\u2019un passage de texte associ\xE9 au tableau faisant office de titre.\n Dans la mesure o\xF9 il est bien correctement restitu\xE9 et associ\xE9 par les technologies d\u2019assistance au tableau de donn\xE9es, le titre associ\xE9 peut \xEAtre\xA0:\n Dans une balise <caption> \xA0;\n Dans un attribut title \xA0;\n Dans un attribut WAI-ARIA aria-label \xA0;\n Dans une balise associ\xE9e au tableau de donn\xE9es via un attribut WAI-ARIA aria-labelledby sur le tableau.\n \n Note\xA0: seule la balise <caption> \xE9tant compl\xE8tement support\xE9 par l\u2019ensemble des technologies d\u2019assistance, il est fortement recommand\xE9 de privil\xE9gier cette solution lors de la mise en \u0153uvre afin d\u2019\xE9viter de nombreuses v\xE9rifications dans les diff\xE9rentes combinaisons pr\xE9vues par l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB)."
+  },
+  "tableau-de-donnees-complexe": {
+    title: "Tableau de donn\xE9es complexe",
+    body: 'Un tableau de donn\xE9es est une structure introduite par une balise <table> ou lorsqu\u2019il est correctement restitu\xE9 par les technologies d\u2019assistance par une balise pourvue d\u2019un attribut WAI-ARIA role="table" .\n Lorsqu\u2019un tableau de donn\xE9es contient des en-t\xEAtes qui ne sont pas r\xE9partis uniquement sur la premi\xE8re ligne et/ou la premi\xE8re colonne de la grille ou dont la port\xE9e n\u2019est pas valable pour l\u2019ensemble de la colonne ou de la ligne, on parle de tableau de donn\xE9es complexe. Il est alors n\xE9cessaire de fournir un \xAB\xA0r\xE9sum\xE9\xA0\xBB permettant d\u2019en expliquer sa nature et sa structure afin d\u2019en faciliter la consultation pour des utilisateurs de technologies d\u2019assistance par exemple.'
+  },
+  "tableau-de-donnees": {
+    title: "Tableau de donn\xE9es",
+    body: 'Un tableau de donn\xE9es est une structure introduite par une balise <table> ou lorsqu\u2019il est correctement restitu\xE9 par les technologies d\u2019assistance par une balise pourvue d\u2019un attribut WAI-ARIA role="table" . Cette balise permet de structurer des informations en lignes et en colonnes via des cellules de donn\xE9es et des cellules d\u2019en-t\xEAtes.'
+  },
+  "tableau-de-mise-en-forme": {
+    title: "Tableau de mise en forme",
+    body: "Technique qui utilise un \xE9l\xE9ment HTML (balise <table> ) pour contr\xF4ler l\u2019affichage d\u2019informations via des cellules (balise <td> )."
+  },
+  "taille-des-caracteres": {
+    title: "Taille des caract\xE8res",
+    body: "Valeur attribu\xE9e aux polices de caract\xE8res pr\xE9sentes sur une page web."
+  },
+  "texte-style": {
+    title: "Texte styl\xE9",
+    body: "Texte dont la mise en forme est contr\xF4l\xE9e par une feuille de styles."
+  },
+  "titre-de-cadre": {
+    title: "Titre de cadre",
+    body: 'Contenu de l\u2019attribut title de la balise <iframe> ou <frame> permettant de conna\xEEtre la nature du contenu diffus\xE9 via le cadre lorsque l\u2019utilisateur navigue de cadre en cadre ou affiche la liste des cadres de la page par exemple.\n Note 1\xA0: Certains cadres servent uniquement \xE0 des op\xE9rations techniques tels que des traitements applicatifs destin\xE9s \xE0 pr\xE9parer ou piloter des contenus affich\xE9s dans la page comme les cadres utilis\xE9s par certains r\xE9seaux sociaux comme Facebook par exemple.\n Si ces cadres sont d\xE9pourvus de titre de cadre fournis par le service distant, ou si les titres de cadres sont jug\xE9s non pertinents, des mentions g\xE9n\xE9riques peuvent \xEAtre utilis\xE9es, par exemple title="contenus techniques Facebook" .\n Note 2\xA0: Si cela ne g\xEAne pas le fonctionnement de ce type de cadre, il est possible de les rendre indisponibles aux technologies d\u2019assistance en utilisant l\u2019attribut WAI-ARIA aria-hidden="true" . Dans ce cas le crit\xE8re 2.1 et le crit\xE8re 2.2 seront non applicables.'
+  },
+  "titre-de-page": {
+    title: "Titre de page",
+    body: "Contenu de la balise <title> d\u2019une page web permettant d\u2019identifier de mani\xE8re claire, concise et unique les contenus/la nature de la page (\xAB\xA0Plan du site www.nomdusite.fr\xA0\xBB pour une page pr\xE9sentant le plan du site web, par exemple)."
+  },
+  titre: {
+    title: "Titre",
+    body: '\xC9l\xE9ment HTML (balise h ) \xE0 6 niveaux de hi\xE9rarchie (de h1 pour le titre le plus important \xE0 h6 pour le moins important) ou \xE9l\xE9ment HTML ayant les attributs WAI-ARIA role="heading" et aria-level permettant de structurer l\u2019information d\u2019un contenu web.\n Assurer une stricte hi\xE9rarchie entre les titres d\u2019une page web est une bonne pratique, mais la pr\xE9sence de sauts hi\xE9rarchiques n\u2019invalide pas le crit\xE8re tant que cette hi\xE9rarchie plus l\xE2che reste coh\xE9rente (un titre <h3> peut ainsi venir directement apr\xE8s un titre <h1> , par exemple). La hi\xE9rarchie de titres ne doit pas obligatoirement contenir un titre <h1> . M\xEAme si ces pratiques ne sont pas encourag\xE9es, elles n\u2019invalident pas le crit\xE8re.\n Note\xA0: les titres visuellement cach\xE9s via CSS sont consid\xE9r\xE9s comme pr\xE9sents et valident le crit\xE8re 9.1 .'
+  },
+  "transcription-textuelle-media-temporel": {
+    title: "Transcription textuelle (m\xE9dia temporel)",
+    body: "Contenu textuel associ\xE9 \xE0 un m\xE9dia temporel par la technique appropri\xE9e (texte cod\xE9 en HTML ou dans un fichier texte qui se trouve dans la m\xEAme page ou consultable suivant un lien). Ce contenu donne acc\xE8s \xE0 l\u2019utilisateur (de mani\xE8re ind\xE9pendante de la consultation de l\u2019objet multim\xE9dia) \xE0\xA0:\n La totalit\xE9 de ce qui y est exprim\xE9 oralement\xA0;\n Toutes les informations descriptives n\xE9cessaires \xE0 une compr\xE9hension \xE9quivalente de l\u2019action.\n \n Ces informations textuelles doivent \xEAtre pr\xE9sent\xE9es dans l\u2019ordre chronologique de leur apparition dans le m\xE9dia temporel.\n Note\xA0: la transcription textuelle doit se situer \xE0 l\u2019ext\xE9rieur de la balise <object> ."
+  },
+  "type-de-document": {
+    title: "Type de document",
+    body: "Ensemble de donn\xE9es de r\xE9f\xE9rence qui permet aux agents utilisateurs de conna\xEEtre les caract\xE9ristiques techniques des langages utilis\xE9s sur la page web (balise doctype )."
+  },
+  "type-et-format-de-donnees": {
+    title: "Type et format de donn\xE9es",
+    body: "Indication concernant le type et le format des donn\xE9es attendus lors de la saisie d\u2019un champ de formulaire. Par exemple\xA0:\n Date (jj/mm/aaaa)\xA0;\n Montant en euros\xA0;\n Code postal (5 chiffres\xA0: ex. 75001).\n \n Note importante\xA0: lorsque le type de champ de formulaire propose un masque de saisie, par exemple les champs date ou time , l\u2019indication de format n\u2019est pas n\xE9cessaire."
+  },
+  "uniquement-a-des-fins-de-presentation": {
+    title: "Uniquement \xE0 des fins de pr\xE9sentation",
+    body: 'Uniquement \xE0 des fins de pr\xE9sentation\xA0: utilisation de balises HTML pour une finalit\xE9 diff\xE9rente de celle pr\xE9vue dans les sp\xE9cifications (au regard du type de document d\xE9clar\xE9). Exemples\xA0: utilisation des balises h \xE0 seule fin de cr\xE9er un effet typographique\xA0; utilisation de la balise <blockquote> \xE0 seule fin de mettre un paragraphe en retrait, etc.\n Note 1\xA0: l\u2019utilisation d\u2019\xE9l\xE9ments <div> ou <span> ou plusieurs <br> pour cr\xE9er visuellement un paragraphe est consid\xE9r\xE9e comme non conforme et invalide le crit\xE8re.\n Exemple\xA0: <div> , paragraphes d\u2019un bloc de texte simul\xE9s , <br> , \xE0 l\u2019aide de plusieurs balises <br> , </div> \n Note 2\xA0: WAI-ARIA propose un r\xF4le presentation permettant de supprimer la s\xE9mantique d\u2019un \xE9l\xE9ment, par exemple <h1 role="presentation">Titre</h1> . Dans ce cas, le texte sera correctement restitu\xE9 mais son r\xF4le de titre ne le sera plus. L\u2019utilisation du r\xF4le presentation peut \xEAtre requise lorsque l\u2019on utilise un motif de conception WAI-ARIA.\n Le r\xF4le WAI-ARIA presentation peut \xEAtre \xE9galement utilis\xE9 pour supprimer la s\xE9mantique d\u2019un \xE9l\xE9ment lorsque ce dernier est utilis\xE9 uniquement \xE0 des fins de pr\xE9sentation, par exemple <blockquote role="presentation"> aura le m\xEAme effet qu\u2019une absence d\u2019\xE9l\xE9ment <blockquote> .\n M\xEAme si cette utilisation est fortement d\xE9conseill\xE9e (dans le cas de technologie d\u2019assistance qui n\u2019impl\xE9menteraient pas WAI-ARIA par exemple) elle peut \xEAtre consid\xE9r\xE9e comme conforme \xE0 WCAG . En revanche l\u2019utilisation d\u2019un r\xF4le WAI-ARIA presentation sur un \xE9l\xE9ment dont la nature (par exemple la s\xE9mantique) est essentielle \xE0 la compr\xE9hension du contenu est une violation des r\xE8gles WCAG (particuli\xE8rement de l\u2019\xE9chec F92 ) et invalide le crit\xE8re.'
+  },
+  "version-accessible-pour-un-document-en-telechargement": {
+    title: "Version accessible (pour un document en t\xE9l\xE9chargement)",
+    body: "Les documents en t\xE9l\xE9chargement dont les types de format sont reconnus compatibles avec l\u2019accessibilit\xE9 doivent \xEAtre rendus accessibles soit directement soit par l\u2019interm\xE9diaire d\u2019une version accessible ou d\u2019une version en HTML. Les formats de document dont la compatibilit\xE9 est reconnue sont\xA0:\n Microsoft Office (Word 2003, OOXML)\xA0;\n Open Office Org (ODF)\xA0;\n Adobe PDF\xA0;\n EPUB/Daisy.\n \n Note\xA0: le format texte (txt) ne peut pas \xEAtre utilis\xE9 pour produire une version accessible pour un document en t\xE9l\xE9chargement."
+  },
+  "version-alternative-audio-seulement": {
+    title: "Version alternative \xAB\xA0audio seulement\xA0\xBB",
+    body: "Une version \xAB\xA0audio seulement\xA0\xBB est une version sonore, sous la forme d\u2019un simple fichier au format MP3 par exemple, utilis\xE9e comme alternative \xE0 une vid\xE9o seulement (vid\xE9o sans information sonore). Les seuls utilisateurs impact\xE9s par l\u2019accessibilit\xE9 \xE9tant les personnes aveugles, qui ne peuvent pas voir la vid\xE9o, WCAG consid\xE8re comme acceptable de proposer en alternative une version sonore.\n La version \xAB\xA0audio seulement\xA0\xBB doit contenir toutes les informations visuelles importantes de la vid\xE9o.\n G\xE9n\xE9ralement il est plus simple de produire une version sonore qu\u2019une version textuelle lorsque la vid\xE9o est tr\xE8s descriptive (la transcription textuelle n\xE9cessitant souvent un travail r\xE9dactionnel important). Il est rappel\xE9, n\xE9anmoins, que seule la transcription textuelle assure un acc\xE8s universel aux informations diffus\xE9es par la vid\xE9o, dans le cas o\xF9 un utilisateur ne serait pas en capacit\xE9 de lancer la vid\xE9o par exemple."
+  },
+  "zone-cliquable": {
+    title: "Zone cliquable",
+    body: "R\xE9gion d\u2019une image r\xE9active \xE0 laquelle une action a \xE9t\xE9 associ\xE9e\xA0; par exemple, le d\xE9clenchement d\u2019un \xE9v\xE9nement en cliquant sur un lien (pour une zone cliquable c\xF4t\xE9 client\xA0: balise <area> avec l\u2019attribut href ). Les balises <area> sont contenues dans la balise <map> .\n Pour les images r\xE9actives c\xF4t\xE9 serveur, les coordonn\xE9es sont d\xE9tenues sur le serveur."
+  },
+  "zone-d-en-tete": {
+    title: "Zone d\u2019en-t\xEAte",
+    body: "Zone situ\xE9e en haut du document et contenant g\xE9n\xE9ralement le titre du document, un logo, un slogan\u2026\n Note\xA0: Attention \xE0 ne pas confondre cette zone d\u2019en-t\xEAte, unique dans le site, avec tout contenu pouvant \xEAtre balis\xE9 en HTML5 avec l\u2019\xE9l\xE9ment <header> .\n Voir la d\xE9finition technique fournie par WAI-ARIA\xA0: Banner (role) ."
+  },
+  "zone-d-une-image-reactive": {
+    title: "Zone (d\u2019une image r\xE9active)",
+    body: "Zone cliquable ou zone non cliquable d\u2019une image r\xE9active c\xF4t\xE9 client ou zone cliquable d\u2019une image r\xE9active c\xF4t\xE9 serveur."
+  },
+  "zone-de-contenu-principal": {
+    title: "Zone de contenu principal",
+    body: "Zone contenant les principaux contenus de la page, l\xE0 o\xF9 se trouvent les informations et fonctionnalit\xE9s de fond (donc en dehors des menus, de la recherche ou des zones secondaires de publicit\xE9s, actualit\xE9s connexes\u2026).\n Note\xA0: Cette zone est unique dans la page. Elle peut \xEAtre difficile \xE0 d\xE9terminer sur certaines pages particuli\xE8res, comme la page d\u2019accueil.\n Voir la d\xE9finition technique fournie par WAI-ARIA\xA0: Main (role) ."
+  },
+  "zone-de-pied-de-page": {
+    title: "Zone de pied de page",
+    body: "Il s\u2019agit des informations concernant le fonctionnement du site ou les informations l\xE9gales. On y trouve par exemple les mentions l\xE9gales, les cr\xE9dits, les conditions d\u2019utilisation, le plan du site et \xE9ventuellement la page accessibilit\xE9.\n Note\xA0: Attention \xE0 ne pas confondre cette zone de pied de page, unique dans le site, avec tout contenu pouvant \xEAtre balis\xE9 en HTML5 avec l\u2019\xE9l\xE9ment <footer> .\n Voir la d\xE9finition technique fournie par WAI-ARIA\xA0: Contentinfo (role) ."
+  },
+  "zone-non-cliquable": {
+    title: "Zone non cliquable",
+    body: "R\xE9gion d\u2019une image r\xE9active \xE0 laquelle aucune action n\u2019est associ\xE9e. Une zone non cliquable c\xF4t\xE9 client est contenue dans une balise <area> \xA0:\n Avec l\u2019attribut nohref lorsque le code HTML de la page n\u2019est pas du HTML5\xA0;\n Sans attribut href en HTML5.\n \n Les balises <area> sont contenus dans la balise <map> ."
+  }
+};
+
+// src/standards/validate.ts
+var RESERVED_CORE_KEY = "wcag";
+var LOCALE_SHAPE = /^[a-z]{2,3}(-[a-zA-Z]{2,4})?$/;
+var SC_SHAPE = /^\d+\.\d+\.\d+$/;
+var RULE_ID_SHAPE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+var SEVERITIES2 = /* @__PURE__ */ new Set(["bloquant", "majeur", "mineur"]);
+var MAX_MATCH_DEPTH = 3;
+var MATCH_OPS = /* @__PURE__ */ new Set(["present", "absent", "equals", "matches"]);
+var TEXT_OPS = /* @__PURE__ */ new Set(["matches", "lacks"]);
+var DOC_OPS = /* @__PURE__ */ new Set(["absent", "matches", "lacks"]);
+var MATCH_CONDITION_KEYS = ["tag", "attrs", "text", "has", "lacks"];
+var MATCH_NODE_KEYS = new Set(MATCH_CONDITION_KEYS);
+var REDOS_SINGLE_ATOM = /\((?:\\.|\[[^\]]*\]|[^()\\])[*+]\)[*+]/;
+var REDOS_ALT_QUANTIFIED = /\([^()]*\|[^()]*\)[*+]/;
+var REDOS_NESTED_QUANT_GROUP = /\((?![\\])[^()|]*[*+][^()|]*\)[*+]/;
+function isRedosShape(pattern) {
+  return REDOS_SINGLE_ATOM.test(pattern) || REDOS_ALT_QUANTIFIED.test(pattern) || REDOS_NESTED_QUANT_GROUP.test(pattern);
+}
+function regexIssue(pattern) {
+  if (isRedosShape(pattern))
+    return "has a nested quantifier or an ambiguous alternation (e.g. (a+)+, (a|a)*, (ab+)+) \u2014 a catastrophic-backtracking (ReDoS) shape; simplify it";
+  try {
+    new RegExp(pattern);
+  } catch (e) {
+    return `is not a valid regex: ${e.message}`;
+  }
+  return null;
+}
+function classifySc(sc) {
+  if (!SC_SHAPE.test(sc)) return "malformed";
+  if (hasSC(sc)) return "core";
+  const status = knownScStatus(sc);
+  if (status === "out-of-core" || status === "removed") return status;
+  return "unknown";
+}
+var REQUIRED_STRING_FIELDS = ["key", "name", "org", "country", "baseVersion", "wcagVersion", "license", "source", "attribution", "idPattern"];
+function validatePack(raw, opts = {}) {
+  const issues = [];
+  const err2 = (path, message) => issues.push({ path, message, severity: "error" });
+  const warn = (path, message) => issues.push({ path, message, severity: "warn" });
+  const done = () => {
+    const ok = !issues.some((x) => x.severity === "error");
+    return { ok, issues, pack: ok ? normalize(raw) : void 0 };
+  };
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    err2("", "pack must be a JSON object");
+    return { ok: false, issues };
+  }
+  const p = raw;
+  for (const f of REQUIRED_STRING_FIELDS) {
+    const v = p[f];
+    if (typeof v !== "string" || v.trim() === "") err2(f, `"${f}" must be a non-empty string`);
+  }
+  const key = typeof p.key === "string" ? p.key.toLowerCase() : "";
+  if (key === RESERVED_CORE_KEY) err2("key", `pack key "${RESERVED_CORE_KEY}" is reserved for the WCAG core`);
+  if (key && opts.knownKeys?.has(key)) {
+    if (opts.allowOverride) warn("key", `pack key "${key}" overrides a built-in/loaded standard`);
+    else err2("key", `pack key "${key}" collides with a built-in/loaded standard (use --override to replace it)`);
+  }
+  const locales = Array.isArray(p.locales) ? p.locales : [];
+  if (locales.length === 0) err2("locales", "locales must be a non-empty array");
+  for (const l of locales) {
+    if (typeof l !== "string" || !LOCALE_SHAPE.test(l)) err2("locales", `malformed locale "${String(l)}" (expected a BCP-47-ish tag, e.g. "en", "fr", "pt-BR")`);
+  }
+  if (locales.length && !locales.some((l) => l === "fr" || l === "en")) {
+    warn("locales", 'pack carries neither "fr" nor "en" \u2014 the UI frame will fall back to its own generic auditor-display terms');
+  }
+  const defaultLocale = p.defaultLocale;
+  if (typeof defaultLocale !== "string" || !locales.includes(defaultLocale)) {
+    err2("defaultLocale", "defaultLocale must be one of locales");
+  }
+  const loc = typeof defaultLocale === "string" ? defaultLocale : locales[0] ?? "en";
+  let idRe = null;
+  if (typeof p.idPattern === "string") {
+    const bad = regexIssue(p.idPattern);
+    if (bad) err2("idPattern", `idPattern ${bad}`);
+    else idRe = new RegExp(p.idPattern);
+  }
+  const themes = Array.isArray(p.themes) ? p.themes : null;
+  if (!themes) err2("themes", "themes must be an array");
+  const themeNumbers = /* @__PURE__ */ new Set();
+  themes?.forEach((t3, i2) => {
+    const n = t3?.number;
+    if (typeof n !== "number") {
+      err2(`themes[${i2}].number`, "theme number must be a number");
+      return;
+    }
+    if (themeNumbers.has(n)) err2(`themes[${i2}].number`, `duplicate theme number ${n}`);
+    themeNumbers.add(n);
+    const name2 = t3?.name;
+    if (!name2 || typeof name2[loc] !== "string") err2(`themes[${i2}].name`, `theme ${n} missing name[${loc}]`);
+  });
+  const criteria = Array.isArray(p.criteria) ? p.criteria : null;
+  if (!criteria) err2("criteria", "criteria must be an array");
+  const ids = /* @__PURE__ */ new Set();
+  const countByTheme = /* @__PURE__ */ new Map();
+  criteria?.forEach((c2, i2) => {
+    const id = c2?.id;
+    if (typeof id !== "string" || id === "") {
+      err2(`criteria[${i2}].id`, "criterion id must be a non-empty string");
+    } else {
+      if (ids.has(id)) err2(`criteria[${i2}].id`, `duplicate criterion id "${id}"`);
+      ids.add(id);
+      if (idRe && !idRe.test(id)) err2(`criteria[${i2}].id`, `id "${id}" does not match idPattern ${String(p.idPattern)}`);
+    }
+    const theme = c2?.theme;
+    if (typeof theme !== "number") {
+      err2(`criteria[${i2}].theme`, "criterion theme must be a number");
+    } else {
+      if (themes && !themeNumbers.has(theme)) err2(`criteria[${i2}].theme`, `criterion "${String(id)}" references unknown theme ${theme}`);
+      countByTheme.set(theme, (countByTheme.get(theme) ?? 0) + 1);
+    }
+    const title2 = c2?.title;
+    if (!title2 || typeof title2[loc] !== "string") err2(`criteria[${i2}].title`, `criterion "${String(id)}" missing title[${loc}]`);
+    const titlePlain2 = c2?.titlePlain;
+    if (!titlePlain2 || typeof titlePlain2[loc] !== "string") err2(`criteria[${i2}].titlePlain`, `criterion "${String(id)}" missing titlePlain[${loc}]`);
+    if (c2?.appliesTo !== void 0) {
+      const a = c2.appliesTo;
+      const ruleIds2 = a && typeof a === "object" && !Array.isArray(a) ? a.ruleIds : void 0;
+      if (!a || typeof a !== "object" || Array.isArray(a) || !Array.isArray(ruleIds2)) {
+        err2(`criteria[${i2}].appliesTo`, `criterion "${String(id)}" appliesTo must be an object { ruleIds: string[] }`);
+      } else {
+        ruleIds2.forEach((r, k) => {
+          if (typeof r !== "string" || r.trim() === "")
+            err2(`criteria[${i2}].appliesTo.ruleIds[${k}]`, `criterion "${String(id)}" appliesTo.ruleIds must be non-empty strings`);
+        });
+      }
+    }
+    const wcag = Array.isArray(c2?.wcag) ? c2.wcag : null;
+    if (!wcag || wcag.length === 0) {
+      err2(`criteria[${i2}].wcag`, `criterion "${String(id)}" must map to at least one WCAG SC`);
+    } else {
+      wcag.forEach((sc, j) => {
+        const where = `criteria[${i2}].wcag[${j}]`;
+        if (typeof sc !== "string") {
+          err2(where, `malformed SC id "${String(sc)}" (expected N.N.N)`);
+          return;
+        }
+        switch (classifySc(sc)) {
+          case "malformed":
+            err2(where, `malformed SC id "${sc}" (expected N.N.N)`);
+            break;
+          case "unknown":
+            err2(
+              where,
+              `SC "${sc}" is not a recognized WCAG success criterion (not in the WCAG 2.2 AA core, and not a real WCAG AAA or removed SC) \u2014 fabricated?`
+            );
+            break;
+          case "out-of-core":
+            warn(
+              where,
+              `SC "${sc}" is a real WCAG AAA success criterion, outside the WCAG 2.2 AA core \u2014 kept as a pack-local mapping (out of engine scope; derive as manual)`
+            );
+            break;
+          case "removed":
+            warn(
+              where,
+              `SC "${sc}" is a real but removed WCAG success criterion (obsolete) \u2014 kept as a pack-local mapping (out of engine scope; derive as manual)`
+            );
+            break;
+        }
+      });
+    }
+  });
+  themes?.forEach((t3, i2) => {
+    const n = t3?.number;
+    if (typeof n !== "number") return;
+    const declared = t3?.count;
+    const actual = countByTheme.get(n) ?? 0;
+    if (typeof declared === "number" && declared !== actual) {
+      err2(`themes[${i2}].count`, `theme ${n} declares count ${declared} but has ${actual} criteria`);
+    }
+  });
+  if (p.vocabulary !== void 0) {
+    if (typeof p.vocabulary !== "object" || p.vocabulary === null || Array.isArray(p.vocabulary)) {
+      warn("vocabulary", "vocabulary must be an object of localized terms \u2014 ignored");
+    } else {
+      const VOC_KEYS = ["theme", "criterion", "test", "conformant", "nonConformant", "notApplicable", "auditorHeading", "normativeNote"];
+      const voc = p.vocabulary;
+      for (const k of Object.keys(voc)) {
+        if (!VOC_KEYS.includes(k)) {
+          warn(`vocabulary.${k}`, `unknown vocabulary term "${k}" (ignored)`);
+          continue;
+        }
+        const term = voc[k];
+        if (typeof term !== "object" || term === null || Array.isArray(term)) {
+          warn(`vocabulary.${k}`, `term "${k}" must be a localized object (e.g. { "${loc}": "\u2026" }) \u2014 default used`);
+        } else if (typeof term[loc] !== "string") {
+          warn(`vocabulary.${k}`, `term "${k}" has no string for the default locale "${loc}" \u2014 default used`);
+        }
+      }
+    }
+  }
+  if (p.sampleMethodology !== void 0) {
+    const m = p.sampleMethodology;
+    const kinds = m && typeof m === "object" && !Array.isArray(m) ? m.requiredKinds : void 0;
+    if (!m || typeof m !== "object" || Array.isArray(m) || !Array.isArray(kinds)) {
+      warn("sampleMethodology", "sampleMethodology must be an object { requiredKinds: [...] } \u2014 ignored");
+    } else {
+      kinds.forEach((k, i2) => {
+        const kk = k;
+        if (!kk || typeof kk !== "object" || Array.isArray(kk)) {
+          warn(`sampleMethodology.requiredKinds[${i2}]`, "each required kind must be an object { id, label, keywords } \u2014 ignored");
+          return;
+        }
+        if (typeof kk.id !== "string" || kk.id.trim() === "") warn(`sampleMethodology.requiredKinds[${i2}].id`, "required kind id should be a non-empty string");
+        const label = kk.label;
+        if (!label || typeof label !== "object" || Array.isArray(label) || typeof label[loc] !== "string")
+          warn(`sampleMethodology.requiredKinds[${i2}].label`, `required kind should carry label[${loc}]`);
+        if (!Array.isArray(kk.keywords) || kk.keywords.some((w) => typeof w !== "string"))
+          warn(`sampleMethodology.requiredKinds[${i2}].keywords`, "required kind keywords should be an array of strings");
+      });
+    }
+  }
+  if (p.rules !== void 0) {
+    if (!Array.isArray(p.rules)) {
+      err2("rules", "rules must be an array");
+    } else {
+      const ruleIds2 = /* @__PURE__ */ new Set();
+      p.rules.forEach((raw2, i2) => {
+        const at = `rules[${i2}]`;
+        if (typeof raw2 !== "object" || raw2 === null || Array.isArray(raw2)) {
+          err2(at, "each rule must be an object");
+          return;
+        }
+        const r = raw2;
+        const rid = r.id;
+        if (typeof rid !== "string" || !RULE_ID_SHAPE.test(rid)) {
+          err2(`${at}.id`, 'rule id must be a lower-kebab slug (e.g. "download-link-format")');
+        } else {
+          if (ruleIds2.has(rid)) err2(`${at}.id`, `duplicate rule id "${rid}"`);
+          ruleIds2.add(rid);
+        }
+        if (typeof r.criterion !== "string" || r.criterion === "") {
+          err2(`${at}.criterion`, "rule criterion must be a non-empty string");
+        } else if (!ids.has(r.criterion)) {
+          err2(`${at}.criterion`, `rule reports under criterion "${r.criterion}" which does not exist in this pack`);
+        }
+        if (typeof r.severity !== "string" || !SEVERITIES2.has(r.severity)) {
+          err2(`${at}.severity`, "rule severity must be one of bloquant|majeur|mineur");
+        }
+        if (r.advisory !== void 0 && typeof r.advisory !== "boolean") err2(`${at}.advisory`, "rule advisory must be a boolean");
+        const wcag = Array.isArray(r.wcag) ? r.wcag : null;
+        if (!wcag || wcag.length === 0) {
+          err2(`${at}.wcag`, "rule must map to at least one WCAG SC");
+        } else {
+          wcag.forEach((sc, j) => {
+            const where = `${at}.wcag[${j}]`;
+            if (typeof sc !== "string") {
+              err2(where, `malformed SC id "${String(sc)}" (expected N.N.N)`);
+              return;
+            }
+            switch (classifySc(sc)) {
+              case "malformed":
+                err2(where, `malformed SC id "${sc}" (expected N.N.N)`);
+                break;
+              case "unknown":
+                err2(where, `SC "${sc}" is not a recognized WCAG success criterion \u2014 fabricated?`);
+                break;
+              case "out-of-core":
+                warn(where, `SC "${sc}" is a real WCAG AAA success criterion, outside the WCAG 2.2 AA core (out of engine scope)`);
+                break;
+              case "removed":
+                warn(where, `SC "${sc}" is a real but removed WCAG success criterion (obsolete)`);
+                break;
+            }
+          });
+          if (typeof r.criterion === "string") {
+            const crit = criteria?.find((c2) => c2.id === r.criterion);
+            const critWcag = Array.isArray(crit?.wcag) ? crit.wcag : [];
+            if (critWcag.length && !wcag.some((sc) => critWcag.includes(sc)))
+              warn(`${at}.wcag`, `none of the rule's SC(s) are in criterion ${String(r.criterion)}'s WCAG mapping \u2014 the finding will not project`);
+          }
+        }
+        if (r.doc !== void 0 && r.match !== void 0)
+          err2(at, "rule carries both match and doc \u2014 a rule selects elements, or reads a document signal, not both");
+        if (r.doc !== void 0) validateDocMatch(r.doc, `${at}.doc`, err2);
+        else validateMatch(r.match, `${at}.match`, 1, err2, true);
+        validateLocaleText(r.message, `${at}.message`, err2);
+        validateLocaleText(r.remediation, `${at}.remediation`, err2);
+      });
+    }
+  }
+  if (p.overrides !== void 0) {
+    if (typeof p.overrides !== "object" || p.overrides === null || Array.isArray(p.overrides)) {
+      err2("overrides", "overrides must be an object keyed by ruleId");
+    } else {
+      for (const [ruleId, raw2] of Object.entries(p.overrides)) {
+        const at = `overrides["${ruleId}"]`;
+        if (typeof raw2 !== "object" || raw2 === null || Array.isArray(raw2)) {
+          err2(at, "each override must be an object { advisory?, severity? }");
+          continue;
+        }
+        const o = raw2;
+        if (o.advisory !== void 0 && typeof o.advisory !== "boolean") err2(`${at}.advisory`, "override advisory must be a boolean");
+        if (o.severity !== void 0 && (typeof o.severity !== "string" || !SEVERITIES2.has(o.severity)))
+          err2(`${at}.severity`, "override severity must be one of bloquant|majeur|mineur");
+        if (o.advisory === void 0 && o.severity === void 0) warn(at, "override has neither advisory nor severity \u2014 no effect");
+      }
+    }
+  }
+  if (p.secondaryMappings !== void 0) {
+    if (!Array.isArray(p.secondaryMappings)) {
+      err2("secondaryMappings", "secondaryMappings must be an array");
+    } else {
+      p.secondaryMappings.forEach((raw2, i2) => {
+        const at = `secondaryMappings[${i2}]`;
+        if (typeof raw2 !== "object" || raw2 === null || Array.isArray(raw2)) {
+          err2(at, "each secondary mapping must be an object { ruleId, criterion, note?, enabled? }");
+          return;
+        }
+        const m = raw2;
+        if (typeof m.ruleId !== "string" || m.ruleId.trim() === "") err2(`${at}.ruleId`, "secondary mapping ruleId must be a non-empty string");
+        if (typeof m.criterion !== "string" || m.criterion === "") {
+          err2(`${at}.criterion`, "secondary mapping criterion must be a non-empty string");
+        } else if (!ids.has(m.criterion)) {
+          err2(`${at}.criterion`, `secondary mapping projects onto criterion "${m.criterion}" which does not exist in this pack`);
+        }
+        if (m.enabled !== void 0 && typeof m.enabled !== "boolean") err2(`${at}.enabled`, "secondary mapping enabled must be a boolean");
+        if (m.note !== void 0) {
+          if (typeof m.note !== "object" || m.note === null || Array.isArray(m.note)) {
+            err2(`${at}.note`, `secondary mapping note must be a localized object (e.g. { "${loc}": "\u2026" })`);
+          } else if (typeof m.note[loc] !== "string") {
+            warn(`${at}.note`, `secondary mapping note has no string for the default locale "${loc}"`);
+          }
+        }
+        if (typeof m.ruleId === "string" && m.ruleId.trim() !== "" && typeof m.criterion === "string" && ids.has(m.criterion)) {
+          warn(at, `secondary mapping bypasses the SC crosswalk \u2014 intentional deviation (ruleId "${m.ruleId}" \u2192 criterion "${m.criterion}")`);
+        }
+      });
+    }
+  }
+  return done();
+}
+function validateDocMatch(raw, path, err2) {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    err2(path, "doc must be an object");
+    return;
+  }
+  const d = raw;
+  for (const k of Object.keys(d)) {
+    if (k !== "signal" && k !== "op" && k !== "value") err2(`${path}.${k}`, `unknown doc key "${k}" (allowed: op, signal, value)`);
+  }
+  if (d.signal !== "doctype") err2(`${path}.signal`, `unknown document signal "${String(d.signal)}" (allowed: doctype)`);
+  if (typeof d.op !== "string" || !DOC_OPS.has(d.op)) err2(`${path}.op`, "doc op must be one of absent|matches|lacks");
+  if (d.op === "matches" || d.op === "lacks") {
+    if (typeof d.value !== "string" || d.value === "") err2(`${path}.value`, `doc op "${String(d.op)}" requires a regex string value`);
+    else {
+      const bad = regexIssue(d.value);
+      if (bad) err2(`${path}.value`, `doc regex ${bad}`);
+    }
+  } else if (d.value !== void 0) {
+    err2(`${path}.value`, 'doc op "absent" takes no value');
+  }
+}
+function validateMatch(node, path, depth, err2, top) {
+  if (top && node === void 0) {
+    err2(path, "rule must carry a match");
+    return;
+  }
+  if (typeof node !== "object" || node === null || Array.isArray(node)) {
+    err2(path, "match must be an object");
+    return;
+  }
+  if (depth > MAX_MATCH_DEPTH) {
+    err2(path, `match nesting exceeds the maximum depth of ${MAX_MATCH_DEPTH}`);
+    return;
+  }
+  const n = node;
+  const allowedKeys = top ? /* @__PURE__ */ new Set([...MATCH_NODE_KEYS, "scope"]) : MATCH_NODE_KEYS;
+  for (const k of Object.keys(n)) {
+    if (!allowedKeys.has(k)) err2(`${path}.${k}`, `unknown match key "${k}" (allowed: ${[...allowedKeys].sort().join(", ")})`);
+  }
+  const hasCondition = MATCH_CONDITION_KEYS.some((k) => {
+    const v = n[k];
+    if (k === "tag") return typeof v === "string" && v !== "";
+    if (k === "text") return v !== void 0 && v !== null;
+    return Array.isArray(v) && v.length > 0;
+  });
+  if (!hasCondition) err2(path, "match must carry at least one condition (tag, attrs, text, has, or lacks) \u2014 an empty match fires on every element");
+  if (n.tag !== void 0 && (typeof n.tag !== "string" || n.tag === "")) err2(`${path}.tag`, "match tag must be a non-empty string");
+  if (top && n.scope !== void 0 && n.scope !== "page" && n.scope !== "fragment") err2(`${path}.scope`, 'match scope must be "page" or "fragment"');
+  if (n.attrs !== void 0) {
+    if (!Array.isArray(n.attrs)) err2(`${path}.attrs`, "match attrs must be an array");
+    else
+      n.attrs.forEach((raw, i2) => {
+        const a = raw;
+        const at = `${path}.attrs[${i2}]`;
+        if (!a || typeof a !== "object" || Array.isArray(a)) {
+          err2(at, "each attr condition must be an object { name, op, value? }");
+          return;
+        }
+        if (typeof a.name !== "string" || a.name === "") err2(`${at}.name`, "attr name must be a non-empty string");
+        if (typeof a.op !== "string" || !MATCH_OPS.has(a.op)) err2(`${at}.op`, "attr op must be one of present|absent|equals|matches");
+        if ((a.op === "equals" || a.op === "matches") && typeof a.value !== "string") err2(`${at}.value`, `attr op "${String(a.op)}" requires a string value`);
+        if (a.op === "matches" && typeof a.value === "string") {
+          const bad = regexIssue(a.value);
+          if (bad) err2(`${at}.value`, `attr matches regex ${bad}`);
+        }
+      });
+  }
+  if (n.text !== void 0) {
+    const t3 = n.text;
+    if (!t3 || typeof t3 !== "object" || Array.isArray(t3)) {
+      err2(`${path}.text`, "match text must be an object { op, value }");
+    } else {
+      if (typeof t3.op !== "string" || !TEXT_OPS.has(t3.op)) err2(`${path}.text.op`, "text op must be one of matches|lacks");
+      if (typeof t3.value !== "string" || t3.value === "") err2(`${path}.text.value`, "text value must be a non-empty regex string");
+      else {
+        const bad = regexIssue(t3.value);
+        if (bad) err2(`${path}.text.value`, `text regex ${bad}`);
+      }
+    }
+  }
+  for (const key of ["has", "lacks"]) {
+    const v = n[key];
+    if (v === void 0) continue;
+    if (!Array.isArray(v)) err2(`${path}.${key}`, `match ${key} must be an array of match nodes`);
+    else v.forEach((child, i2) => validateMatch(child, `${path}.${key}[${i2}]`, depth + 1, err2, false));
+  }
+}
+function validateLocaleText(v, path, err2) {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) {
+    err2(path, "must be a localized object carrying both en and fr");
+    return;
+  }
+  const t3 = v;
+  for (const lang of ["en", "fr"]) {
+    if (typeof t3[lang] !== "string" || t3[lang] === "") err2(`${path}.${lang}`, `missing ${lang} text`);
+  }
+}
+function normalize(p) {
+  return { ...p, key: String(p.key).toLowerCase() };
+}
+function formatIssues(issues) {
+  const order = (s) => s === "error" ? 0 : 1;
+  return [...issues].sort((a, b) => order(a.severity) - order(b.severity)).map((x) => `  ${x.severity === "error" ? "\u2717" : "\u26A0"} ${x.path ? `${x.path}: ` : ""}${x.message}`);
+}
+
+// src/standards/registry.ts
+var CORE_KEY = "wcag";
+var registry = /* @__PURE__ */ new Map();
+var overlays = /* @__PURE__ */ new Map();
+var scopeStore = new AsyncLocalStorage();
+function currentOverlay() {
+  const scope = scopeStore.getStore();
+  return scope === void 0 ? void 0 : overlays.get(scope);
+}
+function lookup(key) {
+  return currentOverlay()?.get(key) ?? registry.get(key);
+}
+function visible() {
+  const overlay = currentOverlay();
+  if (!overlay?.size) return registry;
+  const merged = new Map(registry);
+  for (const [key, entry] of overlay) merged.set(key, entry);
+  return merged;
+}
+function withScope(scope, fn) {
+  return scope === void 0 ? fn() : scopeStore.run(scope, fn);
+}
+function registerScoped(scope, raw, glossary = {}, opts = {}) {
+  const overlay = ensureScope(scope);
+  const known = /* @__PURE__ */ new Set([CORE_KEY, ...registry.keys(), ...overlay.keys()]);
+  const v = validatePack(raw, { knownKeys: known, allowOverride: opts.override });
+  if (v.ok && v.pack) overlay.set(v.pack.key, { pack: v.pack, glossary });
+  return v;
+}
+function packForMutation(key) {
+  const overlay = currentOverlay();
+  if (!overlay) return loadPack(key);
+  const own = overlay.get(key);
+  if (own) return own.pack;
+  const shared = registry.get(key);
+  if (!shared) return loadPack(key);
+  const copy = { pack: structuredClone(shared.pack), glossary: shared.glossary };
+  overlay.set(key, copy);
+  return copy.pack;
+}
+function ensureScope(scope) {
+  let overlay = overlays.get(scope);
+  if (!overlay) {
+    overlay = /* @__PURE__ */ new Map();
+    overlays.set(scope, overlay);
+  }
+  return overlay;
+}
+function scopeLoaded(scope) {
+  return overlays.has(scope);
+}
+function dropScope(scope) {
+  overlays.delete(scope);
+}
+function register(pack, glossary) {
+  if (pack.key === CORE_KEY) throw new Error(`pack key "${CORE_KEY}" is reserved for the WCAG core`);
+  registry.set(pack.key, { pack, glossary });
+}
+register(rgaa_default, rgaa_glossary_default);
+function registerRuntimePack(raw, glossary = {}, opts = {}) {
+  const v = validatePack(raw, { knownKeys: new Set(listStandards()), allowOverride: opts.override });
+  if (v.ok && v.pack) registry.set(v.pack.key, { pack: v.pack, glossary });
+  return v;
+}
+function enableSecondaryMapping(packKey, m) {
+  const pack = packForMutation(packKey);
+  const list = pack.secondaryMappings ??= [];
+  const existing = list.find((x) => x.ruleId === m.ruleId && x.criterion === m.criterion);
+  if (existing) {
+    existing.enabled = true;
+    if (m.note) existing.note = m.note;
+  } else {
+    list.push({ ruleId: m.ruleId, criterion: m.criterion, ...m.note ? { note: m.note } : {}, enabled: true });
+  }
+}
+function isCore(key) {
+  return key === CORE_KEY;
+}
+function hasStandard(key) {
+  return key === CORE_KEY || lookup(key) !== void 0;
+}
+function loadPack(key) {
+  const r = lookup(key);
+  if (!r) throw new Error(`unknown standards pack "${key}" (known packs: ${[...visible().keys()].join(", ") || "none"})`);
+  return r.pack;
+}
+function getPack(key) {
+  return lookup(key)?.pack;
+}
+function packGlossary(key) {
+  return lookup(key)?.glossary;
+}
+function listStandards() {
+  return [CORE_KEY, ...visible().keys()];
+}
+function listPacks() {
+  return [...visible().values()].map((r) => r.pack);
+}
+function packsForSc(sc) {
+  const out2 = [];
+  for (const { pack } of visible().values()) {
+    const ids = pack.criteria.filter((c2) => c2.wcag.includes(sc)).map((c2) => c2.id);
+    if (ids.length) out2.push({ key: pack.key, ids });
+  }
+  return out2;
+}
+function docSignalRuleIds() {
+  const out2 = /* @__PURE__ */ new Set();
+  for (const pack of listPacks()) {
+    for (const r of pack.rules ?? []) if (r.doc) out2.add(`pack:${pack.key}:${r.id}`);
+  }
+  return out2;
+}
+
 // src/coverage.ts
 function renderedProvesOn(sc, cov) {
   if (!cov) return false;
@@ -39392,18 +44041,20 @@ function intersectCoverage(audit2) {
 function coverageFor(audit2, pageId) {
   return pageId === void 0 ? intersectCoverage(audit2) : audit2.scope.pageCoverage?.[pageId];
 }
-function ruleRanOn(ruleId, cov, scs) {
+function ruleRanOn(ruleId, cov, scs, docRules) {
   if (ruleId.startsWith("axe:")) return cov.axe === true;
   if (ruleId.startsWith("dyn-")) return scs.some((sc) => cov.scs?.includes(sc) === true);
   if (RENDERED_SIGNAL_RULES.includes(ruleId)) return cov.rules?.includes(ruleId) === true;
+  if (docRules.has(ruleId)) return cov.rules?.includes(ruleId) === true;
   return cov.dom === true;
 }
 function criterionMeasuredOn(ruleIds2, scs, cov, ran) {
   if (!cov || !ran || !ruleIds2?.length) return false;
   if (ruleIds2.some((p) => p === "*" || p.endsWith(":*") || p.endsWith("-*"))) return false;
-  const inThisRun = ruleIds2.filter((id) => ruleRanOn(id, ran, scs));
+  const docRules = docSignalRuleIds();
+  const inThisRun = ruleIds2.filter((id) => ruleRanOn(id, ran, scs, docRules));
   if (!inThisRun.length) return false;
-  return inThisRun.every((id) => ruleRanOn(id, cov, scs));
+  return inThisRun.every((id) => ruleRanOn(id, cov, scs, docRules));
 }
 
 // src/adjudicate-subjects.ts
@@ -43356,4596 +48007,6 @@ function runCrossRules(doc, graph) {
   return { findings, suppress };
 }
 
-// src/standards/registry.ts
-import { AsyncLocalStorage } from "async_hooks";
-
-// src/data/standards/rgaa.json
-var rgaa_default = {
-  key: "rgaa",
-  name: "RGAA",
-  fullName: "R\xE9f\xE9rentiel g\xE9n\xE9ral d\u2019am\xE9lioration de l\u2019accessibilit\xE9",
-  org: "DINUM",
-  country: "FR",
-  baseVersion: "4.1.2",
-  wcagVersion: "2.1",
-  locales: ["fr"],
-  defaultLocale: "fr",
-  license: "Licence Ouverte / Etalab 2.0",
-  source: "https://github.com/DISIC/accessibilite.numerique.gouv.fr",
-  attribution: "RGAA 4.1.2 \xA9 DINUM (Direction interminist\xE9rielle du num\xE9rique) \u2014 Licence Ouverte / Etalab 2.0",
-  idPattern: "^\\d+\\.\\d+$",
-  vocabulary: {
-    theme: {
-      fr: "Th\xE9matique"
-    },
-    criterion: {
-      fr: "Crit\xE8re"
-    },
-    test: {
-      fr: "Test"
-    },
-    conformant: {
-      fr: "Conforme (C)"
-    },
-    nonConformant: {
-      fr: "Non conforme (NC)"
-    },
-    notApplicable: {
-      fr: "Non applicable (NA)"
-    },
-    auditorHeading: {
-      fr: "Crit\xE8re d\u2019accessibilit\xE9"
-    }
-  },
-  sampleMethodology: {
-    requiredKinds: [
-      {
-        id: "accueil",
-        label: {
-          fr: "Page d\u2019accueil"
-        },
-        keywords: ["accueil", "home", "index", "racine", "homepage"]
-      },
-      {
-        id: "contact",
-        label: {
-          fr: "Contact"
-        },
-        keywords: ["contact", "nous contacter", "nous ecrire", "coordonnees"]
-      },
-      {
-        id: "mentions-legales",
-        label: {
-          fr: "Mentions l\xE9gales"
-        },
-        keywords: ["mentions legales", "mentions", "legal notice", "legal"]
-      },
-      {
-        id: "declaration-accessibilite",
-        label: {
-          fr: "D\xE9claration d\u2019accessibilit\xE9"
-        },
-        keywords: ["declaration d accessibilite", "declaration accessibilite", "accessibilite", "accessibility statement", "accessibility"]
-      },
-      {
-        id: "plan-du-site",
-        label: {
-          fr: "Plan du site"
-        },
-        keywords: ["plan du site", "sitemap", "site map"]
-      },
-      {
-        id: "aide",
-        label: {
-          fr: "Aide"
-        },
-        keywords: ["aide", "help", "faq", "assistance"]
-      },
-      {
-        id: "authentification",
-        label: {
-          fr: "Authentification"
-        },
-        keywords: ["authentification", "authentication", "connexion", "identification", "login", "log in", "sign in", "se connecter", "auth"]
-      },
-      {
-        id: "pages-representatives",
-        label: {
-          fr: "Pages repr\xE9sentatives"
-        },
-        keywords: ["representative", "representatif", "representatives", "gabarit", "template", "modele", "formulaire", "recherche", "resultats"]
-      },
-      {
-        id: "elements-transverses",
-        label: {
-          fr: "\xC9l\xE9ments transverses"
-        },
-        keywords: ["transverse", "transversaux", "en-tete", "entete", "header", "navigation", "menu", "pied de page", "footer"]
-      }
-    ]
-  },
-  secondaryMappings: [
-    {
-      ruleId: "dyn-live-region",
-      criterion: "7.4",
-      note: {
-        fr: "Rel\xE8ve aussi de 7.4 (changement de contexte) selon le classement Ara ; projection WCAG-fid\xE8le = 7.5.",
-        en: "Also classified under 7.4 (change of context) per Ara; the WCAG-faithful projection is 7.5."
-      },
-      enabled: false
-    }
-  ],
-  rules: [
-    {
-      id: "download-link-format",
-      criterion: "6.1",
-      wcag: ["2.4.4"],
-      severity: "mineur",
-      advisory: true,
-      match: {
-        tag: "a",
-        attrs: [
-          {
-            name: "href",
-            op: "matches",
-            value: "\\.(pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|epub|mp3|mp4|avi|mov)(\\?|#|$)"
-          }
-        ],
-        text: {
-          op: "lacks",
-          value: "(pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|epub|mp3|mp4|avi|mov|\\d+\\s*(ko|mo|go|kb|mb|gb|octets?|bytes?))"
-        }
-      },
-      message: {
-        en: "Download link whose visible text states neither the file format nor its size.",
-        fr: "Lien de t\xE9l\xE9chargement dont l\u2019intitul\xE9 ne pr\xE9cise ni le format ni le poids du fichier."
-      },
-      remediation: {
-        en: "State the file format and size in the link text, e.g. \u201CAnnual report (PDF, 2 MB)\u201D.",
-        fr: "Indiquez le format et le poids du fichier dans l\u2019intitul\xE9 du lien, par exemple \xAB Rapport annuel (PDF, 2 Mo) \xBB."
-      }
-    },
-    {
-      id: "optgroup-without-label",
-      criterion: "11.8",
-      wcag: ["1.3.1"],
-      severity: "majeur",
-      match: {
-        tag: "optgroup",
-        attrs: [
-          {
-            name: "label",
-            op: "absent"
-          }
-        ]
-      },
-      message: {
-        en: "<optgroup> without a label attribute \u2014 the group of options is unnamed (RGAA test 11.8.2).",
-        fr: "<optgroup> sans attribut label \u2014 le regroupement d\u2019options n\u2019est pas nomm\xE9 (test RGAA 11.8.2)."
-      },
-      remediation: {
-        en: 'Add label="\u2026" naming what the options in this group have in common, e.g. <optgroup label="Europe">.',
-        fr: 'Ajoutez label="\u2026" nommant ce que les options du groupe ont en commun, par ex. <optgroup label="Europe">.'
-      }
-    },
-    {
-      id: "dir-value-invalid",
-      criterion: "8.10",
-      wcag: ["1.3.2"],
-      severity: "majeur",
-      match: {
-        attrs: [
-          {
-            name: "dir",
-            op: "present"
-          },
-          {
-            name: "dir",
-            op: "matches",
-            value: "^(?!(rtl|ltr|auto)$).+$"
-          }
-        ]
-      },
-      message: {
-        en: "dir attribute with a value that is not rtl, ltr or auto \u2014 the reading direction change is not declared conformantly (RGAA test 8.10.2).",
-        fr: "Attribut dir dont la valeur n\u2019est ni rtl, ni ltr, ni auto \u2014 le changement de sens de lecture n\u2019est pas d\xE9clar\xE9 conform\xE9ment (test RGAA 8.10.2)."
-      },
-      remediation: {
-        en: 'Use dir="rtl" or dir="ltr" (or dir="auto"), matching the reading direction of the text it carries.',
-        fr: 'Utilisez dir="rtl" ou dir="ltr" (ou dir="auto"), en accord avec le sens de lecture du texte port\xE9.'
-      }
-    }
-  ],
-  themes: [
-    {
-      number: 1,
-      name: {
-        fr: "Images"
-      },
-      count: 9
-    },
-    {
-      number: 2,
-      name: {
-        fr: "Cadres"
-      },
-      count: 2
-    },
-    {
-      number: 3,
-      name: {
-        fr: "Couleurs"
-      },
-      count: 3
-    },
-    {
-      number: 4,
-      name: {
-        fr: "Multim\xE9dia"
-      },
-      count: 13
-    },
-    {
-      number: 5,
-      name: {
-        fr: "Tableaux"
-      },
-      count: 8
-    },
-    {
-      number: 6,
-      name: {
-        fr: "Liens"
-      },
-      count: 2
-    },
-    {
-      number: 7,
-      name: {
-        fr: "Scripts"
-      },
-      count: 5
-    },
-    {
-      number: 8,
-      name: {
-        fr: "\xC9l\xE9ments obligatoires"
-      },
-      count: 10
-    },
-    {
-      number: 9,
-      name: {
-        fr: "Structuration de l\u2019information"
-      },
-      count: 4
-    },
-    {
-      number: 10,
-      name: {
-        fr: "Pr\xE9sentation de l\u2019information"
-      },
-      count: 14
-    },
-    {
-      number: 11,
-      name: {
-        fr: "Formulaires"
-      },
-      count: 13
-    },
-    {
-      number: 12,
-      name: {
-        fr: "Navigation"
-      },
-      count: 11
-    },
-    {
-      number: 13,
-      name: {
-        fr: "Consultation"
-      },
-      count: 12
-    }
-  ],
-  criteria: [
-    {
-      id: "1.1",
-      theme: 1,
-      title: {
-        fr: "Chaque [image porteuse d\u2019information](#image-porteuse-d-information) a-t-elle une [alternative textuelle](#alternative-textuelle-image)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque image porteuse d\u2019information a-t-elle une alternative textuelle\xA0?"
-      },
-      tests: {
-        "1": [
-          'Chaque image (balise `<img>` ou balise poss\xE9dant l\u2019attribut WAI-ARIA `role="img"`) [porteuse d\u2019information](#image-porteuse-d-information) a-t-elle une [alternative textuelle](#alternative-textuelle-image)\xA0?'
-        ],
-        "2": [
-          "Chaque [zone](#zone-d-une-image-reactive) d\u2019une [image r\xE9active](#image-reactive) (balise `<area>`) [porteuse d\u2019information](#image-porteuse-d-information) a-t-elle une [alternative textuelle](#alternative-textuelle-image)\xA0?"
-        ],
-        "3": [
-          'Chaque bouton de type `image` (balise `<input>` avec l\u2019attribut `type="image"`) a-t-il une [alternative textuelle](#alternative-textuelle-image)\xA0?'
-        ],
-        "4": [
-          "Chaque [zone cliquable](#zone-cliquable) d\u2019une image r\xE9active c\xF4t\xE9 serveur est-elle doubl\xE9e d\u2019un m\xE9canisme utilisable quel que soit le dispositif de pointage utilis\xE9 et permettant d\u2019acc\xE9der \xE0 la m\xEAme destination\xA0?"
-        ],
-        "5": [
-          "Chaque image vectorielle (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information), v\xE9rifie-t-elle ces conditions\xA0?",
-          'La balise `<svg>` poss\xE8de un attribut WAI-ARIA `role="img"`\xA0;',
-          "La balise `<svg>` a une [alternative textuelle](#alternative-textuelle-image)."
-        ],
-        "6": [
-          'Chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), v\xE9rifie-t-elle une de ces conditions\xA0?',
-          'La balise `<object>` poss\xE8de une [alternative textuelle](#alternative-textuelle-image) et un attribut `role="img"`\xA0;',
-          "L\u2019\xE9l\xE9ment `<object>` est imm\xE9diatement suivi d\u2019un [lien ou bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 un [contenu alternatif](#contenu-alternatif)\xA0;",
-          "Un m\xE9canisme permet \xE0 l\u2019utilisateur de remplacer l\u2019\xE9l\xE9ment `<object>` par un [contenu alternatif](#contenu-alternatif)."
-        ],
-        "7": [
-          'Chaque image embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), v\xE9rifie-t-elle une de ces conditions\xA0?',
-          'La balise `<embed>` poss\xE8de une [alternative textuelle](#alternative-textuelle-image) et un attribut `role="img"`\xA0;',
-          "L\u2019\xE9l\xE9ment `<embed>` est imm\xE9diatement suivi d\u2019un [lien ou bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 un [contenu alternatif](#contenu-alternatif)\xA0;",
-          "Un m\xE9canisme permet \xE0 l\u2019utilisateur de remplacer l\u2019\xE9l\xE9ment `<embed>` par un [contenu alternatif](#contenu-alternatif)."
-        ],
-        "8": [
-          "Chaque image bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information), v\xE9rifie-t-elle une de ces conditions\xA0?",
-          'La balise `<canvas>` poss\xE8de une [alternative textuelle](#alternative-textuelle-image) et un attribut `role="img"`\xA0;',
-          "Un [contenu alternatif](#contenu-alternatif) est pr\xE9sent entre les balises `<canvas>` et `</canvas>`\xA0;",
-          "L\u2019\xE9l\xE9ment `<canvas>` est imm\xE9diatement suivi d\u2019un [lien ou bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 un [contenu alternatif](#contenu-alternatif)\xA0;",
-          "Un m\xE9canisme permet \xE0 l\u2019utilisateur de remplacer l\u2019\xE9l\xE9ment `<canvas>` par un [contenu alternatif](#contenu-alternatif)."
-        ]
-      },
-      techniques: ["H36", "H37", "H53", "F65", "H24"],
-      wcag: ["1.1.1"],
-      appliesTo: {
-        ruleIds: [
-          "axe:area-alt",
-          "axe:image-alt",
-          "axe:input-image-alt",
-          "axe:object-alt",
-          "axe:role-img-alt",
-          "axe:svg-img-alt",
-          "canvas-fallback-missing",
-          "chart-no-accessible-name",
-          "img-alt-missing",
-          "input-image-alt-missing",
-          "object-embed-no-name"
-        ]
-      }
-    },
-    {
-      id: "1.2",
-      theme: 1,
-      title: {
-        fr: "Chaque [image de d\xE9coration](#image-de-decoration) est-elle correctement ignor\xE9e par les technologies d\u2019assistance\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque image de d\xE9coration est-elle correctement ignor\xE9e par les technologies d\u2019assistance\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque image (balise `<img>`) [de d\xE9coration](#image-de-decoration), sans [l\xE9gende](#legende-d-image), v\xE9rifie-t-elle une de ces conditions\xA0?",
-          'La balise `<img>` poss\xE8de un attribut `alt` vide (`alt=""`) et est d\xE9pourvue de tout autre attribut permettant de fournir une [alternative textuelle](#alternative-textuelle-image)\xA0;',
-          'La balise `<img>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"` ou `role="presentation"`.'
-        ],
-        "2": [
-          "Chaque [zone non cliquable](#zone-non-cliquable) (balise `<area>` sans attribut `href`) [de d\xE9coration](#image-de-decoration), v\xE9rifie-t-elle une de ces conditions\xA0?",
-          'La balise `<area>` poss\xE8de un attribut `alt` vide (`alt=""`) et est d\xE9pourvue de tout autre attribut permettant de fournir une [alternative textuelle](#alternative-textuelle-image)\xA0;',
-          'La balise `<area>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"` ou `role="presentation"`.'
-        ],
-        "3": [
-          'Chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [de d\xE9coration](#image-de-decoration), sans [l\xE9gende](#legende-d-image), v\xE9rifie-t-elle ces conditions\xA0?',
-          'La balise `<object>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;',
-          "La balise `<object>` est d\xE9pourvue d\u2019alternative textuelle\xA0;",
-          "Il n\u2019y a aucun texte faisant office d\u2019alternative textuelle entre `<object>` et `</object>`."
-        ],
-        "4": [
-          "Chaque image vectorielle (balise `<svg>`) [de d\xE9coration](#image-de-decoration), sans [l\xE9gende](#legende-d-image), v\xE9rifie-t-elle ces conditions\xA0?",
-          'La balise `<svg>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;',
-          "La balise `<svg>` et ses enfants sont d\xE9pourvus d\u2019[alternative textuelle](#alternative-textuelle-image)\xA0;",
-          "Les balises `<title>` et `<desc>` sont absentes ou vides\xA0;",
-          "La balise `<svg>` et ses enfants sont d\xE9pourvus d\u2019attribut `title`."
-        ],
-        "5": [
-          "Chaque image bitmap (balise `<canvas>`) [de d\xE9coration](#image-de-decoration), sans [l\xE9gende](#legende-d-image), v\xE9rifie-t-elle ces conditions\xA0?",
-          'La balise `<canvas>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;',
-          "La balise `<canvas>` et ses enfants sont d\xE9pourvus d\u2019[alternative textuelle](#alternative-textuelle-image)\xA0;",
-          "Il n\u2019y a aucun texte faisant office d\u2019[alternative textuelle](#alternative-textuelle-image) entre `<canvas>` et `</canvas>`."
-        ],
-        "6": [
-          'Chaque image embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) [de d\xE9coration](#image-de-decoration), sans [l\xE9gende](#legende-d-image), v\xE9rifie-t-elle ces conditions\xA0?',
-          'La balise `<embed>` poss\xE8de un attribut WAI-ARIA `aria-hidden="true"`\xA0;',
-          "La balise `<embed>` et ses enfants sont d\xE9pourvus d\u2019[alternative textuelle](#alternative-textuelle-image)."
-        ]
-      },
-      techniques: ["H67", "G196", "C9", "F39", "F38", "ARIA4", "ARIA10"],
-      technicalNote: [
-        "Lorsqu'une image est associ\xE9e \xE0 une [l\xE9gende](#legende-d-image), la note technique WCAG recommande de pr\xE9voir syst\xE9matiquement une [alternative textuelle](#alternative-textuelle-image) (cf. crit\xE8re 1.9). Dans ce cas le crit\xE8re 1.2 est non applicable.",
-        "Dans le cas d'une image vectorielle (balise `<svg>`) de d\xE9coration qui serait affich\xE9e au travers d'un \xE9l\xE9ment `<use href=\"\u2026\">` enfant de l'\xE9l\xE9ment `<svg>`, le test 1.2.4 s'appliquera \xE9galement \xE0 l'\xE9l\xE9ment `<svg>` associ\xE9e par le biais de l'\xE9l\xE9ment `<use>`.",
-        'Un attribut WAI-ARIA `role="presentation"` peut \xEAtre utilis\xE9 sur les images de d\xE9coration et les zones non cliquables de d\xE9coration. Le r\xF4le `"none"` introduit en ARIA 1.1 et synonyme du r\xF4le `"presentation"` peut \xEAtre aussi utilis\xE9. Il reste pr\xE9f\xE9rable cependant d\'utiliser le r\xF4le `"presentation"` en attendant un support satisfaisant du r\xF4le `"none"`.'
-      ],
-      wcag: ["1.1.1", "4.1.2"],
-      appliesTo: {
-        ruleIds: ["axe:image-redundant-alt", "decorative-alt-misuse"]
-      }
-    },
-    {
-      id: "1.3",
-      theme: 1,
-      title: {
-        fr: "Pour chaque image [porteuse d\u2019information](#image-porteuse-d-information) ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque image porteuse d\u2019information ayant une alternative textuelle, cette alternative est-elle pertinente (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          'Chaque image (balise `<img>` ou balise poss\xE9dant l\u2019attribut WAI-ARIA `role="img"`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente (hors cas particuliers)\xA0?',
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
-        ],
-        "2": [
-          "Pour chaque [zone](#zone-d-une-image-reactive) (balise `<area>`) d\u2019une [image r\xE9active](#image-reactive) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente (hors cas particuliers)\xA0?",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
-        ],
-        "3": [
-          'Pour chaque [bouton](#bouton-formulaire) de type `image` (balise `<input>` avec l\u2019attribut `type="image"`), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente (hors cas particuliers)\xA0?',
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
-        ],
-        "4": [
-          'Pour chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente (hors cas particuliers)\xA0?',
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
-        ],
-        "5": [
-          'Pour chaque image embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente (hors cas particuliers)\xA0?',
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
-        ],
-        "6": [
-          "Pour chaque image vectorielle (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente (hors cas particuliers)\xA0?",
-          "S\u2019il est pr\xE9sent, le contenu de l'\xE9l\xE9ment `<title>` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
-        ],
-        "7": [
-          "Pour chaque image bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente (hors cas particuliers)\xA0?",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
-        ],
-        "8": [
-          "Pour chaque image bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information) et ayant  un [contenu alternatif](#contenu-alternatif) entre `<canvas>` et `</canvas>`, ce [contenu alternatif](#contenu-alternatif) est-il [correctement restitu\xE9 par les technologies d\u2019assistance](#correctement-restitue-par-les-technologies-d-assistance)\xA0?"
-        ],
-        "9": [
-          "Pour chaque image [porteuse d\u2019information](#image-porteuse-d-information) et ayant une [alternative textuelle](#alternative-textuelle-image), l\u2019[alternative textuelle](#alternative-textuelle-image) est-elle [courte et concise](#alternative-courte-et-concise) (hors cas particuliers)\xA0?"
-        ]
-      },
-      techniques: ["G94", "G95", "F30", "F71", "G196", "ARIA6", "ARIA9", "ARIA10"],
-      particularCases: [
-        "Il existe une gestion de cas particuliers lorsque l\u2019image est utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test). Dans cette situation, o\xF9 il n\u2019est pas possible de donner une alternative pertinente sans d\xE9truire l\u2019objet du CAPTCHA ou du test, le crit\xE8re est non applicable.",
-        "Note\xA0: le cas des CAPTCHA et des images-test est trait\xE9 de mani\xE8re sp\xE9cifique par le crit\xE8re 1.4."
-      ],
-      wcag: ["1.1.1", "4.1.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "1.4",
-      theme: 1,
-      title: {
-        fr: "Pour chaque image utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative permet-elle d\u2019identifier la nature et la fonction de l\u2019image\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque image utilis\xE9e comme CAPTCHA ou comme image-test, ayant une alternative textuelle, cette alternative permet-elle d\u2019identifier la nature et la fonction de l\u2019image\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque image (balise `<img>`) utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente\xA0?",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
-        ],
-        "2": [
-          "Pour chaque zone (balise `<area>`) d\u2019une image r\xE9active utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente\xA0?",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
-        ],
-        "3": [
-          'Pour chaque [bouton](#bouton-formulaire) de type image (balise `<input>` avec l\u2019attribut `type="image"`) utilis\xE9 comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente\xA0?',
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
-        ],
-        "4": [
-          'Pour chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente\xA0?',
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
-        ],
-        "5": [
-          'Pour chaque image embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente\xA0?',
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
-        ],
-        "6": [
-          "Pour chaque image vectorielle (balise `<svg>`) utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente\xA0?",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent."
-        ],
-        "7": [
-          "Pour chaque image bitmap (balise `<canvas>`) utilis\xE9e comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image) ou un [contenu alternatif](#contenu-alternatif), cette alternative est-elle pertinente\xA0?",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent le [contenu alternatif](#contenu-alternatif) est pertinent."
-        ]
-      },
-      techniques: ["G100", "G143"],
-      wcag: ["1.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "1.5",
-      theme: 1,
-      title: {
-        fr: "Pour chaque image utilis\xE9e comme [CAPTCHA](#captcha), une solution d\u2019acc\xE8s alternatif au contenu ou \xE0 la fonction du CAPTCHA est-elle pr\xE9sente\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque image utilis\xE9e comme CAPTCHA, une solution d\u2019acc\xE8s alternatif au contenu ou \xE0 la fonction du CAPTCHA est-elle pr\xE9sente\xA0?"
-      },
-      tests: {
-        "1": [
-          'Chaque image (balises `<img>`, `<area>`, `<object>`, `<embed>`, `<svg>`, `<canvas>` ou poss\xE9dant un attribut WAI-ARIA `role="img"`) utilis\xE9e comme [CAPTCHA](#captcha) v\xE9rifie-t-elle une de ces conditions\xA0?',
-          "Il existe une autre forme de [CAPTCHA](#captcha) non graphique, au moins\xA0;",
-          "Il existe une autre solution d\u2019acc\xE8s \xE0 la fonctionnalit\xE9 qui est s\xE9curis\xE9e par le [CAPTCHA](#captcha)."
-        ],
-        "2": [
-          'Chaque bouton associ\xE9 \xE0 une image (balise `input` avec l\u2019attribut `type="image"`) utilis\xE9e comme [CAPTCHA](#captcha) v\xE9rifie-t-il une de ces conditions\xA0?',
-          "Il existe une autre forme de [CAPTCHA](#captcha) non graphique, au moins\xA0;",
-          "Il existe une autre solution d\u2019acc\xE8s \xE0 la fonctionnalit\xE9 s\xE9curis\xE9e par le [CAPTCHA](#captcha)."
-        ]
-      },
-      techniques: ["G144"],
-      wcag: ["1.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "1.6",
-      theme: 1,
-      title: {
-        fr: "Chaque image [porteuse d\u2019information](#image-porteuse-d-information) a-t-elle, si n\xE9cessaire, une [description d\xE9taill\xE9e](#description-detaillee-image)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque image porteuse d\u2019information a-t-elle, si n\xE9cessaire, une description d\xE9taill\xE9e\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque image (balise `<img>`) [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "Il existe un attribut `longdesc` qui donne l\u2019adresse (URL) d\u2019une page ou d\u2019un emplacement dans la page contenant la [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
-          "Il existe une [alternative textuelle](#alternative-textuelle-image) contenant la r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image\xA0;",
-          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
-        ],
-        "2": [
-          'Chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?',
-          "Il existe un attribut `longdesc` qui donne l\u2019adresse (URL) d\u2019une page ou d\u2019un emplacement dans la page contenant la [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
-          "Il existe une [alternative textuelle](#alternative-textuelle-image) contenant la r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image\xA0;",
-          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
-        ],
-        "3": [
-          "Chaque image embarqu\xE9e (balise `<embed>`) [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "Il existe un attribut `longdesc` qui donne l\u2019adresse (URL) d\u2019une page ou d\u2019un emplacement dans la page contenant la [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
-          "Il existe une [alternative textuelle](#alternative-textuelle-image) contenant la r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image\xA0;",
-          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
-        ],
-        "4": [
-          'Chaque [bouton](#bouton-formulaire) de type image (balise `<input>` avec l\u2019attribut `type="image"`) [porteur d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-il une de ces conditions\xA0?',
-          "Il existe un attribut `longdesc` qui donne l\u2019adresse (URL) d\u2019une page ou d\u2019un emplacement dans la page contenant la [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
-          "Il existe une [alternative textuelle](#alternative-textuelle-image) contenant la r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image\xA0;",
-          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
-        ],
-        "5": [
-          "Chaque image vectorielle (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "Il existe un attribut WAI-ARIA `aria-label` contenant l\u2019alternative textuelle et une r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente\xA0;",
-          "Il existe un attribut WAI-ARIA `aria-labelledby` associant un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) faisant office d\u2019alternative textuelle et un autre faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
-          "Il existe un attribut WAI-ARIA `aria-describedby` associant un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
-          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
-        ],
-        "6": [
-          "Pour chaque image vectorielle (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), la r\xE9f\xE9rence \xE9ventuelle \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image) dans l\u2019attribut WAI-ARIA `aria-label` et la [description d\xE9taill\xE9e](#description-detaillee-image) associ\xE9e par l\u2019attribut WAI-ARIA `aria-labelledby` ou `aria-describedby` sont-elles correctement restitu\xE9es par les technologies d\u2019assistance\xA0?"
-        ],
-        "7": [
-          "Chaque image bitmap (balise `<canvas>`), [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "Il existe un attribut WAI-ARIA `aria-label` contenant l\u2019alternative textuelle et une r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente\xA0;",
-          "Il existe un attribut WAI-ARIA `aria-labelledby` associant un passage de texte faisant office d\u2019alternative textuelle et un autre faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
-          "Il existe un contenu textuel entre `<canvas>` et `</canvas>` faisant r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image bitmap\xA0;",
-          "Il existe un contenu textuel entre `<canvas>` et `</canvas>` faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
-          "Il existe un [lien ou bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
-        ],
-        "8": [
-          "Pour chaque image bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information), qui impl\xE9mente une r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente, cette r\xE9f\xE9rence est-elle correctement restitu\xE9e par les technologies d\u2019assistance\xA0?"
-        ],
-        "9": [
-          'Pour chaque image (balise `<img>`, `<input>` avec l\u2019attribut `type="image"`, `<area>`, `<object>`, `<embed>`, `<svg>`, `<canvas>`, ou poss\xE9dant un attribut WAI-ARIA `role="img"`) [porteuse d\u2019information](#image-porteuse-d-information), qui est accompagn\xE9e d\u2019une [description d\xE9taill\xE9e](#description-detaillee-image) et qui utilise un attribut WAI-ARIA `aria-describedby`, l\u2019attribut WAI-ARIA `aria-describedby` associe-t-il la [description d\xE9taill\xE9e](#description-detaillee-image)\xA0?'
-        ],
-        "10": [
-          'Chaque balise poss\xE9dant un attribut WAI-ARIA `role="img"` [porteuse d\u2019information](#image-porteuse-d-information), qui n\xE9cessite une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle une de ces conditions\xA0?',
-          "Il existe un attribut WAI-ARIA `aria-label` contenant l\u2019[alternative textuelle](#alternative-textuelle-image) et une r\xE9f\xE9rence \xE0 une [description d\xE9taill\xE9e](#description-detaillee-image) adjacente\xA0;",
-          "Il existe un attribut WAI-ARIA `aria-labelledby` associant un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) faisant office d\u2019[alternative textuelle](#alternative-textuelle-image) et un autre faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
-          "Il existe un attribut WAI-ARIA `aria-describedby` associant un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) faisant office de [description d\xE9taill\xE9e](#description-detaillee-image)\xA0;",
-          "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d\u2019acc\xE9der \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image)."
-        ]
-      },
-      techniques: ["G92", "G74", "G73", "H45", "ARIA6"],
-      technicalNote: [
-        "Dans le cas du SVG, le manque de support de l\u2019\xE9l\xE9ment `<title>` et `<desc>` par les technologies d\u2019assistance cr\xE9e une difficult\xE9 dans le cas de l\u2019impl\xE9mentation de l\u2019[alternative textuelle](#alternative-textuelle-image) de l\u2019image et de sa [description d\xE9taill\xE9e](#description-detaillee-image). Dans ce cas, il est recommand\xE9 d\u2019utiliser l\u2019attribut WAI-ARIA `aria-label` pour impl\xE9menter \xE0 la fois l\u2019[alternative textuelle](#alternative-textuelle-image) courte et la r\xE9f\xE9rence \xE0 la [description d\xE9taill\xE9e](#description-detaillee-image) adjacente ou l\u2019attribut WAI-ARIA `aria-labelledby` pour associer les passages de texte faisant office d\u2019alternative courte et de [description d\xE9taill\xE9e](#description-detaillee-image).",
-        "L\u2019utilisation de l\u2019attribut WAI-ARIA aria-describedby n\u2019est pas recommand\xE9e pour lier une image (`<img>`, `<object>`, `<embed>`, `<canvas>`) a\u0300 sa [description d\xE9taill\xE9e](#description-detaillee-image), par manque de support des technologies d\u2019assistance. N\xE9anmoins, lorsqu\u2019il est utilis\xE9, l\u2019attribut devra n\xE9cessairement faire r\xE9f\xE9rence \xE0 l\u2019`id` de la zone contenant la [description d\xE9taill\xE9e](#description-detaillee-image).",
-        'La [description d\xE9taill\xE9e](#description-detaillee-image) adjacente peut \xEAtre impl\xE9ment\xE9e via une balise `<figcaption>`, dans ce cas le crit\xE8re 1.9 doit \xEAtre v\xE9rifi\xE9 (utilisation de `<figure>` et des attributs WAI-ARIA `role="figure"` et `aria-label`, notamment).',
-        "L'attribut `longdesc` qui constitue une des conditions du test 1.6.1 (et dont la pertinence est v\xE9rifi\xE9e avec le test 1.7.1) est d\xE9sormais consid\xE9r\xE9 comme obsol\xE8te par la sp\xE9cification HTML en cours. La v\xE9rification de cet attribut ne sera donc requise que pour les versions de la sp\xE9cification HTML ant\xE9rieure \xE0 HTML 5."
-      ],
-      wcag: ["1.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "1.7",
-      theme: 1,
-      title: {
-        fr: "Pour chaque image [porteuse d\u2019information](#image-porteuse-d-information) ayant une [description d\xE9taill\xE9e](#description-detaillee-image), cette description est-elle pertinente\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque image porteuse d\u2019information ayant une description d\xE9taill\xE9e, cette description est-elle pertinente\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque image (balise `<img>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle ces conditions\xA0?",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) via l\u2019adresse r\xE9f\xE9renc\xE9e dans l\u2019attribut `longdesc` est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
-          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
-        ],
-        "2": [
-          'Chaque [bouton](#bouton-formulaire) de type image (balise `<input>` avec l\u2019attribut `type="image"`) [porteur d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-il ces conditions\xA0?',
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
-          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
-        ],
-        "3": [
-          'Chaque [image objet](#image-objet) (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle ces conditions\xA0?',
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019[image objet](#image-objet) est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
-          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
-        ],
-        "4": [
-          'Chaque image embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle ces conditions\xA0?',
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image embarqu\xE9e est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
-          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
-        ],
-        "5": [
-          "Chaque image vectorielle (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle ces conditions\xA0?",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par le texte contenu dans la balise `<desc>` ou `<title>` est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) adjacente contenue dans la balise `<desc>` est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
-          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
-        ],
-        "6": [
-          "Chaque image bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information), ayant une [description d\xE9taill\xE9e](#description-detaillee-image), v\xE9rifie-t-elle ces conditions\xA0?",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par l\u2019[alternative textuelle](#alternative-textuelle-image) est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) dans la page et signal\xE9e par le texte contenu entre `<canvas>` et `</canvas>` est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) contenue entre `<canvas>` et `</canvas>` est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) adjacente \xE0 l\u2019image bitmap est pertinente\xA0;",
-          "La [description d\xE9taill\xE9e](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente\xA0;",
-          "Le passage de texte associ\xE9 via l\u2019attribut WAI-ARIA `aria-describedby` est pertinent."
-        ]
-      },
-      techniques: ["G92", "F67"],
-      wcag: ["1.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "1.8",
-      theme: 1,
-      title: {
-        fr: "Chaque [image texte](#image-texte) [porteuse d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque image texte porteuse d\u2019information, en l\u2019absence d\u2019un m\xE9canisme de remplacement, doit si possible \xEAtre remplac\xE9e par du texte styl\xE9. Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          'Chaque [image texte](#image-texte) (balise `<img>` ou poss\xE9dant un attribut WAI-ARIA `role="img"`) [porteuse d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?'
-        ],
-        "2": [
-          'Chaque bouton \xAB\xA0[image texte](#image-texte)\xA0\xBB (balise `<input>` avec l\u2019attribut `type="image"`) [porteur d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9 par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?'
-        ],
-        "3": [
-          'Chaque [image texte](#image-texte) objet (balise `<object>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?'
-        ],
-        "4": [
-          'Chaque [image texte](#image-texte) embarqu\xE9e (balise `<embed>` avec l\u2019attribut `type="image/\u2026"`) [porteuse d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?'
-        ],
-        "5": [
-          "Chaque [image texte](#image-texte) bitmap (balise `<canvas>`) [porteuse d\u2019information](#image-porteuse-d-information), en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"
-        ],
-        "6": [
-          "Chaque [image texte](#image-texte) SVG (balise `<svg>`) [porteuse d\u2019information](#image-porteuse-d-information) et dont le texte n\u2019est pas compl\xE8tement structur\xE9 au moyen d\u2019\xE9l\xE9ments `<text>`, en l\u2019absence d\u2019un [m\xE9canisme de remplacement](#mecanisme-de-remplacement), doit si possible \xEAtre remplac\xE9e par du [texte styl\xE9](#texte-style). Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"
-        ]
-      },
-      techniques: ["G136", "G140", "C22", "C30"],
-      technicalNote: ["Le texte dans les images vectorielles \xE9tant du texte r\xE9el, il n\u2019est pas concern\xE9 par ce crit\xE8re."],
-      particularCases: [
-        "Pour ce crit\xE8re, il existe une gestion de cas particulier lorsque le texte fait partie du logo, d\u2019une d\xE9nomination commerciale, d\u2019un [CAPTCHA](#captcha), d\u2019une [image-test](#image-test) ou d\u2019une image dont l\u2019exactitude graphique serait consid\xE9r\xE9e comme essentielle \xE0 la bonne transmission de l\u2019information v\xE9hicul\xE9e par l\u2019image. Dans ces situations, le crit\xE8re est non applicable pour ces \xE9l\xE9ments."
-      ],
-      wcag: ["1.4.5"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "1.9",
-      theme: 1,
-      title: {
-        fr: "Chaque [l\xE9gende d\u2019image](#legende-d-image) est-elle, si n\xE9cessaire, correctement reli\xE9e \xE0 l\u2019image correspondante\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque l\xE9gende d\u2019image est-elle, si n\xE9cessaire, correctement reli\xE9e \xE0 l\u2019image correspondante\xA0?"
-      },
-      tests: {
-        "1": [
-          'Chaque image pourvue d\u2019une [l\xE9gende](#legende-d-image) (balise `<img>`, `<input>` avec l\u2019attribut `type="image"` ou poss\xE9dant un attribut WAI-ARIA `role="img"` associ\xE9e \xE0 une [l\xE9gende](#legende-d-image) adjacente), v\xE9rifie-t-elle, si n\xE9cessaire, ces conditions\xA0?',
-          'L\u2019image (balise `<img>`, `<input>` avec l\u2019attribut `type="image"` ou poss\xE9dant un attribut WAI-ARIA `role="img"`) et sa [l\xE9gende](#legende-d-image) adjacente sont contenues dans une balise `<figure>`\xA0;',
-          'La balise `<figure>` poss\xE8de un attribut WAI-ARIA `role="figure"` ou `role="group"`\xA0;',
-          "La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la [l\xE9gende](#legende-d-image)\xA0;",
-          "La [l\xE9gende](#legende-d-image) est contenue dans une balise `<figcaption>`."
-        ],
-        "2": [
-          'Chaque [image objet](#image-objet) pourvue d\u2019une [l\xE9gende](#legende-d-image) (balise `<object>` avec l\u2019attribut `type="image/\u2026"` associ\xE9e \xE0 une [l\xE9gende](#legende-d-image) adjacente), v\xE9rifie-t-elle, si n\xE9cessaire, ces conditions\xA0?',
-          "L\u2019[image objet](#image-objet) et sa [l\xE9gende](#legende-d-image) adjacente sont contenues dans une balise `<figure>`\xA0;",
-          'La balise `<figure>` poss\xE8de un attribut WAI-ARIA `role="figure"` ou `role="group"`\xA0;',
-          "La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la [l\xE9gende](#legende-d-image)\xA0;",
-          "La [l\xE9gende](#legende-d-image) est contenue dans une balise `<figcaption>`."
-        ],
-        "3": [
-          "Chaque image embarqu\xE9e pourvue d\u2019une [l\xE9gende](#legende-d-image) (balise `<embed>` associ\xE9e \xE0 une [l\xE9gende](#legende-d-image) adjacente), v\xE9rifie-t-elle, si n\xE9cessaire, ces conditions\xA0?",
-          "L\u2019image embarqu\xE9e (balise `<embed>`) et sa [l\xE9gende](#legende-d-image) adjacente sont contenues dans une balise `<figure>`\xA0;",
-          'La balise `<figure>` poss\xE8de un attribut WAI-ARIA `role="figure"` ou `role="group"`\xA0;',
-          "La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la [l\xE9gende](#legende-d-image)\xA0;",
-          "La [l\xE9gende](#legende-d-image) est contenue dans une balise `<figcaption>`."
-        ],
-        "4": [
-          "Chaque image vectorielle pourvue d\u2019une [l\xE9gende](#legende-d-image) (balise `<svg>` associ\xE9e \xE0 une [l\xE9gende](#legende-d-image) adjacente), v\xE9rifie-t-elle, si n\xE9cessaire, ces conditions\xA0?",
-          "L\u2019image vectorielle (balise `<svg>`) et sa [l\xE9gende](#legende-d-image) adjacente sont contenues dans une balise `<figure>`\xA0;",
-          'La balise `<figure>` poss\xE8de un attribut WAI-ARIA `role="figure"` ou `role="group"`\xA0;',
-          "La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la [l\xE9gende](#legende-d-image)\xA0;",
-          "La [l\xE9gende](#legende-d-image) est contenue dans une balise `<figcaption>`."
-        ],
-        "5": [
-          "Chaque image bitmap pourvue d\u2019une [l\xE9gende](#legende-d-image) (balise `<canvas>` associ\xE9e \xE0 une [l\xE9gende](#legende-d-image) adjacente), v\xE9rifie-t-elle, si n\xE9cessaire, ces conditions\xA0?",
-          "L\u2019image bitmap (balise `<canvas>`) et sa [l\xE9gende](#legende-d-image) adjacente sont contenues dans une balise `<figure>`\xA0;",
-          'La balise `<figure>` poss\xE8de un attribut WAI-ARIA `role="figure"` ou `role="group"`\xA0;',
-          "La balise `<figure>` poss\xE8de un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la [l\xE9gende](#legende-d-image)\xA0;",
-          "La [l\xE9gende](#legende-d-image) est contenue dans une balise `<figcaption>`."
-        ]
-      },
-      techniques: ["G140", "ARIA4", "ARIA6"],
-      technicalNote: [
-        'L\u2019impl\xE9mentation d\u2019un attribut WAI-ARIA `role="group"` ou `role="figure"` sur l\u2019\xE9l\xE9ment parent `<figure>` est destin\xE9 \xE0 pallier le manque de support actuel des \xE9l\xE9ments `<figure>` par les technologies d\u2019assistance. L\u2019utilisation d\u2019un \xE9l\xE9ment `<figcaption>` pour associer une [l\xE9gende](#legende-d-image) \xE0 une image impose au minimum l\u2019utilisation d\u2019un attribut WAI-ARIA `aria-label` sur l\u2019\xE9l\xE9ment parent `<figure>` dont le contenu sera identique au contenu de l\u2019\xE9l\xE9ment `<figcaption>`. Pour s\u2019assurer d\u2019un support optimal, il peut \xE9galement \xEAtre fait une association explicite entre le contenu de l\u2019[alternative textuelle](#alternative-textuelle-image) de l\u2019image et le contenu de l\u2019\xE9l\xE9ment `<figcaption>`, par exemple\xA0:',
-        '`<img src="image.png" alt="Photo\xA0: soleil couchant" /><figcaption>Photo\xA0: cr\xE9dit xxx</figcaption>`',
-        "Les attributs WAI-ARIA `aria-labelledby` et `aria-describedby` ne peuvent pas \xEAtre utilis\xE9s actuellement par manque de support par les technologies d\u2019assistance.",
-        "Note\xA0: les images l\xE9gend\xE9es doivent par ailleurs respecter le crit\xE8re 1.1 et le crit\xE8re 1.3 relatifs aux images porteuses d\u2019information."
-      ],
-      wcag: ["1.1.1", "4.1.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "2.1",
-      theme: 2,
-      title: {
-        fr: "Chaque [cadre](#cadre) a-t-il un [titre de cadre](#titre-de-cadre)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque cadre a-t-il un titre de cadre\xA0?"
-      },
-      tests: {
-        "1": ["Chaque cadre (balise `<iframe>` ou `<frame>`) a-t-il un attribut `title`\xA0?"]
-      },
-      techniques: ["H64"],
-      wcag: ["4.1.2"],
-      appliesTo: {
-        ruleIds: ["axe:frame-title", "axe:frame-title-unique", "iframe-title-missing"]
-      }
-    },
-    {
-      id: "2.2",
-      theme: 2,
-      title: {
-        fr: "Pour chaque [cadre](#cadre) ayant un [titre de cadre](#titre-de-cadre), ce titre de cadre est-il pertinent\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque cadre ayant un titre de cadre, ce titre de cadre est-il pertinent\xA0?"
-      },
-      tests: {
-        "1": ["Pour chaque cadre (balise `<iframe>` ou `<frame>`) ayant un attribut `title`, le contenu de cet attribut est-il pertinent\xA0?"]
-      },
-      techniques: ["H64"],
-      wcag: ["4.1.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "3.1",
-      theme: 3,
-      title: {
-        fr: "Dans chaque page web, l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque mot ou ensemble de mots dont la mise en couleur est porteuse d\u2019information, l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ],
-        "2": [
-          "Pour chaque indication de couleur donn\xE9e par un texte, l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ],
-        "3": [
-          "Pour chaque image [v\xE9hiculant une information](#image-vehiculant-une-information-donnee-par-la-couleur), l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ],
-        "4": [
-          "Pour chaque [propri\xE9t\xE9 CSS d\xE9terminant une couleur](#propriete-css-determinant-une-couleur) et [v\xE9hiculant une information](#image-vehiculant-une-information-donnee-par-la-couleur), l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ],
-        "5": [
-          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) [v\xE9hiculant une information](#image-vehiculant-une-information-donnee-par-la-couleur), l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ],
-        "6": [
-          "Pour chaque [m\xE9dia non temporel](#media-non-temporel) [v\xE9hiculant une information](#image-vehiculant-une-information-donnee-par-la-couleur), l\u2019[information](#information-donnee-par-la-couleur) ne doit pas \xEAtre donn\xE9e uniquement par la couleur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ]
-      },
-      techniques: ["G14", "G182", "G111", "G117", "G138", "G205"],
-      wcag: ["1.3.1", "1.4.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "3.2",
-      theme: 3,
-      title: {
-        fr: "Dans chaque page web, le [contraste](#contraste) entre la couleur du texte et la couleur de son arri\xE8re-plan est-il suffisamment \xE9lev\xE9 (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, le contraste entre la couleur du texte et la couleur de son arri\xE8re-plan est-il suffisamment \xE9lev\xE9 (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, le texte et le texte en image sans effet de graisse d\u2019une taille restitu\xE9e inf\xE9rieure \xE0 24px v\xE9rifient-ils une de ces conditions (hors cas particuliers)\xA0?",
-          "Le rapport de [contraste](#contraste) entre le texte et son arri\xE8re-plan est de 4.5:1, au moins\xA0;",
-          "Un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de [contraste](#contraste) de 4.5:1, au moins."
-        ],
-        "2": [
-          "Dans chaque page web, le texte et le texte en image en gras d\u2019une taille restitu\xE9e inf\xE9rieure \xE0 18,5px v\xE9rifient-ils une de ces conditions (hors cas particuliers)\xA0?",
-          "Le rapport de [contraste](#contraste) entre le texte et son arri\xE8re-plan est de 4.5:1, au moins\xA0;",
-          "Un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de [contraste](#contraste) de 4.5:1, au moins."
-        ],
-        "3": [
-          "Dans chaque page web, le texte et le texte en image sans effet de graisse d\u2019une taille restitu\xE9e sup\xE9rieure ou \xE9gale \xE0 24px v\xE9rifient-ils une de ces conditions (hors cas particuliers)\xA0?",
-          "Le rapport de [contraste](#contraste) entre le texte et son arri\xE8re-plan est de 3:1, au moins\xA0;",
-          "Un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de [contraste](#contraste) de 3:1, au moins."
-        ],
-        "4": [
-          "Dans chaque page web, le texte et le texte en image en gras d\u2019une taille restitu\xE9e sup\xE9rieure ou \xE9gale \xE0 18,5px v\xE9rifient-ils une de ces conditions (hors cas particuliers)\xA0?",
-          "Le rapport de [contraste](#contraste) entre le texte et son arri\xE8re-plan est de 3:1, au moins\xA0;",
-          "Un m\xE9canisme permet \xE0 l\u2019utilisateur d\u2019afficher le texte avec un rapport de [contraste](#contraste) de 3:1, au moins."
-        ],
-        "5": [
-          "Dans le [m\xE9canisme qui permet d\u2019afficher un rapport de contraste](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) conforme, le rapport de contraste entre le texte et la couleur d\u2019arri\xE8re-plan est-il suffisamment \xE9lev\xE9\xA0?"
-        ]
-      },
-      techniques: ["G18", "G136", "G148", "G174", "G145", "C29"],
-      particularCases: [
-        "Dans ces situations, les crit\xE8res sont non applicables pour ces \xE9l\xE9ments\xA0:",
-        "- Le texte fait partie d\u2019un logo ou d\u2019un nom de marque d\u2019un organisme ou d\u2019une soci\xE9t\xE9\xA0;",
-        "- Le texte ou l\u2019image de texte est purement d\xE9coratif\xA0;",
-        "- Le texte fait partie d\u2019une image v\xE9hiculant une information mais le texte lui-m\xEAme n\u2019apporte aucune information essentielle\xA0;",
-        "- Le texte ou l\u2019image de texte fait partie d\u2019un \xE9l\xE9ment d\u2019interface sur lequel aucune action n\u2019est possible (par exemple un bouton avec l\u2019attribut `disabled`)."
-      ],
-      wcag: ["1.4.3"],
-      appliesTo: {
-        ruleIds: ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
-      }
-    },
-    {
-      id: "3.3",
-      theme: 3,
-      title: {
-        fr: "Dans chaque page web, les couleurs utilis\xE9es dans les [composants d\u2019interface](#composant-d-interface) ou les \xE9l\xE9ments graphiques porteurs d\u2019informations sont-elles suffisamment contrast\xE9es (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les couleurs utilis\xE9es dans les composants d\u2019interface ou les \xE9l\xE9ments graphiques porteurs d\u2019informations sont-elles suffisamment contrast\xE9es (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, le rapport de [contraste](#contraste) entre les couleurs d\u2019un [composant d\u2019interface](#composant-d-interface) dans ses diff\xE9rents \xE9tats et la [couleur d\u2019arri\xE8re-plan contigu\xEB](#couleur-d-arriere-plan-contigue-et-couleur-contigue) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "Le rapport de [contraste](#contraste) est de 3:1, au moins\xA0;",
-          "Un [m\xE9canisme](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) permet un rapport de [contraste](#contraste) de 3:1, au moins."
-        ],
-        "2": [
-          "Dans chaque page web, le rapport de [contraste](#contraste) des diff\xE9rentes couleurs composant un [\xE9l\xE9ment graphique](#element-graphique), lorsqu\u2019elles sont n\xE9cessaires \xE0 sa compr\xE9hension, et la [couleur d\u2019arri\xE8re-plan contigu\xEB](#couleur-d-arriere-plan-contigue-et-couleur-contigue), v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "Le rapport de [contraste](#contraste) est de 3:1, au moins\xA0;",
-          "Un [m\xE9canisme](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) permet un rapport de [contraste](#contraste) de 3:1, au moins."
-        ],
-        "3": [
-          "Dans chaque page web, le rapport de [contraste](#contraste) des diff\xE9rentes [couleurs contigu\xEBs](#couleur-d-arriere-plan-contigue-et-couleur-contigue) entre elles d\u2019un [\xE9l\xE9ment graphique](#element-graphique), lorsqu\u2019elles sont n\xE9cessaires \xE0 sa compr\xE9hension, v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "Le rapport de [contraste](#contraste) est de 3:1, au moins\xA0;",
-          "Un [m\xE9canisme](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) permet un rapport de [contraste](#contraste) de 3:1, au moins."
-        ],
-        "4": [
-          "Dans le [m\xE9canisme qui permet d\u2019afficher un rapport de contraste](#mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme) conforme, les couleurs du composant ou des \xE9l\xE9ments graphiques porteurs d\u2019informations qui le composent, sont-elles suffisamment contrast\xE9es\xA0?"
-        ]
-      },
-      techniques: ["G18", "G195", "G207", "G174", "G145", "G183", "F78"],
-      particularCases: [
-        "Les cas suivants sont non applicables pour ce crit\xE8re\xA0:",
-        "- Composant d\u2019interface inactif (par exemple, un bouton avec un attribut `disabled`) sur lequel aucune action n\u2019est possible\xA0;",
-        "- Composant d\u2019interface pour lequel l\u2019apparence est g\xE9r\xE9e par les styles natifs du navigateur sans aucune modification par l\u2019auteur (par exemple, le style au focus natif dans Chrome ou Firefox)\xA0;",
-        "- Composant d\u2019interface pour lequel la couleur n\u2019est pas n\xE9cessaire pour identifier le composant ou son \xE9tat (par exemple, un groupe de liens faisant office de navigation dont la position dans la page, la taille et la couleur du texte permettent de comprendre qu\u2019il s\u2019agit de liens m\xEAme si la couleur du soulignement des liens avec le fond blanc n\u2019a pas un ratio de 3:1 et que le texte lui a un ratio de 4.5:1)\xA0;",
-        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique non porteur d\u2019information ou ayant une alternative (description longue, informations identiques visibles dans la page)\xA0;",
-        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique faisant partie d\u2019un logo ou du nom de marque d\u2019un organisme ou d\u2019une soci\xE9t\xE9\xA0;",
-        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique dont la pr\xE9sentation est essentielle \xE0 l\u2019information v\xE9hicul\xE9e (par exemple, drapeaux, logotypes, photos de personnes ou de sc\xE8nes, captures d\u2019\xE9cran, diagrammes m\xE9dicaux, carte de chaleurs)\xA0;",
-        "- [\xC9l\xE9ment graphique](#element-graphique) ou parties d\u2019\xE9l\xE9ment graphique dynamiques dont le contraste au survol / focus est suffisant."
-      ],
-      wcag: ["1.4.11"],
-      appliesTo: {
-        ruleIds: ["rendered-nontext-contrast"]
-      }
-    },
-    {
-      id: "4.1",
-      theme: 4,
-      title: {
-        fr: "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, une [transcription textuelle](#transcription-textuelle-media-temporel) ou une [audiodescription](#audiodescription-synchronisee-media-temporel) (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque m\xE9dia temporel pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, une transcription textuelle ou une audiodescription (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement audio, v\xE9rifie-t-il, si n\xE9cessaire, l\u2019une de ces conditions (hors cas particuliers)\xA0?",
-          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)\xA0;",
-          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) adjacente clairement identifiable."
-        ],
-        "2": [
-          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement vid\xE9o v\xE9rifie-t-il, si n\xE9cessaire, l\u2019une de ces conditions (hors cas particuliers)\xA0?",
-          "Il existe une [version alternative \xAB\xA0audio seulement\xA0\xBB](#version-alternative-audio-seulement) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)\xA0;",
-          "Il existe une [version alternative \xAB\xA0audio seulement\xA0\xBB](#version-alternative-audio-seulement) adjacente clairement identifiable\xA0;",
-          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)\xA0;",
-          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) adjacente clairement identifiable\xA0;",
-          "Il existe une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e\xA0;",
-          "Il existe une version alternative avec une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)."
-        ],
-        "3": [
-          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 v\xE9rifie-t-il, si n\xE9cessaire, une de ces conditions (hors cas particuliers)\xA0?",
-          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)\xA0;",
-          "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) adjacente clairement identifiable\xA0;",
-          "Il existe une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e\xA0;",
-          "Il existe une version alternative avec une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)."
-        ]
-      },
-      techniques: ["G58", "G69", "G78", "G158", "G159", "G173", "G8", "G166", "H96", "SM6", "SM7"],
-      particularCases: [
-        "Il existe une gestion de cas particulier lorsque\xA0:",
-        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est utilis\xE9 \xE0 des fins d\xE9coratives (c\u2019est-\xE0-dire qu\u2019il n\u2019apporte aucune information)\xA0;",
-        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est lui-m\xEAme une alternative \xE0 un contenu de la page (une vid\xE9o en langue des signes ou la vocalisation d\u2019un texte, par exemple)\xA0;",
-        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est utilis\xE9 pour acc\xE9der \xE0 une version agrandie\xA0;",
-        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est utilis\xE9 comme un [CAPTCHA](#captcha)\xA0;",
-        "- Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) fait partie d\u2019un test qui deviendrait inutile si la [transcription textuelle](#transcription-textuelle-media-temporel), les [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia) ou l\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) \xE9taient communiqu\xE9s\xA0;",
-        "- Pour les services de l\u2019\xC9tat, les collectivit\xE9s territoriales et leurs \xE9tablissements\xA0: si le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) a \xE9t\xE9 publi\xE9 entre le 23 septembre 2019 et le 23 septembre 2020 sur un site internet, intranet ou extranet cr\xE9\xE9 depuis le 23 septembre 2018, il est exempt\xE9 de l\u2019obligation d\u2019accessibilit\xE9\xA0;",
-        "- Pour les personnes de droit priv\xE9 mentionn\xE9es aux 2\xB0 \xE0 4\xB0 du I de l\u2019article 47 de la loi du 11 f\xE9vrier 2005\xA0: si le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) a \xE9t\xE9 publi\xE9 avant le 23 septembre 2020, il est exempt\xE9 de l\u2019obligation d\u2019accessibilit\xE9.",
-        "Dans ces situations, le crit\xE8re est non applicable.",
-        "Ce cas particulier s\u2019applique \xE9galement aux crit\xE8res 4.2, 4.3, 4.5."
-      ],
-      wcag: ["1.2.1", "1.2.3"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "4.2",
-      theme: 4,
-      title: {
-        fr: "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 ayant une [transcription textuelle](#transcription-textuelle-media-temporel) ou une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e, celles-ci sont-elles pertinentes (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque m\xE9dia temporel pr\xE9-enregistr\xE9 ayant une transcription textuelle ou une audiodescription synchronis\xE9e, celles-ci sont-elles pertinentes (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement audio, ayant une [transcription textuelle](#transcription-textuelle-media-temporel), celle-ci est-elle pertinente (hors cas particuliers)\xA0?"
-        ],
-        "2": [
-          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement vid\xE9o v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "La [transcription textuelle](#transcription-textuelle-media-temporel) est pertinente\xA0;",
-          "L\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e est pertinente\xA0;",
-          "L\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e de la version alternative est pertinente\xA0;",
-          "La version alternative audio seulement est pertinente."
-        ],
-        "3": [
-          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "La [transcription textuelle](#transcription-textuelle-media-temporel) est pertinente\xA0;",
-          "L\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e est pertinente\xA0;",
-          "L\u2019[audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e de la version alternative est pertinente."
-        ]
-      },
-      techniques: ["F30", "F67", "SM6", "SM7"],
-      particularCases: ["Voir cas particuliers crit\xE8re 4.1."],
-      wcag: ["1.2.1", "1.2.3"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "4.3",
-      theme: 4,
-      title: {
-        fr: "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia) (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque m\xE9dia temporel synchronis\xE9 pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, des sous-titres synchronis\xE9s (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 v\xE9rifie-t-il, si n\xE9cessaire, l\u2019une de ces conditions (hors cas particuliers)\xA0?",
-          "Le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 poss\xE8de des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia)\xA0;",
-          "Il existe une version alternative poss\xE9dant des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)."
-        ],
-        "2": [
-          'Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 poss\xE9dant des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia) diffus\xE9s via une balise `<track>`, la balise `<track>` poss\xE8de-t-elle un attribut `kind="captions"`\xA0?'
-        ]
-      },
-      techniques: ["G58", "G93", "G87", "H95", "SM11", "SM12", "F74", "F75"],
-      particularCases: ["Voir cas particuliers crit\xE8re 4.1."],
-      wcag: ["1.2.2"],
-      appliesTo: {
-        ruleIds: ["axe:audio-caption", "axe:video-caption", "media-no-track"]
-      }
-    },
-    {
-      id: "4.4",
-      theme: 4,
-      title: {
-        fr: "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 ayant des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia), ces sous-titres sont-ils pertinents\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque m\xE9dia temporel synchronis\xE9 pr\xE9-enregistr\xE9 ayant des sous-titres synchronis\xE9s, ces sous-titres sont-ils pertinents\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 ayant des [sous-titres synchronis\xE9s](#sous-titres-synchronises-objet-multimedia), ces sous-titres sont-ils pertinents\xA0?"
-        ]
-      },
-      techniques: ["G93", "G87", "SM11", "SM12", "F8", "F74", "F75"],
-      wcag: ["1.2.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "4.5",
-      theme: 4,
-      title: {
-        fr: "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque m\xE9dia temporel pr\xE9-enregistr\xE9 a-t-il, si n\xE9cessaire, une audiodescription synchronis\xE9e (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement vid\xE9o v\xE9rifie-t-il, si n\xE9cessaire, une de ces conditions (hors cas particuliers)\xA0?",
-          "Il existe une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e\xA0;",
-          "Il existe une version alternative avec une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e."
-        ],
-        "2": [
-          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 pr\xE9-enregistr\xE9 v\xE9rifie-t-il, si n\xE9cessaire, une de ces conditions (hors cas particuliers)\xA0?",
-          "Il existe une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e\xA0;",
-          "Il existe une version alternative avec une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e."
-        ]
-      },
-      techniques: ["G8", "G58", "G78", "G173", "H96", "SM1", "SM2", "SM6", "SM7"],
-      particularCases: ["Voir cas particuliers crit\xE8re 4.1."],
-      wcag: ["1.2.5"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "4.6",
-      theme: 4,
-      title: {
-        fr: "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 ayant une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e, celle-ci est-elle pertinente\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque m\xE9dia temporel pr\xE9-enregistr\xE9 ayant une audiodescription synchronis\xE9e, celle-ci est-elle pertinente\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) pr\xE9-enregistr\xE9 seulement vid\xE9o ayant une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e, celle-ci est-elle pertinente\xA0?"
-        ],
-        "2": [
-          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) synchronis\xE9 ayant une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronis\xE9e, celle-ci est-elle pertinente\xA0?"
-        ]
-      },
-      techniques: ["SM1", "SM2", "SM6", "SM7"],
-      wcag: ["1.2.5"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "4.7",
-      theme: 4,
-      title: {
-        fr: "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est-il clairement identifiable (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque m\xE9dia temporel est-il clairement identifiable (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) seulement son, seulement vid\xE9o ou synchronis\xE9, le contenu textuel adjacent permet-il d\u2019identifier clairement le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) (hors cas particuliers)\xA0?"
-        ]
-      },
-      techniques: ["G68", "G100"],
-      particularCases: [
-        "Il existe une gestion de cas particulier lorsque le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est utilis\xE9 \xE0 des fins d\xE9coratives (c\u2019est-\xE0-dire qu\u2019il n\u2019apporte aucune information). Dans cette situation, le crit\xE8re est non applicable."
-      ],
-      wcag: ["1.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "4.8",
-      theme: 4,
-      title: {
-        fr: "Chaque [m\xE9dia non temporel](#media-non-temporel) a-t-il, si n\xE9cessaire, une alternative (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque m\xE9dia non temporel a-t-il, si n\xE9cessaire, une alternative (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [m\xE9dia non temporel](#media-non-temporel) v\xE9rifie-t-il, si n\xE9cessaire, une de ces conditions (hors cas particuliers)\xA0?",
-          "Un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent), clairement identifiable, permet d\u2019acc\xE9der \xE0 une page contenant une alternative\xA0;",
-          "Un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent), clairement identifiable, permet d\u2019acc\xE9der \xE0 une alternative dans la page."
-        ],
-        "2": [
-          "Chaque [m\xE9dia non temporel](#media-non-temporel) associ\xE9 \xE0 une alternative v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "La page r\xE9f\xE9renc\xE9e par le [lien ou bouton adjacent](#lien-ou-bouton-adjacent) est accessible\xA0;",
-          "L\u2019alternative dans la page, r\xE9f\xE9renc\xE9e par le [lien ou bouton adjacent](#lien-ou-bouton-adjacent), est accessible."
-        ]
-      },
-      techniques: ["H35", "H46"],
-      particularCases: [
-        "Il existe une gestion de cas particulier lorsque\xA0:",
-        "- Le [m\xE9dia non temporel](#media-non-temporel) est utilis\xE9 \xE0 des fins d\xE9coratives (c\u2019est-\xE0-dire qu\u2019il n\u2019apporte aucune information)\xA0;",
-        "- Le [m\xE9dia non temporel](#media-non-temporel) est diffus\xE9 dans un [environnement ma\xEEtris\xE9](#environnement-maitrise)\xA0;",
-        "- Le [m\xE9dia non temporel](#media-non-temporel) est ins\xE9r\xE9 via JavaScript en v\xE9rifiant la pr\xE9sence et la version du plug-in, en remplacement d\u2019un [contenu alternatif](#contenu-alternatif) d\xE9j\xE0 pr\xE9sent.",
-        "Dans ces situations, le crit\xE8re est non applicable."
-      ],
-      wcag: ["1.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "4.9",
-      theme: 4,
-      title: {
-        fr: "Pour chaque [m\xE9dia non temporel](#media-non-temporel) ayant une alternative, cette alternative est-elle pertinente\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque m\xE9dia non temporel ayant une alternative, cette alternative est-elle pertinente\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque [m\xE9dia non temporel](#media-non-temporel) ayant une alternative, cette alternative permet-elle d\u2019acc\xE9der au m\xEAme contenu et \xE0 des fonctionnalit\xE9s similaires\xA0?"
-        ]
-      },
-      techniques: ["H46", "F30"],
-      wcag: ["1.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "4.10",
-      theme: 4,
-      title: {
-        fr: "Chaque son d\xE9clench\xE9 automatiquement est-il [contr\xF4lable](#controle-son-declenche-automatiquement) par l\u2019utilisateur\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque son d\xE9clench\xE9 automatiquement est-il contr\xF4lable par l\u2019utilisateur\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque s\xE9quence sonore d\xE9clench\xE9e automatiquement via une balise `<object>`, `<video>`, `<audio>`, `<embed>`, `<bgsound>` ou un code JavaScript v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "La s\xE9quence sonore a une dur\xE9e inf\xE9rieure ou \xE9gale \xE0 3 secondes\xA0;",
-          "La s\xE9quence sonore peut \xEAtre stopp\xE9e sur action de l\u2019utilisateur\xA0;",
-          "Le volume de la s\xE9quence sonore peut \xEAtre contr\xF4l\xE9 par l\u2019utilisateur ind\xE9pendamment du contr\xF4le de volume du syst\xE8me."
-        ]
-      },
-      techniques: ["G60", "G170", "G171", "F23", "F93"],
-      wcag: ["1.4.2"],
-      appliesTo: {
-        ruleIds: ["autoplay-media", "axe:no-autoplay-audio"]
-      },
-      judgment: true
-    },
-    {
-      id: "4.11",
-      theme: 4,
-      title: {
-        fr: "La consultation de chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) est-elle, si n\xE9cessaire, [contr\xF4lable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0?"
-      },
-      titlePlain: {
-        fr: "La consultation de chaque m\xE9dia temporel est-elle, si n\xE9cessaire, contr\xF4lable par le clavier et tout dispositif de pointage\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) a-t-il, si n\xE9cessaire, les fonctionnalit\xE9s de [contr\xF4le de sa consultation](#controle-de-la-consultation-d-un-media-temporel)\xA0?"
-        ],
-        "2": [
-          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise), chaque fonctionnalit\xE9 v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "La fonctionnalit\xE9 est [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0;",
-          "Une fonctionnalit\xE9 [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page."
-        ],
-        "3": [
-          "Pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise), chaque fonctionnalit\xE9 v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "La fonctionnalit\xE9 est [activable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0;",
-          "Une fonctionnalit\xE9 [activable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page."
-        ]
-      },
-      techniques: ["G4", "G90", "G202"],
-      wcag: ["2.1.1", "2.1.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "4.12",
-      theme: 4,
-      title: {
-        fr: "La consultation de chaque [m\xE9dia non temporel](#media-non-temporel) est-elle [contr\xF4lable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0?"
-      },
-      titlePlain: {
-        fr: "La consultation de chaque m\xE9dia non temporel est-elle contr\xF4lable par le clavier et tout dispositif de pointage\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque [m\xE9dia non temporel](#media-non-temporel), chaque fonctionnalit\xE9 v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "La fonctionnalit\xE9 est [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0;",
-          "Une fonctionnalit\xE9 [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page."
-        ],
-        "2": [
-          "Pour chaque [m\xE9dia non temporel](#media-non-temporel), chaque fonctionnalit\xE9 v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "La fonctionnalit\xE9 est [activable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0;",
-          "Une fonctionnalit\xE9 [activable par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sente dans la page."
-        ]
-      },
-      techniques: ["G4", "G90"],
-      wcag: ["2.1.1", "2.1.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "4.13",
-      theme: 4,
-      title: {
-        fr: "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) et [non temporel](#media-non-temporel) est-il [compatible avec les technologies d\u2019assistance](#compatible-avec-les-technologies-d-assistance) (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque m\xE9dia temporel et non temporel est-il compatible avec les technologies d\u2019assistance (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) et [non temporel](#media-non-temporel) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "Le nom, le r\xF4le, la valeur, le param\xE9trage et les changements d\u2019\xE9tats des composants d\u2019interfaces sont accessibles aux technologies d\u2019assistance via une API d\u2019accessibilit\xE9\xA0;",
-          "Une alternative [compatible avec une API d\u2019accessibilit\xE9](#compatible-avec-les-technologies-d-assistance) permet d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s."
-        ],
-        "2": [
-          "Chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) et [non temporel](#media-non-temporel) qui poss\xE8de une alternative [compatible avec les technologies d\u2019assistance](#compatible-avec-les-technologies-d-assistance), v\xE9rifie-t-il une de ces conditions\xA0?",
-          "L\u2019alternative est adjacente au [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) ou [non temporel](#media-non-temporel)\xA0;",
-          "L\u2019alternative est accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)\xA0;",
-          "Un m\xE9canisme permet de remplacer le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) ou [non temporel](#media-non-temporel) par son alternative."
-        ]
-      },
-      techniques: ["G10", "G135", "F15", "F54"],
-      particularCases: [
-        "Il existe une gestion de cas particulier lorsque\xA0le [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise) ou [non temporel](#media-non-temporel) est utilis\xE9 \xE0 des fins d\xE9coratives (c\u2019est-\xE0-dire qu\u2019il n\u2019apporte aucune information).",
-        "Dans ces situations, le crit\xE8re est non applicable."
-      ],
-      wcag: ["4.1.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "5.1",
-      theme: 5,
-      title: {
-        fr: "Chaque [tableau de donn\xE9es complexe](#tableau-de-donnees-complexe) a-t-il un [r\xE9sum\xE9](#resume-de-tableau)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque tableau de donn\xE9es complexe a-t-il un r\xE9sum\xE9\xA0?"
-      },
-      tests: {
-        "1": ["Pour chaque [tableau de donn\xE9es complexe](#tableau-de-donnees-complexe), un [r\xE9sum\xE9](#resume-de-tableau) est-il disponible\xA0?"]
-      },
-      techniques: ["H73"],
-      technicalNote: [
-        "La sp\xE9cification HTML propose plusieurs [m\xE9thodes pour lier un r\xE9sum\xE9 \xE0 un tableau](#table-descriptions-techniques) (tableau li\xE9 \xE0 un passage de texte avec l\u2019attribut `aria-describedby`, tableau group\xE9 dans un \xE9l\xE9ment `figure` avec un r\xE9sum\xE9 pr\xE9sent dans un \xE9l\xE9ment `figcaption` ou un \xE9l\xE9ment `p`, r\xE9sum\xE9 pr\xE9sent dans un \xE9l\xE9ment `details` contenu dans l\u2019\xE9l\xE9ment `caption`). Ces m\xE9thodes n\u2019ont pas un support suffisant pour \xEAtre utilis\xE9es actuellement."
-      ],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "5.2",
-      theme: 5,
-      title: {
-        fr: "Pour chaque [tableau de donn\xE9es complexe](#tableau-de-donnees-complexe) ayant un [r\xE9sum\xE9](#resume-de-tableau), celui-ci est-il pertinent\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque tableau de donn\xE9es complexe ayant un r\xE9sum\xE9, celui-ci est-il pertinent\xA0?"
-      },
-      tests: {
-        "1": ["Pour chaque [tableau de donn\xE9es complexe](#tableau-de-donnees-complexe) ayant un [r\xE9sum\xE9](#resume-de-tableau), celui-ci est-il pertinent\xA0?"]
-      },
-      techniques: ["H73"],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "5.3",
-      theme: 5,
-      title: {
-        fr: "Pour chaque [tableau de mise en forme](#tableau-de-mise-en-forme), le contenu lin\xE9aris\xE9 reste-t-il compr\xE9hensible\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque tableau de mise en forme, le contenu lin\xE9aris\xE9 reste-t-il compr\xE9hensible\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [tableau de mise en forme](#tableau-de-mise-en-forme) v\xE9rifie-t-il ces conditions\xA0?",
-          "Le contenu lin\xE9aris\xE9 reste compr\xE9hensible\xA0;",
-          'La balise `<table>` poss\xE8de un attribut `role="presentation"`.'
-        ]
-      },
-      techniques: ["F49", "ARIA4"],
-      wcag: ["1.3.2", "4.1.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "5.4",
-      theme: 5,
-      title: {
-        fr: "Pour chaque [tableau de donn\xE9es ayant un titre](#tableau-de-donnees-ayant-un-titre), le titre est-il correctement associ\xE9 au tableau de donn\xE9es\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque tableau de donn\xE9es ayant un titre, le titre est-il correctement associ\xE9 au tableau de donn\xE9es\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque [tableau de donn\xE9es ayant un titre](#tableau-de-donnees-ayant-un-titre), le titre est-il correctement associ\xE9 au tableau de donn\xE9es\xA0?"
-        ]
-      },
-      techniques: ["H39"],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: ["table-caption-missing"]
-      }
-    },
-    {
-      id: "5.5",
-      theme: 5,
-      title: {
-        fr: "Pour chaque [tableau de donn\xE9es ayant un titre](#tableau-de-donnees-ayant-un-titre), celui-ci est-il pertinent\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque tableau de donn\xE9es ayant un titre, celui-ci est-il pertinent\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque [tableau de donn\xE9es ayant un titre](#tableau-de-donnees-ayant-un-titre), ce titre permet-il d\u2019identifier le contenu du [tableau de donn\xE9es](#tableau-de-donnees) de mani\xE8re claire et concise\xA0?"
-        ]
-      },
-      techniques: ["H39"],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "5.6",
-      theme: 5,
-      title: {
-        fr: "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), chaque [en-t\xEAte de colonne](#en-tete-de-colonne-ou-de-ligne) et chaque [en-t\xEAte de ligne](#en-tete-de-colonne-ou-de-ligne) sont-ils correctement d\xE9clar\xE9s\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque tableau de donn\xE9es, chaque en-t\xEAte de colonne et chaque en-t\xEAte de ligne sont-ils correctement d\xE9clar\xE9s\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), chaque [en-t\xEAte de colonne](#en-tete-de-colonne-ou-de-ligne) s\u2019appliquant \xE0 la totalit\xE9 de la colonne v\xE9rifie-t-il une de ces conditions\xA0?",
-          "L\u2019[en-t\xEAte de colonnes](#en-tete-de-colonne-ou-de-ligne) est structur\xE9 au moyen d\u2019une balise `<th>`\xA0;",
-          'L\u2019[en-t\xEAte de colonnes](#en-tete-de-colonne-ou-de-ligne) est structur\xE9 au moyen d\u2019une balise pourvue d\u2019un attribut WAI-ARIA `role="columnheader"`.'
-        ],
-        "2": [
-          "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), chaque [en-t\xEAte de ligne](#en-tete-de-colonne-ou-de-ligne) s\u2019appliquant \xE0 la totalit\xE9 de la ligne v\xE9rifie-t-il une de ces conditions\xA0?",
-          "L\u2019[en-t\xEAte de lignes](#en-tete-de-colonne-ou-de-ligne) est structur\xE9 au moyen d\u2019une balise `<th>`\xA0;",
-          'L\u2019[en-t\xEAte de lignes](#en-tete-de-colonne-ou-de-ligne) est structur\xE9 au moyen d\u2019une balise pourvue d\u2019un attribut WAI-ARIA `role="rowheader"`.'
-        ],
-        "3": [
-          "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), chaque en-t\xEAte ne s\u2019appliquant pas \xE0 la totalit\xE9 de la ligne ou de la colonne est-il structur\xE9 au moyen d\u2019une balise `<th>`\xA0?"
-        ],
-        "4": [
-          "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), chaque cellule associ\xE9e \xE0 plusieurs en-t\xEAtes est-elle structur\xE9e au moyen d\u2019une balise `<td>` ou `<th>`\xA0?"
-        ]
-      },
-      techniques: ["H51", "F91"],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: ["axe:empty-table-header", "axe:td-has-header", "axe:th-has-data-cells", "data-table-no-headers"]
-      }
-    },
-    {
-      id: "5.7",
-      theme: 5,
-      title: {
-        fr: "Pour chaque [tableau de donn\xE9es](#tableau-de-donnees), la technique appropri\xE9e permettant d\u2019associer chaque cellule avec ses [en-t\xEAtes](#en-tete-de-colonne-ou-de-ligne) est-elle utilis\xE9e (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque tableau de donn\xE9es, la technique appropri\xE9e permettant d\u2019associer chaque cellule avec ses en-t\xEAtes est-elle utilis\xE9e (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque contenu de balise `<th>` s\u2019appliquant \xE0 la totalit\xE9 de la ligne ou de la colonne, la balise `<th>` respecte-t-elle une de ces conditions (hors cas particuliers)\xA0?",
-          "La balise `<th>` poss\xE8de un attribut `id` unique\xA0;",
-          "La balise `<th>` poss\xE8de un attribut `scope`\xA0;",
-          'La balise `<th>` poss\xE8de un attribut WAI-ARIA `role="rowheader"` ou `role="columnheader"`.'
-        ],
-        "2": [
-          "Pour chaque contenu de balise `<th>` s\u2019appliquant \xE0 la totalit\xE9 de la ligne ou de la colonne et poss\xE9dant un attribut `scope`, la balise `<th>` v\xE9rifie-t-elle une de ces conditions\xA0?",
-          'La balise `<th>` poss\xE8de un attribut `scope` avec la valeur `"row"` pour les [en-t\xEAtes de ligne](#en-tete-de-colonne-ou-de-ligne)\xA0;',
-          'La balise `<th>` poss\xE8de un attribut `scope` avec la valeur `"col"` pour les [en-t\xEAtes de colonne](#en-tete-de-colonne-ou-de-ligne).'
-        ],
-        "3": [
-          "Pour chaque contenu de balise `<th>` ne s\u2019appliquant pas \xE0 la totalit\xE9 de la ligne ou de la colonne, la balise `<th>` v\xE9rifie-t-elle ces conditions\xA0?",
-          "La balise `<th>` ne poss\xE8de pas d\u2019attribut `scope`\xA0;",
-          'La balise `<th>` ne poss\xE8de pas d\u2019attribut WAI-ARIA `role="rowheader"` ou `role="columnheader"`\xA0;',
-          "La balise `<th>` poss\xE8de un attribut `id` unique."
-        ],
-        "4": [
-          "Pour chaque contenu de balise `<td>` ou `<th>` associ\xE9e \xE0 un ou plusieurs en-t\xEAtes poss\xE9dant un attribut `id`, la balise v\xE9rifie-t-elle ces conditions\xA0?",
-          "La balise poss\xE8de un attribut `headers`\xA0;",
-          "L\u2019attribut `headers` poss\xE8de la liste des valeurs d\u2019attribut `id` des [en-t\xEAtes](#en-tete-de-colonne-ou-de-ligne) associ\xE9s."
-        ],
-        "5": [
-          'Pour chaque balise pourvue d\u2019un attribut WAI-ARIA `role="rowheader"` ou `role="columnheader"` dont le contenu s\u2019applique \xE0 la totalit\xE9 de la ligne ou de la colonne, la balise v\xE9rifie-t-elle une de ces conditions\xA0?',
-          'La balise poss\xE8de un attribut WAI-ARIA `role="rowheader"` pour les [en-t\xEAtes de ligne](#en-tete-de-colonne-ou-de-ligne)\xA0;',
-          'La balise poss\xE8de un attribut WAI-ARIA `role="columnheader"` pour les [en-t\xEAtes de colonne](#en-tete-de-colonne-ou-de-ligne).'
-        ]
-      },
-      techniques: ["H43", "H63", "F90"],
-      technicalNote: [
-        "Si l\u2019attribut `headers` est impl\xE9ment\xE9 sur une cellule d\xE9j\xE0 reli\xE9e \xE0 un en-t\xEAte (de ligne ou de colonne) avec l\u2019attribut `scope` (avec la valeur `col` ou `row`), c\u2019est l\u2019en-t\xEAte ou les en-t\xEAtes r\xE9f\xE9renc\xE9s par l\u2019attribut `headers` qui seront restitu\xE9s aux technologies d\u2019assistance. Les en-t\xEAtes reli\xE9s avec l\u2019attribut `scope` seront ignor\xE9s."
-      ],
-      particularCases: [
-        "Dans le cas de tableaux de donn\xE9es ayant des en-t\xEAtes sur une seule ligne ou une seule colonne, les en-t\xEAtes peuvent \xEAtre structur\xE9s \xE0 l\u2019aide de balise `<th>` sans attribut `scope`."
-      ],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: ["axe:scope-attr-valid", "axe:td-headers-attr", "data-table-no-headers", "sortable-header-no-aria-sort", "table-empty-data-cell"]
-      }
-    },
-    {
-      id: "5.8",
-      theme: 5,
-      title: {
-        fr: "Chaque [tableau de mise en forme](#tableau-de-mise-en-forme) ne doit pas utiliser d\u2019\xE9l\xE9ments propres aux  [tableaux de donn\xE9es](#tableau-de-donnees). Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque tableau de mise en forme ne doit pas utiliser d\u2019\xE9l\xE9ments propres aux  tableaux de donn\xE9es. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [tableau de mise en forme](#tableau-de-mise-en-forme) (balise `<table>`) v\xE9rifie-t-il ces conditions\xA0?",
-          'Le tableau de mise en forme (balise `<table>`) n\u2019a pas d\u2019attribut `summary` (sinon vide) et ne contient pas de balises `<caption>`, `<th>`, `<thead>`, `<tfoot>` ou de balises ayant un attribut WAI-ARIA `role="rowheader"`, `role="columnheader"`\xA0;',
-          "Les cellules du tableau de mise en forme (balises `<td>`) ne poss\xE8dent pas d\u2019attributs `scope`, `headers` et `axis`."
-        ]
-      },
-      techniques: ["F46"],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: ["axe:table-fake-caption", "layout-table-data-markup"]
-      }
-    },
-    {
-      id: "6.1",
-      theme: 6,
-      title: {
-        fr: "Chaque [lien](#lien) est-il explicite (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque lien est-il explicite (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [lien texte](#lien-texte) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) seul permet d\u2019en comprendre la fonction et la destination\xA0;",
-          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) additionn\xE9 au [contexte du lien](#contexte-du-lien) permet d\u2019en comprendre la fonction et la destination."
-        ],
-        "2": [
-          "Chaque [lien image](#lien-image) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) seul permet d\u2019en comprendre la fonction et la destination\xA0;",
-          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) additionn\xE9 au [contexte du lien](#contexte-du-lien) permet d\u2019en comprendre la fonction et la destination."
-        ],
-        "3": [
-          "Chaque [lien composite](#lien-composite) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) seul permet d\u2019en comprendre la fonction et la destination\xA0;",
-          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) additionn\xE9 au [contexte du lien](#contexte-du-lien) permet d\u2019en comprendre la fonction et la destination."
-        ],
-        "4": [
-          "Chaque [lien SVG](#lien-svg) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) seul permet d\u2019en comprendre la fonction et la destination\xA0;",
-          "L\u2019[intitul\xE9 de lien](#intitule-ou-nom-accessible-de-lien) additionn\xE9 au [contexte du lien](#contexte-du-lien) permet d\u2019en comprendre la fonction et la destination."
-        ],
-        "5": [
-          "Pour chaque [lien](#lien) ayant un [intitul\xE9 visible](#intitule-visible), le [nom accessible du lien](#intitule-ou-nom-accessible-de-lien) contient-il au moins l\u2019[intitul\xE9 visible](#intitule-visible) (hors cas particuliers)\xA0?"
-        ]
-      },
-      techniques: ["H30", "H78", "H79", "H80", "H81", "G53", "G91", "F63", "F89", "ARIA7", "ARIA8"],
-      technicalNote: [
-        "Lorsque l\u2019intitul\xE9 visible est compl\xE9t\xE9 par une autre expression dans le nom accessible\xA0:",
-        "- WCAG insiste sur le placement de l\u2019intitul\xE9 visible au d\xE9but du nom accessible sans toutefois r\xE9server l\u2019exclusivit\xE9 de cet emplacement\xA0;",
-        "- WCAG consid\xE8re comme un cas d\u2019\xE9chec une correspondance non exacte de la cha\xEEne de caract\xE8res de l\u2019intitul\xE9 visible au sein du nom accessible.",
-        "Par exemple, si l\u2019on consid\xE8re l\u2019intitul\xE9 visible \xAB\xA0Commander maintenant\xA0\xBB compl\xE9t\xE9 dans le nom accessible par l\u2019expression \xAB\xA0produit X\xA0\xBB, on peut avoir les diff\xE9rents cas suivants\xA0:",
-        "- \xAB\xA0Commander maintenant produit X\xA0\xBB est valide (bonne pratique)\xA0;",
-        "- \xAB\xA0Produit X : commander maintenant\xA0\xBB est valide\xA0;",
-        "- \xAB\xA0Commander produit X maintenant\xA0\xBB est non valide."
-      ],
-      particularCases: [
-        "Il existe une gestion de cas particuliers pour les tests 6.1.1, 6.1.2, 6.1.3 et 6.1.4 lorsque le lien est [ambigu pour tout le monde](#ambigu-pour-tout-le-monde). Dans cette situation, o\xF9 il n\u2019est pas possible de rendre le lien explicite dans son contexte, le crit\xE8re est non applicable.",
-        "Il existe une gestion de cas particuliers pour le test 6.1.5 lorsque\xA0:",
-        "- La ponctuation et les lettres majuscules sont pr\xE9sentes dans le texte de l\u2019[intitul\xE9 visible](#intitule-visible)\xA0: elles peuvent \xEAtre ignor\xE9es dans le nom accessible sans porter \xE0 cons\xE9quence\xA0;",
-        "- Le texte de l\u2019[intitul\xE9 visible](#intitule-visible) sert de symbole\xA0: le texte ne doit pas \xEAtre interpr\xE9t\xE9 litt\xE9ralement au niveau du nom accessible. Le nom doit exprimer la fonction v\xE9hicul\xE9e par le symbole (par exemple, \u201CB\u201D au niveau d\u2019un \xE9diteur de texte aura pour nom accessible \u201CMettre en gras\u201D, le signe \u201C>\u201D en fonction du contexte signifiera \u201CSuivant\u201D ou \u201CLancer la vid\xE9o\u201D). Le cas des symboles math\xE9matiques fait cependant exception (voir la note ci-dessous).",
-        "Note\xA0: si l\u2019\xE9tiquette visible repr\xE9sente une expression math\xE9matique, les symboles math\xE9matiques peuvent \xEAtre repris litt\xE9ralement pour servir d\u2019\xE9tiquette au nom accessible (ex.\xA0: \u201CA>B\u201D). Il est laiss\xE9 \xE0 l\u2019utilisateur le soin d\u2019op\xE9rer la correspondance entre l\u2019expression et ce qu\u2019il doit \xE9peler compte tenu de la connaissance qu\u2019il a du fonctionnement de son logiciel de saisie vocale (\u201CA plus grand que B\u201D ou \u201CA sup\xE9rieur \xE0 B\u201D)."
-      ],
-      wcag: ["1.1.1", "2.4.4", "2.5.3"],
-      appliesTo: {
-        ruleIds: ["pack:rgaa:download-link-format"]
-      }
-    },
-    {
-      id: "6.2",
-      theme: 6,
-      title: {
-        fr: "Dans chaque page web, chaque [lien](#lien) a-t-il un [intitul\xE9](#intitule-ou-nom-accessible-de-lien)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, chaque lien a-t-il un intitul\xE9\xA0?"
-      },
-      tests: {
-        "1": ["Dans chaque page web, chaque [lien](#lien) a-t-il un [intitul\xE9](#intitule-ou-nom-accessible-de-lien) entre `<a>` et `</a>`\xA0?"]
-      },
-      techniques: ["H30", "G91", "F89"],
-      technicalNote: [
-        "Une ancre n\u2019est pas un lien m\xEAme si pendant longtemps l\u2019\xE9l\xE9ment `<a>` a servi de support \xE0 cette technique. Elle n\u2019est donc pas concern\xE9e par le pr\xE9sent crit\xE8re."
-      ],
-      wcag: ["1.1.1", "2.4.4"],
-      appliesTo: {
-        ruleIds: ["axe:link-name", "icon-only-control-unnamed", "link-empty-name"]
-      }
-    },
-    {
-      id: "7.1",
-      theme: 7,
-      title: {
-        fr: "Chaque [script](#script) est-il, si n\xE9cessaire, [compatible avec les technologies d\u2019assistance](#compatible-avec-les-technologies-d-assistance)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque script est-il, si n\xE9cessaire, compatible avec les technologies d\u2019assistance\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [script](#script) qui g\xE9n\xE8re ou contr\xF4le un [composant d\u2019interface](#composant-d-interface) v\xE9rifie-t-il, si n\xE9cessaire, une de ces conditions\xA0?",
-          "Le [nom, le r\xF4le, la valeur, le param\xE9trage et les changements d\u2019\xE9tats](#le-nom-le-role-la-valeur-le-parametrage-et-les-changements-d-etats) sont accessibles aux technologies d\u2019assistance via une API d\u2019accessibilit\xE9\xA0;",
-          "Un [composant d\u2019interface](#composant-d-interface) accessible permettant d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s est pr\xE9sent dans la page\xA0;",
-          "Une [alternative](#alternative-a-script) accessible permet d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s."
-        ],
-        "2": [
-          "Chaque [script](#script) qui g\xE9n\xE8re ou contr\xF4le un [composant d\u2019interface](#composant-d-interface) respecte-t-il une de ces conditions\xA0?",
-          "Le [composant d\u2019interface](#composant-d-interface) est [correctement restitu\xE9](#correctement-restitue-par-les-technologies-d-assistance) par les technologies d\u2019assistance\xA0;",
-          "Une [alternative](#alternative-a-script) accessible permet d\u2019acc\xE9der aux m\xEAmes fonctionnalit\xE9s."
-        ],
-        "3": [
-          "Chaque [script](#script) qui g\xE9n\xE8re ou contr\xF4le un [composant d\u2019interface](#composant-d-interface) v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
-          "Le composant poss\xE8de un nom pertinent\xA0;",
-          "Le nom accessible du composant contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
-          "Le composant poss\xE8de un r\xF4le pertinent."
-        ]
-      },
-      techniques: ["G10", "G135", "G136", "F15", "F19", "F20", "F42", "F59", "F79", "ARIA4", "ARIA5", "ARIA18", "ARIA19", "SCR21"],
-      technicalNote: [
-        "Le crit\xE8re 7.1 impl\xE9mente la notion de \xAB\xA0compatible avec les technologies d\u2019assistance\xA0\xBB telle que d\xE9finie par les WCAG, ainsi que le recours \xE0 WAI-ARIA pour rendre un composant ou une fonctionnalit\xE9 accessible. Le bon usage de WAI-ARIA est v\xE9rifi\xE9 via les tests 7.1.1, 7.1.2, 7.1.3.",
-        "Note importante\xA0: dans un environnement HTML5, beaucoup de composants peuvent n\xE9cessiter JavaScript pour fonctionner\xA0; en cons\xE9quence la fourniture d\u2019une alternative \xE0 un composant JavaScript qui ne pourrait pas \xEAtre rendu accessible devra b\xE9n\xE9ficier d\u2019une m\xE9thode sp\xE9cifique au composant en cause, permettant de le remplacer par une alternative accessible (et de le r\xE9activer). Cela signifie que la d\xE9sactivation de JavaScript pour l\u2019ensemble de la page ne sera pas accept\xE9e comme une m\xE9thode valable, \xE0 moins qu\u2019elle ne remette pas en cause l\u2019utilisation des autres composants."
-      ],
-      particularCases: [
-        "Il existe une gestion de cas particuliers pour le test 7.1.3 lorsque\xA0:",
-        "- La ponctuation et les lettres majuscules sont pr\xE9sentes dans le texte de l\u2019intitul\xE9 visible : elles peuvent \xEAtre ignor\xE9es dans le nom accessible sans porter \xE0 cons\xE9quence\xA0;",
-        "- Le texte de l\u2019intitul\xE9 visible sert de symbole : le texte ne doit pas \xEAtre interpr\xE9t\xE9 litt\xE9ralement au niveau du nom accessible. Le nom doit exprimer la fonction v\xE9hicul\xE9e par le symbole (par exemple, \u201CB\u201D au niveau d\u2019un \xE9diteur de texte aura pour nom accessible \u201CMettre en gras\u201D, le signe \u201C>\u201D en fonction du contexte signifiera \u201CSuivant\u201D ou \u201CLancer la vid\xE9o\u201D). Le cas des symboles math\xE9matiques fait cependant exception (voir la note ci-dessous).",
-        "Note\xA0: si l\u2019\xE9tiquette visible repr\xE9sente une expression math\xE9matique, les symboles math\xE9matiques peuvent \xEAtre repris litt\xE9ralement pour servir d\u2019\xE9tiquette au nom accessible (ex.\xA0: \u201CA>B\u201D). Il est laiss\xE9 \xE0 l\u2019utilisateur le soin d\u2019op\xE9rer la correspondance entre l\u2019expression et ce qu\u2019il doit \xE9peler compte tenu de la connaissance qu\u2019il a du fonctionnement de son logiciel de saisie vocale (\u201CA plus grand que B\u201D ou \u201CA sup\xE9rieur \xE0 B\u201D)."
-      ],
-      wcag: ["2.5.3", "4.1.2"],
-      appliesTo: {
-        ruleIds: [
-          "aria-hidden-focusable",
-          "aria-ref-missing-id",
-          "aria-required-children",
-          "axe:aria-allowed-attr",
-          "axe:aria-allowed-role",
-          "axe:aria-hidden-focus",
-          "axe:aria-required-attr",
-          "axe:aria-required-children",
-          "axe:aria-required-parent",
-          "axe:aria-roles",
-          "axe:aria-valid-attr",
-          "axe:aria-valid-attr-value",
-          "axe:nested-interactive",
-          "axe:presentation-role-conflict",
-          "cross-prop-drilled-name-lost",
-          "disabled-context-content",
-          "invalid-aria-role",
-          "nested-interactive",
-          "redundant-aria"
-        ]
-      }
-    },
-    {
-      id: "7.2",
-      theme: 7,
-      title: {
-        fr: "Pour chaque [script](#script) ayant une [alternative](#alternative-a-script), cette alternative est-elle pertinente\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque script ayant une alternative, cette alternative est-elle pertinente\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [script](#script) d\xE9butant par la balise `<script>` et ayant une [alternative](#alternative-a-script) v\xE9rifie-t-il une de ces conditions\xA0?",
-          "L\u2019[alternative](#alternative-a-script) entre `<noscript>` et `</noscript>` permet d\u2019acc\xE9der \xE0 des contenus et des fonctionnalit\xE9s similaires\xA0;",
-          "La page affich\xE9e, lorsque JavaScript est d\xE9sactiv\xE9, permet d\u2019acc\xE9der \xE0 des contenus et des fonctionnalit\xE9s similaires\xA0;",
-          "La page alternative permet d\u2019acc\xE9der \xE0 des contenus et des fonctionnalit\xE9s similaires\xA0;",
-          "Le langage de script c\xF4t\xE9 serveur permet d\u2019acc\xE9der \xE0 des contenus et des fonctionnalit\xE9s similaires\xA0;",
-          "L\u2019alternative pr\xE9sente dans la page permet d\u2019acc\xE9der \xE0 des contenus et des fonctionnalit\xE9s similaires."
-        ],
-        "2": [
-          "Chaque \xE9l\xE9ment non textuel mis \xE0 jour par un [script](#script) (dans la page, ou dans un [cadre](#cadre)) et ayant une [alternative](#alternative-a-script) v\xE9rifie-t-il ces conditions\xA0?",
-          "L\u2019alternative de l\u2019\xE9l\xE9ment non textuel est mise \xE0 jour\xA0;",
-          "L\u2019alternative mise \xE0 jour est pertinente."
-        ]
-      },
-      techniques: ["G136", "F19", "F20"],
-      wcag: ["1.1.1", "4.1.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "7.3",
-      theme: 7,
-      title: {
-        fr: "Chaque [script](#script) est-il [contr\xF4lable par le clavier et par tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque script est-il contr\xF4lable par le clavier et par tout dispositif de pointage (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque \xE9l\xE9ment poss\xE9dant un gestionnaire d\u2019\xE9v\xE9nement contr\xF4l\xE9 par un script v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "L\u2019\xE9l\xE9ment est [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage)\xA0;",
-          "Un \xE9l\xE9ment [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de r\xE9aliser la m\xEAme action est pr\xE9sent dans la page."
-        ],
-        "2": ["Un [script](#script) ne doit pas supprimer le focus d\u2019un \xE9l\xE9ment qui le re\xE7oit. Cette r\xE8gle est-elle respect\xE9e (hors cas particuliers)\xA0?"]
-      },
-      techniques: ["G90", "G202", "F42", "F54", "F55", "SCR2", "SCR20", "SCR29", "SCR35"],
-      particularCases: [
-        "Il existe une gestion de cas particuliers lorsque la fonctionnalit\xE9 d\xE9pend de l\u2019utilisation d\u2019un gestionnaire d\u2019\xE9v\xE9nement sans \xE9quivalent universel\xA0; par exemple, une application de dessin \xE0 main lev\xE9e ne pourra pas \xEAtre rendue contr\xF4lable au clavier. Dans ces situations, le crit\xE8re est non applicable."
-      ],
-      wcag: ["1.3.1", "2.1.1", "2.4.7"],
-      appliesTo: {
-        ruleIds: ["clickable-noninteractive"]
-      }
-    },
-    {
-      id: "7.4",
-      theme: 7,
-      title: {
-        fr: "Pour chaque [script](#script) qui initie un [changement de contexte](#changement-de-contexte), l\u2019utilisateur est-il averti ou en a-t-il le contr\xF4le\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque script qui initie un changement de contexte, l\u2019utilisateur est-il averti ou en a-t-il le contr\xF4le\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [script](#script) qui initie un [changement de contexte](#changement-de-contexte) v\xE9rifie-t-il une de ces conditions\xA0?",
-          "L\u2019utilisateur est averti par un texte de l\u2019action du script et du type de changement avant son d\xE9clenchement\xA0;",
-          "Le changement de contexte est initi\xE9 par un bouton (input de type `submit`, `button` ou `image` ou balise `<button>`) explicite\xA0;",
-          "Le changement de contexte est initi\xE9 par un lien explicite."
-        ]
-      },
-      techniques: ["G13", "G76", "G80", "G107", "H32", "H84", "F9", "F22", "F36", "F37", "F41", "SCR19"],
-      wcag: ["3.2.1", "3.2.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "7.5",
-      theme: 7,
-      title: {
-        fr: "Dans chaque page web, les [messages de statut](#message-de-statut) sont-ils correctement restitu\xE9s par les technologies d\u2019assistance\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les messages de statut sont-ils correctement restitu\xE9s par les technologies d\u2019assistance\xA0?"
-      },
-      tests: {
-        "1": [
-          'Chaque [message de statut](#message-de-statut) qui informe de la r\xE9ussite, du r\xE9sultat d\u2019une action ou bien de l\u2019\xE9tat d\u2019une application utilise-t-il l\u2019attribut WAI-ARIA `role="status"`\xA0?'
-        ],
-        "2": [
-          'Chaque [message de statut](#message-de-statut) qui pr\xE9sente une suggestion, ou avertit de l\u2019existence d\u2019une erreur utilise-t-il l\u2019attribut WAI-ARIA `role="alert"`\xA0?'
-        ],
-        "3": [
-          'Chaque [message de statut](#message-de-statut) qui indique la progression d\u2019un processus utilise-t-il l\u2019un des attributs WAI-ARIA `role="log"`, `role="progressbar"` ou `role="status"`\xA0?'
-        ]
-      },
-      techniques: ["ARIA19", "ARIA22", "ARIA23"],
-      technicalNote: [
-        "Les r\xF4les WAI-ARIA `log`, `status` et `alert` ont implicitement une valeur d\u2019attribut WAI-ARIA `aria-live` et `aria-atomic`. On pourra donc consid\xE9rer (conform\xE9ment \xE0 la sp\xE9cification WAI-ARIA 1.1) que\xA0:",
-        '- Un attribut WAI-ARIA `aria-live="polite"` associ\xE9 \xE0 un message de statut peut valoir pour un r\xF4le WAI-ARIA `log`\xA0;',
-        '- Un attribut WAI-ARIA `aria-live="polite"` et un attribut WAI-ARIA `aria-atomic="true"` associ\xE9s \xE0 un message de statut peuvent valoir pour un r\xF4le WAI-ARIA `status`\xA0;',
-        '- Un attribut WAI-ARIA `aria-live="assertive"` et un attribut WAI-ARIA `aria-atomic="true"` associ\xE9s \xE0 un message de statut peuvent valoir pour un r\xF4le WAI-ARIA `alert`.',
-        "C\u2019est sous r\xE9serve que la nature du message de statut satisfasse bien \xE0 la correspondance implicitement \xE9tablie. Dans le cas d\u2019un message de statut indiquant la progression d\u2019un processus et mat\xE9rialis\xE9 graphiquement par une barre de progression, un r\xF4le WAI-ARIA `progressbar` explicite est n\xE9cessaire."
-      ],
-      wcag: ["4.1.3"],
-      appliesTo: {
-        ruleIds: ["dyn-live-region", "live-region-conflict", "status-message-not-assertive"]
-      }
-    },
-    {
-      id: "8.1",
-      theme: 8,
-      title: {
-        fr: "Chaque page web est-elle d\xE9finie par un [type de document](#type-de-document)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque page web est-elle d\xE9finie par un type de document\xA0?"
-      },
-      tests: {
-        "1": ["Pour chaque page web, le [type de document](#type-de-document) (balise `doctype`) est-il pr\xE9sent\xA0?"],
-        "2": ["Pour chaque page web, le [type de document](#type-de-document) (balise `doctype`) est-il valide\xA0?"],
-        "3": [
-          "Pour chaque page web poss\xE9dant une d\xE9claration de [type de document](#type-de-document), celle-ci est-elle situ\xE9e avant la balise `<html>` dans le code source\xA0?"
-        ]
-      },
-      techniques: ["G134", "G192"],
-      wcag: ["4.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "8.2",
-      theme: 8,
-      title: {
-        fr: "Pour chaque page web, le code source g\xE9n\xE9r\xE9 est-il valide selon le [type de document](#type-de-document) sp\xE9cifi\xE9\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque page web, le code source g\xE9n\xE9r\xE9 est-il valide selon le type de document sp\xE9cifi\xE9\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque d\xE9claration de [type de document](#type-de-document), le code source g\xE9n\xE9r\xE9 de la page v\xE9rifie-t-il ces conditions\xA0?",
-          "Les balises, attributs et valeurs d\u2019attributs respectent les [r\xE8gles d\u2019\xE9criture](#regles-d-ecriture)\xA0;",
-          "L\u2019imbrication des balises est conforme\xA0;",
-          "L\u2019ouverture et la fermeture des balises sont conformes\xA0;",
-          "Les valeurs d\u2019attribut id sont uniques dans la page\xA0;",
-          "Les attributs ne sont pas doubl\xE9s sur un m\xEAme \xE9l\xE9ment."
-        ]
-      },
-      techniques: ["H74", "H93", "H94", "F70", "F77"],
-      wcag: ["4.1.1", "4.1.2"],
-      appliesTo: {
-        ruleIds: ["axe:duplicate-id", "axe:duplicate-id-active", "axe:duplicate-id-aria", "duplicate-id"]
-      }
-    },
-    {
-      id: "8.3",
-      theme: 8,
-      title: {
-        fr: "Dans chaque page web, la [langue par d\xE9faut](#langue-par-defaut) est-elle pr\xE9sente\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, la langue par d\xE9faut est-elle pr\xE9sente\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque page web, l\u2019indication de langue par d\xE9faut v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "L\u2019indication de la langue de la page (attribut `lang` et/ou `xml:lang`) est donn\xE9e pour l\u2019\xE9l\xE9ment `html`\xA0;",
-          "L\u2019indication de la langue de la page (attribut `lang` et/ou `xml:lang`) est donn\xE9e sur chaque \xE9l\xE9ment de texte ou sur l\u2019un des \xE9l\xE9ments parents."
-        ]
-      },
-      techniques: ["H57"],
-      wcag: ["3.1.1"],
-      appliesTo: {
-        ruleIds: ["axe:html-has-lang", "axe:html-xml-lang-mismatch", "html-lang-missing"]
-      }
-    },
-    {
-      id: "8.4",
-      theme: 8,
-      title: {
-        fr: "Pour chaque page web ayant une [langue par d\xE9faut](#langue-par-defaut), le [code de langue](#code-de-langue) est-il pertinent\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque page web ayant une langue par d\xE9faut, le code de langue est-il pertinent\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque page web ayant une langue par d\xE9faut, le code de langue v\xE9rifie-t-il ces conditions\xA0?",
-          "Le code de langue est valide\xA0;",
-          "Le code de langue est pertinent."
-        ]
-      },
-      techniques: ["H57"],
-      wcag: ["3.1.1"],
-      appliesTo: {
-        ruleIds: ["axe:html-lang-valid", "lang-invalid"]
-      },
-      judgment: true
-    },
-    {
-      id: "8.5",
-      theme: 8,
-      title: {
-        fr: "Chaque page web a-t-elle un [titre de page](#titre-de-page)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque page web a-t-elle un titre de page\xA0?"
-      },
-      tests: {
-        "1": ["Chaque page web a-t-elle un [titre de page](#titre-de-page) (balise `<title>`)\xA0?"]
-      },
-      techniques: ["G88", "G127", "H25"],
-      wcag: ["2.4.2"],
-      appliesTo: {
-        ruleIds: ["axe:document-title", "title-missing-empty"]
-      }
-    },
-    {
-      id: "8.6",
-      theme: 8,
-      title: {
-        fr: "Pour chaque page web ayant un [titre de page](#titre-de-page), ce titre est-il pertinent\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque page web ayant un titre de page, ce titre est-il pertinent\xA0?"
-      },
-      tests: {
-        "1": ["Pour chaque page web ayant un [titre de page](#titre-de-page) (balise `<title>`), le contenu de cette balise est-il pertinent\xA0?"]
-      },
-      techniques: ["G88", "G127", "H25"],
-      wcag: ["2.4.2"],
-      appliesTo: {
-        ruleIds: []
-      },
-      judgment: true
-    },
-    {
-      id: "8.7",
-      theme: 8,
-      title: {
-        fr: "Dans chaque page web, chaque [changement de langue](#changement-de-langue) est-il indiqu\xE9 dans le code source (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, chaque changement de langue est-il indiqu\xE9 dans le code source (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque texte \xE9crit dans une langue diff\xE9rente de la [langue par d\xE9faut](#langue-par-defaut) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "L\u2019indication de langue est donn\xE9e sur l\u2019\xE9l\xE9ment contenant le texte (attribut `lang` et/ou `xml:lang`)\xA0;",
-          "L\u2019indication de langue est donn\xE9e sur un des \xE9l\xE9ments parents (attribut `lang` et/ou `xml:lang`)"
-        ]
-      },
-      techniques: ["H58"],
-      particularCases: [
-        "Il y a une gestion de cas particuliers sur le changement de langue pour les cas suivants\xA0:",
-        "- Nom propre, le crit\xE8re est non applicable\xA0;",
-        "- Nom commun de langue \xE9trang\xE8re pr\xE9sent dans le dictionnaire officiel de la langue (voir note 1 ci-dessous) par d\xE9faut de la page web, le crit\xE8re est non applicable\xA0;",
-        "- Le terme de langue \xE9trang\xE8re soumis, via un [champ de formulaire](#champ-de-saisie-de-formulaire) et rappel\xE9 dans la page (par exemple comme indication du terme recherch\xE9 dans le cas d\u2019un moteur de recherche), le crit\xE8re est non applicable\xA0;",
-        "- Passage de texte dont la langue ne peut pas \xEAtre d\xE9termin\xE9e : le crit\xE8re est non applicable\xA0;",
-        "- Terme ou passage de texte issus d\u2019une langue morte ou imaginaire pour laquelle il n\u2019existe pas d\u2019interpr\xE9tation vocale : le crit\xE8re est non applicable.",
-        "Note 1\xA0: le dictionnaire officiel est celui recommand\xE9 par l\u2019acad\xE9mie en charge de la langue en question. Pour la France, par exemple, le lien vers le dictionnaire officiel se trouve sur le site de l\u2019Acad\xE9mie fran\xE7aise \xE0 l\u2019adresse suivante\xA0: http://www.academie-francaise.fr/le-dictionnaire/la-9e-edition. Pour toute demande aupr\xE8s du service du dictionnaire de l\u2019Acad\xE9mie fran\xE7aise, utiliser le formulaire de contact du service du dictionnaire.",
-        "Note 2\xA0: pour les noms communs de langue \xE9trang\xE8re, absents dans le dictionnaire officiel de la langue par d\xE9faut de la page web, et qui sont pass\xE9s dans le langage commun (exemple\xA0: newsletter)\xA0: le crit\xE8re est applicable, uniquement lorsque l\u2019absence d\u2019indication de langue peut provoquer une incompr\xE9hension pour la restitution."
-      ],
-      wcag: ["3.1.2"],
-      appliesTo: {
-        ruleIds: ["inline-lang-change-missing"]
-      }
-    },
-    {
-      id: "8.8",
-      theme: 8,
-      title: {
-        fr: "Dans chaque page web, le code de langue de chaque [changement de langue](#changement-de-langue) est-il valide et pertinent\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, le code de langue de chaque changement de langue est-il valide et pertinent\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque page web, le code de langue de chaque [changement de langue](#changement-de-langue) v\xE9rifie-t-il ces conditions\xA0?",
-          "Le code de langue est valide\xA0;",
-          "Le code de langue est pertinent."
-        ]
-      },
-      techniques: ["H58"],
-      wcag: ["3.1.2"],
-      appliesTo: {
-        ruleIds: ["axe:valid-lang", "lang-invalid"]
-      }
-    },
-    {
-      id: "8.9",
-      theme: 8,
-      title: {
-        fr: "Dans chaque page web, les balises ne doivent pas \xEAtre utilis\xE9es [uniquement \xE0 des fins de pr\xE9sentation](#uniquement-a-des-fins-de-presentation). Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les balises ne doivent pas \xEAtre utilis\xE9es uniquement \xE0 des fins de pr\xE9sentation. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web les balises (\xE0 l\u2019exception de `<div>`, `<span>` et `<table>`) ne doivent pas \xEAtre utilis\xE9es [uniquement \xE0 des fins de pr\xE9sentation](#uniquement-a-des-fins-de-presentation). Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ]
-      },
-      techniques: ["G115", "H88", "F43", "F92"],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "8.10",
-      theme: 8,
-      title: {
-        fr: "Dans chaque page web, les changements du [sens de lecture](#sens-de-lecture) sont-ils signal\xE9s\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les changements du sens de lecture sont-ils signal\xE9s\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque texte dont le sens de lecture est diff\xE9rent du [sens de lecture](#sens-de-lecture) par d\xE9faut est contenu dans une balise poss\xE9dant un attribut `dir`\xA0?"
-        ],
-        "2": [
-          "Dans chaque page web, chaque changement du [sens de lecture](#sens-de-lecture) (attribut `dir`) v\xE9rifie-t-il ces conditions\xA0?",
-          "La valeur de l\u2019attribut `dir` est conforme (`rtl` ou `ltr`)\xA0;",
-          "La valeur de l\u2019attribut `dir` est pertinente."
-        ]
-      },
-      techniques: ["H56"],
-      wcag: ["1.3.2"],
-      appliesTo: {
-        ruleIds: ["pack:rgaa:dir-value-invalid"]
-      }
-    },
-    {
-      id: "9.1",
-      theme: 9,
-      title: {
-        fr: "Dans chaque page web, l\u2019information est-elle structur\xE9e par l\u2019utilisation appropri\xE9e de [titres](#titre)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, l\u2019information est-elle structur\xE9e par l\u2019utilisation appropri\xE9e de titres\xA0?"
-      },
-      tests: {
-        "1": [
-          'Dans chaque page web, la hi\xE9rarchie entre les [titres](#titre) (balise `<hx>` ou balise poss\xE9dant un attribut WAI-ARIA `role="heading"` associ\xE9 \xE0 un attribut WAI-ARIA `aria-level`) est-elle pertinente\xA0?'
-        ],
-        "2": [
-          'Dans chaque page web, le contenu de chaque [titre](#titre) (balise `<hx>` ou balise poss\xE9dant un attribut WAI-ARIA `role="heading"` associ\xE9 \xE0 un attribut WAI-ARIA `aria-level`) est-il pertinent\xA0?'
-        ],
-        "3": [
-          'Dans chaque page web, chaque passage de texte constituant un [titre](#titre) est-il structur\xE9 \xE0 l\u2019aide d\u2019une balise `<hx>` ou d\u2019une balise poss\xE9dant un attribut WAI-ARIA `role="heading"` associ\xE9 \xE0 un attribut WAI-ARIA `aria-level`\xA0?'
-        ]
-      },
-      techniques: ["G115", "G130", "H42", "G141", "ARIA4", "ARIA12"],
-      technicalNote: [
-        "WAI-ARIA permet de d\xE9finir des titres via le r\xF4le `heading` et l\u2019attribut `aria-level` (indication du niveau de titre). Bien qu\u2019il soit pr\xE9f\xE9rable d\u2019utiliser l\u2019\xE9l\xE9ment de titre natif en HTML `<hx>`, l\u2019utilisation du r\xF4le WAI-ARIA `heading` est compatible avec l\u2019accessibilit\xE9."
-      ],
-      wcag: ["1.3.1", "2.4.1", "2.4.6", "4.1.2"],
-      appliesTo: {
-        ruleIds: ["axe:empty-heading", "axe:heading-order", "axe:page-has-heading-one", "empty-heading", "h1-missing", "h1-multiple", "heading-order-skip"]
-      }
-    },
-    {
-      id: "9.2",
-      theme: 9,
-      title: {
-        fr: "Dans chaque page web, la [structure du document](#structure-du-document) est-elle coh\xE9rente (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, la structure du document est-elle coh\xE9rente (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, la [structure du document](#structure-du-document) v\xE9rifie-t-elle ces conditions (hors cas particuliers)\xA0?",
-          "La [zone d\u2019en-t\xEAte de la page](#zone-d-en-tete) est structur\xE9e via une balise `<header>`\xA0;",
-          "Les [zones de navigation principales et secondaires](#menu-et-barre-de-navigation) sont structur\xE9es via une balise `<nav>`\xA0;",
-          "La balise `<nav>` est r\xE9serv\xE9e \xE0 la structuration des [zones de navigation principales et secondaires](#menu-et-barre-de-navigation)\xA0;",
-          "La [zone de contenu principal](#zone-de-contenu-principal) est structur\xE9e via une balise `<main>`\xA0;",
-          "La [structure du document](#structure-du-document) utilise une balise `<main>` visible unique\xA0;",
-          "La [zone de pied de page](#zone-de-pied-de-page) est structur\xE9e via une balise `<footer>`."
-        ]
-      },
-      techniques: ["G115", "ARIA11"],
-      technicalNote: [
-        "La balise `<main>` peut \xEAtre utilis\xE9e plusieurs fois dans le m\xEAme document HTML. N\xE9anmoins, il ne peut y avoir en permanence qu\u2019une seule balise visible et lisible par les technologies d\u2019assistances, les autres devant disposer d\u2019un attribut `hidden` ou d\u2019un style permettant de les masquer aux technologies d\u2019assistances. \xC0 noter cependant que l\u2019utilisation d\u2019un style seul restera insuffisante pour assurer l\u2019unicit\xE9 d\u2019une balise `<main>` visible en cas de d\xE9sactivation des feuilles de styles."
-      ],
-      particularCases: ["Lorsque le doctype d\xE9clar\xE9 dans la page n\u2019est pas le doctype HTML5, ce crit\xE8re est non applicable."],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: ["missing-main-landmark", "multiple-main-landmark", "nav-landmark-missing"]
-      }
-    },
-    {
-      id: "9.3",
-      theme: 9,
-      title: {
-        fr: "Dans chaque page web, chaque [liste](#listes) est-elle correctement structur\xE9e\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, chaque liste est-elle correctement structur\xE9e\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, les informations regroup\xE9es visuellement sous forme de [liste](#listes) non ordonn\xE9e v\xE9rifient-elles une de ces conditions\xA0?",
-          "La liste utilise les balises HTML `<ul>` et `<li>`\xA0;",
-          'La liste utilise les attributs WAI-ARIA `role="list"` et `role="listitem"`.'
-        ],
-        "2": [
-          "Dans chaque page web, les informations regroup\xE9es visuellement sous forme de [liste](#listes) ordonn\xE9e v\xE9rifient-elles une de ces conditions\xA0?",
-          "La liste utilise les balises HTML `<ol>` et `<li>`\xA0;",
-          'La liste utilise les attributs WAI-ARIA `role="list"` et `role="listitem"`.'
-        ],
-        "3": [
-          "Dans chaque page web, les informations regroup\xE9es sous forme de [liste](#listes) de description utilisent-elles les balises `<dl>` et `<dt>/<dd>`\xA0?"
-        ]
-      },
-      techniques: ["G115", "G153", "H40", "H48", "F2"],
-      technicalNote: [
-        'Les attributs WAI-ARIA `role="list"` et `role="listitem"` peuvent n\xE9cessiter l\u2019utilisation des attributs WAI-ARIA `aria-setsize` et `aria-posinset` dans le cas o\xF9 l\u2019ensemble de la liste n\u2019est pas disponible via le DOM g\xE9n\xE9r\xE9 au moment de la consultation.',
-        'Les attributs WAI-ARIA `role="tree"`, `role="tablist"`, `role="menu"`, `role="combobox"` et `role="listbox"` ne sont pas \xE9quivalents \xE0 une liste HTML `<ul>` ou `<ol>`.'
-      ],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: ["axe:definition-list", "axe:dlitem", "axe:list", "axe:listitem", "list-structure"]
-      }
-    },
-    {
-      id: "9.4",
-      theme: 9,
-      title: {
-        fr: "Dans chaque page web, chaque citation est-elle correctement indiqu\xE9e\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, chaque citation est-elle correctement indiqu\xE9e\xA0?"
-      },
-      tests: {
-        "1": ["Dans chaque page web, chaque citation courte utilise-t-elle une balise `<q>`\xA0?"],
-        "2": ["Dans chaque page web, chaque bloc de citation utilise-t-il une balise `<blockquote>`\xA0?"]
-      },
-      techniques: ["G115", "H49", "F2"],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "10.1",
-      theme: 10,
-      title: {
-        fr: "Dans le site web, des [feuilles de styles](#feuille-de-style) sont-elles utilis\xE9es pour contr\xF4ler la [pr\xE9sentation de l\u2019information](#presentation-de-l-information)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans le site web, des feuilles de styles sont-elles utilis\xE9es pour contr\xF4ler la pr\xE9sentation de l\u2019information\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, les balises servant \xE0 la [pr\xE9sentation de l\u2019information](#presentation-de-l-information) ne doivent pas \xEAtre pr\xE9sentes dans le code source g\xE9n\xE9r\xE9 des pages. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ],
-        "2": [
-          "Dans chaque page web, les attributs servant \xE0 la [pr\xE9sentation de l\u2019information](#presentation-de-l-information) ne doivent pas \xEAtre pr\xE9sents dans le code source g\xE9n\xE9r\xE9 des pages. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ],
-        "3": [
-          "Dans chaque page web, l\u2019utilisation des espaces v\xE9rifie-t-elle ces conditions\xA0?",
-          "Les espaces ne sont pas utilis\xE9es pour s\xE9parer les lettres d\u2019un mot\xA0;",
-          "Les espaces ne sont pas utilis\xE9es pour simuler des tableaux\xA0;",
-          "Les espaces ne sont pas utilis\xE9es pour simuler des colonnes de texte."
-        ]
-      },
-      techniques: ["G140", "F32", "F33", "F34", "F48", "C6", "C8", "C18", "C22"],
-      wcag: ["1.3.1", "1.3.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "10.2",
-      theme: 10,
-      title: {
-        fr: "Dans chaque page web, le [contenu visible](#contenu-visible) porteur d\u2019information reste-t-il pr\xE9sent lorsque les [feuilles de styles](#feuille-de-style) sont d\xE9sactiv\xE9es\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, le contenu visible porteur d\u2019information reste-t-il pr\xE9sent lorsque les feuilles de styles sont d\xE9sactiv\xE9es\xA0?"
-      },
-      tests: {
-        "1": ["Dans chaque page web, l\u2019information reste-t-elle pr\xE9sente lorsque les [feuilles de styles](#feuille-de-style) sont d\xE9sactiv\xE9es\xA0?"]
-      },
-      techniques: ["G140", "F3", "F87"],
-      wcag: ["1.1.1", "1.3.1"],
-      appliesTo: {
-        ruleIds: ["css-generated-content-informative"]
-      }
-    },
-    {
-      id: "10.3",
-      theme: 10,
-      title: {
-        fr: "Dans chaque page web, l\u2019information reste-t-elle [compr\xE9hensible](#comprehensible-ordre-de-lecture) lorsque les [feuilles de styles](#feuille-de-style) sont d\xE9sactiv\xE9es\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, l\u2019information reste-t-elle compr\xE9hensible lorsque les feuilles de styles sont d\xE9sactiv\xE9es\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, l\u2019information reste-t-elle [compr\xE9hensible](#comprehensible-ordre-de-lecture) lorsque les [feuilles de styles](#feuille-de-style) sont d\xE9sactiv\xE9es\xA0?"
-        ]
-      },
-      techniques: ["G59", "G140", "F1"],
-      wcag: ["1.3.2", "2.4.3"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "10.4",
-      theme: 10,
-      title: {
-        fr: "Dans chaque page web, le texte reste-t-il lisible lorsque la [taille des caract\xE8res](#taille-des-caracteres) est augment\xE9e jusqu\u2019\xE0 200\u202F%, au moins (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, le texte reste-t-il lisible lorsque la taille des caract\xE8res est augment\xE9e jusqu\u2019\xE0 200\u202F%, au moins (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, l\u2019augmentation de la [taille des caract\xE8res](#taille-des-caracteres) jusqu\u2019\xE0 200\u202F%, au moins, ne doit pas provoquer de perte d\u2019information. Cette r\xE8gle est-elle respect\xE9e selon une de ces conditions (hors cas particuliers)\xA0?",
-          "Lors de l\u2019utilisation de la fonction d\u2019agrandissement du texte du navigateur\xA0;",
-          "Lors de l\u2019utilisation des fonctions de zoom graphique du navigateur\xA0;",
-          "Lors de l\u2019utilisation d\u2019un [composant d\u2019interface](#composant-d-interface) propre au site permettant d\u2019agrandir le texte ou de zoomer."
-        ],
-        "2": [
-          "Dans chaque page web, l\u2019augmentation de la taille des caract\xE8res jusqu\u2019\xE0 200\u202F%, au moins, doit \xEAtre possible pour l\u2019ensemble du texte dans la page. Cette r\xE8gle est-elle respect\xE9e selon une de ces conditions (hors cas particuliers)\xA0?",
-          "Lors de l\u2019utilisation de la fonction d\u2019agrandissement du texte du navigateur\xA0;",
-          "Lors de l\u2019utilisation des fonctions de zoom graphique du navigateur\xA0;",
-          "Lors de l\u2019utilisation d\u2019un [composant d\u2019interface](#composant-d-interface) propre au site permettant d\u2019agrandir le texte ou de zoomer."
-        ]
-      },
-      techniques: ["G146", "G179", "F69", "F80", "SCR34", "C12", "C13", "C14", "C17", "C28"],
-      particularCases: [
-        "Font exception \xE0 ce crit\xE8re, les contenus pour lesquels l\u2019utilisateur n\u2019a pas de possibilit\xE9 de personnalisation\xA0:",
-        "- Les sous-titres incrust\xE9s dans une vid\xE9o\xA0;",
-        "- Les textes en image\xA0;",
-        "- Le texte au sein d\u2019une balise `<canvas>`."
-      ],
-      wcag: ["1.4.4"],
-      appliesTo: {
-        ruleIds: ["axe:meta-viewport", "axe:meta-viewport-large", "dyn-input-overflow-zoom", "dyn-reflow-zoom", "meta-viewport-zoom-block"]
-      }
-    },
-    {
-      id: "10.5",
-      theme: 10,
-      title: {
-        fr: "Dans chaque page web, les d\xE9clarations CSS de couleurs de fond d\u2019\xE9l\xE9ment et de police sont-elles correctement utilis\xE9es\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les d\xE9clarations CSS de couleurs de fond d\u2019\xE9l\xE9ment et de police sont-elles correctement utilis\xE9es\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque d\xE9claration CSS de couleurs de police (`color`), d\u2019un \xE9l\xE9ment susceptible de contenir du texte, est-elle accompagn\xE9e d\u2019une d\xE9claration de couleur de fond (`background`, `background-color`), au moins, h\xE9rit\xE9e d\u2019un parent\xA0?"
-        ],
-        "2": [
-          "Dans chaque page web, chaque d\xE9claration de couleur de fond (`background`, `background-color`), d\u2019un \xE9l\xE9ment susceptible de contenir du texte, est-elle accompagn\xE9e d\u2019une d\xE9claration de couleur de police (`color`) au moins, h\xE9rit\xE9e d\u2019un parent\xA0?"
-        ],
-        "3": [
-          "Dans chaque page web, chaque utilisation d\u2019une image pour cr\xE9er une couleur de fond d\u2019un \xE9l\xE9ment susceptible de contenir du texte, via CSS (`background`, `background-image`), est-elle accompagn\xE9e d\u2019une d\xE9claration de couleur de fond (`background`, `background-color`), au moins, h\xE9rit\xE9e d\u2019un parent\xA0?"
-        ]
-      },
-      techniques: ["F24"],
-      wcag: ["1.4.3"],
-      appliesTo: {
-        ruleIds: ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
-      }
-    },
-    {
-      id: "10.6",
-      theme: 10,
-      title: {
-        fr: "Dans chaque page web, chaque [lien dont la nature n\u2019est pas \xE9vidente](#lien-dont-la-nature-n-est-pas-evidente) est-il visible par rapport au texte environnant\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, chaque lien dont la nature n\u2019est pas \xE9vidente est-il visible par rapport au texte environnant\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque [lien texte](#lien-texte) signal\xE9 uniquement par la couleur, et dont la nature n\u2019est pas \xE9vidente, v\xE9rifie-t-il ces conditions\xA0?",
-          "La couleur du lien a un rapport de [contraste](#contraste) sup\xE9rieur ou \xE9gal \xE0 3:1 par rapport au texte environnant\xA0;",
-          "Le lien dispose d\u2019une indication visuelle au survol autre qu\u2019un changement de couleur\xA0;",
-          "Le lien dispose d\u2019une indication visuelle au focus autre qu\u2019un changement de couleur."
-        ]
-      },
-      techniques: ["G183", "F73"],
-      wcag: ["1.4.1"],
-      appliesTo: {
-        ruleIds: ["rendered-link-colour-only"]
-      }
-    },
-    {
-      id: "10.7",
-      theme: 10,
-      title: {
-        fr: "Dans chaque page web, pour chaque \xE9l\xE9ment recevant le focus, la [prise de focus](#prise-de-focus) est-elle visible\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, pour chaque \xE9l\xE9ment recevant le focus, la prise de focus est-elle visible\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque \xE9l\xE9ment recevant le focus, la [prise de focus](#prise-de-focus) v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "Le style du focus natif du navigateur n\u2019est pas supprim\xE9 ou d\xE9grad\xE9\xA0;",
-          "Un style du focus d\xE9fini par l\u2019auteur est visible."
-        ]
-      },
-      techniques: ["G149", "G165", "G183", "G195", "F73", "F78", "SCR31", "C15"],
-      wcag: ["1.4.1", "2.4.7"],
-      appliesTo: {
-        ruleIds: ["dyn-focus-visible", "rendered-focus-not-visible"]
-      }
-    },
-    {
-      id: "10.8",
-      theme: 10,
-      title: {
-        fr: "Pour chaque page web, les [contenus cach\xE9s](#contenu-cache) ont-ils vocation \xE0 \xEAtre ignor\xE9s par les technologies d\u2019assistance\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque page web, les contenus cach\xE9s ont-ils vocation \xE0 \xEAtre ignor\xE9s par les technologies d\u2019assistance\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque contenu cach\xE9 v\xE9rifie-t-il une de ces conditions\xA0?",
-          "Le [contenu cach\xE9](#contenu-cache) a vocation \xE0 \xEAtre ignor\xE9 par les technologies d\u2019assistance\xA0;",
-          "Le [contenu cach\xE9](#contenu-cache) n\u2019a pas vocation \xE0 \xEAtre ignor\xE9 par les technologies d\u2019assistance et est rendu restituable par les technologies d\u2019assistance suite \xE0 une action de l\u2019utilisateur r\xE9alisable au clavier ou par tout dispositif de pointage sur un \xE9l\xE9ment pr\xE9c\xE9dent le contenu cach\xE9 ou suite \xE0 un repositionnement du focus dessus."
-        ]
-      },
-      techniques: ["G57"],
-      technicalNote: [
-        'WAI-ARIA propose un attribut `aria-hidden` (`true` ou `false`) qui permet d\u2019inhiber la restitution d\u2019un contenu en direction des technologies d\u2019assistance, sans action sur sa visibilit\xE9 en direction des agents utilisateurs\xA0: un contenu avec `aria-hidden="true"` ne sera donc plus vocalisable, mais restera visible.',
-        "Sauf si le contenu contr\xF4l\xE9 par `aria-hidden` n\u2019a pas vocation \xE0 \xEAtre restitu\xE9 par les technologies d\u2019assistance, la valeur de l\u2019attribut `aria-hidden` doit \xEAtre coh\xE9rente avec l\u2019\xE9tat affich\xE9 ou masqu\xE9 du contenu \xE0 l\u2019\xE9cran.",
-        'La sp\xE9cification HTML5 propose un attribut `hidden` qui permet de rendre indisponible (quand l\u2019attribut `hidden` est pr\xE9sent) un contenu dans le DOM g\xE9n\xE9r\xE9 (de mani\xE8re similaire au `type="hidden"` sur un contr\xF4le de formulaire).',
-        "Il est possible d\u2019avoir des situations o\xF9 un contenu contr\xF4l\xE9 par `hidden` ou `aria-hidden` se trouve momentan\xE9ment dans un \xE9tat incoh\xE9rent avec le statut affich\xE9 ou masqu\xE9 du contenu, par exemple si l\u2019on d\xE9sire rendre disponible un \xE9l\xE9ment, mais que son affichage \xE0 l\u2019\xE9cran reste d\xE9pendant d\u2019une action ult\xE9rieure. Dans ce cas, c\u2019est l\u2019\xE9tat final du contenu qui doit \xEAtre consid\xE9r\xE9."
-      ],
-      wcag: ["1.3.2", "4.1.2"],
-      appliesTo: {
-        ruleIds: ["disabled-context-content"]
-      }
-    },
-    {
-      id: "10.9",
-      theme: 10,
-      title: {
-        fr: "Dans chaque page web, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement par la forme, taille ou position. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, pour chaque texte ou ensemble de textes, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ],
-        "2": [
-          "Dans chaque page web, pour chaque image ou ensemble d\u2019images, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ],
-        "3": [
-          "Dans chaque page web, pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise), l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ],
-        "4": [
-          "Dans chaque page web, pour chaque [m\xE9dia non temporel](#media-non-temporel), l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ]
-      },
-      techniques: ["G96", "G140", "F14", "F26"],
-      wcag: ["1.3.3", "1.4.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "10.10",
-      theme: 10,
-      title: {
-        fr: "Dans chaque page web, l\u2019information ne doit pas \xEAtre donn\xE9e [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position) uniquement. Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, l\u2019information ne doit pas \xEAtre donn\xE9e par la forme, taille ou position uniquement. Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, pour chaque texte ou ensemble de textes, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
-        ],
-        "2": [
-          "Dans chaque page web, pour chaque image ou ensemble d\u2019images, l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
-        ],
-        "3": [
-          "Dans chaque page web, pour chaque [m\xE9dia temporel](#media-temporel-type-son-video-et-synchronise), l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
-        ],
-        "4": [
-          "Dans chaque page web, pour chaque [m\xE9dia non temporel](#media-non-temporel), l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position](#indication-donnee-par-la-forme-la-taille-ou-la-position). Cette r\xE8gle est-elle impl\xE9ment\xE9e de fa\xE7on pertinente\xA0?"
-        ]
-      },
-      techniques: ["G96", "G140", "F14", "F26"],
-      wcag: ["1.3.3", "1.4.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "10.11",
-      theme: 10,
-      title: {
-        fr: "Pour chaque page web, les contenus peuvent-ils \xEAtre pr\xE9sent\xE9s sans perte d\u2019information ou de fonctionnalit\xE9 et sans avoir recours soit \xE0 un d\xE9filement vertical pour une fen\xEAtre ayant une hauteur de 256\u202Fpx, soit \xE0 un d\xE9filement horizontal pour une fen\xEAtre ayant une largeur de 320\u202Fpx (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque page web, les contenus peuvent-ils \xEAtre pr\xE9sent\xE9s sans perte d\u2019information ou de fonctionnalit\xE9 et sans avoir recours soit \xE0 un d\xE9filement vertical pour une fen\xEAtre ayant une hauteur de 256\u202Fpx, soit \xE0 un d\xE9filement horizontal pour une fen\xEAtre ayant une largeur de 320\u202Fpx (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque page web, lorsque le contenu dont le sens de lecture est horizontal est affich\xE9 dans une fen\xEAtre r\xE9duite \xE0 une largeur de 320\u202Fpx, l\u2019ensemble des informations et des fonctionnalit\xE9s sont-elles disponibles sans aucun d\xE9filement horizontal (hors cas particuliers)\xA0?"
-        ],
-        "2": [
-          "Pour chaque page web, lorsque le contenu dont le sens de lecture est vertical est affich\xE9 dans une fen\xEAtre r\xE9duite \xE0 une hauteur de 256\u202Fpx, l\u2019ensemble des informations et des fonctionnalit\xE9s sont-elles disponibles sans aucun d\xE9filement vertical (hors cas particuliers)\xA0?"
-        ]
-      },
-      techniques: ["C34", "C37"],
-      technicalNote: ["Lorsqu'il est ici question de pixel, il s'agit du pixel CSS tel que d\xE9fini par le W3C https://www.w3.org/TR/css3-values/"],
-      particularCases: [
-        "L'objectif de ce crit\xE8re est de garantir un d\xE9filement dans une unique direction pour une lecture facilit\xE9e selon le sens de l'\xE9criture.",
-        "Font exception \xE0 ce crit\xE8re, les contenus dont l'agencement requiert deux dimensions pour \xEAtre compris ou utilis\xE9s comme\xA0:",
-        "- Les images, les graphiques ou les vid\xE9os\xA0;",
-        "- Les jeux (jeux de plateforme, par exemple)\xA0;",
-        "- Les pr\xE9sentations (type diaporama, par exemple)\xA0;",
-        "- Les tableaux de donn\xE9es\xA0;",
-        "- Les interfaces o\xF9 il est n\xE9cessaire d'avoir un ascenseur horizontal lors de la manipulation de l'interface.",
-        "Note\xA0: la majorit\xE9 des navigateurs sur les syst\xE8mes d'exploitation sur mobile (Android, iOS) ne g\xE8re pas correctement la redistribution en cas de zoom. Dans ce contexte, le crit\xE8re sera consid\xE9r\xE9 comme non applicable sur ces environnements."
-      ],
-      wcag: ["1.4.10"],
-      appliesTo: {
-        ruleIds: ["dyn-input-overflow-reflow", "dyn-reflow"]
-      }
-    },
-    {
-      id: "10.12",
-      theme: 10,
-      title: {
-        fr: "Dans chaque page web, les propri\xE9t\xE9s d\u2019espacement du texte peuvent-elles \xEAtre red\xE9finies par l\u2019utilisateur sans perte de contenu ou de fonctionnalit\xE9 (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les propri\xE9t\xE9s d\u2019espacement du texte peuvent-elles \xEAtre red\xE9finies par l\u2019utilisateur sans perte de contenu ou de fonctionnalit\xE9 (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, le texte reste-t-il lisible lorsque l\u2019affichage est modifi\xE9 selon ces conditions (hors cas particuliers)\xA0?",
-          "L\u2019espacement entre les lignes (`line-height`) est augment\xE9 jusqu\u2019\xE0 1,5 fois la taille de la police\xA0;",
-          "L\u2019espacement suivant les paragraphes (balise `<p>`) est augment\xE9 jusqu\u2019\xE0 2 fois la taille de la police\xA0;",
-          "L\u2019espacement des lettres (`letter-spacing`) est augment\xE9 jusqu\u2019\xE0 0,12 fois la taille de la police\xA0;",
-          "L\u2019espacement des mots (`word-spacing`) est augment\xE9 jusqu\u2019\xE0 0,16 fois la taille de la police."
-        ]
-      },
-      techniques: ["C8", "C21", "C35", "C36"],
-      particularCases: [
-        "Font exception \xE0 ce crit\xE8re, les contenus pour lesquels l\u2019utilisateur n\u2019a pas de possibilit\xE9 de personnalisation\xA0:",
-        "- Les sous-titres directement int\xE9gr\xE9s \xE0 une vid\xE9o\xA0;",
-        "- Les images texte\xA0;",
-        "- Le texte au sein d\u2019une balise `<canvas>`."
-      ],
-      wcag: ["1.4.12"],
-      appliesTo: {
-        ruleIds: ["dyn-input-overflow-spacing", "dyn-text-spacing"]
-      }
-    },
-    {
-      id: "10.13",
-      theme: 10,
-      title: {
-        fr: "Dans chaque page web, les contenus additionnels apparaissant \xE0 la prise de focus ou au survol d\u2019un [composant d\u2019interface](#composant-d-interface) sont-ils contr\xF4lables par l\u2019utilisateur (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les contenus additionnels apparaissant \xE0 la prise de focus ou au survol d\u2019un composant d\u2019interface sont-ils contr\xF4lables par l\u2019utilisateur (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque contenu additionnel devenant visible \xE0 la prise de focus ou au survol d\u2019un [composant d\u2019interface](#composant-d-interface) peut-il \xEAtre masqu\xE9 par une action de l\u2019utilisateur sans d\xE9placer le focus ou le pointeur de la souris (hors cas particuliers)\xA0?"
-        ],
-        "2": [
-          "Chaque contenu additionnel qui apparait au survol d\u2019un [composant d\u2019interface](#composant-d-interface) peut-il \xEAtre survol\xE9 par le pointeur de la souris sans dispara\xEEtre (hors cas particuliers)\xA0?"
-        ],
-        "3": [
-          "Chaque contenu additionnel qui appara\xEEt \xE0 la prise de focus ou au survol d\u2019un [composant d\u2019interface](#composant-d-interface) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "Le contenu additionnel reste visible jusqu\u2019\xE0 ce que l\u2019utilisateur retire le pointeur souris ou le focus du contenu additionnel et du [composant d\u2019interface](#composant-d-interface) ayant d\xE9clench\xE9 son apparition\xA0;",
-          "Le contenu additionnel reste visible jusqu\u2019\xE0 ce que l\u2019utilisateur d\xE9clenche une action masquant ce contenu sans d\xE9placer le focus ou le pointeur de la souris du [composant d\u2019interface](#composant-d-interface) ayant d\xE9clench\xE9 son apparition\xA0;",
-          "Le contenu additionnel reste visible jusqu\u2019\xE0 ce qu\u2019il ne soit plus valide."
-        ]
-      },
-      techniques: ["F95"],
-      particularCases: [
-        "Lorsque le contenu additionnel est contr\xF4l\xE9 par l\u2019agent utilisateur (par exemple, attribut `title` ou validation native de formulaire) ou correspond \xE0 une fen\xEAtre modale conforme au [motif de conception](#motif-de-conception) WAI-ARIA `dialog`, le crit\xE8re 10.13 est non applicable.",
-        "Lorsque le contenu additionnel ne masque ou ne remplace aucun contenu porteur d\u2019information, le test 10.13.1 est non applicable."
-      ],
-      wcag: ["1.4.13"],
-      appliesTo: {
-        ruleIds: ["dyn-hover"]
-      }
-    },
-    {
-      id: "10.14",
-      theme: 10,
-      title: {
-        fr: "Dans chaque page web, les contenus additionnels apparaissant via les styles CSS uniquement peuvent-ils \xEAtre rendus visibles au clavier et par tout dispositif de pointage\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les contenus additionnels apparaissant via les styles CSS uniquement peuvent-ils \xEAtre rendus visibles au clavier et par tout dispositif de pointage\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, les contenus additionnels apparaissant au survol d\u2019un [composant d\u2019interface](#composant-d-interface) via les styles CSS respectent-ils si n\xE9cessaire une de ces conditions\xA0?",
-          "Les contenus additionnels apparaissent \xE9galement \xE0 l\u2019activation du composant via le clavier et tout dispositif de pointage\xA0;",
-          "Les contenus additionnels apparaissent \xE9galement \xE0 la prise de focus du composant\xA0;",
-          "Les contenus additionnels apparaissent \xE9galement par le biais de l\u2019activation ou de la prise de focus d\u2019un autre composant."
-        ],
-        "2": [
-          "Dans chaque page web, les contenus additionnels apparaissant au focus d\u2019un [composant d\u2019interface](#composant-d-interface) via les styles CSS respectent-ils si n\xE9cessaire une de ces conditions\xA0?",
-          "Les contenus additionnels apparaissent \xE9galement \xE0 l\u2019activation du composant via le clavier et tout dispositif de pointage\xA0;",
-          "Les contenus additionnels apparaissent \xE9galement au survol du composant\xA0;",
-          "Les contenus additionnels apparaissent \xE9galement par le biais de l\u2019activation ou du survol d\u2019un autre composant."
-        ]
-      },
-      techniques: ["G202"],
-      wcag: ["2.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "11.1",
-      theme: 11,
-      title: {
-        fr: "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) a-t-il une [\xE9tiquette](#etiquette-de-champ-de-formulaire)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque champ de formulaire a-t-il une \xE9tiquette\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) v\xE9rifie-t-il une de ces conditions\xA0?",
-          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut WAI-ARIA `aria-labelledby` r\xE9f\xE9ren\xE7ant un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) identifi\xE9\xA0;",
-          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut WAI-ARIA `aria-label`\xA0;",
-          "Une balise `<label>` ayant un attribut `for` est associ\xE9e au [champ de formulaire](#champ-de-saisie-de-formulaire)\xA0;",
-          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut `title`\xA0;",
-          "Un bouton adjacent au [champ de formulaire](#champ-de-saisie-de-formulaire) lui fournit une \xE9tiquette visible et un \xE9l\xE9ment `<label>` visuellement cach\xE9 ou un attribut WAI-ARIA `aria-label`, `aria-labelledby` ou `title` lui fournit un nom accessible."
-        ],
-        "2": [
-          "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) associ\xE9 \xE0 une balise `<label>` ayant un attribut `for`, v\xE9rifie-t-il ces conditions\xA0?",
-          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut `id`\xA0;",
-          "La valeur de l\u2019attribut `for` est \xE9gale \xE0 la valeur de l\u2019attribut `id` du [champ de formulaire](#champ-de-saisie-de-formulaire) associ\xE9."
-        ],
-        "3": [
-          "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) ayant une [\xE9tiquette](#etiquette-de-champ-de-formulaire) dont le contenu n\u2019est pas visible ou \xE0 proximit\xE9 (masqu\xE9, `aria-label`) ou qui n\u2019est pas [accol\xE9](#accoles-etiquette-et-champ-accoles) au champ (`aria-labelledby`), v\xE9rifie-t-il une de ses conditions\xA0?",
-          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut `title` dont le contenu permet de comprendre la nature de la saisie attendue\xA0;",
-          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) est accompagn\xE9 d\u2019un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) accol\xE9 au champ qui devient visible \xE0 la prise de focus permettant de comprendre la nature de la saisie attendue\xA0;",
-          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) est accompagn\xE9 d\u2019un [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) visible accol\xE9 au champ permettant de comprendre la nature de la saisie attendue."
-        ]
-      },
-      techniques: ["G82", "G131", "H44", "H65", "F68", "F82", "F86", "ARIA6", "ARIA9", "ARIA14", "ARIA16"],
-      wcag: ["1.3.1", "2.4.6", "3.3.2", "4.1.2"],
-      appliesTo: {
-        ruleIds: [
-          "axe:form-field-multiple-labels",
-          "axe:label",
-          "axe:label-title-only",
-          "axe:select-name",
-          "control-label-missing",
-          "control-name-title-only",
-          "field-purpose-incomplete",
-          "form-field-multiple-labels",
-          "label-for-dangling",
-          "placeholder-as-label",
-          "select-has-option"
-        ]
-      }
-    },
-    {
-      id: "11.2",
-      theme: 11,
-      title: {
-        fr: "Chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) associ\xE9e \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire) est-elle pertinente (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque \xE9tiquette associ\xE9e \xE0 un champ de formulaire est-elle pertinente (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque balise `<label>` permet-elle de conna\xEEtre la fonction exacte du [champ de formulaire](#champ-de-saisie-de-formulaire) auquel elle est associ\xE9e\xA0?"
-        ],
-        "2": [
-          "Chaque attribut `title` permet-il de conna\xEEtre la fonction exacte du [champ de formulaire](#champ-de-saisie-de-formulaire) auquel il est associ\xE9\xA0?"
-        ],
-        "3": [
-          "Chaque \xE9tiquette impl\xE9ment\xE9e via l\u2019attribut WAI-ARIA `aria-label` permet-elle de conna\xEEtre la fonction exacte du [champ de formulaire](#champ-de-saisie-de-formulaire) auquel elle est associ\xE9e\xA0?"
-        ],
-        "4": [
-          "Chaque [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 via l\u2019attribut WAI-ARIA `aria-labelledby` permet-il de conna\xEEtre la fonction exacte du [champ de formulaire](#champ-de-saisie-de-formulaire) auquel il est associ\xE9\xA0?"
-        ],
-        "5": [
-          "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) ayant un [intitul\xE9 visible](#intitule-visible) v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` du [champ de formulaire](#champ-de-saisie-de-formulaire) contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) li\xE9 au [champ de formulaire](#champ-de-saisie-de-formulaire) via un attribut WAI-ARIA `aria-labelledby` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` du [champ de formulaire](#champ-de-saisie-de-formulaire) contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
-          "S\u2019il est pr\xE9sent le contenu de la balise `<label>` associ\xE9 au [champ de formulaire](#champ-de-saisie-de-formulaire) contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)."
-        ],
-        "6": [
-          "Chaque bouton adjacent au [champ de formulaire](#champ-de-saisie-de-formulaire) qui fournit une \xE9tiquette visible permet-il de conna\xEEtre la fonction exacte du [champ de formulaire](#champ-de-saisie-de-formulaire) auquel il est associ\xE9\xA0?"
-        ]
-      },
-      techniques: ["G82", "G131", "H44", "H65", "ARIA6", "ARIA9", "ARIA14", "ARIA16"],
-      particularCases: [
-        "Il existe une gestion de cas particuliers pour le test 11.2.5 lorsque\xA0:",
-        "- La ponctuation et les lettres majuscules sont pr\xE9sentes dans le texte de l\u2019[intitul\xE9 visible](#intitule-visible) : elles peuvent \xEAtre ignor\xE9es dans le nom accessible sans porter \xE0 cons\xE9quence\xA0;",
-        "- Le texte de l\u2019[intitul\xE9 visible](#intitule-visible) sert de symbole\xA0: le texte ne doit pas \xEAtre interpr\xE9t\xE9 litt\xE9ralement au niveau du nom accessible. Le nom doit exprimer la fonction v\xE9hicul\xE9e par le symbole (par exemple, \u201CB\u201D au niveau d\u2019un \xE9diteur de texte aura pour nom accessible \u201CMettre en gras\u201D, le signe \u201C>\u201D en fonction du contexte signifiera \u201CSuivant\u201D ou \u201CLancer la vid\xE9o\u201D). Le cas des symboles math\xE9matiques fait cependant exception (voir la note ci-dessous).",
-        "Note\xA0: si l\u2019\xE9tiquette visible repr\xE9sente une expression math\xE9matique, les symboles math\xE9matiques peuvent \xEAtre repris litt\xE9ralement pour servir d\u2019\xE9tiquette au nom accessible (ex.\xA0: \u201CA>B\u201D). Il est laiss\xE9 \xE0 l\u2019utilisateur le soin d\u2019op\xE9rer la correspondance entre l\u2019expression et ce qu\u2019il doit \xE9peler compte tenu de la connaissance qu\u2019il a du fonctionnement de son logiciel de saisie vocale (\u201CA plus grand que B\u201D ou \u201CA sup\xE9rieur \xE0 B\u201D).",
-        "Ce cas particulier s\u2019applique \xE9galement au test 11.9.2."
-      ],
-      wcag: ["2.4.6", "2.5.3", "3.3.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "11.3",
-      theme: 11,
-      title: {
-        fr: "Dans chaque [formulaire](#formulaire), chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) associ\xE9e \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire) ayant la m\xEAme fonction et r\xE9p\xE9t\xE9e plusieurs fois dans une m\xEAme page ou dans un [ensemble de pages](#ensemble-de-pages) est-elle [coh\xE9rente](#etiquettes-coherentes)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque formulaire, chaque \xE9tiquette associ\xE9e \xE0 un champ de formulaire ayant la m\xEAme fonction et r\xE9p\xE9t\xE9e plusieurs fois dans une m\xEAme page ou dans un ensemble de pages est-elle coh\xE9rente\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) associ\xE9e \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire) ayant la m\xEAme fonction et r\xE9p\xE9t\xE9e plusieurs fois dans une m\xEAme page est-elle [coh\xE9rente](#etiquettes-coherentes)\xA0?"
-        ],
-        "2": [
-          "Chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) associ\xE9e \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire) ayant la m\xEAme fonction et r\xE9p\xE9t\xE9e dans un ensemble de pages est-elle [coh\xE9rente](#etiquettes-coherentes)\xA0?"
-        ]
-      },
-      techniques: ["F31"],
-      wcag: ["3.2.4"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "11.4",
-      theme: 11,
-      title: {
-        fr: "Dans chaque [formulaire](#formulaire), chaque [\xE9tiquette de champ](#etiquette-de-champ-de-formulaire) et son champ associ\xE9 sont-ils [accol\xE9s](#accoles-etiquette-et-champ-accoles) (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque formulaire, chaque \xE9tiquette de champ et son champ associ\xE9 sont-ils accol\xE9s (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [\xE9tiquette de champ](#etiquette-de-champ-de-formulaire) et son [champ](#champ-de-saisie-de-formulaire) associ\xE9 sont-ils [accol\xE9s](#accoles-etiquette-et-champ-accoles)\xA0?"
-        ],
-        "2": [
-          'Chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) [accol\xE9e](#accoles-etiquette-et-champ-accoles) \xE0 un [champ](#champ-de-saisie-de-formulaire) (\xE0 l\u2019exception des cases \xE0 cocher, bouton radio ou balises ayant un attribut WAI-ARIA `role="checkbox"`, `role="radio"` ou `role="switch"`), v\xE9rifie-t-elle ces conditions (hors cas particuliers)\xA0?',
-          "L\u2019\xE9tiquette est visuellement [accol\xE9e](#accoles-etiquette-et-champ-accoles) imm\xE9diatement au-dessus ou \xE0 gauche du [champ de formulaire](#champ-de-saisie-de-formulaire) lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de gauche \xE0 droite\xA0;",
-          "L\u2019\xE9tiquette est visuellement [accol\xE9e](#accoles-etiquette-et-champ-accoles) imm\xE9diatement au-dessus ou \xE0 droite du [champ de formulaire](#champ-de-saisie-de-formulaire) lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de droite \xE0 gauche."
-        ],
-        "3": [
-          'Chaque [\xE9tiquette](#etiquette-de-champ-de-formulaire) [accol\xE9e](#accoles-etiquette-et-champ-accoles) \xE0 un [champ](#champ-de-saisie-de-formulaire) de type `checkbox` ou `radio` ou \xE0 une balise ayant un attribut WAI-ARIA `role="checkbox"`, `role="radio"` ou `role="switch"`, v\xE9rifie-t-elle ces conditions (hors cas particuliers)\xA0?',
-          "L\u2019\xE9tiquette est visuellement [accol\xE9e](#accoles-etiquette-et-champ-accoles) imm\xE9diatement au-dessous ou \xE0 droite du [champ de formulaire](#champ-de-saisie-de-formulaire) lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de gauche \xE0 droite\xA0;",
-          "L\u2019\xE9tiquette est visuellement [accol\xE9e](#accoles-etiquette-et-champ-accoles) imm\xE9diatement au-dessous ou \xE0 gauche du [champ de formulaire](#champ-de-saisie-de-formulaire) lorsque le sens de lecture de la langue de l\u2019\xE9tiquette est de droite \xE0 gauche."
-        ]
-      },
-      techniques: ["G162"],
-      particularCases: [
-        "Les tests 11.4.2 et 11.4.3 seront consid\xE9r\xE9s comme non applicables\xA0:",
-        "- Dans le cas o\xF9 l\u2019[\xE9tiquette](#etiquette-de-champ-de-formulaire) m\xE9lange une portion de texte qui se lit de droite \xE0 gauche avec une portion de texte qui se lit de gauche \xE0 droite\xA0;",
-        "- Dans le cas o\xF9 un formulaire contient des labels de plusieurs langues qui se liraient de droite \xE0 gauche et inversement. Par exemple, un formulaire de commande en arabe qui propose une liste de cases \xE0 cocher de produit en langue fran\xE7aise ou mixant des produits en langue arabe ou en langue fran\xE7aise\xA0;",
-        '- Dans le cas o\xF9 les champs de type `radio` ou `checkbox` et les balises ayant un attribut WAI-ARIA `role="checkbox"`, `role="radio"` ou `role="switch"` ne sont pas visuellement pr\xE9sent\xE9s sous forme de bouton radio ou de case \xE0 cocher\xA0;',
-        "- Dans le cas o\xF9 les champs seraient utilis\xE9s dans un contexte o\xF9 il pourrait \xEAtre l\xE9gitime, du point de vue de l\u2019exp\xE9rience utilisateur, de placer les \xE9tiquettes de mani\xE8re diff\xE9rente \xE0 celle requise dans les tests 11.4.2 et 11.4.3."
-      ],
-      wcag: ["3.3.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "11.5",
-      theme: 11,
-      title: {
-        fr: "Dans chaque [formulaire](#formulaire), les [champs de m\xEAme nature](#champs-de-meme-nature) sont-ils regroup\xE9s, si n\xE9cessaire\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque formulaire, les champs de m\xEAme nature sont-ils regroup\xE9s, si n\xE9cessaire\xA0?"
-      },
-      tests: {
-        "1": [
-          "Les [champs de m\xEAme nature](#champs-de-meme-nature) v\xE9rifient-ils l\u2019une de ces conditions, si n\xE9cessaire\xA0?",
-          "Les [champs de m\xEAme nature](#champs-de-meme-nature) sont regroup\xE9s dans une balise `<fieldset>`\xA0;",
-          'Les [champs de m\xEAme nature](#champs-de-meme-nature) sont regroup\xE9s dans une balise poss\xE9dant un attribut WAI-ARIA `role="group"`\xA0;',
-          'Les [champs de m\xEAme nature](#champs-de-meme-nature) de type radio (`<input type="radio">`) ou balises poss\xE9dant un attribut WAI-ARIA `role="radio"`) sont regroup\xE9s dans une balise poss\xE9dant un attribut WAI-ARIA `role="radiogroup"` ou `role="group"`.'
-        ]
-      },
-      techniques: ["H71", "ARIA17"],
-      wcag: ["1.3.1", "3.3.2"],
-      appliesTo: {
-        ruleIds: ["date-fields-ungrouped", "radio-checkbox-group-ungrouped"]
-      }
-    },
-    {
-      id: "11.6",
-      theme: 11,
-      title: {
-        fr: "Dans chaque [formulaire](#formulaire), chaque regroupement de [champs de m\xEAme nature](#champs-de-meme-nature) a-t-il une [l\xE9gende](#legende)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque formulaire, chaque regroupement de champs de m\xEAme nature a-t-il une l\xE9gende\xA0?"
-      },
-      tests: {
-        "1": ["Chaque regroupement de [champs de m\xEAme nature](#champs-de-meme-nature) poss\xE8de-t-il une [l\xE9gende](#legende)\xA0?"]
-      },
-      techniques: ["H71", "ARIA17"],
-      wcag: ["1.3.1", "3.3.2"],
-      appliesTo: {
-        ruleIds: ["axe:fieldset", "fieldset-legend-missing"]
-      }
-    },
-    {
-      id: "11.7",
-      theme: 11,
-      title: {
-        fr: "Dans chaque [formulaire](#formulaire), chaque [l\xE9gende](#legende) associ\xE9e \xE0 un regroupement de [champs de m\xEAme nature](#champs-de-meme-nature) est-elle pertinente\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque formulaire, chaque l\xE9gende associ\xE9e \xE0 un regroupement de champs de m\xEAme nature est-elle pertinente\xA0?"
-      },
-      tests: {
-        "1": ["Chaque [l\xE9gende](#legende) associ\xE9e \xE0 un regroupement de [champs de m\xEAme nature](#champs-de-meme-nature) est-elle pertinente\xA0?"]
-      },
-      techniques: ["H71", "ARIA17"],
-      wcag: ["1.3.1", "3.3.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "11.8",
-      theme: 11,
-      title: {
-        fr: "Dans chaque [formulaire](#formulaire), les [items de m\xEAme nature d\u2019une liste de choix](#items-de-meme-nature-d-une-liste-de-choix) sont-ils regroup\xE9s de mani\xE8re pertinente\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque formulaire, les items de m\xEAme nature d\u2019une liste de choix sont-ils regroup\xE9s de mani\xE8re pertinente\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque balise `<select>`, les [items de m\xEAme nature d\u2019une liste de choix](#items-de-meme-nature-d-une-liste-de-choix) sont-ils regroup\xE9s avec une balise `<optgroup>`, si n\xE9cessaire\xA0?"
-        ],
-        "2": ["Dans chaque balise `<select>`, chaque balise `<optgroup>` poss\xE8de-t-elle un attribut `label`\xA0?"],
-        "3": ["Pour chaque balise `<optgroup>` ayant un attribut `label`, le contenu de l\u2019attribut `label` est-il pertinent\xA0?"]
-      },
-      techniques: ["H85"],
-      technicalNote: [
-        'Il est possible d\u2019utiliser une balise ayant un attribut WAI-ARIA `role="listbox"` en remplacement d\u2019une balise `<select>`. En revanche, il est impossible de cr\xE9er des groupes d\u2019options via l\u2019utilisation de WAI-ARIA. De ce fait, une liste n\xE9cessitant un regroupement d\u2019options structur\xE9e \xE0 l\u2019aide d\u2019une balise ayant un attribut WAI-ARIA `role="listbox"` sera consid\xE9r\xE9e comme non conforme au crit\xE8re 11.8.'
-      ],
-      wcag: ["1.3.1"],
-      appliesTo: {
-        ruleIds: ["pack:rgaa:optgroup-without-label"]
-      }
-    },
-    {
-      id: "11.9",
-      theme: 11,
-      title: {
-        fr: "Dans chaque [formulaire](#formulaire), l\u2019intitul\xE9 de chaque [bouton](#bouton-formulaire) est-il pertinent (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque formulaire, l\u2019intitul\xE9 de chaque bouton est-il pertinent (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "L\u2019intitul\xE9 de chaque [bouton](#bouton-formulaire) v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) li\xE9 au bouton via un attribut WAI-ARIA `aria-labelledby` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `value` d\u2019une balise `<input>` de type `submit`, `reset` ou `button` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de la balise `<button>` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` d\u2019une balise `<input>` de type `image` est pertinent\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` est pertinent."
-        ],
-        "2": [
-          "Chaque [bouton](#bouton-formulaire) affichant un [intitul\xE9 visible](#intitule-visible) v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut WAI-ARIA `aria-label `contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
-          "S\u2019il est pr\xE9sent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) li\xE9 au bouton via un attribut WAI-ARIA `aria-labelledby` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut value d\u2019une balise `<input>` de type `submit`, `reset` ou `button` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de la balise `<button>` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `alt` d\u2019une balise `<input>` de type `image` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)\xA0;",
-          "S\u2019il est pr\xE9sent, le contenu de l\u2019attribut `title` contient au moins l\u2019[intitul\xE9 visible](#intitule-visible)."
-        ]
-      },
-      techniques: ["H36", "H91", "ARIA6", "ARIA9", "ARIA14", "ARIA16"],
-      particularCases: ["Pour le test 11.9.2, voir cas particuliers crit\xE8re 11.2."],
-      wcag: ["2.5.3", "4.1.2"],
-      appliesTo: {
-        ruleIds: ["axe:button-name", "axe:input-button-name", "button-empty-name", "cross-icon-only-unnamed", "icon-only-control-unnamed"]
-      }
-    },
-    {
-      id: "11.10",
-      theme: 11,
-      title: {
-        fr: "Dans chaque [formulaire](#formulaire), le [contr\xF4le de saisie](#controle-de-saisie-formulaire) est-il utilis\xE9 de mani\xE8re pertinente (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque formulaire, le contr\xF4le de saisie est-il utilis\xE9 de mani\xE8re pertinente (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Les [indications du caract\xE8re obligatoire](#indication-de-champ-obligatoire) de la saisie des champs v\xE9rifient-elles une de ces conditions (hors cas particuliers)\xA0?",
-          "Une [indication de champ obligatoire](#indication-de-champ-obligatoire) est visible et permet d\u2019identifier nomm\xE9ment le champ concern\xE9 pr\xE9alablement \xE0 la validation du formulaire\xA0;",
-          'Le champ obligatoire dispose de l\u2019attribut `aria-required="true"` ou `required` pr\xE9alablement \xE0 la validation du formulaire.'
-        ],
-        "2": [
-          'Les champs obligatoires ayant l\u2019attribut `aria-required="true"` ou `required` v\xE9rifient-ils une de ces conditions\xA0?',
-          "Une [indication de champ obligatoire](#indication-de-champ-obligatoire) est visible et situ\xE9e dans l\u2019\xE9tiquette associ\xE9e au champ pr\xE9alablement \xE0 la validation du formulaire\xA0;",
-          "Une [indication de champ obligatoire](#indication-de-champ-obligatoire) est visible et situ\xE9e dans le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 au champ pr\xE9alablement \xE0 la validation du formulaire."
-        ],
-        "3": [
-          "Les messages d\u2019erreur indiquant l\u2019absence de saisie d\u2019un champ obligatoire v\xE9rifient-ils une de ces conditions\xA0?",
-          "Le message d\u2019erreur indiquant l\u2019absence de saisie d\u2019un champ obligatoire est visible et permet d\u2019identifier nomm\xE9ment le champ concern\xE9\xA0;",
-          'Le champ obligatoire dispose de l\u2019attribut `aria-invalid="true"`.'
-        ],
-        "4": [
-          'Les champs obligatoires ayant l\u2019attribut `aria-invalid="true"` v\xE9rifient-ils une de ces conditions\xA0?',
-          "Le message d\u2019erreur indiquant le caract\xE8re invalide de la saisie est visible et situ\xE9 dans l\u2019\xE9tiquette associ\xE9e au champ\xA0;",
-          "Le message d\u2019erreur indiquant le caract\xE8re invalide de la saisie est visible et situ\xE9 dans le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 au champ."
-        ],
-        "5": [
-          "Les instructions et indications du type de donn\xE9es et/ou de format obligatoires v\xE9rifient-elles une de ces conditions\xA0?",
-          "Une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire est visible et permet d\u2019identifier nomm\xE9ment le champ concern\xE9 pr\xE9alablement \xE0 la validation du formulaire\xA0;",
-          "Une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire est visible dans l\u2019\xE9tiquette ou le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 au champ pr\xE9alablement \xE0 la validation du formulaire."
-        ],
-        "6": [
-          "Les messages d\u2019erreurs fournissant une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire des champs v\xE9rifient-ils une de ces conditions\xA0?",
-          "Le message d\u2019erreur fournissant une instruction ou une indication du type de donn\xE9es et/ou de format obligatoires est visible et identifie le champ concern\xE9\xA0;",
-          'Le champ dispose de l\u2019attribut `aria-invalid="true"`.'
-        ],
-        "7": [
-          'Les champs ayant l\u2019attribut `aria-invalid="true"` dont la saisie requiert un type de donn\xE9es et/ou de format obligatoires v\xE9rifient-ils une de ces conditions\xA0?',
-          "Une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire est visible et situ\xE9e dans la balise `<label>` associ\xE9e au champ\xA0;",
-          "Une instruction ou une indication du type de donn\xE9es et/ou de format obligatoire est visible et situ\xE9e dans le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associ\xE9 au champ."
-        ]
-      },
-      techniques: [
-        "G83",
-        "G84",
-        "G85",
-        "G89",
-        "G184",
-        "H44",
-        "H81",
-        "H89",
-        "H90",
-        "F81",
-        "SCR18",
-        "SCR32",
-        "ARIA1",
-        "ARIA2",
-        "ARIA6",
-        "ARIA9",
-        "ARIA16",
-        "ARIA21"
-      ],
-      technicalNote: [
-        "Dans un long formulaire dont la majorit\xE9 des champs sont obligatoires, on pourrait constater que ce sont les quelques champs rest\xE9s facultatifs qui sont explicitement signal\xE9s comme tels. Dans ce cas, il faudrait s\u2019assurer que\xA0:",
-        "- Un message pr\xE9cise visuellement en haut de formulaire que \u201Ctous les champs sont obligatoires sauf ceux indiqu\xE9s comme \xE9tant facultatifs\u201D\xA0;",
-        "- Une mention \u201Cfacultatif\u201D est pr\xE9sente visuellement dans le libell\xE9 des champs facultatifs ou dans la l\xE9gende d\u2019un groupe de champs facultatifs\xA0;",
-        '- Un attribut `required` ou `aria-required="true"` reste associ\xE9 \xE0 chaque champ qui n\u2019est pas concern\xE9 par ce caract\xE8re facultatif.'
-      ],
-      particularCases: [
-        "Le test 11.10.1 et le test 11.10.2 seront consid\xE9r\xE9s comme non applicables lorsque le formulaire comporte un seul [champ de formulaire](#champ-de-saisie-de-formulaire) ou qu\u2019il indique les champs optionnels de mani\xE8re\xA0:",
-        "- Visible\xA0;",
-        "- Dans la balise `<label>` ou dans la [l\xE9gende](#legende) associ\xE9e au champ.",
-        "Dans le cas o\xF9 l\u2019ensemble des champs d\u2019un formulaire sont obligatoires, les tests 11.10.1 et 11.10.2 restent applicables."
-      ],
-      wcag: ["3.3.1", "3.3.2"],
-      appliesTo: {
-        ruleIds: ["aria-invalid-no-description", "error-not-associated"]
-      }
-    },
-    {
-      id: "11.11",
-      theme: 11,
-      title: {
-        fr: "Dans chaque [formulaire](#formulaire), le [contr\xF4le de saisie](#controle-de-saisie-formulaire) est-il accompagn\xE9, si n\xE9cessaire, de suggestions facilitant la correction des erreurs de saisie\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque formulaire, le contr\xF4le de saisie est-il accompagn\xE9, si n\xE9cessaire, de suggestions facilitant la correction des erreurs de saisie\xA0?"
-      },
-      tests: {
-        "1": ["Pour chaque erreur de saisie, les types et les formats de donn\xE9es sont-ils sugg\xE9r\xE9s, si n\xE9cessaire\xA0?"],
-        "2": ["Pour chaque erreur de saisie, des exemples de valeurs attendues sont-ils sugg\xE9r\xE9s, si n\xE9cessaire\xA0?"]
-      },
-      techniques: ["G84", "G85", "G89", "G177", "H89"],
-      technicalNote: [
-        "Certains types de contr\xF4les en HTML5 proposent des messages d\u2019aide \xE0 la saisie automatique\xA0: par exemple le type `email` affiche un message du type \xAB\xA0veuillez saisir une adresse e-mail valide\xA0\xBB dans le cas o\xF9 l\u2019adresse e-mail saisie ne correspond pas au format attendu. Ces messages sont personnalisables via l\u2019API Constraint Validation, ce qui permet de personnaliser les messages d\u2019erreur et de valider le crit\xE8re. L\u2019attribut `pattern` permet d\u2019effectuer automatiquement des contr\xF4les de format (via des expressions r\xE9guli\xE8res) et affiche un message d\u2019aide personnalisable via l\u2019attribut `title`\xA0: ce dispositif valide \xE9galement le crit\xE8re."
-      ],
-      wcag: ["3.3.3"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "11.12",
-      theme: 11,
-      title: {
-        fr: "Pour chaque [formulaire](#formulaire) qui modifie ou supprime des donne\u0301es, ou qui transmet des re\u0301ponses a\u0300 un test ou a\u0300 un examen, ou dont la validation a des conse\u0301quences financie\u0300res ou juridiques, les donne\u0301es saisies peuvent-elles \xEAtre modifi\xE9es, mises \xE0 jour ou r\xE9cup\xE9r\xE9es par l\u2019utilisateur\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque formulaire qui modifie ou supprime des donne\u0301es, ou qui transmet des re\u0301ponses a\u0300 un test ou a\u0300 un examen, ou dont la validation a des conse\u0301quences financie\u0300res ou juridiques, les donne\u0301es saisies peuvent-elles \xEAtre modifi\xE9es, mises \xE0 jour ou r\xE9cup\xE9r\xE9es par l\u2019utilisateur\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque formulaire qui modifie ou supprime des donn\xE9es, ou qui transmet des r\xE9ponses \xE0 un test ou un examen, ou dont la validation a des cons\xE9quences financi\xE8res ou juridiques, la saisie des donn\xE9es v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "L\u2019utilisateur peut [modifier ou annuler les donn\xE9es et les actions effectu\xE9es](#modifier-ou-annuler-les-donnees-et-les-actions-effectues) sur ces donn\xE9es apr\xE8s la validation du formulaire\xA0;",
-          "L\u2019utilisateur peut v\xE9rifier et corriger les donn\xE9es avant la validation d\u2019un formulaire en plusieurs \xE9tapes\xA0;",
-          'Un m\xE9canisme de confirmation explicite, via une case \xE0 cocher (balise `<input>` de type `checkbox` ou balise ayant un attribut WAI-ARIA `role="checkbox"`) ou une \xE9tape suppl\xE9mentaire, est pr\xE9sent.'
-        ],
-        "2": [
-          "Chaque formulaire dont la validation modifie ou supprime des donn\xE9es \xE0 caract\xE8re financier, juridique ou personnel v\xE9rifie-t-il une de ces conditions\xA0?",
-          "Un m\xE9canisme permet de r\xE9cup\xE9rer les donn\xE9es supprim\xE9es ou modifi\xE9es par l\u2019utilisateur\xA0;",
-          "Un m\xE9canisme de demande de confirmation explicite de la suppression ou de la modification, via un [champ de formulaire](#champ-de-saisie-de-formulaire) ou une \xE9tape suppl\xE9mentaire, est propos\xE9."
-        ]
-      },
-      techniques: ["G98", "G99", "G155", "G164", "G168"],
-      wcag: ["3.3.4"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "11.13",
-      theme: 11,
-      title: {
-        fr: "La finalit\xE9 d\u2019un champ de saisie peut-elle \xEAtre d\xE9duite pour faciliter le remplissage automatique des champs avec les donn\xE9es de l\u2019utilisateur\xA0?"
-      },
-      titlePlain: {
-        fr: "La finalit\xE9 d\u2019un champ de saisie peut-elle \xEAtre d\xE9duite pour faciliter le remplissage automatique des champs avec les donn\xE9es de l\u2019utilisateur\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [champ de formulaire](#champ-de-saisie-de-formulaire) dont l\u2019objet se rapporte \xE0 une information concernant l\u2019utilisateur v\xE9rifie-t-il ces conditions\xA0?",
-          "Le [champ de formulaire](#champ-de-saisie-de-formulaire) poss\xE8de un attribut `autocomplete\xA0`;",
-          "L\u2019attribut `autocomplete` est pourvu d\u2019une valeur pr\xE9sente dans la [liste des valeurs possibles pour l\u2019attribut `autocomplete`](#liste-des-valeurs-possibles-pour-l-attribut-autocomplete) associ\xE9s \xE0 un [champ de formulaire](#champ-de-saisie-de-formulaire)\xA0;",
-          "La valeur indiqu\xE9e pour l\u2019attribut `autocomplete` est pertinente au regard du type d\u2019information attendu."
-        ]
-      },
-      techniques: ["H98"],
-      technicalNote: [
-        "La [liste des valeurs possibles pour l\u2019attribut `autocomplete`](#liste-des-valeurs-possibles-pour-l-attribut-autocomplete) repose sur la liste des valeurs pr\xE9sentes dans la sp\xE9cification WCAG2.1 qui reprend elle-m\xEAme la liste des valeurs de type \u201Cfield name\u201D de la sp\xE9cification HTML5.2. Le crit\xE8re WCAG demande \xE0 ce que l\u2019une de ces valeurs soit pr\xE9sente pour qualifier un champ de saisie concernant l\u2019utilisateur.",
-        'Ce que le crit\xE8re WCAG laisse implicite, ce sont les diff\xE9rentes r\xE8gles de construction possibles pour obtenir une valeur (simple ou compos\xE9e) pour l\u2019attribut `autocomplete`. C\u2019est cependant l\u2019affaire du d\xE9veloppeur de fournir \xE0 l\u2019attribut `autocomplete` une valeur ou un ensemble de valeurs valides au regard des exigences de l\u2019algorithme fourni par la sp\xE9cification HTML5.2. Ainsi, un attribut `autocomplete` ne peut contenir qu\u2019une seule valeur de type `\u201Cfield name\u201D`, comme `"name"` ou `"street-address"`. On peut avoir \xE9galement un ensemble compos\xE9 de diff\xE9rentes valeurs comme, par exemple, `autocomplete="shipping name"` ou `autocomplete="section-software shipping street-address"`\xA0: `"section-software"` renvoie \xE0 une valeur de type <span lang="en">\u201Cscope\u201D</span> et `"shipping"` \xE0 une valeur de type <span lang="en">\u201Chint set\u201D</span>, mais toujours une seule valeur de type <span lang="en">\u201Cfield name\u201D</span>.'
-      ],
-      wcag: ["1.3.5"],
-      appliesTo: {
-        ruleIds: ["axe:autocomplete-valid", "field-purpose-incomplete"]
-      }
-    },
-    {
-      id: "12.1",
-      theme: 12,
-      title: {
-        fr: "Chaque [ensemble de pages](#ensemble-de-pages) dispose-t-il de deux [syst\xE8mes de navigation](#systeme-de-navigation) diff\xE9rents, au moins (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Chaque ensemble de pages dispose-t-il de deux syst\xE8mes de navigation diff\xE9rents, au moins (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque [ensemble de pages](#ensemble-de-pages) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "Un [menu de navigation](#menu-et-barre-de-navigation) et un [plan du site](#page-plan-du-site) sont pr\xE9sents\xA0;",
-          "Un [menu de navigation](#menu-et-barre-de-navigation) et un [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) sont pr\xE9sents\xA0;",
-          "Un [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) et un [plan du site](#page-plan-du-site) sont pr\xE9sents."
-        ]
-      },
-      techniques: ["G63", "G64", "G161"],
-      particularCases: [
-        "Il existe une gestion de cas particulier lorsque le site web est constitu\xE9 d\u2019une seule page ou d\u2019un nombre tr\xE8s limit\xE9 de pages (cf. note). Dans ce cas-l\xE0, le crit\xE8re est non applicable.",
-        "Le crit\xE8re est \xE9galement non applicable pour les pages d\u2019un ensemble de pages qui sont le r\xE9sultat ou une partie d\u2019un processus (un processus de paiement ou de prise de commande, par exemple).",
-        "Note\xA0: l\u2019appr\xE9ciation d\u2019un nombre tr\xE8s limit\xE9 de pages devrait \xEAtre r\xE9serv\xE9 \xE0 un site dont l\u2019ensemble des pages sont atteignables depuis la page d\u2019accueil."
-      ],
-      wcag: ["2.4.5"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "12.2",
-      theme: 12,
-      title: {
-        fr: "Dans chaque [ensemble de pages](#ensemble-de-pages), le [menu et les barres de navigation](#menu-et-barre-de-navigation) sont-ils toujours \xE0 la m\xEAme place (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque ensemble de pages, le menu et les barres de navigation sont-ils toujours \xE0 la m\xEAme place (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque [ensemble de pages](#ensemble-de-pages), chaque page disposant d\u2019un [menu et les barres de navigation](#menu-et-barre-de-navigation) v\xE9rifie-t-elle ces conditions (hors cas particuliers)\xA0?",
-          "Le [menu et les barres de navigation](#menu-et-barre-de-navigation) sont toujours \xE0 la m\xEAme place dans la pr\xE9sentation\xA0;",
-          "Le [menu et les barres de navigation](#menu-et-barre-de-navigation) se pr\xE9sentent toujours dans le m\xEAme ordre relatif dans le code source."
-        ]
-      },
-      techniques: ["G61", "F66"],
-      particularCases: [
-        "Il existe une gestion de cas particuliers lorsque\xA0:",
-        "- La page est la page d\u2019accueil\xA0;",
-        "- Le site web est constitu\xE9 d\u2019une seule page\xA0;",
-        "- Le changement fait suite \xE0 une modification initi\xE9e par l\u2019utilisateur.",
-        "Dans ces situations, le crit\xE8re est non applicable."
-      ],
-      wcag: ["3.2.3"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "12.3",
-      theme: 12,
-      title: {
-        fr: "La [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) est-elle pertinente\xA0?"
-      },
-      titlePlain: {
-        fr: "La page \xAB\xA0plan du site\xA0\xBB est-elle pertinente\xA0?"
-      },
-      tests: {
-        "1": ["La [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) est-elle repr\xE9sentative de l\u2019architecture g\xE9n\xE9rale du site\xA0?"],
-        "2": ["Les liens du [plan du site](#page-plan-du-site) sont-ils fonctionnels\xA0?"],
-        "3": ["Les liens du [plan du site](#page-plan-du-site) renvoient-ils bien vers les pages indiqu\xE9es par l\u2019intitul\xE9\xA0?"]
-      },
-      techniques: ["G63"],
-      wcag: ["2.4.5"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "12.4",
-      theme: 12,
-      title: {
-        fr: "Dans chaque [ensemble de pages](#ensemble-de-pages), la [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) est-elle accessible \xE0 partir d\u2019une fonctionnalit\xE9 identique\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque ensemble de pages, la page \xAB\xA0plan du site\xA0\xBB est-elle accessible \xE0 partir d\u2019une fonctionnalit\xE9 identique\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque [ensemble de pages](#ensemble-de-pages), la [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) est-elle accessible \xE0 partir d\u2019une fonctionnalit\xE9 identique\xA0?"
-        ],
-        "2": [
-          "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalit\xE9 vers la [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) est-elle situ\xE9e \xE0 la m\xEAme place dans la pr\xE9sentation\xA0?"
-        ],
-        "3": [
-          "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalit\xE9 vers la [page \xAB\xA0plan du site\xA0\xBB](#page-plan-du-site) se pr\xE9sente-t-elle toujours dans le m\xEAme ordre relatif dans le code source\xA0?"
-        ]
-      },
-      techniques: ["G61", "G63"],
-      wcag: ["2.4.5", "3.2.3"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "12.5",
-      theme: 12,
-      title: {
-        fr: "Dans chaque [ensemble de pages](#ensemble-de-pages), le [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) est-il atteignable de mani\xE8re identique\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque ensemble de pages, le moteur de recherche est-il atteignable de mani\xE8re identique\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque [ensemble de pages](#ensemble-de-pages), le [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) est-il accessible \xE0 partir d\u2019une fonctionnalit\xE9 identique\xA0?"
-        ],
-        "2": [
-          "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalit\xE9 vers le [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) est-elle situ\xE9e \xE0 la m\xEAme place dans la pr\xE9sentation\xA0?"
-        ],
-        "3": [
-          "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalit\xE9 vers le [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) se pr\xE9sente-t-elle toujours dans le m\xEAme ordre relatif dans le code source\xA0?"
-        ]
-      },
-      techniques: ["G61", "F66"],
-      wcag: ["3.2.3"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "12.6",
-      theme: 12,
-      title: {
-        fr: "Les zones de regroupement de contenus pr\xE9sentes dans plusieurs pages web (zones d\u2019[en-t\xEAte](#zone-d-en-tete), de [navigation principale](#menu-et-barre-de-navigation), de [contenu principal](#zone-de-contenu-principal), de [pied de page](#zone-de-pied-de-page) et de [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web)) peuvent-elles \xEAtre atteintes ou \xE9vit\xE9es\xA0?"
-      },
-      titlePlain: {
-        fr: "Les zones de regroupement de contenus pr\xE9sentes dans plusieurs pages web (zones d\u2019en-t\xEAte, de navigation principale, de contenu principal, de pied de page et de moteur de recherche) peuvent-elles \xEAtre atteintes ou \xE9vit\xE9es\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web o\xF9 elles sont pr\xE9sentes, la zone d\u2019[en-t\xEAte](#zone-d-en-tete), de [navigation principale](#menu-et-barre-de-navigation), de [contenu principal](#zone-de-contenu-principal), de [pied de page](#zone-de-pied-de-page) et de [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) respectent-elles au moins une de ces conditions\xA0?",
-          "La zone poss\xE8de un r\xF4le WAI-ARIA de type [landmark](#landmarks) correspondant \xE0 sa nature\xA0;",
-          "La zone poss\xE8de un titre dont le contenu permet de comprendre la nature du contenu de la zone\xA0;",
-          "La zone peut \xEAtre masqu\xE9e par le biais d\u2019un bouton pr\xE9c\xE9dent directement la zone dans l\u2019ordre du code source\xA0;",
-          "La zone peut \xEAtre \xE9vit\xE9e par le biais d\u2019un [lien d\u2019\xE9vitement](#liens-d-evitement-ou-d-acces-rapide) pr\xE9c\xE9dent directement la zone dans l\u2019ordre du code source\xA0;",
-          "La zone peut \xEAtre atteinte par le biais d\u2019un [lien d\u2019acc\xE8s rapide](#liens-d-evitement-ou-d-acces-rapide) visible ou, \xE0 d\xE9faut, visible \xE0 la prise de focus."
-        ]
-      },
-      techniques: ["H69", "G115", "ARIA4", "ARIA11"],
-      wcag: ["1.3.1", "2.4.1", "4.1.2"],
-      appliesTo: {
-        ruleIds: ["axe:landmark-one-main", "missing-main-landmark", "multiple-main-landmark", "nav-landmark-missing", "nav-landmark-unnamed"]
-      }
-    },
-    {
-      id: "12.7",
-      theme: 12,
-      title: {
-        fr: "Dans chaque page web, un [lien d\u2019\xE9vitement ou d\u2019acc\xE8s rapide](#liens-d-evitement-ou-d-acces-rapide) \xE0 la [zone de contenu principal](#zone-de-contenu-principal) est-il pr\xE9sent (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, un lien d\u2019\xE9vitement ou d\u2019acc\xE8s rapide \xE0 la zone de contenu principal est-il pr\xE9sent (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, un lien permet-il d\u2019\xE9viter la [zone de contenu principal](#zone-de-contenu-principal) ou d\u2019y acc\xE9der (hors cas particuliers)\xA0?"
-        ],
-        "2": [
-          "Dans chaque ensemble de pages, le [lien d\u2019\xE9vitement ou d\u2019acc\xE8s rapide](#liens-d-evitement-ou-d-acces-rapide) \xE0 la [zone de contenu principal](#zone-de-contenu-principal) v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
-          "Le lien est situ\xE9 \xE0 la m\xEAme place dans la pr\xE9sentation\xA0;",
-          "Le lien se pr\xE9sente toujours dans le m\xEAme ordre relatif dans le code source\xA0;",
-          "Le lien est visible ou, \xE0 d\xE9faut, visible \xE0 la prise de focus\xA0;",
-          "Le lien est fonctionnel."
-        ]
-      },
-      techniques: ["G1", "G59", "G123", "G124", "SCR28", "F66"],
-      particularCases: [
-        "Il existe une gestion de cas particuliers lorsque le site web est constitu\xE9 d\u2019une seule page.",
-        "Dans ce cas de figure, l\u2019obligation de la pr\xE9sence d\u2019un lien d\u2019acc\xE8s rapide est li\xE9e au contexte de la page\xA0: pr\xE9sence ou absence de navigation ou de contenus additionnels, par exemple. Le crit\xE8re peut \xEAtre consid\xE9r\xE9 comme non applicable lorsqu\u2019il est av\xE9r\xE9 qu\u2019un lien d\u2019acc\xE8s rapide est inutile."
-      ],
-      wcag: ["2.4.1", "2.4.3", "3.2.3"],
-      appliesTo: {
-        ruleIds: ["axe:bypass", "axe:skip-link", "skip-link-target-missing"]
-      }
-    },
-    {
-      id: "12.8",
-      theme: 12,
-      title: {
-        fr: "Dans chaque page web, l\u2019[ordre de tabulation](#ordre-de-tabulation) est-il [coh\xE9rent](#comprehensible-ordre-de-lecture)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, l\u2019ordre de tabulation est-il coh\xE9rent\xA0?"
-      },
-      tests: {
-        "1": ["Dans chaque page web, l\u2019[ordre de tabulation](#ordre-de-tabulation) dans le contenu est-il [coh\xE9rent](#comprehensible-ordre-de-lecture)\xA0?"],
-        "2": [
-          "Pour chaque [script](#script) qui met \xE0 jour ou ins\xE8re un contenu, l\u2019[ordre de tabulation](#ordre-de-tabulation) reste-t-il [coh\xE9rent](#comprehensible-ordre-de-lecture)\xA0?"
-        ]
-      },
-      techniques: ["G59", "H4", "F44", "F85", "SCR26", "SCR27", "SCR37", "C27"],
-      wcag: ["2.4.3"],
-      appliesTo: {
-        ruleIds: ["axe:tabindex", "positive-tabindex"]
-      }
-    },
-    {
-      id: "12.9",
-      theme: 12,
-      title: {
-        fr: "Dans chaque page web, la navigation ne doit pas contenir de pi\xE8ge au clavier. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, la navigation ne doit pas contenir de pi\xE8ge au clavier. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque [\xE9l\xE9ment recevant le focus](#prise-de-focus) v\xE9rifie-t-il une de ces conditions\xA0?",
-          "Il est possible d\u2019atteindre l\u2019\xE9l\xE9ment suivant ou pr\xE9c\xE9dent pouvant recevoir le focus avec la touche de tabulation\xA0;",
-          "L\u2019utilisateur est inform\xE9 d\u2019un m\xE9canisme fonctionnel permettant d\u2019atteindre au clavier l\u2019\xE9l\xE9ment suivant ou pr\xE9c\xE9dent pouvant recevoir le focus."
-        ]
-      },
-      techniques: ["G21", "H91", "F10"],
-      wcag: ["2.1.1", "2.1.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "12.10",
-      theme: 12,
-      title: {
-        fr: "Dans chaque page web, les [raccourcis clavier](#raccourci-clavier) n\u2019utilisant qu\u2019une seule touche (lettre minuscule ou majuscule, ponctuation, chiffre ou symbole) sont-ils contr\xF4lables par l\u2019utilisateur\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les raccourcis clavier n\u2019utilisant qu\u2019une seule touche (lettre minuscule ou majuscule, ponctuation, chiffre ou symbole) sont-ils contr\xF4lables par l\u2019utilisateur\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque [raccourci clavier](#raccourci-clavier) n\u2019utilisant qu\u2019une seule touche (lettre minuscule ou majuscule, ponctuation, chiffre ou symbole) v\xE9rifie-t-il l\u2019une de ces conditions\xA0?",
-          "Un m\xE9canisme est disponible pour d\xE9sactiver le [raccourci clavier](#raccourci-clavier)\xA0;",
-          "Un m\xE9canisme est disponible pour configurer la touche de [raccourci clavier](#raccourci-clavier) au moyen des touches de modification (Ctrl, Alt, Maj, etc.)\xA0;",
-          "Dans le cas d\u2019un [composant d\u2019interface](#composant-d-interface) utilisateur, le [raccourci clavier](#raccourci-clavier) qui lui est associ\xE9 ne peut \xEAtre activ\xE9 que si le focus clavier est sur ce composant."
-        ]
-      },
-      techniques: ["F99", "G217"],
-      wcag: ["2.1.4"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "12.11",
-      theme: 12,
-      title: {
-        fr: "Dans chaque page web, les contenus additionnels apparaissant au survol, \xE0 la prise de focus ou \xE0 l\u2019activation d\u2019un [composant d\u2019interface](#composant-d-interface) sont-ils si n\xE9cessaire atteignables au clavier\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les contenus additionnels apparaissant au survol, \xE0 la prise de focus ou \xE0 l\u2019activation d\u2019un composant d\u2019interface sont-ils si n\xE9cessaire atteignables au clavier\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, les contenus additionnels apparaissant au survol, \xE0 la prise de focus ou \xE0 l\u2019activation d\u2019un [composant d\u2019interface](#composant-d-interface) sont-ils si n\xE9cessaire atteignables au clavier\xA0?"
-        ]
-      },
-      techniques: [],
-      technicalNote: [
-        "Ce crit\xE8re adresse les situations o\xF9 un contenu additionnel contient des [composants d\u2019interface](#composant-d-interface) avec lesquels il doit \xEAtre possible d\u2019interagir au clavier. Par exemple, une infobulle personnalis\xE9e qui propose un lien dans son contenu."
-      ],
-      wcag: ["2.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "13.1",
-      theme: 13,
-      title: {
-        fr: "Pour chaque page web, l\u2019utilisateur a-t-il le contr\xF4le de chaque limite de temps modifiant le contenu (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque page web, l\u2019utilisateur a-t-il le contr\xF4le de chaque limite de temps modifiant le contenu (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Pour chaque page web, chaque [proc\xE9d\xE9 de rafra\xEEchissement](#procede-de-rafraichissement) (balise `<object>`, balise `<embed>`, balise `<svg>`, balise `<canvas>`, balise `<meta>`) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "L\u2019utilisateur peut arr\xEAter ou relancer le rafra\xEEchissement\xA0;",
-          "L\u2019utilisateur peut augmenter la limite de temps entre deux rafra\xEEchissements de dix fois, au moins\xA0;",
-          "L\u2019utilisateur est averti de l\u2019imminence du rafra\xEEchissement et dispose de vingt secondes, au moins, pour augmenter la limite de temps avant le prochain rafra\xEEchissement\xA0;",
-          "La limite de temps entre deux rafra\xEEchissements est de vingt heures, au moins."
-        ],
-        "2": ["Pour chaque page web, chaque proc\xE9d\xE9 de [redirection](#redirection) effectu\xE9 via une balise `<meta>` est-il imm\xE9diat (hors cas particuliers)\xA0?"],
-        "3": [
-          "Pour chaque page web, chaque proc\xE9d\xE9 de [redirection](#redirection) effectu\xE9 via un [script](#script) v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "L\u2019utilisateur peut arr\xEAter ou relancer la redirection\xA0;",
-          "L\u2019utilisateur peut augmenter la limite de temps avant la redirection de dix fois, au moins\xA0;",
-          "L\u2019utilisateur est averti de l\u2019imminence de la redirection et dispose de vingt secondes, au moins, pour augmenter la limite de temps avant la prochaine redirection\xA0;",
-          "La limite de temps avant la redirection est de vingt heures, au moins."
-        ],
-        "4": [
-          "Pour chaque page web, chaque proc\xE9d\xE9 limitant le temps d\u2019une session v\xE9rifie-t-il une de ces conditions (hors cas particuliers)\xA0?",
-          "L\u2019utilisateur peut supprimer la limite de temps\xA0;",
-          "L\u2019utilisateur peut augmenter la limite de temps\xA0;",
-          "La limite de temps avant la fin de la session est de vingt heures au moins."
-        ]
-      },
-      techniques: ["F40", "F41", "F58", "F61", "G75", "G76", "G110", "G133", "G180", "G186", "G198", "H76", "SCR1", "SCR16", "SCR36", "SVR1"],
-      particularCases: [
-        "Il existe une gestion de cas particuliers lorsque la limite de temps est essentielle, notamment lorsqu\u2019elle ne pourrait pas \xEAtre supprim\xE9e sans changer fondamentalement le contenu ou les fonctionnalit\xE9s li\xE9es au contenu.",
-        "Dans ces situations, le crit\xE8re est non applicable. Par exemple, le rafra\xEEchissement d\u2019un flux RSS dans une page n\u2019est pas une limite de temps essentielle\xA0; le crit\xE8re est applicable. En revanche, une redirection automatique qui am\xE8ne vers la nouvelle version d\u2019une page \xE0 partir d\u2019une URL obsol\xE8te est essentielle\xA0; le crit\xE8re est non applicable."
-      ],
-      wcag: ["2.2.1", "2.2.2"],
-      appliesTo: {
-        ruleIds: ["meta-refresh-redirect"]
-      }
-    },
-    {
-      id: "13.2",
-      theme: 13,
-      title: {
-        fr: "Dans chaque page web, l\u2019ouverture d\u2019une nouvelle fen\xEAtre ne doit pas \xEAtre d\xE9clench\xE9e sans action de l\u2019utilisateur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, l\u2019ouverture d\u2019une nouvelle fen\xEAtre ne doit pas \xEAtre d\xE9clench\xE9e sans action de l\u2019utilisateur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, l\u2019ouverture d\u2019une nouvelle fen\xEAtre ne doit pas \xEAtre d\xE9clench\xE9e sans action de l\u2019utilisateur. Cette r\xE8gle est-elle respect\xE9e\xA0?"
-        ]
-      },
-      techniques: ["F55", "G107"],
-      wcag: ["3.2.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "13.3",
-      theme: 13,
-      title: {
-        fr: "Dans chaque page web, chaque document bureautique en t\xE9l\xE9chargement poss\xE8de-t-il, si n\xE9cessaire, une [version accessible](#version-accessible-pour-un-document-en-telechargement) (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, chaque document bureautique en t\xE9l\xE9chargement poss\xE8de-t-il, si n\xE9cessaire, une version accessible (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque fonctionnalit\xE9 de t\xE9l\xE9chargement d\u2019un document bureautique v\xE9rifie-t-elle une de ces conditions\xA0?",
-          "Le document en t\xE9l\xE9chargement est compatible avec l'accessibilit\xE9 ;",
-          "Il en existe une version alternative en t\xE9l\xE9chargement compatible avec l'accessibilit\xE9 ;",
-          "Il en existe une version alternative au format HTML compatible avec l'accessibilit\xE9."
-        ]
-      },
-      techniques: ["F15", "G10", "G135"],
-      particularCases: [
-        "Il existe une gestion de cas particuliers\xA0:",
-        "- Pour les personnes de droit priv\xE9 mentionn\xE9es aux 2\xB0 \xE0 4\xB0 du I de l\u2019article 47 de la loi du 11 f\xE9vrier 2005\xA0: si les fichiers bureautiques (ex\xA0: PDF, documents Microsoft ou LibreOffice, etc.) ont \xE9t\xE9 publi\xE9s avant le 23 septembre 2018 (sauf si ce sont des documents n\xE9cessaires pour accomplir une d\xE9marche administrative relevant des t\xE2ches effectu\xE9es par l\u2019organisme concern\xE9), ils sont exempt\xE9s de l\u2019obligation d\u2019accessibilit\xE9.",
-        "Dans cette situation, le crit\xE8re est non applicable."
-      ],
-      wcag: ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
-      appliesTo: {
-        ruleIds: []
-      },
-      judgment: true
-    },
-    {
-      id: "13.4",
-      theme: 13,
-      title: {
-        fr: "Pour chaque document bureautique ayant une [version accessible](#version-accessible-pour-un-document-en-telechargement), cette version offre-t-elle la m\xEAme information\xA0?"
-      },
-      titlePlain: {
-        fr: "Pour chaque document bureautique ayant une version accessible, cette version offre-t-elle la m\xEAme information\xA0?"
-      },
-      tests: {
-        "1": [
-          "Chaque document bureautique ayant une version accessible v\xE9rifie-t-il une de ces conditions\xA0?",
-          "La version compatible avec l\u2019accessibilit\xE9 offre la m\xEAme information\xA0;",
-          "La version alternative au format HTML est pertinente et offre la m\xEAme information."
-        ]
-      },
-      techniques: ["F15", "G10", "G135"],
-      wcag: ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
-      appliesTo: {
-        ruleIds: []
-      },
-      judgment: true
-    },
-    {
-      id: "13.5",
-      theme: 13,
-      title: {
-        fr: "Dans chaque page web, chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) a-t-il une alternative\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) a-t-il une alternative\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) v\xE9rifie-t-il une de ces conditions\xA0?",
-          "Un attribut title est disponible\xA0;",
-          "Une d\xE9finition est donn\xE9e par le contexte adjacent."
-        ]
-      },
-      techniques: ["F71", "F70", "G135", "H86"],
-      wcag: ["1.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "13.6",
-      theme: 13,
-      title: {
-        fr: "Dans chaque page web, pour chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) ayant une alternative, cette alternative est-elle pertinente\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, pour chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) ayant une alternative, cette alternative est-elle pertinente\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque contenu cryptique (art ASCII, \xE9motic\xF4ne, syntaxe cryptique) v\xE9rifie-t-il une de ces conditions\xA0?",
-          "Le contenu de l\u2019attribut `title` est pertinent\xA0;",
-          "La d\xE9finition donn\xE9e par le contexte adjacent est pertinente."
-        ]
-      },
-      techniques: ["F71", "F72", "H86"],
-      wcag: ["1.1.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "13.7",
-      theme: 13,
-      title: {
-        fr: "Dans chaque page web, [les changements brusques de luminosit\xE9 ou les effets de flash](#changement-brusque-de-luminosite-ou-effet-de-flash) sont-ils correctement utilis\xE9s\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les changements brusques de luminosit\xE9 ou les effets de flash sont-ils correctement utilis\xE9s\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque image ou \xE9l\xE9ment multim\xE9dia (balise `<video>`, balise `<img>`, balise `<svg>`, balise `<canvas>`, balise `<embed>` ou balise `<object>`) qui provoque un changement brusque de luminosite\u0301 ou un effet de flash ve\u0301rifie-t-il une de ces conditions\xA0?",
-          "La fr\xE9quence de l\u2019effet est inf\xE9rieure \xE0 3 par seconde\xA0;",
-          "La surface totale cumul\xE9e des effets est inf\xE9rieure ou \xE9gale \xE0 21824 pixels."
-        ],
-        "2": [
-          "Dans chaque page web, chaque script qui provoque [un changement brusque de luminosit\xE9 ou un effet de flash](#changement-brusque-de-luminosite-ou-effet-de-flash) v\xE9rifie-t-il une de ces conditions\xA0?",
-          "La fr\xE9quence de l\u2019effet est inf\xE9rieure \xE0 3 par seconde\xA0;",
-          "La surface totale cumul\xE9e des effets est inf\xE9rieure ou \xE9gale \xE0 21824 pixels."
-        ],
-        "3": [
-          "Dans chaque page web, chaque mise en forme CSS qui provoque [un changement brusque de luminosit\xE9 ou un effet de flash](#changement-brusque-de-luminosite-ou-effet-de-flash) v\xE9rifie-t-il une de ces conditions\xA0?",
-          "La fr\xE9quence de l\u2019effet est inf\xE9rieure \xE0 3 par seconde\xA0;",
-          "La surface totale cumul\xE9e des effets est inf\xE9rieure ou \xE9gale \xE0 21824 pixels."
-        ]
-      },
-      techniques: ["G15", "G19", "G176"],
-      wcag: ["2.3.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "13.8",
-      theme: 13,
-      title: {
-        fr: "Dans chaque page web, chaque contenu en mouvement ou clignotant est-il [contr\xF4lable](#controle-contenu-en-mouvement-ou-clignotant) par l\u2019utilisateur\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, chaque contenu en mouvement ou clignotant est-il contr\xF4lable par l\u2019utilisateur\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque contenu en mouvement d\xE9clench\xE9 automatiquement, v\xE9rifie-t-il une de ces conditions\xA0?",
-          "La dur\xE9e du mouvement est inf\xE9rieure ou \xE9gale \xE0 5\u202Fsecondes\xA0;",
-          "L\u2019utilisateur peut arr\xEAter et relancer le mouvement\xA0;",
-          "L\u2019utilisateur peut afficher et masquer le contenu en mouvement\xA0;",
-          "L\u2019utilisateur peut afficher la totalit\xE9 de l\u2019information sans le mouvement."
-        ],
-        "2": [
-          "Dans chaque page web, chaque contenu clignotant d\xE9clench\xE9 automatiquement, v\xE9rifie-t-il une de ces conditions\xA0?",
-          "La dur\xE9e du clignotement est inf\xE9rieure ou \xE9gale \xE0 5\u202Fsecondes\xA0;",
-          "L\u2019utilisateur peut arr\xEAter et relancer le clignotement\xA0;",
-          "L\u2019utilisateur peut afficher et masquer le contenu clignotant\xA0;",
-          "L\u2019utilisateur peut afficher la totalit\xE9 de l\u2019information sans le clignotement."
-        ]
-      },
-      techniques: ["F4", "F7", "F16", "F47", "F50", "G4", "G11", "G152", "G186", "G187", "G191", "SCR22", "SCR33", "SCR36", "SM11", "SM12"],
-      wcag: ["2.2.1", "2.2.2"],
-      appliesTo: {
-        ruleIds: ["autoplay-media", "axe:blink", "axe:marquee", "blink-marquee"]
-      }
-    },
-    {
-      id: "13.9",
-      theme: 13,
-      title: {
-        fr: "Dans chaque page web, le contenu propos\xE9 est-il consultable quelle que soit l\u2019orientation de l\u2019\xE9cran (portrait ou paysage) (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, le contenu propos\xE9 est-il consultable quelle que soit l\u2019orientation de l\u2019\xE9cran (portrait ou paysage) (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque contenu v\xE9rifie-t-il ces conditions (hors cas particuliers)\xA0?",
-          "La consultation est possible quel que soit le mode d\u2019orientation de l\u2019\xE9cran\xA0;",
-          "Le contenu propos\xE9 reste le m\xEAme quel que soit le mode d\u2019orientation de l\u2019\xE9cran utilis\xE9 m\xEAme si sa pr\xE9sentation et le moyen d\u2019y acc\xE9der peut diff\xE9rer."
-        ]
-      },
-      techniques: [],
-      particularCases: [
-        "Il existe des interfaces pour lesquelles l\u2019orientation du p\xE9riph\xE9rique est essentielle \xE0 leur utilisation.",
-        "Dans ces situations, le crit\xE8re est non applicable. Il peut s\u2019agir d\u2019interfaces de jeu, de piano, de d\xE9p\xF4t de ch\xE8ques bancaires, etc.",
-        "Si l\u2019interface est le seul moyen d\u2019acc\xE9der au service propos\xE9, une alternative devrait \xEAtre mise en place pour pallier cette carence."
-      ],
-      wcag: ["1.3.4"],
-      appliesTo: {
-        ruleIds: ["rendered-orientation-lock"]
-      }
-    },
-    {
-      id: "13.10",
-      theme: 13,
-      title: {
-        fr: "Dans chaque page web, les fonctionnalit\xE9s utilisables ou disponibles au moyen d\u2019un [geste complexe](#gestes-complexes-et-gestes-simples) peuvent-elles \xEAtre \xE9galement disponibles au moyen d\u2019un [geste simple](#gestes-complexes-et-gestes-simples) (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les fonctionnalit\xE9s utilisables ou disponibles au moyen d\u2019un geste complexe peuvent-elles \xEAtre \xE9galement disponibles au moyen d\u2019un geste simple (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, chaque fonctionnalit\xE9 utilisable ou disponible suite \xE0 un contact multipoint est-elle \xE9galement utilisable ou disponible suite \xE0 un contact en un point unique de l\u2019\xE9cran (hors cas particuliers)."
-        ],
-        "2": [
-          "Dans chaque page web, chaque fonctionnalit\xE9 utilisable ou disponible suite \xE0 un geste bas\xE9 sur le suivi d\u2019une trajectoire sur l\u2019\xE9cran est-elle \xE9galement utilisable ou disponible suite \xE0 un contact en un point unique de l\u2019\xE9cran (hors cas particuliers)."
-        ]
-      },
-      techniques: ["G215", "G216"],
-      particularCases: [
-        "Il existe une gestion de cas particuliers dans deux types de situation\xA0:",
-        "- Le crit\xE8re ne s\u2019applique qu\u2019\xE0 des fonctionnalit\xE9s mises en place par l\u2019auteur du site. Il ne concerne donc pas les gestes requis par l\u2019agent utilisateur ou le syst\xE8me d\u2019exploitation\xA0;",
-        "- Le crit\xE8re ne s\u2019applique pas aux fonctionnalit\xE9s dont la r\xE9alisation d\u2019un geste complexe est essentielle (ex\xE9cuter le trac\xE9 d\u2019une signature, par exemple)."
-      ],
-      wcag: ["2.5.1"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "13.11",
-      theme: 13,
-      title: {
-        fr: "Dans chaque page web, les actions d\xE9clench\xE9es au moyen d\u2019un dispositif de pointage sur un point unique de l\u2019\xE9cran peuvent-elles faire l\u2019objet d\u2019une annulation (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les actions d\xE9clench\xE9es au moyen d\u2019un dispositif de pointage sur un point unique de l\u2019\xE9cran peuvent-elles faire l\u2019objet d\u2019une annulation (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, les actions d\xE9clench\xE9es au moyen d\u2019un dispositif de pointage sur un point unique de l\u2019\xE9cran v\xE9rifient-elles l\u2019une de ces conditions (hors cas particuliers)\xA0?",
-          "L\u2019action est d\xE9clench\xE9e au moment o\xF9 le dispositif de pointage est [rel\xE2ch\xE9 ou relev\xE9](#relache-ou-releve)\xA0;",
-          "L\u2019action est d\xE9clench\xE9e au moment o\xF9 le dispositif de pointage est [press\xE9 ou pos\xE9](#presse-ou-pose) puis annul\xE9e lorsque le dispositif de pointage est [rel\xE2ch\xE9 ou relev\xE9](#relache-ou-releve)\xA0;",
-          "Un m\xE9canisme est disponible pour abandonner (avant ach\xE8vement de l\u2019action) ou annuler (apr\xE8s ach\xE8vement) l\u2019ex\xE9cution de l\u2019action."
-        ]
-      },
-      techniques: [],
-      technicalNote: [
-        "Deux exemples de m\xE9canisme mis en place pour annuler ou abandonner une action d\xE9clench\xE9e au moyen d\u2019un dispositif de pointage sur un point unique de l\u2019\xE9cran\xA0:",
-        "- Une fen\xEAtre modale permettant d\u2019annuler l\u2019action apr\xE8s son ach\xE8vement\xA0;",
-        "- Pour une fonction de glisser/d\xE9poser, le fait d\u2019abandonner l\u2019action si l\u2019utilisateur rel\xE2che l\u2019\xE9l\xE9ment en dehors de la zone cible."
-      ],
-      particularCases: [
-        "Il existe une gestion de cas particulier lorsque la fonctionnalit\xE9 n\xE9cessite que le comportement attendu soit r\xE9alis\xE9 lors d\u2019un \xE9v\xE9nement descendant, par exemple, un \xE9mulateur de clavier dont les touches doivent s\u2019activer \xE0 la pression comme sur un clavier physique. Dans ces situations, le crit\xE8re est non applicable."
-      ],
-      wcag: ["2.5.2"],
-      appliesTo: {
-        ruleIds: []
-      }
-    },
-    {
-      id: "13.12",
-      theme: 13,
-      title: {
-        fr: "Dans chaque page web, les fonctionnalit\xE9s qui impliquent un mouvement de l\u2019appareil ou vers l\u2019appareil peuvent-elles \xEAtre satisfaites de mani\xE8re alternative (hors cas particuliers)\xA0?"
-      },
-      titlePlain: {
-        fr: "Dans chaque page web, les fonctionnalit\xE9s qui impliquent un mouvement de l\u2019appareil ou vers l\u2019appareil peuvent-elles \xEAtre satisfaites de mani\xE8re alternative (hors cas particuliers)\xA0?"
-      },
-      tests: {
-        "1": [
-          "Dans chaque page web, les fonctionnalit\xE9s disponibles en bougeant l\u2019appareil peuvent-elles \xEAtre accomplies avec des [composants d\u2019interface](#composant-d-interface) utilisateur (hors cas particuliers)\xA0?"
-        ],
-        "2": [
-          "Dans chaque page web, les fonctionnalit\xE9s disponibles en faisant un geste en direction de l\u2019appareil peuvent-elles \xEAtre accomplies avec des [composants d\u2019interface](#composant-d-interface) utilisateur (hors cas particuliers)\xA0?"
-        ],
-        "3": [
-          "L\u2019utilisateur a-t-il la possibilit\xE9 de d\xE9sactiver la d\xE9tection du mouvement pour \xE9viter un d\xE9clenchement accidentel de la fonctionnalit\xE9 (hors cas particuliers)\xA0?"
-        ]
-      },
-      techniques: [],
-      particularCases: [
-        "Il existe une gestion de cas particulier lorsque\xA0:",
-        "- Le mouvement est essentiel \xE0 l\u2019accomplissement de la fonctionnalit\xE9 (ex. podom\xE8tre)\xA0;",
-        "- La d\xE9tection du mouvement est utilis\xE9e pour contr\xF4ler une fonctionnalit\xE9 au travers d\u2019une interface compatible avec l\u2019accessibilit\xE9."
-      ],
-      wcag: ["2.5.4"],
-      appliesTo: {
-        ruleIds: []
-      }
-    }
-  ]
-};
-
-// src/data/standards/rgaa.glossary.json
-var rgaa_glossary_default = {
-  "accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage": {
-    title: "Accessible et activable par le clavier et tout dispositif de pointage",
-    body: "Un composant d\u2019interface (lien, bouton\u2026) est accessible au clavier et par tout dispositif de pointage lorsque l\u2019utilisateur peut prendre, indiff\xE9remment, le focus par un pointeur ou la touche tabulation\xA0;\n Un composant d\u2019interface (lien, bouton\u2026) est activable au clavier et par tout dispositif de pointage lorsque l\u2019utilisateur peut enclencher, indiff\xE9remment, l\u2019action pr\xE9vue par le composant d\u2019interface par une pression du pointeur ou la touche entr\xE9e du clavier\xA0;\n Attention\xA0: pour certains composants d\u2019interface comme les sliders (bouton coulissant ou rotatif\u2026), il n\u2019est pas possible de contr\xF4ler le composant par la seule touche d\u2019entr\xE9e. Dans ces situations, d\u2019autres touches (comme les touches de direction) peuvent \xEAtre utilis\xE9es. En particulier pour les \xE9l\xE9ments ayant un r\xF4le WAI-ARIA correspondant \xE0 un motif de conception il est recommand\xE9 de consid\xE9rer le document WAI-ARIA 1.1 Authoring Practices lors de leur impl\xE9mentation.\n \n Dans le r\xE9f\xE9rentiel, l\u2019expression \xAB\xA0contr\xF4lable par le clavier et tout dispositif de pointage\xA0\xBB se rapporte \xE9galement \xE0 la pr\xE9sente d\xE9finition.\n Note importante\xA0: le recours \xE0 certaines technologies peut rendre la gestion du focus trop complexe ou trop instable pour ne reposer que sur la tabulation, les touches de direction et la touche entr\xE9e. Dans ce cas, la mise \xE0 disposition de raccourcis clavier peut \xEAtre la seule solution pour rendre le composant utilisable.\n Le crit\xE8re ne peut \xEAtre consid\xE9r\xE9 comme conforme qu\u2019\xE0 la condition que les raccourcis clavier utilis\xE9s soient correctement document\xE9s, qu\u2019ils soient fonctionnels et qu\u2019ils respectent le crit\xE8re 12.10 ."
-  },
-  "accoles-etiquette-et-champ-accoles": {
-    title: "Accol\xE9s (\xE9tiquette et champ accol\xE9s)",
-    body: "Il faut que l\u2019\xE9tiquette et son champ soient visuellement proches de mani\xE8re \xE0 ce que la relation entre les deux ne puisse pas pr\xEAter \xE0 confusion."
-  },
-  "alternative-a-script": {
-    title: "Alternative (\xE0 script)",
-    body: "Texte ou proc\xE9d\xE9 associ\xE9 au script via une technique appropri\xE9e et permettant de mettre \xE0 disposition une fonction ou un contenu similaire \xE0 celui propos\xE9 par script.\n Note\xA0: lorsqu\u2019une alternative \xE0 un proc\xE9d\xE9 ou une fonctionnalit\xE9 JavaScript est propos\xE9e, le moyen d\u2019y acc\xE9der doit \xEAtre fourni par le site lui-m\xEAme. Il peut s\u2019agir d\u2019un lien ou d\u2019un bouton permettant d\u2019acc\xE9der \xE0 une page alternative fonctionnant sans JavaScript ou permettant de remplacer le(s) composant(s) par un composant alternatif fonctionnant sans JavaScript par exemple."
-  },
-  "alternative-courte-et-concise": {
-    title: "Alternative courte et concise",
-    body: "Les conditions de restitution d\u2019une alternative textuelle via des technologies d\u2019assistance (par exemple une loupe d\u2019\xE9cran) n\xE9cessitent qu\u2019elle soit la plus courte possible. Une longueur maximale de 80 caract\xE8res est fortement recommand\xE9e\xA0; elle limitera le nombre de manipulations n\xE9cessaires pour lire l\u2019alternative par les utilisateurs de plages braille ou de loupes d\u2019\xE9cran notamment."
-  },
-  "alternative-textuelle-image": {
-    title: "Alternative textuelle (image)",
-    body: '\xAB\xA0Nom accessible\xA0\xBB restitu\xE9 par les technologies d\u2019assistance pour les \xE9l\xE9ments graphiques de type\xA0:\n Image (balise <img> ou balise ouvrante poss\xE9dant un attribut WAI-ARIA role="img" )\xA0;\n Zone d\u2019image r\xE9active (balise <area> )\xA0;\n Bouton de type image (balise <input> avec l\u2019attribut type="image" )\xA0;\n Image objet (balise <object type="image/\u2026"> )\xA0;\n Image vectorielle (balise <svg> )\xA0;\n Image bitmap (balise <canvas> )\xA0;\n Image embarqu\xE9e (balise <embed> ).\n \n Dans le cas d\u2019un \xE9l\xE9ment graphique, le \xAB\xA0nom accessible\xA0\xBB est obtenu selon l\u2019ordre suivant\xA0:\n Passage de texte associ\xE9 via l\u2019attribut WAI-ARIA aria-labelledby pour les balises\xA0: <img> \xA0;\n <input type="image"> \xA0;\n <svg> \xA0;\n <object type="image/\u2026"> \xA0;\n <embed type="image/\u2026"> \xA0;\n <canvas> \xA0;\n balises poss\xE9dant un attribut WAI-ARIA role="img" .\n \n \n Sinon, contenu de l\u2019attribut WAI-ARIA aria-label pour les \xE9l\xE9ments\xA0: <img> \xA0;\n <area> \xA0;\n <input type="image"> \xA0;\n <svg> \xA0;\n <object type="image/\u2026"> \xA0;\n <embed type="image/\u2026"> \xA0;\n <canvas> \xA0;\n balises ouvrantes poss\xE9dant un attribut WAI-ARIA role="img" .\n \n \n Sinon, contenu de l\u2019attribut alt pour les balises\xA0: <img> \xA0;\n <area> \xA0;\n <input type="image"> .\n \n \n Sinon, contenu de l\u2019attribut title pour les balises\xA0: <img> \xA0;\n <input type="image"> \xA0;\n <object type="image/\u2026"> \xA0;\n <embed type="image/\u2026"> .\n \n \n \n Cet ordre doit \xEAtre utilis\xE9 pour d\xE9terminer ce qui constitue l\u2019alternative textuelle.\n N\xE9anmoins, en cas de support partiel de l\u2019algorithme de calcul du \xAB\xA0nom accessible\xA0\xBB, c\u2019est la valeur r\xE9ellement restitu\xE9e par les technologies d\u2019assistance utilis\xE9es dans l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB) qu\u2019il faudra consid\xE9rer comme alternative textuelle.\n Par exemple\xA0:\n En cas de pr\xE9sence conjointe d\u2019un attribut WAI-ARIA aria-label et d\u2019un attribut WAI-ARIA aria-labelledby sur une balise <img> , c\u2019est le passage de texte r\xE9f\xE9renc\xE9 par l\u2019attribut WAI-ARIA aria-labelledby qui doit \xEAtre consid\xE9r\xE9e comme alternative textuelle si le contenu du passage de texte est r\xE9ellement restitu\xE9 par les technologies d\u2019assistance utilis\xE9es dans l\u2019environnement de test\xA0;\n En cas de pr\xE9sence conjointe d\u2019un attribut WAI-ARIA aria-label et d\u2019un attribut alt sur une balise <img> , c\u2019est le contenu de l\u2019attribut WAI-ARIA aria-label qui doit \xEAtre consid\xE9r\xE9 comme alternative textuelle si le contenu de l\u2019attribut WAI-ARIA aria-label est r\xE9ellement restitu\xE9 par les technologies d\u2019assistance utilis\xE9es dans l\u2019environnement de test.\n \n R\xE9f\xE9rence\xA0: Accessible name and description calculation .\n RGAA consid\xE8re trois types d\u2019alternatives textuelles li\xE9es \xE0 la nature de l\u2019image\xA0:\n Pour une image porteuse d\u2019information, l\u2019alternative textuelle apporte l\u2019information n\xE9cessaire \xE0 la compr\xE9hension du contenu qu\u2019elle v\xE9hicule\xA0;\n Pour une image de d\xE9coration, aucune alternative textuelle ne doit \xEAtre restitu\xE9e\xA0;\n Pour une image CAPTCHA ou une image-test , l\u2019alternative textuelle d\xE9crit seulement la nature et la fonction de l\u2019image. En effet, l\u2019alternative textuelle ne peut apporter l\u2019information v\xE9hicul\xE9e par l\u2019image sans rendre la fonction associ\xE9e inop\xE9rante.\n \n Note 1\xA0: pour une image CAPTCHA l\u2019alternative peut \xEAtre, par exemple\xA0: \xAB\xA0Code de s\xE9curit\xE9 anti-spam\xA0\xBB ou \xAB\xA0code pour v\xE9rifier que vous \xEAtes un humain\xA0\xBB ou toute autre alternative permettant \xE0 l\u2019utilisateur de comprendre la nature et la fonction de l\u2019image.\n Note 2\xA0: pour un groupe d\u2019images, par exemple un syst\xE8me de vote constitu\xE9 de plusieurs images d\u2019\xE9toile, il est fortement conseill\xE9 d\u2019utiliser soit la premi\xE8re image du groupe pour donner une alternative coh\xE9rente au groupe d\u2019image (voir la technique WCAG2.1 G196 ), soit une balise conteneur pourvue d\u2019un r\xF4le WAI-ARIA img et d\u2019une alternative textuelle. Dans le premier cas, les autres images du groupe sont consid\xE9r\xE9es comme des images de d\xE9coration. Dans le second cas, toutes les images du groupe sont consid\xE9r\xE9es comme des images de d\xE9coration.\n Note 3\xA0: pour les image-lien, l\u2019alternative doit permettre de comprendre la fonction et la destination du lien\xA0; ce cas est trait\xE9 dans la th\xE9matique liens.\n Note 4\xA0: pour les images vectorielles (balise <svg> ) l\u2019alternative textuelle pourrait se trouver aussi pr\xE9sente dans une balise <title> ou dans une balise <text> que cette derni\xE8re balise soit ou non visible, m\xEAme si ce n\u2019est pas le r\xF4le d\xE9volu \xE0 cet \xE9l\xE9ment en SVG.\n Note 5\xA0: l\u2019utilisation de l\u2019attribut alt \xE9tant la seule technique totalement support\xE9e par les aides techniques il est recommand\xE9 de privil\xE9gier cette solution lors de la mise en \u0153uvre d\u2019une alternative \xE0 une balise <img> , <area> et <input type="image"> .\n Note 6\xA0: bien que l\u2019attribut title soit consid\xE9r\xE9 comme une possibilit\xE9 d\u2019alternative textuelle \xE0 une image, son usage peut poser probl\xE8me, notamment du fait qu\u2019une image avec un attribut alt absent ou vide est consid\xE9r\xE9e comme une image pourvue d\u2019un role=\u201Cpr\xE9sentation\u201D par WAI-ARIA\xA0: https://www.w3.org/TR/html-aam-1.0/#details-id-54 . Il faut s\u2019assurer que les assistances techniques pr\xE9sentes dans l\u2019environnement de test retenu restituent correctement l\u2019alternative propos\xE9e par l\u2019attribut title .'
-  },
-  "ambigu-pour-tout-le-monde": {
-    title: "Ambigu pour tout le monde",
-    body: "L\u2019intention ne peut \xEAtre d\xE9termin\xE9e \xE0 partir du lien et de toute l\u2019information de la page web pr\xE9sent\xE9e \xE0 l\u2019utilisateur en m\xEAme temps que ce lien (c\u2019est-\xE0-dire qu\u2019un lecteur sans limitation fonctionnelle ne conna\xEEtrait pas la fonction d\u2019un lien avant de l\u2019activer). Exemple\xA0: le mot \xAB\xA0goyave\xA0\xBB dans la phrase suivante utilis\xE9 comme lien\xA0: \xAB\xA0L\u2019une des exportations importantes est la goyave\xA0\xBB. Ce lien pourrait conduire \xE0 une d\xE9finition de la goyave, \xE0 un graphe pr\xE9sentant une liste des quantit\xE9s de goyaves export\xE9es ou \xE0 une photo de personnes r\xE9coltant la goyave. Jusqu\u2019\xE0 ce que le lien soit activ\xE9, tout utilisateur est dans l\u2019incertitude et une personne handicap\xE9e n\u2019est donc pas d\xE9savantag\xE9e."
-  },
-  "audiodescription-synchronisee-media-temporel": {
-    title: "Audiodescription synchronis\xE9e (m\xE9dia temporel)",
-    body: "Narration ajout\xE9e (via un fichier son) \xE0 une piste sonore pour d\xE9crire les d\xE9tails visuels importants qui ne peuvent \xEAtre compris \xE0 partir de la piste sonore principale seulement. L\u2019audiodescription doit \xEAtre synchronis\xE9e avec le m\xE9dia temporel par un dispositif applicatif li\xE9 au lecteur lui-m\xEAme ou fourni par le d\xE9veloppement par exemple avec JavaScript.\n Note 1\xA0: l\u2019audiodescription d\u2019une vid\xE9o fournit de l\u2019information \xE0 propos des actions, des personnages, des changements de sc\xE8nes, du texte apparaissant \xE0 l\u2019\xE9cran et d\u2019autres contenus visuels.\n Note 2\xA0: dans une audiodescription standard, la narration est ajout\xE9e durant les pauses qui existent dans le dialogue. (Voir aussi audiodescription \xE9tendue.)\n Note 3\xA0: lorsque toute l\u2019information de la vid\xE9o est d\xE9j\xE0 donn\xE9e dans la piste audio, aucune audiodescription suppl\xE9mentaire n\u2019est requise."
-  },
-  "bouton-formulaire": {
-    title: "Bouton (formulaire)",
-    body: '\xC9l\xE9ment d\u2019un formulaire qui permet d\u2019effectuer une action pr\xE9d\xE9finie. Par exemple, le bouton de soumission d\u2019un formulaire permet l\u2019envoi au serveur des informations collect\xE9es pour leur traitement. L\u2019intitul\xE9 d\u2019un bouton doit d\xE9crire l\u2019action qui r\xE9sulte de son activation (par exemple\xA0: \xAB\xA0Lancer votre recherche\xA0\xBB, \xAB\xA0Envoyer votre message\xA0\xBB).\n En HTML, il y a trois types de boutons de formulaire\xA0:\n Balise <input> de type submit , reset ou button \xA0;\n Balise <input> de type image \xA0;\n Balise <button> .\n \n Il est \xE9galement possible de restituer un bouton \xE0 l\u2019aide du r\xF4le WAI-ARIA button .\n L\u2019intitul\xE9 du bouton peut \xEAtre de six types\xA0:\n Le contenu du passage de texte associ\xE9 au bouton via l\u2019attribut WAI-ARIA aria-labelledby lorsqu\u2019il est pr\xE9sent\xA0;\n Le contenu de l\u2019attribut aria-label lorsqu\u2019il est pr\xE9sent\xA0;\n Le contenu de l\u2019attribut alt d\u2019un bouton de type image \xA0;\n Le contenu de l\u2019attribut value des boutons de type submit , reset ou button \xA0;\n Le contenu de la balise <button> \xA0;\n Le contenu de l\u2019attribut title lorsqu\u2019il est pr\xE9sent.\n \n Note importante\xA0: lorsque plusieurs de ces techniques sont pr\xE9sentes sur un m\xEAme bouton, le calcul du \xAB\xA0nom accessible\xA0\xBB, c\u2019est-\xE0-dire ce qui sera restitu\xE9, ob\xE9it \xE0 un ordre strict\xA0:\n aria-labelledby \xA0;\n Sinon aria-label \xA0;\n Sinon alt pour le cas des input image \xA0;\n Sinon value pour le cas des input submit , reset ou button \xA0;\n Sinon contenu de la balise <button> \xA0;\n Sinon title .\n \n Cet ordre doit \xEAtre utilis\xE9 pour l\u2019\xE9valuation de la pertinence du \xAB\xA0nom accessible\xA0\xBB du bouton. Par exemple, m\xEAme dans le cas de la pr\xE9sence d\u2019un title et d\u2019un passage de texte r\xE9f\xE9renc\xE9 par aria-labelledby sur le m\xEAme bouton, c\u2019est le passage de texte r\xE9f\xE9renc\xE9 par aria-labelledby qui doit \xEAtre \xE9valu\xE9.\n R\xE9f\xE9rence\xA0: Accessible name and description calculation .\n Par ailleurs, un \xAB\xA0nom accessible\xA0\xBB sera consid\xE9r\xE9 comme non-pertinent s\u2019il ne reprend pas le texte visible du bouton. Par exemple\xA0: <button aria-label="confirmer la saisie">valider la saisie</button> sera consid\xE9r\xE9 comme non conforme au crit\xE8re 11.9 .'
-  },
-  cadre: {
-    title: "Cadre",
-    body: "Cadre\xA0: \xE9l\xE9ment HTML (balise <frame> ) permettant d\u2019afficher un contenu dans la page web dans laquelle il est impl\xE9ment\xE9.\n Cadre en ligne\xA0: \xE9l\xE9ment HTML (balise <iframe> ) permettant d\u2019afficher un contenu dans la page web dans laquelle il est impl\xE9ment\xE9."
-  },
-  captcha: {
-    title: "CAPTCHA",
-    body: "Un CAPTCHA est un test utilis\xE9 pour distinguer un utilisateur humain d\u2019un ordinateur. Le test utilise souvent des images contenant du texte d\xE9form\xE9, m\xE9lang\xE9 avec d\u2019autres formes ou utilisant des jeux de couleur alt\xE9r\xE9es, que l\u2019utilisateur est invit\xE9 \xE0 retaper. D\u2019autres formes de CAPTCHA peuvent \xEAtre bas\xE9es sur des questions logiques ou des extraits sonores."
-  },
-  "champ-de-saisie-de-formulaire": {
-    title: "Champ de saisie de formulaire",
-    body: 'Objet d\u2019un formulaire permettant \xE0 l\u2019utilisateur\xA0:\n De saisir des donn\xE9es textuelles ou pr\xE9format\xE9es\xA0: input type="text" \xA0;\n input type="password" \xA0;\n input type="search" \xA0;\n input type="email" \xA0;\n input type="number" \xA0;\n input type="tel" \xA0;\n input type="url" \xA0;\n textarea .\n \n \n De s\xE9lectionner des valeurs pr\xE9d\xE9finies\xA0: input type="checkbox" \xA0;\n input type="radio" \xA0;\n input type="date" \xA0;\n input type="range" \xA0;\n input type="color" \xA0;\n input type="time" \xA0;\n input type="month" \xA0;\n input type="week" \xA0;\n input type="datetime-local" \xA0;\n select \xA0;\n datalist \xA0;\n optgroup \xA0;\n option .\n \n \n De t\xE9l\xE9charger des fichiers\xA0: input type="file" .\n \n \n Ou d\u2019afficher des r\xE9sultats\xA0: output \xA0;\n progress \xA0;\n meter .\n \n \n Les balises poss\xE9dant un r\xF4le WAI-ARIA permettant de restituer un champ de formulaire sont \xE9galement couvertes par cette d\xE9finition\xA0: progressbar \xA0;\n slider \xA0;\n spinbutton \xA0;\n textbox \xA0;\n listbox \xA0;\n searchbox \xA0;\n combobox \xA0;\n option \xA0;\n checkbox \xA0;\n radio \xA0;\n switch .\n \n \n Les objets de formulaires et r\xF4le WAI-ARIA suivants ne sont pas consid\xE9r\xE9s comme des champs de formulaires\xA0: input type="submit" \xA0;\n input type="reset" \xA0;\n input type="hidden" \xA0;\n input type="image" \xA0;\n input type="button" \xA0;\n button \xA0;\n attribut WAI-ARIA role="button" .'
-  },
-  "champs-de-meme-nature": {
-    title: "Champs de m\xEAme nature",
-    body: "Dans un formulaire, ensemble des champs pouvant \xEAtre regroup\xE9s par la nature des informations attendues. Le regroupement vise \xE0 identifier les champs devant \xEAtre trait\xE9s comme un ensemble.\n Quelques exemples\xA0:\n Trois champs successifs pour saisir une date (jour/mois/ann\xE9e)\xA0;\n Champs successifs pour un num\xE9ro de t\xE9l\xE9phone\xA0;\n Un bloc destin\xE9 \xE0 saisir l\u2019identit\xE9 et l\u2019adresse de l\u2019utilisateur, lorsque le formulaire contient plusieurs blocs de contact\xA0;\n Un ensemble de boutons radio ou de cases \xE0 cocher qui se rapportent \xE0 une question.\n \n Ces champs doivent \xEAtre regroup\xE9s lorsque les intitul\xE9s de label ne sont pas suffisants pour informer l\u2019utilisateur que les champs font partie d\u2019un regroupement."
-  },
-  "changement-brusque-de-luminosite-ou-effet-de-flash": {
-    title: "Changement brusque de luminosit\xE9 ou effet de flash",
-    body: "Alternance de luminance relative qui peut causer des crises chez certaines personnes si leur taille est suffisamment importante dans une gamme de fr\xE9quences sp\xE9cifiques."
-  },
-  "changement-de-contexte": {
-    title: "Changement de contexte",
-    body: "Changements majeurs dans le contenu d\u2019une page web qui, s\u2019ils sont faits sans que l\u2019utilisateur n\u2019en soit conscient, peuvent d\xE9sorienter l\u2019utilisateur qui ne peut voir l\u2019ensemble de la page en m\xEAme temps. Les changements de contexte comprennent les changements\xA0:\n d\u2019agent utilisateur\xA0;\n d\u2019espace de restitution\xA0;\n de focus\xA0;\n de contenu qui modifie la signification de la page web.\n \n Note\xA0: Un changement de contenu n\u2019est pas toujours un changement de contexte. Un changement dans le contenu comme le d\xE9ploiement d\u2019une arborescence, un menu dynamique ou un d\xE9placement de tabulation ne change pas n\xE9cessairement le contexte \xE0 moins qu\u2019il ne change aussi l\u2019un des \xE9l\xE9ments \xE9num\xE9r\xE9s ci-dessus (le focus, par exemple).\n Par exemple, l\u2019ouverture d\u2019une nouvelle fen\xEAtre, le d\xE9placement du focus sur un composant diff\xE9rent, le d\xE9placement vers une nouvelle page (y compris tout ce qui, pour l\u2019utilisateur, aurait l\u2019air d\u2019un d\xE9placement vers une autre page) ou la r\xE9organisation significative du contenu d\u2019une page sont autant d\u2019illustrations d\u2019un changement de contexte."
-  },
-  "changement-de-langue": {
-    title: "Changement de langue",
-    body: 'L\u2019indication des changements de langue est n\xE9cessaire pour indiquer aux technologies d\u2019assistance de modifier la restitution vocale d\u2019un \xE9l\xE9ment. Les changements de langue concernent tous les contenus, y compris les valeurs de certains attributs comme title .\n Note\xA0: il n\u2019est pas possible d\u2019indiquer des changements de langue dans une valeur d\u2019attribut elle-m\xEAme, dans ce cas le changement de langue est indiqu\xE9 sur l\u2019\xE9l\xE9ment qui contient l\u2019attribut. Par exemple un lien affect\xE9 d\u2019un title en anglais devra comporter un attribut lang="en" . Lorsque l\u2019attribut contient plusieurs passages de texte dans des langues diff\xE9rentes, le crit\xE8re est non applicable.'
-  },
-  "code-de-langue": {
-    title: "Code de langue",
-    body: 'Code de 2 caract\xE8res (ISO 639-1) ou 3 caract\xE8res (ISO 639-2 et suivants) permettant d\u2019indiquer la langue d\u2019un document ou d\u2019un passage de texte. L\u2019indication du code de langue est constitu\xE9e de deux parties s\xE9par\xE9es par un tiret sur le mod\xE8le lang="[code]-[option]" .\n [code] repr\xE9sente un code de langue valide sur 2 ou 3 caract\xE8res\xA0;\n [option] est une indication laiss\xE9e \xE0 l\u2019appr\xE9ciation de l\u2019auteur.\n \n Lorsqu\u2019un code de pays est utilis\xE9 comme option, il peut servir \xE0 indiquer une r\xE9gionalisation de la langue, l\u2019indication \u201Cen-us\u201D indique la langue am\xE9ricaine, par exemple. L\u2019indication du code de langue ne concerne que la partie [code] avant le tiret.'
-  },
-  "compatible-avec-les-technologies-d-assistance": {
-    title: "Compatible avec les technologies d\u2019assistance",
-    body: "Un contenu ou une fonctionnalit\xE9 doit \xEAtre compatible avec les technologies d\u2019assistance des utilisateurs ainsi qu\u2019avec les fonctions d\u2019accessibilit\xE9 des navigateurs et des autres agents utilisateurs via une API d\u2019accessibilit\xE9.\n Cela concerne, \xE0 la fois, la technologie, ses fonctionnalit\xE9s et ses usages\xA0:\n La fa\xE7on dont la technologie Web est utilis\xE9e doit \xEAtre compatible avec les technologies d\u2019assistance des utilisateurs. Cela signifie que la fa\xE7on dont la technologie est utilis\xE9e a \xE9t\xE9 test\xE9e dans une perspective d\u2019interop\xE9rabilit\xE9 avec des utilisateurs des technologies d\u2019assistance dans la ou les langues du contenu\xA0;\n La technologie fonctionne de fa\xE7on native dans des agents utilisateurs largement distribu\xE9s qui sont, eux-m\xEAmes, compatibles avec l\u2019accessibilit\xE9 (comme HTML et CSS) ou avec un module d\u2019extension largement distribu\xE9 qui est, lui-m\xEAme, compatible avec l\u2019accessibilit\xE9.\n \n La v\xE9rification de la compatibilit\xE9 avec les technologies d\u2019assistance n\xE9cessite de r\xE9aliser un certain nombre de tests sp\xE9cifiques \xE0 la technologie utilis\xE9e, par exemple\xA0:\n V\xE9rifier le nom, le r\xF4le, le param\xE9trage et les changements d\u2019\xE9tats des composants d\u2019interface\xA0;\n V\xE9rifier que la restitution d\u2019un composant d\u2019interface est correcte pour la ou les technologies d\u2019assistance utilis\xE9es."
-  },
-  "composant-d-interface": {
-    title: "Composant d\u2019interface",
-    body: "Un composant d\u2019interface est un \xE9l\xE9ment avec lequel l\u2019utilisateur peut interagir, par exemple un bouton, un lien, une zone de saisie. Certains composants peuvent \xEAtre plus complexes comme un menu, une fen\xEAtre de dialogue, un syst\xE8me d\u2019onglets. Enfin, un composant d\u2019interface peut \xEAtre bas\xE9 sur des \xE9l\xE9ments natifs de HTML ou d\xE9velopp\xE9s de toutes pi\xE8ces en JavaScript et des attributs WAI-ARIA. En particulier pour les \xE9l\xE9ments ayant des attributs WAI-ARIA correspondant \xE0 un motif de conception il est recommand\xE9 de consid\xE9rer le document WAI-ARIA 1.1 Authoring Practices lors de leur impl\xE9mentation."
-  },
-  "comprehensible-ordre-de-lecture": {
-    title: "Compr\xE9hensible (ordre de lecture)",
-    body: "Un contenu compr\xE9hensible est lisible (l\u2019ordre des \xE9l\xE9ments est logique) et coh\xE9rent (l\u2019encha\xEEnement de la lecture est coh\xE9rent)."
-  },
-  "contenu-alternatif": {
-    title: "Contenu alternatif",
-    body: "Contenu venant se substituer \xE0 un autre apportant la m\xEAme information mais pouvant \xEAtre pr\xE9sent\xE9 de fa\xE7on diff\xE9rente. Ce contenu peut \xEAtre de forme textuelle mais \xE9galement \xEAtre lui-m\xEAme structur\xE9 \xE0 l\u2019aide de balises. Un contenu alternatif devra respecter l\u2019ensemble des crit\xE8res du RGAA qui lui sont applicables pour \xEAtre consid\xE9r\xE9 comme une alternative accessible \xE0 l\u2019\xE9l\xE9ment qu\u2019il remplace. Exemple\xA0: un tableau de donn\xE9es peut \xEAtre le contenu alternatif d\u2019une image bitmap (balise <canvas> ) affichant un graphique statistique."
-  },
-  "contenu-cache": {
-    title: "Contenu cach\xE9",
-    body: 'Les technologies d\u2019assistance (notamment les lecteurs d\u2019\xE9cran) ne restituent pas le contenu masqu\xE9 via les propri\xE9t\xE9s\xA0:\n display avec la valeur none ( display: none )\xA0;\n visibility avec la valeur hidden ( visibility: hidden )\xA0;\n font-size avec la valeur 0 ( font-size:0 )\xA0;\n Attribut HTML5 hidden \xA0;\n Attribut WAI-ARIA aria-hidden="true" .\n \n Tous les contenus utilisant une ou plusieurs de ces propri\xE9t\xE9s et attributs sont applicables pour le crit\xE8re 10.8 .'
-  },
-  "contenu-visible": {
-    title: "Contenu visible",
-    body: "Pour le test 12.2.1 \xA0: \xAB\xA0Contenu pr\xE9sent\xA0\xBB signifie que le contenu visible reste pr\xE9sent lorsque CSS est d\xE9sactiv\xE9. Par exemple, une image porteuse d\u2019information en propri\xE9t\xE9 de fond CSS invalide ce test car l\u2019information n\u2019est plus \xAB\xA0pr\xE9sente\xA0\xBB lorsque CSS est d\xE9sactiv\xE9. En revanche, une image porteuse d\u2019information en propri\xE9t\xE9 de fond CSS mais accompagn\xE9e d\u2019un texte cach\xE9 valide ce test car l\u2019information est bien \xAB\xA0pr\xE9sente\xA0\xBB lorsque CSS est d\xE9sactiv\xE9.\n Note\xA0: la pratique qui consiste \xE0 g\xE9rer des images en propri\xE9t\xE9 de fond d\u2019\xE9l\xE9ments via CSS est formellement d\xE9conseill\xE9e, m\xEAme si elle est accompagn\xE9e d\u2019un texte cach\xE9."
-  },
-  "contexte-du-lien": {
-    title: "Contexte du lien",
-    body: "Le contexte du lien repr\xE9sente les informations suppl\xE9mentaires (on parle d\u2019informations de contexte) qui peuvent \xEAtre mises en relation par un programme informatique avec l\u2019 intitul\xE9 du lien . Les informations de contexte qui permettent de compl\xE9ter l\u2019 intitul\xE9 du lien sont les suivantes\xA0:\n Le contenu de la phrase dans laquelle le lien texte est pr\xE9sent\xA0;\n Le contenu du paragraphe (balise <p> ) dans lequel le lien texte est pr\xE9sent\xA0;\n Le contenu de l\u2019item de liste (balise <li> ) ou le contenu d\u2019un item de liste parent (balise <li> ) dans lequel le lien texte est pr\xE9sent\xA0;\n Le contenu du titre (balise <hx> ) pr\xE9c\xE9dent le lien texte\xA0;\n Le contenu de la ou les cellule(s) d\u2019en-t\xEAte de tableau (balise(s) <th> ) associ\xE9e(s) \xE0 la cellule de donn\xE9e (balise <td> ) dans laquelle le lien texte est pr\xE9sent\xA0;\n Le contenu de la cellule de donn\xE9e (balise <td> ) dans laquelle le lien texte est pr\xE9sent.\n \n Note 1\xA0: l\u2019un des 6 contextes de lien combin\xE9 \xE0 l\u2019 intitul\xE9 du lien doit permettre de comprendre la fonction et la destination du lien.\n Note 2\xA0: RGAA consid\xE8re qu\u2019une adresse e-mail de type xxx@xxx.yyy est un texte de lien suffisant pour comprendre la fonction du lien et ne requiert pas de signaler plus explicitement l\u2019action."
-  },
-  contraste: {
-    title: "Contraste",
-    body: "Opposition marqu\xE9e entre la luminosit\xE9 d\u2019une couleur de premier plan et d\u2019une couleur d\u2019arri\xE8re-plan. Le rapport de contraste est bas\xE9 sur la diff\xE9rence de luminance relative entre l\u2019arri\xE8re-plan et le premier plan selon la r\xE8gle\xA0: (L1 + 0,05) / (L2 + 0,05) o\xF9 L1 est la luminance relative la plus claire et L2 la luminance relative la plus sombre. La luminosit\xE9 est calcul\xE9e selon la formule suivante\xA0: L = 0,2126 * R + 0,7152 * G + 0,0722 * B. O\xF9 R, G et B sont d\xE9finis par\xA0:\n Si R sRGB \u2264 0,03928 alors R = R sRGB /12,92 sinon R = ((R sRGB +0,055)/1,055) ^ 2,4\xA0;\n Si G sRGB \u2264 0,03928 alors G = G sRGB /12,92 sinon G = ((G sRGB +0,055)/1,055) ^ 2,4\xA0;\n Si B sRGB \u2264 0,03928 alors B = B sRGB /12.92 sinon B = ((B sRGB +0,055)/1,055) ^ 2,4.\n \n et R sRGB, G sRGB et B sRGB sont d\xE9finis par\xA0:\n R sRGB = R8bit/255\xA0;\n G sRGB = G8bit/255\xA0;\n B sRGB = B8bit/255.\n \n Le caract\xE8re \xAB\xA0^\xA0\xBB est l\u2019op\xE9rateur de puissance.\n Note\xA0: la mesure de contraste concerne le texte, le texte en image, le texte et le texte en image dans les animations, le texte de sous-titrage et le texte incrust\xE9 dans les vid\xE9os. Pour le texte et le texte en image dans les animations, le texte de sous-titrage et le texte incrust\xE9 dans les vid\xE9os, la taille de la police doit \xEAtre mesur\xE9e par rapport \xE0 la taille d\u2019affichage par d\xE9faut (telle qu\u2019affich\xE9e). Les textes pr\xE9sents dans les \xE9l\xE9ments d\u2019une image ou d\u2019une vid\xE9o (par exemple un \xE9criteau, une affiche\u2026) ne sont pas concern\xE9s.\n Source (en anglais)\xA0: Proc\xE9dure de calcul de contraste des WCAG ."
-  },
-  "controle-contenu-en-mouvement-ou-clignotant": {
-    title: "Contr\xF4le (contenu en mouvement ou clignotant)",
-    body: "Possibilit\xE9 pour l\u2019utilisateur de contr\xF4ler l\u2019affichage ou la lecture d\u2019un contenu en mouvement ou clignotant par le clavier et la souris, au moins.\n Tous les contenus en mouvement, \xE0 l\u2019exception des m\xE9dias temporels pris en charge par la th\xE9matique multim\xE9dia, sont concern\xE9s\xA0: les images anim\xE9es (par exemple un gif anim\xE9), les contenus en mouvement propos\xE9s via une balise <object> , du code JavaScript ou des effets CSS par exemple.\n Note 1\xA0: lorsque c\u2019est appropri\xE9, la m\xE9thode de contr\xF4le devrait \xEAtre disponible comme premier \xE9l\xE9ment de la page.\n Note 2\xA0: la m\xE9thode de contr\xF4le du contenu en mouvement ou clignotant doit permettre \xE0 l\u2019utilisateur d\u2019interagir avec le reste de la page. En cons\xE9quence, l\u2019arr\xEAt ou la mise en pause via un \xE9v\xE9nement d\xE9clench\xE9 uniquement sur la prise de focus ne permet pas de valider le crit\xE8re.\n Note 3\xA0: Dans certains cas, le mouvement fait partie int\xE9grante du composant et il n\u2019est pas possible d\u2019en donner le contr\xF4le \xE0 l\u2019utilisateur, par exemple une barre de progression dont la fonction est d\u2019indiquer par un mouvement la progression d\u2019un \xE9v\xE8nement comme un t\xE9l\xE9chargement. Dans ce cas le crit\xE8re est Non Applicable."
-  },
-  "controle-de-la-consultation-d-un-media-temporel": {
-    title: "Contr\xF4le de la consultation (d\u2019un m\xE9dia temporel)",
-    body: "Possibilit\xE9 pour l\u2019utilisateur de contr\xF4ler la consultation d\u2019un m\xE9dia temporel par le clavier et tout dispositif de pointage, au moins. Les points suivants doivent \xEAtre respect\xE9s\xA0:\n Liste des fonctionnalit\xE9s obligatoires de contr\xF4le de la consultation\xA0: L\u2019objet multim\xE9dia doit toujours avoir les fonctionnalit\xE9s suivantes, au minimum\xA0: lecture, pause ou stop\xA0;\n Si l\u2019objet multim\xE9dia a du son, il doit avoir une fonctionnalit\xE9 d\u2019activation / d\xE9sactivation du son\xA0;\n Si l\u2019objet multim\xE9dia a des sous-titres non incrust\xE9s, il doit avoir une fonctionnalit\xE9 de contr\xF4le de l\u2019apparition / disparition des sous-titres\xA0;\n Si l\u2019objet multim\xE9dia a une audiodescription, il doit avoir une fonctionnalit\xE9 de contr\xF4le de l\u2019apparition / disparition de l\u2019audiodescription.\n \n \n Chaque fonctionnalit\xE9 doit \xEAtre accessible par le clavier, via la touche de tabulation, et par tout dispositif de pointage au moins.\n Chaque fonctionnalit\xE9 doit \xEAtre activable par le clavier et par tout dispositif de pointage, au moins.\n \n Note\xA0: s\u2019il n\u2019y a pas de son \xE0 un m\xE9dia temporel, il n\u2019est pas utile de mettre une fonctionnalit\xE9 d\u2019activation / d\xE9sactivation du son. Si cette fonctionnalit\xE9 est cependant pr\xE9sente et qu\u2019elle n\xE9cessite une alternative textuelle pour \xEAtre comprise par certains utilisateurs, il faut alors lui en donner une puisque l\u2019utilisateur est susceptible d\u2019y acc\xE9der et de vouloir l\u2019activer."
-  },
-  "controle-de-saisie-formulaire": {
-    title: "Contr\xF4le de saisie (formulaire)",
-    body: "Ensemble des processus qui permettent de pr\xE9venir l\u2019utilisateur des champs obligatoires, des indications de type ou de format attendus et des erreurs de saisie dans un formulaire. Ces contr\xF4les de saisie peuvent \xEAtre impl\xE9ment\xE9s par l\u2019auteur des contenus ou s\u2019appuyer sur des attributs (comme required ou pattern ), des attributs WAI-ARIA (comme aria-required ) ou des types de champ qui produisent de mani\xE8re automatique des indications de saisie ou d\u2019erreurs (comme les types url , email , date , time par exemple)."
-  },
-  "controle-son-declenche-automatiquement": {
-    title: "Contr\xF4le (son d\xE9clench\xE9 automatiquement)",
-    body: "Possibilit\xE9 pour l\u2019utilisateur d\u2019arr\xEAter ou de relancer un son d\xE9clench\xE9 automatiquement.\n Note\xA0: la m\xE9thode de contr\xF4le du son devrait \xEAtre disponible comme premier \xE9l\xE9ment de la page."
-  },
-  "correctement-restitue-par-les-technologies-d-assistance": {
-    title: "Correctement restitu\xE9 (par les technologies d\u2019assistance)",
-    body: "Lorsqu\u2019un crit\xE8re, un test ou une condition de test demande de v\xE9rifier la restitution d\u2019un dispositif, il faut s\u2019assurer que ladite restitution est compatible avec l\u2019accessibilit\xE9.\n Le test consiste \xE0 v\xE9rifier que la restitution est pertinente pour au moins une des combinaisons de l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB) utilis\xE9 pour d\xE9clarer qu\u2019un \xE9l\xE9ment, un dispositif ou une alternative est \xAB\xA0compatible avec l\u2019accessibilit\xE9\xA0\xBB.\n Par exemple\xA0: le test 1.3.8 demande de v\xE9rifier que l\u2019alternative d\u2019une image bitmap (balise <canvas> ) porteuse d\u2019information est correctement restitu\xE9e.\n On proc\xE8de alors \xE0 un test avec les outils de l\u2019environnement de test d\xE9fini pour le site.\n Si on constate que l\u2019alternative est correctement restitu\xE9e, le test est valid\xE9."
-  },
-  "couleur-d-arriere-plan-contigue-et-couleur-contigue": {
-    title: "Couleur d\u2019arri\xE8re-plan contigu\xEB et couleur contigu\xEB",
-    body: "Couleur d\u2019arri\xE8re-plan contigu\xEB\xA0: couleur d\u2019arri\xE8re-plan directement en contact avec le bord ext\xE9rieur du composant d\u2019interface ou de l\u2019 \xE9l\xE9ment graphique .\n Exemples\xA0:\n Pour un bouton blanc avec une bordure bleue sur un fond blanc, le fond blanc \xE0 l\u2019ext\xE9rieur de la bordure bleue correspond \xE0 la couleur d\u2019arri\xE8re-plan contigu\xEB\xA0;\n Pour un bouton rouge sur fond blanc, le fond blanc \xE0 l\u2019ext\xE9rieur du rouge correspond \xE0 la couleur d\u2019arri\xE8re-plan contigu\xEB\xA0;\n Pour un bouton blanc avec une bordure verte qui devient noire \xE0 la prise de focus et au survol, le fond blanc \xE0 l\u2019ext\xE9rieur de la bordure verte de l\u2019\xE9tat par d\xE9faut et de la bordure noire de l\u2019\xE9tat au survol et au focus correspond \xE0 la couleur d\u2019arri\xE8re-plan contigu\xEB.\n \n Couleur contigu\xEB\xA0: couleur directement en contact avec une autre couleur. Exemple dans un panneau de \xAB\xA0sens interdit\xA0\xBB le rouge du panneau est la couleur contigu\xEB au trait blanc au centre du panneau.\n Note 1\xA0: dans le cas de la pr\xE9sence d\u2019un d\xE9grad\xE9, c\u2019est la couleur contigu\xEB la moins contrast\xE9e du d\xE9grad\xE9 qui sera \xE0 consid\xE9rer comme la couleur contigu\xEB ou couleur d\u2019arri\xE8re-plan contigu\xEB.\n Note 2\xA0: dans le cas de la pr\xE9sence de plusieurs couleurs, c\u2019est l\u2019ensemble des couleurs qui seront \xE0 consid\xE9rer comme couleur contigu\xEB ou couleur d\u2019arri\xE8re-plan contigu\xEB."
-  },
-  "description-detaillee-image": {
-    title: "Description d\xE9taill\xE9e (image)",
-    body: 'Contenu associ\xE9 \xE0 une image en compl\xE9ment de son alternative textuelle afin de d\xE9crire en totalit\xE9 l\u2019information v\xE9hicul\xE9e par l\u2019image. La description d\xE9taill\xE9e peut \xEAtre associ\xE9e \xE0 l\u2019image via\xA0:\n Un attribut longdesc qui contient l\u2019adresse d\u2019une page ou d\u2019un emplacement dans la page contenant la description d\xE9taill\xE9e\xA0;\n Une r\xE9f\xE9rence \xE0 une description d\xE9taill\xE9e adjacente \xE0 l\u2019image dans l\u2019alternative textuelle\xA0;\n Un lien ou un bouton adjacent qui permet d\u2019acc\xE9der \xE0 la description d\xE9taill\xE9e dans la page ou dans une autre page\xA0;\n Un ou plusieurs passages de texte identifi\xE9s par un id et li\xE9s par un attribut WAI-ARIA aria-describedby sur le mod\xE8le aria-describedby="ID1 ID2 ID3\u2026" .\n \n Note 1\xA0: Si le support de l\u2019attribut aria-describedby fait d\xE9faut, il est possible d\u2019utiliser un ou plusieurs passages de texte identifi\xE9s par un id et li\xE9s par un attribut WAI-ARIA aria-labelledby \xE0 la suite de l\u2019alternative textuelle.\n Note 2\xA0: Pour assurer une compatibilit\xE9 maximum avec les agents utilisateurs, notamment Internet Explorer 11, il est recommand\xE9 d\u2019impl\xE9menter un tabindex="-1" sur les balises qui contiennent un passage de texte et qui ne sont pas des \xE9l\xE9ments interactifs (bouton, liens, \xE9l\xE9ments de formulaires, etc.).'
-  },
-  "element-graphique": {
-    title: "\xC9l\xE9ment graphique",
-    body: "\xC9l\xE9ment faisant appel \xE0 une repr\xE9sentation visuelle telle que des images, des pictogrammes ou des graphiques.\n Cet \xE9l\xE9ment peut \xEAtre compos\xE9 d\u2019une ou plusieurs parties dont la visibilit\xE9 est n\xE9cessaire \xE0 sa compr\xE9hension (par exemple chaque point sur chaque ligne d\u2019un graphique de statistiques)."
-  },
-  "en-tete-de-colonne-ou-de-ligne": {
-    title: "En-t\xEAte de colonne ou de ligne",
-    body: 'Contenu d\u2019une cellule dans un tableau de donn\xE9es (la premi\xE8re cellule d\u2019une colonne ou d\u2019une ligne, g\xE9n\xE9ralement) qui sert d\u2019intitul\xE9 pour la totalit\xE9 ou une partie des cellules de la colonne ou de la ligne. Une colonne ou une ligne peut contenir plusieurs en-t\xEAtes (en-t\xEAte interm\xE9diaire). Lorsque les en-t\xEAtes s\u2019appliquent \xE0 l\u2019ensemble d\u2019une ligne ou d\u2019une colonne, ils peuvent \xEAtre structur\xE9s avec une balise <th> ou une balise pourvue d\u2019un attribut WAI-ARIA role="rowheader" ou role="columnheader" . Dans le cas contraire, seule une balise <th> peut \xEAtre utilis\xE9e.\n Note\xA0: seule la balise <th> \xE9tant totalement support\xE9e par l\u2019ensemble des technologies d\u2019assistance, il est fortement recommand\xE9 de privil\xE9gier cette solution lors de la mise en \u0153uvre afin d\u2019\xE9viter de nombreuses v\xE9rifications dans les diff\xE9rentes combinaisons pr\xE9vues dans l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB).'
-  },
-  "ensemble-de-pages": {
-    title: "Ensemble de pages",
-    body: "Pages web li\xE9es les unes aux autres par des liens et constituant un ensemble coh\xE9rent \xE0 l\u2019int\xE9rieur d\u2019un site web. Par exemple, les pages d\u2019une rubrique sp\xE9cifique, les pages d\u2019un blog, les pages d\u2019administration d\u2019un compte client sont autant d\u2019ensembles de page.\n Note\xA0: la page d\u2019accueil d\u2019un site web peut constituer, \xE0 elle seule, un \xAB\xA0ensemble de pages\xA0\xBB du fait de son unicit\xE9."
-  },
-  "environnement-maitrise": {
-    title: "Environnement ma\xEEtris\xE9",
-    body: "Tout environnement dans lequel l\u2019acc\xE8s \xE0 l\u2019information, les technologies, les conditions d\u2019utilisation et le profil des utilisateurs peuvent \xEAtre connus et ma\xEEtris\xE9s. Les principaux \xE9l\xE9ments dont la ma\xEEtrise est essentielle sont\xA0:\n Le type et la version des navigateurs\xA0;\n Les technologies support\xE9es, leur version et leur activation (JavaScript, WAI-ARIA, Flash, Silverlight\u2026)\xA0;\n Les technologies d\u2019assistance et tout dispositif utilis\xE9 de mani\xE8re sp\xE9cifique par les utilisateurs handicap\xE9s\xA0;\n Les syst\xE8mes d\u2019exploitation et les APIs d\u2019accessibilit\xE9 support\xE9es\xA0;\n La formation des utilisateurs de technologies d\u2019assistance \xE0 l\u2019utilisation de tout dispositif particulier (interface, application en ligne\u2026).\n \n Les auteurs et les administrateurs doivent garantir la compatibilit\xE9 des technologies utilis\xE9es et de leurs usages par les utilisateurs et leurs technologies (y compris les technologies d\u2019assistance). Les services d\u2019information ou les sites Web, quel que soit leur statut, qui offrent un acc\xE8s public ne peuvent pas \xEAtre consid\xE9r\xE9s comme des environnements ma\xEEtris\xE9s."
-  },
-  "etiquette-de-champ-de-formulaire": {
-    title: "\xC9tiquette de champ de formulaire",
-    body: 'Texte \xE0 proximit\xE9 du champ de formulaire permettant d\u2019en conna\xEEtre la nature, le type ou le format des informations attendues. L\u2019\xE9tiquette peut \xEAtre associ\xE9e au champ de formulaire de plusieurs mani\xE8res\xA0:\n Par l\u2019utilisation d\u2019une balise <label> \xA0;\n Par l\u2019utilisation de l\u2019attribut WAI-ARIA aria-label \xA0;\n Par l\u2019utilisation d\u2019une liaison entre le texte et le champ par l\u2019attribut WAI-ARIA aria-labelledby \xA0;\n Par l\u2019utilisation de l\u2019attribut title .\n \n Note importante\xA0: lorsque plusieurs de ces techniques sont pr\xE9sentes sur un m\xEAme champ, le calcul du \xAB\xA0nom accessible\xA0\xBB, c\u2019est-\xE0-dire ce qui sera restitu\xE9, ob\xE9it \xE0 un ordre strict\xA0:\n aria-labelledby \xA0;\n Sinon aria-label \xA0;\n Sinon <label> \xA0;\n Sinon title .\n \n Cet ordre doit \xEAtre utilis\xE9 pour l\u2019\xE9valuation de la pertinence de l\u2019\xE9tiquette ( crit\xE8re 11.2 ). Par exemple, m\xEAme dans le cas de la pr\xE9sence d\u2019un <label> , c\u2019est le passage de texte r\xE9f\xE9renc\xE9 par aria-labelledby qui doit \xEAtre pris en compte.\n R\xE9f\xE9rence\xA0: Accessible name and description calculation .\n Note importante au sujet de l\u2019utilisation de placeholder \xA0: lorsque l\u2019attribut placeholder est pr\xE9sent, il est susceptible d\u2019\xEAtre restitu\xE9 \xE0 la place de l\u2019attribut title . Par cons\xE9quent, lorsque ces deux attributs title et placeholder sont pr\xE9sents, ils doivent \xEAtre identiques.\n Note au sujet des \xE9tiquettes li\xE9es par aria-labelledby \xA0: Il s\u2019agit d\u2019un ou de plusieurs passages de texte identifi\xE9s par des id et li\xE9s par aria-labelledby sur le mod\xE8le suivant\xA0: aria-labelledby="ID1 ID2 ID3\u2026" . Pour assurer une compatibilit\xE9 maximum avec les agents utilisateurs, notamment Internet Explorer 11, il est recommand\xE9 d\u2019impl\xE9menter un tabindex="-1" sur les passages de textes qui ne sont pas des \xE9l\xE9ments interactifs (bouton, liens, \xE9l\xE9ments de formulaires, etc.).\n Note\xA0: l\u2019attribut aria-label ne peut pas \xEAtre utilis\xE9 pour indiquer le caract\xE8re obligatoire d\u2019un champ.'
-  },
-  "etiquettes-coherentes": {
-    title: "\xC9tiquettes coh\xE9rentes",
-    body: "Les \xE9tiquettes de champs de formulaire pr\xE9sentes dans une m\xEAme page ou dans un ensemble de pages et r\xE9clamant la saisie d\u2019une m\xEAme information doivent \xEAtre formul\xE9es sans ambigu\xEFt\xE9 pour que l\u2019utilisateur sache que l\u2019information qu\u2019il doit communiquer est la m\xEAme."
-  },
-  "feuille-de-style": {
-    title: "Feuille de style",
-    body: "Le langage CSS destin\xE9 \xE0 la mise en forme des \xE9l\xE9ments du contenu (exemples\xA0: couleur du fond de la page, taille / police / couleur des caract\xE8res, positionnement de l\u2019information dans la page web\u2026). Les styles CSS peuvent \xEAtre externes (fichier CSS), embarqu\xE9s (d\xE9clar\xE9s dans l\u2019en-t\xEAte de la page) ou en ligne (d\xE9clar\xE9s via l\u2019attribut style d\u2019une balise)."
-  },
-  formulaire: {
-    title: "Formulaire",
-    body: 'Balise <form> ou balise poss\xE9dant un attribut WAI-ARIA role="form" .'
-  },
-  "gestes-complexes-et-gestes-simples": {
-    title: "Gestes complexes et gestes simples",
-    body: "Un geste simple implique un contact en un point unique de l\u2019\xE9cran. Il peut s\u2019agir d\u2019une pression ou d\u2019un clic simple, d\u2019une double-pression ou d\u2019un double-clic, d\u2019une pression prolong\xE9e.\n Un geste complexe peut \xEAtre \xE0 la fois un geste impliquant plusieurs points de contact sur l\u2019\xE9cran (exemple\xA0: un geste avec deux doigts sur l\u2019\xE9cran pour zoomer ou d\xE9zoomer une carte) et un geste bas\xE9 sur le suivi d\u2019une trajectoire sur l\u2019\xE9cran (exemple\xA0: fonction JavaScript permettant de d\xE9tection le d\xE9placement d\u2019un doigt vers la gauche ou droite sur une surface tactile pour d\xE9clencher le passage \xE0 l\u2019item pr\xE9c\xE9dent / suivant d\u2019un carrousel)."
-  },
-  "image-de-decoration": {
-    title: "Image de d\xE9coration",
-    body: 'Image n\u2019ayant aucune fonction et ne v\xE9hiculant aucune information particuli\xE8re par rapport au contenu auquel elle est associ\xE9e.\n Exemples\xA0:\n Une image pr\xE9c\xE9dant chaque item d\u2019une liste\xA0;\n Une image servant \xE0 caler la mise en page\xA0;\n Une image de coin arrondie pour habiller un bloc d\u2019information\xA0;\n Une image d\u2019illustration n\u2019apportant aucune information n\xE9cessaire \xE0 la compr\xE9hension du texte auquel elle est associ\xE9e.\n \n Note\xA0: les balises poss\xE9dant un attribut WAI-ARIA role="img" ne peuvent faire office d\u2019image de d\xE9coration qu\u2019\xE0 la condition qu\u2019elles poss\xE8dent un attribut WAI-ARIA aria-hidden="true" .'
-  },
-  "image-objet": {
-    title: "Image objet",
-    body: "Image incorpor\xE9e ou g\xE9n\xE9r\xE9e par une balise <object> ."
-  },
-  "image-porteuse-d-information": {
-    title: "Image porteuse d\u2019information",
-    body: "Image qui v\xE9hicule une information n\xE9cessaire \xE0 la compr\xE9hension du contenu auquel elle est associ\xE9e.\n Note 1\xA0: lorsque l\u2019image est le seul contenu d\u2019un lien, son alternative est l\u2019intitul\xE9 du lien. Dans ce cas, l\u2019alternative de l\u2019image devrait \xEAtre \xE9valu\xE9e avec la th\xE9matique \xAB\xA0Liens\xA0\xBB.\n Note 2\xA0: lorsqu\u2019un bouton de formulaire, ins\xE9r\xE9 avec l\u2019\xE9l\xE9ment <button> , ne contient qu\u2019une image (balise <img> , <object> , <embed> , <canvas> ou <svg> ), l\u2019alternative de l\u2019image est l\u2019intitul\xE9 du bouton. Deux cas peuvent se pr\xE9senter\xA0:\n Le bouton est contr\xF4l\xE9 par son type, par exemple, le type submit ou reset , et fait partie d\u2019un formulaire. Dans ce cas, le bouton image doit \xEAtre \xE9valu\xE9 avec la th\xE9matique \xAB\xA0Formulaires\xA0\xBB\xA0;\n Le bouton est contr\xF4l\xE9 par un dispositif JavaScript. Dans ce cas, le bouton image doit \xEAtre \xE9valu\xE9 avec la th\xE9matique \xAB\xA0Scripts\xA0\xBB."
-  },
-  "image-reactive": {
-    title: "Image r\xE9active",
-    body: 'Image r\xE9active c\xF4t\xE9 client (attribut usemap )\xA0: image divis\xE9e en zones cliquables ou neutres (attribut nohref )\xA0;\n Image r\xE9active c\xF4t\xE9 serveur (attribut ismap )\xA0: image pour laquelle le navigateur transmet au serveur les coordonn\xE9es du pointeur, chaque jeu de coordonn\xE9es correspondant \xE0 une ressource (page web). L\u2019image r\xE9active c\xF4t\xE9 serveur est extr\xEAmement rare.\n \n Note\xA0: en HTML5, l\u2019attribut ismap est obsol\xE8te et non conforme pour les boutons de type image ( input type="image" ).'
-  },
-  "image-test": {
-    title: "Image-test",
-    body: "Image servant dans un test, captcha ou une image servant de test dans un quiz ou un jeu.\n Exemple\xA0: une s\xE9rie d\u2019images pr\xE9sente un d\xE9tail issu de tableaux c\xE9l\xE8bres\xA0; il faut reconna\xEEtre le titre et le peintre de chaque tableau. Dans cette situation, il n\u2019est pas possible de donner une alternative pertinente (par exemple le nom du tableau et/ou du peintre) sans rendre le test inutilisable. L\u2019alternative doit alors se contenter de donner la possibilit\xE9 d\u2019identifier l\u2019image, par exemple \u201Cimage 1 du test\u201D."
-  },
-  "image-texte-objet": {
-    title: "Image texte objet",
-    body: "Image g\xE9n\xE9r\xE9e par la balise <object> et affichant du texte."
-  },
-  "image-texte": {
-    title: "Image texte",
-    body: "Image affichant du texte.\n Note\xA0: il n\u2019est pas recommand\xE9 d\u2019utiliser des images-textes. Lorsqu\u2019il est possible de reproduire les m\xEAmes effets en CSS, le crit\xE8re 1.8 impose que le texte soit reproduit en texte CSS, ou qu\u2019un m\xE9canisme de remplacement permette \xE0 l\u2019utilisateur de remplacer ces images par du texte styl\xE9 en CSS."
-  },
-  "image-vehiculant-une-information-donnee-par-la-couleur": {
-    title: "Image v\xE9hiculant une information (donn\xE9e par la couleur)",
-    body: "Image dont tout ou partie du contenu transmet visuellement une information par l\u2019interm\xE9diaire d\u2019une couleur uniquement."
-  },
-  "indication-de-champ-obligatoire": {
-    title: "Indication de champ obligatoire",
-    body: "Indication textuelle ou graphique (ic\xF4ne) permettant \xE0 l\u2019utilisateur de savoir que la saisie d\u2019un champ est obligatoire pr\xE9alablement \xE0 la saisie.\n Note\xA0: Dans le cas o\xF9 cette indication n\u2019est pas r\xE9alis\xE9e de mani\xE8re textuelle explicite (ic\xF4ne, \u201C*\u201D, \u201C!\u201D, etc.), l\u2019explication de la signification de cette indication doit se situer, visuellement et dans l\u2019ordre du code source, avant la premi\xE8re utilisation de l\u2019indication."
-  },
-  "indication-donnee-par-la-forme-la-taille-ou-la-position": {
-    title: "Indication donn\xE9e par la forme, la taille ou la position",
-    body: "Il peut s\u2019agir, par exemple\xA0:\n De la pr\xE9sence d\u2019un marqueur visuel, pour indiquer la page active dans un menu de navigation (indication donn\xE9e par la position)\xA0;\n D\u2019une mise en avant-plan pour indiquer un onglet actif (indication donn\xE9e par la forme)\xA0;\n D\u2019une modification de la taille de police dans un nuage de tags (indication donn\xE9e par la taille).\n \n Ou de tout autre effet graphique similaire."
-  },
-  "indication-du-type-de-donnees-et-ou-de-format": {
-    title: "Indication du type de donn\xE9es et/ou de format",
-    body: "Indication textuelle permettant \xE0 l\u2019utilisateur de savoir quel est le type de donn\xE9e et/ou le format de saisie requis par un champ obligatoire, pr\xE9alablement \xE0 son renseignement.\n Exemples\xA0:\n Courriel (format\xA0: vous@domaine.com)\xA0;\n Code postal (format\xA0: 00000)\xA0;\n Date (format\xA0: JJ/MM/AAAA)."
-  },
-  "information-donnee-par-la-couleur": {
-    title: "Information (donn\xE9e par la couleur)",
-    body: "Information transmise visuellement par l\u2019interm\xE9diaire d\u2019une couleur. L\u2019indication que les champs en rouge sont obligatoires dans un formulaire, l\u2019utilisation d\u2019un fond bleu pour indiquer la page en cours de consultation dans un menu avec le fond vert, le changement de couleur d\u2019un nom d\u2019article pour indiquer son indisponibilit\xE9 dans une liste d\u2019articles sont autant d\u2019exemples d\u2019indication donn\xE9e par la couleur.\n Lorsqu\u2019une information donn\xE9e par la couleur est accompagn\xE9e d\u2019une autre m\xE9thode \xE0 destination des utilisateurs qui ne voient pas ou per\xE7oivent mal les couleurs ou leurs associations, le crit\xE8re sera consid\xE9r\xE9 comme non applicable.\n Les moyens de transmettre une information autrement que par la couleur peuvent \xEAtre\xA0:\n Une indication textuelle visible\xA0;\n Un moyen faisant intervenir du graphisme (pictogramme, image de fond, forme, style de bordure diff\xE9rent, etc.) et par le biais d\u2019un compl\xE9ment au niveau du code ( aria-label , title , texte masqu\xE9, aria-current , etc.)\xA0;\n Un autre style typographique (gras, italique, taille de texte, autre police, etc) et par le biais d\u2019un compl\xE9ment au niveau du code ( aria-label , title , texte masqu\xE9, aria-current , etc.)."
-  },
-  "intitule-ou-nom-accessible-de-lien": {
-    title: "Intitul\xE9 (ou nom accessible) de lien",
-    body: '\xAB\xA0Nom accessible\xA0\xBB restitu\xE9 par les technologies d\u2019assistance.\n Dans le cas d\u2019un lien HTML, le \xAB\xA0nom accessible\xA0\xBB est obtenu selon l\u2019ordre suivant\xA0:\n passage de texte associ\xE9 par l\u2019attribut WAI-ARIA aria-labelledby \xA0;\n sinon, contenu de l\u2019attribut WAI-ARIA aria-label \xA0;\n sinon, contenu du lien\xA0;\n sinon, contenu de l\u2019attribut title .\n \n Cet ordre doit \xEAtre utilis\xE9 pour d\xE9terminer ce qui constitue l\u2019intitul\xE9 du lien. Par exemple\xA0:\n en cas de pr\xE9sence conjointe d\u2019un attribut WAI-ARIA aria-label et d\u2019un attribut WAI-ARIA aria-labelledby , c\u2019est le passage de texte r\xE9f\xE9renc\xE9 par l\u2019attribut WAI-ARIA aria-labelledby qui doit \xEAtre consid\xE9r\xE9 comme l\u2019intitul\xE9\xA0;\n en cas de pr\xE9sence conjointe d\u2019un attribut WAI-ARIA aria-label et d\u2019un contenu dans le lien, c\u2019est le contenu de l\u2019attribut WAI-ARIA aria-label qui doit \xEAtre consid\xE9r\xE9 comme l\u2019intitul\xE9.\n \n R\xE9f\xE9rence\xA0: Accessible name and description calculation .\n Dans le cas o\xF9 le \xAB\xA0nom accessible\xA0\xBB est obtenu \xE0 partir du contenu du lien, celui-ci sera variable en fonction des cas suivants\xA0:\n Lien texte\xA0:\n En HTML, le \xAB\xA0nom accessible\xA0\xBB correspond au texte constitu\xE9 \xE0 partir\xA0:\n du texte contenu dans le lien\xA0;\n du texte contenu dans les \xE9l\xE9ments enfants du lien.\n \n Lien image\xA0:\n En HTML, le \xAB\xA0nom accessible\xA0\xBB correspond au texte constitu\xE9 \xE0 partir de l\u2019alternative textuelle d\u2019une ou plusieurs images dans le lien du type\xA0:\n Image (\xE9l\xE9ment <img> ou balise ouvrante ayant l\u2019attribut WAI-ARIA role="img" )\xA0;\n Image objet (\xE9l\xE9ment <object> )\xA0;\n Image bitmap (\xE9l\xE9ment <canvas> )\xA0;\n Image vectorielle (\xE9l\xE9ment <svg> ).\n \n Lien composite\xA0:\n En HTML, le \xAB\xA0nom accessible\xA0\xBB correspond au texte constitu\xE9 \xE0 partir de l\u2019ensemble\xA0:\n du texte contenu dans le lien\xA0;\n du texte contenu dans les \xE9l\xE9ments enfant du lien\xA0;\n du contenu de l\u2019alternative textuelle de la ou des images comprises dans le lien.\n \n Dans le cas d\u2019un lien SVG (version 1.1), le \xAB\xA0nom accessible\xA0\xBB est obtenu comme suit\xA0:\n Passage de texte associ\xE9 par l\u2019attribut WAI-ARIA aria-labelledby \xA0;\n Sinon, contenu de l\u2019attribut WAI-ARIA aria-label \xA0;\n Sinon, contenu de l\u2019\xE9l\xE9ment <title> enfant direct du lien\xA0;\n Sinon, contenu de l\u2019attribut xlink:title \xA0;\n Sinon, contenu texte d\u2019un ou plusieurs \xE9l\xE9ments <text> .\n \n Il faut cependant \xEAtre vigilant car cet algorithme de calcul n\u2019est pas encore pris en compte et effectif au sein des diff\xE9rents lecteurs d\u2019\xE9cran. \xC0 ce jour, le support est disponible avec VoiceOver, mais incomplet ou lacunaire avec JAWS et NVDA. Si bien que le plus petit d\xE9nominateur commun sur lequel il est possible de se reposer pour fournir un intitul\xE9 au lien est l\u2019\xE9l\xE9ment <text> .\n Note 1\xA0: un intitul\xE9 de lien sera consid\xE9r\xE9 comme non-explicite dans le cas o\xF9 le \xAB\xA0nom accessible\xA0\xBB ne reprend pas l\u2019 intitul\xE9 visible du lien.\n Note 2\xA0: en raison de la configuration possible des aides techniques permettant de forcer la restitution du \xAB\xA0nom accessible\xA0\xBB issu du contenu de l\u2019attribut title au d\xE9triment du \xAB\xA0nom accessible\xA0\xBB issu du contenu du lien. Un intitul\xE9 de lien sera consid\xE9r\xE9 comme non-explicite dans le cas o\xF9 le lien poss\xE8de un attribut title dont la valeur ne reprendrait pas au moins le \xAB\xA0nom accessible\xA0\xBB issu du contenu du lien.\n Note 3\xA0: dans le cas de la pr\xE9sence de plusieurs liens ayant une destination diff\xE9rente dont le \xAB\xA0nom accessible\xA0\xBB est identique. L\u2019intitul\xE9 de lien seul sera consid\xE9r\xE9 comme non-explicite si le contexte de lien ne permet pas de les diff\xE9rencier.\n Note 4\xA0: lorsqu\u2019un lien ne comporte aucun contenu, il sera non conforme au regard du crit\xE8re 10.2 et du crit\xE8re 6.2 .\n Note 5\xA0: bien que le calcul du nom accessible d\u2019un lien tienne compte de contenus texte g\xE9n\xE9r\xE9s en CSS via les pseudo-\xE9l\xE9ments ::before et ::after , cette pratique ne doit pas \xEAtre utilis\xE9e, car elle constitue une non-conformit\xE9 au crit\xE8re 1.3.1 des WCAG 2.1 (cf. F87 ).'
-  },
-  "intitule-visible": {
-    title: "Intitul\xE9 visible",
-    body: "Texte affich\xE9 faisant office d\u2019intitul\xE9 visible \xE0 l\u2019\xE9cran au sein d\u2019un bouton ou d\u2019un lien.\n Texte affich\xE9 faisant office d\u2019 \xE9tiquette pour un champ formulaire.\n Ce texte peut \xEAtre constitu\xE9 de texte ou d\u2019une image contenant du texte."
-  },
-  "items-de-meme-nature-d-une-liste-de-choix": {
-    title: "Items de m\xEAme nature d\u2019une liste de choix",
-    body: "Dans une liste d\xE9roulante (balise <select> ), ensemble d\u2019items (balises <option> ) pouvant \xEAtre regroup\xE9s par leur nature. Le regroupement vise \xE0 identifier les items devant \xEAtre trait\xE9s comme un ensemble (par exemple, une liste de d\xE9partements regroup\xE9s par r\xE9gions)."
-  },
-  landmarks: {
-    title: "Landmarks",
-    body: 'WAI-ARIA propose des r\xF4les permettant d\u2019indiquer les zones principales (r\xE9gions) du document. Ces r\xF4les sont tr\xE8s profitables aux utilisateurs de lecteurs d\u2019\xE9cran notamment, mais \xE9galement aux utilisateurs de la navigation au clavier qui peuvent ainsi b\xE9n\xE9ficier de fonctionnalit\xE9s de navigation rapide dans la structure du document .\n Les r\xF4les doivent \xEAtre d\xE9finis dans le document en fonction de la nature de la zone\xA0:\n La zone d\u2019 en-t\xEAte doit avoir un attribut WAI-ARIA role="banner" \xA0;\n Le menu de navigation principal doit avoir un attribut WAI-ARIA role="navigation" \xA0;\n La zone de contenu principal doit avoir un attribut WAI-ARIA role="main" \xA0;\n La zone de pied de page doit avoir un attribut WAI-ARIA role="contentinfo" \xA0;\n La zone de moteur de recherche sur le site doit avoir un attribut WAI-ARIA role="search" .\n \n Note 1\xA0: Si la plupart des lecteurs d\u2019\xE9cran mettent \xE0 disposition ces fonctionnalit\xE9s, les navigateurs n\u2019ont pas encore propos\xE9 de fonctionnalit\xE9 de navigation d\xE9di\xE9e pour les utilisateurs qui ne peuvent pas utiliser la souris. La mise en place des liens d\u2019\xE9vitement reste donc \xE0 privil\xE9gier par rapport aux landmarks .\n Note 2\xA0: Les r\xF4les WAI-ARIA banner , main et contentinfo doivent \xEAtre uniques dans la page. Le r\xF4le WAI-ARIA navigation est r\xE9serv\xE9 aux zones de navigations principales et secondaires. Lorsqu\u2019il y a plusieurs r\xF4les WAI-ARIA navigation , il peut \xEAtre utile de les diff\xE9rencier en pr\xE9cisant un nom \xE0 chacune des zones via l\u2019attribut WAI-ARIA aria-label ou aria-labelledby .'
-  },
-  "langue-par-defaut": {
-    title: "Langue par d\xE9faut",
-    body: 'Indication de la langue de traitement principale du document qui peut \xEAtre pr\xE9sente sur l\u2019\xE9l\xE9ment racine html ou sur chaque \xE9l\xE9ment de la page concern\xE9 via les attributs lang et/ou xml:lang selon le sch\xE9ma suivant\xA0:\n Pour HTML jusqu\u2019\xE0 la version 4.01\xA0: attribut lang obligatoire, attribut xml:lang non support\xE9\xA0;\n Pour XHTML 1.0 servi en "text/html" \xA0: attribut lang et xml:lang obligatoires\xA0;\n Pour XHTML 1.0 servi en "application/xhtml+xml" \xA0: attribut xml:lang obligatoire, attribut lang recommand\xE9\xA0;\n Pour XHTML 1.1\xA0: attribut xml:lang obligatoire, attribut lang non support\xE9\xA0;\n Pour HTML5\xA0: attribut lang obligatoire.'
-  },
-  "le-nom-le-role-la-valeur-le-parametrage-et-les-changements-d-etats": {
-    title: "Le nom, le r\xF4le, la valeur, le param\xE9trage et les changements d\u2019\xE9tats",
-    body: 'Un composant doit avoir un r\xF4le et un nom appropri\xE9s. Ses valeurs, \xE9tats et param\xE8tres \xE9ventuels doivent \xE9galement \xEAtre accessibles et correctement transmis aux APIs d\u2019accessibilit\xE9 notamment.\n Un composant peut s\u2019appuyer sur un \xE9l\xE9ment interactif HTML ou sur un \xE9l\xE9ment non interactif surcharg\xE9 par WAI-ARIA via un r\xF4le ad hoc. Important\xA0: les boutons (balises <button> ou <input type="button"> ) lorsqu\u2019ils sont contr\xF4l\xE9s via JavaScript sont \xE0 \xE9valuer avec le crit\xE8re 7.1 .\n Le nom peut \xEAtre l\u2019intitul\xE9 du composant (l\u2019intitul\xE9 d\u2019un bouton, par exemple).\n La valeur est, par exemple, l\u2019\xE9l\xE9ment s\xE9lectionn\xE9 d\u2019une liste d\xE9roulante ou la valeur actuelle d\u2019un curseur ( slider ).\n Le r\xF4le correspond au type d\u2019\xE9l\xE9ment d\xE9fini par la sp\xE9cification HTML ou WAI-ARIA (comme la balise <button> ou l\u2019attribut WAI-ARIA role="button" ).\n Le param\xE9trage correspond aux informations particuli\xE8res d\u2019un composant, g\xE9n\xE9ralement mis \xE0 disposition par WAI-ARIA. Par exemple aria-controls est un param\xE8tre qui transmet aux APIs l\u2019information que le composant contr\xF4le tel ou tel contenu (r\xE9f\xE9renc\xE9 par son identifiant -- attribut id ).\n Les changements d\u2019\xE9tat sont \xE9galement mis \xE0 disposition par WAI-ARIA. Par exemple aria-expanded est un \xE9tat permettant de signaler aux APIs que le composant est \xAB\xA0ouvert\xA0\xBB ou \xAB\xA0ferm\xE9\xA0\xBB. \xC0 noter qu\u2019un \xE9tat peut \xE9galement \xEAtre transmis via le nom, lorsque l\u2019intitul\xE9 est chang\xE9 dynamiquement pour correspondre \xE0 l\u2019\xE9tat de la zone contr\xF4l\xE9e notamment.\n Ces param\xE8tres ne sont pas obligatoires mais peuvent \xEAtre requis s\u2019ils sont indispensables pour rendre le composant accessible. C\u2019est \xE0 l\u2019auditeur de consid\xE9rer les cas o\xF9 ces param\xE8tres sont indispensables en fonction du contexte li\xE9 \xE0 l\u2019utilisation du composant.\n L\u2019auditeur doit \xE9galement v\xE9rifier que, lorsqu\u2019ils sont pr\xE9sents, ces param\xE8tres sont correctement utilis\xE9s.\n Pour ce faire (s\u2019il juge cela pertinent compte tenu du contexte d\u2019impl\xE9mentation des composants et des choix ergonomiques mis en \u0153uvre) il peut s\u2019appuyer sur les recommandations d\u2019utilisation de WAI-ARIA pour les composants ayant des attributs WAI-ARIA correspondant \xE0 un motif de conception tel que d\xE9crit dans le document WAI-ARIA 1.1 Authoring Practices .\n Note\xA0: les r\xF4les, propri\xE9t\xE9s et \xE9tats WAI-ARIA s\u2019impl\xE9mentent via des attributs, par exemple role="banner" , aria-hidden="true" .'
-  },
-  "legende-d-image": {
-    title: "L\xE9gende d\u2019image",
-    body: "Lorsqu\u2019un texte, adjacent \xE0 une image, contient des informations sur l\u2019image (par exemple un copyright, une date, un auteur\u2026) ou est destin\xE9 \xE0 compl\xE9ter les informations apport\xE9es par l\u2019image (par exemple un texte associ\xE9 \xE0 une image dans une galerie d\u2019images), on parle de l\xE9gende d\u2019image.\n Lorsqu\u2019une image est l\xE9gend\xE9e il est n\xE9cessaire d\u2019associer la l\xE9gende de l\u2019image \xE0 l\u2019image par une relation de structure, de telle sorte que les technologies d\u2019assistance puissent traiter l\u2019image et sa l\xE9gende comme un ensemble unique.\n HTML5 propose d\u2019associer une l\xE9gende \xE0 une image via les \xE9l\xE9ments figure (l\u2019ensemble de l\u2019image et la l\xE9gende) et figcaption (la l\xE9gende).\n Une image sans l\xE9gende peut d\xE9finir\xA0:\n Une image qui n\u2019est pas ins\xE9r\xE9e dans un \xE9l\xE9ment figure \xA0;\n Une image ins\xE9r\xE9e dans un \xE9l\xE9ment figure sans \xE9l\xE9ment figcaption .\n \n Note\xA0: lorsque le texte adjacent \xE0 l\u2019image peut faire office de texte de remplacement, il n\u2019est pas obligatoire de recourir \xE0 l\u2019ensemble figure , figcaption , l\u2019image pouvant \xEAtre simplement trait\xE9e comme une image de d\xE9coration.\n Vous pouvez consulter, \xE0 ce sujet, la note en anglais Requirements for providing text to act as an alternative for images du W3C."
-  },
-  legende: {
-    title: "L\xE9gende",
-    body: "HTML propose un dispositif permettant de titrer les groupes de champs de m\xEAme nature par l\u2019interm\xE9diaire des \xE9l\xE9ments <fieldset> et <legend> .\n Il est \xE9galement possible de cr\xE9er des regroupements avec le r\xF4le WAI-ARIA group et un passage de texte, faisant office de l\xE9gende, li\xE9 par l\u2019attribut WAI-ARIA aria-labelledby ou fourni par un attribut WAI-ARIA aria-label .\n Note 1\xA0: Les regroupements de champs peuvent utiliser d\u2019autres m\xE9thodes qui associent l\u2019information du regroupement directement dans l\u2019\xE9tiquette du champ. Par exemple, par l\u2019interm\xE9diaire d\u2019un attribut title , d\u2019un attribut WAI-ARIA aria-label , d\u2019une liaison aria-labelledby faisant office d\u2019\xE9tiquette ou encore par l\u2019attribut WAI-ARIA aria-describedby associant un texte compl\xE9mentaire. Dans ce cas, le regroupement de champs devient inutile puisque les labels sont suffisamment pertinents.\n Note 2\xA0: Lorsque le formulaire est constitu\xE9 d\u2019un seul bloc d\u2019informations de m\xEAme nature (l\u2019identit\xE9 et l\u2019adresse de l\u2019utilisateur, par exemple) ou d\u2019un champ unique (un moteur de recherche, par exemple), le regroupement des champs n\u2019est pas obligatoire."
-  },
-  "lien-composite": {
-    title: "Lien composite",
-    body: 'En HTML, lien contenant \xE0 la fois du texte et un ou plusieurs enfants de type image\xA0:\n Image (balise <img> ou balise ouvrante ayant l\u2019attribut WAI-ARIA role="img" )\xA0;\n Zone cliquable (balise <area> ) poss\xE9dant un attribut href \xA0;\n Image objet (balise <object> )\xA0;\n Image bitmap (balise <canvas> )\xA0;\n Image vectorielle (balise <svg> ).\n \n Note importante\xA0: il est rappel\xE9 que l\u2019utilisation de deux liens adjacents (lien image et lien texte) et identiques constitue une g\xEAne importante pour l\u2019utilisateur. M\xEAme si cela ne constitue pas une non-conformit\xE9, cet usage devrait \xEAtre \xE9vit\xE9. Une mani\xE8re de traiter ce type de liens est d\u2019inclure l\u2019image dans le lien texte de fa\xE7on \xE0 constituer un lien composite, ce qui \xE9vitera la redondance.\n Vous pouvez consulter \xE0 ce sujet la technique H2\xA0: Combining adjacent image and text links for the same resource .'
-  },
-  "lien-dont-la-nature-n-est-pas-evidente": {
-    title: "Lien dont la nature n\u2019est pas \xE9vidente",
-    body: "Lien qui peut \xEAtre confondu avec un texte normal lorsqu\u2019il est signal\xE9 uniquement par la couleur par certains types d\u2019utilisateurs ne percevant pas ou mal les couleurs. Par exemple, dans ce texte \u201CNouvelle gr\xE8ve \xE0 la SNCF\u201D, si le mot \u201Cgr\xE8ve\u201D est un lien signal\xE9 uniquement par la couleur, sa nature peut \xEAtre ignor\xE9e par les utilisateurs ne percevant pas la couleur et acc\xE9dant au contenu CSS activ\xE9.\n Note\xA0: \u201Csignal\xE9s uniquement par la couleur\u201D signifie que le lien n\u2019est accompagn\xE9 d\u2019aucun marqueur visuel (ic\xF4ne, soulignement, bordure\u2026). En cons\xE9quence, un lien de la m\xEAme couleur que le texte environnant est concern\xE9 par ce crit\xE8re."
-  },
-  "lien-image": {
-    title: "Lien image",
-    body: 'En HTML, lien contenant uniquement un ou plusieurs enfants de type image\xA0:\n Image (balise <img> ou balise ouvrante ayant l\u2019attribut WAI-ARIA role="img" )\xA0;\n Zone cliquable (balise <area> ) poss\xE9dant un attribut href \xA0;\n Image objet (balise <object> )\xA0;\n Image bitmap (balise <canvas> )\xA0;\n Image vectorielle (balise <svg> ).'
-  },
-  "lien-ou-bouton-adjacent": {
-    title: "Lien ou bouton adjacent",
-    body: "Lien ou bouton pr\xE9sent\xE9 de mani\xE8re adjacente \xE0 un \xE9l\xE9ment dans la page. Le lien ou bouton doit \xEAtre adjacent visuellement dans la repr\xE9sentation graphique (CSS activ\xE9) et dans le code HTML. Dans le code HTML, le lien ou bouton doit se situer juste avant ou juste apr\xE8s l\u2019\xE9l\xE9ment auquel il est adjacent."
-  },
-  "lien-svg": {
-    title: "Lien SVG",
-    body: "Lien contenu dans un \xE9l\xE9ment <svg> .\n Dans le cas d\u2019un lien SVG (version 1.1), le \xAB\xA0nom accessible\xA0\xBB est obtenu comme suit\xA0:\n Passage de texte associ\xE9 par l\u2019attribut WAI-ARIA aria-labelledby \xA0;\n Sinon, contenu de l\u2019attribut WAI-ARIA aria-label \xA0;\n Sinon, contenu de l\u2019\xE9l\xE9ment <title> enfant direct du lien\xA0;\n Sinon, contenu de l\u2019attribut xlink:title \xA0;\n Sinon, contenu texte d\u2019un ou plusieurs \xE9l\xE9ments <text> .\n \n Il faut cependant \xEAtre vigilant car cet algorithme de calcul n\u2019est pas encore pris en compte et effectif au sein des diff\xE9rents lecteurs d\u2019\xE9cran. \xC0 ce jour, le support est disponible avec VoiceOver, mais incomplet ou lacunaire avec JAWS et NVDA. Si bien que le plus petit d\xE9nominateur commun sur lequel il est possible de se reposer pour fournir un intitul\xE9 au lien est l\u2019\xE9l\xE9ment <text> ."
-  },
-  "lien-texte": {
-    title: "Lien texte",
-    body: 'En HTML, lien ne contenant aucun \xE9l\xE9ment enfant de type\xA0:\n Image (balise <img> ou balise ouvrante ayant l\u2019attribut WAI-ARIA role="img" )\xA0;\n Image objet (balise <object> )\xA0;\n Image bitmap (balise <canvas> )\xA0;\n Image vectorielle (balise <svg> ).'
-  },
-  lien: {
-    title: "Lien",
-    body: 'En HTML\xA0:\n Balise <a> poss\xE9dant un attribut href \xA0;\n Balise poss\xE9dant un attribut WAI-ARIA role="link" et dont l\u2019action de navigation est prise en charge par un script.\n \n En SVG\xA0:\n Balise <a> poss\xE9dant un attribut xlink:href en SVG 1.1.'
-  },
-  "liens-d-evitement-ou-d-acces-rapide": {
-    title: "Liens d\u2019\xE9vitement ou d\u2019acc\xE8s rapide",
-    body: "Liens dont la fonction est de permettre de naviguer \xE0 l\u2019int\xE9rieur de la page (lien d\u2019\xE9vitement, lien d\u2019acc\xE8s au formulaire de recherche ou au menu\u2026). Ces liens peuvent soit permettre d\u2019acc\xE9der \xE0 une zone de la page (lien d\u2019acc\xE8s rapide) ou de sauter une zone dans la page (lien d\u2019\xE9vitement).\n Note 1\xA0: Un lien d\u2019\xE9vitement ou d\u2019acc\xE8s rapide fonctionnel est un lien dont l\u2019activation permet de reprendre la lecture et la navigation clavier \xE0 partir de la cible du lien lors de l\u2019utilisation des navigateurs et des aides techniques retenus dans l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB) de l\u2019audit.\n Note 2\xA0: les liens d\u2019\xE9vitements ou d\u2019acc\xE8s rapide doivent \xEAtre situ\xE9s \xE0 la m\xEAme place dans la pr\xE9sentation et dans le m\xEAme ordre relatif dans le code source afin de satisfaire au crit\xE8re 12.2 ."
-  },
-  "liste-des-valeurs-possibles-pour-l-attribut-autocomplete": {
-    title: "Liste des valeurs possibles pour l\u2019attribut `autocomplete`",
-    body: 'La liste des valeurs disponibles est fournie par la sp\xE9cification WCAG 2.1\xA0:\n name -- Nom complet\xA0;\n honorific-prefix -- Abr\xE9viation, civilit\xE9 ou titre\xA0;\n given-name -- Pr\xE9nom\xA0;\n additional-name -- Pr\xE9noms additionnels\xA0;\n family-name -- Nom de famille\xA0;\n honorific-suffix -- Suffixe honorifique\xA0;\n nickname -- Surnom, diminutif\xA0;\n organization-title -- Fonction, intitul\xE9 de poste\xA0;\n username -- Nom d\u2019utilisateur\xA0;\n new-password -- Nouveau mot de passe (par exemple, lors de la cr\xE9ation d\u2019un compte ou d\u2019un changement de mot de passe)\xA0;\n current-password -- Mot de passe actuel pour le compte identifi\xE9 par le champ username (par exemple, lors d\u2019une connexion)\xA0;\n organization -- Nom de l\u2019organisation correspondant \xE0 la personne, \xE0 l\u2019adresse ou \xE0 l\u2019information de contact dans les autres champs associ\xE9s avec ce champ\xA0;\n street-address -- Adresse postale (multiligne, nouvelles lignes conserv\xE9es)\xA0;\n address-line1 -- Adresse postale (une ligne par champ, ligne 1)\xA0;\n address-line2 -- Adresse postale (une ligne par champ, ligne 2)\xA0;\n address-line3 -- Adresse postale (une ligne par champ, ligne 3)\xA0;\n address-level4 -- Le niveau administratif le plus d\xE9taill\xE9, pour les adresses pourvues de quatre niveaux administratifs\xA0;\n address-level3 -- Le troisi\xE8me niveau administratif, pour les adresses pourvues d\u2019au moins trois niveaux administratifs\xA0;\n address-level2 -- Le deuxi\xE8me niveau administratif, pour les adresses pourvues d\u2019au moins deux niveaux administratifs\xA0;\n address-level1 -- Le plus large niveau administratif d\u2019une adresse, c\u2019est-\xE0-dire la province dans laquelle se trouve la localit\xE9\xA0;\n country -- Code pays\xA0;\n country-name -- Nom de pays\xA0;\n postal-code -- Code postal, code CEDEX (si le CEDEX est pr\xE9sent, ajouter \u201CCEDEX\u201D, et ce qui le suit doit \xEAtre ajout\xE9 dans le champ address-level2 )\xA0;\n cc-name -- Nom complet figurant sur le moyen de paiement\xA0;\n cc-given-name -- Pr\xE9nom figurant sur le moyen de paiement\xA0;\n cc-additional-name -- Pr\xE9noms additionnels figurant sur le moyen de paiement\xA0;\n cc-family-name -- Nom de famille figurant sur le moyen de paiement\xA0;\n cc-number -- Code identifiant le moyen de paiement (e.g., un num\xE9ro de carte bancaire)\xA0;\n cc-exp -- Date d\u2019expiration du moyen de paiement\xA0;\n cc-exp-month -- Le mois de la date d\u2019expiration du moyen de paiement\xA0;\n cc-exp-year -- L\u2019ann\xE9e de la date d\u2019expiration du moyen de paiement\xA0;\n cc-csc -- Code de s\xE9curit\xE9 du moyen de paiement (also known as the card security code (CSC), card validation code (CVC), card verification value (CVV), signature panel code (SPC), credit card ID (CCID), etc.) \xA0;\n cc-type -- Type de moyen de paiement (e.g. Visa)\xA0;\n transaction-currency -- La devise qui a la pr\xE9f\xE9rence de l\u2019utilisateur lors d\u2019une transaction\xA0;\n transaction-amount -- Le montant qui a la pr\xE9f\xE9rence de l\u2019utilisateur lors d\u2019une transaction (e.g., en r\xE9ponse \xE0 une ench\xE8re ou \xE0 un prix sold\xE9)\xA0;\n language -- Langue pr\xE9f\xE9r\xE9e\xA0;\n bday -- Date d\u2019anniversaire\xA0;\n bday-day -- Le jour de la date d\u2019anniversaire\xA0;\n bday-month -- Le mois de la date d\u2019anniversaire\xA0;\n bday-year -- L\u2019ann\xE9e de la date d\u2019anniversaire\xA0;\n sex -- Identit\xE9 de genre\xA0;\n url -- Page d\u2019accueil ou une autre page Web correspondant \xE0 l\u2019organisation, la personne, l\u2019adresse ou \xE0 l\u2019information de contact dans les autres champs associ\xE9s avec ce champ\xA0;\n photo -- Photographie, ic\xF4ne ou une autre image correspondant \xE0 l\u2019organisation, la personne, l\u2019adresse ou \xE0 l\u2019information de contact dans les autres champs associ\xE9s avec ce champ\xA0;\n tel -- Num\xE9ro de t\xE9l\xE9phone complet, y compris le code pays\xA0;\n tel-country-code -- Code pays du num\xE9ro de t\xE9l\xE9phone\xA0;\n tel-national -- Num\xE9ro de t\xE9l\xE9phone sans la partie code pays, avec un pr\xE9fixe interne au pays, s\u2019il y a lieu\xA0;\n tel-area-code -- Indicatif r\xE9gional du num\xE9ro de t\xE9l\xE9phone, avec un pr\xE9fixe interne au pays, s\u2019il y a lieu\xA0;\n tel-local -- Num\xE9ro de t\xE9l\xE9phone sans la partie code pays ni l\u2019indicatif r\xE9gional\xA0;\n tel-local-prefix -- La premi\xE8re partie du composant du num\xE9ro de t\xE9l\xE9phone qui suit l\u2019indicatif r\xE9gional, lorsque ce composant est scind\xE9 en deux parties\xA0;\n tel-local-suffix -- La seconde partie du composant du num\xE9ro de t\xE9l\xE9phone qui suit l\u2019indicatif r\xE9gional, lorsque ce composant est scind\xE9 en deux parties\xA0;\n tel-extension -- Num\xE9ro de t\xE9l\xE9phone d\u2019un poste interne\xA0;\n email -- Adresse \xE9lectronique\xA0;\n impp -- URL correspondant d\u2019un protocole de messagerie instantan\xE9e (par exemple, "aim:goim?screenname=example" ou "xmpp:fred@example.net" ).'
-  },
-  listes: {
-    title: "Listes",
-    body: 'Suite d\u2019\xE9l\xE9ments pouvant \xEAtre regroup\xE9s sous la forme d\u2019une liste structur\xE9e ordonn\xE9e, non ordonn\xE9e ou de d\xE9finition. Par exemple la suite des liens d\u2019un menu de navigation est une liste de liens non ordonn\xE9e, les diff\xE9rentes \xE9tapes d\u2019une proc\xE9dure sont une liste d\u2019\xE9l\xE9ments ordonn\xE9s, le couple terme/description d\u2019un glossaire est une liste de description. En HTML, les listes utilisent les balises suivantes\xA0:\n Liste ordonn\xE9e\xA0: balises <ol> et <li> (chaque \xE9l\xE9ment de la liste est affect\xE9 d\u2019un marqueur index\xE9)\xA0;\n Liste non ordonn\xE9e\xA0: balises <ul> et <li> (chaque \xE9l\xE9ment de la liste est affect\xE9 d\u2019un marqueur non-index\xE9\xA0;\n Liste de description\xA0: balises <dl> , <dt> (terme \xE0 d\xE9crire) et <dd> (description).\n \n Note 1\xA0: En HTML5, la balise <dl> ne repr\xE9sente plus seulement une liste de d\xE9finition, mais de mani\xE8re g\xE9n\xE9rique toute liste de description qui peut comprendre comme groupe de termes-descriptions des noms et des d\xE9finitions, des questions et r\xE9ponses, des cat\xE9gories et des sujets, etc.\n Note 2\xA0: Il est \xE9galement possible de structurer les listes \xE0 l\u2019aide des attributs WAI-ARIA role="list" et role="listitem" pour les listes ordonn\xE9es et non ordonn\xE9es.\n Note 3\xA0: la notion de \xAB\xA0regroup\xE9s visuellement sous forme de liste\xA0\xBB se caract\xE9rise par\xA0:\n La pr\xE9sence d\u2019un marqueur visuel permettant de faire comprendre qu\u2019il s\u2019agit d\u2019une liste non ordonn\xE9e par exemple - , \u2022 , \\* , etc.\xA0;\n La pr\xE9sence d\u2019un marqueur visuel permettant de faire comprendre qu\u2019il s\u2019agit d\u2019une liste ordonn\xE9e par exemple un chiffre, une lettre grecque, etc.\xA0;\n La pr\xE9sence d\u2019une s\xE9rie d\u2019\xE9l\xE9ments se suivant visuellement les uns les autres, avec une forme visuelle, une nature et un fonctionnement identique, mais sans avoir directement de marqueur visuel de liste (non ordonn\xE9e ou ordonn\xE9e), par exemple un menu de navigation.\n \n Attention cependant toutes les listes ne n\xE9cessitent pas obligatoirement une structure de liste, par exemple une s\xE9rie de termes s\xE9par\xE9s par une virgule.'
-  },
-  "mecanisme-de-remplacement": {
-    title: "M\xE9canisme de remplacement",
-    body: "M\xE9canisme g\xE9n\xE9ralement bas\xE9 sur CSS, permettant \xE0 l\u2019utilisateur de remplacer du texte par du texte en image et inversement sur le principe du style switcher. Le m\xE9canisme peut utiliser un langage de script c\xF4t\xE9 serveur ou un langage de script c\xF4t\xE9 client."
-  },
-  "mecanisme-qui-permet-d-afficher-un-rapport-de-contraste-conforme": {
-    title: "M\xE9canisme qui permet d\u2019afficher un rapport de contraste conforme",
-    body: "Composant d\u2019interface dont l\u2019activation permet de modifier l\u2019apparence du site ou de la page de mani\xE8re \xE0 afficher les contenus avec un ratio de contraste suffisant. Le design de ce composant d\u2019interface devra \xEAtre conforme au crit\xE8re 3.2 et au crit\xE8re 3.3 sans avoir recours lui-m\xEAme \xE0 un m\xE9canisme permettant d\u2019afficher un rapport de contraste conforme. Ce m\xE9canisme doit conserver \xE0 l\u2019identique les contenus et les fonctionnalit\xE9s du site ou de la page qu\u2019il modifie."
-  },
-  "media-non-temporel": {
-    title: "M\xE9dia non temporel",
-    body: 'Contenu qui ne se d\xE9roule pas dans le temps, consultable via un plugin (Flash, Java, Silverlight\u2026) ou via les \xE9l\xE9ments svg et canvas \xA0; par exemple, une carte interactive en Flash, une application Flash ou Java, un diaporama sont des m\xE9dias non temporels. Un m\xE9dia non temporel peut contenir des m\xE9dias temporels (un lecteur Flash qui propose une liste de vid\xE9os \xE0 consulter, par exemple).\n Note\xA0: l\u2019utilisation du param\xE8tre wmode pour un objet Flash avec les valeurs "transparent" et "opaque" invalide de fait le crit\xE8re 4.13 . En effet, l\u2019utilisation de ces valeurs a pour cons\xE9quence que l\u2019animation Flash vue du c\xF4t\xE9 des utilisateurs de lecteur d\u2019\xE9cran est invisible.'
-  },
-  "media-temporel-type-son-video-et-synchronise": {
-    title: "M\xE9dia temporel (type son, vid\xE9o et synchronis\xE9)",
-    body: 'M\xE9dia temporel seulement audio\xA0: contenu sonore (Wav, Mp3\u2026)\xA0;\n M\xE9dia temporel seulement vid\xE9o\xA0: images ou photos en mouvement ou en s\xE9quence\xA0;\n M\xE9dia temporel synchronis\xE9\xA0: flux audio ou vid\xE9o synchronis\xE9 avec un autre format pour pr\xE9senter de l\u2019information et/ou comportant des composants temporels interactifs. Un m\xE9dia temporel peut \xEAtre consult\xE9 de 2 mani\xE8res diff\xE9rentes\xA0:\n \n Fichier \xE0 t\xE9l\xE9charger consultable avec un logiciel externe \xE0 la page web\xA0;\n Contenu embarqu\xE9 dans la page web et consultable dans la page web via\xA0: Un plugin (par exemple une vid\xE9o diffus\xE9e par un lecteur Flash)\xA0;\n L\u2019\xE9l\xE9ment <video> (par exemple une vid\xE9o)\xA0;\n L\u2019\xE9l\xE9ment <audio> (par exemple un podcast)\xA0;\n L\u2019\xE9l\xE9ment <svg> (par exemple un dessin anim\xE9 vectoriel)\xA0;\n L\u2019\xE9l\xE9ment <canvas> (par exemple un dessin anim\xE9 en image bitmap)\xA0;\n L\u2019\xE9l\xE9ment <bgsound> pour diffuser un arri\xE8re-plan sonore \xE0 la page web.\n \n \n \n Un m\xE9dia temporel peut \xEAtre diffus\xE9 en temps r\xE9el ou \xEAtre propos\xE9 en lecture de mani\xE8re asynchrone (m\xE9dia pr\xE9-enregistr\xE9).\n Note 1\xA0: l\u2019utilisation du param\xE8tre wmode pour un objet Flash avec les valeurs "transparent" et "opaque" invalide de fait le crit\xE8re 4.13 . En effet, l\u2019utilisation de ces valeurs a pour cons\xE9quence que l\u2019animation Flash vue du c\xF4t\xE9 des utilisateurs de lecteur d\u2019\xE9cran est invisible.\n Note 2\xA0: les gif anim\xE9s, les animations d\u2019images r\xE9alis\xE9es par JavaScript ou CSS ne sont pas consid\xE9r\xE9s comme \xE9tant des m\xE9dias temporels.\n Note 3\xA0: l\u2019\xE9l\xE9ment <bgsound> est sp\xE9cifique \xE0 Internet Explorer et ne devrait pas \xEAtre utilis\xE9.'
-  },
-  "menu-et-barre-de-navigation": {
-    title: "Menu et barre de navigation",
-    body: "Liste de liens permettant une navigation sp\xE9cifique dans le site, dans une rubrique ou dans une collection de pages.\n Les principales barres de navigation ( crit\xE8re 12.2 ) sont\xA0:\n Un menu de navigation\xA0;\n Un fil d\u2019ariane\xA0;\n Une liste de navigation d\u2019une liste de r\xE9sultats\xA0;\n Des liens d\u2019\xE9vitement.\n \n Il existe diff\xE9rents types de menu de navigation ( crit\xE8re 12.1 et crit\xE8re 12.2 )\xA0:\n Menu de navigation principal\xA0;\n Menu de sous-rubrique\xA0;\n Menu contextuel\xA0;\n Table des mati\xE8res concernant un ensemble de pages.\n \n Note\xA0: Les liens de pied de page renvoyant vers les mentions l\xE9gales, plan du site et autres informations concernant le site ne sont pas consid\xE9r\xE9s comme un menu de navigation principal."
-  },
-  "message-de-statut": {
-    title: "Message de statut",
-    body: "Un message de statut informe l\u2019utilisateur d\u2019un changement de contenu dans la page sans interrompre son activit\xE9 principale (il n\u2019y a pas de changement de contexte par exemple un repositionnement du focus sur le message).\n Un message de statut peut informer sur\xA0:\n Le succ\xE8s ou le r\xE9sultat d\u2019une action\xA0;\n L\u2019\xE9tat occup\xE9 d\u2019une application\xA0;\n L\u2019\xE9tat de progression d\u2019un processus\xA0;\n L\u2019existence d\u2019erreur."
-  },
-  "modifier-ou-annuler-les-donnees-et-les-actions-effectues": {
-    title: "Modifier ou annuler les donn\xE9es et les actions effectu\xE9s",
-    body: "Proc\xE9d\xE9s par lesquels un utilisateur peut modifier les donn\xE9es qu\u2019il a saisies, faire annuler sa saisie ou faire annuler les actions d\xE9coulant de sa saisie par exemple annuler une commande ou un virement bancaire.\n Note\xA0: La page contenant un formulaire qui modifie ou supprime des donn\xE9es, ou qui transmet des r\xE9ponses \xE0 un test ou un examen, ou dont la validation a des cons\xE9quences financi\xE8res ou juridiques, doit indiquer explicitement la dur\xE9e pendant laquelle l\u2019utilisateur peut demander l\u2019annulation de sa saisie. Elle devra \xE9galement contenir la proc\xE9dure \xE0 effectuer pour annuler cette saisie. Cette proc\xE9dure n\u2019a pas \xE0 \xEAtre obligatoirement r\xE9alisable en ligne m\xEAme si cela reste recommand\xE9."
-  },
-  "moteur-de-recherche-interne-a-un-site-web": {
-    title: "Moteur de recherche (interne \xE0 un site web)",
-    body: "Zone donnant acc\xE8s directement (formulaire) ou indirectement (\xE9l\xE9ment d\u2019interface donnant acc\xE8s au formulaire) au moteur de recherche qui permet d\u2019effectuer des recherches sur les contenus de l\u2019ensemble du site.\n Note\xA0: Attention \xE0 ne pas confondre cette zone de recherche, unique dans le site, avec tout autre moteur de recherche permettant par exemple de faire des recherches sur une partie restreinte du site\xA0: un catalogue, les offres sur une section march\xE9s publics\u2026\n Voir la d\xE9finition technique de zone d\u2019en-t\xEAte fournie par WAI-ARIA search(role) ."
-  },
-  "motif-de-conception": {
-    title: "Motif de conception",
-    body: "Un motif de conception (Design Pattern) est un mod\xE8le d\xE9fini dans le document WAI-ARIA 1.1 Authoring Practices qui d\xE9crit la structure, les r\xF4les et propri\xE9t\xE9s et le comportement clavier que doit respecter un composant JavaScript (widget).\n Il est recommand\xE9 que les composants d\xE9velopp\xE9s en JavaScript utilisant des attributs WAI-ARIA correspondant \xE0 un motif de conception respectent celui-ci. Attention cependant, les motifs de conception ne sont pas tous adapt\xE9s \xE0 un usage non applicatif, en particulier pour les sites proposant un affichage en contexte mobile.\n Note 1\xA0: compte tenu du manque de support de certaines propri\xE9t\xE9s et de certains r\xF4les WAI-ARIA et de la grande variabilit\xE9 des situations dans lesquelles un composant JavaScript peut \xEAtre propos\xE9, il est possible d\u2019adapter des motifs de conception \xE0 des contextes ou des utilisations particuli\xE8res. Dans ce cas, le motif de conception adapt\xE9 doit\xA0:\n Respecter la structure g\xE9n\xE9rale\xA0: par exemple un ensemble de panneaux (r\xF4le WAI-ARIA tabpanel ) d\u2019un syst\xE8me d\u2019onglets est forc\xE9ment li\xE9 \xE0 un ensemble d\u2019onglets (r\xF4le WAI-ARIA tablist )\xA0;\n Utiliser en remplacement d\u2019un r\xF4le ou d\u2019une propri\xE9t\xE9 WAI-ARIA mal support\xE9, un r\xF4le ou une propri\xE9t\xE9 WAI-ARIA \xE9quivalent, offrant un comportement et une restitution similaire.\n \n Note 2\xA0: Le fait d\u2019enrichir un motif de conception de r\xF4les ou propri\xE9t\xE9s WAI-ARIA suppl\xE9mentaires dont la compatibilit\xE9 avec l\u2019accessibilit\xE9 est contr\xF4l\xE9e par le test de restitution sur l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB) ne constitue pas une adaptation d\u2019un motif de conception. Par exemple l\u2019ajout de l\u2019attribut WAI-ARIA aria-hidden sur les panneaux (r\xF4le WAI-ARIA tabpanel ) d\u2019un syst\xE8me d\u2019onglets ne d\xE9finit pas un motif de conception adapt\xE9."
-  },
-  "ordre-de-tabulation": {
-    title: "Ordre de tabulation",
-    body: "Ordre dans lequel le focus se d\xE9place (vers un \xE9l\xE9ment suivant ou vers un \xE9l\xE9ment pr\xE9c\xE9dent). L\u2019ordre naturel est celui qui est impl\xE9ment\xE9 via le code source. Lorsqu\u2019il est modifi\xE9 par l\u2019utilisation de l\u2019attribut tabindex ou par l\u2019utilisation d\u2019une commande JavaScript, c\u2019est l\u2019ordre modifi\xE9 qui fait r\xE9f\xE9rence.\n Attention\xA0: lorsqu\u2019un \xE9l\xE9ment initie un changement dans la page (changement de contexte, gestion de zones cach\xE9es, ajout de contenu, gestion de champs de formulaire\u2026) il est n\xE9cessaire d\u2019activer l\u2019\xE9l\xE9ment qui initie le changement pour tester la coh\xE9rence de l\u2019ordre de tabulation."
-  },
-  "page-plan-du-site": {
-    title: "Page \xAB\xA0plan du site\xA0\xBB",
-    body: "Page d\xE9di\xE9e pr\xE9sentant l\u2019arborescence d\u2019un site web, g\xE9n\xE9ralement sous forme de listes de liens organis\xE9es en rubriques et sous-rubriques donnant acc\xE8s \xE0 l\u2019ensemble des pages du site.\n Note 1\xA0: les liens du plan du site peuvent \xEAtre constitu\xE9s de balises <a> ou de balises <area> .\n Note 2\xA0: il n\u2019est pas n\xE9cessaire que le plan du site contienne les liens vers toutes les pages du site, en revanche il est n\xE9cessaire qu\u2019\xE0 partir du plan du site, l\u2019utilisateur puisse atteindre l\u2019ensemble des pages du site."
-  },
-  "passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby": {
-    title: "Passage de texte li\xE9 par `aria-labelledby` ou `aria-describedby`",
-    body: 'Il s\u2019agit d\u2019un ou de plusieurs passages de texte identifi\xE9s par des id dont la valeur est unique dans la page et associ\xE9s \xE0 un \xE9l\xE9ment (champ de formulaire, bouton, etc.) par les attributs WAI-ARIA aria-labelledby ou aria-describedby sur le mod\xE8le suivant\xA0: aria-labelledby="ID1 ID2 ID3\u2026" o\xF9 la valeur de l\u2019attribut utilis\xE9 est \xE9gale \xE0 la liste des valeurs d\u2019attributs id des passages de texte \xE0 associer pr\xE9sents dans la page.\n Note 1\xA0: pour assurer une compatibilit\xE9 maximum avec les agents utilisateurs, notamment Internet Explorer 11, il est recommand\xE9 d\u2019impl\xE9menter un tabindex="-1" sur les passages de textes qui ne sont pas des \xE9l\xE9ments interactifs (bouton, liens, \xE9l\xE9ments de formulaires, etc.).\n Note 2\xA0: la valeur des attributs WAI-ARIA aria-labelledby ou aria-describedby ne doivent pas cr\xE9er de r\xE9f\xE9rence r\xE9cursive (A r\xE9f\xE9rence B qui r\xE9f\xE9rence A) ou traversante (A qui r\xE9f\xE9rence B qui r\xE9f\xE9rence C).'
-  },
-  "presentation-de-l-information": {
-    title: "Pr\xE9sentation de l\u2019information",
-    body: "Restitution visuelle des contenus via un navigateur en mode graphique. La pr\xE9sentation concerne le style, la position et les dimensions des \xE9l\xE9ments HTML et de leur contenu. La pr\xE9sentation de l\u2019information doit \xEAtre r\xE9alis\xE9e via CSS. Les \xE9l\xE9ments ( basefont , big , blink , center , font , marquee , s , strike et tt ) et les attributs ( align , alink , background , bgcolor , border , cellpadding , cellspacing , char , charoff , clear , compact , color , frameborder , hspace , link , marginheight , marginwidth , text , valign , vlink , vspace ) sont interdits.\n Notes\xA0:\n Les attributs width et height utilis\xE9s sur d\u2019autres \xE9l\xE9ments que les \xE9l\xE9ments <img> , <object> , <embed> , <canvas> et <svg> sont \xE9galement interdits\xA0;\n L'attribut size utilis\xE9 sur d\u2019autres \xE9l\xE9ments que l'\xE9l\xE9ment <select> est \xE9galement interdit\xA0;\n L\u2019\xE9l\xE9ment <u> est interdit uniquement si le DOCTYPE du document ne correspond pas \xE0 HTML 5."
-  },
-  "presse-ou-pose": {
-    title: "Press\xE9 ou pos\xE9",
-    body: "Correspond aux gestionnaires d\u2019\xE9v\xE9nement JavaScript consid\xE9r\xE9s comme des \xE9v\xE9nements descendants ( mousedown , touchstart par exemple)."
-  },
-  "prise-de-focus": {
-    title: "Prise de focus",
-    body: 'La prise de focus est l\u2019\xE9tat renvoy\xE9 par un \xE9l\xE9ment qui re\xE7oit l\u2019attention suite \xE0 une action de l\u2019utilisateur. Il y a trois moyens en HTML de donner le focus \xE0 un \xE9l\xE9ment\xA0:\n En activant l\u2019\xE9l\xE9ment par un dispositif de pointage (exemple\xA0: souris)\xA0;\n En atteignant l\u2019\xE9l\xE9ment par la touche tabulation ou majuscule + tabulation\xA0;\n En activant l\u2019\xE9l\xE9ment par un raccourci clavier ( accesskey ).\n \n Certains \xE9l\xE9ments re\xE7oivent naturellement le focus, par exemple\xA0: <a href> , <area href> , <button> , <input> , <object> , <select> , <label> , <legend> , <optgroup> , <option> et <textarea> . Le comportement de l\u2019\xE9l\xE9ment, lors de la prise de focus, d\xE9pend de sa nature\xA0; un lien, par exemple, devra \xEAtre activ\xE9 apr\xE8s la prise de focus (sauf utilisation de script). En revanche, un \xE9l\xE9ment de formulaire, comme <textarea> , devra autoriser la saisie suite \xE0 la prise de focus. Les \xE9l\xE9ments <label> et <legend> ne re\xE7oivent la prise de focus que via le pointeur souris. Pour l\u2019\xE9l\xE9ment <label> , le comportement attendu est de transf\xE9rer la prise de focus sur l\u2019\xE9l\xE9ment qui lui est associ\xE9.\n Note 1\xA0: la sp\xE9cification WAI-ARIA \xE9tend le r\xF4le attribu\xE9 \xE0 l\u2019attribut tabindex en d\xE9finissant que tout \xE9l\xE9ment HTML peut acqu\xE9rir la possibilit\xE9 de recevoir le focus en lui attribuant la valeur tabindex="0" . En revanche, aucun comportement n\u2019est attribu\xE9 via la seule pr\xE9sence de tabindex . De m\xEAme, la valeur tabindex="-1" lorsqu\u2019elle est utilis\xE9e sur un \xE9l\xE9ment recevant naturellement le focus retire l\u2019\xE9l\xE9ment qui en est affect\xE9 du plan de tabulation en inhibant sa capacit\xE9 \xE0 signaler la \xAB\xA0prise de focus\xA0\xBB. L\u2019utilisation de tabindex , conform\xE9ment \xE0 la sp\xE9cification WAI-ARIA, peut valider certains tests relatifs \xE0 la gestion du focus de tabulation, notamment.\n Note 2\xA0: l\u2019indication visuelle du focus du navigateur ne doit pas \xEAtre supprim\xE9e ou d\xE9grad\xE9e sauf si un style du focus d\xE9fini par l\u2019auteur est visible et suffisamment contrast\xE9 au regard du crit\xE8re 3.3 .'
-  },
-  "procede-de-rafraichissement": {
-    title: "Proc\xE9d\xE9 de rafra\xEEchissement",
-    body: "Technique visant \xE0 modifier le contenu d\u2019un ou de plusieurs \xE9l\xE9ments de la page web. Le proc\xE9d\xE9 de rafra\xEEchissement peut s\u2019effectuer par rechargement automatique de la page ou de mani\xE8re dynamique sans rechargement de la page (via AJAX, par exemple). L\u2019utilisateur doit pouvoir contr\xF4ler chaque proc\xE9d\xE9 de rafra\xEEchissement de mani\xE8re ind\xE9pendante."
-  },
-  "propriete-css-determinant-une-couleur": {
-    title: "Propri\xE9t\xE9 CSS d\xE9terminant une couleur",
-    body: "Cela concerne les propri\xE9t\xE9s suivantes\xA0: color , background-color , background , border-color , border , outline-color , outline .\n Note\xA0: l\u2019utilisation d\u2019une image de fond pour ins\xE9rer une couleur (propri\xE9t\xE9 background:url\u2026 ) est \xE9galement concern\xE9e."
-  },
-  "raccourci-clavier": {
-    title: "Raccourci clavier",
-    body: "Un moyen de d\xE9clencher une action associ\xE9e \xE0 un composant de l\u2019interface utilisateur en appuyant sur une ou plusieurs touches.\n Note\xA0: les \xAB\xA0Access keys\xA0\xBB (attribut HTML accesskey ) sont bien des raccourcis clavier, mais ils ne sont pas concern\xE9s par le crit\xE8re 12.10 dans la mesure o\xF9 leur activation n\xE9cessite d\xE9j\xE0 l\u2019usage de touches de modification (variables suivant les navigateurs)."
-  },
-  redirection: {
-    title: "Redirection",
-    body: "Proc\xE9d\xE9 qui consiste pour l\u2019affichage d\u2019une page sur le poste client \xE0 rediriger l\u2019utilisateur vers une autre page, sur le m\xEAme domaine ou sur un domaine diff\xE9rent."
-  },
-  "regles-d-ecriture": {
-    title: "R\xE8gles d\u2019\xE9criture",
-    body: 'Le code source doit respecter les r\xE8gles suivantes en accord avec la d\xE9claration de type de document utilis\xE9e dans la page\xA0:\n Pas de balise ouvrante ou fermante sans < ou > (exemple d\u2019erreur\xA0: li>v\xE9lo )\xA0;\n pas de balise fermante avec / manquant (exemple d\u2019erreur\xA0: <li>v\xE9lo<li> )\xA0;\n pas de valeur d\u2019attribut avec des \u201C ou \u2018 manquant (exemple d\u2019erreur\xA0: alt="v\xE9lo )\xA0;\n pas de valeurs multiples d\u2019attribut s\xE9par\xE9es par un espace sans \u201C ou \u2018 (exemple d\u2019erreur\xA0: alt=mon beau v\xE9lo )\xA0;\n pas d\u2019espace manquant entre les attributs (exemple\xA0: alt=\u201Dv\xE9lo\u201Dtitle=\u201Dv\xE9lo\u201D )\xA0;\n pas de balise fermante manquante pour les \xE9l\xE9ments qui en exigent une (exemple d\u2019erreur\xA0: <object> sans </object> ).'
-  },
-  "relache-ou-releve": {
-    title: "Rel\xE2ch\xE9 ou relev\xE9",
-    body: "Correspond aux gestionnaires d\u2019\xE9v\xE9nement JavaScript consid\xE9r\xE9s comme des \xE9v\xE9nements ascendants ( mouseup , touchend par exemple)."
-  },
-  "resume-de-tableau": {
-    title: "R\xE9sum\xE9 (de tableau)",
-    body: 'Un r\xE9sum\xE9 est un passage de texte associ\xE9 \xE0 un tableau de donn\xE9es complexe. Il permet de donner des informations sur la nature et la structure du tableau afin d\u2019en faciliter l\u2019utilisation par les utilisateurs de technologies d\u2019assistance par exemple.\n Note\xA0: en HTML5, la seule technique utilisable actuellement est celle qui consiste \xE0 ins\xE9rer le r\xE9sum\xE9 directement dans le titre (balise <caption> ) en masquant le r\xE9sum\xE9 via CSS si n\xE9cessaire.\n Dans les versions pr\xE9c\xE9dentes de HTML, le r\xE9sum\xE9 peut \xEAtre ins\xE9r\xE9 via un attribut summary sur la balise <table> .\n Dans le cas d\u2019une balise avec l\u2019attribut WAI-ARIA role="table" , le r\xE9sum\xE9 doit \xEAtre fourni au moyen d\u2019un attribut aria-describedby et \xEAtre correctement restitu\xE9 par les technologies d\u2019assistance.'
-  },
-  script: {
-    title: "Script",
-    body: "Code g\xE9n\xE9ralement \xE9crit sous forme d\u2019une liste de commandes (par exemple JavaScript). Les langages interpr\xE9t\xE9s c\xF4t\xE9 client n\xE9cessitent un navigateur compatible sur lequel l\u2019ex\xE9cution du langage est active. Les commandes d\u2019un langage de script c\xF4t\xE9 client peuvent \xEAtre embarqu\xE9es ou contenues dans un fichier externe. Dans les deux cas, l\u2019insertion se fait via la balise <script> ."
-  },
-  "sens-de-lecture": {
-    title: "Sens de lecture",
-    body: 'Indique le sens de lecture du document ou d\u2019un passage de texte via l\u2019attribut dir , dir="ltr" , par exemple. Les deux valeurs reconnues sont\xA0:\n ltr ( left to right ) indique un sens de lecture de gauche \xE0 droite\xA0;\n rtl ( right to left ) indique un sens de lecture de droite \xE0 gauche.\n \n Note\xA0: en l\u2019absence d\u2019indication de sens de lecture via l\u2019attribut dir sur l\u2019\xE9l\xE9ment html , body , ou un des parents du texte analys\xE9, le sens de lecture par d\xE9faut est de gauche \xE0 droite (valeur ltr ).'
-  },
-  "site-web": {
-    title: "Site web",
-    body: "Ensemble de toutes les pages web\xA0:\n Reli\xE9es par des liens web\xA0;\n Appartenant au m\xEAme nom de domaine (ex\xA0: design.numerique.gouv.fr)\xA0;\n Qui constituent un ensemble coh\xE9rent du point de vue de l\u2019utilisateur.\n \n Cas particulier des pages web d\u2019un sous-domaine\xA0; un sous-domaine peut\xA0:\n Soit appartenir au site web attach\xE9 au nom de domaine, si l\u2019utilisateur en a une perception coh\xE9rente avec les autres pages du site web (par exemple\xA0: m\xEAme structure, m\xEAme navigation\u2026)\xA0;\n Soit ne pas appartenir au site web attach\xE9 au nom de domaine (par exemple\xA0: diff\xE9rents blogs en sous-domaine d\u2019un nom de domaine et sans relation les uns avec les autres)."
-  },
-  "sous-titres-synchronises-objet-multimedia": {
-    title: "Sous-titres synchronis\xE9s (objet multim\xE9dia)",
-    body: 'Texte des informations audio (paroles d\u2019un personnage, bruit important pour comprendre l\u2019action\u2026) pr\xE9sentes dans un m\xE9dia temporel et affich\xE9 de mani\xE8re synchrone avec le flux de l\u2019objet multim\xE9dia.\n Note 1\xA0: pour diff\xE9rencier les sources sonores (diff\xE9rents personnages, voix off\u2026), il est recommand\xE9 d\u2019utiliser un m\xE9canisme appropri\xE9 (mise entre crochets, mise en italique, annonce explicite du type \u201Cvoix off\xA0: \u2026\u201D).\n Note 2\xA0: il ne faut pas confondre le sous-titrage pour la traduction (attribut kind="subtitles" de la balise <track> en HTML5, par exemple) et le sous-titrage pour sourds et malentendants (attribut kind="captions" de la balise <track> en HTML5, par exemple). Ces deux types de sous-titrage poursuivent des buts diff\xE9rents. Seule la pr\xE9sence et la pertinence d\u2019un sous-titrage pour sourds et malentendants permet d\u2019\xEAtre conforme.'
-  },
-  "structure-du-document": {
-    title: "Structure du document",
-    body: "Ensemble d\u2019\xE9l\xE9ments permettant de d\xE9finir les grandes zones d\u2019une page HTML telles que la zone d\u2019en-t\xEAte de la page, les zones de navigation principale et secondaire, la zone de contenu principal et la zone de pied de page."
-  },
-  "systeme-de-navigation": {
-    title: "Syst\xE8me de navigation",
-    body: "Tout proc\xE9d\xE9 permettant une navigation dans le site ou dans une page, les syst\xE8mes de navigation retenus sont\xA0:\n Menu de navigation principal\xA0;\n Table des mati\xE8res\xA0;\n Plan du site\xA0;\n Moteur de recherche."
-  },
-  "tableau-de-donnees-ayant-un-titre": {
-    title: "Tableau de donn\xE9es ayant un titre",
-    body: "Tableau de donn\xE9es ayant un attribut ou contenant une balise dont le contenu fait office de titre.\n Tableau de donn\xE9es pr\xE9c\xE9d\xE9 ou suivi d\u2019un passage de texte associ\xE9 au tableau faisant office de titre.\n Dans la mesure o\xF9 il est bien correctement restitu\xE9 et associ\xE9 par les technologies d\u2019assistance au tableau de donn\xE9es, le titre associ\xE9 peut \xEAtre\xA0:\n Dans une balise <caption> \xA0;\n Dans un attribut title \xA0;\n Dans un attribut WAI-ARIA aria-label \xA0;\n Dans une balise associ\xE9e au tableau de donn\xE9es via un attribut WAI-ARIA aria-labelledby sur le tableau.\n \n Note\xA0: seule la balise <caption> \xE9tant compl\xE8tement support\xE9 par l\u2019ensemble des technologies d\u2019assistance, il est fortement recommand\xE9 de privil\xE9gier cette solution lors de la mise en \u0153uvre afin d\u2019\xE9viter de nombreuses v\xE9rifications dans les diff\xE9rentes combinaisons pr\xE9vues par l\u2019environnement de test (ou \xAB\xA0base de r\xE9f\xE9rence\xA0\xBB)."
-  },
-  "tableau-de-donnees-complexe": {
-    title: "Tableau de donn\xE9es complexe",
-    body: 'Un tableau de donn\xE9es est une structure introduite par une balise <table> ou lorsqu\u2019il est correctement restitu\xE9 par les technologies d\u2019assistance par une balise pourvue d\u2019un attribut WAI-ARIA role="table" .\n Lorsqu\u2019un tableau de donn\xE9es contient des en-t\xEAtes qui ne sont pas r\xE9partis uniquement sur la premi\xE8re ligne et/ou la premi\xE8re colonne de la grille ou dont la port\xE9e n\u2019est pas valable pour l\u2019ensemble de la colonne ou de la ligne, on parle de tableau de donn\xE9es complexe. Il est alors n\xE9cessaire de fournir un \xAB\xA0r\xE9sum\xE9\xA0\xBB permettant d\u2019en expliquer sa nature et sa structure afin d\u2019en faciliter la consultation pour des utilisateurs de technologies d\u2019assistance par exemple.'
-  },
-  "tableau-de-donnees": {
-    title: "Tableau de donn\xE9es",
-    body: 'Un tableau de donn\xE9es est une structure introduite par une balise <table> ou lorsqu\u2019il est correctement restitu\xE9 par les technologies d\u2019assistance par une balise pourvue d\u2019un attribut WAI-ARIA role="table" . Cette balise permet de structurer des informations en lignes et en colonnes via des cellules de donn\xE9es et des cellules d\u2019en-t\xEAtes.'
-  },
-  "tableau-de-mise-en-forme": {
-    title: "Tableau de mise en forme",
-    body: "Technique qui utilise un \xE9l\xE9ment HTML (balise <table> ) pour contr\xF4ler l\u2019affichage d\u2019informations via des cellules (balise <td> )."
-  },
-  "taille-des-caracteres": {
-    title: "Taille des caract\xE8res",
-    body: "Valeur attribu\xE9e aux polices de caract\xE8res pr\xE9sentes sur une page web."
-  },
-  "texte-style": {
-    title: "Texte styl\xE9",
-    body: "Texte dont la mise en forme est contr\xF4l\xE9e par une feuille de styles."
-  },
-  "titre-de-cadre": {
-    title: "Titre de cadre",
-    body: 'Contenu de l\u2019attribut title de la balise <iframe> ou <frame> permettant de conna\xEEtre la nature du contenu diffus\xE9 via le cadre lorsque l\u2019utilisateur navigue de cadre en cadre ou affiche la liste des cadres de la page par exemple.\n Note 1\xA0: Certains cadres servent uniquement \xE0 des op\xE9rations techniques tels que des traitements applicatifs destin\xE9s \xE0 pr\xE9parer ou piloter des contenus affich\xE9s dans la page comme les cadres utilis\xE9s par certains r\xE9seaux sociaux comme Facebook par exemple.\n Si ces cadres sont d\xE9pourvus de titre de cadre fournis par le service distant, ou si les titres de cadres sont jug\xE9s non pertinents, des mentions g\xE9n\xE9riques peuvent \xEAtre utilis\xE9es, par exemple title="contenus techniques Facebook" .\n Note 2\xA0: Si cela ne g\xEAne pas le fonctionnement de ce type de cadre, il est possible de les rendre indisponibles aux technologies d\u2019assistance en utilisant l\u2019attribut WAI-ARIA aria-hidden="true" . Dans ce cas le crit\xE8re 2.1 et le crit\xE8re 2.2 seront non applicables.'
-  },
-  "titre-de-page": {
-    title: "Titre de page",
-    body: "Contenu de la balise <title> d\u2019une page web permettant d\u2019identifier de mani\xE8re claire, concise et unique les contenus/la nature de la page (\xAB\xA0Plan du site www.nomdusite.fr\xA0\xBB pour une page pr\xE9sentant le plan du site web, par exemple)."
-  },
-  titre: {
-    title: "Titre",
-    body: '\xC9l\xE9ment HTML (balise h ) \xE0 6 niveaux de hi\xE9rarchie (de h1 pour le titre le plus important \xE0 h6 pour le moins important) ou \xE9l\xE9ment HTML ayant les attributs WAI-ARIA role="heading" et aria-level permettant de structurer l\u2019information d\u2019un contenu web.\n Assurer une stricte hi\xE9rarchie entre les titres d\u2019une page web est une bonne pratique, mais la pr\xE9sence de sauts hi\xE9rarchiques n\u2019invalide pas le crit\xE8re tant que cette hi\xE9rarchie plus l\xE2che reste coh\xE9rente (un titre <h3> peut ainsi venir directement apr\xE8s un titre <h1> , par exemple). La hi\xE9rarchie de titres ne doit pas obligatoirement contenir un titre <h1> . M\xEAme si ces pratiques ne sont pas encourag\xE9es, elles n\u2019invalident pas le crit\xE8re.\n Note\xA0: les titres visuellement cach\xE9s via CSS sont consid\xE9r\xE9s comme pr\xE9sents et valident le crit\xE8re 9.1 .'
-  },
-  "transcription-textuelle-media-temporel": {
-    title: "Transcription textuelle (m\xE9dia temporel)",
-    body: "Contenu textuel associ\xE9 \xE0 un m\xE9dia temporel par la technique appropri\xE9e (texte cod\xE9 en HTML ou dans un fichier texte qui se trouve dans la m\xEAme page ou consultable suivant un lien). Ce contenu donne acc\xE8s \xE0 l\u2019utilisateur (de mani\xE8re ind\xE9pendante de la consultation de l\u2019objet multim\xE9dia) \xE0\xA0:\n La totalit\xE9 de ce qui y est exprim\xE9 oralement\xA0;\n Toutes les informations descriptives n\xE9cessaires \xE0 une compr\xE9hension \xE9quivalente de l\u2019action.\n \n Ces informations textuelles doivent \xEAtre pr\xE9sent\xE9es dans l\u2019ordre chronologique de leur apparition dans le m\xE9dia temporel.\n Note\xA0: la transcription textuelle doit se situer \xE0 l\u2019ext\xE9rieur de la balise <object> ."
-  },
-  "type-de-document": {
-    title: "Type de document",
-    body: "Ensemble de donn\xE9es de r\xE9f\xE9rence qui permet aux agents utilisateurs de conna\xEEtre les caract\xE9ristiques techniques des langages utilis\xE9s sur la page web (balise doctype )."
-  },
-  "type-et-format-de-donnees": {
-    title: "Type et format de donn\xE9es",
-    body: "Indication concernant le type et le format des donn\xE9es attendus lors de la saisie d\u2019un champ de formulaire. Par exemple\xA0:\n Date (jj/mm/aaaa)\xA0;\n Montant en euros\xA0;\n Code postal (5 chiffres\xA0: ex. 75001).\n \n Note importante\xA0: lorsque le type de champ de formulaire propose un masque de saisie, par exemple les champs date ou time , l\u2019indication de format n\u2019est pas n\xE9cessaire."
-  },
-  "uniquement-a-des-fins-de-presentation": {
-    title: "Uniquement \xE0 des fins de pr\xE9sentation",
-    body: 'Uniquement \xE0 des fins de pr\xE9sentation\xA0: utilisation de balises HTML pour une finalit\xE9 diff\xE9rente de celle pr\xE9vue dans les sp\xE9cifications (au regard du type de document d\xE9clar\xE9). Exemples\xA0: utilisation des balises h \xE0 seule fin de cr\xE9er un effet typographique\xA0; utilisation de la balise <blockquote> \xE0 seule fin de mettre un paragraphe en retrait, etc.\n Note 1\xA0: l\u2019utilisation d\u2019\xE9l\xE9ments <div> ou <span> ou plusieurs <br> pour cr\xE9er visuellement un paragraphe est consid\xE9r\xE9e comme non conforme et invalide le crit\xE8re.\n Exemple\xA0: <div> , paragraphes d\u2019un bloc de texte simul\xE9s , <br> , \xE0 l\u2019aide de plusieurs balises <br> , </div> \n Note 2\xA0: WAI-ARIA propose un r\xF4le presentation permettant de supprimer la s\xE9mantique d\u2019un \xE9l\xE9ment, par exemple <h1 role="presentation">Titre</h1> . Dans ce cas, le texte sera correctement restitu\xE9 mais son r\xF4le de titre ne le sera plus. L\u2019utilisation du r\xF4le presentation peut \xEAtre requise lorsque l\u2019on utilise un motif de conception WAI-ARIA.\n Le r\xF4le WAI-ARIA presentation peut \xEAtre \xE9galement utilis\xE9 pour supprimer la s\xE9mantique d\u2019un \xE9l\xE9ment lorsque ce dernier est utilis\xE9 uniquement \xE0 des fins de pr\xE9sentation, par exemple <blockquote role="presentation"> aura le m\xEAme effet qu\u2019une absence d\u2019\xE9l\xE9ment <blockquote> .\n M\xEAme si cette utilisation est fortement d\xE9conseill\xE9e (dans le cas de technologie d\u2019assistance qui n\u2019impl\xE9menteraient pas WAI-ARIA par exemple) elle peut \xEAtre consid\xE9r\xE9e comme conforme \xE0 WCAG . En revanche l\u2019utilisation d\u2019un r\xF4le WAI-ARIA presentation sur un \xE9l\xE9ment dont la nature (par exemple la s\xE9mantique) est essentielle \xE0 la compr\xE9hension du contenu est une violation des r\xE8gles WCAG (particuli\xE8rement de l\u2019\xE9chec F92 ) et invalide le crit\xE8re.'
-  },
-  "version-accessible-pour-un-document-en-telechargement": {
-    title: "Version accessible (pour un document en t\xE9l\xE9chargement)",
-    body: "Les documents en t\xE9l\xE9chargement dont les types de format sont reconnus compatibles avec l\u2019accessibilit\xE9 doivent \xEAtre rendus accessibles soit directement soit par l\u2019interm\xE9diaire d\u2019une version accessible ou d\u2019une version en HTML. Les formats de document dont la compatibilit\xE9 est reconnue sont\xA0:\n Microsoft Office (Word 2003, OOXML)\xA0;\n Open Office Org (ODF)\xA0;\n Adobe PDF\xA0;\n EPUB/Daisy.\n \n Note\xA0: le format texte (txt) ne peut pas \xEAtre utilis\xE9 pour produire une version accessible pour un document en t\xE9l\xE9chargement."
-  },
-  "version-alternative-audio-seulement": {
-    title: "Version alternative \xAB\xA0audio seulement\xA0\xBB",
-    body: "Une version \xAB\xA0audio seulement\xA0\xBB est une version sonore, sous la forme d\u2019un simple fichier au format MP3 par exemple, utilis\xE9e comme alternative \xE0 une vid\xE9o seulement (vid\xE9o sans information sonore). Les seuls utilisateurs impact\xE9s par l\u2019accessibilit\xE9 \xE9tant les personnes aveugles, qui ne peuvent pas voir la vid\xE9o, WCAG consid\xE8re comme acceptable de proposer en alternative une version sonore.\n La version \xAB\xA0audio seulement\xA0\xBB doit contenir toutes les informations visuelles importantes de la vid\xE9o.\n G\xE9n\xE9ralement il est plus simple de produire une version sonore qu\u2019une version textuelle lorsque la vid\xE9o est tr\xE8s descriptive (la transcription textuelle n\xE9cessitant souvent un travail r\xE9dactionnel important). Il est rappel\xE9, n\xE9anmoins, que seule la transcription textuelle assure un acc\xE8s universel aux informations diffus\xE9es par la vid\xE9o, dans le cas o\xF9 un utilisateur ne serait pas en capacit\xE9 de lancer la vid\xE9o par exemple."
-  },
-  "zone-cliquable": {
-    title: "Zone cliquable",
-    body: "R\xE9gion d\u2019une image r\xE9active \xE0 laquelle une action a \xE9t\xE9 associ\xE9e\xA0; par exemple, le d\xE9clenchement d\u2019un \xE9v\xE9nement en cliquant sur un lien (pour une zone cliquable c\xF4t\xE9 client\xA0: balise <area> avec l\u2019attribut href ). Les balises <area> sont contenues dans la balise <map> .\n Pour les images r\xE9actives c\xF4t\xE9 serveur, les coordonn\xE9es sont d\xE9tenues sur le serveur."
-  },
-  "zone-d-en-tete": {
-    title: "Zone d\u2019en-t\xEAte",
-    body: "Zone situ\xE9e en haut du document et contenant g\xE9n\xE9ralement le titre du document, un logo, un slogan\u2026\n Note\xA0: Attention \xE0 ne pas confondre cette zone d\u2019en-t\xEAte, unique dans le site, avec tout contenu pouvant \xEAtre balis\xE9 en HTML5 avec l\u2019\xE9l\xE9ment <header> .\n Voir la d\xE9finition technique fournie par WAI-ARIA\xA0: Banner (role) ."
-  },
-  "zone-d-une-image-reactive": {
-    title: "Zone (d\u2019une image r\xE9active)",
-    body: "Zone cliquable ou zone non cliquable d\u2019une image r\xE9active c\xF4t\xE9 client ou zone cliquable d\u2019une image r\xE9active c\xF4t\xE9 serveur."
-  },
-  "zone-de-contenu-principal": {
-    title: "Zone de contenu principal",
-    body: "Zone contenant les principaux contenus de la page, l\xE0 o\xF9 se trouvent les informations et fonctionnalit\xE9s de fond (donc en dehors des menus, de la recherche ou des zones secondaires de publicit\xE9s, actualit\xE9s connexes\u2026).\n Note\xA0: Cette zone est unique dans la page. Elle peut \xEAtre difficile \xE0 d\xE9terminer sur certaines pages particuli\xE8res, comme la page d\u2019accueil.\n Voir la d\xE9finition technique fournie par WAI-ARIA\xA0: Main (role) ."
-  },
-  "zone-de-pied-de-page": {
-    title: "Zone de pied de page",
-    body: "Il s\u2019agit des informations concernant le fonctionnement du site ou les informations l\xE9gales. On y trouve par exemple les mentions l\xE9gales, les cr\xE9dits, les conditions d\u2019utilisation, le plan du site et \xE9ventuellement la page accessibilit\xE9.\n Note\xA0: Attention \xE0 ne pas confondre cette zone de pied de page, unique dans le site, avec tout contenu pouvant \xEAtre balis\xE9 en HTML5 avec l\u2019\xE9l\xE9ment <footer> .\n Voir la d\xE9finition technique fournie par WAI-ARIA\xA0: Contentinfo (role) ."
-  },
-  "zone-non-cliquable": {
-    title: "Zone non cliquable",
-    body: "R\xE9gion d\u2019une image r\xE9active \xE0 laquelle aucune action n\u2019est associ\xE9e. Une zone non cliquable c\xF4t\xE9 client est contenue dans une balise <area> \xA0:\n Avec l\u2019attribut nohref lorsque le code HTML de la page n\u2019est pas du HTML5\xA0;\n Sans attribut href en HTML5.\n \n Les balises <area> sont contenus dans la balise <map> ."
-  }
-};
-
-// src/standards/validate.ts
-var RESERVED_CORE_KEY = "wcag";
-var LOCALE_SHAPE = /^[a-z]{2,3}(-[a-zA-Z]{2,4})?$/;
-var SC_SHAPE = /^\d+\.\d+\.\d+$/;
-var RULE_ID_SHAPE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-var SEVERITIES2 = /* @__PURE__ */ new Set(["bloquant", "majeur", "mineur"]);
-var MAX_MATCH_DEPTH = 3;
-var MATCH_OPS = /* @__PURE__ */ new Set(["present", "absent", "equals", "matches"]);
-var TEXT_OPS = /* @__PURE__ */ new Set(["matches", "lacks"]);
-var MATCH_CONDITION_KEYS = ["tag", "attrs", "text", "has", "lacks"];
-var MATCH_NODE_KEYS = new Set(MATCH_CONDITION_KEYS);
-var REDOS_SINGLE_ATOM = /\((?:\\.|\[[^\]]*\]|[^()\\])[*+]\)[*+]/;
-var REDOS_ALT_QUANTIFIED = /\([^()]*\|[^()]*\)[*+]/;
-var REDOS_NESTED_QUANT_GROUP = /\((?![\\])[^()|]*[*+][^()|]*\)[*+]/;
-function isRedosShape(pattern) {
-  return REDOS_SINGLE_ATOM.test(pattern) || REDOS_ALT_QUANTIFIED.test(pattern) || REDOS_NESTED_QUANT_GROUP.test(pattern);
-}
-function regexIssue(pattern) {
-  if (isRedosShape(pattern))
-    return "has a nested quantifier or an ambiguous alternation (e.g. (a+)+, (a|a)*, (ab+)+) \u2014 a catastrophic-backtracking (ReDoS) shape; simplify it";
-  try {
-    new RegExp(pattern);
-  } catch (e) {
-    return `is not a valid regex: ${e.message}`;
-  }
-  return null;
-}
-function classifySc(sc) {
-  if (!SC_SHAPE.test(sc)) return "malformed";
-  if (hasSC(sc)) return "core";
-  const status = knownScStatus(sc);
-  if (status === "out-of-core" || status === "removed") return status;
-  return "unknown";
-}
-var REQUIRED_STRING_FIELDS = ["key", "name", "org", "country", "baseVersion", "wcagVersion", "license", "source", "attribution", "idPattern"];
-function validatePack(raw, opts = {}) {
-  const issues = [];
-  const err2 = (path, message) => issues.push({ path, message, severity: "error" });
-  const warn = (path, message) => issues.push({ path, message, severity: "warn" });
-  const done = () => {
-    const ok = !issues.some((x) => x.severity === "error");
-    return { ok, issues, pack: ok ? normalize(raw) : void 0 };
-  };
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    err2("", "pack must be a JSON object");
-    return { ok: false, issues };
-  }
-  const p = raw;
-  for (const f of REQUIRED_STRING_FIELDS) {
-    const v = p[f];
-    if (typeof v !== "string" || v.trim() === "") err2(f, `"${f}" must be a non-empty string`);
-  }
-  const key = typeof p.key === "string" ? p.key.toLowerCase() : "";
-  if (key === RESERVED_CORE_KEY) err2("key", `pack key "${RESERVED_CORE_KEY}" is reserved for the WCAG core`);
-  if (key && opts.knownKeys?.has(key)) {
-    if (opts.allowOverride) warn("key", `pack key "${key}" overrides a built-in/loaded standard`);
-    else err2("key", `pack key "${key}" collides with a built-in/loaded standard (use --override to replace it)`);
-  }
-  const locales = Array.isArray(p.locales) ? p.locales : [];
-  if (locales.length === 0) err2("locales", "locales must be a non-empty array");
-  for (const l of locales) {
-    if (typeof l !== "string" || !LOCALE_SHAPE.test(l)) err2("locales", `malformed locale "${String(l)}" (expected a BCP-47-ish tag, e.g. "en", "fr", "pt-BR")`);
-  }
-  if (locales.length && !locales.some((l) => l === "fr" || l === "en")) {
-    warn("locales", 'pack carries neither "fr" nor "en" \u2014 the UI frame will fall back to its own generic auditor-display terms');
-  }
-  const defaultLocale = p.defaultLocale;
-  if (typeof defaultLocale !== "string" || !locales.includes(defaultLocale)) {
-    err2("defaultLocale", "defaultLocale must be one of locales");
-  }
-  const loc = typeof defaultLocale === "string" ? defaultLocale : locales[0] ?? "en";
-  let idRe = null;
-  if (typeof p.idPattern === "string") {
-    const bad = regexIssue(p.idPattern);
-    if (bad) err2("idPattern", `idPattern ${bad}`);
-    else idRe = new RegExp(p.idPattern);
-  }
-  const themes = Array.isArray(p.themes) ? p.themes : null;
-  if (!themes) err2("themes", "themes must be an array");
-  const themeNumbers = /* @__PURE__ */ new Set();
-  themes?.forEach((t3, i2) => {
-    const n = t3?.number;
-    if (typeof n !== "number") {
-      err2(`themes[${i2}].number`, "theme number must be a number");
-      return;
-    }
-    if (themeNumbers.has(n)) err2(`themes[${i2}].number`, `duplicate theme number ${n}`);
-    themeNumbers.add(n);
-    const name2 = t3?.name;
-    if (!name2 || typeof name2[loc] !== "string") err2(`themes[${i2}].name`, `theme ${n} missing name[${loc}]`);
-  });
-  const criteria = Array.isArray(p.criteria) ? p.criteria : null;
-  if (!criteria) err2("criteria", "criteria must be an array");
-  const ids = /* @__PURE__ */ new Set();
-  const countByTheme = /* @__PURE__ */ new Map();
-  criteria?.forEach((c2, i2) => {
-    const id = c2?.id;
-    if (typeof id !== "string" || id === "") {
-      err2(`criteria[${i2}].id`, "criterion id must be a non-empty string");
-    } else {
-      if (ids.has(id)) err2(`criteria[${i2}].id`, `duplicate criterion id "${id}"`);
-      ids.add(id);
-      if (idRe && !idRe.test(id)) err2(`criteria[${i2}].id`, `id "${id}" does not match idPattern ${String(p.idPattern)}`);
-    }
-    const theme = c2?.theme;
-    if (typeof theme !== "number") {
-      err2(`criteria[${i2}].theme`, "criterion theme must be a number");
-    } else {
-      if (themes && !themeNumbers.has(theme)) err2(`criteria[${i2}].theme`, `criterion "${String(id)}" references unknown theme ${theme}`);
-      countByTheme.set(theme, (countByTheme.get(theme) ?? 0) + 1);
-    }
-    const title2 = c2?.title;
-    if (!title2 || typeof title2[loc] !== "string") err2(`criteria[${i2}].title`, `criterion "${String(id)}" missing title[${loc}]`);
-    const titlePlain2 = c2?.titlePlain;
-    if (!titlePlain2 || typeof titlePlain2[loc] !== "string") err2(`criteria[${i2}].titlePlain`, `criterion "${String(id)}" missing titlePlain[${loc}]`);
-    if (c2?.appliesTo !== void 0) {
-      const a = c2.appliesTo;
-      const ruleIds2 = a && typeof a === "object" && !Array.isArray(a) ? a.ruleIds : void 0;
-      if (!a || typeof a !== "object" || Array.isArray(a) || !Array.isArray(ruleIds2)) {
-        err2(`criteria[${i2}].appliesTo`, `criterion "${String(id)}" appliesTo must be an object { ruleIds: string[] }`);
-      } else {
-        ruleIds2.forEach((r, k) => {
-          if (typeof r !== "string" || r.trim() === "")
-            err2(`criteria[${i2}].appliesTo.ruleIds[${k}]`, `criterion "${String(id)}" appliesTo.ruleIds must be non-empty strings`);
-        });
-      }
-    }
-    const wcag = Array.isArray(c2?.wcag) ? c2.wcag : null;
-    if (!wcag || wcag.length === 0) {
-      err2(`criteria[${i2}].wcag`, `criterion "${String(id)}" must map to at least one WCAG SC`);
-    } else {
-      wcag.forEach((sc, j) => {
-        const where = `criteria[${i2}].wcag[${j}]`;
-        if (typeof sc !== "string") {
-          err2(where, `malformed SC id "${String(sc)}" (expected N.N.N)`);
-          return;
-        }
-        switch (classifySc(sc)) {
-          case "malformed":
-            err2(where, `malformed SC id "${sc}" (expected N.N.N)`);
-            break;
-          case "unknown":
-            err2(
-              where,
-              `SC "${sc}" is not a recognized WCAG success criterion (not in the WCAG 2.2 AA core, and not a real WCAG AAA or removed SC) \u2014 fabricated?`
-            );
-            break;
-          case "out-of-core":
-            warn(
-              where,
-              `SC "${sc}" is a real WCAG AAA success criterion, outside the WCAG 2.2 AA core \u2014 kept as a pack-local mapping (out of engine scope; derive as manual)`
-            );
-            break;
-          case "removed":
-            warn(
-              where,
-              `SC "${sc}" is a real but removed WCAG success criterion (obsolete) \u2014 kept as a pack-local mapping (out of engine scope; derive as manual)`
-            );
-            break;
-        }
-      });
-    }
-  });
-  themes?.forEach((t3, i2) => {
-    const n = t3?.number;
-    if (typeof n !== "number") return;
-    const declared = t3?.count;
-    const actual = countByTheme.get(n) ?? 0;
-    if (typeof declared === "number" && declared !== actual) {
-      err2(`themes[${i2}].count`, `theme ${n} declares count ${declared} but has ${actual} criteria`);
-    }
-  });
-  if (p.vocabulary !== void 0) {
-    if (typeof p.vocabulary !== "object" || p.vocabulary === null || Array.isArray(p.vocabulary)) {
-      warn("vocabulary", "vocabulary must be an object of localized terms \u2014 ignored");
-    } else {
-      const VOC_KEYS = ["theme", "criterion", "test", "conformant", "nonConformant", "notApplicable", "auditorHeading", "normativeNote"];
-      const voc = p.vocabulary;
-      for (const k of Object.keys(voc)) {
-        if (!VOC_KEYS.includes(k)) {
-          warn(`vocabulary.${k}`, `unknown vocabulary term "${k}" (ignored)`);
-          continue;
-        }
-        const term = voc[k];
-        if (typeof term !== "object" || term === null || Array.isArray(term)) {
-          warn(`vocabulary.${k}`, `term "${k}" must be a localized object (e.g. { "${loc}": "\u2026" }) \u2014 default used`);
-        } else if (typeof term[loc] !== "string") {
-          warn(`vocabulary.${k}`, `term "${k}" has no string for the default locale "${loc}" \u2014 default used`);
-        }
-      }
-    }
-  }
-  if (p.sampleMethodology !== void 0) {
-    const m = p.sampleMethodology;
-    const kinds = m && typeof m === "object" && !Array.isArray(m) ? m.requiredKinds : void 0;
-    if (!m || typeof m !== "object" || Array.isArray(m) || !Array.isArray(kinds)) {
-      warn("sampleMethodology", "sampleMethodology must be an object { requiredKinds: [...] } \u2014 ignored");
-    } else {
-      kinds.forEach((k, i2) => {
-        const kk = k;
-        if (!kk || typeof kk !== "object" || Array.isArray(kk)) {
-          warn(`sampleMethodology.requiredKinds[${i2}]`, "each required kind must be an object { id, label, keywords } \u2014 ignored");
-          return;
-        }
-        if (typeof kk.id !== "string" || kk.id.trim() === "") warn(`sampleMethodology.requiredKinds[${i2}].id`, "required kind id should be a non-empty string");
-        const label = kk.label;
-        if (!label || typeof label !== "object" || Array.isArray(label) || typeof label[loc] !== "string")
-          warn(`sampleMethodology.requiredKinds[${i2}].label`, `required kind should carry label[${loc}]`);
-        if (!Array.isArray(kk.keywords) || kk.keywords.some((w) => typeof w !== "string"))
-          warn(`sampleMethodology.requiredKinds[${i2}].keywords`, "required kind keywords should be an array of strings");
-      });
-    }
-  }
-  if (p.rules !== void 0) {
-    if (!Array.isArray(p.rules)) {
-      err2("rules", "rules must be an array");
-    } else {
-      const ruleIds2 = /* @__PURE__ */ new Set();
-      p.rules.forEach((raw2, i2) => {
-        const at = `rules[${i2}]`;
-        if (typeof raw2 !== "object" || raw2 === null || Array.isArray(raw2)) {
-          err2(at, "each rule must be an object");
-          return;
-        }
-        const r = raw2;
-        const rid = r.id;
-        if (typeof rid !== "string" || !RULE_ID_SHAPE.test(rid)) {
-          err2(`${at}.id`, 'rule id must be a lower-kebab slug (e.g. "download-link-format")');
-        } else {
-          if (ruleIds2.has(rid)) err2(`${at}.id`, `duplicate rule id "${rid}"`);
-          ruleIds2.add(rid);
-        }
-        if (typeof r.criterion !== "string" || r.criterion === "") {
-          err2(`${at}.criterion`, "rule criterion must be a non-empty string");
-        } else if (!ids.has(r.criterion)) {
-          err2(`${at}.criterion`, `rule reports under criterion "${r.criterion}" which does not exist in this pack`);
-        }
-        if (typeof r.severity !== "string" || !SEVERITIES2.has(r.severity)) {
-          err2(`${at}.severity`, "rule severity must be one of bloquant|majeur|mineur");
-        }
-        if (r.advisory !== void 0 && typeof r.advisory !== "boolean") err2(`${at}.advisory`, "rule advisory must be a boolean");
-        const wcag = Array.isArray(r.wcag) ? r.wcag : null;
-        if (!wcag || wcag.length === 0) {
-          err2(`${at}.wcag`, "rule must map to at least one WCAG SC");
-        } else {
-          wcag.forEach((sc, j) => {
-            const where = `${at}.wcag[${j}]`;
-            if (typeof sc !== "string") {
-              err2(where, `malformed SC id "${String(sc)}" (expected N.N.N)`);
-              return;
-            }
-            switch (classifySc(sc)) {
-              case "malformed":
-                err2(where, `malformed SC id "${sc}" (expected N.N.N)`);
-                break;
-              case "unknown":
-                err2(where, `SC "${sc}" is not a recognized WCAG success criterion \u2014 fabricated?`);
-                break;
-              case "out-of-core":
-                warn(where, `SC "${sc}" is a real WCAG AAA success criterion, outside the WCAG 2.2 AA core (out of engine scope)`);
-                break;
-              case "removed":
-                warn(where, `SC "${sc}" is a real but removed WCAG success criterion (obsolete)`);
-                break;
-            }
-          });
-          if (typeof r.criterion === "string") {
-            const crit = criteria?.find((c2) => c2.id === r.criterion);
-            const critWcag = Array.isArray(crit?.wcag) ? crit.wcag : [];
-            if (critWcag.length && !wcag.some((sc) => critWcag.includes(sc)))
-              warn(`${at}.wcag`, `none of the rule's SC(s) are in criterion ${String(r.criterion)}'s WCAG mapping \u2014 the finding will not project`);
-          }
-        }
-        validateMatch(r.match, `${at}.match`, 1, err2, true);
-        validateLocaleText(r.message, `${at}.message`, err2);
-        validateLocaleText(r.remediation, `${at}.remediation`, err2);
-      });
-    }
-  }
-  if (p.overrides !== void 0) {
-    if (typeof p.overrides !== "object" || p.overrides === null || Array.isArray(p.overrides)) {
-      err2("overrides", "overrides must be an object keyed by ruleId");
-    } else {
-      for (const [ruleId, raw2] of Object.entries(p.overrides)) {
-        const at = `overrides["${ruleId}"]`;
-        if (typeof raw2 !== "object" || raw2 === null || Array.isArray(raw2)) {
-          err2(at, "each override must be an object { advisory?, severity? }");
-          continue;
-        }
-        const o = raw2;
-        if (o.advisory !== void 0 && typeof o.advisory !== "boolean") err2(`${at}.advisory`, "override advisory must be a boolean");
-        if (o.severity !== void 0 && (typeof o.severity !== "string" || !SEVERITIES2.has(o.severity)))
-          err2(`${at}.severity`, "override severity must be one of bloquant|majeur|mineur");
-        if (o.advisory === void 0 && o.severity === void 0) warn(at, "override has neither advisory nor severity \u2014 no effect");
-      }
-    }
-  }
-  if (p.secondaryMappings !== void 0) {
-    if (!Array.isArray(p.secondaryMappings)) {
-      err2("secondaryMappings", "secondaryMappings must be an array");
-    } else {
-      p.secondaryMappings.forEach((raw2, i2) => {
-        const at = `secondaryMappings[${i2}]`;
-        if (typeof raw2 !== "object" || raw2 === null || Array.isArray(raw2)) {
-          err2(at, "each secondary mapping must be an object { ruleId, criterion, note?, enabled? }");
-          return;
-        }
-        const m = raw2;
-        if (typeof m.ruleId !== "string" || m.ruleId.trim() === "") err2(`${at}.ruleId`, "secondary mapping ruleId must be a non-empty string");
-        if (typeof m.criterion !== "string" || m.criterion === "") {
-          err2(`${at}.criterion`, "secondary mapping criterion must be a non-empty string");
-        } else if (!ids.has(m.criterion)) {
-          err2(`${at}.criterion`, `secondary mapping projects onto criterion "${m.criterion}" which does not exist in this pack`);
-        }
-        if (m.enabled !== void 0 && typeof m.enabled !== "boolean") err2(`${at}.enabled`, "secondary mapping enabled must be a boolean");
-        if (m.note !== void 0) {
-          if (typeof m.note !== "object" || m.note === null || Array.isArray(m.note)) {
-            err2(`${at}.note`, `secondary mapping note must be a localized object (e.g. { "${loc}": "\u2026" })`);
-          } else if (typeof m.note[loc] !== "string") {
-            warn(`${at}.note`, `secondary mapping note has no string for the default locale "${loc}"`);
-          }
-        }
-        if (typeof m.ruleId === "string" && m.ruleId.trim() !== "" && typeof m.criterion === "string" && ids.has(m.criterion)) {
-          warn(at, `secondary mapping bypasses the SC crosswalk \u2014 intentional deviation (ruleId "${m.ruleId}" \u2192 criterion "${m.criterion}")`);
-        }
-      });
-    }
-  }
-  return done();
-}
-function validateMatch(node, path, depth, err2, top) {
-  if (top && node === void 0) {
-    err2(path, "rule must carry a match");
-    return;
-  }
-  if (typeof node !== "object" || node === null || Array.isArray(node)) {
-    err2(path, "match must be an object");
-    return;
-  }
-  if (depth > MAX_MATCH_DEPTH) {
-    err2(path, `match nesting exceeds the maximum depth of ${MAX_MATCH_DEPTH}`);
-    return;
-  }
-  const n = node;
-  const allowedKeys = top ? /* @__PURE__ */ new Set([...MATCH_NODE_KEYS, "scope"]) : MATCH_NODE_KEYS;
-  for (const k of Object.keys(n)) {
-    if (!allowedKeys.has(k)) err2(`${path}.${k}`, `unknown match key "${k}" (allowed: ${[...allowedKeys].sort().join(", ")})`);
-  }
-  const hasCondition = MATCH_CONDITION_KEYS.some((k) => {
-    const v = n[k];
-    if (k === "tag") return typeof v === "string" && v !== "";
-    if (k === "text") return v !== void 0 && v !== null;
-    return Array.isArray(v) && v.length > 0;
-  });
-  if (!hasCondition) err2(path, "match must carry at least one condition (tag, attrs, text, has, or lacks) \u2014 an empty match fires on every element");
-  if (n.tag !== void 0 && (typeof n.tag !== "string" || n.tag === "")) err2(`${path}.tag`, "match tag must be a non-empty string");
-  if (top && n.scope !== void 0 && n.scope !== "page" && n.scope !== "fragment") err2(`${path}.scope`, 'match scope must be "page" or "fragment"');
-  if (n.attrs !== void 0) {
-    if (!Array.isArray(n.attrs)) err2(`${path}.attrs`, "match attrs must be an array");
-    else
-      n.attrs.forEach((raw, i2) => {
-        const a = raw;
-        const at = `${path}.attrs[${i2}]`;
-        if (!a || typeof a !== "object" || Array.isArray(a)) {
-          err2(at, "each attr condition must be an object { name, op, value? }");
-          return;
-        }
-        if (typeof a.name !== "string" || a.name === "") err2(`${at}.name`, "attr name must be a non-empty string");
-        if (typeof a.op !== "string" || !MATCH_OPS.has(a.op)) err2(`${at}.op`, "attr op must be one of present|absent|equals|matches");
-        if ((a.op === "equals" || a.op === "matches") && typeof a.value !== "string") err2(`${at}.value`, `attr op "${String(a.op)}" requires a string value`);
-        if (a.op === "matches" && typeof a.value === "string") {
-          const bad = regexIssue(a.value);
-          if (bad) err2(`${at}.value`, `attr matches regex ${bad}`);
-        }
-      });
-  }
-  if (n.text !== void 0) {
-    const t3 = n.text;
-    if (!t3 || typeof t3 !== "object" || Array.isArray(t3)) {
-      err2(`${path}.text`, "match text must be an object { op, value }");
-    } else {
-      if (typeof t3.op !== "string" || !TEXT_OPS.has(t3.op)) err2(`${path}.text.op`, "text op must be one of matches|lacks");
-      if (typeof t3.value !== "string" || t3.value === "") err2(`${path}.text.value`, "text value must be a non-empty regex string");
-      else {
-        const bad = regexIssue(t3.value);
-        if (bad) err2(`${path}.text.value`, `text regex ${bad}`);
-      }
-    }
-  }
-  for (const key of ["has", "lacks"]) {
-    const v = n[key];
-    if (v === void 0) continue;
-    if (!Array.isArray(v)) err2(`${path}.${key}`, `match ${key} must be an array of match nodes`);
-    else v.forEach((child, i2) => validateMatch(child, `${path}.${key}[${i2}]`, depth + 1, err2, false));
-  }
-}
-function validateLocaleText(v, path, err2) {
-  if (typeof v !== "object" || v === null || Array.isArray(v)) {
-    err2(path, "must be a localized object carrying both en and fr");
-    return;
-  }
-  const t3 = v;
-  for (const lang of ["en", "fr"]) {
-    if (typeof t3[lang] !== "string" || t3[lang] === "") err2(`${path}.${lang}`, `missing ${lang} text`);
-  }
-}
-function normalize(p) {
-  return { ...p, key: String(p.key).toLowerCase() };
-}
-function formatIssues(issues) {
-  const order = (s) => s === "error" ? 0 : 1;
-  return [...issues].sort((a, b) => order(a.severity) - order(b.severity)).map((x) => `  ${x.severity === "error" ? "\u2717" : "\u26A0"} ${x.path ? `${x.path}: ` : ""}${x.message}`);
-}
-
-// src/standards/registry.ts
-var CORE_KEY = "wcag";
-var registry = /* @__PURE__ */ new Map();
-var overlays = /* @__PURE__ */ new Map();
-var scopeStore = new AsyncLocalStorage();
-function currentOverlay() {
-  const scope = scopeStore.getStore();
-  return scope === void 0 ? void 0 : overlays.get(scope);
-}
-function lookup(key) {
-  return currentOverlay()?.get(key) ?? registry.get(key);
-}
-function visible() {
-  const overlay = currentOverlay();
-  if (!overlay?.size) return registry;
-  const merged = new Map(registry);
-  for (const [key, entry] of overlay) merged.set(key, entry);
-  return merged;
-}
-function withScope(scope, fn) {
-  return scope === void 0 ? fn() : scopeStore.run(scope, fn);
-}
-function registerScoped(scope, raw, glossary = {}, opts = {}) {
-  const overlay = ensureScope(scope);
-  const known = /* @__PURE__ */ new Set([CORE_KEY, ...registry.keys(), ...overlay.keys()]);
-  const v = validatePack(raw, { knownKeys: known, allowOverride: opts.override });
-  if (v.ok && v.pack) overlay.set(v.pack.key, { pack: v.pack, glossary });
-  return v;
-}
-function packForMutation(key) {
-  const overlay = currentOverlay();
-  if (!overlay) return loadPack(key);
-  const own = overlay.get(key);
-  if (own) return own.pack;
-  const shared = registry.get(key);
-  if (!shared) return loadPack(key);
-  const copy = { pack: structuredClone(shared.pack), glossary: shared.glossary };
-  overlay.set(key, copy);
-  return copy.pack;
-}
-function ensureScope(scope) {
-  let overlay = overlays.get(scope);
-  if (!overlay) {
-    overlay = /* @__PURE__ */ new Map();
-    overlays.set(scope, overlay);
-  }
-  return overlay;
-}
-function scopeLoaded(scope) {
-  return overlays.has(scope);
-}
-function dropScope(scope) {
-  overlays.delete(scope);
-}
-function register(pack, glossary) {
-  if (pack.key === CORE_KEY) throw new Error(`pack key "${CORE_KEY}" is reserved for the WCAG core`);
-  registry.set(pack.key, { pack, glossary });
-}
-register(rgaa_default, rgaa_glossary_default);
-function registerRuntimePack(raw, glossary = {}, opts = {}) {
-  const v = validatePack(raw, { knownKeys: new Set(listStandards()), allowOverride: opts.override });
-  if (v.ok && v.pack) registry.set(v.pack.key, { pack: v.pack, glossary });
-  return v;
-}
-function enableSecondaryMapping(packKey, m) {
-  const pack = packForMutation(packKey);
-  const list = pack.secondaryMappings ??= [];
-  const existing = list.find((x) => x.ruleId === m.ruleId && x.criterion === m.criterion);
-  if (existing) {
-    existing.enabled = true;
-    if (m.note) existing.note = m.note;
-  } else {
-    list.push({ ruleId: m.ruleId, criterion: m.criterion, ...m.note ? { note: m.note } : {}, enabled: true });
-  }
-}
-function isCore(key) {
-  return key === CORE_KEY;
-}
-function hasStandard(key) {
-  return key === CORE_KEY || lookup(key) !== void 0;
-}
-function loadPack(key) {
-  const r = lookup(key);
-  if (!r) throw new Error(`unknown standards pack "${key}" (known packs: ${[...visible().keys()].join(", ") || "none"})`);
-  return r.pack;
-}
-function getPack(key) {
-  return lookup(key)?.pack;
-}
-function packGlossary(key) {
-  return lookup(key)?.glossary;
-}
-function listStandards() {
-  return [CORE_KEY, ...visible().keys()];
-}
-function listPacks() {
-  return [...visible().values()].map((r) => r.pack);
-}
-function packsForSc(sc) {
-  const out2 = [];
-  for (const { pack } of visible().values()) {
-    const ids = pack.criteria.filter((c2) => c2.wcag.includes(sc)).map((c2) => c2.id);
-    if (ids.length) out2.push({ key: pack.key, ids });
-  }
-  return out2;
-}
-
 // src/standards/pack-rules.ts
 var MAX_MATCH_DEPTH2 = 3;
 var regexCache = /* @__PURE__ */ new Map();
@@ -48018,12 +48079,44 @@ function toFinding2(doc, el, rule, packKey) {
     ...rule.advisory ? { advisory: true } : {}
   };
 }
+function docSignal(doc, signal) {
+  switch (signal) {
+    case "doctype":
+      return doc.signals?.doctype;
+    default:
+      return void 0;
+  }
+}
+function docRuleRan(doc, rule) {
+  return rule.doc !== void 0 && docSignal(doc, rule.doc.signal) !== void 0;
+}
+function matchDoc(value, d) {
+  switch (d.op) {
+    // The recorded empty string: the collector looked, and the page declared nothing.
+    case "absent":
+      return value === "";
+    case "matches":
+      return d.value !== void 0 && compile(d.value).test(value);
+    case "lacks":
+      return d.value !== void 0 && !compile(d.value).test(value);
+    default:
+      return false;
+  }
+}
 function runPackRules(doc, pack) {
   const rules = pack.rules;
   if (!rules || rules.length === 0) return [];
   const out2 = [];
   const fullDoc = isFullDocument(doc);
   for (const rule of rules) {
+    if (rule.doc) {
+      const value = docSignal(doc, rule.doc.signal);
+      if (value === void 0) continue;
+      const root = doc.elements[0];
+      if (root && matchDoc(value, rule.doc)) out2.push(toFinding2(doc, root, rule, pack.key));
+      continue;
+    }
+    if (!rule.match) continue;
     if (rule.match.scope === "page" && !fullDoc) continue;
     for (const el of doc.elements) {
       if (matchNode(el, rule.match, 1)) out2.push(toFinding2(doc, el, rule, pack.key));
@@ -48696,6 +48789,15 @@ function foldDoc(acc, doc, graph) {
       const seen = acc.renderedRan.get(ruleId) ?? /* @__PURE__ */ new Set();
       seen.add(pageId);
       acc.renderedRan.set(ruleId, seen);
+    }
+    for (const pack of listPacks()) {
+      for (const rule of pack.rules ?? []) {
+        if (!docRuleRan(doc, rule)) continue;
+        const id = `pack:${pack.key}:${rule.id}`;
+        const seen = acc.renderedRan.get(id) ?? /* @__PURE__ */ new Set();
+        seen.add(pageId);
+        acc.renderedRan.set(id, seen);
+      }
     }
     const probes = doc.signals?.probes;
     if (probes) {
@@ -53564,11 +53666,12 @@ function derivePackResults(audit2, packKey, pageId) {
   const overrides = pack.overrides;
   const seen = audit2.scope.subjectsSeen;
   const subjectAbsent = (pc) => seen !== void 0 && subjectsAbsent(subjectsForPackCriterion(packKey, pc.id, pc.wcag), new Set(seen));
+  const ownRuleIds = new Set((pack.rules ?? []).map((r) => `pack:${packKey}:${r.id}`));
   const deriveBase = (pc) => {
     const outOfScope = pc.wcag.every((sc) => {
       const s = knownScStatus(sc);
       return s === "out-of-core" || s === "removed";
-    });
+    }) && !(pc.appliesTo?.ruleIds ?? []).some((id) => ownRuleIds.has(id));
     if (outOfScope) {
       return { id: pc.id, theme: pc.theme, status: "manual", findings: [], scs: pc.wcag, outOfScope: true };
     }
@@ -53590,6 +53693,9 @@ function derivePackResults(audit2, packKey, pageId) {
     }
     if (scResults.some((r) => r.status === "NC")) {
       return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag, scopedOut: true };
+    }
+    if (!scResults.length && (pc.appliesTo?.ruleIds ?? []).some((id) => ownRuleIds.has(id))) {
+      return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag };
     }
     const status = scResults.length ? aggregate2(scResults) : INAPPLICABLE_STATUS;
     if (status === "manual" && subjectAbsent(pc)) {
@@ -59514,6 +59620,12 @@ function writeRunnerSnapshot(root, out2, target, page) {
     url,
     runner: "scan",
     ...collected.viewport ? { viewport: collected.viewport } : {},
+    // The doctype, which `dom` cannot carry: `documentElement.outerHTML` starts at <html>.
+    // The collector reads it and every OTHER producer forwards it; this one dropped it, so a
+    // scanned page arrived with the field absent — "nobody looked" — and RGAA 8.1 stayed « à
+    // évaluer » on exactly the pages a browser had just opened. Same shape of defect as the
+    // probes/axe drop this function used to have: measured, then thrown away on the way out.
+    ...collected.doctype !== void 0 ? { doctype: collected.doctype } : {},
     ...page?.auth !== void 0 ? { auth: page.auth } : {},
     ...page?.notes ? { notes: page.notes } : {}
   };

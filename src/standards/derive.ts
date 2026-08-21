@@ -265,14 +265,28 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
   const seen = audit.scope.subjectsSeen;
   const subjectAbsent = (pc: PackCriterion): boolean => seen !== undefined && subjectsAbsent(subjectsForPackCriterion(packKey, pc.id, pc.wcag), new Set(seen));
 
+  // Rules the PACK ITSELF brings, by finding id. A criterion whose `appliesTo` names one of
+  // these has an instrument regardless of what its WCAG mapping is worth — which is the whole
+  // point of a pack shipping its own detection.
+  const ownRuleIds = new Set((pack.rules ?? []).map((r) => `pack:${packKey}:${r.id}`));
+
   const deriveBase = (pc: PackCriterion): PackCriterionResult => {
-    // A criterion whose WCAG mapping is ENTIRELY outside the engine's core (e.g. RGAA 8.1
-    // → only the removed 4.1.1, or a hypothetical pack criterion citing only an AAA SC)
-    // has no core SC the engine could ever audit — it's out of scope, not a silent NA.
-    const outOfScope = pc.wcag.every((sc) => {
-      const s = knownScStatus(sc);
-      return s === "out-of-core" || s === "removed";
-    });
+    // A criterion whose WCAG mapping is ENTIRELY outside the engine's core (e.g. a pack
+    // criterion citing only an AAA SC) has no core SC the engine could ever audit — it's out
+    // of scope, not a silent NA.
+    //
+    // UNLESS THE PACK BROUGHT ITS OWN INSTRUMENT. « Out of scope » is a statement about what
+    // this engine can measure, not about the WCAG crosswalk, and the two stopped agreeing the
+    // moment a pack could ship declarative rules. RGAA 8.1 is the case that forced the
+    // distinction: it maps only onto the REMOVED 4.1.1, so it was permanently « à évaluer » —
+    // while its subject, the doctype, is recorded on every capture and decided by this pack's
+    // own `doctype-missing` rule. Deriving from the mapping alone would go on calling a
+    // criterion unmeasurable while the measurement sat in the audit.
+    const outOfScope =
+      pc.wcag.every((sc) => {
+        const s = knownScStatus(sc);
+        return s === "out-of-core" || s === "removed";
+      }) && !(pc.appliesTo?.ruleIds ?? []).some((id) => ownRuleIds.has(id));
     if (outOfScope) {
       return { id: pc.id, theme: pc.theme, status: "manual" as Status, findings: [], scs: pc.wcag, outOfScope: true };
     }
@@ -315,6 +329,18 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
     // silently flip us to a foreign verdict.
     if (scResults.some((r) => r.status === "NC")) {
       return { id: pc.id, theme: pc.theme, status: "manual" as Status, findings, scs: pc.wcag, scopedOut: true };
+    }
+    // A criterion the PACK decides on its own — its instrument is a pack rule, and its WCAG
+    // mapping contributes no result (RGAA 8.1: the only SC it cites was removed). The empty
+    // aggregate below would read that as « nothing of this kind is in scope » and publish a
+    // conformity for want of a subject — on a page nobody captured, where the rule never ran.
+    //
+    // The honest answer is « undecided », handed to `measuredRescue`: it turns into `C` on the
+    // pages where the rule DID run and reported nothing, with a justification naming it, and
+    // stays open on the pages where it declined. That is the difference between a measurement
+    // and an absence of evidence, and it is the whole reason this branch exists.
+    if (!scResults.length && (pc.appliesTo?.ruleIds ?? []).some((id) => ownRuleIds.has(id))) {
+      return { id: pc.id, theme: pc.theme, status: "manual" as Status, findings, scs: pc.wcag };
     }
     // Otherwise the ordinary non-NC aggregate (C / manual / NA) over the mapped SCs, with
     // any advisory findings kept on the result so the pack view surfaces them.

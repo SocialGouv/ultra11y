@@ -18,7 +18,7 @@ const withRules = pack.criteria.filter((c) => (c.appliesTo?.ruleIds.length ?? 0)
 
 // Measured before the rendered tier landed: 43 of 106. Raise this line when coverage grows;
 // never lower it.
-const FLOOR = 48;
+const FLOOR = 49;
 
 describe("how much of RGAA the engine can evidence", () => {
   it(`maps at least ${FLOOR} of the ${pack.criteria.length} criteria onto an engine rule`, () => {
@@ -93,9 +93,16 @@ describe("the rendered tier's own contribution", () => {
     expect(has("8.10", "pack:rgaa:dir-value-invalid")).toBe(true);
   });
 
+  it("evidences the doctype criterion from the CAPTURE, which is the only place it survives", () => {
+    // 8.1 maps only onto the REMOVED WCAG 4.1.1, so no core SC will ever give it a verdict —
+    // and the doctype is not part of `documentElement.outerHTML` either, so no element rule
+    // can see it. It is decided from the snapshot's recorded meta, by the pack's own
+    // document-level rule. Before that rule it was the one criterion of the 106 that no
+    // measurement could ever close: a grid stuck at 105/106 on every run, for ever.
+    expect(has("8.1", "pack:rgaa:doctype-missing")).toBe(true);
+  });
+
   it("leaves criteria no rule can evidence alone, rather than forcing a verdict", () => {
-    // 8.1 maps only to the REMOVED WCAG 4.1.1: permanently out of the engine's reach.
-    expect(pack.criteria.find((c) => c.id === "8.1")?.appliesTo?.ruleIds ?? []).toEqual([]);
     // 13.3 depends on downloadable office documents — nothing in the DOM decides it.
     expect(pack.criteria.find((c) => c.id === "13.3")?.appliesTo?.ruleIds ?? []).toEqual([]);
     // Structurally out of the DSL's reach, and honestly left alone: 11.4 is positional

@@ -377,6 +377,42 @@ async function main() {
         fr: 'Utilisez dir="rtl" ou dir="ltr" (ou dir="auto"), en accord avec le sens de lecture du texte porté.',
       },
     },
+    // RGAA 8.1 — « chaque page web est-elle définie par un type de document ? » THE criterion
+    // no engine could reach: it maps only onto WCAG 4.1.1, which WCAG 2.2 REMOVED, so
+    // `derivePackResults` classed it out of scope and left it « à évaluer » on every page of
+    // every run — the one criterion of the 106 that no measurement could ever close and only a
+    // model could. Measured on a real RGAA deliverable: a grid that sat at 105/106.
+    //
+    // Its subject is not an element, which is why no element rule could express it: the
+    // doctype is not part of `documentElement.outerHTML`. The collector records it beside the
+    // DOM (SnapshotMeta.doctype), and this DOCUMENT-level rule reads it there.
+    //
+    // WHAT IT DECIDES, AND WHAT IT DOES NOT. Test 8.1.1 (is a doctype present?) is the whole
+    // of it. 8.1.2 (is it valid?) and 8.1.3 (is it before <html>?) are not tested separately
+    // and deliberately so: a doctype the browser PARSED — which is the only kind that reaches
+    // `document.doctype` — is by construction well-formed and positioned ahead of the root
+    // element; one written after <html>, or malformed, is ignored by the parser and arrives
+    // here as the recorded empty string, i.e. as the absence this rule reports. Inventing a
+    // separate "invalid" verdict would mean guessing at legacy but legitimate declarations,
+    // and manufacturing a non-conformity is the one thing this tier must not do.
+    //
+    // NORMATIVE, and signal-gated: it fires only where a capture recorded the field, so a
+    // source file and a pre-field capture are both silence rather than a failure.
+    {
+      id: "doctype-missing",
+      criterion: "8.1",
+      wcag: ["4.1.1"],
+      severity: "majeur",
+      doc: { signal: "doctype", op: "absent" },
+      message: {
+        en: "The captured page declares no document type — the browser parsed no <!DOCTYPE> ahead of <html> (RGAA test 8.1.1).",
+        fr: "La page capturée ne déclare aucun type de document — le navigateur n’a analysé aucun <!DOCTYPE> avant <html> (test RGAA 8.1.1).",
+      },
+      remediation: {
+        en: "Emit <!DOCTYPE html> as the first line of the document, before <html>. A doctype placed after <html>, or malformed, is ignored by the parser and counts as absent.",
+        fr: "Émettez <!DOCTYPE html> en première ligne du document, avant <html>. Un doctype placé après <html>, ou malformé, est ignoré par l’analyseur et compte comme absent.",
+      },
+    },
   ];
   // Wire each rule's namespaced id (`pack:rgaa:<id>`) into the criterion it reports under,
   // so derivePackResults routes its finding onto that criterion through the same

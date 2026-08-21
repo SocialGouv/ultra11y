@@ -138,13 +138,39 @@ export interface PackRuleMatch extends MatchNode {
   scope?: "page" | "fragment";
 }
 
+// A predicate over a DOCUMENT-LEVEL signal that a page CAPTURE recorded — a property of the
+// document that is not carried by any element, so no MatchNode can express it.
+//
+// Only `doctype` today, and it is the reason this exists: the doctype is not part of
+// `documentElement.outerHTML`, so it survives only in the snapshot's meta (SnapshotMeta
+// .doctype). RGAA 8.1 asks about it, maps onto the REMOVED WCAG 4.1.1, and was therefore a
+// criterion no engine could ever decide — permanently « à évaluer », on every page, closable
+// only by paying a model to answer a yes/no question about a string.
+//
+// SIGNAL-GATED, and that is the whole safety property: a rule carrying `doc` runs ONLY on a
+// document whose signal is PRESENT. A source file has no doctype and never should; a capture
+// written before the field existed did not record one. Neither is evidence of absence, so
+// neither fires the rule and neither claims coverage for it.
+export interface MatchDoc {
+  signal: "doctype";
+  /** `absent` fires on the empty string — the recorded « the page genuinely had none ».
+   *  `matches` / `lacks` test the recorded value against a (ReDoS-guarded) regex. */
+  op: "absent" | "matches" | "lacks";
+  value?: string; // a regex string; required for matches/lacks
+}
+
 export interface PackRule {
   id: string; // slug (lower-kebab); the emitted finding's ruleId is `pack:<packKey>:<id>`
   criterion: string; // the pack criterion id this rule reports under (must exist)
   wcag: string[]; // WCAG SC(s) the finding keys on for the core projection (must exist)
   severity: "bloquant" | "majeur" | "mineur";
   advisory?: boolean; // non-normative recommendation — never flips a criterion to NC
-  match: PackRuleMatch;
+  /** Element predicate. Required UNLESS the rule carries `doc`: a document-level rule has no
+   *  element to select, and anchors its finding on the document root. */
+  match?: PackRuleMatch;
+  /** Document-level signal predicate. Mutually exclusive with `match` (the validator refuses
+   *  both): a rule answers a question about an element, or one about the document. */
+  doc?: MatchDoc;
   message: LocaleString; // { en, fr } — both required by the validator
   remediation: LocaleString; // { en, fr } — both required by the validator
 }

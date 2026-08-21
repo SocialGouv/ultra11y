@@ -22,6 +22,7 @@ const SEVERITIES = new Set(["bloquant", "majeur", "mineur"]);
 const MAX_MATCH_DEPTH = 3;
 const MATCH_OPS = new Set(["present", "absent", "equals", "matches"]);
 const TEXT_OPS = new Set(["matches", "lacks"]);
+const DOC_OPS = new Set(["absent", "matches", "lacks"]);
 // The recognized CONDITION keys of a match node (each constrains which elements fire); a
 // node must carry ≥1 so it can never fire on EVERY element. `scope` (top-node only) is an
 // applicability modifier, not a condition — a scope-only match is still empty.
@@ -369,7 +370,13 @@ export function validatePack(raw: unknown, opts: ValidateOpts = {}): PackValidat
               warn(`${at}.wcag`, `none of the rule's SC(s) are in criterion ${String(r.criterion)}'s WCAG mapping — the finding will not project`);
           }
         }
-        validateMatch(r.match, `${at}.match`, 1, err, true);
+        // A rule answers a question about an ELEMENT or one about the DOCUMENT, never both:
+        // `doc` has no element to select and anchors on the root, so a `match` beside it would
+        // silently decide nothing. Refusing the pair keeps the two paths from ever overlapping.
+        if (r.doc !== undefined && r.match !== undefined)
+          err(at, "rule carries both match and doc — a rule selects elements, or reads a document signal, not both");
+        if (r.doc !== undefined) validateDocMatch(r.doc, `${at}.doc`, err);
+        else validateMatch(r.match, `${at}.match`, 1, err, true);
         validateLocaleText(r.message, `${at}.message`, err);
         validateLocaleText(r.remediation, `${at}.remediation`, err);
       });
@@ -444,6 +451,33 @@ export function validatePack(raw: unknown, opts: ValidateOpts = {}): PackValidat
 }
 
 type Emit = (path: string, message: string) => void;
+
+/** Validate a DOCUMENT-LEVEL signal predicate (src/standards/types.ts MatchDoc). Small on
+ *  purpose: the signal names are a closed set, because each one has to be plumbed through the
+ *  audit fold and the page-coverage record before a rule may read it. An unknown name is an
+ *  error rather than an inert rule — a pack whose rule silently never runs is worse than one
+ *  that refuses to load. */
+function validateDocMatch(raw: unknown, path: string, err: Emit): void {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    err(path, "doc must be an object");
+    return;
+  }
+  const d = raw as Record<string, unknown>;
+  for (const k of Object.keys(d)) {
+    if (k !== "signal" && k !== "op" && k !== "value") err(`${path}.${k}`, `unknown doc key "${k}" (allowed: op, signal, value)`);
+  }
+  if (d.signal !== "doctype") err(`${path}.signal`, `unknown document signal "${String(d.signal)}" (allowed: doctype)`);
+  if (typeof d.op !== "string" || !DOC_OPS.has(d.op)) err(`${path}.op`, "doc op must be one of absent|matches|lacks");
+  if (d.op === "matches" || d.op === "lacks") {
+    if (typeof d.value !== "string" || d.value === "") err(`${path}.value`, `doc op "${String(d.op)}" requires a regex string value`);
+    else {
+      const bad = regexIssue(d.value);
+      if (bad) err(`${path}.value`, `doc regex ${bad}`);
+    }
+  } else if (d.value !== undefined) {
+    err(`${path}.value`, 'doc op "absent" takes no value');
+  }
+}
 
 /** Recursively validate a declarative rule's match node: bounded depth, known ops,
  *  ReDoS-safe regexes. `top` marks the outermost node (which may carry `scope`). */

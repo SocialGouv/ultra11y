@@ -39,7 +39,7 @@ describe("ultra11y_standards", () => {
 
     const rgaa = r.standards.find((s: { key: string }) => s.key === "rgaa");
     expect(rgaa.core).toBe(false);
-    expect(rgaa.counts).toMatchObject({ themes: 13, criteria: 106, noEngineRule: 58 });
+    expect(rgaa.counts).toMatchObject({ themes: 13, criteria: 106, noEngineRule: 57 });
     // The attribution a redistributed standard must carry.
     expect(rgaa.license).toBeTruthy();
     expect(rgaa.attribution).toBeTruthy();

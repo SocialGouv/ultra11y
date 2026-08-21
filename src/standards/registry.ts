@@ -204,3 +204,19 @@ export function packsForSc(sc: string): { key: string; ids: string[] }[] {
   }
   return out;
 }
+
+/** Every registered pack rule that reads a DOCUMENT-LEVEL signal, by its finding id
+ *  (`pack:<key>:<id>`).
+ *
+ *  Such a rule is signal-gated: it runs only where the signal is present, so — exactly like a
+ *  rendered rule — it must be credited per page rather than assumed to have run wherever a DOM
+ *  was parsed. `src/coverage.ts` reads this list to tell the two kinds apart; without it a
+ *  document rule would inherit `cov.dom`, and a page nobody captured would be credited with a
+ *  measurement nothing performed. */
+export function docSignalRuleIds(): Set<string> {
+  const out = new Set<string>();
+  for (const pack of listPacks()) {
+    for (const r of pack.rules ?? []) if (r.doc) out.add(`pack:${pack.key}:${r.id}`);
+  }
+  return out;
+}

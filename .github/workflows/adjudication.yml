@@ -98,9 +98,10 @@ on:
         type: string
         default: "60"
       require-decided:
-        description: 'Fail the job while ANY criterion of the grid is still « à évaluer ». On by default, and that is the point of this workflow: a run that leaves seven criteria unruled and reports success is how seven criteria stayed unruled for a month. Turn it off only to MEASURE a residue you already expect.'
-        type: boolean
-        default: true
+        description: "Which completeness bar to hold the grid to. `true` holds the RUN's grid: every criterion of the referential carries a verdict somewhere. `pages` holds EVERY page's grid, which is the bar a page-by-page deliverable is actually read at — a criterion decided on one route and silent on the thirty-six others fails it, and that gap is invisible to `true`. `false` measures a residue you already expect. Never off by accident: a run that leaves seven criteria unruled and reports success is how seven criteria stayed unruled for a month."
+        type: choice
+        options: ["true", "pages", "false"]
+        default: "true"
       undecidable-file:
         description: 'Path to a committed list of criteria this fixture genuinely cannot decide, each with its reason. Empty by default, and it should stay empty: every entry is a criterion the tool failed to give evidence for, and the fix belongs in the engine rather than in an exemption.'
         type: string
