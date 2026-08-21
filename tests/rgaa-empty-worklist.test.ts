@@ -137,6 +137,35 @@ describe("RGAA 13.2 — opening a window, which is not the same question as chan
   it("stays silent on a page that opens nothing", () => {
     expect(harvestOn("13.2", '<a href="/x">x</a>')).toEqual([]);
   });
+
+  // AND THAT SILENCE IS A FACT, so the criterion closes on it instead of costing a model turn.
+  //
+  // 13.2 has exactly one test, and its official methodology is « vérifier qu'à l'ouverture du
+  // document, aucune nouvelle fenêtre n'est ouverte ». A page that FAILS it therefore carries
+  // one of the three things the harvester looks for: a `target` that leaves this browsing
+  // context, a meta refresh, or a literal `window.open(`. That is an element/attribute species
+  // — the same admission test `downloadDocs` passes — so an empty harvest means « nothing here
+  // opens a window », which is the verdict, not a question.
+  //
+  // Measured on tests/fixtures/realworld, crawled and scanned with the engine at v5.25.0: 13.2
+  // was one of only two criteria still reaching the adjudicator with population 0 and
+  // `evidenceComplete`, i.e. the engine already KNEW the answer and billed a model to restate
+  // it. The other is 7.4, which stays out — see below.
+  it("counts a window-opening mechanism as an element species whose absence is a fact", () => {
+    expect(EXISTENCE_SUBJECTS.has("newWindow")).toBe(true);
+  });
+
+  it("is not applicable on a scope where nothing can open a window", () => {
+    const c = rgaa(auditPage('<a href="/contact">Contact</a>'), "13.2");
+    expect(c.inapplicable).toBe(true);
+    expect(c.status).toBe("C");
+  });
+
+  it("stays the agent's the moment something can", () => {
+    const c = rgaa(auditPage('<a href="/x" target="_blank">x</a>'), "13.2");
+    expect(c.inapplicable).toBeUndefined();
+    expect(c.status).toBe("manual");
+  });
 });
 
 // ---------------------------------------------------------------------------------------
@@ -149,6 +178,31 @@ describe("RGAA 7.4 — the three ways a script changes context", () => {
 
   it("still harvests the focus and change handlers it always did", () => {
     expect(harvestOn("7.4", '<input onChange="x()" aria-label="a">').length).toBeGreaterThan(0);
+  });
+
+  // AND IT IS DELIBERATELY NOT AN EXISTENCE SUBJECT, however tempting — 7.4 is the other
+  // criterion measured arriving empty on the fixture, and closing it the way 13.2 closes would
+  // be a wrong NA rather than a saved model turn.
+  //
+  // The admission rule in src/adjudicate-subjects.ts is « could a page that FAILS this criterion
+  // harvest nothing? ». For `contextChange` the answer is yes, and the counter-example is
+  // ordinary: a component that navigates through a router this list does not name
+  // (`history.push`, `navigate()` from a custom hook, `location.reload()`) changes context and
+  // matches none of the five patterns. `newWindow` enumerates the three ways a browser can open
+  // a window; `contextChange` enumerates the ways WE HAVE SEEN a script change context, which
+  // is a heuristic — and a heuristic's silence is exactly what a failing page looks like.
+  //
+  // So 7.4 keeps costing an adjudication when its harvest is empty. That is the honest price:
+  // a wrong NA is a non-conformity hidden inside a report someone signs, a needless « à
+  // évaluer » only costs somebody the work of writing "nothing here".
+  it("does NOT admit `contextChange` — a heuristic's silence is not a fact about the code", () => {
+    expect(EXISTENCE_SUBJECTS.has("contextChange")).toBe(false);
+  });
+
+  it("stays « to assess » on a scope whose scripts this list cannot see", () => {
+    const c = rgaa(auditPage("<p>Rien que du texte.</p>"), "7.4");
+    expect(c.inapplicable).toBeUndefined();
+    expect(c.status).toBe("manual");
   });
 });
 
