@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.25.0](https://github.com/maxgfr/ultra11y/compare/v5.24.0...v5.25.0) (2026-08-21)
+
+
+### Bug Fixes
+
+* **adjudicate:** title a pack criterion in the standard's locale, not in a literal "fr" ([cfc0542](https://github.com/maxgfr/ultra11y/commit/cfc054229e24619af5af567c7e746b64eb10719a))
+
+
+### Features
+
+* **adjudicate:** say which of a criterion's numbered tests the harvest actually touches ([c3ed9f8](https://github.com/maxgfr/ultra11y/commit/c3ed9f8bbe7c43dcccecf1dfee050d107dbfe8c0))
+* **standards:** give a country-standard criterion the standard's own instrument ([39812ae](https://github.com/maxgfr/ultra11y/commit/39812aebf4d1163348da4e585da9ff422561c121))
+
 # [5.24.0](https://github.com/maxgfr/ultra11y/compare/v5.23.0...v5.24.0) (2026-08-21)
 
 
