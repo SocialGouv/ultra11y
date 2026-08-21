@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.26.0](https://github.com/maxgfr/ultra11y/compare/v5.25.0...v5.26.0) (2026-08-21)
+
+
+### Bug Fixes
+
+* **ci:** default the adjudication dispatch to the tier this repository can actually run ([0d520bd](https://github.com/maxgfr/ultra11y/commit/0d520bda088b736f90dc5a69f6025b08f35a6dc0))
+
+
+### Features
+
+* **standards:** close RGAA 13.2 on the measurement instead of billing a model to restate it ([b43e98a](https://github.com/maxgfr/ultra11y/commit/b43e98ab0e7f47564c4bcdcaf1caeaf83b2ec396))
+
 # [5.25.0](https://github.com/maxgfr/ultra11y/compare/v5.24.0...v5.25.0) (2026-08-21)
 
 
