@@ -95,10 +95,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Adjudication mode to exercise'
+        description: "Which tier to exercise. `agent` is the default because it is the one THIS repository can run: its only credential is CLAUDE_CODE_OAUTH_TOKEN, and the Messages API behind `api` accepts nothing but an ANTHROPIC_API_KEY. Defaulting to `both` meant the default dispatch died in the credential guard before measuring anything — nine seconds, no baseline, no adjudication, a red run that said nothing about the code. Pick `api` or `both` only in a repository that actually holds an API key; the comparison they buy is real, but it is not free and it is not available here."
         type: choice
-        options: [api, agent, both]
-        default: both
+        options: [agent, api, both]
+        default: agent
       standard:
         description: 'Standard to report against'
         type: choice
