@@ -58990,7 +58990,13 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
       return blankItem(
         pc.id,
         automatability2,
-        crit ? titlePlain(pack, crit, "fr") : void 0,
+        // THE STANDARD'S OWN LOCALE, not a literal "fr". Identical output for RGAA, which
+        // publishes in French and only in French — but the PACK is what says so, and a
+        // standard publishing in another language must not be titled through a locale this
+        // call happened to name. `localize` rather than `titlePlain` because a pack's
+        // locales are not the UI frame's `Lang`: casting one to the other to satisfy a
+        // signature would be asserting something about a country standard that is not true.
+        crit ? localize(pack, crit.titlePlain, pack.defaultLocale) : void 0,
         harvestSubjects(subjectsForPackCriterion2(standard, pc.id, scs), docs),
         limits
       );

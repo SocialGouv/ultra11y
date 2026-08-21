@@ -33,8 +33,8 @@ import {
   derivePackResults,
   criterionUrl,
   glossaryAnchorsOf,
+  localize,
   resolveGlossary,
-  titlePlain as packTitlePlain,
   type StandardPack,
   type PackCriterion,
 } from "./standards/index.js";
@@ -373,7 +373,13 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
         return blankItem(
           pc.id,
           automatability,
-          crit ? packTitlePlain(pack, crit, "fr") : undefined,
+          // THE STANDARD'S OWN LOCALE, not a literal "fr". Identical output for RGAA, which
+          // publishes in French and only in French — but the PACK is what says so, and a
+          // standard publishing in another language must not be titled through a locale this
+          // call happened to name. `localize` rather than `titlePlain` because a pack's
+          // locales are not the UI frame's `Lang`: casting one to the other to satisfy a
+          // signature would be asserting something about a country standard that is not true.
+          crit ? localize(pack, crit.titlePlain, pack.defaultLocale) : undefined,
           harvestSubjects(subjectsForPackCriterion(standard, pc.id, scs), docs),
           limits,
         );
