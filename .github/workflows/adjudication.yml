@@ -55,6 +55,30 @@
 # the gate does not merely reject, it tells the next adjudicator what was wrong. So `passes`
 # defaults to 3.
 #
+# WHERE THIS STANDS NOW, on the per-page bar, which is the one a deliverable is read at.
+#
+#   run 32508717451 — Sonnet 5, RGAA, `require-decided: pages`, engine at v5.22.1.
+#     37 criteria, 105 of 106 closed, $12.90, RED. The survivor was 10.1, and it was not the
+#     model's doing: it ruled `C` three times and the gate refused all three, because 10.1 had
+#     no evidence to cite. 13.2 was refused twice for the same reason. FIVE criteria were
+#     arriving with an empty harvest, three of them pointing at a subject inherited from a WCAG
+#     mapping that answers a different question.
+#
+#   run 32513023189 — same model, same bar, engine at v5.24.0.
+#     34 criteria, **106 of 106**, $6.87, GREEN — « Grille complète : les 106 critères portent
+#     un verdict », on the run AND on each of the five pages. Half the bill of the run before
+#     it, because three of the five criteria are now decided by measurement and never reach a
+#     model at all.
+#
+# ONE REFUSAL SURVIVES IN THAT GREEN RUN, and it is worth naming rather than polishing away:
+# pass 1 cited `styles.css:56` for 10.14 and the gate refused it as not among the criterion's
+# harvested anchors. The model had opened the file the brief pointed it at and cited a real
+# line of it; the harvest carries the `<link rel=stylesheet>`, not the rule inside. Pass 3
+# closed the criterion, so the loop absorbed it for about $0.77. Loosening the grounding rule
+# to accept it would weaken the check that exists to catch a fabricated citation, which is a
+# bad trade for one pass — the fix, if it is worth making, is to harvest the CSS rules 10.14
+# actually turns on, not to let the gate take a citation it cannot verify.
+#
 # So it is dispatched by hand, and it reports the number that actually separates the two
 # modes: how many criteria stayed `manual`. That is where the API mode decloses — it rules
 # from harvested evidence alone (capped at 30 items per criterion, snippets truncated), while
