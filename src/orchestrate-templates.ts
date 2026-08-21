@@ -260,7 +260,10 @@ Then fold: \`ultra11y verify --apply ${join(runAbs, "VERIFY.todo.json")} --repor
 `;
 }
 
-export function agentContracts(runAbs: string, engineAbs: string, opts: { eco?: boolean } = {}): Record<string, string> {
+// `engineAbs` is deliberately NOT a parameter: the emitted workflow injects `ENGINE` as a
+// constant and the contract refers to it by name, so a second copy of the path here could only
+// ever disagree with the one the agent is actually handed.
+export function agentContracts(runAbs: string, opts: { eco?: boolean } = {}): Record<string, string> {
   const footer = ONE_WRITER_FOOTER.replaceAll("<RUN>", runAbs);
   if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs) };
   return {

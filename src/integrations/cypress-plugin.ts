@@ -22,7 +22,7 @@ interface ScreenshotDetails {
   path: string;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Cypress's `on` is not a dependency of this package
+// `any`: Cypress's `on` is not a dependency of this package.
 type On = (event: string, handler: any) => void;
 
 export interface TaskPayload extends SnapshotPayload {

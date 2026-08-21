@@ -15,8 +15,8 @@ import { describe, expect, it } from "vitest";
 import { agentContracts } from "../src/orchestrate-templates.js";
 
 const RUN = "/w/audits";
-const fanout = agentContracts(RUN, "/w/engine.mjs");
-const eco = agentContracts(RUN, "/w/engine.mjs", { eco: true });
+const fanout = agentContracts(RUN);
+const eco = agentContracts(RUN, { eco: true });
 
 describe("the eco adjudicator contract describes the harness it actually runs in", () => {
   it("drops the fan-out apparatus: no ITEMS selection, no structured output, no orchestrator", () => {

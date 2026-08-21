@@ -852,7 +852,7 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
     const measured = snapById.get(c.id);
     // Only a snapshot that reached `C` WITHOUT the flag has falsified "nothing of that kind
     // here" — that one looked at the rendered page and found the subject.
-    if (!measured || measured.status !== "C" || measured.inapplicable) continue;
+    if (measured?.status !== "C" || measured.inapplicable) continue;
     c.status = "C";
     delete c.inapplicable;
     // Keep the claim citable: adopt what the measuring half said, rather than leaving a `C`

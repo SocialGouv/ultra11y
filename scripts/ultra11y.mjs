@@ -36908,7 +36908,7 @@ function makeFilter(opts = {}) {
     const rel2 = toPosix(file);
     if (include && !include(rel2)) return false;
     if (exclude?.(rel2)) return false;
-    if (!opts.noDefaultExcludes && isTestArtifact(rel2) && !(include && include(rel2))) return false;
+    if (!opts.noDefaultExcludes && isTestArtifact(rel2) && !include?.(rel2)) return false;
     return true;
   };
 }
@@ -36974,7 +36974,7 @@ function expandInputs(inputs, opts = {}) {
     const before = list.length;
     list = list.filter((f) => {
       const rel2 = toPosix(f);
-      return !isTestArtifact(rel2) || explicit.has(f) || include != null && include(rel2);
+      return !isTestArtifact(rel2) || explicit.has(f) || include?.(rel2);
     });
     const dropped = before - list.length;
     if (dropped) opts.onWarn?.(`ultra11y: skipped ${dropped} test/spec/story file(s) \u2014 pass --no-default-excludes to audit them.`);
@@ -46968,7 +46968,7 @@ var tableEmptyDataCell = {
     return out2;
   }
 };
-function ownerTable(el, doc) {
+function ownerTable(el) {
   return ancestors(el).find((a) => a.tag === "table");
 }
 var headersAttrDangling = {
@@ -46981,7 +46981,7 @@ var headersAttrDangling = {
       if (el.tag !== "td" && el.tag !== "th") continue;
       const raw = (attr(el, "headers") ?? "").trim();
       if (!raw || raw.includes("{")) continue;
-      const table = ownerTable(el, doc);
+      const table = ownerTable(el);
       if (!table) continue;
       const inTable = new Map(
         descendants(table).filter((d) => d.tag === "th" || d.tag === "td").map((d) => [attr(d, "id") ?? "", d])
@@ -48784,7 +48784,7 @@ function matchNode(el, node, depth) {
   if (node.has || node.lacks) {
     const desc = descendants(el);
     if (node.has && !node.has.every((sub) => desc.some((d) => matchNode(d, sub, depth + 1)))) return false;
-    if (node.lacks && node.lacks.some((sub) => desc.some((d) => matchNode(d, sub, depth + 1)))) return false;
+    if (node.lacks?.some((sub) => desc.some((d) => matchNode(d, sub, depth + 1)))) return false;
   }
   return true;
 }
@@ -49000,7 +49000,7 @@ function extractGraphNode(ast, doc, file, opts = {}) {
   if (ast) {
     for (const stmt of asNodes((asNode(ast.program) ?? ast).body)) {
       const vd = stmt.type === "VariableDeclaration" ? stmt : stmt.type === "ExportNamedDeclaration" ? asNode(stmt.declaration) : void 0;
-      if (!vd || vd.type !== "VariableDeclaration") continue;
+      if (vd?.type !== "VariableDeclaration") continue;
       for (const d of asNodes(vd.declarations)) {
         const idn = asNode(d.id);
         const init2 = asNode(d.init);
@@ -49353,7 +49353,7 @@ function hasMedia(d) {
   return d.elements.some((el) => {
     if (el.tag === "object" || el.tag === "embed") {
       const type = (el.attribs.type ?? "").toLowerCase();
-      return !type || type.startsWith("audio/") || type.startsWith("video/") || type.startsWith("application/") ? true : false;
+      return !type || type.startsWith("audio/") || type.startsWith("video/") || type.startsWith("application/");
     }
     if (el.tag !== "iframe") return false;
     const hay = `${el.attribs.src ?? ""} ${el.attribs.title ?? ""} ${el.attribs.allow ?? ""}`;
@@ -59219,7 +59219,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
     if (v === null) {
       blame(it.criteriaId, `criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
     } else if (v === "C" || v === "NA") {
-      if (!it.justification || !it.justification.trim()) blame(it.criteriaId, `criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
+      if (!it.justification?.trim()) blame(it.criteriaId, `criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
       const cites = (it.citations ?? []).map(readCitation).filter((c2) => c2 !== null);
       if (v === "C" && it.evidenceComplete === false) {
         blame(
@@ -59272,7 +59272,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
           );
           continue;
         }
-        if (!f.normativeRef || !f.normativeRef.trim()) {
+        if (!f.normativeRef?.trim()) {
           blame(it.criteriaId, `criterion ${it.criteriaId}: an NC finding requires a normativeRef citing the failed test of the active standard`);
         } else if (!normativeRefResolves(f.normativeRef, adj.standard, isCore(adj.standard) ? void 0 : it.criteriaId)) {
           blame(
@@ -60873,7 +60873,7 @@ function mergeSnapshotAudit(base, snap) {
   for (const c2 of merged.criteria) {
     if (!c2.inapplicable) continue;
     const measured = snapById.get(c2.id);
-    if (!measured || measured.status !== "C" || measured.inapplicable) continue;
+    if (measured?.status !== "C" || measured.inapplicable) continue;
     c2.status = "C";
     delete c2.inapplicable;
     if (measured.justification) c2.justification = measured.justification;
@@ -64916,7 +64916,7 @@ function foldRecordedAdjudication(root, fresh) {
   for (const c2 of prior.criteria) {
     if (c2.decidedBy !== "agent") continue;
     const target = byId2.get(c2.id);
-    if (!target || target.status !== "manual") continue;
+    if (target?.status !== "manual") continue;
     target.status = c2.status;
     target.decidedBy = "agent";
     if (c2.justification) target.justification = c2.justification;
@@ -65541,7 +65541,7 @@ For EACH entry:
 Then fold: \`ultra11y verify --apply ${join47(runAbs, "VERIFY.todo.json")} --report <the report .md>\`. Without a shell, leave the fold to whoever gave you the file.
 `;
 }
-function agentContracts(runAbs, engineAbs, opts = {}) {
+function agentContracts(runAbs, opts = {}) {
   const footer = ONE_WRITER_FOOTER.replaceAll("<RUN>", runAbs);
   if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs) };
   return {
@@ -65724,7 +65724,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
   mkdirSync17(agentsDir, { recursive: true });
   const written = [];
   const notices = [];
-  for (const [name2, content] of Object.entries(agentContracts(run2, engineAbs, { eco: opts.eco === true }))) {
+  for (const [name2, content] of Object.entries(agentContracts(run2, { eco: opts.eco === true }))) {
     const p = join48(agentsDir, `${name2}.md`);
     writeFileSync19(p, content);
     written.push(p);
@@ -66230,7 +66230,7 @@ function bool(v) {
 }
 function strArray2(v) {
   const a = Array.isArray(v) && v.every((x) => typeof x === "string") ? v : void 0;
-  return a && a.length ? a : void 0;
+  return a?.length ? a : void 0;
 }
 function positive(v, key) {
   const n = num2(v);

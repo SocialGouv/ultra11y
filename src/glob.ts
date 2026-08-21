@@ -89,7 +89,7 @@ export function makeFilter(opts: ExpandOpts = {}): (file: string) => boolean {
     if (include && !include(rel)) return false;
     if (exclude?.(rel)) return false;
     // Default test-artifact exclusion (re-admitted by an explicit --include match).
-    if (!opts.noDefaultExcludes && isTestArtifact(rel) && !(include && include(rel))) return false;
+    if (!opts.noDefaultExcludes && isTestArtifact(rel) && !include?.(rel)) return false;
     return true;
   };
 }
@@ -197,7 +197,7 @@ export function expandInputs(inputs: string[], opts: ExpandOpts = {}): string[] 
     const before = list.length;
     list = list.filter((f) => {
       const rel = toPosix(f);
-      return !isTestArtifact(rel) || explicit.has(f) || (include != null && include(rel));
+      return !isTestArtifact(rel) || explicit.has(f) || include?.(rel);
     });
     const dropped = before - list.length;
     if (dropped) opts.onWarn?.(`ultra11y: skipped ${dropped} test/spec/story file(s) — pass --no-default-excludes to audit them.`);

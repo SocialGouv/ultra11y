@@ -799,7 +799,7 @@ export function applyAdjudication(
     if (v === null) {
       blame(it.criteriaId, `criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
     } else if (v === "C" || v === "NA") {
-      if (!it.justification || !it.justification.trim()) blame(it.criteriaId, `criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
+      if (!it.justification?.trim()) blame(it.criteriaId, `criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
       // A clearing verdict is gated exactly like an accusing one. Before this, the only
       // check was "the justification is a non-empty string", so `"x"` cleared a criterion —
       // and a model answering C to everything published a conformance nobody had assessed.
@@ -942,7 +942,7 @@ export function applyAdjudication(
         }
         // FAIL-CLOSED: every NC finding must cite a precise, resolvable test of the active
         // standard. A good practice with no normative test is a recommendation, not an NC.
-        if (!f.normativeRef || !f.normativeRef.trim()) {
+        if (!f.normativeRef?.trim()) {
           blame(it.criteriaId, `criterion ${it.criteriaId}: an NC finding requires a normativeRef citing the failed test of the active standard`);
         } else if (!normativeRefResolves(f.normativeRef, adj.standard, isCore(adj.standard) ? undefined : it.criteriaId)) {
           blame(

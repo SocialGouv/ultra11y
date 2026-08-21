@@ -88,7 +88,7 @@ function fromConfig(): { only?: string[]; limits?: Omit<ProbeTuning, "only"> } {
 async function runAxe(page: PlaywrightPage, mode: boolean | "auto" | undefined): Promise<{ ran: true; violations: unknown[] } | undefined> {
   if (mode === false) return undefined;
   const demanded = mode === true;
-  // biome-ignore lint/suspicious/noExplicitAny: the builder's shape is axe's, which is not a dependency here
+  // `any`: the builder's shape is axe's, which is not a dependency here.
   let AxeBuilder: any;
   // PROJECT FIRST, then relative to this module — the same order the Playwright fixture above
   // and `scan --runtime local` use, and for the same reason: module-relative alone works for an
@@ -204,16 +204,16 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
  *
  *  Resolution is lazy and guarded either way, so importing this in a Cypress-only repo
  *  gives `undefined` rather than a crash. */
-// biome-ignore lint/suspicious/noExplicitAny: the shape is Playwright's, which is not a dependency here
+// `any`: the shape is Playwright's, which is not a dependency here.
 export const test: any = (() => {
-  // biome-ignore lint/suspicious/noExplicitAny: same
+  // `any` for the same reason.
   const load = (from: string): any => createRequire(from)("@playwright/test");
   for (const from of [`${process.cwd()}/package.json`, import.meta.url]) {
     try {
       const base = load(from).test;
       if (!base?.extend) continue;
       return base.extend({
-        // biome-ignore lint/suspicious/noExplicitAny: same
+        // `any` for the same reason.
         ultra11y: async ({ page }: any, use: any) => {
           await use((opts: PlaywrightCheckOptions) => checkA11y(page, opts));
         },
@@ -241,7 +241,7 @@ export interface SweepOptions {
    *  `waitForLoadState`, `waitForFunction`, locators — and Playwright is not a dependency of
    *  this package, so the narrow structural shape the collector needs would reject the very
    *  function this option exists to take. Same reasoning as `test` below. */
-  // biome-ignore lint/suspicious/noExplicitAny: the shape is Playwright's, which is not a dependency here
+  // `any`: the shape is Playwright's, which is not a dependency here.
   settle?: (page: any) => Promise<void> | void;
   /** Passed to every `checkA11y`. `failOn: false` (the default here) records without
    *  asserting: the durable output of a sweep is the snapshot, not a red test. */

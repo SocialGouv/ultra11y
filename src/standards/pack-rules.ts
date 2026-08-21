@@ -60,7 +60,7 @@ function matchNode(el: El, node: MatchNode, depth: number): boolean {
     const desc = descendants(el);
     if (node.has && !node.has.every((sub) => desc.some((d) => matchNode(d, sub, depth + 1)))) return false;
     // `lacks`: NO listed sub-condition may match ANY descendant.
-    if (node.lacks && node.lacks.some((sub) => desc.some((d) => matchNode(d, sub, depth + 1)))) return false;
+    if (node.lacks?.some((sub) => desc.some((d) => matchNode(d, sub, depth + 1)))) return false;
   }
   return true;
 }

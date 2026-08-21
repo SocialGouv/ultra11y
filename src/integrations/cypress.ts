@@ -14,10 +14,10 @@ import { type CheckOptions, buildPayload, slugify, stayedOnPage } from "./payloa
 
 // Cypress's globals are not a dependency of this package; they exist at run time only.
 declare const Cypress: {
-  // biome-ignore lint/suspicious/noExplicitAny: Cypress's own command signature
+  // `any`: Cypress's own command signature.
   Commands: { add(name: string, fn: (...args: any[]) => any): void };
 };
-// biome-ignore lint/suspicious/noExplicitAny: same
+// `any` for the same reason.
 declare const cy: any;
 
 export interface CypressCheckOptions extends CheckOptions {

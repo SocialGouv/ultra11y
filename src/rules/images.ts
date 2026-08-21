@@ -1,6 +1,6 @@
 // Theme 1 — Images.
 import type { Doc, El } from "../parse/html.js";
-import { attr, hasAttr, hasBoundAttr, boundAttr, hasDynamicSpread, visibleText, ancestors, descendants } from "../parse/html.js";
+import { attr, hasBoundAttr, boundAttr, hasDynamicSpread, visibleText, ancestors, descendants } from "../parse/html.js";
 import { accessibleName, isNameExempt } from "../name.js";
 import type { Rule, RuleFinding } from "./rule.js";
 

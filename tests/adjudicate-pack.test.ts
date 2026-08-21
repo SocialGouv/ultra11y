@@ -234,7 +234,9 @@ describe("the rendered worklist is self-sufficient", () => {
     });
   });
 
-  it("splits RGAA 1.1's image species — `<img>` is here, `<svg>`/`<object>`/`<canvas>` are not", () => {
+  // RGAA 1.1 asks the same question of eight image species. The fixture has one of them, so
+  // seven of its tests are about markup that exists nowhere in scope.
+  it("splits RGAA 1.1's image species: img is present, area/svg/object/embed/canvas are not", () => {
     const t = onlyBrief("1.1");
     expect(t).toMatch(/^- `1\.1\.1` ⬤/m);
     for (const k of [2, 5, 6, 7, 8]) expect(t, `1.1.${k}`).not.toMatch(new RegExp(`^- \`1\\.1\\.${k}\` ⬤`, "m"));

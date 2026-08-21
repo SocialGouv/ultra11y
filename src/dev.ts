@@ -356,7 +356,7 @@ function foldRecordedAdjudication(root: string, fresh: AuditResult): void {
     const target = byId.get(c.id);
     // A criterion the fresh run decided by itself is authoritative: the page moved, and a
     // stale ruling must never override a live measurement.
-    if (!target || target.status !== "manual") continue;
+    if (target?.status !== "manual") continue;
     target.status = c.status;
     target.decidedBy = "agent";
     if (c.justification) target.justification = c.justification;

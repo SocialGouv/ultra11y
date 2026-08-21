@@ -184,7 +184,7 @@ function hasMedia(d: Doc): boolean {
     if (el.tag === "object" || el.tag === "embed") {
       const type = (el.attribs.type ?? "").toLowerCase();
       // A declared non-media type rules it out; anything else is uncertain, so it counts.
-      return !type || type.startsWith("audio/") || type.startsWith("video/") || type.startsWith("application/") ? true : false;
+      return !type || type.startsWith("audio/") || type.startsWith("video/") || type.startsWith("application/");
     }
     if (el.tag !== "iframe") return false;
     const hay = `${el.attribs.src ?? ""} ${el.attribs.title ?? ""} ${el.attribs.allow ?? ""}`;

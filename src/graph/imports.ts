@@ -225,7 +225,7 @@ export function extractGraphNode(ast: AstFile | null, doc: Doc, file: string, op
   if (ast) {
     for (const stmt of asNodes((asNode(ast.program) ?? ast).body)) {
       const vd = stmt.type === "VariableDeclaration" ? stmt : stmt.type === "ExportNamedDeclaration" ? asNode(stmt.declaration) : undefined;
-      if (!vd || vd.type !== "VariableDeclaration") continue;
+      if (vd?.type !== "VariableDeclaration") continue;
       for (const d of asNodes(vd.declarations)) {
         const idn = asNode(d.id);
         const init = asNode(d.init);

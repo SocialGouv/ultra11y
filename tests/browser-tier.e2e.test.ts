@@ -113,7 +113,7 @@ async function check(opts: Record<string, unknown> = {}) {
   process.chdir(root);
   try {
     await page.goto(origin);
-    // biome-ignore lint/suspicious/noExplicitAny: the plugin is typed against Playwright's Page structurally
+    // `any`: the plugin is typed against Playwright's Page structurally.
     return await checkA11y(page as any, { as: "fiche", name: "Fiche", failOn: false, ...opts });
   } finally {
     process.chdir(cwd);

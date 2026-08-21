@@ -381,7 +381,7 @@ describe("orchestrate — stale artifact reconciliation", () => {
 // asked only for `justification`, and a CI run produced 97 obedient verdicts of which 63 were
 // refused — discarding the whole adjudication, since the fold is all-or-nothing.
 describe("the adjudicator contract states every field the fold enforces", () => {
-  const contract = agentContracts("/run", ENGINE).adjudicator!;
+  const contract = agentContracts("/run").adjudicator!;
   const schema = JSON.stringify(phaseSpec("adjudicate").schema);
 
   it("asks for citations on C, where the fold rejects their absence", () => {

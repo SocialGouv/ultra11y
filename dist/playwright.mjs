@@ -720,7 +720,7 @@ var test = (() => {
       const base = load(from).test;
       if (!base?.extend) continue;
       return base.extend({
-        // biome-ignore lint/suspicious/noExplicitAny: same
+        // `any` for the same reason.
         ultra11y: async ({ page }, use) => {
           await use((opts) => checkA11y(page, opts));
         }

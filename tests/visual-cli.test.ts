@@ -43,7 +43,14 @@ function capture() {
   const err: string[] = [];
   const lo = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => void out.push(a.join(" ")));
   const le = vi.spyOn(console, "error").mockImplementation((...a: unknown[]) => void err.push(a.join(" ")));
-  return { out, err, restore: () => (lo.mockRestore(), le.mockRestore()) };
+  return {
+    out,
+    err,
+    restore: () => {
+      lo.mockRestore();
+      le.mockRestore();
+    },
+  };
 }
 
 async function run(argv: string[], cwd: string): Promise<{ code: number; out: string; err: string }> {

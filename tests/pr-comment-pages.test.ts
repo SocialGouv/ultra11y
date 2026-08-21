@@ -312,7 +312,7 @@ describe("the page comment says what is actually wrong, not only which criterion
   it("folds repeated occurrences of one defect instead of printing them all", () => {
     // The same design-system defect on twenty rows of one page is ONE thing to fix. Printing
     // twenty identical lines is how a comment becomes unreadable and then gets muzzled.
-    const many = Array.from({ length: 20 }, (_, i) =>
+    const many = Array.from({ length: 20 }, () =>
       F({ page: "contact", file: "src/modules/Table.tsx", line: 10, selectorHint: "th", message: "en-tête non référencé" }),
     );
     const md = pagesComment(audit({ criteria: [C("1.1.1", "NC", many)], findings: many } as Partial<AuditResult>), { lang: "fr" });

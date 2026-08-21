@@ -47,7 +47,7 @@ describe("captureSetup — executed against a fake DOM", () => {
     writeFileSync(setupFile, captureSetup());
     const capDir = join(dir, "caps");
 
-    // biome-ignore lint/suspicious/noExplicitAny: intentionally poking globals to drive the harvester
+    // `any`: intentionally poking globals to drive the harvester.
     const g = globalThis as any;
     const saved = { afterEach: g.afterEach, document: g.document, expect: g.expect, env: process.env.ULTRA11Y_CAPTURES };
     let cb: (() => void) | undefined;

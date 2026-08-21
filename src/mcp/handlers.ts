@@ -80,7 +80,7 @@ function bool(v: unknown): boolean {
 
 function strArray(v: unknown): string[] | undefined {
   const a = Array.isArray(v) && v.every((x) => typeof x === "string") ? (v as string[]) : undefined;
-  return a && a.length ? a : undefined;
+  return a?.length ? a : undefined;
 }
 
 function positive(v: unknown, key: string): number | undefined {

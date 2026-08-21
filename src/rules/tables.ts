@@ -181,7 +181,7 @@ const tableEmptyDataCell: Rule = {
 };
 
 /** The <table> a cell belongs to (nearest table ancestor), or undefined. */
-function ownerTable(el: El, doc: Doc): El | undefined {
+function ownerTable(el: El): El | undefined {
   return ancestors(el).find((a) => a.tag === "table");
 }
 
@@ -198,7 +198,7 @@ const headersAttrDangling: Rule = {
       if (el.tag !== "td" && el.tag !== "th") continue;
       const raw = (attr(el, "headers") ?? "").trim();
       if (!raw || raw.includes("{")) continue;
-      const table = ownerTable(el, doc);
+      const table = ownerTable(el);
       if (!table) continue;
       const inTable = new Map(
         descendants(table)
