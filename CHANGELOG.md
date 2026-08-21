@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.24.0](https://github.com/maxgfr/ultra11y/compare/v5.23.0...v5.24.0) (2026-08-21)
+
+
+### Features
+
+* **standards:** give the five criteria that arrived with nothing to read an instrument ([1724f24](https://github.com/maxgfr/ultra11y/commit/1724f24ea377a85a9d3f48a9db8b71e83f46fa44))
+
 # [5.23.0](https://github.com/maxgfr/ultra11y/compare/v5.22.1...v5.23.0) (2026-08-21)
 
 
