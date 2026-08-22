@@ -269,6 +269,107 @@ jobs:
           ULTRA11Y_REQUIRE_BROWSER: "1"
         run: pnpm run test:browser
 
+  # THE THING THAT KEEPS 106/106 FROM ROTTING, and it costs no model at all.
+  #
+  # An adjudication run buys a complete RGAA grid for about nine dollars and twenty minutes.
+  # Nothing kept it: the verdicts lived in one run's audit-latest.json, the next push started
+  # from « 33 à évaluer », and a regression stayed invisible until somebody paid for another
+  # dispatch. That is not a gate, it is a photograph.
+  #
+  # `.ultra11y/verdicts/rgaa.json` is that photograph turned into a claim under review — one
+  # entry per adjudicated criterion with its justification, its citations and a FINGERPRINT of
+  # the evidence it was ruled against. This job replays it onto a freshly audited, freshly
+  # rendered fixture and holds the result to `--require-decided=pages`, the bar a page-by-page
+  # deliverable is actually read at.
+  #
+  # THE REPLAY IS NOT A CACHE HIT, which is the only reason a gate built on it means anything.
+  # Every entry is rebuilt into an ordinary adjudication and folded through the same
+  # `verify --apply` path a session uses: the same coverage checks, the same citation matching,
+  # the same content-level re-grounding. A verdict nobody can still prove is refused here exactly
+  # as it would be refused interactively.
+  #
+  # Measured on this fixture while the job was written: replay closes 33/33 and the grid reads
+  # 106/106 on the run and on each of the five pages. Change one `alt` attribute in
+  # tests/fixtures/realworld/index.html and thirteen verdicts drop as STALE — every criterion
+  # argued on that image — `check` exits 1 and names them. Put the attribute back and it is green
+  # again. That is the regression signal the dispatch never gave.
+  #
+  # IT RENDERS RATHER THAN READING COMMITTED SNAPSHOTS. Most of the ledger's citations are
+  # anchored in `.ultra11y/pages/<id>/dom.html`, so the replay needs those pages to exist. They
+  # could have been committed; re-rendering them is better and turned out to be safe — the
+  # fingerprint hashes file, selector and normalised snippet rather than line numbers, and a
+  # scan-restore cycle reproduced all 33 fingerprints exactly. Committing them would also have
+  # dropped serialized French pages into the tree, which moves the repository's own language
+  # signal and breaks tests in files that never touched it (see .gitignore).
+  #
+  # WHEN THIS GOES RED, the fix is not to regenerate the ledger until it passes. Read which
+  # criteria went stale: their evidence changed, so their verdicts are about code that no longer
+  # exists. Re-adjudicate those criteria — `Adjudication (keyed)`, which records the ledger —
+  # and commit the result as the reviewable claim it is.
+  ledger-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      # NO --with-deps, for the reason the other browser jobs here give: it shells out to apt,
+      # which on the Azure runners hangs for 30min+ whenever their ubuntu mirror misbehaves.
+      - run: pnpm exec playwright install chromium
+
+      - name: Serve the fixture site
+        run: nohup python3 -m http.server 8932 --directory tests/fixtures/realworld > /tmp/fixture.log 2>&1 &
+
+      - name: Wait for the fixture
+        run: |
+          deadline=$(( SECONDS + 30 ))
+          until curl -sSf -o /dev/null http://127.0.0.1:8932/; do
+            if [ $SECONDS -ge $deadline ]; then echo "::error::the fixture server never came up"; cat /tmp/fixture.log; exit 1; fi
+            sleep 1
+          done
+
+      # AUDIT TWICE, SCAN TWICE, and it is not a slip. The first audit has no captures to read;
+      # the scan then writes .ultra11y/pages/, and the second audit ingests them — which is what
+      # anchors a criterion's evidence in the rendered DOM instead of only in the source. The
+      # ledger's citations point at those anchors, so a single pass would replay against a grid
+      # the verdicts were never ruled on. It is exactly what the composite action does.
+      - name: Audit and render the fixture
+        run: |
+          node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 8 \
+            --runtime local --cwd "$PWD" --merge audits/audit-latest.json --out audits
+          node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 8 \
+            --runtime local --cwd "$PWD" --merge audits/audit-latest.json --out audits
+
+      # Not `| tee`: a pipeline reports the exit status of its LAST command, so piping this
+      # through anything would swallow the refusal and paint the job green.
+      - name: Replay the committed verdict ledger
+        run: |
+          node scripts/ultra11y.mjs verify --apply .ultra11y/verdicts/rgaa.json \
+            --in audits/audit-latest.json --standard rgaa --out audits
+
+      - name: Every one of the 106 criteria carries a verdict, on the run and on each page
+        run: |
+          node scripts/ultra11y.mjs check --in audits/audit-latest.json \
+            --standard rgaa --require-decided=pages
+
+      # The instrument gate, one level below completeness: were the criteria that need a browser
+      # actually given one? A run that rendered nothing can still look complete.
+      - name: The rendering criteria were given a browser
+        run: |
+          node scripts/ultra11y.mjs check --in audits/audit-latest.json \
+            --standard rgaa --require-rendered
+
   action:
     # HAND-DISPATCHED ONLY. This is the heaviest job in the file — it installs the browser
     # tier, serves a site, crawls it and drives four full invocations of the shipped action —

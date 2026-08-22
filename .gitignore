@@ -6,7 +6,21 @@ audits/
 # CURRENT DIRECTORY — so a test run from the repository root leaves one here. Ignored rather
 # than tolerated: a stray capture in this tree changes the repo's own language signal, and the
 # failures then land somewhere else entirely (`resolveLang`, in files that never touched it).
-.ultra11y/
+#
+# The CONTENTS are ignored, not the directory: git will not re-include a path whose parent is
+# excluded, so `.ultra11y/` followed by a negation silently does nothing. `.ultra11y/*` leaves
+# the directory itself visible, which is what makes the exception below take effect.
+.ultra11y/*
+# …EXCEPT the verdict ledger, which is the opposite kind of file. A snapshot is a build
+# artefact of a run; a ledger is a CLAIM ABOUT THIS CODEBASE — one entry per adjudicated
+# criterion, with its justification, its citations and a fingerprint of the evidence it was
+# ruled against. It belongs in review next to the code it describes, and committing it is what
+# lets a keyless CI job replay the grid and gate on it with no model in the loop.
+#
+# It holds justifications and citation snippets, not serialized pages, and it sits under a path
+# no capture is written to — so it does not move the repo's language signal the way a stray
+# .ultra11y/pages/ does, which is the only reason the blanket ignore above exists.
+!.ultra11y/verdicts/
 coverage/
 .DS_Store
 # Claude Code session dir — the harness locks .claude/workflows/ against external
