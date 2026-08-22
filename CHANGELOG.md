@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.27.0](https://github.com/maxgfr/ultra11y/compare/v5.26.0...v5.27.0) (2026-08-22)
+
+
+### Features
+
+* **ci:** keep 106/106 from rotting — replay the committed verdict ledger on every push, keyless ([f73fe12](https://github.com/maxgfr/ultra11y/commit/f73fe12d35eacf342aefb6b33e980e47566fd8ba))
+* **standards:** give 7.4 the script it was blind to, and stop an inherited absence closing a criterion ([ad79d1d](https://github.com/maxgfr/ultra11y/commit/ad79d1d4557ac8b6da199f153c470d96b8696d70))
+
 # [5.26.0](https://github.com/maxgfr/ultra11y/compare/v5.25.0...v5.26.0) (2026-08-21)
 
 
