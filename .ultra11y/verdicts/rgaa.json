@@ -1,0 +1,1085 @@
+{
+  "tool": "ultra11y",
+  "kind": "verdict-ledger",
+  "schemaVersion": 2,
+  "standard": "rgaa",
+  "entries": [
+    {
+      "criteriaId": "1.3",
+      "verdict": "C",
+      "justification": "La seule image porteuse d'information du périmètre est la carte du réseau, sur l'accueil. Son alternative « Carte du réseau Orbit avec douze points de présence » décrit ce que l'image APPORTE (la couverture et son nombre de points), et non le texte qui l'entoure : le <h2> voisin dit « Pourquoi Orbit » et la liste qui suit énumère les fonctionnalités, aucun des deux ne porte cette information. Elle est courte et concise (test 1.3.9). Les tests 1.3.2 à 1.3.8 portent sur <area>, <input type=\"image\">, <object>, <embed>, <svg> et <canvas> : aucun de ces éléments n'existe dans les cinq pages rendues ni dans LoginForm.tsx, ces tests sont donc validés faute de sujet.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:21d40758a6f5fffe6f4c23f921f0d7e6",
+      "evidenceCount": 10,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "1.4",
+      "verdict": "NA",
+      "justification": "Aucun CAPTCHA ni image-test dans le périmètre. La seule image levée est une carte illustrative du réseau ; elle n'a ni fonction de test de Turing ni fonction d'épreuve, et rien dans les cinq pages ne présente une image à déchiffrer pour accéder à un contenu ou à une fonction.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:66b0027005a4374b263b31fc4d88e9cf",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "1.5",
+      "verdict": "NA",
+      "justification": "Aucun CAPTCHA dans le périmètre — donc aucune solution d'accès alternatif à fournir. La seule image levée est la carte du réseau de l'accueil, qui n'est pas un CAPTCHA.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:66b0027005a4374b263b31fc4d88e9cf",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "1.6",
+      "verdict": "C",
+      "justification": "La seule image porteuse d'information du périmètre est la carte du réseau. Elle NE NÉCESSITE PAS de description détaillée au sens du critère : elle n'expose ni série de données, ni schéma dont la compréhension exigerait un équivalent structuré — son alternative suffit à en restituer l'information (douze points de présence, réseau mondial), et la même information est reprise en toutes lettres dans le texte de la page (« Orbit héberge vos pages statiques sur un réseau mondial »). Les tests 1.6.2 à 1.6.8 et 1.6.10 portent sur <object>, <embed>, <input type=\"image\">, <svg>, <canvas> et role=\"img\", absents du périmètre.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:66b0027005a4374b263b31fc4d88e9cf",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "1.7",
+      "verdict": "NA",
+      "justification": "Le sujet du critère — une image porteuse d'information AYANT une description détaillée — n'existe pas dans le périmètre. La seule image levée ne porte ni attribut longdesc, ni aria-describedby, ni lien adjacent vers une description, ni description structurée à proximité : il n'y a donc aucune description détaillée dont juger la pertinence.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:66b0027005a4374b263b31fc4d88e9cf",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "1.8",
+      "verdict": "NA",
+      "justification": "Aucune image texte dans le périmètre. La seule image levée est une carte du réseau — une illustration, pas un texte rendu sous forme d'image ; aucune des cinq pages rendues n'affiche de titre, de bouton ou de libellé sous forme d'image. Le critère n'a pas de sujet.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:66b0027005a4374b263b31fc4d88e9cf",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "1.9",
+      "verdict": "NA",
+      "justification": "Aucune légende d'image dans le périmètre. La seule image levée n'est ni dans un <figure>, ni accompagnée d'un <figcaption>, ni suivie d'un texte se présentant comme sa légende. Les autres évidences présentées (nav, liens, formulaire de recherche, bouton d'infobulle, champs) sont des éléments d'interface, pas des légendes d'image : elles sont hors du sujet du critère.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 12,
+          "selector": "nav",
+          "snippet": "<nav aria-label=\"Navigation principale\">",
+          "note": "<nav> role=\"\" aria-label"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 37,
+          "selector": "button",
+          "snippet": "<button type=\"button\" aria-describedby=\"astuce-tls\">Qu’est-ce que le TLS ?</button>",
+          "note": "<button> role=\"\" aria-describedby"
+        }
+      ],
+      "evidenceFingerprint": "sha256:21d40758a6f5fffe6f4c23f921f0d7e6",
+      "evidenceCount": 10,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "4.7",
+      "verdict": "NA",
+      "justification": "Aucun média temporel dans le périmètre : pas de <video>, pas d'<audio>, pas d'<object> ni d'<embed> pointant un média. La seule évidence présentée est une image statique (<img>), qui n'est pas un média temporel au sens du référentiel. Le critère n'a rien à identifier.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:66b0027005a4374b263b31fc4d88e9cf",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "4.8",
+      "verdict": "NA",
+      "justification": "Aucun média non temporel dans le périmètre. Le référentiel entend par là une image objet, une image embarquée, une image bitmap ou une image vectorielle rendues par <object>, <embed>, <canvas> ou <svg> — aucun de ces éléments n'existe dans les cinq pages rendues ni dans LoginForm.tsx. La seule évidence présentée est un <img>, traité par la thématique 1 et non par la thématique 4.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:66b0027005a4374b263b31fc4d88e9cf",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "4.9",
+      "verdict": "NA",
+      "justification": "Le sujet du critère — un média non temporel AYANT une alternative — n'existe pas : il n'y a aucun média non temporel dans le périmètre (ni <object>, ni <embed>, ni <canvas>, ni <svg>). La seule évidence présentée est un <img>, hors du champ de la thématique 4.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:66b0027005a4374b263b31fc4d88e9cf",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "4.13",
+      "verdict": "NA",
+      "justification": "Aucun média, temporel ou non temporel, dans le périmètre : ni <video>, ni <audio>, ni <object>, ni <embed>, ni <canvas>, ni <svg>. Les évidences présentées sont des éléments de structure et de formulaire — nav, liens, formulaire de recherche, bouton, champs, régions de statut — dont la compatibilité avec les technologies d'assistance relève des thématiques 7, 9 et 11, pas de la thématique 4.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 12,
+          "selector": "nav",
+          "snippet": "<nav aria-label=\"Navigation principale\">",
+          "note": "<nav> role=\"\" aria-label"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 19,
+          "selector": "form",
+          "snippet": "<form action=\"/recherche\" method=\"get\" role=\"search\">",
+          "note": "<form> role=\"search\" "
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 37,
+          "selector": "button",
+          "snippet": "<button type=\"button\" aria-describedby=\"astuce-tls\">Qu’est-ce que le TLS ?</button>",
+          "note": "<button> role=\"\" aria-describedby"
+        }
+      ],
+      "evidenceFingerprint": "sha256:ece9e25858d94257119cb7b5f2c15971",
+      "evidenceCount": 9,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "7.2",
+      "verdict": "NA",
+      "justification": "Le sujet du critère — un script AYANT une alternative — n'existe pas dans le périmètre. Aucune des cinq pages rendues ne contient de <script>, et aucune ne porte de <noscript> ni de contenu alternatif à un script (test 7.2.1). Le seul script du périmètre est le composant LoginForm.tsx, dont les deux régions de statut sont rendues PAR le script et ne constituent pas une alternative AU script ; aucun élément non textuel n'y est mis à jour par script (test 7.2.2). Il n'y a donc aucune alternative dont juger la pertinence.",
+      "citations": [
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 27,
+          "selector": "p#form-status",
+          "snippet": "<p id=\"form-status\" role=\"alert\">",
+          "note": "<p> role=\"alert\" "
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 31,
+          "selector": "p#form-status",
+          "snippet": "<p id=\"form-status\" role=\"status\">",
+          "note": "<p> role=\"status\" "
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 19,
+          "selector": "form",
+          "snippet": "<form action=\"/recherche\" method=\"get\" role=\"search\">",
+          "note": "<form> role=\"search\" "
+        }
+      ],
+      "evidenceFingerprint": "sha256:21d40758a6f5fffe6f4c23f921f0d7e6",
+      "evidenceCount": 10,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "7.4",
+      "verdict": "C",
+      "justification": "Le seul script du périmètre est le composant LoginForm.tsx, et il n'initie aucun changement de contexte. Son unique gestionnaire, onSubmit, appelle e.preventDefault() puis met à jour un état local (setError(null)) : il EMPÊCHE la navigation que la soumission aurait provoquée au lieu d'en déclencher une. Aucun changement de contexte n'en résulte — ni ouverture de fenêtre, ni navigation, ni déplacement du focus — donc rien dont l'utilisateur doive être averti. Les cinq pages rendues ne portent par ailleurs aucun <script>, aucun gestionnaire en ligne, aucun appel à window.open ni affectation de location : le changement de contexte y est toujours le fait d'une action explicite de l'utilisateur (activer un lien, soumettre un formulaire par son bouton).",
+      "citations": [
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 15,
+          "selector": "handler",
+          "snippet": "onSubmit={(e) => {",
+          "note": "handler — does it change context (navigate, submit, open a window, move focus)? onSubmit={(e) => {"
+        }
+      ],
+      "evidenceFingerprint": "sha256:4ab0c3844d2e34742b92d88c2846cab5",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "8.4",
+      "verdict": "C",
+      "justification": "Les cinq pages rendues déclarent lang=\"fr\" sur l'élément <html>, et le contenu de chacune est intégralement rédigé en français — titres, navigation, textes courants, étiquettes de formulaire et mentions légales. Le code de langue est valide (code ISO 639-1 sur deux lettres) et pertinent au regard de la langue effectivement utilisée.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 2,
+          "selector": "html",
+          "snippet": "<html lang=\"fr\"><head>",
+          "note": "<html lang=\"fr\"> — is it present, valid, and the language of the content?"
+        }
+      ],
+      "evidenceFingerprint": "sha256:6925e1ae87a1bf9f8a7d53690fc891eb",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "8.6",
+      "verdict": "C",
+      "justification": "Les cinq titres de page identifient chacun le sujet propre de sa page avant le nom du site : « Accueil », « Tarifs », « Contact et compte », « Plan du site », « Mentions légales », tous suivis de « — Orbit, hébergement statique ». Chaque titre est différent des quatre autres, il correspond au <h1> de sa page, et la partie discriminante vient en premier — ce qui reste lisible dans un onglet tronqué ou une liste de fenêtres.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Accueil — Orbit, hébergement statique</title>",
+          "note": "page=\"accueil\" <title>Accueil — Orbit, hébergement statique</title>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Contact et compte — Orbit, hébergement statique</title>",
+          "note": "page=\"contact-html\" <title>Contact et compte — Orbit, hébergement statique</title>"
+        },
+        {
+          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Mentions légales — Orbit, hébergement statique</title>",
+          "note": "page=\"mentions-legales-html\" <title>Mentions légales — Orbit, hébergement statique</title>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Plan du site — Orbit, hébergement statique</title>",
+          "note": "page=\"plan-html\" <title>Plan du site — Orbit, hébergement statique</title>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Tarifs — Orbit, hébergement statique</title>",
+          "note": "page=\"tarifs-html\" <title>Tarifs — Orbit, hébergement statique</title>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:59be3913cde426df726b3730324e8539",
+      "evidenceCount": 5,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "8.9",
+      "verdict": "C",
+      "justification": "Aucune balise du périmètre n'est utilisée à seule fin de présentation. Les titres levés (<h1>, <h2>) marquent tous une véritable rupture de niveau dans le contenu et non un effet de style : « Déployez votre site en une commande » est bien le titre de l'accueil, « Formule Découverte » et « Formule Équipe » les deux sections de la page tarifs. Les listes levées (<ul>) regroupent toutes des éléments de même nature — entrées de navigation, caractéristiques d'une formule, liens de pied de page — et non des lignes mises en retrait pour l'apparence. Les cinq pages ne comportent ni <table> de mise en forme, ni <br> employé pour espacer, ni titre choisi pour sa taille.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 27,
+          "selector": "h1",
+          "snippet": "<h1>Déployez votre site en une commande</h1>",
+          "note": "<h1> \"Déployez votre site en une commande\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 31,
+          "selector": "h2",
+          "snippet": "<h2>Pourquoi Orbit</h2>",
+          "note": "<h2> \"Pourquoi Orbit\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 13,
+          "selector": "ul",
+          "snippet": "<ul>",
+          "note": "<ul> \"Accueil Tarifs Contact\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 33,
+          "selector": "ul",
+          "snippet": "<ul>",
+          "note": "<ul> \"Certificats TLS automatiques Qu’est-ce que le TLS \""
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 30,
+          "selector": "h2",
+          "snippet": "<h2>Formule Découverte</h2>",
+          "note": "<h2> \"Formule Découverte\""
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 37,
+          "selector": "h2",
+          "snippet": "<h2>Formule Équipe</h2>",
+          "note": "<h2> \"Formule Équipe\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:39c9c4230125a798ac81c5ccd0185fc8",
+      "evidenceCount": 22,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "9.4",
+      "verdict": "NA",
+      "justification": "Aucune citation dans le périmètre. Les tests 9.4.1 et 9.4.2 portent sur les citations courtes (<q>) et les blocs de citation (<blockquote>) : ni l'un ni l'autre n'apparaît dans les cinq pages rendues, et aucun passage de texte ne rapporte les propos d'un tiers ou un extrait d'une autre œuvre. Les évidences présentées sont des titres et des listes — la structure du document, sujet des critères 9.1 et 9.3, pas des citations. Le seul texte entre guillemets français du périmètre, « Bonjour, je souhaite migrer trois sites. », est un EXEMPLE de saisie donné dans l'aide d'un champ (contact.html), pas un propos attribué à quelqu'un.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 27,
+          "selector": "h1",
+          "snippet": "<h1>Déployez votre site en une commande</h1>",
+          "note": "<h1> \"Déployez votre site en une commande\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 13,
+          "selector": "ul",
+          "snippet": "<ul>",
+          "note": "<ul> \"Accueil Tarifs Contact\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 33,
+          "selector": "h2",
+          "snippet": "<h2>Nous écrire</h2>",
+          "note": "<h2> \"Nous écrire\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:39c9c4230125a798ac81c5ccd0185fc8",
+      "evidenceCount": 22,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "10.3",
+      "verdict": "C",
+      "justification": "L'information reste compréhensible feuilles de styles désactivées. L'ordre du DOM est celui de la lecture sur chacune des cinq pages : lien d'évitement, en-tête avec la navigation puis la recherche, <main> avec son <h1> et ses sections, pied de page. Les titres levés se lisent dans l'ordre hiérarchique (h1 puis h2), les listes gardent leur sens hors CSS, et aucun contenu n'est positionné hors flux pour être lu ailleurs. Les deux éléments que la feuille de styles masque redeviennent simplement visibles à leur place logique : le lien d'évitement en tête de <body>, et le contenu de l'infobulle immédiatement après le bouton qui l'annonce — le texte « Un certificat TLS chiffre le trafic… » suit alors la question « Qu'est-ce que le TLS ? », ce qui reste cohérent.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 27,
+          "selector": "h1",
+          "snippet": "<h1>Déployez votre site en une commande</h1>",
+          "note": "<h1> \"Déployez votre site en une commande\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 31,
+          "selector": "h2",
+          "snippet": "<h2>Pourquoi Orbit</h2>",
+          "note": "<h2> \"Pourquoi Orbit\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 33,
+          "selector": "ul",
+          "snippet": "<ul>",
+          "note": "<ul> \"Certificats TLS automatiques Qu’est-ce que le TLS \""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 13,
+          "selector": "ul",
+          "snippet": "<ul>",
+          "note": "<ul> \"Accueil Tarifs Contact\""
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 27,
+          "selector": "h1",
+          "snippet": "<h1>Plan du site</h1>",
+          "note": "<h1> \"Plan du site\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:39c9c4230125a798ac81c5ccd0185fc8",
+      "evidenceCount": 22,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "10.14",
+      "verdict": "C",
+      "justification": "Le contenu additionnel révélé par CSS de ce site est l'infobulle de l'accueil, et elle satisfait les deux tests. Test 10.14.1 : elle apparaît au survol via .astuce:hover .astuce-contenu, et elle apparaît ÉGALEMENT à la prise de focus du composant — la feuille de styles chargée par la page porte la règle jumelle .astuce:focus-within .astuce-contenu, et le déclencheur est un <button> natif, donc focusable au clavier sans script. La deuxième condition du test est remplie. Test 10.14.2 : symétriquement, le contenu apparu au focus apparaît aussi au survol. Les autres contenus additionnels levés (les aides de saisie pointées par aria-describedby) ne sont pas révélés par CSS : ils sont présents en permanence dans le DOM rendu et donc hors du sujet des deux tests.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 38,
+          "selector": "span#astuce-tls.astuce-contenu",
+          "snippet": "<span role=\"tooltip\" id=\"astuce-tls\" class=\"astuce-contenu\">",
+          "note": "<span> role=\"tooltip\" text=\"Un certificat TLS chiffre le trafic entre le visiteur et vot\" — revealed how, and reachable with the keyboard?"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 37,
+          "selector": "button",
+          "snippet": "<button type=\"button\" aria-describedby=\"astuce-tls\">Qu’est-ce que le TLS ?</button>",
+          "note": "<button> aria-describedby=\"astuce-tls\" text=\"Qu’est-ce que le TLS ?\" — the component whose hover/focus/activation reveals #astuce-tls"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 6,
+          "selector": "link",
+          "snippet": "<link rel=\"stylesheet\" href=\"/styles.css\">",
+          "note": "stylesheet \"/styles.css\" — this page reveals additional content and the rule that does it is NOT in this file. Open the stylesheet and check the `:hover` selectors for a `:focus`/`:focus-within` twin."
+        }
+      ],
+      "evidenceFingerprint": "sha256:dc5b0523efa2f19e51f8ae62276e18cd",
+      "evidenceCount": 12,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.2",
+      "verdict": "C",
+      "justification": "Les huit champs du périmètre portent une étiquette qui décrit la nature de l'information attendue : « Rechercher sur le site », « Votre adresse e-mail », « Adresse e-mail », « Numéro de téléphone », « Votre message », « Motif de la suppression (facultatif) », « Adresse e-mail » et « Mot de passe ». Aucune ne se réduit à un mot creux, aucune ne s'appuie sur un placeholder pour porter le sens — le champ de recherche est d'ailleurs sans placeholder — et l'étiquette du champ facultatif dit qu'il l'est.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 21,
+          "selector": "input#recherche",
+          "snippet": "<input id=\"recherche\" name=\"recherche\" type=\"search\">",
+          "note": "<input type=\"search\"> label=\"Rechercher sur le site\" placeholder=\"\" aria-label=\"\" required=false describedby=\"\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 51,
+          "selector": "input#newsletter-email",
+          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" aria-describedby=\"newsletter-aide\" required=\"\">",
+          "note": "<input type=\"email\"> label=\"Votre adresse e-mail\" placeholder=\"\" aria-label=\"\" required=true describedby=\"newsletter-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 37,
+          "selector": "input#courriel",
+          "snippet": "<input id=\"courriel\" name=\"courriel\" type=\"email\" autocomplete=\"email\" aria-describedby=\"courriel-aide\" required=\"\">",
+          "note": "<input type=\"email\"> label=\"Adresse e-mail\" placeholder=\"\" aria-label=\"\" required=true describedby=\"courriel-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 46,
+          "selector": "input#telephone",
+          "snippet": "<input id=\"telephone\" name=\"telephone\" type=\"tel\" autocomplete=\"tel\" pattern=\"0[1-9][0-9]{8}\" title=\"Dix chiffres, sans espace ni indicatif international\" aria-",
+          "note": "<input type=\"tel\"> label=\"Numéro de téléphone\" placeholder=\"\" aria-label=\"\" required=false describedby=\"telephone-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 54,
+          "selector": "textarea#message",
+          "snippet": "<textarea id=\"message\" name=\"message\" rows=\"5\" aria-describedby=\"message-aide\" required=\"\"></textarea>",
+          "note": "<textarea> label=\"Votre message\" placeholder=\"\" aria-label=\"\" required=true describedby=\"message-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 77,
+          "selector": "textarea#motif",
+          "snippet": "<textarea id=\"motif\" name=\"motif\" rows=\"3\"></textarea>",
+          "note": "<textarea> label=\"Motif de la suppression (facultatif)\" placeholder=\"\" aria-label=\"\" required=false describedby=\"\""
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 21,
+          "selector": "input#email",
+          "snippet": "<input id=\"email\" name=\"email\" type=\"email\" autoComplete=\"email\" required />",
+          "note": "<input type=\"email\"> label=\"Adresse e-mail\" placeholder=\"\" aria-label=\"\" required=true describedby=\"\""
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 24,
+          "selector": "input#password",
+          "snippet": "<input id=\"password\" name=\"password\" type=\"password\" autoComplete=\"current-password\" required />",
+          "note": "<input type=\"password\"> label=\"Mot de passe\" placeholder=\"\" aria-label=\"\" required=true describedby=\"\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:fe4718f2871e60ec33586f3f33262a55",
+      "evidenceCount": 8,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.3",
+      "verdict": "C",
+      "justification": "Le seul champ de même fonction répété d'une page à l'autre est le champ de recherche de l'en-tête, présent sur les cinq pages ; son étiquette est « Rechercher sur le site » à l'identique partout. Les deux champs d'adresse e-mail du périmètre ne remplissent pas la même fonction — l'un inscrit à la lettre d'information sur l'accueil (« Votre adresse e-mail »), l'autre est l'adresse de contact du formulaire de message (« Adresse e-mail ») — et leurs étiquettes distinctes reflètent cette différence au lieu de la masquer.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 21,
+          "selector": "input#recherche",
+          "snippet": "<input id=\"recherche\" name=\"recherche\" type=\"search\">",
+          "note": "<input type=\"search\"> label=\"Rechercher sur le site\" placeholder=\"\" aria-label=\"\" required=false describedby=\"\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 51,
+          "selector": "input#newsletter-email",
+          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" aria-describedby=\"newsletter-aide\" required=\"\">",
+          "note": "<input type=\"email\"> label=\"Votre adresse e-mail\" placeholder=\"\" aria-label=\"\" required=true describedby=\"newsletter-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 37,
+          "selector": "input#courriel",
+          "snippet": "<input id=\"courriel\" name=\"courriel\" type=\"email\" autocomplete=\"email\" aria-describedby=\"courriel-aide\" required=\"\">",
+          "note": "<input type=\"email\"> label=\"Adresse e-mail\" placeholder=\"\" aria-label=\"\" required=true describedby=\"courriel-aide\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:fe4718f2871e60ec33586f3f33262a55",
+      "evidenceCount": 8,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.4",
+      "verdict": "C",
+      "justification": "Chaque étiquette est accolée à son champ. Dans les cinq pages rendues comme dans LoginForm.tsx, le <label> précède immédiatement le champ qu'il désigne dans le DOM, sans élément interposé, et la feuille de styles ne déplace ni ne repositionne aucun d'eux : elle ne définit aucune règle de position pour les <label>, les <input> ou les <textarea>. L'étiquette et son champ restent donc contigus à l'affichage, y compris sur le formulaire de contact où chaque paire est isolée dans son propre <p>.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 21,
+          "selector": "input#recherche",
+          "snippet": "<input id=\"recherche\" name=\"recherche\" type=\"search\">",
+          "note": "<input type=\"search\"> label=\"Rechercher sur le site\" placeholder=\"\" aria-label=\"\" required=false describedby=\"\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 51,
+          "selector": "input#newsletter-email",
+          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" aria-describedby=\"newsletter-aide\" required=\"\">",
+          "note": "<input type=\"email\"> label=\"Votre adresse e-mail\" placeholder=\"\" aria-label=\"\" required=true describedby=\"newsletter-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 37,
+          "selector": "input#courriel",
+          "snippet": "<input id=\"courriel\" name=\"courriel\" type=\"email\" autocomplete=\"email\" aria-describedby=\"courriel-aide\" required=\"\">",
+          "note": "<input type=\"email\"> label=\"Adresse e-mail\" placeholder=\"\" aria-label=\"\" required=true describedby=\"courriel-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 46,
+          "selector": "input#telephone",
+          "snippet": "<input id=\"telephone\" name=\"telephone\" type=\"tel\" autocomplete=\"tel\" pattern=\"0[1-9][0-9]{8}\" title=\"Dix chiffres, sans espace ni indicatif international\" aria-",
+          "note": "<input type=\"tel\"> label=\"Numéro de téléphone\" placeholder=\"\" aria-label=\"\" required=false describedby=\"telephone-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 54,
+          "selector": "textarea#message",
+          "snippet": "<textarea id=\"message\" name=\"message\" rows=\"5\" aria-describedby=\"message-aide\" required=\"\"></textarea>",
+          "note": "<textarea> label=\"Votre message\" placeholder=\"\" aria-label=\"\" required=true describedby=\"message-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 77,
+          "selector": "textarea#motif",
+          "snippet": "<textarea id=\"motif\" name=\"motif\" rows=\"3\"></textarea>",
+          "note": "<textarea> label=\"Motif de la suppression (facultatif)\" placeholder=\"\" aria-label=\"\" required=false describedby=\"\""
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 21,
+          "selector": "input#email",
+          "snippet": "<input id=\"email\" name=\"email\" type=\"email\" autoComplete=\"email\" required />",
+          "note": "<input type=\"email\"> label=\"Adresse e-mail\" placeholder=\"\" aria-label=\"\" required=true describedby=\"\""
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 24,
+          "selector": "input#password",
+          "snippet": "<input id=\"password\" name=\"password\" type=\"password\" autoComplete=\"current-password\" required />",
+          "note": "<input type=\"password\"> label=\"Mot de passe\" placeholder=\"\" aria-label=\"\" required=true describedby=\"\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:fe4718f2871e60ec33586f3f33262a55",
+      "evidenceCount": 8,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.7",
+      "verdict": "NA",
+      "justification": "Aucun regroupement de champs de même nature dans le périmètre : les cinq pages rendues et LoginForm.tsx ne contiennent aucun <fieldset>, aucun role=\"group\" ni role=\"radiogroup\", et aucun ensemble de boutons radio ou de cases à cocher qui en appellerait un. Il n'existe donc aucune légende dont juger la pertinence. Les évidences présentées sont des champs isolés et des régions de la page (header, nav, main, footer) : des repères de structure, pas des regroupements de champs.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 21,
+          "selector": "input#recherche",
+          "snippet": "<input id=\"recherche\" name=\"recherche\" type=\"search\">",
+          "note": "<input type=\"search\"> label=\"Rechercher sur le site\" placeholder=\"\" aria-label=\"\" required=false describedby=\"\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 37,
+          "selector": "input#courriel",
+          "snippet": "<input id=\"courriel\" name=\"courriel\" type=\"email\" autocomplete=\"email\" aria-describedby=\"courriel-aide\" required=\"\">",
+          "note": "<input type=\"email\"> label=\"Adresse e-mail\" placeholder=\"\" aria-label=\"\" required=true describedby=\"courriel-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 11,
+          "selector": "header",
+          "snippet": "<header>",
+          "note": "<header> role=\"\" aria-label=\"\" aria-labelledby=\"\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 26,
+          "selector": "main#contenu",
+          "snippet": "<main id=\"contenu\">",
+          "note": "<main> role=\"\" aria-label=\"\" aria-labelledby=\"\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:b53c6d97dc9f4ed2cfc673b54eeb3d22",
+      "evidenceCount": 17,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.11",
+      "verdict": "C",
+      "justification": "Chaque champ soumis à un contrôle de saisie est accompagné d'une suggestion qui donne le format attendu ET un exemple, portée par aria-describedby donc annoncée avec le champ. L'adresse e-mail de contact : « Format attendu : une adresse e-mail complète, avec l'arobase et le domaine. Exemple : prenom.nom@exemple.fr. » Le téléphone, en plus du contrôle pattern=\"0[1-9][0-9]{8}\" et de son title : « Format attendu : dix chiffres, sans espace ni indicatif. Exemple : 0142685900. » Le message, requis : « Vingt caractères au moins. Exemple : « Bonjour, je souhaite migrer trois sites. » » L'adresse de la lettre d'information porte la même aide. Le champ de recherche et le motif facultatif ne subissent aucun contrôle de saisie et n'appellent donc pas de suggestion.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 37,
+          "selector": "input#courriel",
+          "snippet": "<input id=\"courriel\" name=\"courriel\" type=\"email\" autocomplete=\"email\" aria-describedby=\"courriel-aide\" required=\"\">",
+          "note": "<input type=\"email\"> label=\"Adresse e-mail\" placeholder=\"\" aria-label=\"\" required=true describedby=\"courriel-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 46,
+          "selector": "input#telephone",
+          "snippet": "<input id=\"telephone\" name=\"telephone\" type=\"tel\" autocomplete=\"tel\" pattern=\"0[1-9][0-9]{8}\" title=\"Dix chiffres, sans espace ni indicatif international\" aria-",
+          "note": "<input type=\"tel\"> label=\"Numéro de téléphone\" placeholder=\"\" aria-label=\"\" required=false describedby=\"telephone-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 54,
+          "selector": "textarea#message",
+          "snippet": "<textarea id=\"message\" name=\"message\" rows=\"5\" aria-describedby=\"message-aide\" required=\"\"></textarea>",
+          "note": "<textarea> label=\"Votre message\" placeholder=\"\" aria-label=\"\" required=true describedby=\"message-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 51,
+          "selector": "input#newsletter-email",
+          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" aria-describedby=\"newsletter-aide\" required=\"\">",
+          "note": "<input type=\"email\"> label=\"Votre adresse e-mail\" placeholder=\"\" aria-label=\"\" required=true describedby=\"newsletter-aide\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:fe4718f2871e60ec33586f3f33262a55",
+      "evidenceCount": 8,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.12",
+      "verdict": "C",
+      "justification": "Le seul formulaire du périmètre qui supprime des données est « Supprimer votre compte » (contact.html), et sa validation n'est pas définitive. Le texte qui le précède l'énonce et le bouton le confirme — il est intitulé « Vérifier ma demande de suppression », pas « Supprimer » : la validation ouvre une page de vérification où la demande est affichée en entier, modifiable et annulable. Après validation, le compte reste récupérable trente jours depuis un lien envoyé par e-mail. La demande est donc à la fois vérifiable avant confirmation et réversible après, ce qui satisfait le test 11.12.1. Les autres formulaires du périmètre — recherche, lettre d'information, message de contact, connexion — ne modifient ni ne suppriment de données et ne transmettent pas de réponses à un test.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 77,
+          "selector": "textarea#motif",
+          "snippet": "<textarea id=\"motif\" name=\"motif\" rows=\"3\"></textarea>",
+          "note": "<textarea> label=\"Motif de la suppression (facultatif)\" placeholder=\"\" aria-label=\"\" required=false describedby=\"\""
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 54,
+          "selector": "textarea#message",
+          "snippet": "<textarea id=\"message\" name=\"message\" rows=\"5\" aria-describedby=\"message-aide\" required=\"\"></textarea>",
+          "note": "<textarea> label=\"Votre message\" placeholder=\"\" aria-label=\"\" required=true describedby=\"message-aide\""
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 21,
+          "selector": "input#recherche",
+          "snippet": "<input id=\"recherche\" name=\"recherche\" type=\"search\">",
+          "note": "<input type=\"search\"> label=\"Rechercher sur le site\" placeholder=\"\" aria-label=\"\" required=false describedby=\"\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:fe4718f2871e60ec33586f3f33262a55",
+      "evidenceCount": 8,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "12.1",
+      "verdict": "C",
+      "justification": "L'ensemble de pages dispose de trois systèmes de navigation, soit un de plus que les deux exigés : un menu principal présent dans l'en-tête des cinq pages (<nav aria-label=\"Navigation principale\">, trois liens), un moteur de recherche présent dans le même en-tête sur les cinq pages, et une page « plan du site » dont le <nav aria-label=\"Plan du site\"> recense cinq liens. Le pied de page ajoute un quatrième repère de navigation.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 12,
+          "selector": "nav",
+          "snippet": "<nav aria-label=\"Navigation principale\">",
+          "note": "<nav> aria-label=\"Navigation principale\" links=3"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 21,
+          "selector": "input#recherche",
+          "snippet": "<input id=\"recherche\" name=\"recherche\" type=\"search\">",
+          "note": "search field — one of the \"multiple ways\" mechanisms"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 33,
+          "selector": "nav",
+          "snippet": "<nav aria-label=\"Plan du site\">",
+          "note": "<nav> aria-label=\"Plan du site\" links=5"
+        }
+      ],
+      "evidenceFingerprint": "sha256:d3f0e43a4c7004a4363ebe33c83ea813",
+      "evidenceCount": 4,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "12.2",
+      "verdict": "C",
+      "justification": "Le menu et les barres de navigation occupent la même place sur les cinq pages. Sur chacune, le <header> est le premier élément du <body> après le lien d'évitement, il contient le <nav> principal puis le formulaire de recherche dans cet ordre, et le <nav> énumère toujours Accueil › Tarifs › Contact — même ordre, mêmes intitulés. Le <footer> ferme toujours la page avec Plan du site › Mentions légales. La feuille de styles ne déplace aucun de ces blocs : elle ne définit pour eux aucune règle de position ou d'ordre.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 11,
+          "selector": "header",
+          "snippet": "<header>",
+          "note": "page=\"accueil\" <header> order: Accueil › Tarifs › Contact"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 12,
+          "selector": "nav",
+          "snippet": "<nav aria-label=\"Navigation principale\">",
+          "note": "page=\"accueil\" <nav> order: Accueil › Tarifs › Contact"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 59,
+          "selector": "footer",
+          "snippet": "<footer>",
+          "note": "page=\"accueil\" <footer> order: Plan du site › Mentions légales"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 11,
+          "selector": "header",
+          "snippet": "<header>",
+          "note": "page=\"contact-html\" <header> order: Accueil › Tarifs › Contact"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 12,
+          "selector": "nav",
+          "snippet": "<nav aria-label=\"Navigation principale\">",
+          "note": "page=\"contact-html\" <nav> order: Accueil › Tarifs › Contact"
+        },
+        {
+          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 11,
+          "selector": "header",
+          "snippet": "<header>",
+          "note": "page=\"mentions-legales-html\" <header> order: Accueil › Tarifs › Contact"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 11,
+          "selector": "header",
+          "snippet": "<header>",
+          "note": "page=\"plan-html\" <header> order: Accueil › Tarifs › Contact"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 11,
+          "selector": "header",
+          "snippet": "<header>",
+          "note": "page=\"tarifs-html\" <header> order: Accueil › Tarifs › Contact"
+        }
+      ],
+      "evidenceFingerprint": "sha256:63e046e34e1c8f5b76d1b5fadfce05ad",
+      "evidenceCount": 18,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "12.3",
+      "verdict": "C",
+      "justification": "La page « plan du site » est représentative de l'architecture générale du site (test 12.3.1) : son <nav aria-label=\"Plan du site\"> recense les quatre autres pages du périmètre — Accueil, Tarifs, Contact et gestion du compte, Mentions légales — plus l'ancre « Pourquoi Orbit » de l'accueil, hiérarchisée sous celle-ci par une liste imbriquée qui reflète la structure réelle. Elle ne s'omet qu'elle-même, ce qui est l'usage. Les liens sont fonctionnels (test 12.3.2) : chacun pointe une ressource servie du périmètre, et le crawl les a tous suivis — les cinq pages ont été rendues. Leurs intitulés correspondent aux pages atteintes (test 12.3.3) : « Tarifs » mène à /tarifs.html dont le <h1> est « Tarifs », « Contact et gestion du compte » à /contact.html dont le <h1> est « Contact et gestion du compte », « Mentions légales » à /mentions-legales.html dont le <h1> est « Mentions légales ».",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 33,
+          "selector": "nav",
+          "snippet": "<nav aria-label=\"Plan du site\">",
+          "note": "<nav> aria-label=\"Plan du site\" links=5"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 12,
+          "selector": "nav",
+          "snippet": "<nav aria-label=\"Navigation principale\">",
+          "note": "<nav> aria-label=\"Navigation principale\" links=3"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 21,
+          "selector": "input#recherche",
+          "snippet": "<input id=\"recherche\" name=\"recherche\" type=\"search\">",
+          "note": "search field — one of the \"multiple ways\" mechanisms"
+        }
+      ],
+      "evidenceFingerprint": "sha256:d3f0e43a4c7004a4363ebe33c83ea813",
+      "evidenceCount": 4,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "12.4",
+      "verdict": "C",
+      "justification": "La page « plan du site » est atteignable par une fonctionnalité identique sur toutes les pages de l'ensemble : le <footer> des cinq pages rendues contient le même <nav aria-label=\"Navigation de pied de page\"> dont le premier lien est « Plan du site », au même endroit — dernier bloc du <body> — et avec le même intitulé. Sur la page du plan elle-même, ce lien porte aria-current=\"page\", ce qui signale la position courante sans rompre l'identité de la fonctionnalité.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 59,
+          "selector": "footer",
+          "snippet": "<footer>",
+          "note": "page=\"accueil\" <footer> order: Plan du site › Mentions légales"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 83,
+          "selector": "footer",
+          "snippet": "<footer>",
+          "note": "page=\"contact-html\" <footer> order: Plan du site › Mentions légales"
+        },
+        {
+          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 42,
+          "selector": "footer",
+          "snippet": "<footer>",
+          "note": "page=\"mentions-legales-html\" <footer> order: Plan du site › Mentions légales"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 48,
+          "selector": "footer",
+          "snippet": "<footer>",
+          "note": "page=\"plan-html\" <footer> order: Plan du site › Mentions légales"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 47,
+          "selector": "footer",
+          "snippet": "<footer>",
+          "note": "page=\"tarifs-html\" <footer> order: Plan du site › Mentions légales"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 60,
+          "selector": "nav",
+          "snippet": "<nav aria-label=\"Navigation de pied de page\">",
+          "note": "<nav> aria-label=\"Navigation de pied de page\" links=2"
+        }
+      ],
+      "evidenceFingerprint": "sha256:6747aae1659c99b753575e07aa65a42c",
+      "evidenceCount": 22,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "12.5",
+      "verdict": "C",
+      "justification": "Le moteur de recherche est atteignable de manière identique sur toutes les pages de l'ensemble : les cinq pages rendues portent dans leur <header> le même formulaire role=\"search\", à la même place — après le <nav> principal, dans le premier bloc du <body> — avec la même étiquette « Rechercher sur le site » et le même bouton « Rechercher ». Aucune page ne le déplace ni ne l'omet.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 11,
+          "selector": "header",
+          "snippet": "<header>",
+          "note": "page=\"accueil\" <header> order: Accueil › Tarifs › Contact"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 11,
+          "selector": "header",
+          "snippet": "<header>",
+          "note": "page=\"contact-html\" <header> order: Accueil › Tarifs › Contact"
+        },
+        {
+          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 11,
+          "selector": "header",
+          "snippet": "<header>",
+          "note": "page=\"mentions-legales-html\" <header> order: Accueil › Tarifs › Contact"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 11,
+          "selector": "header",
+          "snippet": "<header>",
+          "note": "page=\"plan-html\" <header> order: Accueil › Tarifs › Contact"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 11,
+          "selector": "header",
+          "snippet": "<header>",
+          "note": "page=\"tarifs-html\" <header> order: Accueil › Tarifs › Contact"
+        }
+      ],
+      "evidenceFingerprint": "sha256:63e046e34e1c8f5b76d1b5fadfce05ad",
+      "evidenceCount": 18,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "12.11",
+      "verdict": "C",
+      "justification": "Le contenu additionnel apparaissant au survol ou à la prise de focus est atteignable au clavier. Le déclencheur est un <button type=\"button\"> natif, donc dans l'ordre de tabulation sans qu'aucun script n'intervienne ; la feuille de styles chargée par la page révèle l'infobulle à la fois sur .astuce:hover et sur .astuce:focus-within, si bien qu'atteindre le bouton au clavier suffit à faire apparaître le contenu. Le contenu lui-même porte role=\"tooltip\" et est associé au bouton par aria-describedby=\"astuce-tls\", donc restitué à l'activation du bouton par une technologie d'assistance. Les autres contenus additionnels levés (aides de saisie pointées par aria-describedby) sont présents en permanence dans le DOM et n'appellent aucune interaction pour être atteints.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 37,
+          "selector": "button",
+          "snippet": "<button type=\"button\" aria-describedby=\"astuce-tls\">Qu’est-ce que le TLS ?</button>",
+          "note": "<button> aria-describedby=\"astuce-tls\" text=\"Qu’est-ce que le TLS ?\" — the component whose hover/focus/activation reveals #astuce-tls"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 38,
+          "selector": "span#astuce-tls.astuce-contenu",
+          "snippet": "<span role=\"tooltip\" id=\"astuce-tls\" class=\"astuce-contenu\">",
+          "note": "<span> role=\"tooltip\" text=\"Un certificat TLS chiffre le trafic entre le visiteur et vot\" — revealed how, and reachable with the keyboard?"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 6,
+          "selector": "link",
+          "snippet": "<link rel=\"stylesheet\" href=\"/styles.css\">",
+          "note": "stylesheet \"/styles.css\" — this page reveals additional content and the rule that does it is NOT in this file. Open the stylesheet and check the `:hover` selectors for a `:focus`/`:focus-within` twin."
+        }
+      ],
+      "evidenceFingerprint": "sha256:dc5b0523efa2f19e51f8ae62276e18cd",
+      "evidenceCount": 12,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "13.5",
+      "verdict": "NA",
+      "justification": "Aucun contenu cryptique dans le périmètre : ni art ASCII, ni émoticône, ni syntaxe cryptique dans les cinq pages rendues ni dans LoginForm.tsx. Les seuls caractères non alphanumériques du contenu sont le symbole « © » du pied de page, les tirets cadratins des titres de page et les guillemets français d'un exemple de saisie — des signes typographiques courants, restitués tels quels par les technologies d'assistance, et non des contenus cryptiques au sens du référentiel. L'évidence présentée est une image, qui relève de la thématique 1.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:66b0027005a4374b263b31fc4d88e9cf",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "13.6",
+      "verdict": "NA",
+      "justification": "Le sujet du critère — un contenu cryptique AYANT une alternative — n'existe pas, puisqu'il n'y a aucun contenu cryptique dans le périmètre (voir 13.5). Il n'y a donc aucune alternative dont juger la pertinence. L'évidence présentée est une image, qui relève de la thématique 1.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 32,
+          "selector": "img",
+          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
+          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+        }
+      ],
+      "evidenceFingerprint": "sha256:66b0027005a4374b263b31fc4d88e9cf",
+      "evidenceCount": 1,
+      "date": "2026-08-22",
+      "decidedBy": "agent"
+    }
+  ]
+}
