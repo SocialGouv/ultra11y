@@ -45061,14 +45061,42 @@ var SUBJECTS = {
       (e) => h(d, e, `<${e.tag} autoplay=${attr(e, "autoplay") !== void 0} controls=${attr(e, "controls") !== void 0}>`, `media|${e.tag}`)
     )
   ]),
-  // A change of context triggered by focus or by changing a value.
-  // RGAA 7.4 / WCAG 3.2.1-3.2.2. The handlers are half the subject; the OTHER half is what a
-  // script does once it runs, and that is where a context change actually happens: submitting a
-  // form, navigating, opening a window. Looking only for onFocus/onBlur/onChange left the
-  // criterion with an empty harvest on any codebase that binds its handlers in JavaScript
-  // rather than in markup — which is most of them — and an empty harvest is a criterion the
-  // adjudicator can only guess at.
+  // A change of context initiated by a script. RGAA 7.4 / WCAG 3.2.1-3.2.2.
+  //
+  // THE SUBJECT IS THE SCRIPT, and getting that wrong cost a release. This used to be a list of
+  // CONSEQUENCES — onFocus/onBlur/onChange, `.submit(`, `location`, `router.push`,
+  // `window.open` — on the theory that a context change is one of them. It is, but the list can
+  // only ever be the ways we have already seen a script change context, and a criterion whose
+  // subject is « each script » cannot be answered from a catalogue of endings.
+  //
+  // Measured on tests/fixtures/realworld, which ships LoginForm.tsx whose form carries
+  // `onSubmit={(e) => { e.preventDefault(); … }}`: 7.4 reached the adjudicator with population
+  // ZERO. A script was right there, doing the thing the criterion asks about, and the harvest
+  // walked past it because `onSubmit` was not on the list. The adjudicator was told « no
+  // evidence » and billed to guess between NA and manual — on a page it should have been handed
+  // twenty lines of React to read.
+  //
+  // So it collects the script FIRST: any `<script>`, any `on*` binding whatever the event, and
+  // then the consequences it always looked for, which stay because they are what an adjudicator
+  // most needs pointed out. Two things follow. A page with a script always arrives with it, so
+  // the verdict is made on the code rather than on its absence. And a page with no script at all
+  // harvests nothing — which is now a FACT about the code, not a gap in a pattern list, so 7.4
+  // and 3.2.1/3.2.2 close as « not applicable » with no model in the loop (EXISTENCE_SUBJECTS).
   contextChange: (docs) => docs.flatMap((d) => [
+    // The script itself — the subject, before anything it goes on to do.
+    ...elementsByTag(d, "script").map(
+      (e) => h(
+        d,
+        e,
+        `<script${attr(e, "src") ? ` src="${attr(e, "src")}"` : ""}> \u2014 does anything it runs change context, and is the user warned or in control?`,
+        `script|${attr(e, "src") ?? "inline"}`
+      )
+    ),
+    // Any handler binding, whatever the event: `onSubmit` and `onClick` change context as
+    // readily as `onChange`, and a criterion about scripts has no business enumerating events.
+    ...linesOf(d, /\bon[A-Z][A-Za-z]*\s*=|\son[a-z]+\s*=\s*["']/).map(
+      (l) => hAt(d, l.line, "handler", `handler \u2014 does it change context (navigate, submit, open a window, move focus)? ${l.text}`, `handler|${l.text}`)
+    ),
     ...linesOf(d, /\bon(?:Focus|Blur)\s*=/).map(
       (l) => hAt(d, l.line, "handler", `focus handler \u2014 does it change context (navigate, submit, move focus)? ${l.text}`, `onfocus|${l.text}`)
     ),
@@ -45437,9 +45465,11 @@ var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set([
   "errors",
   "frames",
   "downloadDocs",
-  "newWindow"
+  "newWindow",
+  "contextChange"
 ]);
 var subjectsForSc = (sc) => SC_SUBJECTS[sc] ?? [];
+var ownPackSubjects = (standard, id) => PACK_SUBJECTS[standard]?.[id];
 function subjectsForPackCriterion(standard, id, scs) {
   const own = PACK_SUBJECTS[standard]?.[id];
   if (own) return own;
@@ -54408,6 +54438,13 @@ function derivePackResults(audit2, packKey, pageId) {
   const overrides = pack.overrides;
   const seen = audit2.scope.subjectsSeen;
   const subjectAbsent = (pc) => seen !== void 0 && subjectsAbsent(subjectsForPackCriterion(packKey, pc.id, pc.wcag), new Set(seen));
+  const ownSubjectSeen = (pc) => {
+    if (seen === void 0) return false;
+    const own = ownPackSubjects(packKey, pc.id);
+    if (!own?.length) return false;
+    const present = new Set(seen);
+    return own.some((id) => present.has(id));
+  };
   const ownRuleIds = new Set((pack.rules ?? []).map((r) => `pack:${packKey}:${r.id}`));
   const deriveBase = (pc) => {
     const outOfScope = pc.wcag.every((sc) => {
@@ -54444,6 +54481,9 @@ function derivePackResults(audit2, packKey, pageId) {
       return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS, findings, scs: pc.wcag, inapplicable: true };
     }
     const inapplicable = status === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));
+    if (inapplicable && ownSubjectSeen(pc)) {
+      return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag };
+    }
     return { id: pc.id, theme: pc.theme, status, findings, scs: pc.wcag, ...inapplicable ? { inapplicable: true } : {} };
   };
   const enabledSecondary = (pack.secondaryMappings ?? []).filter((m) => m.enabled === true);

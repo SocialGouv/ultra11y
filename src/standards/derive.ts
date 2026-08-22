@@ -2,7 +2,7 @@
 // presentation-only WCAG view (former src/standard.ts). For each pack criterion, gather
 // the results of the WCAG SCs it maps to and fold them with the same NC-dominates rule.
 // Presentation-only: the canonical, gated verdict lives on the WCAG core.
-import { subjectsAbsent, subjectsForPackCriterion } from "../adjudicate-subjects.js";
+import { ownPackSubjects, subjectsAbsent, subjectsForPackCriterion } from "../adjudicate-subjects.js";
 import { coverageFor, criterionMeasuredOn, unionCoverage } from "../coverage.js";
 import type { AuditResult, CriterionResult, PageCoverage, Status, Finding, Severity } from "../types.js";
 import { CORE_KEY, loadPack } from "./registry.js";
@@ -264,6 +264,16 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
   // scope that read no file.
   const seen = audit.scope.subjectsSeen;
   const subjectAbsent = (pc: PackCriterion): boolean => seen !== undefined && subjectsAbsent(subjectsForPackCriterion(packKey, pc.id, pc.wcag), new Set(seen));
+  // Did the criterion's OWN subject turn up? Only its own counts: a criterion that declares none
+  // has nothing to defend against an inherited closure, and the union it borrows from its WCAG
+  // mapping is exactly where that closure came from.
+  const ownSubjectSeen = (pc: PackCriterion): boolean => {
+    if (seen === undefined) return false;
+    const own = ownPackSubjects(packKey, pc.id);
+    if (!own?.length) return false;
+    const present = new Set(seen);
+    return own.some((id) => present.has(id));
+  };
 
   // Rules the PACK ITSELF brings, by finding id. A criterion whose `appliesTo` names one of
   // these has an instrument regardless of what its WCAG mapping is worth — which is the whole
@@ -361,6 +371,28 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
       return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS as Status, findings, scs: pc.wcag, inapplicable: true };
     }
     const inapplicable = status === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));
+    // AN INHERITED ABSENCE CANNOT CLOSE A CRITERION WHOSE OWN SUBJECT IS PRESENT.
+    //
+    // `inapplicable` here means every mapped success criterion came back « nothing of that kind
+    // is in scope ». That is a statement about THEIR subject, and a pack criterion frequently
+    // asks about a different one — which is the entire reason PACK_SUBJECTS exists. Publishing
+    // their absence as our conformity is the precise shape of « conforming because nobody
+    // looked », and it is worse than leaving the criterion open: in the deliverable it reads
+    // identically to a verified conformity.
+    //
+    // Measured on RGAA 13.2 (« l'ouverture d'une nouvelle fenêtre ne doit pas être déclenchée
+    // sans action de l'utilisateur »), which maps onto WCAG 3.2.1, whose subject is a script. On
+    // a page carrying `target="_blank"` and no script, 3.2.1 is honestly inapplicable — and 13.2
+    // inherited that and reported « conforme faute de sujet » over a link sitting in its own
+    // harvest. It surfaced the day `contextChange` became an existence subject, which is what
+    // made 3.2.1 closable at all; the flaw predates that and was merely unreachable.
+    //
+    // The answer is « undecided », never a conformity: our subject is here and nobody has ruled
+    // on it. NC is already excluded above, and a criterion declaring no subject of its own is
+    // untouched.
+    if (inapplicable && ownSubjectSeen(pc)) {
+      return { id: pc.id, theme: pc.theme, status: "manual" as Status, findings, scs: pc.wcag };
+    }
     return { id: pc.id, theme: pc.theme, status, findings, scs: pc.wcag, ...(inapplicable ? { inapplicable: true } : {}) };
   };
 

@@ -706,15 +706,43 @@ export const SUBJECTS: Record<string, Subject> = {
       ),
     ]),
 
-  // A change of context triggered by focus or by changing a value.
-  // RGAA 7.4 / WCAG 3.2.1-3.2.2. The handlers are half the subject; the OTHER half is what a
-  // script does once it runs, and that is where a context change actually happens: submitting a
-  // form, navigating, opening a window. Looking only for onFocus/onBlur/onChange left the
-  // criterion with an empty harvest on any codebase that binds its handlers in JavaScript
-  // rather than in markup — which is most of them — and an empty harvest is a criterion the
-  // adjudicator can only guess at.
+  // A change of context initiated by a script. RGAA 7.4 / WCAG 3.2.1-3.2.2.
+  //
+  // THE SUBJECT IS THE SCRIPT, and getting that wrong cost a release. This used to be a list of
+  // CONSEQUENCES — onFocus/onBlur/onChange, `.submit(`, `location`, `router.push`,
+  // `window.open` — on the theory that a context change is one of them. It is, but the list can
+  // only ever be the ways we have already seen a script change context, and a criterion whose
+  // subject is « each script » cannot be answered from a catalogue of endings.
+  //
+  // Measured on tests/fixtures/realworld, which ships LoginForm.tsx whose form carries
+  // `onSubmit={(e) => { e.preventDefault(); … }}`: 7.4 reached the adjudicator with population
+  // ZERO. A script was right there, doing the thing the criterion asks about, and the harvest
+  // walked past it because `onSubmit` was not on the list. The adjudicator was told « no
+  // evidence » and billed to guess between NA and manual — on a page it should have been handed
+  // twenty lines of React to read.
+  //
+  // So it collects the script FIRST: any `<script>`, any `on*` binding whatever the event, and
+  // then the consequences it always looked for, which stay because they are what an adjudicator
+  // most needs pointed out. Two things follow. A page with a script always arrives with it, so
+  // the verdict is made on the code rather than on its absence. And a page with no script at all
+  // harvests nothing — which is now a FACT about the code, not a gap in a pattern list, so 7.4
+  // and 3.2.1/3.2.2 close as « not applicable » with no model in the loop (EXISTENCE_SUBJECTS).
   contextChange: (docs) =>
     docs.flatMap((d) => [
+      // The script itself — the subject, before anything it goes on to do.
+      ...elementsByTag(d, "script").map((e) =>
+        h(
+          d,
+          e,
+          `<script${attr(e, "src") ? ` src="${attr(e, "src")}"` : ""}> — does anything it runs change context, and is the user warned or in control?`,
+          `script|${attr(e, "src") ?? "inline"}`,
+        ),
+      ),
+      // Any handler binding, whatever the event: `onSubmit` and `onClick` change context as
+      // readily as `onChange`, and a criterion about scripts has no business enumerating events.
+      ...linesOf(d, /\bon[A-Z][A-Za-z]*\s*=|\son[a-z]+\s*=\s*["']/).map((l) =>
+        hAt(d, l.line, "handler", `handler — does it change context (navigate, submit, open a window, move focus)? ${l.text}`, `handler|${l.text}`),
+      ),
       ...linesOf(d, /\bon(?:Focus|Blur)\s*=/).map((l) =>
         hAt(d, l.line, "handler", `focus handler — does it change context (navigate, submit, move focus)? ${l.text}`, `onfocus|${l.text}`),
       ),
@@ -1200,13 +1228,22 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
 // this comment was written from, both were ruled NA on the first pass with no gate refusal,
 // which is the definition of a paid turn that decided nothing.
 //
-// THE OTHER ONE, 7.4, STAYS OUT, and the asymmetry is the whole point of the rule above.
-// `contextChange` does not enumerate the ways a browser CAN change context, it enumerates the
-// ways we have seen a script do it — `.submit(`, `location.href`, `router.push`, a handful of
-// handler attributes. A component that navigates through a router the list does not name
-// (`history.push`, a custom `navigate()`, `location.reload()`) fails 7.4 and matches none of
-// them. Its silence is what a failing page looks like, so admitting it would buy a cheap NA at
-// the price of a hidden non-conformity.
+// `contextChange` is here too NOW, and it was not before — the earlier refusal was right about
+// the rule and wrong about the subject, so it is worth writing down which changed.
+//
+// It used to enumerate CONSEQUENCES: `.submit(`, `location.href`, `router.push`, a handful of
+// handler attributes. Read that way it is a heuristic, its silence is what a failing page looks
+// like, and admitting it would have bought a cheap NA at the price of a hidden non-conformity.
+// That refusal stood, and it also let a real defect stand: on tests/fixtures/realworld, 7.4
+// arrived with population ZERO from a page shipping `onSubmit={(e) => …}` — a script the harvest
+// simply did not look for.
+//
+// The subject is the SCRIPT now, not the endings: any `<script>`, any `on*` binding. RGAA 7.4
+// asks about « chaque script qui initie un changement de contexte », so a page that FAILS it runs
+// a script, and a scope with no script anywhere has nothing for the criterion to be about. That
+// is an element species, and its silence is a fact a reader can check — the same test
+// `downloadDocs` and `newWindow` pass. The heuristics stay in the harvest as POINTERS for
+// whoever reads it; they are no longer what decides whether the subject exists.
 export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   "images",
   "tables",
@@ -1218,6 +1255,7 @@ export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   "frames",
   "downloadDocs",
   "newWindow",
+  "contextChange",
 ]);
 
 /** The subjects that decide a success criterion. Empty ⇒ the criterion has none declared,
@@ -1228,6 +1266,16 @@ export const subjectsForSc = (sc: string): string[] => SC_SUBJECTS[sc] ?? [];
  *  of its mapped success criteria's. The override is what stops RGAA 11.1 (are the fields
  *  labelled?) from being handed the page's heading outline because 1.3.1 happens to come
  *  first in its `wcag` list. */
+/** The subjects a pack criterion declares FOR ITSELF, as opposed to the union it inherits from
+ *  its WCAG mapping. Undefined when it declares none.
+ *
+ *  The distinction decides whether an INHERITED absence may close the criterion. RGAA 13.2 maps
+ *  onto WCAG 3.2.1, whose subject is a script; 13.2's own subject is a window opening. On a page
+ *  carrying `target="_blank"` and no script at all, 3.2.1 is legitimately « nothing of that kind
+ *  in scope » — and 13.2 inherited that closure and published a conformity over an element
+ *  nobody had looked at. Its own subject was right there in the harvest. */
+export const ownPackSubjects = (standard: string, id: string): string[] | undefined => PACK_SUBJECTS[standard]?.[id];
+
 export function subjectsForPackCriterion(standard: string, id: string, scs: string[]): string[] {
   const own = PACK_SUBJECTS[standard]?.[id];
   if (own) return own;
