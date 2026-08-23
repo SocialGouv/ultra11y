@@ -254,103 +254,109 @@
     {
       "criteriaId": "4.1",
       "verdict": "NC",
-      "justification": "Les médias temporels (audio, vidéo, marquee) manquent de transcription textuelle ou d'audiodescription.",
+      "justification": "Audio and video elements are present without transcriptions, audio-only alternatives, or audio descriptions. The jingle autoplay on every page (line 112 accueil) lacks a text transcription. The 2-minute video presentation (line 29 medias-html) has no transcript or audio description. The audio journal (line 35 medias-html) also lacks any transcription.",
       "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 112,
+          "selector": "audio",
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>"
+        },
+        {
+          "file": ".ultra11y/pages/medias-html/dom.html",
+          "line": 29,
+          "selector": "video",
+          "snippet": "<video src=\"/media/presentation.mp4\" width=\"640\" height=\"360\" controls=\"\"></video>"
+        },
         {
           "file": ".ultra11y/pages/medias-html/dom.html",
           "line": 35,
-          "selector": "motion",
+          "selector": "audio",
           "snippet": "<audio src=\"/media/journal-incidents.mp3\" autoplay=\"\"></audio>"
         }
       ],
       "findings": [
         {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 112,
+          "selector": "audio",
+          "message": "Audio element autoplay without transcription",
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "normativeRef": "4.1.1"
+        },
+        {
+          "file": ".ultra11y/pages/medias-html/dom.html",
+          "line": 29,
+          "selector": "video",
+          "message": "Video element without transcription or audio description",
+          "snippet": "<video src=\"/media/presentation.mp4\" width=\"640\" height=\"360\" controls=\"\"></video>",
+          "normativeRef": "4.1.2"
+        },
+        {
           "file": ".ultra11y/pages/medias-html/dom.html",
           "line": 35,
-          "message": "Audio sans transcription textuelle",
+          "selector": "audio",
+          "message": "Audio element autoplay without transcription",
           "snippet": "<audio src=\"/media/journal-incidents.mp3\" autoplay=\"\"></audio>",
           "normativeRef": "4.1.1"
         }
       ],
-      "evidenceFingerprint": "sha256:af8695fa1a9df775f98501a385874765",
-      "evidenceCount": 6,
+      "evidenceFingerprint": "sha256:ee9c48fe9d139769b13e2e20fa4ba9fc",
+      "evidenceCount": 9,
       "date": "2026-08-23",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "4.2",
       "verdict": "NA",
-      "justification": "Aucun média temporel ne dispose de transcription ou audiodescription à évaluer (voir 4.1).",
-      "citations": [
-        {
-          "file": ".ultra11y/pages/medias-html/dom.html",
-          "line": 35,
-          "selector": "motion",
-          "snippet": "<audio src=\"/media/journal-incidents.mp3\" autoplay=\"\"></audio>"
-        }
-      ],
-      "evidenceFingerprint": "sha256:af8695fa1a9df775f98501a385874765",
-      "evidenceCount": 6,
+      "justification": "Criterion 4.2 applies only to media that already have a text transcription or synchronized audio description. Since no media in the audited scope have either transcriptions or audio descriptions (as confirmed by 4.1), this criterion is not applicable. The media present lack the prerequisite condition that would trigger this criterion's applicability.",
+      "evidenceFingerprint": "sha256:ee9c48fe9d139769b13e2e20fa4ba9fc",
+      "evidenceCount": 9,
       "date": "2026-08-23",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "4.4",
       "verdict": "NA",
-      "justification": "Aucun média temporel n'a de sous-titres synchronisés à évaluer.",
-      "citations": [
-        {
-          "file": ".ultra11y/pages/medias-html/dom.html",
-          "line": 40,
-          "selector": "marquee",
-          "snippet": "<marquee>Maintenance planifiée le 12 septembre de 2 h à 4 h.</marquee>"
-        }
-      ],
-      "evidenceFingerprint": "sha256:af8695fa1a9df775f98501a385874765",
-      "evidenceCount": 6,
+      "justification": "Criterion 4.4 applies only to synchronized temporal media that already have synchronized subtitles. The video element (line 29 medias-html) is present but does not have synchronized subtitles associated with it. Since the prerequisite (existing synchronized subtitles) is not met for any media in scope, this criterion is not applicable.",
+      "evidenceFingerprint": "sha256:ee9c48fe9d139769b13e2e20fa4ba9fc",
+      "evidenceCount": 9,
       "date": "2026-08-23",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "4.5",
       "verdict": "NC",
-      "justification": "Les médias visuels manquent d'audiodescription synchronisée.",
+      "justification": "Video element present without synchronized audio description. The 2-minute presentation video (line 29 medias-html) lacks any audio description track or alternative version with audio description. Test 4.5.1 requires video-only media to have synchronized audio description or alternative version with audio description.",
       "citations": [
         {
           "file": ".ultra11y/pages/medias-html/dom.html",
-          "line": 40,
-          "selector": "marquee",
-          "snippet": "<marquee>Maintenance planifiée le 12 septembre de 2 h à 4 h.</marquee>"
+          "line": 29,
+          "selector": "video",
+          "snippet": "<video src=\"/media/presentation.mp4\" width=\"640\" height=\"360\" controls=\"\"></video>"
         }
       ],
       "findings": [
         {
           "file": ".ultra11y/pages/medias-html/dom.html",
           "line": 29,
-          "message": "Vidéo sans audiodescription synchronisée",
+          "selector": "video",
+          "message": "Video element without synchronized audio description or alternative version",
           "snippet": "<video src=\"/media/presentation.mp4\" width=\"640\" height=\"360\" controls=\"\"></video>",
           "normativeRef": "4.5.1"
         }
       ],
-      "evidenceFingerprint": "sha256:af8695fa1a9df775f98501a385874765",
-      "evidenceCount": 6,
+      "evidenceFingerprint": "sha256:ee9c48fe9d139769b13e2e20fa4ba9fc",
+      "evidenceCount": 9,
       "date": "2026-08-23",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "4.6",
       "verdict": "NA",
-      "justification": "Aucun média n'a d'audiodescription synchronisée à évaluer (voir 4.5).",
-      "citations": [
-        {
-          "file": ".ultra11y/pages/medias-html/dom.html",
-          "line": 40,
-          "selector": "marquee",
-          "snippet": "<marquee>Maintenance planifiée le 12 septembre de 2 h à 4 h.</marquee>"
-        }
-      ],
-      "evidenceFingerprint": "sha256:af8695fa1a9df775f98501a385874765",
-      "evidenceCount": 6,
+      "justification": "Criterion 4.6 applies only to media that already have synchronized audio description. The video element in the audited scope (line 29 medias-html) does not have any audio description, so the prerequisite condition for this criterion is not met. This criterion is not applicable.",
+      "evidenceFingerprint": "sha256:ee9c48fe9d139769b13e2e20fa4ba9fc",
+      "evidenceCount": 9,
       "date": "2026-08-23",
       "decidedBy": "agent"
     },
@@ -950,26 +956,17 @@
     },
     {
       "criteriaId": "13.2",
-      "verdict": "NC",
-      "justification": "La page mentions-legales utilise meta http-equiv refresh pour rediriger automatiquement l'utilisateur.",
+      "verdict": "C",
+      "justification": "The meta refresh element at line 16 of mentions-legales-html redirects the browser to another URL after 3600 seconds. This navigates within the same window rather than opening a new window (pop-up or pop-under). Test 13.2.1 requires verification that no new window opens at document load, which is satisfied—no new window is opened without user action.",
       "citations": [
         {
           "file": ".ultra11y/pages/mentions-legales-html/dom.html",
-          "line": 9,
+          "line": 16,
           "selector": "meta",
-          "snippet": "<meta http-equiv=\"refresh\" content=\"5;url=/mentions-legales.html\">"
+          "snippet": "<meta http-equiv=\"refresh\" content=\"3600;url=/mentions-legales.html\">"
         }
       ],
-      "findings": [
-        {
-          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
-          "line": 9,
-          "message": "Meta refresh sans action utilisateur",
-          "snippet": "<meta http-equiv=\"refresh\" content=\"5;url=/mentions-legales.html\">",
-          "normativeRef": "13.2.1"
-        }
-      ],
-      "evidenceFingerprint": "sha256:1b5ee9dde45a2ac86143f508a048f664",
+      "evidenceFingerprint": "sha256:083af177602f9d0cf45e7497a0fab012",
       "evidenceCount": 1,
       "date": "2026-08-23",
       "decidedBy": "agent"
@@ -1044,9 +1041,15 @@
     },
     {
       "criteriaId": "13.7",
-      "verdict": "C",
-      "justification": "No problematic flash effects or sudden luminosity changes are present. The marquee element provides continuous scrolling text without flashing effects. Video and audio elements do not contain flash or luminosity effects that would violate the criterion thresholds (3+ flashes per second or greater than 21824 pixels cumulative surface).",
+      "verdict": "NA",
+      "justification": "The criterion addresses content that causes abrupt luminosity changes or photosensitive flash effects at frequencies and scales that could trigger seizures. The evidence presented—autoplay audio, marquee text, and video—represents moving or auto-updating content rather than luminosity-changing content. No elements in the audited scope produce the rapid brightness/color alternations defined by criterion 13.7. These elements address separate criteria: autoplay media (4.10), moving text (13.8).",
       "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 112,
+          "selector": "audio",
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>"
+        },
         {
           "file": ".ultra11y/pages/medias-html/dom.html",
           "line": 40,
@@ -1055,19 +1058,13 @@
         },
         {
           "file": ".ultra11y/pages/medias-html/dom.html",
-          "line": 33,
-          "selector": "motion",
-          "snippet": "<!-- autoplay-media · RGAA 4.10 · WCAG 1.4.2 — un son qui démarre seul, sans contrôle"
-        },
-        {
-          "file": ".ultra11y/pages/medias-html/dom.html",
-          "line": 35,
-          "selector": "motion",
-          "snippet": "<audio src=\"/media/journal-incidents.mp3\" autoplay=\"\"></audio>"
+          "line": 29,
+          "selector": "video",
+          "snippet": "<video src=\"/media/presentation.mp4\" width=\"640\" height=\"360\" controls=\"\"></video>"
         }
       ],
-      "evidenceFingerprint": "sha256:af8695fa1a9df775f98501a385874765",
-      "evidenceCount": 6,
+      "evidenceFingerprint": "sha256:ee9c48fe9d139769b13e2e20fa4ba9fc",
+      "evidenceCount": 9,
       "date": "2026-08-23",
       "decidedBy": "agent"
     }
