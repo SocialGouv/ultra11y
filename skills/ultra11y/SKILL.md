@@ -221,7 +221,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   undecidable). Each leaves the criterion `manual` when it cannot measure — never a guess;
   read **`references/pages.md`**.
 - **"Give me the RGAA grid, page by page"** → `pages --in audits/audit-latest.json --standard
-  rgaa` (also embedded in `report`): one row per criterion, one column per page, rebuilt from
+  rgaa` (also embedded in `report`): one row per criterion, one column per page **URL**, rebuilt from
   the committed audit.json alone. Two rules hold: a finding is attributed to a page only when
   something SAYS so (else it is reported as unattributed, never spread), and `C` by silence is
   earned only by a page whose real DOM was audited — a source-only page keeps its undecided

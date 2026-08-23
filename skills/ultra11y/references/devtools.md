@@ -40,7 +40,7 @@ at it in dev and set `window.__ULTRA11Y_ENDPOINT__` if you moved the port.
 ## The dashboard
 
 `http://127.0.0.1:4111` renders the **per-page criterion grid** (`references/pages.md`) for
-every page you have visited: one row per criterion, one column per page, in the standard you
+every page you have visited: one row per criterion, one column per page URL, in the standard you
 chose (`--standard rgaa`). It is a self-contained page — no external stylesheet, no script, no
 network — and it accumulates as you browse. Visit five pages of your app and you have the
 beginnings of a real échantillon, snapshotted and re-auditable offline.

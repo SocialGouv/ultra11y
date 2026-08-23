@@ -298,7 +298,7 @@ Commands:
              SKIP_A11Y=1. Called by hooks/pre-tool-use.mjs, not by hand.
   pages      The per-page criterion grid — RGAA is a per-page norm, the engine's
              verdict is scope-wide, and this bridges the two. One row per criterion
-             (the pack's own under --standard), one column per page. Rebuilt from a
+             (the pack's own under --standard), one column per page URL. Rebuilt from a
              committed audit.json alone: no snapshots on disk, no browser.
              Two honesty rules: a finding is attributed to a page only when something
              SAYS so (the snapshot it was raised on, the scanned URL, the sample page

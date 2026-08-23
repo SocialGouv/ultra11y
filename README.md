@@ -371,7 +371,7 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   fills an input or resizes the viewport — otherwise the snapshot would record our own
   instrumentation instead of the site.
 - **Page by page** — RGAA is a per-page norm; the engine's verdict is scope-wide. `pages`
-  bridges the two: one row per criterion, one column per page, embedded in `report` and
+  bridges the two: one row per criterion, one column per page URL, embedded in `report` and
   rebuilt from a committed `audit.json` alone. The per-page status is not recomputed — a
   per-page *view* of the audit runs through the very same projection the report uses, so grid
   and report agree by construction. Two rules hold the line: a finding is attributed to a page

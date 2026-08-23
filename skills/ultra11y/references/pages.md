@@ -186,7 +186,14 @@ conformancePct, decided, total }], unattributed }`.
 
 One row per criterion (the pack's own under `--standard`), one column per page:
 `C` conforming · `NC` non-conforming · `—` not applicable · `?` to assess. The same grid is
-embedded in `report` whenever pages are in scope. It rebuilds from a committed `audit.json`
+embedded in `report` whenever pages are in scope.
+
+A column is headed by the page's **URL**, not its name. A name is not an address — two routes
+of one app are routinely both called « Accueil », and a `<title>` is written for a browser tab
+rather than for a column. When every page in scope shares an origin (what a crawl of one site
+produces) the header is the **path** and the origin is stated once above the table, because
+nine columns of `https://example.fr/mentions-legales.html` is a table nobody reads; a
+mixed-origin run keeps full URLs, since there the origin *is* part of the identity. It rebuilds from a committed `audit.json`
 **alone** — no snapshots on disk, no browser — because `scope.pages` records the pages and
 every finding carries its `page`.
 
