@@ -3,7 +3,10 @@
      l'en-tête de index.html. Cette page porte les défauts de structure qui s'excluent
      mutuellement avec ceux de index.html : deux <h1>, deux <main>, et un <nav> anonyme
      à côté d'un <nav> nommé. -->
-<html lang="fr">
+<!-- lang-invalid · RGAA 8.4 · WCAG 3.1.1 — « francais » n'est pas une étiquette
+     BCP-47. Sur TOUTES les pages : 8.4 est `judgment: true`, et un code de langue invalide
+     sur une seule page laisse le critère « à évaluer » sur toutes les autres. -->
+<html lang="francais">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -66,6 +69,13 @@
     </main>
 
     <footer>
+      <!-- autoplay-media · RGAA 4.10 · WCAG 1.4.2 — le « jingle Orbit » démarre seul, sur
+           CHAQUE page, et rien ne permet de l'arrêter. Il est sur toutes les pages exprès :
+           4.10 est `judgment: true`, donc le silence ne lui vaut jamais un `C`, et un défaut
+           présent sur une seule page laisse le critère « à évaluer » sur toutes les autres —
+           une grille page par page qu'aucune adjudication ne peut compléter. Voir l'en-tête
+           de index.html. -->
+      <audio src="/media/jingle-orbit.mp3" autoplay></audio>
       <p>© 2026 Orbit.</p>
     </footer>
   </body>
