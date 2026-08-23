@@ -345,10 +345,10 @@ jobs:
       - name: Audit and render the fixture
         run: |
           node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 8 \
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 \
             --runtime local --cwd "$PWD" --merge audits/audit-latest.json --out audits
           node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 8 \
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 \
             --runtime local --cwd "$PWD" --merge audits/audit-latest.json --out audits
 
       # Not `| tee`: a pipeline reports the exit status of its LAST command, so piping this
