@@ -117,20 +117,57 @@
     },
     {
       "criteriaId": "1.8",
-      "verdict": "NA",
-      "justification": "Aucune image texte dans le périmètre. La seule image levée est une carte du réseau — une illustration, pas un texte rendu sous forme d'image ; aucune des cinq pages rendues n'affiche de titre, de bouton ou de libellé sous forme d'image. Le critère n'a pas de sujet.",
+      "verdict": "NC",
+      "justification": "Multiple images and embedded content lack proper text alternatives or replacement mechanisms required by criterion 1.8.",
       "citations": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 32,
+          "line": 56,
           "selector": "img",
-          "snippet": "<img src=\"/img/reseau.png\" alt=\"Carte du réseau Orbit avec douze points de présence\">",
-          "note": "<img> alt=\"Carte du réseau Orbit avec douze points de présence\" aria-label=\"\" src=\"/img/reseau.png\""
+          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 62,
+          "selector": "canvas#latence",
+          "snippet": "<canvas id=\"latence\" width=\"600\" height=\"200\"></canvas>"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 65,
+          "selector": "object",
+          "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>"
         }
       ],
-      "evidenceFingerprint": "sha256:66b0027005a4374b263b31fc4d88e9cf",
-      "evidenceCount": 1,
-      "date": "2026-08-22",
+      "findings": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 56,
+          "selector": "img",
+          "message": "Image with no alt attribute and no replacement mechanism",
+          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">",
+          "normativeRef": "1.8.1"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 62,
+          "selector": "canvas#latence",
+          "message": "Canvas element with no fallback content",
+          "snippet": "<canvas id=\"latence\" width=\"600\" height=\"200\"></canvas>",
+          "normativeRef": "1.8.5"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 65,
+          "selector": "object",
+          "message": "Object element with embedded SVG has no accessible name",
+          "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>",
+          "normativeRef": "1.8.3"
+        }
+      ],
+      "evidenceFingerprint": "sha256:448996d21e64320ae696cdc16066d212",
+      "evidenceCount": 5,
+      "date": "2026-08-23",
       "decidedBy": "agent"
     },
     {
@@ -182,6 +219,35 @@
       ],
       "evidenceFingerprint": "sha256:5ee5cce0d65c3c20e1deff4144ea7848",
       "evidenceCount": 2,
+      "date": "2026-08-23",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "3.1",
+      "verdict": "C",
+      "justification": "Information is conveyed through visible text content, not through color alone. All examined links and text elements remain distinguishable when considering their text content, not relying on color as the sole means of conveying meaning.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 51,
+          "selector": "p",
+          "snippet": "<p style=\"color:#bbbbbb;background:#ffffff\">Facturation à la seconde, sans engagement.</p>"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 14,
+          "selector": "a.skip-link",
+          "snippet": "<a class=\"skip-link\" href=\"#contenu\">Aller au contenu</a>"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 19,
+          "selector": "a",
+          "snippet": "<a href=\"/\">Accueil</a>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:59b4378b41e1b379d5658a52c92a6b79",
+      "evidenceCount": 23,
       "date": "2026-08-23",
       "decidedBy": "agent"
     },
@@ -351,6 +417,32 @@
       ],
       "evidenceFingerprint": "sha256:448996d21e64320ae696cdc16066d212",
       "evidenceCount": 5,
+      "date": "2026-08-23",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "4.11",
+      "verdict": "NA",
+      "justification": "Les pages auditées (contact-html, accueil, cadres-html) ne contiennent aucun média temporel (vidéo, audio, média synchronisé). Aucun élément <video>, <audio>, ou lecteur multimédia temporel n'est présent dans le périmètre audité. Le critère 4.11 ne s'applique donc pas.",
+      "evidenceFingerprint": "sha256:1a25b7806c5aef8643a7e0c4cca1198b",
+      "evidenceCount": 7,
+      "date": "2026-08-23",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "4.12",
+      "verdict": "C",
+      "justification": "Les pages auditées contiennent un média non temporel : un élément <object> de type SVG (carte de réseau) sur la page accueil/dom.html:65. Cet élément SVG est un contenu statique d'affichage (image/svg+xml) sans fonctionnalités interactives ni contrôles utilisateur. Aucun contrôle de consultation n'est exposé sur cet élément, donc aucune interaction clavier n'est requise. Le critère est donc conforme.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 65,
+          "selector": "object",
+          "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:1a25b7806c5aef8643a7e0c4cca1198b",
+      "evidenceCount": 7,
       "date": "2026-08-23",
       "decidedBy": "agent"
     },
@@ -947,6 +1039,35 @@
       ],
       "evidenceFingerprint": "sha256:448996d21e64320ae696cdc16066d212",
       "evidenceCount": 5,
+      "date": "2026-08-23",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "13.7",
+      "verdict": "C",
+      "justification": "No problematic flash effects or sudden luminosity changes are present. The marquee element provides continuous scrolling text without flashing effects. Video and audio elements do not contain flash or luminosity effects that would violate the criterion thresholds (3+ flashes per second or greater than 21824 pixels cumulative surface).",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/medias-html/dom.html",
+          "line": 40,
+          "selector": "marquee",
+          "snippet": "<marquee>Maintenance planifiée le 12 septembre de 2 h à 4 h.</marquee>"
+        },
+        {
+          "file": ".ultra11y/pages/medias-html/dom.html",
+          "line": 33,
+          "selector": "motion",
+          "snippet": "<!-- autoplay-media · RGAA 4.10 · WCAG 1.4.2 — un son qui démarre seul, sans contrôle"
+        },
+        {
+          "file": ".ultra11y/pages/medias-html/dom.html",
+          "line": 35,
+          "selector": "motion",
+          "snippet": "<audio src=\"/media/journal-incidents.mp3\" autoplay=\"\"></audio>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:af8695fa1a9df775f98501a385874765",
+      "evidenceCount": 6,
       "date": "2026-08-23",
       "decidedBy": "agent"
     }
