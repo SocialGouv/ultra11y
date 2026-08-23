@@ -541,9 +541,13 @@ export function renderRedirected(redirected: ScanRedirect[], lang: Lang = "en"):
         ? fr
           ? `HTTP ${r.status ?? "≥ 400"} — page d'erreur rendue à la même adresse`
           : `HTTP ${r.status ?? "≥ 400"} — error page served at the same address`
-        : fr
-          ? "redirection"
-          : "redirect";
+        : r.reason === "error"
+          ? fr
+            ? `le navigateur a échoué sur cette page${r.detail ? ` — ${r.detail}` : ""}`
+            : `the browser failed on this page${r.detail ? ` — ${r.detail}` : ""}`
+          : fr
+            ? "redirection"
+            : "redirect";
     out.push(`| ${r.name} (\`${r.id}\`) | \`${r.requested}\` | \`${r.landed}\` | ${why} |`);
   }
   return out;

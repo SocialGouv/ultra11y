@@ -349,3 +349,67 @@ describe("the keyboard-trap probe tells a composite control from a cage", () => 
     await page.close();
   }, 120_000);
 });
+
+// ---------------------------------------------------------------------------------------------
+// ONE BAD PAGE COSTS ITS OWN PAGE, NOT THE RUN.
+//
+// `runOnPage` drives a real browser, and a real browser throws — a page that reloads itself
+// mid-probe destroys the execution context under `page.evaluate`, an address stops answering,
+// a navigation times out. Uncaught, any of those propagated out of the scan loop and took every
+// OTHER page with it.
+//
+// Measured on a dispatched CI run over tests/fixtures/realworld: mentions-legales.html carried a
+// `<meta http-equiv="refresh" content="5;…">` (RGAA 13.1, a defect real sites have), the probe
+// pass on it ran past five seconds, Playwright raised « Execution context was destroyed », and
+// NINE scanned pages became zero. Every rendering criterion then fell back to « à évaluer » with
+// nothing anywhere saying the scan had died rather than found nothing — a run that measured
+// nothing, reported exactly like a clean one.
+//
+// The failure is forced here with an address nothing is listening on, rather than by racing a
+// meta refresh: the contract under test is CONTAINMENT — whatever the browser throws, it costs
+// one page and is reported by name — and a test that reproduced the original timing would be
+// flaky about the very thing it is pinning.
+describe("a page the browser fails on does not take the scan with it", () => {
+  let flaky: Server | undefined;
+  let flakyOrigin = "";
+
+  beforeAll(async () => {
+    if (!browserAvailable) return;
+    flaky = createServer((req, res) => {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(
+        `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${req.url}</title></head>` +
+          `<body><main><h1>${req.url}</h1><p>Texte</p><a href="/autre">Autre</a><button type="button">Bouton</button></main></body></html>`,
+      );
+    });
+    await new Promise<void>((resolve) => flaky?.listen(0, "127.0.0.1", resolve));
+    const addr = flaky.address();
+    flakyOrigin = typeof addr === "object" && addr ? `http://127.0.0.1:${addr.port}` : "";
+  }, 120_000);
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => (flaky ? flaky.close(() => resolve()) : resolve()));
+  });
+
+  it("scans the pages either side of it, and says which one it refused and why", async () => {
+    if (!browserAvailable) return;
+    const { runScanManyLocal } = await import("../src/scan-local.js");
+    const root = mkdtempSync(join(tmpdir(), "u11y-flaky-"));
+    // Port 1 is privileged and nothing is bound to it: `page.goto` raises rather than returning
+    // a response, which is the shape of every browser-side failure this guard is about.
+    const urls = [`${flakyOrigin}/un`, "http://127.0.0.1:1/boom", `${flakyOrigin}/trois`];
+    const scan = await runScanManyLocal(urls, { cwd: join(dirname(fileURLToPath(import.meta.url)), ".."), snapshotRoot: root, lang: "fr" });
+
+    // The two good pages were recorded. Before the fix this was zero — the throw from the
+    // middle URL escaped the loop and the whole scan died with it.
+    expect(scan.snapshots ?? [], "a page either side of the failing one was lost too").toHaveLength(2);
+
+    // …and the bad one is REFUSED BY NAME rather than quietly missing. A report that is merely
+    // shorter than the site it covers reads exactly like a complete one.
+    const refused = scan.redirected ?? [];
+    expect(refused, "the failing page was dropped without a word").toHaveLength(1);
+    expect(refused[0]?.requested).toContain(":1/boom");
+    expect(refused[0]?.reason, "the refusal does not say the browser failed").toBe("error");
+    expect(refused[0]?.detail ?? "", "the refusal carries nothing a reader could act on").not.toBe("");
+  }, 180_000);
+});

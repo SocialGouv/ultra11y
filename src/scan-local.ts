@@ -830,13 +830,40 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
   const redirected: ScanRedirect[] = [];
   try {
     for (const url of urls) {
-      const out = await runOnPage(browser, AxeBuilder, url, false, {
-        storageState: opts.storageState,
-        interact,
-        allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
-        lang,
-        snapshot: Boolean(opts.snapshotRoot),
-      });
+      // ONE BAD PAGE COSTS ITS OWN PAGE, NOT THE RUN.
+      //
+      // `runOnPage` drives a real browser, and a real browser throws: a page that reloads
+      // itself mid-probe destroys the execution context under `page.evaluate`, and Playwright
+      // says so — « Execution context was destroyed, most likely because of a navigation ».
+      // Uncaught, that propagated out of this loop and took the WHOLE scan with it. Measured on
+      // tests/fixtures/realworld: `mentions-legales.html` carries a `<meta http-equiv=refresh
+      // content="5;…">` — RGAA 13.1, a defect real sites have — the probe pass on it ran past
+      // five seconds, and nine scanned pages became zero. Every rendering criterion then fell
+      // back to « à évaluer » with nothing saying the scan had died rather than found nothing.
+      //
+      // Refused rather than skipped, exactly like the redirect and the HTTP error below: the
+      // page is recorded in `redirected` with what the browser said, so a report is never
+      // merely SHORTER than the site it claims to cover.
+      let out: RunnerOutput;
+      try {
+        out = await runOnPage(browser, AxeBuilder, url, false, {
+          storageState: opts.storageState,
+          interact,
+          allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
+          lang,
+          snapshot: Boolean(opts.snapshotRoot),
+        });
+      } catch (e: unknown) {
+        redirected.push({
+          id: slugifyPageId(url),
+          name: url,
+          requested: url,
+          landed: url,
+          reason: "error",
+          detail: String((e as Error)?.message ?? e).slice(0, 200),
+        });
+        continue;
+      }
       // A CRAWLED URL THAT ANSWERED AN ERROR IS NOT A PAGE OF THE SITE.
       //
       // The sample scan has refused these since it existed, for the reason its own comment
@@ -897,13 +924,28 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
     for (const page of pages) {
       const storageState = page.storageState ?? opts.storageState; // per-page override
       const isFile = !/^https?:\/\//i.test(page.url);
-      const out = await runOnPage(browser, AxeBuilder, page.url, isFile, {
-        storageState,
-        interact,
-        allowClicks: clicksAllowed(storageState, opts.interactClicks),
-        lang,
-        snapshot: Boolean(opts.snapshotRoot),
-      });
+      // Same guarantee as the crawl path above: a page the browser threw on is refused by
+      // name, and the rest of the sample is still scanned.
+      let out: RunnerOutput;
+      try {
+        out = await runOnPage(browser, AxeBuilder, page.url, isFile, {
+          storageState,
+          interact,
+          allowClicks: clicksAllowed(storageState, opts.interactClicks),
+          lang,
+          snapshot: Boolean(opts.snapshotRoot),
+        });
+      } catch (e: unknown) {
+        redirected.push({
+          id: page.id,
+          name: page.name,
+          requested: page.url,
+          landed: page.url,
+          reason: "error",
+          detail: String((e as Error)?.message ?? e).slice(0, 200),
+        });
+        continue;
+      }
       // The declared identity is applied to whatever the browser had on screen, so a page
       // that bounced elsewhere — or answered an error at the same address — would be filed
       // under the name of the page nobody looked at. Drop it instead, and say which one and

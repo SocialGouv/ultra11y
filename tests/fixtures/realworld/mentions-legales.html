@@ -9,9 +9,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- title-missing-empty · RGAA 8.5 · WCAG 2.4.2 -->
     <title></title>
-    <!-- meta-refresh-redirect · RGAA 13.1 · WCAG 2.2.1 — rechargement automatique au bout de
-         cinq secondes, sans moyen de le suspendre. -->
-    <meta http-equiv="refresh" content="5;url=/mentions-legales.html" />
+    <!-- meta-refresh-redirect · RGAA 13.1 · WCAG 2.2.1 — rechargement automatique, sans moyen
+         de le suspendre, de le reporter ni de l'arrêter.
+         UNE HEURE, ET PAS CINQ SECONDES, ET CE N'EST PAS UN ADOUCISSEMENT : le critère est
+         échoué de la même façon (13.1 vise tout rechargement automatique sous vingt heures),
+         mais à cinq secondes la page se rechargeait AU MILIEU des sondes navigateur, détruisait
+         le contexte d'exécution et se faisait refuser — la page portant le défaut sortait du
+         livrable. Le moteur ne perd plus la totalité du scan pour autant (voir
+         `runScanManyLocal`), mais il perd toujours cette page-là, et un jeu d'essai qui ne peut
+         pas être mesuré ne prouve rien. -->
+    <meta http-equiv="refresh" content="3600;url=/mentions-legales.html" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>

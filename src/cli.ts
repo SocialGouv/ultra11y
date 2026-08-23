@@ -3618,9 +3618,16 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
           ? lang === "fr"
             ? `a répondu HTTP ${r.status} à la même adresse`
             : `answered HTTP ${r.status} at the same address`
-          : lang === "fr"
-            ? `a redirigé vers ${r.landed}`
-            : `redirected to ${r.landed}`;
+          : r.reason === "error"
+            ? // Named rather than folded into the redirect wording: « a redirigé vers » its own
+              // address is a sentence that explains nothing, and the browser's message is the
+              // one fact that says which page to go and look at.
+              lang === "fr"
+              ? `a fait échouer le navigateur${r.detail ? ` — ${r.detail}` : ""}`
+              : `made the browser fail${r.detail ? ` — ${r.detail}` : ""}`
+            : lang === "fr"
+              ? `a redirigé vers ${r.landed}`
+              : `redirected to ${r.landed}`;
       console.error(
         lang === "fr"
           ? `⚠️ ultra11y scan : « ${r.name} » (${r.id}) non enregistrée — ${r.requested} ${why}. L'enregistrer aurait décrit cet écran sous le nom demandé.`

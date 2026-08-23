@@ -55634,7 +55634,7 @@ function renderRedirected(redirected, lang = "en") {
     "| --- | --- | --- | --- |"
   ];
   for (const r of redirected) {
-    const why = r.reason === "http-status" ? fr ? `HTTP ${r.status ?? "\u2265 400"} \u2014 page d'erreur rendue \xE0 la m\xEAme adresse` : `HTTP ${r.status ?? "\u2265 400"} \u2014 error page served at the same address` : fr ? "redirection" : "redirect";
+    const why = r.reason === "http-status" ? fr ? `HTTP ${r.status ?? "\u2265 400"} \u2014 page d'erreur rendue \xE0 la m\xEAme adresse` : `HTTP ${r.status ?? "\u2265 400"} \u2014 error page served at the same address` : r.reason === "error" ? fr ? `le navigateur a \xE9chou\xE9 sur cette page${r.detail ? ` \u2014 ${r.detail}` : ""}` : `the browser failed on this page${r.detail ? ` \u2014 ${r.detail}` : ""}` : fr ? "redirection" : "redirect";
     out2.push(`| ${r.name} (\`${r.id}\`) | \`${r.requested}\` | \`${r.landed}\` | ${why} |`);
   }
   return out2;
@@ -61726,13 +61726,26 @@ async function runScanManyLocal(urls, opts) {
   const redirected = [];
   try {
     for (const url of urls) {
-      const out2 = await runOnPage(browser, AxeBuilder, url, false, {
-        storageState: opts.storageState,
-        interact,
-        allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
-        lang,
-        snapshot: Boolean(opts.snapshotRoot)
-      });
+      let out2;
+      try {
+        out2 = await runOnPage(browser, AxeBuilder, url, false, {
+          storageState: opts.storageState,
+          interact,
+          allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
+          lang,
+          snapshot: Boolean(opts.snapshotRoot)
+        });
+      } catch (e) {
+        redirected.push({
+          id: slugifyPageId(url),
+          name: url,
+          requested: url,
+          landed: url,
+          reason: "error",
+          detail: String(e?.message ?? e).slice(0, 200)
+        });
+        continue;
+      }
       if (out2.httpStatus !== void 0 && out2.httpStatus >= 400) {
         redirected.push({
           id: slugifyPageId(url),
@@ -61774,13 +61787,26 @@ async function runSampleScanLocal(pages, opts) {
     for (const page of pages) {
       const storageState = page.storageState ?? opts.storageState;
       const isFile = !/^https?:\/\//i.test(page.url);
-      const out2 = await runOnPage(browser, AxeBuilder, page.url, isFile, {
-        storageState,
-        interact,
-        allowClicks: clicksAllowed(storageState, opts.interactClicks),
-        lang,
-        snapshot: Boolean(opts.snapshotRoot)
-      });
+      let out2;
+      try {
+        out2 = await runOnPage(browser, AxeBuilder, page.url, isFile, {
+          storageState,
+          interact,
+          allowClicks: clicksAllowed(storageState, opts.interactClicks),
+          lang,
+          snapshot: Boolean(opts.snapshotRoot)
+        });
+      } catch (e) {
+        redirected.push({
+          id: page.id,
+          name: page.name,
+          requested: page.url,
+          landed: page.url,
+          reason: "error",
+          detail: String(e?.message ?? e).slice(0, 200)
+        });
+        continue;
+      }
       const requestedUrl = isFile ? "file://" + resolve12(page.url) : page.url;
       const landedUrl = out2.landedUrl ?? out2.url;
       if (!landedOnRequestedPage(requestedUrl, landedUrl)) {
@@ -70674,7 +70700,12 @@ async function cmdScan(p) {
   }
   if (dynamic.redirected?.length) {
     for (const r of dynamic.redirected) {
-      const why = r.reason === "http-status" ? lang === "fr" ? `a r\xE9pondu HTTP ${r.status} \xE0 la m\xEAme adresse` : `answered HTTP ${r.status} at the same address` : lang === "fr" ? `a redirig\xE9 vers ${r.landed}` : `redirected to ${r.landed}`;
+      const why = r.reason === "http-status" ? lang === "fr" ? `a r\xE9pondu HTTP ${r.status} \xE0 la m\xEAme adresse` : `answered HTTP ${r.status} at the same address` : r.reason === "error" ? (
+        // Named rather than folded into the redirect wording: « a redirigé vers » its own
+        // address is a sentence that explains nothing, and the browser's message is the
+        // one fact that says which page to go and look at.
+        lang === "fr" ? `a fait \xE9chouer le navigateur${r.detail ? ` \u2014 ${r.detail}` : ""}` : `made the browser fail${r.detail ? ` \u2014 ${r.detail}` : ""}`
+      ) : lang === "fr" ? `a redirig\xE9 vers ${r.landed}` : `redirected to ${r.landed}`;
       console.error(
         lang === "fr" ? `\u26A0\uFE0F ultra11y scan : \xAB ${r.name} \xBB (${r.id}) non enregistr\xE9e \u2014 ${r.requested} ${why}. L'enregistrer aurait d\xE9crit cet \xE9cran sous le nom demand\xE9.` : `\u26A0\uFE0F ultra11y scan: "${r.name}" (${r.id}) not recorded \u2014 ${r.requested} ${why}. Recording it would have described that screen under the requested name.`
       );

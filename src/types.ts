@@ -86,9 +86,13 @@ export interface ScanRedirect {
   // WHY it was refused. `redirect`: the browser ended up at another address. `http-status`:
   // it stayed at the requested one but the server answered an error — a framework's own
   // not-found page is a full, valid document at the right URL, which no address comparison
-  // can tell from the real thing.
-  reason?: "redirect" | "http-status";
+  // can tell from the real thing. `error`: the browser threw while measuring it, and `detail`
+  // carries what it said.
+  reason?: "redirect" | "http-status" | "error";
   status?: number;
+  /** What the browser said, when `reason` is `error`. Truncated — it is a signpost to the
+   *  page, not a stack trace. */
+  detail?: string;
 }
 
 // ---- WCAG 2.2 canonical core (src/data/wcag.json, produced by scripts/build-standards.mjs)
