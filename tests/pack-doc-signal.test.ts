@@ -163,6 +163,60 @@ describe("every producer carries the doctype out of the browser", () => {
   });
 });
 
+// A PAGE WITH AN EMPTY <title> IS STILL A PAGE, and it used to vanish.
+//
+// `document.title` is `""` — not undefined — on a page whose <title> is empty, so
+// `page?.name ?? collected.title ?? id` kept the empty string, `validateSnapshotMeta` refused a
+// meta with a blank `name`, and `writeRunnerSnapshot` returned undefined. No snapshot, no entry
+// in `scope.pages`, no column in the per-page grid — and nothing said so, because a drop that is
+// not a redirect never reaches `redirected` either.
+//
+// The page it swallowed is the one carrying RGAA 8.5 / WCAG 2.4.2: an empty <title> IS that
+// non-conformity, so the deliverable came back one page SHORTER instead of one finding louder,
+// and a shorter deliverable reads exactly like a complete one. Measured on
+// tests/fixtures/realworld: nine pages crawled, eight snapshots written, no warning.
+describe("a page that names itself nothing is still recorded", () => {
+  it("keeps the page when its <title> is empty, and names it from the URL", () => {
+    const id = writeRunnerSnapshot(
+      root,
+      { url: "https://example.test/mentions-legales.html", violations: [], reflow: { horizontalScroll: false }, snapshot: { dom: DOM, title: "" } },
+      "https://example.test/mentions-legales.html",
+    );
+    expect(id, "a page with an empty <title> was dropped instead of recorded").toBeTruthy();
+    const meta = JSON.parse(readFileSync(join(root, PAGES_DIR, id!, "meta.json"), "utf8"));
+    // `nameFromUrl` is the repository's existing answer to "this document names itself nothing",
+    // and it reads as a name rather than as the raw slug.
+    expect(meta.name).toBe("Mentions legales");
+  });
+
+  it("keeps a whitespace-only <title> out too — it is a blank name by any reading", () => {
+    const id = writeRunnerSnapshot(
+      root,
+      { url: "https://example.test/vide", violations: [], reflow: { horizontalScroll: false }, snapshot: { dom: DOM, title: "   " } },
+      "https://example.test/vide",
+    );
+    expect(id).toBeTruthy();
+    expect(JSON.parse(readFileSync(join(root, PAGES_DIR, id!, "meta.json"), "utf8")).name).toBe("Vide");
+  });
+
+  it("still prefers a real title, and a declared sample name over both", () => {
+    const withTitle = writeRunnerSnapshot(
+      root,
+      { url: "https://example.test/t", violations: [], reflow: { horizontalScroll: false }, snapshot: { dom: DOM, title: "Nos tarifs" } },
+      "https://example.test/t",
+    );
+    expect(JSON.parse(readFileSync(join(root, PAGES_DIR, withTitle!, "meta.json"), "utf8")).name).toBe("Nos tarifs");
+
+    const declared = writeRunnerSnapshot(
+      root,
+      { url: "https://example.test/d", violations: [], reflow: { horizontalScroll: false }, snapshot: { dom: DOM, title: "Nos tarifs" } },
+      "https://example.test/d",
+      { id: "grille", name: "Grille tarifaire", url: "https://example.test/d" },
+    );
+    expect(JSON.parse(readFileSync(join(root, PAGES_DIR, declared!, "meta.json"), "utf8")).name).toBe("Grille tarifaire");
+  });
+});
+
 // Where the bug actually lived. `validateSnapshotMeta` rebuilds the meta from a whitelist, so
 // it dropped every field nobody had thought to name — and it guards BOTH directions: the
 // `snapshot write` ingest and the read back off disk. A producer could record the doctype

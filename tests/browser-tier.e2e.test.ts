@@ -299,3 +299,50 @@ describe("the recall fixture's rendered tier", () => {
     }
   }, 180_000);
 });
+
+// ---------------------------------------------------------------------------------------------
+// 2.1.2, AND THE ONE CONTROL THAT LOOKS EXACTLY LIKE A CAGE WITHOUT BEING ONE.
+//
+// A `bloquant` false positive is the most expensive kind this tool can emit: it is the severity
+// that turns a gate red and a release around. `input[type=date]` produced one. Chromium splits
+// it into day, month, year and the picker button, and Tab walks those WITHOUT changing
+// `document.activeElement` — so the trap walk, which confirmed over three presses, watched focus
+// sit still on a field every keyboard user crosses in four and called it a cage.
+//
+// These two cases are the whole contract, and they must be asserted together: a probe made safe
+// by never accusing anything is not a fixed probe, it is a deleted one.
+describe("the keyboard-trap probe tells a composite control from a cage", () => {
+  const withBody = async (body: string) => {
+    const page = await browser!.newPage();
+    await page.setContent(`<!doctype html><html lang="fr"><head><title>t</title></head><body>${body}</body></html>`, { waitUntil: "load" });
+    return page;
+  };
+
+  it("does not accuse a native multi-segment editor, whatever its type", async () => {
+    if (!browserAvailable) return;
+    const { probeKeyboardTrap } = await import("../src/probes.js");
+    for (const type of ["date", "time", "datetime-local", "month", "week"]) {
+      const page = await withBody(
+        `<a href="/a">A</a><label for="f">F</label><input id="f" type="${type}"><label for="g">G</label><input id="g" type="text"><a href="/b">B</a>`,
+      );
+      const hits = await probeKeyboardTrap(page);
+      expect(hits.map((h) => h.selector), `input[type=${type}] was reported as a keyboard trap`).toEqual([]);
+      await page.close();
+    }
+  }, 120_000);
+
+  it("still catches a real cage sitting after one of them", async () => {
+    if (!browserAvailable) return;
+    // The date field first, so the walk has to cross it before it can reach the trap — which is
+    // exactly the arrangement that used to end the walk two iterations in.
+    const { probeKeyboardTrap } = await import("../src/probes.js");
+    const page = await withBody(
+      `<a href="/a">A</a><label for="d">D</label><input id="d" type="date">` +
+        `<label for="t">T</label><input id="t" onkeydown="if(event.key==='Tab'){event.preventDefault();this.focus();}">` +
+        `<a href="/b">B</a>`,
+    );
+    const hits = await probeKeyboardTrap(page);
+    expect(hits.map((h) => h.selector).join(","), "the trap behind a date field was not found").toContain("#t");
+    await page.close();
+  }, 120_000);
+});

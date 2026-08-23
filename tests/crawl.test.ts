@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseSitemapUrls, extractLinks, crawlUrls, canonicalUrl, crawlBound } from "../src/crawl.js";
+import { parseSitemapUrls, extractLinks, crawlUrls, canonicalUrl, crawlBound, isDownloadUrl } from "../src/crawl.js";
 
 describe("parseSitemapUrls", () => {
   it("extracts every <loc> from a urlset, trimming whitespace", () => {
@@ -31,6 +31,39 @@ describe("extractLinks", () => {
       <a href="/page#top">hash</a>
       <a href="/page">dup</a>`;
     expect(extractLinks(html, base)).toEqual(["https://exemple.fr/page"]);
+  });
+
+  // A DOWNLOAD IS NOT A PAGE, and enqueueing one costs a crawl slot to learn nothing.
+  //
+  // Chromium answers a PDF link with a download rather than a navigation, so `page.goto` either
+  // times out or lands on about:blank. Measured on tests/fixtures/realworld: a documents page
+  // with four download links ate three of the twelve crawl slots and printed three
+  // « non enregistrée — HTTP 404 » warnings, which read as a broken site rather than as a
+  // crawler following links it should never have followed.
+  it("does not enqueue links to files a browser downloads instead of rendering", () => {
+    const html = `
+      <a href="/rapport.pdf">Rapport</a>
+      <a href="/contrat.docx">Contrat</a>
+      <a href="/annexe.XLSX">Annexe</a>
+      <a href="/archive.zip">Archive</a>
+      <a href="/demo.mp4">Démo</a>
+      <a href="/logo.svg">Logo</a>
+      <a href="/tarifs">Tarifs</a>`;
+    expect(extractLinks(html, base)).toEqual(["https://exemple.fr/tarifs"]);
+  });
+
+  it("keeps a page whose path merely CONTAINS a document extension", () => {
+    // The match is anchored at the end of the path: `/guide-pdf` and `/pdf/lecteur` are pages,
+    // and a filter that matched anywhere would silently drop a whole section of a site.
+    const html = `<a href="/guide-pdf">Guide</a><a href="/pdf/lecteur">Lecteur</a><a href="/a.pdf?v=2">Fichier</a>`;
+    expect(extractLinks(html, base)).toEqual(["https://exemple.fr/guide-pdf", "https://exemple.fr/pdf/lecteur"]);
+  });
+
+  it("exposes the same judgement on its own, so a caller never re-implements the list", () => {
+    expect(isDownloadUrl("https://exemple.fr/a.pdf")).toBe(true);
+    expect(isDownloadUrl("/dossier/b.DOCX")).toBe(true);
+    expect(isDownloadUrl("https://exemple.fr/contact")).toBe(false);
+    expect(isDownloadUrl("/")).toBe(false);
   });
 });
 
