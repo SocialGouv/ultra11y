@@ -64,15 +64,25 @@ describe("RGAA applicability — an image-alt NC no longer over-projects", () =>
       expect(pack.criteria.find((c) => c.id === id)?.judgment, `RGAA ${id} must be flagged judgment`).toBe(true);
     }
     // The guard bites where the criterion HAS a subject to be broader about: this page carries
-    // a language, a title and a link, so those questions are still open.
-    for (const id of ["8.4", "8.6", "13.3", "13.4"]) {
+    // a language and a title, so those questions are still open.
+    for (const id of ["8.4", "8.6"]) {
       expect(statusOf(rows, id), `RGAA ${id} must never be C`).not.toBe("C");
+      expect(rows.find((r) => r.id === id)?.inapplicable, `RGAA ${id} has a subject here`).toBeUndefined();
     }
-    // …and it does not bite where there is no subject at all. 4.10 asks whether automatically
-    // triggered SOUND is controllable; this page has no media, so there is nothing to control
-    // and nothing to rule on. Reopening it would print a row of work that does not exist.
-    expect(statusOf(rows, "4.10")).toBe("C");
-    expect(rows.find((r) => r.id === "4.10")?.inapplicable).toBe(true);
+    // …and it does not bite where there is no subject at all — where the honest answer is
+    // « nothing of that kind here », which reads `C` and carries `inapplicable`. 4.10 asks
+    // whether automatically triggered SOUND is controllable and this page has no media; 13.3
+    // and 13.4 ask about downloadable documents and this page links to none. Reopening any of
+    // them would print a row of work that does not exist.
+    //
+    // 13.3/13.4 reach that answer only since absence is asked BEFORE a mapped SC's NC is
+    // inherited: both map onto 1.1.1, which IS non-conforming here (the alt-less image), and
+    // that sibling failure used to short-circuit them to « à évaluer » on every page with an
+    // unrelated image defect — permanently, since both are `judgment`.
+    for (const id of ["4.10", "13.3", "13.4"]) {
+      expect(statusOf(rows, id), `RGAA ${id} has no subject here and must read C`).toBe("C");
+      expect(rows.find((r) => r.id === id)?.inapplicable, `RGAA ${id} must say it is C for want of a subject`).toBe(true);
+    }
     // The mechanical siblings are untouched: presence of a language / of a title really is
     // what the engine checked, so they stay decidable.
     for (const id of ["8.3", "8.5"]) {
@@ -365,5 +375,83 @@ describe("packConformancePct", () => {
     const corePct = 50;
     expect(packConformancePct(derived)).toBe(67);
     expect(packConformancePct(derived)).not.toBe(corePct);
+  });
+});
+
+// ABSENCE IS A PER-PAGE FACT, and asking it of the whole run left criteria open for ever.
+//
+// `subjectsSeen` answers "does anything of this kind exist ANYWHERE in scope?". That is the
+// right question for the run's grid and the wrong one for a page: a criterion whose subject
+// lives on one route could never be closed on the others, because scope-wide presence cannot
+// conclude absence here — and a `judgment` criterion never earns a `C` by silence either. The
+// audit now folds subjects per page as well, and `pageView` narrows onto that.
+//
+// Only EXISTENCE_SUBJECTS can conclude anything from it, and those are element species whose
+// absence on a page is a fact a reader can check. The site-level criteria are safe by
+// construction — RGAA 12.1–12.5 declare `navMechanisms`/`repeatedBlocks`, neither of which is
+// an existence subject — so narrowing can never close « the ensemble has two navigation
+// systems » on a page that happens to carry one. That is asserted below, not assumed.
+describe("a criterion is closed for absence ON A PAGE, not only across the run", () => {
+  const site = mkdtempSync(join(tmpdir(), "u11y-perpage-"));
+  // Two pages. One declares a language and links to a PDF; the other declares neither — and
+  // its missing language is its own defect, RGAA 8.3.
+  const withLang = join(site, "avec.html");
+  const noLang = join(site, "sans.html");
+  writeFileSync(
+    withLang,
+    `<!doctype html><html lang="fr"><head><title>Avec</title></head><body><main><h1>Avec</h1>` +
+      `<a href="/rapport.pdf">Rapport</a><nav aria-label="Principale"><a href="/sans.html">Sans</a></nav></main></body></html>`,
+  );
+  writeFileSync(
+    noLang,
+    `<!doctype html><html><head><title>Sans</title></head><body><main><h1>Sans</h1>` + `<p>Aucune langue déclarée ici.</p></main></body></html>`,
+  );
+  const audit = runAudit({ inputs: [site] });
+
+  it("folds the subjects each document carries, per page as well as per run", () => {
+    // Source files are not pages — only a snapshot is — so this audit records no per-page fold
+    // and the run-wide one still answers. The fold itself is exercised end to end by the
+    // browser tier and by the RGAA fixture; what matters here is that its ABSENCE changes
+    // nothing, so an audit written before it reads exactly as it always did.
+    expect(audit.scope.subjectsSeen, "the run-wide fold must still be recorded").toBeDefined();
+    expect(audit.scope.subjectsSeen).toContain("downloadDocs");
+  });
+
+  it("does not let a sibling criterion's NC keep an absent-subject criterion open", () => {
+    // THE BRANCH THIS FIXES. `sans.html` declares no language, so WCAG 3.1.1 is non-conforming
+    // there — because RGAA 8.3 failed, not 8.4. 8.4 asks « pour chaque page AYANT une langue
+    // par défaut, le code est-il pertinent ? » and its subject, `declaredLang`, is not there.
+    //
+    // Inheriting 3.1.1's NC read that as "assess this separately", which is the right answer
+    // for a criterion whose subject exists and nobody has ruled on, and a permanent open for
+    // one with nothing to assess: 8.4 is `judgment`, so silence never closes it either.
+    const only = runAudit({ inputs: [noLang] });
+    const rows = derivePackResults(only, "rgaa");
+    expect(statusOf(rows, "8.3"), "the missing language is still its own non-conformity").toBe("NC");
+    const c84 = rows.find((r) => r.id === "8.4");
+    expect(c84?.status, "8.4 has no language code to judge on a page that declares none").toBe("C");
+    expect(c84?.inapplicable, "…and it must say it is C for want of a subject, never as a verdict").toBe(true);
+  });
+
+  it("still leaves 8.4 open where a language IS declared", () => {
+    // The other half, and the one that stops this from being a licence to close: the subject is
+    // there, so whether `fr` is the language the content is actually written in is nobody's
+    // verdict yet.
+    const only = runAudit({ inputs: [withLang] });
+    const rows = derivePackResults(only, "rgaa");
+    const c84 = rows.find((r) => r.id === "8.4");
+    expect(c84?.status, "8.4 must stay open where a code was declared").toBe("manual");
+    expect(c84?.inapplicable).toBeUndefined();
+  });
+
+  it("never closes a site-level navigation criterion for want of a subject", () => {
+    // 12.1–12.5 are about an ENSEMBLE of pages. Their subjects are deliberately not existence
+    // subjects, so no absence — per page or per run — may conclude anything about them. A page
+    // with no navigation at all is a failure of those criteria, never an inapplicability.
+    const only = runAudit({ inputs: [noLang] });
+    const rows = derivePackResults(only, "rgaa");
+    for (const id of ["12.1", "12.2", "12.3", "12.4", "12.5"]) {
+      expect(rows.find((r) => r.id === id)?.inapplicable, `RGAA ${id} must never be closed for absence`).toBeUndefined();
+    }
   });
 });

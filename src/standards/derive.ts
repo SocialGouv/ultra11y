@@ -337,6 +337,25 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
     // still attach for display (a recommendation, never a non-conformity). This ordering
     // matters: an attached advisory recommendation must not let a scoped-out sibling NC
     // silently flip us to a foreign verdict.
+    // …UNLESS OUR OWN SUBJECT IS NOT HERE AT ALL, in which case there is nothing to assess
+    // separately and « manual » is simply wrong.
+    //
+    // A sibling's NC says something of ITS kind failed. It says nothing about ours, and the
+    // branch below reads it as "come back to this one later" — which is right when our subject
+    // exists and nobody has ruled on it, and a permanent open when it does not.
+    //
+    // Measured on tests/fixtures/realworld: mentions-legales.html declares no language (its
+    // seeded 8.3 defect), so WCAG 3.1.1 is NC there. RGAA 8.4 — « pour chaque page AYANT une
+    // langue par défaut, le code est-il pertinent ? », subject `declaredLang` — attaches no
+    // finding of its own, inherited 3.1.1's NC through this branch, and stayed « à évaluer » on
+    // that page for ever: it is `judgment: true`, so silence never earned it a `C` either, and
+    // no adjudication could reach a criterion the run-level worklist had already closed.
+    //
+    // Ordered before the sibling check rather than after, because the two answer different
+    // questions and absence is the more specific one.
+    if (subjectAbsent(pc)) {
+      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS as Status, findings, scs: pc.wcag, inapplicable: true };
+    }
     if (scResults.some((r) => r.status === "NC")) {
       return { id: pc.id, theme: pc.theme, status: "manual" as Status, findings, scs: pc.wcag, scopedOut: true };
     }

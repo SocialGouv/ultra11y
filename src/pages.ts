@@ -477,8 +477,25 @@ export interface PageGridModel {
  *  overrides, advisory handling and secondary mappings all come from the one implementation
  *  instead of a second, drifting copy here. */
 export function pageView(result: AuditResult, page: PageResult): AuditResult {
+  // `subjectsSeen` is narrowed to THIS page when the audit recorded the per-page fold.
+  //
+  // Without it the projection asked a run-wide question of a single page — "does anything of
+  // this kind exist ANYWHERE?" — so a criterion whose subject lives on one route stayed open on
+  // every other one for ever: absence could not be concluded, and a `judgment` criterion never
+  // earns a `C` by silence either. RGAA 8.4 on the one page declaring no language was exactly
+  // that, and no adjudication could reach it.
+  //
+  // Only EXISTENCE_SUBJECTS can conclude anything from this (subjectsAbsent), and those are
+  // element species whose absence on a page is a fact a reader can check. The site-level
+  // criteria are untouched by construction: RGAA 12.1–12.5 declare `navMechanisms` /
+  // `repeatedBlocks`, neither of which is an existence subject, so narrowing can never close
+  // « the ensemble has two navigation systems » on a page that happens to carry one.
+  //
+  // Absent map ⇒ unchanged behaviour, so an audit written before the fold reads as it always did.
+  const own = result.scope.pageSubjects?.[page.id];
   return {
     ...result,
+    ...(own ? { scope: { ...result.scope, subjectsSeen: own } } : {}),
     criteria: page.criteria,
     findings: page.findings,
     ...(result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {}),

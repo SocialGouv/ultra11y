@@ -44949,6 +44949,32 @@ var SUBJECTS = {
     )
   ]),
   // The document's own language declaration.
+  // THE LANGUAGE CODE THAT IS ACTUALLY THERE — RGAA 8.4's own subject, and NOT `docLang`.
+  //
+  // 8.3 and 8.4 read the same element and ask opposite questions. 8.3 (« la page a-t-elle une
+  // langue par défaut ? ») is about the `<html>` element, and its subject must be present even
+  // when the attribute is missing — that absence IS its non-conformity. 8.4 (« POUR CHAQUE PAGE
+  // AYANT UNE LANGUE PAR DÉFAUT, le code est-il pertinent ? ») is about the code, and on a page
+  // that declares none the criterion has, in the referential's own words, nothing to be about.
+  //
+  // Sharing `docLang` made 8.4 unclosable exactly there: the subject was seen (the `<html>`
+  // element is always seen), so absence could never be concluded, and 8.4 is `judgment: true`
+  // so silence never earned it a `C` either. Measured on tests/fixtures/realworld: one page
+  // declares no language — that is its seeded 8.3 defect — and 8.4 stayed « à évaluer » on it
+  // for ever, on every run, with nothing any adjudicator could read.
+  //
+  // Same correction as 13.2 and 7.4 further down: the refusal was right about the rule and
+  // wrong about the SUBJECT.
+  declaredLang: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, "html").filter((e) => (attr(e, "lang") ?? attr(e, "xml:lang") ?? "").trim() !== "").map(
+      (e) => h(
+        d,
+        e,
+        `<html lang="${attr(e, "lang") ?? attr(e, "xml:lang")}"> \u2014 is this code the language the content is actually written in?`,
+        `declaredlang|${attr(e, "lang") ?? attr(e, "xml:lang")}`
+      )
+    )
+  ),
   docLang: (docs) => docs.flatMap(
     (d) => elementsByTag(d, "html").map(
       (e) => h(d, e, `<html lang="${attr(e, "lang") ?? ""}"> \u2014 is it present, valid, and the language of the content?`, `doclang|${attr(e, "lang") ?? ""}`)
@@ -45370,7 +45396,8 @@ var PACK_SUBJECTS = {
     // is the ONLY place its subject can be named.
     "8.1": ["doctype"],
     "8.3": ["docLang"],
-    "8.4": ["docLang"],
+    // 8.4 asks about the CODE, 8.3 about the element — see `declaredLang`.
+    "8.4": ["declaredLang"],
     "8.5": ["docTitle"],
     "8.6": ["docTitle"],
     "8.7": ["langParts"],
@@ -45466,7 +45493,10 @@ var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set([
   "frames",
   "downloadDocs",
   "newWindow",
-  "contextChange"
+  "contextChange",
+  // A page that declares no default language has no language code for 8.4 to be about. The
+  // `<html>` element is always there; the attribute is what this subject looks for.
+  "declaredLang"
 ]);
 var subjectsForSc = (sc) => SC_SUBJECTS[sc] ?? [];
 var ownPackSubjects = (standard, id) => PACK_SUBJECTS[standard]?.[id];
@@ -49513,7 +49543,8 @@ function newAccum() {
     renderedRan: /* @__PURE__ */ new Map(),
     probedScs: /* @__PURE__ */ new Map(),
     axeRan: /* @__PURE__ */ new Set(),
-    subjectsSeen: /* @__PURE__ */ new Set()
+    subjectsSeen: /* @__PURE__ */ new Set(),
+    pageSubjects: /* @__PURE__ */ new Map()
   };
 }
 function primarySubtag(lang) {
@@ -49554,6 +49585,9 @@ function foldDoc(acc, doc, graph) {
   const pageId = snapshotPageId(doc.file);
   if (pageId) {
     acc.pageIds.add(pageId);
+    const own = acc.pageSubjects.get(pageId) ?? /* @__PURE__ */ new Set();
+    for (const id of subjectsPresentIn(doc, own)) own.add(id);
+    acc.pageSubjects.set(pageId, own);
     for (const ruleId of renderedRulesRan(doc.signals)) {
       const seen = acc.renderedRan.get(ruleId) ?? /* @__PURE__ */ new Set();
       seen.add(pageId);
@@ -49817,6 +49851,9 @@ function finalize(acc, inputs, extra = {}) {
       // nothing, `undefined` says this audit predates the fold. A pack derivation must be
       // able to tell those apart before concluding NA from silence.
       ...acc.fileCount > 0 ? { subjectsSeen: [...acc.subjectsSeen].sort() } : {},
+      // Per page, and omitted when no page was read — same rule as above: absent means "this
+      // audit predates the fold", never "nothing was found".
+      ...acc.pageSubjects.size ? { pageSubjects: Object.fromEntries([...acc.pageSubjects].map(([id, set]) => [id, [...set].sort()])) } : {},
       // The pages this run genuinely read. Written UNCONDITIONALLY — `[]` is the whole point,
       // because "this audit read no page" is exactly the claim a source-only run needs to make,
       // and an omit-when-empty field would say nothing precisely then. See scope.pagesAudited.
@@ -54470,6 +54507,9 @@ function derivePackResults(audit2, packKey, pageId) {
     if (normativeFindings.length) {
       return { id: pc.id, theme: pc.theme, status: "NC", findings, scs: pc.wcag };
     }
+    if (subjectAbsent(pc)) {
+      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS, findings, scs: pc.wcag, inapplicable: true };
+    }
     if (scResults.some((r) => r.status === "NC")) {
       return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag, scopedOut: true };
     }
@@ -55601,8 +55641,10 @@ function pageOriginNote(origin, lang) {
   return origin ? L3[lang].originNote(origin) : void 0;
 }
 function pageView(result, page) {
+  const own = result.scope.pageSubjects?.[page.id];
   return {
     ...result,
+    ...own ? { scope: { ...result.scope, subjectsSeen: own } } : {},
     criteria: page.criteria,
     findings: page.findings,
     ...result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {}

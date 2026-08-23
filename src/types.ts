@@ -598,6 +598,10 @@ export interface AuditResult {
      *  then READ by every projection — the pack derivation above all, since a country
      *  standard is where a reader actually counts rows. See EXISTENCE_SUBJECTS. */
     subjectsSeen?: string[];
+    /** The same fold per page id — what `pageView` narrows `subjectsSeen` onto, so a criterion
+     *  can be closed for absence ON A PAGE and not only across the run. Absent on an audit
+     *  written before the fold existed; that is "unknown", never "nothing". */
+    pageSubjects?: Record<string, string[]>;
     // Sample pages a `scan --sample` REFUSED to record, and why. They are deliberately absent
     // from `sample` above — a page kept there would be re-added to the per-page grid with the
     // same basis as one really visited, so the deliverable would claim a page nobody looked

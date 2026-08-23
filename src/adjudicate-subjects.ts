@@ -565,6 +565,36 @@ export const SUBJECTS: Record<string, Subject> = {
     ]),
 
   // The document's own language declaration.
+  // THE LANGUAGE CODE THAT IS ACTUALLY THERE — RGAA 8.4's own subject, and NOT `docLang`.
+  //
+  // 8.3 and 8.4 read the same element and ask opposite questions. 8.3 (« la page a-t-elle une
+  // langue par défaut ? ») is about the `<html>` element, and its subject must be present even
+  // when the attribute is missing — that absence IS its non-conformity. 8.4 (« POUR CHAQUE PAGE
+  // AYANT UNE LANGUE PAR DÉFAUT, le code est-il pertinent ? ») is about the code, and on a page
+  // that declares none the criterion has, in the referential's own words, nothing to be about.
+  //
+  // Sharing `docLang` made 8.4 unclosable exactly there: the subject was seen (the `<html>`
+  // element is always seen), so absence could never be concluded, and 8.4 is `judgment: true`
+  // so silence never earned it a `C` either. Measured on tests/fixtures/realworld: one page
+  // declares no language — that is its seeded 8.3 defect — and 8.4 stayed « à évaluer » on it
+  // for ever, on every run, with nothing any adjudicator could read.
+  //
+  // Same correction as 13.2 and 7.4 further down: the refusal was right about the rule and
+  // wrong about the SUBJECT.
+  declaredLang: (docs) =>
+    docs.flatMap((d) =>
+      elementsByTag(d, "html")
+        .filter((e) => (attr(e, "lang") ?? attr(e, "xml:lang") ?? "").trim() !== "")
+        .map((e) =>
+          h(
+            d,
+            e,
+            `<html lang="${attr(e, "lang") ?? attr(e, "xml:lang")}"> — is this code the language the content is actually written in?`,
+            `declaredlang|${attr(e, "lang") ?? attr(e, "xml:lang")}`,
+          ),
+        ),
+    ),
+
   docLang: (docs) =>
     docs.flatMap((d) =>
       elementsByTag(d, "html").map((e) =>
@@ -1083,7 +1113,8 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // is the ONLY place its subject can be named.
     "8.1": ["doctype"],
     "8.3": ["docLang"],
-    "8.4": ["docLang"],
+    // 8.4 asks about the CODE, 8.3 about the element — see `declaredLang`.
+    "8.4": ["declaredLang"],
     "8.5": ["docTitle"],
     "8.6": ["docTitle"],
     "8.7": ["langParts"],
@@ -1256,6 +1287,9 @@ export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   "downloadDocs",
   "newWindow",
   "contextChange",
+  // A page that declares no default language has no language code for 8.4 to be about. The
+  // `<html>` element is always there; the attribute is what this subject looks for.
+  "declaredLang",
 ]);
 
 /** The subjects that decide a success criterion. Empty ⇒ the criterion has none declared,

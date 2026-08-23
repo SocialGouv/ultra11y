@@ -385,6 +385,12 @@ interface Accum {
   // « nothing of this kind exists here ». See EXISTENCE_SUBJECTS for what may be concluded
   // from a subject's silence, and what may not.
   subjectsSeen: Set<string>;
+  // The same fold, PER PAGE. `subjectsSeen` answers "does anything of this kind exist in the
+  // whole run?", which is the right question for the run's grid and the wrong one for a page:
+  // a criterion whose subject lives on one route was open on all the others for ever, because
+  // scope-wide presence can never conclude absence HERE. See pageView (src/pages.ts), which
+  // narrows onto this, and EXISTENCE_SUBJECTS for the only subjects allowed to conclude at all.
+  pageSubjects: Map<string, Set<string>>;
   // AXE coverage: page ids on which an axe pass actually RAN. Separate from `probedScs`
   // because axe covers a whole family of criteria at once rather than one per probe, and
   // because — the same rule as everywhere in this tier — a rule engine that did not run has
@@ -423,6 +429,7 @@ function newAccum(): Accum {
     probedScs: new Map(),
     axeRan: new Set(),
     subjectsSeen: new Set(),
+    pageSubjects: new Map(),
   };
 }
 
@@ -503,6 +510,11 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
   const pageId = snapshotPageId(doc.file);
   if (pageId) {
     acc.pageIds.add(pageId);
+    // The subject fold, scoped to THIS page. Its own `skip` set, never the run-wide one:
+    // sharing that would record a subject on the first page that carried it and on no other.
+    const own = acc.pageSubjects.get(pageId) ?? new Set<string>();
+    for (const id of subjectsPresentIn(doc, own)) own.add(id);
+    acc.pageSubjects.set(pageId, own);
     for (const ruleId of renderedRulesRan(doc.signals)) {
       const seen = acc.renderedRan.get(ruleId) ?? new Set<string>();
       seen.add(pageId);
@@ -897,6 +909,9 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       // nothing, `undefined` says this audit predates the fold. A pack derivation must be
       // able to tell those apart before concluding NA from silence.
       ...(acc.fileCount > 0 ? { subjectsSeen: [...acc.subjectsSeen].sort() } : {}),
+      // Per page, and omitted when no page was read — same rule as above: absent means "this
+      // audit predates the fold", never "nothing was found".
+      ...(acc.pageSubjects.size ? { pageSubjects: Object.fromEntries([...acc.pageSubjects].map(([id, set]) => [id, [...set].sort()])) } : {}),
       // The pages this run genuinely read. Written UNCONDITIONALLY — `[]` is the whole point,
       // because "this audit read no page" is exactly the claim a source-only run needs to make,
       // and an omit-when-empty field would say nothing precisely then. See scope.pagesAudited.
