@@ -326,7 +326,10 @@ describe("the keyboard-trap probe tells a composite control from a cage", () => 
         `<a href="/a">A</a><label for="f">F</label><input id="f" type="${type}"><label for="g">G</label><input id="g" type="text"><a href="/b">B</a>`,
       );
       const hits = await probeKeyboardTrap(page);
-      expect(hits.map((h) => h.selector), `input[type=${type}] was reported as a keyboard trap`).toEqual([]);
+      expect(
+        hits.map((h) => h.selector),
+        `input[type=${type}] was reported as a keyboard trap`,
+      ).toEqual([]);
       await page.close();
     }
   }, 120_000);
