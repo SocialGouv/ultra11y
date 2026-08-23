@@ -287,7 +287,7 @@ async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, dead
   if (!count) return [];
   const hits = [];
   const seen = /* @__PURE__ */ new Set();
-  const limit = Math.min(count + 2, limits.maxFocusables + 10);
+  const limit = tabPressBudget(count, limits);
   let prevKey = null;
   for (let i = 0; i < limit; i++) {
     if (deadline?.out()) break;
@@ -316,6 +316,9 @@ var NATIVE_SEGMENT_STOPS = {
   month: 4,
   week: 4
 };
+function tabPressBudget(count, limits) {
+  return Math.min(count * 2 + 20, limits.maxFocusables * 2 + 20);
+}
 var FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
   const e = document.activeElement;
   if (!e || e === document.body || e === document.documentElement) return null;
@@ -330,7 +333,7 @@ async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
   const hits = [];
   const seen = /* @__PURE__ */ new Set();
   const confirmPresses = 2;
-  const limit = Math.min(count + 2, limits.maxFocusables + 10);
+  const limit = tabPressBudget(count, limits);
   let prev = null;
   for (let i = 0; i < limit; i++) {
     if (deadline?.out()) break;

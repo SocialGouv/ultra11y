@@ -249,7 +249,7 @@ export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimi
   if (!count) return [];
   const hits: ProbeHit[] = [];
   const seen = new Set<string>();
-  const limit = Math.min(count + 2, limits.maxFocusables + 10);
+  const limit = tabPressBudget(count, limits);
   let prevKey: string | null = null;
   for (let i = 0; i < limit; i++) {
     // A tab ring of 130 elements is two round-trips each on a loaded CI runner. Stopping at
@@ -286,19 +286,6 @@ export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimi
   return hits;
 }
 
-// 2.1.2 No Keyboard Trap — where the ACTIVE element is, and whether it is still inside the
-// page. `focusSetupExpr` has already tagged the focusable ring with `data-u11y-f`; this reads
-// the tag back, so the walk below identifies an element without re-querying the document on
-// every step.
-//
-// `null` means focus has left the ring — body, documentElement, or nothing at all, which is
-// what Playwright reports once Tab hands focus back to the browser chrome. That is the NORMAL
-// end of a tab ring, never a trap, and conflating the two would report every well-behaved page.
-//
-// `tagged` decides whether the caller may COMPARE two observations. An element the setup pass
-// never tagged is identified by its selector alone, and a selector is not an identity: two links
-// in the same list share one, so a walk that compared them would report a trap on a page whose
-// focus was moving perfectly well. Untagged means « cannot accuse ».
 // HOW MANY TAB STOPS ONE NATIVE CONTROL LEGITIMATELY HOLDS.
 //
 // A date field is not one tab stop. Chromium splits `input[type=date]` into day, month, year
@@ -328,6 +315,34 @@ export const NATIVE_SEGMENT_STOPS: Record<string, number> = {
   week: 4,
 };
 
+/** THE PRESS BUDGET OF A TAB WALK, which is not the same number as the ring's length.
+ *
+ *  Both walks below bounded themselves at `count + 2` PRESSES while `count` counts ELEMENTS,
+ *  and the two only agree on a page where every control is crossed in one press. A composite
+ *  native editor costs up to seven (see NATIVE_SEGMENT_STOPS), so a form with a handful of date
+ *  fields ran the budget out before the end of the ring — and stopped measuring without saying
+ *  so, which is the same silent under-coverage the wrap test used to produce.
+ *
+ *  The ceiling is generous because it is a BACKSTOP, not a schedule: `seen` stops the walk as
+ *  soon as the ring closes, `hits` caps what is recorded, and `deadline` bounds the wall clock.
+ *  What this number must never do is stop a walk that still had ring left to cross. */
+function tabPressBudget(count: number, limits: ProbeLimits): number {
+  return Math.min(count * 2 + 20, limits.maxFocusables * 2 + 20);
+}
+
+// 2.1.2 No Keyboard Trap — where the ACTIVE element is, and whether it is still inside the
+// page. `focusSetupExpr` has already tagged the focusable ring with `data-u11y-f`; this reads
+// the tag back, so the walk below identifies an element without re-querying the document on
+// every step.
+//
+// `null` means focus has left the ring — body, documentElement, or nothing at all, which is
+// what Playwright reports once Tab hands focus back to the browser chrome. That is the NORMAL
+// end of a tab ring, never a trap, and conflating the two would report every well-behaved page.
+//
+// `tagged` decides whether the caller may COMPARE two observations. An element the setup pass
+// never tagged is identified by its selector alone, and a selector is not an identity: two links
+// in the same list share one, so a walk that compared them would report a trap on a page whose
+// focus was moving perfectly well. Untagged means « cannot accuse ».
 export const FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
   const e = document.activeElement;
   if (!e || e === document.body || e === document.documentElement) return null;
@@ -358,7 +373,7 @@ export async function probeKeyboardTrap(page: Any, limits: ProbeLimits = PROBE_D
   const hits: ProbeHit[] = [];
   const seen = new Set<string>();
   const confirmPresses = 2;
-  const limit = Math.min(count + 2, limits.maxFocusables + 10);
+  const limit = tabPressBudget(count, limits);
   type Where = { key: string; tagged?: boolean; selector: string; html: string; segments?: number };
   let prev: Where | null = null;
   for (let i = 0; i < limit; i++) {
