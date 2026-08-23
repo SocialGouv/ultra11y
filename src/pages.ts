@@ -340,6 +340,7 @@ const L = {
     notAuditedNote:
       "Une page marquée « non audité » a bien un instantané, mais CET audit ne l'a pas lu (il ne portait que sur les sources). L'absence de constat n'y vaut donc PAS conformité — relancez l'audit en incluant `.ultra11y/pages`.",
     agentMark: "`C*` : conformité tranchée par l'agent IA à partir des évidences citées (gaté), et non prouvée par le moteur déterministe.",
+    originNote: (o: string) => `Les colonnes sont les URL des pages, relatives à \`${o}\`.`,
   },
   en: {
     title: "Per-page grid",
@@ -358,6 +359,7 @@ const L = {
     notAuditedNote:
       'A page marked "not audited" does have a snapshot, but THIS audit never read it (it covered sources only). Absence of a finding there does NOT mean conforming — re-run the audit with `.ultra11y/pages` in scope.',
     agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
+    originNote: (o: string) => `Columns are the pages' URLs, relative to \`${o}\`.`,
   },
 } as const;
 
@@ -399,6 +401,59 @@ export function basisLabel(basis: PageScope["basis"], lang: Lang): string {
 /** Honesty rule 1, as one sentence: findings no page could claim are reported, never spread. */
 export function unattributedNote(n: number, lang: Lang): string {
   return L[lang].unattributed(n);
+}
+
+/** THE COLUMN HEADER OF THE CRITERIA × PAGES MATRIX: the page's URL.
+ *
+ *  It used to be the page's NAME, and a name is not an address. Two routes of the same app are
+ *  routinely called « Accueil » and « Accueil (connecté) »; a `<title>` is written for a browser
+ *  tab, not for a column; and the reader of a per-page grid is looking for the page they are
+ *  about to go and fix. The URL is the only column header that says which page a cell is about
+ *  without the reader having to guess.
+ *
+ *  The PATH, when every page shares one origin — which is what a crawl of one site produces, so
+ *  it is the ordinary case. `http://127.0.0.1:8932/mentions-legales.html` repeated across nine
+ *  columns is a table nobody can read; `/mentions-legales.html` is the same fact, and the origin
+ *  is stated once in `pageOriginNote` beneath the grid. A mixed-origin run keeps full URLs,
+ *  because there the origin IS part of the identity.
+ *
+ *  Exported for the same reason `formatRate` and `basisLabel` are: the Markdown grid, the HTML
+ *  grid and the pull-request grid all draw this header, and a surface that composes its own is
+ *  a surface that will drift from the other two. */
+export function pageColumnLabel(page: { url: string; auth?: boolean }, origin?: string): string {
+  let label = page.url;
+  if (origin && page.url.startsWith(origin)) {
+    const rest = page.url.slice(origin.length);
+    label = rest === "" ? "/" : rest;
+  }
+  return `${label}${page.auth ? " 🔒" : ""}`;
+}
+
+/** The one origin every page in scope shares, or undefined when they do not share one.
+ *
+ *  `undefined` is a real answer and not a failure: a run that spans two hosts must show both in
+ *  full, and a run over `file://` captures or source-attributed pages has no origin at all. */
+export function commonOrigin(pages: { url: string }[]): string | undefined {
+  if (!pages.length) return undefined;
+  let origin: string | undefined;
+  for (const p of pages) {
+    let o: string;
+    try {
+      o = new URL(p.url).origin;
+    } catch {
+      return undefined; // not an absolute URL — a source-attributed page, or a bare route
+    }
+    if (origin === undefined) origin = o;
+    else if (origin !== o) return undefined;
+  }
+  return origin;
+}
+
+/** « Les colonnes sont les URL … » — the sentence that says what the column headers are and,
+ *  when they were shortened, what they were shortened against. Without it a reader of a grid
+ *  headed `/tarifs.html` has no way to know which host it is a path of. */
+export function pageOriginNote(origin: string | undefined, lang: Lang): string | undefined {
+  return origin ? L[lang].originNote(origin) : undefined;
 }
 
 /** One criterion's row in the cross-page grid: its id, its rendered label, and the group
@@ -526,7 +581,10 @@ export function renderPageGrid(result: AuditResult, pages: PageScope[], standard
   out.push(`> ${s.note}`, "");
   if (derived.some((p) => p.basis === "attributed")) out.push(`> ⚠️ ${s.basisNote}`, "");
 
-  const head = [isCore(standard) ? s.criterion : s.criterion, ...derived.map((p) => `${p.name}${p.auth ? " 🔒" : ""}`)];
+  const origin = commonOrigin(derived);
+  const originNote = pageOriginNote(origin, lang);
+  if (originNote) out.push(`> ${originNote}`, "");
+  const head = [s.criterion, ...derived.map((p) => pageColumnLabel(p, origin))];
   out.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
   // THE MODEL FIRST, because the rate is a summary OF THIS GRID and has to be computed from
   // the rows it is printed above. It was read off `PageResult` instead — which is always the

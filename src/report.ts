@@ -496,6 +496,18 @@ function render(
   // counts, then the page's findings). UNNUMBERED heading so the 1–5 section numbering
   // `check` requires stays intact and the packReportNcIds parser (section 2) never sees it.
   //
+  // EACH PAGE FOLDS, and the matrix above is what a reader meets first.
+  //
+  // The two sections answer the same question at two grains. « Grille par page » answers it
+  // ACROSS pages — one row per criterion, one column per URL — which is the shape that says
+  // whether 10.7 fails everywhere or on one route. This one answers it for a single page, and
+  // on a nine-page RGAA run it is nine headings and up to 270 bullets between the matrix and
+  // whatever follows. Unfolded, the summary of the deliverable is buried inside its appendix.
+  //
+  // Folded, nothing is removed: every bullet, every screenshot and every cap notice is exactly
+  // where it was, one click away, and the per-page dossiers (`pages --format report`) still
+  // carry the full auditor blocks.
+  //
   // It keys on `pageScope`, not on `scope.sample`. A sample was once the only way a page
   // reached the report, but a SNAPSHOT is now the better one (its findings were raised on
   // the page's real DOM, and it is the only basis that can earn conformity). Keying on the
@@ -516,7 +528,10 @@ function render(
     for (const pg of derived) {
       const nc = pg.findings.filter((f) => !f.advisory);
       const adv = pg.findings.filter((f) => f.advisory);
-      out.push(`### ${pg.name} — \`${pg.url}\` — ${pg.auth ? s.authYes : s.authNo}`, "");
+      // <details> rather than a heading: GFM only renders Markdown inside one after a blank
+      // line, and the summary line carries the same identity the heading did — name, URL, auth
+      // — so a reader scanning the folded list loses nothing.
+      out.push("<details>", `<summary>${pg.name} — <code>${pg.url}</code> — ${pg.auth ? s.authYes : s.authNo}</summary>`, "");
       out.push(`- ${nc.length} ${s.ncCount}${adv.length ? ` · ${adv.length} ${s.advCount}` : ""}`);
       const notes = pageScope.find((x) => x.id === pg.id)?.notes;
       if (notes) out.push(`- _${notes}_`);
@@ -551,7 +566,7 @@ function render(
       // house style as the other scope caveats above — the count is right there in the heading,
       // so a reader who stops at the thirtieth bullet must be told there is a thirty-first.
       if (nc.length > PER_PAGE_MAX) out.push(`  - _${s.perPageMore(nc.length - PER_PAGE_MAX, nc.length)}_`);
-      out.push("");
+      out.push("", "</details>", "");
     }
   }
 

@@ -286,7 +286,9 @@ describe("the main report speaks of every page in scope, not only a scanned samp
     expect(result.scope.sample).toBeUndefined();
     const md = renderPackReport(result, loadPack("rgaa"), "fr");
     expect(md).toContain("## 📄 Constats par page");
-    expect(md).toContain("### Contact — `https://exemple.fr/contact`");
+    // Each page FOLDS under the matrix above it, so its identity travels in the <summary>
+    // rather than in an `###` heading. Same three facts — name, URL, auth.
+    expect(md).toContain("<summary>Contact — <code>https://exemple.fr/contact</code>");
   });
 
   it("keeps the §1–5 numbering the conformance gate requires", () => {

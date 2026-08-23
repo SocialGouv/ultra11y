@@ -60,7 +60,7 @@ const OUT_OF_SCOPE: Record<string, string> = {
  *  doctype on purpose; the browser tier is where it is asserted. */
 const PACK_CAPTURE_ONLY = ["pack:rgaa:doctype-missing"];
 
-const audit = (): ReturnType<typeof runAudit> => runAudit({ inputs: [SITE], graph: true, standard: "rgaa" });
+const audit = (): ReturnType<typeof runAudit> => runAudit({ inputs: [SITE], graph: true });
 
 describe("the recall fixture catches every rule the engine ships", () => {
   const result = audit();
@@ -92,7 +92,7 @@ describe("the recall fixture catches every rule the engine ships", () => {
     // Without `graph: true` neither can be raised — which is the point of the pair.
     expect(fired.has("cross-icon-only-unnamed")).toBe(true);
     expect(fired.has("cross-prop-drilled-name-lost")).toBe(true);
-    const flat = runAudit({ inputs: [SITE], standard: "rgaa" });
+    const flat = runAudit({ inputs: [SITE] });
     const flatIds = new Set(flat.findings.map((f) => f.ruleId));
     expect(flatIds.has("cross-icon-only-unnamed"), "a cross-file rule fired without a graph").toBe(false);
     expect(flatIds.has("cross-prop-drilled-name-lost"), "a cross-file rule fired without a graph").toBe(false);
@@ -109,7 +109,7 @@ describe("the recall fixture catches every rule the engine ships", () => {
   it("leaves the clean landing page alone — the recall fixture did not become a false-positive fixture", () => {
     // The two fixtures answer the two halves. If seeding defects next door had also started
     // raising findings on genuinely accessible markup, this is where it would show.
-    const clean = runAudit({ inputs: [join(__dirname, "fixtures", "clean-landing")], standard: "rgaa" });
+    const clean = runAudit({ inputs: [join(__dirname, "fixtures", "clean-landing")] });
     const blocking = [...clean.findings, ...(clean.packFindings ?? [])].filter((f) => f.severity === "bloquant" || f.severity === "majeur");
     expect(blocking, `unexpected finding on clean markup: ${JSON.stringify(blocking)}`).toHaveLength(0);
   });

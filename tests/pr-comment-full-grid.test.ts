@@ -58,10 +58,13 @@ describe("the page comment carries the whole criterion grid", () => {
     }
   });
 
-  it("gives each page its own column, so a cell is one page's standing on one criterion", () => {
+  it("gives each page its own column, headed by its URL, so a cell is one page's standing on one criterion", () => {
+    // The header carries the page's address rather than its name — see `pageColumnLabel`. Both
+    // pages share an origin here, so the columns are paths and the origin is named once above.
     const md = pagesComment(audit(), { standard: "rgaa", lang: "fr" });
-    const header = md.split("\n").find((l) => l.includes("Accueil") && l.includes("Contact") && l.startsWith("|"));
+    const header = md.split("\n").find((l) => l.startsWith("|") && l.includes("| / |") && l.includes("| /contact |"));
     expect(header, "no grid header row with one column per page").toBeDefined();
+    expect(md, "the origin the column paths are relative to is never stated").toContain("https://x");
   });
 
   it("says what conforms, not only what fails", () => {

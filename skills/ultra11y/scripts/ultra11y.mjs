@@ -55537,7 +55537,8 @@ var L3 = {
     source: "source",
     notAudited: "non audit\xE9",
     notAuditedNote: "Une page marqu\xE9e \xAB non audit\xE9 \xBB a bien un instantan\xE9, mais CET audit ne l'a pas lu (il ne portait que sur les sources). L'absence de constat n'y vaut donc PAS conformit\xE9 \u2014 relancez l'audit en incluant `.ultra11y/pages`.",
-    agentMark: "`C*` : conformit\xE9 tranch\xE9e par l'agent IA \xE0 partir des \xE9vidences cit\xE9es (gat\xE9), et non prouv\xE9e par le moteur d\xE9terministe."
+    agentMark: "`C*` : conformit\xE9 tranch\xE9e par l'agent IA \xE0 partir des \xE9vidences cit\xE9es (gat\xE9), et non prouv\xE9e par le moteur d\xE9terministe.",
+    originNote: (o) => `Les colonnes sont les URL des pages, relatives \xE0 \`${o}\`.`
   },
   en: {
     title: "Per-page grid",
@@ -55552,7 +55553,8 @@ var L3 = {
     source: "source",
     notAudited: "not audited",
     notAuditedNote: 'A page marked "not audited" does have a snapshot, but THIS audit never read it (it covered sources only). Absence of a finding there does NOT mean conforming \u2014 re-run the audit with `.ultra11y/pages` in scope.',
-    agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine."
+    agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
+    originNote: (o) => `Columns are the pages' URLs, relative to \`${o}\`.`
   }
 };
 function formatRate(rate, decided, total) {
@@ -55571,6 +55573,32 @@ function basisLabel(basis, lang) {
 }
 function unattributedNote(n, lang) {
   return L3[lang].unattributed(n);
+}
+function pageColumnLabel(page, origin) {
+  let label = page.url;
+  if (origin && page.url.startsWith(origin)) {
+    const rest = page.url.slice(origin.length);
+    label = rest === "" ? "/" : rest;
+  }
+  return `${label}${page.auth ? " \u{1F512}" : ""}`;
+}
+function commonOrigin(pages) {
+  if (!pages.length) return void 0;
+  let origin;
+  for (const p of pages) {
+    let o;
+    try {
+      o = new URL(p.url).origin;
+    } catch {
+      return void 0;
+    }
+    if (origin === void 0) origin = o;
+    else if (origin !== o) return void 0;
+  }
+  return origin;
+}
+function pageOriginNote(origin, lang) {
+  return origin ? L3[lang].originNote(origin) : void 0;
 }
 function pageView(result, page) {
   return {
@@ -55633,7 +55661,10 @@ function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   }
   out2.push(`> ${s.note}`, "");
   if (derived.some((p) => p.basis === "attributed")) out2.push(`> \u26A0\uFE0F ${s.basisNote}`, "");
-  const head = [isCore(standard) ? s.criterion : s.criterion, ...derived.map((p) => `${p.name}${p.auth ? " \u{1F512}" : ""}`)];
+  const origin = commonOrigin(derived);
+  const originNote = pageOriginNote(origin, lang);
+  if (originNote) out2.push(`> ${originNote}`, "");
+  const head = [s.criterion, ...derived.map((p) => pageColumnLabel(p, origin))];
   out2.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
   const { rows, status } = pageGridModel(result, derived, standard, lang);
   out2.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id))}**`).join(" | ")} |`);
@@ -56202,7 +56233,7 @@ function render(r, lang, opts) {
     for (const pg of derived) {
       const nc = pg.findings.filter((f) => !f.advisory);
       const adv = pg.findings.filter((f) => f.advisory);
-      out2.push(`### ${pg.name} \u2014 \`${pg.url}\` \u2014 ${pg.auth ? s.authYes : s.authNo}`, "");
+      out2.push("<details>", `<summary>${pg.name} \u2014 <code>${pg.url}</code> \u2014 ${pg.auth ? s.authYes : s.authNo}</summary>`, "");
       out2.push(`- ${nc.length} ${s.ncCount}${adv.length ? ` \xB7 ${adv.length} ${s.advCount}` : ""}`);
       const notes = pageScope.find((x) => x.id === pg.id)?.notes;
       if (notes) out2.push(`- _${notes}_`);
@@ -56225,7 +56256,7 @@ function render(r, lang, opts) {
         out2.push(`  - [${label}] \`${f.selectorHint}\` \u2014 ${mdText(resolveMessage(f, lang))}`);
       }
       if (nc.length > PER_PAGE_MAX) out2.push(`  - _${s.perPageMore(nc.length - PER_PAGE_MAX, nc.length)}_`);
-      out2.push("");
+      out2.push("", "</details>", "");
     }
   }
   out2.push(`## ${s.cTitle}`, "");
@@ -63469,6 +63500,8 @@ function perPageTable(result, standard = CORE2, lang = "en") {
     ...scoreboardTable(result, derived, standard, s, lang),
     "",
     ...basisCaveats(result, derived, s, lang),
+    ...fullGridBlock(result, derived, standard, s, lang),
+    "",
     ...derived.flatMap((pg) => [...namedCriteriaBlock(result, pg, standard, s, lang), ""])
   ].join("\n");
 }
@@ -63594,7 +63627,9 @@ function fullGridBlock(result, derived, standard, s, lang) {
   const { rows, status } = pageGridModel(result, derived, standard, lang);
   if (!rows.length || !derived.length) return [];
   const cell = (v) => v.replace(/\|/g, "\\|");
-  const head = [s.criterion, ...derived.map((p) => `${cell(p.name)}${p.auth ? " \u{1F512}" : ""}`)];
+  const origin = commonOrigin(derived);
+  const originNote = pageOriginNote(origin, lang);
+  const head = [s.criterion, ...derived.map((p) => cell(pageColumnLabel(p, origin)))];
   const out2 = [
     "<details>",
     `<summary><b>${s.fullGrid}</b> \u2014 ${rows.length} \xD7 ${derived.length}</summary>`,
@@ -63602,6 +63637,7 @@ function fullGridBlock(result, derived, standard, s, lang) {
     "",
     `> ${s.gridLegend}`,
     "",
+    ...originNote ? [`> ${originNote}`, ""] : [],
     `| ${head.join(" | ")} |`,
     `| ${head.map(() => "---").join(" | ")} |`
   ];
@@ -64420,10 +64456,12 @@ function crossGridBlocks(result, derived, standard, lang) {
   if (!derived.length) return [];
   const { rows, status } = pageGridModel(result, derived, standard, lang);
   if (!rows.length) return [];
+  const origin = commonOrigin(derived);
+  const originNote = pageOriginNote(origin, lang);
   const table = {
     kind: "table",
     caption: t3.crossGridCaption,
-    columns: [{ text: t3.criterion }, ...derived.map((p) => ({ text: `${p.name}${p.auth ? " \u{1F512}" : ""}` }))],
+    columns: [{ text: t3.criterion }, ...derived.map((p) => ({ text: pageColumnLabel(p, origin) }))],
     rows: []
   };
   let group = "";
@@ -64434,7 +64472,12 @@ function crossGridBlocks(result, derived, standard, lang) {
     }
     table.rows.push([{ text: row.label }, ...derived.map((p) => ({ status: status.get(row.id)?.get(p.id) ?? "manual", text: "" }))]);
   }
-  return [{ kind: "heading", level: 2, text: t3.grid, id: "grid" }, { kind: "note", tone: "info", runs: ticks(t3.legend) }, table];
+  return [
+    { kind: "heading", level: 2, text: t3.grid, id: "grid" },
+    { kind: "note", tone: "info", runs: ticks(t3.legend) },
+    ...originNote ? [{ kind: "note", tone: "info", runs: ticks(originNote) }] : [],
+    table
+  ];
 }
 function pageGridBlocks(result, page, standard, lang) {
   const t3 = T4[lang];

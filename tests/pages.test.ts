@@ -230,12 +230,27 @@ describe("the rendered grid", () => {
   const nc = F({ page: "accueil", criteriaId: "1.1.1" });
   const r = audit({ findings: [nc], criteria: [C("1.1.1", "NC", [nc]), C("2.4.2", "C"), C("1.4.3", "manual")] });
 
-  it("has one column per page and one row per criterion", () => {
+  it("has one column per page and one row per criterion, keyed on the page's URL", () => {
+    // The header is the page's ADDRESS, not its name: two routes of one app are routinely both
+    // called « Accueil », and the reader of this grid is looking for the page to go and fix.
+    // Shared origin, so the columns are paths and the origin is stated once above the table.
     const md = renderPageGrid(r, PAGES, "wcag", "en");
-    expect(md).toContain("Accueil");
-    expect(md).toContain("Contact");
+    const header = md.split("\n").find((l) => l.startsWith("| Criterion |"));
+    expect(header, "no header row").toBeDefined();
+    expect(header).toContain("| / |");
+    expect(header).toContain("| /contact |");
+    expect(md).toContain("https://x"); // the origin the paths are relative to, named once
     expect(md).toContain("1.1.1");
     expect(md).toContain("1.4.3");
+  });
+
+  it("keeps the full URL when the pages do not share one origin", () => {
+    // Two hosts: there the origin IS part of the identity, and shortening would merge two
+    // different pages into one column header.
+    const mixed = [PAGES[0]!, { ...PAGES[1]!, url: "https://autre.example/contact" }];
+    const md = renderPageGrid(r, mixed, "wcag", "en");
+    expect(md).toContain("https://x/");
+    expect(md).toContain("https://autre.example/contact");
   });
 
   it("speaks the pack's own criteria under --standard", () => {

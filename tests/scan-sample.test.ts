@@ -91,8 +91,10 @@ describe("report « Constats par page » section", () => {
   it("renders a per-page synthesis (name + URL + auth badge + NC count) in the WCAG report", () => {
     const md = renderReport(merged, "fr");
     expect(md).toContain("## 📄 Constats par page");
-    expect(md).toContain("### Page d'accueil — `https://example.fr/` — 🌐 public");
-    expect(md).toContain("### Mon compte — `https://example.fr/compte` — 🔒 authentification requise");
+    // Folded under the criteria × pages matrix: the identity line is the <summary>, not an
+    // `###` heading, and carries the same name + URL + auth badge it always did.
+    expect(md).toContain("<summary>Page d'accueil — <code>https://example.fr/</code> — 🌐 public</summary>");
+    expect(md).toContain("<summary>Mon compte — <code>https://example.fr/compte</code> — 🔒 authentification requise</summary>");
     expect(md).toContain("Éléments transverses audités sur chaque page : En-tête, Navigation, Pied de page.");
     expect(md).toMatch(/- 1 non-conformité\(s\)/);
   });

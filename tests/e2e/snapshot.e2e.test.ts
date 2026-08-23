@@ -197,12 +197,16 @@ describe("the per-page grid, rebuilt from the audit JSON alone", () => {
     expect(accueil?.basis).toBe("snapshot");
   });
 
-  it("renders a grid naming both pages and the RGAA criteria", () => {
+  it("renders a grid naming both pages by URL, and the RGAA criteria", () => {
     const cwd = mkTmp();
     twoPages(cwd);
     const md = runCli(["pages", "--in", "audit-latest.json", "--standard", "rgaa", "--lang", "fr"], { cwd }).stdout;
-    expect(md).toContain("Page d'accueil"); // the page NAME from meta.json, not its id
-    expect(md).toContain("Contact");
+    // Columns are the pages' URLs — an address, not a `<title>`. Both share an origin here,
+    // so they render as paths with the origin stated once above the table.
+    const header = md.split("\n").find((l) => l.startsWith("| Critère |"));
+    expect(header, "no header row").toBeDefined();
+    expect(header).toContain("| /contact |");
+    expect(md).toContain("https://example.com");
     expect(md).toContain("Images"); // RGAA theme 1
     expect(md).toContain("NC");
   });

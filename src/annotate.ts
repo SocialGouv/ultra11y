@@ -29,10 +29,13 @@ import {
   agentMarkNote,
   attributePages,
   basisLabel,
+  commonOrigin,
   derivePages,
   formatRate,
   pageBasisWarning,
+  pageColumnLabel,
   pageGridModel,
+  pageOriginNote,
   pagesOf,
   renderRedirected,
   unattributedFindings,
@@ -524,12 +527,26 @@ export function perPageTable(result: AuditResult, standard: StandardId = CORE, l
   attributePages(result, scope);
   const derived = derivePages(result, scope);
   // The summary has a 1 MiB budget: it never clamps, and passes every page.
+  //
+  // THE MATRIX LEADS, and the per-page id lists follow it folded.
+  //
+  // Both answer "which criteria, on which page", and only one of them answers it in a shape a
+  // reader can compare across pages. `namedCriteriaBlock` prints one <details> per page with
+  // four id lists inside: on a nine-page RGAA run that is nine blocks and 954 ids, and finding
+  // out whether 10.7 fails everywhere or only on one route means opening all nine and reading
+  // each list. The same fact is one row of the matrix.
+  //
+  // The lists are kept, folded, underneath: they carry the CONFORMING ids too, and under a
+  // per-page norm most of a deliverable is what conforms. Leading with the matrix changes
+  // which question the summary answers first, and removes nothing.
   return [
     `### ${s.perPage}`,
     "",
     ...scoreboardTable(result, derived, standard, s, lang),
     "",
     ...basisCaveats(result, derived, s, lang),
+    ...fullGridBlock(result, derived, standard, s, lang),
+    "",
     ...derived.flatMap((pg) => [...namedCriteriaBlock(result, pg, standard, s, lang), ""]),
   ].join("\n");
 }
@@ -762,7 +779,9 @@ function fullGridBlock(result: AuditResult, derived: PageResult[], standard: Sta
   const { rows, status } = pageGridModel(result, derived, standard, lang);
   if (!rows.length || !derived.length) return [];
   const cell = (v: string): string => v.replace(/\|/g, "\\|");
-  const head = [s.criterion, ...derived.map((p) => `${cell(p.name)}${p.auth ? " 🔒" : ""}`)];
+  const origin = commonOrigin(derived);
+  const originNote = pageOriginNote(origin, lang);
+  const head = [s.criterion, ...derived.map((p) => cell(pageColumnLabel(p, origin)))];
   const out: string[] = [
     "<details>",
     `<summary><b>${s.fullGrid}</b> — ${rows.length} × ${derived.length}</summary>`,
@@ -770,6 +789,7 @@ function fullGridBlock(result: AuditResult, derived: PageResult[], standard: Sta
     "",
     `> ${s.gridLegend}`,
     "",
+    ...(originNote ? [`> ${originNote}`, ""] : []),
     `| ${head.join(" | ")} |`,
     `| ${head.map(() => "---").join(" | ")} |`,
   ];

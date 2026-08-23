@@ -154,6 +154,40 @@ describe("job summary", () => {
     const md = stepSummary(a, { lang: "fr" });
     expect(md).toContain("Accueil");
   });
+
+  it("leads the per-page section with the criteria × URLs matrix, not with the id lists", () => {
+    // THE SHAPE OF THE ANSWER, and it is the whole point of the section. Both the matrix and
+    // the per-page id lists say which criteria fail where; only the matrix says it in a shape
+    // a reader can compare ACROSS pages. On a nine-page RGAA run the lists are nine folded
+    // blocks and near a thousand ids, and "does 10.7 fail everywhere or on one route?" means
+    // opening all nine — the same fact is one row of the matrix.
+    const a = audit([F()], {
+      scope: {
+        inputs: [],
+        files: 1,
+        sample: {
+          pages: [
+            { id: "accueil", name: "Accueil", url: "https://x/" },
+            { id: "contact", name: "Contact", url: "https://x/contact" },
+          ],
+        },
+      },
+    } as unknown as Partial<AuditResult>);
+    const md = stepSummary(a, { standard: "rgaa", lang: "fr" });
+
+    // Columns are the URLs, shortened against the origin the pages share and stated once.
+    const header = md.split("\n").find((l) => l.startsWith("|") && l.includes("| / |") && l.includes("| /contact |"));
+    expect(header, "no criteria × URLs header row in the job summary").toBeDefined();
+    expect(md).toContain("https://x");
+
+    // …and it comes FIRST. The id lists are kept, folded, underneath — they carry what
+    // CONFORMS, which under a per-page norm is most of the deliverable.
+    const grid = md.indexOf("| / |");
+    const lists = md.indexOf("le détail critère par critère");
+    expect(grid, "the matrix is missing").toBeGreaterThan(-1);
+    expect(lists, "the per-page id lists were dropped rather than folded").toBeGreaterThan(-1);
+    expect(grid, "the id lists still come before the matrix").toBeLessThan(lists);
+  });
 });
 
 // The pull-request digest is a DIFFERENT document from the job summary, not a truncation of

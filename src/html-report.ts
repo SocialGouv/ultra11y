@@ -12,9 +12,12 @@ import { auditorUnitModel } from "./auditor.js";
 import {
   agentMarkNote,
   basisLabel,
+  commonOrigin,
   derivePages,
   formatRate,
   pageBasisWarning,
+  pageColumnLabel,
+  pageOriginNote,
   pagesOf,
   unattributedFindings,
   unattributedNote,
@@ -340,10 +343,12 @@ export function crossGridBlocks(result: AuditResult, derived: PageResult[], stan
   if (!derived.length) return [];
   const { rows, status } = pageGridModel(result, derived, standard, lang);
   if (!rows.length) return [];
+  const origin = commonOrigin(derived);
+  const originNote = pageOriginNote(origin, lang);
   const table: Block = {
     kind: "table",
     caption: t.crossGridCaption,
-    columns: [{ text: t.criterion }, ...derived.map((p) => ({ text: `${p.name}${p.auth ? " 🔒" : ""}` }))],
+    columns: [{ text: t.criterion }, ...derived.map((p) => ({ text: pageColumnLabel(p, origin) }))],
     rows: [],
   };
   let group = "";
@@ -354,7 +359,12 @@ export function crossGridBlocks(result: AuditResult, derived: PageResult[], stan
     }
     table.rows.push([{ text: row.label }, ...derived.map((p) => ({ status: (status.get(row.id)?.get(p.id) ?? "manual") as Status, text: "" }))]);
   }
-  return [{ kind: "heading", level: 2, text: t.grid, id: "grid" }, { kind: "note", tone: "info", runs: ticks(t.legend) }, table];
+  return [
+    { kind: "heading", level: 2, text: t.grid, id: "grid" },
+    { kind: "note", tone: "info", runs: ticks(t.legend) },
+    ...(originNote ? [{ kind: "note", tone: "info", runs: ticks(originNote) } as Block] : []),
+    table,
+  ];
 }
 
 /** One page's criteria grid — the sheet's own table, not the cross-page one. */
