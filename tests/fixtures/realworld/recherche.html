@@ -1,0 +1,50 @@
+<!doctype html>
+<!-- JEU D'ESSAI DE RAPPEL — thématique RGAA 12 (navigation) : lien d'évitement qui ne mène
+     nulle part, ordre de tabulation forcé, et un moteur de recherche placé autrement que sur
+     le reste du site — la matière que RGAA 12.1, 12.2, 12.4 et 12.5 demandent de trancher sur
+     un ENSEMBLE de pages. Voir l'en-tête de index.html. -->
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Recherche — Orbit, hébergement statique</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <!-- skip-link-target-missing · RGAA 12.7 · WCAG 2.4.1 — la cible #principal n'existe pas
+         sur cette page : le lien d'évitement n'évite rien. -->
+    <a class="skip-link" href="#principal">Aller au contenu</a>
+
+    <header>
+      <nav aria-label="Navigation principale">
+        <ul>
+          <li><a href="/">Accueil</a></li>
+          <li><a href="/tarifs.html">Tarifs</a></li>
+          <li><a href="/contact.html">Contact</a></li>
+          <li><a href="/plan.html">Plan du site</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="contenu">
+      <h1>Recherche</h1>
+
+      <!-- Le moteur de recherche est ici, au milieu du contenu, alors qu'il est dans l'en-tête
+           sur les autres pages : c'est exactement ce que RGAA 12.5 interroge. -->
+      <form action="/recherche" method="get" role="search">
+        <label for="requete">Rechercher sur le site</label>
+        <!-- positive-tabindex · RGAA 12.8 · WCAG 2.4.3 — un ordre de tabulation imposé, qui ne
+             suit plus l'ordre de lecture. -->
+        <input id="requete" name="q" type="search" tabindex="3" />
+        <button type="submit" tabindex="1">Rechercher</button>
+      </form>
+
+      <h2>Résultats</h2>
+      <p>Saisissez un terme pour lancer une recherche.</p>
+    </main>
+
+    <footer>
+      <p>© 2026 Orbit.</p>
+    </footer>
+  </body>
+</html>

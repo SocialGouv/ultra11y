@@ -1,44 +1,94 @@
 <!doctype html>
+<!-- CE SITE EST UN JEU D'ESSAI DE RAPPEL. Chaque défaut ci-dessous est PLANTÉ, nommé dans le
+     commentaire qui le précède, et attendu par tests/fixture-recall.test.ts. Ne « corrigez »
+     rien ici sans lire ce test d'abord : une page redevenue conforme fait passer le test de
+     rappel du vert au rouge, ce qui est exactement l'effet voulu. Le pendant propre du site —
+     celui qui prouve l'absence de faux positifs — est tests/fixtures/clean-landing/.
+
+     Cette page-ci porte les thématiques RGAA 1 (images), 3 (couleurs) et 10 (présentation),
+     plus deux défauts de structure qu'aucune autre page ne peut porter en même temps
+     (h1-missing, nav-landmark-missing). -->
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- meta-viewport-zoom-block · RGAA 10.4 · WCAG 1.4.4 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1" />
     <title>Accueil — Orbit, hébergement statique</title>
     <link rel="stylesheet" href="/styles.css" />
+    <!-- css-generated-content-informative · RGAA 10.2 · WCAG 1.3.1 -->
+    <style>
+      .badge::after { content: "Nouveau"; color: #c0c0c0; }
+    </style>
   </head>
   <body>
     <a class="skip-link" href="#contenu">Aller au contenu</a>
 
+    <!-- nav-landmark-missing · RGAA 12.6 · WCAG 1.3.1 — quatre liens de navigation dans un
+         <header>, et pas un seul repère <nav> sur la page. -->
     <header>
-      <nav aria-label="Navigation principale">
-        <ul>
-          <li><a href="/" aria-current="page">Accueil</a></li>
-          <li><a href="/tarifs.html">Tarifs</a></li>
-          <li><a href="/contact.html">Contact</a></li>
-        </ul>
-      </nav>
-      <form action="/recherche" method="get" role="search">
-        <label for="recherche">Rechercher sur le site</label>
-        <input id="recherche" name="recherche" type="search" />
-        <button type="submit">Rechercher</button>
-      </form>
+      <a href="/">Accueil</a>
+      <a href="/tarifs.html">Tarifs</a>
+      <a href="/contact.html">Contact</a>
+      <a href="/medias.html">Médias</a>
+      <a href="/cadres.html">Intégrations</a>
+      <a href="/documents.html">Documents</a>
+      <a href="/recherche.html">Recherche</a>
+      <a href="/plan.html">Plan du site</a>
+      <a href="/mentions-legales.html">Mentions légales</a>
     </header>
 
     <main id="contenu">
-      <h1>Déployez votre site en une commande</h1>
-      <p>Orbit héberge vos pages statiques sur un réseau mondial, sans configuration.</p>
-      <p><a href="/contact.html">Créer un compte gratuit</a></p>
+      <!-- rendered-contrast-pixel · RGAA 3.2 · WCAG 1.4.3 — le fond est un DÉGRADÉ : le
+           CSSOM ne sait pas dire quelle couleur est derrière ce texte, donc le contraste ne se
+           mesure que sur la capture d'écran. C'est le seul chemin qui allume le tier pixel. -->
+      <div class="banniere">
+        <p class="banniere-texte">Douze points de présence, une seule commande de déploiement.</p>
+      </div>
 
-      <h2>Pourquoi Orbit</h2>
-      <img src="/img/reseau.png" alt="Carte du réseau Orbit avec douze points de présence" />
+      <!-- h1-missing · RGAA 9.1 — la page démarre à h2. -->
+      <h2>Déployez votre site en une commande</h2>
+
+      <!-- presentational-element · RGAA 10.1 (normatif via l'override du pack) -->
+      <center><font color="#999999" size="4">Orbit héberge vos pages statiques sans configuration.</font></center>
+
+      <!-- presentational-attribute · RGAA 10.1 -->
+      <p align="center" bgcolor="#ffffff">Un réseau mondial, douze points de présence.</p>
+
+      <!-- presentational-spacing · RGAA 10.1 — un mot écrit lettre à lettre pour l'effet visuel. -->
+      <p>O r b i t</p>
+
+      <!-- contrast-literal · RGAA 3.2 · WCAG 1.4.3 — 1,8:1 -->
+      <p style="color:#bbbbbb;background:#ffffff">Facturation à la seconde, sans engagement.</p>
+
+      <h3>Pourquoi Orbit</h3>
+
+      <!-- img-alt-missing · RGAA 1.1 · WCAG 1.1.1 -->
+      <img src="/img/reseau.png" width="640" height="320" />
+
+      <!-- decorative-alt-misuse · RGAA 1.2 — décoratif ET porteur d'un title. -->
+      <img src="/img/logo.png" alt="" title="Logo Orbit" />
+
+      <!-- canvas-fallback-missing · RGAA 1.1 — aucun contenu de repli. -->
+      <canvas id="latence" width="600" height="200"></canvas>
+
+      <!-- object-embed-no-name · RGAA 1.1 -->
+      <object data="/img/carte-reseau.svg" type="image/svg+xml"></object>
+
+      <!-- chart-no-accessible-name · RGAA 1.1 — un graphique sans nom accessible. -->
+      <div class="chart">
+        <svg viewBox="0 0 100 40"><rect x="0" y="10" width="20" height="30" /><rect x="30" y="4" width="20" height="36" /></svg>
+      </div>
+
       <ul>
         <li>
           Certificats TLS automatiques
+          <!-- dyn-hover · RGAA 10.13 · WCAG 1.4.13 — l'infobulle n'apparaît qu'au survol du
+               pointeur, jamais à la prise de focus, et rien ne la ferme avec Échap. C'est la
+               sonde `probeHover` qui le mesure sur la page rendue (voir styles.css). -->
           <span class="astuce">
             <button type="button" aria-describedby="astuce-tls">Qu’est-ce que le TLS ?</button>
             <span role="tooltip" id="astuce-tls" class="astuce-contenu">
-              Un certificat TLS chiffre le trafic entre le visiteur et votre site. Orbit
-              le renouvelle avant chaque expiration.
+              Un certificat TLS chiffre le trafic entre le visiteur et votre site.
             </span>
           </span>
         </li>
@@ -46,31 +96,23 @@
         <li>Aperçus par branche</li>
       </ul>
 
-      <h2>Rester informé</h2>
+      <!-- dyn-text-spacing / REFLOW_ZOOM_PROBE · RGAA 10.12 · WCAG 1.4.12 — un entrefilet à
+           hauteur figée : dès que l'interlignage augmente, la phrase est coupée. -->
+      <p class="entrefilet">
+        Le réseau Orbit compte douze points de présence répartis sur quatre continents, et une
+        latence médiane inférieure à trente millisecondes.
+      </p>
+
+      <h3>Rester informé</h3>
       <form action="/newsletter" method="post">
         <label for="newsletter-email">Votre adresse e-mail</label>
-        <input
-          id="newsletter-email"
-          name="email"
-          type="email"
-          autocomplete="email"
-          aria-describedby="newsletter-aide"
-          required
-        />
-        <p id="newsletter-aide" class="aide">
-          Format attendu : une adresse e-mail complète. Exemple : prenom.nom@exemple.fr.
-        </p>
-        <button type="submit">S’abonner</button>
+        <input id="newsletter-email" name="email" type="email" autocomplete="email" required />
+        <!-- input-image-alt-missing · RGAA 1.1 — un bouton image sans alternative. -->
+        <input type="image" src="/img/envoyer.png" />
       </form>
     </main>
 
     <footer>
-      <nav aria-label="Navigation de pied de page">
-        <ul>
-          <li><a href="/plan.html">Plan du site</a></li>
-          <li><a href="/mentions-legales.html">Mentions légales</a></li>
-        </ul>
-      </nav>
       <p>© 2026 Orbit.</p>
     </footer>
   </body>

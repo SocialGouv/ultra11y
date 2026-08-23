@@ -1,0 +1,63 @@
+/* Le contenu additionnel de ce site est fait EN CSS, et c'est le sujet de RGAA 10.14 et 12.11.
+   Il apparaît au survol du pointeur ET à la prise de focus clavier — c'est `:focus-within` qui
+   fait la seconde moitié, et son absence est exactement la non-conformité que ces deux critères
+   existent pour attraper. Un audit qui ne lit que la source ne peut pas le savoir : il faut la
+   page rendue, ce que `scan --runtime local` fournit.
+
+   L'INFOBULLE NE SE FERME PAS AVEC ÉCHAP, ET C'EST VOULU. La sonde `dyn-hover` le mesure et
+   dépose une non-conformité MINEURE sur WCAG 1.4.13 (RGAA 10.13) à chaque run de
+   `.github/workflows/adjudication.yml`. C'est la preuve que le tier navigateur travaille
+   vraiment sur cette fixture : un jeu d'essai où le navigateur ne trouve jamais rien ne prouve
+   rien du tout. Une infobulle purement CSS ne PEUT pas être « dismissible » au sens de 1.4.13
+   sans une ligne de script — la rendre conforme reviendrait à ajouter un script, donc à ouvrir
+   le thème 7 et à changer ce que ce jeu d'essai mesure. Ne « corrigez » pas ceci sans lire
+   d'abord ce que la CI en attend. */
+:root {
+  --encre: #1a1a1a;
+  --papier: #ffffff;
+  --trait: #595959;
+}
+
+body {
+  color: var(--encre);
+  background: var(--papier);
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  margin: 0 auto;
+  max-width: 60rem;
+  padding: 1rem;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+.skip-link:focus {
+  position: static;
+}
+
+/* Le déclencheur reste un <button> natif : opérable au clavier sans une ligne de script, ce qui
+   est aussi ce qui rend 12.9 (pas de piège au clavier) lisible sur la page rendue. */
+.astuce {
+  position: relative;
+  display: inline-block;
+}
+.astuce-contenu {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: 18rem;
+  padding: 0.5rem;
+  border: 1px solid var(--trait);
+  background: var(--papier);
+  color: var(--encre);
+}
+.astuce:hover .astuce-contenu,
+.astuce:focus-within .astuce-contenu {
+  display: block;
+}
+
+.aide {
+  color: var(--trait);
+}

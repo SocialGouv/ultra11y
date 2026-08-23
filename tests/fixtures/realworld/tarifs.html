@@ -1,4 +1,6 @@
 <!doctype html>
+<!-- JEU D'ESSAI DE RAPPEL — thématiques RGAA 5 (tableaux) et 6 (liens). Voir l'en-tête de
+     index.html : les défauts sont plantés et attendus par tests/fixture-recall.test.ts. -->
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
@@ -15,34 +17,106 @@
           <li><a href="/">Accueil</a></li>
           <li><a href="/tarifs.html" aria-current="page">Tarifs</a></li>
           <li><a href="/contact.html">Contact</a></li>
+          <li><a href="/medias.html">Médias</a></li>
+          <li><a href="/documents.html">Documents</a></li>
         </ul>
       </nav>
-      <form action="/recherche" method="get" role="search">
-        <label for="recherche">Rechercher sur le site</label>
-        <input id="recherche" name="recherche" type="search" />
-        <button type="submit">Rechercher</button>
-      </form>
     </header>
 
     <main id="contenu">
       <h1>Tarifs</h1>
-      <p>Deux formules, sans engagement. Les prix sont indiqués hors taxes, par mois.</p>
+      <p>Deux formules, sans engagement. Prix hors taxes, par mois.</p>
 
-      <h2>Formule Découverte</h2>
+      <!-- data-table-no-headers · RGAA 5.6 · WCAG 1.3.1 — deux lignes, aucun <th>, la première
+           ligne fait office d'en-tête pour l'œil et pour personne d'autre. -->
+      <h2>Comparatif des formules</h2>
+      <table>
+        <tr>
+          <td>Formule</td>
+          <td>Prix</td>
+          <td>Sites</td>
+        </tr>
+        <tr>
+          <td>Découverte</td>
+          <td>0 €</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <td>Équipe</td>
+          <td>20 €</td>
+          <td>illimité</td>
+        </tr>
+      </table>
+
+      <!-- table-caption-missing · RGAA 5.4 — des <th>, mais pas de titre de tableau.
+           table-empty-data-cell · RGAA 5.7 — une cellule vide, sans valeur ni « — ».
+           sortable-header-no-aria-sort · RGAA 5.7 — un en-tête triable sans aria-sort. -->
+      <h2>Quotas par formule</h2>
+      <table>
+        <tr>
+          <th class="sortable"><button type="button">Ressource</button></th>
+          <th>Découverte</th>
+          <th>Équipe</th>
+        </tr>
+        <tr>
+          <td>Visites mensuelles</td>
+          <td>100 000</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Aperçus par branche</td>
+          <td>non</td>
+          <td>oui</td>
+        </tr>
+      </table>
+
+      <!-- headers-attr-dangling · WCAG 1.3.1 — headers pointe sur un id inexistant.
+           th-no-data-cells · WCAG 1.3.1 — l'en-tête « Remise » n'est référencé par aucune cellule. -->
+      <h2>Remises annuelles</h2>
+      <table>
+        <caption>Remises appliquées au paiement annuel</caption>
+        <tr>
+          <th id="offre">Offre</th>
+          <th id="remise">Remise</th>
+        </tr>
+        <tr>
+          <td headers="offre">Équipe</td>
+          <td headers="remise-annuelle">deux mois offerts</td>
+        </tr>
+      </table>
+
+      <!-- layout-table-data-markup · RGAA 5.8 — une table de mise en forme qui garde du
+           balisage de données. -->
+      <table role="presentation">
+        <tr>
+          <th scope="col">Colonne de mise en page</th>
+        </tr>
+        <tr>
+          <td>
+            <!-- Un champ étroit dans une cellule : la sonde dyn-input-overflow-* le remplit et
+                 mesure ce qui déborde (RGAA 10.11, 10.12). -->
+            <label for="devis">Nombre de sites à migrer</label>
+            <input id="devis" name="devis" type="text" class="champ-etroit" />
+          </td>
+        </tr>
+      </table>
+
+      <h2>Aller plus loin</h2>
       <ul>
-        <li>Gratuite</li>
-        <li>Un site, cent mille visites par mois</li>
-        <li>Certificat TLS inclus</li>
+        <!-- link-empty-name · RGAA 6.2 · WCAG 2.4.4 — un lien sans intitulé. -->
+        <li><a href="/contact.html"></a></li>
+        <!-- icon-only-control-unnamed · RGAA 6.2 — un lien qui n'est qu'une icône. -->
+        <li>
+          <a href="/tarifs.html#comparatif">
+            <svg viewBox="0 0 16 16" width="16" height="16"><path d="M0 0 L16 16" /></svg>
+          </a>
+        </li>
+        <!-- pack:rgaa:download-link-format · RGAA 6.1 — ni format ni poids dans l'intitulé. -->
+        <li><a href="/documents/grille-tarifaire.pdf">Grille tarifaire complète</a></li>
       </ul>
 
-      <h2>Formule Équipe</h2>
-      <ul>
-        <li>Vingt euros hors taxes par mois</li>
-        <li>Sites illimités, aperçus par branche</li>
-        <li>Assistance sous un jour ouvré</li>
-      </ul>
-
-      <p><a href="/contact.html">Poser une question sur les tarifs</a></p>
+      <!-- label-in-name-mismatch · WCAG 2.5.3 — le nom accessible ne contient pas le texte visible. -->
+      <button type="button" aria-label="Souscrire">Demander un devis</button>
     </main>
 
     <footer>

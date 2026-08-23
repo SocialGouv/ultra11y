@@ -1,4 +1,8 @@
 <!doctype html>
+<!-- JEU D'ESSAI DE RAPPEL — thématiques RGAA 9 (structuration) et 12 (navigation). Voir
+     l'en-tête de index.html. Cette page porte les défauts de structure qui s'excluent
+     mutuellement avec ceux de index.html : deux <h1>, deux <main>, et un <nav> anonyme
+     à côté d'un <nav> nommé. -->
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
@@ -15,44 +19,53 @@
           <li><a href="/">Accueil</a></li>
           <li><a href="/tarifs.html">Tarifs</a></li>
           <li><a href="/contact.html">Contact</a></li>
+          <li><a href="/medias.html">Médias</a></li>
         </ul>
       </nav>
-      <form action="/recherche" method="get" role="search">
-        <label for="recherche">Rechercher sur le site</label>
-        <input id="recherche" name="recherche" type="search" />
-        <button type="submit">Rechercher</button>
-      </form>
     </header>
 
     <main id="contenu">
       <h1>Plan du site</h1>
-      <p>
-        Toutes les pages de ce site sont atteignables depuis cette page. C’est le second
-        système de navigation du site, à côté du menu principal et du moteur de recherche.
-      </p>
 
-      <nav aria-label="Plan du site">
+      <!-- heading-order-skip · RGAA 9.1 · WCAG 1.3.1 — h1 puis h4. -->
+      <h4>Toutes les pages</h4>
+
+      <!-- nav-landmark-unnamed · RGAA 12.6 — deux repères de navigation, un seul est nommé. -->
+      <nav>
         <ul>
-          <li>
-            <a href="/">Accueil</a>
-            <ul>
-              <li><a href="/#contenu">Pourquoi Orbit</a></li>
-            </ul>
-          </li>
+          <li><a href="/">Accueil</a></li>
           <li><a href="/tarifs.html">Tarifs</a></li>
           <li><a href="/contact.html">Contact et gestion du compte</a></li>
+          <li><a href="/medias.html">Médias</a></li>
+          <li><a href="/cadres.html">Intégrations</a></li>
+          <li><a href="/documents.html">Documents</a></li>
+          <li><a href="/recherche.html">Recherche</a></li>
           <li><a href="/mentions-legales.html">Mentions légales</a></li>
         </ul>
       </nav>
+
+      <!-- empty-heading · RGAA 9.1 — un titre sans intitulé. -->
+      <h2></h2>
+
+      <!-- list-structure · RGAA 9.3 — un enfant direct de <ul> qui n'est pas un <li>. -->
+      <ul>
+        <span>Pages archivées</span>
+        <li><a href="/tarifs.html">Anciennes grilles tarifaires</a></li>
+      </ul>
+
+      <!-- dl-structure · WCAG 1.3.1 — un <dt> orphelin, hors de toute <dl>. -->
+      <dt>Aperçu par branche</dt>
+      <dd>Une URL de prévisualisation par branche Git.</dd>
+    </main>
+
+    <!-- multiple-main-landmark · RGAA 12.6 · WCAG 1.3.1 — un second repère principal. -->
+    <main>
+      <!-- h1-multiple · RGAA 9.1 — un second titre de niveau 1. -->
+      <h1>Nouveautés</h1>
+      <p>Les journaux de déploiement sont désormais conservés trente jours.</p>
     </main>
 
     <footer>
-      <nav aria-label="Navigation de pied de page">
-        <ul>
-          <li><a href="/plan.html" aria-current="page">Plan du site</a></li>
-          <li><a href="/mentions-legales.html">Mentions légales</a></li>
-        </ul>
-      </nav>
       <p>© 2026 Orbit.</p>
     </footer>
   </body>

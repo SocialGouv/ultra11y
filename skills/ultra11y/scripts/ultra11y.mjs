@@ -43052,7 +43052,7 @@ var rgaa_default = {
       techniques: ["G21", "H91", "F10"],
       wcag: ["2.1.1", "2.1.2"],
       appliesTo: {
-        ruleIds: []
+        ruleIds: ["dyn-keyboard-trap"]
       }
     },
     {
@@ -60153,6 +60153,15 @@ function parseSitemapUrls(xml) {
   while ((m = re.exec(xml)) !== null) out2.push(m[1]);
   return out2;
 }
+var DOWNLOAD_EXT = /\.(?:pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|tar|epub|dmg|exe|pkg|mp3|mp4|m4a|m4v|avi|mov|wmv|webm|ogg|wav|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)$/i;
+function isDownloadUrl(url) {
+  let path = url;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+  }
+  return DOWNLOAD_EXT.test(path);
+}
 function extractLinks(html, baseUrl) {
   const origin = new URL(baseUrl).origin;
   const seen = /* @__PURE__ */ new Set();
@@ -60170,6 +60179,7 @@ function extractLinks(html, baseUrl) {
     }
     if (abs.protocol !== "http:" && abs.protocol !== "https:") continue;
     if (abs.origin !== origin) continue;
+    if (isDownloadUrl(abs.pathname)) continue;
     abs.hash = "";
     const url = abs.href;
     if (seen.has(url)) continue;
@@ -60519,10 +60529,11 @@ function writeRunnerSnapshot(root, out2, target, page) {
   if (!collected?.dom) return void 0;
   const url = page?.url ?? hostPageOf(out2.url ?? collected.url, target);
   const id = page?.id ?? pageIdFor(url);
+  const name2 = page?.name?.trim() || collected.title?.trim() || nameFromUrl(url);
   const meta2 = {
     v: SNAPSHOT_VERSION,
     id,
-    name: page?.name ?? collected.title ?? id,
+    name: name2,
     url,
     runner: "scan",
     ...collected.viewport ? { viewport: collected.viewport } : {},
@@ -61084,13 +61095,16 @@ async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, dead
   const hits = [];
   const seen = /* @__PURE__ */ new Set();
   const limit = Math.min(count + 2, limits.maxFocusables + 10);
+  let prevKey = null;
   for (let i2 = 0; i2 < limit; i2++) {
     if (deadline?.out()) break;
     await page.keyboard.press("Tab");
     const r = await page.evaluate(FOCUS_CHECK_PROBE);
     if (!r) continue;
+    if (r.key === prevKey) continue;
     if (seen.has(r.key)) break;
     seen.add(r.key);
+    prevKey = r.key;
     if (!r.changed) {
       hits.push({
         selector: r.selector,
@@ -61102,11 +61116,20 @@ async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, dead
   }
   return hits;
 }
+var NATIVE_SEGMENT_STOPS = {
+  date: 5,
+  time: 5,
+  "datetime-local": 8,
+  month: 4,
+  week: 4
+};
 var FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
   const e = document.activeElement;
   if (!e || e === document.body || e === document.documentElement) return null;
   const key = e.getAttribute && e.getAttribute('data-u11y-f');
-  return { key: key || __sel(e), tagged: !!key, selector: __sel(e), html: __html(e) };
+  const stops = ${JSON.stringify(NATIVE_SEGMENT_STOPS)};
+  const type = e.tagName === 'INPUT' ? (e.getAttribute('type') || 'text').toLowerCase() : '';
+  return { key: key || __sel(e), tagged: !!key, selector: __sel(e), html: __html(e), segments: stops[type] || 1 };
 })()`;
 async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
   const count = await page.evaluate(focusSetupExpr("", limits.maxFocusables));
@@ -61122,8 +61145,9 @@ async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
     const now = await page.evaluate(FOCUS_WHERE_PROBE);
     if (!now) break;
     if (prev?.tagged && now.tagged && now.key === prev.key) {
+      const budget = Math.max(confirmPresses, (now.segments ?? 1) - 1);
       let stuck = true;
-      for (let k = 0; k < confirmPresses && stuck; k++) {
+      for (let k = 0; k < budget && stuck; k++) {
         if (deadline?.out()) break;
         await page.keyboard.press("Tab");
         const again = await page.evaluate(FOCUS_WHERE_PROBE);
@@ -61133,13 +61157,15 @@ async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
         hits.push({
           selector: now.selector,
           html: now.html,
-          detail: `Le focus reste sur cet \xE9l\xE9ment apr\xE8s ${1 + confirmPresses} appuis sur Tab, alors que la page compte ${count} \xE9l\xE9ments focalisables \u2014 pi\xE8ge au clavier (2.1.2).`
+          detail: `Le focus reste sur cet \xE9l\xE9ment apr\xE8s ${1 + budget} appuis sur Tab, alors que la page compte ${count} \xE9l\xE9ments focalisables \u2014 pi\xE8ge au clavier (2.1.2).`
         });
         break;
       }
     }
-    if (seen.has(now.key)) break;
-    seen.add(now.key);
+    if (now.key !== prev?.key) {
+      if (seen.has(now.key)) break;
+      seen.add(now.key);
+    }
     prev = now;
   }
   return hits;

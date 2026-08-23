@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Accueil — Orbit, hébergement statique</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+    <header>
+      <nav aria-label="Navigation principale">
+        <ul>
+          <li><a href="/" aria-current="page">Accueil</a></li>
+          <li><a href="/tarifs.html">Tarifs</a></li>
+          <li><a href="/contact.html">Contact</a></li>
+        </ul>
+      </nav>
+      <form action="/recherche" method="get" role="search">
+        <label for="recherche">Rechercher sur le site</label>
+        <input id="recherche" name="recherche" type="search" />
+        <button type="submit">Rechercher</button>
+      </form>
+    </header>
+
+    <main id="contenu">
+      <h1>Déployez votre site en une commande</h1>
+      <p>Orbit héberge vos pages statiques sur un réseau mondial, sans configuration.</p>
+      <p><a href="/contact.html">Créer un compte gratuit</a></p>
+
+      <h2>Pourquoi Orbit</h2>
+      <img src="/img/reseau.png" alt="Carte du réseau Orbit avec douze points de présence" />
+      <ul>
+        <li>
+          Certificats TLS automatiques
+          <span class="astuce">
+            <button type="button" aria-describedby="astuce-tls">Qu’est-ce que le TLS ?</button>
+            <span role="tooltip" id="astuce-tls" class="astuce-contenu">
+              Un certificat TLS chiffre le trafic entre le visiteur et votre site. Orbit
+              le renouvelle avant chaque expiration.
+            </span>
+          </span>
+        </li>
+        <li>Retours arrière instantanés</li>
+        <li>Aperçus par branche</li>
+      </ul>
+
+      <h2>Rester informé</h2>
+      <form action="/newsletter" method="post">
+        <label for="newsletter-email">Votre adresse e-mail</label>
+        <input
+          id="newsletter-email"
+          name="email"
+          type="email"
+          autocomplete="email"
+          aria-describedby="newsletter-aide"
+          required
+        />
+        <p id="newsletter-aide" class="aide">
+          Format attendu : une adresse e-mail complète. Exemple : prenom.nom@exemple.fr.
+        </p>
+        <button type="submit">S’abonner</button>
+      </form>
+    </main>
+
+    <footer>
+      <nav aria-label="Navigation de pied de page">
+        <ul>
+          <li><a href="/plan.html">Plan du site</a></li>
+          <li><a href="/mentions-legales.html">Mentions légales</a></li>
+        </ul>
+      </nav>
+      <p>© 2026 Orbit.</p>
+    </footer>
+  </body>
+</html>

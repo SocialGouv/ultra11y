@@ -1,0 +1,65 @@
+<!doctype html>
+<!-- JEU D'ESSAI DE RAPPEL — thématique RGAA 4 (multimédia), plus 13.8 (contenu en mouvement)
+     et 8.4 (langue mal formée). Voir l'en-tête de index.html. Aucune autre page du site ne
+     porte de média temporel : sans elle, tout le thème 4 reste « non applicable » et treize
+     critères ne sont jamais posés. -->
+<!-- lang-invalid · RGAA 8.4 · WCAG 3.1.1 — « francais » n'est pas une étiquette BCP-47. -->
+<html lang="francais">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Médias — Orbit, hébergement statique</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+    <header>
+      <nav aria-label="Navigation principale">
+        <ul>
+          <li><a href="/">Accueil</a></li>
+          <li><a href="/tarifs.html">Tarifs</a></li>
+          <li><a href="/contact.html">Contact</a></li>
+          <li><a href="/medias.html" aria-current="page">Médias</a></li>
+          <li><a href="/documents.html">Documents</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="contenu">
+      <h1>Médias</h1>
+
+      <h2>Présentation d’Orbit en deux minutes</h2>
+      <!-- media-no-track · RGAA 4.3 · WCAG 1.2.2 — aucune piste de sous-titres, et aucune
+           transcription textuelle à côté. -->
+      <video src="/media/presentation.mp4" width="640" height="360" controls></video>
+      <p>Durée : 2 min 10 s.</p>
+
+      <h2>Le journal audio des incidents</h2>
+      <!-- autoplay-media · RGAA 4.10 · WCAG 1.4.2 — un son qui démarre seul, sans contrôle
+           pour l’arrêter. -->
+      <audio src="/media/journal-incidents.mp3" autoplay></audio>
+
+      <h2>À la une</h2>
+      <!-- blink-marquee · RGAA 13.8 · WCAG 2.2.2 — du texte défilant qu’on ne peut ni mettre
+           en pause, ni arrêter, ni masquer. -->
+      <marquee>Maintenance planifiée le 12 septembre de 2 h à 4 h.</marquee>
+
+      <h2>Webinaire en direct</h2>
+      <p>
+        La rediffusion est publiée le lendemain. Aucune transcription n’est fournie pour la
+        diffusion en direct.
+      </p>
+    </main>
+
+    <footer>
+      <nav aria-label="Navigation de pied de page">
+        <ul>
+          <li><a href="/plan.html">Plan du site</a></li>
+          <li><a href="/mentions-legales.html">Mentions légales</a></li>
+        </ul>
+      </nav>
+      <p>© 2026 Orbit.</p>
+    </footer>
+  </body>
+</html>

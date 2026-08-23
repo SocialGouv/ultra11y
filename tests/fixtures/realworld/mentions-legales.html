@@ -1,9 +1,17 @@
 <!doctype html>
-<html lang="fr">
+<!-- JEU D'ESSAI DE RAPPEL — thématique RGAA 8 (éléments obligatoires), plus 13.1 (limite de
+     temps). Voir l'en-tête de index.html. C'est la SEULE page du site sans attribut `lang` :
+     `resolveLang` lit `scope.langs[0]` pour choisir la langue du rapport, et retirer `lang`
+     partout ferait basculer le livrable en anglais. -->
+<html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mentions légales — Orbit, hébergement statique</title>
+    <!-- title-missing-empty · RGAA 8.5 · WCAG 2.4.2 -->
+    <title></title>
+    <!-- meta-refresh-redirect · RGAA 13.1 · WCAG 2.2.1 — rechargement automatique au bout de
+         cinq secondes, sans moyen de le suspendre. -->
+    <meta http-equiv="refresh" content="5;url=/mentions-legales.html" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -15,23 +23,29 @@
           <li><a href="/">Accueil</a></li>
           <li><a href="/tarifs.html">Tarifs</a></li>
           <li><a href="/contact.html">Contact</a></li>
+          <li><a href="/plan.html">Plan du site</a></li>
         </ul>
       </nav>
-      <form action="/recherche" method="get" role="search">
-        <label for="recherche">Rechercher sur le site</label>
-        <input id="recherche" name="recherche" type="search" />
-        <button type="submit">Rechercher</button>
-      </form>
     </header>
 
     <main id="contenu">
       <h1>Mentions légales</h1>
 
       <h2>Éditeur</h2>
-      <p>Orbit SAS, 12 rue de la Fonderie, 31000 Toulouse, France.</p>
+      <!-- duplicate-id · RGAA 8.2 — le même id porté par deux éléments. -->
+      <p id="editeur">Orbit SAS, 12 rue de la Fonderie, 31000 Toulouse, France.</p>
+      <p id="editeur">Capital de 40 000 euros. RCS Toulouse 900 000 000.</p>
 
       <h2>Hébergement</h2>
       <p>Les pages de ce site sont servies depuis le réseau Orbit.</p>
+
+      <h2>Conditions</h2>
+      <!-- inline-lang-change-missing · RGAA 8.7 · WCAG 3.1.2 — un changement de langue déclaré
+           par un attribut vide, donc pas déclaré du tout. -->
+      <p lang="">Service provided as is, without warranty of any kind.</p>
+
+      <!-- pack:rgaa:dir-value-invalid · RGAA 8.10 — « right » n'est pas une valeur de `dir`. -->
+      <p dir="right">Sens de lecture forcé pour la traduction arabe de cette page.</p>
 
       <h2>Accessibilité</h2>
       <p>
@@ -44,7 +58,7 @@
       <nav aria-label="Navigation de pied de page">
         <ul>
           <li><a href="/plan.html">Plan du site</a></li>
-          <li><a href="/mentions-legales.html" aria-current="page">Mentions légales</a></li>
+          <li><a href="/documents.html">Documents</a></li>
         </ul>
       </nav>
       <p>© 2026 Orbit.</p>

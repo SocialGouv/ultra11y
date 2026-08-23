@@ -58,7 +58,7 @@ describe("a country standard's own criteria", () => {
     // 56 of 106 RGAA criteria declare that NO engine rule can evidence them. Surfacing that
     // is the difference between a plan and a false sense of coverage. It was 58 until the
     // doctype (8.1) got an instrument of its own.
-    expect(r.counts.noEngineRule).toBe(56);
+    expect(r.counts.noEngineRule).toBe(55);
     expect(r.groups).toHaveLength(13);
   });
 

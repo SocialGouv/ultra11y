@@ -139,7 +139,7 @@ describe("the documented RGAA figures match the pack", () => {
   const judgmentCount = [...cov.values()].filter((c) => c.tier === "judgment").length;
 
   it("states the same judgment count everywhere it is quoted", () => {
-    expect(judgmentCount).toBe(58); // the pack's own arithmetic; update the docs WITH this line
+    expect(judgmentCount).toBe(57); // the pack's own arithmetic; update the docs WITH this line
     for (const doc of ["skills/ultra11y/SKILL.md", "skills/ultra11y/references/ci.md", "skills/ultra11y/references/judgment.md"]) {
       const text = read(doc);
       const quoted = [...text.matchAll(/(\d+)\s*(?:of|de)\s*(?:RGAA's\s*)?106/gi)].map((m) => Number(m[1]));

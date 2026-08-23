@@ -87,7 +87,7 @@ RGAA 4.10 is flagged `judgment` (no tool may declare it conformant) and still ca
 `autoplay-media`, which can fail it outright. Collapsing the two axes into one boolean throws
 that coverage away.
 
-The headline number for RGAA: **58 of its 106 criteria declare that no engine rule can
+The headline number for RGAA: **57 of its 106 criteria declare that no engine rule can
 evidence them at all.** That is not a gap in the tool — it is the standard saying those are
 yours. A plan that hides it reads as coverage that does not exist.
 
@@ -200,7 +200,7 @@ nothing.
 ```
 
 Steps 2 and 5 are the ones that make it a rule engine rather than a linter. Skipping step 2
-means auditing without knowing that 58 of 106 criteria were never going to be decided by a
+means auditing without knowing that 57 of 106 criteria were never going to be decided by a
 tool; skipping the lookups in step 5 means ruling on criteria from memory.
 
 **A criterion nobody tested is untested, never conformant.** Every tool description repeats

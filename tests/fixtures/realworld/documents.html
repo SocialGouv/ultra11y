@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- JEU D'ESSAI DE RAPPEL — thématique RGAA 13 (documents bureautiques), plus le repère
+     principal manquant (RGAA 12.6) que index.html ne peut pas porter en même temps que son
+     propre défaut de navigation. Voir l'en-tête de index.html. -->
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Documents — Orbit, hébergement statique</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <nav aria-label="Navigation principale">
+        <ul>
+          <li><a href="/">Accueil</a></li>
+          <li><a href="/tarifs.html">Tarifs</a></li>
+          <li><a href="/contact.html">Contact</a></li>
+          <li><a href="/documents.html" aria-current="page">Documents</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <!-- missing-main-landmark · RGAA 12.6 · WCAG 1.3.1 — aucun <main> : le contenu principal
+         n'est pas identifié, et le lien d'évitement n'a nulle part où aller. -->
+    <h1>Documents à télécharger</h1>
+
+    <h2>Contrats et conditions</h2>
+    <ul>
+      <!-- pack:rgaa:download-link-format · RGAA 6.1 — ni le format ni le poids ne sont donnés
+           dans l'intitulé, et aucune version accessible n'est proposée à côté (RGAA 13.3). -->
+      <li><a href="/documents/conditions-generales.pdf">Conditions générales de service</a></li>
+      <li><a href="/documents/contrat-type.docx">Contrat type</a></li>
+      <li><a href="/documents/annexe-tarifaire.xlsx">Annexe tarifaire</a></li>
+      <li><a href="/documents/plan-de-reprise.odt">Plan de reprise d’activité</a></li>
+    </ul>
+
+    <h2>Archives</h2>
+    <p>Les documents antérieurs à 2024 sont fournis sur demande.</p>
+    <!-- button-empty-name · RGAA 11.9 · WCAG 4.1.2 — un bouton sans intitulé. -->
+    <button type="button"></button>
+
+    <footer>
+      <nav aria-label="Navigation de pied de page">
+        <ul>
+          <li><a href="/plan.html">Plan du site</a></li>
+          <li><a href="/mentions-legales.html">Mentions légales</a></li>
+        </ul>
+      </nav>
+      <p>© 2026 Orbit.</p>
+    </footer>
+  </body>
+</html>

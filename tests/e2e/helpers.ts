@@ -23,12 +23,24 @@ export const FIX = {
   inputInCellClip: join(FIXTURES, "dynamic", "input-in-cell-clip.html"),
   inputInCellClean: join(FIXTURES, "dynamic", "input-in-cell-clean.html"),
   loginForm: join(FIXTURES, "realworld", "LoginForm.tsx"),
+  // THE FALSE-POSITIVE GUARD, and it lives in its own directory on purpose.
+  //
+  // This page IS the `realworld/index.html` that stood here until the site next door was
+  // turned into a recall fixture — copied verbatim, not rewritten. A guard that says "the
+  // engine invents nothing on genuinely accessible markup" is only worth something while the
+  // markup it reads is genuinely accessible, and pointing it at a page seeded with defects
+  // would have quietly turned an assertion into a tautology.
+  landing: join(FIXTURES, "clean-landing", "index.html"),
   // `realworld/` grew from one page into a small SITE — a shared header (menu + search form),
   // a footer, a sitemap page, a contact form and a stylesheet — because the criteria it is
   // adjudicated against in CI are about an « ensemble de pages »: two navigation systems (12.1),
   // a search engine reachable identically (12.5), CSS-only content revealed on hover AND on
   // focus (10.14, 12.11). One page could not pose those questions, let alone answer them.
-  landing: join(FIXTURES, "realworld", "index.html"),
+  //
+  // It is now also the RECALL fixture: every page of it is seeded with real RGAA defects, so
+  // an audit of it measures what the engine FINDS. A clean fixture can only ever prove the
+  // absence of false positives; it says nothing about what a run misses. The two fixtures
+  // answer the two halves and must not be merged back together.
   siteRoot: join(FIXTURES, "realworld"),
 };
 

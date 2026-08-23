@@ -1,43 +1,109 @@
-/* Le contenu additionnel de ce site est fait EN CSS, et c'est le sujet de RGAA 10.14 et 12.11.
-   Il apparaît au survol du pointeur ET à la prise de focus clavier — c'est `:focus-within` qui
-   fait la seconde moitié, et son absence est exactement la non-conformité que ces deux critères
-   existent pour attraper. Un audit qui ne lit que la source ne peut pas le savoir : il faut la
-   page rendue, ce que `scan --runtime local` fournit.
+/* LA FEUILLE DE STYLES DU JEU D'ESSAI DE RAPPEL.
+ *
+ * Sept critères RGAA ne se décident pas sur la source : il faut la page RENDUE, mesurée par
+ * `scan --runtime local` (Playwright + axe + sondes). Ils sont tous plantés ici, un par bloc,
+ * et chaque bloc dit lequel. Ne « corrigez » rien sans lire tests/fixture-recall.test.ts :
+ * un style redevenu conforme fait tomber la mesure que la CI attend, et le tier navigateur se
+ * met alors à ne plus rien trouver — ce qui ne prouve rien du tout.
+ *
+ * Le pendant conforme de cette feuille est tests/fixtures/clean-landing/styles.css. */
 
-   L'INFOBULLE NE SE FERME PAS AVEC ÉCHAP, ET C'EST VOULU. La sonde `dyn-hover` le mesure et
-   dépose une non-conformité MINEURE sur WCAG 1.4.13 (RGAA 10.13) à chaque run de
-   `.github/workflows/adjudication.yml`. C'est la preuve que le tier navigateur travaille
-   vraiment sur cette fixture : un jeu d'essai où le navigateur ne trouve jamais rien ne prouve
-   rien du tout. Une infobulle purement CSS ne PEUT pas être « dismissible » au sens de 1.4.13
-   sans une ligne de script — la rendre conforme reviendrait à ajouter un script, donc à ouvrir
-   le thème 7 et à changer ce que ce jeu d'essai mesure. Ne « corrigez » pas ceci sans lire
-   d'abord ce que la CI en attend. */
 :root {
   --encre: #1a1a1a;
   --papier: #ffffff;
   --trait: #595959;
+  /* Gris sur blanc : 2,3:1, sous le 4,5:1 exigé. */
+  --grise: #a8a8a8;
 }
 
+/* dyn-reflow · RGAA 10.11 · WCAG 1.4.10 — une largeur plancher de 1200 px : à 320 px la page
+   se parcourt en scroll horizontal. */
 body {
   color: var(--encre);
   background: var(--papier);
   font-family: system-ui, sans-serif;
   line-height: 1.5;
   margin: 0 auto;
-  max-width: 60rem;
+  min-width: 1200px;
   padding: 1rem;
+}
+
+/* axe color-contrast · RGAA 3.2 · WCAG 1.4.3 — le texte secondaire du site, sous le seuil. */
+p,
+li,
+figcaption {
+  color: var(--grise);
+}
+
+/* rendered-contrast-pixel · RGAA 3.2 · WCAG 1.4.3 — un dégradé derrière du texte clair. Aucune
+   couleur de fond opaque n'est lisible dans le CSSOM, donc `rendered-contrast` passe la main
+   et c'est la capture d'écran qui tranche (`dominantBackground`). */
+.banniere {
+  background: linear-gradient(90deg, #e8e8e8 0%, #ffffff 100%);
+  padding: 1.5rem;
+}
+.banniere-texte {
+  color: #d0d0d0;
+  font-size: 18px;
+}
+
+/* rendered-focus-not-visible · dyn-focus-visible · RGAA 10.7 · WCAG 2.4.7 — le contour de
+   focus est supprimé partout, et rien ne le remplace. */
+*:focus {
+  outline: none;
 }
 
 .skip-link {
   position: absolute;
   left: -9999px;
 }
-.skip-link:focus {
-  position: static;
+
+/* rendered-link-colour-only · RGAA 10.6 · WCAG 1.4.1 — dans un paragraphe, un lien ne se
+   distingue plus que par sa couleur : ni soulignement, ni graisse, ni bordure. */
+p a,
+li a {
+  color: #0000ee;
+  text-decoration: none;
+  font-weight: inherit;
 }
 
-/* Le déclencheur reste un <button> natif : opérable au clavier sans une ligne de script, ce qui
-   est aussi ce qui rend 12.9 (pas de piège au clavier) lisible sur la page rendue. */
+/* rendered-nontext-contrast · RGAA 3.3 · WCAG 1.4.11 — un champ blanc sur fond blanc, sans
+   bordure : rien n'indique où il commence. */
+input,
+select,
+textarea {
+  background: #ffffff;
+  border: 0;
+  color: var(--encre);
+}
+
+/* dyn-input-overflow-* · RGAA 10.11, 10.12, 10.4 — le champ de devis de la page Tarifs. À
+   taille d'écran normale il est confortable ; une règle responsive cassée le réduit à dix-huit
+   pixels sous 400 px, si bien que la valeur saisie devient illisible. La sonde le remplit, passe
+   à 320 px, et mesure ce qui reste visible. Sa taille de police est en `em` pour que le zoom à
+   200 % la double vraiment : en `px` elle ne bougerait pas et la mesure au zoom ne dirait rien. */
+.champ-etroit {
+  width: 220px;
+  font-size: 1em;
+}
+@media (max-width: 400px) {
+  .champ-etroit {
+    width: 18px;
+  }
+}
+
+/* dyn-text-spacing · REFLOW_ZOOM_PROBE · RGAA 10.12 · WCAG 1.4.12 — une hauteur figée et un
+   débordement masqué : dès qu'on augmente l'interlignage ou la taille du texte, le contenu
+   est coupé sans moyen de le lire. */
+.entrefilet {
+  height: 20px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* dyn-hover · RGAA 10.13 · WCAG 1.4.13 — l'infobulle apparaît au survol du pointeur, PAS à la
+   prise de focus clavier (`:focus-within` a disparu), et rien ne la ferme avec Échap. */
 .astuce {
   position: relative;
   display: inline-block;
@@ -53,9 +119,16 @@ body {
   background: var(--papier);
   color: var(--encre);
 }
-.astuce:hover .astuce-contenu,
-.astuce:focus-within .astuce-contenu {
+.astuce:hover .astuce-contenu {
   display: block;
+}
+
+/* rendered-orientation-lock · RGAA 13.9 · WCAG 1.3.4 — la page est pivotée de force en
+   portrait : l'orientation est verrouillée en paysage. */
+@media (orientation: portrait) {
+  html {
+    transform: rotate(90deg);
+  }
 }
 
 .aide {

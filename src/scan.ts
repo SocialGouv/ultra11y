@@ -14,7 +14,7 @@ import type { AuditResult, DynamicEngine, DynamicFinding, DynamicResult, Finding
 import { lineStartsOf, lineColAt } from "./parse/html.js";
 import { allGuidelines } from "./wcag.js";
 import { PROBE_SEVERITY, PROBE_WCAG, scForAxe, severityFromImpact, isAxeAdvisory } from "./axe-map.js";
-import { parseSitemapUrls, crawlUrls, crawlBound } from "./crawl.js";
+import { parseSitemapUrls, crawlUrls, crawlBound, nameFromUrl } from "./crawl.js";
 import { sampleScope } from "./sample.js";
 import {
   COLLECT_SNAPSHOT,
@@ -250,10 +250,26 @@ export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: str
   // they are.
   const url = page?.url ?? hostPageOf(out.url ?? collected.url, target);
   const id = page?.id ?? pageIdFor(url);
+  // A BLANK <title> IS NOT A NAME, and reading it as one dropped the page entirely.
+  //
+  // `document.title` is `""` — not undefined — on a page whose <title> is empty, so `??` kept
+  // it, `validateSnapshotMeta` refused the meta for an empty `name`, and this function
+  // returned undefined. No snapshot, no page in `scope.pages`, no column in the grid, and
+  // NOTHING SAID SO: the drop is not a redirect, so it never reached `redirected` either.
+  //
+  // The page it silently swallowed is the one carrying RGAA 8.5 / WCAG 2.4.2 — an empty
+  // <title> is exactly that non-conformity — so the deliverable lost the page it was about to
+  // fail, and came back shorter instead of louder. Measured on tests/fixtures/realworld:
+  // nine pages crawled, eight snapshots written, no warning.
+  //
+  // `nameFromUrl` is the repository's existing answer to "this document names itself nothing"
+  // (src/crawl.ts), and it reads as a name — « Mentions legales » rather than the raw
+  // `mentions-legales-html` slug.
+  const name = page?.name?.trim() || collected.title?.trim() || nameFromUrl(url);
   const meta: SnapshotMeta = {
     v: SNAPSHOT_VERSION,
     id,
-    name: page?.name ?? collected.title ?? id,
+    name,
     url,
     runner: "scan",
     ...(collected.viewport ? { viewport: collected.viewport } : {}),

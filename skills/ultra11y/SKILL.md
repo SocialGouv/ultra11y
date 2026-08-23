@@ -71,7 +71,7 @@ adjudicates. So the engine's clean run is a starting point, never a verdict — 
 >    decides what its terms mean. An auditor block that cites `8.3.1` after reading it is
 >    grounded; one that cites it from memory is a guess wearing a reference. Before auditing
 >    against a country standard, run the plan (`ultra11y_method`): it tells you how many of its
->    criteria no tool will decide for you — for RGAA, **58 of 106**. See `references/mcp.md`.
+>    criteria no tool will decide for you — for RGAA, **57 of 106**. See `references/mcp.md`.
 > 6. **The FINAL rendered semantic HTML must be correct.** The engine sees only source; a
 >    component library (DSFR/MUI…) or `.vue`/`.svelte`/`.astro` SFC hides the real markup, so
 >    a green source audit is not proof. Verify the produced semantic HTML — install the

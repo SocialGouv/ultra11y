@@ -250,6 +250,7 @@ export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimi
   const hits: ProbeHit[] = [];
   const seen = new Set<string>();
   const limit = Math.min(count + 2, limits.maxFocusables + 10);
+  let prevKey: string | null = null;
   for (let i = 0; i < limit; i++) {
     // A tab ring of 130 elements is two round-trips each on a loaded CI runner. Stopping at
     // the deadline costs the tail of the ring, which `runLiveProbes` then records.
@@ -257,8 +258,22 @@ export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimi
     await page.keyboard.press("Tab");
     const r = (await page.evaluate(FOCUS_CHECK_PROBE)) as { key: string; changed: boolean; selector: string; html: string } | null;
     if (!r) continue;
+    // STAYING PUT IS NOT WRAPPING ROUND, and reading it as such ended this walk early.
+    //
+    // A native multi-segment editor holds focus across several presses — `input[type=date]`
+    // has four tab stops (day, month, year, picker) and `datetime-local` seven, all reported
+    // as the same element. The wrap test below saw that repeat, concluded the ring had come
+    // full circle, and stopped: on tests/fixtures/realworld/contact.html the walk ended on the
+    // FIRST date field, 18 of 34 focusables in, and every control after it went unmeasured —
+    // while `pageCoverage.scs` went on claiming 2.4.7 was measured for the whole page. Silent
+    // under-coverage is the one outcome this engine must never produce.
+    //
+    // A wrap is returning to a key seen EARLIER in the walk. Being on the key we were already
+    // on is the control eating a keystroke, and the loop's own `limit` still bounds it.
+    if (r.key === prevKey) continue;
     if (seen.has(r.key)) break; // wrapped around the tab ring
     seen.add(r.key);
+    prevKey = r.key;
     if (!r.changed) {
       hits.push({
         selector: r.selector,
@@ -284,11 +299,42 @@ export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimi
 // never tagged is identified by its selector alone, and a selector is not an identity: two links
 // in the same list share one, so a walk that compared them would report a trap on a page whose
 // focus was moving perfectly well. Untagged means « cannot accuse ».
+// HOW MANY TAB STOPS ONE NATIVE CONTROL LEGITIMATELY HOLDS.
+//
+// A date field is not one tab stop. Chromium splits `input[type=date]` into day, month, year
+// and the picker button, and Tab walks them one by one WITHOUT leaving the element — so
+// `document.activeElement` is unchanged for several presses on a page with nothing wrong with
+// it. MEASURED in Chromium, presses needed before focus leaves the input:
+//
+//     text · number · color · range · file   1
+//     month · week                           3
+//     date · time                            4
+//     datetime-local                         7
+//
+// The trap walk confirmed over three presses, so `date`, `time` and `datetime-local` were all
+// reported as keyboard traps — a `bloquant` 2.1.2 non-conformity, raised on a plain date field
+// that any keyboard user tabs straight through. Found on tests/fixtures/realworld/contact.html,
+// which carries two ordinary `<input type="date">`.
+//
+// The budget is read from the ELEMENT rather than raised to a constant: a bigger magic number
+// would still be wrong for the next composite control, and it would make every genuine trap
+// four presses slower to confirm. `+1` over the measured figure so the confirmation ends on a
+// press that really did leave.
+export const NATIVE_SEGMENT_STOPS: Record<string, number> = {
+  date: 5,
+  time: 5,
+  "datetime-local": 8,
+  month: 4,
+  week: 4,
+};
+
 export const FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
   const e = document.activeElement;
   if (!e || e === document.body || e === document.documentElement) return null;
   const key = e.getAttribute && e.getAttribute('data-u11y-f');
-  return { key: key || __sel(e), tagged: !!key, selector: __sel(e), html: __html(e) };
+  const stops = ${JSON.stringify(NATIVE_SEGMENT_STOPS)};
+  const type = e.tagName === 'INPUT' ? (e.getAttribute('type') || 'text').toLowerCase() : '';
+  return { key: key || __sel(e), tagged: !!key, selector: __sel(e), html: __html(e), segments: stops[type] || 1 };
 })()`;
 
 /** RGAA 12.9 / WCAG 2.1.2 — can the keyboard always LEAVE?
@@ -313,7 +359,7 @@ export async function probeKeyboardTrap(page: Any, limits: ProbeLimits = PROBE_D
   const seen = new Set<string>();
   const confirmPresses = 2;
   const limit = Math.min(count + 2, limits.maxFocusables + 10);
-  type Where = { key: string; tagged?: boolean; selector: string; html: string };
+  type Where = { key: string; tagged?: boolean; selector: string; html: string; segments?: number };
   let prev: Where | null = null;
   for (let i = 0; i < limit; i++) {
     if (deadline?.out()) break;
@@ -325,8 +371,14 @@ export async function probeKeyboardTrap(page: Any, limits: ProbeLimits = PROBE_D
     if (prev?.tagged && now.tagged && now.key === prev.key) {
       // Stuck for one press. Confirm before accusing: press again, and only call it a trap if
       // focus is STILL on the same element every time.
+      //
+      // How many times is a property of the CONTROL, not a constant — see NATIVE_SEGMENT_STOPS.
+      // An ordinary control gets the two extra presses this loop always used; a native
+      // multi-segment editor gets as many as its segments need, because walking its own
+      // segments is the control working, not a cage.
+      const budget = Math.max(confirmPresses, (now.segments ?? 1) - 1);
       let stuck = true;
-      for (let k = 0; k < confirmPresses && stuck; k++) {
+      for (let k = 0; k < budget && stuck; k++) {
         if (deadline?.out()) break;
         await page.keyboard.press("Tab");
         const again = (await page.evaluate(FOCUS_WHERE_PROBE)) as Where | null;
@@ -336,15 +388,24 @@ export async function probeKeyboardTrap(page: Any, limits: ProbeLimits = PROBE_D
         hits.push({
           selector: now.selector,
           html: now.html,
-          detail: `Le focus reste sur cet élément après ${1 + confirmPresses} appuis sur Tab, alors que la page compte ${count} éléments focalisables — piège au clavier (2.1.2).`,
+          detail: `Le focus reste sur cet élément après ${1 + budget} appuis sur Tab, alors que la page compte ${count} éléments focalisables — piège au clavier (2.1.2).`,
         });
         // One cage is the finding; walking further inside it only produces the same hit again.
         break;
       }
     }
     // The ring wrapped round to somewhere already visited: a complete, escapable cycle.
-    if (seen.has(now.key)) break;
-    seen.add(now.key);
+    //
+    // Same exemption as the focus walk above: a key equal to the PREVIOUS one is a composite
+    // control walking its own segments, not a cycle. Without it, a walk that started on a date
+    // field — which is exactly where `probeFocusVisible` used to leave the focus — broke after
+    // two iterations and never reached the real trap ten controls later. Measured on
+    // tests/fixtures/realworld/contact.html: the seeded trap on `#confirmation` was reported by
+    // a hand walk and by nothing else.
+    if (now.key !== prev?.key) {
+      if (seen.has(now.key)) break;
+      seen.add(now.key);
+    }
     prev = now;
   }
   return hits;

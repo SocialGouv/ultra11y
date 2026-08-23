@@ -1,0 +1,88 @@
+<!-- JEU D'ESSAI DE RAPPEL — thématiques RGAA 2 (cadres) et 7 (scripts / vocabulaire ARIA).
+     Voir l'en-tête de index.html.
+
+     CETTE PAGE N'A DÉLIBÉRÉMENT PAS DE <!DOCTYPE>. C'est le seul moyen de déclencher la règle
+     déclarative `pack:rgaa:doctype-missing` (RGAA 8.1), qui est signal-gated : elle lit le
+     signal `doctype` d'une CAPTURE et ne peut donc pas tirer sur un audit de source seule.
+     Elle n'apparaît qu'après `scan`. Ne remettez pas le doctype. -->
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Intégrations — Orbit, hébergement statique</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+    <header>
+      <nav aria-label="Navigation principale">
+        <ul>
+          <li><a href="/">Accueil</a></li>
+          <li><a href="/tarifs.html">Tarifs</a></li>
+          <li><a href="/contact.html">Contact</a></li>
+          <li><a href="/cadres.html" aria-current="page">Intégrations</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="contenu">
+      <h1>Intégrations</h1>
+
+      <h2>Tableau de bord de disponibilité</h2>
+      <!-- iframe-title-missing · RGAA 2.1 · WCAG 4.1.2 — un cadre sans titre. -->
+      <iframe src="/embed/disponibilite" width="600" height="300"></iframe>
+
+      <h2>Formulaire de facturation</h2>
+      <!-- iframe-title-missing · RGAA 2.1 — un second cadre, sans titre lui non plus. -->
+      <iframe src="/embed/facturation" width="600" height="400"></iframe>
+
+      <h2>Options d’intégration</h2>
+
+      <!-- invalid-aria-role · RGAA 7.1 — « panneau » n'est pas un rôle WAI-ARIA. -->
+      <div role="panneau">Choisissez ce que le widget affiche.</div>
+
+      <!-- aria-ref-missing-id · RGAA 7.1 — la référence pointe sur un id absent de la page. -->
+      <section aria-labelledby="titre-supprime">
+        <p>Les widgets sont mis à jour toutes les minutes.</p>
+      </section>
+
+      <!-- redundant-aria · RGAA 7.1 — le rôle répète le rôle implicite de l'élément. -->
+      <button type="button" role="button">Copier le code d’intégration</button>
+
+      <!-- aria-required-children · RGAA 7.1 — une liste dont l'enfant n'est pas un élément de liste. -->
+      <ul role="list">
+        <div>Disponibilité</div>
+        <div>Latence</div>
+      </ul>
+
+      <!-- invalid-aria-attr · WCAG 4.1.2 — « aria-labeledby » avec un seul l : ce n'est pas un
+           attribut ARIA, et le navigateur l'ignore en silence. -->
+      <div role="button" tabindex="0" aria-labeledby="titre-supprime">Prévisualiser</div>
+
+      <!-- invalid-aria-value · WCAG 4.1.2 — aria-expanded ne prend pas « yes ». -->
+      <div role="button" tabindex="0" aria-expanded="yes">Afficher les options avancées</div>
+
+      <!-- aria-required-attr · WCAG 4.1.2 — un rôle checkbox sans aria-checked. -->
+      <div role="checkbox" tabindex="0">Activer les journaux détaillés</div>
+
+      <!-- aria-required-parent · WCAG 1.3.1 — un onglet hors de toute liste d'onglets. -->
+      <div role="tab">Disponibilité</div>
+
+      <!-- aria-prohibited-attr · WCAG 4.1.2 — le rôle paragraph n'admet pas de nom accessible. -->
+      <p role="paragraph" aria-label="Introduction aux intégrations">
+        Chaque widget se colle dans une page avec une seule balise.
+      </p>
+    </main>
+
+    <footer>
+      <nav aria-label="Navigation de pied de page">
+        <ul>
+          <li><a href="/plan.html">Plan du site</a></li>
+          <li><a href="/mentions-legales.html">Mentions légales</a></li>
+        </ul>
+      </nav>
+      <p>© 2026 Orbit.</p>
+    </footer>
+  </body>
+</html>

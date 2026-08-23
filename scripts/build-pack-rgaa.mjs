@@ -251,9 +251,16 @@ const RULE_TO_CRITERIA = {
   "error-not-associated": ["11.10"], "aria-invalid-no-description": ["11.10"],
   "axe:label": ["11.1"], "axe:form-field-multiple-labels": ["11.1"], "axe:select-name": ["11.1"], "axe:label-title-only": ["11.1"],
   "axe:autocomplete-valid": ["11.13"], "axe:fieldset": ["11.6"], "axe:input-button-name": ["11.9"], "axe:button-name": ["11.9"],
-  // Theme 12 — navigation (12.7 skip link, 12.8 tab order)
+  // Theme 12 — navigation (12.7 skip link, 12.8 tab order, 12.9 keyboard trap)
   "skip-link-target-missing": ["12.7"], "axe:skip-link": ["12.7"], "axe:bypass": ["12.7"],
   "positive-tabindex": ["12.8"], "axe:tabindex": ["12.8"],
+  // 12.9 « la navigation ne doit pas contenir de piège au clavier ». The probe that answers it
+  // has existed since `probeKeyboardTrap` landed, and it was mapped to WCAG 2.1.2 alone — so a
+  // trap the browser had just walked into raised a blocking WCAG non-conformity and left RGAA
+  // 12.9 « à évaluer », to be bought from a paid adjudicator on every run. The evidence was
+  // measured and then never delivered to the criterion it answers. No axe rule joins it: axe
+  // has none for keyboard traps, which is why the probe was written in the first place.
+  "dyn-keyboard-trap": ["12.9"],
   // Theme 13 — consultation (13.1 time limits, 13.8 moving/blinking)
   "meta-refresh-redirect": ["13.1"], "blink-marquee": ["13.8"], "autoplay-media": ["4.10", "13.8"],
   "axe:no-autoplay-audio": ["4.10"], "axe:blink": ["13.8"], "axe:marquee": ["13.8"],

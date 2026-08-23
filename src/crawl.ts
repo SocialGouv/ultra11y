@@ -13,7 +13,39 @@ export function parseSitemapUrls(xml: string): string[] {
   return out;
 }
 
-/** Same-origin, hash-stripped, de-duplicated absolute links from a page's HTML. */
+/** Extensions a crawl must never enqueue: they are DOWNLOADS, not pages.
+ *
+ *  A link to a PDF or a spreadsheet is a link off the web: Chromium answers it with a download
+ *  rather than a navigation, so `page.goto` either times out or lands on `about:blank`, and the
+ *  crawl spends a slot of its `--max` budget to learn nothing. Measured on
+ *  tests/fixtures/realworld: a documents page with four download links ate three of the twelve
+ *  crawl slots and printed three « non enregistrée — HTTP 404 » warnings, which read as a
+ *  broken site rather than as a crawler following links it should never have followed.
+ *
+ *  Those documents are not dropped from the audit — RGAA 13.3/13.4 are about them, and the
+ *  LINK is still audited on the page that carries it (`pack:rgaa:download-link-format` fires
+ *  there). What is refused is treating the file itself as a page of the site.
+ *
+ *  The vocabulary is the RGAA pack's own download list (`download-link-format` in
+ *  src/data/standards/rgaa.json), widened to the archive, media and asset types a crawl meets.
+ *  A crawler that skipped a different set from the one the pack calls a document would
+ *  disagree with the report about what a document is. */
+const DOWNLOAD_EXT =
+  /\.(?:pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|tar|epub|dmg|exe|pkg|mp3|mp4|m4a|m4v|avi|mov|wmv|webm|ogg|wav|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)$/i;
+
+/** Whether a URL points at a file to download rather than a page to crawl. */
+export function isDownloadUrl(url: string): boolean {
+  let path = url;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+    /* not absolute — match on the raw string, which is what a relative href looks like */
+  }
+  return DOWNLOAD_EXT.test(path);
+}
+
+/** Same-origin, hash-stripped, de-duplicated absolute links from a page's HTML.
+ *  Links to downloadable files are left out — see DOWNLOAD_EXT. */
 export function extractLinks(html: string, baseUrl: string): string[] {
   const origin = new URL(baseUrl).origin;
   const seen = new Set<string>();
@@ -31,6 +63,7 @@ export function extractLinks(html: string, baseUrl: string): string[] {
     }
     if (abs.protocol !== "http:" && abs.protocol !== "https:") continue; // mailto/tel/js
     if (abs.origin !== origin) continue;
+    if (isDownloadUrl(abs.pathname)) continue; // a download, not a page — see DOWNLOAD_EXT
     abs.hash = "";
     const url = abs.href;
     if (seen.has(url)) continue;
