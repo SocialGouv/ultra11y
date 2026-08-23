@@ -35,11 +35,18 @@ figcaption {
   color: var(--grise);
 }
 
-/* rendered-contrast-pixel · RGAA 3.2 · WCAG 1.4.3 — un dégradé derrière du texte clair. Aucune
-   couleur de fond opaque n'est lisible dans le CSSOM, donc `rendered-contrast` passe la main
-   et c'est la capture d'écran qui tranche (`dominantBackground`). */
+/* rendered-contrast-pixel · RGAA 3.2 · WCAG 1.4.3 — une IMAGE de fond derrière du texte clair.
+   `backdropOf` abandonne dès qu'il rencontre une background-image (elle recouvre la couleur
+   déclarée), donc `rendered-contrast` passe la main et c'est la capture d'écran qui tranche
+   via `dominantBackground`.
+
+   UNE IMAGE PLATE, ET PAS UN DÉGRADÉ, ET C'EST LE FOND DU SUJET : `dominantBackground` refuse
+   un arrière-plan « genuinely varied » — à juste titre, ce n'est alors pas un nombre. Un
+   dégradé l'est par construction : le seed a tenu sur macOS et pas sur les runners Linux, où
+   la règle ne s'est pas déclenchée du tout. Un aplat en SVG 1×1 est illisible pour le CSSOM et
+   parfaitement uniforme pour le tier pixel, sur les deux plateformes. */
 .banniere {
-  background: linear-gradient(90deg, #e8e8e8 0%, #ffffff 100%);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'><rect width='1' height='1' fill='%23e8e8e8'/></svg>");
   padding: 1.5rem;
 }
 .banniere-texte {
