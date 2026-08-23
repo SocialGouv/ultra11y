@@ -49,6 +49,26 @@ describe("the repository tracks no artefact one of its own runs left behind", ()
     expect(trackedAtRoot()).toContain(LEDGER);
   });
 
+  // THE OTHER KIND OF STRAY, and the rule above could not see it: not a run's output, but a
+  // human's scratch file swept in by `git add -A`.
+  //
+  // Written from experience rather than from principle — `zz-watch.sh`, a throwaway loop that
+  // polled a CI run, rode three commits to `main` that way. It never reached the npm tarball
+  // (`package.json` `files` is an allowlist), so nothing downstream broke and nothing failed;
+  // it simply sat in the repository looking as if somebody meant it. That is precisely the
+  // failure mode this file exists for: harmless, invisible, and permanent.
+  //
+  // Anchored on the SHAPE of a scratch name rather than on a list of extensions, because the
+  // next one will not be called zz-watch.sh. A root-level script or note whose name starts
+  // `zz`, `tmp`, `scratch`, `wip` or `debug` is not a deliverable; if one ever legitimately is,
+  // it wants a real name, and that is the point of the rule.
+  const SCRATCH = /^(zz|tmp|temp|scratch|wip|debug|test-|foo|bar)[.\-_a-z0-9]*\.(sh|mjs|cjs|js|ts|json|txt|md|log)$/i;
+
+  it("has no scratch file at its root", () => {
+    const offenders = trackedAtRoot().filter((f) => !f.includes("/") && SCRATCH.test(f));
+    expect(offenders, "a scratch file is tracked — `git add -A` swept it in; delete it").toEqual([]);
+  });
+
   it("keeps that ledger readable and non-empty, since a gate replays it", () => {
     const j = JSON.parse(readFileSync(join(ROOT, LEDGER), "utf8"));
     expect(j.standard).toBe("rgaa");
