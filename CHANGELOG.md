@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.28.0](https://github.com/maxgfr/ultra11y/compare/v5.27.0...v5.28.0) (2026-08-23)
+
+
+### Bug Fixes
+
+* **derive:** ask whether a criterion's subject is here BEFORE inheriting a sibling's failure ([3631aa2](https://github.com/maxgfr/ultra11y/commit/3631aa26dbc0014a2345ce4418ea92faba68d5d6))
+* **fixture:** seed 4.10 and 8.4 on every page, so the per-page grid can be completed at all ([6fa77f2](https://github.com/maxgfr/ultra11y/commit/6fa77f2e4d4cab1b9c499d911b30fe4617c53da6))
+* **fixture:** seed the pixel tier with a flat background image, not a gradient ([bc8d11a](https://github.com/maxgfr/ultra11y/commit/bc8d11a551422539b8e2115340a236b4c17f4b8e))
+* **probes:** budget a tab walk in presses, not in ring length ([8bbb4d3](https://github.com/maxgfr/ultra11y/commit/8bbb4d393f85980ee6d61c091ae19908791a93bf))
+* **scan:** a page the browser fails on costs its own page, not the whole run ([9147921](https://github.com/maxgfr/ultra11y/commit/914792149bdd5b8afa06a68fb494d9950e039995))
+
+
+### Features
+
+* **fixtures:** turn the realworld site into a recall fixture, and fix the three defects it found ([33158a6](https://github.com/maxgfr/ultra11y/commit/33158a66488add9bf8cfd02ed03ea20530c1eb43))
+* **pages:** key the criteria grid on the page's URL, and lead with it ([e0c3415](https://github.com/maxgfr/ultra11y/commit/e0c3415f6e8ada9900569f9d96959592d2dd62c7))
+
 # [5.27.0](https://github.com/maxgfr/ultra11y/compare/v5.26.0...v5.27.0) (2026-08-22)
 
 
