@@ -107,8 +107,9 @@ const S = {
     criterion: "Critère",
     where: "Emplacement",
     what: "Constat",
-    more: (n: number) => `… et ${n} autre(s).`,
-    moreGroups: (n: number) => `… et ${n} autre(s) groupe(s) — voir le résumé de job.`,
+    moreCriteria: (n: number) => `… et ${n} autre(s) critère(s).`,
+    moreDefects: (n: number) => `… et ${n} autre(s) défaut(s) distinct(s) sur ce critère — voir le rapport de l'artefact.`,
+    moreGroups: (n: number) => `… et ${n} autre(s) critère(s) — voir le résumé de job.`,
     perPage: "Bilan page par page",
     pageCriteriaTitle: (name: string) => `${name} — le détail critère par critère`,
     conformingList: "Conformes",
@@ -123,15 +124,17 @@ const S = {
     source: "source",
     occurrences: "Occ.",
     pagesCol: "Pages",
-    grouped: (groups: number, occ: number) => `${groups} défaut(s) distinct(s) · ${occ} occurrence(s)`,
-    groupNote:
-      "Une ligne par (critère, règle, sélecteur) : un même défaut de design system répété sur toutes les routes compte pour un. Les colonnes Occ. et Pages disent l'ampleur réelle.",
+    defectsCol: "Défauts",
+    byCriterion: (criteria: number, defects: number, occ: number) => `${criteria} critère(s) · ${defects} défaut(s) distinct(s) · ${occ} occurrence(s)`,
+    criterionDefects: (n: number) => `${n} défaut(s) distinct(s)`,
+    criterionNote:
+      "Une ligne par critère du référentiel — dépliez-en un pour ses défauts distincts (règle, sélecteur, emplacement). Un même défaut de design system répété sur toutes les routes compte pour un ; les colonnes Occ. et Pages disent l'ampleur réelle.",
     verdictFail: (n: number) => `🔴 ${n} non-conformité(s) bloquante(s) — la porte est rouge.`,
     verdictWarn: "🟠 Aucune non-conformité bloquante ; des constats majeurs ou mineurs restent à traiter.",
     verdictPass: "✅ Aucune non-conformité relevée par le moteur statique.",
     artifact: (name: string) => `Rapport complet (HTML, captures annotées) : artefact **${name}** du run.`,
     runLink: (url: string) => `[Voir le run et son résumé de job](${url})`,
-    clamped: (n: number) => `_${n} groupe(s) retiré(s) de ce commentaire pour tenir dans la limite de GitHub — le résumé de job les porte tous._`,
+    clamped: (n: number) => `_${n} critère(s) retiré(s) de ce commentaire pour tenir dans la limite de GitHub — le résumé de job les porte tous._`,
     sectionsDropped: (names: string[]) =>
       `_Sections retirées de ce commentaire pour tenir dans la limite de GitHub (64 Kio), en entier et jamais tronquées : ${names
         .map((n) => `**${n}**`)
@@ -169,10 +172,10 @@ const S = {
     fullGrid: "Grille complète — chaque critère du référentiel, page par page",
     allDefects: "Défauts distincts — où corriger",
     allDefectsNote:
-      "Un défaut distinct = une (règle, critère, sélecteur) ; les occurrences répétées sont repliées. C'est la moitié « actionnable » du digest, reprise ici pour que ce commentaire soit le seul à lire.",
+      "Groupés par critère : un défaut distinct = une (règle, sélecteur), les occurrences répétées sont repliées, et un critère n'apparaît qu'une fois. C'est la moitié « actionnable » du digest, reprise ici pour que ce commentaire soit le seul à lire.",
     gridLegend: "`C` conforme · `NC` non conforme · `—` non applicable · `?` à évaluer",
     gridDropped: "_La grille complète ne tient pas dans un commentaire GitHub (64 Kio) — elle est dans la fiche par page du livrable._",
-    pageMoreDefects: (n: number) => `_… et ${n} autre(s) défaut(s) distinct(s) sur cette page — voir la fiche de page dans l'artefact._`,
+    pageMoreCriteria: (n: number) => `_… et ${n} autre(s) critère(s) non conforme(s) sur cette page — voir la fiche de page dans l'artefact._`,
     noCriterionForFindings: (n: number) =>
       `${n} constat(s) sur cette page ne rendent aucun critère du référentiel non conforme : leur règle sort du périmètre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont détaillés dans l'artefact.`,
   },
@@ -186,8 +189,9 @@ const S = {
     criterion: "Criterion",
     where: "Location",
     what: "Finding",
-    more: (n: number) => `… and ${n} more.`,
-    moreGroups: (n: number) => `… and ${n} more group(s) — see the job summary.`,
+    moreCriteria: (n: number) => `… and ${n} more criterion(ia).`,
+    moreDefects: (n: number) => `… and ${n} more distinct defect(s) on this criterion — see the artifact's report.`,
+    moreGroups: (n: number) => `… and ${n} more criterion(ia) — see the job summary.`,
     perPage: "Page-by-page scoreboard",
     pageCriteriaTitle: (name: string) => `${name} — criterion by criterion`,
     conformingList: "Conforming",
@@ -202,15 +206,17 @@ const S = {
     source: "source",
     occurrences: "Occ.",
     pagesCol: "Pages",
-    grouped: (groups: number, occ: number) => `${groups} distinct defect(s) · ${occ} occurrence(s)`,
-    groupNote:
-      "One row per (criterion, rule, selector): one design-system defect repeated across every route counts once. The Occ. and Pages columns carry the real scale.",
+    defectsCol: "Defects",
+    byCriterion: (criteria: number, defects: number, occ: number) => `${criteria} criterion(ia) · ${defects} distinct defect(s) · ${occ} occurrence(s)`,
+    criterionDefects: (n: number) => `${n} distinct defect(s)`,
+    criterionNote:
+      "One row per criterion of the standard — unfold one for its distinct defects (rule, selector, location). One design-system defect repeated across every route counts once; the Occ. and Pages columns carry the real scale.",
     verdictFail: (n: number) => `🔴 ${n} blocking non-conformity(ies) — the gate is red.`,
     verdictWarn: "🟠 No blocking non-conformity; major or minor findings remain.",
     verdictPass: "✅ No non-conformity found by the static engine.",
     artifact: (name: string) => `Full report (HTML, annotated crops): artifact **${name}** of this run.`,
     runLink: (url: string) => `[See the run and its job summary](${url})`,
-    clamped: (n: number) => `_${n} group(s) dropped from this comment to fit GitHub's limit — the job summary carries them all._`,
+    clamped: (n: number) => `_${n} criterion(ia) dropped from this comment to fit GitHub's limit — the job summary carries them all._`,
     sectionsDropped: (names: string[]) =>
       `_Sections dropped from this comment to fit GitHub's 64 KiB limit, whole and never truncated: ${names
         .map((n) => `**${n}**`)
@@ -247,18 +253,24 @@ const S = {
     fullGrid: "Full grid — every criterion of the standard, page by page",
     allDefects: "Distinct defects — where to fix",
     allDefectsNote:
-      "One distinct defect = one (rule, criterion, selector); repeated occurrences are folded. This is the digest's actionable half, carried here so this comment is the only one to read.",
+      "Grouped by criterion: one distinct defect = one (rule, selector), repeated occurrences are folded, and a criterion appears once. This is the digest's actionable half, carried here so this comment is the only one to read.",
     gridLegend: "`C` conforming · `NC` non-conforming · `—` not applicable · `?` to assess",
     gridDropped: "_The full grid does not fit in a GitHub comment (64 KiB) — it is in the deliverable's per-page sheet._",
-    pageMoreDefects: (n: number) => `_… and ${n} more distinct defect(s) on this page — see its sheet in the artifact._`,
+    pageMoreCriteria: (n: number) => `_… and ${n} more non-conforming criterion(ia) on this page — see its sheet in the artifact._`,
     noCriterionForFindings: (n: number) =>
       `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`,
   },
 } as const;
 
-/** Group rows kept on the job summary. Groups, not findings — 472 occurrences of one
- *  design-system defect are one row, so this ceiling is reached by real variety only. */
+/** Criterion rows kept on the job summary. CRITERIA, not defects and not findings: a
+ *  standard has 55 of them (WCAG 2.2 AA) or 106 (RGAA), so this ceiling is now above the
+ *  whole referential and clamps nothing in practice. It used to count (criterion, rule,
+ *  selector) groups, and a real audit had 252 of those — 202 silently escamotés, whole
+ *  criteria among them. */
 const MAX_ROWS = 50;
+/** Distinct defects listed inside one criterion's fold before it says what it held back.
+ *  A design-system criterion can carry a hundred; the fold is a detail view, not a report. */
+const MAX_DEFECTS_PER_CRITERION = 20;
 /** Group rows kept in the pull-request digest, before the size clamp gets a say. */
 const COMMENT_ROWS = 10;
 /** GitHub refuses an issue-comment body past this. Documented for tickets at
@@ -287,6 +299,10 @@ export interface FindingGroup {
   occurrences: number;
   /** Distinct pages the defect was raised on. 0 when nothing is page-attributed. */
   pages: number;
+  /** Those pages, by id and sorted. Kept so a criterion can UNION its defects' pages
+   *  rather than SUM them: one defect on 38 routes and another on 21 of the same 38 are
+   *  38 pages, never 59. */
+  pageIds: string[];
 }
 
 /** Fold findings by what is actually WRONG rather than by where it shows up.
@@ -297,7 +313,8 @@ export interface FindingGroup {
  *  about the shape of the problem. Grouping shows seven defects and says, in its own columns,
  *  that they occur 472 times over 38 pages. */
 export function groupFindings(findings: Finding[], standard: StandardId, lang: Lang, baseDir: string): FindingGroup[] {
-  const groups = new Map<string, FindingGroup & { pageSet: Set<string> }>();
+  // `pageIds` is derived from `pageSet` on the way out, so the accumulator does not carry it.
+  const groups = new Map<string, Omit<FindingGroup, "pageIds"> & { pageSet: Set<string> }>();
   for (const f of findings) {
     const criterion = criterionLabel(f, standard);
     const key = `${criterion} ${f.ruleId} ${f.selectorHint}`;
@@ -320,7 +337,55 @@ export function groupFindings(findings: Finding[], standard: StandardId, lang: L
     });
   }
   return [...groups.values()]
-    .map(({ pageSet, ...g }) => ({ ...g, pages: pageSet.size }))
+    .map(({ pageSet, ...g }) => ({ ...g, pages: pageSet.size, pageIds: [...pageSet].sort() }))
+    .sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity) || b.occurrences - a.occurrences || a.criterion.localeCompare(b.criterion));
+}
+
+/** One CRITERION's distinct defects, folded. */
+export interface CriterionGroup {
+  criterion: string;
+  /** The worst severity among its defects — a criterion is as blocking as its worst one. */
+  severity: Severity;
+  /** Its (rule, selector) defects, in the order `groupFindings` already sorted them. */
+  defects: FindingGroup[];
+  occurrences: number;
+  /** Distinct pages across ALL its defects — a union, never a sum. */
+  pages: number;
+}
+
+/** Fold the defects again, by the CRITERION they make non-conforming.
+ *
+ *  The layer above `groupFindings`, and the one the reader actually asks for. Grouping by
+ *  (criterion, rule, selector) answers "what is broken"; it does not answer "which criteria
+ *  am I failing", and on a real audit the difference was 252 rows against 41. Worse, the sort
+ *  was severity → occurrences → criterion, so a criterion's rows were not even adjacent: RGAA
+ *  1.1 appeared a dozen times, scattered, and the 50-row ceiling then dropped 202 of them —
+ *  taking entire criteria out of a table that reads as though it listed them all.
+ *
+ *  The deliverable has grouped by criterion since it existed (`prdUnits`, src/prd.ts); this
+ *  is the CI surfaces catching up, so the two cannot disagree about what a criterion carries. */
+export function groupByCriterion(groups: FindingGroup[]): CriterionGroup[] {
+  const byCriterion = new Map<string, CriterionGroup & { pageSet: Set<string> }>();
+  for (const g of groups) {
+    const c = byCriterion.get(g.criterion);
+    if (c) {
+      c.defects.push(g);
+      c.occurrences += g.occurrences;
+      for (const p of g.pageIds) c.pageSet.add(p);
+      if (SEV_ORDER.indexOf(g.severity) < SEV_ORDER.indexOf(c.severity)) c.severity = g.severity;
+      continue;
+    }
+    byCriterion.set(g.criterion, {
+      criterion: g.criterion,
+      severity: g.severity,
+      defects: [g],
+      occurrences: g.occurrences,
+      pages: 0,
+      pageSet: new Set(g.pageIds),
+    });
+  }
+  return [...byCriterion.values()]
+    .map(({ pageSet, ...c }) => ({ ...c, pages: pageSet.size }))
     .sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity) || b.occurrences - a.occurrences || a.criterion.localeCompare(b.criterion));
 }
 
@@ -335,18 +400,51 @@ export function runRate(result: AuditResult, standard: StandardId, lang: Lang): 
   return { text: `${formatRate(decided === 0 ? null : result.conformancePct, decided, total)}${agentRuled ? "*" : ""}`, agentRuled };
 }
 
-function groupTableHead(s: (typeof S)[Lang]): string[] {
-  return [`| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} | ${s.occurrences} | ${s.pagesCol} |`, "| --- | --- | --- | --- | ---: | ---: |"];
+// Pipes inside a cell would break the table.
+const cell = (v: string): string => v.replace(/\|/g, "\\|");
+
+function criterionTableHead(s: (typeof S)[Lang]): string[] {
+  return [`| ${s.severity} | ${s.criterion} | ${s.defectsCol} | ${s.occurrences} | ${s.pagesCol} |`, "| --- | --- | ---: | ---: | ---: |"];
 }
 
-function groupRow(g: FindingGroup): string {
-  // Pipes inside a cell would break the table.
-  const cell = (v: string): string => v.replace(/\|/g, "\\|");
-  return `| ${ICON[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} | ${g.pages || "—"} |`;
+function criterionRow(c: CriterionGroup): string {
+  return `| ${ICON[c.severity]} ${c.severity} | ${cell(c.criterion)} | ${c.defects.length} | ${c.occurrences} | ${c.pages || "—"} |`;
 }
 
-function groupTable(rows: FindingGroup[], s: (typeof S)[Lang]): string[] {
-  return [...groupTableHead(s), ...rows.map(groupRow)];
+/** One defect, WITHOUT its criterion: it is written on the fold that contains it. */
+function defectRow(g: FindingGroup): string {
+  return `| ${ICON[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} | ${g.pages || "—"} |`;
+}
+
+/** One criterion's defects, behind its own fold: where to actually go and change something.
+ *
+ *  The criterion table says WHICH criteria fail; this says where. Folded, because a reviewer
+ *  scans the table first and opens the two or three that matter — and because 252 rows in the
+ *  open is the state this replaced. */
+function criterionDetails(c: CriterionGroup, s: (typeof S)[Lang]): string[] {
+  const out: string[] = [
+    "<details>",
+    `<summary><b>${cell(c.criterion)}</b> — ${s.criterionDefects(c.defects.length)}</summary>`,
+    // GFM only renders Markdown inside <details> after a blank line — at EVERY level of
+    // nesting, and these folds sit inside the page and digest folds.
+    "",
+    `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} | ${s.pagesCol} |`,
+    "| --- | --- | --- | ---: | ---: |",
+    ...c.defects.slice(0, MAX_DEFECTS_PER_CRITERION).map(defectRow),
+  ];
+  if (c.defects.length > MAX_DEFECTS_PER_CRITERION) out.push("", s.moreDefects(c.defects.length - MAX_DEFECTS_PER_CRITERION));
+  out.push("", "</details>");
+  return out;
+}
+
+/** The whole non-conformity block: one row per criterion, then each shown criterion's own
+ *  fold. Nothing is dropped in silence — what the ceiling holds back is counted and said. */
+function criterionSection(criteria: CriterionGroup[], s: (typeof S)[Lang], maxRows: number, more: (n: number) => string): string[] {
+  const shown = criteria.slice(0, maxRows);
+  const out = [...criterionTableHead(s), ...shown.map(criterionRow)];
+  if (criteria.length > maxRows) out.push("", more(criteria.length - maxRows));
+  for (const c of shown) out.push("", ...criterionDetails(c, s));
+  return out;
 }
 
 /** Markdown for `$GITHUB_STEP_SUMMARY`. */
@@ -377,10 +475,10 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
   }
 
   const grouped = groupFindings(all, standard, lang, baseDir);
-  out.push(`### ${s.findings} — ${s.grouped(grouped.length, all.length)}`, "");
-  out.push(`> ${s.groupNote}`, "");
-  out.push(...groupTable(grouped.slice(0, MAX_ROWS), s));
-  if (grouped.length > MAX_ROWS) out.push("", s.more(grouped.length - MAX_ROWS));
+  const criteria = groupByCriterion(grouped);
+  out.push(`### ${s.findings} — ${s.byCriterion(criteria.length, grouped.length, all.length)}`, "");
+  out.push(`> ${s.criterionNote}`, "");
+  out.push(...criterionSection(criteria, s, MAX_ROWS, s.moreCriteria));
   out.push("");
 
   const unanchored = all.filter((f) => isUrl(f.file)).length;
@@ -464,6 +562,7 @@ export function prComment(result: AuditResult, opts: AnnotateOptions & { runUrl?
   const blocking = normative.filter((f) => f.severity === "bloquant").length;
   const rate = runRate(result, standard, lang);
   const grouped = groupFindings(all, standard, lang, baseDir);
+  const criteria = groupByCriterion(grouped);
   const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
 
   const head: string[] = [];
@@ -498,15 +597,17 @@ export function prComment(result: AuditResult, opts: AnnotateOptions & { runUrl?
   // is the least a reviewer needs. Never a byte-slice of the report.
   const assemble = (rows: number): string => {
     const digest: string[] = [];
-    if (grouped.length) {
-      digest.push(s.grouped(grouped.length, all.length), "");
-      digest.push(...groupTable(grouped.slice(0, rows), s), "");
-      const omitted = grouped.length - rows;
+    if (criteria.length) {
+      digest.push(s.byCriterion(criteria.length, grouped.length, all.length), "");
+      // The clamp comes off CRITERIA now, and the note says which of the two reasons it fired
+      // for: a budget too small for the whole referential, or the comment's own row ceiling.
+      digest.push(...criterionSection(criteria.slice(0, rows), s, rows, s.moreCriteria), "");
+      const omitted = criteria.length - rows;
       if (omitted > 0) digest.push(rows < COMMENT_ROWS ? s.clamped(omitted) : s.moreGroups(omitted), "");
     }
     return [...head, ...digest, ...tail].join("\n").trimEnd();
   };
-  let rows = Math.min(COMMENT_ROWS, grouped.length);
+  let rows = Math.min(COMMENT_ROWS, criteria.length);
   while (rows > 0 && sizeOf(assemble(rows)) > COMMENT_LIMIT) rows--;
   return assemble(rows);
 }
@@ -665,12 +766,12 @@ function basisCaveats(result: AuditResult, derived: PageResult[], s: (typeof S)[
   return out;
 }
 
-/** Distinct defects shown under one page before the block says how many it held back.
+/** Non-conforming CRITERIA shown under one page before the block says how many it held back.
  *
- *  Distinct, not occurrences — the grouping already folded the repeats. Six is what fits
- *  beside the criterion table without turning a 35-page comment into something nobody scrolls,
- *  and the ones held back are counted rather than dropped in silence. */
-const PAGE_DEFECTS_SHOWN = 6;
+ *  Criteria, not occurrences and no longer defects — the two foldings already collapsed the
+ *  repeats. Six is what fits beside the criterion table without turning a 35-page comment into
+ *  something nobody scrolls, and the ones held back are counted rather than dropped in silence. */
+const PAGE_CRITERIA_SHOWN = 6;
 
 /** One page's collapsed block: its severity counts in the summary line, its standing as the
  *  shared tally sentence, and the criteria that are actually NON-CONFORMING.
@@ -686,7 +787,6 @@ function pageBlock(result: AuditResult, page: PageResult, standard: StandardId, 
   const nc = rows.filter((r) => r.status === "NC");
   const occurrences = page.findings.filter((f) => !f.advisory).length;
   if (!nc.length && !occurrences) return undefined;
-  const cell = (v: string): string => v.replace(/\|/g, "\\|");
   const counts = `🔴 ${severityCount(page, "bloquant")} · 🟠 ${severityCount(page, "majeur")} · 🟡 ${severityCount(page, "mineur")}`;
   const withTests = nc.some((r) => r.tests.length);
   const out: string[] = [
@@ -735,30 +835,20 @@ function pageBlock(result: AuditResult, page: PageResult, standard: StandardId, 
     lang,
     baseDir,
   );
-  const blocking = defects.filter((g) => g.severity === "bloquant");
-  const rest = defects.filter((g) => g.severity !== "bloquant");
+  // Grouped by criterion here too, for the reason the run-wide table was: this page's twelve
+  // `img-alt-missing` selectors are ONE criterion to answer for, and listing them flat made the
+  // six-row budget spend itself on one criterion while the others went unnamed.
+  const blocking = groupByCriterion(defects.filter((g) => g.severity === "bloquant"));
+  const rest = groupByCriterion(defects.filter((g) => g.severity !== "bloquant"));
   // BLOCKING SERVED FIRST, out of one budget. The cap is what keeps a 40-defect page from
   // burying the other thirty-six, and it stays — what changes is WHO it takes from: the
   // blocking half draws first, and only the remainder is offered to the rest. Each half says
   // what it held back, so neither ever trails off in silence.
-  const shownBlocking = Math.min(blocking.length, PAGE_DEFECTS_SHOWN);
-  const shownRest = Math.min(rest.length, Math.max(0, PAGE_DEFECTS_SHOWN - shownBlocking));
-  const half = (rows: FindingGroup[], shown: number, title: string): string[] => {
+  const shownBlocking = Math.min(blocking.length, PAGE_CRITERIA_SHOWN);
+  const shownRest = Math.min(rest.length, Math.max(0, PAGE_CRITERIA_SHOWN - shownBlocking));
+  const half = (rows: CriterionGroup[], shown: number, title: string): string[] => {
     if (!rows.length) return [];
-    const lines = [
-      "",
-      `**${title}**`,
-      "",
-      `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} |`,
-      "| --- | --- | --- | ---: |",
-      ...rows
-        .slice(0, shown)
-        .map(
-          (g) => `| ${ICON[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`,
-        ),
-    ];
-    if (rows.length > shown) lines.push("", s.pageMoreDefects(rows.length - shown));
-    return lines;
+    return ["", `**${title}**`, "", ...criterionSection(rows, s, shown, s.pageMoreCriteria)];
   };
   out.push(...half(blocking, shownBlocking, s.blockingNc), ...half(rest, shownRest, s.nonBlockingNc));
   out.push("", "</details>");
@@ -778,7 +868,6 @@ function pageBlock(result: AuditResult, page: PageResult, standard: StandardId, 
 function fullGridBlock(result: AuditResult, derived: PageResult[], standard: StandardId, s: (typeof S)[Lang], lang: Lang): string[] {
   const { rows, status } = pageGridModel(result, derived, standard, lang);
   if (!rows.length || !derived.length) return [];
-  const cell = (v: string): string => v.replace(/\|/g, "\\|");
   const origin = commonOrigin(derived);
   const originNote = pageOriginNote(origin, lang);
   const head = [s.criterion, ...derived.map((p) => cell(pageColumnLabel(p, origin)))];
@@ -813,8 +902,7 @@ function fullGridBlock(result: AuditResult, derived: PageResult[], standard: Sta
 function orphansBlock(result: AuditResult, standard: StandardId, s: (typeof S)[Lang], lang: Lang, baseDir: string): string[] {
   const orphans = unattributedFindings(result).filter((f) => !f.advisory);
   if (!orphans.length) return [];
-  const cell = (v: string): string => v.replace(/\|/g, "\\|");
-  const groups = groupFindings(orphans, standard, lang, baseDir);
+  const criteria = groupByCriterion(groupFindings(orphans, standard, lang, baseDir));
   const counts = SEV_ORDER.map((sev) => `${ICON[sev]} ${orphans.filter((f) => f.severity === sev).length}`).join(" · ");
   const out: string[] = [
     "<details>",
@@ -823,15 +911,8 @@ function orphansBlock(result: AuditResult, standard: StandardId, s: (typeof S)[L
     "",
     `> ${s.orphansNote}`,
     "",
-    `| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} | ${s.occurrences} |`,
-    "| --- | --- | --- | --- | ---: |",
+    ...criterionSection(criteria, s, MAX_ROWS, s.moreCriteria),
   ];
-  for (const g of groups.slice(0, MAX_ROWS)) {
-    out.push(
-      `| ${ICON[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`,
-    );
-  }
-  if (groups.length > MAX_ROWS) out.push("", s.more(groups.length - MAX_ROWS));
   out.push("", "</details>");
   return out;
 }
@@ -851,25 +932,18 @@ function orphansBlock(result: AuditResult, standard: StandardId, s: (typeof S)[L
 function allDefectsBlock(result: AuditResult, standard: StandardId, s: (typeof S)[Lang], lang: Lang, baseDir: string): string[] {
   const all = findingsForStandard(result, standard).filter((f) => !f.advisory);
   if (!all.length) return [];
-  const cell = (v: string): string => v.replace(/\|/g, "\\|");
   const groups = groupFindings(all, standard, lang, baseDir);
+  const criteria = groupByCriterion(groups);
   const counts = SEV_ORDER.map((sev) => `${ICON[sev]} ${all.filter((f) => f.severity === sev).length}`).join(" · ");
   const out: string[] = [
     "<details>",
-    `<summary><b>${s.allDefects}</b> — ${groups.length} / ${all.length} · ${counts}</summary>`,
+    `<summary><b>${s.allDefects}</b> — ${s.byCriterion(criteria.length, groups.length, all.length)} · ${counts}</summary>`,
     // GFM only renders Markdown inside <details> after a blank line.
     "",
     `> ${s.allDefectsNote}`,
     "",
-    `| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} | ${s.occurrences} |`,
-    "| --- | --- | --- | --- | ---: |",
+    ...criterionSection(criteria, s, MAX_ROWS, s.moreCriteria),
   ];
-  for (const g of groups.slice(0, MAX_ROWS)) {
-    out.push(
-      `| ${ICON[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`,
-    );
-  }
-  if (groups.length > MAX_ROWS) out.push("", s.more(groups.length - MAX_ROWS));
   out.push("", "</details>");
   return out;
 }

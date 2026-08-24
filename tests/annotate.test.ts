@@ -135,9 +135,12 @@ describe("job summary", () => {
   it("folds one design-system defect repeated across routes into a single row", () => {
     const many = Array.from({ length: 40 }, (_, i) => F({ ruleId: "rendered-link-colour-only", selectorHint: "a.fr-link", file: `p${i}.html`, page: `p${i}` }));
     const md = stepSummary(audit([...many, F({ selectorHint: "a.fr-btn" })]), { lang: "en" });
-    expect(md).toContain("2 distinct defect(s) · 41 occurrence(s)");
-    // One row for the 40, one for the singleton — and the count is not hidden by the fold.
-    expect(md.split("\n").filter((l) => l.startsWith("| 🔴 bloquant |"))).toHaveLength(2);
+    // Both findings sit under the same criterion, so the table is ONE criterion row; the two
+    // distinct defects live in its fold, and neither count is hidden by the folding.
+    expect(md).toContain("1 criterion(ia) · 2 distinct defect(s) · 41 occurrence(s)");
+    const rows = md.split("\n").filter((l) => l.startsWith("| 🔴 bloquant |"));
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toContain("| WCAG 1.1.1 | 2 | 41 |");
     expect(md).toMatch(/\| 40 \| 40 \|/);
   });
 

@@ -79,7 +79,12 @@ describe("the job summary names the criteria under each page", () => {
 
   it("says nothing extra when no page is in scope", () => {
     const noPages = audit({ scope: { inputs: [], files: 2 } } as Partial<AuditResult>);
-    expect(stepSummary(noPages, { standard: "rgaa", lang: "fr" })).not.toContain("<details>");
+    const md = stepSummary(noPages, { standard: "rgaa", lang: "fr" });
+    // No PAGE block — keyed on the page names, not on `<details>`: the non-conformity table
+    // now folds each criterion behind one of its own, and that fold is not a page.
+    expect(md).not.toContain("Accueil");
+    expect(md).not.toContain("Contact");
+    expect(md).not.toContain(`${"Bilan page par page"}`);
   });
 
   it("says it in English too", () => {

@@ -378,15 +378,34 @@ describe("the single deliverable", () => {
     expect(md.indexOf("défaut bloquant")).toBeLessThan(md.indexOf("défaut mineur"));
   });
 
-  it("gives blocking defects the budget before the non-blocking ones", () => {
-    // Eight distinct blocking defects and one minor: the blocking half fills the budget, and
-    // what it held back is stated. The minor one may be crowded out — that is the point.
-    const many = Array.from({ length: 8 }, (_, i) => F({ page: "contact", file: `src/b${i}.html`, selectorHint: `img.b${i}`, message: `bloquant ${i}` }));
+  it("gives blocking criteria the budget before the non-blocking ones", () => {
+    // Eight blocking CRITERIA and one minor: the blocking half fills the six-slot budget, and
+    // what it held back is stated. The minor one is crowded out — that is the point.
+    //
+    // Criteria, not defects: the budget used to be spent at the (rule, selector) grain, so ONE
+    // criterion with eight selectors swallowed the page's whole allowance and every other
+    // criterion went unnamed. Eight selectors of one criterion are now one row with a fold.
+    const many = Array.from({ length: 8 }, (_, i) =>
+      F({ page: "contact", criteriaId: `4.1.${i + 1}`, file: `src/b${i}.html`, selectorHint: `img.b${i}`, message: `bloquant ${i}` }),
+    );
     const minor = F({ page: "contact", file: "src/z.html", selectorHint: "a.z", severity: "mineur", message: "mineur unique" });
     const all = [...many, minor];
     const md = pagesComment(audit({ criteria: [C("1.1.1", "NC", all)], findings: all } as Partial<AuditResult>), { lang: "fr" });
     expect(md).toContain("bloquant 0");
-    expect(md).toMatch(/autre\(s\) défaut\(s\) distinct\(s\)/);
+    expect(md).toMatch(/autre\(s\) critère\(s\) non conforme\(s\) sur cette page/);
+    expect(md).not.toContain("mineur unique");
+  });
+
+  it("spends a page's budget on criteria, not on one criterion's selectors", () => {
+    // The regression the grain change exists to prevent: eight selectors of ONE criterion plus
+    // a second criterion. At the old grain the eight filled the budget and the second criterion
+    // was never named; now the eight fold into one row and both criteria appear.
+    const many = Array.from({ length: 8 }, (_, i) => F({ page: "contact", file: `src/b${i}.html`, selectorHint: `img.b${i}`, message: `bloquant ${i}` }));
+    const other = F({ page: "contact", criteriaId: "4.1.2", file: "src/o.html", selectorHint: "button", message: "bouton sans nom" });
+    const all = [...many, other];
+    const md = pagesComment(audit({ criteria: [C("1.1.1", "NC", all)], findings: all } as Partial<AuditResult>), { lang: "fr" });
+    expect(md).toContain("bouton sans nom");
+    expect(md).toContain("bloquant 0");
   });
 
   it("clamps on the bytes GitHub actually receives, not on UTF-16 units", () => {

@@ -47016,14 +47016,14 @@ var tableEmptyDataCell = {
     const out2 = [];
     for (const t3 of doc.elements) {
       if (t3.tag !== "table" || isLayoutTable(t3)) continue;
-      for (const cell of descendants(t3)) {
-        if (cell.tag !== "td") continue;
-        if (mayInjectContent(cell)) continue;
-        if (cell.children.some((c2) => c2.type === "element")) continue;
-        if ((attr(cell, "aria-label") ?? "").trim() || hasAttr(cell, "aria-labelledby")) continue;
-        const txt = visibleText(cell);
+      for (const cell2 of descendants(t3)) {
+        if (cell2.tag !== "td") continue;
+        if (mayInjectContent(cell2)) continue;
+        if (cell2.children.some((c2) => c2.type === "element")) continue;
+        if ((attr(cell2, "aria-label") ?? "").trim() || hasAttr(cell2, "aria-labelledby")) continue;
+        const txt = visibleText(cell2);
         if (txt !== "" && txt !== "-") continue;
-        out2.push({ criteriaId: "1.3.1", el: cell, msgId: "table-empty-data-cell", advisory: true });
+        out2.push({ criteriaId: "1.3.1", el: cell2, msgId: "table-empty-data-cell", advisory: true });
       }
     }
     return out2;
@@ -63298,8 +63298,9 @@ var S = {
     criterion: "Crit\xE8re",
     where: "Emplacement",
     what: "Constat",
-    more: (n) => `\u2026 et ${n} autre(s).`,
-    moreGroups: (n) => `\u2026 et ${n} autre(s) groupe(s) \u2014 voir le r\xE9sum\xE9 de job.`,
+    moreCriteria: (n) => `\u2026 et ${n} autre(s) crit\xE8re(s).`,
+    moreDefects: (n) => `\u2026 et ${n} autre(s) d\xE9faut(s) distinct(s) sur ce crit\xE8re \u2014 voir le rapport de l'artefact.`,
+    moreGroups: (n) => `\u2026 et ${n} autre(s) crit\xE8re(s) \u2014 voir le r\xE9sum\xE9 de job.`,
     perPage: "Bilan page par page",
     pageCriteriaTitle: (name2) => `${name2} \u2014 le d\xE9tail crit\xE8re par crit\xE8re`,
     conformingList: "Conformes",
@@ -63314,14 +63315,16 @@ var S = {
     source: "source",
     occurrences: "Occ.",
     pagesCol: "Pages",
-    grouped: (groups, occ) => `${groups} d\xE9faut(s) distinct(s) \xB7 ${occ} occurrence(s)`,
-    groupNote: "Une ligne par (crit\xE8re, r\xE8gle, s\xE9lecteur) : un m\xEAme d\xE9faut de design system r\xE9p\xE9t\xE9 sur toutes les routes compte pour un. Les colonnes Occ. et Pages disent l'ampleur r\xE9elle.",
+    defectsCol: "D\xE9fauts",
+    byCriterion: (criteria, defects, occ) => `${criteria} crit\xE8re(s) \xB7 ${defects} d\xE9faut(s) distinct(s) \xB7 ${occ} occurrence(s)`,
+    criterionDefects: (n) => `${n} d\xE9faut(s) distinct(s)`,
+    criterionNote: "Une ligne par crit\xE8re du r\xE9f\xE9rentiel \u2014 d\xE9pliez-en un pour ses d\xE9fauts distincts (r\xE8gle, s\xE9lecteur, emplacement). Un m\xEAme d\xE9faut de design system r\xE9p\xE9t\xE9 sur toutes les routes compte pour un ; les colonnes Occ. et Pages disent l'ampleur r\xE9elle.",
     verdictFail: (n) => `\u{1F534} ${n} non-conformit\xE9(s) bloquante(s) \u2014 la porte est rouge.`,
     verdictWarn: "\u{1F7E0} Aucune non-conformit\xE9 bloquante ; des constats majeurs ou mineurs restent \xE0 traiter.",
     verdictPass: "\u2705 Aucune non-conformit\xE9 relev\xE9e par le moteur statique.",
     artifact: (name2) => `Rapport complet (HTML, captures annot\xE9es) : artefact **${name2}** du run.`,
     runLink: (url) => `[Voir le run et son r\xE9sum\xE9 de job](${url})`,
-    clamped: (n) => `_${n} groupe(s) retir\xE9(s) de ce commentaire pour tenir dans la limite de GitHub \u2014 le r\xE9sum\xE9 de job les porte tous._`,
+    clamped: (n) => `_${n} crit\xE8re(s) retir\xE9(s) de ce commentaire pour tenir dans la limite de GitHub \u2014 le r\xE9sum\xE9 de job les porte tous._`,
     sectionsDropped: (names) => `_Sections retir\xE9es de ce commentaire pour tenir dans la limite de GitHub (64 Kio), en entier et jamais tronqu\xE9es : ${names.map((n) => `**${n}**`).join(" \xB7 ")}. Elles sont dans le rapport de l'artefact, \xE0 l'identique._`,
     unanchored: (n) => `${n} constat(s) rattach\xE9(s) \xE0 une URL, sans ligne de code \xE0 annoter \u2014 voir le rapport.`,
     unattributed: (n) => `${n} constat(s) ne sont rattach\xE9s \xE0 aucune page (code partag\xE9, fichier hors routes) \u2014 compt\xE9s dans l'audit global, jamais r\xE9partis d'office.`,
@@ -63347,10 +63350,10 @@ var S = {
     pageDefects: "D\xE9fauts",
     fullGrid: "Grille compl\xE8te \u2014 chaque crit\xE8re du r\xE9f\xE9rentiel, page par page",
     allDefects: "D\xE9fauts distincts \u2014 o\xF9 corriger",
-    allDefectsNote: "Un d\xE9faut distinct = une (r\xE8gle, crit\xE8re, s\xE9lecteur) ; les occurrences r\xE9p\xE9t\xE9es sont repli\xE9es. C'est la moiti\xE9 \xAB actionnable \xBB du digest, reprise ici pour que ce commentaire soit le seul \xE0 lire.",
+    allDefectsNote: "Group\xE9s par crit\xE8re : un d\xE9faut distinct = une (r\xE8gle, s\xE9lecteur), les occurrences r\xE9p\xE9t\xE9es sont repli\xE9es, et un crit\xE8re n'appara\xEEt qu'une fois. C'est la moiti\xE9 \xAB actionnable \xBB du digest, reprise ici pour que ce commentaire soit le seul \xE0 lire.",
     gridLegend: "`C` conforme \xB7 `NC` non conforme \xB7 `\u2014` non applicable \xB7 `?` \xE0 \xE9valuer",
     gridDropped: "_La grille compl\xE8te ne tient pas dans un commentaire GitHub (64 Kio) \u2014 elle est dans la fiche par page du livrable._",
-    pageMoreDefects: (n) => `_\u2026 et ${n} autre(s) d\xE9faut(s) distinct(s) sur cette page \u2014 voir la fiche de page dans l'artefact._`,
+    pageMoreCriteria: (n) => `_\u2026 et ${n} autre(s) crit\xE8re(s) non conforme(s) sur cette page \u2014 voir la fiche de page dans l'artefact._`,
     noCriterionForFindings: (n) => `${n} constat(s) sur cette page ne rendent aucun crit\xE8re du r\xE9f\xE9rentiel non conforme : leur r\xE8gle sort du p\xE9rim\xE8tre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont d\xE9taill\xE9s dans l'artefact.`
   },
   en: {
@@ -63363,8 +63366,9 @@ var S = {
     criterion: "Criterion",
     where: "Location",
     what: "Finding",
-    more: (n) => `\u2026 and ${n} more.`,
-    moreGroups: (n) => `\u2026 and ${n} more group(s) \u2014 see the job summary.`,
+    moreCriteria: (n) => `\u2026 and ${n} more criterion(ia).`,
+    moreDefects: (n) => `\u2026 and ${n} more distinct defect(s) on this criterion \u2014 see the artifact's report.`,
+    moreGroups: (n) => `\u2026 and ${n} more criterion(ia) \u2014 see the job summary.`,
     perPage: "Page-by-page scoreboard",
     pageCriteriaTitle: (name2) => `${name2} \u2014 criterion by criterion`,
     conformingList: "Conforming",
@@ -63379,14 +63383,16 @@ var S = {
     source: "source",
     occurrences: "Occ.",
     pagesCol: "Pages",
-    grouped: (groups, occ) => `${groups} distinct defect(s) \xB7 ${occ} occurrence(s)`,
-    groupNote: "One row per (criterion, rule, selector): one design-system defect repeated across every route counts once. The Occ. and Pages columns carry the real scale.",
+    defectsCol: "Defects",
+    byCriterion: (criteria, defects, occ) => `${criteria} criterion(ia) \xB7 ${defects} distinct defect(s) \xB7 ${occ} occurrence(s)`,
+    criterionDefects: (n) => `${n} distinct defect(s)`,
+    criterionNote: "One row per criterion of the standard \u2014 unfold one for its distinct defects (rule, selector, location). One design-system defect repeated across every route counts once; the Occ. and Pages columns carry the real scale.",
     verdictFail: (n) => `\u{1F534} ${n} blocking non-conformity(ies) \u2014 the gate is red.`,
     verdictWarn: "\u{1F7E0} No blocking non-conformity; major or minor findings remain.",
     verdictPass: "\u2705 No non-conformity found by the static engine.",
     artifact: (name2) => `Full report (HTML, annotated crops): artifact **${name2}** of this run.`,
     runLink: (url) => `[See the run and its job summary](${url})`,
-    clamped: (n) => `_${n} group(s) dropped from this comment to fit GitHub's limit \u2014 the job summary carries them all._`,
+    clamped: (n) => `_${n} criterion(ia) dropped from this comment to fit GitHub's limit \u2014 the job summary carries them all._`,
     sectionsDropped: (names) => `_Sections dropped from this comment to fit GitHub's 64 KiB limit, whole and never truncated: ${names.map((n) => `**${n}**`).join(" \xB7 ")}. They are in the artifact's report, identical._`,
     unanchored: (n) => `${n} finding(s) keyed to a URL, with no code line to annotate \u2014 see the report.`,
     unattributed: (n) => `${n} finding(s) are attributed to no page (shared code, file outside any route) \u2014 counted in the overall audit, never spread across pages.`,
@@ -63412,14 +63418,15 @@ var S = {
     pageDefects: "Defects",
     fullGrid: "Full grid \u2014 every criterion of the standard, page by page",
     allDefects: "Distinct defects \u2014 where to fix",
-    allDefectsNote: "One distinct defect = one (rule, criterion, selector); repeated occurrences are folded. This is the digest's actionable half, carried here so this comment is the only one to read.",
+    allDefectsNote: "Grouped by criterion: one distinct defect = one (rule, selector), repeated occurrences are folded, and a criterion appears once. This is the digest's actionable half, carried here so this comment is the only one to read.",
     gridLegend: "`C` conforming \xB7 `NC` non-conforming \xB7 `\u2014` not applicable \xB7 `?` to assess",
     gridDropped: "_The full grid does not fit in a GitHub comment (64 KiB) \u2014 it is in the deliverable's per-page sheet._",
-    pageMoreDefects: (n) => `_\u2026 and ${n} more distinct defect(s) on this page \u2014 see its sheet in the artifact._`,
+    pageMoreCriteria: (n) => `_\u2026 and ${n} more non-conforming criterion(ia) on this page \u2014 see its sheet in the artifact._`,
     noCriterionForFindings: (n) => `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`
   }
 };
 var MAX_ROWS = 50;
+var MAX_DEFECTS_PER_CRITERION = 20;
 var COMMENT_ROWS = 10;
 var COMMENT_LIMIT = 65536;
 var BYTES = new TextEncoder();
@@ -63449,7 +63456,29 @@ function groupFindings(findings, standard, lang, baseDir) {
       pageSet: new Set(f.page ? [f.page] : [])
     });
   }
-  return [...groups.values()].map(({ pageSet, ...g }) => ({ ...g, pages: pageSet.size })).sort((a, b) => SEV_ORDER4.indexOf(a.severity) - SEV_ORDER4.indexOf(b.severity) || b.occurrences - a.occurrences || a.criterion.localeCompare(b.criterion));
+  return [...groups.values()].map(({ pageSet, ...g }) => ({ ...g, pages: pageSet.size, pageIds: [...pageSet].sort() })).sort((a, b) => SEV_ORDER4.indexOf(a.severity) - SEV_ORDER4.indexOf(b.severity) || b.occurrences - a.occurrences || a.criterion.localeCompare(b.criterion));
+}
+function groupByCriterion(groups) {
+  const byCriterion = /* @__PURE__ */ new Map();
+  for (const g of groups) {
+    const c2 = byCriterion.get(g.criterion);
+    if (c2) {
+      c2.defects.push(g);
+      c2.occurrences += g.occurrences;
+      for (const p of g.pageIds) c2.pageSet.add(p);
+      if (SEV_ORDER4.indexOf(g.severity) < SEV_ORDER4.indexOf(c2.severity)) c2.severity = g.severity;
+      continue;
+    }
+    byCriterion.set(g.criterion, {
+      criterion: g.criterion,
+      severity: g.severity,
+      defects: [g],
+      occurrences: g.occurrences,
+      pages: 0,
+      pageSet: new Set(g.pageIds)
+    });
+  }
+  return [...byCriterion.values()].map(({ pageSet, ...c2 }) => ({ ...c2, pages: pageSet.size })).sort((a, b) => SEV_ORDER4.indexOf(a.severity) - SEV_ORDER4.indexOf(b.severity) || b.occurrences - a.occurrences || a.criterion.localeCompare(b.criterion));
 }
 function runRate(result, standard, lang) {
   const groups = isCore(standard) ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
@@ -63457,15 +63486,37 @@ function runRate(result, standard, lang) {
   const agentRuled = groups.some((g) => g.rows.some((r) => r.decidedBy === "agent" && r.status === "C"));
   return { text: `${formatRate(decided === 0 ? null : result.conformancePct, decided, total)}${agentRuled ? "*" : ""}`, agentRuled };
 }
-function groupTableHead(s) {
-  return [`| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} | ${s.occurrences} | ${s.pagesCol} |`, "| --- | --- | --- | --- | ---: | ---: |"];
+var cell = (v) => v.replace(/\|/g, "\\|");
+function criterionTableHead(s) {
+  return [`| ${s.severity} | ${s.criterion} | ${s.defectsCol} | ${s.occurrences} | ${s.pagesCol} |`, "| --- | --- | ---: | ---: | ---: |"];
 }
-function groupRow(g) {
-  const cell = (v) => v.replace(/\|/g, "\\|");
-  return `| ${ICON5[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} | ${g.pages || "\u2014"} |`;
+function criterionRow(c2) {
+  return `| ${ICON5[c2.severity]} ${c2.severity} | ${cell(c2.criterion)} | ${c2.defects.length} | ${c2.occurrences} | ${c2.pages || "\u2014"} |`;
 }
-function groupTable(rows, s) {
-  return [...groupTableHead(s), ...rows.map(groupRow)];
+function defectRow(g) {
+  return `| ${ICON5[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} | ${g.pages || "\u2014"} |`;
+}
+function criterionDetails(c2, s) {
+  const out2 = [
+    "<details>",
+    `<summary><b>${cell(c2.criterion)}</b> \u2014 ${s.criterionDefects(c2.defects.length)}</summary>`,
+    // GFM only renders Markdown inside <details> after a blank line — at EVERY level of
+    // nesting, and these folds sit inside the page and digest folds.
+    "",
+    `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} | ${s.pagesCol} |`,
+    "| --- | --- | --- | ---: | ---: |",
+    ...c2.defects.slice(0, MAX_DEFECTS_PER_CRITERION).map(defectRow)
+  ];
+  if (c2.defects.length > MAX_DEFECTS_PER_CRITERION) out2.push("", s.moreDefects(c2.defects.length - MAX_DEFECTS_PER_CRITERION));
+  out2.push("", "</details>");
+  return out2;
+}
+function criterionSection(criteria, s, maxRows, more) {
+  const shown = criteria.slice(0, maxRows);
+  const out2 = [...criterionTableHead(s), ...shown.map(criterionRow)];
+  if (criteria.length > maxRows) out2.push("", more(criteria.length - maxRows));
+  for (const c2 of shown) out2.push("", ...criterionDetails(c2, s));
+  return out2;
 }
 function stepSummary(result, opts = {}) {
   const standard = opts.standard ?? CORE2;
@@ -63485,10 +63536,10 @@ function stepSummary(result, opts = {}) {
     return out2.join("\n");
   }
   const grouped = groupFindings(all, standard, lang, baseDir);
-  out2.push(`### ${s.findings} \u2014 ${s.grouped(grouped.length, all.length)}`, "");
-  out2.push(`> ${s.groupNote}`, "");
-  out2.push(...groupTable(grouped.slice(0, MAX_ROWS), s));
-  if (grouped.length > MAX_ROWS) out2.push("", s.more(grouped.length - MAX_ROWS));
+  const criteria = groupByCriterion(grouped);
+  out2.push(`### ${s.findings} \u2014 ${s.byCriterion(criteria.length, grouped.length, all.length)}`, "");
+  out2.push(`> ${s.criterionNote}`, "");
+  out2.push(...criterionSection(criteria, s, MAX_ROWS, s.moreCriteria));
   out2.push("");
   const unanchored = all.filter((f) => isUrl2(f.file)).length;
   if (unanchored) out2.push(`> ${s.unanchored(unanchored)}`, "");
@@ -63529,6 +63580,7 @@ function prComment(result, opts = {}) {
   const blocking = normative.filter((f) => f.severity === "bloquant").length;
   const rate = runRate(result, standard, lang);
   const grouped = groupFindings(all, standard, lang, baseDir);
+  const criteria = groupByCriterion(grouped);
   const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
   const head = [];
   head.push(`### ${s.title} \u2014 ${stdLabel}`, "");
@@ -63547,15 +63599,15 @@ function prComment(result, opts = {}) {
   if (sizeOf(assembled) <= COMMENT_LIMIT) return assembled;
   const assemble = (rows2) => {
     const digest = [];
-    if (grouped.length) {
-      digest.push(s.grouped(grouped.length, all.length), "");
-      digest.push(...groupTable(grouped.slice(0, rows2), s), "");
-      const omitted = grouped.length - rows2;
+    if (criteria.length) {
+      digest.push(s.byCriterion(criteria.length, grouped.length, all.length), "");
+      digest.push(...criterionSection(criteria.slice(0, rows2), s, rows2, s.moreCriteria), "");
+      const omitted = criteria.length - rows2;
       if (omitted > 0) digest.push(rows2 < COMMENT_ROWS ? s.clamped(omitted) : s.moreGroups(omitted), "");
     }
     return [...head, ...digest, ...tail].join("\n").trimEnd();
   };
-  let rows = Math.min(COMMENT_ROWS, grouped.length);
+  let rows = Math.min(COMMENT_ROWS, criteria.length);
   while (rows > 0 && sizeOf(assemble(rows)) > COMMENT_LIMIT) rows--;
   return assemble(rows);
 }
@@ -63638,14 +63690,13 @@ function basisCaveats(result, derived, s, lang) {
   if (notAudited && derived.some((p) => p.basis === "not-audited")) out2.push(`> ${notAudited}`, "");
   return out2;
 }
-var PAGE_DEFECTS_SHOWN = 6;
+var PAGE_CRITERIA_SHOWN = 6;
 function pageBlock(result, page, standard, lang, baseDir) {
   const s = S[lang];
   const rows = pageCriterionRows(result, page, standard, lang);
   const nc = rows.filter((r) => r.status === "NC");
   const occurrences = page.findings.filter((f) => !f.advisory).length;
   if (!nc.length && !occurrences) return void 0;
-  const cell = (v) => v.replace(/\|/g, "\\|");
   const counts = `\u{1F534} ${severityCount(page, "bloquant")} \xB7 \u{1F7E0} ${severityCount(page, "majeur")} \xB7 \u{1F7E1} ${severityCount(page, "mineur")}`;
   const withTests = nc.some((r) => r.tests.length);
   const out2 = [
@@ -63671,24 +63722,13 @@ function pageBlock(result, page, standard, lang, baseDir) {
     lang,
     baseDir
   );
-  const blocking = defects.filter((g) => g.severity === "bloquant");
-  const rest = defects.filter((g) => g.severity !== "bloquant");
-  const shownBlocking = Math.min(blocking.length, PAGE_DEFECTS_SHOWN);
-  const shownRest = Math.min(rest.length, Math.max(0, PAGE_DEFECTS_SHOWN - shownBlocking));
+  const blocking = groupByCriterion(defects.filter((g) => g.severity === "bloquant"));
+  const rest = groupByCriterion(defects.filter((g) => g.severity !== "bloquant"));
+  const shownBlocking = Math.min(blocking.length, PAGE_CRITERIA_SHOWN);
+  const shownRest = Math.min(rest.length, Math.max(0, PAGE_CRITERIA_SHOWN - shownBlocking));
   const half = (rows2, shown, title2) => {
     if (!rows2.length) return [];
-    const lines = [
-      "",
-      `**${title2}**`,
-      "",
-      `| ${s.severity} | ${s.where} | ${s.what} | ${s.occurrences} |`,
-      "| --- | --- | --- | ---: |",
-      ...rows2.slice(0, shown).map(
-        (g) => `| ${ICON5[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`
-      )
-    ];
-    if (rows2.length > shown) lines.push("", s.pageMoreDefects(rows2.length - shown));
-    return lines;
+    return ["", `**${title2}**`, "", ...criterionSection(rows2, s, shown, s.pageMoreCriteria)];
   };
   out2.push(...half(blocking, shownBlocking, s.blockingNc), ...half(rest, shownRest, s.nonBlockingNc));
   out2.push("", "</details>");
@@ -63697,7 +63737,6 @@ function pageBlock(result, page, standard, lang, baseDir) {
 function fullGridBlock(result, derived, standard, s, lang) {
   const { rows, status } = pageGridModel(result, derived, standard, lang);
   if (!rows.length || !derived.length) return [];
-  const cell = (v) => v.replace(/\|/g, "\\|");
   const origin = commonOrigin(derived);
   const originNote = pageOriginNote(origin, lang);
   const head = [s.criterion, ...derived.map((p) => cell(pageColumnLabel(p, origin)))];
@@ -63721,8 +63760,7 @@ function fullGridBlock(result, derived, standard, s, lang) {
 function orphansBlock(result, standard, s, lang, baseDir) {
   const orphans = unattributedFindings(result).filter((f) => !f.advisory);
   if (!orphans.length) return [];
-  const cell = (v) => v.replace(/\|/g, "\\|");
-  const groups = groupFindings(orphans, standard, lang, baseDir);
+  const criteria = groupByCriterion(groupFindings(orphans, standard, lang, baseDir));
   const counts = SEV_ORDER4.map((sev) => `${ICON5[sev]} ${orphans.filter((f) => f.severity === sev).length}`).join(" \xB7 ");
   const out2 = [
     "<details>",
@@ -63731,40 +63769,26 @@ function orphansBlock(result, standard, s, lang, baseDir) {
     "",
     `> ${s.orphansNote}`,
     "",
-    `| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} | ${s.occurrences} |`,
-    "| --- | --- | --- | --- | ---: |"
+    ...criterionSection(criteria, s, MAX_ROWS, s.moreCriteria)
   ];
-  for (const g of groups.slice(0, MAX_ROWS)) {
-    out2.push(
-      `| ${ICON5[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`
-    );
-  }
-  if (groups.length > MAX_ROWS) out2.push("", s.more(groups.length - MAX_ROWS));
   out2.push("", "</details>");
   return out2;
 }
 function allDefectsBlock(result, standard, s, lang, baseDir) {
   const all = findingsForStandard(result, standard).filter((f) => !f.advisory);
   if (!all.length) return [];
-  const cell = (v) => v.replace(/\|/g, "\\|");
   const groups = groupFindings(all, standard, lang, baseDir);
+  const criteria = groupByCriterion(groups);
   const counts = SEV_ORDER4.map((sev) => `${ICON5[sev]} ${all.filter((f) => f.severity === sev).length}`).join(" \xB7 ");
   const out2 = [
     "<details>",
-    `<summary><b>${s.allDefects}</b> \u2014 ${groups.length} / ${all.length} \xB7 ${counts}</summary>`,
+    `<summary><b>${s.allDefects}</b> \u2014 ${s.byCriterion(criteria.length, groups.length, all.length)} \xB7 ${counts}</summary>`,
     // GFM only renders Markdown inside <details> after a blank line.
     "",
     `> ${s.allDefectsNote}`,
     "",
-    `| ${s.severity} | ${s.criterion} | ${s.where} | ${s.what} | ${s.occurrences} |`,
-    "| --- | --- | --- | --- | ---: |"
+    ...criterionSection(criteria, s, MAX_ROWS, s.moreCriteria)
   ];
-  for (const g of groups.slice(0, MAX_ROWS)) {
-    out2.push(
-      `| ${ICON5[g.severity]} ${g.severity} | ${cell(g.criterion)} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} |`
-    );
-  }
-  if (groups.length > MAX_ROWS) out2.push("", s.more(groups.length - MAX_ROWS));
   out2.push("", "</details>");
   return out2;
 }
