@@ -68320,7 +68320,7 @@ Usage:
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
   ultra11y fix      <globs\u2026 | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
-  ultra11y judge    --in <audit.json> [--standard <pack>] [--max <n>] [--model <id>] [--out <dir>] [--apply]   (adjudicate the manual criteria with a model \u2014 needs ANTHROPIC_API_KEY)
+  ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|cli] [--grain batch|criterion] [--max <n>] [--model <id>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate the manual criteria with a model \u2014 api needs ANTHROPIC_API_KEY; cli runs the Claude Code CLI and takes CLAUDE_CODE_OAUTH_TOKEN too)
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
   ultra11y scan     <url|file\u2026> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--runtime \u2026] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)

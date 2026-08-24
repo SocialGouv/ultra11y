@@ -124,8 +124,23 @@ describe("skill docs stay in sync with the CLI", () => {
     // exemption is DERIVED from the CLI's own table rather than restated here. A typo in a
     // doc still fails, because a misspelling is not in the table either.
     const removed = new Set(Object.keys(REMOVED_FLAGS).map((f) => `--${f}`));
+    // FLAGS THAT ARE NOT OURS. `adjudicate-runner: cli` spawns the Claude Code CLI and the CI
+    // templates call npm and npx, so the docs now quote three tools rather than one. Listed
+    // rather than pattern-matched, and each one earns its line: an ultra11y flag that goes
+    // missing from `--help` must still fail here, which is the whole point of this test.
+    const foreign = new Set([
+      // Claude Code CLI, cited by the `adjudicate-runner: cli` documentation.
+      "--safe-mode",
+      "--max-turns",
+      "--max-budget-usd",
+      // npm / npx, cited by the CI templates.
+      "--no-save",
+      "--prefix",
+      "--yes",
+      "--with-deps",
+    ]);
     for (const f of flags) {
-      if (removed.has(f)) continue;
+      if (removed.has(f) || foreign.has(f)) continue;
       expect(help.includes(f), `--help omits ${f}, which the docs document`).toBe(true);
     }
   });

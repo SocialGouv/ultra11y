@@ -1,0 +1,91 @@
+# ultra11y on GitLab CI — the same adjudication the GitHub Action runs.
+#
+# There is no GitLab port of anything here. The engine is one file and the adjudication tier
+# is one engine command, so what the composite action does in eleven steps is what this job
+# does in eight lines. The only GitHub-shaped parts of the action — the event allowlist, the
+# `$GITHUB_OUTPUT` plumbing between passes, `claude-code-action` itself — exist to work around
+# a harness, and `adjudicate-runner: cli` is that same tier without one.
+#
+# Include it:
+#
+#   include:
+#     - remote: 'https://raw.githubusercontent.com/maxgfr/ultra11y/main/skills/ultra11y/templates/gitlab-ci.yml'
+#
+#   variables:
+#     ULTRA11Y_STANDARD: rgaa
+#     ULTRA11Y_URL: 'http://127.0.0.1:8080/'
+#
+# and set CLAUDE_CODE_OAUTH_TOKEN as a MASKED, PROTECTED CI/CD variable
+# (mint it with `claude setup-token`). ANTHROPIC_API_KEY works too.
+#
+# WITHOUT that variable the job still runs and still ships a report: the judgment criteria
+# simply stay « to assess » rather than being silently called conforming. That degradation is
+# the same one the GitHub Action makes on a fork's merge request, and it is deliberate.
+
+variables:
+  ULTRA11Y_STANDARD: wcag
+  ULTRA11Y_LANG: en
+  # `criterion` sends one criterion per model call: it costs more calls and it means a run
+  # that stops early loses at most ONE criterion instead of everything it had already ruled on.
+  ULTRA11Y_GRAIN: criterion
+  # A dollar ceiling per call. The turn budget the GitHub Action derives has no equivalent
+  # here on purpose — `--max-turns` is not a flag of the Claude Code CLI, and the CLI swallows
+  # unknown flags without a word, so it would look like a bound and be none.
+  ULTRA11Y_BUDGET_USD: '0.50'
+  # Pages to render before adjudicating. NOT optional if you care about the count: measured on
+  # RGAA, 80 criteria need adjudicating from source alone and 41 once a page has been scanned.
+  ULTRA11Y_URL: ''
+
+.ultra11y:base:
+  image: node:24
+  variables:
+    ENGINE: node_modules/ultra11y/scripts/ultra11y.mjs
+  before_script:
+    - npm i --no-save ultra11y
+
+ultra11y:audit:
+  extends: .ultra11y:base
+  stage: test
+  script:
+    - node "$ENGINE" audit . --out audits --json > /dev/null
+    # Render before you adjudicate, when a URL is in reach. A criterion about computed colour
+    # or visible focus cannot be settled from source, and asking a model to try costs money to
+    # be told so.
+    - |
+      if [ -n "$ULTRA11Y_URL" ]; then
+        npx --yes playwright install --with-deps chromium
+        node "$ENGINE" scan --crawl "$ULTRA11Y_URL" --max 12 --runtime local --cwd "$PWD" \
+          --merge audits/audit-latest.json --out audits
+      fi
+
+    # Replay what has already been ruled, BEFORE spending anything: a repository whose ledger
+    # is current has nothing left to adjudicate and this job costs nothing.
+    - |
+      LEDGER=".ultra11y/verdicts/${ULTRA11Y_STANDARD}.json"
+      if [ -f "$LEDGER" ]; then
+        node "$ENGINE" verify --apply "$LEDGER" --in audits/audit-latest.json \
+          --standard "$ULTRA11Y_STANDARD" --out audits
+      fi
+
+    # THE ADJUDICATION — the same command the GitHub Action's `adjudicate-runner: cli` runs.
+    - |
+      if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}${ANTHROPIC_API_KEY:-}" ]; then
+        npm i --no-save --prefix /tmp/a11y-adjudicator "@anthropic-ai/claude-code@2"
+        export ULTRA11Y_CLAUDE_BIN=/tmp/a11y-adjudicator/node_modules/.bin/claude
+        node "$ENGINE" judge --in audits/audit-latest.json --out audits --apply \
+          --runner cli --grain "$ULTRA11Y_GRAIN" --max-budget-usd "$ULTRA11Y_BUDGET_USD" \
+          --standard "$ULTRA11Y_STANDARD" --lang "$ULTRA11Y_LANG" --ledger "$LEDGER" \
+          || echo "ultra11y: the adjudication failed — the judgment criteria stay to assess."
+      else
+        echo "ultra11y: no model credential — the judgment criteria stay to assess."
+      fi
+
+    - node "$ENGINE" report --in audits/audit-latest.json --out audits --standard "$ULTRA11Y_STANDARD" --lang "$ULTRA11Y_LANG"
+    # The gate. `--fail-on bloquant` fails the job on a blocking non-conformity; add
+    # `check --require-decided` to also fail while any criterion is still « to assess ».
+    - node "$ENGINE" audit . --in audits/audit-latest.json --fail-on bloquant
+  artifacts:
+    when: always
+    paths:
+      - audits/
+    expire_in: 30 days

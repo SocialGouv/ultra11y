@@ -132,8 +132,11 @@ steps:
 | input | default | |
 |---|---|---|
 | `adjudicate` | `none` | `api` · `agent` · `none` |
+| `adjudicate-runner` | `action` | WHO drives the agent tier: `action` (claude-code-action) or `cli` (the engine spawns `claude -p`) |
+| `adjudicate-grain` | `worklist` | how much the model rules on at once: `worklist` (batches of 8) or `criterion` (one call each). Needs `adjudicate-runner: cli` |
+| `adjudicate-budget-usd` | *(empty)* | dollar ceiling per `cli` invocation |
 | `adjudicate-model` | *(empty)* | model id for `api`; else `$ULTRA11Y_LLM_MODEL`, else the engine default |
-| `adjudicate-max-turns` | *(empty)* | turn budget for `agent`; empty derives it from the worklist |
+| `adjudicate-max-turns` | *(empty)* | turn budget for `agent` with `adjudicate-runner: action`; empty derives it from the worklist. Ignored by the `cli` runner — see below |
 | `adjudicate-passes` | `1` | how many times `agent` may go round; each pass re-derives the worklist from what is STILL undecided. Capped at 3 |
 | `gate-adjudicated` | `false` | let a model-ruled NC fail the job |
 
@@ -149,6 +152,69 @@ better.
 **`agent`** emits the worklist plus `orchestrate --eco`'s runbook and hands them to a
 `claude-code-action` run, then folds the same way. Both end in the **same fail-closed gate** an
 agent's verdicts pass through, so neither can assert a conformance the engine refuses.
+
+### `adjudicate-runner: cli` — the same tier, without GitHub in it
+
+`agent` has always meant "a model that can OPEN the files a criterion cites". Until now that
+was spelled `anthropics/claude-code-action`, which made it a GitHub feature rather than a
+tier: unusable from this skill, from a GitLab CI, from a cron — and unusable on **`push`**,
+because claude-code-action parses the event context before it reads the prompt and refuses
+what it does not know. `push` is the event an accessibility gate actually fires on.
+
+`adjudicate-runner: cli` has the ENGINE spawn a headless `claude -p` instead. Same worklist as
+the prompt, same system prompt, same schema, same fail-closed fold — only the transport
+changes. One step replaces eleven, because `judge --apply` derives, rules, folds and records
+the ledger in one go. And it is the same command you can run anywhere:
+
+```bash
+node scripts/ultra11y.mjs judge --in audits/audit-latest.json --out audits --apply \
+  --runner cli --grain criterion --standard rgaa --ledger .ultra11y/verdicts/rgaa.json
+```
+
+It runs **read-only** (`Read`, `Grep`, `Glob`). The action path has to grant `Write`, because
+writing `ADJUDICATE.verdicts.json` is its adjudicator's only way to return anything — measured
+on a real run: 17 permission denials and the file untouched. Answering on stdout removes the
+need, so the tier can no longer touch the audited source, and it still opens every file a
+criterion cites. It also runs with `--safe-mode`: the audited repository's own `CLAUDE.md`,
+hooks, skills and MCP servers are untrusted content and have no business loading into the
+session that rules on it.
+
+**Bound it in dollars, not in turns.** `adjudicate-max-turns` does nothing on this runner:
+`--max-turns` is not a flag of the Claude Code CLI, and the CLI **swallows unknown flags
+without a word** (invent one and it still exits 0, printing the version). A turn budget
+there would read as a ceiling in every log and be an unbounded run. Use
+`adjudicate-budget-usd`, which the CLI enforces, and note that the engine also kills an
+invocation that passes its wall clock — the only bound nothing can ignore.
+
+**Pin the model.** The CLI's own default is Opus: measured on a one-turn probe, $0.164 against
+$0.014 for Haiku. The engine states Haiku rather than inheriting that; `adjudicate-model`
+overrides it.
+
+**`adjudicate-grain: criterion`** sends one criterion per call. It costs more calls and buys
+two things: the model sees one criterion's evidence instead of eight competing for its
+attention, and a run that stops early loses at most ONE criterion — the cliff where a
+truncated pass threw away everything it had already ruled on cannot happen. It works on the
+`api` tier too. It is refused with `adjudicate-runner: action`, because a composite action
+cannot loop over a `uses:` step.
+
+### GitLab CI, and anything else with a shell
+
+Because the tier is one engine command, there is no port to write. A ready template lives at
+`skills/ultra11y/templates/gitlab-ci.yml` and is `include:`-able as-is:
+
+```yaml
+include:
+  - remote: 'https://raw.githubusercontent.com/maxgfr/ultra11y/main/skills/ultra11y/templates/gitlab-ci.yml'
+
+variables:
+  ULTRA11Y_STANDARD: rgaa
+  ULTRA11Y_URL: 'http://127.0.0.1:8080/'
+```
+
+with `CLAUDE_CODE_OAUTH_TOKEN` as a masked, protected CI/CD variable. Without it the job still
+runs and still ships a report — the judgment criteria stay « to assess » rather than being
+called conforming by silence, which is the same degradation the GitHub Action makes on a
+fork's merge request.
 
 The difference between them is **evidence, not trust**. `judge` rules from the harvested
 evidence alone — capped at 30 items per criterion, snippets truncated — while the agent can
