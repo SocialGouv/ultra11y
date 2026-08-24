@@ -60023,6 +60023,31 @@ function replayLedger(audit2, ledger, opts = {}) {
   };
 }
 
+// src/verdict-rules.ts
+var VERDICT_KINDS = `Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold, and its criterion goes back to \xAB to assess \xBB carrying the refusal):
+   - \`C\` (conforming) \u2014 REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this criterion's own evidence; an anchor that is not in that list is treated as fabricated). A criterion presented with NO evidence at all cannot be \`C\` \u2014 it is \`manual\` (\`undecidable\`), or \`NA\` if nothing in scope is concerned.
+   - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected, and so is a finding with no \`file\` at all. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the criterion's OWN numbered tests, listed in its brief under \xAB tests to rule on \xBB. A WCAG id looks alike, denotes an unrelated test, and is rejected.
+   - \`NA\` (not applicable) \u2014 REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
+   - \`manual\` (still undecidable) \u2014 REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide it, and no capture in this run carries its subject) or \`undecidable\` (the evidence cannot settle it either way).`;
+var ABSENCE_RULE = `AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. \xAB No second navigation system \xBB, \xAB no search engine \xBB, \xAB no error message suggests the expected format \xBB \u2014 an absence is OBSERVED somewhere: cite the element and the page you observed it on. And when the criterion's subject exists nowhere in the audited scope, the verdict is \`NA\` with its justification, never \`NC\`.`;
+var CAPTURE_RULE = `THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidence is anchored under \`.ultra11y/pages/<id>/\`, the browser already ran: \`dom.html\`, \`styles.json\`, \`boxes.json\`, \`axtree.json\` and \`screen.png\` are there to read. \`needs-rendered-dom\` is refused on such a criterion \u2014 decide it from those files, or answer \`undecidable\` and say what the capture does not settle.`;
+var NEVER_GUESS_RULE = `Never guess. A criterion you cannot decide from real evidence stays \`manual\` with its reason \u2014 that is a valid, honest verdict, and it is worth more than a verdict the gate throws away.`;
+var SCOPE_RULE = `Rule ONLY on the criteria presented. Never introduce another \u2014 a verdict for a criterion nobody asked about is dropped, and under the fold it would otherwise overwrite what the deterministic engine already decided.`;
+var TAIL = [ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE];
+function verdictRulesMd(startAt) {
+  const lines = [`${startAt}. ${VERDICT_KINDS}`];
+  TAIL.forEach((rule, i2) => lines.push(`${startAt + 1 + i2}. ${rule}`));
+  return lines.join("\n");
+}
+function verdictSystemPrompt() {
+  return `You are an accessibility auditor ruling on the criteria a static engine could not decide.
+
+NEVER assert conformity you did not verify. \`manual\` with a reason is always available and is always a correct answer.
+
+Rules, in order of importance:
+${verdictRulesMd(1)}`;
+}
+
 // src/llm.ts
 var DEFAULT_MODEL = "claude-sonnet-5";
 var API_VERSION = "2023-06-01";
@@ -60114,14 +60139,7 @@ var VERDICT_TOOL = {
     required: ["verdicts"]
   }
 };
-var SYSTEM = `You are an accessibility auditor ruling on the criteria a static engine could not decide.
-
-Rules, in order of importance:
-1. NEVER assert conformity you did not verify. "manual" with a reason is always available and is a correct answer.
-2. An NC must cite a real file:line taken from the evidence you were given, and the criterion's OWN numbered test as normativeRef. A citation that does not resolve against the real source is rejected downstream, and the refusal costs THAT criterion alone \u2014 every other verdict you got right still stands. So never guess to fill a gap: an honest "manual" is worth more than a verdict that will be refused.
-3. C and NA require a justification that says what you saw, AND a "citations" array naming the evidence items you cleared \u2014 file and line copied verbatim from the evidence presented for that criterion. A criterion presented with NO evidence cannot be C: record "manual" (reason "undecidable"), or NA if nothing in scope is concerned.
-4. A criterion that needs a rendered page (computed contrast, visible focus, zoom, reflow) and was given only source evidence is "manual" with reason "needs-rendered-dom".
-5. Rule only on the criteria presented. Never introduce another.`;
+var SYSTEM = verdictSystemPrompt();
 var sleep = (ms) => ms <= 0 ? Promise.resolve() : new Promise((r) => setTimeout(r, ms));
 var backoff = (opts, attempt) => opts.backoffMs?.(attempt) ?? 2 ** attempt * 500;
 async function callOnce(body3, opts) {
@@ -60160,6 +60178,7 @@ function verdictsOf(res) {
   return input.verdicts;
 }
 async function judgeBatch(items, prompt, opts) {
+  if (!opts.apiKey) throw new Error("ultra11y judge: the Messages backend needs an API key (ANTHROPIC_API_KEY or --api-key).");
   const res = await callOnce(
     {
       model: opts.model ?? modelFromEnv(),
@@ -60179,11 +60198,13 @@ async function judgeAll(batches, opts) {
   const failures = [];
   let done = 0;
   const queue = [...batches];
+  const backend = opts.backend ?? judgeBatch;
+  const lanes = Math.max(1, opts.concurrency ?? CONCURRENCY);
   await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+    Array.from({ length: Math.min(lanes, queue.length) }, async () => {
       for (let b = queue.shift(); b !== void 0; b = queue.shift()) {
         try {
-          verdicts.push(...await judgeBatch(b.items, b.prompt, opts));
+          verdicts.push(...await backend(b.items, b.prompt, opts));
         } catch (e) {
           failures.push(e instanceof Error ? e.message : String(e));
         }
@@ -65695,14 +65716,6 @@ function phaseWorkflowScript(ph, runAbs, engineAbs, batchSize) {
     ``
   ].join("\n");
 }
-var VERDICT_RULES = `2. Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold, and its criterion goes back to \xAB to assess \xBB carrying the refusal):
-   - \`C\` (conforming) \u2014 REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this criterion's own evidence; an anchor that is not in that list is treated as fabricated). A criterion presented with NO evidence at all cannot be \`C\` \u2014 it is \`manual\` (\`undecidable\`), or \`NA\` if nothing in scope is concerned.
-   - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected, and so is a finding with no \`file\` at all. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the criterion's OWN numbered tests, listed in its brief under \xAB tests to rule on \xBB. A WCAG id looks alike, denotes an unrelated test, and is rejected.
-   - \`NA\` (not applicable) \u2014 REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
-   - \`manual\` (still undecidable) \u2014 REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide it, and no capture in this run carries its subject) or \`undecidable\` (the evidence cannot settle it either way).
-3. AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. \xAB No second navigation system \xBB, \xAB no search engine \xBB, \xAB no error message suggests the expected format \xBB \u2014 an absence is OBSERVED somewhere: cite the element and the page you observed it on. And when the criterion's subject exists nowhere in the audited scope, the verdict is \`NA\` with its justification, never \`NC\`.
-4. THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidence is anchored under \`.ultra11y/pages/<id>/\`, the browser already ran: \`dom.html\`, \`styles.json\`, \`boxes.json\`, \`axtree.json\` and \`screen.png\` are there to read. \`needs-rendered-dom\` is refused on such a criterion \u2014 decide it from those files, or answer \`undecidable\` and say what the capture does not settle.
-5. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with its reason \u2014 that is a valid, honest verdict, and it is worth more than a verdict the gate throws away.`;
 function ecoAdjudicatorContract(runAbs) {
   return `# Contract: adjudicator (sequential / --eco)
 
@@ -65718,7 +65731,7 @@ There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one
 ## For EACH criterion
 
 1. Read its brief in full \u2014 it carries BOTH halves of the decision: the criterion's official wording with its numbered tests, the standard's own test methodology, the technical note, the particular cases and the glossary terms; and \`evidence[]\`, source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`). Open the cited files at the cited lines whenever the snippet alone cannot decide, and copy the \`snippet\` from the brief rather than retyping it.
-${VERDICT_RULES}
+${verdictRulesMd(2)}
 
 Every item comes back with a verdict. Each one stands or falls on its own: a refusal costs THAT criterion and leaves every other verdict standing \u2014 so work through the list steadily, and never guess to fill a gap.
 

@@ -21,6 +21,7 @@
 //
 // Zero dependencies: global `fetch`, no SDK.
 import type { AdjudicationItem, AgentFinding, CriterionVerdict, Evidence } from "./adjudicate.js";
+import { verdictSystemPrompt } from "./verdict-rules.js";
 
 export const DEFAULT_MODEL = "claude-sonnet-5";
 const API_VERSION = "2023-06-01";
@@ -43,9 +44,21 @@ export function modelFromEnv(): string {
 }
 
 export interface LlmOptions {
-  apiKey: string;
+  /** Required by the Messages backend, and by it alone. The CLI backend authenticates from
+   *  the environment (CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY), so each backend
+   *  validates its OWN credential rather than this type demanding one for both. */
+  apiKey?: string;
   model?: string;
   baseUrl?: string;
+  /** How ONE batch is ruled on. Defaults to the Messages API.
+   *
+   *  The seam that makes `judgeAll` a scheduler rather than an HTTP client: batching,
+   *  bounded concurrency, progress and per-batch failure absorption are transport-neutral,
+   *  and a second transport reuses them along with the prompt, the schema and the fold. */
+  backend?: (items: AdjudicationItem[], prompt: string, opts: LlmOptions) => Promise<RawVerdict[]>;
+  /** Batches in flight at once. The Messages backend defaults to 4; the CLI backend runs
+   *  sequentially, because one local process per criterion is not a rate-limit question. */
+  concurrency?: number;
   /** Injected for tests. Defaults to the global fetch. */
   fetchImpl?: typeof fetch;
   /** Backoff before retry N (1-based). Injected so a test can exercise the retry path
@@ -136,14 +149,10 @@ const VERDICT_TOOL = {
   },
 } as const;
 
-const SYSTEM = `You are an accessibility auditor ruling on the criteria a static engine could not decide.
-
-Rules, in order of importance:
-1. NEVER assert conformity you did not verify. "manual" with a reason is always available and is a correct answer.
-2. An NC must cite a real file:line taken from the evidence you were given, and the criterion's OWN numbered test as normativeRef. A citation that does not resolve against the real source is rejected downstream, and the refusal costs THAT criterion alone — every other verdict you got right still stands. So never guess to fill a gap: an honest "manual" is worth more than a verdict that will be refused.
-3. C and NA require a justification that says what you saw, AND a "citations" array naming the evidence items you cleared — file and line copied verbatim from the evidence presented for that criterion. A criterion presented with NO evidence cannot be C: record "manual" (reason "undecidable"), or NA if nothing in scope is concerned.
-4. A criterion that needs a rendered page (computed contrast, visible focus, zoom, reflow) and was given only source evidence is "manual" with reason "needs-rendered-dom".
-5. Rule only on the criteria presented. Never introduce another.`;
+// The clauses live in src/verdict-rules.ts, shared with the orchestrate contracts. This tier
+// used to keep its own copy, and the copy was missing two rules the contracts had — the
+// absence rule and the capture rule — which are precisely the two measured to cost criteria.
+const SYSTEM = verdictSystemPrompt();
 
 interface AnthropicContentBlock {
   type: string;
@@ -212,6 +221,7 @@ function verdictsOf(res: AnthropicResponse): RawVerdict[] {
 /** Rule on one batch of worklist items. `prompt` is the rendered worklist for exactly these
  *  items — the same text the agent reads, never a second protocol. */
 export async function judgeBatch(items: AdjudicationItem[], prompt: string, opts: LlmOptions): Promise<RawVerdict[]> {
+  if (!opts.apiKey) throw new Error("ultra11y judge: the Messages backend needs an API key (ANTHROPIC_API_KEY or --api-key).");
   const res = await callOnce(
     {
       model: opts.model ?? modelFromEnv(),
@@ -241,11 +251,13 @@ export async function judgeAll(
   const failures: string[] = [];
   let done = 0;
   const queue = [...batches];
+  const backend = opts.backend ?? judgeBatch;
+  const lanes = Math.max(1, opts.concurrency ?? CONCURRENCY);
   await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+    Array.from({ length: Math.min(lanes, queue.length) }, async () => {
       for (let b = queue.shift(); b !== undefined; b = queue.shift()) {
         try {
-          verdicts.push(...(await judgeBatch(b.items, b.prompt, opts)));
+          verdicts.push(...(await backend(b.items, b.prompt, opts)));
         } catch (e) {
           failures.push(e instanceof Error ? e.message : String(e));
         }

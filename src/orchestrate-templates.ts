@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import type { PhaseInfo } from "./orchestrate.js";
+import { verdictRulesMd } from "./verdict-rules.js";
 
 // ---------------------------------------------------------------------------
 // Templates for `ultra11y orchestrate` — the generator that turns the run's
@@ -194,19 +195,6 @@ export function phaseWorkflowScript(ph: PhaseInfo, runAbs: string, engineAbs: st
  *  came back with no verdict at all. So `--eco` gets a contract written for the harness it
  *  actually runs in. */
 
-/** THE RULING RULES ARE THE SAME IN EVERY HARNESS — only the paperwork differs.
- *
- *  Kept as one string and shared by both eco contracts below, so the fan-out contract and the
- *  sequential one can never drift into two different definitions of what a `C` requires. */
-const VERDICT_RULES = `2. Rule it (the apply gate is FAIL-CLOSED — a verdict missing its required field does not fold, and its criterion goes back to « to assess » carrying the refusal):
-   - \`C\` (conforming) — REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this criterion's own evidence; an anchor that is not in that list is treated as fabricated). A criterion presented with NO evidence at all cannot be \`C\` — it is \`manual\` (\`undecidable\`), or \`NA\` if nothing in scope is concerned.
-   - \`NC\` (non-conforming) — REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected, and so is a finding with no \`file\` at all. \`normativeRef\` MUST cite the precise failed test — under a country standard, one of the criterion's OWN numbered tests, listed in its brief under « tests to rule on ». A WCAG id looks alike, denotes an unrelated test, and is rejected.
-   - \`NA\` (not applicable) — REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
-   - \`manual\` (still undecidable) — REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide it, and no capture in this run carries its subject) or \`undecidable\` (the evidence cannot settle it either way).
-3. AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. « No second navigation system », « no search engine », « no error message suggests the expected format » — an absence is OBSERVED somewhere: cite the element and the page you observed it on. And when the criterion's subject exists nowhere in the audited scope, the verdict is \`NA\` with its justification, never \`NC\`.
-4. THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidence is anchored under \`.ultra11y/pages/<id>/\`, the browser already ran: \`dom.html\`, \`styles.json\`, \`boxes.json\`, \`axtree.json\` and \`screen.png\` are there to read. \`needs-rendered-dom\` is refused on such a criterion — decide it from those files, or answer \`undecidable\` and say what the capture does not settle.
-5. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with its reason — that is a valid, honest verdict, and it is worth more than a verdict the gate throws away.`;
-
 /** The sequential adjudicator — `--eco`, no fan-out.
  *
  *  Two shapes, because eco covers two harnesses and the difference is only WHICH FILE. A local
@@ -229,7 +217,7 @@ There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one
 ## For EACH criterion
 
 1. Read its brief in full — it carries BOTH halves of the decision: the criterion's official wording with its numbered tests, the standard's own test methodology, the technical note, the particular cases and the glossary terms; and \`evidence[]\`, source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`). Open the cited files at the cited lines whenever the snippet alone cannot decide, and copy the \`snippet\` from the brief rather than retyping it.
-${VERDICT_RULES}
+${verdictRulesMd(2)}
 
 Every item comes back with a verdict. Each one stands or falls on its own: a refusal costs THAT criterion and leaves every other verdict standing — so work through the list steadily, and never guess to fill a gap.
 
