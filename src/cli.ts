@@ -41,7 +41,7 @@ import { discover } from "./discover.js";
 import { toPosix, GRAPH_ONLY_EXT } from "./glob.js";
 import { runCriteria, renderCriteriaReference } from "./criteria.js";
 import { checkSampleCaptured, checkDecided, checkRendered, checkReport, checkSemantic, isUndecidedFile, type UndecidedFile } from "./check.js";
-import { buildWorklist, writeWorklist, applyVerdicts, VERIFY_MAX, type VerifyItem } from "./verify.js";
+import { buildWorklist, buildConformityWorklist, writeWorklist, applyVerdicts, VERIFY_MAX, type ConformityClaim, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import {
   buildAdjudicationWorklist,
@@ -122,6 +122,7 @@ Usage:
   ultra11y check    --report <md> [--standard <pack>] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
   ultra11y check    --in <audit.json> --require-decided [--standard <pack>] [--allow-undecided <file>]   (fail while any criterion is still « to assess »)
   ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
+  ultra11y verify   --report <md> [--conformities <ledger|adjudication.json> | --no-conformities]   (also put the claimed CONFORMITIES on trial — on by default when a ledger exists)
   ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (adjudicate the manual criteria)
   ultra11y verify   --apply <adjudication.json> --in <audit.json> [--out <dir>]        (fold the adjudication into the audit)
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
@@ -211,8 +212,12 @@ Commands:
   check      Integrity gate on a produced report: every cited criterion resolves,
              every NA is justified, sections + pass-rate maths are well-formed.
              --standard tells it which id grammar/registry to validate against.
-  verify     Adversarial claim↔criterion worklist for the report's non-conformities,
-             then (--apply) gate on refuted/unsupported findings.
+  verify     Adversarial claim↔criterion worklist, then (--apply) gate on
+             refuted/unsupported claims. Covers BOTH directions: the report's
+             non-conformities (is this failure real?) and the ledger's
+             agent-adjudicated conformities (does the cited evidence ESTABLISH the
+             criterion, or only show its subject exists?). A refuted conformity
+             sends its criterion back to « to assess », never to NC.
   orchestrate  Emit the run's multi-agent orchestration from its CURRENT worklists:
              one launchable Workflow script per ready phase (adjudicate over
              ADJUDICATE.todo.json, verify-report over VERIFY.todo.json), the
@@ -399,6 +404,16 @@ Options:
                      .ultra11y/verdicts/<standard>.json). Replay re-derives the evidence
                      and re-runs the same gate; a verdict whose evidence changed is
                      dropped as stale and its criterion says so
+  --conformities <file>
+                     verify: the CLAIMED CONFORMITIES to put on trial — a verdict ledger or an
+                     adjudication file. Defaults to the standard's ledger
+                     (.ultra11y/verdicts/<standard>.json) when one exists, so the conformity
+                     half of the gate runs without being asked for: nothing used to challenge
+                     an agent's C verdict, and a criterion cleared because its subject was
+                     PRESENT rather than RIGHT shipped as a conformance claim. Each cited anchor
+                     becomes an item asking whether the evidence ESTABLISHES the criterion.
+                     A refuted one sends its criterion back to « to assess » — never to NC
+  --no-conformities  verify: do not put the ledger's conformities on trial
   --max-verify <n>   verify: cap the worklist size; 0 = no cap           (default: 40)
   --verdicts <file>  check --semantic: the adjudicated verdicts artifact
   --require-sample   check: fail while a page DECLARED in .ultra11yrc.json has no capture under
@@ -584,6 +599,10 @@ const VALUE_FLAGS = new Set([
   // later run can replay them without a model (src/ledger.ts). A path; empty falls back to the
   // standard's default location under .ultra11y/verdicts/.
   "ledger",
+  // `verify`: where the CLAIMED CONFORMITIES to put on trial come from — a verdict ledger or an
+  // adjudication file. Empty/absent falls back to the standard's default ledger, which is why
+  // the conformity half of the gate runs without anyone asking for it.
+  "conformities",
   "baseline",
   "fail-on",
   "split",
@@ -679,6 +698,10 @@ const BOOLEAN_FLAGS = new Set([
   // page. Default: on outside CI, off under it — see `webAllowed`.
   "web",
   "no-web",
+  // `verify`: opt OUT of putting the ledger's claimed conformities on trial. There is no
+  // positive twin because the answer is yes by default — a gate you have to remember to turn
+  // on is a gate that does not run.
+  "no-conformities",
   "no-technical",
   "override",
   "local",
@@ -2825,7 +2848,11 @@ function cmdVerify(p: ParsedArgs): number {
       console.error(`ultra11y verify: --report file not found: ${applyReport}.`);
       return 2;
     }
-    const expected = buildWorklist(repMd, standard, Number.POSITIVE_INFINITY);
+    // Coverage covers BOTH claim kinds. Rebuilt uncapped from the same two sources the
+    // worklist was written from, so a verdicts file that quietly dropped every conformity item
+    // fails as `missing` rather than passing green over the half it did adjudicate.
+    const expectedNc = buildWorklist(repMd, standard, Number.POSITIVE_INFINITY);
+    const expected = [...expectedNc, ...buildConformityWorklist(conformityClaimsFor(p, standard, lang), expectedNc.length, Number.POSITIVE_INFINITY)];
     const r = applyVerdicts(items, expected);
     // Content-level grounding of every verdict that passed adjudication: the cited
     // file/line/snippet must still exist and match the source (see src/grounding.ts).
@@ -2848,6 +2875,19 @@ function cmdVerify(p: ParsedArgs): number {
             ? `✗ ${r.failures.length}/${r.total} en échec (refuted ${r.refuted}, unsupported ${r.unsupported}, non statué ${r.unadjudicated}${r.missing ? `, absent(s) ${r.missing} — régénérez la worklist avec --max-verify 0` : ""}${r.invalid ? `, invalide ${r.invalid}` : ""}).`
             : `✗ ${r.failures.length}/${r.total} failed (refuted ${r.refuted}, unsupported ${r.unsupported}, unadjudicated ${r.unadjudicated}${r.missing ? `, missing ${r.missing} — regenerate the worklist with --max-verify 0` : ""}${r.invalid ? `, invalid ${r.invalid}` : ""}).`,
         );
+      // NAME THE REFUSED CONFORMITIES SEPARATELY, because the remedy is a different action.
+      // A refuted non-conformity is deleted from the report. A refuted conformity sends its
+      // criterion back to « à évaluer » — nobody has established it, which is not the same
+      // claim as having established that it fails, and turning one into the other would be
+      // the mirror image of the fabrication this gate exists to refuse.
+      if (r.conformitiesRefused.length) {
+        const ids = [...new Set(r.conformitiesRefused.map((f) => f.criteriaId))].join(", ");
+        console.error(
+          lang === "fr"
+            ? `✗ ${r.conformitiesRefused.length} conformité(s) revendiquée(s) non étayée(s) — ces critères retournent « à évaluer », ils ne deviennent PAS des non-conformités : ${ids}`
+            : `✗ ${r.conformitiesRefused.length} claimed conformity(ies) unsupported — those criteria go back to "to assess", they do NOT become non-conformities: ${ids}`,
+        );
+      }
       for (const issue of grounding.issues) console.error(`✗ ${issue}`);
     }
     return ok ? 0 : 1;
@@ -2953,14 +2993,62 @@ function cmdVerify(p: ParsedArgs): number {
   }
   const repMd = readInputFile(rep, "verify", "--report");
   if (repMd === null) return 2;
-  const items = buildWorklist(repMd, standard, max);
+  const ncItems = buildWorklist(repMd, standard, max);
+  const conformities = conformityClaimsFor(p, standard, lang);
+  const cItems = buildConformityWorklist(conformities, ncItems.length, max);
+  const items = [...ncItems, ...cItems];
   const { todoPath, mdPath, count } = writeWorklist(items, out, p.flags.semantic === true, standard, lang);
-  if (p.flags.json) console.log(JSON.stringify({ mdPath, todoPath, count, items }, null, 2));
+  if (p.flags.json) console.log(JSON.stringify({ mdPath, todoPath, count, nc: ncItems.length, conformities: cItems.length, items }, null, 2));
   else
     console.log(
-      lang === "fr" ? `${count} non-conformité(s) à vérifier → ${mdPath}, ${todoPath}` : `${count} non-conformity(ies) to verify → ${mdPath}, ${todoPath}`,
+      lang === "fr"
+        ? `${ncItems.length} non-conformité(s)${cItems.length ? ` et ${cItems.length} conformité(s) revendiquée(s)` : ""} à vérifier → ${mdPath}, ${todoPath}`
+        : `${ncItems.length} non-conformity(ies)${cItems.length ? ` and ${cItems.length} claimed conformity(ies)` : ""} to verify → ${mdPath}, ${todoPath}`,
     );
   return 0;
+}
+
+/**
+ * The claimed conformities to put on trial, from the verdict ledger (or an adjudication file).
+ *
+ * ON BY DEFAULT, and that is the decision worth defending. `verify` attacked only
+ * non-conformities, so a cheap adjudicator's `C` was challenged by nothing — a criterion could
+ * be cleared because its subject was PRESENT rather than because it was RIGHT, and the
+ * conformance claim shipped. A gate that has to be remembered is a gate that does not run, and
+ * the failure it guards against is the one nobody notices.
+ *
+ * It costs nothing when there is nothing to check: no ledger, or a ledger with no agent `C`,
+ * and the worklist is exactly what it was. `--no-conformities` opts out; `--conformities <file>`
+ * names a source other than the standard's default ledger.
+ */
+function conformityClaimsFor(p: ParsedArgs, standard: StandardId, lang: Lang): ConformityClaim[] {
+  if (p.flags.conformities === false || p.flags["no-conformities"] === true) return [];
+  const named = typeof p.flags.conformities === "string" && p.flags.conformities ? p.flags.conformities : undefined;
+  const path = named ?? ledgerPath(standard);
+  if (!existsSync(path)) {
+    // Silent when nobody asked for a specific file — most runs have no ledger and want no
+    // noise. Loud when a path WAS named, because a typo there would otherwise verify nothing
+    // and report success.
+    if (named)
+      console.error(
+        lang === "fr" ? `ultra11y verify : fichier --conformities introuvable : ${named}.` : `ultra11y verify: --conformities file not found: ${named}.`,
+      );
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(readText(path)) as { entries?: ConformityClaim[]; items?: ConformityClaim[] };
+    // A ledger stores `entries`, an adjudication file stores `items`; both carry the two
+    // fields this needs, so either is accepted rather than making the caller convert one.
+    return parsed.entries ?? parsed.items ?? [];
+  } catch {
+    if (named)
+      console.error(
+        lang === "fr"
+          ? `ultra11y verify : le fichier --conformities n'est pas du JSON valide : ${named}.`
+          : `ultra11y verify: --conformities file is not valid JSON: ${named}.`,
+      );
+    return [];
+  }
 }
 
 /** Where to record the verdicts a fold accepted. `--ledger <path>` names a file; `--ledger`

@@ -38,8 +38,16 @@ export const NEVER_GUESS_RULE = `Never guess. A criterion you cannot decide from
 /** A surplus verdict overwrites something the engine already decided, so the fold refuses it. */
 export const SCOPE_RULE = `Rule ONLY on the criteria presented. Never introduce another — a verdict for a criterion nobody asked about is dropped, and under the fold it would otherwise overwrite what the deterministic engine already decided.`;
 
+/** A `C` is now attacked too, and the adjudicator has to know the standard it will be held to.
+ *
+ *  Until conformities entered the verify worklist, nothing ever challenged one: a criterion
+ *  cleared because its subject was PRESENT rather than because it was RIGHT sailed through, and
+ *  shipped as an accessibility claim. Saying so up front is cheaper than refuting it later —
+ *  and it is the same bar the criterion's own wording sets. */
+export const CONFORMITY_RULE = `A \`C\` WILL BE ATTACKED, exactly as an \`NC\` is. Every conformity you record goes into an adversarial worklist where a second reader opens your citations and asks whether they ESTABLISH the criterion or merely show that its subject exists — a present \`alt\` is not a relevant \`alt\`, a present \`<title>\` is not a title that describes the page. Cite the evidence that answers the criterion's own question, and when the evidence only proves presence, the honest verdict is \`manual\`.`;
+
 /** The clauses in the order every surface states them, after the verdict kinds. */
-const TAIL = [ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE];
+const TAIL = [ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE, CONFORMITY_RULE];
 
 /** Render the rules as a numbered Markdown list starting at `startAt`.
  *

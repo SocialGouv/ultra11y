@@ -29,6 +29,11 @@ const CLAUSES: [name: string, probe: RegExp][] = [
   ["needs-rendered-dom is refused over a capture", /`needs-rendered-dom` is refused/],
   ["never guess", /Never guess/],
   ["rule only on the criteria presented", /Rule ONLY on the criteria presented/],
+  // The conformity half of the gate is only a deterrent if the adjudicator is told about it
+  // BEFORE it rules. Nothing used to challenge a `C`, so a criterion cleared on presence
+  // rather than on relevance shipped as an accessibility claim.
+  ["a C will be attacked too", /A `C` WILL BE ATTACKED/],
+  ["presence is not relevance", /a present `alt` is not a relevant `alt`/],
 ];
 
 const SURFACES: [name: string, text: () => string][] = [
@@ -79,6 +84,6 @@ describe("the numbering is the only thing that varies between surfaces", () => {
         .split("\n")
         .filter((l) => /^\d+\. /.test(l))
         .map((l) => l.split(".")[0]),
-    ).toEqual(["2", "3", "4", "5", "6"]);
+    ).toEqual(["2", "3", "4", "5", "6", "7"]);
   });
 });

@@ -13,6 +13,23 @@ export const VERIFY_MAX = 40;
 
 export type Verdict = "supported" | "partial" | "refuted" | "unsupported" | null;
 
+/** WHAT A WORKLIST ITEM PUTS ON TRIAL.
+ *
+ *  `nc` — a claimed non-conformity. The original and, for a long time, the only one:
+ *  the gate existed to stop a fabricated failure reaching a deliverable.
+ *
+ *  `c` — a claimed CONFORMITY, and the asymmetry it closes. `verify` attacked only
+ *  non-conformities, so a cheap adjudicator's `C` was never challenged by anything: a
+ *  criterion could be cleared on a citation that merely showed the element EXISTED —
+ *  an `<img>` with some alt text, a page with some `<title>` — and nothing downstream
+ *  ever asked whether that established the criterion. Wrong in the expensive direction,
+ *  too: an invented non-conformity costs a reviewer an argument, an invented conformity
+ *  ships as an accessibility claim about a site nobody checked.
+ *
+ *  The verdict vocabulary is deliberately the same on both, because the QUESTION is the
+ *  same — does the cited evidence support the claim? — and only the claim differs. */
+export type VerifyKind = "nc" | "c";
+
 export interface VerifyItem {
   n: number;
   criteriaId: string;
@@ -22,6 +39,9 @@ export interface VerifyItem {
   claim: string;
   verdict: Verdict;
   note: string;
+  /** Absent ⇒ `nc`, so every worklist written before conformities were verified reads
+   *  unchanged and every stored verdicts file still applies. */
+  kind?: VerifyKind;
 }
 
 const plain = (s: string) => s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
@@ -123,6 +143,55 @@ export function buildWorklist(reportMd: string, standard: StandardId = "wcag", m
   return buildWorklistLegacy(reportMd, standard, max);
 }
 
+/** One adjudicated conformity, as the ledger and the adjudication file both store it. Kept
+ *  structural rather than importing either type: this reads the two fields it needs from
+ *  whichever artefact the caller resolved, and neither owns the other. */
+export interface ConformityClaim {
+  criteriaId: string;
+  verdict?: string;
+  justification?: string;
+  citations?: { file: string; line?: number; selector?: string; snippet?: string }[];
+}
+
+/**
+ * The adversarial worklist over CLAIMED CONFORMITIES — one item per citation an agent
+ * cleared a criterion on.
+ *
+ * The source is the ledger (or an adjudication file), not the report, and that is not an
+ * implementation convenience: a report's conforming section is a LIST of criteria, with no
+ * anchors to attack. A `C` verdict, on the other hand, is required to name the evidence it
+ * cleared — `file`, `line`, `selector`, `snippet` — which is exactly the shape an item needs.
+ * Refuting a conformity means opening those anchors and asking whether they establish the
+ * criterion or merely show that its subject exists.
+ *
+ * Engine conformities are NOT included, and the distinction matters. A criterion the
+ * deterministic engine decided is recomputed from source on every run; a criterion an AGENT
+ * decided is a judgement recorded once, and the judgement is what needs a second reader.
+ */
+export function buildConformityWorklist(claims: ConformityClaim[], startAt = 0, max = VERIFY_MAX): VerifyItem[] {
+  const items: VerifyItem[] = [];
+  for (const c of claims) {
+    if (c.verdict !== "C") continue;
+    for (const cite of c.citations ?? []) {
+      if (items.length >= max) return items;
+      items.push({
+        n: startAt + items.length + 1,
+        criteriaId: c.criteriaId,
+        file: cite.file,
+        line: cite.line ?? 1,
+        selector: cite.selector ?? "",
+        // The claim under trial is the justification the agent wrote. Attacking a paraphrase
+        // of it would let a bad justification survive by never being read.
+        claim: (c.justification ?? "").replace(/\s+/g, " ").trim(),
+        verdict: null,
+        note: "",
+        kind: "c",
+      });
+    }
+  }
+  return items;
+}
+
 const T = {
   fr: {
     title: "# Vérification des non-conformités (ultra11y)",
@@ -132,6 +201,15 @@ const T = {
     refuted: "- `refuted` — fausse (l'élément cité est en réalité conforme) ;",
     unsupported: "- `unsupported` — l'élément cité ne permet pas de trancher.",
     semantic: "> Mode --semantic : vérifiez que l'extrait cité **étaye** réellement la non-conformité.",
+    conformityTitle: "## Conformités revendiquées (adjugées par un agent)",
+    conformityIntro:
+      "La question est INVERSÉE. Pour chaque entrée, ouvrez le fichier à la ligne citée et demandez-vous : cette évidence **établit-elle** le critère, ou montre-t-elle seulement que son sujet EXISTE ? Un `alt` présent n'est pas un `alt` pertinent ; un `<title>` présent n'est pas un titre qui décrit la page.",
+    conformitySupported: "- `supported` — l'évidence citée établit bien la conformité ;",
+    conformityPartial: "- `partial` — elle l'établit pour l'élément cité, mais la justification déborde sur des cas qu'elle ne couvre pas ;",
+    conformityRefuted: "- `refuted` — l'évidence n'établit pas la conformité (elle constate une présence, pas une pertinence) ;",
+    conformityUnsupported: "- `unsupported` — l'évidence citée ne permet pas de trancher.",
+    conformityCheck:
+      "- [ ] Aucune conformité inventée : un `C` réfuté ou non étayé retourne « à évaluer » — il ne devient PAS une non-conformité, car réfuter une conformité ne prouve rien contre le critère.",
     then: "Puis : `ultra11y verify --apply VERIFY.todo.json` (échoue si un verdict est refuted/unsupported).",
     understand: "Comprendre",
     moreTests: (n: number, id: string) => `… +${n} autre(s) test(s) — voir \`criteria --standard <pack> ${id}\``,
@@ -153,6 +231,15 @@ const T = {
     refuted: "- `refuted` — false (the cited element is actually conforming);",
     unsupported: "- `unsupported` — the cited element is not enough to decide.",
     semantic: "> --semantic mode: confirm the cited snippet actually **supports** the non-conformity.",
+    conformityTitle: "## Claimed conformities (agent-adjudicated)",
+    conformityIntro:
+      "The question is INVERTED. For each entry, open the file at the cited line and ask: does this evidence **establish** the criterion, or does it only show that its subject EXISTS? A present `alt` is not a relevant `alt`; a present `<title>` is not a title that describes the page.",
+    conformitySupported: "- `supported` — the cited evidence does establish conformity;",
+    conformityPartial: "- `partial` — it establishes it for the cited element, but the justification reaches beyond what it covers;",
+    conformityRefuted: "- `refuted` — the evidence does not establish conformity (it observes a presence, not a relevance);",
+    conformityUnsupported: "- `unsupported` — the cited evidence is not enough to decide.",
+    conformityCheck:
+      "- [ ] No invented conformity: a refuted or unsupported `C` goes back to “to assess” — it does NOT become a non-conformity, because refuting a conformity proves nothing against the criterion.",
     then: "Then: `ultra11y verify --apply VERIFY.todo.json` (fails if any verdict is refuted/unsupported).",
     understand: "Understanding",
     moreTests: (n: number, id: string) => `… +${n} more test(s) — see \`criteria --standard <pack> ${id}\``,
@@ -178,7 +265,16 @@ export function formatWorklist(items: VerifyItem[], semantic: boolean, standard:
   out.push(s.supported, s.partial, s.refuted, s.unsupported, "");
   if (semantic) out.push(s.semantic, "");
   out.push(s.then, "");
-  for (const it of items) {
+  // THE CONFORMITIES GET THEIR OWN SECTION AND THEIR OWN QUESTION. Same verdict vocabulary
+  // — the question is always « does the cited evidence support the claim? » — but the claim
+  // is inverted, and an adjudicator handed both in one undifferentiated list would read the
+  // second half through the first half's framing and clear it.
+  const ncItems = items.filter((it) => it.kind !== "c");
+  const cItems = items.filter((it) => it.kind === "c");
+  const render = (list: VerifyItem[]) => {
+    for (const it of list) renderItem(it);
+  };
+  const renderItem = (it: VerifyItem) => {
     out.push(`- [ ] #${it.n} **${it.criteriaId}** @ \`${it.file}:${it.line}\` (\`${it.selector}\`) — ${it.claim}`);
     // Ground the judgment in the active standard's reference so the verdict is checked
     // against real conditions, not a guess.
@@ -198,10 +294,18 @@ export function formatWorklist(items: VerifyItem[], semantic: boolean, standard:
         if (tests.length > 6) out.push(`      - ${s.moreTests(tests.length - 6, it.criteriaId)}`);
       }
     }
+  };
+  render(ncItems);
+  if (cItems.length) {
+    out.push("", s.conformityTitle, "");
+    out.push(s.conformityIntro, "");
+    out.push(s.conformitySupported, s.conformityPartial, s.conformityRefuted, s.conformityUnsupported, "");
+    render(cItems);
   }
   out.push("");
   out.push(s.checklistTitle, "");
   for (const line of s.checklist) out.push(line);
+  if (cItems.length) out.push(s.conformityCheck);
   out.push("");
   return out.join("\n");
 }
@@ -215,9 +319,19 @@ export interface ApplyResult {
   invalid: number;
   missing: number; // report NCs with no verdict at all (coverage gap) — only when `expected` is given
   failures: VerifyItem[];
+  /** The failures that were CLAIMED CONFORMITIES. Reported separately because the remedy is
+   *  different in kind: a refuted non-conformity is deleted from the report, a refuted
+   *  conformity sends its criterion back to « to assess » — nobody has established it, and
+   *  that is not the same as having established it fails. */
+  conformitiesRefused: VerifyItem[];
 }
 
-const itemKey = (it: VerifyItem): string => `${it.criteriaId}|${it.file}|${it.line}|${it.selector}`;
+// `kind` is part of the key: one criterion can be BOTH claimed non-conformant on one element
+// and claimed conformant on another (RGAA 1.3 clearing four images and failing a fifth), and
+// with the same anchor the two claims would collide — the coverage gate would then read a
+// conformity verdict as covering the non-conformity, and let it through unadjudicated.
+// Absent `kind` means `nc`, so every verdicts file written before this still keys identically.
+const itemKey = (it: VerifyItem): string => `${it.kind ?? "nc"}|${it.criteriaId}|${it.file}|${it.line}|${it.selector}`;
 
 // Only these two verdicts clear the gate. Everything else — refuted, unsupported,
 // null/unadjudicated, AND any unknown/typo/mis-cased token — must FAIL, so a
@@ -261,7 +375,17 @@ export function applyVerdicts(items: VerifyItem[], expected?: VerifyItem[]): App
     }
   }
   const total = expected ? expected.length : items.length;
-  return { ok: failures.length === 0, total, refuted, unsupported, unadjudicated, invalid, missing, failures };
+  return {
+    ok: failures.length === 0,
+    total,
+    refuted,
+    unsupported,
+    unadjudicated,
+    invalid,
+    missing,
+    failures,
+    conformitiesRefused: failures.filter((f) => f.kind === "c"),
+  };
 }
 
 export interface WriteWorklistResult {

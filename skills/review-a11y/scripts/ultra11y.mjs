@@ -57719,6 +57719,29 @@ function buildWorklist(reportMd, standard = "wcag", max = VERIFY_MAX) {
   if (items.length) return items;
   return buildWorklistLegacy(reportMd, standard, max);
 }
+function buildConformityWorklist(claims, startAt = 0, max = VERIFY_MAX) {
+  const items = [];
+  for (const c2 of claims) {
+    if (c2.verdict !== "C") continue;
+    for (const cite of c2.citations ?? []) {
+      if (items.length >= max) return items;
+      items.push({
+        n: startAt + items.length + 1,
+        criteriaId: c2.criteriaId,
+        file: cite.file,
+        line: cite.line ?? 1,
+        selector: cite.selector ?? "",
+        // The claim under trial is the justification the agent wrote. Attacking a paraphrase
+        // of it would let a bad justification survive by never being read.
+        claim: (c2.justification ?? "").replace(/\s+/g, " ").trim(),
+        verdict: null,
+        note: "",
+        kind: "c"
+      });
+    }
+  }
+  return items;
+}
 var T = {
   fr: {
     title: "# V\xE9rification des non-conformit\xE9s (ultra11y)",
@@ -57728,6 +57751,13 @@ var T = {
     refuted: "- `refuted` \u2014 fausse (l'\xE9l\xE9ment cit\xE9 est en r\xE9alit\xE9 conforme) ;",
     unsupported: "- `unsupported` \u2014 l'\xE9l\xE9ment cit\xE9 ne permet pas de trancher.",
     semantic: "> Mode --semantic : v\xE9rifiez que l'extrait cit\xE9 **\xE9taye** r\xE9ellement la non-conformit\xE9.",
+    conformityTitle: "## Conformit\xE9s revendiqu\xE9es (adjug\xE9es par un agent)",
+    conformityIntro: "La question est INVERS\xC9E. Pour chaque entr\xE9e, ouvrez le fichier \xE0 la ligne cit\xE9e et demandez-vous : cette \xE9vidence **\xE9tablit-elle** le crit\xE8re, ou montre-t-elle seulement que son sujet EXISTE ? Un `alt` pr\xE9sent n'est pas un `alt` pertinent ; un `<title>` pr\xE9sent n'est pas un titre qui d\xE9crit la page.",
+    conformitySupported: "- `supported` \u2014 l'\xE9vidence cit\xE9e \xE9tablit bien la conformit\xE9 ;",
+    conformityPartial: "- `partial` \u2014 elle l'\xE9tablit pour l'\xE9l\xE9ment cit\xE9, mais la justification d\xE9borde sur des cas qu'elle ne couvre pas ;",
+    conformityRefuted: "- `refuted` \u2014 l'\xE9vidence n'\xE9tablit pas la conformit\xE9 (elle constate une pr\xE9sence, pas une pertinence) ;",
+    conformityUnsupported: "- `unsupported` \u2014 l'\xE9vidence cit\xE9e ne permet pas de trancher.",
+    conformityCheck: "- [ ] Aucune conformit\xE9 invent\xE9e : un `C` r\xE9fut\xE9 ou non \xE9tay\xE9 retourne \xAB \xE0 \xE9valuer \xBB \u2014 il ne devient PAS une non-conformit\xE9, car r\xE9futer une conformit\xE9 ne prouve rien contre le crit\xE8re.",
     then: "Puis : `ultra11y verify --apply VERIFY.todo.json` (\xE9choue si un verdict est refuted/unsupported).",
     understand: "Comprendre",
     moreTests: (n, id) => `\u2026 +${n} autre(s) test(s) \u2014 voir \`criteria --standard <pack> ${id}\``,
@@ -57749,6 +57779,13 @@ var T = {
     refuted: "- `refuted` \u2014 false (the cited element is actually conforming);",
     unsupported: "- `unsupported` \u2014 the cited element is not enough to decide.",
     semantic: "> --semantic mode: confirm the cited snippet actually **supports** the non-conformity.",
+    conformityTitle: "## Claimed conformities (agent-adjudicated)",
+    conformityIntro: "The question is INVERTED. For each entry, open the file at the cited line and ask: does this evidence **establish** the criterion, or does it only show that its subject EXISTS? A present `alt` is not a relevant `alt`; a present `<title>` is not a title that describes the page.",
+    conformitySupported: "- `supported` \u2014 the cited evidence does establish conformity;",
+    conformityPartial: "- `partial` \u2014 it establishes it for the cited element, but the justification reaches beyond what it covers;",
+    conformityRefuted: "- `refuted` \u2014 the evidence does not establish conformity (it observes a presence, not a relevance);",
+    conformityUnsupported: "- `unsupported` \u2014 the cited evidence is not enough to decide.",
+    conformityCheck: "- [ ] No invented conformity: a refuted or unsupported `C` goes back to \u201Cto assess\u201D \u2014 it does NOT become a non-conformity, because refuting a conformity proves nothing against the criterion.",
     then: "Then: `ultra11y verify --apply VERIFY.todo.json` (fails if any verdict is refuted/unsupported).",
     understand: "Understanding",
     moreTests: (n, id) => `\u2026 +${n} more test(s) \u2014 see \`criteria --standard <pack> ${id}\``,
@@ -57773,7 +57810,12 @@ function formatWorklist(items, semantic, standard = "wcag", lang = "en") {
   out2.push(s.supported, s.partial, s.refuted, s.unsupported, "");
   if (semantic) out2.push(s.semantic, "");
   out2.push(s.then, "");
-  for (const it of items) {
+  const ncItems = items.filter((it) => it.kind !== "c");
+  const cItems = items.filter((it) => it.kind === "c");
+  const render2 = (list) => {
+    for (const it of list) renderItem(it);
+  };
+  const renderItem = (it) => {
     out2.push(`- [ ] #${it.n} **${it.criteriaId}** @ \`${it.file}:${it.line}\` (\`${it.selector}\`) \u2014 ${it.claim}`);
     if (core) {
       const sc = getSC(it.criteriaId);
@@ -57790,14 +57832,22 @@ function formatWorklist(items, semantic, standard = "wcag", lang = "en") {
         if (tests.length > 6) out2.push(`      - ${s.moreTests(tests.length - 6, it.criteriaId)}`);
       }
     }
+  };
+  render2(ncItems);
+  if (cItems.length) {
+    out2.push("", s.conformityTitle, "");
+    out2.push(s.conformityIntro, "");
+    out2.push(s.conformitySupported, s.conformityPartial, s.conformityRefuted, s.conformityUnsupported, "");
+    render2(cItems);
   }
   out2.push("");
   out2.push(s.checklistTitle, "");
   for (const line of s.checklist) out2.push(line);
+  if (cItems.length) out2.push(s.conformityCheck);
   out2.push("");
   return out2.join("\n");
 }
-var itemKey = (it) => `${it.criteriaId}|${it.file}|${it.line}|${it.selector}`;
+var itemKey = (it) => `${it.kind ?? "nc"}|${it.criteriaId}|${it.file}|${it.line}|${it.selector}`;
 var PASSING = /* @__PURE__ */ new Set(["supported", "partial"]);
 function normalizeVerdict(v) {
   if (typeof v !== "string") return null;
@@ -57830,7 +57880,17 @@ function applyVerdicts(items, expected) {
     }
   }
   const total = expected ? expected.length : items.length;
-  return { ok: failures.length === 0, total, refuted, unsupported, unadjudicated, invalid, missing, failures };
+  return {
+    ok: failures.length === 0,
+    total,
+    refuted,
+    unsupported,
+    unadjudicated,
+    invalid,
+    missing,
+    failures,
+    conformitiesRefused: failures.filter((f) => f.kind === "c")
+  };
 }
 function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") {
   mkdirSync8(outDir, { recursive: true });
@@ -60058,7 +60118,8 @@ var ABSENCE_RULE = `AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. \xAB No seco
 var CAPTURE_RULE = `THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidence is anchored under \`.ultra11y/pages/<id>/\`, the browser already ran: \`dom.html\`, \`styles.json\`, \`boxes.json\`, \`axtree.json\` and \`screen.png\` are there to read. \`needs-rendered-dom\` is refused on such a criterion \u2014 decide it from those files, or answer \`undecidable\` and say what the capture does not settle.`;
 var NEVER_GUESS_RULE = `Never guess. A criterion you cannot decide from real evidence stays \`manual\` with its reason \u2014 that is a valid, honest verdict, and it is worth more than a verdict the gate throws away.`;
 var SCOPE_RULE = `Rule ONLY on the criteria presented. Never introduce another \u2014 a verdict for a criterion nobody asked about is dropped, and under the fold it would otherwise overwrite what the deterministic engine already decided.`;
-var TAIL = [ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE];
+var CONFORMITY_RULE = `A \`C\` WILL BE ATTACKED, exactly as an \`NC\` is. Every conformity you record goes into an adversarial worklist where a second reader opens your citations and asks whether they ESTABLISH the criterion or merely show that its subject exists \u2014 a present \`alt\` is not a relevant \`alt\`, a present \`<title>\` is not a title that describes the page. Cite the evidence that answers the criterion's own question, and when the evidence only proves presence, the honest verdict is \`manual\`.`;
+var TAIL = [ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE, CONFORMITY_RULE];
 function verdictRulesMd(startAt) {
   const lines = [`${startAt}. ${VERDICT_KINDS}`];
   TAIL.forEach((rule, i2) => lines.push(`${startAt + 1 + i2}. ${rule}`));
@@ -68470,6 +68531,7 @@ Usage:
   ultra11y check    --report <md> [--standard <pack>] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
   ultra11y check    --in <audit.json> --require-decided [--standard <pack>] [--allow-undecided <file>]   (fail while any criterion is still \xAB to assess \xBB)
   ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
+  ultra11y verify   --report <md> [--conformities <ledger|adjudication.json> | --no-conformities]   (also put the claimed CONFORMITIES on trial \u2014 on by default when a ledger exists)
   ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (adjudicate the manual criteria)
   ultra11y verify   --apply <adjudication.json> --in <audit.json> [--out <dir>]        (fold the adjudication into the audit)
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
@@ -68559,8 +68621,12 @@ Commands:
   check      Integrity gate on a produced report: every cited criterion resolves,
              every NA is justified, sections + pass-rate maths are well-formed.
              --standard tells it which id grammar/registry to validate against.
-  verify     Adversarial claim\u2194criterion worklist for the report's non-conformities,
-             then (--apply) gate on refuted/unsupported findings.
+  verify     Adversarial claim\u2194criterion worklist, then (--apply) gate on
+             refuted/unsupported claims. Covers BOTH directions: the report's
+             non-conformities (is this failure real?) and the ledger's
+             agent-adjudicated conformities (does the cited evidence ESTABLISH the
+             criterion, or only show its subject exists?). A refuted conformity
+             sends its criterion back to \xAB to assess \xBB, never to NC.
   orchestrate  Emit the run's multi-agent orchestration from its CURRENT worklists:
              one launchable Workflow script per ready phase (adjudicate over
              ADJUDICATE.todo.json, verify-report over VERIFY.todo.json), the
@@ -68747,6 +68813,16 @@ Options:
                      .ultra11y/verdicts/<standard>.json). Replay re-derives the evidence
                      and re-runs the same gate; a verdict whose evidence changed is
                      dropped as stale and its criterion says so
+  --conformities <file>
+                     verify: the CLAIMED CONFORMITIES to put on trial \u2014 a verdict ledger or an
+                     adjudication file. Defaults to the standard's ledger
+                     (.ultra11y/verdicts/<standard>.json) when one exists, so the conformity
+                     half of the gate runs without being asked for: nothing used to challenge
+                     an agent's C verdict, and a criterion cleared because its subject was
+                     PRESENT rather than RIGHT shipped as a conformance claim. Each cited anchor
+                     becomes an item asking whether the evidence ESTABLISHES the criterion.
+                     A refuted one sends its criterion back to \xAB to assess \xBB \u2014 never to NC
+  --no-conformities  verify: do not put the ledger's conformities on trial
   --max-verify <n>   verify: cap the worklist size; 0 = no cap           (default: 40)
   --verdicts <file>  check --semantic: the adjudicated verdicts artifact
   --require-sample   check: fail while a page DECLARED in .ultra11yrc.json has no capture under
@@ -68928,6 +69004,10 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   // later run can replay them without a model (src/ledger.ts). A path; empty falls back to the
   // standard's default location under .ultra11y/verdicts/.
   "ledger",
+  // `verify`: where the CLAIMED CONFORMITIES to put on trial come from — a verdict ledger or an
+  // adjudication file. Empty/absent falls back to the standard's default ledger, which is why
+  // the conformity half of the gate runs without anyone asking for it.
+  "conformities",
   "baseline",
   "fail-on",
   "split",
@@ -69010,6 +69090,10 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   // page. Default: on outside CI, off under it — see `webAllowed`.
   "web",
   "no-web",
+  // `verify`: opt OUT of putting the ledger's claimed conformities on trial. There is no
+  // positive twin because the answer is yes by default — a gate you have to remember to turn
+  // on is a gate that does not run.
+  "no-conformities",
   "no-technical",
   "override",
   "local",
@@ -70564,7 +70648,8 @@ function cmdVerify(p) {
       console.error(`ultra11y verify: --report file not found: ${applyReport}.`);
       return 2;
     }
-    const expected = buildWorklist(repMd2, standard2, Number.POSITIVE_INFINITY);
+    const expectedNc = buildWorklist(repMd2, standard2, Number.POSITIVE_INFINITY);
+    const expected = [...expectedNc, ...buildConformityWorklist(conformityClaimsFor(p, standard2, lang), expectedNc.length, Number.POSITIVE_INFINITY)];
     const r = applyVerdicts(items2, expected);
     const passing = items2.filter((it) => typeof it.verdict === "string" && ["supported", "partial"].includes(it.verdict.trim().toLowerCase()));
     const grounding = groundItems(
@@ -70581,6 +70666,12 @@ function cmdVerify(p) {
         console.error(
           lang === "fr" ? `\u2717 ${r.failures.length}/${r.total} en \xE9chec (refuted ${r.refuted}, unsupported ${r.unsupported}, non statu\xE9 ${r.unadjudicated}${r.missing ? `, absent(s) ${r.missing} \u2014 r\xE9g\xE9n\xE9rez la worklist avec --max-verify 0` : ""}${r.invalid ? `, invalide ${r.invalid}` : ""}).` : `\u2717 ${r.failures.length}/${r.total} failed (refuted ${r.refuted}, unsupported ${r.unsupported}, unadjudicated ${r.unadjudicated}${r.missing ? `, missing ${r.missing} \u2014 regenerate the worklist with --max-verify 0` : ""}${r.invalid ? `, invalid ${r.invalid}` : ""}).`
         );
+      if (r.conformitiesRefused.length) {
+        const ids = [...new Set(r.conformitiesRefused.map((f) => f.criteriaId))].join(", ");
+        console.error(
+          lang === "fr" ? `\u2717 ${r.conformitiesRefused.length} conformit\xE9(s) revendiqu\xE9e(s) non \xE9tay\xE9e(s) \u2014 ces crit\xE8res retournent \xAB \xE0 \xE9valuer \xBB, ils ne deviennent PAS des non-conformit\xE9s : ${ids}` : `\u2717 ${r.conformitiesRefused.length} claimed conformity(ies) unsupported \u2014 those criteria go back to "to assess", they do NOT become non-conformities: ${ids}`
+        );
+      }
       for (const issue of grounding.issues) console.error(`\u2717 ${issue}`);
     }
     return ok ? 0 : 1;
@@ -70653,14 +70744,39 @@ function cmdVerify(p) {
   }
   const repMd = readInputFile(rep, "verify", "--report");
   if (repMd === null) return 2;
-  const items = buildWorklist(repMd, standard, max);
+  const ncItems = buildWorklist(repMd, standard, max);
+  const conformities = conformityClaimsFor(p, standard, lang);
+  const cItems = buildConformityWorklist(conformities, ncItems.length, max);
+  const items = [...ncItems, ...cItems];
   const { todoPath, mdPath, count } = writeWorklist(items, out2, p.flags.semantic === true, standard, lang);
-  if (p.flags.json) console.log(JSON.stringify({ mdPath, todoPath, count, items }, null, 2));
+  if (p.flags.json) console.log(JSON.stringify({ mdPath, todoPath, count, nc: ncItems.length, conformities: cItems.length, items }, null, 2));
   else
     console.log(
-      lang === "fr" ? `${count} non-conformit\xE9(s) \xE0 v\xE9rifier \u2192 ${mdPath}, ${todoPath}` : `${count} non-conformity(ies) to verify \u2192 ${mdPath}, ${todoPath}`
+      lang === "fr" ? `${ncItems.length} non-conformit\xE9(s)${cItems.length ? ` et ${cItems.length} conformit\xE9(s) revendiqu\xE9e(s)` : ""} \xE0 v\xE9rifier \u2192 ${mdPath}, ${todoPath}` : `${ncItems.length} non-conformity(ies)${cItems.length ? ` and ${cItems.length} claimed conformity(ies)` : ""} to verify \u2192 ${mdPath}, ${todoPath}`
     );
   return 0;
+}
+function conformityClaimsFor(p, standard, lang) {
+  if (p.flags.conformities === false || p.flags["no-conformities"] === true) return [];
+  const named3 = typeof p.flags.conformities === "string" && p.flags.conformities ? p.flags.conformities : void 0;
+  const path = named3 ?? ledgerPath(standard);
+  if (!existsSync36(path)) {
+    if (named3)
+      console.error(
+        lang === "fr" ? `ultra11y verify : fichier --conformities introuvable : ${named3}.` : `ultra11y verify: --conformities file not found: ${named3}.`
+      );
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(readText(path));
+    return parsed.entries ?? parsed.items ?? [];
+  } catch {
+    if (named3)
+      console.error(
+        lang === "fr" ? `ultra11y verify : le fichier --conformities n'est pas du JSON valide : ${named3}.` : `ultra11y verify: --conformities file is not valid JSON: ${named3}.`
+      );
+    return [];
+  }
 }
 function ledgerTarget(p, standard) {
   const flag = p.flags.ledger;
