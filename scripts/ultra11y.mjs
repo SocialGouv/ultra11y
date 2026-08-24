@@ -60588,6 +60588,7 @@ function applyRawVerdicts(items, verdicts) {
 var ALLOWED_TOOLS = "Read,Grep,Glob";
 var MAX_ATTEMPTS2 = 4;
 var DEFAULT_CLI_MODEL = "claude-haiku-4-5-20251001";
+var EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
 var DEFAULT_TIMEOUT_MS2 = 10 * 6e4;
 function realSpawn(argv, input, timeoutMs) {
   return new Promise((resolve17, reject) => {
@@ -60664,6 +60665,7 @@ function cliArgv(opts, items) {
     opts.model ?? DEFAULT_CLI_MODEL
   ];
   if (opts.maxBudgetUsd !== void 0) argv.push("--max-budget-usd", String(opts.maxBudgetUsd));
+  if (opts.effort) argv.push("--effort", opts.effort);
   return argv;
 }
 function verdictsFromText(text) {
@@ -60726,6 +60728,7 @@ async function refuteBatchCli(items, prompt, opts, lang = "en") {
     opts.model ?? DEFAULT_CLI_MODEL
   ];
   if (opts.maxBudgetUsd !== void 0) argv.push("--max-budget-usd", String(opts.maxBudgetUsd));
+  if (opts.effort) argv.push("--effort", opts.effort);
   return runCli2(argv, prompt, opts, (env) => {
     const structured = env.structured_output?.verdicts;
     const raw = Array.isArray(structured) ? structured : verdictsArrayFromText(env.result ?? "");
@@ -68889,7 +68892,7 @@ Usage:
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
   ultra11y fix      <globs\u2026 | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
-  ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|cli] [--grain batch|criterion] [--max <n>] [--model <id>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate the manual criteria with a model \u2014 api needs ANTHROPIC_API_KEY; cli runs the Claude Code CLI and takes CLAUDE_CODE_OAUTH_TOKEN too)
+  ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|cli] [--grain batch|criterion] [--max <n>] [--model <id>] [--effort <level>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate the manual criteria with a model \u2014 api needs ANTHROPIC_API_KEY; cli runs the Claude Code CLI and takes CLAUDE_CODE_OAUTH_TOKEN too)
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
   ultra11y scan     <url|file\u2026> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--runtime \u2026] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
@@ -69122,6 +69125,8 @@ Options:
   --provider <id>    tickets: auto|github|gitlab|jira. 'auto' reads ULTRA11Y_TICKET_PROVIDER,
                      then .ultra11yrc.json, then the git remote (Jira is never auto-detected)
   --grain <mode>     tickets: what one ticket is \u2014 criterion (default) | page | page-criterion | single | file
+  --effort <level>   judge (--runner cli): reasoning effort per invocation \u2014 low | medium |
+                     high | xhigh | max. Unset leaves the CLI's own default
   --transport <t>    tickets: auto|cli|rest (mcp: stdio|http). 'auto' prefers the CLI (gh/glab),
                      falling back to REST when only a token is available. Jira is REST-only
   --max-tickets <n>  tickets: refuse to file more than n tickets in one run (default 200)
@@ -69325,6 +69330,7 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "runner",
   "grain",
   "max-budget-usd",
+  "effort",
   "timeout",
   "concurrency",
   "out",
@@ -71460,6 +71466,15 @@ async function cmdJudge(p) {
     console.error(`ultra11y judge: --grain '${grain}' is not a grain \u2014 expected 'batch' or 'criterion'.`);
     return 2;
   }
+  const effort = typeof p.flags.effort === "string" ? p.flags.effort : void 0;
+  if (effort !== void 0 && !EFFORT_LEVELS.includes(effort)) {
+    console.error(`ultra11y judge: --effort '${effort}' is not a level \u2014 expected ${EFFORT_LEVELS.map((l) => `'${l}'`).join(", ")}.`);
+    return 2;
+  }
+  if (effort !== void 0 && runner !== "cli") {
+    console.error("ultra11y judge: --effort applies to `--runner cli` only \u2014 the Messages API has no session to set an effort on.");
+    return 2;
+  }
   const key2 = typeof p.flags["api-key"] === "string" && p.flags["api-key"] ? p.flags["api-key"] : apiKeyFromEnv();
   if (!key2 && runner === "api") {
     console.error(
@@ -71533,6 +71548,7 @@ async function cmdJudge(p) {
     // requests do. `--concurrency` overrides it for a runner with room.
     concurrency: runner === "cli" ? cliConcurrency : void 0,
     maxBudgetUsd: Number.isFinite(maxBudgetUsd) ? maxBudgetUsd : void 0,
+    effort,
     timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : void 0,
     onCost: (usd) => {
       spent += usd;

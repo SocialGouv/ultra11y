@@ -5,7 +5,7 @@
 // reachable from a fake process. What a unit test cannot prove is the authentication and the
 // model's behaviour on a real brief; that needs a real run, and it is the only part that does.
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_CLI_MODEL, batchSchema, cliArgv, judgeBatchCli, reconcileIds, verdictsFromText } from "../src/agent-cli.js";
+import { DEFAULT_CLI_MODEL, EFFORT_LEVELS, batchSchema, cliArgv, judgeBatchCli, reconcileIds, verdictsFromText } from "../src/agent-cli.js";
 import type { AdjudicationItem } from "../src/adjudicate.js";
 import type { LlmOptions } from "../src/llm.js";
 import { verdictSystemPrompt } from "../src/verdict-rules.js";
@@ -50,6 +50,19 @@ describe("cliArgv", () => {
   it("passes a dollar ceiling only when asked", () => {
     expect(cliArgv(base, ITEMS).join(" ")).not.toContain("--max-budget-usd");
     expect(cliArgv({ ...base, maxBudgetUsd: 1.5 }, ITEMS).join(" ")).toContain("--max-budget-usd 1.5");
+  });
+
+  // THE LEVER THAT IS NOT THE MODEL. What reaches this tier is what no engine could decide, so
+  // how hard the model is asked to think moves verdicts without moving the bill to a bigger
+  // tier. Unlike `--max-turns` below, `--effort` IS a flag of this CLI — hence passed, not
+  // refused. Unset stays unset: inheriting the harness default is the documented behaviour.
+  it("passes a reasoning effort only when asked", () => {
+    expect(cliArgv(base, ITEMS).join(" ")).not.toContain("--effort");
+    expect(cliArgv({ ...base, effort: "high" }, ITEMS).join(" ")).toContain("--effort high");
+  });
+
+  it("enumerates the levels the CLI documents, so a typo can be refused before it is swallowed", () => {
+    expect(EFFORT_LEVELS).toEqual(["low", "medium", "high", "xhigh", "max"]);
   });
 
   // THE BOUND THAT ISN'T ONE. `--max-turns` is not a flag of this CLI, and the CLI swallows
