@@ -52,6 +52,7 @@ import {
   type AdjudicationFile,
 } from "./adjudicate.js";
 import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, unreadableCaptures, type VerdictLedger, writeLedger } from "./ledger.js";
+import { DEFAULT_CLI_MODEL, judgeBatchCli } from "./agent-cli.js";
 import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable, localTierStatus } from "./scan-local.js";
@@ -3194,8 +3195,27 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   }
   const lang = resolveLang(p.flags, { audit, standard });
 
+  // WHICH TRANSPORT RULES. `api` posts the worklist to the Messages API; `cli` hands each
+  // batch to a local `claude -p`, which can OPEN the files a criterion cites — the difference
+  // the agent tier has always been about — and which runs anywhere a shell does: the skill, a
+  // GitHub Action, a GitLab CI, a laptop.
+  const runner = typeof p.flags.runner === "string" ? (p.flags.runner as string) : "api";
+  if (runner !== "api" && runner !== "cli") {
+    console.error(`ultra11y judge: --runner '${runner}' is not a transport — expected 'api' or 'cli'.`);
+    return 2;
+  }
+  // One criterion per invocation instead of eight. It costs more calls and buys two things: the
+  // model sees one criterion's evidence rather than eight competing for its attention, and a run
+  // cut short loses at most ONE criterion — the turn-budget cliff that made a truncated agent
+  // pass throw away everything it had already ruled on simply cannot happen.
+  const grain = typeof p.flags.grain === "string" ? (p.flags.grain as string) : "batch";
+  if (grain !== "batch" && grain !== "criterion") {
+    console.error(`ultra11y judge: --grain '${grain}' is not a grain — expected 'batch' or 'criterion'.`);
+    return 2;
+  }
+
   const key = typeof p.flags["api-key"] === "string" && p.flags["api-key"] ? (p.flags["api-key"] as string) : apiKeyFromEnv();
-  if (!key) {
+  if (!key && runner === "api") {
     console.error(
       lang === "fr"
         ? "ultra11y judge : aucune clé d'API. Exportez ANTHROPIC_API_KEY (ou passez --api-key).\n" +
@@ -3234,23 +3254,47 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
 
   // Batch, and render EACH batch through the very worklist formatter the agent reads. There
   // is no second prompt to keep in step with the protocol.
+  const size = grain === "criterion" ? 1 : BATCH_SIZE;
+  // THE FULL PREAMBLE ENDS BY TELLING THE READER TO RUN `verify --apply` (src/adjudicate.ts
+  // T.then). Harmless to the api tier, which has no tools; wrong to hand a process that does.
+  // `preamble: false` is the rendering the on-disk briefs already use — the compressed
+  // contract, without the shell instructions — so the CLI runner reads exactly what
+  // `audits/adjudicate/<id>.md` carries, and the two surfaces cannot describe different jobs.
+  const render = (slice: typeof items): string => formatAdjudication(slice, lang, standard, runner === "cli" ? { preamble: false } : {});
   const batches: { items: typeof items; prompt: string }[] = [];
-  for (let i = 0; i < items.length; i += BATCH_SIZE) {
-    const slice = items.slice(i, i + BATCH_SIZE);
-    batches.push({ items: slice, prompt: formatAdjudication(slice, lang, standard) });
+  for (let i = 0; i < items.length; i += size) {
+    const slice = items.slice(i, i + size);
+    batches.push({ items: slice, prompt: render(slice) });
   }
-  const model = typeof p.flags.model === "string" && p.flags.model ? (p.flags.model as string) : modelFromEnv();
+  const model = typeof p.flags.model === "string" && p.flags.model ? (p.flags.model as string) : runner === "cli" ? DEFAULT_CLI_MODEL : modelFromEnv();
   console.error(
     lang === "fr"
-      ? `ultra11y judge : ${items.length} critère(s) en ${batches.length} lot(s), modèle ${model}…`
-      : `ultra11y judge: ${items.length} criterion(ia) in ${batches.length} batch(es), model ${model}…`,
+      ? `ultra11y judge : ${items.length} critère(s) en ${batches.length} lot(s), transport ${runner}, modèle ${model}…`
+      : `ultra11y judge: ${items.length} criterion(ia) in ${batches.length} batch(es), ${runner} transport, model ${model}…`,
   );
 
+  let spent = 0;
+  // A dollar ceiling and a wall clock — never a turn budget. `--max-turns` is not a flag of
+  // the Claude Code CLI, and the CLI swallows unknown flags without a word, so passing one
+  // would look like a bound and be an unbounded run.
+  const maxBudgetUsd = typeof p.flags["max-budget-usd"] === "string" ? Number(p.flags["max-budget-usd"]) : undefined;
+  const timeoutMs = typeof p.flags.timeout === "string" ? Number(p.flags.timeout) * 1000 : undefined;
   const { verdicts, failures } = await judgeAll(batches, {
     apiKey: key,
     model,
+    backend: runner === "cli" ? judgeBatchCli : undefined,
+    // One local process at a time. Four in flight is an answer to a rate limit, and a rate
+    // limit is not what bounds a subprocess.
+    concurrency: runner === "cli" ? 1 : undefined,
+    maxBudgetUsd: Number.isFinite(maxBudgetUsd) ? maxBudgetUsd : undefined,
+    timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : undefined,
+    onCost: (usd) => {
+      spent += usd;
+    },
     onProgress: (done, total) => console.error(`  ${done}/${total}`),
   });
+  // What it cost, from the run itself rather than from a dashboard read a day later.
+  if (spent > 0) console.error(lang === "fr" ? `ultra11y judge : ${spent.toFixed(4)} $ dépensé(s).` : `ultra11y judge: ${spent.toFixed(4)} spent.`);
   for (const f of failures) console.error(`⚠ ${f}`);
   const filled = applyRawVerdicts(items, verdicts);
 

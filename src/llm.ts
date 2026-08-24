@@ -61,6 +61,19 @@ export interface LlmOptions {
   concurrency?: number;
   /** Injected for tests. Defaults to the global fetch. */
   fetchImpl?: typeof fetch;
+  /** Injected for tests, the CLI backend's counterpart to `fetchImpl`: it takes the argv and
+   *  the stdin payload and returns what the process wrote. */
+  spawnImpl?: (argv: string[], input: string, timeoutMs: number) => Promise<{ code: number | null; stdout: string; stderr: string; timedOut?: boolean }>;
+  /** Wall-clock kill for one CLI invocation, in ms. THE ONLY BOUND WE OWN: the CLI swallows
+   *  an unknown flag without a word, so any ceiling expressed as a flag it might not have is
+   *  a ceiling that may not exist. This one is enforced by killing the process. */
+  timeoutMs?: number;
+  /** Dollar ceiling handed to the CLI backend — the bound that survives whatever a turn
+   *  happens to cost, which is what a CI job actually wants to cap. */
+  maxBudgetUsd?: number;
+  /** Called with each invocation's real cost, so a run can report what it spent instead of
+   *  leaving the reader to find it in a provider dashboard. */
+  onCost?: (usd: number) => void;
   /** Backoff before retry N (1-based). Injected so a test can exercise the retry path
    *  without waiting out the real curve. */
   backoffMs?: (attempt: number) => number;
@@ -70,7 +83,7 @@ export interface LlmOptions {
 // The verdict shape the model must return. It mirrors AdjudicationItem exactly, because the
 // gate downstream reads AdjudicationItem — describing anything else here would only move the
 // mismatch to where it is harder to see.
-const VERDICT_TOOL = {
+export const VERDICT_TOOL = {
   name: "record_verdicts",
   description:
     "Record one verdict per criterion presented. Never invent a criterion that was not presented. A criterion you cannot decide from the evidence stays `manual` with a reason — that is a correct answer, not a failure.",
