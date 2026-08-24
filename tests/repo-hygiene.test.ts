@@ -35,9 +35,16 @@ describe("the repository tracks no artefact one of its own runs left behind", ()
   // job in ci.yml replays it on every push to hold the RGAA grid to 106/106 with no model in
   // the loop. Deleting it would not tidy the repository, it would remove the gate.
   const LEDGER = ".ultra11y/verdicts/rgaa.json";
+  // The undecidable declaration has the same standing, and for the same reason: it is a CLAIM
+  // ABOUT THIS CODEBASE — the criteria no engine, no agent and no capture can settle, each with
+  // the reason a human auditor is handed to go and finish the job — not the output of a run.
+  // `check --require-decided --allow-undecided` reads it to tell an honest residual apart from
+  // an unfilled cell, and a declaration living outside review would be a way to make a grid
+  // look complete without anyone seeing what was excused.
+  const DECLARED = /^\.ultra11y\/undecidable-[a-z0-9-]+\.json$/;
 
   it("has none of them in the index", () => {
-    const offenders = trackedAtRoot().filter((f) => LEFTOVERS.some((re) => re.test(f)) && f !== LEDGER);
+    const offenders = trackedAtRoot().filter((f) => LEFTOVERS.some((re) => re.test(f)) && f !== LEDGER && !DECLARED.test(f));
     expect(offenders, "a run's output is tracked — delete it and anchor it in .gitignore").toEqual([]);
   });
 

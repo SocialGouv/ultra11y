@@ -198,28 +198,25 @@
     },
     {
       "criteriaId": "2.2",
-      "verdict": "NC",
-      "justification": "Les iframes manquent d'attribut title pour identifier leur contenu.",
+      "verdict": "NA",
+      "justification": "Le périmètre ne contient que deux cadres, tous deux sur la page « Intégrations » (cadres-html) : <iframe src=\"/embed/disponibilite.html\"> et <iframe src=\"/embed/facturation.html\">. Vérification faite dans le DOM capturé (.ultra11y/pages/cadres-html/dom.html:27 et :31) ET dans la source (tests/fixtures/realworld/cadres.html:37 et :41) : aucun des deux ne porte d'attribut title (ni aria-label, ni aria-labelledby) — la note de moisson le confirme (title=\"\" name=\"\"). Un grep de tout le périmètre audité ne trouve pas d'autre <iframe> ni de <frame>. Or le test 2.2.1 ne porte QUE sur « chaque cadre pourvu d'un attribut title » : le sujet du critère est vide, il n'y a aucun titre de cadre dont juger la pertinence. L'absence de titre est un défaut réel, mais il relève du critère 2.1 (« chaque cadre a-t-il un titre de cadre ? »), pas de 2.2 — le compter ici reviendrait à sanctionner deux fois le même manquement.",
       "citations": [
         {
           "file": ".ultra11y/pages/cadres-html/dom.html",
           "line": 27,
           "selector": "iframe",
-          "snippet": "<iframe src=\"/embed/disponibilite\" width=\"600\" height=\"300\"></iframe>"
-        }
-      ],
-      "findings": [
+          "snippet": "<iframe src=\"/embed/disponibilite.html\" width=\"600\" height=\"300\"></iframe>"
+        },
         {
           "file": ".ultra11y/pages/cadres-html/dom.html",
-          "line": 27,
-          "message": "iframe sans attribut title",
-          "snippet": "<iframe src=\"/embed/disponibilite\" width=\"600\" height=\"300\"></iframe>",
-          "normativeRef": "2.2.1"
+          "line": 31,
+          "selector": "iframe",
+          "snippet": "<iframe src=\"/embed/facturation.html\" width=\"600\" height=\"400\"></iframe>"
         }
       ],
-      "evidenceFingerprint": "sha256:5ee5cce0d65c3c20e1deff4144ea7848",
+      "evidenceFingerprint": "sha256:e43171dc39d2019ff2e53091cce5e809",
       "evidenceCount": 2,
-      "date": "2026-08-23",
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
@@ -428,28 +425,146 @@
     },
     {
       "criteriaId": "4.11",
-      "verdict": "NA",
-      "justification": "Les pages auditées (contact-html, accueil, cadres-html) ne contiennent aucun média temporel (vidéo, audio, média synchronisé). Aucun élément <video>, <audio>, ou lecteur multimédia temporel n'est présent dans le périmètre audité. Le critère 4.11 ne s'applique donc pas.",
-      "evidenceFingerprint": "sha256:1a25b7806c5aef8643a7e0c4cca1198b",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": ".ultra11y/pages/medias-html/dom.html",
+          "line": 35,
+          "selector": "audio",
+          "snippet": "<audio src=\"/media/journal-incidents.mp3\" autoplay=\"\"></audio>",
+          "severity": "majeur",
+          "normativeRef": "4.11.1",
+          "message": "Le média temporel « journal audio des incidents » n'offre aucune fonctionnalité de contrôle de sa consultation : l'élément <audio> n'a pas d'attribut controls, et aucun bouton lecture / pause / stop ni contrôle du son ne figure ailleurs dans la page (aucun <script> dans le périmètre n'en ajoute — vérifié sur la source tests/fixtures/realworld/medias.html:41 comme sur le DOM capturé). Comme il démarre seul (autoplay), l'utilisateur n'a strictement aucun moyen, ni au clavier ni au pointeur, d'arrêter ou de couper le son. Le minimum exigé par le glossaire « contrôle de la consultation » (lecture, pause ou stop, plus activation/désactivation du son puisque le média a du son) est absent. Correctif : ajouter l'attribut controls et retirer autoplay. Le <video controls> de la même page (ligne 29) satisfait, lui, les tests 4.11.1 à 4.11.3 grâce aux contrôles natifs."
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 112,
+          "selector": "audio",
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "severity": "majeur",
+          "normativeRef": "4.11.1",
+          "message": "Le « jingle Orbit » du pied de page est un média temporel sans aucune fonctionnalité de contrôle : pas d'attribut controls sur l'<audio>, et aucune commande équivalente (lecture, pause, stop, coupure du son) dans la page. Le son se déclenche automatiquement et rien ne permet de l'interrompre au clavier ni au pointeur. Correctif : ajouter controls (et supprimer autoplay)."
+        },
+        {
+          "file": ".ultra11y/pages/cadres-html/dom.html",
+          "line": 84,
+          "selector": "audio",
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "severity": "majeur",
+          "normativeRef": "4.11.1",
+          "message": "Même défaut sur la page « Intégrations » : l'<audio> du pied de page démarre seul et ne propose aucune fonctionnalité de contrôle de la consultation (pas de controls, aucune commande de remplacement dans la page)."
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 187,
+          "selector": "audio",
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "severity": "majeur",
+          "normativeRef": "4.11.1",
+          "message": "Même défaut sur la page « Contact et compte » : l'<audio> du pied de page démarre seul et ne propose aucune fonctionnalité de contrôle de la consultation (pas de controls, aucune commande de remplacement dans la page)."
+        },
+        {
+          "file": ".ultra11y/pages/documents-html/dom.html",
+          "line": 52,
+          "selector": "audio",
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "severity": "majeur",
+          "normativeRef": "4.11.1",
+          "message": "Même défaut sur la page « Documents » : l'<audio> du pied de page démarre seul et ne propose aucune fonctionnalité de contrôle de la consultation (pas de controls, aucune commande de remplacement dans la page)."
+        },
+        {
+          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 72,
+          "selector": "audio",
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "severity": "majeur",
+          "normativeRef": "4.11.1",
+          "message": "Même défaut sur la page « Mentions légales » : l'<audio> du pied de page démarre seul et ne propose aucune fonctionnalité de contrôle de la consultation (pas de controls, aucune commande de remplacement dans la page)."
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 70,
+          "selector": "audio",
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "severity": "majeur",
+          "normativeRef": "4.11.1",
+          "message": "Même défaut sur la page « Plan du site » : l'<audio> du pied de page démarre seul et ne propose aucune fonctionnalité de contrôle de la consultation (pas de controls, aucune commande de remplacement dans la page)."
+        },
+        {
+          "file": ".ultra11y/pages/recherche-html/dom.html",
+          "line": 48,
+          "selector": "audio",
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "severity": "majeur",
+          "normativeRef": "4.11.1",
+          "message": "Même défaut sur la page « Recherche » : l'<audio> du pied de page démarre seul et ne propose aucune fonctionnalité de contrôle de la consultation (pas de controls, aucune commande de remplacement dans la page)."
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 132,
+          "selector": "audio",
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "severity": "majeur",
+          "normativeRef": "4.11.1",
+          "message": "Même défaut sur la page « Tarifs » : l'<audio> du pied de page démarre seul et ne propose aucune fonctionnalité de contrôle de la consultation (pas de controls, aucune commande de remplacement dans la page)."
+        }
+      ],
+      "evidenceFingerprint": "sha256:e8fa4cf8247f4ba4c6b05672be4cfe94",
       "evidenceCount": 7,
-      "date": "2026-08-23",
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "4.12",
-      "verdict": "C",
-      "justification": "Les pages auditées contiennent un média non temporel : un élément <object> de type SVG (carte de réseau) sur la page accueil/dom.html:65. Cet élément SVG est un contenu statique d'affichage (image/svg+xml) sans fonctionnalités interactives ni contrôles utilisateur. Aucun contrôle de consultation n'est exposé sur cet élément, donc aucune interaction clavier n'est requise. Le critère est donc conforme.",
+      "verdict": "NA",
+      "justification": "Les tests 4.12.1 et 4.12.2 ne portent que sur « les médias non temporels POURVUS de fonctionnalités de contrôle ». Au sens du glossaire RGAA, les médias non temporels du périmètre sont : l'<object type=\"image/svg+xml\"> de la page d'accueil (évidence citée), le <canvas id=\"latence\"> de la même page (.ultra11y/pages/accueil/dom.html:62) et le <svg> statique du « graphique » (index.html:82). Aucun ne porte de fonctionnalité de contrôle : le canvas est vide et aucun <script> du périmètre ne le dessine ni ne l'anime (aucune balise <script> dans les fixtures auditées), l'objet SVG est une carte statique, le <svg> inline est un histogramme figé — il n'existe donc aucune commande (lecture, navigation, zoom…) dont on puisse vérifier l'accessibilité ou l'activabilité au clavier et au pointeur. Les autres évidences présentées sortent du champ du critère : les deux <iframe> sont des cadres (thème 2 / 4.12 ne vise pas les cadres), et le <div onclick> ainsi que les gestionnaires appelant preventDefault sont des composants scriptés relevant des critères 7.3 et 12.x, pas des médias non temporels. À noter que l'<object> et le <canvas> sont par ailleurs sans alternative textuelle — défaut réel, mais il relève du critère 1.1, pas de 4.12.",
       "citations": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
           "line": 65,
           "selector": "object",
           "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>"
+        },
+        {
+          "file": ".ultra11y/pages/cadres-html/dom.html",
+          "line": 27,
+          "selector": "iframe",
+          "snippet": "<iframe src=\"/embed/disponibilite.html\" width=\"600\" height=\"300\"></iframe>"
+        },
+        {
+          "file": ".ultra11y/pages/cadres-html/dom.html",
+          "line": 31,
+          "selector": "iframe",
+          "snippet": "<iframe src=\"/embed/facturation.html\" width=\"600\" height=\"400\"></iframe>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 139,
+          "selector": "div",
+          "snippet": "<div onclick=\"ouvrirAssistance()\">Ouvrir une demande d’assistance</div>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 167,
+          "selector": "handler",
+          "snippet": "<input id=\"confirmation\" name=\"confirmation\" type=\"text\" onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\">"
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 16,
+          "selector": "handler",
+          "snippet": "e.preventDefault();"
+        },
+        {
+          "file": "tests/fixtures/realworld/contact.html",
+          "line": 179,
+          "selector": "handler",
+          "snippet": "onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\""
         }
       ],
-      "evidenceFingerprint": "sha256:1a25b7806c5aef8643a7e0c4cca1198b",
+      "evidenceFingerprint": "sha256:e8fa4cf8247f4ba4c6b05672be4cfe94",
       "evidenceCount": 7,
-      "date": "2026-08-23",
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
@@ -477,51 +592,90 @@
     },
     {
       "criteriaId": "5.1",
-      "verdict": "NC",
-      "justification": "Les tableaux de données complexes manquent de résumé approprié via caption, summary, ou aria-describedby.",
+      "verdict": "NA",
+      "justification": "Aucun tableau de données COMPLEXE au sens du glossaire RGAA (en-têtes non répartis uniquement sur la première ligne et/ou la première colonne, ou dont la portée n'est pas valable pour l'ensemble de la ligne ou de la colonne) n'existe dans le périmètre. Examen des cinq tableaux relevés, structure lue dans le DOM capturé et dans la source : (1) tarifs-html:30 — grille 3 colonnes sans aucun <th> ; sans en-tête il n'y a pas de structure complexe (le défaut relève de 5.6) ; (2) tarifs-html:52 — trois <th> tous situés sur la première ligne, portée implicite valable pour toute la colonne ; (3) tarifs-html:73 — deux <th> (« Offre », « Remise ») sur la seule première ligne, grille 2×2 ; les attributs headers fautifs (headers=\"remise-annuelle\" pointant sur un id inexistant) sont un défaut de liaison, ils ne rendent pas la grille complexe ; (4) tarifs-html:87 — role=\"presentation\" : tableau de mise en forme, donc hors de la définition « tableau de données » ; (5) embed/disponibilite.html:11 — <th scope=\"col\"> sur la première ligne et <th scope=\"row\"> en première colonne, portées explicites et valables. Le test 5.1.1 n'a donc aucun sujet dans le périmètre.",
       "citations": [
         {
           "file": ".ultra11y/pages/tarifs-html/dom.html",
           "line": 30,
           "selector": "table",
           "snippet": "<table>"
-        }
-      ],
-      "findings": [
+        },
         {
           "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 30,
-          "message": "Tableau de données sans résumé",
-          "snippet": "<table>",
-          "normativeRef": "5.1.1"
+          "line": 52,
+          "selector": "table",
+          "snippet": "<table>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 73,
+          "selector": "table",
+          "snippet": "<table>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 87,
+          "selector": "table",
+          "snippet": "<table role=\"presentation\">"
+        },
+        {
+          "file": "tests/fixtures/realworld/embed/disponibilite.html",
+          "line": 11,
+          "selector": "table",
+          "snippet": "<table>"
         }
       ],
-      "evidenceFingerprint": "sha256:f52d9e0c15095c72e6ab12ae174b7215",
-      "evidenceCount": 4,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:b4345a9deca68298cfaeb20673b49cbe",
+      "evidenceCount": 5,
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "5.2",
       "verdict": "NA",
-      "justification": "Aucun tableau n'a de résumé à évaluer (voir 5.1).",
+      "justification": "Le test 5.2.1 porte sur « les résumés de tableaux de données complexes (tels que déterminés par le test 5.1.1) ». Deux conditions manquent, cumulativement : (a) aucun tableau du périmètre n'est complexe — les cinq tableaux relevés sont soit un tableau de mise en forme (tarifs-html:87, role=\"presentation\"), soit des tableaux de données simples dont les en-têtes tiennent sur la première ligne et/ou la première colonne avec une portée valable (tarifs-html:52 et :73, embed/disponibilite.html:11), soit une grille sans aucun <th> (tarifs-html:30) ; (b) aucun de ces tableaux ne porte de résumé — la moisson relève summary=\"\" sur les cinq, et aucun <caption> ne contient de passage décrivant la nature ou la structure du tableau (les deux captions existantes sont des titres, jugés au critère 5.5). L'ensemble sur lequel porte 5.2 est donc vide.",
       "citations": [
         {
           "file": ".ultra11y/pages/tarifs-html/dom.html",
           "line": 30,
           "selector": "table",
           "snippet": "<table>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 52,
+          "selector": "table",
+          "snippet": "<table>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 73,
+          "selector": "table",
+          "snippet": "<table>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 87,
+          "selector": "table",
+          "snippet": "<table role=\"presentation\">"
+        },
+        {
+          "file": "tests/fixtures/realworld/embed/disponibilite.html",
+          "line": 11,
+          "selector": "table",
+          "snippet": "<table>"
         }
       ],
-      "evidenceFingerprint": "sha256:f52d9e0c15095c72e6ab12ae174b7215",
-      "evidenceCount": 4,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:b4345a9deca68298cfaeb20673b49cbe",
+      "evidenceCount": 5,
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "5.3",
       "verdict": "C",
-      "justification": "Les tableaux de mise en forme sont marqués avec role=\"presentation\" pour indiquer qu'ils n'ont pas de fonction sémantique de tableau de données.",
+      "justification": "Un seul tableau de mise en forme dans le périmètre : celui de la page Tarifs, <table role=\"presentation\"> (.ultra11y/pages/tarifs-html/dom.html:87, source tests/fixtures/realworld/tarifs.html:93). Les deux conditions cumulatives du test 5.3.1 sont réunies. (a) L'élément <table> est bien pourvu de role=\"presentation\". (b) Le contenu linéarisé reste compréhensible : le tableau tient sur une seule colonne et deux lignes — la cellule d'en-tête « Colonne de mise en page » puis une cellule contenant <label for=\"devis\">Nombre de sites à migrer</label> et son champ associé. Lu hors structure de tableau, l'ordre d'accès aux cellules (intitulé, puis le couple étiquette + champ correctement lié par for/id) suit l'ordre visuel et reste intelligible ; aucun contenu principal n'est rejeté après un contenu secondaire. Les quatre autres tableaux cités dans les évidences sont des tableaux de données (comparatif des formules, quotas par formule, remises annuelles, disponibilité mensuelle) et sortent du champ de 5.3 ; ils ne sont donc pas cités ici. Réserve non normative : ce tableau de mise en forme conserve un <th scope=\"col\">, c'est-à-dire du balisage propre aux tableaux de données — cela relève du critère 5.8, que 5.3 ne teste pas.",
       "citations": [
         {
           "file": ".ultra11y/pages/tarifs-html/dom.html",
@@ -530,35 +684,32 @@
           "snippet": "<table role=\"presentation\">"
         }
       ],
-      "evidenceFingerprint": "sha256:f52d9e0c15095c72e6ab12ae174b7215",
-      "evidenceCount": 4,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:b4345a9deca68298cfaeb20673b49cbe",
+      "evidenceCount": 5,
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "5.5",
-      "verdict": "NC",
-      "justification": "Les tableaux manquent de titre ou de caption pertinent.",
+      "verdict": "C",
+      "justification": "Deux tableaux de données du périmètre sont pourvus d'un titre, tous deux au moyen d'une balise <caption> (la seule technique pleinement supportée selon le glossaire), et chacun identifie le contenu du tableau de manière claire et concise — test 5.5.1 validé. (1) tarifs-html:73 — <caption>Remises appliquées au paiement annuel</caption> : le tableau croise « Offre » et « Remise », le titre en nomme exactement le sujet (les remises) et la condition (le paiement annuel), sans être générique du type « Tableau 1 ». (2) embed/disponibilite.html:11 — <caption>Disponibilité mensuelle par service</caption> : le tableau croise « Service » (Hébergement, Diffusion) et « Disponibilité » (99,98 %, 99,95 %) ; le titre nomme la donnée mesurée, sa périodicité et son axe de découpage. Les deux titres sont distincts l'un de l'autre et de tout autre intitulé de leur page. Les trois autres tableaux relevés n'ont ni <caption>, ni title, ni aria-label / aria-labelledby (tarifs-html:30 et :52), ou ne sont pas des tableaux de données (tarifs-html:87, role=\"presentation\") : ils sortent du champ de 5.5, qui ne juge que la pertinence des titres existants. L'absence de titre sur le tableau « Quotas par formule » est un défaut réel, mais il relève du critère 5.4.",
       "citations": [
         {
           "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 30,
+          "line": 73,
+          "selector": "table",
+          "snippet": "<table>"
+        },
+        {
+          "file": "tests/fixtures/realworld/embed/disponibilite.html",
+          "line": 11,
           "selector": "table",
           "snippet": "<table>"
         }
       ],
-      "findings": [
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 30,
-          "message": "Tableau sans caption ou titre identifiant",
-          "snippet": "<table>",
-          "normativeRef": "5.5.1"
-        }
-      ],
-      "evidenceFingerprint": "sha256:f52d9e0c15095c72e6ab12ae174b7215",
-      "evidenceCount": 4,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:b4345a9deca68298cfaeb20673b49cbe",
+      "evidenceCount": 5,
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
@@ -624,79 +775,280 @@
     },
     {
       "criteriaId": "8.6",
-      "verdict": "NC",
-      "justification": "La page mentions-legales a un titre vide.",
+      "verdict": "C",
+      "justification": "Dix des onze <title> relevés portent un contenu, et chacun satisfait le test 8.6.1 : il permet de retrouver la page dans l'historique ou la liste des onglets. Ils suivent tous le même schéma « sujet de la page — nom du site » (Accueil, Intégrations, Contact et compte, Documents, Médias, Plan du site, Recherche, Tarifs — Orbit, hébergement statique), sont distincts deux à deux, concis, non génériques, et le sujet annoncé correspond bien au contenu de la page (vérifié sur les <h1> correspondants : « Intégrations » pour la page des cadres, « Plan du site », « Tarifs »…). Les deux pages embarquées dans les cadres portent également des titres propres et descriptifs de leur contenu (« Disponibilité des services » pour le tableau de disponibilité, « Facturation » pour le formulaire SIRET). La onzième évidence — <title></title> sur mentions-legales-html:6 — est délibérément exclue de ces citations : une balise <title> vide ne constitue pas un « titre de page » au sens du glossaire RGAA (« contenu de la balise <title> permettant d'identifier de manière claire, concise et unique les contenus/la nature de la page »). Cette page n'« a » donc pas de titre de page et sort du champ de 8.6, qui ne juge que les titres existants ; l'absence est un défaut réel relevant du critère 8.5 (test 8.5.1), où le moteur la rattache déjà.",
       "citations": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
           "line": 6,
           "selector": "title",
           "snippet": "<title>Accueil — Orbit, hébergement statique</title>"
-        }
-      ],
-      "findings": [
+        },
         {
-          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
+          "file": ".ultra11y/pages/cadres-html/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Intégrations — Orbit, hébergement statique</title>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Contact et compte — Orbit, hébergement statique</title>"
+        },
+        {
+          "file": ".ultra11y/pages/documents-html/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Documents — Orbit, hébergement statique</title>"
+        },
+        {
+          "file": ".ultra11y/pages/medias-html/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Médias — Orbit, hébergement statique</title>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Plan du site — Orbit, hébergement statique</title>"
+        },
+        {
+          "file": ".ultra11y/pages/recherche-html/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Recherche — Orbit, hébergement statique</title>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 5,
+          "selector": "title",
+          "snippet": "<title>Tarifs — Orbit, hébergement statique</title>"
+        },
+        {
+          "file": "tests/fixtures/realworld/embed/disponibilite.html",
           "line": 6,
-          "message": "Titre de page vide",
-          "snippet": "<title></title>",
-          "normativeRef": "8.6.1"
+          "selector": "title",
+          "snippet": "<title>Disponibilité des services</title><link rel=\"stylesheet\" href=\"/styles.css\" /></head>"
+        },
+        {
+          "file": "tests/fixtures/realworld/embed/facturation.html",
+          "line": 6,
+          "selector": "title",
+          "snippet": "<title>Facturation</title><link rel=\"stylesheet\" href=\"/styles.css\" /></head>"
         }
       ],
-      "evidenceFingerprint": "sha256:79889d02c97cee0bea89c910df815ace",
-      "evidenceCount": 9,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:1a1c8fbddfca212259d3b42b2288be64",
+      "evidenceCount": 11,
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "8.9",
       "verdict": "C",
-      "justification": "Les balises structurelles (h2, h3, ul, table) sont utilisées correctement pour leur fonction sémantique.",
+      "justification": "Aucune balise sémantique du périmètre n'est détournée à des seules fins de présentation (test 8.9.1). Chaque titre moissonné porte l'intitulé de la section qui le suit (h1/h2/h3 d'accueil, cadres, contact, documents, médias, mentions légales, plan, recherche, tarifs et des deux documents encadrés) ; chaque <ul> regroupe une vraie liste (navigations, listes de documents, listes de liens) ; les trois tableaux de tarifs-html:30/52/73 et celui de disponibilite.html:11 portent des données tabulaires ; et le seul tableau de mise en forme, tarifs-html:87, déclare role=\"presentation\" — exactement la sortie que la méthodologie 8.9.1 admet, sachant que <table> est de toute façon exclu de la liste des balises visées par le test. Le balisage de présentation constaté ailleurs sur le site relève d'un autre critère et pas de 8.9 : <center>/<font> (index.html:55), align/bgcolor (index.html:58), le mot écrit lettre à lettre (index.html:61) et <marquee> (medias.html:46) sont des balises et attributs DE présentation, donc RGAA 10.1 (tests 10.1.1, 10.1.2, 10.1.3) — ils sont employés conformément à leur finalité de spécification, pas détournés d'elle, ce que la définition « uniquement à des fins de présentation » exige. De même, le <h2></h2> vide de plan-html:43 est un titre sans intitulé (9.1) et non un titre créé pour un effet typographique ; le <dt> orphelin hors de toute <dl> de plan-html:52 relève du test 9.3.3 (listes de description) ; le <span> et les <div> enfants directs de <ul> sont des balises explicitement exclues du test 8.9.1 et relèvent de 9.3.1 ; et le <th scope=\"col\"> conservé dans le tableau de mise en forme est visé nommément par le test 5.8.1.",
       "citations": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
           "line": 39,
           "selector": "h2",
           "snippet": "<h2>Déployez votre site en une commande</h2>"
+        },
+        {
+          "file": ".ultra11y/pages/cadres-html/dom.html",
+          "line": 23,
+          "selector": "h1",
+          "snippet": "<h1>Intégrations</h1>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 24,
+          "selector": "h1",
+          "snippet": "<h1>Contact et gestion du compte</h1>"
+        },
+        {
+          "file": ".ultra11y/pages/documents-html/dom.html",
+          "line": 25,
+          "selector": "ul",
+          "snippet": "<ul>"
+        },
+        {
+          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 36,
+          "selector": "h2",
+          "snippet": "<h2>Éditeur</h2>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 26,
+          "selector": "h4",
+          "snippet": "<h4>Toutes les pages</h4>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 43,
+          "selector": "h2",
+          "snippet": "<h2></h2>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 52,
+          "selector": "dt",
+          "snippet": "<dt>Aperçu par branche</dt>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 30,
+          "selector": "table",
+          "snippet": "<table>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 87,
+          "selector": "table",
+          "snippet": "<table role=\"presentation\">"
+        },
+        {
+          "file": "tests/fixtures/realworld/embed/disponibilite.html",
+          "line": 11,
+          "selector": "table",
+          "snippet": "<table>"
         }
       ],
-      "evidenceFingerprint": "sha256:b9fb0e7e6d39a9fed81f0182c23b3a5c",
-      "evidenceCount": 55,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:b23b4b976f90df051be327f7eb7d9fda",
+      "evidenceCount": 58,
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "9.4",
       "verdict": "NA",
-      "justification": "Aucune citation au sens HTML (blockquote, q) n'a été identifiée dans le périmètre audité.",
+      "justification": "Le sujet du critère — une citation — n'existe nulle part dans le périmètre audité, donc les tests 9.4.1 (citation courte, <q>) et 9.4.2 (bloc de citation, <blockquote>) ont une population vide. Les 58 évidences présentées sont des conteneurs de structure (titres h1 à h4, listes <ul>, tableaux, un <dt>) qui encadrent le texte éditorial propre au site — présentation de l'offre, mentions légales, quotas tarifaires, plan du site, contenus encadrés — et aucun de ces contenus ne reproduit un passage attribué à une source tierce. La vérification a été menée dans les deux sens : aucun passage cité (guillemets ou attribution) n'apparaît dans le contenu rendu des neuf pages ni des deux documents encadrés — les seuls guillemets français du dépôt sont dans des commentaires HTML, non restitués — et symétriquement aucune balise <q>, <blockquote> ni aucun attribut cite= n'est présent, ce qui écarte aussi l'hypothèse d'une citation mal indiquée. Rien n'étant concerné, le verdict est NA et non NC.",
       "citations": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
           "line": 39,
           "selector": "h2",
           "snippet": "<h2>Déployez votre site en une commande</h2>"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 72,
+          "selector": "ul",
+          "snippet": "<ul>"
+        },
+        {
+          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 44,
+          "selector": "h2",
+          "snippet": "<h2>Conditions</h2>"
+        },
+        {
+          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 52,
+          "selector": "h2",
+          "snippet": "<h2>Accessibilité</h2>"
+        },
+        {
+          "file": ".ultra11y/pages/medias-html/dom.html",
+          "line": 42,
+          "selector": "h2",
+          "snippet": "<h2>Webinaire en direct</h2>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 52,
+          "selector": "dt",
+          "snippet": "<dt>Aperçu par branche</dt>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 73,
+          "selector": "table",
+          "snippet": "<table>"
+        },
+        {
+          "file": "tests/fixtures/realworld/embed/disponibilite.html",
+          "line": 9,
+          "selector": "h1",
+          "snippet": "<h1>Disponibilité des services</h1>"
         }
       ],
-      "evidenceFingerprint": "sha256:b9fb0e7e6d39a9fed81f0182c23b3a5c",
-      "evidenceCount": 55,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:b23b4b976f90df051be327f7eb7d9fda",
+      "evidenceCount": 58,
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "10.3",
       "verdict": "C",
-      "justification": "La structure HTML utilise une hiérarchie claire de titres et de listes qui reste compréhensible sans CSS.",
+      "justification": "Test 10.3.1 : l'ordre d'implémentation des contenus est l'ordre de lecture, et il reste logique feuilles de styles désactivées. La vérification s'appuie sur les captures rendues : pour chacune des neuf pages, l'ordre DOM des éléments rendus a été confronté à leur position verticale mesurée (boxes.json), et il coïncide — les seuls écarts relevés sont des éléments en ligne partagés sur une même ligne visuelle (cellules <th> d'une même rangée sur tarifs-html, deux champs côte à côte sur accueil, un bouton à côté d'un lien sur contact-html), jamais un bloc remonté ou descendu. Le CSSOM capturé (css.json) ne contient aucune règle qui sorte un contenu du flux dans l'ordre : ni float, ni order de flexbox ou de grille, ni changement de direction. Les deux seules règles hors flux sont .skip-link{position:absolute;left:-9999px} — le lien d'évitement, qui sans CSS revient en tête de document, c'est-à-dire précisément à sa place — et .astuce-contenu{position:absolute;display:none}, dont le texte, sans CSS, s'affiche à sa place dans le <li>, immédiatement après le bouton qu'il explique. Les titres moissonnés précèdent chacun la section qu'ils annoncent, les listes de navigation ouvrent leur page et les tableaux suivent le titre qui les nomme : l'enchaînement reste cohérent sans styles. Les défauts de structure constatés par ailleurs sur ce corpus (titre vide et saut de niveau sur plan-html, <dt> orphelin) portent sur le niveau et l'intitulé des éléments, pas sur leur ORDRE d'implémentation, qui est le seul objet du test 10.3.1 ; ils sont traités par 9.1 et 9.3.",
       "citations": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
           "line": 39,
           "selector": "h2",
           "snippet": "<h2>Déployez votre site en une commande</h2>"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 53,
+          "selector": "h3",
+          "snippet": "<h3>Pourquoi Orbit</h3>"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 72,
+          "selector": "ul",
+          "snippet": "<ul>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 13,
+          "selector": "ul",
+          "snippet": "<ul>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 26,
+          "selector": "h2",
+          "snippet": "<h2>Nous écrire</h2>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 23,
+          "selector": "h1",
+          "snippet": "<h1>Plan du site</h1>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 30,
+          "selector": "ul",
+          "snippet": "<ul>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 29,
+          "selector": "h2",
+          "snippet": "<h2>Comparatif des formules</h2>"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 30,
+          "selector": "table",
+          "snippet": "<table>"
+        },
+        {
+          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 34,
+          "selector": "h1",
+          "snippet": "<h1>Mentions légales</h1>"
         }
       ],
-      "evidenceFingerprint": "sha256:b9fb0e7e6d39a9fed81f0182c23b3a5c",
-      "evidenceCount": 55,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:b23b4b976f90df051be327f7eb7d9fda",
+      "evidenceCount": 58,
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
@@ -735,121 +1087,401 @@
     },
     {
       "criteriaId": "10.14",
-      "verdict": "C",
-      "justification": "Les contenus additionnels (tooltips) sont liés à des éléments interactifs (button) avec aria-describedby, rendant possible leur accès via keyboard.",
-      "citations": [
+      "verdict": "NC",
+      "findings": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 79,
-          "selector": "button",
-          "snippet": "<button type=\"button\" aria-describedby=\"astuce-tls\">Qu'est-ce que le TLS ?</button>"
+          "line": 80,
+          "selector": "span#astuce-tls.astuce-contenu",
+          "snippet": "<span role=\"tooltip\" id=\"astuce-tls\" class=\"astuce-contenu\">",
+          "message": "L'infobulle « Un certificat TLS chiffre le trafic entre le visiteur et votre site. » est un contenu additionnel masqué par display:none et révélé par le seul mécanisme CSS .astuce:hover .astuce-contenu{display:block}. Le CSSOM capturé de la page (css.json) ne contient qu'une seule règle de focus, :focus{outline:none} : aucune règle :focus ni :focus-within ne révèle ce contenu, et la page ne porte aucun script. Le contenu n'apparaît donc ni à la prise de focus du bouton <button aria-describedby=\"astuce-tls\"> qui le déclenche (accueil/dom.html:79), ni à son activation au clavier, ni par l'activation ou la prise de focus d'un autre composant : aucune des trois conditions du test 10.14.1 n'est remplie. La sonde de survol de la capture confirme la révélation au seul survol du pointeur. Correctif : ajouter .astuce:focus-within .astuce-contenu{display:block} en jumeau de la règle :hover.",
+          "normativeRef": "10.14.1",
+          "severity": "majeur"
+        },
+        {
+          "file": "tests/fixtures/realworld/styles.css",
+          "line": 129,
+          "selector": ".astuce:hover .astuce-contenu",
+          "snippet": ".astuce:hover .astuce-contenu {",
+          "message": "Règle CSS qui révèle le contenu additionnel #astuce-tls au seul survol du pointeur, sans jumelle :focus/:focus-within dans la feuille de styles — c'est le mécanisme qui met en échec le test 10.14.1 sur la page d'accueil.",
+          "normativeRef": "10.14.1",
+          "severity": "majeur"
         }
       ],
-      "evidenceFingerprint": "sha256:789ac60c8f090fb3d4aaa5e8b55d740b",
+      "evidenceFingerprint": "sha256:41bbca2186a29d42e0d2fb7bffab39b2",
       "evidenceCount": 11,
-      "date": "2026-08-23",
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "11.2",
       "verdict": "C",
-      "justification": "Les champs de formulaire ont des étiquettes pertinentes via l'élément <label>, des attributs title, ou des placeholders identifiants.",
+      "justification": "Toutes les étiquettes présentes dans le périmètre permettent de connaître la fonction exacte de leur champ. Test 11.2.1 : chaque <label> associé à un champ nomme l'information attendue — « Adresse e-mail de secours », « Adresse e-mail de facturation », « Pays », « Offre concernée », « Devise », « Début de la migration », « Fin souhaitée », « Mot de passe du compte », « SIRET », « Société », « Tapez SUPPRIMER pour confirmer », « Rechercher sur le site », « Nombre de sites à migrer », « Votre adresse e-mail », « Numéro SIRET », « Adresse e-mail », « Mot de passe ». Test 11.2.2 : le seul champ étiqueté par un attribut title, contact-html:35, porte title=\"Objet du message\", qui est pertinent (le fait qu'il soit nommé UNIQUEMENT par title relève de 11.1, pas de la pertinence). Tests 11.2.3 et 11.2.4 : aucun champ du périmètre n'est étiqueté par aria-label ni par aria-labelledby, population vide. Test 11.2.5 : pour tous les champs disposant à la fois d'un intitulé visible et d'un nom accessible, le nom accessible EST ce texte visible, puisqu'il provient du <label> lui-même ; la condition « contient au moins l'intitulé visible » est donc satisfaite. Test 11.2.6 : aucun champ n'est étiqueté par un bouton adjacent. Trois cas ont été examinés puis écartés du périmètre de 11.2. Le champ contact-html:53 porte deux <label for=\"telephone\"> (« Téléphone » et « Sans indicatif ») : la note de la définition « Étiquette de champ de formulaire » impose d'évaluer la pertinence de 11.2 sur le NOM ACCESSIBLE, qui concatène ici les deux labels en « Téléphone Sans indicatif » — pertinent ; la duplication elle-même est un défaut de 11.1. Les boutons radio contact-html:88/90 (« Oui » / « Non ») ne sont pas rendus insuffisants par leur étiquette mais par l'absence de regroupement portant la question : la définition « Champs de même nature » traite explicitement ce cas (« Un ensemble de boutons radio […] qui se rapportent à une question […] lorsque les intitulés de label ne sont pas suffisants »), et il est instruit par 11.5 et 11.6. Enfin les champs contact-html:29 et 32 (aucune étiquette, placeholder tenant lieu d'étiquette) sortent de la population de 11.2, qui porte sur la pertinence des étiquettes existantes : leur absence relève de 11.1, et l'<input type=\"image\"> d'accueil/dom.html:101 n'est pas un champ de saisie au sens du glossaire.",
       "citations": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
           "line": 99,
           "selector": "input#newsletter-email",
           "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" required=\"\">"
-        }
-      ],
-      "evidenceFingerprint": "sha256:92ed36f0fa82268087b558320f22cb1a",
-      "evidenceCount": 26,
-      "date": "2026-08-23",
-      "decidedBy": "agent"
-    },
-    {
-      "criteriaId": "11.3",
-      "verdict": "C",
-      "justification": "Les étiquettes sont cohérentes à travers les pages pour les champs ayant la même fonction (e-mail, etc.).",
-      "citations": [
+        },
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 99,
-          "selector": "input#newsletter-email",
-          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" required=\"\">"
-        }
-      ],
-      "evidenceFingerprint": "sha256:f3c5e777530b182f827ae637bc0a6143",
-      "evidenceCount": 27,
-      "date": "2026-08-23",
-      "decidedBy": "agent"
-    },
-    {
-      "criteriaId": "11.4",
-      "verdict": "C",
-      "justification": "Les étiquettes sont accolées aux champs via l'association <label>-<input> ou des attributs title.",
-      "citations": [
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 35,
+          "selector": "input",
+          "snippet": "<input type=\"text\" name=\"objet\" title=\"Objet du message\"></p>"
+        },
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 99,
-          "selector": "input#newsletter-email",
-          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" required=\"\">"
-        }
-      ],
-      "evidenceFingerprint": "sha256:92ed36f0fa82268087b558320f22cb1a",
-      "evidenceCount": 26,
-      "date": "2026-08-23",
-      "decidedBy": "agent"
-    },
-    {
-      "criteriaId": "11.7",
-      "verdict": "C",
-      "justification": "Les regroupements de champs sont structurés avec des fieldsets et legends pertinents, ou avec des aria-labelledby.",
-      "citations": [
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 40,
+          "selector": "input#courriel-secondaire",
+          "snippet": "<input id=\"courriel-secondaire\" name=\"email\" type=\"email\">"
+        },
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 99,
-          "selector": "input#newsletter-email",
-          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" required=\"\">"
-        }
-      ],
-      "evidenceFingerprint": "sha256:d2b9d6b5382cc4ec4621d1062e8bf0a9",
-      "evidenceCount": 37,
-      "date": "2026-08-23",
-      "decidedBy": "agent"
-    },
-    {
-      "criteriaId": "11.11",
-      "verdict": "C",
-      "justification": "Les erreurs de saisie sont accompagnées de messages d'erreur pertinents (aria-invalid avec messages textuels).",
-      "citations": [
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 53,
+          "selector": "input#telephone",
+          "snippet": "<input id=\"telephone\" name=\"telephone\" type=\"tel\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 62,
+          "selector": "select#pays",
+          "snippet": "<select id=\"pays\" name=\"pays\"></select>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 68,
+          "selector": "select#offre",
+          "snippet": "<select id=\"offre\" name=\"offre\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 104,
+          "selector": "input#debut",
+          "snippet": "<input id=\"debut\" type=\"date\" name=\"debut\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 112,
+          "selector": "input#motdepasse",
+          "snippet": "<input id=\"motdepasse\" type=\"password\" name=\"motdepasse\" autocomplete=\"off\">"
+        },
         {
           "file": ".ultra11y/pages/contact-html/dom.html",
           "line": 119,
           "selector": "input#siret",
           "snippet": "<input id=\"siret\" name=\"siret\" type=\"text\" aria-invalid=\"true\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 167,
+          "selector": "input#confirmation",
+          "snippet": "<input id=\"confirmation\" name=\"confirmation\" type=\"text\" onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\">"
+        },
+        {
+          "file": ".ultra11y/pages/recherche-html/dom.html",
+          "line": 33,
+          "selector": "input#requete",
+          "snippet": "<input id=\"requete\" name=\"q\" type=\"search\" tabindex=\"3\">"
+        },
+        {
+          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "line": 96,
+          "selector": "input#devis.champ-etroit",
+          "snippet": "<input id=\"devis\" name=\"devis\" type=\"text\" class=\"champ-etroit\">"
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 21,
+          "selector": "input#email",
+          "snippet": "<input id=\"email\" name=\"email\" type=\"email\" autoComplete=\"email\" required />"
+        },
+        {
+          "file": "tests/fixtures/realworld/embed/facturation.html",
+          "line": 13,
+          "selector": "input#siret",
+          "snippet": "<input type=\"text\" id=\"siret\" name=\"siret\" autocomplete=\"off\" /></p>"
         }
       ],
-      "evidenceFingerprint": "sha256:2e2132e9332aa0ad7ac95a85d5b6da2e",
-      "evidenceCount": 28,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:024f68e19582d298798d623d5eb2a626",
+      "evidenceCount": 27,
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
-      "criteriaId": "11.12",
+      "criteriaId": "11.3",
       "verdict": "C",
-      "justification": "Les formulaires permettent la modification et la récupération des données saisies via des champs visibles.",
+      "justification": "Les champs de même fonction répétés dans une page et dans l'ensemble de pages portent des étiquettes cohérentes, au sens du glossaire « Étiquettes cohérentes » (formulées sans ambiguïté pour que l'utilisateur sache que l'information demandée est la même). Test 11.3.1 (dans une même page) : sur contact-html, le SIRET est demandé deux fois et étiqueté « SIRET » aux deux endroits (dom.html:119 dans le formulaire de saisie, dom.html:130 dans le récapitulatif) ; les deux champs de date d'une même opération portent « Début de la migration » et « Fin souhaitée », qui se lisent comme les deux bornes d'un même intervalle ; les trois adresses électroniques de la page sont toutes libellées « Adresse e-mail … » et ne se distinguent que par leur usage. Test 11.3.2 (dans l'ensemble de pages) : la saisie d'une adresse électronique est libellée « Votre adresse e-mail » (accueil, inscription à l'infolettre), « Adresse e-mail de secours » et « Adresse e-mail de facturation » (contact) et « Adresse e-mail » (formulaire de connexion) — même formulation de base, qualificatif distinct pour chaque fonction distincte, jamais de synonyme concurrent (pas de « courriel » ici et « e-mail » là) ; le SIRET est libellé « SIRET » sur contact et « Numéro SIRET » dans le document encadré facturation.html, deux formulations qui désignent sans ambiguïté la même information ; le mot de passe est libellé « Mot de passe du compte » sur contact et « Mot de passe » sur le formulaire de connexion. Aucune paire de champs de même fonction ne reçoit d'étiquettes divergentes. Deux éléments de la moisson sortent du périmètre : le champ contact-html:29 (« societe ») n'a aucune étiquette, ce qui relève de 11.1 et non de la cohérence des étiquettes, et le bouton tarifs-html:116 (aria-label=\"Souscrire\" pour un texte visible « Demander un devis ») n'est pas un champ de saisie de formulaire au sens du glossaire — c'est un bouton, instruit par 11.9.",
       "citations": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
           "line": 99,
           "selector": "input#newsletter-email",
           "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" required=\"\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 40,
+          "selector": "input#courriel-secondaire",
+          "snippet": "<input id=\"courriel-secondaire\" name=\"email\" type=\"email\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 46,
+          "selector": "input#courriel-facturation",
+          "snippet": "<input id=\"courriel-facturation\" name=\"facturation\" type=\"text\" autocomplete=\"e-mail\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 104,
+          "selector": "input#debut",
+          "snippet": "<input id=\"debut\" type=\"date\" name=\"debut\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 106,
+          "selector": "input#fin",
+          "snippet": "<input id=\"fin\" type=\"date\" name=\"fin\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 112,
+          "selector": "input#motdepasse",
+          "snippet": "<input id=\"motdepasse\" type=\"password\" name=\"motdepasse\" autocomplete=\"off\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 119,
+          "selector": "input#siret",
+          "snippet": "<input id=\"siret\" name=\"siret\" type=\"text\" aria-invalid=\"true\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 130,
+          "selector": "input#recap-siret",
+          "snippet": "<input id=\"recap-siret\" type=\"text\" value=\"00000000000000\">"
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 21,
+          "selector": "input#email",
+          "snippet": "<input id=\"email\" name=\"email\" type=\"email\" autoComplete=\"email\" required />"
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 24,
+          "selector": "input#password",
+          "snippet": "<input id=\"password\" name=\"password\" type=\"password\" autoComplete=\"current-password\" required />"
+        },
+        {
+          "file": "tests/fixtures/realworld/embed/facturation.html",
+          "line": 13,
+          "selector": "input#siret",
+          "snippet": "<input type=\"text\" id=\"siret\" name=\"siret\" autocomplete=\"off\" /></p>"
         }
       ],
-      "evidenceFingerprint": "sha256:2e2132e9332aa0ad7ac95a85d5b6da2e",
+      "evidenceFingerprint": "sha256:044fb6034ea91ad83a854d539702fc38",
       "evidenceCount": 28,
-      "date": "2026-08-23",
+      "date": "2026-08-24",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.4",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 88,
+          "selector": "input#rappel-oui",
+          "snippet": "<input id=\"rappel-oui\" type=\"radio\" name=\"rappel\" value=\"oui\">",
+          "message": "Bouton radio dont l'étiquette « Oui » est placée visuellement à GAUCHE du champ. La géométrie mesurée sur la capture rendue (boxes.json de contact-html) donne le <label for=\"rappel-oui\"> à x=16..41, y=702 et le bouton radio à x=50, y=704 : même ligne, étiquette avant le contrôle. Le test 11.4.3 exige, pour un champ de type radio dont l'étiquette se lit de gauche à droite, que celle-ci soit accolée immédiatement AU-DESSOUS ou À DROITE du champ. Aucun des cas particuliers du critère ne s'applique : la page est intégralement en français (sens de lecture unique), les radios sont rendus en boutons radio natifs (13×13 px), et rien dans ce couple oui/non ne justifie une disposition dérogatoire. La conséquence est réelle : la séquence rendue « Oui ◯ Non ◯ » laisse penser que le radio suit l'étiquette qu'il précède. Correctif : placer chaque <label> après son <input type=\"radio\">.",
+          "normativeRef": "11.4.3",
+          "severity": "majeur"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 90,
+          "selector": "input#rappel-non",
+          "snippet": "<input id=\"rappel-non\" type=\"radio\" name=\"rappel\" value=\"non\">",
+          "message": "Même défaut sur le second radio du couple : <label for=\"rappel-non\"> mesuré à x=70..100, y=702 et le bouton radio à x=109, y=704 — étiquette à gauche du champ, alors que le test 11.4.3 impose au-dessous ou à droite pour un champ de type radio en lecture gauche-droite.",
+          "normativeRef": "11.4.3",
+          "severity": "majeur"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 96,
+          "selector": "input#canal-mail",
+          "snippet": "<input id=\"canal-mail\" type=\"radio\" name=\"canal\" value=\"mail\">",
+          "message": "Bouton radio du regroupement « canal » : <label for=\"canal-mail\">E-mail</label> mesuré à x=32..78, y=749 et le bouton radio à x=87, y=751 — étiquette accolée à gauche du champ, disposition interdite par le test 11.4.3 pour les champs de type radio en lecture gauche-droite.",
+          "normativeRef": "11.4.3",
+          "severity": "majeur"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 98,
+          "selector": "input#canal-tel",
+          "snippet": "<input id=\"canal-tel\" type=\"radio\" name=\"canal\" value=\"tel\">",
+          "message": "Second radio du même regroupement : <label for=\"canal-tel\">Téléphone</label> mesuré à x=107..182, y=749 et le bouton radio à x=192, y=751 — étiquette à gauche du champ, au lieu d'au-dessous ou à droite comme l'exige le test 11.4.3.",
+          "normativeRef": "11.4.3",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:024f68e19582d298798d623d5eb2a626",
+      "evidenceCount": 27,
+      "date": "2026-08-24",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.7",
+      "verdict": "C",
+      "justification": "Test 11.7.1 : le périmètre audité ne contient qu'un seul regroupement de champs de même nature doté d'une légende, et cette légende est pertinente. Il s'agit du <fieldset disabled> de contact-html (dom.html:125) dont la <legend>Récapitulatif</legend> (dom.html:126) titre les deux champs cités ci-dessous, « Société » et « SIRET » — un bloc d'identité de l'entreprise repris en fin de formulaire. L'intitulé « Récapitulatif » dit exactement ce qu'est ce groupe : le rappel des informations déjà saisies, et il le distingue sans ambiguïté du bloc de saisie qui le précède, où les mêmes deux informations sont demandées. La géométrie de la capture confirme que la légende est bien rendue en tête du groupe (x=32, y=918, juste au-dessus des deux champs à y=951). Les autres regroupements moissonnés sortent de la population du test, qui ne porte que sur les légendes existantes : le <fieldset> de contact-html:94 (radios « canal ») n'a AUCUNE légende — absence instruite par le test 11.6.1 — et le couple de radios « rappel » de contact-html:88/90 n'est enfermé dans aucun regroupement, ce qui relève du test 11.5.1. Aucune légende non pertinente n'existe donc dans le périmètre.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 128,
+          "selector": "input#recap-societe",
+          "snippet": "<input id=\"recap-societe\" type=\"text\" value=\"Orbit\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 130,
+          "selector": "input#recap-siret",
+          "snippet": "<input id=\"recap-siret\" type=\"text\" value=\"00000000000000\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 96,
+          "selector": "input#canal-mail",
+          "snippet": "<input id=\"canal-mail\" type=\"radio\" name=\"canal\" value=\"mail\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 98,
+          "selector": "input#canal-tel",
+          "snippet": "<input id=\"canal-tel\" type=\"radio\" name=\"canal\" value=\"tel\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 88,
+          "selector": "input#rappel-oui",
+          "snippet": "<input id=\"rappel-oui\" type=\"radio\" name=\"rappel\" value=\"oui\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 90,
+          "selector": "input#rappel-non",
+          "snippet": "<input id=\"rappel-non\" type=\"radio\" name=\"rappel\" value=\"non\">"
+        }
+      ],
+      "evidenceFingerprint": "sha256:b9956f22d25c083ec69b6294734e16b4",
+      "evidenceCount": 38,
+      "date": "2026-08-24",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.11",
+      "verdict": "C",
+      "justification": "Les deux tests portent sur les messages d'erreur de saisie retrouvables dans les documents audités. Le seul message d'erreur de saisie du périmètre est celui du champ SIRET (.ultra11y/pages/contact-html/dom.html:120) : « Le SIRET doit comporter quatorze chiffres. » Il énonce le type de donnée attendu (des chiffres) ET le format (quatorze caractères) — 11.11.1 est validé pour ce message. Le format étant univoque, un exemple de valeur n'est pas nécessaire au sens du « si nécessaire » de 11.11.2 ; le récapitulatif voisin affiche d'ailleurs une valeur de la forme attendue, à quatorze chiffres (dom.html:130). Les autres champs contraints reposent sur la validation native HTML5 — input#newsletter-email (type=email, required) sur accueil, et les champs email / mot de passe de LoginForm (type=email et type=password, required) — dont les messages d'aide à la saisie (« veuillez saisir une adresse e-mail valide ») sont explicitement admis par la note technique du critère comme suggestion du type et du format attendus. Aucun autre message d'erreur de saisie n'existe dans le périmètre : le seul autre texte de type « erreur » de contact-html est un message d'état de service (indisponibilité du service de tickets), qui ne concerne aucune saisie. Réserve non normative, qui n'établit aucun échec de test : le texte d'erreur dynamique de LoginForm (une chaîne d'état rendue dans un <p role=\"alert\">) n'est pas déterminable en source seule, ce composant n'ayant pas de capture rendue.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 120,
+          "selector": "span#siret-error.error-message",
+          "snippet": "<span class=\"error-message\" id=\"siret-error\">Le SIRET doit comporter quatorze chiffres.</span>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 119,
+          "selector": "input#siret",
+          "snippet": "<input id=\"siret\" name=\"siret\" type=\"text\" aria-invalid=\"true\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 130,
+          "selector": "input#recap-siret",
+          "snippet": "<input id=\"recap-siret\" type=\"text\" value=\"00000000000000\">"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 99,
+          "selector": "input#newsletter-email",
+          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" required=\"\">"
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 21,
+          "selector": "input#email",
+          "snippet": "<input id=\"email\" name=\"email\" type=\"email\" autoComplete=\"email\" required />"
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 24,
+          "selector": "input#password",
+          "snippet": "<input id=\"password\" name=\"password\" type=\"password\" autoComplete=\"current-password\" required />"
+        }
+      ],
+      "evidenceFingerprint": "sha256:58c4b350aa5549ae7ad0eb67131df570",
+      "evidenceCount": 29,
+      "date": "2026-08-24",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.12",
+      "verdict": "C",
+      "justification": "Deux formulaires du périmètre entrent dans le champ du critère, et chacun satisfait une des conditions alternatives des deux tests. (1) La suppression de compte (contact-html, action=\"/compte/suppression\") : sa validation supprime des données personnelles, et elle est subordonnée à un mécanisme de confirmation explicite réalisé PAR UN CHAMP DE FORMULAIRE — l'utilisateur doit saisir « SUPPRIMER » dans input#confirmation, étiqueté « Tapez SUPPRIMER pour confirmer » (.ultra11y/pages/contact-html/dom.html:167), avant que le bouton « Supprimer définitivement mon compte » n'ait d'effet. C'est la troisième condition de 11.12.1 (« mécanisme de confirmation explicite […] ou une étape supplémentaire », la méthodologie officielle donnant la case à cocher « par exemple ») et la seconde condition de 11.12.2 (« mécanisme de demande de confirmation explicite de la suppression […] via un champ de formulaire »). (2) Le formulaire de facturation encadré (tests/fixtures/realworld/embed/facturation.html:13, action=\"/facturation\", bouton « Mettre à jour ») modifie une donnée à caractère financier et juridique (le numéro SIRET) : le formulaire est lui-même, et en permanence, le mécanisme de modification de cette donnée — après validation, l'utilisateur rouvre la même page et re-soumet la valeur corrigée, ce qui remplit la première condition de 11.12.1 (« modifier […] les données après la validation du formulaire »). Les autres formulaires du périmètre ne modifient ni ne suppriment de données et n'emportent aucune conséquence financière, juridique, ni de test ou d'examen : /contact (envoi d'un message, avec de surcroît un récapitulatif des données saisies avant validation, dom.html:128 et :130), /newsletter (abonnement), /recherche (interrogation), et LoginForm (authentification) — ils sortent du champ du critère. Réserve hors critère : le piège au clavier porté par l'attribut onkeydown de input#confirmation relève de RGAA 12.9, pas de 11.12.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 167,
+          "selector": "input#confirmation",
+          "snippet": "<input id=\"confirmation\" name=\"confirmation\" type=\"text\" onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\">"
+        },
+        {
+          "file": "tests/fixtures/realworld/embed/facturation.html",
+          "line": 13,
+          "selector": "input#siret",
+          "snippet": "<input type=\"text\" id=\"siret\" name=\"siret\" autocomplete=\"off\" /></p>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 128,
+          "selector": "input#recap-societe",
+          "snippet": "<input id=\"recap-societe\" type=\"text\" value=\"Orbit\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 130,
+          "selector": "input#recap-siret",
+          "snippet": "<input id=\"recap-siret\" type=\"text\" value=\"00000000000000\">"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 29,
+          "selector": "input",
+          "snippet": "<input type=\"text\" name=\"societe\"></p>"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 99,
+          "selector": "input#newsletter-email",
+          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" required=\"\">"
+        },
+        {
+          "file": ".ultra11y/pages/recherche-html/dom.html",
+          "line": 33,
+          "selector": "input#requete",
+          "snippet": "<input id=\"requete\" name=\"q\" type=\"search\" tabindex=\"3\">"
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 21,
+          "selector": "input#email",
+          "snippet": "<input id=\"email\" name=\"email\" type=\"email\" autoComplete=\"email\" required />"
+        }
+      ],
+      "evidenceFingerprint": "sha256:58c4b350aa5549ae7ad0eb67131df570",
+      "evidenceCount": 29,
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
@@ -940,18 +1572,78 @@
     {
       "criteriaId": "12.11",
       "verdict": "C",
-      "justification": "Les contenus additionnels (tooltips) sont associés à des éléments clavier-accessible via aria-describedby sur des boutons.",
+      "justification": "Le test 12.11.1 ne porte que sur les contenus additionnels QUI CONTIENNENT des composants d'interface manipulables au clavier (la note technique donne l'exemple de l'infobulle proposant un lien). Le seul contenu additionnel du périmètre est l'infobulle #astuce-tls (.ultra11y/pages/accueil/dom.html:80), révélée par la règle « .astuce:hover .astuce-contenu { display: block } » de la feuille liée en accueil/dom.html:7 (tests/fixtures/realworld/styles.css) — c'est le seul sélecteur :hover révélant du contenu de tout le périmètre. Son contenu est exclusivement textuel (« Un certificat TLS chiffre le trafic entre le visiteur et votre site. ») : il ne comporte aucun lien, aucun bouton, aucun champ, donc aucun composant d'interface à atteindre au clavier — le test est validé pour ce contenu. Son déclencheur est de surcroît un <button> natif, atteignable au clavier (dom.html:79). Les autres évidences moissonnées ne portent pas le sujet du critère : le div role=\"button\" tabindex=\"0\" aria-expanded (cadres-html/dom.html:57) est focusable et ne révèle aucun contenu dans la page ; le div onclick=\"ouvrirAssistance()\" (contact-html/dom.html:139) n'ouvre aucun contenu additionnel — la fonction n'est définie nulle part et aucune page du périmètre ne contient de <script> —, son inopérabilité au clavier relevant de RGAA 7.3 ; l'<object> (accueil/dom.html:65) et les deux <iframe> (cadres-html/dom.html:27 et :31) concernent la sortie du focus d'un contenu embarqué, soit RGAA 12.9 ; les preventDefault (contact-html/dom.html:167 et LoginForm.tsx:16) relèvent respectivement du piège au clavier (12.9) et de la soumission d'un formulaire, non d'un contenu additionnel. Enfin, le fait que l'infobulle n'apparaisse pas à la prise de focus et ne se masque pas avec Échap — mesuré par la sonde hover de la capture accueil — relève de RGAA 10.13, hors du champ de 12.11.",
       "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 80,
+          "selector": "span#astuce-tls.astuce-contenu",
+          "snippet": "<span role=\"tooltip\" id=\"astuce-tls\" class=\"astuce-contenu\">"
+        },
         {
           "file": ".ultra11y/pages/accueil/dom.html",
           "line": 79,
           "selector": "button",
-          "snippet": "<button type=\"button\" aria-describedby=\"astuce-tls\">Qu'est-ce que le TLS ?</button>"
+          "snippet": "<button type=\"button\" aria-describedby=\"astuce-tls\">Qu’est-ce que le TLS ?</button>"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 7,
+          "selector": "link",
+          "snippet": "<link rel=\"stylesheet\" href=\"/styles.css\">"
+        },
+        {
+          "file": ".ultra11y/pages/cadres-html/dom.html",
+          "line": 57,
+          "selector": "div",
+          "snippet": "<div role=\"button\" tabindex=\"0\" aria-expanded=\"yes\">Afficher les options avancées</div>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 139,
+          "selector": "div",
+          "snippet": "<div onclick=\"ouvrirAssistance()\">Ouvrir une demande d’assistance</div>"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 65,
+          "selector": "object",
+          "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>"
+        },
+        {
+          "file": ".ultra11y/pages/cadres-html/dom.html",
+          "line": 27,
+          "selector": "iframe",
+          "snippet": "<iframe src=\"/embed/disponibilite.html\" width=\"600\" height=\"300\"></iframe>"
+        },
+        {
+          "file": ".ultra11y/pages/cadres-html/dom.html",
+          "line": 31,
+          "selector": "iframe",
+          "snippet": "<iframe src=\"/embed/facturation.html\" width=\"600\" height=\"400\"></iframe>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 167,
+          "selector": "handler",
+          "snippet": "<input id=\"confirmation\" name=\"confirmation\" type=\"text\" onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\">"
+        },
+        {
+          "file": "tests/fixtures/realworld/LoginForm.tsx",
+          "line": 16,
+          "selector": "handler",
+          "snippet": "e.preventDefault();"
+        },
+        {
+          "file": "tests/fixtures/realworld/contact.html",
+          "line": 179,
+          "selector": "handler",
+          "snippet": "onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\""
         }
       ],
-      "evidenceFingerprint": "sha256:789ac60c8f090fb3d4aaa5e8b55d740b",
+      "evidenceFingerprint": "sha256:41bbca2186a29d42e0d2fb7bffab39b2",
       "evidenceCount": 11,
-      "date": "2026-08-23",
+      "date": "2026-08-24",
       "decidedBy": "agent"
     },
     {
