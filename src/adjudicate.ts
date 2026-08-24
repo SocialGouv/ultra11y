@@ -793,6 +793,27 @@ export function applyAdjudication(
   let scopeCache: Set<string> | undefined;
   const { citationDrift } = adjudicationLimits(opts.cwd);
   const scopeFiles = (): Set<string> => (scopeCache ??= auditFiles(audit, opts.cwd));
+  // Which pack criteria the ENGINE already ruled non-conformant, indexed by the exact anchor
+  // it ruled them on. Memoised: only an NC on a criterion that HAS a mechanical neighbour ever
+  // asks for it, which is a minority of a worklist. `agent:` findings are excluded on purpose
+  // — this asks what the deterministic engine established, not what a previous pass claimed.
+  let engineNcCache: Map<string, Set<string>> | undefined;
+  const engineNcAt = (key: string): ReadonlySet<string> => {
+    if (!engineNcCache) {
+      engineNcCache = new Map();
+      if (!isCore(adj.standard)) {
+        for (const pc of derivePackResults(audit, adj.standard)) {
+          if (pc.status !== "NC") continue;
+          for (const f of pc.findings) {
+            if (f.advisory || f.ruleId.startsWith("agent:")) continue;
+            const k = anchorKey(f.file, f.line, f.selectorHint);
+            (engineNcCache.get(k) ?? engineNcCache.set(k, new Set()).get(k)!).add(pc.id);
+          }
+        }
+      }
+    }
+    return engineNcCache.get(key) ?? EMPTY_IDS;
+  };
   const toGround = (
     criteriaId: string,
     g: { file: string; line: number; selector?: string; snippet?: string },
@@ -960,6 +981,38 @@ export function applyAdjudication(
               ? `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" does not resolve to a test of ${adj.standard} (fabricated?)`
               : `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" is not a test of ${adj.standard} ${it.criteriaId} — cite one of its own tests (e.g. "${it.criteriaId}.1"); a WCAG id looks alike but denotes an unrelated test`,
           );
+        }
+        // THE SAME DEFECT, CHARGED TWICE.
+        //
+        // A field with no label is RGAA 11.1's non-conformity, and the engine finds it with no
+        // model in the loop. 11.2 asks whether the label is RELEVANT, and every one of its six
+        // tests opens on a label that exists — so on that field it has no subject, and « no
+        // label here » filed under 11.2 is the neighbour's finding wearing the wrong number.
+        // The gate above cannot see it: 11.2.1 really is a test of 11.2, and the citation
+        // really does ground.
+        //
+        // Narrow on purpose, and this is the one check here that could refuse a true finding.
+        // It fires only when all three hold: the criterion under verdict has a MECHANICAL
+        // neighbour (`siblingCriteria` — same theme, shared success criterion, opposite side of
+        // the line, which by construction means this criterion carries no engine rule of its
+        // own), the engine has already ruled that neighbour non-conformant, and the anchor is
+        // literally the same file, line and selector. Two criteria failing the same element for
+        // genuinely different reasons keep different anchors, or the neighbour is not
+        // mechanical, and neither reaches here.
+        //
+        // Refused per verdict like everything else: the criterion returns to « to assess »
+        // carrying the reason, naming the neighbour, so the next pass can file it correctly.
+        if (!isCore(adj.standard) && f.file?.trim()) {
+          const mechanical = siblingCriteria(loadPack(adj.standard), it.criteriaId).filter((sib) => sib.role === "mechanical");
+          if (mechanical.length) {
+            const owners = engineNcAt(anchorKey(f.file, f.line, f.selector ?? ""));
+            const clash = mechanical.find((sib) => owners.has(sib.id));
+            if (clash)
+              blame(
+                it.criteriaId,
+                `criterion ${it.criteriaId}: this anchor (${f.file}:${f.line}) is already the engine's non-conformity on ${adj.standard} ${clash.id} — « ${clash.title} ». ${it.criteriaId} asks the NEXT question about the same subject and presupposes it is there, so on this element it is not non-conformant: it has no subject. Report it on ${clash.id} (the engine already did), or rule ${it.criteriaId} on a different element.`,
+              );
+          }
         }
         toGround(it.criteriaId, { file: f.file, line: f.line, selector: f.selector, snippet: f.snippet });
       }
@@ -1223,6 +1276,15 @@ export function agentSeverity(v: unknown, advisory: boolean): Severity {
   if (v === "minor") return "mineur";
   return advisory ? "mineur" : NC_SEVERITY_DEFAULT;
 }
+
+/** One element, keyed the way the double-charge check compares them: file, line and selector,
+ *  all three, trimmed. Deliberately EXACT — a looser key (file+line alone) would refuse two
+ *  criteria that legitimately fail different aspects of one line, and this check's whole
+ *  licence to refuse a verdict rests on the anchors being literally the same. */
+const anchorKey = (file: string, line: number, selector: string): string => `${file.trim()}|${line}|${selector.trim()}`;
+
+/** Shared empty set, so the memoised lookup never allocates on the common miss. */
+const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
 
 /** The anchors a `C`/`NA` was settled on, narrowed to what the audit document persists.
  *
