@@ -134,7 +134,7 @@ describe("the two new declarative rules", () => {
 });
 
 describe("the work that is NOT a non-conformity is still shown", () => {
-  // 99 of RGAA's 106 criteria can only derive `manual`. The report listed them one bare line
+  // 57 of RGAA's 106 criteria are judgment-tier and can only derive `manual`. The report listed them one bare line
   // each, and the PRD skipped them entirely (`if (!pr.findings.length) continue`) — so the
   // backlog of an RGAA audit was silently missing ~93% of the job.
   const r = () => runAudit({ inputs: [PAGE] });

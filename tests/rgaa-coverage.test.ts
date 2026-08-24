@@ -16,9 +16,9 @@ import { getSC } from "../src/wcag.js";
 const pack = loadPack("rgaa");
 const withRules = pack.criteria.filter((c) => (c.appliesTo?.ruleIds.length ?? 0) > 0);
 
-// Measured before the rendered tier landed: 43 of 106. Raise this line when coverage grows;
-// never lower it.
-const FLOOR = 49;
+// Measured before the rendered tier landed: 43 of 106; 51 today. Raise this line when coverage
+// grows — it had two notches of lag, which is a ratchet that had stopped ratcheting. Never lower it.
+const FLOOR = 51;
 
 describe("how much of RGAA the engine can evidence", () => {
   it(`maps at least ${FLOOR} of the ${pack.criteria.length} criteria onto an engine rule`, () => {

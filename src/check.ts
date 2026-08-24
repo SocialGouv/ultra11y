@@ -461,6 +461,14 @@ export interface DecidedResult {
    *  the RUN and open on a page — that is the normal shape of a per-page norm, and it is
    *  exactly what a page-by-page deliverable is judged on. */
   pages?: { id: string; name: string; undecided: string[] }[];
+  /** WHO SETTLED THE STANDARD, this run — the answer to « did all 106 actually run? ».
+   *
+   *  The question has been asked by hand every time, by counting ledger entries against a
+   *  worklist, and the hand count answers the wrong thing: a criterion the static engine
+   *  decided never appears in either. The split says it directly, and it is the number worth
+   *  watching between runs — every criterion that moves from `agent` to `engine` or `scan` is
+   *  one the pass no longer pays a model to read. */
+  provenance: { total: number; engine: number; scan: number; agent: number; declared: number; undecided: number };
 }
 
 export function isUndecidedFile(v: unknown): v is UndecidedFile {
@@ -476,8 +484,8 @@ export function checkDecided(
 ): DecidedResult {
   const fr = lang === "fr";
   const rows = isCore(standard)
-    ? audit.criteria.map((c) => ({ id: c.id, status: c.status }))
-    : derivePackResults(audit, standard).map((c) => ({ id: c.id, status: c.status }));
+    ? audit.criteria.map((c) => ({ id: c.id, status: c.status, decidedBy: c.decidedBy }))
+    : derivePackResults(audit, standard).map((c) => ({ id: c.id, status: c.status, decidedBy: c.decidedBy }));
   const issues: string[] = [];
 
   const declared = new Map<string, UndecidedAllowance>();
@@ -563,7 +571,19 @@ export function checkDecided(
         : `Page “${p.name}”: ${own.length} criterion(ia) still to assess — ${own.join(", ")}.`,
     );
   }
-  return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length, ...(pages ? { pages } : {}) };
+  // A criterion is counted exactly once, and `manual` wins over its provenance: a still-open
+  // criterion recorded as agent-decided (the shape a refused verdict leaves behind) is open,
+  // not adjudicated, and counting it under `agent` would be the laundering the gate refuses.
+  const settled = rows.filter((r) => r.status !== "manual");
+  const provenance = {
+    total: rows.length,
+    engine: settled.filter((r) => r.decidedBy === undefined || r.decidedBy === "engine").length,
+    scan: settled.filter((r) => r.decidedBy === "scan").length,
+    agent: settled.filter((r) => r.decidedBy === "agent").length,
+    declared: allowed.length,
+    undecided: undecided.length,
+  };
+  return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length, provenance, ...(pages ? { pages } : {}) };
 }
 
 export interface RenderedCoverage {

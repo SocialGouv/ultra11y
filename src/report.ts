@@ -617,7 +617,7 @@ function render(
   out.push(na.length ? na.map((x) => `- ${x.label}${x.justification ? ` — _${x.justification}_` : ""}`).join("\n") : s.nothing, "");
 
   // 5. manual worklist. Under a country standard this is where nearly the whole audit lives
-  // (99 of RGAA's 106 criteria can only ever derive `manual`), so a bare label per line hid
+  // (57 of RGAA's 106 criteria can only ever derive `manual`), so a bare label per line hid
   // the actual work. Name the criterion's own numbered tests: that is what has to be ruled
   // on, and what `verify --manual` hands the agent.
   out.push(`## ${s.manualTitle}`, "", `> ${s.manualWarn}`, "");

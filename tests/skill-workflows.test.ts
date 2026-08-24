@@ -159,7 +159,7 @@ describe("pages.md teaches page snapshots", () => {
     expect(t).toContain("rendered-link-colour-only");
     expect(t).toContain("10.6");
     expect(t).toMatch(/I don't know|I don’t know/i);
-    expect(t).toMatch(/48 of 106/);
+    expect(t).toMatch(/51 of 106/);
     expect(t).toContain("rendered-nontext-contrast");
     expect(t).toMatch(/could not look/i);
   });

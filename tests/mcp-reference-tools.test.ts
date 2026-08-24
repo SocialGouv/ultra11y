@@ -137,10 +137,15 @@ describe("ultra11y_method", () => {
     expect(r.coverageNote).toMatch(/untested, never conformant/);
   });
 
+  // Was pinned on `out-of-scope` and RGAA 8.1, which is no longer out of scope: the plan's
+  // predicate now carries the same pack-rule exemption the projection has, so 8.1 is decided by
+  // `pack:rgaa:doctype-missing` on both sides instead of being unmeasurable on one.
   it("filters to one tier, and explains itself at detail: full", async () => {
-    const r = await j("ultra11y_method", { standard: "rgaa", tier: "out-of-scope", detail: "full" });
+    const r = await j("ultra11y_method", { standard: "rgaa", tier: "judgment", detail: "full" });
     expect(r.buckets).toHaveLength(1);
-    expect(r.buckets[0].criteria.map((c: { id: string }) => c.id)).toEqual(["8.1"]);
+    const ids = r.buckets[0].criteria.map((c: { id: string }) => c.id);
+    expect(ids.length).toBe(57);
+    expect(ids).toContain("11.2");
     expect(r.buckets[0].criteria[0].why).toBeTruthy();
     expect(r.buckets[0].criteria[0].title).toBeTruthy();
   });

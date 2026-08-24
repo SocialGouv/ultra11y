@@ -531,8 +531,9 @@ export interface PageResult {
 }
 
 // ---- adjudication under a COUNTRY STANDARD ------------------------------------------------
-// An AuditResult is WCAG-keyed by construction and a pack is a derived projection. But 99 of
-// RGAA's 106 criteria can only ever derive `manual`, so almost the whole standard is settled
+// An AuditResult is WCAG-keyed by construction and a pack is a derived projection. But 57 of
+// RGAA's 106 criteria are judgment-tier and can only ever derive `manual`, so much of the
+// standard — and, on a run with no captures, nearly all of it — is settled
 // by the agent — at the PACK's granularity, which is finer than WCAG's (1.1.1 alone fans out
 // to 19 RGAA criteria). Folding those verdicts onto the WCAG criteria would make several RGAA
 // criteria overwrite one another on a shared success criterion, so they are recorded here

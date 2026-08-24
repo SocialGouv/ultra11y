@@ -375,7 +375,7 @@ export function acceptanceCriteria(unit: PrdUnit, standard: StandardId, lang: La
  *  tool must never do. This is a separate section listing what has to be decided, and the
  *  numbered tests to decide it against.
  *
- *  It matters because 99 of RGAA's 106 criteria can only ever derive `manual`: without this
+ *  It matters because 57 of RGAA's 106 criteria are judgment-tier and can only ever derive `manual`: without this
  *  the backlog of an RGAA audit was silently missing ~93% of the job. */
 export function toRuleOnSection(r: AuditResult, standard: StandardId, lang: Lang): string[] {
   if (isCore(standard)) return [];

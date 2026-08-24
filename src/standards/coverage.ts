@@ -10,7 +10,7 @@
 //   - `automatability` per WCAG success criterion (src/data/wcag.json): 3 static,
 //     14 needs-rendering, 38 judgment — the 3/14/38 arithmetic quoted across the tool.
 //   - `appliesTo.ruleIds` per pack criterion: which engine rules can evidence it. EMPTY is
-//     a statement, not a gap — 56 of RGAA's 106 criteria say "no engine rule can attest
+//     a statement, not a gap — 55 of RGAA's 106 criteria say "no engine rule can attest
 //     this", and that fact is the single most useful thing in an audit plan.
 //   - `judgment: true` per pack criterion: the criterion asks more than its mapped SCs, so
 //     `judgmentGuard` in derive.ts refuses to let it inherit a Conforming verdict.
@@ -139,7 +139,16 @@ function coreCoverage(sc: string): Coverage | undefined {
  * projection files as out of scope must be the one the plan files as out of scope, or the
  * plan is telling the auditor to gather evidence for a verdict that can never be rendered.
  */
-function outOfCore(pc: PackCriterion): boolean {
+function outOfCore(pack: StandardPack, pc: PackCriterion): boolean {
+  // …INCLUDING THE EXEMPTION derive.ts carries, which this had stopped mirroring. A pack may
+  // ship its own declarative rules, and one of them can decide a criterion whose whole WCAG
+  // mapping is outside the core. RGAA 8.1 is that criterion: it maps only onto the REMOVED
+  // 4.1.1, so the plan filed it « out of scope » — while the projection decided it from this
+  // pack's own `doctype-missing` rule, reading the doctype off every capture. The plan was
+  // telling an auditor not to bother gathering evidence for a verdict the tool was already
+  // rendering, which is the exact drift the comment above forbids.
+  const ownRuleIds = new Set((pack.rules ?? []).map((r) => `pack:${pack.key}:${r.id}`));
+  if ((pc.appliesTo?.ruleIds ?? []).some((id) => ownRuleIds.has(id))) return false;
   return pc.wcag.every((sc) => {
     const s = knownScStatus(sc);
     return s === "out-of-core" || s === "removed";
@@ -147,7 +156,7 @@ function outOfCore(pc: PackCriterion): boolean {
 }
 
 function packCoverage(pack: StandardPack, pc: PackCriterion): Coverage {
-  if (outOfCore(pc)) {
+  if (outOfCore(pack, pc)) {
     return {
       tier: "out-of-scope",
       sourceIsEnough: false,

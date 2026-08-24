@@ -2780,6 +2780,17 @@ function cmdCheck(p: ParsedArgs): number {
             ? `✓ Grille complète : les ${decided.total} critères portent un verdict${allowedNote}.`
             : `✓ Complete grid: all ${decided.total} criteria carry a verdict${allowedNote}.`,
         );
+      // WHO SETTLED THEM — printed green OR red, because the question « did all 106 run? » is
+      // asked of both outcomes and was until now answered by hand, by counting ledger entries
+      // against a worklist. That hand count answers the wrong thing: a criterion the static
+      // engine decided appears in neither. It is also the number to watch between runs — every
+      // criterion that moves from `agent` to `engine` or `scan` is one nobody pays a model for.
+      const pv = decided.provenance;
+      console.log(
+        lang === "fr"
+          ? `  ${pv.total} critères — ${pv.engine} moteur, ${pv.scan} mesure (scan), ${pv.agent} agent, ${pv.declared} déclaré(s) indécidable(s), ${pv.undecided} sans verdict.`
+          : `  ${pv.total} criteria — ${pv.engine} engine, ${pv.scan} measured (scan), ${pv.agent} agent, ${pv.declared} declared undecidable, ${pv.undecided} with no verdict.`,
+      );
     }
     if (covered?.ok) {
       // Green or red, say what it engaged on — a gate that reports only its failures cannot be

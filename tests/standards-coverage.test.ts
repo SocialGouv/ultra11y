@@ -55,11 +55,26 @@ describe("the WCAG census reproduces the coverage arithmetic the tool quotes eve
 });
 
 describe("a pack criterion is classified from what the pack declares", () => {
-  it("files RGAA 8.1 — and only 8.1 — as out of engine scope", () => {
-    // Its only WCAG mapping is 4.1.1 Parsing, which WCAG 2.2 removed. Same predicate as
-    // derivePackResults, so the plan and the projection cannot disagree.
-    const out = [...standardCoverage("rgaa")].filter(([, c]) => c.tier === "out-of-scope").map(([id]) => id);
-    expect(out).toEqual(["8.1"]);
+  // THE PLAN AND THE PROJECTION MUST AGREE, and for a while they did not. `derivePackResults`
+  // grew an exemption the moment a pack could ship its own declarative rules — a criterion whose
+  // whole WCAG mapping is outside the core is still decidable when one of the PACK's rules
+  // applies to it — and this predicate never grew it. RGAA 8.1 is the case: it maps only onto
+  // the REMOVED 4.1.1, so the plan filed it « out of scope » while the projection was deciding
+  // it from `pack:rgaa:doctype-missing`, reading the doctype off every capture. An auditor
+  // reading the plan was told not to bother gathering evidence for a verdict the tool rendered.
+  it("agrees with the projection on what is out of engine scope, criterion by criterion", () => {
+    const pack = loadPack("rgaa");
+    const ownRuleIds = new Set((pack.rules ?? []).map((r) => `pack:${pack.key}:${r.id}`));
+    for (const [id, cov] of standardCoverage("rgaa")) {
+      const pc = allCriteria(pack).find((c) => c.id === id)!;
+      const decidableByOwnRule = (pc.appliesTo?.ruleIds ?? []).some((r) => ownRuleIds.has(r));
+      if (cov.tier === "out-of-scope") expect(decidableByOwnRule, `${id} is filed out of scope but a pack rule decides it`).toBe(false);
+    }
+  });
+
+  it("no longer files 8.1 out of scope — the pack's own doctype rule decides it", () => {
+    expect(criterionCoverage("rgaa", "8.1")?.tier).not.toBe("out-of-scope");
+    expect(criterionCoverage("rgaa", "8.1")?.engineRules).toContain("pack:rgaa:doctype-missing");
   });
 
   it("never claims source is enough for a criterion the pack says no rule can evidence", () => {

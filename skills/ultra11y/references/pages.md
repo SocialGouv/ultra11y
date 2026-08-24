@@ -158,7 +158,7 @@ adding this tier cannot change a single pre-existing verdict.
 
 ### How much of RGAA the engine can evidence
 
-`tests/rgaa-coverage.test.ts` pins the number and ratchets it: **48 of 106** criteria map onto
+`tests/rgaa-coverage.test.ts` pins the number and ratchets it: **51 of 106** criteria map onto
 an engine rule, up from 43 before this tier — the rendered rules plus two declarative pack
 rules (`optgroup` without `label`, an invalid `dir` value). It can only go up — a refactor that silently
 unmaps a criterion fails CI rather than quietly shrinking the audit. Criteria nothing can

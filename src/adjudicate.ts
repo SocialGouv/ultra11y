@@ -376,7 +376,7 @@ function subjectsForPackCriterion(standard: StandardId, id: string, scs: string[
  *  For the WCAG core: one item per residual-risk (manual) success criterion.
  *
  *  For a COUNTRY STANDARD: one item per PACK criterion that derives `manual` — which is where
- *  almost the whole standard lives (99 of RGAA's 106 criteria can only ever derive `manual`).
+ *  almost the whole standard lives (57 of RGAA's 106 criteria can only ever derive `manual`).
  *  Keying by the pack's own criteria is not cosmetic: it is what lets an item carry the
  *  criterion's numbered tests, and therefore what lets `normativeRefResolves` check a citation
  *  against THIS criterion's tests instead of accepting any id of the right shape. */
