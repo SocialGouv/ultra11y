@@ -262,6 +262,16 @@ export interface Finding {
   // back to the English `message` bake. Keyed by the UI frame's `Lang` (fr|en). Optional/
   // additive (no SCHEMA_VERSION bump) — absent ⇒ resolve via `msg`/baked strings as before.
   i18n?: { message: Partial<Record<Lang, string>>; remediation: Partial<Record<Lang, string>> };
+  // THE PRECISE NORMATIVE TEST THIS FINDING FAILS — a pack test id under a pack standard
+  // (RGAA "11.1.2"), a WCAG SC id for the core. Set on an agent-declared non-conformity,
+  // where `applyAdjudication` has already REFUSED the verdict unless it resolves to a test
+  // of the adjudicated criterion (`normativeRefResolves`). Deliverables print this test
+  // instead of enumerating every test of the criterion: an RGAA non-conformity is a claim
+  // about one numbered test, and « 11.1.1 · 11.1.2 · 11.1.3 » under a finding that failed
+  // only 11.1.2 overstates what was observed. Optional/additive (no SCHEMA_VERSION bump) —
+  // absent ⇒ renderers fall back to the criterion's full test list, so a ledger recorded
+  // before this field existed still renders exactly as it did.
+  normativeRef?: string;
   // Set when this finding was projected onto a pack criterion via an opt-in SECONDARY
   // crosswalk mapping (src/standards/types.ts SecondaryMapping) — an additional criterion
   // whose official WCAG mapping does NOT contain the finding's SC, an explicit,
@@ -273,12 +283,37 @@ export interface Finding {
   secondary?: { note?: string };
 }
 
+/** ONE ANCHOR A VERDICT WAS SETTLED ON — the evidence an agent cleared a criterion on for a
+ *  `C`, or ruled out of scope for an `NA`.
+ *
+ *  Structurally a prefix of the adjudication engine's `Evidence` (src/adjudicate.ts), and
+ *  deliberately not that type: this lives on the audit DOCUMENT, which is read by renderers
+ *  and by `verify`, and none of them should have to import the adjudication engine to read a
+ *  file and a line. The harvester's own bookkeeping (`occurrences`, `alsoAt`, `pages`) is not
+ *  copied — it describes the evidence class the citation was drawn from, not the claim.
+ *
+ *  It is what a second reader needs and the whole reason it is persisted: refuting a
+ *  conformity means opening these anchors and asking whether they ESTABLISH the criterion or
+ *  merely show that its subject exists. */
+export interface CriterionCitation {
+  file: string;
+  line: number;
+  selector: string;
+  snippet: string;
+  note?: string;
+}
+
 export interface CriterionResult {
   id: string; // WCAG success-criterion id, e.g. "1.4.3"
   guideline: string; // WCAG guideline this SC belongs to, e.g. "1.4"
   status: Status;
   findings: Finding[];
   justification?: string;
+  /** The evidence an AGENT verdict was settled on — required by the fold for `C` and `NA`,
+   *  and persisted here so `verify --report` can put the claim on trial without a ledger.
+   *  Absent on an engine-decided criterion, which is recomputed from source on every run and
+   *  is not a judgement anyone recorded. Optional/additive (no SCHEMA_VERSION bump). */
+  citations?: CriterionCitation[];
   // Who decided this criterion's status. Absent = the deterministic engine (the default
   // for every audit). "agent" = an AI adjudication of a formerly-`manual` judgment/
   // rendering criterion, recorded via `verify --manual` → `verify --apply` (each carries a
@@ -508,6 +543,9 @@ export interface PackCriterionAdjudication {
   justification?: string; // REQUIRED for C and NA
   reason?: "needs-rendered-dom" | "undecidable"; // REQUIRED for a still-manual verdict
   findings: Finding[]; // REQUIRED (≥1, groundable, each citing a test OF THIS CRITERION) for NC
+  /** The evidence this verdict was settled on — the fold requires it for `C` and `NA`. See
+   *  CriterionCitation: it is what lets `verify --report` attack the claim with no ledger. */
+  citations?: CriterionCitation[];
   // Absent when the partial fold REFUSED this criterion's verdict: the entry then exists only
   // to carry the refusal as the criterion's `justification`, and claiming the agent decided it
   // would be the exact laundering the gate just prevented. Present ("agent") on every verdict

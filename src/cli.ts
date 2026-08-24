@@ -41,7 +41,7 @@ import { discover } from "./discover.js";
 import { toPosix, GRAPH_ONLY_EXT } from "./glob.js";
 import { runCriteria, renderCriteriaReference } from "./criteria.js";
 import { checkSampleCaptured, checkDecided, checkRendered, checkReport, checkSemantic, isUndecidedFile, type UndecidedFile } from "./check.js";
-import { buildWorklist, buildConformityWorklist, writeWorklist, applyVerdicts, VERIFY_MAX, type ConformityClaim, type VerifyItem } from "./verify.js";
+import { buildWorklist, buildConformityWorklist, conformityClaimsFromAudit, writeWorklist, applyVerdicts, VERIFY_MAX, type ConformityClaim, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import {
   buildAdjudicationWorklist,
@@ -3034,14 +3034,21 @@ function conformityClaimsFor(p: ParsedArgs, standard: StandardId, lang: Lang): C
   const named = typeof p.flags.conformities === "string" && p.flags.conformities ? p.flags.conformities : undefined;
   const path = named ?? ledgerPath(standard);
   if (!existsSync(path)) {
-    // Silent when nobody asked for a specific file — most runs have no ledger and want no
-    // noise. Loud when a path WAS named, because a typo there would otherwise verify nothing
-    // and report success.
-    if (named)
+    // Loud when a path WAS named, because a typo there would otherwise verify nothing and
+    // report success — and then stop, rather than quietly verifying a different source than
+    // the one asked for.
+    if (named) {
       console.error(
         lang === "fr" ? `ultra11y verify : fichier --conformities introuvable : ${named}.` : `ultra11y verify: --conformities file not found: ${named}.`,
       );
-    return [];
+      return [];
+    }
+    // NO LEDGER — fall back to the audit itself, which now carries the citations each agent
+    // verdict was settled on. This used to return nothing, and « nothing » is what made the
+    // conformity trial silently optional: `judge --apply` without `--ledger` produced an audit
+    // whose every `C` was beyond reach of a second reader, which is exactly the run a cheap
+    // adjudicator makes dangerous.
+    return claimsFromAudit(p, standard, lang);
   }
   try {
     const parsed = JSON.parse(readText(path)) as { entries?: ConformityClaim[]; items?: ConformityClaim[] };
@@ -3055,6 +3062,30 @@ function conformityClaimsFor(p: ParsedArgs, standard: StandardId, lang: Lang): C
           ? `ultra11y verify : le fichier --conformities n'est pas du JSON valide : ${named}.`
           : `ultra11y verify: --conformities file is not valid JSON: ${named}.`,
       );
+    return [];
+  }
+}
+
+/** The claimed conformities carried by the audit under `--in`, for a run that recorded no
+ *  ledger. Silent on every failure that is not a real problem — no `--in` (the `--report`
+ *  path does not require one), `-` for stdin (already consumed), an unreadable or non-JSON
+ *  file: the caller is verifying non-conformities either way, and a noisy warning here would
+ *  fire on every ordinary `verify --report <md>`. A malformed `--in` that matters is reported
+ *  by the command that actually reads it. */
+function claimsFromAudit(p: ParsedArgs, standard: StandardId, lang: Lang): ConformityClaim[] {
+  const inFlag = p.flags.in;
+  if (typeof inFlag !== "string" || !inFlag || inFlag === "-") return [];
+  try {
+    const audit = JSON.parse(readText(inFlag)) as AuditResult;
+    const claims = conformityClaimsFromAudit(audit, standard);
+    if (claims.length)
+      console.error(
+        lang === "fr"
+          ? `ultra11y verify : aucun registre — ${claims.length} conformité(s) revendiquée(s) lues dans ${inFlag}.`
+          : `ultra11y verify: no ledger — ${claims.length} claimed conformity(ies) read from ${inFlag}.`,
+      );
+    return claims;
+  } catch {
     return [];
   }
 }

@@ -71,6 +71,34 @@ export function packTests(pack: StandardPack, id: string): { id: string; wording
   }));
 }
 
+/** The criterion's tests NARROWED to the ones a set of findings actually cited — the subset a
+ *  non-conformity is a claim about, rather than everything the criterion could have been
+ *  failed on.
+ *
+ *  `refs` are raw `normativeRef` strings, taken from the findings by the caller: this stays a
+ *  pure function over the pack, so a renderer can call it without the pack module learning
+ *  what a `Finding` is.
+ *
+ *  IT FALLS BACK TO THE FULL LIST, and the fallback is the point. Three inputs mean « the
+ *  citation does not narrow anything » and must render exactly as they did before this
+ *  function existed: no references at all (an engine finding, or a ledger recorded before
+ *  `normativeRef` was carried), a reference naming the CRITERION rather than one of its tests
+ *  (`11.1`, which the gate also accepts), and a reference belonging to another criterion —
+ *  the gate refuses those at the fold, so one reaching a renderer means the data predates the
+ *  gate, and silently printing an empty test list would be worse than printing all of them.
+ *  Order and duplicates come from the pack, never from the citation order. */
+export function packTestsCited(pack: StandardPack, id: string, refs: readonly (string | undefined)[]): { id: string; wording: string }[] {
+  const all = packTests(pack, id);
+  const own = new Set(all.map((t) => t.id));
+  const cited = new Set(refs.map((r) => (r ?? "").trim()).filter((r) => own.has(r)));
+  return cited.size ? all.filter((t) => cited.has(t.id)) : all;
+}
+
+/** `packTestsCited` reduced to ids — the shape the auditor block and the report print. */
+export function packTestIdsCited(pack: StandardPack, id: string, refs: readonly (string | undefined)[]): string[] {
+  return packTestsCited(pack, id, refs).map((t) => t.id);
+}
+
 /** Where the standard publishes this criterion, from the pack's `criterionUrl` template.
  *  Undefined when the pack declares none — the engine never guesses a URL for a standard. */
 export function criterionUrl(pack: StandardPack, id: string): string | undefined {

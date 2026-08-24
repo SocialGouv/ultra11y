@@ -11,7 +11,7 @@ import type { AuditResult, Finding, Lang, Severity } from "./types.js";
 import { prdUnits, partitionUnits, effortOf, guidanceFor, guidanceExampleBlock, acceptanceCriteria, type PrdUnit, type PrdFile } from "./prd.js";
 import { getSC, guidelineTitle, principleTitle, techniques as scTechniques } from "./wcag.js";
 import { resolveMessage, resolveRemediation, resolveNote } from "./messages.js";
-import { type StandardId, isCore, loadPack, packTestIds, standardLabel, themeName, vocabularyFor } from "./standards/index.js";
+import { type StandardId, isCore, loadPack, packTestIdsCited, standardLabel, themeName, vocabularyFor } from "./standards/index.js";
 import { mdText } from "./md.js";
 
 const SEV_ORDER: Severity[] = ["bloquant", "majeur", "mineur"];
@@ -340,7 +340,18 @@ export function auditorUnitModel(unit: PrdUnit, standard: StandardId, lang: Lang
     // name must not leave a trailing space behind the colon.
     if (pc) fields.push({ label: v.theme, value: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trimEnd() });
     fields.push({ label: v.criterion, value: `${unit.criteriaId} — ${unit.title}` });
-    const testNums = packTestIds(pack, unit.criteriaId);
+    // The tests THIS unit's non-conformities cite, not every test of the criterion. An RGAA
+    // NC is a claim about one numbered test — the fold proved the citation resolves to a test
+    // of this criterion — and listing the other two beside it says the auditor observed more
+    // than they did. Advisories are excluded: a recommendation has no normative test, so
+    // letting one into the citation set would widen the line back out to everything.
+    // `packTestIdsCited` falls back to the full list when nothing cites a test, which is what
+    // an engine finding and a pre-`normativeRef` ledger both need.
+    const testNums = packTestIdsCited(
+      pack,
+      unit.criteriaId,
+      unit.findings.filter((f) => !f.advisory).map((f) => f.normativeRef),
+    );
     if (testNums.length) fields.push({ label: `${v.test}(s)`, value: testNums.join(" · ") });
     // NO WCAG CROSS-REFERENCE UNDER A PACK. A deliverable produced with `--standard rgaa` is
     // read by an auditor working to RGAA: it names RGAA themes, RGAA criteria and RGAA tests,

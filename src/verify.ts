@@ -5,7 +5,7 @@
 // fabricated non-conformities surviving into the final report.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Lang } from "./types.js";
+import type { AuditResult, CriterionCitation, Lang } from "./types.js";
 import { getSC, scTitle } from "./wcag.js";
 import { type StandardId, isCore, loadPack, getCriterion as getPackCriterion, idCaptureSource } from "./standards/index.js";
 
@@ -168,6 +168,37 @@ export interface ConformityClaim {
  * deterministic engine decided is recomputed from source on every run; a criterion an AGENT
  * decided is a judgement recorded once, and the judgement is what needs a second reader.
  */
+/**
+ * The claimed conformities an AUDIT DOCUMENT carries — the third source, and the one that
+ * needs no opt-in.
+ *
+ * The ledger and the adjudication file both hold these, and both are optional artefacts: a
+ * `judge --apply` without `--ledger`, run in a directory nobody kept, left an audit whose every
+ * `C` was beyond reach of a second reader. Since the fold now persists `citations[]` on the
+ * criterion itself, the audit under `--in` answers the question directly.
+ *
+ * ONLY AGENT VERDICTS, for the reason `buildConformityWorklist` gives: a criterion the
+ * deterministic engine decided is recomputed from source on every run, so putting it on trial
+ * would be attacking this run's own arithmetic. A judgement recorded once is what needs a
+ * second reader. A pack adjudication recorded under a DIFFERENT standard is likewise ignored —
+ * RGAA "11.2" and a WCAG SC id share a shape, and reading one as the other is the exact
+ * confusion the anti-fabrication gate exists to prevent.
+ */
+export function conformityClaimsFromAudit(audit: AuditResult, standard: StandardId): ConformityClaim[] {
+  const claim = (c: { id: string; justification?: string; citations?: CriterionCitation[] }): ConformityClaim => ({
+    criteriaId: c.id,
+    verdict: "C",
+    justification: c.justification,
+    citations: c.citations,
+  });
+  if (!isCore(standard)) {
+    const pa = audit.packAdjudication;
+    if (!pa || pa.standard !== standard) return [];
+    return pa.criteria.filter((c) => c.decidedBy === "agent" && c.status === "C").map(claim);
+  }
+  return audit.criteria.filter((c) => c.decidedBy === "agent" && c.status === "C").map(claim);
+}
+
 export function buildConformityWorklist(claims: ConformityClaim[], startAt = 0, max = VERIFY_MAX): VerifyItem[] {
   const items: VerifyItem[] = [];
   for (const c of claims) {

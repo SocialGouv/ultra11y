@@ -11,7 +11,7 @@
 // decisions are the AGENT's, statically, gated — not a deferral to a human.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { AuditResult, Automatability, Finding, Lang, PackCriterionAdjudication, ResidualRisk, Severity, Status } from "./types.js";
+import type { AuditResult, Automatability, CriterionCitation, Finding, Lang, PackCriterionAdjudication, ResidualRisk, Severity, Status } from "./types.js";
 import { SCHEMA_VERSION } from "./types.js";
 import { discover } from "./discover.js";
 import { readText } from "./util.js";
@@ -1094,7 +1094,9 @@ export function applyAdjudication(
       decided.push({
         id: it.criteriaId,
         status: it.verdict as Status,
-        ...(it.verdict === "C" || it.verdict === "NA" ? { justification: it.justification.trim() } : {}),
+        ...(it.verdict === "C" || it.verdict === "NA"
+          ? { justification: it.justification.trim(), ...citationsOf(it) }
+          : {}),
         findings: [...fs, ...recs],
         decidedBy: "agent",
       });
@@ -1157,12 +1159,21 @@ export function applyAdjudication(
     c.decidedBy = "agent";
     // Whatever it was closed for before, it now carries a ruling of its own.
     delete c.inapplicable;
-    if (it.verdict === "C" || it.verdict === "NA") c.justification = it.justification.trim();
+    if (it.verdict === "C" || it.verdict === "NA") {
+      c.justification = it.justification.trim();
+      const cites = citationsOf(it);
+      if (cites.citations) c.citations = cites.citations;
+      else delete c.citations;
+    }
     if (it.verdict === "NC") {
       const fs: Finding[] = it.findings.map((f) => agentFinding(it.criteriaId, f));
       c.findings = fs;
       newFindings.push(...fs);
       delete c.justification;
+      // An NC is anchored by its findings, each carrying its own `normativeRef`. Leaving a
+      // previous run's citations behind would offer `verify --report` a conformity to attack
+      // on a criterion that is no longer claimed conforming.
+      delete c.citations;
     }
   }
 
@@ -1214,6 +1225,21 @@ export function agentSeverity(v: unknown, advisory: boolean): Severity {
   return advisory ? "mineur" : NC_SEVERITY_DEFAULT;
 }
 
+/** The anchors a `C`/`NA` was settled on, narrowed to what the audit document persists.
+ *
+ *  Returns a SPREADABLE object rather than an array so an item that cited nothing writes no
+ *  key at all: `citations: []` on a criterion would read as « cleared on nothing », which is
+ *  the one thing the gate refuses a `C` for. The harvester's class bookkeeping
+ *  (`occurrences`/`alsoAt`/`pages`) is dropped on purpose — it describes the evidence the
+ *  citation was drawn from, not the claim, and it is what made these too heavy to persist. */
+function citationsOf(it: AdjudicationItem): { citations?: CriterionCitation[] } {
+  const cites = (it.citations ?? [])
+    .map((c) => (typeof c === "string" ? readCitation(c) : c))
+    .filter((c): c is Evidence => c !== null && c !== undefined)
+    .map(({ file, line, selector, snippet, note }) => ({ file, line, selector, snippet, ...(note ? { note } : {}) }));
+  return cites.length ? { citations: cites } : {};
+}
+
 function agentFinding(criteriaId: string, f: AgentFinding, advisory = false): Finding {
   return {
     ruleId: `agent:${criteriaId}`,
@@ -1226,6 +1252,11 @@ function agentFinding(criteriaId: string, f: AgentFinding, advisory = false): Fi
     message: f.message,
     remediation: getSC(criteriaId)?.understanding ? `See WCAG ${criteriaId}.` : "Address the reported non-conformity.",
     snippet: f.snippet ?? "",
+    // The gate immediately above this fold spent real effort proving this reference resolves
+    // to a test of THIS criterion (`normativeRefResolves`); dropping it here is what made the
+    // deliverable print all three tests of RGAA 11.1 under a finding that failed only 11.1.2.
+    // A recommendation carries none by definition — a good practice has no normative test.
+    ...(f.normativeRef && !advisory ? { normativeRef: f.normativeRef.trim() } : {}),
     ...(advisory ? { advisory: true } : {}),
   };
 }

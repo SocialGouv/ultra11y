@@ -15,7 +15,7 @@ import {
   derivePackResults,
   packConformancePct,
   packTestIds,
-  packTests,
+  packTestsCited,
   standardLabel,
   themeName,
   titlePlain as packTitlePlain,
@@ -350,7 +350,14 @@ export function acceptanceCriteria(unit: PrdUnit, standard: StandardId, lang: La
   }
 
   const pack = loadPack(standard);
-  const tests = packTests(pack, unit.criteriaId);
+  // Narrowed to the tests the unit's non-conformities cite, for the reason the auditor block
+  // gives: a Given/When/Then per test of the criterion asks a developer to prove three things
+  // where the audit established one. Falls back to every test when nothing cites one.
+  const tests = packTestsCited(
+    pack,
+    unit.criteriaId,
+    unit.findings.filter((f) => !f.advisory).map((f) => f.normativeRef),
+  );
   // A pack criterion with no numbered test (or one this pack does not carry) still deserves a
   // line — fall back to the criterion itself rather than emitting nothing, which would leave
   // an NC block with no acceptance criteria at all.
