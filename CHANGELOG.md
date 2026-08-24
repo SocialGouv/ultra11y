@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.32.0](https://github.com/maxgfr/ultra11y/compare/v5.31.2...v5.32.0) (2026-08-24)
+
+
+### Bug Fixes
+
+* **build:** rebuild the bundles from a real node_modules, not a worktree symlink ([f1b0cbf](https://github.com/maxgfr/ultra11y/commit/f1b0cbf3bba501ffa6e92680c04a1e08bad6d8ed))
+* **ci:** carry the selected standard through the steps that WRITE the audit ([8fca62a](https://github.com/maxgfr/ultra11y/commit/8fca62af66d6d620f0fec78598bd2302d4db0589))
+* **document:** take a criterion's findings from the derivation, not from the raw mapping ([b21f394](https://github.com/maxgfr/ultra11y/commit/b21f394e07f5b19773ba4059f84cbc6dedfd3ba8))
+* **ledger:** stop the grid claiming two criteria it also declares undecidable ([5e03813](https://github.com/maxgfr/ultra11y/commit/5e0381395d0a47ac4200c6a92b91f0f631f8cbb2))
+
+
+### Features
+
+* **probes:** measure 2.4.11, the criterion no tier could reach ([eb3f62d](https://github.com/maxgfr/ultra11y/commit/eb3f62dfce86559b2b8128cfdf67c7177865cf69))
+* **standards:** select a standard and get that standard, everywhere ([a4ae6c8](https://github.com/maxgfr/ultra11y/commit/a4ae6c849962e0c3c7ff90766ca1ec17a2f79aad))
+* **verify:** put the claimed conformities on trial too ([c48bde7](https://github.com/maxgfr/ultra11y/commit/c48bde77d1fec8d40427bf769973d174a3e7235b))
+
 ## [5.31.2](https://github.com/maxgfr/ultra11y/compare/v5.31.1...v5.31.2) (2026-08-24)
 
 
