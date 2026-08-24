@@ -751,7 +751,19 @@ runs:
         export ULTRA11Y_CLAUDE_BIN="$prefix/node_modules/.bin/claude"
 
         args=(--in audits/audit-latest.json --out audits --apply --runner cli)
-        args+=(--grain "${GRAIN:-worklist}" --standard "$STANDARD" --lang "$LANG_OPT")
+        # TRANSLATED AT THE BOUNDARY, because the two vocabularies are not the same one.
+        # This Action says `worklist` for the batched grain; the engine's `judge --grain` says
+        # `batch`, and refuses anything else with exit 2 BEFORE it calls a model. Passing the
+        # input through untranslated made `adjudicate-runner: cli` unusable at its OWN default:
+        # every pass exited 2, the loop printed "did not apply cleanly" once per pass, and —
+        # with `gate-adjudicated` off — the job emitted a warning and then failed on
+        # `require-decided` with the whole grid still to assess. Forty minutes of CI, no model
+        # call, no verdicts, and nothing in the log naming the cause.
+        case "${GRAIN:-worklist}" in
+          criterion) engine_grain=criterion ;;
+          *) engine_grain=batch ;;
+        esac
+        args+=(--grain "$engine_grain" --standard "$STANDARD" --lang "$LANG_OPT")
         if [ -n "${MODEL:-}" ]; then args+=(--model "$MODEL"); fi
         if [ -n "${EFFORT:-}" ]; then args+=(--effort "$EFFORT"); fi
         if [ -n "${BUDGET:-}" ]; then args+=(--max-budget-usd "$BUDGET"); fi
