@@ -171,6 +171,18 @@ inputs:
     description: 'Rule on the judgment criteria the static engine cannot decide (alt relevance, link purpose in context, reading order): `api` sends the worklist to the Anthropic API in batches, `agent` hands it to a Claude Code run, `none` (default) leaves them « to assess ». Both modes read their credential from the JOB environment, never from an input, and skip themselves when it is absent — which is what makes them harmless on a fork pull request. `api` needs ANTHROPIC_API_KEY (the Messages API takes nothing else); `agent` accepts ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN, the token a Pro/Max subscriber mints with `claude setup-token`. `agent` also skips itself on an event claude-code-action does not support — `push` above all. Pair it with `ledger` so each run records what it paid for.'
     required: false
     default: 'none'
+  adjudicate-runner:
+    description: "WHO drives the agent tier. `action` (default) is the three `anthropics/claude-code-action` steps below — unchanged, and still what an existing consumer gets. `cli` has the ENGINE spawn a headless `claude -p` per batch and fold the verdicts itself, which is the same tier reachable from anywhere a shell is: this action, a GitLab CI, a cron, a laptop. It also lifts the event restriction — claude-code-action parses the event context before it reads the prompt and refuses what it does not know, `push` above all, which is the event an accessibility gate actually fires on. The CLI is installed into a scratch prefix by the step, never into your tree; the engine itself still installs nothing."
+    required: false
+    default: "action"
+  adjudicate-grain:
+    description: "How much the model is asked to rule on at once. `worklist` (default) sends batches of 8 criteria; `criterion` sends one. One call per criterion costs more calls and buys two things: the model sees one criterion's evidence instead of eight competing for its attention, and a run that stops early loses at most ONE criterion instead of everything it had already ruled on. Needs `adjudicate-runner: cli` on the agent tier — a composite action cannot loop over a `uses:` step, so the claude-code-action passes are unrolled by hand and there is no syntax that repeats one per criterion."
+    required: false
+    default: "worklist"
+  adjudicate-budget-usd:
+    description: "Dollar ceiling handed to each `adjudicate-runner: cli` invocation. Empty leaves it unbounded and lets the wall clock be the only stop. This is the bound to reach for rather than `adjudicate-max-turns`, which the CLI runner ignores: `--max-turns` is not one of its flags, and the CLI swallows an unknown flag without a word, so a turn budget there would look like a ceiling and be nothing at all."
+    required: false
+    default: ""
   adjudicate-passes:
     description: 'How many times `adjudicate: agent` may go round. Each pass re-derives the worklist from what is STILL undecided — a criterion the previous pass never reached, or whose verdict the gate refused — so a second pass only ever costs the residue, and a run that decided everything stops on its own. Default 1 (one pass, the historical behaviour). Raise it when completeness matters more than the bill: measured on a real run, an adjudicator stopped after 22 turns of a 228 budget with 42 criteria still `null`, and a single pass had no way to come back to them. Capped at 3.'
     required: false
@@ -270,6 +282,8 @@ runs:
       env:
         REQUIRE_DECIDED: ${{ inputs.require-decided }}
         ADJUDICATE_PASSES: ${{ inputs.adjudicate-passes }}
+        ADJUDICATE_RUNNER: ${{ inputs.adjudicate-runner }}
+        ADJUDICATE_GRAIN: ${{ inputs.adjudicate-grain }}
         REQUIRE_RENDERED: ${{ inputs.require-rendered }}
         COMMENT_KIND: ${{ inputs.comment-kind }}
       run: |
@@ -308,6 +322,27 @@ runs:
             exit 1
             ;;
         esac
+        case "${ADJUDICATE_RUNNER:-}" in
+          action|cli|'') ;;
+          *)
+            echo "::error::ultra11y: adjudicate-runner='${ADJUDICATE_RUNNER}' is not a runner — expected 'action' (claude-code-action, the default) or 'cli' (the engine spawns a headless Claude Code process)."
+            exit 1
+            ;;
+        esac
+        case "${ADJUDICATE_GRAIN:-}" in
+          worklist|criterion|'') ;;
+          *)
+            echo "::error::ultra11y: adjudicate-grain='${ADJUDICATE_GRAIN}' is not a grain — expected 'worklist' (batches of 8) or 'criterion' (one call per criterion)."
+            exit 1
+            ;;
+        esac
+        # THE COMBINATION THAT CANNOT WORK, refused here and nowhere else. Silently ignoring
+        # the grain would be the same failure the two cases above exist to remove: a caller
+        # asks for something stricter and is told nothing when it does not happen.
+        if [ "${ADJUDICATE_GRAIN:-worklist}" = 'criterion' ] && [ "${ADJUDICATE_RUNNER:-action}" = 'action' ]; then
+          echo "::error::ultra11y: adjudicate-grain='criterion' needs adjudicate-runner='cli'. A composite action cannot loop over a \`uses:\` step — the three claude-code-action passes below are unrolled by hand, and no syntax repeats one per criterion. Set adjudicate-runner: cli, or keep adjudicate-grain: worklist."
+          exit 1
+        fi
         # Same family, same reason: `require-rendered` is compared literally against 'true' by
         # its own step AND by the final gate, so `yes` would run neither and the caller would
         # be told nothing at all about a strictness they asked for.
@@ -658,9 +693,67 @@ runs:
     # `--eco` emits the sequential RUNBOOK + the dispatch contracts, not the *.workflow.mjs
     # fan-out: the latter needs the harness to expose a Workflow tool, which is not part of
     # claude-code-action's contract.
+    # THE AGENT TIER, DRIVEN BY THE ENGINE — same tier, no GitHub in it.
+    #
+    # One step where the action path needs eleven, because `judge --apply` already derives the
+    # worklist, calls the model, folds fail-closed and records the ledger. There is no turn
+    # budget to derive (the CLI has no `--max-turns`, and it swallows unknown flags without a
+    # word, so passing one would look like a bound and be nothing), no `$GITHUB_OUTPUT` to
+    # thread between passes, and no three passes to unroll — `adjudicate-grain: criterion` IS
+    # the fine granularity, and a retry is internal rather than another pass of this file.
+    #
+    # It carries no event allowlist either. That list exists only because claude-code-action
+    # parses the event context before it reads the prompt; a local process does not, so this
+    # runner works on `push` — the event an accessibility gate actually fires on, and the one
+    # the action path has never been able to serve.
+    - name: Adjudicate through the engine-driven CLI
+      id: clirunner
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner == 'cli'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+        STANDARD: ${{ inputs.standard }}
+        LANG_OPT: ${{ inputs.lang }}
+        GRAIN: ${{ inputs.adjudicate-grain }}
+        MODEL: ${{ inputs.adjudicate-model }}
+        BUDGET: ${{ inputs.adjudicate-budget-usd }}
+        LEDGER: ${{ inputs.ledger }}
+        GATE: ${{ inputs.gate-adjudicated }}
+      run: |
+        # A SCRATCH PREFIX, never the audited repository — the same rule the browser tier
+        # follows, and for the same reason. The ENGINE still installs nothing itself: that
+        # promise is why nothing else here reaches a registry, and the caller is the one
+        # allowed to.
+        prefix="$RUNNER_TEMP/a11y-adjudicator"
+        mkdir -p "$prefix"
+        if ! npm i --no-save --prefix "$prefix" "@anthropic-ai/claude-code@2" >/dev/null 2>&1; then
+          echo "::warning::ultra11y: the Claude Code CLI could not be installed — the judgment criteria stay to assess."
+          exit 0
+        fi
+        export ULTRA11Y_CLAUDE_BIN="$prefix/node_modules/.bin/claude"
+
+        args=(--in audits/audit-latest.json --out audits --apply --runner cli)
+        args+=(--grain "${GRAIN:-worklist}" --standard "$STANDARD" --lang "$LANG_OPT")
+        if [ -n "${MODEL:-}" ]; then args+=(--model "$MODEL"); fi
+        if [ -n "${BUDGET:-}" ]; then args+=(--max-budget-usd "$BUDGET"); fi
+        if [ -n "$LEDGER" ] && [ "$LEDGER" != 'false' ]; then
+          if [ "$LEDGER" = 'true' ]; then args+=(--ledger ".ultra11y/verdicts/$STANDARD.json"); else args+=(--ledger "$LEDGER"); fi
+        fi
+        # Same policy as every other fold in this file: an adjudication that fails costs the
+        # verdicts, never the audit that was already produced above.
+        if node "$ENGINE" judge "${args[@]}"; then
+          echo "ultra11y: the CLI adjudication was applied."
+        elif [ "$GATE" = 'true' ]; then
+          echo "::error::ultra11y: the CLI adjudication failed and gate-adjudicated is on — refusing to gate on a partial adjudication."
+          exit 1
+        else
+          echo "::warning::ultra11y: the CLI adjudication failed — the judgment criteria stay to assess."
+        fi
+
     - name: Adjudicate with an agent — worklist and runbook
       id: worklist
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent'
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -756,7 +849,7 @@ runs:
     # `--max-turns` bounds an unattended run. claude-code-action sets no default, and this
     # step has nobody watching it.
     - name: Adjudicate with an agent — Claude Code
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent'
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli'
       uses: anthropics/claude-code-action@v1
       # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
       # always honoured, and the one tier that could not. A `uses:` step has no `if node …
@@ -876,7 +969,7 @@ runs:
           not comment on the PR.
 
     - name: Adjudicate with an agent — fold the verdicts
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent'
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -922,7 +1015,7 @@ runs:
     # is the criterion's own `manual` reason.
     - name: Adjudicate with an agent — pass 2, worklist
       id: worklist2
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && (inputs.adjudicate-passes == '2' || inputs.adjudicate-passes == '3') && steps.worklist.outputs.remaining != '0'
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && (inputs.adjudicate-passes == '2' || inputs.adjudicate-passes == '3') && steps.worklist.outputs.remaining != '0'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -976,7 +1069,7 @@ runs:
         echo "ultra11y: pass 2 — $n criterion(ia) still undecided, budget $turns turns."
 
     - name: Adjudicate with an agent — pass 2, Claude Code
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0'
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0'
       uses: anthropics/claude-code-action@v1
       # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
       # always honoured, and the one tier that could not. A `uses:` step has no `if node …
@@ -1039,7 +1132,7 @@ runs:
           not comment on the PR.
 
     - name: Adjudicate with an agent — pass 2, fold
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0'
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1066,7 +1159,7 @@ runs:
 
     - name: Adjudicate with an agent — pass 3, worklist
       id: worklist3
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0' && inputs.adjudicate-passes == '3'
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0' && inputs.adjudicate-passes == '3'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1120,7 +1213,7 @@ runs:
         echo "ultra11y: pass 3 — $n criterion(ia) still undecided, budget $turns turns."
 
     - name: Adjudicate with an agent — pass 3, Claude Code
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0'
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0'
       uses: anthropics/claude-code-action@v1
       # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
       # always honoured, and the one tier that could not. A `uses:` step has no `if node …
@@ -1168,7 +1261,7 @@ runs:
           not comment on the PR.
 
     - name: Adjudicate with an agent — pass 3, fold
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0'
+      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:

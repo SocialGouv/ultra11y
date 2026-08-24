@@ -74,10 +74,17 @@ describe("it runs the engine that ships with it", () => {
     expect(RAW).not.toMatch(/npm (i|install|exec)\s[^\n]*ultra11y/);
   });
 
-  it("installs nothing but the browser tier, and nothing into the audited repository", () => {
+  // TWO tiers cannot ship in a git checkout: the browser (a 100+ MB binary) and the
+  // adjudication CLI (a model client the engine deliberately does not vendor). Both are
+  // installed by the action, never by the engine, and never into the consumer's tree — which
+  // is the invariant, and the reason `--prefix` is asserted on every one of them.
+  it("installs nothing but the tiers that cannot ship, and nothing into the audited repository", () => {
     const installs = RAW.match(/npm (?:i|install)\s[^\n]*/g) ?? [];
+    expect(installs.length, "the install lines vanished — this test would then assert nothing").toBeGreaterThan(0);
     for (const line of installs) {
-      expect(line, "an npm install in this action must be the browser tier").toMatch(/@playwright\/test|@axe-core\/playwright/);
+      expect(line, "an npm install in this action must be the browser tier or the adjudication CLI").toMatch(
+        /@playwright\/test|@axe-core\/playwright|@anthropic-ai\/claude-code/,
+      );
       expect(line, "and must land in a scratch prefix, never in the consumer's tree").toContain("--prefix");
     }
   });
@@ -451,13 +458,22 @@ describe("the adjudication tier", () => {
     // and the two it never saw were precisely the two that ignored `gate-adjudicated`, which
     // is to say the test was green about the half of the code that was wrong.
     const folding = adjudicationSteps().filter((s) => s.run?.includes("--apply"));
-    const agentFolds = folding.filter((s) => s.name?.includes("agent"));
-    // One fold per agent pass — `adjudicate-passes` documents three — plus the API tier's.
+    const agentFolds = folding.filter((s) => s.name?.includes("with an agent"));
+    // One fold per claude-code-action pass — `adjudicate-passes` documents three.
     expect(agentFolds.length, "an agent pass was added without a fold, or a fold lost its --apply").toBe(3);
-    expect(folding.length).toBe(agentFolds.length + 1);
+    // And one per tier that folds inside a single step: the API tier, and the CLI runner
+    // (whose `judge --apply` derives, rules and folds in one go). Counted by what they ARE
+    // rather than by a total, so adding a tier is a visible decision rather than a number
+    // nudged from 4 to 5.
+    expect(folding.length - agentFolds.length, "one fold per single-step tier: api and cli").toBe(2);
     for (const step of folding) {
       expect(step.run, `step "${step.name}" propagates its failure`).toContain("::warning::");
-      expect(step.run, `step "${step.name}" ignores gate-adjudicated`).toContain("inputs.gate-adjudicated");
+      // HONOURS it, however it reads it. Interpolating an input into a bash string is the
+      // weaker spelling — this file's own rule is to pass inputs through `env:` so a value
+      // carrying a quote stays data — so a step that does the safer thing must not fail an
+      // assertion written when only the weaker one existed.
+      const honours = String(step.run).includes("inputs.gate-adjudicated") || JSON.stringify(step.env ?? {}).includes("inputs.gate-adjudicated");
+      expect(honours, `step "${step.name}" ignores gate-adjudicated`).toBe(true);
     }
   });
 
@@ -595,6 +611,60 @@ describe("the adjudication tier", () => {
       // expensive reading of a mistake.
       expect(run).toContain("is neither a turn count nor 'unlimited'");
     }
+  });
+
+  // THE CLI RUNNER — the same tier without GitHub in it. Opt-in, so an existing consumer
+  // gets exactly what it got before: `adjudicate-runner` defaults to `action`.
+  describe("the engine-driven CLI runner", () => {
+    const cli = () => ACTION.runs.steps.find((s) => s.id === "clirunner");
+
+    it("is opt-in — the default is still claude-code-action", () => {
+      expect(ACTION.inputs["adjudicate-runner"]?.default).toBe("action");
+      expect(ACTION.inputs["adjudicate-grain"]?.default).toBe("worklist");
+    });
+
+    it("and the action path stands down when it is on, so the tier never runs twice", () => {
+      const actionPath = adjudicationSteps().filter((s) => s.if?.includes("inputs.adjudicate == 'agent'") && s.id !== "clirunner");
+      expect(actionPath.length).toBeGreaterThan(0);
+      for (const step of actionPath) {
+        expect(step.if, `step "${step.name}" would run alongside the CLI runner`).toContain("inputs.adjudicate-runner != 'cli'");
+      }
+    });
+
+    // One step where the action path needs eleven: `judge --apply` derives the worklist,
+    // calls the model, folds fail-closed and records the ledger.
+    it("derives, rules, folds and records in one step", () => {
+      const run = String(cli()?.run ?? "");
+      expect(run).toContain("judge");
+      expect(run).toContain("--runner cli");
+      expect(run).toContain("--apply");
+      expect(run).toContain("--ledger");
+    });
+
+    // `--max-turns` is not a flag of the Claude Code CLI, and the CLI swallows unknown flags
+    // without a word — so passing one would read as a ceiling in every log and be an
+    // unbounded run. The bound that exists is the dollar one.
+    it("bounds the spend in dollars, never in turns it cannot enforce", () => {
+      expect(String(cli()?.run ?? "")).not.toContain("--max-turns");
+      expect(String(cli()?.run ?? "")).toContain("--max-budget-usd");
+      expect(ACTION.inputs["adjudicate-budget-usd"]).toBeDefined();
+    });
+
+    // The list exists only because claude-code-action refuses events it does not parse. A
+    // local process has no such notion, so this runner is the one that works on `push`.
+    it("carries no event allowlist, which is the point of it", () => {
+      expect(cli()?.if).not.toContain("github.event_name");
+    });
+
+    // A composite action cannot loop over a `uses:` step, so the combination is impossible and
+    // has to say so rather than ignore the grain the caller asked for.
+    it("refuses grain=criterion on the action runner, in the step allowed to refuse", () => {
+      const preflight = ACTION.runs.steps.find((s) => s.id === "engine");
+      expect(preflight?.run).toContain("adjudicate-runner=");
+      expect(preflight?.run).toContain("adjudicate-grain=");
+      expect(preflight?.run).toMatch(/adjudicate-grain='criterion' needs adjudicate-runner='cli'/);
+      expect(preflight?.run).toContain("exit 1");
+    });
   });
 
   it("pins claude-code-action, because `uses:` cannot take an expression", () => {
