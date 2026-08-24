@@ -166,6 +166,8 @@ export interface RunnerOutput {
   // the Docker RUNNER never sets them, so its RunnerOutput is unchanged. Optional so
   // every existing caller/test (which omits them) stays valid.
   focusVisible?: ProbeHit[];
+  /** 2.4.11 — the component receiving focus entirely hidden behind author-created content. */
+  focusObscured?: ProbeHit[];
   reflowZoom?: ProbeHit[];
   textSpacing?: ProbeHit[];
   hover?: ProbeHit[];
@@ -321,6 +323,7 @@ export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: str
 // exactly as before and the local output adds the residual-criteria findings.
 const PROBE_FIELDS: { key: keyof RunnerOutput; engine: Exclude<DynamicEngine, "axe" | "reflow"> }[] = [
   { key: "focusVisible", engine: "focus-visible" },
+  { key: "focusObscured", engine: "focus-obscured" },
   { key: "reflowZoom", engine: "reflow-zoom" },
   { key: "textSpacing", engine: "text-spacing" },
   { key: "hover", engine: "hover" },

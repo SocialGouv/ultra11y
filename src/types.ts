@@ -658,6 +658,7 @@ export type DynamicEngine =
   | "axe"
   | "reflow"
   | "focus-visible"
+  | "focus-obscured"
   | "reflow-zoom"
   | "text-spacing"
   | "hover"

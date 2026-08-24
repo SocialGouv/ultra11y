@@ -212,8 +212,9 @@ const L = {
 // them was still told the rendering criteria "were not tested", while the criteria those
 // snapshots really did decide were absent from the list and so could never be reported covered.
 //
-// The needs-rendering criteria NO tier measures (1.4.5, 2.3.1, 2.4.11, 2.5.8 — 2.1.2 left them
-// when the keyboard-trap probe landed) are
+// The needs-rendering criteria NO tier measures (1.4.5, 2.3.1, 2.5.8 — 2.1.2 left them when the
+// keyboard-trap probe landed, 2.4.11 when the focus-obscured probe joined the same walk of the
+// tab ring) are
 // deliberately NOT here: listing them would make the banner permanent and un-actionable, since
 // no run could ever clear it. They carry a per-criterion reason instead (src/audit.ts
 // RESIDUAL_TRAIL) saying that no automated tier decides them, and what does.
@@ -228,6 +229,7 @@ const NEEDS_RENDERING: readonly { sc: string; label: Record<Lang, string> }[] = 
   { sc: "1.4.13", label: { fr: "contenu au survol", en: "content on hover" } },
   { sc: "2.1.2", label: { fr: "piège au clavier", en: "keyboard trap" } },
   { sc: "2.4.7", label: { fr: "visibilité du focus", en: "focus visibility" } },
+  { sc: "2.4.11", label: { fr: "focus masqué", en: "focus obscured" } },
   { sc: "4.1.3", label: { fr: "régions live", en: "live regions" } },
 ];
 

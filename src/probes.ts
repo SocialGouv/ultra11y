@@ -220,6 +220,69 @@ export const FOCUS_CHECK_PROBE = `(() => {
   return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
 })()`;
 
+// 2.4.11 Focus Not Obscured (Minimum) — pass 2', run after the same Tab press as the
+// focus-visible check, on the same tagged ring.
+//
+// THE CRITERION, from its own wording: « When a user interface component receives keyboard
+// focus, the component is not ENTIRELY hidden due to author-created content. » Three things
+// follow, and each one is a way to get this wrong:
+//
+//   • ENTIRELY, not partially. A sticky header covering the top half of a focused button
+//     satisfies 2.4.11 (it is 2.4.12 Focus Not Obscured (Enhanced), AAA, that forbids any
+//     obscuring). So a single visible point anywhere on the component is a pass, which is why
+//     this samples a grid rather than testing the centre.
+//   • AUTHOR-CREATED CONTENT. Scrolled out of the viewport is not this criterion — the browser
+//     scrolls focus into view, and content below the fold is not "hidden by content". The
+//     occluder must be something the author overlaid, so only `position: fixed` and `sticky`
+//     ancestors count: the sticky headers, the cookie banners and the floating action bars
+//     the Understanding document names.
+//   • The component's OWN subtree does not obscure it. An icon inside a button is the topmost
+//     element over the button's centre on every well-built page in existence; reading that as
+//     occlusion would fail everything.
+//
+// `elementsFromPoint` is what makes this measurable: it returns the whole hit-test stack at a
+// point, so "is any part of me on top anywhere?" is answered without guessing at z-index,
+// transforms or stacking contexts — the three things that make a computed-style approach wrong.
+export const FOCUS_OBSCURED_PROBE = `(() => { ${PRELUDE}
+  const e = document.activeElement;
+  if (!e || e === document.body || e === document.documentElement) return null;
+  const key = e.getAttribute && e.getAttribute('data-u11y-f');
+  if (!key) return null;
+  const r = e.getBoundingClientRect();
+  if (r.width < 1 || r.height < 1) return null;         // nothing to obscure
+  const vw = window.innerWidth, vh = window.innerHeight;
+  // Sample a 5×5 grid inset by a pixel, keeping only points inside the viewport. A component
+  // scrolled off-screen leaves no sampleable point and is NOT reported: out of view is not
+  // obscured, and the criterion is about content laid over it.
+  const xs = [0.02, 0.25, 0.5, 0.75, 0.98], pts = [];
+  for (const fx of xs) for (const fy of xs) {
+    const x = r.left + r.width * fx, y = r.top + r.height * fy;
+    if (x >= 0 && y >= 0 && x < vw && y < vh) pts.push([x, y]);
+  }
+  if (!pts.length) return null;
+  // The topmost element over a point, for each sampled point. The focused element counts as
+  // visible when it — or anything inside it — is on top: an icon inside a button is the button
+  // being visible, and reading that as occlusion would fail every well-built page.
+  let occluder = null;
+  for (const [x, y] of pts) {
+    const top = document.elementsFromPoint(x, y)[0];
+    if (!top) continue;
+    if (top === e || e.contains(top)) return null;      // some part of it is on top → pass
+    if (!occluder) occluder = top;
+  }
+  if (!occluder) return null;
+  // AUTHOR-CREATED OVERLAY, or nothing. Walk up from the occluder looking for the fixed/sticky
+  // ancestor that puts it over the page; without one this is ordinary layout, not obscuring.
+  let overlay = null;
+  for (let n = occluder; n && n !== document.documentElement; n = n.parentElement) {
+    const pos = getComputedStyle(n).position;
+    if (pos === 'fixed' || pos === 'sticky') { overlay = n; break; }
+  }
+  if (!overlay) return null;
+  if (overlay.contains(e)) return null;                 // it is the component's own container
+  return { key: key, selector: __sel(e), html: __html(e), overlay: __sel(overlay) };
+})()`;
+
 // 1.4.13 Content on Hover — find triggers whose aria-describedby target is hidden, so
 // hovering can reveal it. probeHover then checks it is dismissible (Escape).
 export const HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
@@ -247,10 +310,26 @@ export function hoverVisibleExpr(id: string, wantHidden = false): string {
   return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
 }
 
+/** What ONE walk of the tab ring measures. Two criteria, one walk: pressing Tab through a
+ *  130-element ring is the expensive part (two round-trips per press on a loaded CI runner),
+ *  and both questions are asked of the same focused element at the same moment. Walking twice
+ *  would double the cost of the most expensive probe in the tier to learn nothing extra. */
+export interface FocusRingHits {
+  /** 2.4.7 — focus produced no visible change. */
+  visible: ProbeHit[];
+  /** 2.4.11 — the focused component was entirely hidden behind author-created content. */
+  obscured: ProbeHit[];
+}
+
 export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<ProbeHit[]> {
+  return (await probeFocusRing(page, scope, limits, deadline)).visible;
+}
+
+export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<FocusRingHits> {
   const count = (await page.evaluate(focusSetupExpr(scope, limits.maxFocusables))) as number;
-  if (!count) return [];
+  if (!count) return { visible: [], obscured: [] };
   const hits: ProbeHit[] = [];
+  const obscured: ProbeHit[] = [];
   const seen = new Set<string>();
   const limit = tabPressBudget(count, limits);
   let prevKey: string | null = null;
@@ -281,12 +360,25 @@ export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimi
       hits.push({
         selector: r.selector,
         html: r.html,
-        detail: "Le focus clavier ne produit aucun changement visible (outline/box-shadow/bordure/fond) — focus non visible (2.4.7).",
+        detail: "Le focus clavier ne produit aucun changement visible (outline/box-shadow/bordure/fond) — focus non visible.",
       });
     }
-    if (hits.length >= 20) break;
+    // Same focused element, same moment, second question. Evaluated after the visibility
+    // check so a page with neither defect costs one extra round-trip per tab stop and no
+    // second walk.
+    if (obscured.length < 20 && !deadline?.out()) {
+      const o = (await page.evaluate(FOCUS_OBSCURED_PROBE)) as { selector: string; html: string; overlay: string } | null;
+      if (o) {
+        obscured.push({
+          selector: o.selector,
+          html: o.html,
+          detail: `Le composant qui reçoit le focus clavier est entièrement masqué par un contenu ajouté par l'auteur (${o.overlay}) — il est impossible de voir où l'on se trouve au clavier.`,
+        });
+      }
+    }
+    if (hits.length >= 20 && obscured.length >= 20) break;
   }
-  return hits;
+  return { visible: hits, obscured };
 }
 
 // HOW MANY TAB STOPS ONE NATIVE CONTROL LEGITIMATELY HOLDS.
@@ -595,11 +687,18 @@ export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?:
       }
     }
   }
-  if (want("2.4.7") && canType) {
-    const r = await bounded("2.4.7", () => probeFocusVisible(page, "", limits, deadline));
+  // ONE WALK, TWO CRITERIA. 2.4.7 asks whether focus is visible, 2.4.11 whether the focused
+  // component is entirely hidden behind author-created content — both about the same element
+  // at the same moment, so they share the ring rather than each paying for a walk of it.
+  // `probed` records them separately: a run that reached the deadline mid-ring must not claim
+  // to have measured either one for the whole page.
+  if ((want("2.4.7") || want("2.4.11")) && canType) {
+    const r = await bounded("2.4.7", () => probeFocusRing(page, "", limits, deadline));
     if (r) {
-      out.focusVisible = r;
-      out.probed.push("2.4.7");
+      out.focusVisible = r.visible;
+      out.focusObscured = r.obscured;
+      if (want("2.4.7")) out.probed.push("2.4.7");
+      if (want("2.4.11")) out.probed.push("2.4.11");
     }
   }
   // AFTER focus visibility, and for the same reason it comes late: it walks the tab ring, which
@@ -637,6 +736,9 @@ export const REMOVE_TEXT_SPACING_STEP = `(() => {
 /** What `runLiveProbes` measured, and which criteria it is entitled to speak for. */
 export interface LiveProbeResult {
   focusVisible: ProbeHit[];
+  /** 2.4.11 — the focused component entirely hidden behind author-created content. Optional
+   *  so every existing caller and fixture that omits it stays valid. */
+  focusObscured?: ProbeHit[];
   hover: ProbeHit[];
   /** 2.1.2 — focus that Tab cannot move off. Empty AND `probed` carrying "2.1.2" is the only
    *  combination that means "the ring was walked and it always let go". */

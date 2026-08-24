@@ -262,6 +262,45 @@ var FOCUS_CHECK_PROBE = `(() => {
   const now = [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|');
   return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
 })()`;
+var FOCUS_OBSCURED_PROBE = `(() => { ${PRELUDE}
+  const e = document.activeElement;
+  if (!e || e === document.body || e === document.documentElement) return null;
+  const key = e.getAttribute && e.getAttribute('data-u11y-f');
+  if (!key) return null;
+  const r = e.getBoundingClientRect();
+  if (r.width < 1 || r.height < 1) return null;         // nothing to obscure
+  const vw = window.innerWidth, vh = window.innerHeight;
+  // Sample a 5\xD75 grid inset by a pixel, keeping only points inside the viewport. A component
+  // scrolled off-screen leaves no sampleable point and is NOT reported: out of view is not
+  // obscured, and the criterion is about content laid over it.
+  const xs = [0.02, 0.25, 0.5, 0.75, 0.98], pts = [];
+  for (const fx of xs) for (const fy of xs) {
+    const x = r.left + r.width * fx, y = r.top + r.height * fy;
+    if (x >= 0 && y >= 0 && x < vw && y < vh) pts.push([x, y]);
+  }
+  if (!pts.length) return null;
+  // The topmost element over a point, for each sampled point. The focused element counts as
+  // visible when it \u2014 or anything inside it \u2014 is on top: an icon inside a button is the button
+  // being visible, and reading that as occlusion would fail every well-built page.
+  let occluder = null;
+  for (const [x, y] of pts) {
+    const top = document.elementsFromPoint(x, y)[0];
+    if (!top) continue;
+    if (top === e || e.contains(top)) return null;      // some part of it is on top \u2192 pass
+    if (!occluder) occluder = top;
+  }
+  if (!occluder) return null;
+  // AUTHOR-CREATED OVERLAY, or nothing. Walk up from the occluder looking for the fixed/sticky
+  // ancestor that puts it over the page; without one this is ordinary layout, not obscuring.
+  let overlay = null;
+  for (let n = occluder; n && n !== document.documentElement; n = n.parentElement) {
+    const pos = getComputedStyle(n).position;
+    if (pos === 'fixed' || pos === 'sticky') { overlay = n; break; }
+  }
+  if (!overlay) return null;
+  if (overlay.contains(e)) return null;                 // it is the component's own container
+  return { key: key, selector: __sel(e), html: __html(e), overlay: __sel(overlay) };
+})()`;
 var HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
   const out = [];
   let n = 0;
@@ -285,10 +324,11 @@ function hoverVisibleExpr(id, wantHidden = false) {
   const j = JSON.stringify(id);
   return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
 }
-async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
+async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
   const count = await page.evaluate(focusSetupExpr(scope, limits.maxFocusables));
-  if (!count) return [];
+  if (!count) return { visible: [], obscured: [] };
   const hits = [];
+  const obscured = [];
   const seen = /* @__PURE__ */ new Set();
   const limit = tabPressBudget(count, limits);
   let prevKey = null;
@@ -305,12 +345,22 @@ async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, dead
       hits.push({
         selector: r.selector,
         html: r.html,
-        detail: "Le focus clavier ne produit aucun changement visible (outline/box-shadow/bordure/fond) \u2014 focus non visible (2.4.7)."
+        detail: "Le focus clavier ne produit aucun changement visible (outline/box-shadow/bordure/fond) \u2014 focus non visible."
       });
     }
-    if (hits.length >= 20) break;
+    if (obscured.length < 20 && !deadline?.out()) {
+      const o = await page.evaluate(FOCUS_OBSCURED_PROBE);
+      if (o) {
+        obscured.push({
+          selector: o.selector,
+          html: o.html,
+          detail: `Le composant qui re\xE7oit le focus clavier est enti\xE8rement masqu\xE9 par un contenu ajout\xE9 par l'auteur (${o.overlay}) \u2014 il est impossible de voir o\xF9 l'on se trouve au clavier.`
+        });
+      }
+    }
+    if (hits.length >= 20 && obscured.length >= 20) break;
   }
-  return hits;
+  return { visible: hits, obscured };
 }
 var NATIVE_SEGMENT_STOPS = {
   date: 5,
@@ -489,11 +539,13 @@ async function runLiveProbes(page, opts = {}) {
       }
     }
   }
-  if (want("2.4.7") && canType) {
-    const r = await bounded("2.4.7", () => probeFocusVisible(page, "", limits, deadline));
+  if ((want("2.4.7") || want("2.4.11")) && canType) {
+    const r = await bounded("2.4.7", () => probeFocusRing(page, "", limits, deadline));
     if (r) {
-      out.focusVisible = r;
-      out.probed.push("2.4.7");
+      out.focusVisible = r.visible;
+      out.focusObscured = r.obscured;
+      if (want("2.4.7")) out.probed.push("2.4.7");
+      if (want("2.4.11")) out.probed.push("2.4.11");
     }
   }
   if (want("2.1.2") && canType) {

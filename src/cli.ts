@@ -251,9 +251,12 @@ Commands:
              needs-rendering criteria the static engine can't — computed contrast
              (1.4.3), 320px reflow (1.4.10) — over a URL or HTML file. The local
              runtime (--runtime local, default when Playwright resolves from --cwd;
-             no Docker) additionally probes focus visibility (2.4.7), 200% zoom
-             (1.4.4), text spacing (1.4.12), content on hover (1.4.13) and target
-             size (2.5.8), and accepts --storage-state for authenticated pages.
+             no Docker) additionally probes focus visibility (2.4.7), focus not
+             obscured (2.4.11 — is the focused component entirely hidden behind a
+             sticky header / cookie banner? measured on the same walk of the tab
+             ring), 200% zoom (1.4.4), text spacing (1.4.12), content on hover
+             (1.4.13) and target size (2.5.8), and accepts --storage-state for
+             authenticated pages.
              By default the local runtime is STATEFUL: it types long values into
              inputs and flags any that clip at 320px/200%/text-spacing (1.4.10/1.4.4/
              1.4.12 — esp. inputs inside table cells), opens closed dialogs to re-check

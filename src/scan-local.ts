@@ -24,6 +24,7 @@ import {
   hoverVisibleExpr,
   PRELUDE,
   REMOVE_TEXT_SPACING_STEP,
+  probeFocusRing,
   probeFocusVisible,
   probeHover,
   probeKeyboardTrap,
@@ -40,6 +41,7 @@ export const LOCAL_ENGINE = "axe-core@playwright (local)";
 
 // The needs-rendering SCs the LOCAL runtime's probes actually MEASURE on every run: 200%
 // zoom (1.4.4), 320px reflow (1.4.10), text spacing (1.4.12), focus visibility (2.4.7),
+// focus not obscured (2.4.11 — the same walk of the tab ring as 2.4.7),
 // content on hover (1.4.13). Live regions (4.1.3) are measured only when the STATEFUL
 // interactions are on (`--no-interact` skips that probe). Stamped on every local
 // DynamicResult so the partial-audit advisory reflects real coverage — the Docker subset
@@ -48,7 +50,7 @@ export const LOCAL_ENGINE = "axe-core@playwright (local)";
 // array `renderedProvesOn` reads to decide whether an empty probe result may be read as
 // conformity, so a probe that runs without saying so here measures a criterion and then leaves
 // it « to assess » — the exact failure this file's comments describe elsewhere.
-const LOCAL_TESTED_SCS: readonly string[] = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13", "2.1.2"];
+const LOCAL_TESTED_SCS: readonly string[] = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
 export function localTestedScs(interact: boolean): string[] {
   return interact ? [...LOCAL_TESTED_SCS, "4.1.3"] : [...LOCAL_TESTED_SCS];
 }
@@ -700,7 +702,15 @@ async function runOnPage(
         return fallback;
       }
     };
-    const focusVisible = await ran("2.4.7", empty, () => probeFocusVisible(page));
+    // ONE WALK OF THE TAB RING, TWO CRITERIA: is focus visible (2.4.7), and is the focused
+    // component entirely hidden behind author-created content (2.4.11)? Both are asked of the
+    // same element at the same moment, so walking twice would double the cost of the most
+    // expensive probe here to learn nothing extra.
+    const focusRing = await ran("2.4.7", { visible: empty, obscured: empty }, () => probeFocusRing(page));
+    const focusVisible = focusRing.visible;
+    // Recorded as its own measured criterion — the ring was walked, so 2.4.11 has an answer
+    // whether or not it found anything, and an empty result must not read as "not measured".
+    probed.push("2.4.11");
     // Straight after the focus walk, on the same pristine DOM and reusing the tagging it has
     // just laid down. Before the inputs are filled and before any viewport change: a tab ring
     // measured at 320px, or with every field carrying injected text, is not the ring a keyboard
@@ -749,6 +759,7 @@ async function runOnPage(
       violations,
       reflow,
       focusVisible: dialogFocus.length ? [...focusVisible, ...dialogFocus] : focusVisible,
+      focusObscured: focusRing.obscured,
       hover,
       keyboardTrap,
       reflowZoom,

@@ -351,6 +351,79 @@ describe("the keyboard-trap probe tells a composite control from a cage", () => 
 });
 
 // ---------------------------------------------------------------------------------------------
+// 2.4.11 FOCUS NOT OBSCURED (MINIMUM) — the criterion no tier could reach.
+//
+// WCAG 2.2 added it and nothing here measured it, so it harvested ZERO evidence: an agent could
+// never rule it `C` however carefully it looked, because the gate requires a citation and there
+// was nothing to cite. A criterion condemned to `manual` for want of an instrument.
+//
+// The criterion's own wording decides every case below: « when a user interface component
+// receives keyboard focus, the component is not ENTIRELY hidden due to author-created content ».
+// Partly covered passes (that is 2.4.12, AAA). Scrolled out of view is not this criterion. The
+// component's own children are not "author-created content" obscuring it.
+//
+// A probe that never accuses anything is not a safe probe, it is a deleted one — so the fires
+// case and the four does-not-fire cases are asserted together.
+describe("the focus-obscured probe reads 2.4.11 as the criterion is written", () => {
+  const STICKY = `<div id="bar" style="position:fixed;left:0;top:0;width:100vw;height:200px;background:#fff"></div>`;
+  const withBody = async (body: string) => {
+    const page = await browser!.newPage();
+    await page.setContent(`<!doctype html><html lang="fr"><head><title>t</title></head><body style="margin:0">${body}</body></html>`, {
+      waitUntil: "load",
+    });
+    return page;
+  };
+  const obscured = async (body: string) => {
+    const page = await withBody(body);
+    const { probeFocusRing } = await import("../src/probes.js");
+    const hits = (await probeFocusRing(page)).obscured;
+    await page.close();
+    return hits;
+  };
+
+  it("fires when a fixed bar covers the focused component entirely", async () => {
+    if (!browserAvailable) return;
+    // The link sits at y≈20, wholly inside the 200px-tall bar laid over it.
+    const hits = await obscured(`<a id="hidden" href="/a" style="position:absolute;left:10px;top:20px">Aller au contenu</a>${STICKY}`);
+    expect(hits.map((h) => h.selector).join(","), "a link fully under a fixed bar was not reported").toContain("#hidden");
+    expect(hits[0]?.detail, "the finding must name the overlay a developer has to go and fix").toContain("#bar");
+  }, 120_000);
+
+  it("does NOT fire when the bar covers only part of it — that is 2.4.12, not 2.4.11", async () => {
+    if (!browserAvailable) return;
+    // Tall enough that its lower half clears the bar. Entirely hidden is the bar this criterion
+    // sets, and reporting a partly-covered component here would fail almost every sticky header
+    // on the web against a criterion that permits them.
+    const hits = await obscured(`<a id="tall" href="/a" style="position:absolute;left:10px;top:100px;display:block;height:300px">A</a>${STICKY}`);
+    expect(hits.map((h) => h.selector)).toEqual([]);
+  }, 120_000);
+
+  it("does NOT fire on a component scrolled out of the viewport", async () => {
+    if (!browserAvailable) return;
+    // Out of view is not hidden BY CONTENT: the browser scrolls focus into view, and content
+    // below the fold is not an author overlay. Nothing fixed on this page at all.
+    const hits = await obscured(`<a id="near" href="/a">A</a><div style="height:4000px"></div><a id="far" href="/b">B</a>`);
+    expect(hits.map((h) => h.selector)).toEqual([]);
+  }, 120_000);
+
+  it("does NOT fire when the topmost element is the component's own child", async () => {
+    if (!browserAvailable) return;
+    // An icon inside a button is the topmost element over that button's centre on every
+    // well-built page in existence. Reading that as occlusion would fail all of them.
+    const hits = await obscured(`<button id="b"><span style="display:block;width:100%;height:100%">✕</span></button>`);
+    expect(hits.map((h) => h.selector)).toEqual([]);
+  }, 120_000);
+
+  it("does NOT fire when the overlapping element is ordinary flow, not an author overlay", async () => {
+    if (!browserAvailable) return;
+    // A statically-positioned sibling drawn over the link by negative margin is a layout bug at
+    // worst; 2.4.11 is about content the author FIXED over the page.
+    const hits = await obscured(`<a id="a" href="/a" style="display:block;height:40px">A</a><div style="margin-top:-40px;height:40px;background:#fff"></div>`);
+    expect(hits.map((h) => h.selector)).toEqual([]);
+  }, 120_000);
+});
+
+// ---------------------------------------------------------------------------------------------
 // ONE BAD PAGE COSTS ITS OWN PAGE, NOT THE RUN.
 //
 // `runOnPage` drives a real browser, and a real browser throws — a page that reloads itself

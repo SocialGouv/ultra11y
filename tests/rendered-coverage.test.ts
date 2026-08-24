@@ -63,9 +63,10 @@ describe("a live probe is the other way a criterion gets measured", () => {
   // ACTED ON. No digest settles them, so before the probes they could only ever stay « to
   // assess » — on egapro, that was most of theme 10, run after run.
   // The full local-tier list — `src/scan-local.ts` LOCAL_TESTED_SCS. 2.1.2 joined it when the
-  // keyboard-trap probe landed, and this fixture has to follow, or the banner assertion below
-  // measures a sweep no runtime performs.
-  const probed = { probed: ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7"] };
+  // keyboard-trap probe landed and 2.4.11 when the focus-obscured probe joined the same walk
+  // of the tab ring; this fixture has to follow, or the banner assertion below measures a
+  // sweep no runtime performs.
+  const probed = { probed: ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11"] };
 
   it("concludes C when the probe ran on every page and observed nothing", () => {
     const r = auditPages(2, () => ({ probes: probed }));
@@ -102,7 +103,7 @@ describe("a live probe is the other way a criterion gets measured", () => {
     // five digest criteria and the report told its reader nothing had been tested.
     const r = auditPages(2, () => ({ probes: probed }));
     const tested = new Set(r.scope.scan?.testedScs ?? []);
-    for (const sc of ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7"]) {
+    for (const sc of ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11"]) {
       expect(tested.has(sc), `${sc} was probed on every page but is absent from scope.scan.testedScs`).toBe(true);
     }
     // …and 4.1.3 is STILL named, correctly: no probe measures a live region. Deciding it

@@ -54,7 +54,11 @@ function fakePage(overrides: Record<string, unknown> = {}) {
 describe("runLiveProbes", () => {
   it("names the criteria it actually probed", async () => {
     const r = await runLiveProbes(fakePage());
-    expect(r.probed.sort()).toEqual(["1.4.10", "1.4.12", "1.4.13", "1.4.4", "2.1.2", "2.4.7"]);
+    // 2.4.11 rides the SAME walk of the tab ring as 2.4.7 — both ask about the element that
+    // has focus at that moment — so it is probed whenever the ring is walked, and recorded
+    // separately so an empty result reads as « measured, nothing found » rather than « never
+    // measured ».
+    expect(r.probed.sort()).toEqual(["1.4.10", "1.4.12", "1.4.13", "1.4.4", "2.1.2", "2.4.11", "2.4.7"]);
   });
 
   it("restores the caller's viewport after narrowing it to 320px", async () => {

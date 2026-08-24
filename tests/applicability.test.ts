@@ -249,7 +249,12 @@ describe("every criterion left to assess says why, and where its evidence comes 
     // 2.1.2 left this list the day `probeKeyboardTrap` landed — a tier DOES decide it now, so
     // its reason points at `scan` like every other measured criterion. It is asserted below,
     // with the ones that carry a runnable command, which is the whole difference.
-    for (const sc of ["2.3.1", "2.4.11"]) {
+    //
+    // 2.4.11 left it the same way, on the same walk of the tab ring as 2.4.7. It mattered more
+    // there than anywhere else: with no tier measuring it, the criterion harvested ZERO
+    // evidence, so no agent could rule it `C` either — the gate needs a citation and there was
+    // nothing to cite. A cell nobody could fill, by any means.
+    for (const sc of ["2.3.1"]) {
       expect(r.residualRisks.find((x) => x.criteriaId === sc)?.reason, `SC ${sc}`).toMatch(/no automated tier decides this/i);
     }
     expect(r.residualRisks.some((x) => x.criteriaId === "1.4.5")).toBe(false);
@@ -257,7 +262,7 @@ describe("every criterion left to assess says why, and where its evidence comes 
   });
 
   it("carries a runnable command wherever one would actually help", () => {
-    for (const sc of ["1.4.3", "1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "4.1.3"]) {
+    for (const sc of ["1.4.3", "1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"]) {
       expect(r.residualRisks.find((x) => x.criteriaId === sc)?.reason, `SC ${sc}`).toMatch(/`[^`]*(scan|verify)[^`]*`/);
     }
   });

@@ -43,9 +43,11 @@ export function renderedProvesOn(sc: string, cov: PageCoverage | undefined): boo
   // AXE, for the handful of criteria it is the canonical decider of (AXE_DECIDES).
   if (AXE_DECIDES[sc] && cov.axe) return true;
   const rules = renderedRulesFor(sc);
-  // A criterion NO rule measures (1.4.5, 2.3.1, 2.4.11, 2.5.8) can never be concluded
-  // here — its silence is not a measurement, and reading it as one is exactly the failure this
-  // tier exists to avoid.
+  // A criterion NO rule measures (1.4.5 images of text, 2.3.1 flashes, 2.5.8 target size) can
+  // never be concluded here — its silence is not a measurement, and reading it as one is
+  // exactly the failure this tier exists to avoid. 2.4.11 left that list when the
+  // focus-obscured probe landed: it is now measured on the same walk of the tab ring as 2.4.7,
+  // so it comes through the live-probe branch above.
   if (!rules.length) return false;
   return rules.every((ruleId) => cov.rules?.includes(ruleId) === true);
 }

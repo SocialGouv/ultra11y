@@ -285,7 +285,11 @@ const RESIDUAL_TRAIL: Record<string, string> = {
   "2.1.2":
     "Needs a live browser: the tab ring is walked and every focusable is checked for one Tab cannot move off — `scan <url> --runtime local --merge <audit.json>`. A region only a pointer can open (a custom widget behind a click) still has to be attempted by hand.",
   "2.3.1": "No automated tier decides this: flashing has to be observed over time on the rendered page.",
-  "2.4.11": "No automated tier decides this: whether a focused element stays unobscured depends on the sticky headers and overlays in play on each screen.",
+  // 2.4.11 no longer has an entry here. It used to say "no automated tier decides this", which
+  // was true and was the problem: the criterion harvested zero evidence, so no agent could rule
+  // it C either — a cell nobody could ever fill. The focus-obscured probe measures it now, on
+  // the same walk of the tab ring as 2.4.7, so its residual reason is the ordinary
+  // needs-rendering one: run the scan.
 };
 
 function residualReason(automatability: string, sc?: string): string {
@@ -606,9 +610,10 @@ interface FinalizeExtra {
  *
  *   1. at least one page is in scope. No page ⇒ no measurement ⇒ nothing to conclude;
  *   2. the criterion is carried by at least one rendered rule. A criterion NO rule measures
- *      (1.4.5, 2.3.1, 2.4.11, 2.5.8 — 2.1.2 left this list when the keyboard-trap probe landed)
- *      can never be concluded here — its silence is not
- *      a measurement, and treating it as one is exactly the failure this tier exists to avoid;
+ *      (1.4.5, 2.3.1, 2.5.8 — 2.1.2 left this list when the keyboard-trap probe landed, 2.4.11
+ *      when the focus-obscured probe joined the same walk of the tab ring) can never be
+ *      concluded here — its silence is not a measurement, and treating it as one is exactly the
+ *      failure this tier exists to avoid;
  *   3. EVERY such rule ran on EVERY page. One page whose collector truncated, whose style
  *      digest failed verification or whose stylesheet was cross-origin, and the criterion
  *      stays open for the whole scope. The fold is an AND, never an OR;

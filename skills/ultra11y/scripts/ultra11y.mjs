@@ -39214,6 +39214,11 @@ var RENDERED_SIGNAL_RULES = Object.keys(SIGNALS_REQUIRED);
 var PROBE_WCAG = {
   "focus-visible": "2.4.7",
   // Focus Visible — focusing a control produces no visible change
+  // Focus Not Obscured (Minimum) — the focused component ENTIRELY hidden behind author-created
+  // content (a sticky header, a cookie banner, a floating action bar). WCAG 2.2 added it, and
+  // no tier measured it: 2.4.11 harvested ZERO evidence, so no agent could ever rule it `C` —
+  // a criterion condemned to `manual` for want of an instrument, not for want of a judgement.
+  "focus-obscured": "2.4.11",
   "reflow-zoom": "1.4.4",
   // Resize Text / 200% zoom — content clipped/lost when enlarged
   "text-spacing": "1.4.12",
@@ -39239,6 +39244,10 @@ var PROBE_WCAG = {
 };
 var PROBE_SEVERITY = {
   "focus-visible": "majeur",
+  // Not heuristic: the probe focused the component and found no point of it on top anywhere,
+  // under an element the author fixed over the page. A keyboard user cannot see where they
+  // are — the same class of blocker as focus that produces no indicator at all.
+  "focus-obscured": "majeur",
   "reflow-zoom": "majeur",
   "text-spacing": "mineur",
   hover: "mineur",
@@ -49478,8 +49487,12 @@ var RESIDUAL_TRAIL = {
   // letting the reader discover it changes nothing.
   "1.4.5": "No automated tier decides this: whether text is presented as an image is a reading of each image's content. Adjudicate it (`verify --manual`) against the images the audit lists.",
   "2.1.2": "Needs a live browser: the tab ring is walked and every focusable is checked for one Tab cannot move off \u2014 `scan <url> --runtime local --merge <audit.json>`. A region only a pointer can open (a custom widget behind a click) still has to be attempted by hand.",
-  "2.3.1": "No automated tier decides this: flashing has to be observed over time on the rendered page.",
-  "2.4.11": "No automated tier decides this: whether a focused element stays unobscured depends on the sticky headers and overlays in play on each screen."
+  "2.3.1": "No automated tier decides this: flashing has to be observed over time on the rendered page."
+  // 2.4.11 no longer has an entry here. It used to say "no automated tier decides this", which
+  // was true and was the problem: the criterion harvested zero evidence, so no agent could rule
+  // it C either — a cell nobody could ever fill. The focus-obscured probe measures it now, on
+  // the same walk of the tab ring as 2.4.7, so its residual reason is the ordinary
+  // needs-rendering one: run the scan.
 };
 function residualReason(automatability2, sc) {
   const trail = sc ? RESIDUAL_TRAIL[sc] : void 0;
@@ -56150,6 +56163,7 @@ var NEEDS_RENDERING = [
   { sc: "1.4.13", label: { fr: "contenu au survol", en: "content on hover" } },
   { sc: "2.1.2", label: { fr: "pi\xE8ge au clavier", en: "keyboard trap" } },
   { sc: "2.4.7", label: { fr: "visibilit\xE9 du focus", en: "focus visibility" } },
+  { sc: "2.4.11", label: { fr: "focus masqu\xE9", en: "focus obscured" } },
   { sc: "4.1.3", label: { fr: "r\xE9gions live", en: "live regions" } }
 ];
 function untestedNeedsRendering(r) {
@@ -60911,6 +60925,7 @@ function writeRunnerSnapshot(root, out2, target, page) {
 }
 var PROBE_FIELDS = [
   { key: "focusVisible", engine: "focus-visible" },
+  { key: "focusObscured", engine: "focus-obscured" },
   { key: "reflowZoom", engine: "reflow-zoom" },
   { key: "textSpacing", engine: "text-spacing" },
   { key: "hover", engine: "hover" },
@@ -61399,6 +61414,45 @@ var FOCUS_CHECK_PROBE = `(() => {
   const now = [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|');
   return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
 })()`;
+var FOCUS_OBSCURED_PROBE = `(() => { ${PRELUDE}
+  const e = document.activeElement;
+  if (!e || e === document.body || e === document.documentElement) return null;
+  const key = e.getAttribute && e.getAttribute('data-u11y-f');
+  if (!key) return null;
+  const r = e.getBoundingClientRect();
+  if (r.width < 1 || r.height < 1) return null;         // nothing to obscure
+  const vw = window.innerWidth, vh = window.innerHeight;
+  // Sample a 5\xD75 grid inset by a pixel, keeping only points inside the viewport. A component
+  // scrolled off-screen leaves no sampleable point and is NOT reported: out of view is not
+  // obscured, and the criterion is about content laid over it.
+  const xs = [0.02, 0.25, 0.5, 0.75, 0.98], pts = [];
+  for (const fx of xs) for (const fy of xs) {
+    const x = r.left + r.width * fx, y = r.top + r.height * fy;
+    if (x >= 0 && y >= 0 && x < vw && y < vh) pts.push([x, y]);
+  }
+  if (!pts.length) return null;
+  // The topmost element over a point, for each sampled point. The focused element counts as
+  // visible when it \u2014 or anything inside it \u2014 is on top: an icon inside a button is the button
+  // being visible, and reading that as occlusion would fail every well-built page.
+  let occluder = null;
+  for (const [x, y] of pts) {
+    const top = document.elementsFromPoint(x, y)[0];
+    if (!top) continue;
+    if (top === e || e.contains(top)) return null;      // some part of it is on top \u2192 pass
+    if (!occluder) occluder = top;
+  }
+  if (!occluder) return null;
+  // AUTHOR-CREATED OVERLAY, or nothing. Walk up from the occluder looking for the fixed/sticky
+  // ancestor that puts it over the page; without one this is ordinary layout, not obscuring.
+  let overlay = null;
+  for (let n = occluder; n && n !== document.documentElement; n = n.parentElement) {
+    const pos = getComputedStyle(n).position;
+    if (pos === 'fixed' || pos === 'sticky') { overlay = n; break; }
+  }
+  if (!overlay) return null;
+  if (overlay.contains(e)) return null;                 // it is the component's own container
+  return { key: key, selector: __sel(e), html: __html(e), overlay: __sel(overlay) };
+})()`;
 var HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
   const out = [];
   let n = 0;
@@ -61423,9 +61477,13 @@ function hoverVisibleExpr(id, wantHidden = false) {
   return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
 }
 async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
+  return (await probeFocusRing(page, scope, limits, deadline)).visible;
+}
+async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
   const count = await page.evaluate(focusSetupExpr(scope, limits.maxFocusables));
-  if (!count) return [];
+  if (!count) return { visible: [], obscured: [] };
   const hits = [];
+  const obscured = [];
   const seen = /* @__PURE__ */ new Set();
   const limit = tabPressBudget(count, limits);
   let prevKey = null;
@@ -61442,12 +61500,22 @@ async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, dead
       hits.push({
         selector: r.selector,
         html: r.html,
-        detail: "Le focus clavier ne produit aucun changement visible (outline/box-shadow/bordure/fond) \u2014 focus non visible (2.4.7)."
+        detail: "Le focus clavier ne produit aucun changement visible (outline/box-shadow/bordure/fond) \u2014 focus non visible."
       });
     }
-    if (hits.length >= 20) break;
+    if (obscured.length < 20 && !deadline?.out()) {
+      const o = await page.evaluate(FOCUS_OBSCURED_PROBE);
+      if (o) {
+        obscured.push({
+          selector: o.selector,
+          html: o.html,
+          detail: `Le composant qui re\xE7oit le focus clavier est enti\xE8rement masqu\xE9 par un contenu ajout\xE9 par l'auteur (${o.overlay}) \u2014 il est impossible de voir o\xF9 l'on se trouve au clavier.`
+        });
+      }
+    }
+    if (hits.length >= 20 && obscured.length >= 20) break;
   }
-  return hits;
+  return { visible: hits, obscured };
 }
 var NATIVE_SEGMENT_STOPS = {
   date: 5,
@@ -61538,7 +61606,7 @@ async function probeHover(page, limits = PROBE_DEFAULTS, deadline) {
 
 // src/scan-local.ts
 var LOCAL_ENGINE = "axe-core@playwright (local)";
-var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "1.4.13", "2.1.2"];
+var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
 function localTestedScs(interact) {
   return interact ? [...LOCAL_TESTED_SCS, "4.1.3"] : [...LOCAL_TESTED_SCS];
 }
@@ -61947,7 +62015,9 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
         return fallback;
       }
     };
-    const focusVisible = await ran("2.4.7", empty, () => probeFocusVisible(page));
+    const focusRing = await ran("2.4.7", { visible: empty, obscured: empty }, () => probeFocusRing(page));
+    const focusVisible = focusRing.visible;
+    probed.push("2.4.11");
     const keyboardTrap = await ran("2.1.2", empty, () => probeKeyboardTrap(page));
     const hover = await ran("1.4.13", empty, () => probeHover(page));
     const l = opts.lang;
@@ -61978,6 +62048,7 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
       violations,
       reflow,
       focusVisible: dialogFocus.length ? [...focusVisible, ...dialogFocus] : focusVisible,
+      focusObscured: focusRing.obscured,
       hover,
       keyboardTrap,
       reflowZoom,
@@ -68660,9 +68731,12 @@ Commands:
              needs-rendering criteria the static engine can't \u2014 computed contrast
              (1.4.3), 320px reflow (1.4.10) \u2014 over a URL or HTML file. The local
              runtime (--runtime local, default when Playwright resolves from --cwd;
-             no Docker) additionally probes focus visibility (2.4.7), 200% zoom
-             (1.4.4), text spacing (1.4.12), content on hover (1.4.13) and target
-             size (2.5.8), and accepts --storage-state for authenticated pages.
+             no Docker) additionally probes focus visibility (2.4.7), focus not
+             obscured (2.4.11 \u2014 is the focused component entirely hidden behind a
+             sticky header / cookie banner? measured on the same walk of the tab
+             ring), 200% zoom (1.4.4), text spacing (1.4.12), content on hover
+             (1.4.13) and target size (2.5.8), and accepts --storage-state for
+             authenticated pages.
              By default the local runtime is STATEFUL: it types long values into
              inputs and flags any that clip at 320px/200%/text-spacing (1.4.10/1.4.4/
              1.4.12 \u2014 esp. inputs inside table cells), opens closed dialogs to re-check

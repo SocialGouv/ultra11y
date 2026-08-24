@@ -11,6 +11,11 @@ import { hasSC } from "./wcag.js";
 // (a clean probe leaves the SC `manual`, never silently Conforming).
 export const PROBE_WCAG: Record<Exclude<DynamicEngine, "axe" | "reflow">, string> = {
   "focus-visible": "2.4.7", // Focus Visible — focusing a control produces no visible change
+  // Focus Not Obscured (Minimum) — the focused component ENTIRELY hidden behind author-created
+  // content (a sticky header, a cookie banner, a floating action bar). WCAG 2.2 added it, and
+  // no tier measured it: 2.4.11 harvested ZERO evidence, so no agent could ever rule it `C` —
+  // a criterion condemned to `manual` for want of an instrument, not for want of a judgement.
+  "focus-obscured": "2.4.11",
   "reflow-zoom": "1.4.4", // Resize Text / 200% zoom — content clipped/lost when enlarged
   "text-spacing": "1.4.12", // Text Spacing — clipping/overlap under the WCAG spacing override
   hover: "1.4.13", // Content on Hover or Focus — not dismissible/hoverable/persistent
@@ -32,6 +37,10 @@ export const PROBE_WCAG: Record<Exclude<DynamicEngine, "axe" | "reflow">, string
 // (majeur); spacing/hover are heuristic, so minor by default (tunable).
 export const PROBE_SEVERITY: Record<Exclude<DynamicEngine, "axe" | "reflow">, Severity> = {
   "focus-visible": "majeur",
+  // Not heuristic: the probe focused the component and found no point of it on top anywhere,
+  // under an element the author fixed over the page. A keyboard user cannot see where they
+  // are — the same class of blocker as focus that produces no indicator at all.
+  "focus-obscured": "majeur",
   "reflow-zoom": "majeur",
   "text-spacing": "mineur",
   hover: "mineur",
