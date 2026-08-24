@@ -2,6 +2,7 @@ import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, appen
 import { join, relative, resolve, sep, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
+  SCHEMA_VERSION,
   VERSION,
   type Lang,
   type AuditResult,
@@ -542,6 +543,11 @@ function isCommand(s: string | undefined): s is Command {
 }
 
 const VALUE_FLAGS = new Set([
+  "runner",
+  "grain",
+  "max-budget-usd",
+  "timeout",
+  "concurrency",
   "out",
   "provider",
   "grain",
@@ -3273,6 +3279,44 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
       : `ultra11y judge: ${items.length} criterion(ia) in ${batches.length} batch(es), ${runner} transport, model ${model}…`,
   );
 
+  const outDir = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
+  const cwd = typeof p.flags.cwd === "string" ? (p.flags.cwd as string) : undefined;
+  const applying = p.flags.apply === true;
+  const askedConcurrency = typeof p.flags.concurrency === "string" ? Number(p.flags.concurrency) : Number.NaN;
+  const cliConcurrency = Number.isFinite(askedConcurrency) && askedConcurrency > 0 ? Math.min(askedConcurrency, 8) : 2;
+
+  // CHECKPOINTS, because a killed run used to lose everything it had already paid for.
+  //
+  // Measured: a per-criterion pass reached 31 of 51 criteria in 40 minutes, the CI job hit its
+  // 45-minute ceiling, the process was killed — and the audit came back with all 51 still to
+  // assess. The fold only ran at the END, so 31 rulings were bought and thrown away. Isolating
+  // the model call per criterion buys nothing while the WRITE is still one all-or-nothing
+  // operation, which is exactly what the per-criterion grain was sold as fixing.
+  //
+  // Time-throttled rather than every batch: the fold re-grounds every citation against real
+  // source, and doing that 51 times over would spend on bookkeeping what the grain saves.
+  const CHECKPOINT_MS = 15_000;
+  let lastCheckpoint = 0;
+  const checkpoint = (force: boolean): void => {
+    if (!applying) return;
+    const now = Date.now();
+    if (!force && now - lastCheckpoint < CHECKPOINT_MS) return;
+    lastCheckpoint = now;
+    try {
+      const partial = applyAdjudication(
+        audit,
+        { tool: "ultra11y", kind: "adjudication", schemaVersion: SCHEMA_VERSION, standard, auditDate: audit.date, items },
+        { cwd },
+      );
+      // A partial sweep cannot satisfy the COVERAGE check, and that is correct rather than a
+      // problem: the per-verdict fold still lands every valid verdict, and the criteria nobody
+      // has reached yet stay to assess. Only a checkpoint that landed nothing is worth skipping.
+      if (partial.applied > 0) writeFileSync(join(outDir, "audit-latest.json"), `${JSON.stringify(partial.audit, null, 2)}\n`);
+    } catch {
+      // A checkpoint is a safety net, never a reason to lose the run it protects.
+    }
+  };
+
   let spent = 0;
   // A dollar ceiling and a wall clock — never a turn budget. `--max-turns` is not a flag of
   // the Claude Code CLI, and the CLI swallows unknown flags without a word, so passing one
@@ -3283,13 +3327,21 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
     apiKey: key,
     model,
     backend: runner === "cli" ? judgeBatchCli : undefined,
-    // One local process at a time. Four in flight is an answer to a rate limit, and a rate
-    // limit is not what bounds a subprocess.
-    concurrency: runner === "cli" ? 1 : undefined,
+    // TWO local processes, not one, and the reason is measured rather than tuned: sequentially,
+    // one criterion took ~75s on Haiku, so a 51-criterion sweep needs ~64 minutes and a CI job
+    // that allows 45 is killed at 31. Two in flight brings it inside the ceiling; more than a
+    // few is a different risk — each `claude` is its own Node process making its own API calls,
+    // and four of them on a subscription token reach a rate limit faster than four HTTP
+    // requests do. `--concurrency` overrides it for a runner with room.
+    concurrency: runner === "cli" ? cliConcurrency : undefined,
     maxBudgetUsd: Number.isFinite(maxBudgetUsd) ? maxBudgetUsd : undefined,
     timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : undefined,
     onCost: (usd) => {
       spent += usd;
+    },
+    onVerdicts: (landed) => {
+      applyRawVerdicts(items, landed);
+      checkpoint(false);
     },
     onProgress: (done, total) => console.error(`  ${done}/${total}`),
   });

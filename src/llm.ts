@@ -74,6 +74,15 @@ export interface LlmOptions {
   /** Called with each invocation's real cost, so a run can report what it spent instead of
    *  leaving the reader to find it in a provider dashboard. */
   onCost?: (usd: number) => void;
+  /** Called with each batch's verdicts AS THEY LAND, so a caller can persist them before the
+   *  run is over.
+   *
+   *  Measured, and it cost a whole paid run: a per-criterion pass reached 31 of 51 criteria in
+   *  40 minutes, the CI job hit its 45-minute ceiling, the process was killed — and because
+   *  the fold only ran at the END, all 31 verdicts went with it. The audit came back with 51
+   *  criteria still to assess, having paid for 31. Isolating the model CALL per criterion is
+   *  worth nothing if the write is still one all-or-nothing operation at the end. */
+  onVerdicts?: (verdicts: RawVerdict[]) => void;
   /** Backoff before retry N (1-based). Injected so a test can exercise the retry path
    *  without waiting out the real curve. */
   backoffMs?: (attempt: number) => number;
@@ -270,7 +279,11 @@ export async function judgeAll(
     Array.from({ length: Math.min(lanes, queue.length) }, async () => {
       for (let b = queue.shift(); b !== undefined; b = queue.shift()) {
         try {
-          verdicts.push(...(await backend(b.items, b.prompt, opts)));
+          const landed = await backend(b.items, b.prompt, opts);
+          verdicts.push(...landed);
+          // Handed over BEFORE the next batch starts, so a run that dies mid-sweep leaves
+          // behind what it had already ruled on rather than nothing at all.
+          if (landed.length) opts.onVerdicts?.(landed);
         } catch (e) {
           failures.push(e instanceof Error ? e.message : String(e));
         }

@@ -60209,7 +60209,9 @@ async function judgeAll(batches, opts) {
     Array.from({ length: Math.min(lanes, queue.length) }, async () => {
       for (let b = queue.shift(); b !== void 0; b = queue.shift()) {
         try {
-          verdicts.push(...await backend(b.items, b.prompt, opts));
+          const landed = await backend(b.items, b.prompt, opts);
+          verdicts.push(...landed);
+          if (landed.length) opts.onVerdicts?.(landed);
         } catch (e) {
           failures.push(e instanceof Error ? e.message : String(e));
         }
@@ -68733,6 +68735,11 @@ function isCommand(s) {
   return !!s && COMMANDS.includes(s);
 }
 var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
+  "runner",
+  "grain",
+  "max-budget-usd",
+  "timeout",
+  "concurrency",
   "out",
   "provider",
   "grain",
@@ -70720,6 +70727,29 @@ async function cmdJudge(p) {
   console.error(
     lang === "fr" ? `ultra11y judge : ${items.length} crit\xE8re(s) en ${batches.length} lot(s), transport ${runner}, mod\xE8le ${model}\u2026` : `ultra11y judge: ${items.length} criterion(ia) in ${batches.length} batch(es), ${runner} transport, model ${model}\u2026`
   );
+  const outDir = typeof p.flags.out === "string" ? p.flags.out : ".";
+  const cwd = typeof p.flags.cwd === "string" ? p.flags.cwd : void 0;
+  const applying = p.flags.apply === true;
+  const askedConcurrency = typeof p.flags.concurrency === "string" ? Number(p.flags.concurrency) : Number.NaN;
+  const cliConcurrency = Number.isFinite(askedConcurrency) && askedConcurrency > 0 ? Math.min(askedConcurrency, 8) : 2;
+  const CHECKPOINT_MS = 15e3;
+  let lastCheckpoint = 0;
+  const checkpoint = (force) => {
+    if (!applying) return;
+    const now = Date.now();
+    if (!force && now - lastCheckpoint < CHECKPOINT_MS) return;
+    lastCheckpoint = now;
+    try {
+      const partial = applyAdjudication(
+        audit2,
+        { tool: "ultra11y", kind: "adjudication", schemaVersion: SCHEMA_VERSION, standard, auditDate: audit2.date, items },
+        { cwd }
+      );
+      if (partial.applied > 0) writeFileSync20(join52(outDir, "audit-latest.json"), `${JSON.stringify(partial.audit, null, 2)}
+`);
+    } catch {
+    }
+  };
   let spent = 0;
   const maxBudgetUsd = typeof p.flags["max-budget-usd"] === "string" ? Number(p.flags["max-budget-usd"]) : void 0;
   const timeoutMs = typeof p.flags.timeout === "string" ? Number(p.flags.timeout) * 1e3 : void 0;
@@ -70727,13 +70757,21 @@ async function cmdJudge(p) {
     apiKey: key,
     model,
     backend: runner === "cli" ? judgeBatchCli : void 0,
-    // One local process at a time. Four in flight is an answer to a rate limit, and a rate
-    // limit is not what bounds a subprocess.
-    concurrency: runner === "cli" ? 1 : void 0,
+    // TWO local processes, not one, and the reason is measured rather than tuned: sequentially,
+    // one criterion took ~75s on Haiku, so a 51-criterion sweep needs ~64 minutes and a CI job
+    // that allows 45 is killed at 31. Two in flight brings it inside the ceiling; more than a
+    // few is a different risk — each `claude` is its own Node process making its own API calls,
+    // and four of them on a subscription token reach a rate limit faster than four HTTP
+    // requests do. `--concurrency` overrides it for a runner with room.
+    concurrency: runner === "cli" ? cliConcurrency : void 0,
     maxBudgetUsd: Number.isFinite(maxBudgetUsd) ? maxBudgetUsd : void 0,
     timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : void 0,
     onCost: (usd) => {
       spent += usd;
+    },
+    onVerdicts: (landed) => {
+      applyRawVerdicts(items, landed);
+      checkpoint(false);
     },
     onProgress: (done, total) => console.error(`  ${done}/${total}`)
   });
