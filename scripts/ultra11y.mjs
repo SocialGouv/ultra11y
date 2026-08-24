@@ -60179,7 +60179,6 @@ function pruneRefuted(audit2, standard, items, lang = "en") {
   const reopenedCriteria = [];
   const clearedConformities = [];
   let removedFindings = 0;
-  let skippedEngine;
   const deleted = /* @__PURE__ */ new Set();
   const acted = /* @__PURE__ */ new Set();
   const prune = (rec, setOpen) => {
@@ -60231,7 +60230,7 @@ function pruneRefuted(audit2, standard, items, lang = "en") {
       });
     }
   }
-  skippedEngine = withdrawn.filter((it) => !acted.has(it.criteriaId)).length;
+  const skippedEngine = withdrawn.filter((it) => !acted.has(it.criteriaId)).length;
   if (deleted.size) next.findings = next.findings.filter((f) => !deleted.has(`${f.criteriaId}|${findingKey(f)}`));
   if (isCore(standard)) recomputeTallies(next);
   return { audit: next, removedFindings, reopenedCriteria, clearedConformities, skippedEngine };

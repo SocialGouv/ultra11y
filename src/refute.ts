@@ -87,7 +87,6 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
   const reopenedCriteria: string[] = [];
   const clearedConformities: string[] = [];
   let removedFindings = 0;
-  let skippedEngine: number;
   // Every anchor actually deleted from a criterion, so the flat findings list is filtered by
   // what the criteria agreed to lose — never by the worklist, which may name an engine anchor
   // this pass refuses to touch.
@@ -164,7 +163,7 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
 
   // Everything the trial withdrew that this pass did not act on — counted here rather than
   // inside the loops, so the case where there is no record to iterate at all is counted too.
-  skippedEngine = withdrawn.filter((it) => !acted.has(it.criteriaId)).length;
+  const skippedEngine = withdrawn.filter((it) => !acted.has(it.criteriaId)).length;
 
   // The flat list mirrors the criteria, and only them: an anchor the criteria refused to drop
   // stays here too, or `check`'s grounding would resolve a finding no criterion carries.
