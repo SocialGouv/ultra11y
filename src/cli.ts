@@ -64,7 +64,7 @@ import {
   type AdjudicationFile,
 } from "./adjudicate.js";
 import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, unreadableCaptures, type VerdictLedger, writeLedger } from "./ledger.js";
-import { DEFAULT_CLI_MODEL, judgeBatchCli, refuteBatchCli } from "./agent-cli.js";
+import { DEFAULT_CLI_MODEL, EFFORT_LEVELS, judgeBatchCli, refuteBatchCli } from "./agent-cli.js";
 import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv, type LlmOptions } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable, localTierStatus } from "./scan-local.js";
@@ -142,7 +142,7 @@ Usage:
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
   ultra11y fix      <globs… | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
-  ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|cli] [--grain batch|criterion] [--max <n>] [--model <id>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate the manual criteria with a model — api needs ANTHROPIC_API_KEY; cli runs the Claude Code CLI and takes CLAUDE_CODE_OAUTH_TOKEN too)
+  ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|cli] [--grain batch|criterion] [--max <n>] [--model <id>] [--effort <level>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate the manual criteria with a model — api needs ANTHROPIC_API_KEY; cli runs the Claude Code CLI and takes CLAUDE_CODE_OAUTH_TOKEN too)
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
   ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--runtime …] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
@@ -375,6 +375,8 @@ Options:
   --provider <id>    tickets: auto|github|gitlab|jira. 'auto' reads ULTRA11Y_TICKET_PROVIDER,
                      then .ultra11yrc.json, then the git remote (Jira is never auto-detected)
   --grain <mode>     tickets: what one ticket is — criterion (default) | page | page-criterion | single | file
+  --effort <level>   judge (--runner cli): reasoning effort per invocation — low | medium |
+                     high | xhigh | max. Unset leaves the CLI's own default
   --transport <t>    tickets: auto|cli|rest (mcp: stdio|http). 'auto' prefers the CLI (gh/glab),
                      falling back to REST when only a token is available. Jira is REST-only
   --max-tickets <n>  tickets: refuse to file more than n tickets in one run (default 200)
@@ -582,6 +584,7 @@ const VALUE_FLAGS = new Set([
   "runner",
   "grain",
   "max-budget-usd",
+  "effort",
   "timeout",
   "concurrency",
   "out",
@@ -3561,6 +3564,21 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
     return 2;
   }
 
+  // HOW HARD THE MODEL IS ASKED TO THINK, which on this worklist is not a detail: what reaches
+  // this tier is what no engine could decide. Validated rather than forwarded, because the CLI
+  // SWALLOWS AN UNKNOWN VALUE the same way it swallows an unknown flag — `--effort hgih` would
+  // read as a setting and be nothing at all, which is the failure mode this repo already ate
+  // once with `--max-turns`. Refused here, loudly, while the message can still reach a human.
+  const effort = typeof p.flags.effort === "string" ? (p.flags.effort as string) : undefined;
+  if (effort !== undefined && !EFFORT_LEVELS.includes(effort)) {
+    console.error(`ultra11y judge: --effort '${effort}' is not a level — expected ${EFFORT_LEVELS.map((l) => `'${l}'`).join(", ")}.`);
+    return 2;
+  }
+  if (effort !== undefined && runner !== "cli") {
+    console.error("ultra11y judge: --effort applies to `--runner cli` only — the Messages API has no session to set an effort on.");
+    return 2;
+  }
+
   const key = typeof p.flags["api-key"] === "string" && p.flags["api-key"] ? (p.flags["api-key"] as string) : apiKeyFromEnv();
   if (!key && runner === "api") {
     console.error(
@@ -3684,6 +3702,7 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
     // requests do. `--concurrency` overrides it for a runner with room.
     concurrency: runner === "cli" ? cliConcurrency : undefined,
     maxBudgetUsd: Number.isFinite(maxBudgetUsd) ? maxBudgetUsd : undefined,
+    effort,
     timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : undefined,
     onCost: (usd) => {
       spent += usd;

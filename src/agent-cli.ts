@@ -39,6 +39,12 @@ const MAX_ATTEMPTS = 4;
  *  states a model rather than inheriting one. */
 export const DEFAULT_CLI_MODEL = "claude-haiku-4-5-20251001";
 
+/** The levels `claude --effort` accepts. Enumerated here so a caller's typo is refused with a
+ *  message instead of forwarded: this CLI treats an unrecognised value the way it treats an
+ *  unrecognised flag — silently — and a ceiling that is silently nothing is the exact failure
+ *  `--max-turns` already cost this repo once. */
+export const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
+
 /** What `claude -p --output-format json` puts on stdout. Only the fields this reads. */
 interface CliEnvelope {
   /** Where `--json-schema` puts the validated object. Present since 2.1.x; `result` carries
@@ -168,6 +174,9 @@ export function cliArgv(opts: LlmOptions, items: AdjudicationItem[]): string[] {
   // a turn budget and be an unbounded run. The bounds that are real: `--max-budget-usd`, which
   // the CLI documents, and the wall-clock kill in `judgeBatchCli`, which is ours.
   if (opts.maxBudgetUsd !== undefined) argv.push("--max-budget-usd", String(opts.maxBudgetUsd));
+  // `--effort` IS documented by this CLI, unlike `--max-turns` above — so it is passed, and a
+  // caller can raise how hard the model thinks without also having to change the model.
+  if (opts.effort) argv.push("--effort", opts.effort);
   return argv;
 }
 
@@ -274,6 +283,9 @@ export async function refuteBatchCli(items: VerifyItem[], prompt: string, opts: 
     opts.model ?? DEFAULT_CLI_MODEL,
   ];
   if (opts.maxBudgetUsd !== undefined) argv.push("--max-budget-usd", String(opts.maxBudgetUsd));
+  // `--effort` IS documented by this CLI, unlike `--max-turns` above — so it is passed, and a
+  // caller can raise how hard the model thinks without also having to change the model.
+  if (opts.effort) argv.push("--effort", opts.effort);
   return runCli(argv, prompt, opts, (env) => {
     const structured = (env.structured_output as { verdicts?: unknown } | undefined)?.verdicts;
     const raw = Array.isArray(structured) ? structured : verdictsArrayFromText(env.result ?? "");

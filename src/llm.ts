@@ -71,6 +71,15 @@ export interface LlmOptions {
   /** Dollar ceiling handed to the CLI backend — the bound that survives whatever a turn
    *  happens to cost, which is what a CI job actually wants to cap. */
   maxBudgetUsd?: number;
+  /** Reasoning effort handed to the CLI backend (`--effort`: low, medium, high, xhigh, max).
+   *
+   *  The criteria this tier rules on are the ones no engine can decide — alt relevance, link
+   *  purpose in context, reading order — so how hard the model is asked to think is a real
+   *  lever on the verdict, and one a caller should be able to move without also changing the
+   *  model. Unlike `--max-turns`, `--effort` IS a flag of this CLI, so it is passed rather
+   *  than refused. The Messages backend ignores it: effort is a session notion there, not a
+   *  request parameter. */
+  effort?: string;
   /** Called with each invocation's real cost, so a run can report what it spent instead of
    *  leaving the reader to find it in a provider dashboard. */
   onCost?: (usd: number) => void;

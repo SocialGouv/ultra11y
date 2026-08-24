@@ -195,6 +195,10 @@ inputs:
     description: 'Model id for BOTH adjudication tiers. `api` passes it to the Messages call; `agent` passes it to claude-code-action, which is how an agent run picks a cheaper model than the harness default — a full RGAA worklist is ~90 items and the tier is billed per item. Empty follows $ULTRA11Y_LLM_MODEL for the API tier, then each tier''s own default.'
     required: false
     default: ''
+  adjudicate-effort:
+    description: "Reasoning effort for the `agent` tier — `low`, `medium`, `high`, `xhigh` or `max`. Empty leaves the harness default. This is the lever that is NOT the model: what reaches this tier is what no engine could decide (alt relevance, link purpose in context, reading order), so how hard the model is asked to think moves verdicts without moving the bill to a bigger tier. Applies to both runners — `action` passes `--effort` through `claude_args`, `cli` through the engine. The value is validated rather than forwarded: this CLI swallows an unrecognised value the way it swallows an unrecognised flag, so a typo would read as a setting and be nothing at all."
+    required: false
+    default: ''
   gate-adjudicated:
     description: 'Gate on the ADJUDICATED audit instead of re-auditing the source, so a model-ruled non-conformity can fail the job. The trade is real: the red/green stops being reproducible run to run. Ignored when `adjudicate` is `none`.'
     required: false
@@ -729,6 +733,7 @@ runs:
         GRAIN: ${{ inputs.adjudicate-grain }}
         PASSES: ${{ inputs.adjudicate-passes }}
         MODEL: ${{ inputs.adjudicate-model }}
+        EFFORT: ${{ inputs.adjudicate-effort }}
         BUDGET: ${{ inputs.adjudicate-budget-usd }}
         LEDGER: ${{ inputs.ledger }}
         GATE: ${{ inputs.gate-adjudicated }}
@@ -748,6 +753,7 @@ runs:
         args=(--in audits/audit-latest.json --out audits --apply --runner cli)
         args+=(--grain "${GRAIN:-worklist}" --standard "$STANDARD" --lang "$LANG_OPT")
         if [ -n "${MODEL:-}" ]; then args+=(--model "$MODEL"); fi
+        if [ -n "${EFFORT:-}" ]; then args+=(--effort "$EFFORT"); fi
         if [ -n "${BUDGET:-}" ]; then args+=(--max-budget-usd "$BUDGET"); fi
         if [ -n "$LEDGER" ] && [ "$LEDGER" != 'false' ]; then
           if [ "$LEDGER" = 'true' ]; then args+=(--ledger ".ultra11y/verdicts/$STANDARD.json"); else args+=(--ledger "$LEDGER"); fi
@@ -792,6 +798,7 @@ runs:
         MAX_TURNS: ${{ inputs.adjudicate-max-turns }}
         # Read from the environment, like every other caller-controlled input in this file.
         MODEL: ${{ inputs.adjudicate-model }}
+        EFFORT: ${{ inputs.adjudicate-effort }}
       run: |
         # `--no-web` is EXPLICIT, not left to the `CI` env var: the adjudicator below is
         # granted Read,Grep,Glob,Edit,Write and nothing else, so a brief that offers it a web
@@ -853,6 +860,18 @@ runs:
               echo "::warning::ultra11y: adjudicate-model='$MODEL' is not a model id — ignoring it and letting claude-code-action choose."
               ;;
             *) cargs="$cargs --model $MODEL" ;;
+          esac
+        fi
+        # Same shape as the model above, and validated for the same reason: the value is
+        # caller-controlled and about to be written to $GITHUB_OUTPUT. The allowed set is
+        # closed, so a typo is refused here rather than forwarded to a CLI that would swallow
+        # it in silence and leave the run at a default nobody asked for.
+        if [ -n "${EFFORT:-}" ]; then
+          case "$EFFORT" in
+            low|medium|high|xhigh|max) cargs="$cargs --effort $EFFORT" ;;
+            *)
+              echo "::warning::ultra11y: adjudicate-effort='$EFFORT' is not a level — expected low, medium, high, xhigh or max. Ignoring it."
+              ;;
           esac
         fi
         echo "args=$cargs" >> "$GITHUB_OUTPUT"
@@ -1054,6 +1073,7 @@ runs:
         MAX_TURNS: ${{ inputs.adjudicate-max-turns }}
         # Read from the environment, like every other caller-controlled input in this file.
         MODEL: ${{ inputs.adjudicate-model }}
+        EFFORT: ${{ inputs.adjudicate-effort }}
       run: |
         # `--no-web`: same reason as the first pass — this adjudicator has no web tool.
         node "$ENGINE" verify --manual --in audits/audit-latest.json --out audits \
@@ -1091,6 +1111,18 @@ runs:
               echo "::warning::ultra11y: adjudicate-model='$MODEL' is not a model id — ignoring it and letting claude-code-action choose."
               ;;
             *) cargs="$cargs --model $MODEL" ;;
+          esac
+        fi
+        # Same shape as the model above, and validated for the same reason: the value is
+        # caller-controlled and about to be written to $GITHUB_OUTPUT. The allowed set is
+        # closed, so a typo is refused here rather than forwarded to a CLI that would swallow
+        # it in silence and leave the run at a default nobody asked for.
+        if [ -n "${EFFORT:-}" ]; then
+          case "$EFFORT" in
+            low|medium|high|xhigh|max) cargs="$cargs --effort $EFFORT" ;;
+            *)
+              echo "::warning::ultra11y: adjudicate-effort='$EFFORT' is not a level — expected low, medium, high, xhigh or max. Ignoring it."
+              ;;
           esac
         fi
         echo "args=$cargs" >> "$GITHUB_OUTPUT"
@@ -1198,6 +1230,7 @@ runs:
         MAX_TURNS: ${{ inputs.adjudicate-max-turns }}
         # Read from the environment, like every other caller-controlled input in this file.
         MODEL: ${{ inputs.adjudicate-model }}
+        EFFORT: ${{ inputs.adjudicate-effort }}
       run: |
         # `--no-web`: same reason as the first pass — this adjudicator has no web tool.
         node "$ENGINE" verify --manual --in audits/audit-latest.json --out audits \
@@ -1235,6 +1268,18 @@ runs:
               echo "::warning::ultra11y: adjudicate-model='$MODEL' is not a model id — ignoring it and letting claude-code-action choose."
               ;;
             *) cargs="$cargs --model $MODEL" ;;
+          esac
+        fi
+        # Same shape as the model above, and validated for the same reason: the value is
+        # caller-controlled and about to be written to $GITHUB_OUTPUT. The allowed set is
+        # closed, so a typo is refused here rather than forwarded to a CLI that would swallow
+        # it in silence and leave the run at a default nobody asked for.
+        if [ -n "${EFFORT:-}" ]; then
+          case "$EFFORT" in
+            low|medium|high|xhigh|max) cargs="$cargs --effort $EFFORT" ;;
+            *)
+              echo "::warning::ultra11y: adjudicate-effort='$EFFORT' is not a level — expected low, medium, high, xhigh or max. Ignoring it."
+              ;;
           esac
         fi
         echo "args=$cargs" >> "$GITHUB_OUTPUT"
