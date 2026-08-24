@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.29.0](https://github.com/maxgfr/ultra11y/compare/v5.28.0...v5.29.0) (2026-08-24)
+
+
+### Bug Fixes
+
+* **standards:** cite the presentational rules on 1.3.1, and gate the dataset against drift ([d32bdba](https://github.com/maxgfr/ultra11y/commit/d32bdba97f43bbd81c60e3a375e662b7ba1ab69d))
+
+
+### Features
+
+* **annotate:** group non-conformities by criterion on every CI surface ([80c9412](https://github.com/maxgfr/ultra11y/commit/80c9412ce7b722f74af87a8b8d70a3a2380ec5cc))
+
 # [5.28.0](https://github.com/maxgfr/ultra11y/compare/v5.27.0...v5.28.0) (2026-08-23)
 
 
