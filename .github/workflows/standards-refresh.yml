@@ -130,6 +130,15 @@ jobs:
         if: steps.detect.outputs.changed == 'true'
         run: pnpm run check:guidance:wcag
 
+      # The third dataset, held to the bar the other two already were. Its generator carries
+      # the only hand-maintained table in this pipeline (RULE_SC_COVERAGE), so it is the one
+      # that can drift from a local edit rather than from upstream — and it did: three
+      # presentational-* rules cited by src/data/wcag.json and by no SC in the generator,
+      # green on every PR, red here two nights running.
+      - name: WCAG core dataset is byte-reproducible from the vendored W3C snapshots
+        if: steps.detect.outputs.changed == 'true'
+        run: pnpm run check:standards
+
       - name: Build is reproducible (committed bundles up to date)
         if: steps.detect.outputs.changed == 'true'
         run: pnpm run check:build

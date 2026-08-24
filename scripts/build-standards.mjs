@@ -42,6 +42,29 @@ function biomeFormat(text, relPath) {
   return execFileSync(BIOME, ["format", `--stdin-file-path=${relPath}`], { input: text, encoding: "utf8" });
 }
 
+// CHECK MODE — the gate this generator was the only one of the three to lack.
+//
+// scripts/build-pack-rgaa.mjs and scripts/build-guidance-wcag.mjs both compare their
+// generated text to the committed file and exit 1 on drift; this one only ever wrote. So a
+// hand edit to src/data/wcag.json passed every gate and was found by the NIGHTLY refresh
+// instead — on main, a day later, in a workflow nobody watches. Measured: SC 1.3.1 carried
+// three presentational-* rules that RULE_SC_COVERAGE below never cited, and
+// standards-refresh went red every night for two days before anyone read the log.
+//
+// Every write goes through `emit` so the check compares EXACTLY what a build would write —
+// a check that recomputed the text a second way could agree with itself and still be wrong.
+const CHECK = process.argv.includes("--check");
+const drift = [];
+function emit(relPath, text) {
+  const abs = join(root, relPath);
+  if (CHECK) {
+    if (!existsSync(abs) || readFileSync(abs, "utf8") !== text) drift.push(relPath);
+    return;
+  }
+  mkdirSync(dirname(abs), { recursive: true });
+  writeFileSync(abs, text);
+}
+
 // ---------------------------------------------------------------------------
 // Refresh mode: parse a w3c/wcag checkout into the vendored SC snapshot.
 // SC numbers are positional within guidelines/index.html (principle → guideline →
@@ -623,6 +646,7 @@ const RULE_SC_COVERAGE = {
     "sortable-header-no-aria-sort", "nav-landmark-missing", "nav-landmark-unnamed", "aria-required-parent",
     "headers-attr-dangling", "th-no-data-cells",
     "radio-checkbox-group-ungrouped", "table-empty-data-cell", "css-generated-content-informative",
+    "presentational-element", "presentational-attribute", "presentational-spacing",
   ],
   "1.3.5": ["field-purpose-incomplete", "autocomplete-token-invalid"],
   "1.4.2": ["autoplay-media"],
@@ -708,8 +732,7 @@ function buildUniverse(shipped) {
     provenance: univ.provenance,
     criteria,
   };
-  mkdirSync(DATA, { recursive: true });
-  writeFileSync(join(DATA, "wcag-universe.json"), biomeFormat(JSON.stringify(out, null, 2) + "\n", "src/data/wcag-universe.json"));
+  emit("src/data/wcag-universe.json", biomeFormat(JSON.stringify(out, null, 2) + "\n", "src/data/wcag-universe.json"));
 
   const coreIds = new Set(criteria.filter((c) => c.status === "core-AA").map((c) => c.id));
   const shippedIds = new Set(shipped.map((c) => c.sc));
@@ -724,6 +747,7 @@ function buildUniverse(shipped) {
   }
   const tally = { "core-AA": 0, "out-of-core": 0, removed: 0 };
   for (const c of criteria) tally[c.status]++;
+  if (CHECK) return;
   console.log(
     `build-standards: ${criteria.length} WCAG 2.x SCs classified — core-AA ${tally["core-AA"]}, out-of-core ${tally["out-of-core"]}, removed ${tally.removed} → src/data/wcag-universe.json`,
   );
@@ -839,8 +863,7 @@ function build() {
     // resolve in either language off one list.
     glossaryFr: frGlossary,
   };
-  mkdirSync(DATA, { recursive: true });
-  writeFileSync(join(DATA, "wcag.json"), biomeFormat(JSON.stringify(out, null, 2) + "\n", "src/data/wcag.json"));
+  emit("src/data/wcag.json", biomeFormat(JSON.stringify(out, null, 2) + "\n", "src/data/wcag.json"));
 
   // --- guards
   const all = new Set(criteria.map((c) => c.sc));
@@ -863,6 +886,7 @@ function build() {
 
   const tally = { static: 0, "needs-rendering": 0, judgment: 0 };
   for (const c of criteria) tally[c.automatability]++;
+  if (CHECK) return void buildUniverse(criteria);
   console.log(`build-standards: ${criteria.length} WCAG 2.2 A/AA criteria → src/data/wcag.json`);
   console.log(`build-standards: automatability — static ${tally.static}, needs-rendering ${tally["needs-rendering"]}, judgment ${tally.judgment}`);
   console.log(`build-standards: seeded techniques from ${sources.length ? sources.map((s) => s.replace(root + "/", "")).join(", ") : "(no pack found — empty)"}`);
@@ -872,12 +896,26 @@ function build() {
 
 async function main() {
   const refreshIdx = process.argv.indexOf("--refresh");
+  // A check that first goes and fetches is not a check: it would compare the committed
+  // dataset against a source that moved under it, and call an upstream change a local drift.
+  // `--check` reads the vendored snapshots and nothing else.
+  const refreshing = refreshIdx !== -1 || process.argv.some((a) => a.startsWith("--refresh-"));
+  if (CHECK && refreshing) {
+    console.error("build-standards --check: --check is offline by construction; it cannot be combined with a --refresh flag.");
+    process.exit(1);
+  }
   if (refreshIdx !== -1) deriveSnapshot(process.argv[refreshIdx + 1]);
   if (process.argv.includes("--refresh-universe")) await deriveUniverse();
   if (process.argv.includes("--refresh-core")) refreshCore();
   if (process.argv.includes("--refresh-fr")) await deriveFr();
   if (process.argv.includes("--refresh-text")) await deriveText();
   build();
+  if (!CHECK) return;
+  if (drift.length) {
+    console.error(`build-standards --check: OUT OF DATE vs the vendored source — re-run \`pnpm run build:wcag\`: ${drift.join(", ")}`);
+    process.exit(1);
+  }
+  console.log("build-standards --check: src/data/wcag.json and src/data/wcag-universe.json match the vendored source.");
 }
 
 main().catch((e) => {
