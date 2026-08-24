@@ -2,7 +2,7 @@
   "source": "https://github.com/w3c/wcag",
   "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/",
   "license": "W3C Document License (code samples: W3C Software License)",
-  "fetchedAt": "2026-08-21",
+  "fetchedAt": "2026-08-24",
   "criteria": {
     "1.1.1": {
       "slug": "non-text-content",
