@@ -41,7 +41,16 @@ import { discover } from "./discover.js";
 import { toPosix, GRAPH_ONLY_EXT } from "./glob.js";
 import { runCriteria, renderCriteriaReference } from "./criteria.js";
 import { checkSampleCaptured, checkDecided, checkRendered, checkReport, checkSemantic, isUndecidedFile, type UndecidedFile } from "./check.js";
-import { buildWorklist, buildConformityWorklist, conformityClaimsFromAudit, writeWorklist, applyVerdicts, VERIFY_MAX, type ConformityClaim, type VerifyItem } from "./verify.js";
+import {
+  buildWorklist,
+  buildConformityWorklist,
+  conformityClaimsFromAudit,
+  writeWorklist,
+  applyVerdicts,
+  VERIFY_MAX,
+  type ConformityClaim,
+  type VerifyItem,
+} from "./verify.js";
 import { groundItems } from "./grounding.js";
 import {
   buildAdjudicationWorklist,

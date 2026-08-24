@@ -35,6 +35,7 @@ import {
   glossaryAnchorsOf,
   localize,
   resolveGlossary,
+  siblingCriteria,
   type StandardPack,
   type PackCriterion,
 } from "./standards/index.js";
@@ -1094,9 +1095,7 @@ export function applyAdjudication(
       decided.push({
         id: it.criteriaId,
         status: it.verdict as Status,
-        ...(it.verdict === "C" || it.verdict === "NA"
-          ? { justification: it.justification.trim(), ...citationsOf(it) }
-          : {}),
+        ...(it.verdict === "C" || it.verdict === "NA" ? { justification: it.justification.trim(), ...citationsOf(it) } : {}),
         findings: [...fs, ...recs],
         decidedBy: "agent",
       });
@@ -1353,6 +1352,11 @@ const T = {
     technicalNote: "Note technique",
     particularCases: "Cas particuliers",
     glossary: "Termes définis par le référentiel",
+    neighbours: "Ce constat appartient-il bien ici ?",
+    neighboursLead: (name: string) =>
+      `${name} sépare en critères distincts des questions que WCAG pose d'un bloc : l'un demande si une chose EXISTE, l'autre si elle est PERTINENTE. Les critères ci-dessous, de la même thématique, portent la question voisine de celle-ci. Un constat d'absence ou de forme appartient au critère « mécanique » ; un jugement de pertinence appartient au critère « jugement ». Aide à la lecture : cela ne préjuge d'aucun verdict, et ne dispense d'aucun test de CE critère.`,
+    roleMechanical: "mécanique — existence / forme",
+    roleJudgment: "jugement — pertinence",
   },
   en: {
     title: "# Criteria adjudication (ultra11y)",
@@ -1402,6 +1406,11 @@ const T = {
     technicalNote: "Technical note",
     particularCases: "Particular cases",
     glossary: "Terms the standard defines",
+    neighbours: "Does this observation belong here?",
+    neighboursLead: (name: string) =>
+      `${name} splits into separate criteria what WCAG states in one: one asks whether a thing EXISTS, the other whether it is RELEVANT. The criteria below, from this same theme, carry the question adjacent to this one. An observation of absence or of malformed markup belongs to the « mechanical » criterion; a judgement of relevance belongs to the « judgment » one. A reading aid: it prejudges no verdict, and excuses no test of THIS criterion.`,
+    roleMechanical: "mechanical — existence / form",
+    roleJudgment: "judgment — relevance",
   },
 } as const;
 
@@ -1483,6 +1492,23 @@ const MAX_METHODOLOGY_CHARS = 900;
 // have to import the adjudication engine to get at a pure function over a criterion.
 // Re-exported here because it was part of this module's surface.
 export { glossaryAnchorsOf };
+
+/** « This observation may belong next door. » — rendered from `siblingCriteria`, which derives
+ *  the pair from the pack's own data (same theme, shared success criterion, opposite sides of
+ *  the mechanical/judgment line).
+ *
+ *  Deliberately printed BEFORE the numbered tests: the point is to be read while deciding
+ *  which criterion the observation belongs to, not after one has been chosen. Like the ⬤
+ *  marker it is a reading aid and says so — it never asserts that a verdict is wrong, only
+ *  where the adjacent question lives. Nothing is emitted for a criterion with no neighbour. */
+function siblingBlock(pack: StandardPack, id: string, lang: Lang, s: (typeof T)[Lang]): string[] {
+  const sibs = siblingCriteria(pack, id, lang);
+  if (!sibs.length) return [];
+  const out: string[] = [`> **${s.neighbours}** — ${s.neighboursLead(pack.name)}`, ""];
+  for (const sib of sibs) out.push(`- \`${sib.id}\` — ${plainTest(sib.title)} _(${sib.role === "mechanical" ? s.roleMechanical : s.roleJudgment})_`);
+  out.push("");
+  return out;
+}
 
 function glossaryBlock(pack: StandardPack, crit: PackCriterion | undefined, lang: Lang): string[] {
   const anchors = glossaryAnchorsOf(crit).slice(0, MAX_GLOSSARY_TERMS);
@@ -1730,6 +1756,14 @@ export function formatAdjudication(
     if (pack) {
       const tests = crit?.tests ?? {};
       const keys = Object.keys(tests);
+      // A DEFINITION IS READ BEFORE THE WORDING THAT USES IT. The glossary used to sit below
+      // the tests, which is backwards for any criterion whose applicability turns on a defined
+      // term — and RGAA 5.1 turns on nothing else: « tableau de données complexe » means one
+      // whose headers are NOT confined to the first row and/or first column, and a cheap
+      // adjudicator read that inside out and called a table complex for meeting the simple
+      // case. The definition cannot be printed under the test that depends on it.
+      out.push(...glossaryBlock(pack, crit, lang));
+      out.push(...siblingBlock(pack, it.criteriaId, lang, s));
       if (keys.length) {
         // WHICH TESTS THE HARVEST ACTUALLY TOUCHES — additive, and only ever additive.
         //
@@ -1777,7 +1811,6 @@ export function formatAdjudication(
       }
       if (crit?.technicalNote?.length) out.push(`> **${s.technicalNote}** — ${crit.technicalNote.map(plainTest).join(" ")}`, "");
       if (crit?.particularCases?.length) out.push(`> **${s.particularCases}** — ${crit.particularCases.map(plainTest).join(" ")}`, "");
-      out.push(...glossaryBlock(pack, crit, lang));
       out.push(...packGuidanceBlock(standard, it.criteriaId, lang));
       out.push(...sourceBlock(s, pack.name, it.criteriaId, criterionUrl(pack, it.criteriaId), opts.web === true));
       // Labelled for the standard in play. The core's wording names W3C techniques, which is

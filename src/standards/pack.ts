@@ -99,6 +99,57 @@ export function packTestIdsCited(pack: StandardPack, id: string, refs: readonly 
   return packTestsCited(pack, id, refs).map((t) => t.id);
 }
 
+/** How many siblings a criterion may name. Three is a reading aid; six is a wall, and a wall
+ *  is read as noise — which is how a marker that was supposed to sharpen attention loses it. */
+const MAX_SIBLINGS = 3;
+
+/** A neighbouring criterion that owns the ADJACENT question.
+ *
+ *  `mechanical` — the neighbour is the one an engine rule can fail: it asks whether the
+ *  subject EXISTS, or is well-formed. `judgment` — the neighbour is the one no rule can
+ *  settle: it asks whether the subject is RELEVANT. */
+export interface SiblingCriterion {
+  id: string;
+  title: string;
+  role: "mechanical" | "judgment";
+}
+
+/** THE NEIGHBOUR THAT OWNS THE ADJACENT QUESTION.
+ *
+ *  A country standard splits into pairs what WCAG states once: 2.4.2 asks only that a page
+ *  have a title, and RGAA turns that into 8.5 (« a-t-elle un titre ? », eight engine rules
+ *  away from being decided) and 8.6 (« ce titre est-il pertinent ? », which no rule can ever
+ *  settle). 11.1/11.2 is the same split over form labels, and there are dozens more.
+ *
+ *  A cheap adjudicator collapses them: it files « this field has no label » under 11.2, whose
+ *  every test presupposes a label EXISTS. The anti-fabrication gate cannot see it —
+ *  `normativeRefResolves` proves 11.2.1 is a test of 11.2, which it is — so the brief has to
+ *  name the split before the model writes the verdict.
+ *
+ *  Derived, never hand-listed: same THEME (RGAA 1.1.1 projects onto 19 criteria across the
+ *  standard, and that is not a neighbourhood), at least one WCAG success criterion in common,
+ *  and opposite sides of the mechanical/judgment line — two criteria that can both be failed
+ *  mechanically are not a pair, they are two rules. Ranked by how much of the WCAG mapping
+ *  they share, so the closest neighbour is named first, and capped. */
+export function siblingCriteria(pack: StandardPack, id: string, lang: string = pack.defaultLocale): SiblingCriterion[] {
+  const c = getCriterion(pack, id);
+  if (!c) return [];
+  const mechanical = (x: PackCriterion) => !x.judgment && (x.appliesTo?.ruleIds ?? []).length > 0;
+  const mine = new Set(c.wcag ?? []);
+  const shared = (x: PackCriterion) => (x.wcag ?? []).filter((w) => mine.has(w)).length;
+  return pack.criteria
+    .filter((x) => x.id !== c.id && x.theme === c.theme && shared(x) > 0 && mechanical(x) !== mechanical(c))
+    .sort((a, b) => shared(b) - shared(a) || a.id.localeCompare(b.id, undefined, { numeric: true }))
+    .slice(0, MAX_SIBLINGS)
+    .map((x) => ({
+      id: x.id,
+      // The plain title is the whole argument: « a-t-il une étiquette ? » beside « cette
+      // étiquette est-elle pertinente ? » explains the split better than any prose could.
+      title: localize(pack, x.titlePlain ?? x.title, lang),
+      role: mechanical(x) ? ("mechanical" as const) : ("judgment" as const),
+    }));
+}
+
 /** Where the standard publishes this criterion, from the pack's `criterionUrl` template.
  *  Undefined when the pack declares none — the engine never guesses a URL for a standard. */
 export function criterionUrl(pack: StandardPack, id: string): string | undefined {
