@@ -21,6 +21,16 @@ audits/
 # no capture is written to — so it does not move the repo's language signal the way a stray
 # .ultra11y/pages/ does, which is the only reason the blanket ignore above exists.
 !.ultra11y/verdicts/
+# …AND the undecidable declaration, for the same reason as the ledger and none of the reasons
+# for the ignore. It names the criteria this project cannot decide AT ALL — not "nobody has got
+# to them yet", but "no engine, no agent and no capture can settle this one" — each with the
+# reason a human auditor is handed to go and finish the job. RGAA 4.5 is the shape of it: only
+# watching the video establishes whether it needs audio description.
+#
+# It has to be committed to be worth anything: `check --require-decided` reads it to tell an
+# honest residual apart from an unfilled cell, and a declaration that lived outside review
+# would be a way to make a grid look complete without anyone seeing what was excused.
+!.ultra11y/undecidable-*.json
 coverage/
 .DS_Store
 # Claude Code session dir — the harness locks .claude/workflows/ against external
