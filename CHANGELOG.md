@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.31.0](https://github.com/maxgfr/ultra11y/compare/v5.30.0...v5.31.0) (2026-08-24)
+
+
+### Features
+
+* **ci:** measure the two agent runners against each other, on one fixture ([30f05f3](https://github.com/maxgfr/ultra11y/commit/30f05f3a3c7d2e81a8bd3b93f7afe1563e232f9c))
+
 # [5.30.0](https://github.com/maxgfr/ultra11y/compare/v5.29.0...v5.30.0) (2026-08-24)
 
 
