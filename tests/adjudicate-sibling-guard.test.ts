@@ -13,7 +13,7 @@
 // whether the READING was right. So the brief has to say it, out of the pack's own data: a
 // criterion states which neighbour owns the adjacent question.
 import { describe, it, expect } from "vitest";
-import { loadPack, siblingCriteria } from "../src/standards/index.js";
+import { loadPack, siblingCriteria, presupposedCriterion } from "../src/standards/index.js";
 import { formatAdjudication, type AdjudicationItem } from "../src/adjudicate.js";
 
 const pack = loadPack("rgaa");
@@ -81,6 +81,41 @@ const item = (criteriaId: string): AdjudicationItem => ({
   reason: "",
   findings: [],
   decidedBy: "agent",
+});
+
+// THE NEIGHBOURHOOD IS A READING AID; THE PRESUPPOSITION IS A CLAIM.
+//
+// `siblingCriteria` names up to three candidates and asserts nothing about which question
+// comes first — right for a brief a model reads, wrong for a gate that refuses findings. The
+// fold used the first for the second and refused RGAA 11.4 on a radio the engine had ruled
+// 11.5 non-conformant, as though an ungrouped group had no labels left to place.
+describe("presupposedCriterion answers only where the pack singles ONE neighbour out", () => {
+  it("keeps 11.2 → 11.1: two shared success criteria against 11.5's and 11.6's one", () => {
+    expect(presupposedCriterion(pack, "11.2")).toMatchObject({ id: "11.1", role: "mechanical" });
+  });
+
+  it("keeps 8.6 → 8.5, the pair with no other candidate at all", () => {
+    expect(presupposedCriterion(pack, "8.6")).toMatchObject({ id: "8.5", role: "mechanical" });
+  });
+
+  it("stands down on 11.4, whose three neighbours are equidistant", () => {
+    expect(ids("11.4")).toEqual(["11.1", "11.5", "11.6"]);
+    expect(presupposedCriterion(pack, "11.4")).toBeUndefined();
+  });
+
+  it("never answers for a criterion the engine can fail itself, nor for an unknown id", () => {
+    expect(presupposedCriterion(pack, "11.1")).toBeUndefined();
+    expect(presupposedCriterion(pack, "99.9")).toBeUndefined();
+  });
+
+  it("only ever names a mechanical neighbour, and one the neighbourhood also lists", () => {
+    for (const c of pack.criteria) {
+      const p = presupposedCriterion(pack, c.id);
+      if (!p) continue;
+      expect(p.role, c.id).toBe("mechanical");
+      expect(ids(c.id), c.id).toContain(p.id);
+    }
+  });
 });
 
 describe("the brief states it, in the standard's own words", () => {

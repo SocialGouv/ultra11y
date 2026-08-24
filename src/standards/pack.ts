@@ -134,20 +134,61 @@ export interface SiblingCriterion {
 export function siblingCriteria(pack: StandardPack, id: string, lang: string = pack.defaultLocale): SiblingCriterion[] {
   const c = getCriterion(pack, id);
   if (!c) return [];
-  const mechanical = (x: PackCriterion) => !x.judgment && (x.appliesTo?.ruleIds ?? []).length > 0;
-  const mine = new Set(c.wcag ?? []);
-  const shared = (x: PackCriterion) => (x.wcag ?? []).filter((w) => mine.has(w)).length;
-  return pack.criteria
-    .filter((x) => x.id !== c.id && x.theme === c.theme && shared(x) > 0 && mechanical(x) !== mechanical(c))
-    .sort((a, b) => shared(b) - shared(a) || a.id.localeCompare(b.id, undefined, { numeric: true }))
+  return neighbourhood(pack, c)
     .slice(0, MAX_SIBLINGS)
-    .map((x) => ({
-      id: x.id,
-      // The plain title is the whole argument: « a-t-il une étiquette ? » beside « cette
-      // étiquette est-elle pertinente ? » explains the split better than any prose could.
-      title: localize(pack, x.titlePlain ?? x.title, lang),
-      role: mechanical(x) ? ("mechanical" as const) : ("judgment" as const),
-    }));
+    .map(({ crit }) => sibling(pack, crit, lang));
+}
+
+/** Mechanical: an engine rule can fail it. A criterion the pack declares `judgment`, and one
+ *  that simply carries no rule, are both on the other side of the line. */
+const isMechanical = (x: PackCriterion) => !x.judgment && (x.appliesTo?.ruleIds ?? []).length > 0;
+
+const sibling = (pack: StandardPack, x: PackCriterion, lang: string): SiblingCriterion => ({
+  id: x.id,
+  // The plain title is the whole argument: « a-t-il une étiquette ? » beside « cette
+  // étiquette est-elle pertinente ? » explains the split better than any prose could.
+  title: localize(pack, x.titlePlain ?? x.title, lang),
+  role: isMechanical(x) ? "mechanical" : "judgment",
+});
+
+/** The full ranked neighbourhood, BEFORE the reading-aid cap — closest first, ties in
+ *  criterion order. `siblingCriteria` shows the top of it; `presupposedCriterion` needs the
+ *  whole thing, because a cap can hide the very tie that disqualifies a refusal. */
+function neighbourhood(pack: StandardPack, c: PackCriterion): { crit: PackCriterion; shared: number }[] {
+  const mine = new Set(c.wcag ?? []);
+  const mech = isMechanical(c);
+  return pack.criteria
+    .map((crit) => ({ crit, shared: (crit.wcag ?? []).filter((w) => mine.has(w)).length }))
+    .filter(({ crit, shared }) => crit.id !== c.id && crit.theme === c.theme && shared > 0 && isMechanical(crit) !== mech)
+    .sort((a, b) => b.shared - a.shared || a.crit.id.localeCompare(b.crit.id, undefined, { numeric: true }));
+}
+
+/** THE NEIGHBOUR WHOSE SUBJECT THIS CRITERION PRESUPPOSES — or none, and none is the honest
+ *  answer far more often than the neighbourhood is empty.
+ *
+ *  `siblingCriteria` is a READING AID: « this observation may belong next door », three
+ *  candidates, no claim that any one of them comes first. That breadth is right for a brief
+ *  and wrong for a refusal, and the difference cost a true finding. RGAA 11.4 (« l'étiquette
+ *  est-elle accolée à son champ ? ») neighbours 11.1, 11.5 and 11.6, each exactly one success
+ *  criterion away. Only 11.1 owns 11.4's subject: with no label there is nothing to place.
+ *  11.5 (« les champs de même nature sont-ils regroupés ? ») owns none of it — a radio group
+ *  that was never grouped still has labels, and they are still placed well or badly. Reading
+ *  the neighbourhood as a presupposition made an ungrouped radio immune to 11.4.
+ *
+ *  So: ONE neighbour, strictly closer than every other, mechanical (the side that can be
+ *  failed without a model, which is what makes « the engine already owns this anchor » sayable
+ *  at all). A tie is the pack declining to say which question comes first, and a refusal on a
+ *  tie is a guess made against a finding that may well be true. On RGAA the rule keeps both
+ *  pairs the split was drawn for — 11.2 → 11.1 (two shared success criteria against one) and
+ *  8.6 → 8.5 (sole neighbour) — and stands down on the thirteen criteria whose neighbours are
+ *  equidistant. */
+export function presupposedCriterion(pack: StandardPack, id: string, lang: string = pack.defaultLocale): SiblingCriterion | undefined {
+  const c = getCriterion(pack, id);
+  if (!c || isMechanical(c)) return undefined;
+  const ranked = neighbourhood(pack, c).filter(({ crit }) => isMechanical(crit));
+  const first = ranked[0];
+  if (!first || ranked[1]?.shared === first.shared) return undefined;
+  return sibling(pack, first.crit, lang);
 }
 
 /** Where the standard publishes this criterion, from the pack's `criterionUrl` template.
