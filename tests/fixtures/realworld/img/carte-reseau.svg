@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 160" width="320" height="160">
+  <rect width="320" height="160" fill="#f2f4f8"/>
+  <circle cx="70" cy="60" r="18" fill="#3a528c"/>
+  <circle cx="200" cy="45" r="18" fill="#3a528c"/>
+  <circle cx="150" cy="120" r="18" fill="#3a528c"/>
+  <path d="M70 60 L200 45 M200 45 L150 120 M150 120 L70 60" stroke="#3a528c" stroke-width="3" fill="none"/>
+  <!-- « ZONE B », traced as outlines. No <text> anywhere in this file, deliberately. -->
+  <path d="M240 96 h30 l-30 34 h30" stroke="#1e222e" stroke-width="4" fill="none"/>
+  <path d="M282 96 a12 17 0 1 0 0.1 0 z" stroke="#1e222e" stroke-width="4" fill="none"/>
+  <path d="M306 130 v-34 l20 34 v-34" stroke="#1e222e" stroke-width="4" fill="none"/>
+</svg>
