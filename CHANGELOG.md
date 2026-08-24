@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.31.2](https://github.com/maxgfr/ultra11y/compare/v5.31.1...v5.31.2) (2026-08-24)
+
+
+### Bug Fixes
+
+* **fixture:** complete the workbook, and declare what genuinely cannot be decided ([61d8bdf](https://github.com/maxgfr/ultra11y/commit/61d8bdfe1c9122046f22ec76b505315f02d7c324))
+* **fixture:** ship the assets the realworld site referenced and never had ([5692ade](https://github.com/maxgfr/ultra11y/commit/5692adee218eb5a1a19a81c28d171be0aae1f9ec))
+* **ledger:** re-adjudicate the 19 criteria the repaired fixture invalidated ([75d257a](https://github.com/maxgfr/ultra11y/commit/75d257aa759a7de0d244ab4277d7b798d676a64f))
+
 ## [5.31.1](https://github.com/maxgfr/ultra11y/compare/v5.31.0...v5.31.1) (2026-08-24)
 
 
