@@ -138,7 +138,7 @@ node scripts/ultra11y.mjs --help
 ## Commands
 
 ```
-ultra11y audit    <globs… | ->  [--out <dir>] [--include <glob>] [--exclude <glob>] [--ext <list>] [--jsx] [--graph] [--json] [--lang auto|en|fr] [--no-default-excludes]
+ultra11y audit    <globs… | ->  [--standard <pack>] [--out <dir>] [--include <glob>] [--exclude <glob>] [--ext <list>] [--jsx] [--graph] [--json] [--lang auto|en|fr] [--no-default-excludes]
 ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--baseline <file>] [--fail-on blocking|major|minor]
 ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]              # audit rendered-DOM captures alongside source
 ultra11y audit    [--format sarif|github]                                               # CI: code-scanning SARIF, or inline annotations + job summary
@@ -156,6 +156,7 @@ ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate]
 ultra11y judge    --in <audit.json> [--standard <pack>] [--max <n>] [--model <id>] [--apply]   # adjudicate with a model (ANTHROPIC_API_KEY)
 ultra11y check    --report <md> [--standard <pack>] [--quiet] [--json]
 ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--json]
+ultra11y verify   --report <md> [--conformities <ledger|adjudication.json> | --no-conformities]   # also put the claimed CONFORMITIES on trial
 ultra11y fix      <globs… | ->  [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--only <ids>] [--jsx] [--json]
 ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
 ultra11y pack     check <pack.json> [--guidance <g.json>]  |  scaffold                 # gate an (AI-)authored standards pack
@@ -290,14 +291,24 @@ Two things worth knowing:
 
 ## Standards packs (RGAA France first; add your country)
 
-WCAG 2.2 AA is the engine's canonical key. Each country standard ships as an in-repo
-**standards pack** — a small JSON that maps the national standard's criteria onto WCAG
-success criteria — so the same audit re-keys to any standard:
+WCAG 2.2 AA is the ENGINE's canonical key, because its rules are tied to success criteria and
+a pack criterion is defined as a projection of them. Each country standard ships as an in-repo
+**standards pack** — a small JSON carrying that mapping — and `--standard` re-keys everything
+a reader sees, starting with `audit` itself:
 
 ```sh
-node scripts/ultra11y.mjs report   --in audits/audit-latest.json --standard rgaa   # → audits/rgaa-YYYY-MM-DD.md
+node scripts/ultra11y.mjs audit  src --standard rgaa                                # RGAA-titled summary by thématique, findings tagged [8.4]
+node scripts/ultra11y.mjs audit  src --standard rgaa --out audits --json            # a pack-keyed document: 106 criteria, 13 themes
+node scripts/ultra11y.mjs report --in audits/audit-latest.json --standard rgaa      # → audits/rgaa-YYYY-MM-DD.md
 node scripts/ultra11y.mjs criteria --standard rgaa 8.3                              # a pack criterion (+ its WCAG SCs)
 ```
+
+`.ultra11yrc.json { "standard": "rgaa" }` makes it the default for every command. Under a pack,
+no deliverable carries a WCAG cross-reference — report, PRD, per-page sheets, CI annotations
+and SARIF name that standard's criteria and nothing else; the WCAG core travels inside the
+document's `core` field, where the pipeline reads it and no rendering does. The one place the
+mapping is still printed is `criteria --standard rgaa <id>`, which is a reference lookup and
+where a reader goes looking for it.
 
 **RGAA 4.1.2** (France) ships as the flagship pack. Section 508 (US), EN 301 549 (EU) and
 others are welcome — adding a country is a single PR (pack JSON + one registration line +
