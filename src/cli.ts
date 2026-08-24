@@ -3593,7 +3593,14 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   // `preamble: false` is the rendering the on-disk briefs already use — the compressed
   // contract, without the shell instructions — so the CLI runner reads exactly what
   // `audits/adjudicate/<id>.md` carries, and the two surfaces cannot describe different jobs.
-  const render = (slice: typeof items): string => formatAdjudication(slice, lang, standard, runner === "cli" ? { preamble: false } : {});
+  // AND `contract: false` ON BOTH TIERS, because both send `verdictSystemPrompt()` — the api
+  // one as the system parameter, the cli one as `--system-prompt` — and its clauses come from
+  // the same source the brief's contract does (src/verdict-rules.ts). Repeating them costs
+  // 2 144 characters per criterion, which at `--grain criterion` over a full RGAA worklist is
+  // 28% of everything the pass pays for, and buys the model nothing it was not already told.
+  // The on-disk briefs `writeAdjudication` produces are unaffected: nobody hands those a
+  // system prompt, so they keep the contract.
+  const render = (slice: typeof items): string => formatAdjudication(slice, lang, standard, { preamble: false, contract: false });
   const batches: { items: typeof items; prompt: string }[] = [];
   for (let i = 0; i < items.length; i += size) {
     const slice = items.slice(i, i + size);

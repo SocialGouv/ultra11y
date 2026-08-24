@@ -1415,8 +1415,8 @@ const T = {
     particularCases: "Cas particuliers",
     glossary: "Termes définis par le référentiel",
     neighbours: "Ce constat appartient-il bien ici ?",
-    neighboursLead: (name: string) =>
-      `${name} sépare en critères distincts des questions que WCAG pose d'un bloc : l'un demande si une chose EXISTE, l'autre si elle est PERTINENTE. Les critères ci-dessous, de la même thématique, portent la question voisine de celle-ci. Un constat d'absence ou de forme appartient au critère « mécanique » ; un jugement de pertinence appartient au critère « jugement ». Aide à la lecture : cela ne préjuge d'aucun verdict, et ne dispense d'aucun test de CE critère.`,
+    neighboursLead: () =>
+      `un constat d'absence ou de forme appartient au critère « mécanique » ci-dessous, un jugement de pertinence au critère « jugement ». Aide à la lecture : ne dispense d'aucun test de CE critère.`,
     roleMechanical: "mécanique — existence / forme",
     roleJudgment: "jugement — pertinence",
   },
@@ -1469,8 +1469,8 @@ const T = {
     particularCases: "Particular cases",
     glossary: "Terms the standard defines",
     neighbours: "Does this observation belong here?",
-    neighboursLead: (name: string) =>
-      `${name} splits into separate criteria what WCAG states in one: one asks whether a thing EXISTS, the other whether it is RELEVANT. The criteria below, from this same theme, carry the question adjacent to this one. An observation of absence or of malformed markup belongs to the « mechanical » criterion; a judgement of relevance belongs to the « judgment » one. A reading aid: it prejudges no verdict, and excuses no test of THIS criterion.`,
+    neighboursLead: () =>
+      `an observation of absence or of malformed markup belongs to the « mechanical » criterion below, a judgement of relevance to the « judgment » one. A reading aid: it excuses no test of THIS criterion.`,
     roleMechanical: "mechanical — existence / form",
     roleJudgment: "judgment — relevance",
   },
@@ -1539,8 +1539,15 @@ export function renderAdjudicationReference(lang: Lang = "en"): string {
 // pack's glossary — 119 entries for RGAA — which nothing used to read. Attaching the ones
 // THIS criterion's tests actually cite makes the item self-sufficient: the agent no longer
 // has to guess what the standard means by "image porteuse d'information".
-const MAX_GLOSSARY_TERMS = 8;
-const MAX_GLOSSARY_CHARS = 600;
+// Five, not eight, and 420 characters, not 600. `glossaryAnchorsOf` returns the terms in the
+// order the criterion's own tests cite them, so the one the criterion TURNS on leads — RGAA 5.1
+// is decided by « tableau de données complexe » and nothing else, and it is the first anchor of
+// its first test. The tail of a long list is terms cited once, in a sub-condition, whose
+// definition the reader could have guessed. Measured on a full RGAA worklist at `--grain
+// criterion`: the glossary was 22% of everything the pass sent, second only to the criteria's
+// own text.
+const MAX_GLOSSARY_TERMS = 5;
+const MAX_GLOSSARY_CHARS = 420;
 
 /** Characters of an official test methodology the brief prints. RGAA documents all 258 of
  *  its tests and the procedures run 200-900 characters each, so a criterion with eight tests
@@ -1548,6 +1555,19 @@ const MAX_GLOSSARY_CHARS = 600;
  *  criteria at a time by `judge`. Generous enough that a whole procedure normally fits, hard
  *  enough that one long one cannot swamp the evidence it is there to help read. */
 const MAX_METHODOLOGY_CHARS = 900;
+
+/** …and the budget for a test whose MECHANISM the harvest did not find in the source.
+ *
+ *  The procedure is the expensive half of a test (RGAA documents all 258, at 200-900 characters
+ *  each) and the least often needed: on a page that labels every field with `<label>`, four of
+ *  RGAA 11.2's six tests are about markup that exists nowhere in scope. Those tests keep their
+ *  full WORDING — an unmarked test is never called inapplicable, and the legend says so — but
+ *  their step-by-step procedure is cut to an opening. The one that matters is intact: a test the
+ *  harvest touches gets all 900 characters.
+ *
+ *  Deliberately not zero. « No procedure at all » would read as « nothing to do here », which is
+ *  exactly the inference the ⬤ legend spends a paragraph forbidding. */
+const MAX_UNTOUCHED_METHODOLOGY_CHARS = 260;
 
 // `glossaryAnchorsOf` now lives in src/standards/pack.ts, next to the glossary it reads —
 // the criteria lookup and the MCP reference tools need it too, and none of them should
@@ -1566,7 +1586,7 @@ export { glossaryAnchorsOf };
 function siblingBlock(pack: StandardPack, id: string, lang: Lang, s: (typeof T)[Lang]): string[] {
   const sibs = siblingCriteria(pack, id, lang);
   if (!sibs.length) return [];
-  const out: string[] = [`> **${s.neighbours}** — ${s.neighboursLead(pack.name)}`, ""];
+  const out: string[] = [`> **${s.neighbours}** — ${s.neighboursLead()}`, ""];
   for (const sib of sibs) out.push(`- \`${sib.id}\` — ${plainTest(sib.title)} _(${sib.role === "mechanical" ? s.roleMechanical : s.roleJudgment})_`);
   out.push("");
   return out;
@@ -1679,7 +1699,7 @@ export function formatAdjudication(
   items: AdjudicationItem[],
   lang: Lang = "en",
   standard: StandardId = CORE,
-  opts: { preamble?: boolean; cwd?: string; unrendered?: string[]; web?: boolean } = {},
+  opts: { preamble?: boolean; contract?: boolean; cwd?: string; unrendered?: string[]; web?: boolean } = {},
 ): string {
   const s = T[lang];
   // Display only — the gate always reads the complete sibling set.
@@ -1699,10 +1719,21 @@ export function formatAdjudication(
   // So a per-criterion brief now opens with the same contract, compressed: the four verdicts,
   // the grounding rule and the absence rule. The two notes below are keyed on THESE items, so a
   // one-item brief gets the note when its own evidence earns it, and stays silent otherwise.
+  //
+  // AND `contract: false` IS THE ONE CASE WHERE IT MUST NOT. A backend that sends
+  // `verdictSystemPrompt()` has already stated every one of these clauses — they come from the
+  // same source, src/verdict-rules.ts — so repeating them in the brief buys nothing and is paid
+  // for once per criterion. Measured on a full RGAA worklist at `--grain criterion`: 2 144
+  // characters × 81 criteria = 174 KB, 28% of everything the pass sends. Only `judge` sets it,
+  // and only because it is the only caller that provably ships a system prompt; the on-disk
+  // briefs, `verify --manual` and the emitted CI contracts are read with no system prompt at
+  // all, and for them the contract stays exactly where it is.
   const out: string[] =
-    opts.preamble === false
-      ? [s.briefContract, "", ...s.verdicts, "", s.rule, "", s.absenceRule, ""]
-      : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", s.then, ""];
+    opts.contract === false
+      ? []
+      : opts.preamble === false
+        ? [s.briefContract, "", ...s.verdicts, "", s.rule, "", s.absenceRule, ""]
+        : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", s.then, ""];
   // THE RENDERED PAGE, WHEN THERE IS ONE.
   //
   // A `needs-rendering` criterion used to arrive with one instruction — answer
@@ -1866,7 +1897,11 @@ export function formatAdjudication(
           const method = crit?.methodology?.[k];
           if (method?.trim()) {
             const flat = plainTest(method).replace(/\s+/g, " ").trim();
-            out.push(`  - _${s.methodology}_ : ${flat.length > MAX_METHODOLOGY_CHARS ? `${flat.slice(0, MAX_METHODOLOGY_CHARS)}…` : flat}`);
+            // Full procedure for a test the harvest touches; an opening for one it does not.
+            // See MAX_UNTOUCHED_METHODOLOGY_CHARS — the WORDING of every test is unabridged
+            // either way, and an unmarked test is still the adjudicator's to rule on.
+            const cap = !anyTouched || touched.get(k) ? MAX_METHODOLOGY_CHARS : MAX_UNTOUCHED_METHODOLOGY_CHARS;
+            out.push(`  - _${s.methodology}_ : ${flat.length > cap ? `${flat.slice(0, cap)}…` : flat}`);
           }
         }
         out.push("");
