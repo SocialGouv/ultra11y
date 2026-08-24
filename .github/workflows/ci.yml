@@ -288,11 +288,12 @@ jobs:
   # the same content-level re-grounding. A verdict nobody can still prove is refused here exactly
   # as it would be refused interactively.
   #
-  # Measured on this fixture while the job was written: replay closes 33/33 and the grid reads
-  # 106/106 on the run and on each of the five pages. Change one `alt` attribute in
-  # tests/fixtures/realworld/index.html and thirteen verdicts drop as STALE — every criterion
-  # argued on that image — `check` exits 1 and names them. Put the attribute back and it is green
-  # again. That is the regression signal the dispatch never gave.
+  # Measured on this fixture: the replay closes 49/49 and the grid reads 106/106 on the run and
+  # on each of the nine pages — 104 verdicts plus the two criteria the project DECLARES it
+  # cannot decide (RGAA 4.5 and 13.7, both of which turn on watching a video). Change one `alt`
+  # attribute in tests/fixtures/realworld/index.html and the verdicts argued on that image drop
+  # as STALE, `check` exits 1 and names them. Put the attribute back and it is green again. That
+  # is the regression signal the dispatch never gave.
   #
   # IT RENDERS RATHER THAN READING COMMITTED SNAPSHOTS. Most of the ledger's citations are
   # anchored in `.ultra11y/pages/<id>/dom.html`, so the replay needs those pages to exist. They
@@ -358,10 +359,18 @@ jobs:
           node scripts/ultra11y.mjs verify --apply .ultra11y/verdicts/rgaa.json \
             --in audits/audit-latest.json --standard rgaa --out audits
 
-      - name: Every one of the 106 criteria carries a verdict, on the run and on each page
+      # `--allow-undecided` is passed, and passing it is the point. Without it the gate never
+      # reads the declaration, and the two committed artefacts were free to contradict each
+      # other in silence — which they did: `61d8bdf` declared 4.5 and 13.7 undecidable,
+      # `75d257a` gave them NC and NA the next day, and this job stayed green for both. The
+      # flag turns that into a failure, because an entry whose criterion now carries a verdict
+      # fails the gate exactly as an entry with no reason does. Excusing a criterion and
+      # deciding it are different claims, and a project may not make both.
+      - name: Every one of the 106 criteria carries a verdict or a declared reason, run and pages
         run: |
           node scripts/ultra11y.mjs check --in audits/audit-latest.json \
-            --standard rgaa --require-decided=pages
+            --standard rgaa --require-decided=pages \
+            --allow-undecided .ultra11y/undecidable-rgaa.json
 
       # The instrument gate, one level below completeness: were the criteria that need a browser
       # actually given one? A run that rendered nothing can still look complete.
