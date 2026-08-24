@@ -154,6 +154,36 @@ describe("the pack-keyed audit document", () => {
     expect((twice.core as unknown as { core?: unknown }).core).toBeUndefined();
   });
 
+  it("never lets a criterion that is not NC carry a NORMATIVE finding", () => {
+    // Re-keying the raw rule→criterion mapping looked equivalent to reading the derivation and
+    // was not: `derivePackResults` applies the pack's `appliesTo` scoping, its judgment guard
+    // and any agent verdict at the pack's own granularity, so a criterion can end up NOT
+    // non-conformant while rules mapping to it fired elsewhere. Measured on this repository's
+    // fixture: RGAA 4.3 came out « C » carrying three `media-no-track` findings — a conforming
+    // criterion publishing its own non-conformities.
+    //
+    // ADVISORY findings are the deliberate exception, and the reason this is not simply
+    // "carries no findings": a recommendation is explicitly NOT a non-conformity, so it rides
+    // along on a criterion nobody has ruled without saying anything about its status.
+    const doc = packAuditDocument(audit(), "rgaa", "fr");
+    const contradictory = doc.criteria.filter((c) => c.status !== "NC" && c.findings.some((f) => !f.advisory));
+    expect(contradictory.map((c) => `${c.id} (${c.status})`)).toEqual([]);
+  });
+
+  it("lists each finding once, carrying every criterion it counts against", () => {
+    const doc = packAuditDocument(audit(), "rgaa", "fr");
+    // A finding appears ONCE at the top level however many criteria it counts against —
+    // listing it per criterion would report several defects where the page has one.
+    const keys = doc.findings.map((f) => `${f.ruleId}|${f.file}|${f.line}|${f.selectorHint}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    // Its `criteriaId` is always the first of its `criteriaIds`, so every consumer of the
+    // single-id field keeps working while the full list stays available.
+    for (const f of doc.findings) expect(f.criteriaId).toBe(f.criteriaIds[0]);
+    // …and every top-level finding is one the derivation attributed to some criterion.
+    const fromCriteria = new Set(doc.criteria.flatMap((c) => c.findings.map((f) => `${f.ruleId}|${f.file}|${f.line}`)));
+    for (const f of doc.findings) expect(fromCriteria.has(`${f.ruleId}|${f.file}|${f.line}`)).toBe(true);
+  });
+
   it("counts NA as a subset of C, so C + NC + manual is the criterion count", () => {
     const doc = packAuditDocument(audit(), "rgaa", "fr");
     const sum = (k: "c" | "nc" | "na" | "manual") => doc.themes.reduce((n, t) => n + t[k], 0);

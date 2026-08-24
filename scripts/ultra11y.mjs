@@ -63439,28 +63439,22 @@ function packAuditDocument(input, packKey, lang) {
   const audit2 = unwrapAudit(input);
   const pack = loadPack(packKey);
   const derived = derivePackResults(audit2, packKey);
-  const findings = [];
-  const byCriterion = /* @__PURE__ */ new Map();
-  for (const f of findingsForStandard(audit2, packKey)) {
-    const ids = packCriteriaOf(pack, f);
-    if (!ids.length) continue;
-    const pf = packFinding(f, ids);
-    findings.push(pf);
-    for (const id of ids) (byCriterion.get(id) ?? byCriterion.set(id, []).get(id)).push(pf);
-  }
+  const seen = /* @__PURE__ */ new Map();
   const criteria = derived.map((d) => {
     const pc = getCriterion(pack, d.id);
+    for (const f of d.findings) (seen.get(f) ?? seen.set(f, []).get(f)).push(d.id);
     return {
       id: d.id,
       theme: d.theme,
       title: pc ? titlePlain(pack, pc, lang) : d.id,
       status: d.status,
-      findings: byCriterion.get(d.id) ?? [],
+      findings: d.findings.map((f) => packFinding(f, [d.id])),
       ...d.justification ? { justification: d.justification } : {},
       ...d.decidedBy ? { decidedBy: d.decidedBy } : {},
       ...d.inapplicable ? { inapplicable: true } : {}
     };
   });
+  const findings = [...seen].map(([f, ids]) => packFinding(f, ids));
   const themes = pack.themes.map((t3) => {
     const rows = criteria.filter((c2) => c2.theme === t3.number);
     return {

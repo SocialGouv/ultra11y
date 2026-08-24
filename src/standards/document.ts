@@ -20,7 +20,7 @@
 import type { AuditResult, PackAuditResult, PackCriterionEntry, PackFinding, PackThemeTally, Finding, Lang, ResidualRisk } from "../types.js";
 import { SCHEMA_VERSION } from "../types.js";
 import { packAutomatability } from "../adjudicate.js";
-import { derivePackResults, packConformancePct, packCriteriaForFinding, findingsForStandard } from "./derive.js";
+import { derivePackResults, packConformancePct, packCriteriaForFinding } from "./derive.js";
 import { CORE_KEY, loadPack } from "./registry.js";
 import { themeName, titlePlain, getCriterion, hasId } from "./pack.js";
 import { standardLabel } from "./index.js";
@@ -108,9 +108,9 @@ function packFinding(f: Finding, ids: string[]): PackFinding {
  *
  * Everything here is a re-keying of results already computed: `derivePackResults` folds the
  * SC verdicts onto the pack's criteria (and prefers an agent adjudication recorded at the
- * pack's own granularity over its own derivation), `findingsForStandard` adds the pack's
- * declarative-rule findings, and `packConformancePct` is the pass rate over the pack's own
- * criteria rather than the core's. No verdict is decided here.
+ * pack's own granularity over its own derivation, and folds in the pack's declarative-rule
+ * findings), and `packConformancePct` is the pass rate over the pack's own criteria rather
+ * than the core's. No verdict is decided here.
  */
 export function packAuditDocument(input: AuditResult | PackAuditResult, packKey: string, lang: Lang): PackAuditResult {
   // UNWRAP FIRST, ALWAYS. Four `--in` readers cast their JSON straight to `AuditResult` with
@@ -122,32 +122,37 @@ export function packAuditDocument(input: AuditResult | PackAuditResult, packKey:
   const pack = loadPack(packKey);
   const derived = derivePackResults(audit, packKey);
 
-  // Findings first: the criteria entries below reuse the same re-keyed objects, so a reader
-  // comparing `criteria[].findings` with the top-level list never sees two shapes of one
-  // finding.
-  const findings: PackFinding[] = [];
-  const byCriterion = new Map<string, PackFinding[]>();
-  for (const f of findingsForStandard(audit, packKey)) {
-    const ids = packCriteriaOf(pack, f);
-    if (!ids.length) continue; // belongs to no criterion of this standard ⇒ not its verdict
-    const pf = packFinding(f, ids);
-    findings.push(pf);
-    for (const id of ids) (byCriterion.get(id) ?? byCriterion.set(id, []).get(id)!).push(pf);
-  }
-
+  // THE DERIVATION DECIDES WHICH FINDINGS COUNT, not the raw rule→criterion mapping.
+  //
+  // Re-keying `findingsForStandard` directly looked equivalent and was not: `derivePackResults`
+  // applies the pack's own `appliesTo` scoping, its judgment guard and any agent verdict
+  // recorded at the pack's granularity, and a criterion can therefore end up NOT non-conformant
+  // while rules that map to it did fire elsewhere. Measured on this repository's fixture, RGAA
+  // 4.3 came out « C » carrying three `media-no-track` findings — a conforming criterion
+  // publishing its own non-conformities.
+  //
+  // So each entry takes the findings the derivation attributed to it, and the document's
+  // top-level list is exactly their union. A finding appears where the standard counts it, and
+  // nowhere else.
+  const seen = new Map<Finding, string[]>();
   const criteria: PackCriterionEntry[] = derived.map((d) => {
     const pc = getCriterion(pack, d.id);
+    for (const f of d.findings) (seen.get(f) ?? seen.set(f, []).get(f)!).push(d.id);
     return {
       id: d.id,
       theme: d.theme,
       title: pc ? titlePlain(pack, pc, lang) : d.id,
       status: d.status,
-      findings: byCriterion.get(d.id) ?? [],
+      findings: d.findings.map((f) => packFinding(f, [d.id])),
       ...(d.justification ? { justification: d.justification } : {}),
       ...(d.decidedBy ? { decidedBy: d.decidedBy } : {}),
       ...(d.inapplicable ? { inapplicable: true } : {}),
     };
   });
+  // One entry per finding, carrying EVERY criterion it counts against: a single missing
+  // navigation landmark is RGAA 9.2 and 12.6, and listing it twice would have the document
+  // report two defects where the page has one.
+  const findings: PackFinding[] = [...seen].map(([f, ids]) => packFinding(f, ids));
 
   const themes: PackThemeTally[] = pack.themes.map((t) => {
     const rows = criteria.filter((c) => c.theme === t.number);
