@@ -99,6 +99,21 @@ on:
         type: choice
         options: [agent, api, both]
         default: agent
+      runner:
+        description: "WHO drives the agent tier. `action` is the three claude-code-action passes. `cli` has the engine spawn a headless `claude -p` — the same tier, reachable from a GitLab CI or a laptop, and the only one that works on `push`. This is the input that makes this workflow a comparison between the two rather than a measurement of one."
+        type: choice
+        options: [action, cli]
+        default: action
+      grain:
+        description: "How much the model rules on at once. `criterion` sends one criterion per call: more calls, and a run that stops early loses at most ONE criterion instead of everything it had already ruled on. Needs `runner: cli` — a composite action cannot loop over a `uses:` step, and the action refuses the combination rather than ignoring it."
+        type: choice
+        options: [worklist, criterion]
+        default: worklist
+      ledger:
+        description: "Whether the committed verdict ledger may answer first. `true` is the production shape and makes a paid pass cover only what the ledger did not. SET IT FALSE TO MEASURE ANYTHING: with a current ledger the replay decides all 106 criteria before the model is invoked, the worklist reaches it empty, and the run comes back green having adjudicated nothing — which is exactly what run 32706213834 did, in 7 minutes, reporting « 0 criterion(ia) adjudicated »."
+        type: choice
+        options: ["true", "false"]
+        default: "true"
       standard:
         description: 'Standard to report against'
         type: choice
@@ -323,8 +338,11 @@ jobs:
           sarif: "false"
           comment: "false"
           adjudicate: agent
-          # Same as the API step above: the ledger is the deliverable of a paid run.
-          ledger: "true"
+          adjudicate-runner: ${{ inputs.runner }}
+          adjudicate-grain: ${{ inputs.grain }}
+          # Same as the API step above: the ledger is the deliverable of a paid run — and the
+          # thing to switch OFF when the point of the run is to watch the model work.
+          ledger: ${{ inputs.ledger }}
           adjudicate-model: ${{ inputs.model }}
           adjudicate-max-turns: ${{ inputs.max-turns }}
           adjudicate-passes: ${{ inputs.passes }}

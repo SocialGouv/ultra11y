@@ -716,6 +716,7 @@ runs:
         STANDARD: ${{ inputs.standard }}
         LANG_OPT: ${{ inputs.lang }}
         GRAIN: ${{ inputs.adjudicate-grain }}
+        PASSES: ${{ inputs.adjudicate-passes }}
         MODEL: ${{ inputs.adjudicate-model }}
         BUDGET: ${{ inputs.adjudicate-budget-usd }}
         LEDGER: ${{ inputs.ledger }}
@@ -740,9 +741,26 @@ runs:
         if [ -n "$LEDGER" ] && [ "$LEDGER" != 'false' ]; then
           if [ "$LEDGER" = 'true' ]; then args+=(--ledger ".ultra11y/verdicts/$STANDARD.json"); else args+=(--ledger "$LEDGER"); fi
         fi
+        # PASSES, for the same reason the action path has them: an adjudicator can stop early,
+        # and a criterion the gate refused deserves a second look at its own refusal. `judge`
+        # re-derives the worklist from what is STILL manual on every call, so a later pass
+        # costs the residue and nothing more — and returns immediately, invoking no model at
+        # all, once there is no residue left. Without this the CLI runner would be measured
+        # against a three-pass action path with one shot, which would say more about the
+        # budget than about the runner.
+        passes="${PASSES:-1}"
+        case "$passes" in 1|2|3) ;; *) passes=1 ;; esac
+        ok=1
+        for i in $(seq 1 "$passes"); do
+          if node "$ENGINE" judge "${args[@]}"; then
+            ok=0
+          else
+            echo "ultra11y: CLI adjudication pass $i did not apply cleanly."
+          fi
+        done
         # Same policy as every other fold in this file: an adjudication that fails costs the
         # verdicts, never the audit that was already produced above.
-        if node "$ENGINE" judge "${args[@]}"; then
+        if [ "$ok" = '0' ]; then
           echo "ultra11y: the CLI adjudication was applied."
         elif [ "$GATE" = 'true' ]; then
           echo "::error::ultra11y: the CLI adjudication failed and gate-adjudicated is on — refusing to gate on a partial adjudication."

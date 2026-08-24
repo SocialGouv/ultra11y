@@ -1,0 +1,191 @@
+# THE TWO AGENT RUNNERS, SIDE BY SIDE, ON THE SAME EVIDENCE.
+#
+# `adjudication.yml` exercises ONE tier per dispatch and reports what it decided. This one
+# answers a different question: given the same fixture, the same rendered pages, the same
+# model and the same number of passes, does the engine-driven CLI runner decide as much as
+# `anthropics/claude-code-action` — and for how much?
+#
+# It exists because the two runners are not comparable by reading them. They differ in the
+# grant (the action path must allow Write, because writing ADJUDICATE.verdicts.json is its
+# adjudicator's only channel back; the CLI answers on stdout and runs read-only), in the
+# harness (three unrolled passes against one engine command), and in what they can be pointed
+# at (the action path refuses events claude-code-action does not parse — `push` above all).
+# None of that says which one RULES better. Only a measurement does.
+#
+# WHAT MAKES IT A COMPARISON RATHER THAN TWO RUNS:
+#
+#   • Same model on both sides. The CLI's own default is Opus and claude-code-action picks its
+#     own; left alone the two would be measured on different models and the numbers would mean
+#     nothing. `model` is passed to both, and defaults to Haiku.
+#   • Same passes on both sides. The CLI runner honours `adjudicate-passes` exactly as the
+#     action path does — `judge` re-derives the worklist from what is still manual, so a later
+#     pass costs the residue and returns without invoking a model when there is none.
+#   • LEDGER OFF, on both. This is the one that is easy to get wrong: with the committed
+#     ledger in play the replay decides all 106 criteria before either runner is invoked, both
+#     worklists arrive empty, and the run reports two green tiers that adjudicated nothing.
+#     Measured: run 32706213834, 7 minutes, « 0 criterion(ia) adjudicated ».
+#   • `require-decided: false`, on both. The question here is what each runner DECIDED, not
+#     whether it reached 106/106 — a completeness gate would turn the answer into a red job
+#     and stop the comparison from being reported at all.
+#
+# COST. Both sides are real paid runs. On Haiku the API tier costs ~$0.50 for RGAA and the
+# agent tier has been measured between $6.87 and $21.22 on Sonnet; this dispatch pays for two
+# adjudications, so treat the default as the cheap shape and raise `passes` deliberately.
+name: Adjudication runners — compare
+
+on:
+  workflow_dispatch:
+    inputs:
+      standard:
+        description: 'Standard to report against.'
+        type: choice
+        options: [rgaa, wcag]
+        default: rgaa
+      model:
+        description: "Model id, sent to BOTH runners so the comparison is about the runner and not about the model. Haiku by default: it is the cheap adjudicator, and what a cheap adjudicator cannot do is the measure of what the tool failed to hand it."
+        type: string
+        default: claude-haiku-4-5-20251001
+      grain:
+        description: "Grain for the CLI side. `criterion` sends one criterion per call. The action side has no equivalent — a composite action cannot loop over a `uses:` step — so this is the one axis where the two are deliberately not identical, and the summary says so."
+        type: choice
+        options: [worklist, criterion]
+        default: criterion
+      passes:
+        description: 'How many times each runner may go round on what is still undecided. Same value on both sides.'
+        type: choice
+        options: ["1", "2", "3"]
+        default: "1"
+      timeout:
+        description: 'Per-job ceiling in minutes.'
+        type: string
+        default: "45"
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    # One job per runner, same steps, so nothing but the runner differs. `fail-fast: false`
+    # because a side that dies is a RESULT — the other side's number is still worth having,
+    # and losing it would be the most annoying possible outcome of a paid dispatch.
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [action, cli]
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(inputs.timeout) }}
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v6
+      - run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm exec playwright install chromium
+
+      - name: Refuse early if the credential is missing
+        run: |
+          if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::error::no model credential in the job environment — neither runner can be measured. Set CLAUDE_CODE_OAUTH_TOKEN (\`claude setup-token\`) or ANTHROPIC_API_KEY."
+            exit 1
+          fi
+
+      - name: Serve the fixture site
+        run: |
+          python3 -m http.server 8932 --directory tests/fixtures/realworld &
+          for _ in $(seq 1 50); do curl -sf -o /dev/null http://127.0.0.1:8932/ && break; sleep 0.2; done
+          curl -sf -o /dev/null http://127.0.0.1:8932/
+
+      # AUDIT AND SCAN TWICE, and it is not a duplicate: the first pass has no captures to
+      # read, the scan writes .ultra11y/pages/, and the second ingests them. A worklist
+      # measured without that second pass is a different worklist from the one each runner is
+      # handed — 80 criteria to adjudicate from source alone, 41 once a page is scanned.
+      - name: Measure the worklist BEFORE either runner
+        id: before
+        run: |
+          node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --runtime local --cwd "$PWD" \
+            --merge audits/audit-latest.json --out audits
+          node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --runtime local --cwd "$PWD" \
+            --merge audits/audit-latest.json --out audits
+          node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
+            --standard '${{ inputs.standard }}' --out /tmp/before --json > /tmp/before.json
+          n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/before.json","utf8")).count')
+          echo "manual=$n" >> "$GITHUB_OUTPUT"
+          echo "unruled before: $n"
+
+      - name: Adjudicate
+        id: adjudicate
+        uses: ./
+        continue-on-error: true
+        with:
+          paths: tests/fixtures/realworld
+          standard: ${{ inputs.standard }}
+          since: ""
+          fail-on: ""
+          sarif: "false"
+          comment: "false"
+          adjudicate: agent
+          adjudicate-runner: ${{ matrix.runner }}
+          # `worklist` on the action side, because it cannot do anything else; the chosen grain
+          # on the CLI side. The summary names this asymmetry rather than averaging over it.
+          adjudicate-grain: ${{ matrix.runner == 'cli' && inputs.grain || 'worklist' }}
+          adjudicate-model: ${{ inputs.model }}
+          adjudicate-passes: ${{ inputs.passes }}
+          # OFF, deliberately — see the header. With it on, both runners are handed an empty
+          # worklist and the comparison measures nothing at all.
+          ledger: "false"
+          # The question is what each runner decided, not whether it reached 106/106.
+          require-decided: "false"
+          artifact-name: adjudication-${{ matrix.runner }}
+          crawl: http://127.0.0.1:8932/
+          crawl-max: "12"
+          runtime: local
+
+      - name: Measure what it left
+        id: after
+        if: always()
+        run: |
+          node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
+            --standard '${{ inputs.standard }}' --out /tmp/after --json > /tmp/after.json || echo '{"count":-1,"items":[]}' > /tmp/after.json
+          n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/after.json","utf8")).count')
+          ids=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/after.json","utf8")).items.map(i=>i.criteriaId).join(", ")')
+          echo "manual=$n" >> "$GITHUB_OUTPUT"
+          echo "ids=$ids" >> "$GITHUB_OUTPUT"
+          echo "unruled after ${{ matrix.runner }}: $n${ids:+ — $ids}"
+
+      # Written per job rather than by a downstream one: a matrix leg that dies still leaves
+      # its half of the table behind, which is the whole reason `fail-fast` is off.
+      - name: Report this runner
+        if: always()
+        run: |
+          before='${{ steps.before.outputs.manual }}'
+          after='${{ steps.after.outputs.manual }}'
+          {
+            echo "## Runner \`${{ matrix.runner }}\` — \`${{ inputs.standard }}\`, ${{ inputs.model }}, ${{ inputs.passes }} pass(es)"
+            echo
+            echo "| | criteria left to assess |"
+            echo "|---|---:|"
+            echo "| before | ${before:-?} |"
+            echo "| after  | ${after:-?} |"
+            echo
+            if [ "${after:-1}" = '0' ]; then
+              echo "Decided everything it was handed."
+            else
+              echo "Still to assess: ${{ steps.after.outputs.ids }}"
+            fi
+            echo
+            echo "Grain: \`${{ matrix.runner == 'cli' && inputs.grain || 'worklist' }}\` · adjudication step outcome: \`${{ steps.adjudicate.outcome }}\`"
+            echo
+            echo "> The ledger was OFF on both sides, so these numbers are what the MODEL decided — not what the committed verdicts already knew."
+          } >> "$GITHUB_STEP_SUMMARY"
