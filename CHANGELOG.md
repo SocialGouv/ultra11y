@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.31.1](https://github.com/maxgfr/ultra11y/compare/v5.31.0...v5.31.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* **judge:** hand verdicts over as they land, and let the CLI runner finish ([3aa0840](https://github.com/maxgfr/ultra11y/commit/3aa08406fd1fa9d574620104a3802d7b8b509bac))
+
 # [5.31.0](https://github.com/maxgfr/ultra11y/compare/v5.30.0...v5.31.0) (2026-08-24)
 
 
