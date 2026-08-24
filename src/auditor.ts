@@ -231,7 +231,7 @@ export function relatedLine(related: NonNullable<Finding["related"]>, lang: Lang
  *  false) Partie technique + Contexte de reproduction. Returns lines (caller joins). */
 export function renderAuditorUnit(unit: PrdUnit, standard: StandardId, lang: Lang, opts: AuditorUnitOpts = {}): string[] {
   const s = L[lang];
-  if (unit.advisory) return renderAdvisoryUnit(unit, standard, lang, opts);
+  if (unit.advisory) return renderAdvisoryUnit(unit, lang, opts);
   const m = auditorUnitModel(unit, standard, lang, opts);
   const out: string[] = [];
   if (opts.heading) out.push(`${opts.heading} ${m.icon} ${m.label}`, "");
@@ -342,7 +342,12 @@ export function auditorUnitModel(unit: PrdUnit, standard: StandardId, lang: Lang
     fields.push({ label: v.criterion, value: `${unit.criteriaId} — ${unit.title}` });
     const testNums = packTestIds(pack, unit.criteriaId);
     if (testNums.length) fields.push({ label: `${v.test}(s)`, value: testNums.join(" · ") });
-    if (unit.refs.length) fields.push({ label: "WCAG", value: unit.refs.map((sc) => `${sc}${scLevel(sc)}`).join(" · ") });
+    // NO WCAG CROSS-REFERENCE UNDER A PACK. A deliverable produced with `--standard rgaa` is
+    // read by an auditor working to RGAA: it names RGAA themes, RGAA criteria and RGAA tests,
+    // and a « WCAG 1.1.1 (A) » line beside them is a second referential to reconcile in a
+    // document that answers to one. The mapping still exists and is still how the projection
+    // is computed — `criteria --standard rgaa <id>` prints it on demand — but a conformance
+    // report is not where a reader goes looking for it.
   }
   fields.push({ label: s.priority, value: `${ICON[unit.severity]} ${SEV_LABEL[lang][unit.severity]}` });
 
@@ -444,13 +449,14 @@ function renderReproductionContext(normative: Finding[], lang: Lang): string[] {
  *  grammar the verify worklist parser keys on (src/verify.ts `auditorCriterionLine`), so
  *  an advisory block can never enter the non-conformity worklist — the related criterion
  *  is cited with an em-dash + middot instead of a colon. */
-function renderAdvisoryUnit(unit: PrdUnit, standard: StandardId, lang: Lang, opts: AuditorUnitOpts): string[] {
+function renderAdvisoryUnit(unit: PrdUnit, lang: Lang, opts: AuditorUnitOpts): string[] {
   const s = L[lang];
   const out: string[] = [];
   if (opts.heading) out.push(`${opts.heading} ${ADVISORY_ICON} ${unit.label}`, "");
   out.push(`> ${s.advisoryTag} — ${s.advisoryNote}`, "");
   out.push(`**${s.advisoryTag}** — ${unit.criteriaId} · ${unit.title}`);
-  if (!isCore(standard) && unit.refs.length) out.push(`_${s.relatedRef}: WCAG ${unit.refs.join(", ")}_`);
+  // Same rule as the auditor block above: under a pack the deliverable names that pack's
+  // criteria and nothing else.
   const messages = uniq(unit.findings.map((f) => resolveMessage(f, lang)));
   const fixes = uniq(unit.findings.map((f) => resolveRemediation(f, lang)));
   out.push("");
@@ -463,11 +469,6 @@ function renderAdvisoryUnit(unit: PrdUnit, standard: StandardId, lang: Lang, opt
   }
   out.push("");
   return out;
-}
-
-function scLevel(sc: string): string {
-  const c = getSC(sc);
-  return c ? ` (${c.level})` : "";
 }
 
 function auditorHeader(r: AuditResult, lang: Lang, standard: StandardId): string[] {

@@ -203,7 +203,10 @@ var TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
     const clipped = (s.overflowX === 'hidden' || s.overflowY === 'hidden' || s.overflow === 'hidden') && (e.scrollHeight > e.clientHeight + 2 || e.scrollWidth > e.clientWidth + 2);
     const ellipsis = s.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 2;
     if (clipped || ellipsis) {
-      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqu\xE9/masqu\xE9 sous l\\'espacement de texte WCAG 1.4.12 \u2014 perte de contenu.' });
+      // No criterion id in the text: every rendering already names the criterion this finding
+      // belongs to, and a hard-coded \xAB 1.4.12 \xBB is a WCAG number appearing inside a deliverable
+      // that may be keyed on another standard entirely.
+      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqu\xE9/masqu\xE9 sous l\\'espacement de texte impos\xE9 \u2014 perte de contenu.' });
     }
     if (hits.length >= 20) break;
   }

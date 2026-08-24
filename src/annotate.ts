@@ -20,7 +20,8 @@
 // to an invented line, and every status comes from the shared projections.
 import { findingsAtOrAbove } from "./baseline.js";
 import { resolveMessage, resolveRemediation } from "./messages.js";
-import { findingsForStandard, packCriteriaForFinding } from "./standards/derive.js";
+import { findingsForStandard } from "./standards/derive.js";
+import { packCriterionLabel } from "./standards/document.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
 import { packReportGroups, renderPackReport, renderReport, reportCoverage, reportGroups, splitReportSections } from "./report.js";
 import type { AuditResult, Finding, Lang, PageResult, Severity, Status } from "./types.js";
@@ -69,12 +70,16 @@ function escProp(s: string): string {
 
 const isUrl = isUrlPath;
 
-/** The criterion label to show: the pack's own id when projected, else the WCAG SC. */
-function criterionLabel(f: Finding, standard: StandardId): string {
+/** The criterion label to show, and `null` when the finding belongs to no criterion of the
+ *  active standard — in which case the caller SKIPS it rather than relabelling it.
+ *
+ *  There used to be a `WCAG ${f.criteriaId}` fallback here, and it was wrong twice over: it
+ *  named WCAG inside a deliverable produced under another standard, and for a finding already
+ *  keyed on a pack criterion it printed things like « WCAG 4.11 », which is not a success
+ *  criterion in any version of WCAG. See `packCriteriaOf`. */
+function criterionLabel(f: Finding, standard: StandardId): string | null {
   if (isCore(standard)) return `WCAG ${f.criteriaId}`;
-  const pack = loadPack(standard);
-  const ids = packCriteriaForFinding(pack, f);
-  return ids.length ? `${pack.name} ${ids.join(", ")}` : `WCAG ${f.criteriaId}`;
+  return packCriterionLabel(loadPack(standard), f);
 }
 
 /** Workflow-command annotations, one per anchorable finding. */
@@ -87,9 +92,11 @@ export function annotations(result: AuditResult, opts: AnnotateOptions = {}): st
   const out: string[] = [];
   for (const f of scoped) {
     if (isUrl(f.file)) continue; // no repo line to annotate — reported in the summary instead
+    const criterion = criterionLabel(f, standard);
+    if (criterion === null) continue; // belongs to no criterion of the active standard
     const level = f.advisory ? "notice" : LEVEL[f.severity];
     const file = repoRelative(f.file, baseDir);
-    const title = `${criterionLabel(f, standard)} · ${f.ruleId}`;
+    const title = `${criterion} · ${f.ruleId}`;
     const body = `${resolveMessage(f, lang)}\n${resolveRemediation(f, lang)}`;
     out.push(`::${level} file=${escProp(file)},line=${Math.max(1, f.line)},col=${Math.max(1, f.col)},title=${escProp(title)}::${esc(body)}`);
   }
@@ -317,6 +324,7 @@ export function groupFindings(findings: Finding[], standard: StandardId, lang: L
   const groups = new Map<string, Omit<FindingGroup, "pageIds"> & { pageSet: Set<string> }>();
   for (const f of findings) {
     const criterion = criterionLabel(f, standard);
+    if (criterion === null) continue; // belongs to no criterion of the active standard
     const key = `${criterion} ${f.ruleId} ${f.selectorHint}`;
     const g = groups.get(key);
     if (g) {

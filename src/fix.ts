@@ -15,6 +15,7 @@ import { readText } from "./util.js";
 import { applyEdits, type Edit } from "./fix/edits.js";
 import { CODEMODS, fixabilityOf, type Fixability } from "./fix/codemods.js";
 import { unifiedDiff } from "./fix/diff.js";
+import { CORE, isCore, loadPack, packCriteriaForFinding, type StandardId } from "./standards/index.js";
 
 export interface FixInput {
   inputs: string[];
@@ -30,12 +31,26 @@ export interface FixInput {
   only?: string[]; // limit to these ruleIds
   write?: boolean; // default false → dry-run
   noDefaultExcludes?: boolean; // also fix test/spec/story/__tests__ markup
+  /** The standard whose criteria the output names. Absent ⇒ the WCAG core. It selects
+   *  VOCABULARY only: which rules run and what they find is the engine's business, and no
+   *  standard changes a codemod. */
+  standard?: StandardId;
   onWarn?: (m: string) => void;
 }
 
 export interface FixItem {
   ruleId: string;
+  /** The success criterion the rule is tied to. Always WCAG-keyed: the rules ARE WCAG rules,
+   *  and this is the engine's own identifier for one. */
   criteriaId: string;
+  /** The ACTIVE STANDARD's criteria for the same rule — `["8.4"]` under RGAA where
+   *  `criteriaId` reads "3.1.1", and several ids where one rule fires on several criteria.
+   *  Absent under the core, where it would only repeat `criteriaId`.
+   *
+   *  Carried rather than substituted because `fix` is the one command whose output an agent
+   *  acts on directly: it needs the criterion the project is audited against to write the
+   *  ticket, and the engine's own id to look the rule up. */
+  packCriteriaIds?: string[];
   line: number;
   selectorHint: string;
   fixability: Fixability;
@@ -66,8 +81,16 @@ export interface FixResult {
   };
 }
 
-function itemOf(f: Finding): FixItem {
-  return { ruleId: f.ruleId, criteriaId: f.criteriaId, line: f.line, selectorHint: f.selectorHint, fixability: fixabilityOf(f.ruleId) };
+function itemOf(f: Finding, standard: StandardId): FixItem {
+  const packIds = isCore(standard) ? [] : packCriteriaForFinding(loadPack(standard), f);
+  return {
+    ruleId: f.ruleId,
+    criteriaId: f.criteriaId,
+    ...(packIds.length ? { packCriteriaIds: packIds } : {}),
+    line: f.line,
+    selectorHint: f.selectorHint,
+    fixability: fixabilityOf(f.ruleId),
+  };
 }
 
 function fixOne(file: string, source: string, opts: FixInput, canWrite = true): FileFix {
@@ -77,7 +100,7 @@ function fixOne(file: string, source: string, opts: FixInput, canWrite = true): 
   // must never rewrite/re-stage a capture. Skip entirely (no items, no edits).
   if (doc.capture) return { file, lossy: doc.lossy, items: [], diff: "", applied: 0, written: false, regression: false };
   const findings = runRules(doc);
-  const items = findings.map(itemOf);
+  const items = findings.map((f) => itemOf(f, opts.standard ?? CORE));
 
   const edits: Edit[] = [];
   // Real-AST docs (HTML or jsx-ast) carry accurate file offsets, so codemods edit
@@ -193,7 +216,14 @@ const FIX_LABEL: Record<Fixability, { fr: string; en: string }> = {
 };
 
 /** Human summary for the CLI. */
-export function fixSummary(r: FixResult, lang: Lang = "fr", write = false): string {
+/** The criterion a fix item is announced under: the active standard's own ids when it has
+ *  them, else the success criterion the rule is tied to. */
+function itemCriterion(it: FixItem, standard: StandardId): string {
+  if (it.packCriteriaIds?.length) return `${loadPack(standard).name} ${it.packCriteriaIds.join(", ")}`;
+  return `WCAG ${it.criteriaId}`;
+}
+
+export function fixSummary(r: FixResult, lang: Lang = "fr", write = false, standard: StandardId = CORE): string {
   const out: string[] = [];
   const t = r.totals;
   const head =
@@ -206,7 +236,7 @@ export function fixSummary(r: FixResult, lang: Lang = "fr", write = false): stri
     if (!fixable.length && !ff.items.length) continue;
     out.push(`### ${ff.file}${ff.lossy ? " (JSX/TSX — " + (lang === "fr" ? "proposition seule" : "proposal-only") + ")" : ""}`);
     for (const it of ff.items)
-      out.push(`- [${FIX_LABEL[it.fixability][lang]}] ${it.ruleId} (WCAG ${it.criteriaId}) — \`${it.selectorHint}\` @ ${ff.file}:${it.line}`);
+      out.push(`- [${FIX_LABEL[it.fixability][lang]}] ${it.ruleId} (${itemCriterion(it, standard)}) — \`${it.selectorHint}\` @ ${ff.file}:${it.line}`);
     if (ff.diff) out.push("", "```diff", ff.diff, "```");
     if (ff.regression) out.push(`> ⚠️ ${lang === "fr" ? "non écrit : régression détectée" : "not written: regression detected"}`);
     out.push("");

@@ -54,6 +54,23 @@ export function packTestIds(pack: StandardPack, id: string): string[] {
   return tests ? Object.keys(tests).map((k) => `${id}.${k}`) : [];
 }
 
+/** A criterion's numbered tests WITH their wording — the unit an auditor actually signs off,
+ *  so an acceptance criterion can name it instead of the success criterion it projects onto.
+ *
+ *  The wording is stripped of the glossary link syntax the pack stores it in
+ *  (`[alternative textuelle](#alternative-textuelle-image)` → `alternative textuelle`): a
+ *  Given/When/Then line is read, not clicked, and the anchors resolve nowhere outside a
+ *  criterion lookup. A test with several sentences is joined; `criteria --standard <pack>
+ *  <id>` is where the full text lives. */
+export function packTests(pack: StandardPack, id: string): { id: string; wording: string }[] {
+  const tests = getCriterion(pack, id)?.tests;
+  if (!tests) return [];
+  return Object.entries(tests).map(([k, sentences]) => ({
+    id: `${id}.${k}`,
+    wording: (Array.isArray(sentences) ? sentences.join(" ") : String(sentences)).replace(/\[([^\]]+)\]\(#[^)]+\)/g, "$1").trim(),
+  }));
+}
+
 /** Where the standard publishes this criterion, from the pack's `criterionUrl` template.
  *  Undefined when the pack declares none — the engine never guesses a URL for a standard. */
 export function criterionUrl(pack: StandardPack, id: string): string | undefined {

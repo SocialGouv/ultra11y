@@ -710,3 +710,69 @@ export interface DynamicResult {
   // for. Absent when every page was reached. Optional/additive — see ScanRedirect.
   redirected?: ScanRedirect[];
 }
+
+// ---- the pack-keyed audit DOCUMENT -------------------------------------------------------
+//
+// What `audit --standard <pack>` emits, and what every `--in <audit.json>` consumer accepts
+// beside the core `AuditResult`.
+//
+// The engine keys on WCAG success criteria because that is what its rules are tied to, and a
+// pack criterion is DEFINED as a projection of them (rgaa.json maps each of its 106 criteria
+// onto SCs). The derivation is therefore not a rendering choice that could be moved earlier —
+// without the core results there is nothing to project FROM, and report/prd/check/verify/
+// judge and the ledger all read them.
+//
+// So selecting a standard re-keys the DOCUMENT rather than the engine: the criteria, the
+// findings, the tallies and the pass rate are the pack's own, and the canonical core travels
+// beside them under `core`, where no rendering ever reads it. Nothing WCAG-keyed reaches a
+// reader; nothing downstream loses the input it needs.
+export interface PackAuditResult {
+  tool: "ultra11y";
+  /** Discriminates a pack document from a core `AuditResult` at a glance — and in
+   *  `isPackAudit`, which must never mistake one for the other. */
+  kind: "pack-audit";
+  /** The pack key, e.g. "rgaa". Never "wcag": the core keeps its own shape. */
+  standard: string;
+  /** Display label, e.g. "RGAA 4.1.2" — so a reader of the JSON alone knows what it claims. */
+  standardLabel: string;
+  version: string;
+  schemaVersion: number;
+  date: string;
+  scope: AuditResult["scope"];
+  /** One entry per pack THEME (the RGAA « thématique »), a guideline's counterpart. */
+  themes: PackThemeTally[];
+  criteria: PackCriterionEntry[];
+  /** Pack-keyed: `criteriaId` is the pack criterion, and `criteriaIds` carries every one the
+   *  finding fires on when a rule maps to several (RGAA 9.2 AND 12.6 for one landmark miss). */
+  findings: PackFinding[];
+  residualRisks: ResidualRisk[];
+  conformancePct: number;
+  /** The canonical WCAG-keyed engine result. Internal plumbing, never rendered. */
+  core: AuditResult;
+}
+
+export interface PackThemeTally {
+  number: number;
+  title: string;
+  c: number;
+  nc: number;
+  na: number;
+  manual: number;
+}
+
+export interface PackCriterionEntry {
+  id: string;
+  theme: number;
+  title: string;
+  status: Status;
+  findings: PackFinding[];
+  justification?: string;
+  decidedBy?: "engine" | "agent" | "scan";
+  inapplicable?: boolean;
+}
+
+export type PackFinding = Omit<Finding, "criteriaId"> & {
+  criteriaId: string;
+  /** Every pack criterion this finding fires on; `criteriaId` is the first of them. */
+  criteriaIds: string[];
+};

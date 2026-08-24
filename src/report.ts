@@ -51,11 +51,13 @@ const L = {
     rateNote: "sous-ensemble décidable par la machine : C ÷ (C + NC)",
     warn: "Ce rapport couvre le sous-ensemble de critères vérifiables automatiquement. Les critères « à évaluer » (rendu / jugement) sont adjugés par l'agent IA (`verify --manual`, de façon gatée) ; le rendu passe par `scan` (voir la dernière section).",
     derived: (std: string) =>
-      `Vue dérivée du ${std} : projection des critères de succès WCAG audités sur le référentiel. La vérification d'intégrité (\`check\`/\`verify\`) opère sur le rapport WCAG canonique.`,
+      `Rapport ${std}. Chaque critère est jugé sur ses propres tests ; la vérification d'intégrité (\`check\`/\`verify\`) opère sur le même périmètre.`,
     synthTitle: (by: string) => `1. Synthèse par ${by}`,
     byGuideline: "règle WCAG",
     byTheme: "thématique",
     th: (head: string) => [head, "C", "NC", "NA", "À évaluer"],
+    naSubset: (n: number) =>
+      `**NA est un sous-ensemble de C**, jamais une quatrième colonne : un critère conforme faute de sujet dans le périmètre est compté en C, et NA dit seulement combien de conformités ont été atteintes ainsi. Le nombre de critères est C + NC + « À évaluer » = ${n}.`,
     total: "Total",
     ncTitle: "2. Non-conformités (par priorité)",
     recTitle: "Recommandations (non normatives)",
@@ -82,9 +84,13 @@ const L = {
     testsToRule: "tests à trancher",
     manualHowTo:
       "Générez la worklist : `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Chaque item y porte l'énoncé complet de ses tests, sa note technique, ses cas particuliers, sa guidance et les termes que le référentiel définit.",
-    outOfScope: "Hors périmètre moteur — mappé sur des SC hors WCAG 2.2 AA ; vérification manuelle.",
-    scopedOut: "Les non-conformités WCAG relevées concernent des éléments hors du périmètre de ce critère — à évaluer séparément.",
-    judgment: "L’énoncé du critère demande davantage que les CS WCAG auxquels il est rattaché — le moteur n’y a pas répondu, à trancher.",
+    // These three justifications appear ONLY in a pack report (the core has no derivation to
+    // explain), so they are worded in the pack's terms: they used to describe the engine's
+    // internals — « mappé sur des SC hors WCAG 2.2 AA », « les CS WCAG auxquels il est
+    // rattaché » — inside a document whose reader is auditing to another referential entirely.
+    outOfScope: "Hors du périmètre décidable par le moteur pour ce référentiel — vérification manuelle.",
+    scopedOut: "Les non-conformités relevées concernent des éléments hors du périmètre de ce critère — à évaluer séparément.",
+    judgment: "L’énoncé du critère demande davantage que ce que le moteur peut établir — à trancher.",
     nothing: "Aucun.",
     dedup: "Dédup",
     canonical: "fichier(s) canonique(s) audité(s)",
@@ -126,11 +132,13 @@ const L = {
     rateNote: "machine-decidable subset: C ÷ (C + NC)",
     warn: "This report covers the subset of criteria checkable automatically. The “to assess” criteria (rendering / judgment) are adjudicated by the AI agent (`verify --manual`, gated); rendering goes through `scan` (see the last section).",
     derived: (std: string) =>
-      `Derived view of ${std}: the audited WCAG success criteria projected onto this standard. The integrity gates (\`check\`/\`verify\`) operate on the canonical WCAG report.`,
+      `${std} report. Every criterion is judged on its own tests; the integrity gates (\`check\`/\`verify\`) operate on the same scope.`,
     synthTitle: (by: string) => `1. Synthesis by ${by}`,
     byGuideline: "WCAG guideline",
     byTheme: "theme",
     th: (head: string) => [head, "C", "NC", "NA", "To assess"],
+    naSubset: (n: number) =>
+      `**NA is a subset of C**, never a fourth column: a criterion conforming for want of a subject in scope is counted under C, and NA only says how many conformities were reached that way. The criterion count is C + NC + “To assess” = ${n}.`,
     total: "Total",
     ncTitle: "2. Non-conformities (by priority)",
     recTitle: "Recommendations (non-normative)",
@@ -157,9 +165,9 @@ const L = {
     testsToRule: "tests to rule on",
     manualHowTo:
       "Generate the worklist: `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Each item carries the full wording of its tests, its technical note, its particular cases, its guidance and the terms the standard defines.",
-    outOfScope: "Out of engine scope — mapped to SCs outside WCAG 2.2 AA; manual verification.",
-    scopedOut: "The WCAG failures found concern elements outside this criterion's scope — assess separately.",
-    judgment: "The criterion asks more than the WCAG SCs it maps to — the engine did not answer it; rule on it.",
+    outOfScope: "Outside what the engine can decide for this standard — manual verification.",
+    scopedOut: "The failures found concern elements outside this criterion's scope — assess separately.",
+    judgment: "The criterion asks more than the engine can establish — rule on it.",
     nothing: "None.",
     dedup: "Dedup",
     canonical: "canonical file(s) audited",
@@ -442,6 +450,12 @@ function render(
   }
   const tot = reportTotals(opts.groups);
   out.push(`| **${s.total}** | **${tot.c}** | **${tot.nc}** | **${tot.na}** | **${tot.manual}** |`, "");
+  // SAY THAT NA IS A SUBSET OF C. `tallyRows` has documented it since it was written, but the
+  // documentation is in the source and the reader is holding a four-column table: on RGAA the
+  // Total row reads 49 | 57 | 23 | 0 for 106 criteria, and anyone adding them gets 129 and
+  // concludes the grid is wrong. A criterion conforming for want of a subject IS conforming;
+  // the NA column only says how many of the conformities were reached that way.
+  out.push(`> ${s.naSubset(tot.c + tot.nc + tot.manual)}`, "");
 
   // 2. non-conformities by priority — one auditor block per NC criterion (core or
   // pack), the SAME human language `prd`/GitHub issues use (src/auditor.ts
@@ -655,8 +669,7 @@ export function renderReport(r: AuditResult, lang: Lang = "en", outDir?: string,
 export function packReportGroups(r: AuditResult, pack: StandardPack, lang: Lang = "en"): ReportGroup[] {
   const derived = derivePackResults(r, pack.key);
   const s = L[lang];
-  const naReason =
-    lang === "fr" ? "Aucun critère de succès WCAG mappé n'est applicable dans le périmètre." : "No mapped WCAG success criterion is applicable in scope.";
+  const naReason = lang === "fr" ? "Rien de la nature de ce critère n'est présent dans le périmètre." : "Nothing of this criterion's kind is present in scope.";
   const byTheme = new Map<number, ReportRow[]>();
   for (const pr of derived) {
     const pc = pack.criteria.find((c) => c.id === pr.id)!;

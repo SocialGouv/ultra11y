@@ -15,6 +15,7 @@ import {
   derivePackResults,
   packConformancePct,
   packTestIds,
+  packTests,
   standardLabel,
   themeName,
   titlePlain as packTitlePlain,
@@ -61,8 +62,10 @@ const L = {
     toRuleOnNote:
       "Le moteur ne peut pas les décider : ils relèvent du jugement ou du rendu. Ce ne sont PAS des non-conformités — ils sont indécidés. Générez la worklist (`verify --manual --standard <pack>`), qui porte l'énoncé complet de chaque test.",
     tests: "tests",
+    // « ancrés sur les intitulés WCAG » was both a cross-reference and, since the acceptance
+    // criteria are generated from the pack's numbered tests, no longer true under a pack.
     docNote:
-      "Document d'exigences (PRD) généré depuis l'audit statique : une épopée par thème, une user story par critère, des critères d'acceptation ancrés sur les intitulés WCAG. Adjugez les critères « à évaluer » avec `verify --manual` (agent IA, gaté), le rendu via `scan`.",
+      "Document d'exigences (PRD) généré depuis l'audit statique : une épopée par thème, une user story par critère, des critères d'acceptation ancrés sur l'énoncé des tests du référentiel actif. Adjugez les critères « à évaluer » avec `verify --manual` (agent IA, gaté), le rendu via `scan`.",
   },
   en: {
     title: (std: string) => `Accessibility fix plan — ${std}`,
@@ -97,7 +100,7 @@ const L = {
       "The engine cannot decide these: they are judgment or rendering calls. They are NOT non-conformities — they are undecided. Generate the worklist (`verify --manual --standard <pack>`), which carries the full wording of every test.",
     tests: "tests",
     docNote:
-      "Product-requirements document generated from the static audit: one epic per theme, one user story per criterion, acceptance criteria anchored to the WCAG success-criterion text. Adjudicate the “to assess” criteria with `verify --manual` (AI agent, gated), rendering via `scan`.",
+      "Product-requirements document generated from the static audit: one epic per theme, one user story per criterion, acceptance criteria anchored to the active standard's own test wording. Adjudicate the “to assess” criteria with `verify --manual` (AI agent, gated), rendering via `scan`.",
   },
 } as const;
 
@@ -214,7 +217,10 @@ export function guidanceExampleBlock(entries: GuidanceEntry[], lang: Lang): stri
 function unitBlock(unit: PrdUnit, lang: Lang, heading: string, standard: StandardId): string[] {
   const s = L[lang];
   const out: string[] = [];
-  const refs = unit.refs.length ? `  ·  WCAG ${unit.refs.join(", ")}` : "";
+  // `unit.refs` is empty under the core (the unit IS the success criterion) and holds the
+  // mapped SCs under a pack — where naming them appends a second referential to a heading
+  // that already reads « RGAA 11.1 — … ». Same rule as `renderPrdDoc` and the auditor block.
+  const refs = isCore(standard) && unit.refs.length ? `  ·  WCAG ${unit.refs.join(", ")}` : "";
   out.push(`${heading} ${ICON[unit.severity]} ${unit.label}${refs}`, "");
   const fixes = [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))];
   for (const fx of fixes) out.push(`- _${s.fix} :_ ${mdText(fx)}`);
@@ -316,20 +322,40 @@ function epicsOf(units: PrdUnit[], standard: StandardId, lang: Lang): DocEpic[] 
   return [...groups.values()].sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
 }
 
-/** The Given/When/Then acceptance-criteria lines for a unit — one per WCAG ref of the
- *  criterion (core: the SC itself; pack: its mapped WCAG refs), each anchored to the real
- *  WCAG success-criterion title. Shared by `renderPrdDoc` (plain bullets) and the auditor
- *  block's technical section (checkbox list via `opts.checkbox`) so the generator lives in
- *  exactly one place. */
+/**
+ * The Given/When/Then acceptance-criteria lines for a unit.
+ *
+ * Under the CORE there is one line per success criterion, anchored to its real WCAG title.
+ *
+ * Under a PACK there is one line per NUMBERED TEST of the pack's own criterion, anchored to
+ * that test's wording. It used to enumerate the criterion's mapped WCAG refs instead — so an
+ * RGAA deliverable's acceptance criteria read « Alors « Contenu non textuel » (WCAG 1.1.1) »,
+ * naming a referential the rest of the document had stopped mentioning, and naming the wrong
+ * unit of work besides: what an RGAA auditor signs off is test 1.1.1 through 1.1.8, not the
+ * success criterion they collectively project onto.
+ *
+ * Shared by `renderPrdDoc` (plain bullets) and the auditor block's technical section
+ * (checkbox list via `opts.checkbox`) so the generator lives in exactly one place.
+ */
 export function acceptanceCriteria(unit: PrdUnit, standard: StandardId, lang: Lang, opts: { checkbox?: boolean } = {}): string[] {
   const s = L[lang];
   const prefix = opts.checkbox ? "- [ ] " : "- ";
   const hints = [...new Set(unit.findings.map((f) => `\`${f.selectorHint}\``))].slice(0, 3).join(", ") || "—";
-  const scs = isCore(standard) ? [unit.criteriaId] : unit.refs;
-  return scs.map((sc) => {
-    const req = scTitle(sc, lang) ?? sc;
-    return `${prefix}**${s.given}** ${s.givenElements(hints)} · **${s.when}** ${s.acWhen} · **${s.then}** « ${req} » (WCAG ${sc}).`;
-  });
+  const line = (req: string, ref: string) =>
+    `${prefix}**${s.given}** ${s.givenElements(hints)} · **${s.when}** ${s.acWhen} · **${s.then}** « ${req} » (${ref}).`;
+
+  if (isCore(standard)) {
+    const sc = unit.criteriaId;
+    return [line(scTitle(sc, lang) ?? sc, `WCAG ${sc}`)];
+  }
+
+  const pack = loadPack(standard);
+  const tests = packTests(pack, unit.criteriaId);
+  // A pack criterion with no numbered test (or one this pack does not carry) still deserves a
+  // line — fall back to the criterion itself rather than emitting nothing, which would leave
+  // an NC block with no acceptance criteria at all.
+  if (!tests.length) return [line(unit.title, `${pack.name} ${unit.criteriaId}`)];
+  return tests.map((t) => line(t.wording, `${pack.name} ${t.id}`));
 }
 
 /** A product-requirements document: epics by theme, one user story per criterion, with
@@ -374,12 +400,18 @@ export function renderPrdDoc(r: AuditResult, lang: Lang = "en", standard: Standa
   for (const epic of epicsOf(units, standard, lang)) {
     out.push(`## ${s.epic} — ${epic.title}`, "");
     for (const u of epic.units) {
-      const refs = u.refs.length ? `  ·  WCAG ${u.refs.join(", ")}` : "";
+      // ONE REFERENTIAL. The story heading used to append « · WCAG 1.3.1, 2.4.6, 3.3.2, 4.1.2 »
+      // and the body a « Techniques WCAG : ARIA11, ARIA12, … » line of W3C technique ids —
+      // both inside a backlog whose epics, stories and acceptance criteria are RGAA. The
+      // techniques stay reachable where they answer a question a reader actually asked:
+      // `criteria <sc>` under the core, and `criteria --standard rgaa <id>` for the pack's own
+      // technical note.
+      const refs = isCore(standard) && u.refs.length ? `  ·  WCAG ${u.refs.join(", ")}` : "";
       out.push(`### ${ICON[u.severity]} ${s.story} — ${u.label}${refs}`, "");
       out.push(`> ${s.asUser}, ${s.iNeed(u.title)}.`, "");
       out.push(`**${s.ac}**`, "");
       out.push(...acceptanceCriteria(u, standard, lang));
-      const techs = isCore(standard) ? scTechniques(u.criteriaId) : [...new Set(u.refs.flatMap((sc) => scTechniques(sc)))];
+      const techs = isCore(standard) ? scTechniques(u.criteriaId) : [];
       if (techs.length) out.push("", `_${s.techniques} : ${techs.join(", ")}_`);
       out.push("", `**${s.tasks} (${u.findings.length})**`, "");
       for (const f of u.findings) {

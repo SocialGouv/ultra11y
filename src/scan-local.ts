@@ -297,16 +297,18 @@ function inputOverflowZoomExpr(detail: string, cellSuffix: string): string {
 const CELL_SUFFIX = { fr: " (champ situé dans une cellule de tableau)", en: " (input inside a table cell)" };
 const INPUT_OVERFLOW_DETAIL = {
   reflow: {
-    fr: "Champ rempli dont la valeur saisie est tronquée/illisible à 320px de large — perte de contenu (1.4.10).",
-    en: "Filled input whose typed value is clipped/unreadable at 320px width — loss of content (1.4.10).",
+    fr: "Champ rempli dont la valeur saisie est tronquée/illisible à 320px de large — perte de contenu.",
+    en: "Filled input whose typed value is clipped/unreadable at 320px width — loss of content.",
   },
   zoom: {
-    fr: "Champ rempli dont la valeur saisie est tronquée/illisible au zoom 200% — perte de contenu (1.4.4).",
-    en: "Filled input whose typed value is clipped/unreadable at 200% zoom — loss of content (1.4.4).",
+    fr: "Champ rempli dont la valeur saisie est tronquée/illisible au zoom 200% — perte de contenu.",
+    en: "Filled input whose typed value is clipped/unreadable at 200% zoom — loss of content.",
   },
+  // Same rule as the other probe strings: describe what was applied, never restate the
+  // criterion — the rendering names it, and in one standard's vocabulary rather than another's.
   spacing: {
-    fr: "Champ rempli dont la valeur saisie est tronquée/illisible sous l'espacement de texte WCAG — perte de contenu (1.4.12).",
-    en: "Filled input whose typed value is clipped/unreadable under the WCAG text-spacing override — loss of content (1.4.12).",
+    fr: "Champ rempli dont la valeur saisie est tronquée/illisible sous l'espacement de texte imposé — perte de contenu.",
+    en: "Filled input whose typed value is clipped/unreadable under the text-spacing override — loss of content.",
   },
 };
 
@@ -499,8 +501,8 @@ function liveRegionExpr(detail: string, allowClicks: boolean): string {
 })()`;
 }
 const LIVE_REGION_DETAIL = {
-  fr: "Mise à jour de contenu déclenchée par une interaction hors d'une région live (aria-live / role=status|alert|log) — probablement non restituée aux technologies d'assistance (4.1.3).",
-  en: "Content update triggered by an interaction outside any live region (aria-live / role=status|alert|log) — likely not announced to assistive technology (4.1.3).",
+  fr: "Mise à jour de contenu déclenchée par une interaction hors d'une région live (aria-live / role=status|alert|log) — probablement non restituée aux technologies d'assistance.",
+  en: "Content update triggered by an interaction outside any live region (aria-live / role=status|alert|log) — likely not announced to assistive technology.",
 };
 
 /** Should the live-region probe CLICK buttons? Never by default on an authenticated scan

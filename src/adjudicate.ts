@@ -315,6 +315,19 @@ function collapse(
   };
 }
 
+/** A pack criterion's automatability: the WORST among the success criteria it maps to. One
+ *  needing a rendered DOM for any of them needs one, full stop. A criterion whose SCs are all
+ *  outside the core (RGAA 8.1 → the removed 4.1.1) is still the agent's to decide from source.
+ *
+ *  Exported because the pack audit DOCUMENT (src/standards/document.ts) has to label its
+ *  residual risks the same way this worklist labels its items — two answers for one criterion
+ *  would have `audit --standard rgaa` and `verify --manual --standard rgaa` disagree about
+ *  whether a browser is needed. */
+export function packAutomatability(scs: readonly string[]): Automatability {
+  const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a): a is Automatability => !!a);
+  return autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
+}
+
 function blankItem(
   criteriaId: string,
   automatability: Automatability,
@@ -378,14 +391,9 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
       .map((pc) => {
         const crit = getCriterion(pack, pc.id);
         const scs = crit?.wcag ?? pc.scs;
-        // The worst automatability among the mapped SCs: a criterion needing a rendered DOM
-        // for any of them needs one, full stop. A criterion whose SCs are all outside the
-        // core (RGAA 8.1 → the removed 4.1.1) is still the agent's to decide from source.
-        const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a): a is Automatability => !!a);
-        const automatability: Automatability = autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
         return blankItem(
           pc.id,
-          automatability,
+          packAutomatability(scs),
           // THE STANDARD'S OWN LOCALE, not a literal "fr". Identical output for RGAA, which
           // publishes in French and only in French — but the PACK is what says so, and a
           // standard publishing in another language must not be titled through a locale this

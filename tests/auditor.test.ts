@@ -99,7 +99,9 @@ describe("renderAuditorUnit", () => {
     expect(md).toContain("**Thématique** : 11."); // theme name resolved
     expect(md).toContain("**Critère** : 11.6 — Légende");
     expect(md).toContain("**Test(s)** : 11.6.1"); // test numbers from pack tests
-    expect(md).toContain("**WCAG** : 1.3.1 (A) · 3.3.2 (A)"); // per-ref level
+    // …and NOTHING from another referential: the block used to carry
+    // « **WCAG** : 1.3.1 (A) · 3.3.2 (A) » here.
+    expect(md).not.toMatch(/WCAG/);
     expect(md).toContain("**Constat (Non conforme (NC))**");
     expect(md).toContain("**Attendu (Conforme (C))** : Ajoutez alt");
   });
@@ -456,9 +458,23 @@ describe("auditorUnitModel", () => {
 
   it("resolves the pack's own vocabulary and test numbers under --standard rgaa", () => {
     const m = auditorUnitModel(unit("11.6", "Légende", ["1.3.1"]), "rgaa", "fr");
-    expect(m.fields.map((f) => f.label)).toEqual(["Thématique", "Critère", "Test(s)", "WCAG", "Priorité"]);
+    expect(m.fields.map((f) => f.label)).toEqual(["Thématique", "Critère", "Test(s)", "Priorité"]);
     expect(m.fields[0]!.value).toBe("11. Formulaires");
     expect(m.conformanceTerms.nonConformant).toBe("Non conforme (NC)");
+  });
+
+  // A PACK DELIVERABLE NAMES ONE REFERENTIAL. The block used to carry a « WCAG 1.3.1 (A) »
+  // field beside the RGAA theme/criterion/tests, which left an auditor working to RGAA
+  // reconciling two referentials inside a document that answers to one. The mapping is still
+  // what computes the projection and `criteria --standard rgaa <id>` still prints it — a
+  // conformance report is simply not where it belongs.
+  it("carries no WCAG cross-reference under a pack, and keeps one under the core", () => {
+    const pack = auditorUnitModel(unit("11.6", "Légende", ["1.3.1"]), "rgaa", "fr");
+    expect(pack.fields.some((f) => f.label === "WCAG")).toBe(false);
+    expect(renderAuditorUnit(unit("11.6", "Légende", ["1.3.1"]), "rgaa", "fr", {}).join("\n")).not.toMatch(/WCAG/);
+
+    const core = auditorUnitModel(unit("1.4.3", "Contraste (minimum)"), "wcag", "fr");
+    expect(core.fields.find((f) => f.label === "WCAG")?.value).toBe("1.4.3 (AA)");
   });
 
   it("never counts an advisory as a non-conformity, and never folds unless asked", () => {

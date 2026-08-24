@@ -14,8 +14,9 @@
 //    class of error the whole engine is built to refuse.
 import { findingId } from "./baseline.js";
 import { resolveMessage, resolveRemediation } from "./messages.js";
-import { findingsForStandard, packCriteriaForFinding } from "./standards/derive.js";
-import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
+import { findingsForStandard } from "./standards/derive.js";
+import { packCriteriaOf, packCriterionLabel } from "./standards/document.js";
+import { CORE, type StandardId, isCore, loadPack, criterionUrl, type StandardPack } from "./standards/index.js";
 import type { AuditResult, Finding, Lang, Severity } from "./types.js";
 import { VERSION } from "./types.js";
 import { isUrlPath, repoRelative } from "./util.js";
@@ -116,32 +117,47 @@ function relatedLocations(f: Finding, baseDir: string): SarifLocation[] | undefi
 }
 
 /** The criterion label a message should speak: the pack's own id when a standard is
- *  projected (RGAA 1.1), else the bare WCAG success criterion. */
-function criterionLabel(f: Finding, standard: StandardId): string {
+ *  projected (RGAA 1.1), else the bare WCAG success criterion. `null` under a pack when the
+ *  finding belongs to none of its criteria — the caller drops it rather than mislabelling it
+ *  (see `packCriteriaOf`; the old `WCAG ${f.criteriaId}` fallback emitted « WCAG 4.11 »). */
+function criterionLabel(f: Finding, standard: StandardId): string | null {
   if (isCore(standard)) return `WCAG ${f.criteriaId}`;
-  const pack = loadPack(standard);
-  const ids = packCriteriaForFinding(pack, f);
-  return ids.length ? `${pack.name} ${ids.join(", ")}` : `WCAG ${f.criteriaId}`;
+  return packCriterionLabel(loadPack(standard), f);
 }
 
 function ruleFor(f: Finding, standard: StandardId, lang: Lang): SarifRule {
   const sc = f.criteriaId;
   const title = scTitle(sc, lang);
-  const tags = ["accessibility", `wcag:${sc}`];
-  if (!isCore(standard)) {
-    const pack = loadPack(standard);
-    for (const id of packCriteriaForFinding(pack, f)) tags.push(`${pack.key}:${id}`);
-  }
-  if (f.advisory) tags.push("recommendation");
   const level = levelFor(f);
+  const core = isCore(standard);
+  // ONE REFERENTIAL PER LOG. A SARIF uploaded from a run under `--standard rgaa` is read in
+  // GitHub code scanning next to a report that names RGAA criteria; tagging its rules
+  // `wcag:1.3.1` and titling them « WCAG 1.3.1 » makes the two views disagree about what the
+  // finding is, and the `wcag:` tag is what a reader filters on.
+  const pack = core ? null : loadPack(standard);
+  const packIds = pack ? packCriteriaOf(pack, f) : [];
+  const tags = core ? ["accessibility", `wcag:${sc}`] : ["accessibility", ...packIds.map((id) => `${pack!.key}:${id}`)];
+  if (f.advisory) tags.push("recommendation");
+  const label = core ? `WCAG ${sc}` : `${pack!.name} ${packIds.join(", ")}`;
+  const shortDescription = core && title ? `${f.ruleId} — ${label} ${title}` : `${f.ruleId} — ${label}`;
   return {
     id: f.ruleId,
-    shortDescription: { text: title ? `${f.ruleId} — WCAG ${sc} ${title}` : `${f.ruleId} — WCAG ${sc}` },
+    shortDescription: { text: shortDescription },
     fullDescription: { text: resolveRemediation(f, lang) },
-    ...(understanding(sc) ? { helpUri: understanding(sc) } : {}),
+    // The Understanding page is the CORE's help link. A pack criterion's own published page
+    // comes from `criterionUrl`, and pointing at a W3C document from an RGAA rule would send
+    // the reader to the wrong referential.
+    ...(core ? (understanding(sc) ? { helpUri: understanding(sc) } : {}) : packHelpUri(pack!, packIds)),
     defaultConfiguration: { level },
     properties: { tags, "problem.severity": level },
   };
+}
+
+/** The pack's own published page for a rule's first criterion, when the pack declares a URL
+ *  template. Absent otherwise — the engine never guesses a URL for a standard. */
+function packHelpUri(pack: StandardPack, ids: string[]): { helpUri?: string } {
+  const url = ids[0] ? criterionUrl(pack, ids[0]) : undefined;
+  return url ? { helpUri: url } : {};
 }
 
 /** Project an AuditResult onto a SARIF 2.1.0 log. Pure — writes nothing. */
@@ -155,6 +171,8 @@ export function toSarif(result: AuditResult, opts: SarifOptions = {}): SarifLog 
   const results: SarifResult[] = [];
 
   for (const f of findingsForStandard(result, standard)) {
+    const criterion = criterionLabel(f, standard);
+    if (criterion === null) continue; // belongs to no criterion of the active standard
     let idx = indexOf.get(f.ruleId);
     if (idx === undefined) {
       idx = rules.length;
@@ -163,7 +181,7 @@ export function toSarif(result: AuditResult, opts: SarifOptions = {}): SarifLog 
     }
     const related = relatedLocations(f, baseDir);
     const page = f.sample?.page;
-    const properties: Record<string, string | boolean> = { criterion: criterionLabel(f, standard) };
+    const properties: Record<string, string | boolean> = { criterion };
     if (isUrl(f.file)) properties.url = f.file;
     if (page) properties.page = page;
     if (f.advisory) properties.advisory = true;
@@ -172,7 +190,7 @@ export function toSarif(result: AuditResult, opts: SarifOptions = {}): SarifLog 
       ruleId: f.ruleId,
       ruleIndex: idx,
       level: levelFor(f),
-      message: { text: `[${criterionLabel(f, standard)}] ${resolveMessage(f, lang)} — ${resolveRemediation(f, lang)}` },
+      message: { text: `[${criterion}] ${resolveMessage(f, lang)} — ${resolveRemediation(f, lang)}` },
       locations: physicalLocation(f, baseDir),
       ...(related ? { relatedLocations: related } : {}),
       partialFingerprints: { [FINGERPRINT_KEY]: findingId(f) },

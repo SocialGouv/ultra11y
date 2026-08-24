@@ -146,7 +146,10 @@ export const TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
     const clipped = (s.overflowX === 'hidden' || s.overflowY === 'hidden' || s.overflow === 'hidden') && (e.scrollHeight > e.clientHeight + 2 || e.scrollWidth > e.clientWidth + 2);
     const ellipsis = s.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 2;
     if (clipped || ellipsis) {
-      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqué/masqué sous l\\'espacement de texte WCAG 1.4.12 — perte de contenu.' });
+      // No criterion id in the text: every rendering already names the criterion this finding
+      // belongs to, and a hard-coded « 1.4.12 » is a WCAG number appearing inside a deliverable
+      // that may be keyed on another standard entirely.
+      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqué/masqué sous l\\'espacement de texte imposé — perte de contenu.' });
     }
     if (hits.length >= 20) break;
   }

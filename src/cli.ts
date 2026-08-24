@@ -87,7 +87,8 @@ import { pagesForStandard, renderPageDocument, renderPagesDocument, renderPagesI
 import { crawlBound, crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
 import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
-import { resolveStandard, getPack, isCore, CORE, derivePackResults, type StandardId } from "./standards/index.js";
+import { resolveStandard, getPack, isCore, CORE, derivePackResults, findingsForStandard, type StandardId } from "./standards/index.js";
+import { auditDocumentFor, packAuditDocument, unwrapAudit } from "./standards/document.js";
 import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
 import { listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
@@ -865,7 +866,7 @@ function isCurrentAudit(r: unknown): r is AuditResult {
 function peekMergeAudit(mergeIn: string | boolean | undefined): AuditResult | undefined {
   if (typeof mergeIn !== "string" || !mergeIn) return undefined;
   try {
-    const parsed: unknown = JSON.parse(readText(mergeIn));
+    const parsed: unknown = unwrapAudit(JSON.parse(readText(mergeIn)));
     return isCurrentAudit(parsed) ? parsed : undefined;
   } catch {
     return undefined;
@@ -984,7 +985,7 @@ async function cmdAuditFromFile(p: ParsedArgs, inPath: string): Promise<number> 
 
   let result: AuditResult;
   try {
-    const parsed = JSON.parse(inPath === "-" ? await readStdin() : readText(inPath)) as unknown;
+    const parsed = unwrapAudit(JSON.parse(inPath === "-" ? await readStdin() : readText(inPath))) as unknown;
     if (!isCurrentAudit(parsed)) {
       console.error("ultra11y audit: --in is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
       return 2;
@@ -1035,10 +1036,18 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   const stdin = inputs.includes("-") ? await readStdin() : undefined;
   const since = typeof p.flags.since === "string" ? (p.flags.since as string) : undefined;
   const dedupFlag = p.flags.dedup;
-  // Pre-audit: no scope.langs yet (audit itself doesn't take --standard), so this is
-  // just the explicit-flag-or-English fallback — used only by messages emitted before
-  // runAudit returns (below). Recomputed with the audit's own detection right after.
-  let lang = resolveLang(p.flags, {});
+  // THE ACTIVE STANDARD. `audit` used to take none by design and the engine's WCAG keying was
+  // taken to settle the question for every surface too — so a project declaring
+  // `.ultra11yrc.json { "standard": "rgaa" }` still got « WCAG 2.2 AA audit » with `[3.1.1]`
+  // tags, in English, while `report --standard rgaa` two commands later spoke RGAA in French.
+  // The engine stays WCAG-keyed (a pack criterion is DEFINED as a projection of success
+  // criteria); what the standard now decides is the DOCUMENT and every rendering of it.
+  const standard = stdOf(p, "audit");
+  if (standard === null) return 2;
+  // Pre-audit: no scope.langs yet, so this is the flag-or-standard-locale fallback — used
+  // only by messages emitted before runAudit returns. Recomputed with the audit's own
+  // detection right after.
+  let lang = resolveLang(p.flags, { standard });
 
   // Rendered captures: ingest the .ultra11y/captures dir (or --captures <dir>) alongside
   // the source so the audit covers the REAL DOM component libraries/SFCs emit. In a full
@@ -1097,7 +1106,7 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   });
   // Re-resolve with the audit's own repo-language detection (scope.langs) now that
   // it's available — every message from here on uses this, not the pre-audit fallback.
-  lang = resolveLang(p.flags, { audit: result });
+  lang = resolveLang(p.flags, { audit: result, standard });
 
   // Record the pages in scope + attribute the source findings to them, so the per-page grid
   // rebuilds later from this JSON alone (no snapshots on disk, no browser).
@@ -1116,13 +1125,19 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   // R6: an `--out` value ending in `.json` is a FILE target (write exactly there);
   // otherwise it's a directory and the canonical `audit-latest.json` lands inside it — so
   // `--out run.json` no longer surprises the user with `run.json/audit-latest.json`.
+  // THE DOCUMENT this run publishes. Under the core it is the AuditResult itself; under a
+  // pack it is that result re-keyed onto the pack's own criteria, carrying the core inside
+  // (see src/standards/document.ts). Written to `--out`, printed by `--json`, and read back
+  // by every `--in` consumer through `unwrapAudit`.
+  const document = isCore(standard) ? result : packAuditDocument(result, standard, lang);
+
   if (typeof p.flags.out === "string") {
     const out = p.flags.out;
     const asFile = out.toLowerCase().endsWith(".json");
     const target = asFile ? out : join(out, "audit-latest.json");
     try {
       mkdirSync(asFile ? dirname(out) : out, { recursive: true });
-      writeFileSync(target, JSON.stringify(result, null, 2) + "\n");
+      writeFileSync(target, JSON.stringify(document, null, 2) + "\n");
       // Report the path actually written on STDERR so `--json` stdout stays parseable.
       console.error(lang === "fr" ? `→ audit écrit dans ${target}` : `→ audit written to ${target}`);
     } catch {
@@ -1154,7 +1169,7 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
     let baseline: AuditResult | null = null;
     if (existsSync(baselineFlag)) {
       try {
-        const parsed: unknown = JSON.parse(readText(baselineFlag));
+        const parsed: unknown = unwrapAudit(JSON.parse(readText(baselineFlag)));
         if (isCurrentAudit(parsed)) baseline = parsed;
         else
           console.error(
@@ -1168,7 +1183,7 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
     const blindSpots = requireCaptures ? (result.scope.captureCoverage?.blindSpots ?? []) : [];
     // In gate mode the subject is the REGRESSION, not the backlog: the CI rendering covers
     // exactly the new findings, so a PR is annotated with what it introduced.
-    if (ciFormat) emitCiFormat({ ...result, findings: diff.newFindings }, ciFormat, CORE, lang, failOnParsed ?? "bloquant");
+    if (ciFormat) emitCiFormat({ ...result, findings: diff.newFindings }, ciFormat, standard, lang, failOnParsed ?? "bloquant");
     else if (p.flags.json)
       console.log(JSON.stringify(requireCaptures && result.scope.captureCoverage ? { ...diff, captureCoverage: result.scope.captureCoverage } : diff, null, 2));
     else {
@@ -1183,13 +1198,16 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   // compose; a plain audit (neither flag) always exits 0.
   const failOnSet = failOnRaw !== undefined;
   const failOn = failOnSet ? (failOnParsed ?? "bloquant") : undefined;
-  const failing = failOn ? findingsAtOrAbove(result.findings, failOn) : [];
+  // Gate on THIS standard's findings. Under the core that is the engine's own list; under a
+  // pack it also carries the pack's declarative-rule findings, which are part of its verdict
+  // and were previously invisible to the gate for want of a `--standard` to select them.
+  const failing = failOn ? findingsAtOrAbove(findingsForStandard(result, standard), failOn) : [];
   const blindSpots = requireCaptures ? (result.scope.captureCoverage?.blindSpots ?? []) : [];
 
-  if (ciFormat) emitCiFormat(result, ciFormat, CORE, lang, failOn);
-  else if (p.flags.json) console.log(JSON.stringify(result, null, 2));
+  if (ciFormat) emitCiFormat(result, ciFormat, standard, lang, failOn);
+  else if (p.flags.json) console.log(JSON.stringify(document, null, 2));
   else {
-    console.log(auditSummary(result, lang));
+    console.log(auditSummary(result, lang, standard));
     if (requireCaptures && result.scope.captureCoverage) console.error(captureCoverageSummary(result.scope.captureCoverage, lang));
     if (failOnSet && failing.length)
       console.error(lang === "fr" ? `✗ ${failing.length} non-conformité(s) ≥ ${failOn}.` : `✗ ${failing.length} non-conformity(ies) ≥ ${failOn}.`);
@@ -1442,7 +1460,7 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   if (raw === null) return 2;
   let result: unknown;
   try {
-    result = JSON.parse(raw);
+    result = unwrapAudit(JSON.parse(raw));
   } catch {
     console.error("ultra11y pages: --in is not valid JSON (expected an AuditResult).");
     return 2;
@@ -1967,7 +1985,7 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
   if (raw === null) return 2;
   let result: unknown;
   try {
-    result = JSON.parse(raw);
+    result = unwrapAudit(JSON.parse(raw));
   } catch {
     console.error("ultra11y report: --in is not valid JSON (expected an AuditResult).");
     return 2;
@@ -2066,7 +2084,7 @@ async function cmdPrd(p: ParsedArgs): Promise<number> {
   if (raw === null) return 2;
   let result: unknown;
   try {
-    result = JSON.parse(raw);
+    result = unwrapAudit(JSON.parse(raw));
   } catch {
     console.error("ultra11y prd: --in is not valid JSON (expected an AuditResult).");
     return 2;
@@ -2123,7 +2141,7 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
   if (raw === null) return 2;
   let result: unknown;
   try {
-    result = JSON.parse(raw);
+    result = unwrapAudit(JSON.parse(raw));
   } catch {
     console.error("ultra11y tickets: --in is not valid JSON (expected an AuditResult).");
     return 2;
@@ -2630,7 +2648,7 @@ function cmdCheck(p: ParsedArgs): number {
       return 2;
     }
     try {
-      audit = JSON.parse(rawAudit) as AuditResult;
+      audit = unwrapAudit(JSON.parse(rawAudit)) as AuditResult;
     } catch {
       console.error("ultra11y check: --in file is not valid JSON.");
       return 2;
@@ -2856,7 +2874,7 @@ function cmdVerify(p: ParsedArgs): number {
     }
     let audit: AuditResult;
     try {
-      audit = JSON.parse(readText(inFlag)) as AuditResult;
+      audit = unwrapAudit(JSON.parse(readText(inFlag))) as AuditResult;
     } catch {
       console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
       return 2;
@@ -2973,7 +2991,7 @@ function replayLedgerFile(p: ParsedArgs, ledger: VerdictLedger, lang: Lang): num
   }
   let audit: AuditResult;
   try {
-    audit = JSON.parse(readText(inFlag)) as AuditResult;
+    audit = unwrapAudit(JSON.parse(readText(inFlag))) as AuditResult;
   } catch {
     console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
     return 2;
@@ -2994,7 +3012,7 @@ function replayLedgerFile(p: ParsedArgs, ledger: VerdictLedger, lang: Lang): num
   const out = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
   mkdirSync(out, { recursive: true });
   const auditPath = join(out, "audit-latest.json");
-  writeFileSync(auditPath, `${JSON.stringify(r.audit, null, 2)}\n`);
+  writeFileSync(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, standard, lang), null, 2)}\n`);
 
   if (p.flags.json)
     console.log(
@@ -3063,7 +3081,7 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
   }
   let audit: AuditResult;
   try {
-    audit = JSON.parse(readText(inFlag)) as AuditResult;
+    audit = unwrapAudit(JSON.parse(readText(inFlag))) as AuditResult;
   } catch {
     console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
     return 2;
@@ -3100,7 +3118,7 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
   const out = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
   mkdirSync(out, { recursive: true });
   const auditPath = join(out, "audit-latest.json");
-  writeFileSync(auditPath, JSON.stringify(r.audit, null, 2) + "\n");
+  writeFileSync(auditPath, JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2) + "\n");
   // Record what landed, so the next run does not have to pay a model to learn it again. Only
   // the ACCEPTED verdicts go in: a refused one in the ledger would be laundered back on the
   // next replay, which is the whole thing the gate exists to prevent.
@@ -3189,7 +3207,7 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   }
   let audit: AuditResult;
   try {
-    const parsed = JSON.parse(inFlag === "-" ? await readStdin() : readText(inFlag)) as unknown;
+    const parsed = unwrapAudit(JSON.parse(inFlag === "-" ? await readStdin() : readText(inFlag))) as unknown;
     if (!isCurrentAudit(parsed)) {
       console.error("ultra11y judge: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
       return 2;
@@ -3311,7 +3329,8 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
       // A partial sweep cannot satisfy the COVERAGE check, and that is correct rather than a
       // problem: the per-verdict fold still lands every valid verdict, and the criteria nobody
       // has reached yet stay to assess. Only a checkpoint that landed nothing is worth skipping.
-      if (partial.applied > 0) writeFileSync(join(outDir, "audit-latest.json"), `${JSON.stringify(partial.audit, null, 2)}\n`);
+      if (partial.applied > 0)
+        writeFileSync(join(outDir, "audit-latest.json"), `${JSON.stringify(auditDocumentFor(partial.audit, standard, lang), null, 2)}\n`);
     } catch {
       // A checkpoint is a safety net, never a reason to lose the run it protects.
     }
@@ -3398,7 +3417,7 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   }
   mkdirSync(out, { recursive: true });
   const auditPath = join(out, "audit-latest.json");
-  writeFileSync(auditPath, `${JSON.stringify(r.audit, null, 2)}\n`);
+  writeFileSync(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}\n`);
   // Same recording as `verify --apply`: what the model paid for, written down where the next
   // run can replay it for free.
   const ledgerOut = ledgerTarget(p, adj.standard);
@@ -3450,9 +3469,16 @@ async function cmdFix(p: ParsedArgs): Promise<number> {
     console.error("ultra11y fix: --only requires one or more rule ids (comma-separated).");
     return 2;
   }
+  // VOCABULARY ONLY. `fix` names the criterion behind each proposed edit, and an agent acting
+  // on that output writes the ticket in the standard the project is audited against — so a
+  // project on RGAA being told « WCAG 3.1.1 » has to translate before it can file anything.
+  // No codemod changes, and no rule is selected or skipped by this.
+  const fixStandard = stdOf(p, "fix");
+  if (fixStandard === null) return 2;
   const opts = {
     inputs,
     stdin,
+    standard: fixStandard,
     forceJsx: p.flags.jsx === true,
     include: asList(p.flags.include),
     exclude: asList(p.flags.exclude),
@@ -3491,11 +3517,11 @@ async function cmdFix(p: ParsedArgs): Promise<number> {
   }
 
   // `fix` runs its own rule pass (no AuditResult/scope.langs is built internally — see
-  // src/fix.ts), so there is no repo-language signal to feed resolveLang beyond the flag.
-  const fixLang = resolveLang(p.flags, {});
+  // src/fix.ts), so the only language signals are the flag and the active standard's locale.
+  const fixLang = resolveLang(p.flags, { standard: fixStandard });
   if (p.flags.json) console.log(JSON.stringify(p.flags.iterate === true ? { ...result, rounds, totalWritten } : result, null, 2));
   else {
-    console.log(fixSummary(result, fixLang, write));
+    console.log(fixSummary(result, fixLang, write, fixStandard));
     if (write && p.flags.iterate === true)
       console.log(
         fixLang === "fr"
@@ -3507,11 +3533,17 @@ async function cmdFix(p: ParsedArgs): Promise<number> {
 }
 
 async function cmdScan(p: ParsedArgs): Promise<number> {
-  // scan has no --standard. With --merge, peek the target audit's scope.langs BEFORE
-  // resolving lang (a French repo audited without --lang must not get English dyn-*
-  // text permanently baked with no way back — see peekMergeAudit). --lang stays explicit-wins.
+  // `scan` takes `--standard` for the same reason `audit` now does: it REWRITES
+  // audit-latest.json mid-chain, and a merge that silently re-keyed an RGAA document back to
+  // the core would undo the selection one step after it was made. It changes no verdict — the
+  // probes measure what they measure — only which standard the merged document speaks.
+  const standard = stdOf(p, "scan");
+  if (standard === null) return 2;
+  // With --merge, peek the target audit's scope.langs BEFORE resolving lang (a French repo
+  // audited without --lang must not get English dyn-* text permanently baked with no way back
+  // — see peekMergeAudit). --lang stays explicit-wins.
   const mergeAudit = peekMergeAudit(p.flags.merge);
-  const lang = resolveLang(p.flags, mergeAudit ? { audit: mergeAudit } : {});
+  const lang = resolveLang(p.flags, mergeAudit ? { audit: mergeAudit, standard } : { standard });
   if (p.flags.clean) {
     const r = cleanDynamic();
     console.log(
@@ -3774,7 +3806,7 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     } else {
       let parsed: unknown;
       try {
-        parsed = JSON.parse(readText(mergeIn));
+        parsed = unwrapAudit(JSON.parse(readText(mergeIn)));
       } catch {
         console.error("ultra11y scan: --merge is not valid JSON (expected an AuditResult).");
         return 2;
@@ -3806,8 +3838,9 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       }
     }
     mkdirSync(out, { recursive: true });
-    writeFileSync(join(out, "audit-latest.json"), JSON.stringify(merged, null, 2) + "\n");
-    if (p.flags.json) console.log(JSON.stringify(merged, null, 2));
+    const mergedDocument = auditDocumentFor(merged, standard, lang);
+    writeFileSync(join(out, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
+    if (p.flags.json) console.log(JSON.stringify(mergedDocument, null, 2));
     else {
       console.log(
         lang === "fr"

@@ -856,8 +856,11 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
         `Identification field (${p.type === "email" || p.type === "tel" ? `type="${p.type}"` : "name/id"}) with no autocomplete — the field's purpose is not exposed.`,
     },
     remediation: {
-      fr: () => `Ajoutez un autocomplete approprié (ex. email, tel, name, postal-code, street-address) — WCAG 1.3.5.`,
-      en: () => `Add an appropriate autocomplete (e.g. email, tel, name, postal-code, street-address) — WCAG 1.3.5.`,
+      // No trailing criterion reference: every rendering already states the criterion this
+      // remediation belongs to, and under a country standard the hard-coded « WCAG 1.3.5 »
+      // named a referential the rest of the deliverable no longer mentions.
+      fr: () => `Ajoutez un autocomplete approprié (ex. email, tel, name, postal-code, street-address).`,
+      en: () => `Add an appropriate autocomplete (e.g. email, tel, name, postal-code, street-address).`,
     },
   },
   "field-purpose-incomplete.aria-required": {

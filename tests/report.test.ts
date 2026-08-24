@@ -273,9 +273,13 @@ describe("renderPackReport (derived RGAA view)", () => {
     };
     registerRuntimePack(orphan);
     const fr = renderPackReport(bad, loadPack("orphrep"), "fr");
-    expect(fr.slice(fr.indexOf("## 5."))).toMatch(/Orph 8\.1 —.*— _Hors périmètre moteur/);
+    // The justification is worded in the PACK's terms, not in the engine's: it used to read
+    // « mappé sur des SC hors WCAG 2.2 AA », naming a referential this deliverable does not.
+    expect(fr.slice(fr.indexOf("## 5."))).toMatch(/Orph 8\.1 —.*— _Hors du périmètre décidable par le moteur/);
+    expect(fr).not.toMatch(/WCAG/);
     const en = renderPackReport(bad, loadPack("orphrep"), "en");
-    expect(en.slice(en.indexOf("## 5."))).toMatch(/Orph 8\.1 —.*— _Out of engine scope/);
+    expect(en.slice(en.indexOf("## 5."))).toMatch(/Orph 8\.1 —.*— _Outside what the engine can decide/);
+    expect(en).not.toMatch(/WCAG/);
   });
 
   // Task 5 (Phase 4): the pack view's NC section renders the SAME auditor block too
