@@ -1324,7 +1324,7 @@ function agentFinding(criteriaId: string, f: AgentFinding, advisory = false): Fi
 
 /** Recompute guideline tallies + conformancePct after statuses changed. Mirrors the
  *  finalize() logic in src/audit.ts so an adjudicated audit is internally consistent. */
-function recomputeTallies(a: AuditResult): void {
+export function recomputeTallies(a: AuditResult): void {
   for (const g of a.guidelines) {
     const inG = a.criteria.filter((c) => c.guideline === g.key);
     g.c = inG.filter((c) => c.status === "C").length;

@@ -24,6 +24,8 @@ import { delimiter, join } from "node:path";
 import type { AdjudicationItem } from "./adjudicate.js";
 import { VERDICT_TOOL } from "./llm.js";
 import type { LlmOptions, RawVerdict } from "./llm.js";
+import type { Lang } from "./types.js";
+import { refuteSchema, refuteSystemPrompt, type VerifyItem } from "./verify.js";
 import { verdictSystemPrompt } from "./verdict-rules.js";
 
 /** Tools the adjudicator needs: open what a criterion cites, and nothing else. */
@@ -176,6 +178,12 @@ export function cliArgv(opts: LlmOptions, items: AdjudicationItem[]): string[] {
  *  adjudicated — and saying so beats parsing prose into verdicts, exactly as the Messages
  *  backend refuses a response that skipped the tool call. */
 export function verdictsFromText(text: string): RawVerdict[] {
+  return verdictsArrayFromText(text) as RawVerdict[];
+}
+
+/** The same recovery, untyped — the refutation pass answers with a different verdict shape
+ *  through the same envelope, and the wrapper-tolerance is about JSON, not about verdicts. */
+export function verdictsArrayFromText(text: string): unknown[] {
   const candidates: string[] = [text.trim()];
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenced?.[1]) candidates.push(fenced[1].trim());
@@ -185,7 +193,7 @@ export function verdictsFromText(text: string): RawVerdict[] {
     if (!c) continue;
     try {
       const parsed = JSON.parse(c) as { verdicts?: unknown };
-      if (Array.isArray(parsed?.verdicts)) return parsed.verdicts as RawVerdict[];
+      if (Array.isArray(parsed?.verdicts)) return parsed.verdicts;
     } catch {
       /* try the next shape */
     }
@@ -223,8 +231,70 @@ const sleep = (ms: number): Promise<void> => (ms <= 0 ? Promise.resolve() : new 
 /** Rule on one batch through the CLI. `prompt` is the rendered worklist for exactly these
  *  items — the same text the Messages backend sends and the same the agent reads. */
 export async function judgeBatchCli(items: AdjudicationItem[], prompt: string, opts: LlmOptions): Promise<RawVerdict[]> {
+  return runCli(cliArgv(opts, items), prompt, opts, (env) => {
+    const structured = (env.structured_output as { verdicts?: unknown } | undefined)?.verdicts;
+    const raw = Array.isArray(structured) ? (structured as RawVerdict[]) : verdictsFromText(env.result ?? "");
+    return reconcileIds(raw, items);
+  });
+}
+
+/** One refutation verdict, as the CLI returns it. Keyed by the worklist's item number rather
+ *  than by criterion: one criterion can be on trial several times over — cleared on four
+ *  images and failed on a fifth — and the number is the only thing that tells them apart. */
+export interface RawRefutation {
+  n: number;
+  verdict: string;
+  note?: string;
+}
+
+/**
+ * Put a batch of already-written claims on trial. The counterpart of `judgeBatchCli`, through
+ * the same transport, the same bounds and the same retry policy — and a DIFFERENT system
+ * prompt, because the question is different: an adjudicator asked « is this criterion met? »
+ * and a reviewer asked « does the cited evidence establish what was claimed? » fail in
+ * different directions, and only the second catches an over-accusing first.
+ */
+export async function refuteBatchCli(items: VerifyItem[], prompt: string, opts: LlmOptions, lang: Lang = "en"): Promise<RawRefutation[]> {
+  const argv = [
+    ...claudeBin(),
+    "-p",
+    "--output-format",
+    "json",
+    "--json-schema",
+    JSON.stringify(refuteSchema(items)),
+    "--system-prompt",
+    refuteSystemPrompt(lang),
+    "--tools",
+    ALLOWED_TOOLS,
+    "--allowedTools",
+    ALLOWED_TOOLS,
+    "--safe-mode",
+    "--strict-mcp-config",
+    "--model",
+    opts.model ?? DEFAULT_CLI_MODEL,
+  ];
+  if (opts.maxBudgetUsd !== undefined) argv.push("--max-budget-usd", String(opts.maxBudgetUsd));
+  return runCli(argv, prompt, opts, (env) => {
+    const structured = (env.structured_output as { verdicts?: unknown } | undefined)?.verdicts;
+    const raw = Array.isArray(structured) ? structured : verdictsArrayFromText(env.result ?? "");
+    const known = new Set(items.map((it) => it.n));
+    // Anything matching no item is dropped, exactly as the adjudication path drops it: the
+    // enum is the real defence, and a CLI too old for `--json-schema` ignores it in silence.
+    return (raw as RawRefutation[]).filter((v) => known.has(Number(v?.n)));
+  });
+}
+
+/**
+ * ONE INVOCATION OF THE CLI, WITH ITS BOUNDS AND ITS RETRIES — shared by the adjudication pass
+ * and the refutation pass.
+ *
+ * Extracted rather than copied because everything below the `extract` callback is policy, not
+ * plumbing: which failures are transient, why a missing envelope never is, why a permission
+ * denial is fatal rather than retried, and why a wall-clock kill is never tried twice. Two
+ * copies of that would be two policies the day one of them is edited.
+ */
+async function runCli<T>(argv: string[], prompt: string, opts: LlmOptions, extract: (env: CliEnvelope) => T): Promise<T> {
   const run = opts.spawnImpl ?? realSpawn;
-  const argv = cliArgv(opts, items);
   let lastError = "";
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     if (attempt > 0) await sleep(opts.backoffMs?.(attempt) ?? 2 ** attempt * 500);
@@ -260,9 +330,7 @@ export async function judgeBatchCli(items: AdjudicationItem[], prompt: string, o
       if (env.api_error_status && (env.api_error_status === 429 || env.api_error_status >= 500)) continue;
       break;
     }
-    const structured = (env.structured_output as { verdicts?: unknown } | undefined)?.verdicts;
-    const raw = Array.isArray(structured) ? (structured as RawVerdict[]) : verdictsFromText(env.result ?? "");
-    return reconcileIds(raw, items);
+    return extract(env);
   }
   throw new Error(`ultra11y judge: ${lastError || "the CLI failed after every attempt."}`);
 }

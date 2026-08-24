@@ -184,6 +184,46 @@ export interface ConformityClaim {
  * RGAA "11.2" and a WCAG SC id share a shape, and reading one as the other is the exact
  * confusion the anti-fabrication gate exists to prevent.
  */
+/** The refutation verdict vocabulary, as a JSON schema the CLI validates its own output
+ *  against. `n` is pinned to the items actually handed over, for the reason the adjudication
+ *  schema pins `criteriaId`: a verdict that matches no item is silently dropped, and a paid-for
+ *  answer thrown away without a word is worse than a refusal. */
+export function refuteSchema(items: VerifyItem[]): Record<string, unknown> {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["verdicts"],
+    properties: {
+      verdicts: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["n", "verdict", "note"],
+          properties: {
+            n: { type: "integer", enum: items.map((it) => it.n), description: "The item number EXACTLY as given." },
+            verdict: { type: "string", enum: ["supported", "partial", "refuted", "unsupported"] },
+            note: { type: "string", description: "One sentence: what you opened, and what it showed." },
+          },
+        },
+      },
+    },
+  };
+}
+
+/** The system prompt for the refutation pass.
+ *
+ *  ADVERSARIAL BY CONSTRUCTION, and that is the whole reason this pass exists: an adjudicator
+ *  asked « is this criterion met? » and a reviewer asked « does the cited evidence establish
+ *  what was claimed? » fail in different directions, and only the second catches an
+ *  over-accusing first. The instruction to prefer refutation when the evidence is thin is
+ *  deliberate — an unfounded claim withdrawn costs a criterion a second look, an unfounded
+ *  claim kept ships as a conformance statement about a site nobody checked. */
+export function refuteSystemPrompt(lang: Lang = "en"): string {
+  const s = T[lang];
+  return [s.refuteRole, "", s.supported, s.partial, s.refuted, s.unsupported, "", s.refuteInverted, s.refuteAttach, s.refuteDoubt, s.refuteNever].join("\n");
+}
+
 export function conformityClaimsFromAudit(audit: AuditResult, standard: StandardId): ConformityClaim[] {
   const claim = (c: { id: string; justification?: string; citations?: CriterionCitation[] }): ConformityClaim => ({
     criteriaId: c.id,
@@ -239,6 +279,14 @@ const T = {
     conformityPartial: "- `partial` — elle l'établit pour l'élément cité, mais la justification déborde sur des cas qu'elle ne couvre pas ;",
     conformityRefuted: "- `refuted` — l'évidence n'établit pas la conformité (elle constate une présence, pas une pertinence) ;",
     conformityUnsupported: "- `unsupported` — l'évidence citée ne permet pas de trancher.",
+    refuteRole:
+      "Vous êtes le SECOND lecteur d'un audit d'accessibilité. Vous n'auditez pas : vous mettez à l'épreuve des constats déjà écrits. Pour chaque entrée, ouvrez le fichier à la ligne citée, lisez l'élément, et dites si l'évidence citée étaye la revendication :",
+    refuteInverted:
+      "Les entrées marquées « conformité revendiquée » posent la question INVERSE : l'évidence ÉTABLIT-elle le critère, ou constate-t-elle seulement que son sujet EXISTE ? Un `alt` présent n'est pas un `alt` pertinent ; un `<title>` présent n'est pas un titre qui décrit la page.",
+    refuteAttach:
+      "Vérifiez aussi le RATTACHEMENT : le référentiel sépare l'existence d'une chose et sa pertinence en deux critères distincts. Un constat d'absence rangé sous le critère de pertinence est `refuted` — il est réel, mais il appartient au critère voisin.",
+    refuteDoubt: "Dans le doute, réfutez. Un constat retiré à tort coûte une relecture ; un constat gardé à tort part dans un document opposable.",
+    refuteNever: "Ne réécrivez rien, ne corrigez rien, n'auditez aucun critère absent de la liste. Répondez uniquement par les verdicts demandés.",
     conformityCheck:
       "- [ ] Aucune conformité inventée : un `C` réfuté ou non étayé retourne « à évaluer » — il ne devient PAS une non-conformité, car réfuter une conformité ne prouve rien contre le critère.",
     then: "Puis : `ultra11y verify --apply VERIFY.todo.json` (échoue si un verdict est refuted/unsupported).",
@@ -269,6 +317,14 @@ const T = {
     conformityPartial: "- `partial` — it establishes it for the cited element, but the justification reaches beyond what it covers;",
     conformityRefuted: "- `refuted` — the evidence does not establish conformity (it observes a presence, not a relevance);",
     conformityUnsupported: "- `unsupported` — the cited evidence is not enough to decide.",
+    refuteRole:
+      "You are the SECOND reader of an accessibility audit. You are not auditing: you are putting already-written observations on trial. For each entry, open the file at the cited line, read the element, and say whether the cited evidence supports the claim:",
+    refuteInverted:
+      "Entries marked “claimed conformity” ask the INVERTED question: does the evidence ESTABLISH the criterion, or does it only show that its subject EXISTS? A present `alt` is not a relevant `alt`; a present `<title>` is not a title that describes the page.",
+    refuteAttach:
+      "Check the ATTACHMENT too: the standard splits the existence of a thing and its relevance into two separate criteria. An observation of absence filed under the relevance criterion is `refuted` — it is real, but it belongs to the neighbouring criterion.",
+    refuteDoubt: "When in doubt, refute. An observation wrongly withdrawn costs a second look; an observation wrongly kept ships in a legal deliverable.",
+    refuteNever: "Rewrite nothing, fix nothing, audit no criterion absent from the list. Answer only with the verdicts asked for.",
     conformityCheck:
       "- [ ] No invented conformity: a refuted or unsupported `C` goes back to “to assess” — it does NOT become a non-conformity, because refuting a conformity proves nothing against the criterion.",
     then: "Then: `ultra11y verify --apply VERIFY.todo.json` (fails if any verdict is refuted/unsupported).",

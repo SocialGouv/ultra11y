@@ -46,11 +46,13 @@ import {
   buildConformityWorklist,
   conformityClaimsFromAudit,
   writeWorklist,
+  formatWorklist,
   applyVerdicts,
   VERIFY_MAX,
   type ConformityClaim,
   type VerifyItem,
 } from "./verify.js";
+import { pruneRefuted, type PruneResult } from "./refute.js";
 import { groundItems } from "./grounding.js";
 import {
   buildAdjudicationWorklist,
@@ -62,8 +64,8 @@ import {
   type AdjudicationFile,
 } from "./adjudicate.js";
 import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, unreadableCaptures, type VerdictLedger, writeLedger } from "./ledger.js";
-import { DEFAULT_CLI_MODEL, judgeBatchCli } from "./agent-cli.js";
-import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv } from "./llm.js";
+import { DEFAULT_CLI_MODEL, judgeBatchCli, refuteBatchCli } from "./agent-cli.js";
+import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv, type LlmOptions } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable, localTierStatus } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
@@ -571,6 +573,9 @@ function isCommand(s: string | undefined): s is Command {
 }
 
 const VALUE_FLAGS = new Set([
+  // `judge --refute <VERIFY.todo.json>`: put already-written claims on trial, through the same
+  // transport the adjudication pass uses.
+  "refute",
   "runner",
   "grain",
   "max-budget-usd",
@@ -666,6 +671,9 @@ function valueFlagsFor(command: string): ReadonlySet<string> {
 // Paired with VALUE_FLAGS this is the full set of recognised long flags, used to
 // warn on unknown/misspelled ones instead of silently accepting them as no-ops.
 const BOOLEAN_FLAGS = new Set([
+  // `verify --apply … --prune`: apply what the refutation trial decided to the audit, instead
+  // of only reporting it (src/refute.ts).
+  "prune",
   "changed",
   "staged",
   "jsx",
@@ -2810,7 +2818,7 @@ function cmdCheck(p: ParsedArgs): number {
 
 function cmdVerify(p: ParsedArgs): number {
   // --apply has no --standard/audit in hand — resolved below (post-standard) for the --report path.
-  let lang = resolveLang(p.flags, {});
+  const lang = resolveLang(p.flags, {});
   const apply = p.flags.apply;
   if (typeof apply === "string" && apply) {
     // Read and parse separately so a missing file is not mislabeled as bad JSON.
@@ -2877,8 +2885,16 @@ function cmdVerify(p: ParsedArgs): number {
     const grounding = groundItems(
       passing.map((it) => ({ file: it.file, line: it.line, selector: it.selector, snippet: (it as { snippet?: string }).snippet })),
     );
-    const ok = r.ok && grounding.failed === 0;
-    if (p.flags.json) console.log(JSON.stringify({ ...r, ok, grounding }, null, 2));
+    // --prune: APPLY the outcome instead of only reporting it. See src/refute.ts for why a
+    // gate that can only go red is the wrong shape for a cheap adjudicator's run, and for the
+    // asymmetry between withdrawing a non-conformity and withdrawing a conformity.
+    //
+    // The exit code changes with it, and deliberately: a refuted claim has been HANDLED, so it
+    // no longer fails the gate. An unadjudicated, missing or invalid one still does — nothing
+    // was tried there, and pruning cannot stand in for a trial that never ran.
+    const pruned = p.flags.prune === true ? applyPrune(p, standard, items, lang) : undefined;
+    const ok = (pruned ? r.unadjudicated + r.invalid + r.missing === 0 : r.ok) && grounding.failed === 0;
+    if (p.flags.json) console.log(JSON.stringify({ ...r, ok, grounding, ...(pruned ? { pruned } : {}) }, null, 2));
     else if (ok)
       console.log(
         lang === "fr"
@@ -2909,6 +2925,59 @@ function cmdVerify(p: ParsedArgs): number {
     }
     return ok ? 0 : 1;
   }
+
+  return cmdVerifyWorklist(p, lang);
+}
+
+/** `verify --apply … --prune`: write back the audit the trial repaired.
+ *
+ *  Requires `--in`, because there is nothing to prune without the audit, and refuses silently
+ *  doing nothing — a flag that was accepted and ignored is the exact shape of a gate that
+ *  reports success over work it never did. */
+function applyPrune(p: ParsedArgs, standard: StandardId, items: VerifyItem[], lang: Lang): PruneResult | undefined {
+  const inFlag = p.flags.in;
+  if (typeof inFlag !== "string" || !inFlag || inFlag === "-") {
+    console.error(
+      lang === "fr"
+        ? "ultra11y verify : --prune exige --in <audit.json> (l'audit que la contre-expertise répare) — sans lui il n'y a rien à réparer."
+        : "ultra11y verify: --prune requires --in <audit.json> (the audit the trial repairs) — without it there is nothing to prune.",
+    );
+    return undefined;
+  }
+  let audit: AuditResult;
+  try {
+    audit = unwrapAudit(JSON.parse(readText(inFlag))) as AuditResult;
+  } catch {
+    console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
+    return undefined;
+  }
+  const pruned = pruneRefuted(audit, standard, items, lang);
+  const out = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
+  if (!p.flags.json) {
+    console.log(
+      lang === "fr"
+        ? `✓ Contre-expertise appliquée : ${pruned.removedFindings} non-conformité(s) supprimée(s), ${pruned.reopenedCriteria.length + pruned.clearedConformities.length} critère(s) de retour à « à évaluer ».`
+        : `✓ Trial applied: ${pruned.removedFindings} non-conformity(ies) deleted, ${pruned.reopenedCriteria.length + pruned.clearedConformities.length} criterion(ia) back to “to assess”.`,
+    );
+    const reopened = [...pruned.reopenedCriteria, ...pruned.clearedConformities];
+    if (reopened.length) console.log(`  ${reopened.join(", ")}`);
+    // A withdrawn claim against an ENGINE verdict is left alone on purpose (src/refute.ts),
+    // and saying so is the difference between « handled » and « silently dropped ».
+    if (pruned.skippedEngine)
+      console.error(
+        lang === "fr"
+          ? `⚠ ${pruned.skippedEngine} verdict(s) réfuté(s) visent une décision du moteur — non modifiés : un critère que le moteur tranche est recalculé à chaque run, et un faux positif se corrige dans la règle.`
+          : `⚠ ${pruned.skippedEngine} refuted verdict(s) name an ENGINE decision — left untouched: a criterion the engine decides is recomputed every run, and a false positive is fixed in the rule.`,
+      );
+  }
+  return pruned;
+}
+
+/** The `--report` worklist path of `verify`, split out when `--apply` grew a `--prune`. */
+function cmdVerifyWorklist(p: ParsedArgs, langIn: Lang): number {
+  let lang = langIn;
 
   const standard = stdOf(p, "verify");
   if (standard === null) return 2;
@@ -3333,7 +3402,111 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
 //
 // Strictly opt-in: with no ANTHROPIC_API_KEY this command explains itself and exits, and no
 // other command is affected.
+/**
+ * `judge --refute <VERIFY.todo.json>` — the SECOND pass, through the same transport.
+ *
+ * `verify --report` has always written a worklist for a human or a session agent to fill, and
+ * `orchestrate --phase verify-report` fans it out to a harness's subagents. Neither is a
+ * command a pipeline can run, so no pipeline ran one, and the pass that catches an
+ * over-accusing adjudicator was the only pass in the tool nothing could invoke.
+ *
+ * ONE ITEM PER INVOCATION, always — there is no `--grain` here. Batching claims would put the
+ * reviewer back in the position the adjudicator was in, reading eight elements at once, and
+ * the entire value of this pass is one reader looking at one element with one question.
+ *
+ * `--runner cli` only. The api tier has no tools, and a reviewer who cannot OPEN the cited
+ * file can only re-read the claim it was given — which is not a second reading, it is an echo.
+ */
+async function cmdRefute(p: ParsedArgs, todoPath: string): Promise<number> {
+  const standard = stdOf(p, "judge");
+  if (standard === null) return 2;
+  const lang = resolveLang(p.flags, { standard });
+  const runner = typeof p.flags.runner === "string" ? (p.flags.runner as string) : "cli";
+  if (runner !== "cli") {
+    console.error(
+      lang === "fr"
+        ? "ultra11y judge : --refute exige --runner cli. Le tier `api` n'a aucun outil, et un relecteur qui ne peut pas OUVRIR le fichier cité ne relit rien — il répète."
+        : "ultra11y judge: --refute requires --runner cli. The api tier has no tools, and a reviewer who cannot OPEN the cited file is not re-reading anything — it is echoing.",
+    );
+    return 2;
+  }
+  let items: VerifyItem[];
+  try {
+    const parsed = JSON.parse(readText(todoPath)) as unknown;
+    if (!Array.isArray(parsed)) throw new Error("not an array");
+    items = parsed as VerifyItem[];
+  } catch {
+    console.error(`ultra11y judge: --refute file not found or not a verdicts array: ${todoPath}.`);
+    return 2;
+  }
+  // Only what is still open. Re-running after a kill costs the items that did not land and
+  // nothing else — the same resume the adjudication pass gets from re-deriving its residual.
+  const pending = items.filter((it) => typeof it.verdict !== "string" || !it.verdict.trim());
+  if (!pending.length) {
+    console.log(
+      lang === "fr"
+        ? `✓ Rien à mettre à l'épreuve : les ${items.length} entrées portent déjà un verdict.`
+        : `✓ Nothing to try: all ${items.length} entries already carry a verdict.`,
+    );
+    return 0;
+  }
+  const askedConcurrency = typeof p.flags.concurrency === "string" ? Number(p.flags.concurrency) : Number.NaN;
+  const lanes = Number.isFinite(askedConcurrency) && askedConcurrency > 0 ? Math.min(askedConcurrency, 8) : 2;
+  const timeout = typeof p.flags.timeout === "string" ? Number(p.flags.timeout) * 1000 : undefined;
+  const budget = typeof p.flags["max-budget-usd"] === "string" ? Number(p.flags["max-budget-usd"]) : undefined;
+  const opts: LlmOptions = {
+    ...(typeof p.flags.model === "string" && p.flags.model ? { model: p.flags.model as string } : {}),
+    ...(Number.isFinite(timeout) && timeout ? { timeoutMs: timeout } : {}),
+    ...(Number.isFinite(budget) ? { maxBudgetUsd: budget } : {}),
+  };
+  let spent = 0;
+  let failed = 0;
+  const byN = new Map(items.map((it) => [it.n, it]));
+  const queue = [...pending];
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const item = queue.shift();
+      if (!item) return;
+      try {
+        const verdicts = await refuteBatchCli(
+          [item],
+          formatWorklist([item], p.flags.semantic === true, standard, lang),
+          { ...opts, onCost: (c) => (spent += c) },
+          lang,
+        );
+        for (const v of verdicts) {
+          const target = byN.get(Number(v.n));
+          if (!target) continue;
+          target.verdict = v.verdict as VerifyItem["verdict"];
+          target.note = v.note ?? "";
+        }
+      } catch (e) {
+        // One item's failure is one item's, exactly as a failed adjudication batch is: it stays
+        // unadjudicated, `applyVerdicts` refuses to pass over it, and the run says so.
+        failed++;
+        console.error(`ultra11y judge: item #${item.n} (${item.criteriaId}) — ${e instanceof Error ? e.message : String(e)}`);
+      }
+      // Written after every item, not at the end: this pass is per-item precisely so a killed
+      // run keeps what it paid for.
+      writeFileSync(todoPath, JSON.stringify(items, null, 2) + "\n");
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(lanes, queue.length) }, worker));
+  const tally = (v: string) => items.filter((it) => (it.verdict ?? "").trim().toLowerCase() === v).length;
+  console.log(
+    lang === "fr"
+      ? `✓ ${pending.length - failed}/${pending.length} entrée(s) mise(s) à l'épreuve → ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`
+      : `✓ ${pending.length - failed}/${pending.length} entry(ies) tried → ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`,
+  );
+  if (spent > 0) console.log(lang === "fr" ? `  ${spent.toFixed(4)} $ dépensé(s).` : `  $${spent.toFixed(4)} spent.`);
+  return failed ? 1 : 0;
+}
+
 async function cmdJudge(p: ParsedArgs): Promise<number> {
+  // The refutation pass shares this command's transport, its bounds and its cost reporting,
+  // and needs neither an audit nor a worklist of criteria — so it branches before `--in`.
+  const refute = p.flags.refute;
+  if (typeof refute === "string" && refute) return cmdRefute(p, refute);
   const standard = stdOf(p, "judge");
   if (standard === null) return 2;
   const inFlag = p.flags.in;
