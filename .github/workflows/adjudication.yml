@@ -266,12 +266,14 @@ jobs:
           # what anchors a criterion's evidence in the rendered DOM instead of only in the
           # source. It is exactly what the composite action does internally, and a baseline that
           # skipped it would measure a different grid from the one each tier is handed.
-          node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
+          # `--standard` on the audit and the scan too: the standard re-keys the DOCUMENT, and
+          # a baseline measured on a core-keyed one is not the artefact either tier is handed.
+          node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard '${{ inputs.standard }}' --out audits --json > /dev/null
           node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --runtime local --cwd "$PWD" \
-            --merge audits/audit-latest.json --out audits
-          node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
+            --standard '${{ inputs.standard }}' --merge audits/audit-latest.json --out audits
+          node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard '${{ inputs.standard }}' --out audits --json > /dev/null
           node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --runtime local --cwd "$PWD" \
-            --merge audits/audit-latest.json --out audits
+            --standard '${{ inputs.standard }}' --merge audits/audit-latest.json --out audits
           node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
             --standard '${{ inputs.standard }}' --out /tmp/before --json > /tmp/before.json
           n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/before.json","utf8")).count')

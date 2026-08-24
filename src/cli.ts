@@ -87,7 +87,7 @@ import { pagesForStandard, renderPageDocument, renderPagesDocument, renderPagesI
 import { crawlBound, crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
 import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
-import { resolveStandard, getPack, isCore, CORE, derivePackResults, findingsForStandard, type StandardId } from "./standards/index.js";
+import { resolveStandard, getPack, isCore, derivePackResults, findingsForStandard, type StandardId } from "./standards/index.js";
 import { auditDocumentFor, packAuditDocument, unwrapAudit } from "./standards/document.js";
 import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
@@ -1022,7 +1022,12 @@ async function cmdAuditFromFile(p: ParsedArgs, inPath: string): Promise<number> 
     return 2;
   }
 
-  const lang = resolveLang(p.flags, { audit: result });
+  // Same standard resolution as a fresh audit — this path is the CI gate (`audit --in
+  // audits/audit-latest.json --fail-on …`), and a gate that counts the core's findings while
+  // the report beside it counts the standard's is two numbers for one run.
+  const standard = stdOf(p, "audit");
+  if (standard === null) return 2;
+  const lang = resolveLang(p.flags, { audit: result, standard });
 
   const failOnRaw = p.flags["fail-on"];
   const failOnParsed = parseFailOn(failOnRaw);
@@ -1038,12 +1043,12 @@ async function cmdAuditFromFile(p: ParsedArgs, inPath: string): Promise<number> 
 
   const failOnSet = failOnRaw !== undefined;
   const failOn = failOnSet ? (failOnParsed ?? "bloquant") : undefined;
-  const failing = failOn ? findingsAtOrAbove(result.findings, failOn) : [];
+  const failing = failOn ? findingsAtOrAbove(findingsForStandard(result, standard), failOn) : [];
 
-  if (ciFormat) emitCiFormat(result, ciFormat, CORE, lang, failOn);
-  else if (p.flags.json) console.log(JSON.stringify(result, null, 2));
+  if (ciFormat) emitCiFormat(result, ciFormat, standard, lang, failOn);
+  else if (p.flags.json) console.log(JSON.stringify(auditDocumentFor(result, standard, lang), null, 2));
   else {
-    console.log(auditSummary(result, lang));
+    console.log(auditSummary(result, lang, standard));
     if (failOnSet && failing.length)
       console.error(lang === "fr" ? `✗ ${failing.length} non-conformité(s) ≥ ${failOn}.` : `✗ ${failing.length} non-conformity(ies) ≥ ${failOn}.`);
   }

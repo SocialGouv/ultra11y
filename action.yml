@@ -408,8 +408,15 @@ runs:
         if [ '${{ inputs.graph }}' = 'true' ]; then args+=(--graph); fi
         if [ -n '${{ inputs.baseline }}' ]; then args+=(--baseline '${{ inputs.baseline }}'); fi
         mkdir -p audits
-        # Always produce the full AuditResult first; gating happens at the end, so every
+        # Always produce the full audit first; gating happens at the end, so every
         # surface (SARIF, annotations, comment, report) is emitted even on a failing run.
+        #
+        # `--standard` here, and not only on the renderings downstream: selecting a standard
+        # re-keys the DOCUMENT, so `audits/audit-latest.json` — the artifact this job uploads
+        # and consumers read — carries that standard's criteria, its themes and its findings,
+        # with the WCAG core inside `core` for the pipeline. Without it the uploaded artifact
+        # spoke WCAG while every rendering beside it spoke RGAA.
+        args+=(--standard '${{ inputs.standard }}')
         node "$ENGINE" audit "${args[@]}" --out audits --json > /dev/null
         node -e '
           const a = require("fs").readFileSync("audits/audit-latest.json", "utf8");
@@ -499,7 +506,11 @@ runs:
         # scratch prefix only changes WHERE Playwright is found.
         BROWSER_CWD: ${{ steps.browsertier.outputs.cwd }}
       run: |
-        args=(--merge audits/audit-latest.json --out audits)
+        # `--standard` because this step REWRITES audits/audit-latest.json: merging without it
+        # would silently re-key the document back to the core one step after `audit` selected
+        # the standard, and every rendering downstream would then read a different artifact
+        # from the one the job published.
+        args=(--merge audits/audit-latest.json --out audits --standard '${{ inputs.standard }}')
         if [ -n "$BROWSER_CWD" ]; then args+=(--cwd "$BROWSER_CWD"); fi
         if [ '${{ inputs.snapshot }}' != 'true' ]; then args+=(--no-snapshot); fi
         # Read from the environment, never interpolated into the script — see the note on the
@@ -1671,7 +1682,7 @@ runs:
         # non-conformity can fail the job. `exec` so the engine's exit code IS the step's.
         if [ '${{ inputs.gate-adjudicated }}' = 'true' ] && [ '${{ steps.adjudication.outputs.on }}' = 'true' ]; then
           echo "ultra11y: gating on the adjudicated audit — this run's verdict is not reproducible."
-          exec node "$ENGINE" audit --in audits/audit-latest.json --fail-on '${{ inputs.fail-on }}'
+          exec node "$ENGINE" audit --in audits/audit-latest.json --fail-on '${{ inputs.fail-on }}' --standard '${{ inputs.standard }}'
         fi
         args=()
         since='${{ inputs.since }}'
@@ -1682,4 +1693,6 @@ runs:
         if [ '${{ inputs.jsx }}' = 'true' ]; then args+=(--jsx); fi
         if [ '${{ inputs.graph }}' = 'true' ]; then args+=(--graph); fi
         if [ -n '${{ inputs.baseline }}' ]; then args+=(--baseline '${{ inputs.baseline }}'); fi
-        node "$ENGINE" audit "${args[@]}" --fail-on '${{ inputs.fail-on }}'
+        # The gate counts THIS standard's non-conformities — which under a pack also carries
+        # its declarative-rule findings, part of its verdict and previously invisible here.
+        node "$ENGINE" audit "${args[@]}" --fail-on '${{ inputs.fail-on }}' --standard '${{ inputs.standard }}'

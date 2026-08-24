@@ -343,13 +343,18 @@ jobs:
       # anchors a criterion's evidence in the rendered DOM instead of only in the source. The
       # ledger's citations point at those anchors, so a single pass would replay against a grid
       # the verdicts were never ruled on. It is exactly what the composite action does.
+      # `--standard rgaa` on every step, including `audit` and `scan`. This job gates the RGAA
+      # grid, so it should exercise the pipeline a project on RGAA actually runs — a
+      # pack-keyed document written by `audit`, carried through `scan --merge`, replayed and
+      # checked. Running the first two steps on the core and only re-keying at the end would
+      # leave the shipped path untested by the one job that runs on every push.
       - name: Audit and render the fixture
         run: |
-          node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 \
+          node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard rgaa --out audits --json > /dev/null
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --standard rgaa \
             --runtime local --cwd "$PWD" --merge audits/audit-latest.json --out audits
-          node scripts/ultra11y.mjs audit tests/fixtures/realworld --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 \
+          node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard rgaa --out audits --json > /dev/null
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --standard rgaa \
             --runtime local --cwd "$PWD" --merge audits/audit-latest.json --out audits
 
       # Not `| tee`: a pipeline reports the exit status of its LAST command, so piping this

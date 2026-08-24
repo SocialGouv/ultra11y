@@ -69365,7 +69365,9 @@ async function cmdAuditFromFile(p, inPath) {
     console.error(`ultra11y audit: --in file not found or not valid JSON: ${inPath}.`);
     return 2;
   }
-  const lang = resolveLang(p.flags, { audit: result });
+  const standard = stdOf(p, "audit");
+  if (standard === null) return 2;
+  const lang = resolveLang(p.flags, { audit: result, standard });
   const failOnRaw = p.flags["fail-on"];
   const failOnParsed = parseFailOn(failOnRaw);
   if (failOnRaw !== void 0 && failOnParsed === null) {
@@ -69379,11 +69381,11 @@ async function cmdAuditFromFile(p, inPath) {
   }
   const failOnSet = failOnRaw !== void 0;
   const failOn = failOnSet ? failOnParsed ?? "bloquant" : void 0;
-  const failing = failOn ? findingsAtOrAbove(result.findings, failOn) : [];
-  if (ciFormat) emitCiFormat(result, ciFormat, CORE2, lang, failOn);
-  else if (p.flags.json) console.log(JSON.stringify(result, null, 2));
+  const failing = failOn ? findingsAtOrAbove(findingsForStandard(result, standard), failOn) : [];
+  if (ciFormat) emitCiFormat(result, ciFormat, standard, lang, failOn);
+  else if (p.flags.json) console.log(JSON.stringify(auditDocumentFor(result, standard, lang), null, 2));
   else {
-    console.log(auditSummary(result, lang));
+    console.log(auditSummary(result, lang, standard));
     if (failOnSet && failing.length)
       console.error(lang === "fr" ? `\u2717 ${failing.length} non-conformit\xE9(s) \u2265 ${failOn}.` : `\u2717 ${failing.length} non-conformity(ies) \u2265 ${failOn}.`);
   }
