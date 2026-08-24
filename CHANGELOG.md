@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.33.0](https://github.com/maxgfr/ultra11y/compare/v5.32.0...v5.33.0) (2026-08-24)
+
+
+### Bug Fixes
+
+* **adjudicate:** the fold stops dropping what the gate just validated ([a29eed5](https://github.com/maxgfr/ultra11y/commit/a29eed523e2d2852ab36ad8c4de7b0c5f0b94359))
+* **standards:** make the coverage of the 106 provable per run, and stop lying about it ([1cfe05e](https://github.com/maxgfr/ultra11y/commit/1cfe05ecb830d1ee8e589733bcd70d86e9b41c52))
+
+
+### Features
+
+* **adjudicate:** refuse a non-conformity that re-charges the neighbour's anchor ([629ed0f](https://github.com/maxgfr/ultra11y/commit/629ed0f92e9538f480e81520f8108ec611ae5ba0))
+* **adjudicate:** the brief names the neighbour that owns the adjacent question ([97f3db2](https://github.com/maxgfr/ultra11y/commit/97f3db24ab7f01e3efcf2d85df4500e71493ca59))
+* **runbook:** wire the reliable recipe, and make CI run the trial ([ea71968](https://github.com/maxgfr/ultra11y/commit/ea7196808cfe0ca3fd6796b8ff8f0d6605c08032))
+* **verify:** the refutation pass becomes runnable, and repairs instead of only refusing ([03dd3f7](https://github.com/maxgfr/ultra11y/commit/03dd3f7ec89818b91f69036ca44b94ca87a4aefe))
+
+
+### Performance Improvements
+
+* **adjudicate:** cut what the pass pays for per criterion by a third ([bde5f9e](https://github.com/maxgfr/ultra11y/commit/bde5f9e95fc6d772d5a3dbbfa9ab5e1febae743f))
+
 # [5.32.0](https://github.com/maxgfr/ultra11y/compare/v5.31.2...v5.32.0) (2026-08-24)
 
 
