@@ -114,6 +114,10 @@ on:
         type: choice
         options: ["true", "false"]
         default: "true"
+      refute:
+        description: "Put the adjudicated claims on trial afterwards, and APPLY the outcome (`judge --refute` → `verify --apply --prune`). Not a formality: measured on a full RGAA pass with Haiku, the adjudicator returned 74 non-conformities where a stronger model through the same gate found 57, and 19 of them landed on criteria the committed ledger had cleared. The gate cannot see it — it proves the cited test belongs to the criterion, never that the reading was right — so with a cheap model this is the only pass that catches an over-accusing one. Costs one call per non-conformity and per cleared citation."
+        type: boolean
+        default: true
       standard:
         description: 'Standard to report against'
         type: choice
@@ -381,6 +385,44 @@ jobs:
           echo "manual=$n" >> "$GITHUB_OUTPUT"
           echo "ids=$ids" >> "$GITHUB_OUTPUT"
           echo "unruled after agent: $n${ids:+ — $ids}"
+
+      # ---- THE SECOND READING ------------------------------------------------------------
+      #
+      # No pipeline ran this, and with a cheap adjudicator it is not optional. Measured on a
+      # full RGAA pass with Haiku: 74 non-conformities where a stronger model, through the same
+      # gate, found 57 — and 19 of them on criteria the committed ledger had CLEARED. The gate
+      # cannot catch that: `normativeRefResolves` proves the cited test belongs to the
+      # adjudicated criterion, never that the reading was right. An over-accusing adjudicator
+      # passes it cleanly.
+      #
+      # `--prune` is what makes this a pipeline step rather than a tripwire. Without it the job
+      # can only go red, every run, and a job that can only go red is a job somebody switches
+      # off. With it, a refuted non-conformity is deleted, a refuted conformity sends its
+      # criterion back to « à évaluer », and the step fails only on a claim nobody TRIED —
+      # unadjudicated, missing or invalid.
+      - name: Put the claims on trial
+        if: always() && inputs.mode != 'api' && inputs.refute
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ ! -f audits/audit-latest.json ]; then
+            echo "::warning::no audit to put on trial — the adjudication tier died before writing one"
+            exit 0
+          fi
+          # The report is what `verify --report` parses the non-conformities out of; the audit
+          # is where the claimed CONFORMITIES now live, so no ledger is needed for either half.
+          node scripts/ultra11y.mjs report --in audits/audit-latest.json \
+            --standard '${{ inputs.standard }}' --out audits > /dev/null
+          REPORT=$(/bin/ls audits/*.md | head -1)
+          node scripts/ultra11y.mjs verify --report "$REPORT" \
+            --in audits/audit-latest.json --standard '${{ inputs.standard }}' --out audits --max-verify 0
+          node scripts/ultra11y.mjs judge --refute audits/VERIFY.todo.json \
+            --standard '${{ inputs.standard }}' --runner cli \
+            --model '${{ inputs.model }}' --concurrency 4
+          node scripts/ultra11y.mjs verify --apply audits/VERIFY.todo.json --report "$REPORT" \
+            --in audits/audit-latest.json --standard '${{ inputs.standard }}' --out audits --prune
 
       # The metric. A tier that ruled on nothing is a tier that cost money to change nothing,
       # and it should be visible as such rather than buried in a green check. `always()` so a

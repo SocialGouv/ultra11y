@@ -125,6 +125,8 @@ Usage:
   ultra11y report   --in <audit.json> [--evidence [--evidence-max <n>]] [--out <dir>]   (the Markdown report, illustrated with annotated crops)
   ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file)
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
+  ultra11y judge    --in <audit.json> [--concurrency <n>] [--ledger [<path>]] [--lang auto|en|fr]
+  ultra11y judge    --refute <VERIFY.todo.json> --runner cli [--standard <pack>] [--model <id>] [--concurrency <n>] [--max-budget-usd <n>] [--timeout <s>]   (put the already-written claims on trial — one call per item, read-only)
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
@@ -136,6 +138,7 @@ Usage:
   ultra11y verify   --report <md> [--conformities <ledger|adjudication.json> | --no-conformities]   (also put the claimed CONFORMITIES on trial — on by default when a ledger exists)
   ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (adjudicate the manual criteria)
   ultra11y verify   --apply <adjudication.json> --in <audit.json> [--out <dir>]        (fold the adjudication into the audit)
+  ultra11y verify   --apply <VERIFY.todo.json> --report <md> --in <audit.json> --out <dir> --prune   (APPLY the trial: delete refuted non-conformities, send refuted conformities back to « à évaluer »)
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
   ultra11y fix      <globs… | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]

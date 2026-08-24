@@ -110,6 +110,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 
 | Running the tool | |
 |---|---|
+| `references/runbook.md` | **The reliable run**: the one recipe, the transport to use and why, and what a pass costs. Read this before paying for an adjudication |
 | `references/audit.md` | The audit loop end to end, and the normative page sample |
 | `references/judgment.md` | The adjudication + refutation worklists, verdict vocabulary, fail-closed fold |
 | `references/verify.md` | The `check`/`verify` gates |

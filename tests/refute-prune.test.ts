@@ -26,6 +26,7 @@ import { buildAdjudicationWorklist, applyAdjudication, type AdjudicationFile, ty
 import { pruneRefuted } from "../src/refute.js";
 import type { VerifyItem } from "../src/verify.js";
 import type { AuditResult } from "../src/types.js";
+import { derivePackResults } from "../src/standards/index.js";
 
 const dir = mkdtempSync(join(tmpdir(), "u11y-prune-"));
 const PAGE = join(dir, "page.html");
@@ -214,6 +215,27 @@ describe("it applies only what was actually refuted", () => {
     expect(r.removedFindings).toBe(0);
     expect(r.skippedEngine).toBe(1);
     expect(r.audit.criteria.find((c) => c.id === engineNc!.id)?.status).toBe("NC");
+  });
+});
+
+describe("a refutation it cannot act on is REPORTED, never swallowed", () => {
+  // Found by running the real recipe rather than the unit: under `--standard rgaa` on an audit
+  // with no adjudication at all, `packAdjudication` is absent, so neither loop iterates and a
+  // refuted engine non-conformity produced « 0 deleted, 0 back to to assess » and no warning.
+  // The count is now taken from the withdrawn claims, not from inside the loops.
+  it("counts a withdrawn claim on a pack criterion that has no adjudication record", () => {
+    const plain = audit();
+    const nc = derivePackResults(plain, "rgaa").find((c) => c.status === "NC" && c.findings.length)!;
+    const f = nc.findings[0]!;
+    const r = pruneRefuted(
+      plain,
+      "rgaa",
+      [{ n: 1, criteriaId: nc.id, file: f.file, line: f.line, selector: f.selectorHint, claim: f.message, verdict: "refuted", note: "", kind: "nc" }],
+      "fr",
+    );
+    expect(r.skippedEngine).toBe(1);
+    expect(r.removedFindings).toBe(0);
+    expect(derivePackResults(r.audit, "rgaa").find((c) => c.id === nc.id)?.status).toBe("NC");
   });
 });
 

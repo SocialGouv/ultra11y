@@ -87,11 +87,20 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
   const reopenedCriteria: string[] = [];
   const clearedConformities: string[] = [];
   let removedFindings = 0;
-  let skippedEngine = 0;
+  let skippedEngine: number;
   // Every anchor actually deleted from a criterion, so the flat findings list is filtered by
   // what the criteria agreed to lose — never by the worklist, which may name an engine anchor
   // this pass refuses to touch.
   const deleted = new Set<string>();
+
+  // The criteria this pass actually acted on. Everything a withdrawn claim named and that is
+  // NOT in here was an engine verdict — either recorded as one, or (under a pack) never
+  // recorded AT ALL, because a criterion the engine decides has no adjudication entry to find.
+  // That second case used to fall through both loops and be reported as nothing whatsoever: a
+  // refutation silently ignored, on a run whose whole point is not to ignore things. Measured
+  // on the fixture: `--standard rgaa` with no adjudication, one engine non-conformity refuted,
+  // and the step printed « 0 deleted, 0 back to to assess » and no warning at all.
+  const acted = new Set<string>();
 
   /** Shared between the pack layer and the core layer: they carry different record types but
    *  the decision is identical, and writing it twice is how the two drift. */
@@ -99,9 +108,8 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
     const isAgent = rec.decidedBy === "agent";
     const drop = removedNc.get(rec.id);
     if (drop?.size) {
-      if (!isAgent) {
-        skippedEngine += drop.size;
-      } else {
+      if (isAgent) {
+        acted.add(rec.id);
         const keep = rec.findings.filter((f) => {
           const k = findingKey(f);
           // An advisory rides alongside the verdict and is not the claim under trial, so a
@@ -118,12 +126,10 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
         }
       }
     }
-    if (withdrawnC.has(rec.id)) {
-      if (!isAgent) skippedEngine++;
-      else {
-        clearedConformities.push(rec.id);
-        setOpen(reason.c);
-      }
+    if (withdrawnC.has(rec.id) && isAgent) {
+      acted.add(rec.id);
+      clearedConformities.push(rec.id);
+      setOpen(reason.c);
     }
   };
 
@@ -155,6 +161,10 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
       });
     }
   }
+
+  // Everything the trial withdrew that this pass did not act on — counted here rather than
+  // inside the loops, so the case where there is no record to iterate at all is counted too.
+  skippedEngine = withdrawn.filter((it) => !acted.has(it.criteriaId)).length;
 
   // The flat list mirrors the criteria, and only them: an anchor the criteria refused to drop
   // stays here too, or `check`'s grounding would resolve a finding no criterion carries.

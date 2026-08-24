@@ -5668,8 +5668,8 @@ var StandardErrors = {
   MixingCoalesceWithLogical: "Nullish coalescing operator(??) requires parens when mixing with logical operators.",
   ModuleAttributeInvalidValue: "Only string literals are allowed as module attribute values.",
   ModuleAttributesWithDuplicateKeys: ({
-    key
-  }) => `Duplicate key "${key}" is not allowed in module attributes.`,
+    key: key2
+  }) => `Duplicate key "${key2}" is not allowed in module attributes.`,
   ModuleExportNameHasLoneSurrogate: ({
     surrogateCharCode
   }) => `An export name cannot include a lone surrogate, found '\\u${surrogateCharCode.toString(16)}'.`,
@@ -5789,8 +5789,8 @@ var FunctionBindErrors = {
   UnsupportedBind: "Binding should be performed on object property.",
   UnsupportedBindRHS: "The right-hand side of binding can not be super or import."
 };
-function defineHidden(obj, key, value) {
-  Object.defineProperty(obj, key, {
+function defineHidden(obj, key2, value) {
+  Object.defineProperty(obj, key2, {
     enumerable: false,
     configurable: true,
     value
@@ -5912,8 +5912,8 @@ function getOptions(opts) {
   if (opts.annexB != null && opts.annexB !== false) {
     throw new Error("The `annexB` option can only be set to `false`.");
   }
-  for (const key of Object.keys(options)) {
-    if (opts[key] != null) options[key] = opts[key];
+  for (const key2 of Object.keys(options)) {
+    if (opts[key2] != null) options[key2] = opts[key2];
   }
   if (options.startLine === 1) {
     if (opts.startIndex == null && options.startColumn > 0) {
@@ -6120,9 +6120,9 @@ var estree = (superClass) => class ESTreeParserMixin extends superClass {
       return this.finishNode(node, "MethodDefinition");
     }
   }
-  nameIsConstructor(key) {
-    if (key.type === "Literal") return key.value === "constructor";
-    return super.nameIsConstructor(key);
+  nameIsConstructor(key2) {
+    if (key2.type === "Literal") return key2.value === "constructor";
+    return super.nameIsConstructor(key2);
   }
   parseClassProperty(...args2) {
     const propertyNode = super.parseClassProperty(...args2);
@@ -6178,11 +6178,11 @@ var estree = (superClass) => class ESTreeParserMixin extends superClass {
   toAssignable(node, isLHS = false) {
     if (node != null && this.isObjectProperty(node)) {
       const {
-        key,
+        key: key2,
         value
       } = node;
-      if (this.isPrivateName(key)) {
-        this.classScope.usePrivateName(this.getPrivateNameSV(key), key.start);
+      if (this.isPrivateName(key2)) {
+        this.classScope.usePrivateName(this.getPrivateNameSV(key2), key2.start);
       }
       this.toAssignable(value, isLHS);
     } else {
@@ -10332,8 +10332,8 @@ var BaseParser = class {
         return false;
       }
       const actualOptions = this.plugins.get(pluginName);
-      for (const key of Object.keys(pluginOptions)) {
-        if (actualOptions?.[key] !== pluginOptions[key]) {
+      for (const key2 of Object.keys(pluginOptions)) {
+        if (actualOptions?.[key2] !== pluginOptions[key2]) {
           return false;
         }
       }
@@ -12106,12 +12106,12 @@ var ExpressionScopeHandler = class {
     } = this;
     const currentScope = stack[stack.length - 1];
     if (!currentScope.canBeArrowParameterDeclaration()) return;
-    currentScope.iterateErrors((toParseError, key) => {
-      this.parser.raise(toParseError, key);
+    currentScope.iterateErrors((toParseError, key2) => {
+      this.parser.raise(toParseError, key2);
       let i2 = stack.length - 2;
       let scope = stack[i2];
       while (scope.canBeArrowParameterDeclaration()) {
-        scope.clearDeclarationError(key);
+        scope.clearDeclarationError(key2);
         scope = stack[--i2];
       }
     });
@@ -12160,7 +12160,7 @@ function functionFlags(isAsync, isGenerator) {
   return (isAsync ? 2 : 0) | (isGenerator ? 1 : 0);
 }
 var UtilParser = class extends Tokenizer2 {
-  addExtra(node, key, value, enumerable = true) {
+  addExtra(node, key2, value, enumerable = true) {
     if (!node) return;
     let {
       extra
@@ -12170,9 +12170,9 @@ var UtilParser = class extends Tokenizer2 {
       node.extra = extra;
     }
     if (enumerable) {
-      extra[key] = value;
+      extra[key2] = value;
     } else {
-      Object.defineProperty(extra, key, {
+      Object.defineProperty(extra, key2, {
         enumerable,
         value
       });
@@ -12586,11 +12586,11 @@ var LValParser = class extends NodeUtils {
         break;
       case "ObjectProperty": {
         const {
-          key,
+          key: key2,
           value
         } = node;
-        if (this.isPrivateName(key)) {
-          this.classScope.usePrivateName(this.getPrivateNameSV(key), key.start);
+        if (this.isPrivateName(key2)) {
+          this.classScope.usePrivateName(this.getPrivateNameSV(key2), key2.start);
         }
         this.toAssignable(value, isLHS);
         break;
@@ -12895,17 +12895,17 @@ var LValParser = class extends NodeUtils {
       });
       return;
     }
-    let key, isParenthesizedExpression;
+    let key2, isParenthesizedExpression;
     if (typeof validity === "string") {
-      key = validity;
+      key2 = validity;
       isParenthesizedExpression = type === "ParenthesizedExpression";
     } else {
-      [key, isParenthesizedExpression] = validity;
+      [key2, isParenthesizedExpression] = validity;
     }
     const nextAncestor = type === "ArrayPattern" || type === "ObjectPattern" ? {
       type
     } : ancestor;
-    const val = expression[key];
+    const val = expression[key2];
     if (Array.isArray(val)) {
       for (const child of val) {
         if (child) {
@@ -12966,16 +12966,16 @@ var ExpressionParser = class extends LValParser {
     if (prop.type === "SpreadElement" || this.isObjectMethod(prop) || prop.computed || prop.shorthand) {
       return sawProto;
     }
-    const key = prop.key;
-    const name2 = key.type === "Identifier" ? key.name : key.value;
+    const key2 = prop.key;
+    const name2 = key2.type === "Identifier" ? key2.name : key2.value;
     if (name2 === "__proto__") {
       if (sawProto) {
         if (refExpressionErrors) {
           if (refExpressionErrors.doubleProtoLoc === null) {
-            refExpressionErrors.doubleProtoLoc = this.getLoc(key.start);
+            refExpressionErrors.doubleProtoLoc = this.getLoc(key2.start);
           }
         } else {
-          this.raise(Errors.DuplicateProto, key);
+          this.raise(Errors.DuplicateProto, key2);
         }
       }
       return true;
@@ -14044,18 +14044,18 @@ var ExpressionParser = class extends LValParser {
     this.parsePropertyName(prop, refExpressionErrors);
     if (!isGenerator && !containsEsc && this.maybeAsyncOrAccessorProp(prop)) {
       const {
-        key
+        key: key2
       } = prop;
-      const keyName = key.name;
+      const keyName = key2.name;
       if (keyName === "async" && !this.hasPrecedingLineBreak()) {
         isAsync = true;
-        this.resetPreviousNodeTrailingComments(key);
+        this.resetPreviousNodeTrailingComments(key2);
         isGenerator = this.eat(51);
         this.parsePropertyName(prop);
       }
       if (keyName === "get" || keyName === "set") {
         isAccessor = true;
-        this.resetPreviousNodeTrailingComments(key);
+        this.resetPreviousNodeTrailingComments(key2);
         prop.kind = keyName;
         if (this.match(51)) {
           isGenerator = true;
@@ -14143,19 +14143,19 @@ var ExpressionParser = class extends LValParser {
         type,
         value
       } = this.state;
-      let key;
+      let key2;
       if (tokenIsKeywordOrIdentifier(type)) {
-        key = this.parseIdentifier(true);
+        key2 = this.parseIdentifier(true);
       } else {
         switch (type) {
           case 131:
-            key = this.parseNumericLiteral(value);
+            key2 = this.parseNumericLiteral(value);
             break;
           case 130:
-            key = this.parseStringLiteral(value);
+            key2 = this.parseStringLiteral(value);
             break;
           case 132:
-            key = this.parseBigIntLiteral(value);
+            key2 = this.parseBigIntLiteral(value);
             break;
           case 134: {
             const privateKeyLoc = this.state.startLoc;
@@ -14166,14 +14166,14 @@ var ExpressionParser = class extends LValParser {
             } else {
               this.raise(Errors.UnexpectedPrivateField, privateKeyLoc);
             }
-            key = this.parsePrivateName();
+            key2 = this.parsePrivateName();
             break;
           }
           default:
             this.unexpected();
         }
       }
-      prop.key = key;
+      prop.key = key2;
       if (type !== 134) {
         prop.computed = false;
       }
@@ -15451,8 +15451,8 @@ var StatementParser = class extends ExpressionParser {
   isClassMethod() {
     return this.match(6);
   }
-  nameIsConstructor(key) {
-    return key.type === "Identifier" && key.name === "constructor" || key.type === "StringLiteral" && key.value === "constructor";
+  nameIsConstructor(key2) {
+    return key2.type === "Identifier" && key2.name === "constructor" || key2.type === "StringLiteral" && key2.value === "constructor";
   }
   isNonstaticConstructor(method) {
     return !method.computed && !method.static && this.nameIsConstructor(method.key);
@@ -15495,24 +15495,24 @@ var StatementParser = class extends ExpressionParser {
     return this.finishNode(classBody, "ClassBody");
   }
   parseClassMemberFromModifier(classBody, member) {
-    const key = this.parseIdentifier(true);
+    const key2 = this.parseIdentifier(true);
     if (this.isClassMethod()) {
       const method = member;
       method.kind = "method";
       method.computed = false;
-      method.key = key;
+      method.key = key2;
       method.static = false;
       this.pushClassMethod(classBody, method, false, false, false, false);
       return true;
     } else if (this.isClassProperty()) {
       const prop = member;
       prop.computed = false;
-      prop.key = key;
+      prop.key = key2;
       prop.static = false;
       classBody.body.push(this.parseClassProperty(prop));
       return true;
     }
-    this.resetPreviousNodeTrailingComments(key);
+    this.resetPreviousNodeTrailingComments(key2);
     return false;
   }
   parseClassMember(classBody, member, state) {
@@ -15554,9 +15554,9 @@ var StatementParser = class extends ExpressionParser {
       return;
     }
     const isContextual = !this.state.containsEsc && tokenIsIdentifier(this.state.type);
-    const key = this.parseClassElementName(member);
-    const maybeContextualKw = isContextual ? key.name : null;
-    const isPrivate = this.isPrivateName(key);
+    const key2 = this.parseClassElementName(member);
+    const maybeContextualKw = isContextual ? key2.name : null;
+    const isPrivate = this.isPrivateName(key2);
     const maybeQuestionTokenStartLoc = this.state.startLoc;
     this.parsePostMemberNameModifiers(publicMember);
     if (this.isClassMethod()) {
@@ -15573,10 +15573,10 @@ var StatementParser = class extends ExpressionParser {
           this.raise(Errors.DecoratorConstructor, member);
         }
         if (state.hadConstructor && !this.hasPlugin("typescript")) {
-          this.raise(Errors.DuplicateConstructor, key);
+          this.raise(Errors.DuplicateConstructor, key2);
         }
         if (isConstructor && this.hasPlugin("typescript") && member.override) {
-          this.raise(Errors.OverrideOnConstructor, key);
+          this.raise(Errors.OverrideOnConstructor, key2);
         }
         state.hadConstructor = true;
         allowsDirectSuper = state.hadSuperClass;
@@ -15589,7 +15589,7 @@ var StatementParser = class extends ExpressionParser {
         this.pushClassProperty(classBody, publicProp);
       }
     } else if (maybeContextualKw === "async" && !this.isLineTerminator()) {
-      this.resetPreviousNodeTrailingComments(key);
+      this.resetPreviousNodeTrailingComments(key2);
       const isGenerator = this.eat(51);
       if (publicMember.optional) {
         this.unexpected(maybeQuestionTokenStartLoc);
@@ -15607,7 +15607,7 @@ var StatementParser = class extends ExpressionParser {
         this.pushClassMethod(classBody, publicMethod, isGenerator, true, false, false);
       }
     } else if ((maybeContextualKw === "get" || maybeContextualKw === "set") && !(this.match(51) && this.isLineTerminator())) {
-      this.resetPreviousNodeTrailingComments(key);
+      this.resetPreviousNodeTrailingComments(key2);
       method.kind = maybeContextualKw;
       const isPrivate2 = this.match(134);
       this.parseClassElementName(publicMethod);
@@ -15622,7 +15622,7 @@ var StatementParser = class extends ExpressionParser {
       this.checkGetterSetterParams(publicMethod);
     } else if (maybeContextualKw === "accessor" && !this.isLineTerminator()) {
       this.expectPlugin("decoratorAutoAccessors");
-      this.resetPreviousNodeTrailingComments(key);
+      this.resetPreviousNodeTrailingComments(key2);
       const isPrivate2 = this.match(134);
       this.parseClassElementName(publicProp);
       this.pushClassAccessorProperty(classBody, accessorProp, isPrivate2);
@@ -15648,9 +15648,9 @@ var StatementParser = class extends ExpressionParser {
       if (value === "constructor") {
         this.raise(Errors.ConstructorClassPrivateField, this.state.startLoc);
       }
-      const key = this.parsePrivateName();
-      member.key = key;
-      return key;
+      const key2 = this.parsePrivateName();
+      member.key = key2;
+      return key2;
     }
     this.parsePropertyName(member);
     return member.key;
@@ -18469,10 +18469,10 @@ var typescript = (superClass) => class TypeScriptParserMixin extends superClass 
     }
     if (node.abstract && this.match(25)) {
       const {
-        key
+        key: key2
       } = node;
       this.raise(TSErrors.AbstractPropertyHasInitializer, this.state.startLoc, {
-        propertyName: key.type === "Identifier" && !node.computed ? key.name : `[${this.input.slice(this.offsetToSourcePos(key.start), this.offsetToSourcePos(key.end))}]`
+        propertyName: key2.type === "Identifier" && !node.computed ? key2.name : `[${this.input.slice(this.offsetToSourcePos(key2.start), this.offsetToSourcePos(key2.end))}]`
       });
     }
     return super.parseClassProperty(node);
@@ -18925,10 +18925,10 @@ var typescript = (superClass) => class TypeScriptParserMixin extends superClass 
       const methodFn = hasEstreePlugin ? method.value : method;
       if (methodFn.body) {
         const {
-          key
+          key: key2
         } = method;
         this.raise(TSErrors.AbstractMethodHasImplementation, method, {
-          methodName: key.type === "Identifier" && !method.computed ? key.name : `[${this.input.slice(this.offsetToSourcePos(key.start), this.offsetToSourcePos(key.end))}]`
+          methodName: key2.type === "Identifier" && !method.computed ? key2.name : `[${this.input.slice(this.offsetToSourcePos(key2.start), this.offsetToSourcePos(key2.end))}]`
         });
       }
     }
@@ -19664,14 +19664,14 @@ function getParserClass(pluginsMap) {
       pluginList.push(name2);
     }
   }
-  const key = pluginList.join("|");
-  let cls = parserClassCache.get(key);
+  const key2 = pluginList.join("|");
+  let cls = parserClassCache.get(key2);
   if (!cls) {
     cls = Parser2;
     for (const plugin of pluginList) {
       cls = mixinPlugins[plugin](cls);
     }
-    parserClassCache.set(key, cls);
+    parserClassCache.set(key2, cls);
   }
   return cls;
 }
@@ -19703,9 +19703,9 @@ function walkAst(root, visit) {
   const n = asNode(root);
   if (!n || typeof n.type !== "string") return;
   visit(n);
-  for (const key in n) {
-    if (SKIP_KEYS.has(key)) continue;
-    walkAst(n[key], visit);
+  for (const key2 in n) {
+    if (SKIP_KEYS.has(key2)) continue;
+    walkAst(n[key2], visit);
   }
 }
 
@@ -19798,9 +19798,9 @@ function collectJsx(node, out2, arm, seq) {
     collectJsx(n.right, out2, `${arm}/c${id}R`, seq);
     return;
   }
-  for (const key in n) {
-    if (key === "loc" || key === "start" || key === "end" || key === "range" || key === "type") continue;
-    collectJsx(n[key], out2, arm, seq);
+  for (const key2 in n) {
+    if (key2 === "loc" || key2 === "start" || key2 === "end" || key2 === "range" || key2 === "type") continue;
+    collectJsx(n[key2], out2, arm, seq);
   }
 }
 function jsxAstToDoc(ast, source, file) {
@@ -19864,9 +19864,9 @@ function jsxAstToDoc(ast, source, file) {
       roots.push(convert(n, null));
       return;
     }
-    for (const key in n) {
-      if (key === "loc" || key === "start" || key === "end" || key === "range" || key === "type") continue;
-      visit(n[key]);
+    for (const key2 in n) {
+      if (key2 === "loc" || key2 === "start" || key2 === "end" || key2 === "range" || key2 === "type") continue;
+      visit(n[key2]);
     }
   };
   visit(ast.program);
@@ -20099,8 +20099,8 @@ function rrf(lists, keyOf2, k = 60) {
   const score = /* @__PURE__ */ new Map();
   for (const list of lists) {
     list.forEach((item, idx) => {
-      const key = keyOf2(item);
-      score.set(key, (score.get(key) ?? 0) + 1 / (k + idx + 1));
+      const key2 = keyOf2(item);
+      score.set(key2, (score.get(key2) ?? 0) + 1 / (k + idx + 1));
     });
   }
   return score;
@@ -20830,9 +20830,9 @@ function extractReexports(rel2, content, localSymbols) {
   while ((m = star.exec(scanned)) && out2.length < MAX_REEXPORTS) {
     const ns = m[1];
     const from = m[2];
-    const key = "*" + (ns ?? from);
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const key2 = "*" + (ns ?? from);
+    if (seen.has(key2)) continue;
+    seen.add(key2);
     out2.push({
       name: ns ?? `* (${from})`,
       kind: ns ? "reexport" : "reexport-all",
@@ -21732,9 +21732,9 @@ var init_literals = __esm({
         if (kind === "string" && !isInterestingString(value)) return;
         if (kind === "number" && !isInterestingNumber(value)) return;
         if (kind === "regex" && !value) return;
-        const key = `${kind}\0${value}\0${line}`;
-        if (this.seen.has(key)) return;
-        this.seen.add(key);
+        const key2 = `${kind}\0${value}\0${line}`;
+        if (this.seen.has(key2)) return;
+        this.seen.add(key2);
         this.out.push({ value, line, kind });
       }
       addString(text, line) {
@@ -25063,7 +25063,7 @@ ${body22}`);
         }
         const mod = await C.loadWebAssemblyModule(binary2, { loadAsync: true });
         const symbolNames = Object.keys(mod);
-        const functionName = symbolNames.find((key) => LANGUAGE_FUNCTION_REGEX.test(key) && !key.includes("external_scanner_"));
+        const functionName = symbolNames.find((key2) => LANGUAGE_FUNCTION_REGEX.test(key2) && !key2.includes("external_scanner_"));
         if (!functionName) {
           console.log(`Couldn't find language function in Wasm file. Symbols:
 ${JSON.stringify(symbolNames, null, 2)}`);
@@ -25802,17 +25802,17 @@ async function ensureGrammars(keys) {
     runtimeReady = true;
     parser = new Parser3();
   }
-  for (const key of new Set(keys)) {
-    if (loaded.has(key) || failed.has(key)) continue;
-    const wasm = firstIn(`${key}.wasm`);
+  for (const key2 of new Set(keys)) {
+    if (loaded.has(key2) || failed.has(key2)) continue;
+    const wasm = firstIn(`${key2}.wasm`);
     if (!wasm) {
-      failed.add(key);
+      failed.add(key2);
       continue;
     }
     try {
-      loaded.set(key, await Language.load(new Uint8Array(readFileSync22(wasm))));
+      loaded.set(key2, await Language.load(new Uint8Array(readFileSync22(wasm))));
     } catch {
-      failed.add(key);
+      failed.add(key2);
     }
   }
 }
@@ -25822,19 +25822,19 @@ function allGrammarKeys() {
 function grammarKeysForExts(exts) {
   const keys = /* @__PURE__ */ new Set();
   for (const ext2 of exts) {
-    const key = EXT_GRAMMAR[ext2];
-    if (key !== void 0) keys.add(key);
+    const key2 = EXT_GRAMMAR[ext2];
+    if (key2 !== void 0) keys.add(key2);
   }
   return [...keys].sort();
 }
-function grammarReady(key) {
-  return loaded.has(key);
+function grammarReady(key2) {
+  return loaded.has(key2);
 }
-function languageFor(key) {
-  return loaded.get(key);
+function languageFor(key2) {
+  return loaded.get(key2);
 }
-function parserFor(key) {
-  const lang = loaded.get(key);
+function parserFor(key2) {
+  const lang = loaded.get(key2);
   if (!parser || !lang) return null;
   parser.setLanguage(lang);
   return parser;
@@ -27172,9 +27172,9 @@ function collectAll(root, spec, defNames, maxCalls, wantImports) {
   const addCall = (name2, node, receiver) => {
     if (!name2 || name2.length < 2 || !/^[A-Za-z_]\w*$/.test(name2)) return;
     const line = node.startPosition.row + 1;
-    const key = `${name2} ${line}`;
-    if (callSeen.has(key)) return;
-    callSeen.add(key);
+    const key2 = `${name2} ${line}`;
+    if (callSeen.has(key2)) return;
+    callSeen.add(key2);
     calls.push(receiver ? { name: name2, line, receiver } : { name: name2, line });
   };
   const termsFound = /* @__PURE__ */ new Set();
@@ -27286,11 +27286,11 @@ function boundNames(pattern) {
   return out2;
 }
 function extractAst(rel2, ext2, content, opts = {}) {
-  const key = grammarKeyForExt(ext2);
-  if (!key || !grammarReady(key)) return void 0;
-  const spec = SPECS[key];
+  const key2 = grammarKeyForExt(ext2);
+  if (!key2 || !grammarReady(key2)) return void 0;
+  const spec = SPECS[key2];
   if (!spec) return void 0;
-  const parser2 = parserFor(key);
+  const parser2 = parserFor(key2);
   if (!parser2) return void 0;
   let tree = null;
   try {
@@ -27311,9 +27311,9 @@ function extractAst(rel2, ext2, content, opts = {}) {
       if (!reader) return;
       for (const r of reader(node, { self })) {
         if (r.from === r.to) continue;
-        const key2 = `${r.kind} ${r.from} ${r.to}`;
-        if (relSeen.has(key2) || relations.length >= MAX_RELATIONS) continue;
-        relSeen.add(key2);
+        const key22 = `${r.kind} ${r.from} ${r.to}`;
+        if (relSeen.has(key22) || relations.length >= MAX_RELATIONS) continue;
+        relSeen.add(key22);
         relations.push(r);
       }
     };
@@ -27881,8 +27881,8 @@ function collectCallsRegex(content, symbols = [], maxCalls = 512) {
     const introducerCaught = /* @__PURE__ */ new Set();
     while ((probe = CALL_RE.exec(line)) !== null) {
       const name2 = probe[2];
-      const key = `${name2} ${i2 + 1}`;
-      if (ownDefLines.has(key) && DEF_INTRODUCERS.test(line.slice(0, probe.index))) introducerCaught.add(key);
+      const key2 = `${name2} ${i2 + 1}`;
+      if (ownDefLines.has(key2) && DEF_INTRODUCERS.test(line.slice(0, probe.index))) introducerCaught.add(key2);
     }
     CALL_RE.lastIndex = 0;
     let m;
@@ -27892,14 +27892,14 @@ function collectCallsRegex(content, symbols = [], maxCalls = 512) {
       const name2 = m[2];
       if (name2.length < 2 || CALL_KEYWORDS.has(name2)) continue;
       if (DEF_INTRODUCERS.test(line.slice(0, m.index))) continue;
-      const key = `${name2} ${i2 + 1}`;
-      if (ownDefLines.has(key) && !introducerCaught.has(key)) {
-        if (!fallbackExcluded.has(key)) {
-          fallbackExcluded.add(key);
+      const key2 = `${name2} ${i2 + 1}`;
+      if (ownDefLines.has(key2) && !introducerCaught.has(key2)) {
+        if (!fallbackExcluded.has(key2)) {
+          fallbackExcluded.add(key2);
           continue;
         }
       }
-      if (!out2.has(key)) out2.set(key, receiver ? { name: name2, line: i2 + 1, receiver } : { name: name2, line: i2 + 1 });
+      if (!out2.has(key2)) out2.set(key2, receiver ? { name: name2, line: i2 + 1, receiver } : { name: name2, line: i2 + 1 });
     }
   }
   return [...out2.values()].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : a.line - b.line);
@@ -28502,10 +28502,10 @@ function readTsConfig(root, fileSet, rel2, warnings, seen) {
   }
   return eff;
 }
-function conditionRank(key) {
-  const i2 = CONDITION_PRIORITY.indexOf(key);
+function conditionRank(key2) {
+  const i2 = CONDITION_PRIORITY.indexOf(key2);
   if (i2 !== -1) return i2;
-  return key === "types" ? CONDITION_PRIORITY.length + 1 : CONDITION_PRIORITY.length;
+  return key2 === "types" ? CONDITION_PRIORITY.length + 1 : CONDITION_PRIORITY.length;
 }
 function flattenExportTargets(value, out2) {
   if (out2.length >= MAX_EXPORT_TARGETS) return;
@@ -28521,10 +28521,10 @@ function flattenExportTargets(value, out2) {
 function parseExportEntries(exportsField) {
   if (exportsField === void 0 || exportsField === null) return [];
   const entries = [];
-  const push = (key, value) => {
+  const push = (key2, value) => {
     const targets = [];
     flattenExportTargets(value, targets);
-    if (targets.length) entries.push({ key, star: key.includes("*"), targets });
+    if (targets.length) entries.push({ key: key2, star: key2.includes("*"), targets });
   };
   if (typeof exportsField === "string" || Array.isArray(exportsField)) {
     push(".", exportsField);
@@ -29220,13 +29220,13 @@ function resolveCallEdges(scan2, importPairs) {
         confidence = "inferred";
       }
       if (!chosen) continue;
-      const key = `${f.rel}|${chosen.file}`;
-      const prev = agg.get(key);
+      const key2 = `${f.rel}|${chosen.file}`;
+      const prev = agg.get(key2);
       if (prev) {
         prev.weight += count;
         if (confidence === "extracted") prev.confidence = "extracted";
       } else {
-        agg.set(key, { from: f.rel, to: chosen.file, weight: count, confidence });
+        agg.set(key2, { from: f.rel, to: chosen.file, weight: count, confidence });
       }
     }
   }
@@ -29289,10 +29289,10 @@ function resolveRelationEdges(scan2, importPairs) {
   const agg = /* @__PURE__ */ new Map();
   for (const r of resolveRelations(scan2, importPairs)) {
     if (r.toFile === r.fromFile) continue;
-    const key = `${r.fromFile}${SEP}${r.toFile}${SEP}${r.kind}`;
-    const prev = agg.get(key);
+    const key2 = `${r.fromFile}${SEP}${r.toFile}${SEP}${r.kind}`;
+    const prev = agg.get(key2);
     if (prev) prev.weight = Math.min(prev.weight + 1, 5);
-    else agg.set(key, { from: r.fromFile, to: r.toFile, kind: r.kind, weight: 1 });
+    else agg.set(key2, { from: r.fromFile, to: r.toFile, kind: r.kind, weight: 1 });
   }
   return [...agg.values()].sort((a, b) => byStr(a.from, b.from) || byStr(a.to, b.to) || byStr(a.kind, b.kind));
 }
@@ -29367,9 +29367,9 @@ function implementationsOf(hierarchy, name2) {
     const next = [];
     for (const e of frontier) {
       for (const child of [...e.implementedBy, ...e.extendedBy]) {
-        const key = `${child.name}${SEP}${child.file}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
+        const key2 = `${child.name}${SEP}${child.file}`;
+        if (seen.has(key2)) continue;
+        seen.add(key2);
         out2.push(child);
         const entry = hierarchy.get(child.name) ?? hierarchy.get(`${child.name}@${child.file}`);
         if (entry && entry.file === child.file) next.push(entry);
@@ -29535,8 +29535,8 @@ function buildCallerIndex(scan2, importPairs, opts = {}) {
   }
   const index = /* @__PURE__ */ new Map();
   const keys = [...sites.keys()].sort(byStr);
-  for (const key of keys) {
-    const { def, callers } = sites.get(key);
+  for (const key2 of keys) {
+    const { def, callers } = sites.get(key2);
     callers.sort((a, b) => byStr(a.file, b.file) || a.line - b.line);
     if (!index.has(def.name)) index.set(def.name, { def, callers });
     else index.set(`${def.name}@${def.file}`, { def, callers });
@@ -29621,9 +29621,9 @@ function buildSymbolGraph(scan2, importPairs) {
       usable.push(s);
       nodes.set(symbolId(s), toNode(s));
       if (!s.exported) continue;
-      const key = `${s.name} ${s.file}`;
-      if (defSeen.has(key)) continue;
-      defSeen.add(key);
+      const key2 = `${s.name} ${s.file}`;
+      if (defSeen.has(key2)) continue;
+      defSeen.add(key2);
       let arr = defs.get(s.name);
       if (!arr) defs.set(s.name, arr = []);
       arr.push(s);
@@ -29633,10 +29633,10 @@ function buildSymbolGraph(scan2, importPairs) {
   const agg = /* @__PURE__ */ new Map();
   const add2 = (from, to, kind) => {
     if (from === to) return;
-    const key = `${from}${SEP2}${to}${SEP2}${kind}`;
-    const prev = agg.get(key);
+    const key2 = `${from}${SEP2}${to}${SEP2}${kind}`;
+    const prev = agg.get(key2);
     if (prev) prev.weight += 1;
-    else agg.set(key, { from, to, kind, weight: 1 });
+    else agg.set(key2, { from, to, kind, weight: 1 });
   };
   for (const f of scan2.files) {
     if (!f.calls?.length) continue;
@@ -29770,7 +29770,7 @@ function computeTestMap(graph) {
   }
   const sortSets = (m) => {
     const out2 = /* @__PURE__ */ new Map();
-    for (const key of [...m.keys()].sort(byStr)) out2.set(key, [...m.get(key)].sort(byStr));
+    for (const key2 of [...m.keys()].sort(byStr)) out2.set(key2, [...m.get(key2)].sort(byStr));
     return out2;
   };
   return { testFiles, testedByFile: sortSets(byFile), testedByModule: sortSets(byModule) };
@@ -30831,13 +30831,13 @@ function tomlSectionBody(toml, section) {
   const m = toml.match(re);
   return m ? m[1] : null;
 }
-function tomlStringArray(body22, key) {
-  const m = body22.match(new RegExp(`${escapeRegExp(key)}\\s*=\\s*\\[([^\\]]*)\\]`));
+function tomlStringArray(body22, key2) {
+  const m = body22.match(new RegExp(`${escapeRegExp(key2)}\\s*=\\s*\\[([^\\]]*)\\]`));
   if (!m) return [];
   return m[1].split(/\r?\n/).map((line) => line.replace(/#.*$/, "")).join("\n").split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
 }
-function tomlString(body22, key) {
-  return body22?.match(new RegExp(`^\\s*${escapeRegExp(key)}\\s*=\\s*["']([^"']+)["']`, "m"))?.[1];
+function tomlString(body22, key2) {
+  return body22?.match(new RegExp(`^\\s*${escapeRegExp(key2)}\\s*=\\s*["']([^"']+)["']`, "m"))?.[1];
 }
 function wsGlobToRegExp(pat) {
   let re = "";
@@ -31709,9 +31709,9 @@ function findLiteralDuplications(scan2, opts = {}) {
     for (const lit of f.literals) {
       if (opts.kinds && !opts.kinds.has(lit.kind)) continue;
       if (!isDistinctive2(lit.value, lit.kind)) continue;
-      const key = `${lit.kind}\0${lit.value}`;
-      let g = groups.get(key);
-      if (!g) groups.set(key, g = { value: lit.value, kind: lit.kind, sites: [] });
+      const key2 = `${lit.kind}\0${lit.value}`;
+      let g = groups.get(key2);
+      if (!g) groups.set(key2, g = { value: lit.value, kind: lit.kind, sites: [] });
       const holder = holderFor(f.symbols, lit.line);
       g.sites.push(
         holder ? { file: f.rel, line: lit.line, holder: holder.name, holderExported: holder.exported } : { file: f.rel, line: lit.line }
@@ -32365,15 +32365,15 @@ function changeCoupling(dir, opts = {}) {
     for (const f of unique) totals.set(f, (totals.get(f) ?? 0) + 1);
     for (let i2 = 0; i2 < unique.length; i2++) {
       for (let j = i2 + 1; j < unique.length; j++) {
-        const key = `${unique[i2]}${SEP4}${unique[j]}`;
-        pairs.set(key, (pairs.get(key) ?? 0) + 1);
+        const key2 = `${unique[i2]}${SEP4}${unique[j]}`;
+        pairs.set(key2, (pairs.get(key2) ?? 0) + 1);
       }
     }
   }
   const out2 = [];
-  for (const [key, together] of pairs) {
+  for (const [key2, together] of pairs) {
     if (together < minTogether) continue;
-    const [a, b] = key.split(SEP4);
+    const [a, b] = key2.split(SEP4);
     const totalA = totals.get(a) ?? together;
     const totalB = totals.get(b) ?? together;
     out2.push({ a, b, together, totalA, totalB, strength: Number((together / Math.min(totalA, totalB)).toFixed(3)) });
@@ -32553,9 +32553,9 @@ function locationsToRefs(root, raw) {
     const start2 = (item.range ?? item.targetSelectionRange ?? item.targetRange)?.start;
     const line = typeof start2?.line === "number" ? start2.line + 1 : 1;
     const character = typeof start2?.character === "number" ? start2.character : void 0;
-    const key = `${file}:${line}:${character ?? ""}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const key2 = `${file}:${line}:${character ?? ""}`;
+    if (seen.has(key2)) continue;
+    seen.add(key2);
     out2.push(character === void 0 ? { file, line } : { file, line, character });
   }
   return out2.sort((a, b) => byStr(a.file, b.file) || a.line - b.line || (a.character ?? 0) - (b.character ?? 0));
@@ -32633,8 +32633,8 @@ async function openLspSession(transport, options) {
     startupTimeoutMs
   );
   notify("initialized", {});
-  const provides = (key) => {
-    const value = initResult?.capabilities?.[key];
+  const provides = (key2) => {
+    const value = initResult?.capabilities?.[key2];
     return value === true || typeof value === "object" && value !== null;
   };
   const capabilities = {
@@ -32830,9 +32830,9 @@ async function annotateWithLsp(scan2, name2, statik, session, serverId, language
       session.didOpen(def.file, text, languageId);
       const character = columnOfSymbol(scan2.root, def.file, def.line, name2);
       for (const ref of await session.references(def.file, def.line, character)) {
-        const key = `${ref.file}:${ref.line}:${ref.character ?? ""}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
+        const key2 = `${ref.file}:${ref.line}:${ref.character ?? ""}`;
+        if (seen.has(key2)) continue;
+        seen.add(key2);
         refs.push(ref);
       }
     }
@@ -33324,24 +33324,24 @@ var init_viz = __esm({
 });
 function validateArgs(schema, args2) {
   const props = schema.properties ?? {};
-  for (const [key, value] of Object.entries(args2)) {
+  for (const [key2, value] of Object.entries(args2)) {
     if (value === void 0 || value === null) continue;
-    const spec = props[key];
+    const spec = props[key2];
     if (!spec?.type) continue;
     const actual = Array.isArray(value) ? "array" : typeof value;
     if (spec.type === "number") {
       if (actual === "number") continue;
       if (actual === "string" && Number.isFinite(Number(value)) && value.trim() !== "") continue;
-      return `\`${key}\` must be a number, got ${actual === "string" ? JSON.stringify(value) : actual}`;
+      return `\`${key2}\` must be a number, got ${actual === "string" ? JSON.stringify(value) : actual}`;
     }
     if (spec.type === "array") {
-      if (actual !== "array") return `\`${key}\` must be an array of strings, got ${actual}`;
+      if (actual !== "array") return `\`${key2}\` must be an array of strings, got ${actual}`;
       if (spec.items?.type === "string" && !value.every((x) => typeof x === "string")) {
-        return `\`${key}\` must be an array of strings`;
+        return `\`${key2}\` must be an array of strings`;
       }
       continue;
     }
-    if (actual !== spec.type) return `\`${key}\` must be a ${spec.type}, got ${actual}`;
+    if (actual !== spec.type) return `\`${key2}\` must be a ${spec.type}, got ${actual}`;
   }
   return void 0;
 }
@@ -34095,8 +34095,8 @@ var init_tools = __esm({
 function scanFingerprint(scan2) {
   return sha1(scan2.files.map((f) => `${f.rel}:${f.hash}`).join("\n"));
 }
-async function memoizedEmbeddingIndex(key, build) {
-  const cacheKey = `${key.mode}:${key.identity}:${scanFingerprint(key.scan)}`;
+async function memoizedEmbeddingIndex(key2, build) {
+  const cacheKey = `${key2.mode}:${key2.identity}:${scanFingerprint(key2.scan)}`;
   if (embeddingIndexCache && embeddingIndexCache.key === cacheKey) return embeddingIndexCache.index;
   const index = await build();
   embeddingIndexCache = { key: cacheKey, index };
@@ -34109,14 +34109,14 @@ function memoizedEmbedModel(modelDir) {
   } catch {
     return void 0;
   }
-  const key = `${modelDir}:${stat.mtimeMs}:${stat.size}`;
-  if (embedModelCache && embedModelCache.key === key) return embedModelCache.model;
+  const key2 = `${modelDir}:${stat.mtimeMs}:${stat.size}`;
+  if (embedModelCache && embedModelCache.key === key2) return embedModelCache.model;
   const model = loadEmbedModel(modelDir);
-  if (model) embedModelCache = { key, model };
+  if (model) embedModelCache = { key: key2, model };
   return model;
 }
-function sessionGet(key) {
-  const i2 = sessionCaches.findIndex((e) => e.key === key);
+function sessionGet(key2) {
+  const i2 = sessionCaches.findIndex((e) => e.key === key2);
   if (i2 < 0) return void 0;
   const [entry] = sessionCaches.splice(i2, 1);
   sessionCaches.unshift(entry);
@@ -34147,8 +34147,8 @@ function sessionKey(repo, opts) {
   });
 }
 function getScan(repo, opts = {}, walked) {
-  const key = sessionKey(repo, opts);
-  const hit = sessionGet(key);
+  const key2 = sessionKey(repo, opts);
+  const hit = sessionGet(key2);
   if (hit) {
     const fresh = scanRepo(repo, { ...opts, cache: hit.cacheMap, precomputedWalk: walked });
     if (fresh.contentUnchanged) {
@@ -34156,16 +34156,16 @@ function getScan(repo, opts = {}, walked) {
       if (hit.scan.commit !== fresh.commit) hit.scan.commit = fresh.commit;
       return hit.scan;
     }
-    sessionPut({ key, scan: fresh, cacheMap: toCacheMap(fresh) });
+    sessionPut({ key: key2, scan: fresh, cacheMap: toCacheMap(fresh) });
     return fresh;
   }
   const preloaded = preloadSession(repo, { ...opts, precomputedWalk: walked });
   if (preloaded) {
-    sessionPut({ key, scan: preloaded.scan, cacheMap: preloaded.cacheMap, arts: preloaded.arts });
+    sessionPut({ key: key2, scan: preloaded.scan, cacheMap: preloaded.cacheMap, arts: preloaded.arts });
     return preloaded.scan;
   }
   const scan2 = scanRepo(repo, { ...opts, precomputedWalk: walked });
-  sessionPut({ key, scan: scan2, cacheMap: toCacheMap(scan2) });
+  sessionPut({ key: key2, scan: scan2, cacheMap: toCacheMap(scan2) });
   return scan2;
 }
 function getScanSummary(repo, opts = {}, walked) {
@@ -34516,7 +34516,7 @@ async function callTool(name2, args2, defaultRepo) {
     const wanted = str(args2.name);
     if (!wanted) {
       const obj = {};
-      for (const [key, entry2] of hierarchy) obj[key] = entry2;
+      for (const [key2, entry2] of hierarchy) obj[key2] = entry2;
       return JSON.stringify(obj, null, 2);
     }
     const entry = hierarchy.get(wanted);
@@ -35075,12 +35075,12 @@ init_web_tree_sitter();
 init_loader();
 init_sort();
 var queries = /* @__PURE__ */ new Map();
-function queryFor(key, language) {
-  const cached = queries.get(key);
+function queryFor(key2, language) {
+  const cached = queries.get(key2);
   if (cached !== void 0) return cached;
   let compiled = null;
   for (const dir of resolveGrammarsTier().dirs) {
-    const path = join5(dir, `${key}.tags.scm`);
+    const path = join5(dir, `${key2}.tags.scm`);
     if (!existsSync3(path)) continue;
     try {
       compiled = new Query(language, readFileSync4(path, "utf8"));
@@ -35089,23 +35089,23 @@ function queryFor(key, language) {
     }
     break;
   }
-  queries.set(key, compiled);
+  queries.set(key2, compiled);
   return compiled;
 }
-function tagsQueryStatus(key) {
-  const present = resolveGrammarsTier().dirs.some((d) => existsSync3(join5(d, `${key}.tags.scm`)));
+function tagsQueryStatus(key2) {
+  const present = resolveGrammarsTier().dirs.some((d) => existsSync3(join5(d, `${key2}.tags.scm`)));
   if (!present) return { present: false, compiled: false };
-  const language = languageFor(key);
+  const language = languageFor(key2);
   if (!language) return { present: true, compiled: false };
-  return { present: true, compiled: queryFor(key, language) !== null };
+  return { present: true, compiled: queryFor(key2, language) !== null };
 }
 function extractTags(ext2, content) {
-  const key = grammarKeyForExt(ext2);
-  if (!key) return [];
-  const language = languageFor(key);
-  const parser2 = parserFor(key);
+  const key2 = grammarKeyForExt(ext2);
+  if (!key2) return [];
+  const language = languageFor(key2);
+  const parser2 = parserFor(key2);
   if (!language || !parser2) return [];
-  const query = queryFor(key, language);
+  const query = queryFor(key2, language);
   if (!query) return [];
   let tree = null;
   try {
@@ -35598,9 +35598,9 @@ function renderScip(scan2, opts = {}) {
     pushString(doc, F_DOC_RELPATH, f.rel);
     const ob = new Bytes(64);
     for (const o of occs) {
-      const key = `${o.range.join(",")} ${o.roles} ${o.symbol}`;
-      if (seenOcc.has(key)) continue;
-      seenOcc.add(key);
+      const key2 = `${o.range.join(",")} ${o.roles} ${o.symbol}`;
+      if (seenOcc.has(key2)) continue;
+      seenOcc.add(key2);
       ob.reset();
       pushPackedInt32(ob, F_OCC_RANGE, o.range);
       pushString(ob, F_OCC_SYMBOL, o.symbol);
@@ -35779,9 +35779,9 @@ function symbolsInHunks(defs, hunks) {
   const out2 = [];
   const seen = /* @__PURE__ */ new Set();
   const push = (d, approx) => {
-    const key = `${d.name}:${d.line}`;
-    if (seen.has(key)) return;
-    seen.add(key);
+    const key2 = `${d.name}:${d.line}`;
+    if (seen.has(key2)) return;
+    seen.add(key2);
     out2.push({
       name: d.name,
       kind: d.kind,
@@ -36576,7 +36576,7 @@ async function runCli(rawArgv) {
       emit(JSON.stringify(entry, null, 2) + "\n", flags2.out);
     } else {
       const obj = {};
-      for (const [key, entry] of hierarchy) obj[key] = entry;
+      for (const [key2, entry] of hierarchy) obj[key2] = entry;
       emit(JSON.stringify(obj, null, 2) + "\n", flags2.out);
     }
   } else if (cmd === "implementations") {
@@ -37043,11 +37043,11 @@ function computeCaptureCoverage(graph, captures) {
     const opaque = node.opaqueComponents.length > 0;
     for (const def of new Set(node.components.values())) {
       if (!def.hasControl && !opaque) continue;
-      const key = `${node.file}#${def.name}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const key2 = `${node.file}#${def.name}`;
+      if (seen.has(key2)) continue;
+      seen.add(key2);
       const isCovered = sigs.some((s) => pathMatch(s.sourceFile, node.file) && (!s.component || s.component === def.name));
-      (isCovered ? covered : blindSpots).push(key);
+      (isCovered ? covered : blindSpots).push(key2);
     }
   }
   covered.sort();
@@ -38781,13 +38781,13 @@ function dominantBackground(img, rect) {
     for (let x = r.x; x < r.x + r.w; x += step) {
       const p = img.at(x, y);
       if (!p) continue;
-      const key = Math.round(p.r / BUCKET) << 16 | Math.round(p.g / BUCKET) << 8 | Math.round(p.b / BUCKET);
-      const cur = counts.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+      const key2 = Math.round(p.r / BUCKET) << 16 | Math.round(p.g / BUCKET) << 8 | Math.round(p.b / BUCKET);
+      const cur = counts.get(key2) ?? { n: 0, r: 0, g: 0, b: 0 };
       cur.n++;
       cur.r += p.r;
       cur.g += p.g;
       cur.b += p.b;
-      counts.set(key, cur);
+      counts.set(key2, cur);
       total++;
     }
   }
@@ -44038,11 +44038,11 @@ function validatePack(raw, opts = {}) {
     const v = p[f];
     if (typeof v !== "string" || v.trim() === "") err2(f, `"${f}" must be a non-empty string`);
   }
-  const key = typeof p.key === "string" ? p.key.toLowerCase() : "";
-  if (key === RESERVED_CORE_KEY) err2("key", `pack key "${RESERVED_CORE_KEY}" is reserved for the WCAG core`);
-  if (key && opts.knownKeys?.has(key)) {
-    if (opts.allowOverride) warn("key", `pack key "${key}" overrides a built-in/loaded standard`);
-    else err2("key", `pack key "${key}" collides with a built-in/loaded standard (use --override to replace it)`);
+  const key2 = typeof p.key === "string" ? p.key.toLowerCase() : "";
+  if (key2 === RESERVED_CORE_KEY) err2("key", `pack key "${RESERVED_CORE_KEY}" is reserved for the WCAG core`);
+  if (key2 && opts.knownKeys?.has(key2)) {
+    if (opts.allowOverride) warn("key", `pack key "${key2}" overrides a built-in/loaded standard`);
+    else err2("key", `pack key "${key2}" collides with a built-in/loaded standard (use --override to replace it)`);
   }
   const locales = Array.isArray(p.locales) ? p.locales : [];
   if (locales.length === 0) err2("locales", "locales must be a non-empty array");
@@ -44419,11 +44419,11 @@ function validateMatch(node, path, depth, err2, top) {
       }
     }
   }
-  for (const key of ["has", "lacks"]) {
-    const v = n[key];
+  for (const key2 of ["has", "lacks"]) {
+    const v = n[key2];
     if (v === void 0) continue;
-    if (!Array.isArray(v)) err2(`${path}.${key}`, `match ${key} must be an array of match nodes`);
-    else v.forEach((child, i2) => validateMatch(child, `${path}.${key}[${i2}]`, depth + 1, err2, false));
+    if (!Array.isArray(v)) err2(`${path}.${key2}`, `match ${key2} must be an array of match nodes`);
+    else v.forEach((child, i2) => validateMatch(child, `${path}.${key2}[${i2}]`, depth + 1, err2, false));
   }
 }
 function validateLocaleText(v, path, err2) {
@@ -44453,14 +44453,14 @@ function currentOverlay() {
   const scope = scopeStore.getStore();
   return scope === void 0 ? void 0 : overlays.get(scope);
 }
-function lookup(key) {
-  return currentOverlay()?.get(key) ?? registry.get(key);
+function lookup(key2) {
+  return currentOverlay()?.get(key2) ?? registry.get(key2);
 }
 function visible() {
   const overlay = currentOverlay();
   if (!overlay?.size) return registry;
   const merged = new Map(registry);
-  for (const [key, entry] of overlay) merged.set(key, entry);
+  for (const [key2, entry] of overlay) merged.set(key2, entry);
   return merged;
 }
 function withScope(scope, fn) {
@@ -44473,15 +44473,15 @@ function registerScoped(scope, raw, glossary = {}, opts = {}) {
   if (v.ok && v.pack) overlay.set(v.pack.key, { pack: v.pack, glossary });
   return v;
 }
-function packForMutation(key) {
+function packForMutation(key2) {
   const overlay = currentOverlay();
-  if (!overlay) return loadPack(key);
-  const own = overlay.get(key);
+  if (!overlay) return loadPack(key2);
+  const own = overlay.get(key2);
   if (own) return own.pack;
-  const shared = registry.get(key);
-  if (!shared) return loadPack(key);
+  const shared = registry.get(key2);
+  if (!shared) return loadPack(key2);
   const copy = { pack: structuredClone(shared.pack), glossary: shared.glossary };
-  overlay.set(key, copy);
+  overlay.set(key2, copy);
   return copy.pack;
 }
 function ensureScope(scope) {
@@ -44519,22 +44519,22 @@ function enableSecondaryMapping(packKey, m) {
     list.push({ ruleId: m.ruleId, criterion: m.criterion, ...m.note ? { note: m.note } : {}, enabled: true });
   }
 }
-function isCore(key) {
-  return key === CORE_KEY;
+function isCore(key2) {
+  return key2 === CORE_KEY;
 }
-function hasStandard(key) {
-  return key === CORE_KEY || lookup(key) !== void 0;
+function hasStandard(key2) {
+  return key2 === CORE_KEY || lookup(key2) !== void 0;
 }
-function loadPack(key) {
-  const r = lookup(key);
-  if (!r) throw new Error(`unknown standards pack "${key}" (known packs: ${[...visible().keys()].join(", ") || "none"})`);
+function loadPack(key2) {
+  const r = lookup(key2);
+  if (!r) throw new Error(`unknown standards pack "${key2}" (known packs: ${[...visible().keys()].join(", ") || "none"})`);
   return r.pack;
 }
-function getPack(key) {
-  return lookup(key)?.pack;
+function getPack(key2) {
+  return lookup(key2)?.pack;
 }
-function packGlossary(key) {
-  return lookup(key)?.glossary;
+function packGlossary(key2) {
+  return lookup(key2)?.glossary;
 }
 function listStandards() {
   return [CORE_KEY, ...visible().keys()];
@@ -44625,9 +44625,9 @@ function markupOf(el, extra) {
   const out2 = /* @__PURE__ */ new Set([el.tag.toLowerCase(), ...extra ?? []]);
   for (const [name2, value] of Object.entries(el.attribs)) {
     if (typeof value !== "string" || value.trim() === "") continue;
-    const key = name2.toLowerCase();
-    out2.add(key);
-    if (VALUE_BEARING_ATTRS.has(key)) out2.add(`${key}=${value.trim().toLowerCase()}`);
+    const key2 = name2.toLowerCase();
+    out2.add(key2);
+    if (VALUE_BEARING_ATTRS.has(key2)) out2.add(`${key2}=${value.trim().toLowerCase()}`);
   }
   return [...out2];
 }
@@ -45541,9 +45541,9 @@ function harvestSubjects(ids, docs) {
   const seen = /* @__PURE__ */ new Set();
   for (const id of ids) {
     for (const item of SUBJECTS[id]?.(docs) ?? []) {
-      const key = `${item.ev.file}:${item.at}:${item.cls}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const key2 = `${item.ev.file}:${item.at}:${item.cls}`;
+      if (seen.has(key2)) continue;
+      seen.add(key2);
       out2.push(item);
     }
   }
@@ -46433,10 +46433,10 @@ var statusMessageNotAssertive = {
 };
 function literalAriaAttrs(el) {
   const out2 = [];
-  for (const key in el.attribs) {
-    const k = key.toLowerCase();
+  for (const key2 in el.attribs) {
+    const k = key2.toLowerCase();
     if (!k.startsWith("aria-")) continue;
-    const v = el.attribs[key] ?? "";
+    const v = el.attribs[key2] ?? "";
     if (v.includes("{")) continue;
     out2.push([k, v]);
   }
@@ -47649,22 +47649,22 @@ var radioCheckboxGroupUngrouped = {
       if (type !== "radio" && type !== "checkbox") continue;
       const name2 = (attr(el, "name") ?? "").trim();
       if (!name2 || name2.includes("{")) continue;
-      const key = `${type}::${name2}`;
-      const list = groups.get(key);
+      const key2 = `${type}::${name2}`;
+      const list = groups.get(key2);
       if (list) list.push(el);
-      else groups.set(key, [el]);
+      else groups.set(key2, [el]);
     }
     const out2 = [];
-    for (const [key, members] of groups) {
+    for (const [key2, members] of groups) {
       if (members.length < 2) continue;
       if (members.some(hasDynamicSpread)) continue;
       if (members.some(inGroupingContext)) continue;
-      const type = key.slice(0, key.indexOf("::"));
+      const type = key2.slice(0, key2.indexOf("::"));
       out2.push({
         criteriaId: "1.3.1",
         el: members[0],
         msgId: "radio-checkbox-group-ungrouped",
-        params: { type, name: key.slice(key.indexOf("::") + 2), count: members.length }
+        params: { type, name: key2.slice(key2.indexOf("::") + 2), count: members.length }
       });
     }
     return out2;
@@ -47783,8 +47783,8 @@ var onInputContextChange = {
     const out2 = [];
     for (const el of doc.elements) {
       if (!isIntrinsic(el.tag) || !["input", "select", "textarea"].includes(el.tag)) continue;
-      for (const key of ["onchange", "onChange"]) {
-        const handler = attr(el, key);
+      for (const key2 of ["onchange", "onChange"]) {
+        const handler = attr(el, key2);
         if (!handler || !CONTEXT_CHANGE.test(handler)) continue;
         out2.push({ criteriaId: "3.2.2", el, msgId: "on-input-context-change", params: { tag: el.tag } });
         break;
@@ -48401,8 +48401,8 @@ function candidates(base) {
 }
 function matchKnown(base, known) {
   for (const c2 of candidates(base)) {
-    const key = toPosix(c2);
-    if (known.has(key)) return key;
+    const key2 = toPosix(c2);
+    if (known.has(key2)) return key2;
   }
   return null;
 }
@@ -48519,14 +48519,14 @@ function makeSpecResolver(known, aliases = [], startDir) {
   const ctx = buildResolveContext({ root: "", files });
   const memo = /* @__PURE__ */ new Map();
   return (fromFile, spec) => {
-    const key = `${fromFile}\0${spec}`;
-    const cached = memo.get(key);
+    const key2 = `${fromFile}\0${spec}`;
+    const cached = memo.get(key2);
     if (cached !== void 0) return cached;
     const r = resolveImport(toPosix(absPath(fromFile)), ext(fromFile), spec, ctx);
     let out2 = null;
     if (r.kind === "resolved") out2 = backMap.get(r.target) ?? null;
     if (out2 === null) out2 = resolveSpecifier(fromFile, spec, known, aliases);
-    memo.set(key, out2);
+    memo.set(key2, out2);
     return out2;
   };
 }
@@ -49732,8 +49732,8 @@ function probeFindings(probes, file, page) {
     ["reflowZoom", "reflow-zoom"],
     ["textSpacing", "text-spacing"]
   ];
-  for (const [key, engine] of buckets) {
-    const hits = probes[key];
+  for (const [key2, engine] of buckets) {
+    const hits = probes[key2];
     if (!Array.isArray(hits)) continue;
     for (const h2 of hits) add2(PROBE_WCAG[engine], `dyn-${engine}`, PROBE_SEVERITY[engine], h2.selector, h2.html, h2.detail);
   }
@@ -50077,6 +50077,30 @@ function packTests(pack, id) {
     wording: (Array.isArray(sentences) ? sentences.join(" ") : String(sentences)).replace(/\[([^\]]+)\]\(#[^)]+\)/g, "$1").trim()
   }));
 }
+function packTestsCited(pack, id, refs) {
+  const all = packTests(pack, id);
+  const own = new Set(all.map((t3) => t3.id));
+  const cited = new Set(refs.map((r) => (r ?? "").trim()).filter((r) => own.has(r)));
+  return cited.size ? all.filter((t3) => cited.has(t3.id)) : all;
+}
+function packTestIdsCited(pack, id, refs) {
+  return packTestsCited(pack, id, refs).map((t3) => t3.id);
+}
+var MAX_SIBLINGS = 3;
+function siblingCriteria(pack, id, lang = pack.defaultLocale) {
+  const c2 = getCriterion(pack, id);
+  if (!c2) return [];
+  const mechanical = (x) => !x.judgment && (x.appliesTo?.ruleIds ?? []).length > 0;
+  const mine = new Set(c2.wcag ?? []);
+  const shared = (x) => (x.wcag ?? []).filter((w) => mine.has(w)).length;
+  return pack.criteria.filter((x) => x.id !== c2.id && x.theme === c2.theme && shared(x) > 0 && mechanical(x) !== mechanical(c2)).sort((a, b) => shared(b) - shared(a) || a.id.localeCompare(b.id, void 0, { numeric: true })).slice(0, MAX_SIBLINGS).map((x) => ({
+    id: x.id,
+    // The plain title is the whole argument: « a-t-il une étiquette ? » beside « cette
+    // étiquette est-elle pertinente ? » explains the split better than any prose could.
+    title: localize(pack, x.titlePlain ?? x.title, lang),
+    role: mechanical(x) ? "mechanical" : "judgment"
+  }));
+}
 function criterionUrl(pack, id) {
   return pack.criterionUrl ? pack.criterionUrl.replaceAll("{id}", id) : void 0;
 }
@@ -50201,8 +50225,8 @@ function runPackCheck(packPath, guidancePath) {
         if (!resolvable(r)) warnings.push(`criteria "${c2.id}": appliesTo ruleId "${r}" is not a known engine rule (renamed/future?)`);
       }
     }
-    for (const key of Object.keys(v.pack.overrides ?? {})) {
-      if (!resolvable(key)) warnings.push(`overrides: ruleId "${key}" is not a known engine rule or a rule of this pack (renamed/future?)`);
+    for (const key2 of Object.keys(v.pack.overrides ?? {})) {
+      if (!resolvable(key2)) warnings.push(`overrides: ruleId "${key2}" is not a known engine rule or a rule of this pack (renamed/future?)`);
     }
   }
   if (v.ok && v.pack && guidancePath) {
@@ -54324,11 +54348,11 @@ function loopKey(sessionId, intent, findings) {
   for (const id of findings.map(findingId).sort()) h2.update(`${id}\0`);
   return h2.digest("hex").slice(0, 32);
 }
-function firstSighting(key) {
+function firstSighting(key2) {
   try {
     const dir = join30(tmpdir(), "ultra11y-hook");
     mkdirSync5(dir, { recursive: true });
-    const marker = join30(dir, key);
+    const marker = join30(dir, key2);
     if (existsSync17(marker)) return false;
     writeFileSync6(marker, "");
     return true;
@@ -54680,14 +54704,16 @@ function coreCoverage(sc) {
     why: "WCAG automatability class `static`: an engine rule decides it from the source tree."
   };
 }
-function outOfCore(pc) {
+function outOfCore(pack, pc) {
+  const ownRuleIds = new Set((pack.rules ?? []).map((r) => `pack:${pack.key}:${r.id}`));
+  if ((pc.appliesTo?.ruleIds ?? []).some((id) => ownRuleIds.has(id))) return false;
   return pc.wcag.every((sc) => {
     const s = knownScStatus(sc);
     return s === "out-of-core" || s === "removed";
   });
 }
 function packCoverage(pack, pc) {
-  if (outOfCore(pc)) {
+  if (outOfCore(pack, pc)) {
     return {
       tier: "out-of-scope",
       sourceIsEnough: false,
@@ -54771,11 +54797,11 @@ function standardCoverage(standard) {
 var CORE2 = CORE_KEY;
 function resolveStandard(flag) {
   if (flag === void 0 || flag === true || flag === "") return CORE_KEY;
-  const key = String(flag).toLowerCase();
-  if (!hasStandard(key)) {
-    throw new Error(`unknown standard "${key}" (known: ${listStandards().join(", ")})`);
+  const key2 = String(flag).toLowerCase();
+  if (!hasStandard(key2)) {
+    throw new Error(`unknown standard "${key2}" (known: ${listStandards().join(", ")})`);
   }
-  return key;
+  return key2;
 }
 function standardLabel(standard) {
   if (isCore(standard)) return "WCAG 2.2 AA";
@@ -54918,10 +54944,10 @@ function groupOccurrences(findings, collapse3) {
   if (!collapse3) return findings.map((f) => [f]);
   const groups = /* @__PURE__ */ new Map();
   for (const f of findings) {
-    const key = `${f.file}\0${f.ruleId}\0${f.selectorHint}`;
-    const g = groups.get(key);
+    const key2 = `${f.file}\0${f.ruleId}\0${f.selectorHint}`;
+    const g = groups.get(key2);
     if (g) g.push(f);
-    else groups.set(key, [f]);
+    else groups.set(key2, [f]);
   }
   return [...groups.values()];
 }
@@ -55006,7 +55032,11 @@ function auditorUnitModel(unit, standard, lang, opts = {}) {
     const pc = pack.criteria.find((c2) => c2.id === unit.criteriaId);
     if (pc) fields.push({ label: v.theme, value: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trimEnd() });
     fields.push({ label: v.criterion, value: `${unit.criteriaId} \u2014 ${unit.title}` });
-    const testNums = packTestIds(pack, unit.criteriaId);
+    const testNums = packTestIdsCited(
+      pack,
+      unit.criteriaId,
+      unit.findings.filter((f) => !f.advisory).map((f) => f.normativeRef)
+    );
     if (testNums.length) fields.push({ label: `${v.test}(s)`, value: testNums.join(" \xB7 ") });
   }
   fields.push({ label: s.priority, value: `${ICON[unit.severity]} ${SEV_LABEL[lang][unit.severity]}` });
@@ -55344,21 +55374,21 @@ function epicsOf(units, standard, lang) {
   const pack = isCore(standard) ? null : loadPack(standard);
   const groups = /* @__PURE__ */ new Map();
   for (const u of units) {
-    let key;
+    let key2;
     let title2;
     if (pack) {
       const themeNum = pack.criteria.find((c2) => c2.id === u.criteriaId)?.theme ?? 0;
-      key = String(themeNum).padStart(3, "0");
+      key2 = String(themeNum).padStart(3, "0");
       title2 = (themeNum ? themeName(pack, themeNum, lang) : void 0) ?? `#${themeNum}`;
     } else {
       const g = getSC(u.criteriaId)?.guideline ?? u.criteriaId;
-      key = g;
+      key2 = g;
       title2 = `${g} ${guidelineTitle(g, lang) ?? ""}`.trim();
     }
-    let epic = groups.get(key);
+    let epic = groups.get(key2);
     if (!epic) {
-      epic = { key, title: title2, units: [] };
-      groups.set(key, epic);
+      epic = { key: key2, title: title2, units: [] };
+      groups.set(key2, epic);
     }
     epic.units.push(u);
   }
@@ -55374,7 +55404,11 @@ function acceptanceCriteria(unit, standard, lang, opts = {}) {
     return [line(scTitle(sc, lang) ?? sc, `WCAG ${sc}`)];
   }
   const pack = loadPack(standard);
-  const tests = packTests(pack, unit.criteriaId);
+  const tests = packTestsCited(
+    pack,
+    unit.criteriaId,
+    unit.findings.filter((f) => !f.advisory).map((f) => f.normativeRef)
+  );
   if (!tests.length) return [line(unit.title, `${pack.name} ${unit.criteriaId}`)];
   return tests.map((t3) => line(t3.wording, `${pack.name} ${t3.id}`));
 }
@@ -57733,6 +57767,46 @@ function buildWorklist(reportMd, standard = "wcag", max = VERIFY_MAX) {
   if (items.length) return items;
   return buildWorklistLegacy(reportMd, standard, max);
 }
+function refuteSchema(items) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["verdicts"],
+    properties: {
+      verdicts: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["n", "verdict", "note"],
+          properties: {
+            n: { type: "integer", enum: items.map((it) => it.n), description: "The item number EXACTLY as given." },
+            verdict: { type: "string", enum: ["supported", "partial", "refuted", "unsupported"] },
+            note: { type: "string", description: "One sentence: what you opened, and what it showed." }
+          }
+        }
+      }
+    }
+  };
+}
+function refuteSystemPrompt(lang = "en") {
+  const s = T[lang];
+  return [s.refuteRole, "", s.supported, s.partial, s.refuted, s.unsupported, "", s.refuteInverted, s.refuteAttach, s.refuteDoubt, s.refuteNever].join("\n");
+}
+function conformityClaimsFromAudit(audit2, standard) {
+  const claim = (c2) => ({
+    criteriaId: c2.id,
+    verdict: "C",
+    justification: c2.justification,
+    citations: c2.citations
+  });
+  if (!isCore(standard)) {
+    const pa = audit2.packAdjudication;
+    if (!pa || pa.standard !== standard) return [];
+    return pa.criteria.filter((c2) => c2.decidedBy === "agent" && c2.status === "C").map(claim);
+  }
+  return audit2.criteria.filter((c2) => c2.decidedBy === "agent" && c2.status === "C").map(claim);
+}
 function buildConformityWorklist(claims, startAt = 0, max = VERIFY_MAX) {
   const items = [];
   for (const c2 of claims) {
@@ -57771,6 +57845,11 @@ var T = {
     conformityPartial: "- `partial` \u2014 elle l'\xE9tablit pour l'\xE9l\xE9ment cit\xE9, mais la justification d\xE9borde sur des cas qu'elle ne couvre pas ;",
     conformityRefuted: "- `refuted` \u2014 l'\xE9vidence n'\xE9tablit pas la conformit\xE9 (elle constate une pr\xE9sence, pas une pertinence) ;",
     conformityUnsupported: "- `unsupported` \u2014 l'\xE9vidence cit\xE9e ne permet pas de trancher.",
+    refuteRole: "Vous \xEAtes le SECOND lecteur d'un audit d'accessibilit\xE9. Vous n'auditez pas : vous mettez \xE0 l'\xE9preuve des constats d\xE9j\xE0 \xE9crits. Pour chaque entr\xE9e, ouvrez le fichier \xE0 la ligne cit\xE9e, lisez l'\xE9l\xE9ment, et dites si l'\xE9vidence cit\xE9e \xE9taye la revendication :",
+    refuteInverted: "Les entr\xE9es marqu\xE9es \xAB conformit\xE9 revendiqu\xE9e \xBB posent la question INVERSE : l'\xE9vidence \xC9TABLIT-elle le crit\xE8re, ou constate-t-elle seulement que son sujet EXISTE ? Un `alt` pr\xE9sent n'est pas un `alt` pertinent ; un `<title>` pr\xE9sent n'est pas un titre qui d\xE9crit la page.",
+    refuteAttach: "V\xE9rifiez aussi le RATTACHEMENT : le r\xE9f\xE9rentiel s\xE9pare l'existence d'une chose et sa pertinence en deux crit\xE8res distincts. Un constat d'absence rang\xE9 sous le crit\xE8re de pertinence est `refuted` \u2014 il est r\xE9el, mais il appartient au crit\xE8re voisin.",
+    refuteDoubt: "Dans le doute, r\xE9futez. Un constat retir\xE9 \xE0 tort co\xFBte une relecture ; un constat gard\xE9 \xE0 tort part dans un document opposable.",
+    refuteNever: "Ne r\xE9\xE9crivez rien, ne corrigez rien, n'auditez aucun crit\xE8re absent de la liste. R\xE9pondez uniquement par les verdicts demand\xE9s.",
     conformityCheck: "- [ ] Aucune conformit\xE9 invent\xE9e : un `C` r\xE9fut\xE9 ou non \xE9tay\xE9 retourne \xAB \xE0 \xE9valuer \xBB \u2014 il ne devient PAS une non-conformit\xE9, car r\xE9futer une conformit\xE9 ne prouve rien contre le crit\xE8re.",
     then: "Puis : `ultra11y verify --apply VERIFY.todo.json` (\xE9choue si un verdict est refuted/unsupported).",
     understand: "Comprendre",
@@ -57799,6 +57878,11 @@ var T = {
     conformityPartial: "- `partial` \u2014 it establishes it for the cited element, but the justification reaches beyond what it covers;",
     conformityRefuted: "- `refuted` \u2014 the evidence does not establish conformity (it observes a presence, not a relevance);",
     conformityUnsupported: "- `unsupported` \u2014 the cited evidence is not enough to decide.",
+    refuteRole: "You are the SECOND reader of an accessibility audit. You are not auditing: you are putting already-written observations on trial. For each entry, open the file at the cited line, read the element, and say whether the cited evidence supports the claim:",
+    refuteInverted: "Entries marked \u201Cclaimed conformity\u201D ask the INVERTED question: does the evidence ESTABLISH the criterion, or does it only show that its subject EXISTS? A present `alt` is not a relevant `alt`; a present `<title>` is not a title that describes the page.",
+    refuteAttach: "Check the ATTACHMENT too: the standard splits the existence of a thing and its relevance into two separate criteria. An observation of absence filed under the relevance criterion is `refuted` \u2014 it is real, but it belongs to the neighbouring criterion.",
+    refuteDoubt: "When in doubt, refute. An observation wrongly withdrawn costs a second look; an observation wrongly kept ships in a legal deliverable.",
+    refuteNever: "Rewrite nothing, fix nothing, audit no criterion absent from the list. Answer only with the verdicts asked for.",
     conformityCheck: "- [ ] No invented conformity: a refuted or unsupported `C` goes back to \u201Cto assess\u201D \u2014 it does NOT become a non-conformity, because refuting a conformity proves nothing against the criterion.",
     then: "Then: `ultra11y verify --apply VERIFY.todo.json` (fails if any verdict is refuted/unsupported).",
     understand: "Understanding",
@@ -58205,7 +58289,7 @@ function isUndecidedFile(v) {
 }
 function checkDecided(audit2, standard = CORE2, lang = "en", opts = {}) {
   const fr = lang === "fr";
-  const rows = isCore(standard) ? audit2.criteria.map((c2) => ({ id: c2.id, status: c2.status })) : derivePackResults(audit2, standard).map((c2) => ({ id: c2.id, status: c2.status }));
+  const rows = isCore(standard) ? audit2.criteria.map((c2) => ({ id: c2.id, status: c2.status, decidedBy: c2.decidedBy })) : derivePackResults(audit2, standard).map((c2) => ({ id: c2.id, status: c2.status, decidedBy: c2.decidedBy }));
   const issues = [];
   const declared = /* @__PURE__ */ new Map();
   for (const e of opts.allow?.entries ?? []) {
@@ -58250,7 +58334,16 @@ function checkDecided(audit2, standard = CORE2, lang = "en", opts = {}) {
       fr ? `Page \xAB ${p.name} \xBB : ${own.length} crit\xE8re(s) encore \xAB \xE0 \xE9valuer \xBB \u2014 ${own.join(", ")}.` : `Page \u201C${p.name}\u201D: ${own.length} criterion(ia) still to assess \u2014 ${own.join(", ")}.`
     );
   }
-  return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length, ...pages ? { pages } : {} };
+  const settled = rows.filter((r) => r.status !== "manual");
+  const provenance = {
+    total: rows.length,
+    engine: settled.filter((r) => r.decidedBy === void 0 || r.decidedBy === "engine").length,
+    scan: settled.filter((r) => r.decidedBy === "scan").length,
+    agent: settled.filter((r) => r.decidedBy === "agent").length,
+    declared: allowed.length,
+    undecided: undecided.length
+  };
+  return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length, provenance, ...pages ? { pages } : {} };
 }
 function checkRendered(audit2, standard = CORE2, lang = "en", opts = {}) {
   const fr = lang === "fr";
@@ -59416,6 +59509,23 @@ function applyAdjudication(audit2, adj, opts = {}) {
   let scopeCache;
   const { citationDrift } = adjudicationLimits(opts.cwd);
   const scopeFiles = () => scopeCache ??= auditFiles(audit2, opts.cwd);
+  let engineNcCache;
+  const engineNcAt = (key2) => {
+    if (!engineNcCache) {
+      engineNcCache = /* @__PURE__ */ new Map();
+      if (!isCore(adj.standard)) {
+        for (const pc of derivePackResults(audit2, adj.standard)) {
+          if (pc.status !== "NC") continue;
+          for (const f of pc.findings) {
+            if (f.advisory || f.ruleId.startsWith("agent:")) continue;
+            const k = anchorKey(f.file, f.line, f.selectorHint);
+            (engineNcCache.get(k) ?? engineNcCache.set(k, /* @__PURE__ */ new Set()).get(k)).add(pc.id);
+          }
+        }
+      }
+    }
+    return engineNcCache.get(key2) ?? EMPTY_IDS;
+  };
   const toGround = (criteriaId, g, fallback) => {
     const entry = { g, ...fallback ? { fallback } : {} };
     const list = groundInputs.get(criteriaId);
@@ -59487,6 +59597,18 @@ function applyAdjudication(audit2, adj, opts = {}) {
             it.criteriaId,
             isCore(adj.standard) ? `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" does not resolve to a test of ${adj.standard} (fabricated?)` : `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" is not a test of ${adj.standard} ${it.criteriaId} \u2014 cite one of its own tests (e.g. "${it.criteriaId}.1"); a WCAG id looks alike but denotes an unrelated test`
           );
+        }
+        if (!isCore(adj.standard) && f.file?.trim()) {
+          const mechanical = siblingCriteria(loadPack(adj.standard), it.criteriaId).filter((sib) => sib.role === "mechanical");
+          if (mechanical.length) {
+            const owners = engineNcAt(anchorKey(f.file, f.line, f.selector ?? ""));
+            const clash = mechanical.find((sib) => owners.has(sib.id));
+            if (clash)
+              blame(
+                it.criteriaId,
+                `criterion ${it.criteriaId}: this anchor (${f.file}:${f.line}) is already the engine's non-conformity on ${adj.standard} ${clash.id} \u2014 \xAB ${clash.title} \xBB. ${it.criteriaId} asks the NEXT question about the same subject and presupposes it is there, so on this element it is not non-conformant: it has no subject. Report it on ${clash.id} (the engine already did), or rule ${it.criteriaId} on a different element.`
+              );
+          }
         }
         toGround(it.criteriaId, { file: f.file, line: f.line, selector: f.selector, snippet: f.snippet });
       }
@@ -59577,7 +59699,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
       decided.push({
         id: it.criteriaId,
         status: it.verdict,
-        ...it.verdict === "C" || it.verdict === "NA" ? { justification: it.justification.trim() } : {},
+        ...it.verdict === "C" || it.verdict === "NA" ? { justification: it.justification.trim(), ...citationsOf(it) } : {},
         findings: [...fs2, ...recs],
         decidedBy: "agent"
       });
@@ -59615,12 +59737,18 @@ function applyAdjudication(audit2, adj, opts = {}) {
     c2.status = it.verdict === "NA" ? INAPPLICABLE_STATUS : it.verdict;
     c2.decidedBy = "agent";
     delete c2.inapplicable;
-    if (it.verdict === "C" || it.verdict === "NA") c2.justification = it.justification.trim();
+    if (it.verdict === "C" || it.verdict === "NA") {
+      c2.justification = it.justification.trim();
+      const cites = citationsOf(it);
+      if (cites.citations) c2.citations = cites.citations;
+      else delete c2.citations;
+    }
     if (it.verdict === "NC") {
       const fs2 = it.findings.map((f) => agentFinding(it.criteriaId, f));
       c2.findings = fs2;
       newFindings.push(...fs2);
       delete c2.justification;
+      delete c2.citations;
     }
   }
   for (const it of adj.items) {
@@ -59645,6 +59773,12 @@ function agentSeverity(v, advisory) {
   if (v === "minor") return "mineur";
   return advisory ? "mineur" : NC_SEVERITY_DEFAULT;
 }
+var anchorKey = (file, line, selector) => `${file.trim()}|${line}|${selector.trim()}`;
+var EMPTY_IDS = /* @__PURE__ */ new Set();
+function citationsOf(it) {
+  const cites = (it.citations ?? []).map((c2) => typeof c2 === "string" ? readCitation(c2) : c2).filter((c2) => c2 !== null && c2 !== void 0).map(({ file, line, selector, snippet: snippet2, note }) => ({ file, line, selector, snippet: snippet2, ...note ? { note } : {} }));
+  return cites.length ? { citations: cites } : {};
+}
 function agentFinding(criteriaId, f, advisory = false) {
   return {
     ruleId: `agent:${criteriaId}`,
@@ -59657,6 +59791,11 @@ function agentFinding(criteriaId, f, advisory = false) {
     message: f.message,
     remediation: getSC(criteriaId)?.understanding ? `See WCAG ${criteriaId}.` : "Address the reported non-conformity.",
     snippet: f.snippet ?? "",
+    // The gate immediately above this fold spent real effort proving this reference resolves
+    // to a test of THIS criterion (`normativeRefResolves`); dropping it here is what made the
+    // deliverable print all three tests of RGAA 11.1 under a finding that failed only 11.1.2.
+    // A recommendation carries none by definition — a good practice has no normative test.
+    ...f.normativeRef && !advisory ? { normativeRef: f.normativeRef.trim() } : {},
     ...advisory ? { advisory: true } : {}
   };
 }
@@ -59725,7 +59864,11 @@ var T2 = {
     webLookup: "Le texte ci-dessus est celui du r\xE9f\xE9rentiel : c'est LUI qui tranche. Si une formulation reste ambigu\xEB et que vous disposez d'un outil web, vous POUVEZ consulter la page officielle ci-dessus pour la lever \u2014 jamais pour la contredire, jamais pour \xE9largir un test, et une page web n'est jamais un `normativeRef` : seules les r\xE9f\xE9rences normatives list\xE9es ci-dessous en sont.",
     technicalNote: "Note technique",
     particularCases: "Cas particuliers",
-    glossary: "Termes d\xE9finis par le r\xE9f\xE9rentiel"
+    glossary: "Termes d\xE9finis par le r\xE9f\xE9rentiel",
+    neighbours: "Ce constat appartient-il bien ici ?",
+    neighboursLead: () => `un constat d'absence ou de forme appartient au crit\xE8re \xAB m\xE9canique \xBB ci-dessous, un jugement de pertinence au crit\xE8re \xAB jugement \xBB. Aide \xE0 la lecture : ne dispense d'aucun test de CE crit\xE8re.`,
+    roleMechanical: "m\xE9canique \u2014 existence / forme",
+    roleJudgment: "jugement \u2014 pertinence"
   },
   en: {
     title: "# Criteria adjudication (ultra11y)",
@@ -59766,13 +59909,26 @@ var T2 = {
     webLookup: "The text above is the standard's own, and it is what decides. If a wording stays ambiguous and you have a web tool, you MAY consult the official page above to settle it \u2014 never to contradict it, never to widen a test, and a web page is never a `normativeRef`: only the normative references listed below are.",
     technicalNote: "Technical note",
     particularCases: "Particular cases",
-    glossary: "Terms the standard defines"
+    glossary: "Terms the standard defines",
+    neighbours: "Does this observation belong here?",
+    neighboursLead: () => `an observation of absence or of malformed markup belongs to the \xAB mechanical \xBB criterion below, a judgement of relevance to the \xAB judgment \xBB one. A reading aid: it excuses no test of THIS criterion.`,
+    roleMechanical: "mechanical \u2014 existence / form",
+    roleJudgment: "judgment \u2014 relevance"
   }
 };
 var MAX_REFS = 12;
-var MAX_GLOSSARY_TERMS = 8;
-var MAX_GLOSSARY_CHARS = 600;
+var MAX_GLOSSARY_TERMS = 5;
+var MAX_GLOSSARY_CHARS = 420;
 var MAX_METHODOLOGY_CHARS = 900;
+var MAX_UNTOUCHED_METHODOLOGY_CHARS = 260;
+function siblingBlock(pack, id, lang, s) {
+  const sibs = siblingCriteria(pack, id, lang);
+  if (!sibs.length) return [];
+  const out2 = [`> **${s.neighbours}** \u2014 ${s.neighboursLead()}`, ""];
+  for (const sib of sibs) out2.push(`- \`${sib.id}\` \u2014 ${plainTest(sib.title)} _(${sib.role === "mechanical" ? s.roleMechanical : s.roleJudgment})_`);
+  out2.push("");
+  return out2;
+}
 function glossaryBlock(pack, crit, lang) {
   const anchors = glossaryAnchorsOf(crit).slice(0, MAX_GLOSSARY_TERMS);
   if (!anchors.length) return [];
@@ -59830,7 +59986,7 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   const s = T2[lang];
   const { showAlsoAt: shown } = adjudicationLimits(opts.cwd);
   const pack = isCore(standard) ? void 0 : loadPack(standard);
-  const out2 = opts.preamble === false ? [s.briefContract, "", ...s.verdicts, "", s.rule, "", s.absenceRule, ""] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", s.then, ""];
+  const out2 = opts.contract === false ? [] : opts.preamble === false ? [s.briefContract, "", ...s.verdicts, "", s.rule, "", s.absenceRule, ""] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", s.then, ""];
   if (items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
     out2.push(`> ${s.renderedAvailable}`, "");
   }
@@ -59887,6 +60043,8 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
     if (pack) {
       const tests = crit?.tests ?? {};
       const keys = Object.keys(tests);
+      out2.push(...glossaryBlock(pack, crit, lang));
+      out2.push(...siblingBlock(pack, it.criteriaId, lang, s));
       if (keys.length) {
         const found = new Set(it.markup ?? []);
         const touched = /* @__PURE__ */ new Map();
@@ -59905,14 +60063,14 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
           const method = crit?.methodology?.[k];
           if (method?.trim()) {
             const flat = plainTest(method).replace(/\s+/g, " ").trim();
-            out2.push(`  - _${s.methodology}_ : ${flat.length > MAX_METHODOLOGY_CHARS ? `${flat.slice(0, MAX_METHODOLOGY_CHARS)}\u2026` : flat}`);
+            const cap = !anyTouched || touched.get(k) ? MAX_METHODOLOGY_CHARS : MAX_UNTOUCHED_METHODOLOGY_CHARS;
+            out2.push(`  - _${s.methodology}_ : ${flat.length > cap ? `${flat.slice(0, cap)}\u2026` : flat}`);
           }
         }
         out2.push("");
       }
       if (crit?.technicalNote?.length) out2.push(`> **${s.technicalNote}** \u2014 ${crit.technicalNote.map(plainTest).join(" ")}`, "");
       if (crit?.particularCases?.length) out2.push(`> **${s.particularCases}** \u2014 ${crit.particularCases.map(plainTest).join(" ")}`, "");
-      out2.push(...glossaryBlock(pack, crit, lang));
       out2.push(...packGuidanceBlock(standard, it.criteriaId, lang));
       out2.push(...sourceBlock(s, pack.name, it.criteriaId, criterionUrl(pack, it.criteriaId), opts.web === true));
       if (keys.length) out2.push(`> ${s.packRefs(pack.name)}: ${keys.map((k) => `\`${it.criteriaId}.${k}\``).join(", ")}`, "");
@@ -59994,6 +60152,91 @@ function hydrateAdjudication(adj, audit2, opts = {}) {
   }
 }
 
+// src/refute.ts
+var WITHDRAWN = /* @__PURE__ */ new Set(["refuted", "unsupported"]);
+var REASON = {
+  fr: {
+    nc: "Non-conformit\xE9 r\xE9fut\xE9e \xE0 la contre-expertise : le constat ne tient pas sur l'\xE9l\xE9ment cit\xE9. Le crit\xE8re retourne \xAB \xE0 \xE9valuer \xBB \u2014 r\xE9futer une non-conformit\xE9 n'\xE9tablit pas la conformit\xE9.",
+    c: "Conformit\xE9 revendiqu\xE9e non \xE9tay\xE9e \xE0 la contre-expertise : l'\xE9vidence cit\xE9e constate une pr\xE9sence, pas une conformit\xE9. Le crit\xE8re retourne \xAB \xE0 \xE9valuer \xBB \u2014 il ne devient PAS une non-conformit\xE9."
+  },
+  en: {
+    nc: "Non-conformity refuted on review: the observation does not hold on the cited element. The criterion goes back to \u201Cto assess\u201D \u2014 refuting a non-conformity does not establish conformity.",
+    c: "Claimed conformity unsupported on review: the cited evidence observes a presence, not a conformity. The criterion goes back to \u201Cto assess\u201D \u2014 it does NOT become a non-conformity."
+  }
+};
+var key = (file, line, selector) => `${file.trim()}|${line}|${(selector ?? "").trim()}`;
+var findingKey = (f) => key(f.file, f.line, f.selectorHint);
+function pruneRefuted(audit2, standard, items, lang = "en") {
+  const next = structuredClone(audit2);
+  const reason = REASON[lang] ?? REASON.en;
+  const withdrawn = items.filter((it) => WITHDRAWN.has((it.verdict ?? "").trim().toLowerCase()));
+  const removedNc = /* @__PURE__ */ new Map();
+  const withdrawnC = /* @__PURE__ */ new Set();
+  for (const it of withdrawn) {
+    if (it.kind === "c") withdrawnC.add(it.criteriaId);
+    else (removedNc.get(it.criteriaId) ?? removedNc.set(it.criteriaId, /* @__PURE__ */ new Set()).get(it.criteriaId)).add(key(it.file, it.line, it.selector));
+  }
+  const reopenedCriteria = [];
+  const clearedConformities = [];
+  let removedFindings = 0;
+  let skippedEngine;
+  const deleted = /* @__PURE__ */ new Set();
+  const acted = /* @__PURE__ */ new Set();
+  const prune = (rec, setOpen) => {
+    const isAgent = rec.decidedBy === "agent";
+    const drop = removedNc.get(rec.id);
+    if (drop?.size) {
+      if (isAgent) {
+        acted.add(rec.id);
+        const keep = rec.findings.filter((f) => {
+          const k = findingKey(f);
+          if (f.advisory || !drop.has(k)) return true;
+          deleted.add(`${rec.id}|${k}`);
+          removedFindings++;
+          return false;
+        });
+        rec.findings = keep;
+        if (!keep.some((f) => !f.advisory)) {
+          reopenedCriteria.push(rec.id);
+          setOpen(reason.nc);
+        }
+      }
+    }
+    if (withdrawnC.has(rec.id) && isAgent) {
+      acted.add(rec.id);
+      clearedConformities.push(rec.id);
+      setOpen(reason.c);
+    }
+  };
+  if (!isCore(standard) && next.packAdjudication?.standard === standard) {
+    for (const rec of next.packAdjudication.criteria) {
+      prune(rec, (why) => {
+        rec.status = "manual";
+        rec.reason = "undecidable";
+        rec.justification = why;
+        rec.findings = [];
+        delete rec.decidedBy;
+        delete rec.citations;
+      });
+    }
+  } else if (isCore(standard)) {
+    for (const rec of next.criteria) {
+      prune(rec, (why) => {
+        rec.status = "manual";
+        rec.justification = why;
+        rec.findings = [];
+        delete rec.decidedBy;
+        delete rec.citations;
+        delete rec.inapplicable;
+      });
+    }
+  }
+  skippedEngine = withdrawn.filter((it) => !acted.has(it.criteriaId)).length;
+  if (deleted.size) next.findings = next.findings.filter((f) => !deleted.has(`${f.criteriaId}|${findingKey(f)}`));
+  if (isCore(standard)) recomputeTallies(next);
+  return { audit: next, removedFindings, reopenedCriteria, clearedConformities, skippedEngine };
+}
+
 // src/ledger.ts
 import { createHash as createHash6 } from "crypto";
 import { existsSync as existsSync21, mkdirSync as mkdirSync10, readFileSync as readFileSync19, writeFileSync as writeFileSync11 } from "fs";
@@ -60003,17 +60246,17 @@ function ledgerPath(standard, root = ".") {
   return join36(root, LEDGER_DIR, `${standard}.json`);
 }
 var norm3 = (s) => s.replace(/\s+/g, " ").trim();
-var anchorKey = (e) => `${e.file}|${e.selector ?? ""}|${norm3(e.snippet ?? "")}`;
+var anchorKey2 = (e) => `${e.file}|${e.selector ?? ""}|${norm3(e.snippet ?? "")}`;
 function evidenceFingerprint(evidence) {
-  const keys = evidence.map(anchorKey).sort();
+  const keys = evidence.map(anchorKey2).sort();
   return `sha256:${createHash6("sha256").update(`${keys.length}
 ${keys.join("\n")}`).digest("hex").slice(0, 32)}`;
 }
 function reanchor(stored, today2) {
   if (!stored?.length) return stored;
-  const byKey2 = new Map(today2.map((e) => [anchorKey(e), e]));
+  const byKey2 = new Map(today2.map((e) => [anchorKey2(e), e]));
   return stored.map((s) => {
-    const now = byKey2.get(anchorKey(s));
+    const now = byKey2.get(anchorKey2(s));
     return now && now.line !== s.line ? { ...s, line: now.line } : s;
   });
 }
@@ -60417,6 +60660,9 @@ function cliArgv(opts, items) {
   return argv;
 }
 function verdictsFromText(text) {
+  return verdictsArrayFromText(text);
+}
+function verdictsArrayFromText(text) {
   const candidates2 = [text.trim()];
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenced?.[1]) candidates2.push(fenced[1].trim());
@@ -60447,8 +60693,41 @@ function reconcileIds(verdicts, items) {
 }
 var sleep2 = (ms) => ms <= 0 ? Promise.resolve() : new Promise((r) => setTimeout(r, ms));
 async function judgeBatchCli(items, prompt, opts) {
+  return runCli2(cliArgv(opts, items), prompt, opts, (env) => {
+    const structured = env.structured_output?.verdicts;
+    const raw = Array.isArray(structured) ? structured : verdictsFromText(env.result ?? "");
+    return reconcileIds(raw, items);
+  });
+}
+async function refuteBatchCli(items, prompt, opts, lang = "en") {
+  const argv = [
+    ...claudeBin(),
+    "-p",
+    "--output-format",
+    "json",
+    "--json-schema",
+    JSON.stringify(refuteSchema(items)),
+    "--system-prompt",
+    refuteSystemPrompt(lang),
+    "--tools",
+    ALLOWED_TOOLS,
+    "--allowedTools",
+    ALLOWED_TOOLS,
+    "--safe-mode",
+    "--strict-mcp-config",
+    "--model",
+    opts.model ?? DEFAULT_CLI_MODEL
+  ];
+  if (opts.maxBudgetUsd !== void 0) argv.push("--max-budget-usd", String(opts.maxBudgetUsd));
+  return runCli2(argv, prompt, opts, (env) => {
+    const structured = env.structured_output?.verdicts;
+    const raw = Array.isArray(structured) ? structured : verdictsArrayFromText(env.result ?? "");
+    const known = new Set(items.map((it) => it.n));
+    return raw.filter((v) => known.has(Number(v?.n)));
+  });
+}
+async function runCli2(argv, prompt, opts, extract) {
   const run2 = opts.spawnImpl ?? realSpawn;
-  const argv = cliArgv(opts, items);
   let lastError = "";
   for (let attempt = 0; attempt < MAX_ATTEMPTS2; attempt++) {
     if (attempt > 0) await sleep2(opts.backoffMs?.(attempt) ?? 2 ** attempt * 500);
@@ -60475,9 +60754,7 @@ async function judgeBatchCli(items, prompt, opts) {
       if (env.api_error_status && (env.api_error_status === 429 || env.api_error_status >= 500)) continue;
       break;
     }
-    const structured = env.structured_output?.verdicts;
-    const raw = Array.isArray(structured) ? structured : verdictsFromText(env.result ?? "");
-    return reconcileIds(raw, items);
+    return extract(env);
   }
   throw new Error(`ultra11y judge: ${lastError || "the CLI failed after every attempt."}`);
 }
@@ -61017,8 +61294,8 @@ function toDynamicResult(out2, target, lang = "en", engine = "axe-core@playwrigh
       page
     });
   }
-  for (const { key, engine: probe } of PROBE_FIELDS) {
-    const hits = out2[key];
+  for (const { key: key2, engine: probe } of PROBE_FIELDS) {
+    const hits = out2[key2];
     if (!hits) continue;
     const severity = PROBE_SEVERITY[probe];
     for (const h2 of hits) {
@@ -61833,8 +62110,8 @@ async function probeDialogs(page) {
   const keys = await page.evaluate(OPEN_DIALOGS_STEP).catch(() => []);
   if (!Array.isArray(keys) || keys.length === 0) return [];
   const hits = [];
-  for (const key of keys) {
-    const scoped = await probeFocusVisible(page, `[data-u11y-dialog="${key}"]`).catch(() => []);
+  for (const key2 of keys) {
+    const scoped = await probeFocusVisible(page, `[data-u11y-dialog="${key2}"]`).catch(() => []);
     hits.push(...scoped);
     if (hits.length >= 12) break;
   }
@@ -63529,8 +63806,8 @@ var STR = {
     capturesNote: "rendered capture file(s) audited at full fidelity (real DOM) \u2014 the true produced HTML"
   }
 };
-function t2(lang, key) {
-  return STR[lang][key];
+function t2(lang, key2) {
+  return STR[lang][key2];
 }
 var ICON4 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
 function auditSummary(r, lang, standard = CORE2) {
@@ -63892,14 +64169,14 @@ function groupFindings(findings, standard, lang, baseDir) {
   for (const f of findings) {
     const criterion = criterionLabel2(f, standard);
     if (criterion === null) continue;
-    const key = `${criterion}\0${f.ruleId}\0${f.selectorHint}`;
-    const g = groups.get(key);
+    const key2 = `${criterion}\0${f.ruleId}\0${f.selectorHint}`;
+    const g = groups.get(key2);
     if (g) {
       g.occurrences++;
       if (f.page) g.pageSet.add(f.page);
       continue;
     }
-    groups.set(key, {
+    groups.set(key2, {
       criterion,
       ruleId: f.ruleId,
       selectorHint: f.selectorHint,
@@ -64540,10 +64817,10 @@ function writeEvidence(result, opts) {
     let onPage = 0;
     for (const f of findings) {
       const id = findingId(f);
-      const key = `${f.ruleId}\0${f.selectorHint}`;
+      const key2 = `${f.ruleId}\0${f.selectorHint}`;
       const ruleCount = perRule.get(f.ruleId) ?? 0;
       const overLimit = ruleCount >= caps.perRule || onPage >= caps.perPage || manifest.crops.size >= caps.total;
-      const refusal = seen.has(key) ? "deduplicated" : overLimit ? "capped" : null;
+      const refusal = seen.has(key2) ? "deduplicated" : overLimit ? "capped" : null;
       if (refusal) {
         manifest.skipped.set(id, refusal);
         bump(tally, refusal);
@@ -64571,7 +64848,7 @@ function writeEvidence(result, opts) {
         bump(manifest.totals, "no-screenshot");
         continue;
       }
-      seen.add(key);
+      seen.add(key2);
       perRule.set(f.ruleId, ruleCount + 1);
       onPage++;
       tally.imaged++;
@@ -65643,8 +65920,8 @@ function startDevServer(opts) {
     }
     if (url.pathname === "/judge" && req.method === "POST") {
       void (async () => {
-        const key = req.headers["x-anthropic-key"]?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
-        if (!key) {
+        const key2 = req.headers["x-anthropic-key"]?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
+        if (!key2) {
           res.writeHead(400, { "content-type": "application/json" }).end(
             JSON.stringify({
               error: "No API key. Set it in the extension's options, or start `ultra11y dev` with ANTHROPIC_API_KEY in its environment. This is the only part of ultra11y that takes one."
@@ -65669,7 +65946,7 @@ function startDevServer(opts) {
             batches.push({ items: slice, prompt: formatAdjudication(slice, opts.lang, opts.standard) });
           }
           log(opts.lang === "fr" ? `ultra11y dev : adjudication de ${items.length} crit\xE8re(s)\u2026` : `ultra11y dev: adjudicating ${items.length} criterion(ia)\u2026`);
-          const { verdicts, failures } = await judgeAll(batches, { apiKey: key });
+          const { verdicts, failures } = await judgeAll(batches, { apiKey: key2 });
           applyRawVerdicts(items, verdicts);
           const applied = applyAdjudication(result, {
             tool: "ultra11y",
@@ -66701,33 +66978,33 @@ function tierCensus2(standard, ids) {
   }
   return by;
 }
-function summarize(key) {
-  if (isCore(key)) {
+function summarize(key2) {
+  if (isCore(key2)) {
     const scs = allSC();
     const byAuto = {};
     for (const c2 of scs) byAuto[c2.automatability] = (byAuto[c2.automatability] ?? 0) + 1;
     return {
-      key,
+      key: key2,
       core: true,
-      label: standardLabel(key),
+      label: standardLabel(key2),
       ...meta(),
       counts: { criteria: scs.length, ...byAuto },
       byTier: tierCensus2(
-        key,
+        key2,
         scs.map((c2) => c2.sc)
       ),
       // The core keeps its terms in wcag.json, not in a pack glossary — it defines "large
       // scale" and "pure decoration" itself, and those definitions decide its verdicts.
       glossary: Object.keys(coreGlossary()).length,
-      guidance: getDataset(key)?.entries.length ?? 0
+      guidance: getDataset(key2)?.entries.length ?? 0
     };
   }
-  const pack = loadPack(key);
+  const pack = loadPack(key2);
   const criteria = allCriteria(pack);
   return {
-    key,
+    key: key2,
     core: false,
-    label: standardLabel(key),
+    label: standardLabel(key2),
     name: pack.name,
     fullName: pack.fullName,
     org: pack.org,
@@ -66748,11 +67025,11 @@ function summarize(key) {
       declarativeRules: pack.rules?.length ?? 0
     },
     byTier: tierCensus2(
-      key,
+      key2,
       criteria.map((c2) => c2.id)
     ),
-    glossary: Object.keys(packGlossary(key) ?? {}).length,
-    guidance: hasGuidance(key) ? getDataset(key)?.entries.length ?? 0 : 0,
+    glossary: Object.keys(packGlossary(key2) ?? {}).length,
+    guidance: hasGuidance(key2) ? getDataset(key2)?.entries.length ?? 0 : 0,
     ...pack.sampleMethodology ? { sampleKinds: pack.sampleMethodology.requiredKinds.length } : {}
   };
 }
@@ -66884,10 +67161,10 @@ function strArray2(v) {
   const a = Array.isArray(v) && v.every((x) => typeof x === "string") ? v : void 0;
   return a?.length ? a : void 0;
 }
-function positive(v, key) {
+function positive(v, key2) {
   const n = num2(v);
   if (n === void 0) return void 0;
-  if (n <= 0) throw new ToolError(`\`${key}\` must be greater than 0.`);
+  if (n <= 0) throw new ToolError(`\`${key2}\` must be greater than 0.`);
   return n;
 }
 function requiredCwd(args2, defaults) {
@@ -67356,35 +67633,35 @@ function negotiateProtocol2(requested) {
   return isProtocolVersion(requested) ? requested : LATEST_PROTOCOL2;
 }
 function validateArgs2(schema, args2) {
-  for (const key of schema.required) {
-    const v = args2[key];
-    if (v === void 0 || v === null || v === "") return `\`${key}\` is required`;
+  for (const key2 of schema.required) {
+    const v = args2[key2];
+    if (v === void 0 || v === null || v === "") return `\`${key2}\` is required`;
   }
-  for (const [key, value] of Object.entries(args2)) {
+  for (const [key2, value] of Object.entries(args2)) {
     if (value === void 0 || value === null) continue;
-    const spec = schema.properties[key];
+    const spec = schema.properties[key2];
     if (!spec?.type) continue;
     const actual = Array.isArray(value) ? "array" : typeof value;
     if (spec.type === "number") {
       if (actual === "number") continue;
       if (actual === "string" && value.trim() !== "" && Number.isFinite(Number(value))) continue;
-      return `\`${key}\` must be a number, got ${actual === "string" ? JSON.stringify(value) : actual}`;
+      return `\`${key2}\` must be a number, got ${actual === "string" ? JSON.stringify(value) : actual}`;
     }
     if (spec.type === "array") {
-      if (actual !== "array") return `\`${key}\` must be an array, got ${actual}`;
+      if (actual !== "array") return `\`${key2}\` must be an array, got ${actual}`;
       const arr = value;
       if (spec.items?.type === "string" && !arr.every((x) => typeof x === "string")) {
-        return `\`${key}\` must be an array of strings`;
+        return `\`${key2}\` must be an array of strings`;
       }
       if (spec.enum) {
         const bad = arr.find((x) => typeof x === "string" && !spec.enum.includes(x));
-        if (bad !== void 0) return `\`${key}\` contains "${String(bad)}" \u2014 allowed: ${spec.enum.join(", ")}`;
+        if (bad !== void 0) return `\`${key2}\` contains "${String(bad)}" \u2014 allowed: ${spec.enum.join(", ")}`;
       }
       continue;
     }
-    if (actual !== spec.type) return `\`${key}\` must be a ${spec.type}, got ${actual}`;
+    if (actual !== spec.type) return `\`${key2}\` must be a ${spec.type}, got ${actual}`;
     if (spec.enum && typeof value === "string" && !spec.enum.includes(value)) {
-      return `\`${key}\` must be one of: ${spec.enum.join(", ")}`;
+      return `\`${key2}\` must be one of: ${spec.enum.join(", ")}`;
     }
   }
   return void 0;
@@ -68058,40 +68335,40 @@ function firstProse(file) {
 // src/mcp/standards-resources.ts
 var SCHEME = "std://";
 var MIME = "application/json";
-function hasGlossary(key) {
-  return Object.keys(isCore(key) ? coreGlossary() : packGlossary(key) ?? {}).length > 0;
+function hasGlossary(key2) {
+  return Object.keys(isCore(key2) ? coreGlossary() : packGlossary(key2) ?? {}).length > 0;
 }
 function listStandardResources() {
   const out2 = [];
-  for (const key of listStandards()) {
-    const label = standardLabel(key);
+  for (const key2 of listStandards()) {
+    const label = standardLabel(key2);
     out2.push({
-      uri: `${SCHEME}${key}/criteria`,
-      name: `${key}/criteria`,
+      uri: `${SCHEME}${key2}/criteria`,
+      name: `${key2}/criteria`,
       title: `${label}: every criterion`,
       description: `The full criterion index for ${label}, with the evidence tier each one needs.`,
       mimeType: MIME
     });
     out2.push({
-      uri: `${SCHEME}${key}/method`,
-      name: `${key}/method`,
+      uri: `${SCHEME}${key2}/method`,
+      name: `${key2}/method`,
       title: `${label}: the audit work plan`,
       description: `Which ${label} criteria the engine decides from source, which need a rendered page or a browser, and which are judgment calls.`,
       mimeType: MIME
     });
-    if (hasGlossary(key)) {
+    if (hasGlossary(key2)) {
       out2.push({
-        uri: `${SCHEME}${key}/glossary`,
-        name: `${key}/glossary`,
+        uri: `${SCHEME}${key2}/glossary`,
+        name: `${key2}/glossary`,
         title: `${label}: the terms it defines`,
         description: `The terms ${label} defines normatively \u2014 the definitions that decide its verdicts.`,
         mimeType: MIME
       });
     }
-    if (!isCore(key)) {
+    if (!isCore(key2)) {
       out2.push({
-        uri: `${SCHEME}${key}/pack.json`,
-        name: `${key}/pack.json`,
+        uri: `${SCHEME}${key2}/pack.json`,
+        name: `${key2}/pack.json`,
         title: `${label}: the standards pack`,
         description: `The whole ${label} pack as ultra11y loads it, including its licence and attribution.`,
         mimeType: MIME
@@ -68155,20 +68432,20 @@ function readStandardResource(uri, lang = "en") {
   };
   try {
     const [, section, ...tail] = parts2;
-    const key = tail.length ? decode(tail.join("/")) : void 0;
+    const key2 = tail.length ? decode(tail.join("/")) : void 0;
     if (section === void 0) return { uri, mimeType: MIME, text: body2(criteriaIndex(standard, lang)) };
     if (section === "criteria") {
-      return { uri, mimeType: MIME, text: body2(key ? criterionView(standard, key, lang, true) : criteriaIndex(standard, lang)) };
+      return { uri, mimeType: MIME, text: body2(key2 ? criterionView(standard, key2, lang, true) : criteriaIndex(standard, lang)) };
     }
     if (section === "themes") {
-      if (!key) throw new ResourceError(`no theme named in "${uri}"`);
-      return { uri, mimeType: MIME, text: body2(themeView(standard, Number(key), lang)) };
+      if (!key2) throw new ResourceError(`no theme named in "${uri}"`);
+      return { uri, mimeType: MIME, text: body2(themeView(standard, Number(key2), lang)) };
     }
-    if (section === "glossary") return { uri, mimeType: MIME, text: body2(glossaryView(standard, key, lang)) };
+    if (section === "glossary") return { uri, mimeType: MIME, text: body2(glossaryView(standard, key2, lang)) };
     if (section === "guidance") {
-      if (!key) throw new ResourceError(`no criterion named in "${uri}"`);
-      const view = criterionView(standard, key, lang, true);
-      return { uri, mimeType: MIME, text: body2({ standard, criterion: key, entries: view.criterion.guidance }) };
+      if (!key2) throw new ResourceError(`no criterion named in "${uri}"`);
+      const view = criterionView(standard, key2, lang, true);
+      return { uri, mimeType: MIME, text: body2({ standard, criterion: key2, entries: view.criterion.guidance }) };
     }
     if (section === "method") return { uri, mimeType: MIME, text: body2(methodView(standard, lang)) };
     if (section === "pack.json") {
@@ -68588,6 +68865,8 @@ Usage:
   ultra11y report   --in <audit.json> [--evidence [--evidence-max <n>]] [--out <dir>]   (the Markdown report, illustrated with annotated crops)
   ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file)
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
+  ultra11y judge    --in <audit.json> [--concurrency <n>] [--ledger [<path>]] [--lang auto|en|fr]
+  ultra11y judge    --refute <VERIFY.todo.json> --runner cli [--standard <pack>] [--model <id>] [--concurrency <n>] [--max-budget-usd <n>] [--timeout <s>]   (put the already-written claims on trial \u2014 one call per item, read-only)
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
@@ -68599,6 +68878,7 @@ Usage:
   ultra11y verify   --report <md> [--conformities <ledger|adjudication.json> | --no-conformities]   (also put the claimed CONFORMITIES on trial \u2014 on by default when a ledger exists)
   ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (adjudicate the manual criteria)
   ultra11y verify   --apply <adjudication.json> --in <audit.json> [--out <dir>]        (fold the adjudication into the audit)
+  ultra11y verify   --apply <VERIFY.todo.json> --report <md> --in <audit.json> --out <dir> --prune   (APPLY the trial: delete refuted non-conformities, send refuted conformities back to \xAB \xE0 \xE9valuer \xBB)
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
   ultra11y fix      <globs\u2026 | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
@@ -69032,6 +69312,9 @@ function isCommand(s) {
   return !!s && COMMANDS.includes(s);
 }
 var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
+  // `judge --refute <VERIFY.todo.json>`: put already-written claims on trial, through the same
+  // transport the adjudication pass uses.
+  "refute",
   "runner",
   "grain",
   "max-budget-usd",
@@ -69114,6 +69397,9 @@ function valueFlagsFor(command) {
   return VALUE_FLAGS2;
 }
 var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
+  // `verify --apply … --prune`: apply what the refutation trial decided to the audit, instead
+  // of only reporting it (src/refute.ts).
+  "prune",
   "changed",
   "staged",
   "jsx",
@@ -69205,19 +69491,19 @@ function parseArgs(argv) {
     const a = rest[i2];
     if (a.startsWith("--")) {
       const eq = a.indexOf("=");
-      const key = eq === -1 ? a.slice(2) : a.slice(2, eq);
+      const key2 = eq === -1 ? a.slice(2) : a.slice(2, eq);
       const inlineVal = eq === -1 ? void 0 : a.slice(eq + 1);
       let val;
       if (inlineVal !== void 0) val = inlineVal;
-      else if (valueFlags.has(key) && !looksLikeFlag(rest[i2 + 1])) val = rest[++i2] ?? "";
+      else if (valueFlags.has(key2) && !looksLikeFlag(rest[i2 + 1])) val = rest[++i2] ?? "";
       else val = true;
-      const prev = flags2[key];
-      if (LIST_FLAGS.has(key) && typeof prev === "string" && typeof val === "string") {
-        flags2[key] = prev ? `${prev},${val}` : val;
+      const prev = flags2[key2];
+      if (LIST_FLAGS.has(key2) && typeof prev === "string" && typeof val === "string") {
+        flags2[key2] = prev ? `${prev},${val}` : val;
       } else {
-        flags2[key] = val;
+        flags2[key2] = val;
       }
-      if (!KNOWN_FLAGS.has(key)) unknown.push(key);
+      if (!KNOWN_FLAGS.has(key2)) unknown.push(key2);
     } else if (a.startsWith("-") && a !== "-") {
       flags2[a.slice(1)] = true;
       unknown.push(a.slice(1));
@@ -70203,10 +70489,10 @@ async function cmdTickets(p) {
     console.error(`ultra11y tickets: ${e instanceof Error ? e.message : String(e)}`);
     return 2;
   }
-  for (const key of SECRET_CONFIG_KEYS) {
-    if (config && key in config) {
+  for (const key2 of SECRET_CONFIG_KEYS) {
+    if (config && key2 in config) {
       console.error(
-        `ultra11y tickets: .ultra11yrc.json must not carry a "${key}" \u2014 credentials belong in the environment (see references/tickets.md). Remove it and rotate that value.`
+        `ultra11y tickets: .ultra11yrc.json must not carry a "${key2}" \u2014 credentials belong in the environment (see references/tickets.md). Remove it and rotate that value.`
       );
       return 2;
     }
@@ -70652,6 +70938,10 @@ function cmdCheck(p) {
         console.log(
           lang === "fr" ? `\u2713 Grille compl\xE8te : les ${decided.total} crit\xE8res portent un verdict${allowedNote}.` : `\u2713 Complete grid: all ${decided.total} criteria carry a verdict${allowedNote}.`
         );
+      const pv = decided.provenance;
+      console.log(
+        lang === "fr" ? `  ${pv.total} crit\xE8res \u2014 ${pv.engine} moteur, ${pv.scan} mesure (scan), ${pv.agent} agent, ${pv.declared} d\xE9clar\xE9(s) ind\xE9cidable(s), ${pv.undecided} sans verdict.` : `  ${pv.total} criteria \u2014 ${pv.engine} engine, ${pv.scan} measured (scan), ${pv.agent} agent, ${pv.declared} declared undecidable, ${pv.undecided} with no verdict.`
+      );
     }
     if (covered?.ok) {
       console.log(
@@ -70674,7 +70964,7 @@ function cmdCheck(p) {
   return ok ? 0 : 1;
 }
 function cmdVerify(p) {
-  let lang = resolveLang(p.flags, {});
+  const lang = resolveLang(p.flags, {});
   const apply = p.flags.apply;
   if (typeof apply === "string" && apply) {
     let raw;
@@ -70701,7 +70991,7 @@ function cmdVerify(p) {
       console.error("ultra11y verify: --apply must be a JSON array of verdicts, or an adjudication object.");
       return 2;
     }
-    const items2 = parsed;
+    const items = parsed;
     const applyReport = p.flags.report;
     if (typeof applyReport !== "string" || !applyReport) {
       console.error(
@@ -70709,24 +70999,25 @@ function cmdVerify(p) {
       );
       return 2;
     }
-    const standard2 = stdOf(p, "verify");
-    if (standard2 === null) return 2;
-    let repMd2;
+    const standard = stdOf(p, "verify");
+    if (standard === null) return 2;
+    let repMd;
     try {
-      repMd2 = readText(applyReport);
+      repMd = readText(applyReport);
     } catch {
       console.error(`ultra11y verify: --report file not found: ${applyReport}.`);
       return 2;
     }
-    const expectedNc = buildWorklist(repMd2, standard2, Number.POSITIVE_INFINITY);
-    const expected = [...expectedNc, ...buildConformityWorklist(conformityClaimsFor(p, standard2, lang), expectedNc.length, Number.POSITIVE_INFINITY)];
-    const r = applyVerdicts(items2, expected);
-    const passing = items2.filter((it) => typeof it.verdict === "string" && ["supported", "partial"].includes(it.verdict.trim().toLowerCase()));
+    const expectedNc = buildWorklist(repMd, standard, Number.POSITIVE_INFINITY);
+    const expected = [...expectedNc, ...buildConformityWorklist(conformityClaimsFor(p, standard, lang), expectedNc.length, Number.POSITIVE_INFINITY)];
+    const r = applyVerdicts(items, expected);
+    const passing = items.filter((it) => typeof it.verdict === "string" && ["supported", "partial"].includes(it.verdict.trim().toLowerCase()));
     const grounding = groundItems(
       passing.map((it) => ({ file: it.file, line: it.line, selector: it.selector, snippet: it.snippet }))
     );
-    const ok = r.ok && grounding.failed === 0;
-    if (p.flags.json) console.log(JSON.stringify({ ...r, ok, grounding }, null, 2));
+    const pruned = p.flags.prune === true ? applyPrune(p, standard, items, lang) : void 0;
+    const ok = (pruned ? r.unadjudicated + r.invalid + r.missing === 0 : r.ok) && grounding.failed === 0;
+    if (p.flags.json) console.log(JSON.stringify({ ...r, ok, grounding, ...pruned ? { pruned } : {} }, null, 2));
     else if (ok)
       console.log(
         lang === "fr" ? `\u2713 ${r.total} non-conformit\xE9s v\xE9rifi\xE9es, toutes \xE9tay\xE9es et ancr\xE9es dans la source${grounding.moved ? ` (${grounding.moved} d\xE9plac\xE9e(s))` : ""}.` : `\u2713 ${r.total} non-conformities verified, all supported and grounded in source${grounding.moved ? ` (${grounding.moved} moved)` : ""}.`
@@ -70746,6 +71037,42 @@ function cmdVerify(p) {
     }
     return ok ? 0 : 1;
   }
+  return cmdVerifyWorklist(p, lang);
+}
+function applyPrune(p, standard, items, lang) {
+  const inFlag = p.flags.in;
+  if (typeof inFlag !== "string" || !inFlag || inFlag === "-") {
+    console.error(
+      lang === "fr" ? "ultra11y verify : --prune exige --in <audit.json> (l'audit que la contre-expertise r\xE9pare) \u2014 sans lui il n'y a rien \xE0 r\xE9parer." : "ultra11y verify: --prune requires --in <audit.json> (the audit the trial repairs) \u2014 without it there is nothing to prune."
+    );
+    return void 0;
+  }
+  let audit2;
+  try {
+    audit2 = unwrapAudit(JSON.parse(readText(inFlag)));
+  } catch {
+    console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
+    return void 0;
+  }
+  const pruned = pruneRefuted(audit2, standard, items, lang);
+  const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
+  mkdirSync18(out2, { recursive: true });
+  writeFileSync20(join52(out2, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
+  if (!p.flags.json) {
+    console.log(
+      lang === "fr" ? `\u2713 Contre-expertise appliqu\xE9e : ${pruned.removedFindings} non-conformit\xE9(s) supprim\xE9e(s), ${pruned.reopenedCriteria.length + pruned.clearedConformities.length} crit\xE8re(s) de retour \xE0 \xAB \xE0 \xE9valuer \xBB.` : `\u2713 Trial applied: ${pruned.removedFindings} non-conformity(ies) deleted, ${pruned.reopenedCriteria.length + pruned.clearedConformities.length} criterion(ia) back to \u201Cto assess\u201D.`
+    );
+    const reopened = [...pruned.reopenedCriteria, ...pruned.clearedConformities];
+    if (reopened.length) console.log(`  ${reopened.join(", ")}`);
+    if (pruned.skippedEngine)
+      console.error(
+        lang === "fr" ? `\u26A0 ${pruned.skippedEngine} verdict(s) r\xE9fut\xE9(s) visent une d\xE9cision du moteur \u2014 non modifi\xE9s : un crit\xE8re que le moteur tranche est recalcul\xE9 \xE0 chaque run, et un faux positif se corrige dans la r\xE8gle.` : `\u26A0 ${pruned.skippedEngine} refuted verdict(s) name an ENGINE decision \u2014 left untouched: a criterion the engine decides is recomputed every run, and a false positive is fixed in the rule.`
+      );
+  }
+  return pruned;
+}
+function cmdVerifyWorklist(p, langIn) {
+  let lang = langIn;
   const standard = stdOf(p, "verify");
   if (standard === null) return 2;
   lang = resolveLang(p.flags, { standard });
@@ -70831,11 +71158,13 @@ function conformityClaimsFor(p, standard, lang) {
   const named3 = typeof p.flags.conformities === "string" && p.flags.conformities ? p.flags.conformities : void 0;
   const path = named3 ?? ledgerPath(standard);
   if (!existsSync36(path)) {
-    if (named3)
+    if (named3) {
       console.error(
         lang === "fr" ? `ultra11y verify : fichier --conformities introuvable : ${named3}.` : `ultra11y verify: --conformities file not found: ${named3}.`
       );
-    return [];
+      return [];
+    }
+    return claimsFromAudit(p, standard, lang);
   }
   try {
     const parsed = JSON.parse(readText(path));
@@ -70845,6 +71174,21 @@ function conformityClaimsFor(p, standard, lang) {
       console.error(
         lang === "fr" ? `ultra11y verify : le fichier --conformities n'est pas du JSON valide : ${named3}.` : `ultra11y verify: --conformities file is not valid JSON: ${named3}.`
       );
+    return [];
+  }
+}
+function claimsFromAudit(p, standard, lang) {
+  const inFlag = p.flags.in;
+  if (typeof inFlag !== "string" || !inFlag || inFlag === "-") return [];
+  try {
+    const audit2 = JSON.parse(readText(inFlag));
+    const claims = conformityClaimsFromAudit(audit2, standard);
+    if (claims.length)
+      console.error(
+        lang === "fr" ? `ultra11y verify : aucun registre \u2014 ${claims.length} conformit\xE9(s) revendiqu\xE9e(s) lues dans ${inFlag}.` : `ultra11y verify: no ledger \u2014 ${claims.length} claimed conformity(ies) read from ${inFlag}.`
+      );
+    return claims;
+  } catch {
     return [];
   }
 }
@@ -71004,7 +71348,81 @@ function applyAdjudicationFile(p, adj, lang) {
     );
   return 0;
 }
+async function cmdRefute(p, todoPath) {
+  const standard = stdOf(p, "judge");
+  if (standard === null) return 2;
+  const lang = resolveLang(p.flags, { standard });
+  const runner = typeof p.flags.runner === "string" ? p.flags.runner : "cli";
+  if (runner !== "cli") {
+    console.error(
+      lang === "fr" ? "ultra11y judge : --refute exige --runner cli. Le tier `api` n'a aucun outil, et un relecteur qui ne peut pas OUVRIR le fichier cit\xE9 ne relit rien \u2014 il r\xE9p\xE8te." : "ultra11y judge: --refute requires --runner cli. The api tier has no tools, and a reviewer who cannot OPEN the cited file is not re-reading anything \u2014 it is echoing."
+    );
+    return 2;
+  }
+  let items;
+  try {
+    const parsed = JSON.parse(readText(todoPath));
+    if (!Array.isArray(parsed)) throw new Error("not an array");
+    items = parsed;
+  } catch {
+    console.error(`ultra11y judge: --refute file not found or not a verdicts array: ${todoPath}.`);
+    return 2;
+  }
+  const pending = items.filter((it) => typeof it.verdict !== "string" || !it.verdict.trim());
+  if (!pending.length) {
+    console.log(
+      lang === "fr" ? `\u2713 Rien \xE0 mettre \xE0 l'\xE9preuve : les ${items.length} entr\xE9es portent d\xE9j\xE0 un verdict.` : `\u2713 Nothing to try: all ${items.length} entries already carry a verdict.`
+    );
+    return 0;
+  }
+  const askedConcurrency = typeof p.flags.concurrency === "string" ? Number(p.flags.concurrency) : Number.NaN;
+  const lanes = Number.isFinite(askedConcurrency) && askedConcurrency > 0 ? Math.min(askedConcurrency, 8) : 2;
+  const timeout = typeof p.flags.timeout === "string" ? Number(p.flags.timeout) * 1e3 : void 0;
+  const budget = typeof p.flags["max-budget-usd"] === "string" ? Number(p.flags["max-budget-usd"]) : void 0;
+  const opts = {
+    ...typeof p.flags.model === "string" && p.flags.model ? { model: p.flags.model } : {},
+    ...Number.isFinite(timeout) && timeout ? { timeoutMs: timeout } : {},
+    ...Number.isFinite(budget) ? { maxBudgetUsd: budget } : {}
+  };
+  let spent = 0;
+  let failed2 = 0;
+  const byN = new Map(items.map((it) => [it.n, it]));
+  const queue = [...pending];
+  const worker = async () => {
+    for (; ; ) {
+      const item = queue.shift();
+      if (!item) return;
+      try {
+        const verdicts = await refuteBatchCli(
+          [item],
+          formatWorklist([item], p.flags.semantic === true, standard, lang),
+          { ...opts, onCost: (c2) => spent += c2 },
+          lang
+        );
+        for (const v of verdicts) {
+          const target = byN.get(Number(v.n));
+          if (!target) continue;
+          target.verdict = v.verdict;
+          target.note = v.note ?? "";
+        }
+      } catch (e) {
+        failed2++;
+        console.error(`ultra11y judge: item #${item.n} (${item.criteriaId}) \u2014 ${e instanceof Error ? e.message : String(e)}`);
+      }
+      writeFileSync20(todoPath, JSON.stringify(items, null, 2) + "\n");
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(lanes, queue.length) }, worker));
+  const tally = (v) => items.filter((it) => (it.verdict ?? "").trim().toLowerCase() === v).length;
+  console.log(
+    lang === "fr" ? `\u2713 ${pending.length - failed2}/${pending.length} entr\xE9e(s) mise(s) \xE0 l'\xE9preuve \u2192 ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})` : `\u2713 ${pending.length - failed2}/${pending.length} entry(ies) tried \u2192 ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`
+  );
+  if (spent > 0) console.log(lang === "fr" ? `  ${spent.toFixed(4)} $ d\xE9pens\xE9(s).` : `  $${spent.toFixed(4)} spent.`);
+  return failed2 ? 1 : 0;
+}
 async function cmdJudge(p) {
+  const refute = p.flags.refute;
+  if (typeof refute === "string" && refute) return cmdRefute(p, refute);
   const standard = stdOf(p, "judge");
   if (standard === null) return 2;
   const inFlag = p.flags.in;
@@ -71035,8 +71453,8 @@ async function cmdJudge(p) {
     console.error(`ultra11y judge: --grain '${grain}' is not a grain \u2014 expected 'batch' or 'criterion'.`);
     return 2;
   }
-  const key = typeof p.flags["api-key"] === "string" && p.flags["api-key"] ? p.flags["api-key"] : apiKeyFromEnv();
-  if (!key && runner === "api") {
+  const key2 = typeof p.flags["api-key"] === "string" && p.flags["api-key"] ? p.flags["api-key"] : apiKeyFromEnv();
+  if (!key2 && runner === "api") {
     console.error(
       lang === "fr" ? "ultra11y judge : aucune cl\xE9 d'API. Exportez ANTHROPIC_API_KEY (ou passez --api-key).\n  C'est le SEUL point de l'outil qui en demande une : le moteur, lui, ne requiert ni cl\xE9 ni installation.\n  Dans un agent de code, utilisez `verify --manual` \u2014 c'est l'agent qui tranche, gratuitement." : "ultra11y judge: no API key. Export ANTHROPIC_API_KEY (or pass --api-key).\n  This is the ONLY place in the tool that asks for one: the engine itself needs no key and no install.\n  Inside a coding agent use `verify --manual` instead \u2014 the agent rules, at no cost."
     );
@@ -71059,7 +71477,7 @@ async function cmdJudge(p) {
   }
   if (truncated) items = items.slice(0, max);
   const size = grain === "criterion" ? 1 : BATCH_SIZE;
-  const render2 = (slice) => formatAdjudication(slice, lang, standard, runner === "cli" ? { preamble: false } : {});
+  const render2 = (slice) => formatAdjudication(slice, lang, standard, { preamble: false, contract: false });
   const batches = [];
   for (let i2 = 0; i2 < items.length; i2 += size) {
     const slice = items.slice(i2, i2 + size);
@@ -71097,7 +71515,7 @@ async function cmdJudge(p) {
   const maxBudgetUsd = typeof p.flags["max-budget-usd"] === "string" ? Number(p.flags["max-budget-usd"]) : void 0;
   const timeoutMs = typeof p.flags.timeout === "string" ? Number(p.flags.timeout) * 1e3 : void 0;
   const { verdicts, failures } = await judgeAll(batches, {
-    apiKey: key,
+    apiKey: key2,
     model,
     backend: runner === "cli" ? judgeBatchCli : void 0,
     // TWO local processes, not one, and the reason is measured rather than tuned: sequentially,
@@ -71440,10 +71858,10 @@ ${dynamic.snapshots.length} page snapshot(s) written to ${PAGES_DIR}/ \u2014 \`u
 }
 function cmdSample(p) {
   const action = p.positionals[0];
-  const key = typeof p.flags.standard === "string" && p.flags.standard ? p.flags.standard : "rgaa";
+  const key2 = typeof p.flags.standard === "string" && p.flags.standard ? p.flags.standard : "rgaa";
   let standard;
   try {
-    standard = resolveStandard(key);
+    standard = resolveStandard(key2);
   } catch (e) {
     console.error(`ultra11y sample: ${e instanceof Error ? e.message : String(e)}`);
     return 2;
