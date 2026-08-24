@@ -23,7 +23,8 @@ hallucinated non-conformity from surviving, and nothing is ever silently "confor
 
 **WCAG 2.2 Level AA is the worldwide core.** Country standards — France's **RGAA**, the
 US **Section 508**, the EU **EN 301 549** — are pluggable *standards packs* that map their
-criteria onto WCAG. Add `--standard rgaa` to re-key reports/criteria; **plug an external
+criteria onto WCAG. Add `--standard rgaa` to re-key **every command and every output** —
+`audit` included, findings and all; **plug an external
 pack at runtime** with `--pack ./pack.json` (or a `.ultra11yrc.json`), no rebuild; or
 contribute your country (see `references/standards.md`). Packs (and their concrete
 **implementation guidance** — the RGAA SocialGouv/etalab good/bad patterns) can be
@@ -322,8 +323,17 @@ node scripts/ultra11y.mjs fix "src/**/*.html" --write --iterate               # 
 node scripts/ultra11y.mjs init --hook                                        # pre-commit gate (--baseline for the regression variant)
 node scripts/ultra11y.mjs pack check ./packs/section508.json                  # gate an (AI-)authored standards pack
 ```
-Add `--standard rgaa` to `report`/`prd`/`criteria`/`check`/`verify` for a country standard,
-`--pack ./pack.json` to load one at runtime, and `--json` anywhere for machine output.
+**`--standard rgaa` goes on `audit` too, and then everything speaks RGAA.** It is honoured by
+`audit`/`scan`/`fix` as well as `report`/`prd`/`tickets`/`criteria`/`check`/`verify`/`judge`,
+and `.ultra11yrc.json { "standard": "rgaa" }` makes it the default for all of them. Under it,
+`audit` prints an RGAA-titled summary tabulated by thématique with findings tagged `[8.4]`
+rather than `[3.1.1]`, in the pack's own language; `--json` and `--out` write a pack-keyed
+document (106 criteria, 13 themes) carrying the WCAG core inside `core` for the pipeline; and
+CI annotations, SARIF, the report, the PRD and the per-page sheets name RGAA criteria and
+nothing else — no WCAG cross-reference anywhere in a pack deliverable. The engine still keys
+on success criteria internally, because a pack criterion is DEFINED as a projection of them;
+that is plumbing, and no reader sees it. Add `--pack ./pack.json` to load a standard at
+runtime, and `--json` anywhere for machine output.
 `--lang` follows the conversation (pass it explicitly — Core rule 7).
 
 ## The loop: audit → render → judge → fix → re-audit
@@ -351,9 +361,16 @@ drive the judgment and content stages:
    `reason` when it truly `needs-rendered-dom`), each verdict carrying a `justification` or a
    groundable finding; `verify --apply … --in audit.json` folds them back FAIL-CLOSED (agent NCs
    become real `agent:<sc>` findings that re-render in §2). (b) `verify --report … [--semantic]`
-   builds `VERIFY.todo.json` to **refute any `preliminary`/SFC/library-source finding** the
-   rendered DOM disproves (verdicts `supported`/`partial`/`refuted`/`unsupported`);
-   `verify --apply` drops the refuted/unsupported ones (the anti-hallucination gate). This
+   builds `VERIFY.todo.json`, which attacks **both directions**. It refutes any
+   `preliminary`/SFC/library-source **non-conformity** the rendered DOM disproves, and — when a
+   verdict ledger exists, which is the default — it also puts the ledger's agent-adjudicated
+   **conformities** on trial, one item per citation, question inverted: *does this evidence
+   establish the criterion, or only show that its subject exists?* Nothing used to challenge a
+   `C`, so a criterion cleared because its subject was PRESENT rather than RIGHT shipped as a
+   conformance claim. Same verdicts (`supported`/`partial`/`refuted`/`unsupported`);
+   `verify --apply` drops the refuted/unsupported non-conformities and sends a refuted
+   conformity's criterion back to « à évaluer » — never to NC, because refuting a conformity
+   proves nothing against the criterion. `--no-conformities` opts out. This
    includes **focus & interaction logic** (read the full component source: keyboard
    operability, focus order/visibility, traps, on-focus/on-input changes; see
    `references/focus-and-logic.md`) and the per-rule traps in `references/false-positives.md`.

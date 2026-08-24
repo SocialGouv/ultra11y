@@ -1,7 +1,8 @@
 # Dynamic tier (axe-core) — optional
 
 The static engine leaves some criteria "to assess" because they need a **render**: computed
-contrast (1.4.3), focus visible (2.4.7), reflow/zoom (1.4.4/1.4.10), text spacing (1.4.12),
+contrast (1.4.3), focus visible (2.4.7), focus not obscured (2.4.11), reflow/zoom
+(1.4.4/1.4.10), text spacing (1.4.12),
 content on hover (1.4.13), target size (2.5.8). The dynamic tier decides them by running
 **axe-core in a real headless browser** (Playwright). Two runtimes, same finding shape:
 
@@ -102,6 +103,7 @@ clean probe leaves the SC `manual` (never silently conforming). Merged findings 
 | Probe | SC | How |
 |---|---|---|
 | focus visibility | 2.4.7 | Tab through focusables; flag any whose computed style (outline/box-shadow/border/background) is unchanged when focused |
+| focus not obscured | 2.4.11 | On the SAME walk of the tab ring: sample a grid over the focused component and flag it when NO point of it is on top anywhere, under an element with a `fixed`/`sticky` ancestor. **Entirely** hidden only — a partly-covered component satisfies 2.4.11 (that is 2.4.12, AAA) — and scrolled out of the viewport is not this criterion at all |
 | 200% zoom | 1.4.4 | Enlarge text to 200%; flag page-level horizontal scroll or text clipped in an `overflow:hidden` container |
 | text spacing | 1.4.12 | Inject the WCAG 1.4.12 spacing override; flag clipped/truncated text |
 | content on hover | 1.4.13 | For `aria-describedby` triggers whose target is hidden, hover to reveal then check it is dismissible (Escape) |
