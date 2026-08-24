@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.33.1](https://github.com/maxgfr/ultra11y/compare/v5.33.0...v5.33.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* **adjudicate:** the double-charge guard stops refusing a second, real defect ([dc7b69c](https://github.com/maxgfr/ultra11y/commit/dc7b69ccb98d51926e3a46d3968623d257f901db))
+
 # [5.33.0](https://github.com/maxgfr/ultra11y/compare/v5.32.0...v5.33.0) (2026-08-24)
 
 
