@@ -50090,16 +50090,28 @@ var MAX_SIBLINGS = 3;
 function siblingCriteria(pack, id, lang = pack.defaultLocale) {
   const c2 = getCriterion(pack, id);
   if (!c2) return [];
-  const mechanical = (x) => !x.judgment && (x.appliesTo?.ruleIds ?? []).length > 0;
+  return neighbourhood(pack, c2).slice(0, MAX_SIBLINGS).map(({ crit }) => sibling(pack, crit, lang));
+}
+var isMechanical = (x) => !x.judgment && (x.appliesTo?.ruleIds ?? []).length > 0;
+var sibling = (pack, x, lang) => ({
+  id: x.id,
+  // The plain title is the whole argument: « a-t-il une étiquette ? » beside « cette
+  // étiquette est-elle pertinente ? » explains the split better than any prose could.
+  title: localize(pack, x.titlePlain ?? x.title, lang),
+  role: isMechanical(x) ? "mechanical" : "judgment"
+});
+function neighbourhood(pack, c2) {
   const mine = new Set(c2.wcag ?? []);
-  const shared = (x) => (x.wcag ?? []).filter((w) => mine.has(w)).length;
-  return pack.criteria.filter((x) => x.id !== c2.id && x.theme === c2.theme && shared(x) > 0 && mechanical(x) !== mechanical(c2)).sort((a, b) => shared(b) - shared(a) || a.id.localeCompare(b.id, void 0, { numeric: true })).slice(0, MAX_SIBLINGS).map((x) => ({
-    id: x.id,
-    // The plain title is the whole argument: « a-t-il une étiquette ? » beside « cette
-    // étiquette est-elle pertinente ? » explains the split better than any prose could.
-    title: localize(pack, x.titlePlain ?? x.title, lang),
-    role: mechanical(x) ? "mechanical" : "judgment"
-  }));
+  const mech = isMechanical(c2);
+  return pack.criteria.map((crit) => ({ crit, shared: (crit.wcag ?? []).filter((w) => mine.has(w)).length })).filter(({ crit, shared }) => crit.id !== c2.id && crit.theme === c2.theme && shared > 0 && isMechanical(crit) !== mech).sort((a, b) => b.shared - a.shared || a.crit.id.localeCompare(b.crit.id, void 0, { numeric: true }));
+}
+function presupposedCriterion(pack, id, lang = pack.defaultLocale) {
+  const c2 = getCriterion(pack, id);
+  if (!c2 || isMechanical(c2)) return void 0;
+  const ranked = neighbourhood(pack, c2).filter(({ crit }) => isMechanical(crit));
+  const first = ranked[0];
+  if (!first || ranked[1]?.shared === first.shared) return void 0;
+  return sibling(pack, first.crit, lang);
 }
 function criterionUrl(pack, id) {
   return pack.criterionUrl ? pack.criterionUrl.replaceAll("{id}", id) : void 0;
@@ -59599,16 +59611,12 @@ function applyAdjudication(audit2, adj, opts = {}) {
           );
         }
         if (!isCore(adj.standard) && f.file?.trim()) {
-          const mechanical = siblingCriteria(loadPack(adj.standard), it.criteriaId).filter((sib) => sib.role === "mechanical");
-          if (mechanical.length) {
-            const owners = engineNcAt(anchorKey(f.file, f.line, f.selector ?? ""));
-            const clash = mechanical.find((sib) => owners.has(sib.id));
-            if (clash)
-              blame(
-                it.criteriaId,
-                `criterion ${it.criteriaId}: this anchor (${f.file}:${f.line}) is already the engine's non-conformity on ${adj.standard} ${clash.id} \u2014 \xAB ${clash.title} \xBB. ${it.criteriaId} asks the NEXT question about the same subject and presupposes it is there, so on this element it is not non-conformant: it has no subject. Report it on ${clash.id} (the engine already did), or rule ${it.criteriaId} on a different element.`
-              );
-          }
+          const presupposed = presupposedCriterion(loadPack(adj.standard), it.criteriaId);
+          if (presupposed && engineNcAt(anchorKey(f.file, f.line, f.selector ?? "")).has(presupposed.id))
+            blame(
+              it.criteriaId,
+              `criterion ${it.criteriaId}: this anchor (${f.file}:${f.line}) is already the engine's non-conformity on ${adj.standard} ${presupposed.id} \u2014 \xAB ${presupposed.title} \xBB. ${it.criteriaId} asks the NEXT question about the same subject and presupposes it is there, so on this element it is not non-conformant: it has no subject. Report it on ${presupposed.id} (the engine already did), or rule ${it.criteriaId} on a different element.`
+            );
         }
         toGround(it.criteriaId, { file: f.file, line: f.line, selector: f.selector, snippet: f.snippet });
       }

@@ -41,7 +41,28 @@ writeFileSync(
 </main></body></html>`,
 );
 
-const audit = () => runAudit({ inputs: [PAGE] });
+// A SECOND FORM, where two DIFFERENT defects land on one control. The radio group carries no
+// `fieldset`, which is RGAA 11.5's non-conformity and the engine finds it; each `<label>` is
+// also written BEFORE its radio, which is RGAA 11.4's (test 11.4.3 wants the label below or to
+// the right of a radio). Same file, same line, same selector — and two findings, not one
+// charged twice. 11.5 is not a question 11.4 presupposes: an ungrouped radio still has a
+// label, and that label is still placed well or badly.
+const RADIOS = join(dir, "radios.html");
+writeFileSync(
+  RADIOS,
+  `<!doctype html><html lang="fr"><head><title>Contact</title></head><body><main>
+<h1>Contact</h1>
+<form action="/go">
+<label for="nom">Nom</label><input id="nom" type="text">
+<label for="oui">Oui</label><input id="oui" type="radio" name="rappel">
+<label for="non">Non</label><input id="non" type="radio" name="rappel">
+<button type="submit">Envoyer</button>
+</form>
+</main></body></html>`,
+);
+
+const auditOf = (page: string) => runAudit({ inputs: [page] });
+const audit = () => auditOf(PAGE);
 
 const adjFile = (items: AdjudicationItem[]): AdjudicationFile => ({
   tool: "ultra11y",
@@ -57,22 +78,22 @@ const clear = (it: AdjudicationItem): AdjudicationItem =>
     ? { ...it, verdict: "C" as const, justification: "vérifié sur la page", citations: [it.evidence[0]!] }
     : { ...it, verdict: "manual" as const, reason: "undecidable" };
 
-/** The anchor the ENGINE raised its 11.1 non-conformity on. */
-function engineAnchor(criterion: string) {
-  const pc = derivePackResults(audit(), "rgaa").find((c) => c.id === criterion);
+/** The anchor the ENGINE raised its non-conformity on, for a criterion it decides itself. */
+function engineAnchor(criterion: string, page: string = PAGE) {
+  const pc = derivePackResults(auditOf(page), "rgaa").find((c) => c.id === criterion);
   const f = pc?.findings.find((x) => !x.advisory && !x.ruleId.startsWith("agent:"));
   return f ? { file: f.file, line: f.line, selector: f.selectorHint, snippet: f.snippet } : undefined;
 }
 
 /** Rule `id` non-conformant on a given anchor, clearing every other criterion. */
-function ncOn(id: string, anchor: { file: string; line: number; selector: string; snippet: string }, normativeRef: string) {
-  const items = buildAdjudicationWorklist(audit(), { standard: "rgaa" });
+function ncOn(id: string, anchor: { file: string; line: number; selector: string; snippet: string }, normativeRef: string, page: string = PAGE) {
+  const items = buildAdjudicationWorklist(auditOf(page), { standard: "rgaa" });
   expect(
     items.map((i) => i.criteriaId),
     `${id} is not open for adjudication`,
   ).toContain(id);
   return applyAdjudication(
-    audit(),
+    auditOf(page),
     adjFile(
       items.map((it) =>
         it.criteriaId === id ? ({ ...it, verdict: "NC" as const, findings: [{ ...anchor, message: "constat", normativeRef }] } as AdjudicationItem) : clear(it),
@@ -135,5 +156,41 @@ describe("the refusal stays narrow", () => {
     for (const pc of derivePackResults(audit(), "rgaa").filter((c) => c.status === "NC")) {
       expect(open.has(pc.id), `${pc.id} should not be open — the engine decided it`).toBe(false);
     }
+  });
+});
+
+// TWO DEFECTS ON ONE CONTROL ARE NOT ONE DEFECT CHARGED TWICE.
+//
+// The guard above reads a NEIGHBOURHOOD — same theme, shared success criterion, opposite side
+// of the mechanical/judgment line — and treats every member of it as a question the criterion
+// under verdict presupposes. That holds for the pair it was built on (11.2 has no subject on a
+// field 11.1 says has no label) and for nothing else automatically. RGAA 11.4 neighbours 11.1,
+// 11.5 AND 11.6, each exactly one success criterion away, and only the first owns its subject:
+// a radio group the engine ruled ungrouped under 11.5 still HAS labels, and 11.4 still asks
+// whether they are placed correctly.
+//
+// It cost a true finding, on this repository's own gate: the committed RGAA ledger rules 11.4
+// non-conformant on four radios of the fixture site (label to the LEFT of the control, test
+// 11.4.3), the engine owns those same anchors under 11.5, the replay refused the verdict, and
+// `ledger-gate` went red reporting 11.4 « still to assess » — 105 criteria decided out of 106.
+//
+// So the refusal now needs the pack to single ONE neighbour out, strictly closer than every
+// other. A tie is the pack declining to say which question comes first, and refusing on a tie
+// is a guess made against a finding that may well be true.
+describe("a neighbour the pack does not single out refuses nothing", () => {
+  it("states the premise: the engine owns the radio under 11.5, and 11.4 is left to the agent", () => {
+    const pcs = derivePackResults(auditOf(RADIOS), "rgaa");
+    expect(pcs.find((c) => c.id === "11.5")?.status).toBe("NC");
+    expect(engineAnchor("11.5", RADIOS)).toMatchObject({ selector: "input#oui" });
+    expect(pcs.find((c) => c.id === "11.4")?.status).toBe("manual");
+  });
+
+  it("accepts 11.4 on the very anchor the engine ruled 11.5 non-conformant", () => {
+    const r = ncOn("11.4", engineAnchor("11.5", RADIOS)!, "11.4.3", RADIOS);
+    expect(r.rejectedCriteria, r.issues.join("\n")).not.toContain("11.4");
+  });
+
+  it("still refuses the pair it was built for — 11.2 on 11.1's own anchor", () => {
+    expect(ncOn("11.2", engineAnchor("11.1")!, "11.2.1").rejectedCriteria).toContain("11.2");
   });
 });

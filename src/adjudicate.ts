@@ -36,6 +36,7 @@ import {
   localize,
   resolveGlossary,
   siblingCriteria,
+  presupposedCriterion,
   type StandardPack,
   type PackCriterion,
 } from "./standards/index.js";
@@ -992,27 +993,29 @@ export function applyAdjudication(
         // really does ground.
         //
         // Narrow on purpose, and this is the one check here that could refuse a true finding.
-        // It fires only when all three hold: the criterion under verdict has a MECHANICAL
-        // neighbour (`siblingCriteria` — same theme, shared success criterion, opposite side of
-        // the line, which by construction means this criterion carries no engine rule of its
-        // own), the engine has already ruled that neighbour non-conformant, and the anchor is
-        // literally the same file, line and selector. Two criteria failing the same element for
-        // genuinely different reasons keep different anchors, or the neighbour is not
-        // mechanical, and neither reaches here.
+        // It fires only when all three hold: the criterion under verdict PRESUPPOSES a
+        // mechanical neighbour's subject (`presupposedCriterion`), the engine has already ruled
+        // that neighbour non-conformant, and the anchor is literally the same file, line and
+        // selector.
+        //
+        // It read `siblingCriteria` before, and that was too wide by exactly the margin that
+        // matters. The neighbourhood is a reading aid — up to three criteria, no claim that any
+        // of them comes first — so 11.4 (« l'étiquette est-elle accolée à son champ ? ») counted
+        // 11.5 (« les champs de même nature sont-ils regroupés ? ») as a question it
+        // presupposes, and a radio group the engine ruled ungrouped became immune to 11.4 on
+        // the same control. Two defects on one element are not one defect charged twice.
+        // `presupposedCriterion` answers only where the pack singles ONE neighbour out and
+        // stands down on a tie, which keeps 11.2/11.1 and 8.6/8.5 and drops the guesses.
         //
         // Refused per verdict like everything else: the criterion returns to « to assess »
         // carrying the reason, naming the neighbour, so the next pass can file it correctly.
         if (!isCore(adj.standard) && f.file?.trim()) {
-          const mechanical = siblingCriteria(loadPack(adj.standard), it.criteriaId).filter((sib) => sib.role === "mechanical");
-          if (mechanical.length) {
-            const owners = engineNcAt(anchorKey(f.file, f.line, f.selector ?? ""));
-            const clash = mechanical.find((sib) => owners.has(sib.id));
-            if (clash)
-              blame(
-                it.criteriaId,
-                `criterion ${it.criteriaId}: this anchor (${f.file}:${f.line}) is already the engine's non-conformity on ${adj.standard} ${clash.id} — « ${clash.title} ». ${it.criteriaId} asks the NEXT question about the same subject and presupposes it is there, so on this element it is not non-conformant: it has no subject. Report it on ${clash.id} (the engine already did), or rule ${it.criteriaId} on a different element.`,
-              );
-          }
+          const presupposed = presupposedCriterion(loadPack(adj.standard), it.criteriaId);
+          if (presupposed && engineNcAt(anchorKey(f.file, f.line, f.selector ?? "")).has(presupposed.id))
+            blame(
+              it.criteriaId,
+              `criterion ${it.criteriaId}: this anchor (${f.file}:${f.line}) is already the engine's non-conformity on ${adj.standard} ${presupposed.id} — « ${presupposed.title} ». ${it.criteriaId} asks the NEXT question about the same subject and presupposes it is there, so on this element it is not non-conformant: it has no subject. Report it on ${presupposed.id} (the engine already did), or rule ${it.criteriaId} on a different element.`,
+            );
         }
         toGround(it.criteriaId, { file: f.file, line: f.line, selector: f.selector, snippet: f.snippet });
       }
