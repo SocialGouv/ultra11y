@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.30.0](https://github.com/maxgfr/ultra11y/compare/v5.29.0...v5.30.0) (2026-08-24)
+
+
+### Features
+
+* **action:** opt into the CLI runner and the per-criterion grain ([291fef9](https://github.com/maxgfr/ultra11y/commit/291fef9ce09c47c3726e26db9cb8a84c74a09e2b))
+* **judge:** rule through the Claude Code CLI, criterion by criterion ([7b2bb8c](https://github.com/maxgfr/ultra11y/commit/7b2bb8cc96c4e190a02e5b164e8d06ba97d344a7))
+
 # [5.29.0](https://github.com/maxgfr/ultra11y/compare/v5.28.0...v5.29.0) (2026-08-24)
 
 
