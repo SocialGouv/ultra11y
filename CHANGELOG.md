@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.35.1](https://github.com/maxgfr/ultra11y/compare/v5.35.0...v5.35.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* make RGAA CI coverage fail closed ([88dbb77](https://github.com/maxgfr/ultra11y/commit/88dbb7730c3fb92298ceffb2a4cbd08acbe95218))
+
 # [5.35.0](https://github.com/maxgfr/ultra11y/compare/v5.34.2...v5.35.0) (2026-08-25)
 
 
