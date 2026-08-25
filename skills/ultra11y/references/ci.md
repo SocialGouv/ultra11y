@@ -334,9 +334,8 @@ What the projection guarantees:
 
 Advanced Security is not available on every plan. This mode writes
 `::error file=…,line=…,col=…,title=…::` workflow commands to **stdout**, which every GitHub
-plan renders inline on the diff, and appends a Markdown job summary to
-`$GITHUB_STEP_SUMMARY` (severity table, and the per-page synthesis once a page sample has
-been scanned and merged). With no `$GITHUB_STEP_SUMMARY` set, the summary goes to stderr so a
+plan renders inline on the diff, and appends a compact Markdown job summary to
+`$GITHUB_STEP_SUMMARY`. With no `$GITHUB_STEP_SUMMARY` set, the summary goes to stderr so a
 local run still shows it.
 
 The GitHub summary deliberately prints **coverage, never a percentage**:
@@ -347,7 +346,10 @@ and the occurrence count is derived from the same projection; a WCAG finding tha
 RGAA criterion non-conformant therefore appears in neither the heading nor an empty table.
 
 URL-keyed findings are **skipped** for annotations — there is no repo line to point at — and
-counted in the summary instead, so they are never silently dropped.
+counted in the summary instead, so they are never silently dropped. The summary deliberately
+stops at the run-level result and distinct non-conformities: the page scoreboard and its
+traffic-light columns live in the explicit `pages`/`full` PR comment and the artifact, not in
+every job summary.
 
 ## Which command to run it from
 
@@ -492,13 +494,16 @@ grid is almost empty and the job reports far less than it measured.
 
 Four surfaces come out of it:
 
-- **The scoreboard**, in the job summary and the sticky PR comment: one row per page with its
-  rate and its blocking/major/minor counts, plus a `basis` column. That column is not
+- **The scoreboard**, in the explicit `pages`/`full` sticky PR comment and the artifact: one
+  row per page with its rate and its blocking/major/minor counts, plus a `basis` column. It is
+  omitted from the ordinary job summary so the run-level result is not buried under a second
+  dashboard. The `basis` column is not
   decoration — a page marked *source* has no snapshot, so its silence is not conformity.
   It appears on a clean run too, which is exactly when a reviewer wants to see *which* pages
   passed.
-- **The criteria, NAMED, under each page** — in the job summary, folded: what conforms, what
-  does not, what nobody has ruled on, by id. Counts are the right shape for a scoreboard and
+- **The criteria, NAMED, under each page** — in the explicit page comment and per-page
+  dossiers: what conforms, what does not, what nobody has ruled on, by id. Counts are the
+  right shape for a scoreboard and
   the wrong one for acting: « 65 / 6 » says nothing about *which* six, and until now the ids
   lived only in an artifact nobody downloads. Every status comes from the same
   `pageCriterionRows` the dossiers render, so the summary and the deliverable cannot disagree.

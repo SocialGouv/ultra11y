@@ -3,10 +3,9 @@
 //  • `annotations()` — workflow commands (`::error file=…,line=…::`). Every GitHub plan
 //    renders these inline on the diff, so this is the fallback when SARIF upload is
 //    unavailable (a private repo without Advanced Security).
-//  • `stepSummary()` — the Markdown written to `$GITHUB_STEP_SUMMARY`: the run's headline,
-//    a grouped severity table, and — once the audit carries a page sample — the per-page
-//    synthesis. Long and complete; the step summary has a 1 MiB budget and no reader who
-//    reached it arrived by accident.
+//  • `stepSummary()` — the Markdown written to `$GITHUB_STEP_SUMMARY`: the run's headline
+//    and grouped severity table. The page-by-page scoreboard is deliberately absent: its
+//    traffic-light columns duplicated the artifact and buried the run-level result.
 //  • `prComment()` — the DIGEST posted on the pull request. A different document, not a
 //    truncation of the one above: a reviewer scanning a PR needs the verdict, the coverage
 //    and the handful of distinct defects, then a link. Posting the full summary there is how
@@ -493,9 +492,6 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
 
   if (!all.length) {
     out.push(s.none, "");
-    // Still show the scoreboard: a clean run over five pages is exactly when a reviewer
-    // wants to see WHICH five, and how much of each was actually decided.
-    out.push(perPageTable(result, standard, lang));
     return out.join("\n");
   }
 
@@ -509,7 +505,6 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
   const unanchored = all.filter((f) => isUrl(f.file)).length;
   if (unanchored) out.push(`> ${s.unanchored(unanchored)}`, "");
 
-  out.push(perPageTable(result, standard, lang));
   return out.join("\n");
 }
 

@@ -1326,18 +1326,28 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     expect(summary?.env?.REFUTE_IDS).toContain("steps.after_refute.outputs.ids");
   });
 
-  it("applies completed refutations before preserving a partial judge failure", () => {
+  it("applies completed refutations and reports a partial judge failure without failing", () => {
     const trial = job().steps.find((s) => s.name === "Put the claims on trial");
     const run = String(trial?.run);
     const judge = run.indexOf("node scripts/ultra11y.mjs judge --refute");
     const apply = run.indexOf("node scripts/ultra11y.mjs verify --apply");
-    const finalExit = run.lastIndexOf('exit "$judge_status"');
 
     expect(judge).toBeGreaterThanOrEqual(0);
     expect(run).toContain("|| judge_status=$?");
     expect(apply, "partial judge output must be applied instead of lost to set -e").toBeGreaterThan(judge);
     expect(run).toContain("|| apply_status=$?");
-    expect(finalExit, "the provider failure must still keep the step red").toBeGreaterThan(apply);
+    expect(run).toContain("::warning::the refuter stopped early");
+    expect(run).toContain("::warning::the trial reopened or left unsupported claims");
+    expect(run.lastIndexOf("exit 0"), "an honest residue is reported, not treated as a broken workflow").toBeGreaterThan(apply);
+    expect(run).not.toContain('exit "$judge_status"');
+  });
+
+  it("retries by default and only makes an undecided residue fatal when explicitly requested", () => {
+    expect(WF.on?.workflow_dispatch?.inputs?.passes?.default).toBe("3");
+    expect(WF.on?.workflow_dispatch?.inputs?.["require-decided"]?.default).toBe("false");
+
+    const after = job().steps.find((s) => s.name === "Measure and gate AFTER refutation");
+    expect(String(after?.run)).toContain('if [ "$REQUIRE_DECIDED" != "false" ]');
   });
 
   it("uploads the audit produced by the trial, not only the pre-refutation action artifact", () => {

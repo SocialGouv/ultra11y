@@ -1,9 +1,7 @@
-// THE CRITERIA, NAMED, PAGE BY PAGE — on the two surfaces a reviewer actually reads.
+// THE CRITERIA, NAMED, PAGE BY PAGE — on the explicit page surfaces a reviewer asks for.
 //
-// The job summary has carried a page-by-page table for a while, and it carries COUNTS: page,
-// basis, how many conform, how many do not, and the severity tallies. Counts are the right
-// shape for a scoreboard and the wrong one for acting: « 65 / 6 » on a row tells a reader
-// nothing about WHICH 6, and the ids live only in the artifact nobody downloads.
+// The ordinary job summary is run-level. The page scoreboard belongs to the `pages`/`full`
+// sticky comments and the artifact, where its matrix and named criteria have enough context.
 //
 // And the pull-request surface had two documents under two markers — a code digest and a page
 // scoreboard — so "the comment at the end with everything in it" did not exist: whichever kind
@@ -50,45 +48,22 @@ const audit = (over: Partial<AuditResult> = {}): AuditResult =>
     ...over,
   }) as unknown as AuditResult;
 
-describe("the job summary names the criteria under each page", () => {
-  it("keeps the counts table", () => {
+describe("the job summary stays run-level when pages are in scope", () => {
+  it("does not carry the page names, scoreboard or page-specific criterion lists", () => {
     const md = stepSummary(audit(), { standard: "rgaa", lang: "fr" });
-    expect(md).toContain("Accueil");
-    expect(md).toContain("Contact");
-  });
-
-  it("names the NON-CONFORMING criteria of a page, not just how many", () => {
-    const md = stepSummary(audit(), { standard: "rgaa", lang: "fr" });
-    // 1.1.1 fires on `contact`; under RGAA that is criterion 1.1.
-    expect(md).toMatch(/`1\.1`/);
-  });
-
-  it("names the CONFORMING ones too — the half a scoreboard can never show", () => {
-    const md = stepSummary(audit(), { standard: "rgaa", lang: "fr" });
-    expect(md).toMatch(/conforme/i);
-    // 8.3 (lang) and 8.5 (title) are the two RGAA criteria a snapshot earns by silence.
-    expect(md).toMatch(/`8\.[35]`/);
-  });
-
-  it("folds the detail away, so the scoreboard stays what is read first", () => {
-    const md = stepSummary(audit(), { standard: "rgaa", lang: "fr" });
-    expect(md).toContain("<details>");
-    // GFM needs a blank line after the summary or the table ships as literal pipes.
-    expect(md).toMatch(/<\/summary>\n\n/);
-  });
-
-  it("says nothing extra when no page is in scope", () => {
-    const noPages = audit({ scope: { inputs: [], files: 2 } } as Partial<AuditResult>);
-    const md = stepSummary(noPages, { standard: "rgaa", lang: "fr" });
-    // No PAGE block — keyed on the page names, not on `<details>`: the non-conformity table
-    // now folds each criterion behind one of its own, and that fold is not a page.
     expect(md).not.toContain("Accueil");
     expect(md).not.toContain("Contact");
-    expect(md).not.toContain(`${"Bilan page par page"}`);
+    expect(md).not.toContain("Bilan page par page");
+    expect(md).not.toMatch(/\|\s*🔴\s*\|\s*🟠\s*\|\s*🟡\s*\|/);
+    // The run-wide non-conformity still names the projected RGAA criterion.
+    expect(md).toContain("RGAA 1.1");
   });
 
-  it("says it in English too", () => {
-    expect(stepSummary(audit(), { standard: "rgaa", lang: "en" })).toMatch(/conforming/i);
+  it("omits the page scoreboard in English too", () => {
+    const md = stepSummary(audit(), { standard: "rgaa", lang: "en" });
+    expect(md).not.toContain("Page-by-page scoreboard");
+    expect(md).not.toContain("Accueil");
+    expect(md).not.toContain("Contact");
   });
 });
 

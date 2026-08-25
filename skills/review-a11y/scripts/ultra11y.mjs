@@ -64642,7 +64642,6 @@ function stepSummary(result, opts = {}) {
   const all = findingsForStandard(result, standard);
   if (!all.length) {
     out2.push(s.none, "");
-    out2.push(perPageTable(result, standard, lang));
     return out2.join("\n");
   }
   const grouped = groupFindings(all, standard, lang, baseDir);
@@ -64653,7 +64652,6 @@ function stepSummary(result, opts = {}) {
   out2.push("");
   const unanchored = all.filter((f) => isUrl2(f.file)).length;
   if (unanchored) out2.push(`> ${s.unanchored(unanchored)}`, "");
-  out2.push(perPageTable(result, standard, lang));
   return out2.join("\n");
 }
 function reportSectionsBody(result, standard, lang, budget, prefer) {
@@ -64720,43 +64718,6 @@ function prComment(result, opts = {}) {
   let rows = Math.min(COMMENT_ROWS, criteria.length);
   while (rows > 0 && sizeOf(assemble(rows)) > COMMENT_LIMIT) rows--;
   return assemble(rows);
-}
-function perPageTable(result, standard = CORE2, lang = "en") {
-  const s = S[lang];
-  const scope = pagesOf(result);
-  if (!scope.length) return "";
-  attributePages(result, scope);
-  const derived = derivePages(result, scope);
-  return [
-    `### ${s.perPage}`,
-    "",
-    ...scoreboardTable(result, derived, standard, s, lang),
-    "",
-    ...basisCaveats(result, derived, standard, s, lang),
-    ...fullGridBlock(result, derived, standard, s, lang),
-    "",
-    ...derived.flatMap((pg) => [...namedCriteriaBlock(result, pg, standard, s, lang), ""])
-  ].join("\n");
-}
-function namedCriteriaBlock(result, page, standard, s, lang) {
-  const rows = pageCriterionRows(result, page, standard, lang);
-  if (!rows.length) return [];
-  const ids = (status) => rows.filter((r) => r.status === status).map((r) => `\`${r.id}\``);
-  const line = (label, list) => list.length ? [`- **${label}** (${list.length}) : ${list.join(" \xB7 ")}`] : [];
-  return [
-    "<details>",
-    `<summary>${s.pageCriteriaTitle(page.name)}${page.auth ? " \u{1F512}" : ""}</summary>`,
-    // GFM only renders Markdown inside <details> after a blank line; without it the list
-    // ships to the reader as one run-on paragraph.
-    "",
-    // Failures first — that is the work — then what stands, then what nobody has ruled on.
-    ...line(s.nonConformingList, ids("NC")),
-    ...line(s.conformingList, ids("C")),
-    ...line(s.toAssessList, ids("manual")),
-    ...line(s.naList, ids("NA")),
-    "",
-    "</details>"
-  ];
 }
 function scoreboardTable(result, derived, standard, s, lang) {
   const out2 = [

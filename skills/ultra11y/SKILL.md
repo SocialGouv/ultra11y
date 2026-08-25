@@ -249,8 +249,9 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   A client-rendered SPA exposes no routes in its served HTML — use a sitemap there; read
   **`references/dynamic.md`**.
 - **"Audit these URLs page by page, in CI"** → the shipped Action takes `urls`, `sitemap`,
-  `crawl` or `sample`, snapshots every page it visits, writes the per-page dossiers into its
-  artifact and adds a per-page scoreboard to the job summary and the PR comment; read
+  `crawl` or `sample`, snapshots every page it visits and writes the per-page dossiers into its
+  artifact. The ordinary job summary stays run-level; request a `pages`/`full` PR comment when
+  a page scoreboard is wanted; read
   **`references/ci.md`**.
 - **"Nobody is here to rule on the judgment criteria"** → `judge --in audits/audit-latest.json
   --standard rgaa [--apply]` adjudicates them with a model, for a run with no coding agent in

@@ -215,20 +215,7 @@ describe("job summary", () => {
     expect(md).toContain("1.1");
   });
 
-  it("renders the per-page grid when the audit carries pages", () => {
-    const a = audit([F()], {
-      scope: { inputs: [], files: 1, sample: { pages: [{ id: "accueil", name: "Accueil", url: "https://x/" }] } },
-    } as unknown as Partial<AuditResult>);
-    const md = stepSummary(a, { lang: "fr" });
-    expect(md).toContain("Accueil");
-  });
-
-  it("leads the per-page section with the criteria × URLs matrix, not with the id lists", () => {
-    // THE SHAPE OF THE ANSWER, and it is the whole point of the section. Both the matrix and
-    // the per-page id lists say which criteria fail where; only the matrix says it in a shape
-    // a reader can compare ACROSS pages. On a nine-page RGAA run the lists are nine folded
-    // blocks and near a thousand ids, and "does 10.7 fail everywhere or on one route?" means
-    // opening all nine — the same fact is one row of the matrix.
+  it("does not append the page scoreboard or cross-grid when the audit carries pages", () => {
     const a = audit([F()], {
       scope: {
         inputs: [],
@@ -242,19 +229,12 @@ describe("job summary", () => {
       },
     } as unknown as Partial<AuditResult>);
     const md = stepSummary(a, { standard: "rgaa", lang: "fr" });
-
-    // Columns are the URLs, shortened against the origin the pages share and stated once.
-    const header = md.split("\n").find((l) => l.startsWith("|") && l.includes("| / |") && l.includes("| /contact |"));
-    expect(header, "no criteria × URLs header row in the job summary").toBeDefined();
-    expect(md).toContain("https://x");
-
-    // …and it comes FIRST. The id lists are kept, folded, underneath — they carry what
-    // CONFORMS, which under a per-page norm is most of the deliverable.
-    const grid = md.indexOf("| / |");
-    const lists = md.indexOf("le détail critère par critère");
-    expect(grid, "the matrix is missing").toBeGreaterThan(-1);
-    expect(lists, "the per-page id lists were dropped rather than folded").toBeGreaterThan(-1);
-    expect(grid, "the id lists still come before the matrix").toBeLessThan(lists);
+    expect(md).not.toContain("Bilan page par page");
+    expect(md).not.toContain("Accueil");
+    expect(md).not.toContain("Contact");
+    expect(md).not.toContain("| / |");
+    expect(md).not.toContain("le détail critère par critère");
+    expect(md).not.toMatch(/\|\s*🔴\s*\|\s*🟠\s*\|\s*🟡\s*\|/);
   });
 });
 
@@ -387,9 +367,13 @@ describe("the per-page scoreboard", () => {
     expect(perPageTable(runAudit({ inputs: ["-"], stdin: "<div></div>" }), "wcag", "en")).toBe("");
   });
 
-  it("still appears on a clean run, which is exactly when you want to see WHICH pages passed", () => {
+  it("stays out of the job summary, where the run-level result is the only useful digest", () => {
     const r = runAudit({ inputs: ["-"], stdin: "<div><p>ok</p></div>" });
     r.scope.pages = [{ id: "accueil", name: "Accueil", url: "https://exemple.fr/", basis: "snapshot" }];
-    expect(stepSummary(r, { standard: "wcag", lang: "en" })).toContain("Page-by-page scoreboard");
+    const summary = stepSummary(r, { standard: "wcag", lang: "en" });
+    expect(summary).not.toContain("Page-by-page scoreboard");
+    expect(summary).not.toMatch(/\|\s*🔴\s*\|\s*🟠\s*\|\s*🟡\s*\|/);
+    // The explicit page document remains available to callers that asked for it.
+    expect(perPageTable(r, "wcag", "en")).toContain("Page-by-page scoreboard");
   });
 });
