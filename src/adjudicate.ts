@@ -484,6 +484,22 @@ function auditFiles(audit: AuditResult, cwd?: string): Set<string> {
  *  criterion was never given. And it is only half the gate — `groundFinding` still has to find
  *  the cited content in the real source, so a plausible-looking file:line in the right
  *  neighbourhood proves nothing on its own. */
+/** Why a citation was held to the literal check, and what to cite instead.
+ *
+ *  Appended to a `cited snippet not found` refusal when the citation missed THIS criterion's
+ *  harvest. Without it the message names a symptom — a transcription that did not match — and
+ *  hides the cause, which is that the citation left the evidence the criterion was shown. The
+ *  two are fixed differently: one asks the adjudicator to copy more carefully, the other asks
+ *  it to cite something else entirely. */
+export function offHarvestHint(criteriaId: string, evidence: Evidence[]): string {
+  const anchors = [...new Set(evidence.map((e) => e.selector?.trim() || `${e.file}:${e.line}`).filter(Boolean))];
+  const shown = anchors.slice(0, 4).join(", ");
+  const rest = anchors.length > 4 ? `, +${anchors.length - 4}` : "";
+  return anchors.length
+    ? ` — this anchor is not among the evidence harvested for ${criteriaId}, so the snippet was verified literally rather than vouched for by the harvest. Cite one of: ${shown}${rest}.`
+    : ` — ${criteriaId} was harvested no evidence, so nothing can vouch for a transcription here. If the criterion has no subject in scope, the verdict is NA with a justification and no citation to ground.`;
+}
+
 /** The tag a citation or an anchor is about, from its snippet first and its selector second.
  *  Lowercased — HTML tag names are case-insensitive. Undefined when neither says. */
 function tagOf(x: { snippet?: string; selector?: string }): string | undefined {
@@ -789,7 +805,7 @@ export function applyAdjudication(
   // flat list) for the same reason as `blame`: a failed citation has to condemn its own
   // criterion and no other.
   type Ground = { file: string; line: number; selector?: string; snippet?: string };
-  const groundInputs = new Map<string, { g: Ground; fallback?: Ground }[]>();
+  const groundInputs = new Map<string, { g: Ground; fallback?: Ground; offHarvest?: string }[]>();
   // Memoised: only a citation that missed its criterion's own anchors ever asks for it.
   let scopeCache: Set<string> | undefined;
   const { citationDrift } = adjudicationLimits(opts.cwd);
@@ -819,8 +835,9 @@ export function applyAdjudication(
     criteriaId: string,
     g: { file: string; line: number; selector?: string; snippet?: string },
     fallback?: { file: string; line: number; selector?: string; snippet?: string },
+    offHarvest?: string,
   ) => {
-    const entry = { g, ...(fallback ? { fallback } : {}) };
+    const entry = { g, ...(fallback ? { fallback } : {}), ...(offHarvest ? { offHarvest } : {}) };
     const list = groundInputs.get(criteriaId);
     if (list) list.push(entry);
     else groundInputs.set(criteriaId, [entry]);
@@ -948,7 +965,30 @@ export function applyAdjudication(
                 : { file: c.file, line: c.line, selector: anchor.at.selector ?? c.selector },
             );
           } else {
-            toGround(it.criteriaId, cite);
+            // WHY THE STRICT PATH APPLIED, said at the point it applies.
+            //
+            // The citation belongs (it is in a file this audit read) but it is not on an anchor
+            // THIS criterion was shown, so the paragraph above cannot let the harvest vouch for
+            // the transcription — and the refusal that follows says only `cited snippet not
+            // found`, which reads as « you mistyped » when the actionable fact is « you cited
+            // outside this criterion's evidence, so your retyping was verified literally ».
+            //
+            // Measured: that message sent a reader diagnosing RGAA 12.5 to the wrong conclusion
+            // — a fold bug — with this source open. The risk is not the lost criterion, it is
+            // the « fix » that would follow: relaxing the strict path is exactly the hole the
+            // two bounds above exist to close. So the cause travels with the refusal.
+            //
+            // It bites hardest where the criterion's subject is an ABSENCE. 12.1 and 12.5 are
+            // the repeat offenders the adjudicator prompt already names: asked to prove there is
+            // no search engine, a model cites the search form it is arguing about — which is, by
+            // definition, not among the anchors harvested for a criterion about navigation.
+            // ONLY when the citation is genuinely off-harvest. Landing on an anchor and then
+            // claiming a different KIND of element (an <img> cited as a <video>) also reaches
+            // this branch, and telling that reader « not among the harvested evidence » would
+            // be false: the anchor is right there, it is the element that is wrong. That case
+            // keeps the bare refusal, which already says the honest thing — this markup is not
+            // in the file.
+            toGround(it.criteriaId, cite, undefined, anchor ? undefined : offHarvestHint(it.criteriaId, it.evidence));
           }
         }
       }
@@ -1069,7 +1109,7 @@ export function applyAdjudication(
   // flat `groundItems` produced.
   const grounding: GroundingSummary = { grounded: 0, moved: 0, failed: 0, issues: [] };
   for (const [criteriaId, inputs] of groundInputs) {
-    for (const { g, fallback } of inputs) {
+    for (const { g, fallback, offHarvest } of inputs) {
       let r = groundFinding(g, { cwd: opts.cwd });
       // The harvested anchor vouches for a citation the file could not confirm on its own —
       // an adjudicator's retyping of an element it did read. `moved` either way: what
@@ -1084,8 +1124,12 @@ export function applyAdjudication(
       } else {
         grounding.failed++;
         if (r.issue) {
-          grounding.issues.push(r.issue);
-          blame(criteriaId, r.issue);
+          // The cause travels with the refusal, and only when it IS the cause: a citation that
+          // never reached the literal check (a missing file, a line out of range) is not an
+          // off-harvest problem, and saying so would send the reader chasing the wrong thing.
+          const issue = offHarvest && r.issue.startsWith("cited snippet not found") ? `${r.issue}${offHarvest}` : r.issue;
+          grounding.issues.push(issue);
+          blame(criteriaId, issue);
         }
       }
     }
