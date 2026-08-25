@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.35.3](https://github.com/maxgfr/ultra11y/compare/v5.35.2...v5.35.3) (2026-08-25)
+
+
+### Bug Fixes
+
+* preserve partial RGAA refutations ([dd33c1d](https://github.com/maxgfr/ultra11y/commit/dd33c1da35a3125f912143d4bb16a971adc4dbc3))
+
 ## [5.35.2](https://github.com/maxgfr/ultra11y/compare/v5.35.1...v5.35.2) (2026-08-25)
 
 
