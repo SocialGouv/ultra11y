@@ -161,3 +161,70 @@ describe("a citation the file itself supports is never second-guessed", () => {
     expect(r.rejectedCriteria, r.issues.join("\n")).not.toContain(base.criteriaId);
   });
 });
+
+// A REFUSAL THAT NAMES ITS CAUSE, BECAUSE THE SYMPTOM SENDS READERS THE WRONG WAY.
+//
+// `cited snippet not found in <page>:2` is accurate and, on its own, misleading: it reads as
+// « you mistyped » when the actionable fact is « you cited outside this criterion's evidence,
+// so your retyping was verified literally ». The two are fixed differently — copy more
+// carefully, versus cite something else entirely.
+//
+// Measured: diagnosing RGAA 12.5 on a real run (SocialGouv/egapro, 106 criteria), that message
+// sent a reader to the wrong conclusion — a fold bug — with this source open in front of them.
+// The lost criterion is not the risk; the « fix » that would follow is. Relaxing the strict
+// path is precisely the hole the membership bound exists to close.
+//
+// It bites hardest where the criterion's subject is an ABSENCE. Asked to establish that there
+// is no site search engine, an adjudicator cites the search form it is arguing about — which
+// is, by definition, not among the anchors harvested for a criterion about navigation.
+describe("an off-harvest refusal explains why the literal check applied", () => {
+  it("names the criterion's own anchors when the citation left the harvest", () => {
+    const base = itemWithEvidence();
+    // In a file this audit read — so membership passes — but on nothing this criterion was
+    // shown, and retyped, so the literal check is the only one left and it fails.
+    // A SECOND file this audit reads, holding nothing this criterion was shown. Citing inside
+    // `PAGE` cannot exercise the branch: a snapshot is one line, so every citation in it falls
+    // within the drift of some anchor and the harvest vouches for it.
+    const other = join(dir, "other.html");
+    writeFileSync(
+      other,
+      `<!doctype html><html lang="fr"><head><title>Recherche</title></head><body><main><form aria-label="Rechercher une entreprise"><label for="q">SIREN</label><input id="q"></form></main></body></html>`,
+    );
+    const both = () => runAudit({ inputs: [PAGE, other] });
+    const items = buildAdjudicationWorklist(both(), { standard: "rgaa" });
+    const target = items.find((i) => i.criteriaId === base.criteriaId);
+    if (!target) throw new Error("criterion missing from the two-file worklist");
+    const offHarvest: AdjudicationItem = {
+      ...target,
+      verdict: "NA",
+      justification: "aucun moteur de recherche du site : la zone de navigation n'en porte pas",
+      citations: [{ file: other, line: 1, selector: "form", snippet: '<form aria-label="Rechercher"><input></form>' }],
+    };
+    const bothOnly = items.map((x) =>
+      x.criteriaId === base.criteriaId ? offHarvest : ({ ...x, verdict: "manual", reason: "undecidable" } as AdjudicationItem),
+    );
+    const r = applyAdjudication(both(), file(bothOnly), { cwd: dir });
+    expect(r.rejectedCriteria).toContain(base.criteriaId);
+    const joined = r.issues.join("\n");
+    expect(joined).toMatch(/cited snippet not found/);
+    expect(joined).toMatch(/not among the evidence harvested for/);
+    expect(joined).toMatch(/Cite one of:/);
+  });
+
+  it("stays silent when the citation IS on an anchor and only the element is wrong", () => {
+    // The message must not lie in the other direction: here the anchor is right there, it is
+    // the claimed element that is not. `not among the evidence harvested` would be false.
+    const base = itemWithEvidence();
+    const anchor = base.evidence[0]!;
+    const wrongKind: AdjudicationItem = {
+      ...base,
+      verdict: "C",
+      justification: "vérifié",
+      citations: [{ file: anchor.file, line: anchor.line, selector: "video", snippet: '<video controls src="/tour.mp4"></video>' }],
+    };
+    const r = applyAdjudication(audit(), file(only(wrongKind)), { cwd: dir });
+    expect(r.rejectedCriteria).toContain(base.criteriaId);
+    expect(r.issues.join("\n")).toMatch(/cited snippet not found/);
+    expect(r.issues.join("\n")).not.toMatch(/not among the evidence harvested for/);
+  });
+});

@@ -59367,6 +59367,12 @@ function auditFiles(audit2, cwd) {
     return /* @__PURE__ */ new Set();
   }
 }
+function offHarvestHint(criteriaId, evidence) {
+  const anchors = [...new Set(evidence.map((e) => e.selector?.trim() || `${e.file}:${e.line}`).filter(Boolean))];
+  const shown = anchors.slice(0, 4).join(", ");
+  const rest = anchors.length > 4 ? `, +${anchors.length - 4}` : "";
+  return anchors.length ? ` \u2014 this anchor is not among the evidence harvested for ${criteriaId}, so the snippet was verified literally rather than vouched for by the harvest. Cite one of: ${shown}${rest}.` : ` \u2014 ${criteriaId} was harvested no evidence, so nothing can vouch for a transcription here. If the criterion has no subject in scope, the verdict is NA with a justification and no citation to ground.`;
+}
 function tagOf2(x) {
   const fromSnippet = /<\s*([a-zA-Z][\w-]*)/.exec(x.snippet ?? "");
   if (fromSnippet) return fromSnippet[1].toLowerCase();
@@ -59538,8 +59544,8 @@ function applyAdjudication(audit2, adj, opts = {}) {
     }
     return engineNcCache.get(key2) ?? EMPTY_IDS;
   };
-  const toGround = (criteriaId, g, fallback) => {
-    const entry = { g, ...fallback ? { fallback } : {} };
+  const toGround = (criteriaId, g, fallback, offHarvest) => {
+    const entry = { g, ...fallback ? { fallback } : {}, ...offHarvest ? { offHarvest } : {} };
     const list = groundInputs.get(criteriaId);
     if (list) list.push(entry);
     else groundInputs.set(criteriaId, [entry]);
@@ -59584,7 +59590,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
               anchor.representative ? { file: anchor.at.file, line: anchor.at.line, selector: anchor.at.selector ?? c2.selector, snippet: anchor.at.snippet } : { file: c2.file, line: c2.line, selector: anchor.at.selector ?? c2.selector }
             );
           } else {
-            toGround(it.criteriaId, cite);
+            toGround(it.criteriaId, cite, void 0, anchor ? void 0 : offHarvestHint(it.criteriaId, it.evidence));
           }
         }
       }
@@ -59644,7 +59650,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
   }
   const grounding = { grounded: 0, moved: 0, failed: 0, issues: [] };
   for (const [criteriaId, inputs] of groundInputs) {
-    for (const { g, fallback } of inputs) {
+    for (const { g, fallback, offHarvest } of inputs) {
       let r = groundFinding(g, { cwd: opts.cwd });
       if (!r.ok && fallback) {
         const viaAnchor = groundFinding(fallback, { cwd: opts.cwd });
@@ -59656,8 +59662,9 @@ function applyAdjudication(audit2, adj, opts = {}) {
       } else {
         grounding.failed++;
         if (r.issue) {
-          grounding.issues.push(r.issue);
-          blame(criteriaId, r.issue);
+          const issue = offHarvest && r.issue.startsWith("cited snippet not found") ? `${r.issue}${offHarvest}` : r.issue;
+          grounding.issues.push(issue);
+          blame(criteriaId, issue);
         }
       }
     }
@@ -60378,7 +60385,9 @@ var VERDICT_KINDS = `Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict mis
    - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected, and so is a finding with no \`file\` at all. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the criterion's OWN numbered tests, listed in its brief under \xAB tests to rule on \xBB. A WCAG id looks alike, denotes an unrelated test, and is rejected.
    - \`NA\` (not applicable) \u2014 REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
    - \`manual\` (still undecidable) \u2014 REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide it, and no capture in this run carries its subject) or \`undecidable\` (the evidence cannot settle it either way).`;
-var ABSENCE_RULE = `AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. \xAB No second navigation system \xBB, \xAB no search engine \xBB, \xAB no error message suggests the expected format \xBB \u2014 an absence is OBSERVED somewhere: cite the element and the page you observed it on. And when the criterion's subject exists nowhere in the audited scope, the verdict is \`NA\` with its justification, never \`NC\`.`;
+var ABSENCE_RULE = `AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. \xAB No second navigation system \xBB, \xAB no search engine \xBB, \xAB no error message suggests the expected format \xBB \u2014 an absence is OBSERVED somewhere: cite the element and the page you observed it on. And when the criterion's subject exists nowhere in the audited scope, the verdict is \`NA\` with its justification, never \`NC\`.
+
+AND CITE FROM THIS CRITERION'S OWN ANCHORS, NOT THE THING YOU ARE RULING OUT. An absence pulls you toward the element you are arguing ABOUT \u2014 the search form that is not a site search engine, the menu that is not a second navigation system \u2014 and that element is, precisely because it is off-topic, absent from what this criterion was harvested. A citation on one of the criterion's own anchors is vouched for by the harvest; one outside it has its snippet verified LITERALLY, character for character, and a retyping then fails. Cite the region you inspected \u2014 the \`header\`, the \`nav\`, the \`footer\` the brief listed \u2014 and say in the justification what you did not find in it.`;
 var CAPTURE_RULE = `THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidence is anchored under \`.ultra11y/pages/<id>/\`, the browser already ran: \`dom.html\`, \`styles.json\`, \`boxes.json\`, \`axtree.json\` and \`screen.png\` are there to read. \`needs-rendered-dom\` is refused on such a criterion \u2014 decide it from those files, or answer \`undecidable\` and say what the capture does not settle.`;
 var NEVER_GUESS_RULE = `Never guess. A criterion you cannot decide from real evidence stays \`manual\` with its reason \u2014 that is a valid, honest verdict, and it is worth more than a verdict the gate throws away.`;
 var SCOPE_RULE = `Rule ONLY on the criteria presented. Never introduce another \u2014 a verdict for a criterion nobody asked about is dropped, and under the fold it would otherwise overwrite what the deterministic engine already decided.`;
