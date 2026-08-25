@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.34.2](https://github.com/maxgfr/ultra11y/compare/v5.34.1...v5.34.2) (2026-08-25)
+
+
+### Bug Fixes
+
+* make ultra11y compatible with Codex ([45234f4](https://github.com/maxgfr/ultra11y/commit/45234f477d3aa1ca9bd535188a41fa2135673d24))
+
 ## [5.34.1](https://github.com/maxgfr/ultra11y/compare/v5.34.0...v5.34.1) (2026-08-25)
 
 
