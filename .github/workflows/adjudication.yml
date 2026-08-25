@@ -424,6 +424,54 @@ jobs:
           node scripts/ultra11y.mjs verify --apply audits/VERIFY.todo.json --report "$REPORT" \
             --in audits/audit-latest.json --standard '${{ inputs.standard }}' --out audits --prune
 
+      # `verify --apply --prune` MUTATES the audit. In run 32854529215 it reopened eighteen
+      # conformities, but the workflow kept displaying and gating the three-item count measured
+      # before the trial. The job was red by accident (the earlier gate had already failed),
+      # while its summary and artifact both described a grid that no longer existed. Measure
+      # the mutated document, then hold THAT document to the same completeness bar.
+      - name: Measure and gate AFTER refutation
+        id: after_refute
+        if: always() && inputs.mode != 'api' && inputs.refute
+        env:
+          REQUIRE_DECIDED: ${{ inputs.require-decided }}
+          UNDECIDABLE_FILE: ${{ inputs.undecidable-file }}
+        run: |
+          set -euo pipefail
+          if [ ! -f audits/audit-latest.json ]; then
+            echo "::warning::no post-refutation audit exists to measure"
+            exit 0
+          fi
+
+          node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
+            --standard '${{ inputs.standard }}' --out /tmp/after-refute --json > /tmp/after-refute.json
+          n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/after-refute.json","utf8")).count')
+          ids=$(node -p 'const j=JSON.parse(require("fs").readFileSync("/tmp/after-refute.json","utf8"));(j.items||[]).map(x=>x.criteriaId).join(", ")')
+          echo "manual=$n" >> "$GITHUB_OUTPUT"
+          echo "ids=$ids" >> "$GITHUB_OUTPUT"
+          echo "unruled after refutation: $n${ids:+ — $ids}"
+
+          if [ "$REQUIRE_DECIDED" != "false" ]; then
+            args=(check --in audits/audit-latest.json --standard '${{ inputs.standard }}' "--require-decided=$REQUIRE_DECIDED")
+            if [ -n "$UNDECIDABLE_FILE" ]; then args+=(--allow-undecided "$UNDECIDABLE_FILE"); fi
+            node scripts/ultra11y.mjs "${args[@]}"
+          fi
+
+      # The composite action uploaded its artifact BEFORE the outer trial. Keep that useful
+      # input, and also persist the document the final gate actually read so a red run can be
+      # audited without reconstructing state from log lines.
+      - name: Upload the post-refutation audit
+        if: always() && inputs.mode != 'api' && inputs.refute
+        uses: actions/upload-artifact@v7
+        with:
+          name: adjudication-agent-post-refutation
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            audits/audit-latest.json
+            audits/*.md
+            audits/VERIFY*.json
+            audits/ADJUDICATE*.json
+
       # The metric. A tier that ruled on nothing is a tier that cost money to change nothing,
       # and it should be visible as such rather than buried in a green check. `always()` so a
       # tier that died still leaves its baseline on the summary.
@@ -434,6 +482,8 @@ jobs:
           AFTER_API: ${{ steps.after_api.outputs.manual }}
           AFTER_AGENT: ${{ steps.after_agent.outputs.manual }}
           AGENT_IDS: ${{ steps.after_agent.outputs.ids }}
+          AFTER_REFUTE: ${{ steps.after_refute.outputs.manual }}
+          REFUTE_IDS: ${{ steps.after_refute.outputs.ids }}
         run: |
           {
             echo "### Adjudication (${{ inputs.mode }}, ${{ inputs.standard }})"
@@ -443,18 +493,22 @@ jobs:
             echo "| before (engine alone) | ${BEFORE:-—} |"
             if [ -n "${AFTER_API:-}" ]; then echo "| after \`api\` | $AFTER_API |"; fi
             if [ -n "${AFTER_AGENT:-}" ]; then echo "| after \`agent\` | $AFTER_AGENT |"; fi
+            if [ -n "${AFTER_REFUTE:-}" ]; then echo "| after refutation | $AFTER_REFUTE |"; fi
             if [ -n "${AGENT_IDS:-}" ]; then
               echo ""
               echo "Still « à évaluer » after the agent tier: ${AGENT_IDS}."
+            fi
+            if [ -n "${REFUTE_IDS:-}" ]; then
               echo ""
-              echo "Each one is a criterion the TOOL failed to settle, not a model that gave up:"
-              echo "either its harvest carries no anchor on the subject the criterion asks about,"
-              echo "or its brief never stated the rule the gate then refused it on. Read the"
-              echo "refusal printed above before reaching for another pass or a bigger model."
+              echo "Still « à évaluer » after refutation: ${REFUTE_IDS}."
+              echo "These are the final open claims: the post-trial completeness gate reads this"
+              echo "list, not the pre-trial count. Read the refusal/refutation above before"
+              echo "changing the harvester, the brief, or the model."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          for pair in "api:${AFTER_API:-}" "agent:${AFTER_AGENT:-}"; do
+          FINAL_AGENT=${AFTER_REFUTE:-${AFTER_AGENT:-}}
+          for pair in "api:${AFTER_API:-}" "agent:${FINAL_AGENT:-}"; do
             tier=${pair%%:*}
             after=${pair#*:}
             if [ -z "$after" ]; then continue; fi

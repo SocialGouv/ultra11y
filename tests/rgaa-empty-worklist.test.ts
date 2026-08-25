@@ -63,6 +63,49 @@ const subjects = (id: string) => {
 const harvestOn = (id: string, html: string) => harvestSubjects(subjects(id), [parseHtml(page(html), "p.html")]);
 
 // ---------------------------------------------------------------------------------------
+describe("RGAA multimedia subjects stay aligned with the criterion being adjudicated", () => {
+  it("gives 4.11 temporal media, not the generic keyboard/pointer union", () => {
+    const evidence = harvestOn(
+      "4.11",
+      '<div onclick="go()">ordinary widget</div><object data="map.svg"></object><audio src="voice.mp3" autoplay></audio><video controls></video>',
+    );
+    expect(evidence.some((x) => x.ev.selector.startsWith("audio"))).toBe(true);
+    expect(evidence.some((x) => x.ev.selector.startsWith("video"))).toBe(true);
+    expect(evidence.some((x) => x.ev.selector.startsWith("div"))).toBe(false);
+    expect(evidence.some((x) => x.ev.selector.startsWith("object"))).toBe(false);
+  });
+
+  it("gives 4.12 non-temporal media, not temporal players or unrelated handlers", () => {
+    const evidence = harvestOn(
+      "4.12",
+      '<div onclick="go()">ordinary widget</div><object data="map.svg"></object><canvas></canvas><svg></svg><audio controls></audio>',
+    );
+    for (const tag of ["object", "canvas", "svg"]) expect(evidence.some((x) => x.ev.selector.startsWith(tag))).toBe(true);
+    expect(evidence.some((x) => x.ev.selector.startsWith("audio"))).toBe(false);
+    expect(evidence.some((x) => x.ev.selector.startsWith("div"))).toBe(false);
+  });
+
+  it("gives 13.7 flash candidates, without confusing autoplay audio or scrolling text with a flash", () => {
+    const evidence = harvestOn(
+      "13.7",
+      '<audio autoplay></audio><marquee>news</marquee><img src="still.png" alt=""><video src="clip.mp4"></video><canvas></canvas>',
+    );
+    for (const tag of ["img", "video", "canvas"]) expect(evidence.some((x) => x.ev.selector.startsWith(tag))).toBe(true);
+    expect(evidence.some((x) => x.ev.selector.startsWith("audio"))).toBe(false);
+    expect(evidence.some((x) => x.ev.selector.startsWith("marquee"))).toBe(false);
+  });
+
+  it("recognises script and CSS flash mechanisms as evidence for 13.7", () => {
+    const evidence = harvestOn(
+      "13.7",
+      '<style>.warning { animation: strobe .2s infinite }</style><script>setInterval(() => el.classList.toggle("bright"), 100)</script>',
+    );
+    expect(evidence.some((x) => x.ev.selector.startsWith("script"))).toBe(true);
+    expect(evidence.some((x) => /animation|setInterval|strobe/i.test(`${x.ev.note} ${x.ev.snippet}`))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------------------
 describe("RGAA 10.1 — presentational markup, which is a closed list and therefore mechanical", () => {
   // The list is normative and vendored: the RGAA glossary entry « Présentation de
   // l'information » names the forbidden elements and attributes outright.

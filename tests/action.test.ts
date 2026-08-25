@@ -1241,7 +1241,7 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
         // An expression now: the dispatch sets its own ceiling. See the timeout test.
         "timeout-minutes"?: number | string;
         env?: Record<string, string>;
-        steps: { id?: string; name?: string; uses?: string; run?: string; if?: string; with?: Record<string, string> }[];
+        steps: { id?: string; name?: string; uses?: string; run?: string; if?: string; with?: Record<string, string>; env?: Record<string, string> }[];
       }
     >;
   };
@@ -1305,5 +1305,33 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     expect(apiRead, "the API tier must be measured").toBeGreaterThan(apiRun);
     expect(apiRead, "the API tier must be measured BEFORE the agent re-audits over it").toBeLessThan(agentRun);
     expect(at("What the agent tier decided")).toBeGreaterThan(agentRun);
+  });
+
+  it("remeasures and re-gates the audit after refutation mutates its verdicts", () => {
+    const steps = job().steps;
+    const trial = steps.findIndex((s) => s.name === "Put the claims on trial");
+    const after = steps.findIndex((s) => s.name === "Measure and gate AFTER refutation");
+    expect(trial).toBeGreaterThanOrEqual(0);
+    expect(after, "a refuted conformity must not disappear behind the pre-trial count").toBeGreaterThan(trial);
+
+    const gate = String(steps[after]?.run);
+    expect(gate).toContain("verify --manual");
+    expect(gate).toContain("check --in audits/audit-latest.json");
+    expect(gate).toContain("--require-decided");
+    expect(gate).toContain("--allow-undecided");
+
+    const summary = steps.find((s) => s.name === "Report what each tier actually decided");
+    expect(String(summary?.run)).toContain("after refutation");
+    expect(summary?.env?.AFTER_REFUTE).toContain("steps.after_refute.outputs.manual");
+    expect(summary?.env?.REFUTE_IDS).toContain("steps.after_refute.outputs.ids");
+  });
+
+  it("uploads the audit produced by the trial, not only the pre-refutation action artifact", () => {
+    const steps = job().steps;
+    const trial = steps.findIndex((s) => s.name === "Put the claims on trial");
+    const upload = steps.findIndex((s) => s.name === "Upload the post-refutation audit");
+    expect(upload).toBeGreaterThan(trial);
+    expect(steps[upload]?.uses).toMatch(/^actions\/upload-artifact@/);
+    expect(steps[upload]?.with?.path).toContain("audits/audit-latest.json");
   });
 });

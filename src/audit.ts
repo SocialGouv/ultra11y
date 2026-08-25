@@ -143,7 +143,7 @@ const SUBJECT_MATTER: Record<string, (d: Doc) => boolean> = {
   "2.1.4": hasCharShortcut,
   "2.2.1": hasTimeLimit,
   "2.2.2": hasMovingContent,
-  "2.3.1": hasMovingContent,
+  "2.3.1": hasFlashCandidate,
   "2.5.1": hasGesture,
   "2.5.2": hasDownEventAction,
   "2.5.7": hasDrag,
@@ -233,6 +233,21 @@ function hasMovingContent(d: Doc): boolean {
   if (d.elements.some((e) => /animation|transition/i.test(e.attribs.style ?? ""))) return true;
   if ((d.signals?.css?.rules ?? []).some((r) => r.decls.animation !== undefined || r.decls.animationName !== undefined)) return true;
   return /\b(?:carousel|autoplay|requestAnimationFrame|animation-iteration-count|\.gif["']|\bswiper\b)/i.test(d.source);
+}
+
+/** Anything that can produce opposing luminance changes over time (WCAG 2.3.1).
+ *
+ * Sound-only media and scrolling text are motion, not flashes. Conversely, an image, canvas,
+ * visual media, script or CSS animation can flash even when no carousel/autoplay keyword is
+ * present. Keep this deliberately wider than a detector: it decides applicability only; the
+ * agent or a dedicated analyser still decides the frequency and area thresholds. */
+function hasFlashCandidate(d: Doc): boolean {
+  if (has(d, "video", "img", "svg", "canvas", "embed", "object", "blink", "script")) return true;
+  if (d.elements.some((e) => /animation|transition/i.test(e.attribs.style ?? ""))) return true;
+  if ((d.signals?.css?.rules ?? []).some((r) => r.decls.animation !== undefined || r.decls.animationName !== undefined)) return true;
+  return /\b(?:flash|flashing|strobe|blink|setInterval|requestAnimationFrame|classList\.(?:add|remove|replace|toggle))\b|animation(?:-name)?\s*:/i.test(
+    d.source,
+  );
 }
 
 /** Any control that takes user input, native or delegated. Over-inclusive on purpose. */

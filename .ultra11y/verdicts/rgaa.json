@@ -482,16 +482,22 @@
           "message": "Même défaut sur la page « Tarifs » : l'<audio> du pied de page démarre seul et ne propose aucune fonctionnalité de contrôle de la consultation (pas de controls, aucune commande de remplacement dans la page)."
         }
       ],
-      "evidenceFingerprint": "sha256:e8fa4cf8247f4ba4c6b05672be4cfe94",
-      "evidenceCount": 7,
-      "date": "2026-08-24",
+      "evidenceFingerprint": "sha256:c21d8b47551aed1e6a7c5558d07085c4",
+      "evidenceCount": 3,
+      "date": "2026-08-25",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "4.12",
       "verdict": "NA",
-      "justification": "Les tests 4.12.1 et 4.12.2 ne portent que sur « les médias non temporels POURVUS de fonctionnalités de contrôle ». Au sens du glossaire RGAA, les médias non temporels du périmètre sont : l'<object type=\"image/svg+xml\"> de la page d'accueil (évidence citée), le <canvas id=\"latence\"> de la même page (.ultra11y/pages/accueil/dom.html:62) et le <svg> statique du « graphique » (index.html:82). Aucun ne porte de fonctionnalité de contrôle : le canvas est vide et aucun <script> du périmètre ne le dessine ni ne l'anime (aucune balise <script> dans les fixtures auditées), l'objet SVG est une carte statique, le <svg> inline est un histogramme figé — il n'existe donc aucune commande (lecture, navigation, zoom…) dont on puisse vérifier l'accessibilité ou l'activabilité au clavier et au pointeur. Les autres évidences présentées sortent du champ du critère : les deux <iframe> sont des cadres (thème 2 / 4.12 ne vise pas les cadres), et le <div onclick> ainsi que les gestionnaires appelant preventDefault sont des composants scriptés relevant des critères 7.3 et 12.x, pas des médias non temporels. À noter que l'<object> et le <canvas> sont par ailleurs sans alternative textuelle — défaut réel, mais il relève du critère 1.1, pas de 4.12.",
+      "justification": "Les tests 4.12.1 et 4.12.2 ne portent que sur les médias non temporels pourvus de fonctionnalités de contrôle. La récolte ciblée et complète en relève trois classes : le canvas #latence, l'object chargeant carte-reseau.svg et les SVG statiques. Le canvas est vide et aucun code du périmètre ne le dessine ni ne lui ajoute des commandes ; l'object charge une carte SVG statique ; les SVG inline sont des graphiques ou icônes figés. Aucun n'expose de fonctionnalité de consultation (navigation, zoom ou autre commande) dont l'accessibilité et l'activation au clavier et au pointeur seraient à évaluer. Le critère est donc non applicable. Les défauts d'alternative du canvas et de l'object relèvent du critère 1.1, pas de 4.12.",
       "citations": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 62,
+          "selector": "canvas#latence",
+          "snippet": "<canvas id=\"latence\" width=\"600\" height=\"200\"></canvas>"
+        },
         {
           "file": ".ultra11y/pages/accueil/dom.html",
           "line": 65,
@@ -499,45 +505,15 @@
           "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>"
         },
         {
-          "file": ".ultra11y/pages/cadres-html/dom.html",
-          "line": 27,
-          "selector": "iframe",
-          "snippet": "<iframe src=\"/embed/disponibilite.html\" width=\"600\" height=\"300\"></iframe>"
-        },
-        {
-          "file": ".ultra11y/pages/cadres-html/dom.html",
-          "line": 31,
-          "selector": "iframe",
-          "snippet": "<iframe src=\"/embed/facturation.html\" width=\"600\" height=\"400\"></iframe>"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 139,
-          "selector": "div",
-          "snippet": "<div onclick=\"ouvrirAssistance()\">Ouvrir une demande d’assistance</div>"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 167,
-          "selector": "handler",
-          "snippet": "<input id=\"confirmation\" name=\"confirmation\" type=\"text\" onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\">"
-        },
-        {
-          "file": "tests/fixtures/realworld/LoginForm.tsx",
-          "line": 16,
-          "selector": "handler",
-          "snippet": "e.preventDefault();"
-        },
-        {
-          "file": "tests/fixtures/realworld/contact.html",
-          "line": 179,
-          "selector": "handler",
-          "snippet": "onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\""
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 69,
+          "selector": "svg",
+          "snippet": "<svg viewBox=\"0 0 100 40\"><rect x=\"0\" y=\"10\" width=\"20\" height=\"30\"></rect><rect x=\"30\" y=\"4\" width=\"20\" height=\"36\"></rect></svg>"
         }
       ],
-      "evidenceFingerprint": "sha256:e8fa4cf8247f4ba4c6b05672be4cfe94",
-      "evidenceCount": 7,
-      "date": "2026-08-24",
+      "evidenceFingerprint": "sha256:593e3b2aa16345f8c33f9f093c68fc30",
+      "evidenceCount": 3,
+      "date": "2026-08-25",
       "decidedBy": "agent"
     },
     {

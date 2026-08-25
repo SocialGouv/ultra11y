@@ -214,6 +214,7 @@ const PRESENTATIONAL_MARKUP_ATTRS = new Set([
 
 const DOWNLOAD_HREF = /\.(pdf|docx?|xlsx?)(?:[?#]|$)/i;
 const STATUS_CLASS = /(error|status|message|alert|notif|toast|feedback|live)/i;
+const TEMPORAL_MEDIA_VALUE = /(?:^|[/.?=&_-])(?:audio|video|player|podcast|mp[34]|webm|ogg|ogv|wav|m4a|mov|avi|mpeg)(?:$|[/.?=&_-])/i;
 const ROUTER_IMPORT =
   /['"](?:react-router(?:-dom)?|next\/(?:router|navigation)|vue-router|@remix-run\/[\w-]+|@tanstack\/[\w-]*router|@sveltejs\/kit|\$app\/(?:navigation|stores))['"]/;
 
@@ -225,6 +226,17 @@ const FOREIGN_LEXICON =
 
 const CONTROL_TAGS = ["input", "select", "textarea"] as const;
 const INTERACTIVE_TAGS = ["a", "button", "input", "select", "textarea", "summary", "details", "label"];
+
+/** An object/embed is ambiguous until its declared type or resource says what it carries.
+ * Unknown plug-in content stays in BOTH multimedia populations: narrowing uncertainty to one
+ * side can hide the exact temporal/non-temporal player the criterion was meant to inspect. */
+function embeddedMediaKind(el: El): "temporal" | "non-temporal" | "unknown" {
+  const type = (attr(el, "type") ?? "").toLowerCase();
+  const resource = `${attr(el, "src") ?? ""} ${attr(el, "data") ?? ""}`.toLowerCase();
+  if (/^(?:audio|video)\//.test(type) || TEMPORAL_MEDIA_VALUE.test(`${type} ${resource}`)) return "temporal";
+  if (/^image\//.test(type) || /\.(?:svg|png|jpe?g|webp|avif)(?:[?#]|$)/i.test(resource)) return "non-temporal";
+  return "unknown";
+}
 
 function labelFor(doc: Doc, el: El): string {
   const id = attr(el, "id");
@@ -736,6 +748,84 @@ export const SUBJECTS: Record<string, Subject> = {
       ),
     ]),
 
+  // RGAA 4.11 — temporal players and the code that controls their consultation. This must
+  // not inherit WCAG 2.1.1/2.1.2's page-wide union of pointer handlers and focusables: an
+  // unrelated clickable card says nothing about whether an <audio> can be paused.
+  temporalMediaControls: (docs) =>
+    docs.flatMap((d) => [
+      ...d.elements
+        .filter((e) => e.tag === "audio" || e.tag === "video" || (["object", "embed"].includes(e.tag) && embeddedMediaKind(e) !== "non-temporal"))
+        .map((e) =>
+          h(
+            d,
+            e,
+            `<${e.tag}> temporal media — controls=${attr(e, "controls") !== undefined}, autoplay=${attr(e, "autoplay") !== undefined}; can play/pause/stop and sound be operated by keyboard and pointer?`,
+            `temporal-media|${e.tag}|${attr(e, "src") ?? attr(e, "data") ?? ""}|controls=${attr(e, "controls") !== undefined}`,
+          ),
+        ),
+      ...linesOf(d, /\.(?:play|pause)\s*\(|\b(?:currentTime|muted|volume|playbackRate)\s*=|\bHTMLMediaElement\b/).map((l) =>
+        hAt(d, l.line, "media-control", `custom temporal-media control: ${l.text}`, `temporal-control|${l.text}`),
+      ),
+    ]),
+
+  // RGAA 4.12 — non-temporal plug-in/SVG/canvas media. Static instances are included too:
+  // the adjudicator must first establish whether they expose consultation controls before it
+  // can legitimately answer NA. Temporal players and generic event handlers stay out.
+  nonTemporalMediaControls: (docs) =>
+    docs.flatMap((d) => [
+      ...d.elements
+        .filter((e) => e.tag === "svg" || e.tag === "canvas" || (["object", "embed"].includes(e.tag) && embeddedMediaKind(e) !== "temporal"))
+        .map((e) =>
+          h(
+            d,
+            e,
+            `<${e.tag}> non-temporal media — inspect any pan/zoom/navigation/control function for keyboard and pointer operation`,
+            `non-temporal-media|${e.tag}|${attr(e, "src") ?? attr(e, "data") ?? attr(e, "id") ?? ""}`,
+          ),
+        ),
+      ...linesOf(d, /\b(?:svgPanZoom|panzoom|zoomIn|zoomOut|getContext)\b/i).map((l) =>
+        hAt(d, l.line, "media-control", `non-temporal media/control code: ${l.text}`, `non-temporal-control|${l.text}`),
+      ),
+    ]),
+
+  // WCAG 2.3.1 / RGAA 13.7 — only things capable of a luminance flash. The old `motion`
+  // subject mixed autoplay audio and <marquee> into this criterion while omitting ordinary
+  // images, canvas, scripts and stylesheet animation rules. That gave the adjudicator lots of
+  // evidence and none of the evidence the three-flash test actually asks for.
+  flashes: (docs) =>
+    docs.flatMap((d) => [
+      ...d.elements
+        .filter((e) => ["video", "img", "svg", "canvas", "embed", "object", "blink"].includes(e.tag))
+        .map((e) =>
+          h(
+            d,
+            e,
+            `<${e.tag}> visual/animated content — does it flash, and if so is it at most 3 flashes/s or below the area threshold?`,
+            `flash-media|${e.tag}|${attr(e, "src") ?? attr(e, "data") ?? attr(e, "id") ?? ""}`,
+          ),
+        ),
+      ...elementsByTag(d, "script").map((e) =>
+        h(d, e, `<script> — inspect for luminance/colour states toggled rapidly`, `flash-script|${attr(e, "src") ?? t(e, 80)}`),
+      ),
+      ...d.elements
+        .filter((e) => /animation|transition/i.test(attr(e, "style") ?? ""))
+        .map((e) => h(d, e, `inline visual animation: ${(attr(e, "style") ?? "").slice(0, 100)}`, `flash-inline|${attr(e, "style") ?? ""}`)),
+      ...(d.signals?.css?.rules ?? [])
+        .filter((r) => r.decls.animation !== undefined || r.decls.animationName !== undefined)
+        .map((r) =>
+          hAt(
+            d,
+            1,
+            `css:${r.selector}`,
+            `stylesheet animation: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} } — inspect keyframes for rapid opposing luminance changes`,
+            `flash-css|${r.selector}|${declsText(r.decls)}`,
+          ),
+        ),
+      ...linesOf(d, /\b(?:flash|flashing|strobe|setInterval|requestAnimationFrame|classList\.(?:add|remove|replace|toggle))\b|animation(?:-name)?\s*:/i)
+        .filter((l) => !/^\s*(?:<!--|\/\/|\/\*)/.test(l.text))
+        .map((l) => hAt(d, l.line, "flash-code", `possible scripted/CSS flash mechanism: ${l.text}`, `flash-code|${l.text}`)),
+    ]),
+
   // A change of context initiated by a script. RGAA 7.4 / WCAG 3.2.1-3.2.2.
   //
   // THE SUBJECT IS THE SCRIPT, and getting that wrong cost a release. This used to be a list of
@@ -1056,7 +1146,7 @@ export const SC_SUBJECTS: Record<string, string[]> = {
   "2.1.4": ["shortcuts"],
   "2.2.1": ["timers"],
   "2.2.2": ["motion", "timers"],
-  "2.3.1": ["motion"],
+  "2.3.1": ["flashes"],
   "2.4.1": ["landmarks"],
   "2.4.3": ["focusOrder"],
   "2.4.4": ["links"],
@@ -1156,6 +1246,10 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // WCAG 1.4.2, which is `static` and therefore has no subject of its own — but the pack
     // flags 4.10 `judgment`, so judgmentGuard reopens it and it would arrive with nothing.
     "4.10": ["motion"],
+    // 4.11/4.12 map to the same keyboard SCs but ask about disjoint media populations.
+    // Inheriting the union handed both criteria every pointer handler and focusable in scope.
+    "4.11": ["temporalMediaControls"],
+    "4.12": ["nonTemporalMediaControls"],
     // Theme 3 — colour. The question is about what colour alone conveys, not the outline.
     "3.1": ["colourPairs", "links"],
     "3.2": ["colourPairs"],
@@ -1192,7 +1286,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "13.2": ["newWindow"],
     "13.3": ["downloadDocs"],
     "13.4": ["downloadDocs"],
-    "13.7": ["motion"],
+    "13.7": ["flashes"],
     "13.8": ["motion", "timers"],
     "13.9": ["readingOrder"],
     "13.10": ["pointerHandlers"],

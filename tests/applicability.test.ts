@@ -102,6 +102,24 @@ describe("time-based media (WCAG 1.2.x)", () => {
   });
 });
 
+describe("flash applicability (WCAG 2.3.1)", () => {
+  it("does not treat sound-only media or scrolling text as a possible luminosity flash", () => {
+    expect(statusOf(audit(doc('<audio autoplay src="sound.mp3"></audio><marquee>News</marquee>')), "2.3.1")).toBe(INAPPLICABLE_STATUS);
+  });
+
+  for (const [label, markup] of [
+    ["visual media", '<video src="clip.mp4"></video>'],
+    ["an image", '<img src="still.png" alt="">'],
+    ["a canvas", "<canvas></canvas>"],
+    ["an inline animation", '<div style="animation: strobe .2s infinite"></div>'],
+    ["a script", '<script>setInterval(() => el.classList.toggle("bright"), 100)</script>'],
+  ] as const) {
+    it(`keeps the criterion open for ${label}`, () => {
+      expect(statusOf(audit(doc(markup)), "2.3.1")).not.toBe(INAPPLICABLE_STATUS);
+    });
+  }
+});
+
 describe("user input (WCAG 3.3.x + 1.3.5)", () => {
   it("closes the form criteria as NA when nothing in scope takes input", () => {
     const r = audit(doc("<p>Read-only content.</p>"));
