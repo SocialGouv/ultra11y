@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.34.0](https://github.com/maxgfr/ultra11y/compare/v5.33.1...v5.34.0) (2026-08-25)
+
+
+### Bug Fixes
+
+* **action:** the default grain is not a value the engine accepts ([eac461e](https://github.com/maxgfr/ultra11y/commit/eac461eadab5805b6d97a883c76159c85892069f))
+
+
+### Features
+
+* **adjudicate:** hand the agent tier a reasoning effort ([eb20405](https://github.com/maxgfr/ultra11y/commit/eb20405e739b0e2b532a79c0f81e99b176953990))
+
 ## [5.33.1](https://github.com/maxgfr/ultra11y/compare/v5.33.0...v5.33.1) (2026-08-24)
 
 
