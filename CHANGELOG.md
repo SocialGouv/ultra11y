@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.34.1](https://github.com/maxgfr/ultra11y/compare/v5.34.0...v5.34.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **adjudicate:** un refus qui nomme sa cause, pas seulement son symptôme ([30b092b](https://github.com/maxgfr/ultra11y/commit/30b092b4ce20404a4a9e65aa1d41b23acbab3b6d))
+
 # [5.34.0](https://github.com/maxgfr/ultra11y/compare/v5.33.1...v5.34.0) (2026-08-25)
 
 
