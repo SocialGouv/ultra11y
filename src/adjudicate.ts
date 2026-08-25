@@ -766,6 +766,12 @@ export function applyAdjudication(
   // Spelling first, decisions second: "na" is NA, and rejecting the run over the case of a
   // verdict taught the caller nothing about accessibility. Everything below stays fail-closed.
   canonicalizeAdjudication(adj);
+  const itemCounts = new Map<string, number>();
+  for (const item of adj.items) itemCounts.set(item.criteriaId, (itemCounts.get(item.criteriaId) ?? 0) + 1);
+  for (const [criteriaId, count] of itemCounts) {
+    if (count > 1)
+      blame(criteriaId, `criterion ${criteriaId}: duplicate criterion id appears ${count} times in the adjudication — no implicit winner is accepted`);
+  }
   const byId = new Map(adj.items.map((it) => [it.criteriaId, it]));
 
   // Coverage. Under the core that means every residual success criterion; under a pack it

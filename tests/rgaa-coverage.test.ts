@@ -9,7 +9,7 @@
 // never be blocked by a test, only removing coverage should.
 import { describe, it, expect } from "vitest";
 import { loadPack } from "../src/standards/index.js";
-import { ruleIds } from "../src/rules/registry.js";
+import { ruleById, ruleIds } from "../src/rules/registry.js";
 import { crossRuleIds } from "../src/rules/cross-registry.js";
 import { getSC } from "../src/wcag.js";
 
@@ -60,6 +60,14 @@ describe("the mapping is real, not aspirational", () => {
   it("only attaches a rule to a criterion they genuinely share a success criterion with", () => {
     for (const c of withRules) {
       for (const sc of c.wcag) expect(getSC(sc) ?? sc === "4.1.1", `RGAA ${c.id} → WCAG ${sc}`).toBeTruthy();
+      for (const ruleId of c.appliesTo?.ruleIds ?? []) {
+        const rule = ruleById(ruleId);
+        if (!rule) continue; // cross-file, rendered, axe, dynamic or pack-owned tier
+        expect(
+          rule.criteria.some((sc) => c.wcag.includes(sc)),
+          `RGAA ${c.id} maps ${ruleId}, but the rule owns ${rule.criteria.join(", ")}`,
+        ).toBe(true);
+      }
     }
   });
 });

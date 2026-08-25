@@ -35,6 +35,26 @@ const CONCURRENCY = 4;
 const MAX_ATTEMPTS = 4;
 const MAX_TOKENS = 16000;
 
+/** Partition a worklist without changing its order or identity. */
+export function batchWorklist(
+  items: AdjudicationItem[],
+  render: (items: AdjudicationItem[]) => string,
+  size = BATCH_SIZE,
+): { items: AdjudicationItem[]; prompt: string }[] {
+  if (!Number.isInteger(size) || size < 1) throw new Error(`batch size must be a positive integer (got ${size})`);
+  const ids = items.map((item) => item.criteriaId);
+  if (new Set(ids).size !== ids.length) {
+    const duplicate = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+    throw new Error(`worklist contains duplicate criterion id(s): ${duplicate.join(", ")}`);
+  }
+  const batches: { items: AdjudicationItem[]; prompt: string }[] = [];
+  for (let i = 0; i < items.length; i += size) {
+    const slice = items.slice(i, i + size);
+    batches.push({ items: slice, prompt: render(slice) });
+  }
+  return batches;
+}
+
 export function apiKeyFromEnv(): string | undefined {
   const k = process.env.ANTHROPIC_API_KEY?.trim();
   return k || undefined;
@@ -251,7 +271,7 @@ function verdictsOf(res: AnthropicResponse): RawVerdict[] {
 
 /** Rule on one batch of worklist items. `prompt` is the rendered worklist for exactly these
  *  items — the same text the agent reads, never a second protocol. */
-export async function judgeBatch(items: AdjudicationItem[], prompt: string, opts: LlmOptions): Promise<RawVerdict[]> {
+export async function judgeBatch(_items: AdjudicationItem[], prompt: string, opts: LlmOptions): Promise<RawVerdict[]> {
   if (!opts.apiKey) throw new Error("ultra11y judge: the Messages backend needs an API key (ANTHROPIC_API_KEY or --api-key).");
   const res = await callOnce(
     {
@@ -264,10 +284,25 @@ export async function judgeBatch(items: AdjudicationItem[], prompt: string, opts
     },
     opts,
   );
-  const known = new Set(items.map((i) => i.criteriaId));
-  // A verdict for a criterion nobody asked about is dropped rather than folded: the gate
-  // downstream would reject it anyway, and dropping it keeps the failure legible.
-  return verdictsOf(res).filter((v) => known.has(v.criteriaId));
+  // Validation is centralized in `judgeAll`, whatever transport produced the answer. Keeping
+  // unknown ids until that boundary means they are diagnosed rather than silently dropped.
+  return verdictsOf(res);
+}
+
+function validateBatchVerdicts(items: AdjudicationItem[], landed: RawVerdict[]): { accepted: RawVerdict[]; failures: string[] } {
+  const expected = new Set(items.map((item) => item.criteriaId));
+  const counts = new Map<string, number>();
+  for (const verdict of landed) counts.set(verdict.criteriaId, (counts.get(verdict.criteriaId) ?? 0) + 1);
+  const duplicate = new Set([...counts].filter(([, count]) => count > 1).map(([id]) => id));
+  const unknown = [...new Set(landed.map((v) => v.criteriaId).filter((id) => !expected.has(id)))];
+  const accepted = landed.filter((verdict) => expected.has(verdict.criteriaId) && !duplicate.has(verdict.criteriaId));
+  const acceptedIds = new Set(accepted.map((verdict) => verdict.criteriaId));
+  const missing = [...expected].filter((id) => !acceptedIds.has(id) && !duplicate.has(id));
+  const failures: string[] = [];
+  if (duplicate.size) failures.push(`duplicate criterion id(s) in batch response: ${[...duplicate].join(", ")}`);
+  if (unknown.length) failures.push(`unknown criterion id(s) in batch response: ${unknown.join(", ")}`);
+  if (missing.length) failures.push(`missing criterion id(s) in batch response: ${missing.join(", ")}`);
+  return { accepted, failures };
 }
 
 /** Run every batch with bounded concurrency, returning the verdicts in no particular order.
@@ -289,10 +324,12 @@ export async function judgeAll(
       for (let b = queue.shift(); b !== undefined; b = queue.shift()) {
         try {
           const landed = await backend(b.items, b.prompt, opts);
-          verdicts.push(...landed);
+          const checked = validateBatchVerdicts(b.items, landed);
+          failures.push(...checked.failures);
+          verdicts.push(...checked.accepted);
           // Handed over BEFORE the next batch starts, so a run that dies mid-sweep leaves
           // behind what it had already ruled on rather than nothing at all.
-          if (landed.length) opts.onVerdicts?.(landed);
+          if (checked.accepted.length) opts.onVerdicts?.(checked.accepted);
         } catch (e) {
           failures.push(e instanceof Error ? e.message : String(e));
         }
@@ -306,7 +343,11 @@ export async function judgeAll(
 /** Fold raw verdicts onto the worklist items. Unmatched items keep their blank verdict, so
  *  the coverage gate — not this function — is what refuses an incomplete adjudication. */
 export function applyRawVerdicts(items: AdjudicationItem[], verdicts: RawVerdict[]): number {
-  const byId = new Map(verdicts.map((v) => [v.criteriaId, v]));
+  const counts = new Map<string, number>();
+  for (const verdict of verdicts) counts.set(verdict.criteriaId, (counts.get(verdict.criteriaId) ?? 0) + 1);
+  // A contradiction has no safe implicit winner. Leave it blank so the coverage gate refuses
+  // it, exactly as it refuses an unanswered item.
+  const byId = new Map(verdicts.filter((v) => counts.get(v.criteriaId) === 1).map((v) => [v.criteriaId, v]));
   let filled = 0;
   for (const item of items) {
     const v = byId.get(item.criteriaId);

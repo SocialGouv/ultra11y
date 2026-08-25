@@ -88,6 +88,12 @@ with Haiku, against a reference ledger adjudicated by a stronger model through t
 `11.2.1` really is a test of `11.2`. It never asks whether the reading was right, so an
 adjudicator that files « this field has no label » (which is 11.1's) under 11.2 passes cleanly.
 
+The `48` above is the intersection of two measured experiment outputs, **not** a fixed number
+of RGAA criteria assigned to the agent. On every real run, read the final provenance tally.
+For example, `26 engine + 32 scan + 46 agent + 2 named undecidable = 106` is complete; calling
+that “48 agent criteria” would hide both the actual 46 model verdicts and the two explicit
+exceptions.
+
 Three things now stand between that and a deliverable, and only the third is a model:
 
 1. **The brief names the neighbour.** A criterion states which of its theme-mates owns the

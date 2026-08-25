@@ -3,6 +3,7 @@
 // the results of the WCAG SCs it maps to and fold them with the same NC-dominates rule.
 // Presentation-only: the canonical, gated verdict lives on the WCAG core.
 import { ownPackSubjects, subjectsAbsent, subjectsForPackCriterion } from "../adjudicate-subjects.js";
+import { findingId } from "../baseline.js";
 import { coverageFor, criterionMeasuredOn, unionCoverage } from "../coverage.js";
 import type { AuditResult, CriterionResult, PageCoverage, Status, Finding, Severity } from "../types.js";
 import { CORE_KEY, loadPack } from "./registry.js";
@@ -461,6 +462,32 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
  *  per-page grid used to drop them silently. */
 export function findingsForStandard(audit: AuditResult, standard: string): Finding[] {
   if (standard === CORE_KEY) return audit.findings;
-  const mine = (audit.packFindings ?? []).filter((f) => f.ruleId.startsWith(`pack:${standard}:`));
-  return mine.length ? [...audit.findings, ...mine] : audit.findings;
+  // The standard's DERIVED GRID is the authority. Returning every core finding here and
+  // relying on each renderer to filter it afterwards produced contradictory surfaces: the
+  // RGAA heading counted four WCAG 1.3.1 findings while the table (correctly) had no RGAA
+  // criterion to attach them to. It also made severity gates fail on defects the selected
+  // standard did not count. A finding belongs here only when at least one derived criterion
+  // actually carries it.
+  // `audit.findings` is also the selection boundary used by baseline-mode CI: that path
+  // narrows the flat list to NEW findings while deliberately retaining the full criterion
+  // grid for coverage. Match by stable occurrence id (not object identity, which is lost on
+  // JSON round-trips), otherwise deriving from the retained grid resurrects the backlog.
+  const eligible = new Set(
+    [
+      ...audit.findings,
+      ...(audit.packFindings ?? []).filter((finding) => finding.ruleId.startsWith(`pack:${standard}:`)),
+      ...(audit.packAdjudication?.standard === standard ? audit.packAdjudication.criteria.flatMap((criterion) => criterion.findings) : []),
+    ].map(findingId),
+  );
+  const seen = new Set<string>();
+  const out: Finding[] = [];
+  for (const criterion of derivePackResults(audit, standard)) {
+    for (const finding of criterion.findings) {
+      const id = findingId(finding);
+      if (!eligible.has(id) || seen.has(id)) continue;
+      seen.add(id);
+      out.push(finding);
+    }
+  }
+  return out;
 }

@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { toSarif } from "../src/sarif.js";
 import { findingId } from "../src/baseline.js";
-import { VERSION } from "../src/types.js";
+import { SCHEMA_VERSION, VERSION } from "../src/types.js";
 import type { AuditResult, Finding } from "../src/types.js";
+import { allSC } from "../src/wcag.js";
 
 const F = (over: Partial<Finding> = {}): Finding => ({
   ruleId: "img-alt-missing",
@@ -20,7 +21,22 @@ const F = (over: Partial<Finding> = {}): Finding => ({
   ...over,
 });
 
-const audit = (findings: Finding[]): AuditResult => ({ findings, date: "2026-07-29", scope: { inputs: [], files: 1 } }) as unknown as AuditResult;
+const audit = (findings: Finding[]): AuditResult => ({
+  tool: "ultra11y",
+  standard: "wcag",
+  version: VERSION,
+  schemaVersion: SCHEMA_VERSION,
+  findings,
+  date: "2026-07-29",
+  scope: { inputs: [], files: 1, subjectsSeen: ["images", "links"] },
+  criteria: allSC().map((sc) => {
+    const own = findings.filter((f) => f.criteriaId === sc.sc);
+    return { id: sc.sc, guideline: sc.guideline, status: own.some((f) => !f.advisory) ? "NC" : "manual", findings: own };
+  }),
+  guidelines: [],
+  residualRisks: [],
+  conformancePct: 0,
+});
 
 describe("SARIF envelope", () => {
   it("is a well-formed 2.1.0 log naming ultra11y and its version", () => {
@@ -68,6 +84,17 @@ describe("rules table", () => {
   it("carries the pack criterion as a tag when a standard is projected", () => {
     const rule = toSarif(audit([F()]), { standard: "rgaa" }).runs[0]?.tool.driver.rules[0];
     expect(rule?.properties?.tags).toContain("rgaa:1.1");
+  });
+
+  it("does not resurrect baseline findings from the retained criterion grid", () => {
+    const old = F({ sourceStart: 10, sourceEnd: 20 });
+    const fresh = F({ sourceStart: 50, sourceEnd: 60 });
+    const full = audit([old, fresh]);
+    const baselineView = { ...full, findings: [fresh] };
+    const results = toSarif(baselineView, { standard: "rgaa" }).runs[0]?.results ?? [];
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.partialFingerprints?.["ultra11yFindingId/v1"]).toBe(findingId(fresh));
   });
 });
 

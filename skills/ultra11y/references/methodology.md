@@ -19,6 +19,17 @@ criteria are coarser than the engine's rules, that denominator is deliberately s
 it is **not** a full conformance rate. Full WCAG 2.2 AA conformance requires completing
 the "to assess" criteria by hand.
 
+That rate remains available in the complete artifact, beside its qualification. GitHub job
+summaries and PR comments do **not** print it: they print `decided/total`, the provenance
+breakdown (`engine`, `scan`, `agent`) and the remaining count. This prevents a static result
+such as 11 conformities and 1 non-conformity from being read as “92% RGAA” when only 12 of the
+106 RGAA criteria have actually been decided.
+
+The 81 bundled static checks are **rules, not criteria**. Their relationship is many-to-many:
+several rules can evidence one criterion, and a pack can scope one rule to several of its own
+criteria. Rule count, criterion coverage and agent worklist size must never be substituted for
+one another.
+
 ## Non-conformity priorities
 
 - 🔴 **Blocking** — prevents access to content/function (e.g. missing alt, unlabeled

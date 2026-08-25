@@ -20,6 +20,14 @@ criteria (computed contrast, visible focus, zoom/reflow, content-on-hover) fall 
 tier (axe-core in a real browser); a human is at most optional oversight. Gates stop any
 hallucinated non-conformity from surviving, and nothing is ever silently "conforming".
 
+**Do not confuse rules with criteria.** The bundle ships 81 static checks, WCAG AA has 55
+success criteria, and RGAA has 106 criteria. Several rules may evidence one criterion, one
+rule may contribute to several pack criteria, and most criteria remain open until a scan or
+an adjudication. The only honest run-level coverage is the grid's live provenance tally
+(`moteur + scan + agent`, plus any named undecidable residue), never a fixed promise such as
+“48 agent criteria”. GitHub summaries therefore show `decided/total`, not a percentage over
+the small decided subset.
+
 **WCAG 2.2 Level AA is the worldwide core.** Country standards — France's **RGAA**, the
 US **Section 508**, the EU **EN 301 549** — are pluggable *standards packs* that map their
 criteria onto WCAG. Add `--standard rgaa` to re-key **every command and every output** —

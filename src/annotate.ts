@@ -32,11 +32,11 @@ import {
   basisLabel,
   commonOrigin,
   derivePages,
-  formatRate,
   pageBasisWarning,
   pageColumnLabel,
   pageGridModel,
   pageOriginNote,
+  pageView,
   pagesOf,
   renderRedirected,
   unattributedFindings,
@@ -107,7 +107,9 @@ const S = {
   fr: {
     title: "Audit d'accessibilité ultra11y",
     files: "fichiers",
-    rate: "réussite automatique",
+    coverage: (decided: number, total: number) => `${decided}/${total} critères tranchés dans ce run`,
+    remaining: (n: number) => `${n} à compléter par scan ou adjudication`,
+    provenance: { engine: "moteur", scan: "scan", agent: "agent" },
     none: "✅ Aucune non-conformité détectée par le moteur statique.",
     findings: "Non-conformités",
     severity: "Sévérité",
@@ -189,7 +191,9 @@ const S = {
   en: {
     title: "ultra11y accessibility audit",
     files: "files",
-    rate: "automatic pass rate",
+    coverage: (decided: number, total: number) => `${decided}/${total} criteria decided in this run`,
+    remaining: (n: number) => `${n} still to complete by scan or adjudication`,
+    provenance: { engine: "engine", scan: "scan", agent: "agent" },
     none: "✅ No non-conformity detected by the static engine.",
     findings: "Non-conformities",
     severity: "Severity",
@@ -397,15 +401,28 @@ export function groupByCriterion(groups: FindingGroup[]): CriterionGroup[] {
     .sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity) || b.occurrences - a.occurrences || a.criterion.localeCompare(b.criterion));
 }
 
-/** The run-wide rate, WITH the denominator it never carried, and the `*` when an agent ruled
- *  a conformity the engine did not prove. `conformancePct` is computed over the decided set
- *  (src/audit.ts) and then discarded; the count comes back from the shared report model, so
- *  this number and the Markdown report's §1 total cannot disagree. */
-export function runRate(result: AuditResult, standard: StandardId, lang: Lang): { text: string; agentRuled: boolean } {
+/** Run-wide COVERAGE for GitHub surfaces. Deliberately no percentage: a rate over the decided
+ *  subset reads like a score for the whole standard, which is how a WCAG 92 % was presented
+ *  beside an RGAA 12/106 denominator. Counts and provenance all come from the same report
+ *  rows, so the headline cannot mix standards or decision tiers. */
+export function runCoverage(result: AuditResult, standard: StandardId, lang: Lang): { text: string; detail: string; agentRuled: boolean } {
   const groups = isCore(standard) ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
   const { decided, total } = reportCoverage(groups);
+  const decidedRows = groups.flatMap((g) => g.rows).filter((r) => r.status === "C" || r.status === "NC");
+  const by = {
+    engine: decidedRows.filter((r) => !r.decidedBy || r.decidedBy === "engine").length,
+    scan: decidedRows.filter((r) => r.decidedBy === "scan").length,
+    agent: decidedRows.filter((r) => r.decidedBy === "agent").length,
+  };
+  const s = S[lang];
+  const provenance = (["engine", "scan", "agent"] as const).filter((key) => by[key] > 0).map((key) => `${by[key]} ${s.provenance[key]}`);
+  const remaining = Math.max(0, total - decided);
   const agentRuled = groups.some((g) => g.rows.some((r) => r.decidedBy === "agent" && r.status === "C"));
-  return { text: `${formatRate(decided === 0 ? null : result.conformancePct, decided, total)}${agentRuled ? "*" : ""}`, agentRuled };
+  return {
+    text: s.coverage(decided, total),
+    detail: [...provenance, ...(remaining ? [s.remaining(remaining)] : [])].join(" · "),
+    agentRuled,
+  };
 }
 
 // Pipes inside a cell would break the table.
@@ -461,12 +478,12 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
   const lang = opts.lang ?? "en";
   const s = S[lang];
   const stdLabel = isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name;
-  const rate = runRate(result, standard, lang);
+  const coverage = runCoverage(result, standard, lang);
 
   const out: string[] = [];
   out.push(`## ${s.title} — ${stdLabel}`, "");
-  out.push(`\`${result.date}\` · ${result.scope.files} ${s.files} · **${rate.text}** ${s.rate}`, "");
-  if (rate.agentRuled) out.push(`> ${agentMarkNote(lang)}`, "");
+  out.push(`\`${result.date}\` · ${result.scope.files} ${s.files} · **${coverage.text}**${coverage.detail ? ` · ${coverage.detail}` : ""}`, "");
+  if (coverage.agentRuled) out.push(`> ${agentMarkNote(lang)}`, "");
 
   // Resolve the standard's findings BEFORE the empty check: a page whose only defect comes
   // from a declarative pack rule has an empty `result.findings` and would otherwise be
@@ -568,16 +585,16 @@ export function prComment(result: AuditResult, opts: AnnotateOptions & { runUrl?
   const all = findingsForStandard(result, standard);
   const normative = all.filter((f) => !f.advisory);
   const blocking = normative.filter((f) => f.severity === "bloquant").length;
-  const rate = runRate(result, standard, lang);
+  const coverage = runCoverage(result, standard, lang);
   const grouped = groupFindings(all, standard, lang, baseDir);
   const criteria = groupByCriterion(grouped);
-  const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
+  const orphans = all.filter((f) => !f.advisory && !f.page).length;
 
   const head: string[] = [];
   head.push(`### ${s.title} — ${stdLabel}`, "");
   head.push(blocking ? s.verdictFail(blocking) : normative.length ? s.verdictWarn : s.verdictPass, "");
-  head.push(`\`${result.date}\` · ${result.scope.files} ${s.files} · **${rate.text}** ${s.rate}`, "");
-  if (rate.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
+  head.push(`\`${result.date}\` · ${result.scope.files} ${s.files} · **${coverage.text}**${coverage.detail ? ` · ${coverage.detail}` : ""}`, "");
+  if (coverage.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
   if (orphans) head.push(`> ${s.unattributed(orphans)}`, "");
 
   const tail: string[] = [];
@@ -653,7 +670,7 @@ export function perPageTable(result: AuditResult, standard: StandardId = CORE, l
     "",
     ...scoreboardTable(result, derived, standard, s, lang),
     "",
-    ...basisCaveats(result, derived, s, lang),
+    ...basisCaveats(result, derived, standard, s, lang),
     ...fullGridBlock(result, derived, standard, s, lang),
     "",
     ...derived.flatMap((pg) => [...namedCriteriaBlock(result, pg, standard, s, lang), ""]),
@@ -717,7 +734,8 @@ function scoreboardTable(result: AuditResult, derived: PageResult[], standard: S
     "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
   ];
   for (const pg of derived) {
-    const n = (sev: Severity): number => severityCount(pg, sev);
+    const pageFindings = findingsForStandard(pageView(result, pg), standard).filter((f) => !f.advisory);
+    const n = (sev: Severity): number => pageFindings.filter((f) => f.severity === sev).length;
     const t = pageTally(pageCriterionRows(result, pg, standard, lang));
     out.push(
       `| ${pg.name}${pg.auth ? " 🔒" : ""} — \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${t.c} | ${t.nc} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`,
@@ -756,17 +774,14 @@ function undecidedBlock(result: AuditResult, derived: PageResult[], standard: St
   return out;
 }
 
-function severityCount(pg: PageResult, sev: Severity): number {
-  return pg.findings.filter((f) => !f.advisory && f.severity === sev).length;
-}
-
 /** The caveats a scoreboard must carry: findings no page could claim, and every basis weaker
  *  than a snapshot actually present. One caveat per basis, from the shared sentences — a
  *  « non audité » page must not be explained by the note that asserts it has no snapshot. */
-function basisCaveats(result: AuditResult, derived: PageResult[], s: (typeof S)[Lang], lang: Lang): string[] {
+function basisCaveats(result: AuditResult, derived: PageResult[], standard: StandardId, s: (typeof S)[Lang], lang: Lang): string[] {
   // What the three count columns mean, and why there is no percentage beside them.
   const out: string[] = [`> ${s.scoreboardNote}`, ""];
-  const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
+  const projected = new Set(findingsForStandard(result, standard));
+  const orphans = unattributedFindings(result).filter((f) => projected.has(f) && !f.advisory).length;
   if (orphans) out.push(`> ${s.unattributed(orphans)}`, "");
   if (derived.some((p) => p.basis === "attributed")) out.push(`> ${s.sourceBasis}`, "");
   const notAudited = pageBasisWarning("not-audited", lang);
@@ -793,9 +808,11 @@ function pageBlock(result: AuditResult, page: PageResult, standard: StandardId, 
   const s = S[lang];
   const rows = pageCriterionRows(result, page, standard, lang);
   const nc = rows.filter((r) => r.status === "NC");
-  const occurrences = page.findings.filter((f) => !f.advisory).length;
+  const pageFindings = findingsForStandard(pageView(result, page), standard).filter((f) => !f.advisory);
+  const occurrences = pageFindings.length;
   if (!nc.length && !occurrences) return undefined;
-  const counts = `🔴 ${severityCount(page, "bloquant")} · 🟠 ${severityCount(page, "majeur")} · 🟡 ${severityCount(page, "mineur")}`;
+  const count = (severity: Severity): number => pageFindings.filter((f) => f.severity === severity).length;
+  const counts = `🔴 ${count("bloquant")} · 🟠 ${count("majeur")} · 🟡 ${count("mineur")}`;
   const withTests = nc.some((r) => r.tests.length);
   const out: string[] = [
     "<details>",
@@ -837,12 +854,7 @@ function pageBlock(result: AuditResult, page: PageResult, standard: StandardId, 
   // actually stop a user. They are different work — a blocking non-conformity is a page
   // somebody cannot use — so they get their own heading, and the clamp below can never take
   // one: it comes off the non-blocking half first, and off the blocking half never.
-  const defects = groupFindings(
-    page.findings.filter((f) => !f.advisory),
-    standard,
-    lang,
-    baseDir,
-  );
+  const defects = groupFindings(pageFindings, standard, lang, baseDir);
   // Grouped by criterion here too, for the reason the run-wide table was: this page's twelve
   // `img-alt-missing` selectors are ONE criterion to answer for, and listing them flat made the
   // six-row budget spend itself on one criterion while the others went unnamed.
@@ -908,7 +920,8 @@ function fullGridBlock(result: AuditResult, derived: PageResult[], standard: Sta
  *  So they get a block of their own, folded, in the same shape as a page's: shared code and
  *  files outside every route are still code somebody has to fix. */
 function orphansBlock(result: AuditResult, standard: StandardId, s: (typeof S)[Lang], lang: Lang, baseDir: string): string[] {
-  const orphans = unattributedFindings(result).filter((f) => !f.advisory);
+  const projected = new Set(findingsForStandard(result, standard));
+  const orphans = unattributedFindings(result).filter((f) => projected.has(f) && !f.advisory);
   if (!orphans.length) return [];
   const criteria = groupByCriterion(groupFindings(orphans, standard, lang, baseDir));
   const counts = SEV_ORDER.map((sev) => `${ICON[sev]} ${orphans.filter((f) => f.severity === sev).length}`).join(" · ");
@@ -1001,19 +1014,19 @@ export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runU
   const derived = derivePages(result, scope);
   const normative = findingsForStandard(result, standard).filter((f) => !f.advisory);
   const blocking = normative.filter((f) => f.severity === "bloquant").length;
-  const rate = runRate(result, standard, lang);
+  const coverage = runCoverage(result, standard, lang);
 
   head.push(blocking ? s.verdictFail(blocking) : normative.length ? s.verdictWarn : s.verdictPass, "");
-  head.push(`\`${result.date}\` · ${s.pagesCount(derived.length)} · **${rate.text}** ${s.rate}`, "");
-  if (rate.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
+  head.push(`\`${result.date}\` · ${s.pagesCount(derived.length)} · **${coverage.text}**${coverage.detail ? ` · ${coverage.detail}` : ""}`, "");
+  if (coverage.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
 
   // Worst first, so the pages the size clamp drops are the least severe ones.
+  const severity = (page: PageResult, level: Severity): number =>
+    findingsForStandard(pageView(result, page), standard).filter((f) => !f.advisory && f.severity === level).length;
   const blocks = [...derived]
     .sort(
       (a, b) =>
-        severityCount(b, "bloquant") - severityCount(a, "bloquant") ||
-        severityCount(b, "majeur") - severityCount(a, "majeur") ||
-        severityCount(b, "mineur") - severityCount(a, "mineur"),
+        severity(b, "bloquant") - severity(a, "bloquant") || severity(b, "majeur") - severity(a, "majeur") || severity(b, "mineur") - severity(a, "mineur"),
     )
     .map((p) => pageBlock(result, p, standard, lang, baseDir))
     .filter((b): b is string => b !== undefined);
@@ -1036,7 +1049,7 @@ export function pagesComment(result: AuditResult, opts: AnnotateOptions & { runU
   const assemble = (nBlocks: number, nRows: number, withGrid = true): string => {
     const body: string[] = [...scoreboardTable(result, derived.slice(0, nRows), standard, s, lang), ""];
     if (nRows < derived.length) body.push(s.scoreboardClamped(derived.length - nRows), "");
-    body.push(...basisCaveats(result, derived, s, lang));
+    body.push(...basisCaveats(result, derived, standard, s, lang));
     // What nobody has ruled on, NAMED. Empty — and therefore invisible — on a complete grid,
     // which is the state this whole document is meant to reach.
     body.push(...undecidedBlock(result, derived, standard, s, lang));

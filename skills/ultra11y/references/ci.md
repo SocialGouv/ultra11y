@@ -339,18 +339,27 @@ plan renders inline on the diff, and appends a Markdown job summary to
 been scanned and merged). With no `$GITHUB_STEP_SUMMARY` set, the summary goes to stderr so a
 local run still shows it.
 
+The GitHub summary deliberately prints **coverage, never a percentage**:
+`12/106 criteria decided in this run · 12 engine · 94 still to complete by scan or
+adjudication`. A percentage over the decided subset looks like a conformance score for the
+whole grid. Coverage and provenance are derived from the selected standard's criterion rows,
+and the occurrence count is derived from the same projection; a WCAG finding that makes no
+RGAA criterion non-conformant therefore appears in neither the heading nor an empty table.
+
 URL-keyed findings are **skipped** for annotations — there is no repo line to point at — and
 counted in the summary instead, so they are never silently dropped.
 
 ## Which command to run it from
 
-`audit` is always WCAG-keyed: it takes **no** `--standard`, by design (a pack is a derived
-view, never a second source of truth). So:
+The engine remains WCAG-keyed internally, while `audit --standard <pack>` writes a pack-keyed
+document with that core under `core`. CI renderers always project from the active standard's
+grid. So:
 
 | You want | Run |
 |---|---|
 | WCAG-keyed CI output, one shot | `audit … --format sarif` |
-| **RGAA**-keyed CI output | `audit … --out audits` then `report --in audits/audit-latest.json --standard rgaa --format sarif` |
+| **RGAA**-keyed CI output, one shot | `audit … --standard rgaa --format sarif` |
+| Re-render an existing RGAA audit | `report --in audits/audit-latest.json --standard rgaa --format sarif` |
 | Only what the PR introduced | `audit --since origin/main --baseline audits/baseline.json --format sarif` |
 
 In `--baseline` gate mode the CI rendering covers **exactly the new findings** — the subject
@@ -376,7 +385,7 @@ with the action's `comment-kind` (`ULTRA11Y_PR_COMMENT_KIND`):
 | kind | what it posts |
 |---|---|
 | `digest` (default) | The verdict, the coverage, and the distinct defects — one row per (criterion, rule, selector), so 472 occurrences of one design-system defect are one row. Then a link. |
-| `pages` | The page-by-page grid: one row per page with its basis, its rate **and its denominator**, and its severities; then the FULL criterion × page grid (`C` / `NC` / `—` / `?`, collapsed), the criteria nobody has ruled on **named**, and a collapsed block per failing page listing its non-conforming criteria and where to fix them. Needs pages in scope; with none it says so rather than posting an empty scoreboard. |
+| `pages` | The page-by-page grid: one row per page with its basis, its `C`/`NC` counts and severities — no misleading decided-subset percentage; then the FULL criterion × page grid (`C` / `NC` / `—` / `?`, collapsed), the criteria nobody has ruled on **named**, and a collapsed block per failing page listing its non-conforming criteria and where to fix them. Needs pages in scope; with none it says so rather than posting an empty scoreboard. |
 | `full` | Both, in **one** comment under its own marker: everything `pages` posts, plus the run's distinct defects with their locations — the digest's actionable half. For a workflow that wants a single comment at the end with everything in it rather than two a reviewer has to reconcile. Same scope requirement as `pages`. |
 
 **The marker carries both the standard and the kind**, so a WCAG run and an RGAA run keep

@@ -329,6 +329,19 @@ describe("applyAdjudication — partial fold", () => {
     expect(r.applied).toBeGreaterThan(0);
     expect(r.audit.residualRisks.find((x) => x.criteriaId === missing)!.reason).toMatch(/coverage gap/i);
   });
+
+  it("refuses duplicate criterion ids instead of silently taking the last verdict", () => {
+    const audit = auditPage();
+    const all = buildAdjudicationWorklist(audit).map((i) => clearWith(i, "assessed conforming from source"));
+    const baseline = applyAdjudication(audit, file(all));
+    const duplicate = { ...all[0]!, verdict: "manual" as const, reason: "undecidable" as const };
+    const r = applyAdjudication(audit, file([...all, duplicate]));
+
+    expect(r.ok).toBe(false);
+    expect(r.rejectedCriteria).toContain(duplicate.criteriaId);
+    expect(r.issues.join("\n")).toMatch(/duplicate criterion/i);
+    expect(r.applied).toBe(baseline.applied - 1);
+  });
 });
 
 describe("applyAdjudication — fail-closed validation", () => {

@@ -157,6 +157,7 @@ describe("orchestrate — emitted workflow", () => {
     const batches = JSON.parse(m![1]!) as string[][];
     expect(batches.length).toBe(Math.ceil(20 / BATCH_SIZE));
     expect(batches.flat().length).toBe(20);
+    expect(new Set(batches.flat()).size).toBe(20);
     expect(src).toContain("pipeline(BATCHES");
     expect(src).toContain("agentType: 'general-purpose'");
     expect(src).toContain("schema: SCHEMA");

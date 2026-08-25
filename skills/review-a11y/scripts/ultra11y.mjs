@@ -54611,8 +54611,24 @@ function derivePackResults(audit2, packKey, pageId) {
 }
 function findingsForStandard(audit2, standard) {
   if (standard === CORE_KEY) return audit2.findings;
-  const mine = (audit2.packFindings ?? []).filter((f) => f.ruleId.startsWith(`pack:${standard}:`));
-  return mine.length ? [...audit2.findings, ...mine] : audit2.findings;
+  const eligible = new Set(
+    [
+      ...audit2.findings,
+      ...(audit2.packFindings ?? []).filter((finding) => finding.ruleId.startsWith(`pack:${standard}:`)),
+      ...audit2.packAdjudication?.standard === standard ? audit2.packAdjudication.criteria.flatMap((criterion) => criterion.findings) : []
+    ].map(findingId)
+  );
+  const seen = /* @__PURE__ */ new Set();
+  const out2 = [];
+  for (const criterion of derivePackResults(audit2, standard)) {
+    for (const finding of criterion.findings) {
+      const id = findingId(finding);
+      if (!eligible.has(id) || seen.has(id)) continue;
+      seen.add(id);
+      out2.push(finding);
+    }
+  }
+  return out2;
 }
 
 // src/standards/vocabulary.ts
@@ -59499,6 +59515,12 @@ function applyAdjudication(audit2, adj, opts = {}) {
   };
   const uncovered = (criteriaId) => notFolded.add(criteriaId);
   canonicalizeAdjudication(adj);
+  const itemCounts = /* @__PURE__ */ new Map();
+  for (const item of adj.items) itemCounts.set(item.criteriaId, (itemCounts.get(item.criteriaId) ?? 0) + 1);
+  for (const [criteriaId, count] of itemCounts) {
+    if (count > 1)
+      blame(criteriaId, `criterion ${criteriaId}: duplicate criterion id appears ${count} times in the adjudication \u2014 no implicit winner is accepted`);
+  }
   const byId2 = new Map(adj.items.map((it) => [it.criteriaId, it]));
   const packMode = !isCore(adj.standard);
   const open = /* @__PURE__ */ new Set();
@@ -60415,6 +60437,20 @@ var BATCH_SIZE = 8;
 var CONCURRENCY = 4;
 var MAX_ATTEMPTS = 4;
 var MAX_TOKENS = 16e3;
+function batchWorklist(items, render2, size = BATCH_SIZE) {
+  if (!Number.isInteger(size) || size < 1) throw new Error(`batch size must be a positive integer (got ${size})`);
+  const ids = items.map((item) => item.criteriaId);
+  if (new Set(ids).size !== ids.length) {
+    const duplicate = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+    throw new Error(`worklist contains duplicate criterion id(s): ${duplicate.join(", ")}`);
+  }
+  const batches = [];
+  for (let i2 = 0; i2 < items.length; i2 += size) {
+    const slice = items.slice(i2, i2 + size);
+    batches.push({ items: slice, prompt: render2(slice) });
+  }
+  return batches;
+}
 function apiKeyFromEnv() {
   const k = process.env.ANTHROPIC_API_KEY?.trim();
   return k || void 0;
@@ -60536,7 +60572,7 @@ function verdictsOf(res) {
   if (!Array.isArray(input?.verdicts)) throw new Error("ultra11y judge: the model's tool call carried no verdicts array.");
   return input.verdicts;
 }
-async function judgeBatch(items, prompt, opts) {
+async function judgeBatch(_items, prompt, opts) {
   if (!opts.apiKey) throw new Error("ultra11y judge: the Messages backend needs an API key (ANTHROPIC_API_KEY or --api-key).");
   const res = await callOnce(
     {
@@ -60549,8 +60585,22 @@ async function judgeBatch(items, prompt, opts) {
     },
     opts
   );
-  const known = new Set(items.map((i2) => i2.criteriaId));
-  return verdictsOf(res).filter((v) => known.has(v.criteriaId));
+  return verdictsOf(res);
+}
+function validateBatchVerdicts(items, landed) {
+  const expected = new Set(items.map((item) => item.criteriaId));
+  const counts = /* @__PURE__ */ new Map();
+  for (const verdict of landed) counts.set(verdict.criteriaId, (counts.get(verdict.criteriaId) ?? 0) + 1);
+  const duplicate = new Set([...counts].filter(([, count]) => count > 1).map(([id]) => id));
+  const unknown = [...new Set(landed.map((v) => v.criteriaId).filter((id) => !expected.has(id)))];
+  const accepted = landed.filter((verdict) => expected.has(verdict.criteriaId) && !duplicate.has(verdict.criteriaId));
+  const acceptedIds = new Set(accepted.map((verdict) => verdict.criteriaId));
+  const missing = [...expected].filter((id) => !acceptedIds.has(id) && !duplicate.has(id));
+  const failures = [];
+  if (duplicate.size) failures.push(`duplicate criterion id(s) in batch response: ${[...duplicate].join(", ")}`);
+  if (unknown.length) failures.push(`unknown criterion id(s) in batch response: ${unknown.join(", ")}`);
+  if (missing.length) failures.push(`missing criterion id(s) in batch response: ${missing.join(", ")}`);
+  return { accepted, failures };
 }
 async function judgeAll(batches, opts) {
   const verdicts = [];
@@ -60564,8 +60614,10 @@ async function judgeAll(batches, opts) {
       for (let b = queue.shift(); b !== void 0; b = queue.shift()) {
         try {
           const landed = await backend(b.items, b.prompt, opts);
-          verdicts.push(...landed);
-          if (landed.length) opts.onVerdicts?.(landed);
+          const checked = validateBatchVerdicts(b.items, landed);
+          failures.push(...checked.failures);
+          verdicts.push(...checked.accepted);
+          if (checked.accepted.length) opts.onVerdicts?.(checked.accepted);
         } catch (e) {
           failures.push(e instanceof Error ? e.message : String(e));
         }
@@ -60576,7 +60628,9 @@ async function judgeAll(batches, opts) {
   return { verdicts, failures };
 }
 function applyRawVerdicts(items, verdicts) {
-  const byId2 = new Map(verdicts.map((v) => [v.criteriaId, v]));
+  const counts = /* @__PURE__ */ new Map();
+  for (const verdict of verdicts) counts.set(verdict.criteriaId, (counts.get(verdict.criteriaId) ?? 0) + 1);
+  const byId2 = new Map(verdicts.filter((v) => counts.get(v.criteriaId) === 1).map((v) => [v.criteriaId, v]));
   let filled = 0;
   for (const item of items) {
     const v = byId2.get(item.criteriaId);
@@ -64249,7 +64303,9 @@ var S = {
   fr: {
     title: "Audit d'accessibilit\xE9 ultra11y",
     files: "fichiers",
-    rate: "r\xE9ussite automatique",
+    coverage: (decided, total) => `${decided}/${total} crit\xE8res tranch\xE9s dans ce run`,
+    remaining: (n) => `${n} \xE0 compl\xE9ter par scan ou adjudication`,
+    provenance: { engine: "moteur", scan: "scan", agent: "agent" },
     none: "\u2705 Aucune non-conformit\xE9 d\xE9tect\xE9e par le moteur statique.",
     findings: "Non-conformit\xE9s",
     severity: "S\xE9v\xE9rit\xE9",
@@ -64317,7 +64373,9 @@ var S = {
   en: {
     title: "ultra11y accessibility audit",
     files: "files",
-    rate: "automatic pass rate",
+    coverage: (decided, total) => `${decided}/${total} criteria decided in this run`,
+    remaining: (n) => `${n} still to complete by scan or adjudication`,
+    provenance: { engine: "engine", scan: "scan", agent: "agent" },
     none: "\u2705 No non-conformity detected by the static engine.",
     findings: "Non-conformities",
     severity: "Severity",
@@ -64439,11 +64497,24 @@ function groupByCriterion(groups) {
   }
   return [...byCriterion.values()].map(({ pageSet, ...c2 }) => ({ ...c2, pages: pageSet.size })).sort((a, b) => SEV_ORDER4.indexOf(a.severity) - SEV_ORDER4.indexOf(b.severity) || b.occurrences - a.occurrences || a.criterion.localeCompare(b.criterion));
 }
-function runRate(result, standard, lang) {
+function runCoverage(result, standard, lang) {
   const groups = isCore(standard) ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
   const { decided, total } = reportCoverage(groups);
+  const decidedRows = groups.flatMap((g) => g.rows).filter((r) => r.status === "C" || r.status === "NC");
+  const by = {
+    engine: decidedRows.filter((r) => !r.decidedBy || r.decidedBy === "engine").length,
+    scan: decidedRows.filter((r) => r.decidedBy === "scan").length,
+    agent: decidedRows.filter((r) => r.decidedBy === "agent").length
+  };
+  const s = S[lang];
+  const provenance = ["engine", "scan", "agent"].filter((key2) => by[key2] > 0).map((key2) => `${by[key2]} ${s.provenance[key2]}`);
+  const remaining = Math.max(0, total - decided);
   const agentRuled = groups.some((g) => g.rows.some((r) => r.decidedBy === "agent" && r.status === "C"));
-  return { text: `${formatRate(decided === 0 ? null : result.conformancePct, decided, total)}${agentRuled ? "*" : ""}`, agentRuled };
+  return {
+    text: s.coverage(decided, total),
+    detail: [...provenance, ...remaining ? [s.remaining(remaining)] : []].join(" \xB7 "),
+    agentRuled
+  };
 }
 var cell = (v) => v.replace(/\|/g, "\\|");
 function criterionTableHead(s) {
@@ -64482,11 +64553,11 @@ function stepSummary(result, opts = {}) {
   const lang = opts.lang ?? "en";
   const s = S[lang];
   const stdLabel = isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name;
-  const rate = runRate(result, standard, lang);
+  const coverage = runCoverage(result, standard, lang);
   const out2 = [];
   out2.push(`## ${s.title} \u2014 ${stdLabel}`, "");
-  out2.push(`\`${result.date}\` \xB7 ${result.scope.files} ${s.files} \xB7 **${rate.text}** ${s.rate}`, "");
-  if (rate.agentRuled) out2.push(`> ${agentMarkNote(lang)}`, "");
+  out2.push(`\`${result.date}\` \xB7 ${result.scope.files} ${s.files} \xB7 **${coverage.text}**${coverage.detail ? ` \xB7 ${coverage.detail}` : ""}`, "");
+  if (coverage.agentRuled) out2.push(`> ${agentMarkNote(lang)}`, "");
   const baseDir = opts.baseDir ?? process.cwd();
   const all = findingsForStandard(result, standard);
   if (!all.length) {
@@ -64537,15 +64608,15 @@ function prComment(result, opts = {}) {
   const all = findingsForStandard(result, standard);
   const normative = all.filter((f) => !f.advisory);
   const blocking = normative.filter((f) => f.severity === "bloquant").length;
-  const rate = runRate(result, standard, lang);
+  const coverage = runCoverage(result, standard, lang);
   const grouped = groupFindings(all, standard, lang, baseDir);
   const criteria = groupByCriterion(grouped);
-  const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
+  const orphans = all.filter((f) => !f.advisory && !f.page).length;
   const head = [];
   head.push(`### ${s.title} \u2014 ${stdLabel}`, "");
   head.push(blocking ? s.verdictFail(blocking) : normative.length ? s.verdictWarn : s.verdictPass, "");
-  head.push(`\`${result.date}\` \xB7 ${result.scope.files} ${s.files} \xB7 **${rate.text}** ${s.rate}`, "");
-  if (rate.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
+  head.push(`\`${result.date}\` \xB7 ${result.scope.files} ${s.files} \xB7 **${coverage.text}**${coverage.detail ? ` \xB7 ${coverage.detail}` : ""}`, "");
+  if (coverage.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
   if (orphans) head.push(`> ${s.unattributed(orphans)}`, "");
   const tail = [];
   if (opts.artifactName) tail.push(s.artifact(opts.artifactName), "");
@@ -64581,7 +64652,7 @@ function perPageTable(result, standard = CORE2, lang = "en") {
     "",
     ...scoreboardTable(result, derived, standard, s, lang),
     "",
-    ...basisCaveats(result, derived, s, lang),
+    ...basisCaveats(result, derived, standard, s, lang),
     ...fullGridBlock(result, derived, standard, s, lang),
     "",
     ...derived.flatMap((pg) => [...namedCriteriaBlock(result, pg, standard, s, lang), ""])
@@ -64613,7 +64684,8 @@ function scoreboardTable(result, derived, standard, s, lang) {
     "| --- | --- | ---: | ---: | ---: | ---: | ---: |"
   ];
   for (const pg of derived) {
-    const n = (sev) => severityCount(pg, sev);
+    const pageFindings = findingsForStandard(pageView(result, pg), standard).filter((f) => !f.advisory);
+    const n = (sev) => pageFindings.filter((f) => f.severity === sev).length;
     const t3 = pageTally(pageCriterionRows(result, pg, standard, lang));
     out2.push(
       `| ${pg.name}${pg.auth ? " \u{1F512}" : ""} \u2014 \`${pg.url}\` | ${basisLabel(pg.basis, lang)} | ${t3.c} | ${t3.nc} | ${n("bloquant")} | ${n("majeur")} | ${n("mineur")} |`
@@ -64637,12 +64709,10 @@ function undecidedBlock(result, derived, standard, s, lang) {
   out2.push("");
   return out2;
 }
-function severityCount(pg, sev) {
-  return pg.findings.filter((f) => !f.advisory && f.severity === sev).length;
-}
-function basisCaveats(result, derived, s, lang) {
+function basisCaveats(result, derived, standard, s, lang) {
   const out2 = [`> ${s.scoreboardNote}`, ""];
-  const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
+  const projected = new Set(findingsForStandard(result, standard));
+  const orphans = unattributedFindings(result).filter((f) => projected.has(f) && !f.advisory).length;
   if (orphans) out2.push(`> ${s.unattributed(orphans)}`, "");
   if (derived.some((p) => p.basis === "attributed")) out2.push(`> ${s.sourceBasis}`, "");
   const notAudited = pageBasisWarning("not-audited", lang);
@@ -64654,9 +64724,11 @@ function pageBlock(result, page, standard, lang, baseDir) {
   const s = S[lang];
   const rows = pageCriterionRows(result, page, standard, lang);
   const nc = rows.filter((r) => r.status === "NC");
-  const occurrences = page.findings.filter((f) => !f.advisory).length;
+  const pageFindings = findingsForStandard(pageView(result, page), standard).filter((f) => !f.advisory);
+  const occurrences = pageFindings.length;
   if (!nc.length && !occurrences) return void 0;
-  const counts = `\u{1F534} ${severityCount(page, "bloquant")} \xB7 \u{1F7E0} ${severityCount(page, "majeur")} \xB7 \u{1F7E1} ${severityCount(page, "mineur")}`;
+  const count = (severity) => pageFindings.filter((f) => f.severity === severity).length;
+  const counts = `\u{1F534} ${count("bloquant")} \xB7 \u{1F7E0} ${count("majeur")} \xB7 \u{1F7E1} ${count("mineur")}`;
   const withTests = nc.some((r) => r.tests.length);
   const out2 = [
     "<details>",
@@ -64675,12 +64747,7 @@ function pageBlock(result, page, standard, lang, baseDir) {
   for (const r of nc) {
     out2.push(withTests ? `| ${cell(r.label)} | ${r.tests.map((t3) => `\`${t3}\``).join(" ")} |` : `| ${cell(r.label)} |`);
   }
-  const defects = groupFindings(
-    page.findings.filter((f) => !f.advisory),
-    standard,
-    lang,
-    baseDir
-  );
+  const defects = groupFindings(pageFindings, standard, lang, baseDir);
   const blocking = groupByCriterion(defects.filter((g) => g.severity === "bloquant"));
   const rest = groupByCriterion(defects.filter((g) => g.severity !== "bloquant"));
   const shownBlocking = Math.min(blocking.length, PAGE_CRITERIA_SHOWN);
@@ -64717,7 +64784,8 @@ function fullGridBlock(result, derived, standard, s, lang) {
   return out2;
 }
 function orphansBlock(result, standard, s, lang, baseDir) {
-  const orphans = unattributedFindings(result).filter((f) => !f.advisory);
+  const projected = new Set(findingsForStandard(result, standard));
+  const orphans = unattributedFindings(result).filter((f) => projected.has(f) && !f.advisory);
   if (!orphans.length) return [];
   const criteria = groupByCriterion(groupFindings(orphans, standard, lang, baseDir));
   const counts = SEV_ORDER4.map((sev) => `${ICON5[sev]} ${orphans.filter((f) => f.severity === sev).length}`).join(" \xB7 ");
@@ -64774,17 +64842,18 @@ function pagesComment(result, opts = {}) {
   const derived = derivePages(result, scope);
   const normative = findingsForStandard(result, standard).filter((f) => !f.advisory);
   const blocking = normative.filter((f) => f.severity === "bloquant").length;
-  const rate = runRate(result, standard, lang);
+  const coverage = runCoverage(result, standard, lang);
   head.push(blocking ? s.verdictFail(blocking) : normative.length ? s.verdictWarn : s.verdictPass, "");
-  head.push(`\`${result.date}\` \xB7 ${s.pagesCount(derived.length)} \xB7 **${rate.text}** ${s.rate}`, "");
-  if (rate.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
+  head.push(`\`${result.date}\` \xB7 ${s.pagesCount(derived.length)} \xB7 **${coverage.text}**${coverage.detail ? ` \xB7 ${coverage.detail}` : ""}`, "");
+  if (coverage.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
+  const severity = (page, level) => findingsForStandard(pageView(result, page), standard).filter((f) => !f.advisory && f.severity === level).length;
   const blocks = [...derived].sort(
-    (a, b) => severityCount(b, "bloquant") - severityCount(a, "bloquant") || severityCount(b, "majeur") - severityCount(a, "majeur") || severityCount(b, "mineur") - severityCount(a, "mineur")
+    (a, b) => severity(b, "bloquant") - severity(a, "bloquant") || severity(b, "majeur") - severity(a, "majeur") || severity(b, "mineur") - severity(a, "mineur")
   ).map((p) => pageBlock(result, p, standard, lang, baseDir)).filter((b) => b !== void 0);
   const assemble = (nBlocks2, nRows2, withGrid = true) => {
     const body3 = [...scoreboardTable(result, derived.slice(0, nRows2), standard, s, lang), ""];
     if (nRows2 < derived.length) body3.push(s.scoreboardClamped(derived.length - nRows2), "");
-    body3.push(...basisCaveats(result, derived, s, lang));
+    body3.push(...basisCaveats(result, derived, standard, s, lang));
     body3.push(...undecidedBlock(result, derived, standard, s, lang));
     if (redirected.length) body3.push(...renderRedirected(redirected, lang), "");
     body3.push(...orphansBlock(result, standard, s, lang, baseDir), "");
@@ -71741,11 +71810,7 @@ async function cmdJudge(p) {
   if (truncated) items = items.slice(0, max);
   const size = grain === "criterion" ? 1 : BATCH_SIZE;
   const render2 = (slice) => formatAdjudication(slice, lang, standard, { preamble: false, contract: false });
-  const batches = [];
-  for (let i2 = 0; i2 < items.length; i2 += size) {
-    const slice = items.slice(i2, i2 + size);
-    batches.push({ items: slice, prompt: render2(slice) });
-  }
+  const batches = batchWorklist(items, render2, size);
   const explicitModel = typeof p.flags.model === "string" && p.flags.model ? p.flags.model : void 0;
   const model = explicitModel ?? (runner === "claude" ? DEFAULT_CLI_MODEL : runner === "api" ? modelFromEnv() : void 0);
   const modelLabel = model ?? "Codex account default";

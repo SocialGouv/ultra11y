@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { annotations, perPageTable, prComment, stepSummary } from "../src/annotate.js";
 import { runAudit } from "../src/audit.js";
 import type { AuditResult, Finding } from "../src/types.js";
+import { allSC } from "../src/wcag.js";
 
 const F = (over: Partial<Finding> = {}): Finding => ({
   ruleId: "img-alt-missing",
@@ -90,10 +91,12 @@ const GUIDELINES = [
 const decided = (over: Partial<AuditResult> = {}): Partial<AuditResult> => ({ criteria: CRITERIA, guidelines: GUIDELINES, ...over });
 
 describe("job summary", () => {
-  it("reports the headline rate and the finding count", () => {
+  it("reports coverage without turning it into a score", () => {
     const md = stepSummary(audit([F()], decided()), { lang: "en" });
     expect(md).toContain("ultra11y");
-    expect(md).toContain("80 % (4/5)");
+    expect(md).toContain("4/5 criteria decided in this run");
+    expect(md).toContain("1 still to complete by scan or adjudication");
+    expect(md).not.toContain("80 %");
     expect(md).toContain("1");
   });
 
@@ -101,22 +104,77 @@ describe("job summary", () => {
   // criteria say, and the headline used to print it naked. Four decided out of five is the
   // fact a reviewer needs in order to know what the 80 % is a percentage OF — four, because a
   // criterion closed for want of a subject is decided (INAPPLICABLE_STATUS), not pending.
-  it("never prints the rate without its denominator", () => {
-    expect(stepSummary(audit([F()], decided()), { lang: "en" })).toContain("**80 % (4/5)**");
+  it("never prints a percentage on a GitHub surface", () => {
+    const md = stepSummary(audit([F()], decided()), { lang: "en" });
+    expect(md).toContain("**4/5 criteria decided in this run**");
+    expect(md).not.toContain("%");
   });
 
   // …and an audit that decided nothing has no rate at all, rather than a flattering one.
-  it("prints no rate when nothing was decided, instead of a number over an empty set", () => {
+  it("states an empty coverage instead of inventing a score", () => {
     const md = stepSummary(audit([F()]), { lang: "en" });
-    expect(md).toContain("**— (0/0)**");
+    expect(md).toContain("**0/0 criteria decided in this run**");
     expect(md).not.toContain("80 %");
   });
 
   it("marks a conformity an agent RULED, so it is never read as one the engine proved", () => {
     const ruled = CRITERIA.map((c, i) => (i === 1 ? { ...c, decidedBy: "agent" as const } : c));
     const md = stepSummary(audit([F()], decided({ criteria: ruled })), { lang: "en" });
-    expect(md).toContain("**80 % (4/5)***");
+    expect(md).toContain("**4/5 criteria decided in this run**");
+    expect(md).toContain("3 engine · 1 agent");
     expect(md).toContain("`C*`");
+  });
+
+  it("regresses the Egapro run without mixing the WCAG rate and RGAA grid", () => {
+    const findings = [
+      F({ ruleId: "th-no-data-cells", criteriaId: "1.3.1", line: 62, selectorHint: "th.fr-cell--fixed", severity: "mineur" }),
+      F({ ruleId: "th-no-data-cells", criteriaId: "1.3.1", line: 87, selectorHint: "th#actions", severity: "mineur", sourceStart: 50 }),
+      F({ ruleId: "dl-structure", criteriaId: "1.3.1", line: 249, selectorHint: "dt.label", severity: "majeur", sourceStart: 90 }),
+      F({ ruleId: "dl-structure", criteriaId: "1.3.1", line: 250, selectorHint: "dd", severity: "majeur", sourceStart: 130 }),
+    ];
+    const conforming = new Set(["1.2.1", "1.2.2", "1.2.3", "1.2.4", "1.2.5", "1.4.2", "2.1.4", "2.4.2", "2.5.1", "2.5.4", "3.1.1"]);
+    const criteria = allSC().map((sc) => ({
+      id: sc.sc,
+      guideline: sc.guideline,
+      status: sc.sc === "1.3.1" ? ("NC" as const) : conforming.has(sc.sc) ? ("C" as const) : ("manual" as const),
+      ...(conforming.has(sc.sc) && sc.sc !== "2.4.2" && sc.sc !== "3.1.1" ? { inapplicable: true } : {}),
+      findings: sc.sc === "1.3.1" ? findings : [],
+    })) as AuditResult["criteria"];
+    const result = audit(findings, {
+      conformancePct: 92,
+      criteria,
+      scope: {
+        inputs: ["packages/app/src"],
+        files: 325,
+        subjectsSeen: [
+          "autocomplete",
+          "contextChange",
+          "controls",
+          "declaredLang",
+          "downloadDocs",
+          "errors",
+          "frames",
+          "images",
+          "links",
+          "lists",
+          "newWindow",
+          "tables",
+        ],
+      },
+    });
+
+    const md = stepSummary(result, { standard: "rgaa", lang: "fr" });
+    expect(md).toContain("12/106 critères tranchés dans ce run");
+    expect(md).toContain("94 à compléter par scan ou adjudication");
+    expect(md).not.toContain("92 %");
+    expect(md).not.toContain("4 occurrence(s)");
+    expect(md).toContain("Aucune non-conformité détectée");
+    expect(md).not.toContain("| Sévérité | Critère |");
+
+    const comment = prComment(result, { standard: "rgaa", lang: "fr" });
+    expect(comment).toContain("12/106 critères tranchés dans ce run");
+    expect(comment).not.toContain("92 %");
+    expect(comment).not.toMatch(/4 constat\(s\).*aucune page/);
   });
 
   it("says so plainly when nothing was found", () => {
@@ -145,7 +203,14 @@ describe("job summary", () => {
   });
 
   it("speaks the pack criterion when a standard is projected", () => {
-    const md = stepSummary(audit([F()]), { standard: "rgaa", lang: "fr" });
+    const finding = F();
+    const criteria = allSC().map((sc) => ({
+      id: sc.sc,
+      guideline: sc.guideline,
+      status: sc.sc === "1.1.1" ? ("NC" as const) : ("manual" as const),
+      findings: sc.sc === "1.1.1" ? [finding] : [],
+    })) as AuditResult["criteria"];
+    const md = stepSummary(audit([finding], { criteria, scope: { inputs: [], files: 1, subjectsSeen: ["images"] } }), { standard: "rgaa", lang: "fr" });
     expect(md).toContain("RGAA");
     expect(md).toContain("1.1");
   });
@@ -202,8 +267,10 @@ describe("the pull-request digest", () => {
     expect(prComment(audit([], decided()), { lang: "en" })).toContain("✅ No non-conformity");
   });
 
-  it("carries the rate with its denominator, like every other surface", () => {
-    expect(prComment(audit([F()], decided()), { lang: "en" })).toContain("**80 % (4/5)**");
+  it("carries coverage without a percentage, like every GitHub surface", () => {
+    const md = prComment(audit([F()], decided()), { lang: "en" });
+    expect(md).toContain("**4/5 criteria decided in this run**");
+    expect(md).not.toContain("80 %");
   });
 
   it("carries the report's own sections, so the comment and the artifact are one document", () => {

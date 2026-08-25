@@ -116,7 +116,14 @@ describe("a finding already keyed on a pack criterion", () => {
   });
 
   it("reaches CI annotations as RGAA 4.11, never as a WCAG criterion that does not exist", () => {
-    const r = { ...audit(), findings: [agentFinding] };
+    const r = {
+      ...audit(),
+      findings: [agentFinding],
+      packAdjudication: {
+        standard: "rgaa",
+        criteria: [{ id: "4.11", status: "NC" as const, findings: [agentFinding], decidedBy: "agent" as const }],
+      },
+    };
     const out = annotations(r, { standard: "rgaa", lang: "fr" }).join("\n");
     expect(out).toContain("RGAA 4.11");
     expect(out).not.toMatch(/WCAG/);
@@ -126,7 +133,7 @@ describe("a finding already keyed on a pack criterion", () => {
     const alien = { ...agentFinding, ruleId: "agent:99.99", criteriaId: "99.99" } as Finding;
     expect(packCriteriaOf(loadPack("rgaa"), alien)).toEqual([]);
     expect(packCriterionLabel(loadPack("rgaa"), alien)).toBeNull();
-    expect(annotations({ ...audit(), findings: [alien] }, { standard: "rgaa", lang: "fr" })).toEqual([]);
+    expect(annotations({ ...audit(), findings: [alien] }, { standard: "rgaa", lang: "fr" }).join("\n")).not.toContain("99.99");
   });
 });
 

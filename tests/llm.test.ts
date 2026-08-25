@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BATCH_SIZE, DEFAULT_MODEL, applyRawVerdicts, judgeAll, judgeBatch, modelFromEnv, type RawVerdict } from "../src/llm.js";
+import { BATCH_SIZE, DEFAULT_MODEL, applyRawVerdicts, batchWorklist, judgeAll, judgeBatch, modelFromEnv, type RawVerdict } from "../src/llm.js";
 import { applyAdjudication, buildAdjudicationWorklist, formatAdjudication, type AdjudicationFile, type AdjudicationItem } from "../src/adjudicate.js";
 import { runAudit } from "../src/audit.js";
 import { SCHEMA_VERSION } from "../src/types.js";
@@ -89,10 +89,10 @@ describe("judgeBatch", () => {
     expect(seen.at(-1), "the default must stay the real API").toBe("https://api.anthropic.com/v1/messages");
   });
 
-  it("drops a verdict for a criterion nobody asked about", async () => {
+  it("keeps an unknown verdict visible for the scheduler to diagnose", async () => {
     const items = [item("1.1.1")];
     const { impl } = fakeFetch(toolReply([{ criteriaId: "42.9", verdict: "C", justification: "x" }]));
-    expect(await judgeBatch(items, "p", { apiKey: "k", fetchImpl: impl })).toEqual([]);
+    expect(await judgeBatch(items, "p", { apiKey: "k", fetchImpl: impl })).toEqual([{ criteriaId: "42.9", verdict: "C", justification: "x" }]);
   });
 
   it("refuses prose instead of parsing it into verdicts", async () => {
@@ -147,6 +147,49 @@ describe("judgeAll", () => {
   it("batches by the same size orchestrate fans out at", () => {
     expect(BATCH_SIZE).toBe(8);
   });
+
+  it("keeps every criterion exactly once at the 7/8/9 batch boundaries", () => {
+    for (const count of [7, 8, 9]) {
+      const items = Array.from({ length: count }, (_, i) => item(`x.${i + 1}`));
+      const batches = batchWorklist(items, (slice) => slice.map((x) => x.criteriaId).join(","));
+      const ids = batches.flatMap((batch) => batch.items.map((x) => x.criteriaId));
+      expect(batches).toHaveLength(Math.ceil(count / BATCH_SIZE));
+      expect(ids).toEqual(items.map((x) => x.criteriaId));
+      expect(new Set(ids).size).toBe(count);
+    }
+  });
+
+  it("refuses a duplicated worklist before any batch is rendered", () => {
+    let rendered = 0;
+    expect(() =>
+      batchWorklist([item("1.1.1"), item("1.1.1")], () => {
+        rendered++;
+        return "prompt";
+      }),
+    ).toThrow(/duplicate criterion.*1\.1\.1/i);
+    expect(rendered).toBe(0);
+  });
+
+  it("accepts valid partial results but diagnoses duplicate, unknown and missing ids", async () => {
+    const items = [item("1.1.1"), item("1.3.1"), item("1.4.1")];
+    const persisted: RawVerdict[][] = [];
+    const r = await judgeAll([{ items, prompt: "a" }], {
+      apiKey: "k",
+      backend: async () => [
+        { criteriaId: "1.1.1", verdict: "manual", reason: "undecidable" },
+        { criteriaId: "1.1.1", verdict: "C", justification: "conflicting duplicate" },
+        { criteriaId: "99.99", verdict: "manual", reason: "undecidable" },
+        { criteriaId: "1.4.1", verdict: "manual", reason: "needs-rendered-dom" },
+      ],
+      onVerdicts: (landed) => persisted.push(landed),
+    });
+
+    expect(r.verdicts.map((v) => v.criteriaId)).toEqual(["1.4.1"]);
+    expect(persisted.flat().map((v) => v.criteriaId)).toEqual(["1.4.1"]);
+    expect(r.failures.join("\n")).toMatch(/duplicate.*1\.1\.1/i);
+    expect(r.failures.join("\n")).toMatch(/unknown.*99\.99/i);
+    expect(r.failures.join("\n")).toMatch(/missing.*1\.3\.1/i);
+  });
 });
 
 describe("applyRawVerdicts", () => {
@@ -165,6 +208,17 @@ describe("applyRawVerdicts", () => {
     expect(items[0]!.reason).toBeNull();
     expect(items[0]!.findings).toEqual([]);
     expect(items[1]!.reason).toBe("needs-rendered-dom");
+  });
+
+  it("does not choose a winner when a criterion has duplicate verdicts", () => {
+    const items = [item("1.1.1")];
+    expect(
+      applyRawVerdicts(items, [
+        { criteriaId: "1.1.1", verdict: "manual", reason: "undecidable" },
+        { criteriaId: "1.1.1", verdict: "C", justification: "conflict" },
+      ]),
+    ).toBe(0);
+    expect(items[0]!.verdict).toBeNull();
   });
 });
 

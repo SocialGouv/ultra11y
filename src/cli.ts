@@ -66,7 +66,7 @@ import {
 import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, unreadableCaptures, type VerdictLedger, writeLedger } from "./ledger.js";
 import { DEFAULT_CLI_MODEL, EFFORT_LEVELS, judgeBatchCli, refuteBatchCli } from "./agent-cli.js";
 import { CODEX_EFFORT_LEVELS, judgeBatchCodex, refuteBatchCodex } from "./agent-codex.js";
-import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv, type LlmOptions } from "./llm.js";
+import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, batchWorklist, judgeAll, modelFromEnv, type LlmOptions } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable, localTierStatus } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
@@ -3665,11 +3665,7 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   // The on-disk briefs `writeAdjudication` produces are unaffected: nobody hands those a
   // system prompt, so they keep the contract.
   const render = (slice: typeof items): string => formatAdjudication(slice, lang, standard, { preamble: false, contract: false });
-  const batches: { items: typeof items; prompt: string }[] = [];
-  for (let i = 0; i < items.length; i += size) {
-    const slice = items.slice(i, i + size);
-    batches.push({ items: slice, prompt: render(slice) });
-  }
+  const batches = batchWorklist(items, render, size);
   const explicitModel = typeof p.flags.model === "string" && p.flags.model ? (p.flags.model as string) : undefined;
   const model = explicitModel ?? (runner === "claude" ? DEFAULT_CLI_MODEL : runner === "api" ? modelFromEnv() : undefined);
   const modelLabel = model ?? "Codex account default";

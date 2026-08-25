@@ -159,15 +159,13 @@ describe("the page-by-page comment", () => {
     expect(row?.[2]).toBe(tally?.[2]); // NC
   });
 
-  it("explains a count the criteria cannot account for, instead of an empty block", () => {
-    // Under a pack, a finding whose rule sits outside every criterion's applicability is
-    // counted in the severity columns and turns no criterion NC. Silence there leaves a
-    // « 🟠 1 » a reader can only guess at. Reachable for real: RGAA 3.2 lists the contrast
-    // rules it applies to, so a contrast finding under any OTHER rule id decides nothing.
+  it("does not count a finding the selected standard does not project", () => {
+    // Reachable for real: a WCAG 1.3.1 finding can sit outside every RGAA criterion's own
+    // applicability. It must appear in neither the RGAA severity columns nor a detail block.
     const f = F({ page: "contact", severity: "majeur", criteriaId: "1.4.3", ruleId: "contrast-not-in-any-pack-scope" });
     const md = pagesComment(audit({ findings: [f], criteria: [C("1.4.3", "NC", [f])] } as Partial<AuditResult>), { standard: "rgaa", lang: "fr" });
-    expect(md).toContain("<details>");
-    expect(md).toMatch(/ne rendent aucun critère/);
+    expect(md).not.toMatch(/🟠 1/);
+    expect(md).not.toMatch(/ne rendent aucun critère/);
   });
 
   it("leaves a blank line after <summary> so GFM renders the table", () => {
