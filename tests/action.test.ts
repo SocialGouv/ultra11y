@@ -1326,6 +1326,20 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     expect(summary?.env?.REFUTE_IDS).toContain("steps.after_refute.outputs.ids");
   });
 
+  it("applies completed refutations before preserving a partial judge failure", () => {
+    const trial = job().steps.find((s) => s.name === "Put the claims on trial");
+    const run = String(trial?.run);
+    const judge = run.indexOf("node scripts/ultra11y.mjs judge --refute");
+    const apply = run.indexOf("node scripts/ultra11y.mjs verify --apply");
+    const finalExit = run.lastIndexOf('exit "$judge_status"');
+
+    expect(judge).toBeGreaterThanOrEqual(0);
+    expect(run).toContain("|| judge_status=$?");
+    expect(apply, "partial judge output must be applied instead of lost to set -e").toBeGreaterThan(judge);
+    expect(run).toContain("|| apply_status=$?");
+    expect(finalExit, "the provider failure must still keep the step red").toBeGreaterThan(apply);
+  });
+
   it("uploads the audit produced by the trial, not only the pre-refutation action artifact", () => {
     const steps = job().steps;
     const trial = steps.findIndex((s) => s.name === "Put the claims on trial");

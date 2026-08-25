@@ -418,11 +418,26 @@ jobs:
           REPORT=$(/bin/ls audits/*.md | head -1)
           node scripts/ultra11y.mjs verify --report "$REPORT" \
             --in audits/audit-latest.json --standard '${{ inputs.standard }}' --out audits --max-verify 0
+          # `judge` writes each finished verdict before reporting a partial-run failure. A
+          # provider 429 in run 32861687494 left 33/105 valid trials on disk, but `set -e`
+          # skipped `verify --apply` and the so-called post-refutation audit was still the
+          # pre-refutation one. Keep the trial red, but apply every grounded answer it did
+          # manage to return before exposing the mutated audit to the final gate.
+          judge_status=0
           node scripts/ultra11y.mjs judge --refute audits/VERIFY.todo.json \
             --standard '${{ inputs.standard }}' --runner cli \
-            --model '${{ inputs.model }}' --concurrency 4
+            --model '${{ inputs.model }}' --concurrency 4 || judge_status=$?
+
+          apply_status=0
           node scripts/ultra11y.mjs verify --apply audits/VERIFY.todo.json --report "$REPORT" \
-            --in audits/audit-latest.json --standard '${{ inputs.standard }}' --out audits --prune
+            --in audits/audit-latest.json --standard '${{ inputs.standard }}' --out audits --prune \
+            || apply_status=$?
+
+          if [ "$judge_status" -ne 0 ]; then
+            echo "::error::the refuter stopped early (exit $judge_status); its completed verdicts were still applied"
+          fi
+          if [ "$apply_status" -ne 0 ]; then exit "$apply_status"; fi
+          exit "$judge_status"
 
       # `verify --apply --prune` MUTATES the audit. In run 32854529215 it reopened eighteen
       # conformities, but the workflow kept displaying and gating the three-item count measured
