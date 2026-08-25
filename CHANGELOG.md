@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.35.0](https://github.com/maxgfr/ultra11y/compare/v5.34.2...v5.35.0) (2026-08-25)
+
+
+### Features
+
+* **judge:** add Codex subscription runner ([fc28a55](https://github.com/maxgfr/ultra11y/commit/fc28a55fb13b06c75c8faaa7d117e6f2a9a9da93))
+
 ## [5.34.2](https://github.com/maxgfr/ultra11y/compare/v5.34.1...v5.34.2) (2026-08-25)
 
 

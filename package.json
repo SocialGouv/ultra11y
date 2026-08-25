@@ -1,6 +1,6 @@
 {
   "name": "ultra11y",
-  "version": "5.34.2",
+  "version": "5.35.0",
   "description": "Audit HTML/CSS/JSX against WCAG 2.2 AA and produce a dated compliance report, or author/review accessible markup (native-HTML-first). A skills.sh agent skill: an install-free static engine (bundled, no npm install) plus the agent's judgment, with check/verify gates against hallucinated non-conformities, and pluggable in-repo standards packs (RGAA France first; Section 508 & EN 301 549 next).",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
