@@ -43,6 +43,8 @@ describe("the skills are installable", () => {
     expect(data.name).toBe(name);
     expect(typeof data.description).toBe("string");
     expect((data.description as string).length).toBeGreaterThan(0);
+    expect((data.description as string).length).toBeLessThanOrEqual(1024);
+    expect(Object.keys(data).every((key) => ["name", "description", "allowed-tools", "license", "metadata"].includes(key))).toBe(true);
   });
 
   it("ultra11y describes BOTH scopes (audit AND author/review)", () => {
@@ -64,7 +66,8 @@ describe("the skills are installable", () => {
   it("ultra11y dispatches review-a11y as a subagent once its analysis is done", () => {
     expect(body).toMatch(/review-a11y/);
     expect(body).toMatch(/subagent/i);
-    // Named tool, not a vague "hand it over": a step nobody can execute is a step nobody runs.
+    // Named host routes, not a vague "hand it over": a step nobody can execute is a step nobody runs.
+    expect(body).toMatch(/Codex/);
     expect(body).toMatch(/Agent\(/);
     // And the fallback, so a harness without subagents is not left stuck.
     expect(body).toMatch(/no subagent/i);

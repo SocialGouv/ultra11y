@@ -1,7 +1,6 @@
 ---
 name: ultra11y
-description: "Use to AUDIT existing HTML/CSS/JSX against WCAG 2.2 AA accessibility and produce a dated auditor-conformance report, OR to AUTHOR/REVIEW accessible markup (native-HTML-first, ARIA last). An install-free engine (`node scripts/ultra11y.mjs`, no keys) runs 81 static checks tied to WCAG criteria — alt/lang/title, unlabeled fields, empty links/buttons, tables, headings, ARIA vocabulary, label-in-name, autocomplete — measured against the official W3C ACT corpus. The engine decides 3 of the 55 criteria; the AI agent adjudicates the 38 judgment ones from harvested evidence + a per-criterion decision protocol (`verify --manual`, gated, fannable via `orchestrate`), and the 14 rendering ones go to `scan` — never silently conforming. Library/SFC code is audited as RENDERED captures (`render --setup`); country standards are pluggable packs (`--standard rgaa`, `scan --sample`). check/verify reject invented non-conformities. Triggers: 'audit WCAG/a11y', 'make accessible', 'fix a11y', 'audit RGAA'."
-when_to_use: "Invoke when the user asks for an accessibility AUDIT or a formal deliverable: audit a repo, site or page against WCAG 2.2 AA or a country standard (RGAA, Section 508, EN 301 549); produce a dated conformance report, a criterion grid, a PRD backlog, or tickets (GitHub/GitLab/Jira); author accessible markup from scratch; wire the repo gate (init --hook/--ci) or a rendered-DOM capture pipeline. For a review of the code UNDER CHANGE (diff, branch, PR), use the `review-a11y` skill instead."
+description: "Use to AUDIT a repository, site, or page against WCAG 2.2 AA or a country standard such as RGAA; produce a dated conformance report, criterion grid, PRD backlog, or tickets; AUTHOR accessible markup; fix accessibility; or wire a repo gate and rendered-DOM capture pipeline. The bundled install-free engine runs 81 static checks tied to success criteria, while the agent adjudicates judgment criteria and routes rendering criteria to browser scans; check/verify reject invented non-conformities. Use `review-a11y` instead for a review scoped only to a diff, branch, or PR."
 license: MIT
 metadata:
   version: 5.34.1
@@ -14,7 +13,7 @@ that with a **division of labour**: the deterministic, install-free engine
 (`node scripts/ultra11y.mjs <command>` — no `npm install`, no key; the JSX/TSX parser
 is embedded in the bundle) does the *mechanical* work — detect the machine-checkable
 non-conformities and tie each to the right **WCAG success criterion** — and **the AI agent**
-(Claude running this skill) *adjudicates the judgment criteria itself* — alt relevance, link
+(the AI agent running this skill) *adjudicates the judgment criteria itself* — alt relevance, link
 purpose in context, reading order — statically, from the evidence the engine harvests
 (`verify --manual`), each verdict gated by `verify`/`check`. Only the truly **rendered-DOM**
 criteria (computed contrast, visible focus, zoom/reflow, content-on-hover) fall to the `scan`
@@ -411,8 +410,11 @@ This skill does the analysis end to end: audit, render, adjudicate, fix, re-audi
 When it has produced fixes, **dispatch `review-a11y` on the code under change as a subagent**,
 and report what it returns.
 
+Use the host's native subagent capability: Codex dispatches a subagent with the prompt below;
+Claude Code can use `Agent(...)`. If the host exposes neither, follow the sequential route below.
+
 ```
-Agent(subagent_type: "general-purpose", prompt: "Use the review-a11y skill on the working diff. Return its report verbatim.")
+Use the review-a11y skill on the working diff. Return its report verbatim.
 ```
 
 Two skills, two scopes, and the split is not cosmetic:

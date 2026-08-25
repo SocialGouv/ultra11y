@@ -16,17 +16,14 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Claude Code truncates the COMBINED `description` + `when_to_use` text at 1536
-// chars in the skill listing — that listing is what the model matches a task
-// against, so anything past the cut is invisible and the skill silently stops
-// auto-invoking. 1500 leaves a safety margin. NOTE: the budget is shared, not
-// per-field: growing `description` eats into `when_to_use` and vice versa.
-const LISTING_MAX = 1500;
+// Codex accepts descriptions up to 1024 characters. Keep the gate at the
+// official limit so the same frontmatter remains discoverable across hosts.
+const DESCRIPTION_MAX = 1024;
+const CLAUDE_LISTING_MAX = 1500;
 
-// Frontmatter keys Claude Code understands, plus the two this repo carries
-// (`license`, `metadata`). An unknown key at the root is almost always a typo
-// — `when-to-use` for `when_to_use` costs the whole automatic trigger and
-// otherwise fails silently, so it is a hard error here.
+// Accept the union of the Codex keys and the Claude Code keys supported by this
+// multi-host repository. The installable skills themselves are tested below
+// against the stricter portable subset.
 const KNOWN_KEYS = new Set([
   "name",
   "description",
@@ -107,11 +104,13 @@ for (const name of skillNames) {
     const when = scalar(fm[1], "when_to_use");
     if (!desc) bad(`skills/${name}: frontmatter has no description`);
     else {
-      const total = desc.length + (when?.length ?? 0);
-      const parts = `description ${desc.length}${when ? ` + when_to_use ${when.length}` : ""} = ${total}`;
-      total <= LISTING_MAX
-        ? ok(`${parts} chars (<= ${LISTING_MAX} safety cap)`)
-        : bad(`skills/${name}: ${parts} chars exceeds the ${LISTING_MAX}-char safety cap — Claude Code truncates the listing at 1536 and the tail stops matching`);
+      desc.length <= DESCRIPTION_MAX
+        ? ok(`description ${desc.length} chars (<= ${DESCRIPTION_MAX} Codex limit)`)
+        : bad(`skills/${name}: description ${desc.length} chars exceeds the ${DESCRIPTION_MAX}-char Codex limit`);
+      const listingLength = desc.length + (when?.length ?? 0);
+      listingLength <= CLAUDE_LISTING_MAX
+        ? ok(`Claude listing ${listingLength} chars (<= ${CLAUDE_LISTING_MAX} safety cap)`)
+        : bad(`skills/${name}: Claude listing ${listingLength} chars exceeds the ${CLAUDE_LISTING_MAX}-char safety cap`);
     }
   }
 
