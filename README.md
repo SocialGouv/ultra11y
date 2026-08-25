@@ -153,7 +153,7 @@ ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]
 ultra11y pages    discover --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--write]   # build the page sample
 ultra11y dev      [--port <n>] [--standard <pack>]   |   dev --next                        # live overlay while you build + dashboard
 ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
-ultra11y judge    --in <audit.json> [--standard <pack>] [--max <n>] [--model <id>] [--apply]   # adjudicate with a model (ANTHROPIC_API_KEY)
+ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|claude|codex] [--model <id>] [--apply]   # API or local subscription CLI
 ultra11y check    --report <md> [--standard <pack>] [--quiet] [--json]
 ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--json]
 ultra11y verify   --report <md> [--conformities <ledger|adjudication.json> | --no-conformities]   # also put the claimed CONFORMITIES on trial
@@ -431,8 +431,22 @@ prompt are `verify --manual`'s own, and the verdicts pass through the **same fai
 an agent's do. An unjustified `C`, an `NC` citing a line that does not resolve, a verdict for a
 criterion nobody asked about, or an incomplete run are all refused — and a rejected
 adjudication leaves the audit untouched. All-`manual` with reasons is accepted, because that is
-a correct answer. It is the **only** part of the tool that takes an API key; without one the
-command explains itself and exits, and nothing else changes.
+a correct answer. Choose the transport explicitly:
+
+```sh
+# Anthropic Messages API
+ANTHROPIC_API_KEY=… ultra11y judge --in audits/audit-latest.json --runner api --apply
+
+# Local CLI subscriptions; each reuses that CLI's existing login
+ultra11y judge --in audits/audit-latest.json --runner claude --apply
+ultra11y judge --in audits/audit-latest.json --runner codex --apply
+```
+
+`--runner cli` remains an alias of `claude` for existing scripts. The Codex runner invokes
+`codex exec` ephemerally, read-only, offline, without repository rules, hooks or user config;
+it uses the model attached to the ChatGPT account unless `--model` is given. Its subscription
+has no per-run dollar-budget flag, so `--max-budget-usd` is rejected for Codex rather than
+pretending to enforce a ceiling. Use `--timeout` and `--max` to bound the local run.
 
 The GitHub Action wires this as `adjudicate: api`, and offers `adjudicate: agent` as the other
 half — the same worklist handed to a `claude-code-action` run, which can **open the cited files**
@@ -442,6 +456,8 @@ never from an input, and **skip themselves when it is absent** — which is exac
 pull request looks like, so the job stays green and the criteria stay « à évaluer ». See
 `references/ci.md` for the cost per run and for `gate-adjudicated`, which lets a model-ruled
 non-conformity fail the build at the price of a red/green that no longer reproduces.
+ChatGPT-subscription authentication stays local: public CI does not receive or manufacture a
+Codex subscription secret.
 
 ### Optional dynamic tier (axe-core)
 

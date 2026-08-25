@@ -59,6 +59,17 @@ The deltas that actually matter:
 Gate only, without the marketplace: `ultra11y install --codex` (it sets the feature flag and
 copies both skills into `~/.codex/skills/`).
 
+The installed skill can also delegate an unattended local judgment pass to the same signed-in
+Codex account:
+
+```sh
+ultra11y judge --in audits/audit-latest.json --standard rgaa --runner codex --apply
+```
+
+That command uses `codex exec` with an ephemeral, read-only, offline session and ignores user
+config, repository rules and hooks. No API key is required; Codex reuses its ChatGPT login.
+For Claude CLI use `--runner claude` (`--runner cli` is the legacy alias).
+
 ## OpenCode
 
 ```

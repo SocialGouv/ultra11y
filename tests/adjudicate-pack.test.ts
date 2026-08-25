@@ -365,8 +365,13 @@ describe("the rendered worklist is self-sufficient", () => {
     expect(t).not.toMatch(/\bH\d{2}\b/);
   });
 
-  it("names the standard rather than speaking WCAG", () => {
-    expect(md()).toContain("RGAA");
+  it("renders only RGAA criterion headings", () => {
+    const criterionHeadings = md()
+      .split("\n")
+      .filter((line) => line.startsWith("## "));
+    expect(criterionHeadings.length).toBeGreaterThan(0);
+    expect(criterionHeadings.every((line) => line.startsWith("## RGAA "))).toBe(true);
+    expect(md()).not.toMatch(/^## WCAG /m);
   });
 
   it("still renders the WCAG core worklist unchanged", () => {

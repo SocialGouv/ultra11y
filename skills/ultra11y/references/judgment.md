@@ -1,6 +1,6 @@
 # Judgment phase (the criteria the AI agent adjudicates)
 
-The engine decides the machine-checkable subset; the **AI agent** (Claude running this skill)
+The engine decides the machine-checkable subset; the **active coding agent**
 *adjudicates the rest itself*, gated: the **judgment** criteria (alt relevance, link purpose in
 context, reading order) it rules on **statically, from the evidence the engine harvests**; the
 **rendering** criteria (computed contrast, visible focus, zoom/reflow, content-on-hover) it routes
@@ -171,12 +171,14 @@ Inside a coding agent, the judgment criteria are adjudicated by the agent: `veri
 builds the worklist, the agent rules, `verify --apply` folds the verdicts through the gate.
 
 Outside one — a CI job, a browser extension, an E2E run — nobody rules on them, so they stay
-« à évaluer » forever. Honest, and unusable on its own. `judge` closes that:
+« à évaluer » forever. Honest, and unusable on its own. `judge` closes that through an API or
+an already authenticated local CLI:
 
 ```
-export ANTHROPIC_API_KEY=…            # the ONLY place in the tool that takes a key
-node scripts/ultra11y.mjs judge --in audits/audit-latest.json --standard rgaa --out .
-node scripts/ultra11y.mjs judge --in audits/audit-latest.json --standard rgaa --apply
+export ANTHROPIC_API_KEY=…
+node scripts/ultra11y.mjs judge --in audits/audit-latest.json --standard rgaa --runner api --out .
+node scripts/ultra11y.mjs judge --in audits/audit-latest.json --standard rgaa --runner claude --apply
+node scripts/ultra11y.mjs judge --in audits/audit-latest.json --standard rgaa --runner codex --apply
 ```
 
 **It is a caller, not a second judge.** The items and their harvested evidence come from
@@ -211,8 +213,15 @@ signed off in one pass); there, a rejected adjudication leaves `audit-latest.jso
 Whatever lands can be RECORDED with `--ledger <path>` and replayed on a later run with no model
 in the loop — see `references/ci.md`.
 
-**Strictly opt-in.** With no key the command explains itself and exits 2; nothing else in the
-engine changes.
+**Strictly opt-in.** The API transport needs `ANTHROPIC_API_KEY`; Claude and Codex reuse their
+local CLI login. `cli` remains an alias of `claude`. Codex runs ephemerally, read-only and
+offline, with project instructions, user config, rules and hooks disabled. Its subscription
+has no dollar-budget flag, so `--max-budget-usd` is rejected; use `--timeout` and `--max`.
+Nothing else in the engine changes.
+
+The standard is one pipeline choice, not an extra comparison pass. With `--standard rgaa`,
+the worklist, schemas, verdict ids and fold are RGAA-only; WCAG remains internal crosswalk
+plumbing and is not separately adjudicated.
 
 **In the GitHub Action.** `adjudicate: api` runs exactly the command above; `adjudicate: agent`
 hands the same worklist — plus `orchestrate --eco`'s runbook and the adjudicator contract — to

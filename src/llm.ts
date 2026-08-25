@@ -16,8 +16,9 @@
 // criterion's OWN tests, `manual` needs a reason, and every cited `file:line` is re-grounded
 // against real source. What this file adds is a caller, and nothing else.
 //
-// STRICTLY ADDITIVE. Without ANTHROPIC_API_KEY nothing here runs and no other command
-// changes: the engine's "no keys, no install" promise holds everywhere else.
+// STRICTLY ADDITIVE. The API transport needs ANTHROPIC_API_KEY; local CLI transports are
+// authenticated by their own login state. No other command changes: the deterministic
+// engine's "no keys, no install" promise holds everywhere else.
 //
 // Zero dependencies: global `fetch`, no SDK.
 import type { AdjudicationItem, AgentFinding, CriterionVerdict, Evidence } from "./adjudicate.js";
@@ -44,9 +45,9 @@ export function modelFromEnv(): string {
 }
 
 export interface LlmOptions {
-  /** Required by the Messages backend, and by it alone. The CLI backend authenticates from
-   *  the environment (CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY), so each backend
-   *  validates its OWN credential rather than this type demanding one for both. */
+  /** Required by the Messages backend, and by it alone. Local CLI backends authenticate from
+   *  their own login state, so each backend validates its OWN credential rather than this
+   *  type demanding one for every transport. */
   apiKey?: string;
   model?: string;
   baseUrl?: string;
@@ -56,29 +57,28 @@ export interface LlmOptions {
    *  bounded concurrency, progress and per-batch failure absorption are transport-neutral,
    *  and a second transport reuses them along with the prompt, the schema and the fold. */
   backend?: (items: AdjudicationItem[], prompt: string, opts: LlmOptions) => Promise<RawVerdict[]>;
-  /** Batches in flight at once. The Messages backend defaults to 4; the CLI backend runs
-   *  sequentially, because one local process per criterion is not a rate-limit question. */
+  /** Batches in flight at once. The Messages backend defaults to 4; local CLI transports use
+   *  a deliberately small caller-selected concurrency. */
   concurrency?: number;
   /** Injected for tests. Defaults to the global fetch. */
   fetchImpl?: typeof fetch;
-  /** Injected for tests, the CLI backend's counterpart to `fetchImpl`: it takes the argv and
+  /** Injected for tests, a CLI backend's counterpart to `fetchImpl`: it takes the argv and
    *  the stdin payload and returns what the process wrote. */
   spawnImpl?: (argv: string[], input: string, timeoutMs: number) => Promise<{ code: number | null; stdout: string; stderr: string; timedOut?: boolean }>;
   /** Wall-clock kill for one CLI invocation, in ms. THE ONLY BOUND WE OWN: the CLI swallows
    *  an unknown flag without a word, so any ceiling expressed as a flag it might not have is
    *  a ceiling that may not exist. This one is enforced by killing the process. */
   timeoutMs?: number;
-  /** Dollar ceiling handed to the CLI backend — the bound that survives whatever a turn
-   *  happens to cost, which is what a CI job actually wants to cap. */
+  /** Dollar ceiling supported by the Claude CLI backend. Codex subscription runs reject it
+   *  rather than pretending a provider-side budget exists. */
   maxBudgetUsd?: number;
-  /** Reasoning effort handed to the CLI backend (`--effort`: low, medium, high, xhigh, max).
+  /** Reasoning effort handed to a CLI backend. Each transport validates its own vocabulary.
    *
    *  The criteria this tier rules on are the ones no engine can decide — alt relevance, link
    *  purpose in context, reading order — so how hard the model is asked to think is a real
    *  lever on the verdict, and one a caller should be able to move without also changing the
-   *  model. Unlike `--max-turns`, `--effort` IS a flag of this CLI, so it is passed rather
-   *  than refused. The Messages backend ignores it: effort is a session notion there, not a
-   *  request parameter. */
+   *  model. The Messages backend rejects it: effort is a session notion there, not a request
+   *  parameter. */
   effort?: string;
   /** Called with each invocation's real cost, so a run can report what it spent instead of
    *  leaving the reader to find it in a provider dashboard. */

@@ -65,6 +65,7 @@ import {
 } from "./adjudicate.js";
 import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, unreadableCaptures, type VerdictLedger, writeLedger } from "./ledger.js";
 import { DEFAULT_CLI_MODEL, EFFORT_LEVELS, judgeBatchCli, refuteBatchCli } from "./agent-cli.js";
+import { CODEX_EFFORT_LEVELS, judgeBatchCodex, refuteBatchCodex } from "./agent-codex.js";
 import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, judgeAll, modelFromEnv, type LlmOptions } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable, localTierStatus } from "./scan-local.js";
@@ -126,7 +127,7 @@ Usage:
   ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file)
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y judge    --in <audit.json> [--concurrency <n>] [--ledger [<path>]] [--lang auto|en|fr]
-  ultra11y judge    --refute <VERIFY.todo.json> --runner cli [--standard <pack>] [--model <id>] [--concurrency <n>] [--max-budget-usd <n>] [--timeout <s>]   (put the already-written claims on trial — one call per item, read-only)
+  ultra11y judge    --refute <VERIFY.todo.json> --runner claude|codex [--standard <pack>] [--model <id>] [--effort <level>] [--concurrency <n>] [--max-budget-usd <n> (Claude only)] [--timeout <s>]   (put the already-written claims on trial — one call per item, read-only; cli aliases claude)
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
@@ -142,7 +143,7 @@ Usage:
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
   ultra11y fix      <globs… | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
-  ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|cli] [--grain batch|criterion] [--max <n>] [--model <id>] [--effort <level>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate the manual criteria with a model — api needs ANTHROPIC_API_KEY; cli runs the Claude Code CLI and takes CLAUDE_CODE_OAUTH_TOKEN too)
+  ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|claude|codex] [--grain batch|criterion] [--max <n>] [--model <id>] [--effort <level>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate manual criteria — api needs ANTHROPIC_API_KEY; claude/codex reuse their CLI login; cli aliases claude)
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
   ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--runtime …] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
@@ -375,8 +376,8 @@ Options:
   --provider <id>    tickets: auto|github|gitlab|jira. 'auto' reads ULTRA11Y_TICKET_PROVIDER,
                      then .ultra11yrc.json, then the git remote (Jira is never auto-detected)
   --grain <mode>     tickets: what one ticket is — criterion (default) | page | page-criterion | single | file
-  --effort <level>   judge (--runner cli): reasoning effort per invocation — low | medium |
-                     high | xhigh | max. Unset leaves the CLI's own default
+  --effort <level>   judge CLI runner: Claude accepts low|medium|high|xhigh|max;
+                     Codex accepts minimal|low|medium|high|xhigh. Unset keeps its default
   --transport <t>    tickets: auto|cli|rest (mcp: stdio|http). 'auto' prefers the CLI (gh/glab),
                      falling back to REST when only a token is available. Jira is REST-only
   --max-tickets <n>  tickets: refuse to file more than n tickets in one run (default 200)
@@ -514,8 +515,8 @@ Options:
   --clean            scan: remove the dynamic-tier image + temp contexts, then exit
   --api-key <key>    judge: the Anthropic API key. Defaults to $ANTHROPIC_API_KEY. This is
                      the ONLY place in the tool that takes one — the engine needs no key
-  --model <id>       judge: the model to rule with (default $ULTRA11Y_LLM_MODEL, else
-                     claude-sonnet-5)
+  --model <id>       judge: explicit model. API defaults to $ULTRA11Y_LLM_MODEL / claude-sonnet-5;
+                     Claude CLI defaults to ${DEFAULT_CLI_MODEL}; Codex inherits the account default
   --apply            judge: fold the verdicts straight into the audit, through the SAME
                      fail-closed gate an agent's verdicts pass (no unjustified C/NA, no
                      ungroundable NC, no unadjudicated criterion)
@@ -3417,8 +3418,18 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
 // refuses: no null verdict, `C`/`NA` justified, an `NC` citing the criterion's OWN test, a
 // `manual` carrying a reason, and every `file:line` re-grounded against real source.
 //
-// Strictly opt-in: with no ANTHROPIC_API_KEY this command explains itself and exits, and no
-// other command is affected.
+// Strictly opt-in: the API runner needs ANTHROPIC_API_KEY; local runners reuse their own
+// authenticated CLI. No other command is affected.
+type JudgeRunner = "api" | "claude" | "codex";
+
+/** `cli` shipped as the name of the Claude transport. Keep it as an alias so existing scripts
+ * and Action inputs do not change meaning; new callers can state the provider explicitly. */
+function judgeRunner(value: unknown, fallback: JudgeRunner): JudgeRunner | null {
+  const raw = typeof value === "string" && value ? value : fallback;
+  if (raw === "cli") return "claude";
+  return raw === "api" || raw === "claude" || raw === "codex" ? raw : null;
+}
+
 /**
  * `judge --refute <VERIFY.todo.json>` — the SECOND pass, through the same transport.
  *
@@ -3431,19 +3442,19 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
  * reviewer back in the position the adjudicator was in, reading eight elements at once, and
  * the entire value of this pass is one reader looking at one element with one question.
  *
- * `--runner cli` only. The api tier has no tools, and a reviewer who cannot OPEN the cited
+ * Local CLI runners only. The api tier has no tools, and a reviewer who cannot OPEN the cited
  * file can only re-read the claim it was given — which is not a second reading, it is an echo.
  */
 async function cmdRefute(p: ParsedArgs, todoPath: string): Promise<number> {
   const standard = stdOf(p, "judge");
   if (standard === null) return 2;
   const lang = resolveLang(p.flags, { standard });
-  const runner = typeof p.flags.runner === "string" ? (p.flags.runner as string) : "cli";
-  if (runner !== "cli") {
+  const runner = judgeRunner(p.flags.runner, "claude");
+  if (runner !== "claude" && runner !== "codex") {
     console.error(
       lang === "fr"
-        ? "ultra11y judge : --refute exige --runner cli. Le tier `api` n'a aucun outil, et un relecteur qui ne peut pas OUVRIR le fichier cité ne relit rien — il répète."
-        : "ultra11y judge: --refute requires --runner cli. The api tier has no tools, and a reviewer who cannot OPEN the cited file is not re-reading anything — it is echoing.",
+        ? "ultra11y judge : --refute exige --runner claude ou --runner codex (`cli` reste un alias de claude). Le tier `api` n'a aucun outil, et un relecteur qui ne peut pas OUVRIR le fichier cité ne relit rien — il répète."
+        : "ultra11y judge: --refute requires --runner claude or --runner codex (`cli` remains a claude alias). The api tier has no tools, and a reviewer who cannot OPEN the cited file is not re-reading anything — it is echoing.",
     );
     return 2;
   }
@@ -3471,10 +3482,23 @@ async function cmdRefute(p: ParsedArgs, todoPath: string): Promise<number> {
   const lanes = Number.isFinite(askedConcurrency) && askedConcurrency > 0 ? Math.min(askedConcurrency, 8) : 2;
   const timeout = typeof p.flags.timeout === "string" ? Number(p.flags.timeout) * 1000 : undefined;
   const budget = typeof p.flags["max-budget-usd"] === "string" ? Number(p.flags["max-budget-usd"]) : undefined;
+  if (runner === "codex" && Number.isFinite(budget)) {
+    console.error(
+      "ultra11y judge: --max-budget-usd is a Claude CLI bound and does not exist for a ChatGPT-subscription Codex run; use --timeout or --max instead.",
+    );
+    return 2;
+  }
+  const effort = typeof p.flags.effort === "string" ? (p.flags.effort as string) : undefined;
+  const allowedEfforts = runner === "codex" ? CODEX_EFFORT_LEVELS : EFFORT_LEVELS;
+  if (effort !== undefined && !allowedEfforts.includes(effort)) {
+    console.error(`ultra11y judge: --effort '${effort}' is not valid for ${runner} — expected ${allowedEfforts.map((level) => `'${level}'`).join(", ")}.`);
+    return 2;
+  }
   const opts: LlmOptions = {
     ...(typeof p.flags.model === "string" && p.flags.model ? { model: p.flags.model as string } : {}),
     ...(Number.isFinite(timeout) && timeout ? { timeoutMs: timeout } : {}),
     ...(Number.isFinite(budget) ? { maxBudgetUsd: budget } : {}),
+    ...(effort ? { effort } : {}),
   };
   let spent = 0;
   let failed = 0;
@@ -3485,7 +3509,7 @@ async function cmdRefute(p: ParsedArgs, todoPath: string): Promise<number> {
       const item = queue.shift();
       if (!item) return;
       try {
-        const verdicts = await refuteBatchCli(
+        const verdicts = await (runner === "codex" ? refuteBatchCodex : refuteBatchCli)(
           [item],
           formatWorklist([item], p.flags.semantic === true, standard, lang),
           { ...opts, onCost: (c) => (spent += c) },
@@ -3545,13 +3569,13 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   }
   const lang = resolveLang(p.flags, { audit, standard });
 
-  // WHICH TRANSPORT RULES. `api` posts the worklist to the Messages API; `cli` hands each
-  // batch to a local `claude -p`, which can OPEN the files a criterion cites — the difference
-  // the agent tier has always been about — and which runs anywhere a shell does: the skill, a
-  // GitHub Action, a GitLab CI, a laptop.
-  const runner = typeof p.flags.runner === "string" ? (p.flags.runner as string) : "api";
-  if (runner !== "api" && runner !== "cli") {
-    console.error(`ultra11y judge: --runner '${runner}' is not a transport — expected 'api' or 'cli'.`);
+  // WHICH TRANSPORT RULES. `api` posts the worklist to the Messages API; the local Claude and
+  // Codex transports can OPEN the files a criterion cites — the difference the agent tier has
+  // always been about — and run anywhere their authenticated CLI does. `cli` remains the
+  // historical spelling of the Claude transport so existing Action inputs keep their meaning.
+  const runner = judgeRunner(p.flags.runner, "api");
+  if (!runner) {
+    console.error(`ultra11y judge: --runner '${String(p.flags.runner)}' is not a transport — expected 'api', 'claude' or 'codex' ('cli' aliases 'claude').`);
     return 2;
   }
   // One criterion per invocation instead of eight. It costs more calls and buys two things: the
@@ -3565,17 +3589,25 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   }
 
   // HOW HARD THE MODEL IS ASKED TO THINK, which on this worklist is not a detail: what reaches
-  // this tier is what no engine could decide. Validated rather than forwarded, because the CLI
-  // SWALLOWS AN UNKNOWN VALUE the same way it swallows an unknown flag — `--effort hgih` would
-  // read as a setting and be nothing at all, which is the failure mode this repo already ate
-  // once with `--max-turns`. Refused here, loudly, while the message can still reach a human.
+  // this tier is what no engine could decide. Validated rather than forwarded, because an
+  // unknown value can otherwise be ignored or fail far away from the command that supplied it.
+  // Refused here, loudly, while the message can still reach a human.
   const effort = typeof p.flags.effort === "string" ? (p.flags.effort as string) : undefined;
-  if (effort !== undefined && !EFFORT_LEVELS.includes(effort)) {
-    console.error(`ultra11y judge: --effort '${effort}' is not a level — expected ${EFFORT_LEVELS.map((l) => `'${l}'`).join(", ")}.`);
+  const allowedEfforts = runner === "codex" ? CODEX_EFFORT_LEVELS : runner === "claude" ? EFFORT_LEVELS : [];
+  if (effort !== undefined && !allowedEfforts.includes(effort)) {
+    console.error(
+      runner === "api"
+        ? "ultra11y judge: --effort applies to the Claude and Codex CLI runners only — the Messages API has no session to configure."
+        : `ultra11y judge: --effort '${effort}' is not valid for ${runner} — expected ${allowedEfforts.map((level) => `'${level}'`).join(", ")}.`,
+    );
     return 2;
   }
-  if (effort !== undefined && runner !== "cli") {
-    console.error("ultra11y judge: --effort applies to `--runner cli` only — the Messages API has no session to set an effort on.");
+
+  const maxBudgetUsd = typeof p.flags["max-budget-usd"] === "string" ? Number(p.flags["max-budget-usd"]) : undefined;
+  if (runner === "codex" && Number.isFinite(maxBudgetUsd)) {
+    console.error(
+      "ultra11y judge: --max-budget-usd is a Claude CLI bound and does not exist for a ChatGPT-subscription Codex run; use --timeout or --max instead.",
+    );
     return 2;
   }
 
@@ -3623,10 +3655,10 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   // THE FULL PREAMBLE ENDS BY TELLING THE READER TO RUN `verify --apply` (src/adjudicate.ts
   // T.then). Harmless to the api tier, which has no tools; wrong to hand a process that does.
   // `preamble: false` is the rendering the on-disk briefs already use — the compressed
-  // contract, without the shell instructions — so the CLI runner reads exactly what
+  // contract, without the shell instructions — so each CLI runner reads exactly what
   // `audits/adjudicate/<id>.md` carries, and the two surfaces cannot describe different jobs.
   // AND `contract: false` ON BOTH TIERS, because both send `verdictSystemPrompt()` — the api
-  // one as the system parameter, the cli one as `--system-prompt` — and its clauses come from
+  // one as the system parameter, and each CLI transport as its system contract — and its clauses come from
   // the same source the brief's contract does (src/verdict-rules.ts). Repeating them costs
   // 2 144 characters per criterion, which at `--grain criterion` over a full RGAA worklist is
   // 28% of everything the pass pays for, and buys the model nothing it was not already told.
@@ -3638,11 +3670,13 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
     const slice = items.slice(i, i + size);
     batches.push({ items: slice, prompt: render(slice) });
   }
-  const model = typeof p.flags.model === "string" && p.flags.model ? (p.flags.model as string) : runner === "cli" ? DEFAULT_CLI_MODEL : modelFromEnv();
+  const explicitModel = typeof p.flags.model === "string" && p.flags.model ? (p.flags.model as string) : undefined;
+  const model = explicitModel ?? (runner === "claude" ? DEFAULT_CLI_MODEL : runner === "api" ? modelFromEnv() : undefined);
+  const modelLabel = model ?? "Codex account default";
   console.error(
     lang === "fr"
-      ? `ultra11y judge : ${items.length} critère(s) en ${batches.length} lot(s), transport ${runner}, modèle ${model}…`
-      : `ultra11y judge: ${items.length} criterion(ia) in ${batches.length} batch(es), ${runner} transport, model ${model}…`,
+      ? `ultra11y judge : ${items.length} critère(s) en ${batches.length} lot(s), transport ${runner}, modèle ${modelLabel}…`
+      : `ultra11y judge: ${items.length} criterion(ia) in ${batches.length} batch(es), ${runner} transport, model ${modelLabel}…`,
   );
 
   const outDir = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
@@ -3685,22 +3719,20 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   };
 
   let spent = 0;
-  // A dollar ceiling and a wall clock — never a turn budget. `--max-turns` is not a flag of
-  // the Claude Code CLI, and the CLI swallows unknown flags without a word, so passing one
-  // would look like a bound and be an unbounded run.
-  const maxBudgetUsd = typeof p.flags["max-budget-usd"] === "string" ? Number(p.flags["max-budget-usd"]) : undefined;
+  // A provider-supported dollar ceiling (Claude only) and a wall clock — never an invented
+  // turn budget. The wall clock is enforced by this process for both local transports.
   const timeoutMs = typeof p.flags.timeout === "string" ? Number(p.flags.timeout) * 1000 : undefined;
   const { verdicts, failures } = await judgeAll(batches, {
     apiKey: key,
     model,
-    backend: runner === "cli" ? judgeBatchCli : undefined,
+    backend: runner === "claude" ? judgeBatchCli : runner === "codex" ? judgeBatchCodex : undefined,
     // TWO local processes, not one, and the reason is measured rather than tuned: sequentially,
     // one criterion took ~75s on Haiku, so a 51-criterion sweep needs ~64 minutes and a CI job
     // that allows 45 is killed at 31. Two in flight brings it inside the ceiling; more than a
-    // few is a different risk — each `claude` is its own Node process making its own API calls,
-    // and four of them on a subscription token reach a rate limit faster than four HTTP
-    // requests do. `--concurrency` overrides it for a runner with room.
-    concurrency: runner === "cli" ? cliConcurrency : undefined,
+    // few is a different risk — each local CLI invocation is its own process and concurrent
+    // subscription turns reach provider limits faster. `--concurrency` overrides it for a
+    // runner with room.
+    concurrency: runner === "claude" || runner === "codex" ? cliConcurrency : undefined,
     maxBudgetUsd: Number.isFinite(maxBudgetUsd) ? maxBudgetUsd : undefined,
     effort,
     timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : undefined,

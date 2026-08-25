@@ -105,7 +105,21 @@ jobs:
           test -f "$RDIR/SKILL.md"             || { echo "::error::review-a11y SKILL.md not installed"; exit 1; }
           test -f "$RDIR/scripts/ultra11y.mjs" || { echo "::error::review-a11y engine not bundled — skills add dropped scripts/"; exit 1; }
           node "$RDIR/scripts/ultra11y.mjs" --help > /dev/null || { echo "::error::review-a11y installed engine does not run"; exit 1; }
-          echo "install-bundle: both skills installed whole and their engines run."
+
+          # Codex installs skills in the shared .agents tree. Exercise the real installer and
+          # the copied engine, but never authenticate or invoke a model in public CI.
+          npx --yes skills add "$GITHUB_WORKSPACE" --skill ultra11y --agent codex --copy -y
+          CDIR=.agents/skills/ultra11y
+          test -f "$CDIR/SKILL.md"             || { echo "::error::Codex SKILL.md not installed"; exit 1; }
+          test -f "$CDIR/scripts/ultra11y.mjs" || { echo "::error::Codex engine not bundled"; exit 1; }
+          test -d "$CDIR/references"           || { echo "::error::Codex references not bundled"; exit 1; }
+          node "$CDIR/scripts/ultra11y.mjs" --help > /dev/null || { echo "::error::Codex-installed engine does not run"; exit 1; }
+          npx --yes skills add "$GITHUB_WORKSPACE" --skill review-a11y --agent codex --copy -y
+          CRDIR=.agents/skills/review-a11y
+          test -f "$CRDIR/SKILL.md"             || { echo "::error::Codex review-a11y SKILL.md not installed"; exit 1; }
+          test -f "$CRDIR/scripts/ultra11y.mjs" || { echo "::error::Codex review-a11y engine not bundled"; exit 1; }
+          node "$CRDIR/scripts/ultra11y.mjs" --help > /dev/null || { echo "::error::Codex review-a11y engine does not run"; exit 1; }
+          echo "install-bundle: both skills install whole and run under Claude Code and Codex layouts."
 
       # The PLUGIN half — the manifests + the PreToolUse guard, which is what makes the
       # review automatic. `skills add` never installs hooks, so nothing above covers it.

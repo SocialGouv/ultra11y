@@ -12,8 +12,8 @@ On accessibility, an automated tool only sees part of the problem. `ultra11y` ow
 that with a **division of labour**: the deterministic, install-free engine
 (`node scripts/ultra11y.mjs <command>` — no `npm install`, no key; the JSX/TSX parser
 is embedded in the bundle) does the *mechanical* work — detect the machine-checkable
-non-conformities and tie each to the right **WCAG success criterion** — and **the AI agent**
-(the AI agent running this skill) *adjudicates the judgment criteria itself* — alt relevance, link
+non-conformities and tie each to the right **WCAG success criterion** — and **the active coding
+agent** *adjudicates the judgment criteria itself* — alt relevance, link
 purpose in context, reading order — statically, from the evidence the engine harvests
 (`verify --manual`), each verdict gated by `verify`/`check`. Only the truly **rendered-DOM**
 criteria (computed contrast, visible focus, zoom/reflow, content-on-hover) fall to the `scan`
@@ -247,9 +247,10 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 - **"Nobody is here to rule on the judgment criteria"** → `judge --in audits/audit-latest.json
   --standard rgaa [--apply]` adjudicates them with a model, for a run with no coding agent in
   the loop (CI, the extension, an E2E run). It is a CALLER, not a second judge: same worklist,
-  same evidence, same prompt, and the verdicts pass the same fail-closed gate yours do. The
-  only command that takes an API key — inside an agent, use `verify --manual` instead and rule
-  yourself; read **`references/judgment.md`**.
+  same evidence, same prompt, and the verdicts pass the same fail-closed gate yours do. Use
+  `--runner api` with an API key, or `--runner claude|codex` with that local CLI's existing
+  subscription login (`--runner cli` still aliases Claude). Inside an agent, prefer
+  `verify --manual` and rule the worklist yourself; read **`references/judgment.md`**.
 - **"Show the findings ON the pull request, not just a red job"** → `--format sarif` (upload
   to code scanning → inline annotations at the right file:line) or `--format github`
   (`::error::` workflow commands + a `$GITHUB_STEP_SUMMARY` table) — from `report

@@ -15,13 +15,13 @@ ultra11y audit <src> --standard rgaa --out audits     # re-ingest the captures
 
 # 3. The model rules on what is left — one criterion per call, recorded.
 ultra11y judge --in audits/audit-latest.json --out audits --apply \
-  --standard rgaa --runner cli --grain criterion \
+  --standard rgaa --runner claude --grain criterion \
   --model claude-haiku-4-5-20251001 --max-budget-usd <n> --concurrency 4 --ledger
 
 # 4. A second reader puts those claims on trial, and the outcome is APPLIED.
 ultra11y report --in audits/audit-latest.json --standard rgaa --out audits
 ultra11y verify --report audits/<report>.md --in audits/audit-latest.json --out audits --max-verify 0
-ultra11y judge --refute audits/VERIFY.todo.json --runner cli \
+ultra11y judge --refute audits/VERIFY.todo.json --standard rgaa --runner claude \
   --model claude-haiku-4-5-20251001 --concurrency 4
 ultra11y verify --apply audits/VERIFY.todo.json --report audits/<report>.md \
   --in audits/audit-latest.json --out audits --prune --ledger
@@ -47,16 +47,21 @@ what it cost.
 
 | | why |
 |---|---|
-| `--runner cli` | Read-only tools (`Read,Grep,Glob`), `--safe-mode`, a `--max-budget-usd` that is really enforced, a wall-clock kill, **the cost printed**, runs on `push`, runs off GitHub. |
+| `--runner claude` | Claude subscription/OAuth, read-only tools, safe mode, real dollar ceiling, wall-clock kill and reported cost. `--runner cli` is its compatibility alias. |
+| `--runner codex` | ChatGPT subscription through local `codex exec`, ephemeral/read-only/offline with config, rules and hooks ignored. It inherits the account model unless pinned. Use `--timeout`/`--max`; Codex has no `--max-budget-usd`. |
 | `--grain criterion` | One call per criterion, `criteriaId` pinned to that one criterion. A run cut short loses one criterion instead of everything it had ruled on. |
 | `--ledger` | A verdict paid for once becomes a claim re-verified on every push by `ledger-gate`. |
 
 Not the others, and for concrete reasons: `--runner api` reports no cost, honours no timeout
-and enforces no dollar ceiling (`--timeout` and `--max-budget-usd` are parsed and then consumed
-only by the CLI backend). `adjudicate-runner: action` refuses `--grain criterion`, needs `Write`
+and enforces no dollar ceiling. `adjudicate-runner: action` refuses `--grain criterion`, needs `Write`
 on the audited repository, has no intra-pass resume, and does not run on `push` at all.
 `verify --manual` in a session is free and has the best evidence of any of them — it stays the
 recourse for the hard residue, not the recipe.
+
+To run the same recipe on a Codex subscription, replace both `--runner claude` occurrences
+with `--runner codex`, remove the Claude model and `--max-budget-usd`, and keep the same RGAA
+standard on every phase. A run with `--standard rgaa` builds and adjudicates only the RGAA
+criterion grid; it does not launch a second WCAG judgment pass.
 
 ## Why step 2 is not optional
 

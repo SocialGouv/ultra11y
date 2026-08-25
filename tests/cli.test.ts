@@ -87,6 +87,26 @@ describe("parseArgs", () => {
   });
 });
 
+describe("judge runner validation", () => {
+  const audit = join(FIX, "judge-audit.json");
+
+  it("keeps `cli` as the Claude runner alias", async () => {
+    const r = await run(["judge", "--in", audit, "--runner", "cli", "--effort", "minimal"]);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("not valid for claude");
+  });
+
+  it("uses Codex's effort vocabulary and refuses a fictional dollar ceiling", async () => {
+    const effort = await run(["judge", "--in", audit, "--runner", "codex", "--effort", "max"]);
+    expect(effort.code).toBe(2);
+    expect(effort.err).toContain("not valid for codex");
+
+    const budget = await run(["judge", "--in", audit, "--runner", "codex", "--max-budget-usd", "1"]);
+    expect(budget.code).toBe(2);
+    expect(budget.err).toContain("does not exist for a ChatGPT-subscription Codex run");
+  });
+});
+
 describe("main — help / version / unknown", () => {
   it("--help lists all five commands", async () => {
     const r = await run(["--help"]);

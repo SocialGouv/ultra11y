@@ -161,8 +161,9 @@ tier: unusable from this skill, from a GitLab CI, from a cron — and unusable o
 because claude-code-action parses the event context before it reads the prompt and refuses
 what it does not know. `push` is the event an accessibility gate actually fires on.
 
-`adjudicate-runner: cli` has the ENGINE spawn a headless `claude -p` instead. Same worklist as
-the prompt, same system prompt, same schema, same fail-closed fold — only the transport
+`adjudicate-runner: cli` has the ENGINE spawn a headless `claude -p` instead. The Action keeps
+`cli` as the historical Claude spelling; the standalone command also accepts explicit
+`--runner claude`. Same worklist as the prompt, same system prompt, same schema, same fail-closed fold — only the transport
 changes. One step replaces eleven, because `judge --apply` derives, rules, folds and records
 the ledger in one go. And it is the same command you can run anywhere:
 
@@ -178,6 +179,12 @@ need, so the tier can no longer touch the audited source, and it still opens eve
 criterion cites. It also runs with `--safe-mode`: the audited repository's own `CLAUDE.md`,
 hooks, skills and MCP servers are untrusted content and have no business loading into the
 session that rules on it.
+
+For a local/private runner already signed in to ChatGPT, the corresponding command is
+`--runner codex`. It invokes `codex exec` ephemerally, read-only and offline, ignoring user
+config, repository rules and hooks. It does not need an API key and deliberately is not wired
+to the public Action: CI must not receive or synthesize a personal subscription credential.
+Codex has no dollar-budget flag, so bound it with `--timeout` and `--max` instead.
 
 **Bound it in dollars, not in turns.** `adjudicate-max-turns` does nothing on this runner:
 `--max-turns` is not a flag of the Claude Code CLI, and the CLI **swallows unknown flags
@@ -709,4 +716,3 @@ written and never uploaded. Pass `artifact-name` on each invocation:
 
 Left unset it keeps the historical `ultra11y-<standard>`, so a single-invocation workflow is
 unaffected.
-
