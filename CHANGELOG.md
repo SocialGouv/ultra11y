@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.35.4](https://github.com/maxgfr/ultra11y/compare/v5.35.3...v5.35.4) (2026-08-25)
+
+
+### Bug Fixes
+
+* keep adjudication residue informational ([eb73e32](https://github.com/maxgfr/ultra11y/commit/eb73e32da8a19413135a68592384f0974d836099))
+
 ## [5.35.3](https://github.com/maxgfr/ultra11y/compare/v5.35.2...v5.35.3) (2026-08-25)
 
 
