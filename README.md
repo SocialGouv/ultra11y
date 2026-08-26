@@ -538,3 +538,5 @@ moves on.
 - The **WCAG 2.2** success-criteria dataset (`src/data/wcag.json`) is derived from the official W3C source ([w3c/wcag](https://github.com/w3c/wcag)); WCAG 2.2 is © **W3C**, reused under the **W3C Document License** (only SC ids/titles/levels are reproduced) — see `NOTICE`.
 - The **RGAA pack** (`src/data/standards/rgaa.json`, `rgaa.glossary.json`) is derived from the official **RGAA 4.1.2** reference published by DINUM/DISIC, under the **Licence Ouverte / Etalab 2.0** — see `NOTICE`. Attribution: « RGAA 4.1.2 — DINUM ».
 - The report format is inspired by DINUM/etalab-ia audit conventions; the native-first authoring rules are adapted from the SocialGouv accessibility skill. No source code was copied.
+
+<!-- Temporary static-RGAA pull-request smoke test; this branch is never merged. -->
