@@ -1364,7 +1364,10 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     // A STRING, because every workflow_dispatch input is one — asserting `number` here is
     // what pushed `type: number` into the workflow and made it undispatchable.
     expect(declared?.type ?? "string").toBe("string");
-    expect(Number(declared?.default)).toBeGreaterThan(0);
+    // Run 32964151165 reached 83/91 criterion-sized Claude calls before GitHub killed the
+    // job at the former 60-minute default. The workflow still needs time to retry refusals,
+    // measure the final grid, and upload it, so the default must cover a complete strict run.
+    expect(Number(declared?.default)).toBeGreaterThanOrEqual(120);
     // 360 is GitHub's own hard stop on a hosted runner; a default above it would be a promise
     // this workflow cannot keep.
     expect(Number(declared?.default)).toBeLessThanOrEqual(360);

@@ -137,9 +137,9 @@ on:
         options: ["1", "2", "3"]
         default: "3"
       timeout:
-        description: 'Job ceiling in minutes. GitHub kills a hosted-runner job at 360 whatever this says; only a self-hosted runner goes beyond.'
+        description: 'Job ceiling in minutes. The 120-minute default covers the measured 91-call RGAA criterion run plus retries, final measurement, and artifact upload. GitHub kills a hosted-runner job at 360 whatever this says; only a self-hosted runner goes beyond.'
         type: string
-        default: "60"
+        default: "120"
       require-decided:
         description: "Whether an honest residue should fail this diagnostic workflow. `false` (default) runs up to three adjudication passes, names every criterion still open, and keeps the run green. `true` gates the RUN's grid; `pages` gates every page's grid. Use a strict value only for a deliverable that requires completeness, not to test whether the model and transport work."
         type: choice
