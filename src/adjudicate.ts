@@ -31,6 +31,7 @@ import {
   hasId,
   getCriterion,
   derivePackResults,
+  isProvisionalJudgmentInapplicable,
   criterionUrl,
   glossaryAnchorsOf,
   localize,
@@ -408,8 +409,7 @@ function subjectsForPackCriterion(standard: StandardId, id: string, scs: string[
  *  particular cases. A prior agent decision is never reopened. */
 function packResultNeedsAdjudication(pc: ReturnType<typeof derivePackResults>[number], criterion?: PackCriterion): boolean {
   if (pc.status === "manual") return true;
-  const hasJudgmentTest = Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
-  return pc.status === INAPPLICABLE_STATUS && pc.inapplicable === true && pc.decidedBy !== "agent" && hasJudgmentTest;
+  return isProvisionalJudgmentInapplicable(pc, criterion);
 }
 
 /** Build the adjudication worklist.

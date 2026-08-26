@@ -56362,6 +56362,10 @@ import { mkdirSync as mkdirSync6, writeFileSync as writeFileSync7 } from "fs";
 import { join as join31 } from "path";
 
 // src/standards/derive.ts
+function isProvisionalJudgmentInapplicable(result, criterion) {
+  if (result.status !== INAPPLICABLE_STATUS || result.inapplicable !== true || result.decidedBy === "agent") return false;
+  return Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
+}
 function aggregate2(results) {
   if (results.some((r) => r.status === "NC")) return "NC";
   if (results.some((r) => r.status === "C" && !r.inapplicable)) return "C";
@@ -57687,7 +57691,12 @@ function pageGridModel(result, derived, standard, lang) {
   }
   const pack = loadPack(standard);
   const rows = pack.criteria.map((pc) => ({ id: pc.id, label: pc.id, group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim() }));
-  for (const p of derived) for (const pc of derivePackResults(pageView(result, p), standard, p.id)) put(pc.id, p.id, pc.status);
+  for (const p of derived) {
+    for (const pc of derivePackResults(pageView(result, p), standard, p.id)) {
+      const criterion = pack.criteria.find((row) => row.id === pc.id);
+      put(pc.id, p.id, isProvisionalJudgmentInapplicable(pc, criterion) ? "manual" : pc.status);
+    }
+  }
   return { rows, status };
 }
 function renderRedirected(redirected, lang = "en") {
@@ -57857,15 +57866,19 @@ function pageCriterionRows(result, page, standard, lang) {
   }
   const pack = loadPack(standard);
   const byId2 = new Map(derivePackResults(pageView(result, page), standard, page.id).map((r) => [r.id, r]));
-  return pack.criteria.map((pc) => ({
-    id: pc.id,
-    label: `${pc.id} \u2014 ${titlePlain(pack, pc, lang)}`,
-    group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim(),
-    status: byId2.get(pc.id)?.status ?? "manual",
-    tests: packTestIds(pack, pc.id),
-    decidedBy: byId2.get(pc.id)?.decidedBy,
-    ...byId2.get(pc.id)?.inapplicable ? { inapplicable: true } : {}
-  }));
+  return pack.criteria.map((pc) => {
+    const result2 = byId2.get(pc.id);
+    const provisionalNa = result2 ? isProvisionalJudgmentInapplicable(result2, pc) : false;
+    return {
+      id: pc.id,
+      label: `${pc.id} \u2014 ${titlePlain(pack, pc, lang)}`,
+      group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim(),
+      status: provisionalNa ? "manual" : result2?.status ?? "manual",
+      tests: packTestIds(pack, pc.id),
+      decidedBy: result2?.decidedBy,
+      ...result2?.inapplicable && !provisionalNa ? { inapplicable: true } : {}
+    };
+  });
 }
 function pagesForStandard(result, pages, standard, lang) {
   if (isCore(standard)) return pages;
@@ -58446,19 +58459,21 @@ function packReportGroups(r, pack, lang = "en") {
   const derived = derivePackResults(r, pack.key);
   const s = L5[lang];
   const naReason = lang === "fr" ? "Rien de la nature de ce crit\xE8re n'est pr\xE9sent dans le p\xE9rim\xE8tre." : "Nothing of this criterion's kind is present in scope.";
+  const provisionalNaReason = lang === "fr" ? "Aucun sujet d\xE9tect\xE9 par le moteur ; l'IA doit confirmer la non-applicabilit\xE9 de ce crit\xE8re de jugement." : "The engine detected no subject; the AI must confirm that this judgment criterion is not applicable.";
   const byTheme = /* @__PURE__ */ new Map();
   for (const pr of derived) {
     const pc = pack.criteria.find((c2) => c2.id === pr.id);
+    const provisionalNa = isProvisionalJudgmentInapplicable(pr, pc);
     const row = {
       id: pr.id,
       label: `${pack.name} ${pr.id} \u2014 ${title(pack, pc, lang)}`,
-      status: pr.status,
+      status: provisionalNa ? "manual" : pr.status,
       findings: pr.findings,
       ...pr.decidedBy ? { decidedBy: pr.decidedBy } : {},
-      ...pr.inapplicable ? { inapplicable: true } : {},
+      ...pr.inapplicable && !provisionalNa ? { inapplicable: true } : {},
       // outOfScope / scopedOut criteria are "manual" with their own dedicated justification —
       // never mixed with the "nothing of that kind here" reason (see the manual section above).
-      ...pr.outOfScope ? { justification: s.outOfScope } : pr.scopedOut ? { justification: s.scopedOut } : pr.judgment ? { justification: s.judgment } : pr.inapplicable ? { justification: naReason } : {}
+      ...provisionalNa ? { justification: provisionalNaReason } : pr.outOfScope ? { justification: s.outOfScope } : pr.scopedOut ? { justification: s.scopedOut } : pr.judgment ? { justification: s.judgment } : pr.inapplicable ? { justification: naReason } : {}
     };
     (byTheme.get(pr.theme) ?? byTheme.set(pr.theme, []).get(pr.theme)).push(row);
   }
@@ -61335,8 +61350,7 @@ function subjectsForPackCriterion2(standard, id, scs) {
 }
 function packResultNeedsAdjudication(pc, criterion) {
   if (pc.status === "manual") return true;
-  const hasJudgmentTest = Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
-  return pc.status === INAPPLICABLE_STATUS && pc.inapplicable === true && pc.decidedBy !== "agent" && hasJudgmentTest;
+  return isProvisionalJudgmentInapplicable(pc, criterion);
 }
 function buildAdjudicationWorklist(audit2, opts = {}) {
   const docs = docsForAudit(audit2, opts.cwd);

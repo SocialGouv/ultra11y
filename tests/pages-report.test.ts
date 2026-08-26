@@ -5,7 +5,7 @@ import { renderPageDocument, renderPagesDocument, renderPagesIndex, renderPageRe
 import { checkReport } from "../src/check.js";
 import { AUDITOR_OCCURRENCE } from "../src/verify.js";
 import { renderPackReport, renderReport } from "../src/report.js";
-import { derivePackResults, loadPack, packTestIds } from "../src/standards/index.js";
+import { derivePackResults, isProvisionalJudgmentInapplicable, loadPack, packTestIds } from "../src/standards/index.js";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -116,15 +116,19 @@ describe("renderPageReport", () => {
     }
   });
 
-  it("re-decides nothing: every status equals the shared pack projection for that page", () => {
-    // The whole point of invariant 1. Recompute independently and compare cell by cell.
+  it("publishes the shared pack projection, keeping provisional judgment NA open", () => {
+    // Subject absence is evidence for the AI, not its final NA verdict. Everything else is
+    // reproduced cell for cell from the shared projection.
     const viaProjection = derivePackResults({ ...result, criteria: contact.criteria, findings: contact.findings }, "rgaa");
+    const pack = loadPack("rgaa");
     const MARK = { C: "C", NC: "NC", NA: "—", manual: "?" } as const;
     for (const pc of viaProjection) {
       // label | tests | status
       const row = new RegExp(`\\| ${pc.id.replace(".", "\\.")} —[^|]*\\|[^|]*\\| (\\S+) \\|`).exec(md);
       expect(row, `criterion ${pc.id} missing from the grid`).not.toBeNull();
-      expect(row![1], `criterion ${pc.id}`).toBe(MARK[pc.status]);
+      const criterion = pack.criteria.find((candidate) => candidate.id === pc.id);
+      const published = isProvisionalJudgmentInapplicable(pc, criterion) ? "manual" : pc.status;
+      expect(row![1], `criterion ${pc.id}`).toBe(MARK[published]);
     }
   });
 });

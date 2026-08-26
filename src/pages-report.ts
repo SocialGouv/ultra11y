@@ -26,7 +26,17 @@
 import { prdUnits } from "./prd.js";
 import { renderAuditorUnit, type AuditorCropLookup } from "./auditor.js";
 import { agentMarkNote, basisLabel, formatRate, pageView, unattributedFindings } from "./pages.js";
-import { CORE, type StandardId, derivePackResults, isCore, loadPack, packTestIds, themeName, titlePlain } from "./standards/index.js";
+import {
+  CORE,
+  type StandardId,
+  derivePackResults,
+  isCore,
+  isProvisionalJudgmentInapplicable,
+  loadPack,
+  packTestIds,
+  themeName,
+  titlePlain,
+} from "./standards/index.js";
 import type { AuditResult, Lang, PageResult, Status } from "./types.js";
 import { compareSC, scTitle } from "./wcag.js";
 
@@ -202,15 +212,19 @@ export function pageCriterionRows(result: AuditResult, page: PageResult, standar
   }
   const pack = loadPack(standard);
   const byId = new Map(derivePackResults(pageView(result, page), standard, page.id).map((r) => [r.id, r]));
-  return pack.criteria.map((pc) => ({
-    id: pc.id,
-    label: `${pc.id} — ${titlePlain(pack, pc, lang)}`,
-    group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim(),
-    status: byId.get(pc.id)?.status ?? "manual",
-    tests: packTestIds(pack, pc.id),
-    decidedBy: byId.get(pc.id)?.decidedBy,
-    ...(byId.get(pc.id)?.inapplicable ? { inapplicable: true } : {}),
-  }));
+  return pack.criteria.map((pc) => {
+    const result = byId.get(pc.id);
+    const provisionalNa = result ? isProvisionalJudgmentInapplicable(result, pc) : false;
+    return {
+      id: pc.id,
+      label: `${pc.id} — ${titlePlain(pack, pc, lang)}`,
+      group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim(),
+      status: provisionalNa ? ("manual" as const) : (result?.status ?? "manual"),
+      tests: packTestIds(pack, pc.id),
+      decidedBy: result?.decidedBy,
+      ...(result?.inapplicable && !provisionalNa ? { inapplicable: true } : {}),
+    };
+  });
 }
 
 /** The pages, PROJECTED ONTO THE ACTIVE STANDARD — criteria, coverage and rate.

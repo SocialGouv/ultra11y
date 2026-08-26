@@ -21,6 +21,7 @@ import {
   isCore,
   loadPack,
   derivePackResults,
+  isProvisionalJudgmentInapplicable,
   packCriteriaForFinding,
   packConformancePct,
   packTestIds,
@@ -788,27 +789,34 @@ export function packReportGroups(r: AuditResult, pack: StandardPack, lang: Lang 
   const derived = derivePackResults(r, pack.key);
   const s = L[lang];
   const naReason = lang === "fr" ? "Rien de la nature de ce critère n'est présent dans le périmètre." : "Nothing of this criterion's kind is present in scope.";
+  const provisionalNaReason =
+    lang === "fr"
+      ? "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement."
+      : "The engine detected no subject; the AI must confirm that this judgment criterion is not applicable.";
   const byTheme = new Map<number, ReportRow[]>();
   for (const pr of derived) {
     const pc = pack.criteria.find((c) => c.id === pr.id)!;
+    const provisionalNa = isProvisionalJudgmentInapplicable(pr, pc);
     const row: ReportRow = {
       id: pr.id,
       label: `${pack.name} ${pr.id} — ${packTitle(pack, pc, lang)}`,
-      status: pr.status,
+      status: provisionalNa ? "manual" : pr.status,
       findings: pr.findings,
       ...(pr.decidedBy ? { decidedBy: pr.decidedBy } : {}),
-      ...(pr.inapplicable ? { inapplicable: true } : {}),
+      ...(pr.inapplicable && !provisionalNa ? { inapplicable: true } : {}),
       // outOfScope / scopedOut criteria are "manual" with their own dedicated justification —
       // never mixed with the "nothing of that kind here" reason (see the manual section above).
-      ...(pr.outOfScope
-        ? { justification: s.outOfScope }
-        : pr.scopedOut
-          ? { justification: s.scopedOut }
-          : pr.judgment
-            ? { justification: s.judgment }
-            : pr.inapplicable
-              ? { justification: naReason }
-              : {}),
+      ...(provisionalNa
+        ? { justification: provisionalNaReason }
+        : pr.outOfScope
+          ? { justification: s.outOfScope }
+          : pr.scopedOut
+            ? { justification: s.scopedOut }
+            : pr.judgment
+              ? { justification: s.judgment }
+              : pr.inapplicable
+                ? { justification: naReason }
+                : {}),
     };
     (byTheme.get(pr.theme) ?? byTheme.set(pr.theme, []).get(pr.theme)!).push(row);
   }

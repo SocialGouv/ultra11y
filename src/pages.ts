@@ -22,7 +22,7 @@
 //      on that criterion. Reading it as `C` on every other page is how a page with no images
 //      scored 100% on "does each image have a relevant alternative?". See `pageStatus`.
 import { snapshotPageId } from "./snapshot.js";
-import { CORE, type StandardId, derivePackResults, isCore, loadPack, themeName } from "./standards/index.js";
+import { CORE, type StandardId, derivePackResults, isCore, isProvisionalJudgmentInapplicable, loadPack, themeName } from "./standards/index.js";
 import type { AuditResult, CriterionResult, Finding, Lang, PageCoverage, PageResult, PageScope, Status, ScanRedirect } from "./types.js";
 import { renderedProvesOn } from "./coverage.js";
 import { renderedRulesFor } from "./rules/rendered.js";
@@ -526,7 +526,12 @@ export function pageGridModel(result: AuditResult, derived: PageResult[], standa
 
   const pack = loadPack(standard);
   const rows = pack.criteria.map((pc) => ({ id: pc.id, label: pc.id, group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim() }));
-  for (const p of derived) for (const pc of derivePackResults(pageView(result, p), standard, p.id)) put(pc.id, p.id, pc.status);
+  for (const p of derived) {
+    for (const pc of derivePackResults(pageView(result, p), standard, p.id)) {
+      const criterion = pack.criteria.find((row) => row.id === pc.id);
+      put(pc.id, p.id, isProvisionalJudgmentInapplicable(pc, criterion) ? "manual" : pc.status);
+    }
+  }
   return { rows, status };
 }
 
