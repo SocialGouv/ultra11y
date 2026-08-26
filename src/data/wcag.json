@@ -107,6 +107,7 @@
         "img-alt-missing",
         "canvas-fallback-missing",
         "decorative-alt-misuse",
+        "decorative-marked-exposed",
         "input-image-alt-missing",
         "object-embed-no-name",
         "chart-no-accessible-name"
@@ -293,6 +294,7 @@
         "aria-required-parent",
         "headers-attr-dangling",
         "th-no-data-cells",
+        "table-scope-invalid",
         "radio-checkbox-group-ungrouped",
         "table-empty-data-cell",
         "css-generated-content-informative",
@@ -566,7 +568,7 @@
       "level": "AA",
       "addedIn": "2.1",
       "automatability": "needs-rendering",
-      "ruleIds": [],
+      "ruleIds": ["letter-spacing-important", "word-spacing-important", "line-height-important"],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html",
       "techniques": ["C21", "C35", "C36", "C8"],
       "text": "In content implemented using markup languages that support the following text style properties, no loss of content or functionality occurs by setting all of the following and by changing no other style property:\n• Line height (line spacing) to at least 1.5 times the font size;\n• Spacing following paragraphs to at least 2 times the font size;\n• Letter spacing (tracking) to at least 0.12 times the font size;\n• Word spacing to at least 0.16 times the font size.\nException: Human languages and scripts that do not make use of one or more of these text style properties in written text can conform using only the properties that exist for that combination of language and script.\nNote: Content is not required to use these text spacing values. The requirement is to ensure that when a user overrides the authored text spacing, content or functionality is not lost.\nNote: Writing systems for some languages use different text spacing settings, such as paragraph start indent. Authors are encouraged to follow locally available guidance for improving readability and legibility of text in their writing system.",
@@ -1032,7 +1034,7 @@
       "level": "A",
       "addedIn": "2.0",
       "automatability": "static",
-      "ruleIds": ["html-lang-missing", "lang-invalid"],
+      "ruleIds": ["html-lang-missing", "document-language-missing", "html-lang-xml-lang-mismatch", "lang-invalid"],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/language-of-page.html",
       "techniques": ["F15", "G10", "G135", "H57"],
       "text": "The default human language of each web page can be programmatically determined.",
@@ -1312,6 +1314,7 @@
         "aria-required-attr",
         "aria-prohibited-attr",
         "duplicate-id",
+        "duplicate-attribute",
         "control-label-missing",
         "placeholder-as-label",
         "form-field-multiple-labels",
@@ -1320,7 +1323,10 @@
         "icon-only-control-unnamed",
         "control-name-title-only",
         "field-purpose-incomplete",
-        "disabled-context-content"
+        "disabled-context-content",
+        "presentational-children-focusable",
+        "decorative-marked-exposed",
+        "menuitem-empty-name"
       ],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html",
       "techniques": [

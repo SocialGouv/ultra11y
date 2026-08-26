@@ -219,6 +219,24 @@ const headersAttrDangling: Rule = {
   },
 };
 
+/** A literal invalid `scope` can never establish the association RGAA 5.7 requires. Dynamic
+ * bindings stay undecided. */
+const tableScopeInvalid: Rule = {
+  id: "table-scope-invalid",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (el.tag !== "th") continue;
+      const scope = attr(el, "scope");
+      if (scope === undefined || scope.includes("{") || ["row", "col", "rowgroup", "colgroup"].includes(scope.trim().toLowerCase())) continue;
+      out.push({ criteriaId: "1.3.1", el, msgId: "table-scope-invalid", params: { scope } });
+    }
+    return out;
+  },
+};
+
 // A header cell that heads NOTHING — no data cell resolves to it, by scope or by `headers`.
 // It is announced as a header for an empty set, and the columns it looks like it covers are
 // in fact unheaded.
@@ -260,5 +278,6 @@ export const tablesRules: Rule[] = [
   sortableHeaderNoAriaSort,
   tableEmptyDataCell,
   headersAttrDangling,
+  tableScopeInvalid,
   thNoDataCells,
 ];

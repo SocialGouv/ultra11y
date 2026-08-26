@@ -1,6 +1,6 @@
 // Theme 8 — Mandatory elements (the statically-checkable slice).
 import type { Doc, El, HNode } from "../parse/html.js";
-import { attr, hasAttr, visibleText, allIds, elementsByTag } from "../parse/html.js";
+import { attr, hasAttr, visibleText, allIds, elementsByTag, ancestors } from "../parse/html.js";
 import { isDisplayHidden } from "../name.js";
 import { type Rule, type RuleFinding, shellHeadInjected } from "./rule.js";
 
@@ -14,6 +14,10 @@ function titleSetByFramework(doc: Doc): boolean {
   return NEXT_METADATA.test(doc.source) && /\btitle\s*:/.test(doc.source);
 }
 
+function declaredLanguage(el: El): string {
+  return (attr(el, "lang") ?? "").trim() || (attr(el, "xml:lang") ?? "").trim();
+}
+
 const htmlLangMissing: Rule = {
   id: "html-lang-missing",
   criteria: ["3.1.1"],
@@ -22,7 +26,7 @@ const htmlLangMissing: Rule = {
   run(doc: Doc): RuleFinding[] {
     const html = elementsByTag(doc, "html")[0];
     if (!html) return [];
-    const lang = (attr(html, "lang") ?? attr(html, "xml:lang") ?? "").trim();
+    const lang = declaredLanguage(html);
     if (lang) return [];
     return [
       {
@@ -31,6 +35,85 @@ const htmlLangMissing: Rule = {
         msgId: "html-lang-missing",
       },
     ];
+  },
+};
+
+/** RGAA 8.3 is broader than WCAG's usual `<html lang>` shortcut: a page also passes when
+ * every rendered text node inherits a language from one of its ancestors. This rule only
+ * fires when BOTH routes fail. It is therefore safe to use as a decisive RGAA 8.3.1 rule,
+ * while `html-lang-missing` remains a narrower candidate signal. */
+const documentLanguageMissing: Rule = {
+  id: "document-language-missing",
+  criteria: ["3.1.1"],
+  severity: "bloquant",
+  scope: "page",
+  run(doc: Doc): RuleFinding[] {
+    const html = elementsByTag(doc, "html")[0];
+    if (!html) return [];
+    if (declaredLanguage(html)) return [];
+    const ignored = new Set(["script", "style", "title", "noscript", "template", "svg"]);
+    const uncovered = doc.elements.find((el) => {
+      if (ignored.has(el.tag) || isDisplayHidden(el)) return false;
+      const hasDirectText = el.children.some((child) => child.type === "text" && child.data.trim() !== "");
+      if (!hasDirectText) return false;
+      return ![el, ...ancestors(el)].some((node) => declaredLanguage(node) !== "");
+    });
+    if (!uncovered) return [];
+    return [{ criteriaId: "3.1.1", el: uncovered, msgId: "document-language-missing" }];
+  },
+};
+
+/** Two simultaneous default-language declarations cannot both be pertinent when their
+ * normalized values differ. This is the missing ACT rule 5b7ae0. */
+const htmlLangXmlLangMismatch: Rule = {
+  id: "html-lang-xml-lang-mismatch",
+  criteria: ["3.1.1"],
+  severity: "majeur",
+  scope: "page",
+  run(doc: Doc): RuleFinding[] {
+    const html = elementsByTag(doc, "html")[0];
+    if (!html) return [];
+    const lang = (attr(html, "lang") ?? "").trim();
+    const xmlLang = (attr(html, "xml:lang") ?? "").trim();
+    const primary = (value: string) => value.toLowerCase().split("-")[0];
+    if (!lang || !xmlLang || primary(lang) === primary(xmlLang)) return [];
+    return [{ criteriaId: "3.1.1", el: html, msgId: "html-lang-xml-lang-mismatch", params: { lang, xmlLang } }];
+  },
+};
+
+/** Raw-source duplicate attributes are collapsed by the HTML parser, so they must be found
+ * before looking at `el.attribs`. Restricted to real HTML: JSX/SFC bindings have a different
+ * grammar and are validated by their compiler. */
+const duplicateAttribute: Rule = {
+  id: "duplicate-attribute",
+  criteria: ["4.1.2"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    if (doc.kind !== "html" || doc.lossy) return [];
+    const out: RuleFinding[] = [];
+    const tag = /<([A-Za-z][\w:-]*)(\s[^<>]*?)\/?\s*>/gs;
+    const attribute = /([^\s"'<>/=]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?/g;
+    let match: RegExpExecArray | null;
+    while ((match = tag.exec(doc.source))) {
+      const body = match[2] ?? "";
+      const seen = new Set<string>();
+      let duplicate = "";
+      attribute.lastIndex = 0;
+      let a: RegExpExecArray | null;
+      while ((a = attribute.exec(body))) {
+        const name = (a[1] ?? "").toLowerCase();
+        if (!name) continue;
+        if (seen.has(name)) {
+          duplicate = name;
+          break;
+        }
+        seen.add(name);
+      }
+      if (!duplicate) continue;
+      const el = doc.elements.find((candidate) => candidate.start === match!.index);
+      if (el) out.push({ criteriaId: "4.1.2", el, msgId: "duplicate-attribute", params: { attr: duplicate } });
+    }
+    return out;
   },
 };
 
@@ -170,4 +253,13 @@ const langInvalid: Rule = {
   },
 };
 
-export const mandatoryRules: Rule[] = [htmlLangMissing, titleMissingEmpty, duplicateId, inlineLangChangeMissing, langInvalid];
+export const mandatoryRules: Rule[] = [
+  htmlLangMissing,
+  documentLanguageMissing,
+  htmlLangXmlLangMismatch,
+  titleMissingEmpty,
+  duplicateId,
+  duplicateAttribute,
+  inlineLangChangeMissing,
+  langInvalid,
+];

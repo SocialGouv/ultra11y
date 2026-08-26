@@ -17,10 +17,14 @@ const SEED: Record<string, string> = {
   "aria-required-attr": `<main><div role="checkbox">Accept</div></main>`,
   "aria-required-parent": `<main><div role="tab">One</div></main>`,
   "aria-prohibited-attr": `<main><p role="paragraph" aria-label="Intro">Text</p></main>`,
+  "presentational-children-focusable": `<main><div role="checkbox" aria-checked="false">Choice <button>Help</button></div></main>`,
+  "decorative-marked-exposed": `<main><img src="dot.svg" alt="" tabindex="0"></main>`,
+  "menuitem-empty-name": `<main><div role="menu"><div role="menuitem"></div></div></main>`,
   // structure
   "dl-structure": `<main><dt>Term</dt></main>`,
   "headers-attr-dangling": `<main><table><caption>t</caption><tr><th id="a">A</th></tr><tr><td headers="ghost">1</td></tr></table></main>`,
   "th-no-data-cells": `<main><table><caption>t</caption><tr><th id="a">A</th><th id="b">B</th></tr><tr><td headers="a">1</td></tr></table></main>`,
+  "table-scope-invalid": `<main><table><caption>t</caption><tr><th scope="column">A</th></tr><tr><td>1</td></tr></table></main>`,
   // forms / authentication / context change
   "autocomplete-token-invalid": `<main><form><label for="ac">Email</label><input id="ac" type="text" autocomplete="e-mail"></form></main>`,
   "credential-entry-blocked": `<main><form><label for="pw">Password</label><input id="pw" type="password" autocomplete="off"></form></main>`,
@@ -83,6 +87,9 @@ const SEED: Record<string, string> = {
   "empty-heading": `<main><h2></h2></main>`,
   "table-empty-data-cell": `<main><table><caption>Résultats</caption><tr><th>A</th><th>B</th></tr><tr><td>1</td><td></td></tr></table></main>`,
   "css-generated-content-informative": `<main><style>.badge::after{content:"Nouveau"}</style><p>x</p></main>`,
+  "letter-spacing-important": `<main><p style="letter-spacing:0.1em !important">Text</p></main>`,
+  "word-spacing-important": `<main><p style="word-spacing:0.1em !important">Text</p></main>`,
+  "line-height-important": `<main><p style="line-height:1.2 !important">Text</p></main>`,
   // navigation
   "positive-tabindex": `<main><button tabindex="3">x</button></main>`,
   "inline-lang-change-missing": `<main><p lang="">Bonjour</p></main>`,
@@ -91,6 +98,9 @@ const SEED: Record<string, string> = {
 /** Full-document seeds (page-scoped rules need a complete <html> to fire). */
 const PAGE_SEED: Record<string, string> = {
   "html-lang-missing": `<!doctype html><html><head><title>t</title></head><body><main>x</main></body></html>`,
+  "document-language-missing": `<!doctype html><html><head><title>t</title></head><body><main><p>Text without language</p></main></body></html>`,
+  "html-lang-xml-lang-mismatch": `<!doctype html><html lang="fr" xml:lang="en"><head><title>t</title></head><body><main>x</main></body></html>`,
+  "duplicate-attribute": `<!doctype html><html lang="en"><head><title>t</title></head><body><main><p class="a" class="b">x</p></main></body></html>`,
   "lang-invalid": `<!doctype html><html lang="english"><head><title>t</title></head><body><main>x</main></body></html>`,
   "title-missing-empty": `<!doctype html><html lang="en"><head><title></title></head><body><main>x</main></body></html>`,
   "skip-link-target-missing": `<!doctype html><html lang="en"><head><title>t</title></head><body><a href="#gone">Skip</a><div>content, no #gone target</div></body></html>`,

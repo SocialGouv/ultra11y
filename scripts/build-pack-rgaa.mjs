@@ -130,6 +130,10 @@ const RULE_SC = {
   "clickable-noninteractive": ["4.1.2", "2.1.1"], "contrast-literal": ["1.4.3"], "control-label-missing": ["4.1.2"],
   "rendered-contrast": ["1.4.3"], "rendered-contrast-pixel": ["1.4.3"], "rendered-link-colour-only": ["1.4.1"],
   "rendered-nontext-contrast": ["1.4.11"], "rendered-focus-not-visible": ["2.4.7"], "rendered-orientation-lock": ["1.3.4"],
+  "document-language-missing": ["3.1.1"], "html-lang-xml-lang-mismatch": ["3.1.1"], "duplicate-attribute": ["4.1.2"],
+  "presentational-children-focusable": ["4.1.2"], "decorative-marked-exposed": ["1.1.1", "4.1.2"], "menuitem-empty-name": ["4.1.2"],
+  "letter-spacing-important": ["1.4.12"], "word-spacing-important": ["1.4.12"], "line-height-important": ["1.4.12"],
+  "table-scope-invalid": ["1.3.1"],
   "css-generated-content-informative": ["1.3.1"], "date-fields-ungrouped": ["3.3.2"], "disabled-context-content": ["4.1.2"],
   "control-name-title-only": ["4.1.2"], "cross-icon-only-unnamed": ["4.1.2"],
   "cross-prop-drilled-name-lost": ["4.1.2"], "data-table-no-headers": ["1.3.1"],
@@ -180,6 +184,7 @@ const RULE_TO_CRITERIA = {
   "chart-no-accessible-name": ["1.1"], "canvas-fallback-missing": ["1.1"], "axe:image-alt": ["1.1"],
   "axe:input-image-alt": ["1.1"], "axe:area-alt": ["1.1"], "axe:role-img-alt": ["1.1"], "axe:svg-img-alt": ["1.1"],
   "axe:object-alt": ["1.1"], "decorative-alt-misuse": ["1.2"], "axe:image-redundant-alt": ["1.2"],
+  "decorative-marked-exposed": ["1.2"],
   // Theme 2 — frames (2.1 frame title)
   "iframe-title-missing": ["2.1"], "axe:frame-title": ["2.1"], "axe:frame-title-unique": ["2.1"],
   // Theme 3 — colour contrast. RGAA 10.5 asks about paired CSS declarations, not the
@@ -206,6 +211,7 @@ const RULE_TO_CRITERIA = {
   // Theme 5 — tables (5.4 title, 5.6/5.7 headers, 5.8 layout-table markup)
   "table-caption-missing": ["5.4"], "data-table-no-headers": ["5.6", "5.7"],
   "layout-table-data-markup": ["5.8"], "axe:td-headers-attr": ["5.7"], "axe:th-has-data-cells": ["5.6"],
+  "headers-attr-dangling": ["5.7"], "table-scope-invalid": ["5.7"], "th-no-data-cells": ["5.6"],
   "axe:scope-attr-valid": ["5.7"], "axe:td-has-header": ["5.6"], "axe:table-fake-caption": ["5.8"],
   // Theme 6 — links (6.2 link label)
   "link-empty-name": ["6.2"], "icon-only-control-unnamed": ["6.2", "11.9"], "cross-icon-only-unnamed": ["11.9"],
@@ -214,6 +220,7 @@ const RULE_TO_CRITERIA = {
   "invalid-aria-role": ["7.1"], "aria-ref-missing-id": ["7.1"], "aria-required-children": ["7.1"],
   "aria-hidden-focusable": ["7.1"], "redundant-aria": ["7.1"], "nested-interactive": ["7.1"],
   "cross-prop-drilled-name-lost": ["7.1"],
+  "presentational-children-focusable": ["7.1"], "menuitem-empty-name": ["7.1"],
   "clickable-noninteractive": ["7.3"], "live-region-conflict": ["7.5"], "status-message-not-assertive": ["7.5"],
   // Dynamic tier (scan --local): the live-region probe projects onto WCAG 4.1.3 → RGAA 7.5
   // (status messages) — the WCAG-faithful home. Ara ALSO classifies the source finding under
@@ -229,7 +236,9 @@ const RULE_TO_CRITERIA = {
   // Theme 8 — document (8.2 valid code, 8.3 default lang, 8.4 lang relevant, 8.5 title, 8.7/8.8 lang changes)
   "duplicate-id": ["8.2"], "axe:duplicate-id": ["8.2"], "axe:duplicate-id-aria": ["8.2"], "axe:duplicate-id-active": ["8.2"],
   "html-lang-missing": ["8.3"], "axe:html-has-lang": ["8.3"],
+  "document-language-missing": ["8.3"],
   "lang-invalid": ["8.4", "8.8"], "axe:html-lang-valid": ["8.4"], "axe:html-xml-lang-mismatch": ["8.4"], "axe:valid-lang": ["8.8"],
+  "html-lang-xml-lang-mismatch": ["8.4"], "duplicate-attribute": ["8.2"],
   "title-missing-empty": ["8.5"], "axe:document-title": ["8.5"], "inline-lang-change-missing": ["8.7"],
   // Theme 9 — structure (9.1 headings, 9.2 doc structure, 9.3 lists)
   "h1-missing": ["9.1"], "h1-multiple": ["9.1"], "heading-order-skip": ["9.1"], "empty-heading": ["9.1"],
@@ -241,6 +250,7 @@ const RULE_TO_CRITERIA = {
   "css-generated-content-informative": ["10.2"],
   "meta-viewport-zoom-block": ["10.4"], "axe:meta-viewport": ["10.4"], "axe:meta-viewport-large": ["10.4"],
   "dyn-reflow": ["10.11"], "dyn-reflow-zoom": ["10.4"], "dyn-focus-visible": ["10.7"], "dyn-text-spacing": ["10.12"], "dyn-hover": ["10.13"],
+  "letter-spacing-important": ["10.12"], "word-spacing-important": ["10.12"], "line-height-important": ["10.12"],
   // Stateful input-overflow probes — a filled input clipped under each stress, same RGAA
   // theme as the corresponding reflow/zoom/text-spacing residual probe above.
   "dyn-input-overflow-reflow": ["10.11"], "dyn-input-overflow-zoom": ["10.4"], "dyn-input-overflow-spacing": ["10.12"],
@@ -249,6 +259,7 @@ const RULE_TO_CRITERIA = {
   "form-field-multiple-labels": ["11.1"], "select-has-option": ["11.1"], "control-name-title-only": ["11.1"],
   "radio-checkbox-group-ungrouped": ["11.5"], "date-fields-ungrouped": ["11.5"],
   "field-purpose-incomplete": ["11.1", "11.13"], "fieldset-legend-missing": ["11.6"], "button-empty-name": ["11.9"],
+  "autocomplete-token-invalid": ["11.13"], "label-in-name-mismatch": ["11.9"],
   "error-not-associated": ["11.10"], "aria-invalid-no-description": ["11.10"],
   "axe:label": ["11.1"], "axe:form-field-multiple-labels": ["11.1"], "axe:select-name": ["11.1"], "axe:label-title-only": ["11.1"],
   "axe:autocomplete-valid": ["11.13"], "axe:fieldset": ["11.6"], "axe:input-button-name": ["11.9"], "axe:button-name": ["11.9"],
@@ -284,8 +295,11 @@ const DECISIVE_RULE_TESTS = {
   "8.2|axe:duplicate-id": ["1"],
   "8.2|axe:duplicate-id-aria": ["1"],
   "8.2|axe:duplicate-id-active": ["1"],
+  "8.2|duplicate-attribute": ["1"],
+  "8.3|document-language-missing": ["1"],
   "8.4|axe:html-lang-valid": ["1"],
   "8.4|lang-invalid": ["1"],
+  "8.4|html-lang-xml-lang-mismatch": ["1"],
   "8.5|title-missing-empty": ["1"],
   "8.5|axe:document-title": ["1"],
   "9.3|list-structure": ["1", "2", "3"],
@@ -294,6 +308,9 @@ const DECISIVE_RULE_TESTS = {
   "9.3|axe:definition-list": ["3"],
   "9.3|axe:dlitem": ["3"],
   "10.7|dyn-focus-visible": ["1"],
+  "10.12|letter-spacing-important": ["1"],
+  "10.12|word-spacing-important": ["1"],
+  "10.12|line-height-important": ["1"],
   "11.1|axe:label": ["1"],
   "11.1|axe:select-name": ["1"],
   "11.1|control-label-missing": ["1"],
@@ -302,6 +319,12 @@ const DECISIVE_RULE_TESTS = {
   "11.9|axe:button-name": ["1"],
   "11.9|axe:input-button-name": ["1"],
   "11.9|button-empty-name": ["1"],
+  "11.9|label-in-name-mismatch": ["2"],
+  "11.5|radio-checkbox-group-ungrouped": ["1"],
+  "5.7|headers-attr-dangling": ["4"],
+  "5.7|table-scope-invalid": ["2", "3"],
+  "5.8|layout-table-data-markup": ["1"],
+  "7.1|menuitem-empty-name": ["3"],
 };
 
 // Candidate evidence is test-scoped too. The fallback remains all tests only when one rule id
@@ -316,6 +339,7 @@ const CANDIDATE_RULE_TESTS = {
   "1.1|object-embed-no-name": ["6", "7"],
   "1.1|canvas-fallback-missing": ["8"],
   "1.1|chart-no-accessible-name": ["1", "5", "8"],
+  "1.2|decorative-marked-exposed": ["1", "2", "3", "4", "5", "6"],
   "4.3|axe:audio-caption": ["1"],
   "4.3|axe:video-caption": ["1"],
   "4.3|media-no-track": ["1"],
@@ -325,6 +349,7 @@ const CANDIDATE_RULE_TESTS = {
   "5.7|axe:scope-attr-valid": ["2", "3"],
   "5.7|axe:td-headers-attr": ["4"],
   "7.3|clickable-noninteractive": ["1"],
+  "7.1|presentational-children-focusable": ["1", "2"],
   "8.4|axe:html-xml-lang-mismatch": ["1"],
   "9.1|axe:empty-heading": ["2"],
   "9.1|empty-heading": ["2"],
@@ -348,6 +373,7 @@ const CANDIDATE_RULE_TESTS = {
   "11.1|placeholder-as-label": ["1", "3"],
   "11.1|field-purpose-incomplete": ["1", "3"],
   "11.1|select-has-option": ["1"],
+  "11.13|autocomplete-token-invalid": ["1"],
   "11.9|cross-icon-only-unnamed": ["1"],
   "11.9|icon-only-control-unnamed": ["1"],
   "11.10|aria-invalid-no-description": ["3", "4", "6", "7"],

@@ -19,14 +19,14 @@ so beats quietly scoring zero.
 |---|---|
 | Corpus | 1134 examples across 91 ACT rules |
 | Source | https://act-rules.github.io/testcases.json |
-| Rules scored | **32** |
-| Failed examples caught | **103 / 149** |
-| Clean examples left alone | **291 / 291** — no unexplained false positive |
-| Consistent | 5 |
+| Rules scored | **40** |
+| Failed examples caught | **125 / 176** |
+| Clean examples left alone | **364 / 364** — no unexplained false positive |
+| Consistent | 9 |
 | Divergent (documented, 9 cases) | 3 |
-| Partially consistent | 24 |
+| Partially consistent | 28 |
 | **Inconsistent** | **0** |
-| Declared gaps (static, not implemented) | 13 |
+| Declared gaps (static, not implemented) | 5 |
 
 *Partially consistent* is the ACT Rules Format's own term for a tool that never reports a false
 positive but does not catch everything — it is a coverage statement, not an error. *Divergent* means
@@ -37,22 +37,28 @@ every deviation on that rule is listed below with the argument for it.
 | ACT rule | WCAG | Engine rules | Verdict | Caught |
 |---|---|---|---|---|
 | [Image has non-empty accessible name](https://act-rules.github.io/rules/23a2a8) | 1.1.1 | `img-alt-missing` | 🟨 partially consistent | 4/5 |
+| [Letter spacing in style attributes is not !important](https://act-rules.github.io/rules/24afc2) | 1.4.12 | `letter-spacing-important` | 🟨 partially consistent | 3/4 |
 | [HTML page has non-empty title](https://act-rules.github.io/rules/2779a5) | 2.4.2 | `title-missing-empty` | 🟨 partially consistent | 4/5 |
 | [Visible label is part of accessible name](https://act-rules.github.io/rules/2ee8b8) | 2.5.3 | `label-in-name-mismatch` | 🟦 divergent (documented) | 3/3 |
+| [Element with presentational children has no focusable content](https://act-rules.github.io/rules/307n5z) | 4.1.2 | `presentational-children-focusable` | 🟨 partially consistent | 2/3 |
 | [Id attribute value is unique](https://act-rules.github.io/rules/3ea0c8) | 4.1.1 | `duplicate-id` | ✅ consistent | 3/3 |
+| [Element marked as decorative is not exposed](https://act-rules.github.io/rules/46ca7f) | — | `decorative-marked-exposed` | ✅ consistent | 3/3 |
 | [Audio or video element that plays automatically has a control mechanism](https://act-rules.github.io/rules/4c31df) | — | `autoplay-media` | 🟦 divergent (documented) | 5/5 |
 | [Element with role attribute has required states and properties](https://act-rules.github.io/rules/4e8ab6) | 4.1.2 | `aria-required-attr` | 🟨 partially consistent | 1/2 |
 | [Image button has non-empty accessible name](https://act-rules.github.io/rules/59796f) | 1.1.1, 4.1.2 | `input-image-alt-missing` | 🟨 partially consistent | 2/3 |
+| [HTML page lang and xml:lang attributes have matching values](https://act-rules.github.io/rules/5b7ae0) | 3.1.1 | `html-lang-xml-lang-mismatch` | ✅ consistent | 2/2 |
 | [ARIA state or property is permitted](https://act-rules.github.io/rules/5c01ea) | — | `aria-prohibited-attr` | 🟨 partially consistent | 0/2 |
 | [ARIA attribute is defined in WAI-ARIA](https://act-rules.github.io/rules/5f99a7) | — | `invalid-aria-attr` | ✅ consistent | 2/2 |
 | [Role attribute has valid value](https://act-rules.github.io/rules/674b10) | 1.3.1 | `invalid-aria-role` | ✅ consistent | 2/2 |
 | [ARIA state or property has valid value](https://act-rules.github.io/rules/6a7281) | — | `invalid-aria-value`, `live-region-conflict` | 🟨 partially consistent | 9/10 |
 | [Element with aria-hidden has no content in sequential focus navigation](https://act-rules.github.io/rules/6cfa84) | 4.1.2 | `aria-hidden-focusable` | 🟨 partially consistent | 5/6 |
 | [Autocomplete attribute has valid value](https://act-rules.github.io/rules/73f2c2) | 1.3.5 | `autocomplete-token-invalid` | ✅ consistent | 5/5 |
+| [Line height in style attributes is not !important](https://act-rules.github.io/rules/78fd32) | 1.4.12 | `line-height-important` | 🟨 partially consistent | 4/6 |
 | [SVG element with explicit role has non-empty accessible name](https://act-rules.github.io/rules/7d6734) | 1.1.1 | `img-alt-missing` | 🟨 partially consistent | 2/4 |
 | [Audio or video element avoids automatically playing audio](https://act-rules.github.io/rules/80f0bf) | 1.4.2 | `autoplay-media` | 🟦 divergent (documented) | 2/2 |
 | [Object element rendering non-text content has non-empty accessible name](https://act-rules.github.io/rules/8fc3b6) | 1.1.1 | `object-embed-no-name` | 🟨 partially consistent | 2/4 |
 | [Button has non-empty accessible name](https://act-rules.github.io/rules/97a4e1) | 4.1.2 | `button-empty-name`, `icon-only-control-unnamed` | 🟨 partially consistent | 4/5 |
+| [Word spacing in style attributes is not !important](https://act-rules.github.io/rules/9e45ec) | 1.4.12 | `word-spacing-important` | 🟨 partially consistent | 3/4 |
 | [Headers attribute specified on a cell refers to cells in the same table element](https://act-rules.github.io/rules/a25f45) | 1.3.1 | `headers-attr-dangling` | ✅ consistent | 4/4 |
 | [Meta viewport allows for zoom](https://act-rules.github.io/rules/b4f0c3) | 1.4.4 | `meta-viewport-zoom-block` | 🟨 partially consistent | 3/4 |
 | [HTML page has lang attribute](https://act-rules.github.io/rules/b5c3f8) | 3.1.1 | `html-lang-missing` | 🟨 partially consistent | 3/4 |
@@ -65,21 +71,26 @@ every deviation on that rule is listed below with the argument for it.
 | [Table header cell has assigned cells](https://act-rules.github.io/rules/d0f69e) | 1.3.1 | `th-no-data-cells` | 🟨 partially consistent | 0/3 |
 | [Element with lang attribute has valid language tag](https://act-rules.github.io/rules/de46e4) | 3.1.2 | `lang-invalid`, `inline-lang-change-missing` | 🟨 partially consistent | 6/9 |
 | [Form field has non-empty accessible name](https://act-rules.github.io/rules/e086e5) | 4.1.2 | `control-label-missing` | 🟨 partially consistent | 4/7 |
+| [Attribute is not duplicated](https://act-rules.github.io/rules/e6952f) | 4.1.1 | `duplicate-attribute` | ✅ consistent | 3/3 |
 | [Video element auditory content has captions](https://act-rules.github.io/rules/f51b46) | — | `media-no-track` | 🟨 partially consistent | 0/4 |
 | [ARIA required context role](https://act-rules.github.io/rules/ff89c9) | 1.3.1 | `aria-required-parent` | 🟨 partially consistent | 2/4 |
 | [Heading has non-empty accessible name](https://act-rules.github.io/rules/ffd0e9) | 1.3.1 | `empty-heading` | 🟨 partially consistent | 7/8 |
+| [Menuitem has non-empty accessible name](https://act-rules.github.io/rules/m6b1q3) | 4.1.2 | `menuitem-empty-name` | ✅ consistent | 2/2 |
 
 ### Notes and documented divergences
 
+- **Letter spacing in style attributes is not !important** — definite below-threshold author-important values; computed-unit cases remain rendered
 - **Visible label is part of accessible name** · reports on *Passed Example 6*: an icon FONT renders the text 'search' as a glyph, so the visible label is not the text in the DOM — a fact only the rendered page carries
 - **Audio or video element that plays automatically has a control mechanism** · reports on *Inapplicable Example 2*: the source cannot tell that the referenced media has no audio track
 - **Audio or video element that plays automatically has a control mechanism** · reports on *Passed Example 3*: the pause mechanism is a custom button wired in JavaScript, not a native `controls` attribute
 - **ARIA state or property is permitted** — covers the name-prohibited roles; the full per-role permitted-attribute matrix is not encoded
 - **Element with aria-hidden has no content in sequential focus navigation** · reports on *Passed Example 4*: a focus-sentinel link inside an aria-hidden wrapper: it IS reachable by Tab, and only a runtime focus handler bounces it back — the same call axe-core makes
+- **Line height in style attributes is not !important** — definite below-threshold author-important values; computed-unit cases remain rendered
 - **SVG element with explicit role has non-empty accessible name** — role=img on <svg> is handled by the same rule
 - **Audio or video element avoids automatically playing audio** · reports on *Inapplicable Example 2*: the source cannot tell that the referenced media file is silent
 - **Audio or video element avoids automatically playing audio** · reports on *Passed Example 3*: the pause mechanism is a custom button wired in JavaScript, not a native `controls` attribute
 - **Audio or video element avoids automatically playing audio** · reports on *Passed Example 2*: a #t= media fragment shortening playback below 3s is not resolvable from source
+- **Word spacing in style attributes is not !important** — definite below-threshold author-important values; computed-unit cases remain rendered
 - **Meta element has no refresh delay (no exception)** — this variant drops the >20h exception the engine honours, so long delays are knowingly not reported
 - **Iframe element has non-empty accessible name** · reports on *Inapplicable Example 3*: a tabindex=-1 iframe is still exposed to assistive tech and still needs a title (RGAA 2.1 requires one unconditionally)
 - **Table header cell has assigned cells** — only the explicit `headers`-wired shape is decided; scope-based assignment needs a full table model
@@ -92,17 +103,9 @@ every deviation on that rule is listed below with the argument for it.
 | ACT rule | WCAG | Why it is not covered |
 |---|---|---|
 | [Document has heading for non-repeated content](https://act-rules.github.io/rules/047fe0) | — | a heading for the non-repeated content (h1-missing is advisory, so it does not count) |
-| [Letter spacing in style attributes is not !important](https://act-rules.github.io/rules/24afc2) | 1.4.12 | letter-spacing:!important in a style attribute |
-| [Element with presentational children has no focusable content](https://act-rules.github.io/rules/307n5z) | 4.1.2 | presentational-children conflict |
-| [Element marked as decorative is not exposed](https://act-rules.github.io/rules/46ca7f) | — | an element marked decorative that is still exposed (focusable, or with a name) |
-| [HTML page lang and xml:lang attributes have matching values](https://act-rules.github.io/rules/5b7ae0) | 3.1.1 | lang vs xml:lang mismatch |
-| [Line height in style attributes is not !important](https://act-rules.github.io/rules/78fd32) | 1.4.12 | line-height:!important in a style attribute |
-| [Word spacing in style attributes is not !important](https://act-rules.github.io/rules/9e45ec) | 1.4.12 | word-spacing:!important in a style attribute |
 | [Document has a landmark with non-repeated content](https://act-rules.github.io/rules/b40fd1) | — | ACT asks that the non-repeated content sit in SOME landmark — a weaker claim than `missing-main-landmark`, which requires a <main>, so the two are not equivalent |
 | [Bypass Blocks of Repeated Content](https://act-rules.github.io/rules/cf77f2) | 2.4.1 | presence of a bypass mechanism (landmark or skip link) |
-| [Attribute is not duplicated](https://act-rules.github.io/rules/e6952f) | 4.1.1 | duplicate attributes are collapsed by the parser; needs a raw-source scan |
 | [No keyboard shortcut uses only printable characters](https://act-rules.github.io/rules/ffbc54) | 2.1.4 | 2.1.4 single-character keyboard shortcuts |
-| [Menuitem has non-empty accessible name](https://act-rules.github.io/rules/m6b1q3) | 4.1.2 | role-specific accessible name (menuitem) |
 | [Document has an instrument to move focus to non-repeated content](https://act-rules.github.io/rules/ye5d6e) | — | presence of a bypass instrument |
 
 ## Out of the static engine's reach — routed, not ignored

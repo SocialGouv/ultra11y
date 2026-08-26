@@ -2,7 +2,7 @@
 import type { Doc, El } from "../parse/html.js";
 import { attr, hasAttr, hasBoundAttr, hasDynamicSpread, descendants, ancestors } from "../parse/html.js";
 import { isIntrinsic } from "../parse/jsx-bridge.js";
-import { mayInjectContent, isHiddenFromAT, isDisplayHidden, isPresentational } from "../name.js";
+import { accessibleName, mayInjectContent, isHiddenFromAT, isDisplayHidden, isPresentational } from "../name.js";
 import { ARIA_ATTRS, ARIA_REQUIRED_ATTRS, ARIA_REQUIRED_PARENT, IMPLICIT_CONTAINER_ROLE, NAME_PROHIBITED_ROLES, isValidAriaValue } from "../aria.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
@@ -342,6 +342,76 @@ const ariaHiddenFocusable: Rule = {
   },
 };
 
+// Roles whose descendants are forced presentational by WAI-ARIA. A focusable descendant
+// cannot be made presentational, so the browser exposes a conflicting accessibility tree.
+const PRESENTATIONAL_CHILDREN = new Set([
+  "button",
+  "checkbox",
+  "img",
+  "menuitem",
+  "menuitemcheckbox",
+  "menuitemradio",
+  "meter",
+  "option",
+  "progressbar",
+  "radio",
+  "scrollbar",
+  "separator",
+  "slider",
+  "switch",
+  "tab",
+]);
+
+const presentationalChildrenFocusable: Rule = {
+  id: "presentational-children-focusable",
+  criteria: ["4.1.2"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      if (!PRESENTATIONAL_CHILDREN.has(role) || isHiddenFromAT(el)) continue;
+      const child = descendants(el).find((node) => isFocusable(node) && !isDisplayHidden(node));
+      if (child) out.push({ criteriaId: "4.1.2", el: child, msgId: "presentational-children-focusable", params: { role } });
+    }
+    return out;
+  },
+};
+
+/** ACT 46ca7f: an author explicitly marked an element decorative, but another property makes
+ * that marking ineffective and exposes it. The author intent is explicit, so this can
+ * evidence RGAA 1.2 without guessing whether an ordinary image is decorative. */
+const decorativeMarkedExposed: Rule = {
+  id: "decorative-marked-exposed",
+  criteria: ["1.1.1", "4.1.2"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      const decorative = role === "none" || role === "presentation" || (el.tag === "img" && attr(el, "alt") === "");
+      if (!decorative || isDisplayHidden(el)) continue;
+      const named = (attr(el, "aria-label") ?? "").trim() || (attr(el, "aria-labelledby") ?? "").trim() || (attr(el, "title") ?? "").trim();
+      if (!isFocusable(el) && !named) continue;
+      const nonText = ["img", "svg", "canvas", "object", "embed"].includes(el.tag);
+      out.push({ criteriaId: nonText ? "1.1.1" : "4.1.2", el, msgId: "decorative-marked-exposed", params: { tag: el.tag } });
+    }
+    return out;
+  },
+};
+
+const menuitemEmptyName: Rule = {
+  id: "menuitem-empty-name",
+  criteria: ["4.1.2"],
+  severity: "bloquant",
+  run(doc: Doc): RuleFinding[] {
+    return doc.elements
+      .filter((el) => ["menuitem", "menuitemcheckbox", "menuitemradio"].includes((attr(el, "role") ?? "").trim().toLowerCase()))
+      .filter((el) => !isHiddenFromAT(el) && !mayInjectContent(el) && accessibleName(el, doc).trim() === "")
+      .map((el) => ({ criteriaId: "4.1.2", el, msgId: "menuitem-empty-name" }));
+  },
+};
+
 const nestedInteractive: Rule = {
   id: "nested-interactive",
   criteria: ["4.1.2"],
@@ -625,6 +695,9 @@ export const scriptsAriaRules: Rule[] = [
   clickableNoninteractive,
   ariaRequiredChildren,
   ariaHiddenFocusable,
+  presentationalChildrenFocusable,
+  decorativeMarkedExposed,
+  menuitemEmptyName,
   nestedInteractive,
   liveRegionConflict,
   statusMessageNotAssertive,

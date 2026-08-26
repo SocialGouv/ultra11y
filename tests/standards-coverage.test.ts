@@ -158,9 +158,9 @@ describe("the documented RGAA figures match the pack", () => {
   ).length;
 
   it("distinguishes explicit judgment tests from criteria that need adjudication for C", () => {
-    expect(judgmentTestCriteria).toBe(97);
+    expect(judgmentTestCriteria).toBe(92);
     expect(adjudicationCount).toBe(104);
-    expect(read("skills/ultra11y/references/judgment.md")).toMatch(/97 (?:of RGAA's|criteria)/);
+    expect(read("skills/ultra11y/references/judgment.md")).toMatch(/92 (?:of RGAA's|criteria)/);
     for (const doc of ["skills/ultra11y/SKILL.md", "skills/ultra11y/references/ci.md", "skills/ultra11y/references/mcp.md"]) {
       expect(read(doc), doc).toMatch(/104 of 106/);
     }

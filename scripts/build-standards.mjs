@@ -637,14 +637,14 @@ const NEEDS_RENDERING = new Set([
 // icon-only-control-unnamed) appear under BOTH their SCs so registry's bidirectional
 // rule↔dataset cross-check holds.
 const RULE_SC_COVERAGE = {
-  "1.1.1": ["img-alt-missing", "canvas-fallback-missing", "decorative-alt-misuse", "input-image-alt-missing", "object-embed-no-name", "chart-no-accessible-name"],
+  "1.1.1": ["img-alt-missing", "canvas-fallback-missing", "decorative-alt-misuse", "decorative-marked-exposed", "input-image-alt-missing", "object-embed-no-name", "chart-no-accessible-name"],
   "1.2.2": ["media-no-track"],
   "1.3.1": [
     "fieldset-legend-missing", "data-table-no-headers", "table-caption-missing",
     "layout-table-data-markup", "heading-order-skip", "h1-missing", "h1-multiple", "list-structure", "dl-structure",
     "empty-heading", "label-for-dangling", "missing-main-landmark", "multiple-main-landmark",
     "sortable-header-no-aria-sort", "nav-landmark-missing", "nav-landmark-unnamed", "aria-required-parent",
-    "headers-attr-dangling", "th-no-data-cells",
+    "headers-attr-dangling", "th-no-data-cells", "table-scope-invalid",
     "radio-checkbox-group-ungrouped", "table-empty-data-cell", "css-generated-content-informative",
     "presentational-element", "presentational-attribute", "presentational-spacing",
   ],
@@ -654,6 +654,7 @@ const RULE_SC_COVERAGE = {
   "1.4.1": ["rendered-link-colour-only"],
   "1.4.3": ["contrast-literal", "rendered-contrast", "rendered-contrast-pixel"],
   "1.4.11": ["rendered-nontext-contrast"],
+  "1.4.12": ["letter-spacing-important", "word-spacing-important", "line-height-important"],
   "1.4.4": ["meta-viewport-zoom-block"],
   "2.1.1": ["clickable-noninteractive"],
   "2.2.1": ["meta-refresh-redirect"],
@@ -666,16 +667,17 @@ const RULE_SC_COVERAGE = {
   "2.5.3": ["label-in-name-mismatch"],
   "3.2.2": ["on-input-context-change"],
   "3.3.8": ["credential-entry-blocked"],
-  "3.1.1": ["html-lang-missing", "lang-invalid"],
+  "3.1.1": ["html-lang-missing", "document-language-missing", "html-lang-xml-lang-mismatch", "lang-invalid"],
   "3.1.2": ["inline-lang-change-missing", "lang-invalid"],
   "3.3.1": ["aria-invalid-no-description", "error-not-associated"],
   "3.3.2": ["radio-checkbox-group-ungrouped", "date-fields-ungrouped"],
   "4.1.2": [
     "iframe-title-missing", "invalid-aria-role", "aria-ref-missing-id", "redundant-aria",
     "clickable-noninteractive", "aria-required-children", "aria-hidden-focusable", "nested-interactive", "invalid-aria-attr", "invalid-aria-value", "aria-required-attr", "aria-prohibited-attr",
-    "duplicate-id", "control-label-missing", "placeholder-as-label", "form-field-multiple-labels",
+    "duplicate-id", "duplicate-attribute", "control-label-missing", "placeholder-as-label", "form-field-multiple-labels",
     "select-has-option", "button-empty-name", "icon-only-control-unnamed", "control-name-title-only",
-    "field-purpose-incomplete", "disabled-context-content",
+    "field-purpose-incomplete", "disabled-context-content", "presentational-children-focusable",
+    "decorative-marked-exposed", "menuitem-empty-name",
   ],
   "4.1.3": ["live-region-conflict", "status-message-not-assertive"],
 };

@@ -11,7 +11,8 @@
 <!-- lang-invalid · RGAA 8.4 · WCAG 3.1.1 — « francais » n'est pas une étiquette
      BCP-47. Sur TOUTES les pages : 8.4 est `judgment: true`, et un code de langue invalide
      sur une seule page laisse le critère « à évaluer » sur toutes les autres. -->
-<html lang="francais">
+<!-- html-lang-xml-lang-mismatch · RGAA 8.4 — les deux déclarations se contredisent. -->
+<html lang="francais" xml:lang="en">
   <head>
     <meta charset="utf-8" />
     <!-- meta-viewport-zoom-block · RGAA 10.4 · WCAG 1.4.4 -->
@@ -57,6 +58,14 @@
       <!-- presentational-attribute · RGAA 10.1 -->
       <p align="center" bgcolor="#ffffff">Un réseau mondial, douze points de présence.</p>
 
+      <!-- duplicate-attribute · RGAA 8.2 — attribut HTML répété, conservé dans la source brute. -->
+      <p class="doublon" class="doublon-bis">Deux classes déclarées deux fois.</p>
+
+      <!-- text-spacing-*-important · RGAA 10.12 — les trois seuils sont bloqués par !important. -->
+      <p style="letter-spacing:.1em !important;word-spacing:.1em !important;line-height:1.2 !important">
+        Cette ligne empêche les espacements personnalisés.
+      </p>
+
       <!-- presentational-spacing · RGAA 10.1 — un mot écrit lettre à lettre pour l'effet visuel. -->
       <p>O r b i t</p>
 
@@ -64,6 +73,13 @@
       <p style="color:#bbbbbb;background:#ffffff">Facturation à la seconde, sans engagement.</p>
 
       <h3>Pourquoi Orbit</h3>
+
+      <!-- presentational-children-focusable · RGAA 7.1 — un descendant focusable est masqué
+           par la sémantique d'un onglet, dont les enfants sont présentationnels. -->
+      <div role="tab" aria-selected="false"><a href="/tarifs.html">Voir les tarifs</a></div>
+
+      <!-- menuitem-empty-name · RGAA 7.1 — item de menu sans nom accessible. -->
+      <div role="menu"><button type="button" role="menuitem"></button></div>
 
       <!-- img-alt-missing · RGAA 1.1 · WCAG 1.1.1 -->
       <img src="/img/reseau.png" width="640" height="320" />
@@ -98,6 +114,11 @@
         <li>Retours arrière instantanés</li>
         <li>Aperçus par branche</li>
       </ul>
+
+      <!-- table-scope-invalid · RGAA 5.7 — valeur scope hors vocabulaire HTML. -->
+      <table>
+        <tr><th scope="section">Offre</th><td>Essentiel</td></tr>
+      </table>
 
       <!-- dyn-text-spacing / REFLOW_ZOOM_PROBE · RGAA 10.12 · WCAG 1.4.12 — un entrefilet à
            hauteur figée : dès que l'interlignage augmente, la phrase est coupée. -->

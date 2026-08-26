@@ -185,12 +185,12 @@ describe("a neighbour the pack does not single out refuses nothing", () => {
     return { file: evidence!.file, line: evidence!.line, selector: evidence!.selector, snippet: evidence!.snippet };
   };
 
-  it("states the premise: the ungrouped-radio heuristic is a signal, while 11.4 is left to the agent", () => {
+  it("states the premise: an ungrouped radio set decides 11.5, while 11.4 is left to the agent", () => {
     const pcs = derivePackResults(auditOf(RADIOS), "rgaa");
     const grouping = pcs.find((c) => c.id === "11.5");
-    expect(grouping?.status).toBe("manual");
-    expect(grouping?.candidateFindings?.some((finding) => finding.ruleId === "radio-checkbox-group-ungrouped")).toBe(true);
-    expect(engineAnchor("11.5", RADIOS)).toBeUndefined();
+    expect(grouping?.status).toBe("NC");
+    expect(grouping?.findings.some((finding) => finding.ruleId === "radio-checkbox-group-ungrouped")).toBe(true);
+    expect(engineAnchor("11.5", RADIOS)).toBeDefined();
     expect(pcs.find((c) => c.id === "11.4")?.status).toBe("manual");
   });
 

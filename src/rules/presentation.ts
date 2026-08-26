@@ -2,7 +2,8 @@
 // 10.4 (text legible at 200%) generally needs rendering, but a viewport meta that
 // blocks zooming is a DEFINITE failure detectable from the markup alone.
 import type { Doc, El } from "../parse/html.js";
-import { attr, textContent } from "../parse/html.js";
+import { attr, textContent, ancestors } from "../parse/html.js";
+import { isDisplayHidden } from "../name.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
 const metaViewportZoomBlock: Rule = {
@@ -71,6 +72,50 @@ const cssGeneratedContentInformative: Rule = {
     return out;
   },
 };
+
+type SpacingProperty = "letter-spacing" | "word-spacing" | "line-height";
+
+/** A narrow but decisive form of the ACT text-spacing rules. An author-important value below
+ * the RGAA threshold prevents the user's required override. Values that need computed font
+ * size (`px`, `rem`, `calc`) stay for the rendered probe rather than being guessed here. */
+function spacingImportantRule(id: string, property: SpacingProperty, minimum: number): Rule {
+  return {
+    id,
+    criteria: ["1.4.12"],
+    severity: "majeur",
+    run(doc: Doc): RuleFinding[] {
+      const out: RuleFinding[] = [];
+      const escaped = property.replace("-", "\\-");
+      const declaration = new RegExp(`(?:^|;)\\s*${escaped}\\s*:\\s*([^;!]+)\\s*!important(?=\\s*;|$)`, "gi");
+      for (const el of doc.elements) {
+        if (["script", "style", "svg", "canvas", "video", "img"].includes(el.tag) || isDisplayHidden(el)) continue;
+        const style = attr(el, "style") ?? "";
+        // Visually-hidden/off-canvas text and a scroll container cannot lose visible text
+        // through spacing. These are ACT inapplicable cases, not conforming exceptions.
+        const chainStyles = [el, ...ancestors(el)].map((node) => (attr(node, "style") ?? "").toLowerCase());
+        if (chainStyles.some((value) => /(?:^|;)\s*(?:left|right|top|bottom)\s*:\s*-\d+(?:px|em|rem)/.test(value))) continue;
+        if (chainStyles.some((value) => /(?:^|;)\s*overflow(?:-[xy])?\s*:\s*(?:auto|scroll)/.test(value))) continue;
+        declaration.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        let raw = "";
+        while ((match = declaration.exec(style))) raw = (match[1] ?? "").trim().toLowerCase();
+        if (!raw) continue;
+        let value: number | undefined;
+        if (raw === "normal" || raw === "initial") value = property === "line-height" ? 1.2 : 0;
+        else if (/^-?(?:\d+|\d*\.\d+)em$/.test(raw)) value = Number.parseFloat(raw);
+        else if (property === "line-height" && /^-?(?:\d+|\d*\.\d+)$/.test(raw)) value = Number.parseFloat(raw);
+        else if (/^0(?:[a-z%]+)?$/.test(raw)) value = 0;
+        if (value === undefined || value >= minimum) continue;
+        out.push({ criteriaId: "1.4.12", el, msgId: "text-spacing-important", params: { property, value: raw, minimum } });
+      }
+      return out;
+    },
+  };
+}
+
+const letterSpacingImportant = spacingImportantRule("letter-spacing-important", "letter-spacing", 0.12);
+const wordSpacingImportant = spacingImportantRule("word-spacing-important", "word-spacing", 0.16);
+const lineHeightImportant = spacingImportantRule("line-height-important", "line-height", 1.5);
 
 // ---- RGAA 10.1 — presentational markup ---------------------------------------------------
 //
@@ -232,6 +277,9 @@ export const PRESENTATIONAL_RULE_IDS: readonly string[] = ["presentational-eleme
 export const presentationRules: Rule[] = [
   metaViewportZoomBlock,
   cssGeneratedContentInformative,
+  letterSpacingImportant,
+  wordSpacingImportant,
+  lineHeightImportant,
   presentationalElement,
   presentationalAttribute,
   presentationalSpacing,

@@ -86,7 +86,7 @@ test).
 | `ADJUDICATE.verdicts.json` | the **only file to write** when you have no shell — verdicts, no evidence |
 | `adjudicate/<criteriaId>.md` | one small brief per criterion: its evidence, the criterion's own wording and tests (with the standard's test methodology), its glossary terms and its citable tests |
 
-Why the split exists, measured rather than assumed: under RGAA, up to 97 criteria carry
+Why the split exists, measured rather than assumed: under RGAA, up to 92 criteria carry
 judgment tests. A measured worklist carried 1590 harvested anchors — **536 KB** of JSON and
 **466 KB** of Markdown. An agent given
 `Read/Grep/Glob/Edit/Write` cannot work with that: reading either document swamps its context,

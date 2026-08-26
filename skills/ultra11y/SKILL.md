@@ -1,6 +1,6 @@
 ---
 name: ultra11y
-description: "Use to AUDIT a repository, site, or page against WCAG 2.2 AA or a country standard such as RGAA; produce a dated conformance report, criterion grid, PRD backlog, or tickets; AUTHOR accessible markup; fix accessibility; or wire a repo gate and rendered-DOM capture pipeline. The bundled install-free engine runs 81 static checks tied to success criteria, while the agent adjudicates judgment criteria and routes rendering criteria to browser scans; check/verify reject invented non-conformities. Use `review-a11y` instead for a review scoped only to a diff, branch, or PR."
+description: "Use to AUDIT a repository, site, or page against WCAG 2.2 AA or a country standard such as RGAA; produce a dated conformance report, criterion grid, PRD backlog, or tickets; AUTHOR accessible markup; fix accessibility; or wire a repo gate and rendered-DOM capture pipeline. The bundled install-free engine runs 91 static checks tied to success criteria, while the agent adjudicates judgment criteria and routes rendering criteria to browser scans; check/verify reject invented non-conformities. Use `review-a11y` instead for a review scoped only to a diff, branch, or PR."
 license: MIT
 metadata:
   version: 5.37.1
@@ -20,7 +20,7 @@ criteria (computed contrast, visible focus, zoom/reflow, content-on-hover) fall 
 tier (axe-core in a real browser); a human is at most optional oversight. Gates stop any
 hallucinated non-conformity from surviving, and nothing is ever silently "conforming".
 
-**Do not confuse rules with criteria.** The bundle ships 81 static checks, WCAG AA has 55
+**Do not confuse rules with criteria.** The bundle ships 91 static checks, WCAG AA has 55
 success criteria, and RGAA has 106 criteria. Several rules may evidence one criterion, one
 rule may contribute to several pack criteria, and most criteria remain open until a scan or
 an adjudication. The only honest run-level coverage is the grid's live provenance tally

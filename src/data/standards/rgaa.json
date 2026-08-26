@@ -537,7 +537,7 @@
       ],
       "wcag": ["1.1.1", "4.1.2"],
       "appliesTo": {
-        "ruleIds": ["axe:image-redundant-alt", "decorative-alt-misuse"]
+        "ruleIds": ["axe:image-redundant-alt", "decorative-alt-misuse", "decorative-marked-exposed"]
       },
       "automation": {
         "tests": {
@@ -557,6 +557,12 @@
           },
           {
             "id": "decorative-alt-misuse",
+            "tests": ["1", "2", "3", "4", "5", "6"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "decorative-marked-exposed",
             "tests": ["1", "2", "3", "4", "5", "6"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
@@ -2132,7 +2138,7 @@
       "techniques": ["H51", "F91"],
       "wcag": ["1.3.1"],
       "appliesTo": {
-        "ruleIds": ["axe:td-has-header", "axe:th-has-data-cells", "data-table-no-headers"]
+        "ruleIds": ["axe:td-has-header", "axe:th-has-data-cells", "data-table-no-headers", "th-no-data-cells"]
       },
       "automation": {
         "tests": {
@@ -2157,6 +2163,12 @@
           {
             "id": "data-table-no-headers",
             "tests": ["1", "2", "3"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "th-no-data-cells",
+            "tests": ["1", "2", "3", "4"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           }
@@ -2217,14 +2229,14 @@
       ],
       "wcag": ["1.3.1"],
       "appliesTo": {
-        "ruleIds": ["axe:scope-attr-valid", "axe:td-headers-attr", "data-table-no-headers"]
+        "ruleIds": ["axe:scope-attr-valid", "axe:td-headers-attr", "data-table-no-headers", "headers-attr-dangling", "table-scope-invalid"]
       },
       "automation": {
         "tests": {
           "1": "judgment",
-          "2": "judgment",
-          "3": "judgment",
-          "4": "judgment",
+          "2": "static",
+          "3": "static",
+          "4": "static",
           "5": "judgment"
         },
         "rules": [
@@ -2245,6 +2257,18 @@
             "tests": ["1", "2", "3", "4", "5"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "headers-attr-dangling",
+            "tests": ["4"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "table-scope-invalid",
+            "tests": ["2", "3"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
           }
         ]
       }
@@ -2275,7 +2299,7 @@
       },
       "automation": {
         "tests": {
-          "1": "judgment"
+          "1": "static"
         },
         "rules": [
           {
@@ -2287,8 +2311,8 @@
           {
             "id": "layout-table-data-markup",
             "tests": ["1"],
-            "effect": "candidate",
-            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
           }
         ]
       }
@@ -2486,7 +2510,9 @@
           "cross-prop-drilled-name-lost",
           "disabled-context-content",
           "invalid-aria-role",
+          "menuitem-empty-name",
           "nested-interactive",
+          "presentational-children-focusable",
           "redundant-aria"
         ]
       },
@@ -2494,7 +2520,7 @@
         "tests": {
           "1": "judgment",
           "2": "judgment",
-          "3": "judgment"
+          "3": "static"
         },
         "rules": [
           {
@@ -2600,8 +2626,20 @@
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
+            "id": "menuitem-empty-name",
+            "tests": ["3"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
             "id": "nested-interactive",
             "tests": ["1", "2", "3"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "presentational-children-focusable",
+            "tests": ["1", "2"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
@@ -2863,7 +2901,7 @@
       "techniques": ["H74", "H93", "H94", "F70", "F77"],
       "wcag": ["4.1.1", "4.1.2"],
       "appliesTo": {
-        "ruleIds": ["axe:duplicate-id", "axe:duplicate-id-active", "axe:duplicate-id-aria", "duplicate-id"]
+        "ruleIds": ["axe:duplicate-id", "axe:duplicate-id-active", "axe:duplicate-id-aria", "duplicate-attribute", "duplicate-id"]
       },
       "automation": {
         "tests": {
@@ -2884,6 +2922,12 @@
           },
           {
             "id": "axe:duplicate-id-aria",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "duplicate-attribute",
             "tests": ["1"],
             "effect": "decisive-nc",
             "rationale": "The observed failure exhausts the cited RGAA test."
@@ -2919,11 +2963,11 @@
       "techniques": ["H57"],
       "wcag": ["3.1.1"],
       "appliesTo": {
-        "ruleIds": ["axe:html-has-lang", "html-lang-missing"]
+        "ruleIds": ["axe:html-has-lang", "document-language-missing", "html-lang-missing"]
       },
       "automation": {
         "tests": {
-          "1": "judgment"
+          "1": "static"
         },
         "rules": [
           {
@@ -2931,6 +2975,12 @@
             "tests": ["1"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "document-language-missing",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
           },
           {
             "id": "html-lang-missing",
@@ -2963,7 +3013,7 @@
       "techniques": ["H57"],
       "wcag": ["3.1.1"],
       "appliesTo": {
-        "ruleIds": ["axe:html-lang-valid", "axe:html-xml-lang-mismatch", "lang-invalid"]
+        "ruleIds": ["axe:html-lang-valid", "axe:html-xml-lang-mismatch", "html-lang-xml-lang-mismatch", "lang-invalid"]
       },
       "judgment": true,
       "automation": {
@@ -2982,6 +3032,12 @@
             "tests": ["1"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "html-lang-xml-lang-mismatch",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
           },
           {
             "id": "lang-invalid",
@@ -4020,11 +4076,11 @@
       ],
       "wcag": ["1.4.12"],
       "appliesTo": {
-        "ruleIds": ["dyn-input-overflow-spacing", "dyn-text-spacing"]
+        "ruleIds": ["dyn-input-overflow-spacing", "dyn-text-spacing", "letter-spacing-important", "line-height-important", "word-spacing-important"]
       },
       "automation": {
         "tests": {
-          "1": "judgment"
+          "1": "static"
         },
         "rules": [
           {
@@ -4038,6 +4094,24 @@
             "tests": ["1"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "letter-spacing-important",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "line-height-important",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "word-spacing-important",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
           }
         ]
       }
@@ -4439,7 +4513,7 @@
       },
       "automation": {
         "tests": {
-          "1": "judgment"
+          "1": "static"
         },
         "rules": [
           {
@@ -4451,8 +4525,8 @@
           {
             "id": "radio-checkbox-group-ungrouped",
             "tests": ["1"],
-            "effect": "candidate",
-            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
           }
         ]
       }
@@ -4606,12 +4680,19 @@
       "particularCases": ["Pour le test 11.9.2, voir cas particuliers critère 11.2."],
       "wcag": ["2.5.3", "4.1.2"],
       "appliesTo": {
-        "ruleIds": ["axe:button-name", "axe:input-button-name", "button-empty-name", "cross-icon-only-unnamed", "icon-only-control-unnamed"]
+        "ruleIds": [
+          "axe:button-name",
+          "axe:input-button-name",
+          "button-empty-name",
+          "cross-icon-only-unnamed",
+          "icon-only-control-unnamed",
+          "label-in-name-mismatch"
+        ]
       },
       "automation": {
         "tests": {
           "1": "static",
-          "2": "judgment"
+          "2": "static"
         },
         "rules": [
           {
@@ -4643,6 +4724,12 @@
             "tests": ["1"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "label-in-name-mismatch",
+            "tests": ["2"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
           }
         ]
       }
@@ -4863,13 +4950,19 @@
       ],
       "wcag": ["1.3.5"],
       "appliesTo": {
-        "ruleIds": ["axe:autocomplete-valid", "field-purpose-incomplete"]
+        "ruleIds": ["autocomplete-token-invalid", "axe:autocomplete-valid", "field-purpose-incomplete"]
       },
       "automation": {
         "tests": {
           "1": "judgment"
         },
         "rules": [
+          {
+            "id": "autocomplete-token-invalid",
+            "tests": ["1"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
           {
             "id": "axe:autocomplete-valid",
             "tests": ["1"],

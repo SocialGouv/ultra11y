@@ -123,6 +123,7 @@ var wcag_default = {
         "img-alt-missing",
         "canvas-fallback-missing",
         "decorative-alt-misuse",
+        "decorative-marked-exposed",
         "input-image-alt-missing",
         "object-embed-no-name",
         "chart-no-accessible-name"
@@ -309,6 +310,7 @@ var wcag_default = {
         "aria-required-parent",
         "headers-attr-dangling",
         "th-no-data-cells",
+        "table-scope-invalid",
         "radio-checkbox-group-ungrouped",
         "table-empty-data-cell",
         "css-generated-content-informative",
@@ -582,7 +584,7 @@ var wcag_default = {
       level: "AA",
       addedIn: "2.1",
       automatability: "needs-rendering",
-      ruleIds: [],
+      ruleIds: ["letter-spacing-important", "word-spacing-important", "line-height-important"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html",
       techniques: ["C21", "C35", "C36", "C8"],
       text: "In content implemented using markup languages that support the following text style properties, no loss of content or functionality occurs by setting all of the following and by changing no other style property:\n\u2022 Line height (line spacing) to at least 1.5 times the font size;\n\u2022 Spacing following paragraphs to at least 2 times the font size;\n\u2022 Letter spacing (tracking) to at least 0.12 times the font size;\n\u2022 Word spacing to at least 0.16 times the font size.\nException: Human languages and scripts that do not make use of one or more of these text style properties in written text can conform using only the properties that exist for that combination of language and script.\nNote: Content is not required to use these text spacing values. The requirement is to ensure that when a user overrides the authored text spacing, content or functionality is not lost.\nNote: Writing systems for some languages use different text spacing settings, such as paragraph start indent. Authors are encouraged to follow locally available guidance for improving readability and legibility of text in their writing system.",
@@ -1048,7 +1050,7 @@ var wcag_default = {
       level: "A",
       addedIn: "2.0",
       automatability: "static",
-      ruleIds: ["html-lang-missing", "lang-invalid"],
+      ruleIds: ["html-lang-missing", "document-language-missing", "html-lang-xml-lang-mismatch", "lang-invalid"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/language-of-page.html",
       techniques: ["F15", "G10", "G135", "H57"],
       text: "The default human language of each web page can be programmatically determined.",
@@ -1334,6 +1336,7 @@ Note: For this success criterion, "the same order relative to other page content
         "aria-required-attr",
         "aria-prohibited-attr",
         "duplicate-id",
+        "duplicate-attribute",
         "control-label-missing",
         "placeholder-as-label",
         "form-field-multiple-labels",
@@ -1342,7 +1345,10 @@ Note: For this success criterion, "the same order relative to other page content
         "icon-only-control-unnamed",
         "control-name-title-only",
         "field-purpose-incomplete",
-        "disabled-context-content"
+        "disabled-context-content",
+        "presentational-children-focusable",
+        "decorative-marked-exposed",
+        "menuitem-empty-name"
       ],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html",
       techniques: [
@@ -37485,6 +37491,86 @@ function attachSignals(doc) {
 
 // src/messages.ts
 var MSG_CATALOG = {
+  "document-language-missing": {
+    message: {
+      fr: () => `La page n'a pas de langue par d\xE9faut sur <html> et au moins un texte visible n'h\xE9rite d'aucun attribut lang/xml:lang.`,
+      en: () => `The page has no default language on <html>, and at least one visible text node inherits no lang/xml:lang attribute.`
+    },
+    remediation: {
+      fr: () => `D\xE9clarez lang sur <html>, ou sur chaque texte (ou l'un de ses anc\xEAtres) conform\xE9ment au test RGAA 8.3.1.`,
+      en: () => `Declare lang on <html>, or on every text node (or one of its ancestors) as allowed by RGAA test 8.3.1.`
+    }
+  },
+  "html-lang-xml-lang-mismatch": {
+    message: {
+      fr: (p) => `lang="${p.lang}" et xml:lang="${p.xmlLang}" se contredisent sur <html>.`,
+      en: (p) => `lang="${p.lang}" and xml:lang="${p.xmlLang}" conflict on <html>.`
+    },
+    remediation: {
+      fr: () => `Utilisez le m\xEAme code de langue valide et pertinent dans les deux attributs, ou conservez seulement lang en HTML5.`,
+      en: () => `Use the same valid and relevant language tag in both attributes, or keep only lang in HTML5.`
+    }
+  },
+  "duplicate-attribute": {
+    message: {
+      fr: (p) => `L'attribut ${p.attr} est d\xE9clar\xE9 plusieurs fois sur la m\xEAme balise \u2014 le code g\xE9n\xE9r\xE9 est invalide.`,
+      en: (p) => `The ${p.attr} attribute is declared more than once on the same tag \u2014 the generated markup is invalid.`
+    },
+    remediation: {
+      fr: (p) => `Conservez une seule d\xE9claration de ${p.attr}.`,
+      en: (p) => `Keep a single ${p.attr} declaration.`
+    }
+  },
+  "presentational-children-focusable": {
+    message: {
+      fr: (p) => `Un descendant focalisable est plac\xE9 dans role="${p.role}", dont les enfants sont pr\xE9sentatifs \u2014 l'arbre d'accessibilit\xE9 est contradictoire.`,
+      en: (p) => `A focusable descendant sits inside role="${p.role}", whose children are presentational \u2014 the accessibility tree conflicts.`
+    },
+    remediation: {
+      fr: () => `Placez l'\xE9l\xE9ment interactif hors du composant, ou impl\xE9mentez l'interaction sur le composant ARIA lui-m\xEAme.`,
+      en: () => `Move the interactive element outside the component, or implement the interaction on the ARIA component itself.`
+    }
+  },
+  "decorative-marked-exposed": {
+    message: {
+      fr: (p) => `Ce <${p.tag}> est explicitement d\xE9coratif mais reste expos\xE9 par son nom ou sa pr\xE9sence dans l'ordre de tabulation.`,
+      en: (p) => `This <${p.tag}> is explicitly decorative but remains exposed by its name or sequential focusability.`
+    },
+    remediation: {
+      fr: () => `Retirez le nom et la focalisation de l'\xE9l\xE9ment d\xE9coratif, ou retirez son marquage d\xE9coratif s'il porte r\xE9ellement une fonction.`,
+      en: () => `Remove the decorative element's name and focusability, or remove the decorative marking if it actually has a function.`
+    }
+  },
+  "menuitem-empty-name": {
+    message: {
+      fr: () => `Cet \xE9l\xE9ment de menu n'a aucun nom accessible.`,
+      en: () => `This menu item has no accessible name.`
+    },
+    remediation: {
+      fr: () => `Fournissez un texte visible ou un nom accessible pertinent \xE0 l'\xE9l\xE9ment de menu.`,
+      en: () => `Give the menu item visible text or a relevant accessible name.`
+    }
+  },
+  "text-spacing-important": {
+    message: {
+      fr: (p) => `${p.property}: ${p.value} !important emp\xEAche l'espacement RGAA requis (minimum ${p.minimum}).`,
+      en: (p) => `${p.property}: ${p.value} !important prevents the required RGAA spacing override (minimum ${p.minimum}).`
+    },
+    remediation: {
+      fr: (p) => `Retirez !important de ${p.property}, ou utilisez une valeur au moins \xE9gale au seuil requis.`,
+      en: (p) => `Remove !important from ${p.property}, or use a value at least equal to the required threshold.`
+    }
+  },
+  "table-scope-invalid": {
+    message: {
+      fr: (p) => `scope="${p.scope}" n'est pas une valeur d'association d'en-t\xEAte valide.`,
+      en: (p) => `scope="${p.scope}" is not a valid header-association value.`
+    },
+    remediation: {
+      fr: () => `Utilisez scope="row", "col", "rowgroup" ou "colgroup" selon la port\xE9e r\xE9elle de l'en-t\xEAte.`,
+      en: () => `Use scope="row", "col", "rowgroup", or "colgroup" according to the header's actual reach.`
+    }
+  },
   // ---- Theme 1 — Images (src/rules/images.ts) ---------------------------------
   "img-alt-missing": {
     message: {
@@ -39956,7 +40042,7 @@ var rgaa_default = {
       ],
       wcag: ["1.1.1", "4.1.2"],
       appliesTo: {
-        ruleIds: ["axe:image-redundant-alt", "decorative-alt-misuse"]
+        ruleIds: ["axe:image-redundant-alt", "decorative-alt-misuse", "decorative-marked-exposed"]
       },
       automation: {
         tests: {
@@ -39976,6 +40062,12 @@ var rgaa_default = {
           },
           {
             id: "decorative-alt-misuse",
+            tests: ["1", "2", "3", "4", "5", "6"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "decorative-marked-exposed",
             tests: ["1", "2", "3", "4", "5", "6"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
@@ -41551,7 +41643,7 @@ var rgaa_default = {
       techniques: ["H51", "F91"],
       wcag: ["1.3.1"],
       appliesTo: {
-        ruleIds: ["axe:td-has-header", "axe:th-has-data-cells", "data-table-no-headers"]
+        ruleIds: ["axe:td-has-header", "axe:th-has-data-cells", "data-table-no-headers", "th-no-data-cells"]
       },
       automation: {
         tests: {
@@ -41576,6 +41668,12 @@ var rgaa_default = {
           {
             id: "data-table-no-headers",
             tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "th-no-data-cells",
+            tests: ["1", "2", "3", "4"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           }
@@ -41636,14 +41734,14 @@ var rgaa_default = {
       ],
       wcag: ["1.3.1"],
       appliesTo: {
-        ruleIds: ["axe:scope-attr-valid", "axe:td-headers-attr", "data-table-no-headers"]
+        ruleIds: ["axe:scope-attr-valid", "axe:td-headers-attr", "data-table-no-headers", "headers-attr-dangling", "table-scope-invalid"]
       },
       automation: {
         tests: {
           "1": "judgment",
-          "2": "judgment",
-          "3": "judgment",
-          "4": "judgment",
+          "2": "static",
+          "3": "static",
+          "4": "static",
           "5": "judgment"
         },
         rules: [
@@ -41664,6 +41762,18 @@ var rgaa_default = {
             tests: ["1", "2", "3", "4", "5"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "headers-attr-dangling",
+            tests: ["4"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "table-scope-invalid",
+            tests: ["2", "3"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
           }
         ]
       }
@@ -41694,7 +41804,7 @@ var rgaa_default = {
       },
       automation: {
         tests: {
-          "1": "judgment"
+          "1": "static"
         },
         rules: [
           {
@@ -41706,8 +41816,8 @@ var rgaa_default = {
           {
             id: "layout-table-data-markup",
             tests: ["1"],
-            effect: "candidate",
-            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
           }
         ]
       }
@@ -41905,7 +42015,9 @@ var rgaa_default = {
           "cross-prop-drilled-name-lost",
           "disabled-context-content",
           "invalid-aria-role",
+          "menuitem-empty-name",
           "nested-interactive",
+          "presentational-children-focusable",
           "redundant-aria"
         ]
       },
@@ -41913,7 +42025,7 @@ var rgaa_default = {
         tests: {
           "1": "judgment",
           "2": "judgment",
-          "3": "judgment"
+          "3": "static"
         },
         rules: [
           {
@@ -42019,8 +42131,20 @@ var rgaa_default = {
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
+            id: "menuitem-empty-name",
+            tests: ["3"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
             id: "nested-interactive",
             tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "presentational-children-focusable",
+            tests: ["1", "2"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
@@ -42282,7 +42406,7 @@ var rgaa_default = {
       techniques: ["H74", "H93", "H94", "F70", "F77"],
       wcag: ["4.1.1", "4.1.2"],
       appliesTo: {
-        ruleIds: ["axe:duplicate-id", "axe:duplicate-id-active", "axe:duplicate-id-aria", "duplicate-id"]
+        ruleIds: ["axe:duplicate-id", "axe:duplicate-id-active", "axe:duplicate-id-aria", "duplicate-attribute", "duplicate-id"]
       },
       automation: {
         tests: {
@@ -42303,6 +42427,12 @@ var rgaa_default = {
           },
           {
             id: "axe:duplicate-id-aria",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "duplicate-attribute",
             tests: ["1"],
             effect: "decisive-nc",
             rationale: "The observed failure exhausts the cited RGAA test."
@@ -42338,11 +42468,11 @@ var rgaa_default = {
       techniques: ["H57"],
       wcag: ["3.1.1"],
       appliesTo: {
-        ruleIds: ["axe:html-has-lang", "html-lang-missing"]
+        ruleIds: ["axe:html-has-lang", "document-language-missing", "html-lang-missing"]
       },
       automation: {
         tests: {
-          "1": "judgment"
+          "1": "static"
         },
         rules: [
           {
@@ -42350,6 +42480,12 @@ var rgaa_default = {
             tests: ["1"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "document-language-missing",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
           },
           {
             id: "html-lang-missing",
@@ -42382,7 +42518,7 @@ var rgaa_default = {
       techniques: ["H57"],
       wcag: ["3.1.1"],
       appliesTo: {
-        ruleIds: ["axe:html-lang-valid", "axe:html-xml-lang-mismatch", "lang-invalid"]
+        ruleIds: ["axe:html-lang-valid", "axe:html-xml-lang-mismatch", "html-lang-xml-lang-mismatch", "lang-invalid"]
       },
       judgment: true,
       automation: {
@@ -42401,6 +42537,12 @@ var rgaa_default = {
             tests: ["1"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "html-lang-xml-lang-mismatch",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
           },
           {
             id: "lang-invalid",
@@ -43439,11 +43581,11 @@ var rgaa_default = {
       ],
       wcag: ["1.4.12"],
       appliesTo: {
-        ruleIds: ["dyn-input-overflow-spacing", "dyn-text-spacing"]
+        ruleIds: ["dyn-input-overflow-spacing", "dyn-text-spacing", "letter-spacing-important", "line-height-important", "word-spacing-important"]
       },
       automation: {
         tests: {
-          "1": "judgment"
+          "1": "static"
         },
         rules: [
           {
@@ -43457,6 +43599,24 @@ var rgaa_default = {
             tests: ["1"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "letter-spacing-important",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "line-height-important",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "word-spacing-important",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
           }
         ]
       }
@@ -43858,7 +44018,7 @@ var rgaa_default = {
       },
       automation: {
         tests: {
-          "1": "judgment"
+          "1": "static"
         },
         rules: [
           {
@@ -43870,8 +44030,8 @@ var rgaa_default = {
           {
             id: "radio-checkbox-group-ungrouped",
             tests: ["1"],
-            effect: "candidate",
-            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
           }
         ]
       }
@@ -44025,12 +44185,19 @@ var rgaa_default = {
       particularCases: ["Pour le test 11.9.2, voir cas particuliers crit\xE8re 11.2."],
       wcag: ["2.5.3", "4.1.2"],
       appliesTo: {
-        ruleIds: ["axe:button-name", "axe:input-button-name", "button-empty-name", "cross-icon-only-unnamed", "icon-only-control-unnamed"]
+        ruleIds: [
+          "axe:button-name",
+          "axe:input-button-name",
+          "button-empty-name",
+          "cross-icon-only-unnamed",
+          "icon-only-control-unnamed",
+          "label-in-name-mismatch"
+        ]
       },
       automation: {
         tests: {
           "1": "static",
-          "2": "judgment"
+          "2": "static"
         },
         rules: [
           {
@@ -44062,6 +44229,12 @@ var rgaa_default = {
             tests: ["1"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "label-in-name-mismatch",
+            tests: ["2"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
           }
         ]
       }
@@ -44282,13 +44455,19 @@ var rgaa_default = {
       ],
       wcag: ["1.3.5"],
       appliesTo: {
-        ruleIds: ["axe:autocomplete-valid", "field-purpose-incomplete"]
+        ruleIds: ["autocomplete-token-invalid", "axe:autocomplete-valid", "field-purpose-incomplete"]
       },
       automation: {
         tests: {
           "1": "judgment"
         },
         rules: [
+          {
+            id: "autocomplete-token-invalid",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
           {
             id: "axe:autocomplete-valid",
             tests: ["1"],
@@ -48240,6 +48419,64 @@ var ariaHiddenFocusable = {
     return out2;
   }
 };
+var PRESENTATIONAL_CHILDREN = /* @__PURE__ */ new Set([
+  "button",
+  "checkbox",
+  "img",
+  "menuitem",
+  "menuitemcheckbox",
+  "menuitemradio",
+  "meter",
+  "option",
+  "progressbar",
+  "radio",
+  "scrollbar",
+  "separator",
+  "slider",
+  "switch",
+  "tab"
+]);
+var presentationalChildrenFocusable = {
+  id: "presentational-children-focusable",
+  criteria: ["4.1.2"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      if (!PRESENTATIONAL_CHILDREN.has(role) || isHiddenFromAT(el)) continue;
+      const child = descendants(el).find((node) => isFocusable(node) && !isDisplayHidden(node));
+      if (child) out2.push({ criteriaId: "4.1.2", el: child, msgId: "presentational-children-focusable", params: { role } });
+    }
+    return out2;
+  }
+};
+var decorativeMarkedExposed = {
+  id: "decorative-marked-exposed",
+  criteria: ["1.1.1", "4.1.2"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      const decorative = role === "none" || role === "presentation" || el.tag === "img" && attr(el, "alt") === "";
+      if (!decorative || isDisplayHidden(el)) continue;
+      const named3 = (attr(el, "aria-label") ?? "").trim() || (attr(el, "aria-labelledby") ?? "").trim() || (attr(el, "title") ?? "").trim();
+      if (!isFocusable(el) && !named3) continue;
+      const nonText = ["img", "svg", "canvas", "object", "embed"].includes(el.tag);
+      out2.push({ criteriaId: nonText ? "1.1.1" : "4.1.2", el, msgId: "decorative-marked-exposed", params: { tag: el.tag } });
+    }
+    return out2;
+  }
+};
+var menuitemEmptyName = {
+  id: "menuitem-empty-name",
+  criteria: ["4.1.2"],
+  severity: "bloquant",
+  run(doc) {
+    return doc.elements.filter((el) => ["menuitem", "menuitemcheckbox", "menuitemradio"].includes((attr(el, "role") ?? "").trim().toLowerCase())).filter((el) => !isHiddenFromAT(el) && !mayInjectContent(el) && accessibleName(el, doc).trim() === "").map((el) => ({ criteriaId: "4.1.2", el, msgId: "menuitem-empty-name" }));
+  }
+};
 var nestedInteractive = {
   id: "nested-interactive",
   criteria: ["4.1.2"],
@@ -48466,6 +48703,9 @@ var scriptsAriaRules = [
   clickableNoninteractive,
   ariaRequiredChildren,
   ariaHiddenFocusable,
+  presentationalChildrenFocusable,
+  decorativeMarkedExposed,
+  menuitemEmptyName,
   nestedInteractive,
   liveRegionConflict,
   statusMessageNotAssertive,
@@ -48482,6 +48722,9 @@ function titleSetByFramework(doc) {
   if (doc.kind === "html") return false;
   return NEXT_METADATA.test(doc.source) && /\btitle\s*:/.test(doc.source);
 }
+function declaredLanguage(el) {
+  return (attr(el, "lang") ?? "").trim() || (attr(el, "xml:lang") ?? "").trim();
+}
 var htmlLangMissing = {
   id: "html-lang-missing",
   criteria: ["3.1.1"],
@@ -48490,7 +48733,7 @@ var htmlLangMissing = {
   run(doc) {
     const html = elementsByTag(doc, "html")[0];
     if (!html) return [];
-    const lang = (attr(html, "lang") ?? attr(html, "xml:lang") ?? "").trim();
+    const lang = declaredLanguage(html);
     if (lang) return [];
     return [
       {
@@ -48499,6 +48742,73 @@ var htmlLangMissing = {
         msgId: "html-lang-missing"
       }
     ];
+  }
+};
+var documentLanguageMissing = {
+  id: "document-language-missing",
+  criteria: ["3.1.1"],
+  severity: "bloquant",
+  scope: "page",
+  run(doc) {
+    const html = elementsByTag(doc, "html")[0];
+    if (!html) return [];
+    if (declaredLanguage(html)) return [];
+    const ignored = /* @__PURE__ */ new Set(["script", "style", "title", "noscript", "template", "svg"]);
+    const uncovered = doc.elements.find((el) => {
+      if (ignored.has(el.tag) || isDisplayHidden(el)) return false;
+      const hasDirectText3 = el.children.some((child) => child.type === "text" && child.data.trim() !== "");
+      if (!hasDirectText3) return false;
+      return ![el, ...ancestors(el)].some((node) => declaredLanguage(node) !== "");
+    });
+    if (!uncovered) return [];
+    return [{ criteriaId: "3.1.1", el: uncovered, msgId: "document-language-missing" }];
+  }
+};
+var htmlLangXmlLangMismatch = {
+  id: "html-lang-xml-lang-mismatch",
+  criteria: ["3.1.1"],
+  severity: "majeur",
+  scope: "page",
+  run(doc) {
+    const html = elementsByTag(doc, "html")[0];
+    if (!html) return [];
+    const lang = (attr(html, "lang") ?? "").trim();
+    const xmlLang = (attr(html, "xml:lang") ?? "").trim();
+    const primary = (value) => value.toLowerCase().split("-")[0];
+    if (!lang || !xmlLang || primary(lang) === primary(xmlLang)) return [];
+    return [{ criteriaId: "3.1.1", el: html, msgId: "html-lang-xml-lang-mismatch", params: { lang, xmlLang } }];
+  }
+};
+var duplicateAttribute = {
+  id: "duplicate-attribute",
+  criteria: ["4.1.2"],
+  severity: "majeur",
+  run(doc) {
+    if (doc.kind !== "html" || doc.lossy) return [];
+    const out2 = [];
+    const tag = /<([A-Za-z][\w:-]*)(\s[^<>]*?)\/?\s*>/gs;
+    const attribute = /([^\s"'<>/=]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?/g;
+    let match;
+    while (match = tag.exec(doc.source)) {
+      const body3 = match[2] ?? "";
+      const seen = /* @__PURE__ */ new Set();
+      let duplicate = "";
+      attribute.lastIndex = 0;
+      let a;
+      while (a = attribute.exec(body3)) {
+        const name2 = (a[1] ?? "").toLowerCase();
+        if (!name2) continue;
+        if (seen.has(name2)) {
+          duplicate = name2;
+          break;
+        }
+        seen.add(name2);
+      }
+      if (!duplicate) continue;
+      const el = doc.elements.find((candidate) => candidate.start === match.index);
+      if (el) out2.push({ criteriaId: "4.1.2", el, msgId: "duplicate-attribute", params: { attr: duplicate } });
+    }
+    return out2;
   }
 };
 var titleMissingEmpty = {
@@ -48610,7 +48920,16 @@ var langInvalid = {
     return out2;
   }
 };
-var mandatoryRules = [htmlLangMissing, titleMissingEmpty, duplicateId, inlineLangChangeMissing, langInvalid];
+var mandatoryRules = [
+  htmlLangMissing,
+  documentLanguageMissing,
+  htmlLangXmlLangMismatch,
+  titleMissingEmpty,
+  duplicateId,
+  duplicateAttribute,
+  inlineLangChangeMissing,
+  langInvalid
+];
 
 // src/rules/headings.ts
 function contentMaybeInjected(doc) {
@@ -48967,6 +49286,21 @@ var headersAttrDangling = {
     return out2;
   }
 };
+var tableScopeInvalid = {
+  id: "table-scope-invalid",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (el.tag !== "th") continue;
+      const scope = attr(el, "scope");
+      if (scope === void 0 || scope.includes("{") || ["row", "col", "rowgroup", "colgroup"].includes(scope.trim().toLowerCase())) continue;
+      out2.push({ criteriaId: "1.3.1", el, msgId: "table-scope-invalid", params: { scope } });
+    }
+    return out2;
+  }
+};
 var thNoDataCells = {
   id: "th-no-data-cells",
   criteria: ["1.3.1"],
@@ -48999,6 +49333,7 @@ var tablesRules = [
   sortableHeaderNoAriaSort,
   tableEmptyDataCell,
   headersAttrDangling,
+  tableScopeInvalid,
   thNoDataCells
 ];
 
@@ -49982,6 +50317,41 @@ var cssGeneratedContentInformative = {
     return out2;
   }
 };
+function spacingImportantRule(id, property, minimum) {
+  return {
+    id,
+    criteria: ["1.4.12"],
+    severity: "majeur",
+    run(doc) {
+      const out2 = [];
+      const escaped = property.replace("-", "\\-");
+      const declaration = new RegExp(`(?:^|;)\\s*${escaped}\\s*:\\s*([^;!]+)\\s*!important(?=\\s*;|$)`, "gi");
+      for (const el of doc.elements) {
+        if (["script", "style", "svg", "canvas", "video", "img"].includes(el.tag) || isDisplayHidden(el)) continue;
+        const style = attr(el, "style") ?? "";
+        const chainStyles = [el, ...ancestors(el)].map((node) => (attr(node, "style") ?? "").toLowerCase());
+        if (chainStyles.some((value2) => /(?:^|;)\s*(?:left|right|top|bottom)\s*:\s*-\d+(?:px|em|rem)/.test(value2))) continue;
+        if (chainStyles.some((value2) => /(?:^|;)\s*overflow(?:-[xy])?\s*:\s*(?:auto|scroll)/.test(value2))) continue;
+        declaration.lastIndex = 0;
+        let match;
+        let raw = "";
+        while (match = declaration.exec(style)) raw = (match[1] ?? "").trim().toLowerCase();
+        if (!raw) continue;
+        let value;
+        if (raw === "normal" || raw === "initial") value = property === "line-height" ? 1.2 : 0;
+        else if (/^-?(?:\d+|\d*\.\d+)em$/.test(raw)) value = Number.parseFloat(raw);
+        else if (property === "line-height" && /^-?(?:\d+|\d*\.\d+)$/.test(raw)) value = Number.parseFloat(raw);
+        else if (/^0(?:[a-z%]+)?$/.test(raw)) value = 0;
+        if (value === void 0 || value >= minimum) continue;
+        out2.push({ criteriaId: "1.4.12", el, msgId: "text-spacing-important", params: { property, value: raw, minimum } });
+      }
+      return out2;
+    }
+  };
+}
+var letterSpacingImportant = spacingImportantRule("letter-spacing-important", "letter-spacing", 0.12);
+var wordSpacingImportant = spacingImportantRule("word-spacing-important", "word-spacing", 0.16);
+var lineHeightImportant = spacingImportantRule("line-height-important", "line-height", 1.5);
 var PRESENTATIONAL_TAGS = /* @__PURE__ */ new Set(["basefont", "big", "blink", "center", "font", "marquee", "s", "strike", "tt"]);
 var PRESENTATIONAL_ATTRS = /* @__PURE__ */ new Set([
   "align",
@@ -50068,6 +50438,9 @@ var presentationalSpacing = {
 var presentationRules = [
   metaViewportZoomBlock,
   cssGeneratedContentInformative,
+  letterSpacingImportant,
+  wordSpacingImportant,
+  lineHeightImportant,
   presentationalElement,
   presentationalAttribute,
   presentationalSpacing

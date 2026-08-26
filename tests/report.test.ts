@@ -245,9 +245,9 @@ describe("renderPackReport (derived RGAA view)", () => {
     expect(md).toContain("RGAA 4.1.2");
     expect(md).toContain("## 1. Synthèse par thématique");
     expect(md).toMatch(/RGAA \d+\.\d+ —/); // pack-keyed criterion labels
-    expect(md).toContain("17 test(s) static");
+    expect(md).toContain("26 test(s) static");
     expect(md).toContain("3 rendered");
-    expect(md).toContain("238 judgment");
+    expect(md).toContain("229 judgment");
   });
 
   // RGAA 8.1 (doctype) used to be the report's out-of-scope example: it maps only onto the
@@ -299,7 +299,7 @@ describe("renderPackReport (derived RGAA view)", () => {
     expect(ncSection).toMatch(/#### 🔴 RGAA 6\.2 —/);
     expect(ncSection).toContain("**Thématique** : 6.");
     expect(ncSection).toMatch(/\*\*Critère\*\* : 6\.2 —/);
-    expect(ncSection).not.toContain("RGAA 8.3"); // html-lang is evidence for adjudication, not a complete RGAA failure by itself
+    expect(ncSection).toContain("RGAA 8.3"); // missing language on both the page and visible text exhausts test 8.3.1
     expect(ncSection).not.toContain("RGAA 8.1"); // out-of-scope — §5 only, never a fake NC block
   });
 });

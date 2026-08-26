@@ -23,8 +23,8 @@ describe("RGAA test-level automation contract", () => {
       static: tiers.filter((tier) => tier === "static").length,
       rendered: tiers.filter((tier) => tier === "rendered").length,
       judgment: tiers.filter((tier) => tier === "judgment").length,
-    }).toEqual({ static: 17, rendered: 3, judgment: 238 });
-    expect(pack.criteria.filter((criterion) => Object.values(criterion.automation!.tests).includes("judgment"))).toHaveLength(97);
+    }).toEqual({ static: 26, rendered: 3, judgment: 229 });
+    expect(pack.criteria.filter((criterion) => Object.values(criterion.automation!.tests).includes("judgment"))).toHaveLength(92);
   });
 
   it("publishes the reviewed routing of every criterion and every test in the static artifact", () => {
@@ -37,11 +37,11 @@ describe("RGAA test-level automation contract", () => {
 
   it("keeps the public README aligned with the generated automation contract", () => {
     const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
-    expect(readme).toContain("17 `static` tests across 13 criteria");
+    expect(readme).toContain("26 `static` tests across 19 criteria");
     expect(readme).toContain("3 `rendered` tests across 3 criteria");
-    expect(readme).toContain("15 distinct criteria that can produce a deterministic `NC`");
+    expect(readme).toContain("21 distinct criteria that can produce a deterministic `NC`");
     expect(readme).toContain("49 criteria receive a normative engine signal");
-    expect(readme).toContain("238 `judgment` tests across 97 criteria");
+    expect(readme).toContain("229 `judgment` tests across 92 criteria");
     expect(readme).toContain("104 of 106 criteria require adjudication to earn `C`");
   });
 
@@ -89,10 +89,16 @@ describe("RGAA test-level automation contract", () => {
       { test: "1.1.2", tier: "rendered", rules: ["axe:area-alt"] },
       { test: "1.1.3", tier: "static", rules: ["axe:input-image-alt", "input-image-alt-missing"] },
       { test: "2.1.1", tier: "static", rules: ["axe:frame-title", "iframe-title-missing"] },
+      { test: "5.7.2", tier: "static", rules: ["table-scope-invalid"] },
+      { test: "5.7.3", tier: "static", rules: ["table-scope-invalid"] },
+      { test: "5.7.4", tier: "static", rules: ["headers-attr-dangling"] },
+      { test: "5.8.1", tier: "static", rules: ["layout-table-data-markup"] },
       { test: "6.2.1", tier: "static", rules: ["axe:link-name", "link-empty-name"] },
+      { test: "7.1.3", tier: "static", rules: ["menuitem-empty-name"] },
       { test: "8.1.1", tier: "rendered", rules: ["pack:rgaa:doctype-missing"] },
-      { test: "8.2.1", tier: "static", rules: ["axe:duplicate-id", "axe:duplicate-id-active", "axe:duplicate-id-aria", "duplicate-id"] },
-      { test: "8.4.1", tier: "static", rules: ["axe:html-lang-valid", "lang-invalid"] },
+      { test: "8.2.1", tier: "static", rules: ["axe:duplicate-id", "axe:duplicate-id-active", "axe:duplicate-id-aria", "duplicate-attribute", "duplicate-id"] },
+      { test: "8.3.1", tier: "static", rules: ["document-language-missing"] },
+      { test: "8.4.1", tier: "static", rules: ["axe:html-lang-valid", "html-lang-xml-lang-mismatch", "lang-invalid"] },
       { test: "8.5.1", tier: "static", rules: ["axe:document-title", "title-missing-empty"] },
       { test: "8.10.2", tier: "static", rules: ["pack:rgaa:dir-value-invalid"] },
       { test: "9.3.1", tier: "static", rules: ["axe:list", "axe:listitem", "list-structure"] },
@@ -102,10 +108,13 @@ describe("RGAA test-level automation contract", () => {
       { test: "10.1.2", tier: "static", rules: ["presentational-attribute"] },
       { test: "10.1.3", tier: "static", rules: ["presentational-spacing"] },
       { test: "10.7.1", tier: "rendered", rules: ["dyn-focus-visible"] },
+      { test: "10.12.1", tier: "static", rules: ["letter-spacing-important", "line-height-important", "word-spacing-important"] },
       { test: "11.1.1", tier: "static", rules: ["axe:label", "axe:select-name", "control-label-missing"] },
+      { test: "11.5.1", tier: "static", rules: ["radio-checkbox-group-ungrouped"] },
       { test: "11.6.1", tier: "static", rules: ["axe:fieldset", "fieldset-legend-missing"] },
       { test: "11.8.2", tier: "static", rules: ["pack:rgaa:optgroup-without-label"] },
       { test: "11.9.1", tier: "static", rules: ["axe:button-name", "axe:input-button-name", "button-empty-name"] },
+      { test: "11.9.2", tier: "static", rules: ["label-in-name-mismatch"] },
     ]);
   });
 
@@ -122,7 +131,7 @@ describe("RGAA test-level automation contract", () => {
     expect(pack.criteria.find((criterion) => criterion.id === "10.5")?.automation?.rules).toEqual([]);
   });
 
-  it("routes all 97 judgment criteria to the AI, including those provisionally inapplicable", () => {
+  it("routes all 92 judgment criteria to the AI, including those provisionally inapplicable", () => {
     const dir = mkdtempSync(join(tmpdir(), "u11y-rgaa-judgment-"));
     const file = join(dir, "page.html");
     writeFileSync(file, '<!doctype html><html lang="fr"><head><title>T</title></head><body><main><h1>T</h1><p>Texte</p></main></body></html>');
@@ -137,10 +146,10 @@ describe("RGAA test-level automation contract", () => {
     const items = buildAdjudicationWorklist(audit, { standard: "rgaa" });
     const worklist = new Map(items.map((item) => [item.criteriaId, item]));
     const allJudgment = pack.criteria.filter((criterion) => Object.values(criterion.automation!.tests).includes("judgment")).map((criterion) => criterion.id);
-    expect(openJudgment.length).toBeLessThan(97);
-    expect(allJudgment).toHaveLength(97);
+    expect(openJudgment.length).toBeLessThan(92);
+    expect(allJudgment).toHaveLength(92);
     expect(allJudgment.filter((id) => !worklist.has(id))).toEqual([]);
-    expect(items).toHaveLength(102);
+    expect(items).toHaveLength(99);
     for (const id of allJudgment) {
       const criterion = pack.criteria.find((row) => row.id === id)!;
       const expected = Object.entries(criterion.automation!.tests)

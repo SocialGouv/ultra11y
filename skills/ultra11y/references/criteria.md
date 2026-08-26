@@ -12,7 +12,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 1.1.1 | Non-text Content | A | judgment | img-alt-missing, canvas-fallback-missing, decorative-alt-misuse, input-image-alt-missing, object-embed-no-name, chart-no-accessible-name | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.9, 4.7, 4.8, 4.9, 6.1, 6.2, 7.2, 10.2, 13.3, 13.4, 13.5, 13.6 |
+| 1.1.1 | Non-text Content | A | judgment | img-alt-missing, canvas-fallback-missing, decorative-alt-misuse, decorative-marked-exposed, input-image-alt-missing, object-embed-no-name, chart-no-accessible-name | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.9, 4.7, 4.8, 4.9, 6.1, 6.2, 7.2, 10.2, 13.3, 13.4, 13.5, 13.6 |
 
 ## 1.2 Time-based Media
 
@@ -28,7 +28,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 1.3.1 | Info and Relationships | A | judgment | fieldset-legend-missing, data-table-no-headers, table-caption-missing, layout-table-data-markup, heading-order-skip, h1-missing, h1-multiple, list-structure, dl-structure, empty-heading, label-for-dangling, missing-main-landmark, multiple-main-landmark, sortable-header-no-aria-sort, nav-landmark-missing, nav-landmark-unnamed, aria-required-parent, headers-attr-dangling, th-no-data-cells, radio-checkbox-group-ungrouped, table-empty-data-cell, css-generated-content-informative, presentational-element, presentational-attribute, presentational-spacing | 3.1, 5.1, 5.2, 5.4, 5.5, 5.6, 5.7, 5.8, 7.3, 8.9, 9.1, 9.2, 9.3, 9.4, 10.1, 10.2, 11.1, 11.5, 11.6, 11.7, 11.8, 12.6, 13.3, 13.4 |
+| 1.3.1 | Info and Relationships | A | judgment | fieldset-legend-missing, data-table-no-headers, table-caption-missing, layout-table-data-markup, heading-order-skip, h1-missing, h1-multiple, list-structure, dl-structure, empty-heading, label-for-dangling, missing-main-landmark, multiple-main-landmark, sortable-header-no-aria-sort, nav-landmark-missing, nav-landmark-unnamed, aria-required-parent, headers-attr-dangling, th-no-data-cells, table-scope-invalid, radio-checkbox-group-ungrouped, table-empty-data-cell, css-generated-content-informative, presentational-element, presentational-attribute, presentational-spacing | 3.1, 5.1, 5.2, 5.4, 5.5, 5.6, 5.7, 5.8, 7.3, 8.9, 9.1, 9.2, 9.3, 9.4, 10.1, 10.2, 11.1, 11.5, 11.6, 11.7, 11.8, 12.6, 13.3, 13.4 |
 | 1.3.2 | Meaningful Sequence | A | judgment | — | 5.3, 8.10, 10.1, 10.3, 10.8, 13.3, 13.4 |
 | 1.3.3 | Sensory Characteristics | A | judgment | — | 10.9, 10.10 |
 | 1.3.4 | Orientation | AA | needs-rendering | rendered-orientation-lock | 13.9 |
@@ -45,7 +45,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 | 1.4.5 | Images of Text | AA | needs-rendering | — | 1.8 |
 | 1.4.10 | Reflow | AA | needs-rendering | — | 10.11 |
 | 1.4.11 | Non-text Contrast | AA | needs-rendering | rendered-nontext-contrast | 3.3 |
-| 1.4.12 | Text Spacing | AA | needs-rendering | — | 10.12 |
+| 1.4.12 | Text Spacing | AA | needs-rendering | letter-spacing-important, word-spacing-important, line-height-important | 10.12 |
 | 1.4.13 | Content on Hover or Focus | AA | needs-rendering | — | 10.13 |
 
 ## 2.1 Keyboard Accessible
@@ -97,7 +97,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 3.1.1 | Language of Page | A | static | html-lang-missing, lang-invalid | 8.3, 8.4, 13.3, 13.4 |
+| 3.1.1 | Language of Page | A | static | html-lang-missing, document-language-missing, html-lang-xml-lang-mismatch, lang-invalid | 8.3, 8.4, 13.3, 13.4 |
 | 3.1.2 | Language of Parts | AA | judgment | inline-lang-change-missing, lang-invalid | 8.7, 8.8 |
 
 ## 3.2 Predictable
@@ -125,5 +125,5 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 4.1.2 | Name, Role, Value | A | judgment | iframe-title-missing, invalid-aria-role, aria-ref-missing-id, redundant-aria, clickable-noninteractive, aria-required-children, aria-hidden-focusable, nested-interactive, invalid-aria-attr, invalid-aria-value, aria-required-attr, aria-prohibited-attr, duplicate-id, control-label-missing, placeholder-as-label, form-field-multiple-labels, select-has-option, button-empty-name, icon-only-control-unnamed, control-name-title-only, field-purpose-incomplete, disabled-context-content | 1.2, 1.3, 1.9, 2.1, 2.2, 4.13, 5.3, 7.1, 7.2, 8.2, 9.1, 10.8, 11.1, 11.9, 12.6, 13.3, 13.4 |
+| 4.1.2 | Name, Role, Value | A | judgment | iframe-title-missing, invalid-aria-role, aria-ref-missing-id, redundant-aria, clickable-noninteractive, aria-required-children, aria-hidden-focusable, nested-interactive, invalid-aria-attr, invalid-aria-value, aria-required-attr, aria-prohibited-attr, duplicate-id, duplicate-attribute, control-label-missing, placeholder-as-label, form-field-multiple-labels, select-has-option, button-empty-name, icon-only-control-unnamed, control-name-title-only, field-purpose-incomplete, disabled-context-content, presentational-children-focusable, decorative-marked-exposed, menuitem-empty-name | 1.2, 1.3, 1.9, 2.1, 2.2, 4.13, 5.3, 7.1, 7.2, 8.2, 9.1, 10.8, 11.1, 11.9, 12.6, 13.3, 13.4 |
 | 4.1.3 | Status Messages | AA | judgment | live-region-conflict, status-message-not-assertive | 7.5 |

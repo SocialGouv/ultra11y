@@ -96,9 +96,10 @@ describe("RGAA applicability — real per-element mapping holds across themes", 
   const audit = auditHtml(`<!doctype html><html><head></head><body><main><h1>H</h1><iframe src="x"></iframe></main></body></html>`);
   const rows = derivePackResults(audit, "rgaa");
 
-  it("html-lang-missing → RGAA 8.3 signal, because RGAA also permits language on every text ancestor", () => {
-    expect(statusOf(rows, "8.3")).toBe("manual");
+  it("the exhaustive page-and-text language check makes RGAA 8.3 non-conformant", () => {
+    expect(statusOf(rows, "8.3")).toBe("NC");
     expect(rows.find((row) => row.id === "8.3")?.candidateFindings?.some((finding) => finding.ruleId === "html-lang-missing")).toBe(true);
+    expect(rows.find((row) => row.id === "8.3")?.findings.some((finding) => finding.ruleId === "document-language-missing")).toBe(true);
   });
 
   it("iframe-title-missing → RGAA 2.1 (frame title) NC", () => {
@@ -419,7 +420,7 @@ describe("a criterion is closed for absence ON A PAGE, not only across the run",
   it("does not let a sibling criterion's NC keep an absent-subject criterion open", () => {
     const only = runAudit({ inputs: [noLang] });
     const rows = derivePackResults(only, "rgaa");
-    expect(statusOf(rows, "8.3"), "the missing language still needs the RGAA alternative adjudicated").toBe("manual");
+    expect(statusOf(rows, "8.3"), "neither the page nor its visible text declares a language").toBe("NC");
     expect(rows.find((row) => row.id === "8.3")?.candidateFindings?.some((finding) => finding.ruleId === "html-lang-missing")).toBe(true);
     const c84 = rows.find((r) => r.id === "8.4");
     expect(c84?.status, "8.4 has no language code to judge on a page that declares none").toBe("C");

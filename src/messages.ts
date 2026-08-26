@@ -23,6 +23,86 @@ interface MsgEntry {
 }
 
 export const MSG_CATALOG: Record<string, MsgEntry> = {
+  "document-language-missing": {
+    message: {
+      fr: () => `La page n'a pas de langue par défaut sur <html> et au moins un texte visible n'hérite d'aucun attribut lang/xml:lang.`,
+      en: () => `The page has no default language on <html>, and at least one visible text node inherits no lang/xml:lang attribute.`,
+    },
+    remediation: {
+      fr: () => `Déclarez lang sur <html>, ou sur chaque texte (ou l'un de ses ancêtres) conformément au test RGAA 8.3.1.`,
+      en: () => `Declare lang on <html>, or on every text node (or one of its ancestors) as allowed by RGAA test 8.3.1.`,
+    },
+  },
+  "html-lang-xml-lang-mismatch": {
+    message: {
+      fr: (p) => `lang="${p.lang}" et xml:lang="${p.xmlLang}" se contredisent sur <html>.`,
+      en: (p) => `lang="${p.lang}" and xml:lang="${p.xmlLang}" conflict on <html>.`,
+    },
+    remediation: {
+      fr: () => `Utilisez le même code de langue valide et pertinent dans les deux attributs, ou conservez seulement lang en HTML5.`,
+      en: () => `Use the same valid and relevant language tag in both attributes, or keep only lang in HTML5.`,
+    },
+  },
+  "duplicate-attribute": {
+    message: {
+      fr: (p) => `L'attribut ${p.attr} est déclaré plusieurs fois sur la même balise — le code généré est invalide.`,
+      en: (p) => `The ${p.attr} attribute is declared more than once on the same tag — the generated markup is invalid.`,
+    },
+    remediation: {
+      fr: (p) => `Conservez une seule déclaration de ${p.attr}.`,
+      en: (p) => `Keep a single ${p.attr} declaration.`,
+    },
+  },
+  "presentational-children-focusable": {
+    message: {
+      fr: (p) => `Un descendant focalisable est placé dans role="${p.role}", dont les enfants sont présentatifs — l'arbre d'accessibilité est contradictoire.`,
+      en: (p) => `A focusable descendant sits inside role="${p.role}", whose children are presentational — the accessibility tree conflicts.`,
+    },
+    remediation: {
+      fr: () => `Placez l'élément interactif hors du composant, ou implémentez l'interaction sur le composant ARIA lui-même.`,
+      en: () => `Move the interactive element outside the component, or implement the interaction on the ARIA component itself.`,
+    },
+  },
+  "decorative-marked-exposed": {
+    message: {
+      fr: (p) => `Ce <${p.tag}> est explicitement décoratif mais reste exposé par son nom ou sa présence dans l'ordre de tabulation.`,
+      en: (p) => `This <${p.tag}> is explicitly decorative but remains exposed by its name or sequential focusability.`,
+    },
+    remediation: {
+      fr: () => `Retirez le nom et la focalisation de l'élément décoratif, ou retirez son marquage décoratif s'il porte réellement une fonction.`,
+      en: () => `Remove the decorative element's name and focusability, or remove the decorative marking if it actually has a function.`,
+    },
+  },
+  "menuitem-empty-name": {
+    message: {
+      fr: () => `Cet élément de menu n'a aucun nom accessible.`,
+      en: () => `This menu item has no accessible name.`,
+    },
+    remediation: {
+      fr: () => `Fournissez un texte visible ou un nom accessible pertinent à l'élément de menu.`,
+      en: () => `Give the menu item visible text or a relevant accessible name.`,
+    },
+  },
+  "text-spacing-important": {
+    message: {
+      fr: (p) => `${p.property}: ${p.value} !important empêche l'espacement RGAA requis (minimum ${p.minimum}).`,
+      en: (p) => `${p.property}: ${p.value} !important prevents the required RGAA spacing override (minimum ${p.minimum}).`,
+    },
+    remediation: {
+      fr: (p) => `Retirez !important de ${p.property}, ou utilisez une valeur au moins égale au seuil requis.`,
+      en: (p) => `Remove !important from ${p.property}, or use a value at least equal to the required threshold.`,
+    },
+  },
+  "table-scope-invalid": {
+    message: {
+      fr: (p) => `scope="${p.scope}" n'est pas une valeur d'association d'en-tête valide.`,
+      en: (p) => `scope="${p.scope}" is not a valid header-association value.`,
+    },
+    remediation: {
+      fr: () => `Utilisez scope="row", "col", "rowgroup" ou "colgroup" selon la portée réelle de l'en-tête.`,
+      en: () => `Use scope="row", "col", "rowgroup", or "colgroup" according to the header's actual reach.`,
+    },
+  },
   // ---- Theme 1 — Images (src/rules/images.ts) ---------------------------------
   "img-alt-missing": {
     message: {
