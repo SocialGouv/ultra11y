@@ -35,6 +35,16 @@ describe("RGAA test-level automation contract", () => {
     }
   });
 
+  it("keeps the public README aligned with the generated automation contract", () => {
+    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+    expect(readme).toContain("17 `static` tests across 13 criteria");
+    expect(readme).toContain("3 `rendered` tests across 3 criteria");
+    expect(readme).toContain("15 distinct criteria that can produce a deterministic `NC`");
+    expect(readme).toContain("49 criteria receive a normative engine signal");
+    expect(readme).toContain("238 `judgment` tests across 97 criteria");
+    expect(readme).toContain("104 of 106 criteria require adjudication to earn `C`");
+  });
+
   it("allows C by silence only on the explicit, fully covered allowlist", () => {
     expect(
       pack.criteria

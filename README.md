@@ -314,6 +314,41 @@ where a reader goes looking for it.
 others are welcome — adding a country is a single PR (pack JSON + one registration line +
 a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/references/standards.md`.
 
+### What RGAA automation actually covers
+
+The engine's 81 rules are not 81 RGAA criteria: several rules can evidence the same official
+test, and a rule can detect a useful symptom without exhausting the criterion's alternatives,
+exceptions or relevance checks. The generated contract classifies all **258 official RGAA
+tests**:
+
+- **17 `static` tests across 13 criteria:** `1.1`, `2.1`, `6.2`, `8.2`, `8.4`, `8.5`,
+  `8.10`, `9.3`, `10.1`, `11.1`, `11.6`, `11.8`, `11.9`.
+- **3 `rendered` tests across 3 criteria:** `1.1`, `8.1`, `10.7`.
+- Those two tiers cover **15 distinct criteria that can produce a deterministic `NC`**;
+  `1.1` belongs to both.
+- **49 criteria receive a normative engine signal:** 15 have at least one decisive rule and
+  41 receive candidate evidence, with overlap. One additional criterion receives only an
+  advisory signal. A candidate is forwarded to adjudication and never changes a verdict by
+  itself.
+- Only **8.5 and 10.1** may earn `C` from a complete silent measurement. For the other
+  mechanically detectable tests, silence can mean “no subject found” or “an alternative or
+  exception still needs judging”, so it cannot prove conformity.
+- The remaining **238 `judgment` tests across 97 criteria** all enter the AI worklist,
+  including an apparently absent subject whose `NA` still needs confirmation. Overall,
+  **104 of 106 criteria require adjudication to earn `C`**.
+
+The number can grow, but the useful target is **more observed, exact failures**, not a larger
+marketing count. The best next candidates are complete rendered probes for language ancestry
+(8.3), zoom/reflow/text spacing/hover content (10.4, 10.11, 10.12, 10.13), and contrast,
+link distinction or orientation checks (3.2, 3.3, 10.6, 13.9) that first rule out every
+official alternative and particular case. The 13 declared ACT gaps are another implementation
+queue, although adding one does not necessarily cover a new RGAA criterion. A candidate is
+promoted only when a narrower rule demonstrably exhausts its cited official test; the two
+`C`-by-silence criteria stay unchanged until an equally complete proof exists.
+
+The generated [106-criterion / 258-test matrix](skills/ultra11y/references/rgaa-automation.md)
+is the source of truth; CI rebuilds it from the vendored DINUM data and rejects drift.
+
 ### Scale, fixes, and repo automation
 
 - **Scale** — the engine streams file-by-file (bounded memory), audits **only markup**,
@@ -372,8 +407,8 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   Each can say *"I don't know"*: an unresolvable backdrop, a varied region, a cross-origin
   stylesheet, a `box-shadow` that might be the boundary — all leave the criterion undecided
   rather than guessed, and without signals the rules do not fire, so no pre-existing verdict
-  changes. `tests/rgaa-coverage.test.ts` ratchets the result: **51 of 106** RGAA criteria now
-  map onto an engine rule, up from 43, and the number can only go up.
+  changes. `tests/rgaa-coverage.test.ts` pins a floor of **50 of 106** RGAA criteria mapped
+  onto an engine rule, up from 43 before this tier; silently losing one fails CI.
 - **Every scanned page is a snapshot** — `scan` no longer keeps only findings: each page it
   visits is persisted to `.ultra11y/pages/<id>/` (`--no-snapshot` opts out). That is what turns
   a URL into a real per-page verdict — a page known only by its URL can never be conforming by
