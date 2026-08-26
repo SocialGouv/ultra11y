@@ -622,10 +622,10 @@ describe("the adjudication tier", () => {
     const dir = mkdtempSync(join(tmpdir(), "u11y-agent-operation-"));
     const executionFile = join(dir, "execution.jsonl");
     const output = join(dir, "output");
-    const run = (isError: boolean) => {
+    const run = (isError: boolean, permissionDenials: unknown[] = [], permissionDenialsCount?: number) => {
       writeFileSync(
         executionFile,
-        `${JSON.stringify({ subtype: "init" })}\n${JSON.stringify({ type: "result", subtype: "success", is_error: isError, num_turns: 1 })}\n`,
+        `${JSON.stringify({ subtype: "init" })}\n${JSON.stringify({ type: "result", subtype: "success", is_error: isError, num_turns: 1, permission_denials: permissionDenials, ...(permissionDenialsCount === undefined ? {} : { permission_denials_count: permissionDenialsCount }) })}\n`,
       );
       writeFileSync(output, "");
       const result = spawnSync("bash", ["-c", operationalGate.run ?? ""], {
@@ -638,6 +638,11 @@ describe("the adjudication tier", () => {
 
     expect(run(true)).toContain("ok=false");
     expect(run(false)).toContain("ok=true");
+    // A green wrapper can still mean Claude was unable to perform the adjudication. This is
+    // the exact envelope captured from keyed run 32961042681: the action reported success,
+    // but thirteen denied tool calls left every one of the 91 verdicts untouched.
+    expect(run(false, [{ tool: "Write" }])).toContain("ok=false");
+    expect(run(false, [], 13)).toContain("ok=false");
 
     writeFileSync(output, "");
     const blank = spawnSync("bash", ["-c", operationalGate.run ?? ""], {
@@ -664,13 +669,14 @@ describe("the adjudication tier", () => {
     }
   });
 
-  // THE CLI RUNNER — the same tier without GitHub in it. Opt-in, so an existing consumer
-  // gets exactly what it got before: `adjudicate-runner` defaults to `action`.
+  // THE CLI RUNNER — the same tier without GitHub in it. It is the production default: the
+  // historical action runner needs the model to edit one large JSON file, while this path
+  // returns structured verdicts on stdout and leaves the audited tree read-only.
   describe("the engine-driven CLI runner", () => {
     const cli = () => ACTION.runs.steps.find((s) => s.id === "clirunner");
 
-    it("is opt-in — the default is still claude-code-action", () => {
-      expect(ACTION.inputs["adjudicate-runner"]?.default).toBe("action");
+    it("is the default while retaining worklist batches for compatibility", () => {
+      expect(ACTION.inputs["adjudicate-runner"]?.default).toBe("cli");
       expect(ACTION.inputs["adjudicate-grain"]?.default).toBe("worklist");
     });
 
@@ -690,6 +696,15 @@ describe("the adjudication tier", () => {
       expect(run).toContain("--runner cli");
       expect(run).toContain("--apply");
       expect(run).toContain("--ledger");
+    });
+
+    it("makes an entirely non-operational CLI tier fail at the final gate", () => {
+      const run = String(cli()?.run ?? "");
+      expect(run).toContain('echo "operational=false" >> "$GITHUB_OUTPUT"');
+      expect(run).toContain('echo "operational=true" >> "$GITHUB_OUTPUT"');
+      const finalGate = ACTION.runs.steps.find((step) => step.name === "Gate")!;
+      expect(finalGate.if).toContain("steps.clirunner.outputs.operational == 'false'");
+      expect(finalGate.run).toContain("every attempted Claude CLI adjudication pass failed operationally");
     });
 
     // `--max-turns` is not a flag of the Claude Code CLI, and the CLI swallows unknown flags
@@ -796,11 +811,12 @@ describe("the adjudication tier", () => {
   });
 
   // claude-code-action parses the event context before it reads the prompt and throws on
-  // anything outside its list. `push` is the one that matters: it is what an accessibility
-  // gate runs on, so an unguarded tier turns a green job into a build failure that says
-  // nothing about accessibility.
-  it("skips the agent on an event claude-code-action rejects, instead of failing the job", () => {
+  // anything outside its list. The default CLI runner is a local process and must bypass
+  // that GitHub-only restriction — `push` is the event an accessibility gate needs.
+  it("applies the event allowlist only to the historical action runner", () => {
     const resolve = ACTION.runs.steps.find((s) => s.id === "adjudication");
+    expect(resolve?.env?.RUNNER).toContain("inputs.adjudicate-runner");
+    expect(resolve?.run).toContain("if [ \"$RUNNER\" = 'cli' ]");
     expect(resolve?.run).toContain("github.event_name");
     for (const supported of ["pull_request", "workflow_dispatch", "schedule", "workflow_run", "repository_dispatch"]) {
       expect(resolve?.run, `event ${supported} is not accepted`).toContain(supported);
@@ -1410,6 +1426,11 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
 
     const after = job().steps.find((s) => s.name === "Measure and gate AFTER refutation");
     expect(String(after?.run)).toContain('if [ "$REQUIRE_DECIDED" != "false" ]');
+  });
+
+  it("defaults the keyed full audit to the read-only per-criterion runner shared with GitLab", () => {
+    expect(WF.on?.workflow_dispatch?.inputs?.runner?.default).toBe("cli");
+    expect(WF.on?.workflow_dispatch?.inputs?.grain?.default).toBe("criterion");
   });
 
   it("uploads the audit produced by the trial, not only the pre-refutation action artifact", () => {

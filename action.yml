@@ -168,13 +168,13 @@ inputs:
     required: false
     default: ''
   adjudicate:
-    description: 'Rule on the judgment criteria the static engine cannot decide (alt relevance, link purpose in context, reading order): `api` sends the worklist to the Anthropic API in batches, `agent` hands it to a Claude Code run, `none` (default) leaves them « to assess ». Both modes read their credential from the JOB environment, never from an input, and skip themselves when it is absent — which is what makes them harmless on a fork pull request. `api` needs ANTHROPIC_API_KEY (the Messages API takes nothing else); `agent` accepts ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN, the token a Pro/Max subscriber mints with `claude setup-token`. `agent` also skips itself on an event claude-code-action does not support — `push` above all. Pair it with `ledger` so each run records what it paid for.'
+    description: 'Rule on the judgment criteria the static engine cannot decide (alt relevance, link purpose in context, reading order): `api` sends the worklist to the Anthropic API in batches, `agent` hands it to Claude Code, `none` (default) leaves them « to assess ». Both modes read their credential from the JOB environment, never from an input, and skip themselves when it is absent — which is what makes them harmless on a fork pull request. `api` needs ANTHROPIC_API_KEY (the Messages API takes nothing else); `agent` accepts ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN, the token a Pro/Max subscriber mints with `claude setup-token`. The default CLI runner works on every event; only the historical action runner skips events claude-code-action does not support. Pair the tier with `ledger` so each run records what it paid for.'
     required: false
     default: 'none'
   adjudicate-runner:
-    description: "WHO drives the agent tier. `action` (default) is the three `anthropics/claude-code-action` steps below — unchanged, and still what an existing consumer gets. `cli` has the ENGINE spawn a headless `claude -p` per batch and fold the verdicts itself, which is the same tier reachable from anywhere a shell is: this action, a GitLab CI, a cron, a laptop. It also lifts the event restriction — claude-code-action parses the event context before it reads the prompt and refuses what it does not know, `push` above all, which is the event an accessibility gate actually fires on. The CLI is installed into a scratch prefix by the step, never into your tree; the engine itself still installs nothing."
+    description: "WHO drives the agent tier. `cli` (default) has the ENGINE spawn a headless, read-only `claude -p` per batch and fold structured verdicts itself. It is the production path shared by GitHub, GitLab, cron and laptops, and it works on `push`. `action` keeps the historical three `anthropics/claude-code-action` passes for compatibility and transport comparisons; it requires the model to edit a verdict file and only supports the event types that upstream action parses. The CLI is installed into a scratch prefix, never into the audited tree."
     required: false
-    default: "action"
+    default: "cli"
   adjudicate-grain:
     description: "How much the model is asked to rule on at once. `worklist` (default) sends batches of 8 criteria; `criterion` sends one. One call per criterion costs more calls and buys two things: the model sees one criterion's evidence instead of eight competing for its attention, and a run that stops early loses at most ONE criterion instead of everything it had already ruled on. Needs `adjudicate-runner: cli` on the agent tier — a composite action cannot loop over a `uses:` step, so the claude-code-action passes are unrolled by hand and there is no syntax that repeats one per criterion."
     required: false
@@ -329,7 +329,7 @@ runs:
         case "${ADJUDICATE_RUNNER:-}" in
           action|cli|'') ;;
           *)
-            echo "::error::ultra11y: adjudicate-runner='${ADJUDICATE_RUNNER}' is not a runner — expected 'action' (claude-code-action, the default) or 'cli' (the engine spawns a headless Claude Code process)."
+            echo "::error::ultra11y: adjudicate-runner='${ADJUDICATE_RUNNER}' is not a runner — expected 'cli' (the default, headless read-only Claude Code) or 'action' (the historical claude-code-action transport)."
             exit 1
             ;;
         esac
@@ -613,6 +613,7 @@ runs:
       # the environment it is only ever data. Same reason `runtime` and `storage-state` do it.
       env:
         MODE: ${{ inputs.adjudicate }}
+        RUNNER: ${{ inputs.adjudicate-runner }}
       run: |
         mode="$MODE"
         event='${{ github.event_name }}'
@@ -646,6 +647,14 @@ runs:
         if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
           echo "on=false" >> "$GITHUB_OUTPUT"
           echo "::warning::ultra11y: adjudicate=agent but neither ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN is in the job environment — the judgment criteria stay to assess. Secrets are not exposed to a fork's pull request, so this is the expected path there."
+          exit 0
+        fi
+
+        # The engine-driven runner is a local process. It has no GitHub event parser, so it
+        # works on push, merge queues and every other event a shell step can reach. Only the
+        # historical claude-code-action transport needs the allowlist below.
+        if [ "$RUNNER" = 'cli' ]; then
+          echo "on=true" >> "$GITHUB_OUTPUT"
           exit 0
         fi
 
@@ -745,6 +754,7 @@ runs:
         prefix="$RUNNER_TEMP/a11y-adjudicator"
         mkdir -p "$prefix"
         if ! npm i --no-save --prefix "$prefix" "@anthropic-ai/claude-code@2" >/dev/null 2>&1; then
+          echo "operational=false" >> "$GITHUB_OUTPUT"
           echo "::warning::ultra11y: the Claude Code CLI could not be installed — the judgment criteria stay to assess."
           exit 0
         fi
@@ -787,6 +797,11 @@ runs:
             echo "ultra11y: CLI adjudication pass $i did not apply cleanly."
           fi
         done
+        if [ "$ok" = '0' ]; then
+          echo "operational=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "operational=false" >> "$GITHUB_OUTPUT"
+        fi
         # Same policy as every other fold in this file: an adjudication that fails costs the
         # verdicts, never the audit that was already produced above.
         if [ "$ok" = '0' ]; then
@@ -1424,7 +1439,11 @@ runs:
         };
         for (const record of records) visit(record);
         const result = seen.at(-1);
-        process.exit(result && result.is_error !== true ? 0 : 1);
+        const denied = Math.max(
+          Array.isArray(result?.permission_denials) ? result.permission_denials.length : 0,
+          Number(result?.permission_denials_count ?? 0),
+        );
+        process.exit(result && result.is_error !== true && denied === 0 ? 0 : 1);
         NODE
           then
             succeeded=$((succeeded + 1))
@@ -1783,7 +1802,7 @@ runs:
 
     # The gate runs LAST, so a failing audit has already produced every surface above.
     - name: Gate
-      if: inputs.fail-on != '' || inputs.require-decided == 'true' || inputs.require-decided == 'pages' || inputs.require-sample == 'true' || inputs.require-rendered == 'true' || steps.agentoperational.outputs.ok == 'false'
+      if: inputs.fail-on != '' || inputs.require-decided == 'true' || inputs.require-decided == 'pages' || inputs.require-sample == 'true' || inputs.require-rendered == 'true' || steps.agentoperational.outputs.ok == 'false' || steps.clirunner.outputs.operational == 'false'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1791,6 +1810,10 @@ runs:
       run: |
         if [ '${{ steps.agentoperational.outputs.ok }}' = 'false' ]; then
           echo "::error::ultra11y: every attempted Claude Code adjudication pass failed operationally. The model did not adjudicate this audit."
+          exit 1
+        fi
+        if [ '${{ steps.clirunner.outputs.operational }}' = 'false' ]; then
+          echo "::error::ultra11y: every attempted Claude CLI adjudication pass failed operationally. The model did not adjudicate this audit."
           exit 1
         fi
         # COMPLETENESS first, and on its own: a project may want a complete grid without

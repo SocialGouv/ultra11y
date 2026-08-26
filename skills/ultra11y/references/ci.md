@@ -132,7 +132,7 @@ steps:
 | input | default | |
 |---|---|---|
 | `adjudicate` | `none` | `api` · `agent` · `none` |
-| `adjudicate-runner` | `action` | WHO drives the agent tier: `action` (claude-code-action) or `cli` (the engine spawns `claude -p`) |
+| `adjudicate-runner` | `cli` | WHO drives the agent tier: `cli` (read-only `claude -p`, shared with GitLab) or the historical `action` transport (claude-code-action) |
 | `adjudicate-grain` | `worklist` | how much the model rules on at once: `worklist` (batches of 8) or `criterion` (one call each). Needs `adjudicate-runner: cli` |
 | `adjudicate-budget-usd` | *(empty)* | dollar ceiling per `cli` invocation |
 | `adjudicate-model` | *(empty)* | model id for `api`; else `$ULTRA11Y_LLM_MODEL`, else the engine default |

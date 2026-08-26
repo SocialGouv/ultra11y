@@ -100,15 +100,15 @@ on:
         options: [agent, api, both]
         default: agent
       runner:
-        description: "WHO drives the agent tier. `action` is the three claude-code-action passes. `cli` has the engine spawn a headless `claude -p` — the same tier, reachable from a GitLab CI or a laptop, and the only one that works on `push`. This is the input that makes this workflow a comparison between the two rather than a measurement of one."
+        description: "WHO drives the agent tier. `cli` (default) has the engine spawn a headless, read-only `claude -p` and fold structured verdicts itself; it is the production path shared with GitLab. `action` keeps the historical three claude-code-action passes for transport comparisons, but it needs a writable verdict file and is less reliable on a large grid."
         type: choice
         options: [action, cli]
-        default: action
+        default: cli
       grain:
-        description: "How much the model rules on at once. `criterion` sends one criterion per call: more calls, and a run that stops early loses at most ONE criterion instead of everything it had already ruled on. Needs `runner: cli` — a composite action cannot loop over a `uses:` step, and the action refuses the combination rather than ignoring it."
+        description: "How much the model rules on at once. `criterion` (default) sends one criterion per call: more calls, but each of the 106 RGAA criteria is handled independently and a stopped run loses at most one verdict. Needs `runner: cli`; select `worklist` when explicitly testing the historical action runner."
         type: choice
         options: [worklist, criterion]
-        default: worklist
+        default: criterion
       ledger:
         description: "Whether the committed verdict ledger may answer first. `true` is the production shape and makes a paid pass cover only what the ledger did not. SET IT FALSE TO MEASURE ANYTHING: with a current ledger the replay decides all 106 criteria before the model is invoked, the worklist reaches it empty, and the run comes back green having adjudicated nothing — which is exactly what run 32706213834 did, in 7 minutes, reporting « 0 criterion(ia) adjudicated »."
         type: choice
