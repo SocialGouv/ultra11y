@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.37.0](https://github.com/maxgfr/ultra11y/compare/v5.36.3...v5.37.0) (2026-08-26)
+
+
+### Features
+
+* **ci:** add deterministic RGAA pull request lane ([e138cde](https://github.com/maxgfr/ultra11y/commit/e138cdece2ab5f765d29f3a2e777d8be21f87081))
+
 ## [5.36.3](https://github.com/maxgfr/ultra11y/compare/v5.36.2...v5.36.3) (2026-08-26)
 
 
