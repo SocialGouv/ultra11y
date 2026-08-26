@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.37.1](https://github.com/maxgfr/ultra11y/compare/v5.37.0...v5.37.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* **rgaa:** keep judgment applicability open in reports ([8c2f105](https://github.com/maxgfr/ultra11y/commit/8c2f105d67555209d35d618b08c562ada782e297))
+
 # [5.37.0](https://github.com/maxgfr/ultra11y/compare/v5.36.3...v5.37.0) (2026-08-26)
 
 
