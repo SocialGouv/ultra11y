@@ -40,12 +40,16 @@ const file = (items: AdjudicationItem[]): AdjudicationFile => ({
 /** Rule ONE criterion, leaving every other item out of the file entirely — which is exactly
  *  what a re-derived worklist looks like on a later pass. */
 function rule(audit: AuditResult, criteriaId: string): AuditResult {
-  const src = buildAdjudicationWorklist(audit, { standard: "rgaa" }).find((i) => i.criteriaId === criteriaId);
+  const worklist = buildAdjudicationWorklist(audit, { standard: "rgaa" });
+  const src = worklist.find((i) => i.criteriaId === criteriaId);
   if (!src) throw new Error(`${criteriaId} is not open`);
   const item: AdjudicationItem = src.evidence.length
     ? { ...src, verdict: "C", justification: "vérifié sur la page", citations: [src.evidence[0]!] }
     : { ...src, verdict: "NA", justification: "aucun élément concerné dans le périmètre" };
-  const r = applyAdjudication(audit, file([item]), { cwd: dir });
+  const residualReasons = Object.fromEntries(
+    worklist.filter((candidate) => candidate.criteriaId !== criteriaId).map((candidate) => [candidate.criteriaId, "later pass"]),
+  );
+  const r = applyAdjudication(audit, file([item]), { cwd: dir, residualReasons });
   expect(
     r.issues.filter((x) => x.includes(criteriaId)),
     r.issues.join("\n"),

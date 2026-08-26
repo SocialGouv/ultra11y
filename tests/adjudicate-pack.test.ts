@@ -70,13 +70,18 @@ describe("the worklist is keyed by the standard actually in play", () => {
     for (const id of ids) expect(id).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
-  it("covers exactly the pack criteria that derive `manual` — no more, no less", () => {
-    const manual = new Set(
+  it("covers every manual row and every provisionally-inapplicable judgment row", () => {
+    const pack = loadPack("rgaa");
+    const expected = new Set(
       derivePackResults(audit(), "rgaa")
-        .filter((c) => c.status === "manual")
-        .map((c) => c.id),
+        .filter((row) => {
+          if (row.status === "manual") return true;
+          const criterion = getCriterion(pack, row.id);
+          return row.inapplicable === true && Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
+        })
+        .map((row) => row.id),
     );
-    expect(new Set(rgaaItems().map((i) => i.criteriaId))).toEqual(manual);
+    expect(new Set(rgaaItems().map((i) => i.criteriaId))).toEqual(expected);
   });
 
   it("titles each item with the RGAA criterion, not the WCAG one", () => {

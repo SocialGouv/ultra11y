@@ -400,12 +400,25 @@ function subjectsForPackCriterion(standard: StandardId, id: string, scs: string[
   return out;
 }
 
+/** Whether a pack result still needs an agent ruling.
+ *
+ *  Manual rows are the ordinary residual set. A judgment criterion provisionally closed as
+ *  inapplicable is included as well: absence of a harvested subject is useful deterministic
+ *  evidence, but a FULL audit still asks the agent to confirm that absence and the criterion's
+ *  particular cases. A prior agent decision is never reopened. */
+function packResultNeedsAdjudication(pc: ReturnType<typeof derivePackResults>[number], criterion?: PackCriterion): boolean {
+  if (pc.status === "manual") return true;
+  const hasJudgmentTest = Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
+  return pc.status === INAPPLICABLE_STATUS && pc.inapplicable === true && pc.decidedBy !== "agent" && hasJudgmentTest;
+}
+
 /** Build the adjudication worklist.
  *
  *  For the WCAG core: one item per residual-risk (manual) success criterion.
  *
- *  For a COUNTRY STANDARD: one item per PACK criterion that derives `manual` — which is where
- *  almost the whole standard lives (97 of RGAA's 106 criteria carry judgment tests).
+ *  For a COUNTRY STANDARD: one item per PACK criterion that derives `manual`, plus every
+ *  judgment criterion provisionally closed for absence — 97 of RGAA's 106 criteria carry
+ *  judgment tests, and all 97 pass through the agent unless already decided or definitively NC.
  *  Keying by the pack's own criteria is not cosmetic: it is what lets an item carry the
  *  criterion's numbered tests, and therefore what lets `normativeRefResolves` check a citation
  *  against THIS criterion's tests instead of accepting any id of the right shape. */
@@ -417,7 +430,7 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
   if (standard !== undefined && !isCore(standard)) {
     const pack = loadPack(standard);
     return derivePackResults(audit, standard)
-      .filter((pc) => pc.status === "manual")
+      .filter((pc) => packResultNeedsAdjudication(pc, getCriterion(pack, pc.id)))
       .map((pc) => {
         const crit = getCriterion(pack, pc.id);
         const scs = crit?.wcag ?? pc.scs;
@@ -816,13 +829,13 @@ export function applyAdjudication(
   const byId = new Map(adj.items.map((it) => [it.criteriaId, it]));
 
   // Coverage. Under the core that means every residual success criterion; under a pack it
-  // means every pack criterion that derives `manual` — the pack's own granularity, which is
-  // what the worklist was built at.
+  // mirrors `buildAdjudicationWorklist`, including provisionally-inapplicable judgment rows.
   const packMode = !isCore(adj.standard);
   const open = new Set<string>();
   if (packMode) {
+    const pack = loadPack(adj.standard);
     for (const pc of derivePackResults(audit, adj.standard)) {
-      if (pc.status !== "manual") continue;
+      if (!packResultNeedsAdjudication(pc, getCriterion(pack, pc.id))) continue;
       open.add(pc.id);
       if (byId.has(pc.id)) continue;
       if (Object.hasOwn(expected, pc.id)) uncovered(pc.id);

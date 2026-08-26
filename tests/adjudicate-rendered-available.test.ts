@@ -90,7 +90,7 @@ describe("the worklist says when NOTHING was rendered", () => {
     const { audit, items } = worklistFor(sourceOnly());
     const open = unrenderedResidual(audit, items);
     expect(open.length).toBeGreaterThan(0);
-    expect(open).toEqual(["8.1", "10.7"]);
+    expect(open).toEqual(["1.1", "8.1", "10.7"]);
   });
 
   it("says nothing once a page's real DOM has been read", () => {

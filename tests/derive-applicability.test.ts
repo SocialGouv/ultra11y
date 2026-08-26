@@ -70,16 +70,9 @@ describe("RGAA applicability — an image-alt NC no longer over-projects", () =>
       expect(statusOf(rows, id), `RGAA ${id} must never be C`).not.toBe("C");
       expect(rows.find((r) => r.id === id)?.inapplicable, `RGAA ${id} has a subject here`).toBeUndefined();
     }
-    // …and it does not bite where there is no subject at all — where the honest answer is
-    // « nothing of that kind here », which reads `C` and carries `inapplicable`. 4.10 asks
-    // whether automatically triggered SOUND is controllable and this page has no media; 13.3
-    // and 13.4 ask about downloadable documents and this page links to none. Reopening any of
-    // them would print a row of work that does not exist.
-    //
-    // 13.3/13.4 reach that answer only since absence is asked BEFORE a mapped SC's NC is
-    // inherited: both map onto 1.1.1, which IS non-conforming here (the alt-less image), and
-    // that sibling failure used to short-circuit them to « à évaluer » on every page with an
-    // unrelated image defect — permanently, since both are `judgment`.
+    // …and it does not bite where there is no subject at all — where the report can honestly
+    // say « nothing of that kind here ». The adjudication worklist still includes judgment
+    // criteria in this state so the agent confirms the absence before a full verdict.
     for (const id of ["4.10", "13.3", "13.4"]) {
       expect(statusOf(rows, id), `RGAA ${id} has no subject here and must read C`).toBe("C");
       expect(rows.find((r) => r.id === id)?.inapplicable, `RGAA ${id} must say it is C for want of a subject`).toBe(true);
@@ -424,13 +417,6 @@ describe("a criterion is closed for absence ON A PAGE, not only across the run",
   });
 
   it("does not let a sibling criterion's NC keep an absent-subject criterion open", () => {
-    // THE BRANCH THIS FIXES. `sans.html` declares no language, so WCAG 3.1.1 is non-conforming
-    // there — because RGAA 8.3 failed, not 8.4. 8.4 asks « pour chaque page AYANT une langue
-    // par défaut, le code est-il pertinent ? » and its subject, `declaredLang`, is not there.
-    //
-    // Inheriting 3.1.1's NC read that as "assess this separately", which is the right answer
-    // for a criterion whose subject exists and nobody has ruled on, and a permanent open for
-    // one with nothing to assess: 8.4 is `judgment`, so silence never closes it either.
     const only = runAudit({ inputs: [noLang] });
     const rows = derivePackResults(only, "rgaa");
     expect(statusOf(rows, "8.3"), "the missing language still needs the RGAA alternative adjudicated").toBe("manual");

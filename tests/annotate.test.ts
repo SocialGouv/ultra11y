@@ -177,7 +177,9 @@ describe("job summary", () => {
     expect(comment).not.toMatch(/4 constat\(s\).*aucune page/);
     expect(comment).toContain("0 page rendue : aucun test rendered n'a été exécuté");
     expect(comment).toContain("17 test(s) static — critères :");
-    expect(comment).toContain("238 test(s) judgment sur 97 critère(s)");
+    expect(comment).toContain("238 test(s) judgment sur 97 critère(s), tous transmis à l'IA");
+    expect(comment).not.toContain("Grille exhaustive des critères");
+    expect(comment).not.toContain("Synthèse par thématique");
   });
 
   it("says so plainly when nothing was found", () => {
@@ -256,16 +258,12 @@ describe("the pull-request digest", () => {
     expect(md).not.toContain("80 %");
   });
 
-  it("carries the report's own sections, so the comment and the artifact are one document", () => {
-    // It used to be a document of its own — a digest written separately from the audit it
-    // summarised. Two documents about one run drift, and a reviewer who opens the artifact
-    // after reading the comment should recognise what they are looking at.
+  it("keeps the exhaustive grid in the artifact and carries only the actionable digest", () => {
     const many = Array.from({ length: 25 }, (_, i) => F({ selectorHint: `sel-${i}`, file: `p${i}.html` }));
     const md = prComment(audit(many, decided()), { lang: "en" });
-    expect(md).toMatch(/^## 1\. /m);
-    expect(md).toMatch(/^## 2\. /m);
-    // …and it is still the comment: the verdict and the rate lead, before any section.
-    expect(md.indexOf("automatic pass rate")).toBeLessThan(md.indexOf("## 1."));
+    expect(md).not.toMatch(/^## 1\. /m);
+    expect(md).not.toContain("Exhaustive criterion grid");
+    expect(md).toContain("distinct defect(s)");
   });
 
   it("links the run and names the artifact only when the caller says one exists", () => {
@@ -291,9 +289,7 @@ describe("the pull-request digest", () => {
   it("stays under GitHub's 65 536-character body limit, and says what it dropped", () => {
     const md = prComment(audit(pathological(), decided()), { lang: "en", runUrl: "https://gh/run/1" });
     expect(md.length).toBeLessThanOrEqual(65_536);
-    // Whole sections, named — never a byte slice. A reader can go and find each one in the
-    // artifact, which is the difference between a shorter document and a mutilated one.
-    expect(md).toMatch(/dropped from this comment to fit GitHub's (?:64 KiB )?limit/);
+    expect(md).toMatch(/dropped from this comment to fit GitHub's limit/);
     // Whatever was dropped, the verdict and the way out survive.
     expect(md).toContain("🔴");
     expect(md).toContain("https://gh/run/1");

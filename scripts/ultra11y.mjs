@@ -58261,41 +58261,6 @@ function exhaustiveGrid(groups, standard, lang) {
   out2.push("");
   return out2;
 }
-function splitReportSections(md) {
-  const lines = md.split("\n");
-  const preamble = [];
-  const sections = [];
-  let current = null;
-  let fence = null;
-  const push = (l) => {
-    if (current) current.push(l);
-    else preamble.push(l);
-  };
-  for (const line of lines) {
-    const f = /^\s*(```+|~~~+)/.exec(line);
-    if (f) {
-      const mark = f[1];
-      if (fence === null) fence = mark[0].repeat(mark.length);
-      else if (mark.startsWith(fence[0]) && mark.length >= fence.length) fence = null;
-      push(line);
-      continue;
-    }
-    if (fence === null && line.startsWith("## ")) {
-      current = [line];
-      const own = current;
-      sections.push({
-        heading: line,
-        lines: own,
-        get text() {
-          return own.join("\n");
-        }
-      });
-      continue;
-    }
-    push(line);
-  }
-  return { preamble, sections };
-}
 function renderPageRates(r, pages, standard, lang) {
   if (!pages.length) return [];
   const s = L5[lang];
@@ -61363,13 +61328,18 @@ function subjectsForPackCriterion2(standard, id, scs) {
   for (const sc of scs) for (const subject of subjectsForSc2(sc)) if (!out2.includes(subject)) out2.push(subject);
   return out2;
 }
+function packResultNeedsAdjudication(pc, criterion) {
+  if (pc.status === "manual") return true;
+  const hasJudgmentTest = Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
+  return pc.status === INAPPLICABLE_STATUS && pc.inapplicable === true && pc.decidedBy !== "agent" && hasJudgmentTest;
+}
 function buildAdjudicationWorklist(audit2, opts = {}) {
   const docs = docsForAudit(audit2, opts.cwd);
   const standard = opts.standard;
   const limits = adjudicationLimits(opts.cwd);
   if (standard !== void 0 && !isCore(standard)) {
     const pack = loadPack(standard);
-    return derivePackResults(audit2, standard).filter((pc) => pc.status === "manual").map((pc) => {
+    return derivePackResults(audit2, standard).filter((pc) => packResultNeedsAdjudication(pc, getCriterion(pack, pc.id))).map((pc) => {
       const crit = getCriterion(pack, pc.id);
       const scs = crit?.wcag ?? pc.scs;
       const item = blankItem(
@@ -61570,8 +61540,9 @@ function applyAdjudication(audit2, adj, opts = {}) {
   const packMode = !isCore(adj.standard);
   const open = /* @__PURE__ */ new Set();
   if (packMode) {
+    const pack = loadPack(adj.standard);
     for (const pc of derivePackResults(audit2, adj.standard)) {
-      if (pc.status !== "manual") continue;
+      if (!packResultNeedsAdjudication(pc, getCriterion(pack, pc.id))) continue;
       open.add(pc.id);
       if (byId2.has(pc.id)) continue;
       if (Object.hasOwn(expected, pc.id)) uncovered(pc.id);
@@ -66436,7 +66407,7 @@ var S = {
     noRenderedExecuted: "0 page rendue : aucun test rendered n'a \xE9t\xE9 ex\xE9cut\xE9",
     staticTested: (tests, ids) => `${tests} test(s) static \u2014 crit\xE8res : ${ids || "\u2014"}`,
     renderedContract: (tests, ids) => `${tests} test(s) rendered pr\xE9vus \u2014 crit\xE8res : ${ids || "\u2014"}`,
-    judgmentContract: (tests, criteria) => `${tests} test(s) judgment sur ${criteria} crit\xE8re(s), transmis \xE0 l'IA seulement quand ils restent applicables et non tranch\xE9s`
+    judgmentContract: (tests, criteria) => `${tests} test(s) judgment sur ${criteria} crit\xE8re(s), tous transmis \xE0 l'IA tant qu'ils ne sont pas tranch\xE9s`
   },
   en: {
     title: "ultra11y accessibility audit",
@@ -66512,7 +66483,7 @@ var S = {
     noRenderedExecuted: "0 rendered pages: no rendered test was executed",
     staticTested: (tests, ids) => `${tests} static test(s) \u2014 criteria: ${ids || "\u2014"}`,
     renderedContract: (tests, ids) => `${tests} planned rendered test(s) \u2014 criteria: ${ids || "\u2014"}`,
-    judgmentContract: (tests, criteria) => `${tests} judgment test(s) across ${criteria} criterion(ia), sent to AI only while applicable and undecided`
+    judgmentContract: (tests, criteria) => `${tests} judgment test(s) across ${criteria} criterion(ia), all sent to AI while undecided`
   }
 };
 var MAX_ROWS = 50;
@@ -66663,29 +66634,6 @@ function stepSummary(result, opts = {}) {
   if (unanchored) out2.push(`> ${s.unanchored(unanchored)}`, "");
   return out2.join("\n");
 }
-function reportSectionsBody(result, standard, lang, budget, prefer) {
-  let md;
-  try {
-    md = isCore(standard) ? renderReport(result, lang) : renderPackReport(result, loadPack(standard), lang);
-  } catch {
-    return { body: [], dropped: [] };
-  }
-  const { sections } = splitReportSections(md);
-  const ordered = prefer ? [...sections.filter((x) => prefer.test(x.heading)), ...sections.filter((x) => !prefer.test(x.heading))] : sections;
-  const body3 = [];
-  const dropped = [];
-  let spent = 0;
-  for (const section of ordered) {
-    const text = section.text.trimEnd();
-    if (dropped.length || spent + sizeOf(text) + 2 > budget) {
-      dropped.push(section.heading.replace(/^##\s*/, ""));
-      continue;
-    }
-    body3.push(text, "");
-    spent += sizeOf(text) + 2;
-  }
-  return { body: body3, dropped };
-}
 function prComment(result, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
@@ -66709,12 +66657,6 @@ function prComment(result, opts = {}) {
   const tail = [];
   if (opts.artifactName) tail.push(s.artifact(opts.artifactName), "");
   if (opts.runUrl) tail.push(s.runLink(opts.runUrl), "");
-  const fixed = sizeOf([...head, ...tail].join("\n"));
-  const { body: body3, dropped } = reportSectionsBody(result, standard, lang, Math.max(0, COMMENT_LIMIT - fixed - 512));
-  const notes = [];
-  if (dropped.length) notes.push(s.sectionsDropped(dropped), "");
-  const assembled = [...head, ...body3, ...notes, ...tail].join("\n").trimEnd();
-  if (sizeOf(assembled) <= COMMENT_LIMIT) return assembled;
   const assemble = (rows2) => {
     const digest = [];
     if (criteria.length) {

@@ -112,21 +112,26 @@ describe("RGAA test-level automation contract", () => {
     expect(pack.criteria.find((criterion) => criterion.id === "10.5")?.automation?.rules).toEqual([]);
   });
 
-  it("routes every applicable unresolved judgment criterion to the AI worklist", () => {
+  it("routes all 97 judgment criteria to the AI, including those provisionally inapplicable", () => {
     const dir = mkdtempSync(join(tmpdir(), "u11y-rgaa-judgment-"));
     const file = join(dir, "page.html");
     writeFileSync(file, '<!doctype html><html lang="fr"><head><title>T</title></head><body><main><h1>T</h1><p>Texte</p></main></body></html>');
     const audit = runAudit({ inputs: [file] });
-    const openJudgment = derivePackResults(audit, "rgaa")
-      .filter((row) => row.status === "manual")
-      .filter((row) => Object.values(pack.criteria.find((criterion) => criterion.id === row.id)!.automation!.tests).includes("judgment"))
+    const derived = derivePackResults(audit, "rgaa");
+    const openJudgment = derived
+      .filter(
+        (row) => row.status === "manual" && Object.values(pack.criteria.find((criterion) => criterion.id === row.id)!.automation!.tests).includes("judgment"),
+      )
       .map((row) => row.id)
       .sort();
     const items = buildAdjudicationWorklist(audit, { standard: "rgaa" });
     const worklist = new Map(items.map((item) => [item.criteriaId, item]));
-    expect(openJudgment.length).toBeGreaterThan(0);
-    expect(openJudgment.filter((id) => !worklist.has(id))).toEqual([]);
-    for (const id of openJudgment) {
+    const allJudgment = pack.criteria.filter((criterion) => Object.values(criterion.automation!.tests).includes("judgment")).map((criterion) => criterion.id);
+    expect(openJudgment.length).toBeLessThan(97);
+    expect(allJudgment).toHaveLength(97);
+    expect(allJudgment.filter((id) => !worklist.has(id))).toEqual([]);
+    expect(items).toHaveLength(102);
+    for (const id of allJudgment) {
       const criterion = pack.criteria.find((row) => row.id === id)!;
       const expected = Object.entries(criterion.automation!.tests)
         .filter(([, tier]) => tier === "judgment")

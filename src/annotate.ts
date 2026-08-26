@@ -22,7 +22,7 @@ import { resolveMessage, resolveRemediation } from "./messages.js";
 import { findingsForStandard } from "./standards/derive.js";
 import { packCriterionLabel } from "./standards/document.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
-import { automationOverview, packReportGroups, renderPackReport, renderReport, reportCoverage, reportGroups, splitReportSections } from "./report.js";
+import { automationOverview, packReportGroups, reportCoverage, reportGroups } from "./report.js";
 import type { AuditResult, Finding, Lang, PageResult, Severity, Status } from "./types.js";
 import { isUrlPath, repoRelative } from "./util.js";
 import {
@@ -192,7 +192,7 @@ const S = {
     staticTested: (tests: number, ids: string) => `${tests} test(s) static — critères : ${ids || "—"}`,
     renderedContract: (tests: number, ids: string) => `${tests} test(s) rendered prévus — critères : ${ids || "—"}`,
     judgmentContract: (tests: number, criteria: number) =>
-      `${tests} test(s) judgment sur ${criteria} critère(s), transmis à l'IA seulement quand ils restent applicables et non tranchés`,
+      `${tests} test(s) judgment sur ${criteria} critère(s), tous transmis à l'IA tant qu'ils ne sont pas tranchés`,
   },
   en: {
     title: "ultra11y accessibility audit",
@@ -281,8 +281,7 @@ const S = {
     noRenderedExecuted: "0 rendered pages: no rendered test was executed",
     staticTested: (tests: number, ids: string) => `${tests} static test(s) — criteria: ${ids || "—"}`,
     renderedContract: (tests: number, ids: string) => `${tests} planned rendered test(s) — criteria: ${ids || "—"}`,
-    judgmentContract: (tests: number, criteria: number) =>
-      `${tests} judgment test(s) across ${criteria} criterion(ia), sent to AI only while applicable and undecided`,
+    judgmentContract: (tests: number, criteria: number) => `${tests} judgment test(s) across ${criteria} criterion(ia), all sent to AI while undecided`,
   },
 } as const;
 
@@ -541,60 +540,6 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
   return out.join("\n");
 }
 
-/** THE COMMENT'S BODY IS THE REPORT'S OWN SECTIONS.
- *
- *  A pull-request comment used to be a document of its own — a digest, written separately from
- *  the audit it summarised. Two documents about one run drift, and a reader who opens the
- *  artifact after reading the comment should recognise what they are looking at.
- *
- *  So the body is the report, rendered once and split into its `##` sections, kept in report
- *  order while the budget lasts. What does not fit is dropped WHOLE and NAMED — a heading a
- *  reader can go and find in the artifact — never sliced at a byte offset, which lands
- *  mid-table or inside a fence.
- *
- *  The report's own preamble is skipped: the comment's head already carries the date, the
- *  scope and the rate, and says them in the verdict's voice.
- *
- *  `budget` is what is left after the head and the tail, both of which are never candidates
- *  for dropping — a comment that fits but says nothing about where to look is worse than no
- *  comment at all. */
-function reportSectionsBody(
-  result: AuditResult,
-  standard: StandardId,
-  lang: Lang,
-  budget: number,
-  /** Headings to take FIRST, still in report order. Not a reordering of the audit: the two
-   *  comments answer different questions of the same document, and the one that answers
-   *  "which pages conform" must not lose the page sections to a budget spent on the defect
-   *  list. What is dropped is named either way. */
-  prefer?: RegExp,
-): { body: string[]; dropped: string[] } {
-  let md: string;
-  try {
-    md = isCore(standard) ? renderReport(result, lang) : renderPackReport(result, loadPack(standard), lang);
-  } catch {
-    // A rendering failure must never cost the comment. The caller still has its head and tail,
-    // which carry the verdict and the link — the two things a reviewer cannot do without.
-    return { body: [], dropped: [] };
-  }
-  const { sections } = splitReportSections(md);
-  const ordered = prefer ? [...sections.filter((x) => prefer.test(x.heading)), ...sections.filter((x) => !prefer.test(x.heading))] : sections;
-  const body: string[] = [];
-  const dropped: string[] = [];
-  let spent = 0;
-  for (const section of ordered) {
-    const text = section.text.trimEnd();
-    // +2 for the blank line that joins it to what precedes.
-    if (dropped.length || spent + sizeOf(text) + 2 > budget) {
-      dropped.push(section.heading.replace(/^##\s*/, ""));
-      continue;
-    }
-    body.push(text, "");
-    spent += sizeOf(text) + 2;
-  }
-  return { body, dropped };
-}
-
 /** The pull-request digest.
  *
  *  Deliberately NOT the job summary. A reviewer wants the verdict, how much of the standard
@@ -636,19 +581,10 @@ export function prComment(result: AuditResult, opts: AnnotateOptions & { runUrl?
   // that comes down until the whole document fits, and the verdict, the rate and the link are
   // never candidates: a comment that fits but says nothing about where to look is worse than
   // no comment at all.
-  // The body is the REPORT's own sections — same document, same words, same order — kept while
-  // the budget lasts and dropped whole otherwise. The head and the tail are never candidates.
-  const fixed = sizeOf([...head, ...tail].join("\n"));
-  const { body, dropped } = reportSectionsBody(result, standard, lang, Math.max(0, COMMENT_LIMIT - fixed - 512));
-  const notes: string[] = [];
-  if (dropped.length) notes.push(s.sectionsDropped(dropped), "");
-
-  const assembled = [...head, ...body, ...notes, ...tail].join("\n").trimEnd();
-  if (sizeOf(assembled) <= COMMENT_LIMIT) return assembled;
-
-  // The report could not be cut small enough — a single section larger than the whole budget.
-  // Fall back to the digest this comment carried before: the distinct defects and a link, which
-  // is the least a reviewer needs. Never a byte-slice of the report.
+  // Keep the comment deliberately compact: scope + tested criteria + actionable defects. The
+  // exhaustive 106-row grid belongs to the artifact, where it is searchable and does not bury
+  // the PR verdict. Whole criterion blocks are removed from the end if GitHub's limit requires
+  // it; the verdict, execution scope and artifact/run links always survive.
   const assemble = (rows: number): string => {
     const digest: string[] = [];
     if (criteria.length) {
