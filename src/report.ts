@@ -358,6 +358,7 @@ export function reportCoverage(groups: ReportGroup[]): { decided: number; total:
 export interface AutomationOverview {
   tests: { static: number; rendered: number; judgment: number };
   criteria: { static: string[]; rendered: string[]; judgment: string[] };
+  signals: { decisive: string[]; candidate: string[]; advisory: string[] };
 }
 
 /** The standard's declared test-level contract. This is a plan, not runtime coverage: the
@@ -368,12 +369,17 @@ export function automationOverview(standard: StandardId): AutomationOverview | u
   const pack = loadPack(standard);
   const tests = { static: 0, rendered: 0, judgment: 0 };
   const criteria = { static: [] as string[], rendered: [] as string[], judgment: [] as string[] };
+  const signals = { decisive: [] as string[], candidate: [] as string[], advisory: [] as string[] };
   for (const criterion of pack.criteria) {
     const tiers = Object.values(criterion.automation?.tests ?? {});
     for (const tier of tiers) tests[tier]++;
     for (const tier of ["static", "rendered", "judgment"] as const) if (tiers.includes(tier)) criteria[tier].push(criterion.id);
+    const effects = new Set((criterion.automation?.rules ?? []).map((rule) => rule.effect));
+    if (effects.has("decisive-nc")) signals.decisive.push(criterion.id);
+    if (effects.has("candidate")) signals.candidate.push(criterion.id);
+    if (effects.has("advisory")) signals.advisory.push(criterion.id);
   }
-  return { tests, criteria };
+  return { tests, criteria, signals };
 }
 
 function automationCell(standard: StandardId, id: string): string {

@@ -1,0 +1,66 @@
+name: RGAA static + rendered (PR)
+
+on:
+  pull_request:
+  workflow_dispatch: {}
+
+# No model credential is wired here. The pull-request token only reads the checkout and
+# edits ultra11y's own sticky digest; fork tokens are downgraded by GitHub and the comment
+# path degrades without affecting the audit artifact.
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: static-rgaa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-rgaa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Cache the Chromium binary
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ultra11y-static-${{ runner.os }}-${{ hashFiles('action.yml') }}
+
+      # This is the production PR shape: changed source files are audited first, then a real
+      # page is measured and snapshotted. `adjudicate: none` is explicit, so this lane never
+      # reaches Claude and every judgment criterion stays honestly « à évaluer ».
+      - name: Audit changed code and the rendered fixture
+        uses: ./
+        with:
+          paths: .
+          standard: rgaa
+          since: auto
+          fail-on: ${{ github.event_name == 'pull_request' && 'blocking' || '' }}
+          sarif: "false"
+          annotations: "true"
+          comment: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+          comment-kind: digest
+          artifact-name: ultra11y-pr-static-rgaa
+          report: "true"
+          html: "true"
+          pages-report: "true"
+          evidence: "true"
+          adjudicate: none
+          ledger: "false"
+          require-decided: "false"
+          require-rendered: "true"
+          browser: install
+          runtime: local
+          start: python3 -m http.server 8933 --directory tests/fixtures/clean-landing
+          wait-on: http://127.0.0.1:8933/
+          urls: http://127.0.0.1:8933/
+          snapshot: "true"
+          lang: fr

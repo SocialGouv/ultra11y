@@ -1445,3 +1445,45 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     expect(steps[upload]?.with?.path).toContain("audits/audit-latest.json");
   });
 });
+
+describe("the pull-request RGAA lane is deterministic and rendered", () => {
+  const workflow = parse(readFileSync(join(ROOT, ".github/workflows/static-rgaa.yml"), "utf8")) as {
+    on?: { pull_request?: unknown; workflow_dispatch?: unknown };
+    permissions?: Record<string, string>;
+    jobs?: Record<
+      string,
+      {
+        steps?: Array<{ uses?: string; with?: Record<string, string> }>;
+      }
+    >;
+  };
+  const steps = workflow.jobs?.["static-rgaa"]?.steps ?? [];
+  const audit = steps.find((step) => step.uses === "./");
+
+  it("runs on pull requests and can also be dispatched as a real smoke test", () => {
+    expect(workflow.on?.pull_request).toBeDefined();
+    expect(workflow.on?.workflow_dispatch).toBeDefined();
+  });
+
+  it("runs source and browser tiers without wiring any model", () => {
+    expect(audit?.with?.standard).toBe("rgaa");
+    expect(audit?.with?.adjudicate).toBe("none");
+    expect(audit?.with?.["require-rendered"]).toBe("true");
+    expect(audit?.with?.runtime).toBe("local");
+    expect(audit?.with?.browser).toBe("install");
+    expect(audit?.with?.urls).toMatch(/^http:\/\/127\.0\.0\.1:/);
+    expect(audit?.with?.start).toBeTruthy();
+    expect(audit?.with?.["wait-on"]).toBe(audit?.with?.urls);
+    expect(JSON.stringify(workflow)).not.toMatch(/ANTHROPIC|CLAUDE_CODE/);
+  });
+
+  it("keeps the PR concise and the artifact exhaustive", () => {
+    expect(workflow.permissions?.["pull-requests"]).toBe("write");
+    expect(audit?.with?.comment).toContain("github.event_name == 'pull_request'");
+    expect(audit?.with?.["comment-kind"]).toBe("digest");
+    expect(audit?.with?.report).toBe("true");
+    expect(audit?.with?.html).toBe("true");
+    expect(audit?.with?.["pages-report"]).toBe("true");
+    expect(audit?.with?.["artifact-name"]).toBe("ultra11y-pr-static-rgaa");
+  });
+});

@@ -178,8 +178,27 @@ describe("job summary", () => {
     expect(comment).toContain("0 page rendue : aucun test rendered n'a été exécuté");
     expect(comment).toContain("17 test(s) static — critères :");
     expect(comment).toContain("238 test(s) judgment sur 97 critère(s), tous transmis à l'IA");
+    expect(comment).toContain("49 critère(s) reçoivent un signal normatif");
+    expect(comment).toContain("15 critère(s) peuvent produire un NC décisif");
+    expect(comment).toContain("41 reçoivent des preuves candidates");
     expect(comment).not.toContain("Grille exhaustive des critères");
     expect(comment).not.toContain("Synthèse par thématique");
+  });
+
+  it("names the rendered pages in the compact PR scope", () => {
+    const result = audit([], {
+      scope: {
+        inputs: ["src"],
+        files: 2,
+        pagesAudited: ["accueil", "contact"],
+        pages: [
+          { id: "accueil", name: "Accueil", url: "https://example.test/", sources: [], basis: "snapshot" },
+          { id: "contact", name: "Contact", url: "https://example.test/contact", sources: [], basis: "snapshot" },
+        ],
+      },
+    });
+    const comment = prComment(result, { standard: "rgaa", lang: "fr" });
+    expect(comment).toContain("Pages testées : Accueil (`https://example.test/`) · Contact (`https://example.test/contact`)");
   });
 
   it("says so plainly when nothing was found", () => {

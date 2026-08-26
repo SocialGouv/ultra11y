@@ -188,9 +188,12 @@ const S = {
       `${n} constat(s) sur cette page ne rendent aucun critère du référentiel non conforme : leur règle sort du périmètre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont détaillés dans l'artefact.`,
     runScope: "Périmètre de ce run",
     renderedActuallyTested: (n: number) => `${n} page(s) rendue(s) réellement testée(s)`,
+    testedPages: (pages: string, more: number) => `Pages testées : ${pages}${more ? ` · … +${more} dans l'artefact` : ""}`,
     noRenderedExecuted: "0 page rendue : aucun test rendered n'a été exécuté",
     staticTested: (tests: number, ids: string) => `${tests} test(s) static — critères : ${ids || "—"}`,
     renderedContract: (tests: number, ids: string) => `${tests} test(s) rendered prévus — critères : ${ids || "—"}`,
+    deterministicSignals: (covered: number, decisive: number, candidate: number, advisory: number) =>
+      `Couverture moteur : ${covered} critère(s) reçoivent un signal normatif — ${decisive} critère(s) peuvent produire un NC décisif · ${candidate} reçoivent des preuves candidates (avec chevauchement)${advisory ? ` · ${advisory} autre reçoit une recommandation advisory` : ""}`,
     judgmentContract: (tests: number, criteria: number) =>
       `${tests} test(s) judgment sur ${criteria} critère(s), tous transmis à l'IA tant qu'ils ne sont pas tranchés`,
   },
@@ -278,9 +281,12 @@ const S = {
       `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`,
     runScope: "Scope of this run",
     renderedActuallyTested: (n: number) => `${n} rendered page(s) actually tested`,
+    testedPages: (pages: string, more: number) => `Pages tested: ${pages}${more ? ` · … +${more} in the artifact` : ""}`,
     noRenderedExecuted: "0 rendered pages: no rendered test was executed",
     staticTested: (tests: number, ids: string) => `${tests} static test(s) — criteria: ${ids || "—"}`,
     renderedContract: (tests: number, ids: string) => `${tests} planned rendered test(s) — criteria: ${ids || "—"}`,
+    deterministicSignals: (covered: number, decisive: number, candidate: number, advisory: number) =>
+      `Engine coverage: ${covered} criterion(ia) receive a normative signal — ${decisive} criterion(ia) can produce a decisive NC · ${candidate} receive candidate evidence (with overlap)${advisory ? ` · ${advisory} other receives an advisory recommendation` : ""}`,
     judgmentContract: (tests: number, criteria: number) => `${tests} judgment test(s) across ${criteria} criterion(ia), all sent to AI while undecided`,
   },
 } as const;
@@ -440,16 +446,29 @@ export function runCoverage(result: AuditResult, standard: StandardId, lang: Lan
 /** Compact and literal execution scope for GitHub surfaces. In particular, a source-only
  *  action says “0 rendered pages” instead of deriving routes from source and implying that a
  *  browser visited them. */
-function runScopeLines(result: AuditResult, standard: StandardId, lang: Lang): string[] {
+function runScopeLines(result: AuditResult, standard: StandardId, lang: Lang, includePageNames = false): string[] {
   const s = S[lang];
   const pages = result.scope.pagesAudited?.length ?? 0;
   const out = [`> **${s.runScope}** — ${pages === 0 ? s.noRenderedExecuted : s.renderedActuallyTested(pages)}`];
+  if (includePageNames && pages > 0) {
+    const scope = pagesOf(result);
+    const byId = new Map(scope.map((page) => [page.id, page]));
+    const tested = (result.scope.pagesAudited ?? []).map((id) => byId.get(id) ?? { id, name: id, url: "" });
+    const shown = tested.slice(0, 12).map((page) => {
+      const name = mdText(page.name || page.id);
+      const url = page.url ? ` (\`${page.url.replace(/`/g, "%60")}\`)` : "";
+      return `${name}${url}`;
+    });
+    out.push(`> ${s.testedPages(shown.join(" · "), tested.length - shown.length)}`);
+  }
   const automation = automationOverview(standard);
   if (!automation) return out;
   const ids = (values: string[]) => values.map((id) => `\`${id}\``).join(" · ");
+  const normativeSignals = new Set([...automation.signals.decisive, ...automation.signals.candidate]).size;
   out.push(
     `> ${s.staticTested(automation.tests.static, ids(automation.criteria.static))}`,
     `> ${s.renderedContract(automation.tests.rendered, ids(automation.criteria.rendered))}`,
+    `> ${s.deterministicSignals(normativeSignals, automation.signals.decisive.length, automation.signals.candidate.length, automation.signals.advisory.length)}`,
     `> ${s.judgmentContract(automation.tests.judgment, automation.criteria.judgment.length)}`,
   );
   return out;
@@ -567,7 +586,7 @@ export function prComment(result: AuditResult, opts: AnnotateOptions & { runUrl?
   head.push(`### ${s.title} — ${stdLabel}`, "");
   head.push(blocking ? s.verdictFail(blocking) : normative.length ? s.verdictWarn : s.verdictPass, "");
   head.push(`\`${result.date}\` · ${result.scope.files} ${s.files} · **${coverage.text}**${coverage.detail ? ` · ${coverage.detail}` : ""}`, "");
-  head.push(...runScopeLines(result, standard, lang), "");
+  head.push(...runScopeLines(result, standard, lang, true), "");
   if (coverage.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
   if (orphans) head.push(`> ${s.unattributed(orphans)}`, "");
 

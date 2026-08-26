@@ -58231,12 +58231,17 @@ function automationOverview(standard) {
   const pack = loadPack(standard);
   const tests = { static: 0, rendered: 0, judgment: 0 };
   const criteria = { static: [], rendered: [], judgment: [] };
+  const signals = { decisive: [], candidate: [], advisory: [] };
   for (const criterion of pack.criteria) {
     const tiers = Object.values(criterion.automation?.tests ?? {});
     for (const tier of tiers) tests[tier]++;
     for (const tier of ["static", "rendered", "judgment"]) if (tiers.includes(tier)) criteria[tier].push(criterion.id);
+    const effects = new Set((criterion.automation?.rules ?? []).map((rule) => rule.effect));
+    if (effects.has("decisive-nc")) signals.decisive.push(criterion.id);
+    if (effects.has("candidate")) signals.candidate.push(criterion.id);
+    if (effects.has("advisory")) signals.advisory.push(criterion.id);
   }
-  return { tests, criteria };
+  return { tests, criteria, signals };
 }
 function automationCell(standard, id) {
   if (isCore(standard)) return "\u2014";
@@ -66404,9 +66409,11 @@ var S = {
     noCriterionForFindings: (n) => `${n} constat(s) sur cette page ne rendent aucun crit\xE8re du r\xE9f\xE9rentiel non conforme : leur r\xE8gle sort du p\xE9rim\xE8tre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont d\xE9taill\xE9s dans l'artefact.`,
     runScope: "P\xE9rim\xE8tre de ce run",
     renderedActuallyTested: (n) => `${n} page(s) rendue(s) r\xE9ellement test\xE9e(s)`,
+    testedPages: (pages, more) => `Pages test\xE9es : ${pages}${more ? ` \xB7 \u2026 +${more} dans l'artefact` : ""}`,
     noRenderedExecuted: "0 page rendue : aucun test rendered n'a \xE9t\xE9 ex\xE9cut\xE9",
     staticTested: (tests, ids) => `${tests} test(s) static \u2014 crit\xE8res : ${ids || "\u2014"}`,
     renderedContract: (tests, ids) => `${tests} test(s) rendered pr\xE9vus \u2014 crit\xE8res : ${ids || "\u2014"}`,
+    deterministicSignals: (covered, decisive, candidate, advisory) => `Couverture moteur : ${covered} crit\xE8re(s) re\xE7oivent un signal normatif \u2014 ${decisive} crit\xE8re(s) peuvent produire un NC d\xE9cisif \xB7 ${candidate} re\xE7oivent des preuves candidates (avec chevauchement)${advisory ? ` \xB7 ${advisory} autre re\xE7oit une recommandation advisory` : ""}`,
     judgmentContract: (tests, criteria) => `${tests} test(s) judgment sur ${criteria} crit\xE8re(s), tous transmis \xE0 l'IA tant qu'ils ne sont pas tranch\xE9s`
   },
   en: {
@@ -66480,9 +66487,11 @@ var S = {
     noCriterionForFindings: (n) => `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`,
     runScope: "Scope of this run",
     renderedActuallyTested: (n) => `${n} rendered page(s) actually tested`,
+    testedPages: (pages, more) => `Pages tested: ${pages}${more ? ` \xB7 \u2026 +${more} in the artifact` : ""}`,
     noRenderedExecuted: "0 rendered pages: no rendered test was executed",
     staticTested: (tests, ids) => `${tests} static test(s) \u2014 criteria: ${ids || "\u2014"}`,
     renderedContract: (tests, ids) => `${tests} planned rendered test(s) \u2014 criteria: ${ids || "\u2014"}`,
+    deterministicSignals: (covered, decisive, candidate, advisory) => `Engine coverage: ${covered} criterion(ia) receive a normative signal \u2014 ${decisive} criterion(ia) can produce a decisive NC \xB7 ${candidate} receive candidate evidence (with overlap)${advisory ? ` \xB7 ${advisory} other receives an advisory recommendation` : ""}`,
     judgmentContract: (tests, criteria) => `${tests} judgment test(s) across ${criteria} criterion(ia), all sent to AI while undecided`
   }
 };
@@ -66561,16 +66570,29 @@ function runCoverage(result, standard, lang) {
     agentRuled
   };
 }
-function runScopeLines(result, standard, lang) {
+function runScopeLines(result, standard, lang, includePageNames = false) {
   const s = S[lang];
   const pages = result.scope.pagesAudited?.length ?? 0;
   const out2 = [`> **${s.runScope}** \u2014 ${pages === 0 ? s.noRenderedExecuted : s.renderedActuallyTested(pages)}`];
+  if (includePageNames && pages > 0) {
+    const scope = pagesOf(result);
+    const byId2 = new Map(scope.map((page) => [page.id, page]));
+    const tested = (result.scope.pagesAudited ?? []).map((id) => byId2.get(id) ?? { id, name: id, url: "" });
+    const shown = tested.slice(0, 12).map((page) => {
+      const name2 = mdText(page.name || page.id);
+      const url = page.url ? ` (\`${page.url.replace(/`/g, "%60")}\`)` : "";
+      return `${name2}${url}`;
+    });
+    out2.push(`> ${s.testedPages(shown.join(" \xB7 "), tested.length - shown.length)}`);
+  }
   const automation = automationOverview(standard);
   if (!automation) return out2;
   const ids = (values) => values.map((id) => `\`${id}\``).join(" \xB7 ");
+  const normativeSignals = (/* @__PURE__ */ new Set([...automation.signals.decisive, ...automation.signals.candidate])).size;
   out2.push(
     `> ${s.staticTested(automation.tests.static, ids(automation.criteria.static))}`,
     `> ${s.renderedContract(automation.tests.rendered, ids(automation.criteria.rendered))}`,
+    `> ${s.deterministicSignals(normativeSignals, automation.signals.decisive.length, automation.signals.candidate.length, automation.signals.advisory.length)}`,
     `> ${s.judgmentContract(automation.tests.judgment, automation.criteria.judgment.length)}`
   );
   return out2;
@@ -66651,7 +66673,7 @@ function prComment(result, opts = {}) {
   head.push(`### ${s.title} \u2014 ${stdLabel}`, "");
   head.push(blocking ? s.verdictFail(blocking) : normative.length ? s.verdictWarn : s.verdictPass, "");
   head.push(`\`${result.date}\` \xB7 ${result.scope.files} ${s.files} \xB7 **${coverage.text}**${coverage.detail ? ` \xB7 ${coverage.detail}` : ""}`, "");
-  head.push(...runScopeLines(result, standard, lang), "");
+  head.push(...runScopeLines(result, standard, lang, true), "");
   if (coverage.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
   if (orphans) head.push(`> ${s.unattributed(orphans)}`, "");
   const tail = [];
