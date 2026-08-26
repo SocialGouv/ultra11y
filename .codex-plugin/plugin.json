@@ -1,7 +1,7 @@
 {
   "name": "ultra11y",
   "description": "Accessibility for WCAG 2.2 AA and country standards (RGAA…): an automatic review of the code under change before every commit, push and pull request, plus full audits and conformance deliverables on demand.",
-  "version": "5.36.2",
+  "version": "5.36.3",
   "author": { "name": "maxgfr", "url": "https://github.com/maxgfr" },
   "homepage": "https://github.com/maxgfr/ultra11y",
   "repository": "https://github.com/maxgfr/ultra11y",
