@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.36.2](https://github.com/maxgfr/ultra11y/compare/v5.36.1...v5.36.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* **ci:** make Claude adjudication operational ([c9d3d48](https://github.com/maxgfr/ultra11y/commit/c9d3d48e9274721e48a0590b2b5edb26bd7e2c51))
+
 ## [5.36.1](https://github.com/maxgfr/ultra11y/compare/v5.36.0...v5.36.1) (2026-08-26)
 
 

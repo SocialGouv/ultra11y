@@ -6,7 +6,7 @@ import { join as join53, relative as relative5, resolve as resolve16, sep as sep
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
-var VERSION = "5.36.1";
+var VERSION = "5.36.2";
 var SCHEMA_VERSION = 2;
 var INAPPLICABLE_STATUS = "C";
 
