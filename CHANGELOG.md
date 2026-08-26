@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.36.0](https://github.com/maxgfr/ultra11y/compare/v5.35.4...v5.36.0) (2026-08-26)
+
+
+### Features
+
+* **rgaa:** make automation coverage exhaustive ([f5c36c8](https://github.com/maxgfr/ultra11y/commit/f5c36c8f26e1a0f17c181483d30517c8c9d641ab))
+
 ## [5.35.4](https://github.com/maxgfr/ultra11y/compare/v5.35.3...v5.35.4) (2026-08-25)
 
 
