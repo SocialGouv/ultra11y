@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.36.1](https://github.com/maxgfr/ultra11y/compare/v5.36.0...v5.36.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* **rgaa:** adjudicate every judgment criterion ([8ccf1da](https://github.com/maxgfr/ultra11y/commit/8ccf1da686f3aea94479c94255d73063fd6a7461))
+
 # [5.36.0](https://github.com/maxgfr/ultra11y/compare/v5.35.4...v5.36.0) (2026-08-26)
 
 
