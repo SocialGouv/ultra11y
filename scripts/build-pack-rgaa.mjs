@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // DEV-ONLY (not in `bin`). Builds the RGAA 4.1.2 STANDARDS PACK that ships at
 // src/data/standards/rgaa.json (+ rgaa.glossary.json). RGAA is the first of many
-// pluggable, in-repo country packs (see CONTRIBUTING.md): a pack does NOT carry the
-// engine's rules or automatability — it is a localized criterion set that maps each
-// of its criteria onto WCAG success criteria (bare SC ids). The WCAG↔rule coverage
+// pluggable, in-repo country packs (see CONTRIBUTING.md): a pack carries a test-level
+// automation contract, not executable engine code — it is a localized criterion set that
+// maps each of its criteria onto WCAG success criteria (bare SC ids). The WCAG↔rule coverage
 // lives in the core (scripts/build-standards.mjs). The RGAA content is Licence
 // Ouverte / Etalab 2.0 — see NOTICE. The official source is vendored under
 // scripts/vendor/rgaa/ (criteres.json, glossaire.json, methodologies.json) so the
@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(root, "src", "data", "standards");
+const AUTOMATION_REF = join(root, "skills", "ultra11y", "references", "rgaa-automation.md");
 const VENDOR = join(root, "scripts", "vendor", "rgaa");
 const BIOME = join(root, "node_modules", ".bin", "biome");
 const BASE = "https://raw.githubusercontent.com/DISIC/accessibilite.numerique.gouv.fr/main/RGAA";
@@ -181,11 +182,12 @@ const RULE_TO_CRITERIA = {
   "axe:object-alt": ["1.1"], "decorative-alt-misuse": ["1.2"], "axe:image-redundant-alt": ["1.2"],
   // Theme 2 — frames (2.1 frame title)
   "iframe-title-missing": ["2.1"], "axe:frame-title": ["2.1"], "axe:frame-title-unique": ["2.1"],
-  // Theme 3 / 10.5 — colour contrast (3.2 text/bg, 10.5 CSS declarations)
-  "contrast-literal": ["3.2", "10.5"], "axe:color-contrast": ["3.2", "10.5"], "axe:color-contrast-enhanced": ["3.2", "10.5"],
+  // Theme 3 — colour contrast. RGAA 10.5 asks about paired CSS declarations, not the
+  // resulting ratio, so contrast findings must not be presented as evidence for 10.5.
+  "contrast-literal": ["3.2"], "axe:color-contrast": ["3.2"], "axe:color-contrast-enhanced": ["3.2"],
   // Rendered tier: contrast measured on the real page (computed styles) and on the
   // screenshot, for the gradient/background-image case the CSSOM cannot express.
-  "rendered-contrast": ["3.2", "10.5"], "rendered-contrast-pixel": ["3.2", "10.5"],
+  "rendered-contrast": ["3.2"], "rendered-contrast-pixel": ["3.2"],
   // 10.6 — a link in running text identified by colour alone. Deliberately NOT also
   // mapped to 3.1 (the general "information by colour alone"): 10.6 is RGAA's specific
   // criterion for links, and claiming both would count one defect twice.
@@ -202,10 +204,9 @@ const RULE_TO_CRITERIA = {
   // Theme 4 — multimedia (4.3 captions)
   "media-no-track": ["4.3"], "axe:audio-caption": ["4.3"], "axe:video-caption": ["4.3"],
   // Theme 5 — tables (5.4 title, 5.6/5.7 headers, 5.8 layout-table markup)
-  "table-caption-missing": ["5.4"], "data-table-no-headers": ["5.6", "5.7"], "sortable-header-no-aria-sort": ["5.7"],
-  "table-empty-data-cell": ["5.7"],
+  "table-caption-missing": ["5.4"], "data-table-no-headers": ["5.6", "5.7"],
   "layout-table-data-markup": ["5.8"], "axe:td-headers-attr": ["5.7"], "axe:th-has-data-cells": ["5.6"],
-  "axe:scope-attr-valid": ["5.7"], "axe:td-has-header": ["5.6"], "axe:empty-table-header": ["5.6"], "axe:table-fake-caption": ["5.8"],
+  "axe:scope-attr-valid": ["5.7"], "axe:td-has-header": ["5.6"], "axe:table-fake-caption": ["5.8"],
   // Theme 6 — links (6.2 link label)
   "link-empty-name": ["6.2"], "icon-only-control-unnamed": ["6.2", "11.9"], "cross-icon-only-unnamed": ["11.9"],
   "axe:link-name": ["6.2"],
@@ -227,8 +228,8 @@ const RULE_TO_CRITERIA = {
   "axe:aria-hidden-focus": ["7.1"], "axe:presentation-role-conflict": ["7.1"],
   // Theme 8 — document (8.2 valid code, 8.3 default lang, 8.4 lang relevant, 8.5 title, 8.7/8.8 lang changes)
   "duplicate-id": ["8.2"], "axe:duplicate-id": ["8.2"], "axe:duplicate-id-aria": ["8.2"], "axe:duplicate-id-active": ["8.2"],
-  "html-lang-missing": ["8.3"], "axe:html-has-lang": ["8.3"], "axe:html-xml-lang-mismatch": ["8.3"],
-  "lang-invalid": ["8.4", "8.8"], "axe:html-lang-valid": ["8.4"], "axe:valid-lang": ["8.8"],
+  "html-lang-missing": ["8.3"], "axe:html-has-lang": ["8.3"],
+  "lang-invalid": ["8.4", "8.8"], "axe:html-lang-valid": ["8.4"], "axe:html-xml-lang-mismatch": ["8.4"], "axe:valid-lang": ["8.8"],
   "title-missing-empty": ["8.5"], "axe:document-title": ["8.5"], "inline-lang-change-missing": ["8.7"],
   // Theme 9 — structure (9.1 headings, 9.2 doc structure, 9.3 lists)
   "h1-missing": ["9.1"], "h1-multiple": ["9.1"], "heading-order-skip": ["9.1"], "empty-heading": ["9.1"],
@@ -262,9 +263,109 @@ const RULE_TO_CRITERIA = {
   // has none for keyboard traps, which is why the probe was written in the first place.
   "dyn-keyboard-trap": ["12.9"],
   // Theme 13 — consultation (13.1 time limits, 13.8 moving/blinking)
-  "meta-refresh-redirect": ["13.1"], "blink-marquee": ["13.8"], "autoplay-media": ["4.10", "13.8"],
+  "meta-refresh-redirect": ["13.1"], "blink-marquee": ["13.8"], "autoplay-media": ["4.10"],
   "axe:no-autoplay-audio": ["4.10"], "axe:blink": ["13.8"], "axe:marquee": ["13.8"],
 };
+
+// A rule firing is NOT automatically a complete RGAA failure. Most engine rules are useful
+// evidence for a narrower precondition while the official test still asks about relevance,
+// an allowed alternative, or a particular case. Those rules are routed to adjudication as
+// `candidate` below. This deliberately small table contains only failures whose observation
+// itself exhausts the cited numbered test.
+const DECISIVE_RULE_TESTS = {
+  "1.1|axe:area-alt": ["2"],
+  "1.1|axe:input-image-alt": ["3"],
+  "1.1|input-image-alt-missing": ["3"],
+  "2.1|axe:frame-title": ["1"],
+  "2.1|iframe-title-missing": ["1"],
+  "6.2|link-empty-name": ["1"],
+  "6.2|axe:link-name": ["1"],
+  "8.2|duplicate-id": ["1"],
+  "8.2|axe:duplicate-id": ["1"],
+  "8.2|axe:duplicate-id-aria": ["1"],
+  "8.2|axe:duplicate-id-active": ["1"],
+  "8.4|axe:html-lang-valid": ["1"],
+  "8.4|lang-invalid": ["1"],
+  "8.5|title-missing-empty": ["1"],
+  "8.5|axe:document-title": ["1"],
+  "9.3|list-structure": ["1", "2", "3"],
+  "9.3|axe:list": ["1", "2"],
+  "9.3|axe:listitem": ["1", "2"],
+  "9.3|axe:definition-list": ["3"],
+  "9.3|axe:dlitem": ["3"],
+  "10.7|dyn-focus-visible": ["1"],
+  "11.1|axe:label": ["1"],
+  "11.1|axe:select-name": ["1"],
+  "11.1|control-label-missing": ["1"],
+  "11.6|axe:fieldset": ["1"],
+  "11.6|fieldset-legend-missing": ["1"],
+  "11.9|axe:button-name": ["1"],
+  "11.9|axe:input-button-name": ["1"],
+  "11.9|button-empty-name": ["1"],
+};
+
+// Candidate evidence is test-scoped too. The fallback remains all tests only when one rule id
+// genuinely cannot distinguish the mechanism it observed; the entries below prevent a signal
+// for one numbered test from being presented to the adjudicator as evidence for its siblings.
+const CANDIDATE_RULE_TESTS = {
+  "1.1|axe:image-alt": ["1"],
+  "1.1|axe:role-img-alt": ["1"],
+  "1.1|img-alt-missing": ["1"],
+  "1.1|axe:svg-img-alt": ["5"],
+  "1.1|axe:object-alt": ["6"],
+  "1.1|object-embed-no-name": ["6", "7"],
+  "1.1|canvas-fallback-missing": ["8"],
+  "1.1|chart-no-accessible-name": ["1", "5", "8"],
+  "4.3|axe:audio-caption": ["1"],
+  "4.3|axe:video-caption": ["1"],
+  "4.3|media-no-track": ["1"],
+  "5.6|axe:td-has-header": ["1", "2"],
+  "5.6|axe:th-has-data-cells": ["1", "2", "3"],
+  "5.6|data-table-no-headers": ["1", "2", "3"],
+  "5.7|axe:scope-attr-valid": ["2", "3"],
+  "5.7|axe:td-headers-attr": ["4"],
+  "7.3|clickable-noninteractive": ["1"],
+  "8.4|axe:html-xml-lang-mismatch": ["1"],
+  "9.1|axe:empty-heading": ["2"],
+  "9.1|empty-heading": ["2"],
+  "9.1|axe:heading-order": ["1"],
+  "9.1|heading-order-skip": ["1"],
+  "9.1|axe:page-has-heading-one": ["1", "3"],
+  "9.1|h1-missing": ["1", "3"],
+  "9.1|h1-multiple": ["1"],
+  "10.4|axe:meta-viewport": ["2"],
+  "10.4|axe:meta-viewport-large": ["2"],
+  "10.4|meta-viewport-zoom-block": ["2"],
+  "10.4|dyn-input-overflow-zoom": ["1"],
+  "10.4|dyn-reflow-zoom": ["1"],
+  "10.11|dyn-input-overflow-reflow": ["1"],
+  "10.11|dyn-reflow": ["1"],
+  "11.1|axe:form-field-multiple-labels": ["2"],
+  "11.1|form-field-multiple-labels": ["2"],
+  "11.1|label-for-dangling": ["2"],
+  "11.1|axe:label-title-only": ["1", "3"],
+  "11.1|control-name-title-only": ["1", "3"],
+  "11.1|placeholder-as-label": ["1", "3"],
+  "11.1|field-purpose-incomplete": ["1", "3"],
+  "11.1|select-has-option": ["1"],
+  "11.9|cross-icon-only-unnamed": ["1"],
+  "11.9|icon-only-control-unnamed": ["1"],
+  "11.10|aria-invalid-no-description": ["3", "4", "6", "7"],
+  "11.10|error-not-associated": ["3", "4", "6", "7"],
+  "12.7|axe:bypass": ["1"],
+  "12.7|axe:skip-link": ["2"],
+  "12.7|skip-link-target-missing": ["2"],
+  "12.8|axe:tabindex": ["1"],
+  "12.8|positive-tabindex": ["1"],
+  "13.1|meta-refresh-redirect": ["2"],
+  "13.8|axe:blink": ["2"],
+  "13.8|axe:marquee": ["1"],
+};
+
+const COMPLETE_BY_SILENCE = new Set(["8.5", "10.1"]);
+const renderedTier = (ruleId) =>
+  ruleId.startsWith("rendered-") || ruleId.startsWith("dyn-") || ruleId.startsWith("axe:") ? "rendered" : "static";
+const mergeTestTier = (current, next) => (current === "static" || next === "static" ? "static" : next);
 
 async function main() {
   const criteres = await source("criteres.json");
@@ -389,8 +490,8 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
     // RGAA 8.10.2 — the FIRST of its two sub-conditions: "La valeur de l'attribut dir est
     // conforme (rtl ou ltr)". Mechanical. The second ("la valeur est pertinente") and 8.10.1
     // (is a reading-direction change signalled at all?) need language detection and stay
-    // manual. Anchored negative lookahead so only a genuinely invalid value matches; `auto`
-    // is valid HTML and is accepted.
+    // manual. RGAA 4.1.2 closes the accepted set to `rtl` and `ltr`: HTML's `auto` value is
+    // valid markup but does not satisfy this test, so it is intentionally reported here.
     {
       id: "dir-value-invalid",
       criterion: "8.10",
@@ -399,16 +500,16 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
       match: {
         attrs: [
           { name: "dir", op: "present" },
-          { name: "dir", op: "matches", value: "^(?!(rtl|ltr|auto)$).+$" },
+          { name: "dir", op: "matches", value: "^(?!(rtl|ltr)$).+$" },
         ],
       },
       message: {
-        en: "dir attribute with a value that is not rtl, ltr or auto — the reading direction change is not declared conformantly (RGAA test 8.10.2).",
-        fr: "Attribut dir dont la valeur n’est ni rtl, ni ltr, ni auto — le changement de sens de lecture n’est pas déclaré conformément (test RGAA 8.10.2).",
+        en: "dir attribute with a value other than rtl or ltr — the reading direction change fails RGAA test 8.10.2.",
+        fr: "Attribut dir dont la valeur n’est ni rtl ni ltr — le changement de sens de lecture échoue au test RGAA 8.10.2.",
       },
       remediation: {
-        en: 'Use dir="rtl" or dir="ltr" (or dir="auto"), matching the reading direction of the text it carries.',
-        fr: 'Utilisez dir="rtl" ou dir="ltr" (ou dir="auto"), en accord avec le sens de lecture du texte porté.',
+        en: 'Use dir="rtl" or dir="ltr", matching the reading direction of the text it carries.',
+        fr: 'Utilisez dir="rtl" ou dir="ltr", en accord avec le sens de lecture du texte porté.',
       },
     },
     // RGAA 8.1 — « chaque page web est-elle définie par un type de document ? » THE criterion
@@ -421,14 +522,11 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
     // doctype is not part of `documentElement.outerHTML`. The collector records it beside the
     // DOM (SnapshotMeta.doctype), and this DOCUMENT-level rule reads it there.
     //
-    // WHAT IT DECIDES, AND WHAT IT DOES NOT. Test 8.1.1 (is a doctype present?) is the whole
-    // of it. 8.1.2 (is it valid?) and 8.1.3 (is it before <html>?) are not tested separately
-    // and deliberately so: a doctype the browser PARSED — which is the only kind that reaches
-    // `document.doctype` — is by construction well-formed and positioned ahead of the root
-    // element; one written after <html>, or malformed, is ignored by the parser and arrives
-    // here as the recorded empty string, i.e. as the absence this rule reports. Inventing a
-    // separate "invalid" verdict would mean guessing at legacy but legitimate declarations,
-    // and manufacturing a non-conformity is the one thing this tier must not do.
+    // WHAT IT DECIDES, AND WHAT IT DOES NOT. The signal exhausts test 8.1.1 only: no parsed
+    // doctype means the required declaration is absent. It does not retain enough source
+    // syntax to validate every accepted declaration (8.1.2) or independently prove its source
+    // position (8.1.3). Those two tests remain with the adjudicator, and 8.1 cannot earn C from
+    // this rule's silence. Inventing either conclusion would manufacture conformity.
     //
     // NORMATIVE, and signal-gated: it fires only where a capture recorded the field, so a
     // source file and a pre-field capture are both silence rather than a failure.
@@ -478,6 +576,66 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
   if (!presentational) throw new Error("build-pack-rgaa: RGAA 10.1 is missing from the referential");
   presentational.appliesTo = { ruleIds: [...new Set([...presentational.appliesTo.ruleIds, ...PRESENTATIONAL_RULE_IDS])].sort() };
   const overrides = Object.fromEntries(PRESENTATIONAL_RULE_IDS.map((id) => [id, { advisory: false, severity: "majeur" }]));
+
+  // ---- Test-level automation matrix -------------------------------------------------
+  // Start fail-closed: every one of DINUM's 258 tests is a judgment until a rule is
+  // explicitly tied to it below. Every applicable rule is also classified. Unlisted rules
+  // become candidates, never normative failures by accident.
+  const packRuleById = new Map(rules.map((rule) => [`pack:rgaa:${rule.id}`, rule]));
+  const packDecisive = {
+    "8.1|pack:rgaa:doctype-missing": ["1"],
+    "8.10|pack:rgaa:dir-value-invalid": ["2"],
+    "11.8|pack:rgaa:optgroup-without-label": ["2"],
+    "10.1|presentational-element": ["1"],
+    "10.1|presentational-attribute": ["2"],
+    "10.1|presentational-spacing": ["3"],
+  };
+  for (const [key, tests] of Object.entries(CANDIDATE_RULE_TESTS)) {
+    const split = key.indexOf("|");
+    const criterionId = key.slice(0, split);
+    const ruleId = key.slice(split + 1);
+    const criterion = criteria.find((entry) => entry.id === criterionId);
+    if (!criterion) throw new Error(`CANDIDATE_RULE_TESTS: unknown criterion "${criterionId}"`);
+    if (!criterion.appliesTo.ruleIds.includes(ruleId))
+      throw new Error(`CANDIDATE_RULE_TESTS: "${ruleId}" is not applicable to RGAA ${criterionId}`);
+    for (const test of tests) if (!(test in criterion.tests)) throw new Error(`CANDIDATE_RULE_TESTS: unknown test ${criterionId}.${test}`);
+  }
+  for (const c of criteria) {
+    const testKeys = Object.keys(c.tests ?? {});
+    const testTiers = Object.fromEntries(testKeys.map((key) => [key, "judgment"]));
+    const ruleContracts = c.appliesTo.ruleIds.map((id) => {
+      const decisiveTests = DECISIVE_RULE_TESTS[`${c.id}|${id}`] ?? packDecisive[`${c.id}|${id}`];
+      const advisory = packRuleById.get(id)?.advisory === true;
+      // Fail closed: a rule is decisive only when the exact RGAA numbered test is curated
+      // above. The old fallback made every unlisted rule decisive and then spread it over
+      // every test of the criterion — precisely the false-NC path this contract exists to
+      // prevent.
+      const effect = advisory ? "advisory" : decisiveTests ? "decisive-nc" : "candidate";
+      const touched = decisiveTests ?? CANDIDATE_RULE_TESTS[`${c.id}|${id}`] ?? testKeys;
+      if (effect === "decisive-nc") {
+        const tier = id === "pack:rgaa:doctype-missing" ? "rendered" : renderedTier(id);
+        for (const test of touched) testTiers[test] = mergeTestTier(testTiers[test], tier);
+      }
+      return {
+        id,
+        tests: touched,
+        effect,
+        rationale:
+          effect === "decisive-nc"
+            ? "The observed failure exhausts the cited RGAA test."
+            : effect === "candidate"
+              ? "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+              : "Non-normative recommendation; it cannot affect the criterion verdict.",
+      };
+    });
+    c.automation = {
+      tests: testTiers,
+      rules: ruleContracts,
+      ...(COMPLETE_BY_SILENCE.has(c.id) ? { completeBySilence: true } : {}),
+    };
+    // The matrix supersedes the five historical exceptions: any criterion not explicitly
+    // complete by silence must not inherit C from a broader WCAG projection.
+  }
 
   const pack = {
     key: "rgaa",
@@ -571,6 +729,48 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
 
   const packText = biomeFormat(JSON.stringify(pack, null, 2) + "\n", "src/data/standards/rgaa.json");
   const glossaryText = biomeFormat(JSON.stringify(glossary, null, 2) + "\n", "src/data/standards/rgaa.glossary.json");
+  const automationLines = [
+    "<!-- GENERATED by `pnpm run build:pack:rgaa` from the vendored RGAA 4.1.2 data and the curated rule contracts. -->",
+    "",
+    "# RGAA 4.1.2 automation matrix",
+    "",
+    "Every one of the 258 official tests is classified. `static` and `rendered` mean that an explicitly mapped decisive rule can prove a failure; `judgment` remains for adjudication. A candidate signal is evidence only and never changes the verdict by itself. Conformity by silence is allowed only where explicitly shown.",
+    "",
+    "## Summary by criterion",
+    "",
+    "The 106 criterion rows below are the one-by-one routing review. “AI + signals” means deterministic evidence is forwarded without changing the verdict; “deterministic NC + AI residual” means a precise failure can be decided mechanically while every remaining condition still goes to adjudication.",
+    "",
+    "| Criterion | Tests (static / rendered / judgment) | Rules (decisive / candidate / advisory) | C by silence | Reviewed routing |",
+    "|---|---:|---:|:---:|---|",
+  ];
+  for (const c of criteria) {
+    const tiers = Object.values(c.automation.tests);
+    const effects = c.automation.rules.map((rule) => rule.effect);
+    const count = (values, value) => values.filter((entry) => entry === value).length;
+    automationLines.push(
+      `| ${c.id} | ${count(tiers, "static")} / ${count(tiers, "rendered")} / ${count(tiers, "judgment")} | ${count(effects, "decisive-nc")} / ${count(effects, "candidate")} / ${count(effects, "advisory")} | ${c.automation.completeBySilence ? "yes" : "no"} | ${
+        c.automation.completeBySilence
+          ? "deterministic"
+          : effects.includes("decisive-nc")
+            ? "deterministic NC + AI residual"
+            : effects.includes("candidate")
+              ? "AI + signals"
+              : "AI"
+      } |`,
+    );
+  }
+  automationLines.push("", "## Test-by-test contract", "");
+  automationLines.push("| Test | Owner | Decisive rules | Candidate signals |", "|---|---|---|---|");
+  for (const c of criteria) {
+    for (const [test, tier] of Object.entries(c.automation.tests)) {
+      const contracts = c.automation.rules.filter((rule) => rule.tests.includes(test));
+      const decisive = contracts.filter((rule) => rule.effect === "decisive-nc").map((rule) => `\`${rule.id}\``);
+      const candidates = contracts.filter((rule) => rule.effect === "candidate").map((rule) => `\`${rule.id}\``);
+      automationLines.push(`| ${c.id}.${test} | ${tier} | ${decisive.join(", ") || "—"} | ${candidates.join(", ") || "—"} |`);
+    }
+  }
+  automationLines.push("");
+  const automationText = automationLines.join("\n");
 
   if (doCheck) {
     const packPath = join(OUT, "rgaa.json");
@@ -579,6 +779,8 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
     if (!existsSync(packPath) || readFileSync(packPath, "utf8") !== packText) drift.push("src/data/standards/rgaa.json");
     if (!existsSync(glossaryPath) || readFileSync(glossaryPath, "utf8") !== glossaryText)
       drift.push("src/data/standards/rgaa.glossary.json");
+    if (!existsSync(AUTOMATION_REF) || readFileSync(AUTOMATION_REF, "utf8") !== automationText)
+      drift.push("skills/ultra11y/references/rgaa-automation.md");
     if (drift.length > 0) {
       console.error(`build-pack-rgaa --check: OUT OF DATE vs vendored source — re-run \`pnpm run build:pack:rgaa\`: ${drift.join(", ")}`);
       process.exit(1);
@@ -590,6 +792,7 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "rgaa.json"), packText);
   writeFileSync(join(OUT, "rgaa.glossary.json"), glossaryText);
+  writeFileSync(AUTOMATION_REF, automationText);
 
   // A normative sentence that stringified to "[object Object]" is a DELETED sub-condition an
   // auditor would have had to apply. Fail the build rather than ship placeholder text.

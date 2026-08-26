@@ -150,7 +150,15 @@ describe("the page-by-page comment", () => {
     // ONE page, so the scoreboard row and the detail block below it describe the same thing —
     // the scoreboard is in scope order while the blocks are sorted worst-first.
     const only: PageScope[] = [{ id: "contact", name: "Contact", url: "https://x/contact", sources: ["app/contact/page.tsx"], basis: "snapshot" }];
-    const md = pagesComment(audit({ scope: { inputs: [], files: 1, pages: only } } as Partial<AuditResult>), { standard: "rgaa", lang: "fr" });
+    const failure = F({ ruleId: "link-empty-name", criteriaId: "2.4.4", selectorHint: "a", page: "contact" });
+    const md = pagesComment(
+      audit({
+        scope: { inputs: [], files: 1, pages: only, pagesAudited: ["contact"] },
+        criteria: [C("2.4.4", "NC", [failure])],
+        findings: [failure],
+      } as Partial<AuditResult>),
+      { standard: "rgaa", lang: "fr" },
+    );
     const row = /\| instantané \| (\d+) \| (\d+) \|/.exec(md);
     const tally = /(\d+) conforme\(s\) · (\d+) non conforme\(s\) · (\d+) non applicable\(s\) · (\d+) à évaluer/.exec(md);
     expect(row).not.toBeNull();

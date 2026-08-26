@@ -16,6 +16,9 @@ export interface PackCriterionResult {
   theme: number;
   status: Status;
   findings: Finding[];
+  /** Engine signals relevant to this criterion but not sufficient to establish NC. They are
+   * carried to the adjudication worklist and never enter conformance tallies or gates. */
+  candidateFindings?: Finding[];
   scs: string[]; // contributing WCAG SCs
   // Set when EVERY WCAG SC this criterion maps to is outside the engine's WCAG 2.2 AA
   // core (out-of-core AAA, or removed) — the engine has no core SC to project a verdict
@@ -84,7 +87,11 @@ function ruleMatches(ruleId: string, patterns: string[]): boolean {
  *  the WCAG SC id). */
 export function packCriteriaForFinding(pack: StandardPack, finding: Finding): string[] {
   return pack.criteria
-    .filter((pc) => pc.wcag.includes(finding.criteriaId) && (!pc.appliesTo || ruleMatches(finding.ruleId, pc.appliesTo.ruleIds)))
+    .filter((pc) => {
+      if (!pc.wcag.includes(finding.criteriaId) || (pc.appliesTo && !ruleMatches(finding.ruleId, pc.appliesTo.ruleIds))) return false;
+      if (!pc.automation) return true;
+      return pc.automation.rules.some((rule) => ruleMatches(finding.ruleId, [rule.id]) && rule.effect !== "candidate");
+    })
     .map((pc) => pc.id);
 }
 
@@ -152,6 +159,7 @@ function applySecondaryMappings(
   // out-of-scope/scoped-out base verdict; an advisory-only one just rides along for display.
   if (added.some((f) => !f.advisory))
     return {
+      ...base,
       id: pc.id,
       theme: pc.theme,
       status: aggregate([{ status: base.status, inapplicable: base.inapplicable }, { status: "NC" }]),
@@ -174,7 +182,7 @@ function applySecondaryMappings(
  *  Only `C` is intercepted: an `NC` was evidenced by a rule that really fired on this
  *  criterion, and an `NA` means nothing in scope is concerned — both stay. */
 function judgmentGuard(r: PackCriterionResult, pc: PackCriterion): PackCriterionResult {
-  if (!pc.judgment || r.status !== "C") return r;
+  if (!(pc.judgment || (pc.automation && pc.automation.completeBySilence !== true)) || r.status !== "C") return r;
   // …unless there is nothing of that kind in scope. The guard exists because the RGAA question
   // is usually BROADER than the success criteria it maps onto, so inheriting their `C` would
   // answer a narrower question than the one asked. A broader question still needs a subject:
@@ -216,7 +224,7 @@ function measuredRescue(
   ran: PageCoverage | undefined,
   pageId: string | undefined,
 ): PackCriterionResult {
-  if (r.status !== "manual" || pc.judgment || r.outOfScope) return r;
+  if (r.status !== "manual" || pc.judgment || r.outOfScope || pc.automation?.completeBySilence !== true) return r;
   if (!criterionMeasuredOn(pc.appliesTo?.ruleIds, pc.wcag, cov, ran)) return r;
   // The stale explanations go with the stale status: `scopedOut` and `judgment` say why the
   // criterion STAYED open, and it no longer is.
@@ -327,10 +335,14 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
     // criterion can actually be non-conformant on. NC is driven by NON-ADVISORY findings
     // only; advisory findings still attach (so the pack report/PRD renders the
     // recommendation) but never flip the criterion to NC.
-    const findings = allFindings.filter((f) => ruleMatches(f.ruleId, pc.appliesTo!.ruleIds));
-    const normativeFindings = findings.filter((f) => !f.advisory);
+    const applicableFindings = allFindings.filter((f) => ruleMatches(f.ruleId, pc.appliesTo!.ruleIds));
+    const contractFor = (ruleId: string) => pc.automation?.rules.find((rule) => ruleMatches(ruleId, [rule.id]));
+    const candidateFindings = pc.automation ? applicableFindings.filter((f) => !f.advisory && contractFor(f.ruleId)?.effect === "candidate") : [];
+    const findings = pc.automation ? applicableFindings.filter((f) => f.advisory || contractFor(f.ruleId)?.effect !== "candidate") : applicableFindings;
+    const candidate = candidateFindings.length ? { candidateFindings } : {};
+    const normativeFindings = findings.filter((f) => !f.advisory && (!pc.automation || contractFor(f.ruleId)?.effect === "decisive-nc"));
     if (normativeFindings.length) {
-      return { id: pc.id, theme: pc.theme, status: "NC" as Status, findings, scs: pc.wcag };
+      return { id: pc.id, theme: pc.theme, status: "NC" as Status, findings, scs: pc.wcag, ...candidate };
     }
     // No NORMATIVE finding attaches. A mapped SC may still be NC, but on out-of-scope
     // elements (a sibling criterion's failure) — that NC is NOT ours: derive as manual
@@ -355,10 +367,10 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
     // Ordered before the sibling check rather than after, because the two answer different
     // questions and absence is the more specific one.
     if (subjectAbsent(pc)) {
-      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS as Status, findings, scs: pc.wcag, inapplicable: true };
+      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS as Status, findings, scs: pc.wcag, inapplicable: true, ...candidate };
     }
     if (scResults.some((r) => r.status === "NC")) {
-      return { id: pc.id, theme: pc.theme, status: "manual" as Status, findings, scs: pc.wcag, scopedOut: true };
+      return { id: pc.id, theme: pc.theme, status: "manual" as Status, findings, scs: pc.wcag, scopedOut: true, ...candidate };
     }
     // A criterion the PACK decides on its own — its instrument is a pack rule, and its WCAG
     // mapping contributes no result (RGAA 8.1: the only SC it cites was removed). The empty
@@ -370,7 +382,7 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
     // stays open on the pages where it declined. That is the difference between a measurement
     // and an absence of evidence, and it is the whole reason this branch exists.
     if (!scResults.length && (pc.appliesTo?.ruleIds ?? []).some((id) => ownRuleIds.has(id))) {
-      return { id: pc.id, theme: pc.theme, status: "manual" as Status, findings, scs: pc.wcag };
+      return { id: pc.id, theme: pc.theme, status: "manual" as Status, findings, scs: pc.wcag, ...candidate };
     }
     // Otherwise the ordinary non-NC aggregate (C / manual / NA) over the mapped SCs, with
     // any advisory findings kept on the result so the pack view surfaces them.
@@ -388,7 +400,7 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
     //
     // NC is excluded and stays excluded: something actually fired, so the subject is there.
     if (status !== "NC" && subjectAbsent(pc)) {
-      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS as Status, findings, scs: pc.wcag, inapplicable: true };
+      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS as Status, findings, scs: pc.wcag, inapplicable: true, ...candidate };
     }
     const inapplicable = status === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));
     // AN INHERITED ABSENCE CANNOT CLOSE A CRITERION WHOSE OWN SUBJECT IS PRESENT.
@@ -411,9 +423,9 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
     // on it. NC is already excluded above, and a criterion declaring no subject of its own is
     // untouched.
     if (inapplicable && ownSubjectSeen(pc)) {
-      return { id: pc.id, theme: pc.theme, status: "manual" as Status, findings, scs: pc.wcag };
+      return { id: pc.id, theme: pc.theme, status: "manual" as Status, findings, scs: pc.wcag, ...candidate };
     }
-    return { id: pc.id, theme: pc.theme, status, findings, scs: pc.wcag, ...(inapplicable ? { inapplicable: true } : {}) };
+    return { id: pc.id, theme: pc.theme, status, findings, scs: pc.wcag, ...(inapplicable ? { inapplicable: true } : {}), ...candidate };
   };
 
   // Secondary crosswalk projections (opt-in, config-enabled). Sourced from EVERY audit

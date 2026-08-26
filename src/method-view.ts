@@ -192,6 +192,12 @@ export function methodView(standard: StandardId, lang: Lang, opts: MethodOptions
   // failable from it — RGAA 4.10 is judgment-flagged and still carries autoplay rules.
   // Collapsing the two into one boolean throws away real coverage.
   const failableFromSource = [...coverage].filter(([, c]) => !c.sourceIsEnough && c.canFailFrom.includes("source")).map(([id]) => id);
+  const evidenceTiers = (["source", "cross-file", "rendered-page", "browser"] as const)
+    .map((tier) => {
+      const ids = [...coverage].filter(([, criterion]) => criterion.canFailFrom.includes(tier)).map(([id]) => id);
+      return { tier, count: ids.length, ids, ...TIER_GUIDE[tier] };
+    })
+    .filter((entry) => entry.count > 0);
 
   const pack = isCore(standard) ? undefined : getPack(standard);
   return {
@@ -208,6 +214,7 @@ export function methodView(standard: StandardId, lang: Lang, opts: MethodOptions
       ids: failableFromSource,
       note: "These cannot be PROVEN conformant from source, but an engine rule can still fail them outright.",
     },
+    evidenceTiers,
     ...(pack?.sampleMethodology
       ? {
           sample: {

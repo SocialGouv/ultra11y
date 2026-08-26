@@ -62,12 +62,13 @@ describe("renderPageReport", () => {
   });
 
   it("marks the page's own status, which is not the scope-wide one", () => {
-    expect(md).toMatch(/\| 1\.1 —[^|]*\|[^|]*\| NC \|/); // the image with no alt is on THIS page
-    expect(md).toMatch(/\| 8\.3 —[^|]*\|[^|]*\| C \|/); // lang is declared on THIS page
+    expect(md).toMatch(/\| 1\.1 —[^|]*\|[^|]*\| \? \|/); // missing alt is a signal until image purpose is adjudicated
+    expect(md).toMatch(/\| 11\.9 —[^|]*\|[^|]*\| NC \|/); // the unnamed button is a decisive failure
+    expect(md).toMatch(/\| 8\.3 —[^|]*\|[^|]*\| \? \|/); // presence alone does not clear both RGAA alternatives
   });
 
   it("renders each non-conformity through the shared auditor block, occurrence line included", () => {
-    expect(md).toContain("#### 🔴 RGAA 1.1 —");
+    expect(md).toContain("#### 🔴 RGAA 11.9 —");
     // The machine-parseable occurrence contract (AUDITOR_OCCURRENCE, src/verify.ts).
     expect(md).toMatch(/^- \[ \] `[^`]+:\d+` \(`[^`]*`\) — /m);
   });
@@ -164,7 +165,7 @@ describe("the index", () => {
     // fix it. Listing twelve near-identical lines is what would trade an empty report for an
     // unreadable one — but the count and the adjudicable items must not move.
     const p = derived.find((x) => x.id === "contact")!;
-    const one = p.findings.find((f) => !f.advisory)!;
+    const one = p.findings.find((f) => f.ruleId === "button-empty-name")!;
     // Twelve occurrences of one rule on one selector, as a design-system defect produces. The
     // clones must reach the CRITERION's own finding list — that is what prdUnits reads.
     const clones = Array.from({ length: 11 }, (_, i) => ({ ...one, col: 40 + i }));
@@ -181,8 +182,7 @@ describe("the index", () => {
     // counted header excluded. Not an equality with the finding count — under a pack one finding
     // legitimately projects onto several criteria, so the fan-out can exceed it; what must never
     // happen is the fold REDUCING it.
-    const normative = many.findings.filter((f) => !f.advisory).length;
-    expect(sheet.split("\n").filter((l) => AUDITOR_OCCURRENCE.test(l)).length).toBeGreaterThanOrEqual(normative);
+    expect(sheet.split("\n").filter((l) => AUDITOR_OCCURRENCE.test(l)).length).toBeGreaterThanOrEqual(12);
     // ...and untouched for the reader's arithmetic: the block still claims the raw count.
     expect(sheet).toContain("12 occurrence");
   });

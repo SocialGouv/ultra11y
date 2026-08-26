@@ -142,6 +142,30 @@ describe("validatePack", () => {
     const good = validatePack({ ...base(), locales: ["pt-BR", "en"], defaultLocale: "en" });
     expect(errs(good).some((e) => e.path === "locales")).toBe(false);
   });
+
+  it("fail-closes malformed or incomplete test-level automation contracts", () => {
+    const criterion = {
+      id: "1.1",
+      theme: 1,
+      title: { en: "Alt" },
+      titlePlain: { en: "Alt" },
+      tests: { "1": ["test one"], "2": ["test two"] },
+      wcag: ["1.1.1"],
+      appliesTo: { ruleIds: ["img-alt-missing"] },
+      automation: {
+        tests: { "1": "static" },
+        rules: [{ id: "img-alt-missing", tests: ["1"], effect: "decisive-nc" }],
+        completeBySilence: true,
+      },
+    };
+    const result = validatePack({ ...base(), criteria: [criterion] });
+    expect(result.ok).toBe(false);
+    expect(
+      errs(result)
+        .map((issue) => issue.message)
+        .join("\n"),
+    ).toMatch(/classify exactly|cannot close by silence/);
+  });
 });
 
 describe("neutralizeCaptureGroups (idCaptureSource's capturing-group neutralizer)", () => {

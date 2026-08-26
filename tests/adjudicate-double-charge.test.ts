@@ -178,15 +178,24 @@ describe("the refusal stays narrow", () => {
 // other. A tie is the pack declining to say which question comes first, and refusing on a tie
 // is a guess made against a finding that may well be true.
 describe("a neighbour the pack does not single out refuses nothing", () => {
-  it("states the premise: the engine owns the radio under 11.5, and 11.4 is left to the agent", () => {
+  const radioAnchor = () => {
+    const item = buildAdjudicationWorklist(auditOf(RADIOS), { standard: "rgaa" }).find((entry) => entry.criteriaId === "11.4")!;
+    const evidence = item.evidence.find((entry) => entry.selector === "input#oui") ?? item.evidence[0];
+    expect(evidence).toBeDefined();
+    return { file: evidence!.file, line: evidence!.line, selector: evidence!.selector, snippet: evidence!.snippet };
+  };
+
+  it("states the premise: the ungrouped-radio heuristic is a signal, while 11.4 is left to the agent", () => {
     const pcs = derivePackResults(auditOf(RADIOS), "rgaa");
-    expect(pcs.find((c) => c.id === "11.5")?.status).toBe("NC");
-    expect(engineAnchor("11.5", RADIOS)).toMatchObject({ selector: "input#oui" });
+    const grouping = pcs.find((c) => c.id === "11.5");
+    expect(grouping?.status).toBe("manual");
+    expect(grouping?.candidateFindings?.some((finding) => finding.ruleId === "radio-checkbox-group-ungrouped")).toBe(true);
+    expect(engineAnchor("11.5", RADIOS)).toBeUndefined();
     expect(pcs.find((c) => c.id === "11.4")?.status).toBe("manual");
   });
 
-  it("accepts 11.4 on the very anchor the engine ruled 11.5 non-conformant", () => {
-    const r = ncOn("11.4", engineAnchor("11.5", RADIOS)!, "11.4.3", RADIOS);
+  it("accepts 11.4 on a radio also surfaced as a non-conclusive 11.5 signal", () => {
+    const r = ncOn("11.4", radioAnchor(), "11.4.3", RADIOS);
     expect(r.rejectedCriteria, r.issues.join("\n")).not.toContain("11.4");
   });
 

@@ -22,7 +22,7 @@ import { resolveMessage, resolveRemediation } from "./messages.js";
 import { findingsForStandard } from "./standards/derive.js";
 import { packCriterionLabel } from "./standards/document.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
-import { packReportGroups, renderPackReport, renderReport, reportCoverage, reportGroups, splitReportSections } from "./report.js";
+import { automationOverview, packReportGroups, renderPackReport, renderReport, reportCoverage, reportGroups, splitReportSections } from "./report.js";
 import type { AuditResult, Finding, Lang, PageResult, Severity, Status } from "./types.js";
 import { isUrlPath, repoRelative } from "./util.js";
 import {
@@ -186,6 +186,13 @@ const S = {
     pageMoreCriteria: (n: number) => `_… et ${n} autre(s) critère(s) non conforme(s) sur cette page — voir la fiche de page dans l'artefact._`,
     noCriterionForFindings: (n: number) =>
       `${n} constat(s) sur cette page ne rendent aucun critère du référentiel non conforme : leur règle sort du périmètre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont détaillés dans l'artefact.`,
+    runScope: "Périmètre de ce run",
+    renderedActuallyTested: (n: number) => `${n} page(s) rendue(s) réellement testée(s)`,
+    noRenderedExecuted: "0 page rendue : aucun test rendered n'a été exécuté",
+    staticTested: (tests: number, ids: string) => `${tests} test(s) static — critères : ${ids || "—"}`,
+    renderedContract: (tests: number, ids: string) => `${tests} test(s) rendered prévus — critères : ${ids || "—"}`,
+    judgmentContract: (tests: number, criteria: number) =>
+      `${tests} test(s) judgment sur ${criteria} critère(s), transmis à l'IA seulement quand ils restent applicables et non tranchés`,
   },
   en: {
     title: "ultra11y accessibility audit",
@@ -269,6 +276,13 @@ const S = {
     pageMoreCriteria: (n: number) => `_… and ${n} more non-conforming criterion(ia) on this page — see its sheet in the artifact._`,
     noCriterionForFindings: (n: number) =>
       `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`,
+    runScope: "Scope of this run",
+    renderedActuallyTested: (n: number) => `${n} rendered page(s) actually tested`,
+    noRenderedExecuted: "0 rendered pages: no rendered test was executed",
+    staticTested: (tests: number, ids: string) => `${tests} static test(s) — criteria: ${ids || "—"}`,
+    renderedContract: (tests: number, ids: string) => `${tests} planned rendered test(s) — criteria: ${ids || "—"}`,
+    judgmentContract: (tests: number, criteria: number) =>
+      `${tests} judgment test(s) across ${criteria} criterion(ia), sent to AI only while applicable and undecided`,
   },
 } as const;
 
@@ -424,6 +438,24 @@ export function runCoverage(result: AuditResult, standard: StandardId, lang: Lan
   };
 }
 
+/** Compact and literal execution scope for GitHub surfaces. In particular, a source-only
+ *  action says “0 rendered pages” instead of deriving routes from source and implying that a
+ *  browser visited them. */
+function runScopeLines(result: AuditResult, standard: StandardId, lang: Lang): string[] {
+  const s = S[lang];
+  const pages = result.scope.pagesAudited?.length ?? 0;
+  const out = [`> **${s.runScope}** — ${pages === 0 ? s.noRenderedExecuted : s.renderedActuallyTested(pages)}`];
+  const automation = automationOverview(standard);
+  if (!automation) return out;
+  const ids = (values: string[]) => values.map((id) => `\`${id}\``).join(" · ");
+  out.push(
+    `> ${s.staticTested(automation.tests.static, ids(automation.criteria.static))}`,
+    `> ${s.renderedContract(automation.tests.rendered, ids(automation.criteria.rendered))}`,
+    `> ${s.judgmentContract(automation.tests.judgment, automation.criteria.judgment.length)}`,
+  );
+  return out;
+}
+
 // Pipes inside a cell would break the table.
 const cell = (v: string): string => v.replace(/\|/g, "\\|");
 
@@ -482,6 +514,7 @@ export function stepSummary(result: AuditResult, opts: AnnotateOptions = {}): st
   const out: string[] = [];
   out.push(`## ${s.title} — ${stdLabel}`, "");
   out.push(`\`${result.date}\` · ${result.scope.files} ${s.files} · **${coverage.text}**${coverage.detail ? ` · ${coverage.detail}` : ""}`, "");
+  out.push(...runScopeLines(result, standard, lang), "");
   if (coverage.agentRuled) out.push(`> ${agentMarkNote(lang)}`, "");
 
   // Resolve the standard's findings BEFORE the empty check: a page whose only defect comes
@@ -589,6 +622,7 @@ export function prComment(result: AuditResult, opts: AnnotateOptions & { runUrl?
   head.push(`### ${s.title} — ${stdLabel}`, "");
   head.push(blocking ? s.verdictFail(blocking) : normative.length ? s.verdictWarn : s.verdictPass, "");
   head.push(`\`${result.date}\` · ${result.scope.files} ${s.files} · **${coverage.text}**${coverage.detail ? ` · ${coverage.detail}` : ""}`, "");
+  head.push(...runScopeLines(result, standard, lang), "");
   if (coverage.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
   if (orphans) head.push(`> ${s.unattributed(orphans)}`, "");
 

@@ -95,14 +95,15 @@ describe("a pack criterion is classified from what the pack declares", () => {
     const c = criterionCoverage("rgaa", "4.10")!;
     expect(c.tier).toBe("judgment");
     expect(c.sourceIsEnough).toBe(false);
-    expect(c.canFailFrom).toContain("source");
+    expect(c.canFailFrom).toEqual([]);
     expect(c.engineRules).toContain("autoplay-media");
+    expect(c.alsoNeeds).toEqual(expect.arrayContaining(["source", "browser"]));
   });
 
   it("reports the cheapest tier that can prove a criterion, and names the rest", () => {
     const c = criterionCoverage("rgaa", "8.3")!;
-    expect(c.tier).toBe("source");
-    expect(c.sourceIsEnough).toBe(true);
+    expect(c.tier).toBe("judgment");
+    expect(c.sourceIsEnough).toBe(false);
     expect(c.engineRules).toContain("html-lang-missing");
     expect(c.alsoNeeds).toContain("browser");
   });
@@ -151,32 +152,29 @@ describe("every criterion carries a stated reason", () => {
 describe("the documented RGAA figures match the pack", () => {
   const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
   const cov = standardCoverage("rgaa");
-  const judgmentCount = [...cov.values()].filter((c) => c.tier === "judgment").length;
+  const adjudicationCount = [...cov.values()].filter((c) => c.tier === "judgment").length;
+  const judgmentTestCriteria = allCriteria(loadPack("rgaa")).filter((criterion) =>
+    Object.values(criterion.automation?.tests ?? {}).includes("judgment"),
+  ).length;
 
-  it("states the same judgment count everywhere it is quoted", () => {
-    expect(judgmentCount).toBe(57); // the pack's own arithmetic; update the docs WITH this line
-    for (const doc of ["skills/ultra11y/SKILL.md", "skills/ultra11y/references/ci.md", "skills/ultra11y/references/judgment.md"]) {
-      const text = read(doc);
-      const quoted = [...text.matchAll(/(\d+)\s*(?:of|de)\s*(?:RGAA's\s*)?106/gi)].map((m) => Number(m[1]));
-      expect(quoted.length, `${doc} quotes no "<n> of 106" figure`).toBeGreaterThan(0);
-      for (const n of quoted) expect(n, `${doc} quotes "${n} of 106"`).toBe(judgmentCount);
+  it("distinguishes explicit judgment tests from criteria that need adjudication for C", () => {
+    expect(judgmentTestCriteria).toBe(97);
+    expect(adjudicationCount).toBe(104);
+    expect(read("skills/ultra11y/references/judgment.md")).toMatch(/97 (?:of RGAA's|criteria)/);
+    for (const doc of ["skills/ultra11y/SKILL.md", "skills/ultra11y/references/ci.md", "skills/ultra11y/references/mcp.md"]) {
+      expect(read(doc), doc).toMatch(/104 of 106/);
     }
   });
 
   it("names exactly the criteria that can earn C by silence, and no more", () => {
-    const staticSc = new Set(
-      allSC()
-        .filter((c) => c.automatability === "static")
-        .map((c) => c.sc),
-    );
     const canC = allCriteria(loadPack("rgaa"))
-      .filter((c) => !c.judgment && c.wcag.length > 0 && c.wcag.every((sc) => staticSc.has(sc)))
+      .filter((c) => c.automation?.completeBySilence === true)
       .map((c) => c.id);
-    expect(canC.sort()).toEqual(["8.3", "8.5"]);
+    expect(canC.sort()).toEqual(["10.1", "8.5"]);
 
     // …and the doc says so, rather than the five it used to list.
     const pages = read("skills/ultra11y/references/pages.md");
-    expect(pages).toMatch(/\*\*8\.3 and 8\.5, and\s*\n?those two only\*\*/);
-    expect(pages).toMatch(/judgmentGuard/);
+    expect(pages).toMatch(/\*\*8\.5 and 10\.1, and\s*\n?those two only\*\*/);
+    expect(pages).toMatch(/completeBySilence/);
   });
 });

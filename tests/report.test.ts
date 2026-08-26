@@ -27,6 +27,8 @@ describe("renderReport (WCAG 2.2 AA markdown)", () => {
     expect(md).toContain("## 4. Critères conformes faute de sujet");
     expect(md).toContain("## 5. Critères à adjuger (jugement / rendu) — non décidés par le moteur statique");
     expect(md).toMatch(/Taux de réussite automatique[^*]*\*\* : \d+%/);
+    expect(md).toContain("Pages rendues réellement testées : 0");
+    expect(md).toContain("## Grille exhaustive des critères");
   });
 
   it("synthesis table has WCAG guideline rows (localized fr titles) plus a Total row", () => {
@@ -243,6 +245,9 @@ describe("renderPackReport (derived RGAA view)", () => {
     expect(md).toContain("RGAA 4.1.2");
     expect(md).toContain("## 1. Synthèse par thématique");
     expect(md).toMatch(/RGAA \d+\.\d+ —/); // pack-keyed criterion labels
+    expect(md).toContain("17 test(s) static");
+    expect(md).toContain("3 rendered");
+    expect(md).toContain("238 judgment");
   });
 
   // RGAA 8.1 (doctype) used to be the report's out-of-scope example: it maps only onto the
@@ -250,11 +255,10 @@ describe("renderPackReport (derived RGAA view)", () => {
   // own `doctype-missing` rule, and this audit is source-only — nothing captured a page, so
   // the rule never ran. That is « à évaluer », and for the honest reason: not "the engine
   // cannot measure this", but "the engine did not measure it HERE".
-  it("keeps a criterion its instrument never ran on in the manual section, never among the NA", () => {
+  it("keeps a criterion its instrument never ran on open in the exhaustive grid, never among the NA", () => {
     const naSection = md.slice(md.indexOf("## 4."), md.indexOf("## 5."));
     expect(naSection).not.toContain("RGAA 8.1");
-    const manualSection = md.slice(md.indexOf("## 5."));
-    expect(manualSection).toContain("RGAA 8.1");
+    expect(md).toMatch(/\| RGAA 8\.1 —.*\| \? \| 0 \/ 1 \/ 2 \| à adjuger \|/);
   });
 
   // The out-of-scope justification is still rendered — for a pack criterion that genuinely has
@@ -292,9 +296,10 @@ describe("renderPackReport (derived RGAA view)", () => {
   // §2 unless it actually carries findings — outOfScope criteria stay §5-only.
   it("renders each NC criterion with the auditor conformance block using RGAA's own vocabulary", () => {
     const ncSection = md.slice(md.indexOf("## 2."), md.indexOf("## 3."));
-    expect(ncSection).toMatch(/#### 🔴 RGAA 8\.3 —/);
-    expect(ncSection).toContain("**Thématique** : 8.");
-    expect(ncSection).toMatch(/\*\*Critère\*\* : 8\.3 —/);
+    expect(ncSection).toMatch(/#### 🔴 RGAA 6\.2 —/);
+    expect(ncSection).toContain("**Thématique** : 6.");
+    expect(ncSection).toMatch(/\*\*Critère\*\* : 6\.2 —/);
+    expect(ncSection).not.toContain("RGAA 8.3"); // html-lang is evidence for adjudication, not a complete RGAA failure by itself
     expect(ncSection).not.toContain("RGAA 8.1"); // out-of-scope — §5 only, never a fake NC block
   });
 });
@@ -347,14 +352,15 @@ describe("per-page section renders RGAA criteria, not raw WCAG SC ids (Task #11)
     page("axe:image-alt", "1.4.3", "img.hero"), // same SC, unmatched ruleId → no pack criterion
   ];
 
-  it("shows the RGAA criterion for a one-to-one mapping (dyn-live-region → 7.5)", () => {
+  it("does not present a non-conclusive live-region signal as an RGAA non-conformity", () => {
     const md = renderPackReport(auditWithSamplePage(good, findings), loadPack("rgaa"), "fr");
-    expect(md).toContain("  - [7.5] `div[role=status]` — sample finding");
+    expect(md).not.toContain("  - [7.5] `div[role=status]` — sample finding");
+    expect(md).toContain("RGAA 7.5"); // still present in the exhaustive/manual grid
   });
 
-  it("shows every mapped RGAA criterion for a one-to-many finding (contrast-literal → 3.2, 10.5)", () => {
+  it("does not present a non-conclusive contrast signal as an RGAA non-conformity", () => {
     const md = renderPackReport(auditWithSamplePage(good, findings), loadPack("rgaa"), "fr");
-    expect(md).toContain("  - [3.2, 10.5] `p.intro` — sample finding");
+    expect(md).not.toContain("  - [3.2, 10.5] `p.intro` — sample finding");
   });
 
   it("falls back to the WCAG SC id when the finding's ruleId matches no pack criterion's appliesTo", () => {

@@ -65,7 +65,7 @@ describe("checkReport", () => {
   // Task 2: the report's §2 now embeds the full ticket template (Priorité, Partie technique,
   // Contexte de reproduction). Those extra sections + a served-URL reproduction block must
   // NOT trip the structural gate (no fabricated criterion refs, sections 1–5 intact).
-  it("passes a report whose NC blocks carry the full ticket template, including a URL reproduction context", () => {
+  it("passes a simplified report while keeping technical ticket detail out of the conformance artifact", () => {
     const dynAudit = mergeDynamic(runAudit({ inputs: [`${FIX}conforming/good.html`] }), {
       tool: "ultra11y",
       engine: "axe-core@playwright (docker)",
@@ -86,8 +86,8 @@ describe("checkReport", () => {
       ],
     });
     const md = renderReport(dynAudit, "en");
-    expect(md).toContain("Technical details");
-    expect(md).toContain("Reproduction context");
+    expect(md).not.toContain("Technical details");
+    expect(md).not.toContain("Reproduction context");
     const r = checkReport(md, "wcag", "en");
     expect(r.ok, r.issues.join("\n")).toBe(true);
   });

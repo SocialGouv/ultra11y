@@ -124,22 +124,29 @@ describe("the recall fixture poses every RGAA theme", () => {
   // NC comes from the markup half of the theme — `contrast-literal` for 3, the presentational
   // markup RGAA 10.1 re-normativizes for 10.
   const result = audit();
+  const fired = new Set([...result.findings, ...(result.packFindings ?? [])].map((finding) => finding.ruleId));
   const nc = new Set(
     derivePackResults(result, "rgaa")
       .filter((c) => c.status === "NC")
       .map((c) => c.id),
   );
-  const themes = new Set([...nc].map((id) => id.split(".")[0]));
+  const signals = derivePackResults(result, "rgaa").filter((c) => c.candidateFindings?.length);
+  const actionable = new Set([...nc, ...signals.map((c) => c.id)]);
+  const themes = new Set([...actionable].map((id) => id.split(".")[0]));
 
-  it("fails at least one criterion in each of the thirteen themes", () => {
+  it("finds a decisive failure or an adjudication signal in each of the thirteen themes", () => {
     const all = Array.from({ length: 13 }, (_, i) => String(i + 1));
     const empty = all.filter((t) => !themes.has(t));
     expect(empty, `no criterion of theme(s) ${empty.join(", ")} is non-conforming on the fixture`).toEqual([]);
   });
 
-  it("fails enough of the referential to be worth calling a non-conforming site", () => {
-    // A ratchet, like tests/rgaa-coverage.test.ts: the number may go UP when a rule gains a
-    // mapping or a defect is added, never down without somebody deciding it should.
-    expect(nc.size, `only ${nc.size} RGAA criteria are non-conforming on a fixture built to fail`).toBeGreaterThanOrEqual(38);
+  it("keeps decisive failures and non-conclusive signals separately visible", () => {
+    const expectedNc = new Set(
+      loadPack("rgaa")
+        .criteria.filter((criterion) => criterion.automation?.rules.some((rule) => rule.effect === "decisive-nc" && fired.has(rule.id)))
+        .map((criterion) => criterion.id),
+    );
+    expect([...nc].sort(), "a candidate signal changed a verdict, or a decisive finding was lost in projection").toEqual([...expectedNc].sort());
+    expect(signals.length, "the fixture no longer exercises candidate routing").toBeGreaterThan(0);
   });
 });

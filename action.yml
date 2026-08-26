@@ -909,6 +909,7 @@ runs:
     # `--max-turns` bounds an unattended run. claude-code-action sets no default, and this
     # step has nobody watching it.
     - name: Adjudicate with an agent — Claude Code
+      id: agentpass1
       if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli'
       uses: anthropics/claude-code-action@v1
       # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
@@ -1142,6 +1143,7 @@ runs:
         echo "ultra11y: pass 2 — $n criterion(ia) still undecided, budget $turns turns."
 
     - name: Adjudicate with an agent — pass 2, Claude Code
+      id: agentpass2
       if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0'
       uses: anthropics/claude-code-action@v1
       # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
@@ -1299,6 +1301,7 @@ runs:
         echo "ultra11y: pass 3 — $n criterion(ia) still undecided, budget $turns turns."
 
     - name: Adjudicate with an agent — pass 3, Claude Code
+      id: agentpass3
       if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0'
       uses: anthropics/claude-code-action@v1
       # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
@@ -1370,6 +1373,68 @@ runs:
           exit 1
         else
           echo "::warning::ultra11y: pass 3 landed nothing — the remaining criteria stay to assess."
+        fi
+
+    # A model refusing every operational call is an infrastructure failure, not a successful
+    # accessibility run. Keep `continue-on-error` on each call so reports/artifacts survive,
+    # record the state here, then enforce it in the LAST gate. `conclusion` catches ordinary
+    # failures; inspecting `execution_file` also catches the upstream shape where the wrapper
+    # says success while the final Claude result says `is_error: true`.
+    - name: Require at least one operational agent pass
+      id: agentoperational
+      if: always() && steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist.outputs.remaining != '0'
+      shell: bash
+      env:
+        PASS1: ${{ steps.agentpass1.outputs.conclusion }}
+        PASS2: ${{ steps.agentpass2.outputs.conclusion }}
+        PASS3: ${{ steps.agentpass3.outputs.conclusion }}
+        FILE1: ${{ steps.agentpass1.outputs.execution_file }}
+        FILE2: ${{ steps.agentpass2.outputs.execution_file }}
+        FILE3: ${{ steps.agentpass3.outputs.execution_file }}
+      run: |
+        attempted=0
+        succeeded=0
+        for pass in 1 2 3; do
+          eval "conclusion=\${PASS${pass}:-}"
+          eval "execution_file=\${FILE${pass}:-}"
+          # Pass 1 is mandatory whenever this step runs. Blank outputs from it mean the
+          # action never became operational; later blank passes merely mean no residue
+          # required them, so they are skipped here as they were in the workflow.
+          if [ "$pass" -ne 1 ] && [ -z "$conclusion" ] && [ -z "$execution_file" ]; then continue; fi
+          attempted=$((attempted + 1))
+          if [ "$conclusion" != success ] || [ ! -f "$execution_file" ]; then continue; fi
+          if node - "$execution_file" <<'NODE'
+        const fs = require("node:fs");
+        const path = process.argv[2];
+        const raw = fs.readFileSync(path, "utf8").trim();
+        const records = [];
+        try {
+          records.push(JSON.parse(raw));
+        } catch {
+          for (const line of raw.split(/\r?\n/)) {
+            if (!line.trim()) continue;
+            try { records.push(JSON.parse(line)); } catch {}
+          }
+        }
+        const seen = [];
+        const visit = (value) => {
+          if (!value || typeof value !== "object") return;
+          if (!Array.isArray(value) && (value.type === "result" || Object.hasOwn(value, "is_error"))) seen.push(value);
+          for (const child of Array.isArray(value) ? value : Object.values(value)) visit(child);
+        };
+        for (const record of records) visit(record);
+        const result = seen.at(-1);
+        process.exit(result && result.is_error !== true ? 0 : 1);
+        NODE
+          then
+            succeeded=$((succeeded + 1))
+          fi
+        done
+        if [ "$attempted" -gt 0 ] && [ "$succeeded" -eq 0 ]; then
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::ultra11y: every attempted Claude Code adjudication pass failed operationally. Reports and artifacts will be produced; the final gate will fail this run."
+        else
+          echo "ok=true" >> "$GITHUB_OUTPUT"
         fi
 
     # NO CRITERION LEAVES THIS ACTION UNACCOUNTED FOR.
@@ -1659,6 +1724,23 @@ runs:
         single=$(ls audits/ultra11y-*-*.html 2>/dev/null | head -1 || true)
         echo "single-path=$single" >> "$GITHUB_OUTPUT"
 
+    # The pack audit JSON already embeds the same contract criterion by criterion. This
+    # human-readable appendix keeps the static artifact as self-explanatory as the integral
+    # one: all 258 RGAA tests, their owner, and the exact decisive/candidate rules travel with
+    # the report instead of living only in the action's source repository.
+    - name: Carry the RGAA automation matrix into the artifact
+      if: (inputs.report == 'true' || inputs.html == 'true') && inputs.standard == 'rgaa'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        MATRIX: ${{ github.action_path }}/skills/ultra11y/references/rgaa-automation.md
+      run: |
+        if [ -f "$MATRIX" ]; then
+          cp "$MATRIX" audits/rgaa-automation.md
+        else
+          echo "::warning::ultra11y: the RGAA automation appendix is missing; audit-latest.json still carries the machine-readable contract."
+        fi
+
     # Artifact names are unique per WORKFLOW RUN, not per step: a second invocation in the
     # same job used to die on a 409 with the report already written but never uploaded.
     # `artifact-name` is how you disambiguate; the default keeps the historical name.
@@ -1701,12 +1783,16 @@ runs:
 
     # The gate runs LAST, so a failing audit has already produced every surface above.
     - name: Gate
-      if: inputs.fail-on != '' || inputs.require-decided == 'true' || inputs.require-decided == 'pages' || inputs.require-sample == 'true' || inputs.require-rendered == 'true'
+      if: inputs.fail-on != '' || inputs.require-decided == 'true' || inputs.require-decided == 'pages' || inputs.require-sample == 'true' || inputs.require-rendered == 'true' || steps.agentoperational.outputs.ok == 'false'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
       run: |
+        if [ '${{ steps.agentoperational.outputs.ok }}' = 'false' ]; then
+          echo "::error::ultra11y: every attempted Claude Code adjudication pass failed operationally. The model did not adjudicate this audit."
+          exit 1
+        fi
         # COMPLETENESS first, and on its own: a project may want a complete grid without
         # gating on non-conformities at all (`fail-on: ""`), which is the normal shape for a
         # measuring tier. Failing here rather than in the step that computed it is what lets

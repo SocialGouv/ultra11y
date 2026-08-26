@@ -236,6 +236,87 @@ export function validatePack(raw: unknown, opts: ValidateOpts = {}): PackValidat
         }
       }
     }
+    // Optional TEST-level automation contract. When present it is total and fail-closed:
+    // every declared test is classified exactly once, every applicable rule is described,
+    // and silence may prove C only when every test has a decisive instrument.
+    if (c?.automation !== undefined) {
+      const a = c.automation as Record<string, unknown> | undefined;
+      const testDefs = c?.tests && typeof c.tests === "object" && !Array.isArray(c.tests) ? (c.tests as Record<string, unknown>) : {};
+      const tiers = a && typeof a === "object" && !Array.isArray(a) ? a.tests : undefined;
+      const rules = a && typeof a === "object" && !Array.isArray(a) ? a.rules : undefined;
+      if (!a || typeof a !== "object" || Array.isArray(a) || !tiers || typeof tiers !== "object" || Array.isArray(tiers) || !Array.isArray(rules)) {
+        err(`criteria[${i}].automation`, `criterion "${String(id)}" automation must contain { tests: object, rules: array }`);
+      } else {
+        const tierMap = tiers as Record<string, unknown>;
+        const declaredTests = Object.keys(testDefs).sort();
+        const classifiedTests = Object.keys(tierMap).sort();
+        if (declaredTests.join("\0") !== classifiedTests.join("\0"))
+          err(`criteria[${i}].automation.tests`, `criterion "${String(id)}" must classify exactly its declared tests (${declaredTests.join(", ")})`);
+        for (const [test, tier] of Object.entries(tierMap))
+          if (!(["static", "rendered", "judgment"] as unknown[]).includes(tier))
+            err(`criteria[${i}].automation.tests.${test}`, `criterion "${String(id)}" has unknown automation tier "${String(tier)}"`);
+
+        const applicable = new Set(
+          c?.appliesTo && typeof c.appliesTo === "object" && !Array.isArray(c.appliesTo) && Array.isArray((c.appliesTo as Record<string, unknown>).ruleIds)
+            ? ((c.appliesTo as Record<string, unknown>).ruleIds as unknown[]).filter((value): value is string => typeof value === "string")
+            : [],
+        );
+        const described = new Set<string>();
+        const decisiveByTest = new Set<string>();
+        (rules as unknown[]).forEach((entry, k) => {
+          const rule = entry as Record<string, unknown> | undefined;
+          const rid = rule?.id;
+          const refs = rule?.tests;
+          const effect = rule?.effect;
+          if (
+            !rule ||
+            typeof rule !== "object" ||
+            Array.isArray(rule) ||
+            typeof rid !== "string" ||
+            !Array.isArray(refs) ||
+            !["decisive-nc", "candidate", "advisory"].includes(String(effect))
+          ) {
+            err(`criteria[${i}].automation.rules[${k}]`, `criterion "${String(id)}" automation rule is malformed`);
+            return;
+          }
+          if (described.has(rid)) err(`criteria[${i}].automation.rules[${k}].id`, `criterion "${String(id)}" describes rule "${rid}" twice`);
+          described.add(rid);
+          if (!applicable.has(rid)) err(`criteria[${i}].automation.rules[${k}].id`, `criterion "${String(id)}" describes non-applicable rule "${rid}"`);
+          for (const ref of refs) {
+            if (typeof ref !== "string" || !Object.hasOwn(testDefs, ref))
+              err(`criteria[${i}].automation.rules[${k}].tests`, `criterion "${String(id)}" rule "${rid}" cites unknown test "${String(ref)}"`);
+            else if (effect === "decisive-nc") decisiveByTest.add(ref);
+          }
+        });
+        for (const rid of applicable)
+          if (!described.has(rid)) err(`criteria[${i}].automation.rules`, `criterion "${String(id)}" does not classify applicable rule "${rid}"`);
+        for (const test of declaredTests) {
+          const tier = tierMap[test];
+          if ((tier === "static" || tier === "rendered") && !decisiveByTest.has(test)) {
+            err(
+              `criteria[${i}].automation.tests.${test}`,
+              `criterion "${String(id)}" classifies test ${test} as ${String(tier)} without an explicitly mapped decisive-nc rule`,
+            );
+          }
+          if (tier === "judgment" && decisiveByTest.has(test)) {
+            err(
+              `criteria[${i}].automation.tests.${test}`,
+              `criterion "${String(id)}" classifies test ${test} as judgment even though a decisive-nc rule targets it`,
+            );
+          }
+        }
+        if (a.completeBySilence === true) {
+          const missing = declaredTests.filter((test) => tierMap[test] === "judgment" || !decisiveByTest.has(test));
+          if (missing.length)
+            err(
+              `criteria[${i}].automation.completeBySilence`,
+              `criterion "${String(id)}" cannot close by silence; tests without decisive coverage: ${missing.join(", ")}`,
+            );
+        } else if (a.completeBySilence !== undefined && typeof a.completeBySilence !== "boolean") {
+          err(`criteria[${i}].automation.completeBySilence`, `criterion "${String(id)}" completeBySilence must be boolean`);
+        }
+      }
+    }
     const wcag = Array.isArray(c?.wcag) ? (c.wcag as unknown[]) : null;
     if (!wcag || wcag.length === 0) {
       err(`criteria[${i}].wcag`, `criterion "${String(id)}" must map to at least one WCAG SC`);

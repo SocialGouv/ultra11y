@@ -317,12 +317,10 @@ request can no longer say something its own sheet contradicts.
 criterion means one definite failure fired *somewhere* — not that the engine can rule on that
 criterion. On a page where the failure did not fire, the engine knows "no definite failure
 here", which is not "conforming": alt relevance, link purpose and reading order are still
-nobody's verdict. So only the `static` criteria (the ones with an applicability predicate and
-rules, `src/audit.ts` `APPLICABLE`) earn `C` by silence — under RGAA that is **8.3 and 8.5, and
-those two only**. 4.10, 8.4 and 8.6 look like they should qualify and do not: each is flagged
-`judgment: true`, because the criterion asks more than its mapped success criterion does (8.6
-asks whether the page title is *pertinent*; 2.4.2 only that a title exists), so `judgmentGuard`
-turns their `C` into `manual` on purpose. Everything else stays « à évaluer » until `scan`, the
+nobody's verdict. So only criteria whose test-level matrix opts into `completeBySilence` earn
+`C` from a fully measured silent run — under RGAA that is **8.5 and 10.1, and
+those two only**. A rule that covers one sub-test, one precondition or one allowed mechanism
+cannot close the rest of the criterion. Everything else stays « à évaluer » until `scan`, the
 snapshot tier or an adjudication decides it. Before this rule a page with no images scored 100%
 on « chaque image a-t-elle une alternative pertinente ? », a rate computed over criteria nobody
 had assessed.

@@ -143,17 +143,23 @@ describe("egapro-feedback — missed patterns (must fire)", () => {
 });
 
 describe("rgaa derivation", () => {
-  it.skipIf(!IMPLEMENTED_PHASES.has("P3"))("no-nav-landmark.html derives RGAA 9.2 and 12.6 as NC", () => {
+  it.skipIf(!IMPLEMENTED_PHASES.has("P3"))("no-nav-landmark.html sends RGAA 9.2 and 12.6 to adjudication with evidence", () => {
     const audit = runAudit({ inputs: [`${FIX}missed/no-nav-landmark.html`] });
     const rows = derivePackResults(audit, "rgaa");
-    expect(rows.find((r) => r.id === "9.2")?.status).toBe("NC");
-    expect(rows.find((r) => r.id === "12.6")?.status).toBe("NC");
+    for (const id of ["9.2", "12.6"]) {
+      const row = rows.find((entry) => entry.id === id);
+      expect(row?.status).toBe("manual");
+      expect(row?.candidateFindings?.some((finding) => finding.ruleId === "nav-landmark-missing")).toBe(true);
+    }
   });
 
-  it.skipIf(!IMPLEMENTED_PHASES.has("P3"))("fieldset-disabled.html derives RGAA 7.1 and 10.8 as NC", () => {
+  it.skipIf(!IMPLEMENTED_PHASES.has("P3"))("fieldset-disabled.html sends RGAA 7.1 and 10.8 to adjudication with evidence", () => {
     const audit = runAudit({ inputs: [`${FIX}missed/fieldset-disabled.html`] });
     const rows = derivePackResults(audit, "rgaa");
-    expect(rows.find((r) => r.id === "7.1")?.status).toBe("NC");
-    expect(rows.find((r) => r.id === "10.8")?.status).toBe("NC");
+    for (const id of ["7.1", "10.8"]) {
+      const row = rows.find((entry) => entry.id === id);
+      expect(row?.status).toBe("manual");
+      expect(row?.candidateFindings?.some((finding) => finding.ruleId === "disabled-context-content")).toBe(true);
+    }
   });
 });

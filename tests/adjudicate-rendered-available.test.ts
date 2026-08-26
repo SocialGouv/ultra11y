@@ -86,12 +86,11 @@ describe("the worklist says when NOTHING was rendered", () => {
     return { audit, items: buildAdjudicationWorklist(audit, { standard: "rgaa" }) };
   };
 
-  it("names every needs-rendering criterion nobody could have measured", () => {
+  it("names only criteria whose decisive rendered test nobody could have measured", () => {
     const { audit, items } = worklistFor(sourceOnly());
     const open = unrenderedResidual(audit, items);
     expect(open.length).toBeGreaterThan(0);
-    // The criteria the 2026-08-20 run was left with, mapped through the RGAA pack.
-    expect(open).toEqual(expect.arrayContaining(["3.2", "10.4", "10.11", "10.12"]));
+    expect(open).toEqual(["8.1", "10.7"]);
   });
 
   it("says nothing once a page's real DOM has been read", () => {
@@ -103,7 +102,8 @@ describe("the worklist says when NOTHING was rendered", () => {
     const { audit, items } = worklistFor(sourceOnly());
     const md = formatAdjudication(items, "fr", "rgaa", { unrendered: unrenderedResidual(audit, items) });
     expect(md).toMatch(/aucune page.*instantan|scan/i);
-    expect(md).toContain("`3.2`");
+    expect(md).toContain("`8.1`");
+    expect(md).toContain("`10.7`");
   });
 
   it("says it in English too, and names the command that closes it", () => {

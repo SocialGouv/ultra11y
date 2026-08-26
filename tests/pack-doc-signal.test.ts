@@ -100,13 +100,11 @@ describe("RGAA 8.1 — the criterion the instrument was built for", () => {
     expect(c.findings.map((f) => f.ruleId)).toContain("pack:rgaa:doctype-missing");
   });
 
-  it("is CONFORMING — measured, not inferred — on a captured page that declares one", () => {
+  it("keeps the criterion open when test 8.1.1 passes but validity and position still need judgment", () => {
     const audit = auditCapture([{ id: "accueil", doctype: "<!DOCTYPE html>" }]);
     const c = rgaa(audit, "8.1");
-    expect(c.status).toBe("C");
-    expect(c.decidedBy).toBe("scan");
-    // The claim has to stay falsifiable: it names the rule a reader can go and check.
-    expect(c.justification).toMatch(/pack:rgaa:doctype-missing/);
+    expect(c.status).toBe("manual");
+    expect(c.decidedBy).toBeUndefined();
   });
 
   it("stays « à évaluer » when nothing captured the page — silence is not conformity", () => {
@@ -119,13 +117,13 @@ describe("RGAA 8.1 — the criterion the instrument was built for", () => {
       { id: "accueil", doctype: "<!DOCTYPE html>" },
       { id: "contact" }, // predates the field
     ]);
-    expect(rgaa(audit, "8.1", "accueil").status).toBe("C");
+    expect(rgaa(audit, "8.1", "accueil").status).toBe("manual");
     expect(rgaa(audit, "8.1", "contact").status).toBe("manual");
   });
 
-  it("no longer costs the run its 106th criterion", () => {
+  it("still requires adjudication for tests 8.1.2 and 8.1.3", () => {
     const audit = auditCapture([{ id: "accueil", doctype: "<!DOCTYPE html>" }]);
-    expect(checkDecided(audit, "rgaa").undecided).not.toContain("8.1");
+    expect(checkDecided(audit, "rgaa").undecided).toContain("8.1");
   });
 });
 

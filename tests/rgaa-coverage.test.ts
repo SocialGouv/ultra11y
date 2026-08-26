@@ -16,9 +16,10 @@ import { getSC } from "../src/wcag.js";
 const pack = loadPack("rgaa");
 const withRules = pack.criteria.filter((c) => (c.appliesTo?.ruleIds.length ?? 0) > 0);
 
-// Measured before the rendered tier landed: 43 of 106; 51 today. Raise this line when coverage
-// grows — it had two notches of lag, which is a ratchet that had stopped ratcheting. Never lower it.
-const FLOOR = 51;
+// Measured before the rendered tier landed: 43 of 106; 50 today. The count deliberately fell
+// by one when contrast evidence was removed from RGAA 10.5: that criterion asks about paired
+// CSS declarations, not the resulting contrast ratio. False coverage is not coverage.
+const FLOOR = 50;
 
 describe("how much of RGAA the engine can evidence", () => {
   it(`maps at least ${FLOOR} of the ${pack.criteria.length} criteria onto an engine rule`, () => {
@@ -75,14 +76,14 @@ describe("the mapping is real, not aspirational", () => {
 describe("the rendered tier's own contribution", () => {
   const has = (id: string, rule: string) => pack.criteria.find((c) => c.id === id)?.appliesTo?.ruleIds.includes(rule) ?? false;
 
-  it("makes computed contrast evidence RGAA 3.2 and 10.5", () => {
+  it("routes computed contrast evidence only to RGAA 3.2", () => {
     expect(has("3.2", "rendered-contrast")).toBe(true);
-    expect(has("10.5", "rendered-contrast")).toBe(true);
+    expect(has("10.5", "rendered-contrast")).toBe(false);
   });
 
-  it("makes screenshot-measured contrast evidence the same criteria — the gradient case", () => {
+  it("routes screenshot-measured contrast evidence only to RGAA 3.2 — the gradient case", () => {
     expect(has("3.2", "rendered-contrast-pixel")).toBe(true);
-    expect(has("10.5", "rendered-contrast-pixel")).toBe(true);
+    expect(has("10.5", "rendered-contrast-pixel")).toBe(false);
   });
 
   it("makes RGAA 10.6 decidable at all — it had no rule before", () => {

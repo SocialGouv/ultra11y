@@ -227,7 +227,7 @@ from auditing out of memory. `cwd` is optional on all five; it selects whose pac
 `ultra11y_method` is the one to call first. It partitions the standard into evidence tiers —
 `source`, `cross-file`, `rendered-page`, `browser`, `judgment`, `out-of-scope` — from the
 engine's own per-criterion rule applicability, never from guessing at the wording of a test.
-For RGAA it reports that **55 of 106 criteria declare that no engine rule can evidence them**.
+For RGAA it reports that **56 of 106 criteria declare that no engine rule can evidence them**.
 That is the standard saying they are yours, and a plan that hides it reads as coverage that
 does not exist.
 
@@ -349,8 +349,10 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
   the per-page grid accumulating. The overlay detaches itself before collecting — otherwise it
   would audit itself and shift every element index — and renders nothing outside development.
   See `references/devtools.md`.
-- **A country standard is adjudicated at its OWN granularity** — 57 of RGAA's 106 criteria can
-  only ever derive `manual`, so ~93% of an RGAA audit is settled by the agent. `verify --manual
+- **A country standard is adjudicated at its OWN granularity** — 97 of RGAA's 106 criteria
+  carry at least one judgment test and can still need adjudication to earn C; decisive rules
+  can nevertheless prove their bounded failures.
+  `verify --manual
   --standard rgaa` now keys the worklist by **RGAA criteria**, each carrying its numbered tests
   in full, its technical note, its particular cases, its guidance and the glossary definitions
   its tests cite (119 entries that previously had no reader). A `normativeRef` must cite one of

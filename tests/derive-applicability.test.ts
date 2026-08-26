@@ -34,10 +34,11 @@ describe("RGAA applicability — an image-alt NC no longer over-projects", () =>
   const audit = auditHtml(`<!doctype html><html lang="en"><head><title>t</title></head><body><main><h1>H</h1><img src="hero.png"></main></body></html>`);
   const rows = derivePackResults(audit, "rgaa");
 
-  it("attaches the finding to RGAA 1.1 (informative image alternative) as NC", () => {
-    expect(statusOf(rows, "1.1")).toBe("NC");
+  it("routes the ambiguous missing-alt finding to RGAA 1.1 as an adjudication signal", () => {
+    expect(statusOf(rows, "1.1")).toBe("manual");
     const c11 = rows.find((r) => r.id === "1.1")!;
-    expect(c11.findings.some((f) => f.ruleId === "img-alt-missing")).toBe(true);
+    expect(c11.findings).toEqual([]);
+    expect(c11.candidateFindings?.some((f) => f.ruleId === "img-alt-missing")).toBe(true);
   });
 
   it("leaves the plainly-inapplicable image criteria NON-NC (CAPTCHA 1.4/1.5, detailed-description 1.6/1.7)", () => {
@@ -102,8 +103,9 @@ describe("RGAA applicability — real per-element mapping holds across themes", 
   const audit = auditHtml(`<!doctype html><html><head></head><body><main><h1>H</h1><iframe src="x"></iframe></main></body></html>`);
   const rows = derivePackResults(audit, "rgaa");
 
-  it("html-lang-missing → RGAA 8.3 (default language) NC, not other 3.1.1 criteria", () => {
-    expect(statusOf(rows, "8.3")).toBe("NC");
+  it("html-lang-missing → RGAA 8.3 signal, because RGAA also permits language on every text ancestor", () => {
+    expect(statusOf(rows, "8.3")).toBe("manual");
+    expect(rows.find((row) => row.id === "8.3")?.candidateFindings?.some((finding) => finding.ruleId === "html-lang-missing")).toBe(true);
   });
 
   it("iframe-title-missing → RGAA 2.1 (frame title) NC", () => {
@@ -162,14 +164,16 @@ describe("RGAA applicability — the stateful scan probes project onto the right
   const rows = derivePackResults(mergeDynamic(audit, dyn, "fr"), "rgaa");
   const statusOfR = (id: string) => rows.find((r) => r.id === id)?.status;
 
-  it("input-overflow lands on RGAA 10.11 (320px), 10.4 (zoom) and 10.12 (text-spacing)", () => {
-    expect(statusOfR("10.11")).toBe("NC");
-    expect(statusOfR("10.4")).toBe("NC");
-    expect(statusOfR("10.12")).toBe("NC");
+  it("routes input-overflow to adjudication for the RGAA exceptions instead of asserting NC", () => {
+    for (const id of ["10.11", "10.4", "10.12"]) {
+      expect(statusOfR(id)).toBe("manual");
+      expect(rows.find((row) => row.id === id)?.candidateFindings?.some((finding) => finding.ruleId.startsWith("dyn-input-overflow"))).toBe(true);
+    }
   });
 
-  it("live-region lands on RGAA 7.5 (status messages), NOT 7.4 (change of context)", () => {
-    expect(statusOfR("7.5")).toBe("NC");
+  it("live-region lands as an RGAA 7.5 signal, NOT 7.4 (change of context)", () => {
+    expect(statusOfR("7.5")).toBe("manual");
+    expect(rows.find((row) => row.id === "7.5")?.candidateFindings?.some((finding) => finding.ruleId === "dyn-live-region")).toBe(true);
     expect(statusOfR("7.4")).not.toBe("NC");
   });
 });
@@ -294,15 +298,16 @@ describe("RGAA 7.4 secondary mapping — live regions, disabled by default (Task
     };
   };
 
-  it("DISABLED (out-of-box): 7.4 is not NC and carries no dyn-live-region; 7.5 (WCAG-faithful) is NC", () => {
+  it("DISABLED (out-of-box): 7.4 carries nothing; 7.5 receives the non-conclusive WCAG-faithful signal", () => {
     const rows = derivePackResults(synthAudit(), "rgaa");
     const c74 = rows.find((r) => r.id === "7.4")!;
     expect(c74.status).not.toBe("NC");
     expect(c74.findings.some((f) => f.ruleId === "dyn-live-region")).toBe(false);
-    expect(statusOf(rows, "7.5")).toBe("NC");
+    expect(statusOf(rows, "7.5")).toBe("manual");
+    expect(rows.find((row) => row.id === "7.5")?.candidateFindings?.some((finding) => finding.ruleId === "dyn-live-region")).toBe(true);
   });
 
-  it("ENABLED: 7.4 becomes NC carrying dyn-live-region tagged `secondary`; the two static 4.1.3 siblings never cross over; 7.5 STILL NC", () => {
+  it("ENABLED: 7.4 gets the explicit secondary NC; 7.5 keeps the original signal", () => {
     const pack = loadPack("rgaa");
     const mapping = pack.secondaryMappings!.find((m) => m.ruleId === "dyn-live-region" && m.criterion === "7.4")!;
     const wasEnabled = mapping.enabled;
@@ -317,7 +322,8 @@ describe("RGAA 7.4 secondary mapping — live regions, disabled by default (Task
       // EXACT match: the sibling 4.1.3 rules are NOT dragged onto 7.4.
       expect(c74.findings.some((f) => f.ruleId === "status-message-not-assertive")).toBe(false);
       expect(c74.findings.some((f) => f.ruleId === "live-region-conflict")).toBe(false);
-      expect(statusOf(rows, "7.5")).toBe("NC"); // WCAG-faithful home unchanged
+      expect(statusOf(rows, "7.5")).toBe("manual");
+      expect(rows.find((row) => row.id === "7.5")?.candidateFindings?.some((finding) => finding.ruleId === "dyn-live-region")).toBe(true);
     } finally {
       mapping.enabled = wasEnabled; // restore the shipped-disabled default for other tests
     }
@@ -427,7 +433,8 @@ describe("a criterion is closed for absence ON A PAGE, not only across the run",
     // one with nothing to assess: 8.4 is `judgment`, so silence never closes it either.
     const only = runAudit({ inputs: [noLang] });
     const rows = derivePackResults(only, "rgaa");
-    expect(statusOf(rows, "8.3"), "the missing language is still its own non-conformity").toBe("NC");
+    expect(statusOf(rows, "8.3"), "the missing language still needs the RGAA alternative adjudicated").toBe("manual");
+    expect(rows.find((row) => row.id === "8.3")?.candidateFindings?.some((finding) => finding.ruleId === "html-lang-missing")).toBe(true);
     const c84 = rows.find((r) => r.id === "8.4");
     expect(c84?.status, "8.4 has no language code to judge on a page that declares none").toBe("C");
     expect(c84?.inapplicable, "…and it must say it is C for want of a subject, never as a verdict").toBe(true);

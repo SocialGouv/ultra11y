@@ -531,8 +531,8 @@ export interface PageResult {
 }
 
 // ---- adjudication under a COUNTRY STANDARD ------------------------------------------------
-// An AuditResult is WCAG-keyed by construction and a pack is a derived projection. But 57 of
-// RGAA's 106 criteria are judgment-tier and can only ever derive `manual`, so much of the
+// An AuditResult is WCAG-keyed by construction and a pack is a derived projection. But 97 of
+// RGAA's 106 criteria carry judgment tests and may still need adjudication to earn C, so much of the
 // standard — and, on a run with no captures, nearly all of it — is settled
 // by the agent — at the PACK's granularity, which is finer than WCAG's (1.1.1 alone fans out
 // to 19 RGAA criteria). Folding those verdicts onto the WCAG criteria would make several RGAA
@@ -809,6 +809,18 @@ export interface PackCriterionEntry {
   justification?: string;
   decidedBy?: "engine" | "agent" | "scan";
   inapplicable?: boolean;
+  /** The exact test-level contract used to route deterministic checks and adjudication.
+   *  Persisted in the pack audit so the JSON artifact is independently exhaustive. */
+  automation?: {
+    tests: Record<string, "static" | "rendered" | "judgment">;
+    rules: Array<{
+      id: string;
+      tests: string[];
+      effect: "decisive-nc" | "candidate" | "advisory";
+      rationale?: string;
+    }>;
+    completeBySilence?: boolean;
+  };
 }
 
 export type PackFinding = Omit<Finding, "criteriaId"> & {

@@ -55,10 +55,11 @@ describe("a country standard's own criteria", () => {
     const r = await criteria({ standard: "rgaa" });
     expect(r.kind).toBe("index");
     expect(r.counts).toMatchObject({ themes: 13, criteria: 106 });
-    // 55 of 106 RGAA criteria declare that NO engine rule can evidence them. Surfacing that
+    // 56 of 106 RGAA criteria declare that NO engine rule can evidence them. Surfacing that
     // is the difference between a plan and a false sense of coverage. It was 58 until the
-    // doctype (8.1) got an instrument of its own.
-    expect(r.counts.noEngineRule).toBe(55);
+    // doctype (8.1) got an instrument of its own; 10.5 correctly lost contrast-ratio rules,
+    // because it asks about paired CSS declarations instead.
+    expect(r.counts.noEngineRule).toBe(56);
     expect(r.groups).toHaveLength(13);
   });
 

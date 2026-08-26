@@ -86,8 +86,9 @@ test).
 | `ADJUDICATE.verdicts.json` | the **only file to write** when you have no shell — verdicts, no evidence |
 | `adjudicate/<criteriaId>.md` | one small brief per criterion: its evidence, the criterion's own wording and tests (with the standard's test methodology), its glossary terms and its citable tests |
 
-Why the split exists, measured rather than assumed: under RGAA the worklist is 96 criteria
-carrying 1590 harvested anchors — **536 KB** of JSON and **466 KB** of Markdown. An agent given
+Why the split exists, measured rather than assumed: under RGAA, up to 97 criteria carry
+judgment tests. A measured worklist carried 1590 harvested anchors — **536 KB** of JSON and
+**466 KB** of Markdown. An agent given
 `Read/Grep/Glob/Edit/Write` cannot work with that: reading either document swamps its context,
 and filling 96 verdicts inside half a megabyte is 96 exact-match edits. A real CI run spent 75
 of 424 turns, hit 17 permission denials trying to run the commands the runbook prescribes, and
@@ -122,8 +123,11 @@ Then `node scripts/ultra11y.mjs verify --apply VERIFY.todo.json` is green again 
 ## Under a country standard, the worklist speaks that standard
 
 `verify --manual --standard rgaa` keys the worklist by **RGAA criteria**, not WCAG success
-criteria — which is the granularity that matters, since 57 of RGAA's 106 criteria can only
-ever derive `manual`. Each item carries, inline:
+criteria — which is the granularity that matters, since 97 of RGAA's 106 criteria carry
+judgment tests and may still need adjudication to earn C. Each item carries, inline:
+
+In total, **104 of RGAA's 106** criteria still need adjudication to earn C; the other seven
+beyond the 97 have deterministic failure detectors but no complete positive proof.
 
 - the criterion's **numbered tests, in full** (`11.2.1` … `11.2.6`) — what actually has to be
   ruled on;

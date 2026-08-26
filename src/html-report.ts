@@ -25,8 +25,8 @@ import {
 } from "./pages.js";
 import { pageCoverage, pageCriterionRows, pageRatePct, pageTally } from "./pages-report.js";
 import { partitionUnits, prdUnits, type PrdUnit } from "./prd.js";
-import { packReportGroups, reportCoverage, reportGroups, reportTotals, tallyRows } from "./report.js";
-import { CORE, type StandardId, isCore, loadPack, standardLabel } from "./standards/index.js";
+import { automationOverview, packReportGroups, reportCoverage, reportGroups, reportTotals, tallyRows } from "./report.js";
+import { CORE, type StandardId, isCore, loadPack, standardLabel, titlePlain } from "./standards/index.js";
 import { findingsForStandard } from "./standards/derive.js";
 import type { Block, Cell, Doc, Run } from "./html.js";
 import type { AuditResult, Finding, Lang, PageResult, Status } from "./types.js";
@@ -112,6 +112,16 @@ const T = {
     openPages: "Rapport page par page",
     noScreenshot: "Aucune capture d'écran pour cette page.",
     screenshotAlt: (n: string) => `Capture d'écran de la page ${n}`,
+    scopeTitle: "Périmètre réellement testé",
+    renderedPages: (n: number) => `${n} page(s) rendue(s) réellement testée(s)`,
+    noRenderedPages: "Aucune page rendue : les tests rendered n'ont pas été exécutés dans ce run.",
+    automation: (s: number, sc: number, r: number, rc: number, j: number, jc: number) =>
+      `Contrat RGAA : ${s} test(s) static sur ${sc} critère(s), ${r} rendered sur ${rc}, ${j} judgment sur ${jc}.`,
+    exhaustive: "Grille exhaustive des critères",
+    exhaustiveCaption: "Une ligne par critère ; S/R/J indique le nombre de tests static, rendered et judgment.",
+    automationCol: "Tests S / R / J",
+    decidedBy: "Décidé par",
+    owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "à adjuger" },
   },
   en: {
     reportTitle: "Conformance report",
@@ -163,6 +173,16 @@ const T = {
     openPages: "Page-by-page report",
     noScreenshot: "No screenshot for this page.",
     screenshotAlt: (n: string) => `Screenshot of the ${n} page`,
+    scopeTitle: "Actual tested scope",
+    renderedPages: (n: number) => `${n} rendered page(s) actually tested`,
+    noRenderedPages: "No rendered page: the rendered tests were not executed in this run.",
+    automation: (s: number, sc: number, r: number, rc: number, j: number, jc: number) =>
+      `RGAA contract: ${s} static test(s) across ${sc} criterion(ia), ${r} rendered across ${rc}, ${j} judgment across ${jc}.`,
+    exhaustive: "Exhaustive criteria grid",
+    exhaustiveCaption: "One row per criterion; S/R/J is the number of static, rendered and judgment tests.",
+    automationCol: "S / R / J tests",
+    decidedBy: "Decided by",
+    owner: { engine: "engine", scan: "scan", agent: "AI", pending: "to adjudicate" },
   },
 } as const;
 
@@ -298,6 +318,64 @@ function findingsBlocks(result: AuditResult, standard: StandardId, lang: Lang, l
   return out;
 }
 
+/** What this run truly executed, kept separate from the pack's capability contract. */
+function scopeBlocks(result: AuditResult, standard: StandardId, lang: Lang): Block[] {
+  const t = T[lang];
+  const pages = result.scope.pagesAudited?.length ?? 0;
+  const items: Run[][] = [[{ text: `${result.scope.files} ${t.files}` }], [{ text: t.renderedPages(pages) }]];
+  const automation = automationOverview(standard);
+  if (automation) {
+    items.push([
+      {
+        text: t.automation(
+          automation.tests.static,
+          automation.criteria.static.length,
+          automation.tests.rendered,
+          automation.criteria.rendered.length,
+          automation.tests.judgment,
+          automation.criteria.judgment.length,
+        ),
+      },
+    ]);
+  }
+  const out: Block[] = [
+    { kind: "heading", level: 2, text: t.scopeTitle, id: "scope" },
+    { kind: "list", items },
+  ];
+  if (pages === 0) out.push({ kind: "note", tone: "warn", runs: ticks(t.noRenderedPages) });
+  return out;
+}
+
+/** The run-wide grid that the source-only artifact previously lacked. */
+function criteriaGridBlocks(result: AuditResult, standard: StandardId, lang: Lang): Block[] {
+  const t = T[lang];
+  const groups = isCore(standard) ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
+  const pack = isCore(standard) ? undefined : loadPack(standard);
+  const rows: Cell[][] = [];
+  for (const row of groups.flatMap((group) => group.rows)) {
+    const criterion = pack?.criteria.find((entry) => entry.id === row.id);
+    const tiers = Object.values(criterion?.automation?.tests ?? {});
+    const n = (tier: "static" | "rendered" | "judgment") => tiers.filter((value) => value === tier).length;
+    const status = row.inapplicable ? "NA" : row.status;
+    const owner = row.status === "manual" ? t.owner.pending : t.owner[row.decidedBy ?? "engine"];
+    rows.push([
+      { text: pack && criterion ? `${pack.name} ${row.id} — ${titlePlain(pack, criterion, lang)}` : row.label },
+      { status, text: "" },
+      { text: pack ? `${n("static")} / ${n("rendered")} / ${n("judgment")}` : "—", align: "end" },
+      { text: owner },
+    ]);
+  }
+  return [
+    { kind: "heading", level: 2, text: t.exhaustive, id: "criteria" },
+    {
+      kind: "table",
+      caption: t.exhaustiveCaption,
+      columns: [{ text: t.criterion }, { text: t.status }, { text: t.automationCol, align: "end" }, { text: t.decidedBy }],
+      rows,
+    },
+  ];
+}
+
 /** The per-page scoreboard: one row per page, its basis, its rate WITH the denominator. */
 export function scoreboardBlocks(result: AuditResult, standard: StandardId, lang: Lang, sheetHref?: (id: string) => string): Block[] {
   const t = T[lang];
@@ -413,7 +491,9 @@ export function indexDoc(result: AuditResult, opts: HtmlReportOpts & { links?: {
     blocks.push({ kind: "heading", level: 2, text: t.documents, id: "documents" });
     blocks.push({ kind: "list", items: opts.links.map((l) => [{ text: l.text, href: l.href }]) });
   }
+  blocks.push(...scopeBlocks(result, standard, lang));
   blocks.push(...synthesisBlocks(result, standard, lang));
+  blocks.push(...criteriaGridBlocks(result, standard, lang));
   if (h.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
   blocks.push(...scoreboardBlocks(result, standard, lang));
   return { lang, title: `${t.indexTitle} — ${stdName(standard)}`, subtitle: h.runs, ...(opts.nav ? { nav: opts.nav } : {}), blocks };
@@ -425,7 +505,7 @@ export function compositeDoc(result: AuditResult, opts: HtmlReportOpts = {}): Do
   const lang = opts.lang ?? "en";
   const t = T[lang];
   const h = headline(result, standard, lang);
-  const blocks: Block[] = [...synthesisBlocks(result, standard, lang)];
+  const blocks: Block[] = [...scopeBlocks(result, standard, lang), ...synthesisBlocks(result, standard, lang), ...criteriaGridBlocks(result, standard, lang)];
   if (h.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
   blocks.push(...findingsBlocks(result, standard, lang, 2, opts.crops, opts.refusals));
   blocks.push(...scoreboardBlocks(result, standard, lang));

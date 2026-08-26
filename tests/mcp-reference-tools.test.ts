@@ -39,7 +39,7 @@ describe("ultra11y_standards", () => {
 
     const rgaa = r.standards.find((s: { key: string }) => s.key === "rgaa");
     expect(rgaa.core).toBe(false);
-    expect(rgaa.counts).toMatchObject({ themes: 13, criteria: 106, noEngineRule: 55 });
+    expect(rgaa.counts).toMatchObject({ themes: 13, criteria: 106, noEngineRule: 56 });
     // The attribution a redistributed standard must carry.
     expect(rgaa.license).toBeTruthy();
     expect(rgaa.attribution).toBeTruthy();
@@ -114,7 +114,7 @@ describe("ultra11y_method", () => {
 
   it("names the tool that produces each tier's evidence", async () => {
     const r = await j("ultra11y_method", { standard: "rgaa" });
-    const browser = r.buckets.find((b: { tier: string }) => b.tier === "browser");
+    const browser = r.evidenceTiers.find((b: { tier: string }) => b.tier === "browser");
     // This server declines to drive a browser, so the plan must point at the CLI.
     expect(browser.tool).toMatch(/scan/);
     expect(browser.how).toMatch(/CLI/);
@@ -144,7 +144,7 @@ describe("ultra11y_method", () => {
     const r = await j("ultra11y_method", { standard: "rgaa", tier: "judgment", detail: "full" });
     expect(r.buckets).toHaveLength(1);
     const ids = r.buckets[0].criteria.map((c: { id: string }) => c.id);
-    expect(ids.length).toBe(57);
+    expect(ids.length).toBe(104);
     expect(ids).toContain("11.2");
     expect(r.buckets[0].criteria[0].why).toBeTruthy();
     expect(r.buckets[0].criteria[0].title).toBeTruthy();

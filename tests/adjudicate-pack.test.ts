@@ -1,4 +1,4 @@
-// Adjudicating under a COUNTRY STANDARD. 57 of the 106 RGAA criteria are judgment-tier and can only ever derive
+// Adjudicating under a COUNTRY STANDARD. Most RGAA criteria still need adjudication to earn C and derive
 // `manual`, so this path carries ~93% of an RGAA audit — and it used to be 100% WCAG-keyed:
 // `--standard` was accepted and then never read.
 //
@@ -59,7 +59,7 @@ const allConforming = (items: AdjudicationItem[], override?: Partial<Adjudicatio
 describe("the worklist is keyed by the standard actually in play", () => {
   it("emits RGAA criteria, not WCAG success criteria", () => {
     const ids = rgaaItems().map((i) => i.criteriaId);
-    expect(ids.length).toBeGreaterThan(50); // 57 of 106 are judgment-tier; a source-only run leaves more than that to assess
+    expect(ids.length).toBeGreaterThan(50); // a source-only run leaves most of the grid to assess
     // RGAA ids have two segments; WCAG SC ids have three.
     for (const id of ids) expect(id, `"${id}" is not an RGAA criterion id`).toMatch(/^\d+\.\d+$/);
     expect(ids).toContain("11.2"); // « Chaque étiquette … est-elle pertinente ? »

@@ -12,14 +12,14 @@ import { commentKindFrom } from "../src/pr-comment.js";
 import type { AuditResult, CriterionResult, Finding, PageScope } from "../src/types.js";
 
 const F = (over: Partial<Finding> = {}): Finding => ({
-  ruleId: "img-alt-missing",
+  ruleId: "input-image-alt-missing",
   criteriaId: "1.1.1",
   file: "src/a.html",
   line: 1,
   col: 1,
-  selectorHint: "img",
+  selectorHint: 'input[type="image"]',
   severity: "majeur",
-  message: "image sans alternative",
+  message: "bouton image sans alternative",
   remediation: "ajouter un alt",
   snippet: "",
   ...over,

@@ -193,7 +193,14 @@ describe("renderPrdDoc (--format doc)", () => {
     // The pack view projects from r.criteria (CriterionResult[]), so populate it.
     const withCriteria: AuditResult = {
       ...AUDIT,
-      criteria: [{ id: "1.1.1", guideline: "1.1", status: "NC", findings: [AUDIT.findings[1]!] }],
+      criteria: [
+        {
+          id: "1.1.1",
+          guideline: "1.1",
+          status: "NC",
+          findings: [{ ...AUDIT.findings[1]!, ruleId: "input-image-alt-missing", selectorHint: 'input[type="image"]', snippet: '<input type="image">' }],
+        },
+      ],
     };
     const doc = renderPrdDoc(withCriteria, "fr", "rgaa");
     expect(doc).toContain("## Épopée — ");

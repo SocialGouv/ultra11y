@@ -39600,17 +39600,17 @@ var rgaa_default = {
           {
             name: "dir",
             op: "matches",
-            value: "^(?!(rtl|ltr|auto)$).+$"
+            value: "^(?!(rtl|ltr)$).+$"
           }
         ]
       },
       message: {
-        en: "dir attribute with a value that is not rtl, ltr or auto \u2014 the reading direction change is not declared conformantly (RGAA test 8.10.2).",
-        fr: "Attribut dir dont la valeur n\u2019est ni rtl, ni ltr, ni auto \u2014 le changement de sens de lecture n\u2019est pas d\xE9clar\xE9 conform\xE9ment (test RGAA 8.10.2)."
+        en: "dir attribute with a value other than rtl or ltr \u2014 the reading direction change fails RGAA test 8.10.2.",
+        fr: "Attribut dir dont la valeur n\u2019est ni rtl ni ltr \u2014 le changement de sens de lecture \xE9choue au test RGAA 8.10.2."
       },
       remediation: {
-        en: 'Use dir="rtl" or dir="ltr" (or dir="auto"), matching the reading direction of the text it carries.',
-        fr: 'Utilisez dir="rtl" ou dir="ltr" (ou dir="auto"), en accord avec le sens de lecture du texte port\xE9.'
+        en: 'Use dir="rtl" or dir="ltr", matching the reading direction of the text it carries.',
+        fr: 'Utilisez dir="rtl" ou dir="ltr", en accord avec le sens de lecture du texte port\xE9.'
       }
     },
     {
@@ -39813,6 +39813,86 @@ var rgaa_default = {
           "input-image-alt-missing",
           "object-embed-no-name"
         ]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "rendered",
+          "3": "static",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment",
+          "7": "judgment",
+          "8": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:area-alt",
+            tests: ["2"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:image-alt",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:input-image-alt",
+            tests: ["3"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:object-alt",
+            tests: ["6"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:role-img-alt",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:svg-img-alt",
+            tests: ["5"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "canvas-fallback-missing",
+            tests: ["8"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "chart-no-accessible-name",
+            tests: ["1", "5", "8"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "img-alt-missing",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "input-image-alt-missing",
+            tests: ["3"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "object-embed-no-name",
+            tests: ["6", "7"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -39877,6 +39957,30 @@ var rgaa_default = {
       wcag: ["1.1.1", "4.1.2"],
       appliesTo: {
         ruleIds: ["axe:image-redundant-alt", "decorative-alt-misuse"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:image-redundant-alt",
+            tests: ["1", "2", "3", "4", "5", "6"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "decorative-alt-misuse",
+            tests: ["1", "2", "3", "4", "5", "6"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -39963,6 +40067,20 @@ var rgaa_default = {
       wcag: ["1.1.1", "4.1.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment",
+          "7": "judgment",
+          "8": "judgment",
+          "9": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40041,6 +40159,18 @@ var rgaa_default = {
       wcag: ["1.1.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment",
+          "7": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40072,6 +40202,13 @@ var rgaa_default = {
       wcag: ["1.1.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40162,6 +40299,21 @@ var rgaa_default = {
       wcag: ["1.1.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment",
+          "7": "judgment",
+          "8": "judgment",
+          "9": "judgment",
+          "10": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40231,6 +40383,17 @@ var rgaa_default = {
       wcag: ["1.1.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40278,6 +40441,17 @@ var rgaa_default = {
       wcag: ["1.4.5"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40343,6 +40517,16 @@ var rgaa_default = {
       wcag: ["1.1.1", "4.1.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40364,6 +40548,31 @@ var rgaa_default = {
       wcag: ["4.1.2"],
       appliesTo: {
         ruleIds: ["axe:frame-title", "axe:frame-title-unique", "iframe-title-missing"]
+      },
+      automation: {
+        tests: {
+          "1": "static"
+        },
+        rules: [
+          {
+            id: "axe:frame-title",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:frame-title-unique",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "iframe-title-missing",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {
@@ -40385,6 +40594,12 @@ var rgaa_default = {
       wcag: ["4.1.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40428,6 +40643,17 @@ var rgaa_default = {
       wcag: ["1.3.1", "1.4.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40482,6 +40708,47 @@ var rgaa_default = {
       wcag: ["1.4.3"],
       appliesTo: {
         ruleIds: ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:color-contrast",
+            tests: ["1", "2", "3", "4", "5"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:color-contrast-enhanced",
+            tests: ["1", "2", "3", "4", "5"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "contrast-literal",
+            tests: ["1", "2", "3", "4", "5"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "rendered-contrast",
+            tests: ["1", "2", "3", "4", "5"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "rendered-contrast-pixel",
+            tests: ["1", "2", "3", "4", "5"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -40533,6 +40800,22 @@ var rgaa_default = {
       wcag: ["1.4.11"],
       appliesTo: {
         ruleIds: ["rendered-nontext-contrast"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment"
+        },
+        rules: [
+          {
+            id: "rendered-nontext-contrast",
+            tests: ["1", "2", "3", "4"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -40588,6 +40871,14 @@ var rgaa_default = {
       wcag: ["1.2.1", "1.2.3"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40627,6 +40918,14 @@ var rgaa_default = {
       wcag: ["1.2.1", "1.2.3"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40657,6 +40956,32 @@ var rgaa_default = {
       wcag: ["1.2.2"],
       appliesTo: {
         ruleIds: ["axe:audio-caption", "axe:video-caption", "media-no-track"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:audio-caption",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:video-caption",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "media-no-track",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -40680,6 +41005,12 @@ var rgaa_default = {
       wcag: ["1.2.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40712,6 +41043,13 @@ var rgaa_default = {
       wcag: ["1.2.5"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40739,6 +41077,13 @@ var rgaa_default = {
       wcag: ["1.2.5"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40765,6 +41110,12 @@ var rgaa_default = {
       wcag: ["1.1.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40803,6 +41154,13 @@ var rgaa_default = {
       wcag: ["1.1.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40826,6 +41184,12 @@ var rgaa_default = {
       wcag: ["1.1.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40853,7 +41217,26 @@ var rgaa_default = {
       appliesTo: {
         ruleIds: ["autoplay-media", "axe:no-autoplay-audio"]
       },
-      judgment: true
+      judgment: true,
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "autoplay-media",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:no-autoplay-audio",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
     },
     {
       id: "4.11",
@@ -40888,6 +41271,14 @@ var rgaa_default = {
       wcag: ["2.1.1", "2.1.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40919,6 +41310,13 @@ var rgaa_default = {
       wcag: ["2.1.1", "2.1.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40955,6 +41353,13 @@ var rgaa_default = {
       wcag: ["4.1.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -40979,6 +41384,12 @@ var rgaa_default = {
       wcag: ["1.3.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -41000,6 +41411,12 @@ var rgaa_default = {
       wcag: ["1.3.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -41025,6 +41442,12 @@ var rgaa_default = {
       wcag: ["1.3.2", "4.1.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -41048,6 +41471,19 @@ var rgaa_default = {
       wcag: ["1.3.1"],
       appliesTo: {
         ruleIds: ["table-caption-missing"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "table-caption-missing",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41071,6 +41507,12 @@ var rgaa_default = {
       wcag: ["1.3.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -41109,7 +41551,35 @@ var rgaa_default = {
       techniques: ["H51", "F91"],
       wcag: ["1.3.1"],
       appliesTo: {
-        ruleIds: ["axe:empty-table-header", "axe:td-has-header", "axe:th-has-data-cells", "data-table-no-headers"]
+        ruleIds: ["axe:td-has-header", "axe:th-has-data-cells", "data-table-no-headers"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:td-has-header",
+            tests: ["1", "2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:th-has-data-cells",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "data-table-no-headers",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41166,7 +41636,36 @@ var rgaa_default = {
       ],
       wcag: ["1.3.1"],
       appliesTo: {
-        ruleIds: ["axe:scope-attr-valid", "axe:td-headers-attr", "data-table-no-headers", "sortable-header-no-aria-sort", "table-empty-data-cell"]
+        ruleIds: ["axe:scope-attr-valid", "axe:td-headers-attr", "data-table-no-headers"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:scope-attr-valid",
+            tests: ["2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:td-headers-attr",
+            tests: ["4"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "data-table-no-headers",
+            tests: ["1", "2", "3", "4", "5"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41192,6 +41691,25 @@ var rgaa_default = {
       wcag: ["1.3.1"],
       appliesTo: {
         ruleIds: ["axe:table-fake-caption", "layout-table-data-markup"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:table-fake-caption",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "layout-table-data-markup",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41255,6 +41773,23 @@ var rgaa_default = {
       wcag: ["1.1.1", "2.4.4", "2.5.3"],
       appliesTo: {
         ruleIds: ["pack:rgaa:download-link-format"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment"
+        },
+        rules: [
+          {
+            id: "pack:rgaa:download-link-format",
+            tests: ["1", "2", "3", "4", "5"],
+            effect: "advisory",
+            rationale: "Non-normative recommendation; it cannot affect the criterion verdict."
+          }
+        ]
       }
     },
     {
@@ -41279,6 +41814,31 @@ var rgaa_default = {
       wcag: ["1.1.1", "2.4.4"],
       appliesTo: {
         ruleIds: ["axe:link-name", "icon-only-control-unnamed", "link-empty-name"]
+      },
+      automation: {
+        tests: {
+          "1": "static"
+        },
+        rules: [
+          {
+            id: "axe:link-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "icon-only-control-unnamed",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "link-empty-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {
@@ -41348,6 +41908,129 @@ var rgaa_default = {
           "nested-interactive",
           "redundant-aria"
         ]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: [
+          {
+            id: "aria-hidden-focusable",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "aria-ref-missing-id",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "aria-required-children",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-allowed-attr",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-allowed-role",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-hidden-focus",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-required-attr",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-required-children",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-required-parent",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-roles",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-valid-attr",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-valid-attr-value",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:nested-interactive",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:presentation-role-conflict",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "cross-prop-drilled-name-lost",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "disabled-context-content",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "invalid-aria-role",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "nested-interactive",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "redundant-aria",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41382,6 +42065,13 @@ var rgaa_default = {
       wcag: ["1.1.1", "4.1.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -41412,6 +42102,20 @@ var rgaa_default = {
       wcag: ["1.3.1", "2.1.1", "2.4.7"],
       appliesTo: {
         ruleIds: ["clickable-noninteractive"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: [
+          {
+            id: "clickable-noninteractive",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41438,6 +42142,12 @@ var rgaa_default = {
       wcag: ["3.2.1", "3.2.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -41476,6 +42186,33 @@ var rgaa_default = {
       wcag: ["4.1.3"],
       appliesTo: {
         ruleIds: ["dyn-live-region", "live-region-conflict", "status-message-not-assertive"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: [
+          {
+            id: "dyn-live-region",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "live-region-conflict",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "status-message-not-assertive",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41503,6 +42240,21 @@ var rgaa_default = {
       wcag: ["4.1.1"],
       appliesTo: {
         ruleIds: ["pack:rgaa:doctype-missing"]
+      },
+      automation: {
+        tests: {
+          "1": "rendered",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: [
+          {
+            id: "pack:rgaa:doctype-missing",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {
@@ -41531,6 +42283,37 @@ var rgaa_default = {
       wcag: ["4.1.1", "4.1.2"],
       appliesTo: {
         ruleIds: ["axe:duplicate-id", "axe:duplicate-id-active", "axe:duplicate-id-aria", "duplicate-id"]
+      },
+      automation: {
+        tests: {
+          "1": "static"
+        },
+        rules: [
+          {
+            id: "axe:duplicate-id",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:duplicate-id-active",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:duplicate-id-aria",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "duplicate-id",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {
@@ -41555,7 +42338,26 @@ var rgaa_default = {
       techniques: ["H57"],
       wcag: ["3.1.1"],
       appliesTo: {
-        ruleIds: ["axe:html-has-lang", "axe:html-xml-lang-mismatch", "html-lang-missing"]
+        ruleIds: ["axe:html-has-lang", "html-lang-missing"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:html-has-lang",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "html-lang-missing",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41580,9 +42382,34 @@ var rgaa_default = {
       techniques: ["H57"],
       wcag: ["3.1.1"],
       appliesTo: {
-        ruleIds: ["axe:html-lang-valid", "lang-invalid"]
+        ruleIds: ["axe:html-lang-valid", "axe:html-xml-lang-mismatch", "lang-invalid"]
       },
-      judgment: true
+      judgment: true,
+      automation: {
+        tests: {
+          "1": "static"
+        },
+        rules: [
+          {
+            id: "axe:html-lang-valid",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:html-xml-lang-mismatch",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "lang-invalid",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
     },
     {
       id: "8.5",
@@ -41603,6 +42430,26 @@ var rgaa_default = {
       wcag: ["2.4.2"],
       appliesTo: {
         ruleIds: ["axe:document-title", "title-missing-empty"]
+      },
+      automation: {
+        tests: {
+          "1": "static"
+        },
+        rules: [
+          {
+            id: "axe:document-title",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "title-missing-empty",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ],
+        completeBySilence: true
       }
     },
     {
@@ -41625,7 +42472,13 @@ var rgaa_default = {
       appliesTo: {
         ruleIds: []
       },
-      judgment: true
+      judgment: true,
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
+      }
     },
     {
       id: "8.7",
@@ -41660,6 +42513,19 @@ var rgaa_default = {
       wcag: ["3.1.2"],
       appliesTo: {
         ruleIds: ["inline-lang-change-missing"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "inline-lang-change-missing",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41685,6 +42551,25 @@ var rgaa_default = {
       wcag: ["3.1.2"],
       appliesTo: {
         ruleIds: ["axe:valid-lang", "lang-invalid"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:valid-lang",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "lang-invalid",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41708,6 +42593,12 @@ var rgaa_default = {
       wcag: ["1.3.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -41737,6 +42628,20 @@ var rgaa_default = {
       wcag: ["1.3.2"],
       appliesTo: {
         ruleIds: ["pack:rgaa:dir-value-invalid"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "static"
+        },
+        rules: [
+          {
+            id: "pack:rgaa:dir-value-invalid",
+            tests: ["2"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {
@@ -41771,6 +42676,57 @@ var rgaa_default = {
       wcag: ["1.3.1", "2.4.1", "2.4.6", "4.1.2"],
       appliesTo: {
         ruleIds: ["axe:empty-heading", "axe:heading-order", "axe:page-has-heading-one", "empty-heading", "h1-missing", "h1-multiple", "heading-order-skip"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:empty-heading",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:heading-order",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:page-has-heading-one",
+            tests: ["1", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "empty-heading",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "h1-missing",
+            tests: ["1", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "h1-multiple",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "heading-order-skip",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41804,6 +42760,31 @@ var rgaa_default = {
       wcag: ["1.3.1"],
       appliesTo: {
         ruleIds: ["missing-main-landmark", "multiple-main-landmark", "nav-landmark-missing"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "missing-main-landmark",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "multiple-main-landmark",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "nav-landmark-missing",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41843,6 +42824,45 @@ var rgaa_default = {
       wcag: ["1.3.1"],
       appliesTo: {
         ruleIds: ["axe:definition-list", "axe:dlitem", "axe:list", "axe:listitem", "list-structure"]
+      },
+      automation: {
+        tests: {
+          "1": "static",
+          "2": "static",
+          "3": "static"
+        },
+        rules: [
+          {
+            id: "axe:definition-list",
+            tests: ["3"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:dlitem",
+            tests: ["3"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:list",
+            tests: ["1", "2"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:listitem",
+            tests: ["1", "2"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "list-structure",
+            tests: ["1", "2", "3"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {
@@ -41866,6 +42886,13 @@ var rgaa_default = {
       wcag: ["1.3.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -41900,6 +42927,34 @@ var rgaa_default = {
       wcag: ["1.3.1", "1.3.2"],
       appliesTo: {
         ruleIds: ["presentational-attribute", "presentational-element", "presentational-spacing"]
+      },
+      automation: {
+        tests: {
+          "1": "static",
+          "2": "static",
+          "3": "static"
+        },
+        rules: [
+          {
+            id: "presentational-attribute",
+            tests: ["2"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "presentational-element",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "presentational-spacing",
+            tests: ["3"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ],
+        completeBySilence: true
       }
     },
     {
@@ -41921,6 +42976,19 @@ var rgaa_default = {
       wcag: ["1.1.1", "1.3.1"],
       appliesTo: {
         ruleIds: ["css-generated-content-informative"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "css-generated-content-informative",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -41944,6 +43012,12 @@ var rgaa_default = {
       wcag: ["1.3.2", "2.4.3"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -41983,6 +43057,44 @@ var rgaa_default = {
       wcag: ["1.4.4"],
       appliesTo: {
         ruleIds: ["axe:meta-viewport", "axe:meta-viewport-large", "dyn-input-overflow-zoom", "dyn-reflow-zoom", "meta-viewport-zoom-block"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:meta-viewport",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:meta-viewport-large",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "dyn-input-overflow-zoom",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "dyn-reflow-zoom",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "meta-viewport-zoom-block",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -42013,7 +43125,15 @@ var rgaa_default = {
       techniques: ["F24"],
       wcag: ["1.4.3"],
       appliesTo: {
-        ruleIds: ["axe:color-contrast", "axe:color-contrast-enhanced", "contrast-literal", "rendered-contrast", "rendered-contrast-pixel"]
+        ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42040,6 +43160,19 @@ var rgaa_default = {
       wcag: ["1.4.1"],
       appliesTo: {
         ruleIds: ["rendered-link-colour-only"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "rendered-link-colour-only",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -42065,6 +43198,25 @@ var rgaa_default = {
       wcag: ["1.4.1", "2.4.7"],
       appliesTo: {
         ruleIds: ["dyn-focus-visible", "rendered-focus-not-visible"]
+      },
+      automation: {
+        tests: {
+          "1": "rendered"
+        },
+        rules: [
+          {
+            id: "dyn-focus-visible",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "rendered-focus-not-visible",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -42096,6 +43248,19 @@ var rgaa_default = {
       wcag: ["1.3.2", "4.1.2"],
       appliesTo: {
         ruleIds: ["disabled-context-content"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "disabled-context-content",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -42131,6 +43296,15 @@ var rgaa_default = {
       wcag: ["1.3.3", "1.4.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42166,6 +43340,15 @@ var rgaa_default = {
       wcag: ["1.3.3", "1.4.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42204,6 +43387,26 @@ var rgaa_default = {
       wcag: ["1.4.10"],
       appliesTo: {
         ruleIds: ["dyn-input-overflow-reflow", "dyn-reflow"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: [
+          {
+            id: "dyn-input-overflow-reflow",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "dyn-reflow",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -42237,6 +43440,25 @@ var rgaa_default = {
       wcag: ["1.4.12"],
       appliesTo: {
         ruleIds: ["dyn-input-overflow-spacing", "dyn-text-spacing"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "dyn-input-overflow-spacing",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "dyn-text-spacing",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -42275,6 +43497,21 @@ var rgaa_default = {
       wcag: ["1.4.13"],
       appliesTo: {
         ruleIds: ["dyn-hover"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: [
+          {
+            id: "dyn-hover",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -42308,6 +43545,13 @@ var rgaa_default = {
       wcag: ["2.1.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42360,6 +43604,81 @@ var rgaa_default = {
           "label-for-dangling",
           "placeholder-as-label",
           "select-has-option"
+        ]
+      },
+      automation: {
+        tests: {
+          "1": "static",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:form-field-multiple-labels",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:label",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:label-title-only",
+            tests: ["1", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:select-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "control-label-missing",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "control-name-title-only",
+            tests: ["1", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "field-purpose-incomplete",
+            tests: ["1", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "form-field-multiple-labels",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "label-for-dangling",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "placeholder-as-label",
+            tests: ["1", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "select-has-option",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
         ]
       }
     },
@@ -42415,6 +43734,17 @@ var rgaa_default = {
       wcag: ["2.4.6", "2.5.3", "3.3.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42442,6 +43772,13 @@ var rgaa_default = {
       wcag: ["3.2.4"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42484,6 +43821,14 @@ var rgaa_default = {
       wcag: ["3.3.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42510,6 +43855,25 @@ var rgaa_default = {
       wcag: ["1.3.1", "3.3.2"],
       appliesTo: {
         ruleIds: ["date-fields-ungrouped", "radio-checkbox-group-ungrouped"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "date-fields-ungrouped",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "radio-checkbox-group-ungrouped",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -42531,6 +43895,25 @@ var rgaa_default = {
       wcag: ["1.3.1", "3.3.2"],
       appliesTo: {
         ruleIds: ["axe:fieldset", "fieldset-legend-missing"]
+      },
+      automation: {
+        tests: {
+          "1": "static"
+        },
+        rules: [
+          {
+            id: "axe:fieldset",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "fieldset-legend-missing",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {
@@ -42552,6 +43935,12 @@ var rgaa_default = {
       wcag: ["1.3.1", "3.3.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42582,6 +43971,21 @@ var rgaa_default = {
       wcag: ["1.3.1"],
       appliesTo: {
         ruleIds: ["pack:rgaa:optgroup-without-label"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "static",
+          "3": "judgment"
+        },
+        rules: [
+          {
+            id: "pack:rgaa:optgroup-without-label",
+            tests: ["2"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {
@@ -42622,6 +44026,44 @@ var rgaa_default = {
       wcag: ["2.5.3", "4.1.2"],
       appliesTo: {
         ruleIds: ["axe:button-name", "axe:input-button-name", "button-empty-name", "cross-icon-only-unnamed", "icon-only-control-unnamed"]
+      },
+      automation: {
+        tests: {
+          "1": "static",
+          "2": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:button-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:input-button-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "button-empty-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "cross-icon-only-unnamed",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "icon-only-control-unnamed",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -42714,6 +44156,31 @@ var rgaa_default = {
       wcag: ["3.3.1", "3.3.2"],
       appliesTo: {
         ruleIds: ["aria-invalid-no-description", "error-not-associated"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment",
+          "7": "judgment"
+        },
+        rules: [
+          {
+            id: "aria-invalid-no-description",
+            tests: ["3", "4", "6", "7"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "error-not-associated",
+            tests: ["3", "4", "6", "7"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -42740,6 +44207,13 @@ var rgaa_default = {
       wcag: ["3.3.3"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42772,6 +44246,13 @@ var rgaa_default = {
       wcag: ["3.3.4"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42802,6 +44283,25 @@ var rgaa_default = {
       wcag: ["1.3.5"],
       appliesTo: {
         ruleIds: ["axe:autocomplete-valid", "field-purpose-incomplete"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:autocomplete-valid",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "field-purpose-incomplete",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -42833,6 +44333,12 @@ var rgaa_default = {
       wcag: ["2.4.5"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42865,6 +44371,12 @@ var rgaa_default = {
       wcag: ["3.2.3"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42890,6 +44402,14 @@ var rgaa_default = {
       wcag: ["2.4.5"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42921,6 +44441,14 @@ var rgaa_default = {
       wcag: ["2.4.5", "3.2.3"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42952,6 +44480,14 @@ var rgaa_default = {
       wcag: ["3.2.3"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -42980,6 +44516,43 @@ var rgaa_default = {
       wcag: ["1.3.1", "2.4.1", "4.1.2"],
       appliesTo: {
         ruleIds: ["axe:landmark-one-main", "missing-main-landmark", "multiple-main-landmark", "nav-landmark-missing", "nav-landmark-unnamed"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:landmark-one-main",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "missing-main-landmark",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "multiple-main-landmark",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "nav-landmark-missing",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "nav-landmark-unnamed",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -43015,6 +44588,32 @@ var rgaa_default = {
       wcag: ["2.4.1", "2.4.3", "3.2.3"],
       appliesTo: {
         ruleIds: ["axe:bypass", "axe:skip-link", "skip-link-target-missing"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:bypass",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:skip-link",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "skip-link-target-missing",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -43040,6 +44639,26 @@ var rgaa_default = {
       wcag: ["2.4.3"],
       appliesTo: {
         ruleIds: ["axe:tabindex", "positive-tabindex"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:tabindex",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "positive-tabindex",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -43065,6 +44684,19 @@ var rgaa_default = {
       wcag: ["2.1.1", "2.1.2"],
       appliesTo: {
         ruleIds: ["dyn-keyboard-trap"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "dyn-keyboard-trap",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -43091,6 +44723,12 @@ var rgaa_default = {
       wcag: ["2.1.4"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -43117,6 +44755,12 @@ var rgaa_default = {
       wcag: ["2.1.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -43165,6 +44809,22 @@ var rgaa_default = {
       wcag: ["2.2.1", "2.2.2"],
       appliesTo: {
         ruleIds: ["meta-refresh-redirect"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment"
+        },
+        rules: [
+          {
+            id: "meta-refresh-redirect",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -43188,6 +44848,12 @@ var rgaa_default = {
       wcag: ["3.2.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -43220,7 +44886,13 @@ var rgaa_default = {
       appliesTo: {
         ruleIds: []
       },
-      judgment: true
+      judgment: true,
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
+      }
     },
     {
       id: "13.4",
@@ -43246,7 +44918,13 @@ var rgaa_default = {
       appliesTo: {
         ruleIds: []
       },
-      judgment: true
+      judgment: true,
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
+      }
     },
     {
       id: "13.5",
@@ -43271,6 +44949,12 @@ var rgaa_default = {
       wcag: ["1.1.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -43296,6 +44980,12 @@ var rgaa_default = {
       wcag: ["1.1.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -43333,6 +45023,14 @@ var rgaa_default = {
       wcag: ["2.3.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -43367,7 +45065,33 @@ var rgaa_default = {
       techniques: ["F4", "F7", "F16", "F47", "F50", "G4", "G11", "G152", "G186", "G187", "G191", "SCR22", "SCR33", "SCR36", "SM11", "SM12"],
       wcag: ["2.2.1", "2.2.2"],
       appliesTo: {
-        ruleIds: ["autoplay-media", "axe:blink", "axe:marquee", "blink-marquee"]
+        ruleIds: ["axe:blink", "axe:marquee", "blink-marquee"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: [
+          {
+            id: "axe:blink",
+            tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:marquee",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "blink-marquee",
+            tests: ["1", "2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -43398,6 +45122,19 @@ var rgaa_default = {
       wcag: ["1.3.4"],
       appliesTo: {
         ruleIds: ["rendered-orientation-lock"]
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: [
+          {
+            id: "rendered-orientation-lock",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -43430,6 +45167,13 @@ var rgaa_default = {
       wcag: ["2.5.1"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -43464,6 +45208,12 @@ var rgaa_default = {
       wcag: ["2.5.2"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment"
+        },
+        rules: []
       }
     },
     {
@@ -43500,6 +45250,14 @@ var rgaa_default = {
       wcag: ["2.5.4"],
       appliesTo: {
         ruleIds: []
+      },
+      automation: {
+        tests: {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        rules: []
       }
     }
   ]
@@ -44130,6 +45888,74 @@ function validatePack(raw, opts = {}) {
             err2(`criteria[${i2}].methodology.${k}`, `criterion "${String(id)}" methodology.${k} must be a non-empty string`);
           if (!Object.hasOwn(tests, k))
             err2(`criteria[${i2}].methodology.${k}`, `criterion "${String(id)}" has a methodology for test ${k}, which it does not declare`);
+        }
+      }
+    }
+    if (c2?.automation !== void 0) {
+      const a = c2.automation;
+      const testDefs = c2?.tests && typeof c2.tests === "object" && !Array.isArray(c2.tests) ? c2.tests : {};
+      const tiers = a && typeof a === "object" && !Array.isArray(a) ? a.tests : void 0;
+      const rules = a && typeof a === "object" && !Array.isArray(a) ? a.rules : void 0;
+      if (!a || typeof a !== "object" || Array.isArray(a) || !tiers || typeof tiers !== "object" || Array.isArray(tiers) || !Array.isArray(rules)) {
+        err2(`criteria[${i2}].automation`, `criterion "${String(id)}" automation must contain { tests: object, rules: array }`);
+      } else {
+        const tierMap = tiers;
+        const declaredTests = Object.keys(testDefs).sort();
+        const classifiedTests = Object.keys(tierMap).sort();
+        if (declaredTests.join("\0") !== classifiedTests.join("\0"))
+          err2(`criteria[${i2}].automation.tests`, `criterion "${String(id)}" must classify exactly its declared tests (${declaredTests.join(", ")})`);
+        for (const [test, tier] of Object.entries(tierMap))
+          if (!["static", "rendered", "judgment"].includes(tier))
+            err2(`criteria[${i2}].automation.tests.${test}`, `criterion "${String(id)}" has unknown automation tier "${String(tier)}"`);
+        const applicable = new Set(
+          c2?.appliesTo && typeof c2.appliesTo === "object" && !Array.isArray(c2.appliesTo) && Array.isArray(c2.appliesTo.ruleIds) ? c2.appliesTo.ruleIds.filter((value) => typeof value === "string") : []
+        );
+        const described = /* @__PURE__ */ new Set();
+        const decisiveByTest = /* @__PURE__ */ new Set();
+        rules.forEach((entry, k) => {
+          const rule = entry;
+          const rid = rule?.id;
+          const refs = rule?.tests;
+          const effect = rule?.effect;
+          if (!rule || typeof rule !== "object" || Array.isArray(rule) || typeof rid !== "string" || !Array.isArray(refs) || !["decisive-nc", "candidate", "advisory"].includes(String(effect))) {
+            err2(`criteria[${i2}].automation.rules[${k}]`, `criterion "${String(id)}" automation rule is malformed`);
+            return;
+          }
+          if (described.has(rid)) err2(`criteria[${i2}].automation.rules[${k}].id`, `criterion "${String(id)}" describes rule "${rid}" twice`);
+          described.add(rid);
+          if (!applicable.has(rid)) err2(`criteria[${i2}].automation.rules[${k}].id`, `criterion "${String(id)}" describes non-applicable rule "${rid}"`);
+          for (const ref of refs) {
+            if (typeof ref !== "string" || !Object.hasOwn(testDefs, ref))
+              err2(`criteria[${i2}].automation.rules[${k}].tests`, `criterion "${String(id)}" rule "${rid}" cites unknown test "${String(ref)}"`);
+            else if (effect === "decisive-nc") decisiveByTest.add(ref);
+          }
+        });
+        for (const rid of applicable)
+          if (!described.has(rid)) err2(`criteria[${i2}].automation.rules`, `criterion "${String(id)}" does not classify applicable rule "${rid}"`);
+        for (const test of declaredTests) {
+          const tier = tierMap[test];
+          if ((tier === "static" || tier === "rendered") && !decisiveByTest.has(test)) {
+            err2(
+              `criteria[${i2}].automation.tests.${test}`,
+              `criterion "${String(id)}" classifies test ${test} as ${String(tier)} without an explicitly mapped decisive-nc rule`
+            );
+          }
+          if (tier === "judgment" && decisiveByTest.has(test)) {
+            err2(
+              `criteria[${i2}].automation.tests.${test}`,
+              `criterion "${String(id)}" classifies test ${test} as judgment even though a decisive-nc rule targets it`
+            );
+          }
+        }
+        if (a.completeBySilence === true) {
+          const missing = declaredTests.filter((test) => tierMap[test] === "judgment" || !decisiveByTest.has(test));
+          if (missing.length)
+            err2(
+              `criteria[${i2}].automation.completeBySilence`,
+              `criterion "${String(id)}" cannot close by silence; tests without decisive coverage: ${missing.join(", ")}`
+            );
+        } else if (a.completeBySilence !== void 0 && typeof a.completeBySilence !== "boolean") {
+          err2(`criteria[${i2}].automation.completeBySilence`, `criterion "${String(id)}" completeBySilence must be boolean`);
         }
       }
     }
@@ -54552,7 +56378,11 @@ function ruleMatches(ruleId, patterns) {
   return false;
 }
 function packCriteriaForFinding(pack, finding) {
-  return pack.criteria.filter((pc) => pc.wcag.includes(finding.criteriaId) && (!pc.appliesTo || ruleMatches(finding.ruleId, pc.appliesTo.ruleIds))).map((pc) => pc.id);
+  return pack.criteria.filter((pc) => {
+    if (!pc.wcag.includes(finding.criteriaId) || pc.appliesTo && !ruleMatches(finding.ruleId, pc.appliesTo.ruleIds)) return false;
+    if (!pc.automation) return true;
+    return pc.automation.rules.some((rule) => ruleMatches(finding.ruleId, [rule.id]) && rule.effect !== "candidate");
+  }).map((pc) => pc.id);
 }
 function packConformancePct(derived) {
   const c2 = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent").length;
@@ -54583,6 +56413,7 @@ function applySecondaryMappings(base, pc, enabled, sources, defaultLocale) {
   const findings = [...base.findings, ...added];
   if (added.some((f) => !f.advisory))
     return {
+      ...base,
       id: pc.id,
       theme: pc.theme,
       status: aggregate2([{ status: base.status, inapplicable: base.inapplicable }, { status: "NC" }]),
@@ -54592,12 +56423,12 @@ function applySecondaryMappings(base, pc, enabled, sources, defaultLocale) {
   return { ...base, findings };
 }
 function judgmentGuard(r, pc) {
-  if (!pc.judgment || r.status !== "C") return r;
+  if (!(pc.judgment || pc.automation && pc.automation.completeBySilence !== true) || r.status !== "C") return r;
   if (r.inapplicable) return r;
   return { ...r, status: "manual", judgment: true };
 }
 function measuredRescue(r, pc, cov, ran, pageId) {
-  if (r.status !== "manual" || pc.judgment || r.outOfScope) return r;
+  if (r.status !== "manual" || pc.judgment || r.outOfScope || pc.automation?.completeBySilence !== true) return r;
   if (!criterionMeasuredOn(pc.appliesTo?.ruleIds, pc.wcag, cov, ran)) return r;
   const { scopedOut: _scopedOut, judgment: _judgment, ...rest } = r;
   return { ...rest, status: "C", decidedBy: "scan", justification: measuredReason(pc, pageId) };
@@ -54642,29 +56473,33 @@ function derivePackResults(audit2, packKey, pageId) {
       const inapplicable2 = status2 === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));
       return { id: pc.id, theme: pc.theme, status: status2, findings: allFindings, scs: pc.wcag, ...inapplicable2 ? { inapplicable: true } : {} };
     }
-    const findings = allFindings.filter((f) => ruleMatches(f.ruleId, pc.appliesTo.ruleIds));
-    const normativeFindings = findings.filter((f) => !f.advisory);
+    const applicableFindings = allFindings.filter((f) => ruleMatches(f.ruleId, pc.appliesTo.ruleIds));
+    const contractFor = (ruleId) => pc.automation?.rules.find((rule) => ruleMatches(ruleId, [rule.id]));
+    const candidateFindings = pc.automation ? applicableFindings.filter((f) => !f.advisory && contractFor(f.ruleId)?.effect === "candidate") : [];
+    const findings = pc.automation ? applicableFindings.filter((f) => f.advisory || contractFor(f.ruleId)?.effect !== "candidate") : applicableFindings;
+    const candidate = candidateFindings.length ? { candidateFindings } : {};
+    const normativeFindings = findings.filter((f) => !f.advisory && (!pc.automation || contractFor(f.ruleId)?.effect === "decisive-nc"));
     if (normativeFindings.length) {
-      return { id: pc.id, theme: pc.theme, status: "NC", findings, scs: pc.wcag };
+      return { id: pc.id, theme: pc.theme, status: "NC", findings, scs: pc.wcag, ...candidate };
     }
     if (subjectAbsent(pc)) {
-      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS, findings, scs: pc.wcag, inapplicable: true };
+      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS, findings, scs: pc.wcag, inapplicable: true, ...candidate };
     }
     if (scResults.some((r) => r.status === "NC")) {
-      return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag, scopedOut: true };
+      return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag, scopedOut: true, ...candidate };
     }
     if (!scResults.length && (pc.appliesTo?.ruleIds ?? []).some((id) => ownRuleIds.has(id))) {
-      return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag };
+      return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag, ...candidate };
     }
     const status = scResults.length ? aggregate2(scResults) : INAPPLICABLE_STATUS;
     if (status !== "NC" && subjectAbsent(pc)) {
-      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS, findings, scs: pc.wcag, inapplicable: true };
+      return { id: pc.id, theme: pc.theme, status: INAPPLICABLE_STATUS, findings, scs: pc.wcag, inapplicable: true, ...candidate };
     }
     const inapplicable = status === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));
     if (inapplicable && ownSubjectSeen(pc)) {
-      return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag };
+      return { id: pc.id, theme: pc.theme, status: "manual", findings, scs: pc.wcag, ...candidate };
     }
-    return { id: pc.id, theme: pc.theme, status, findings, scs: pc.wcag, ...inapplicable ? { inapplicable: true } : {} };
+    return { id: pc.id, theme: pc.theme, status, findings, scs: pc.wcag, ...inapplicable ? { inapplicable: true } : {}, ...candidate };
   };
   const enabledSecondary = (pack.secondaryMappings ?? []).filter((m) => m.enabled === true);
   const secondarySources = enabledSecondary.length ? [...audit2.criteria.flatMap((c2) => c2.findings), ...myPackFindings] : [];
@@ -54757,7 +56592,11 @@ var TIER_ORDER = ["source", "cross-file", "rendered-page", "browser"];
 var STATIC_RULE_IDS = new Set(ALL_RULES.map((r) => r.id));
 var CROSS_RULE_IDS = new Set(CROSS_RULES.map((r) => r.id));
 function ruleTier(ruleId, pack) {
-  if (ruleId.startsWith("pack:")) return "source";
+  if (ruleId.startsWith("pack:")) {
+    const prefix2 = pack ? `pack:${pack.key}:` : "";
+    const own = prefix2 && ruleId.startsWith(prefix2) ? pack?.rules?.find((rule) => rule.id === ruleId.slice(prefix2.length)) : void 0;
+    return own?.doc ? "rendered-page" : "source";
+  }
   if (ruleId.startsWith("agent:")) return "judgment";
   if (ruleId.startsWith("axe:") || ruleId.startsWith("dyn-")) return "browser";
   if (ruleId.startsWith("rendered-")) return "rendered-page";
@@ -54844,6 +56683,24 @@ function packCoverage(pack, pc) {
       engineRules: [],
       applicabilityDeclared: false,
       why: "the pack declares no rule applicability, so this is inferred from the WCAG success criteria it maps to."
+    };
+  }
+  if (pc.automation) {
+    const decisiveRules = pc.automation.rules.filter((rule) => rule.effect === "decisive-nc").map((rule) => rule.id);
+    const failTiers = dedupe(decisiveRules.map((rule) => ruleTier(rule, pack)));
+    const testTiers = Object.values(pc.automation.tests);
+    const evidenceTiers = dedupe(pc.automation.rules.map((rule) => ruleTier(rule.id, pack)));
+    const renderedTier = evidenceTiers.includes("rendered-page") ? "rendered-page" : "browser";
+    const tier2 = pc.automation.completeBySilence === true ? testTiers.includes("rendered") ? renderedTier : "source" : "judgment";
+    const candidates2 = pc.automation.rules.filter((rule) => rule.effect === "candidate").length;
+    return {
+      tier: tier2,
+      sourceIsEnough: tier2 === "source" && pc.automation.completeBySilence === true,
+      canFailFrom: failTiers,
+      alsoNeeds: evidenceTiers.filter((value) => value !== tier2),
+      engineRules: [...declared],
+      applicabilityDeclared: true,
+      why: tier2 === "judgment" ? `the test-level matrix leaves a judgment step; ${decisiveRules.length} rule(s) may prove NC and ${candidates2} non-conclusive signal(s) are routed to adjudication.` : `the test-level matrix is complete at the ${tier2} tier and explicitly ${pc.automation.completeBySilence ? "allows" : "forbids"} conformity by measured silence.`
     };
   }
   const engineRules = [...declared];
@@ -56198,6 +58055,7 @@ var L5 = {
     manualTitle: "5. Crit\xE8res \xE0 adjuger (jugement / rendu) \u2014 non d\xE9cid\xE9s par le moteur statique",
     manualWarn: "Adjugez-les avec `verify --manual` (l'agent d\xE9cide depuis la source, de fa\xE7on gat\xE9e) ; les crit\xE8res de rendu passent par `scan`. Aucun ne doit \xEAtre marqu\xE9 \xAB conforme \xBB sans justification enregistr\xE9e et gat\xE9e.",
     testsToRule: "tests \xE0 trancher",
+    manualSummary: (criteria, tests) => `**${criteria} crit\xE8re(s) / ${tests} test(s) restent \xE0 trancher.** Leur statut et leur r\xE9partition S/R/J figurent d\xE9j\xE0 dans la grille exhaustive ci-dessus ; ils ne sont pas r\xE9p\xE9t\xE9s ici.`,
     manualHowTo: "G\xE9n\xE9rez la worklist : `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Chaque item y porte l'\xE9nonc\xE9 complet de ses tests, sa note technique, ses cas particuliers, sa guidance et les termes que le r\xE9f\xE9rentiel d\xE9finit.",
     // These three justifications appear ONLY in a pack report (the core has no derivation to
     // explain), so they are worded in the pack's terms: they used to describe the engine's
@@ -56227,7 +58085,20 @@ var L5 = {
     ncCount: "non-conformit\xE9(s)",
     perPageMore: (hidden, total) => `\u2702\uFE0F ${hidden} autre(s) constat(s) sur cette page ne sont pas list\xE9s ici (${total} au total) \u2014 voir la fiche de page.`,
     advCount: "recommandation(s)",
-    screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`
+    screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`,
+    renderedPages: (n) => `Pages rendues r\xE9ellement test\xE9es : ${n}`,
+    noRenderedPages: "aucune page n'a \xE9t\xE9 rendue ; les tests `rendered` n'ont donc pas \xE9t\xE9 ex\xE9cut\xE9s dans ce run",
+    automationContract: "Contrat d'automatisation RGAA",
+    automationCounts: (s, sc, r, rc, j, jc) => `${s} test(s) static sur ${sc} crit\xE8re(s) \xB7 ${r} rendered sur ${rc} \xB7 ${j} judgment sur ${jc}`,
+    staticCriteria: "Crit\xE8res avec au moins un test static",
+    renderedCriteria: "Crit\xE8res avec au moins un test rendered",
+    exhaustiveTitle: "Grille exhaustive des crit\xE8res",
+    exhaustiveNote: "Une ligne par crit\xE8re. S/R/J indique le nombre de tests static, rendered et judgment du contrat ; le statut reste \xAB \xE0 \xE9valuer \xBB tant que les tests non conclusifs n'ont pas \xE9t\xE9 adjug\xE9s.",
+    criterionCol: "Crit\xE8re",
+    statusCol: "Statut",
+    automationCol: "Tests S / R / J",
+    decidedByCol: "D\xE9cid\xE9 par",
+    owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "\xE0 adjuger" }
   },
   en: {
     title: (std) => `Accessibility audit report \u2014 ${std}`,
@@ -56266,6 +58137,7 @@ var L5 = {
     manualTitle: "5. Criteria to adjudicate (judgment / rendering) \u2014 not decided by the static engine",
     manualWarn: "Adjudicate these with `verify --manual` (the agent decides from source, gated); rendering criteria go to `scan`. None may be marked \u201Cconforming\u201D without a recorded, gated justification.",
     testsToRule: "tests to rule on",
+    manualSummary: (criteria, tests) => `**${criteria} criterion(ia) / ${tests} test(s) remain to be ruled on.** Their status and S/R/J split are already in the exhaustive grid above, so they are not repeated here.`,
     manualHowTo: "Generate the worklist: `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Each item carries the full wording of its tests, its technical note, its particular cases, its guidance and the terms the standard defines.",
     outOfScope: "Outside what the engine can decide for this standard \u2014 manual verification.",
     scopedOut: "The failures found concern elements outside this criterion's scope \u2014 assess separately.",
@@ -56291,7 +58163,20 @@ var L5 = {
     ncCount: "non-conformity(ies)",
     perPageMore: (hidden, total) => `\u2702\uFE0F ${hidden} further finding(s) on this page are not listed here (${total} in total) \u2014 see its page sheet.`,
     advCount: "recommendation(s)",
-    screenshotAlt: (n) => `Screenshot of the ${n} page`
+    screenshotAlt: (n) => `Screenshot of the ${n} page`,
+    renderedPages: (n) => `Rendered pages actually tested: ${n}`,
+    noRenderedPages: "no page was rendered; the `rendered` tests were therefore not executed in this run",
+    automationContract: "RGAA automation contract",
+    automationCounts: (s, sc, r, rc, j, jc) => `${s} static test(s) across ${sc} criterion(ia) \xB7 ${r} rendered across ${rc} \xB7 ${j} judgment across ${jc}`,
+    staticCriteria: "Criteria with at least one static test",
+    renderedCriteria: "Criteria with at least one rendered test",
+    exhaustiveTitle: "Exhaustive criteria grid",
+    exhaustiveNote: "One row per criterion. S/R/J is the number of static, rendered and judgment tests in the contract; a status stays \u201Cto assess\u201D until non-conclusive tests have been adjudicated.",
+    criterionCol: "Criterion",
+    statusCol: "Status",
+    automationCol: "S / R / J tests",
+    decidedByCol: "Decided by",
+    owner: { engine: "engine", scan: "scan", agent: "AI", pending: "to adjudicate" }
   }
 };
 var NEEDS_RENDERING = [
@@ -56340,6 +58225,41 @@ function reportTotals(groups) {
 function reportCoverage(groups) {
   const t3 = reportTotals(groups);
   return { decided: t3.c + t3.nc, total: t3.c + t3.nc + t3.manual };
+}
+function automationOverview(standard) {
+  if (isCore(standard)) return void 0;
+  const pack = loadPack(standard);
+  const tests = { static: 0, rendered: 0, judgment: 0 };
+  const criteria = { static: [], rendered: [], judgment: [] };
+  for (const criterion of pack.criteria) {
+    const tiers = Object.values(criterion.automation?.tests ?? {});
+    for (const tier of tiers) tests[tier]++;
+    for (const tier of ["static", "rendered", "judgment"]) if (tiers.includes(tier)) criteria[tier].push(criterion.id);
+  }
+  return { tests, criteria };
+}
+function automationCell(standard, id) {
+  if (isCore(standard)) return "\u2014";
+  const tiers = Object.values(loadPack(standard).criteria.find((criterion) => criterion.id === id)?.automation?.tests ?? {});
+  const n = (tier) => tiers.filter((value) => value === tier).length;
+  return `${n("static")} / ${n("rendered")} / ${n("judgment")}`;
+}
+function exhaustiveGrid(groups, standard, lang) {
+  const s = L5[lang];
+  const out2 = [
+    `## ${s.exhaustiveTitle}`,
+    "",
+    `> ${s.exhaustiveNote}`,
+    "",
+    `| ${s.criterionCol} | ${s.statusCol} | ${s.automationCol} | ${s.decidedByCol} |`,
+    "| --- | :---: | :---: | --- |"
+  ];
+  for (const row of groups.flatMap((group) => group.rows)) {
+    const owner = row.status === "manual" ? s.owner.pending : s.owner[row.decidedBy ?? "engine"];
+    out2.push(`| ${row.label} | ${row.inapplicable ? "NA" : row.status === "manual" ? "?" : row.status} | ${automationCell(standard, row.id)} | ${owner} |`);
+  }
+  out2.push("");
+  return out2;
 }
 function splitReportSections(md) {
   const lines = md.split("\n");
@@ -56398,6 +58318,23 @@ function render(r, lang, opts) {
   out2.push(`- **${s.tool}** : ultra11y v${r.version} (${s.toolNote})`);
   out2.push(`- **${s.scope}** : ${r.scope.files} ${s.files} \u2014 ${r.scope.inputs.join(", ")}`);
   out2.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% (${s.rateNote})`);
+  const renderedPages = r.scope.pagesAudited?.length ?? 0;
+  out2.push(`- **${s.renderedPages(renderedPages)}**${renderedPages === 0 ? ` \u2014 ${s.noRenderedPages}` : ""}`);
+  const automation = automationOverview(opts.standard);
+  if (automation) {
+    out2.push(
+      `- **${s.automationContract}** : ${s.automationCounts(
+        automation.tests.static,
+        automation.criteria.static.length,
+        automation.tests.rendered,
+        automation.criteria.rendered.length,
+        automation.tests.judgment,
+        automation.criteria.judgment.length
+      )}`,
+      `- **${s.staticCriteria}** : ${automation.criteria.static.map((id) => `\`${id}\``).join(" \xB7 ") || "\u2014"}`,
+      `- **${s.renderedCriteria}** : ${automation.criteria.rendered.map((id) => `\`${id}\``).join(" \xB7 ") || "\u2014"}`
+    );
+  }
   if (r.scope.dedup) out2.push(`- **${s.dedup}** : ${r.scope.dedup.canonicalFiles} ${s.canonical}, ${r.scope.dedup.duplicateFiles} ${s.duplicate}`);
   out2.push("", `> \u26A0\uFE0F ${s.warn}`, "");
   if (opts.partialAudit?.length) out2.push(`> \u{1F6A8} ${partialAuditBanner(lang, opts.partialAudit)}`, "");
@@ -56419,6 +58356,7 @@ function render(r, lang, opts) {
   const tot = reportTotals(opts.groups);
   out2.push(`| **${s.total}** | **${tot.c}** | **${tot.nc}** | **${tot.na}** | **${tot.manual}** |`, "");
   out2.push(`> ${s.naSubset(tot.c + tot.nc + tot.manual)}`, "");
+  out2.push(...exhaustiveGrid(opts.groups, opts.standard, lang));
   out2.push(`## ${s.ncTitle}`, "");
   const { nc: ncUnits, advisory: advisoryUnits } = partitionUnits(prdUnits(r, opts.standard, lang));
   if (ncUnits.length === 0) {
@@ -56428,13 +58366,14 @@ function render(r, lang, opts) {
       const group = ncUnits.filter((u) => u.severity === sev);
       if (!group.length) continue;
       out2.push(`### ${ICON3[sev]} ${s.sev[sev]} (${group.length})`, "");
-      for (const u of group) out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "####", ...opts.cropFor ? { cropFor: opts.cropFor } : {} }));
+      for (const u of group)
+        out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "####", technical: false, ...opts.cropFor ? { cropFor: opts.cropFor } : {} }));
     }
   }
   if (advisoryUnits.length) {
     out2.push(`## \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
     for (const u of advisoryUnits)
-      out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###", ...opts.cropFor ? { cropFor: opts.cropFor } : {} }));
+      out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###", technical: false, ...opts.cropFor ? { cropFor: opts.cropFor } : {} }));
   }
   const pageScope = pagesOf(r);
   if (pageScope.length) attributePages(r, pageScope);
@@ -56497,10 +58436,16 @@ function render(r, lang, opts) {
   if (!manual.length) out2.push(s.nothing, "");
   else {
     const pack5 = isCore(opts.standard) ? void 0 : loadPack(opts.standard);
-    for (const x of manual) {
-      const tests = pack5 ? packTestIds(pack5, x.id) : [];
-      const testRef = tests.length ? ` \u2014 ${s.testsToRule}: ${tests.map((t3) => `\`${t3}\``).join(" \xB7 ")}` : "";
-      out2.push(`- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}${testRef}`);
+    const exhaustiveContract = pack5?.criteria.every((criterion) => criterion.automation !== void 0) === true;
+    if (pack5 && exhaustiveContract) {
+      const tests = manual.reduce((count, row) => count + packTestIds(pack5, row.id).length, 0);
+      out2.push(s.manualSummary(manual.length, tests));
+    } else {
+      for (const x of manual) {
+        const tests = pack5 ? packTestIds(pack5, x.id) : [];
+        const testRef = tests.length ? ` \u2014 ${tests.length} ${s.testsToRule}` : "";
+        out2.push(`- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}${testRef}`);
+      }
     }
     out2.push("", `> ${s.manualHowTo}`, "");
   }
@@ -59380,17 +61325,24 @@ function collapse2(harvested, limits) {
     markup: [...new Set(harvested.flatMap((x) => x.markup ?? []))].sort()
   };
 }
-function packAutomatability(scs) {
+function packAutomatability(scs, criterion) {
+  if (criterion?.automation) {
+    const tiers = Object.values(criterion.automation.tests);
+    if (criterion.automation.completeBySilence === true) return tiers.includes("rendered") ? "needs-rendering" : "static";
+    return "judgment";
+  }
   const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a) => !!a);
   return autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
 }
-function blankItem(criteriaId, automatability2, title2, harvested, limits) {
+function blankItem(criteriaId, automatability2, title2, harvested, limits, signals = [], testIds = []) {
   const { evidence, population, complete, markup } = collapse2(harvested, limits);
   return {
     criteriaId,
     automatability: automatability2,
     ...title2 ? { title: title2 } : {},
+    ...testIds.length ? { testIds } : {},
     evidence,
+    ...signals.length ? { signals } : {},
     ...markup.length ? { markup } : {},
     population,
     evidenceComplete: complete,
@@ -59420,9 +61372,9 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
     return derivePackResults(audit2, standard).filter((pc) => pc.status === "manual").map((pc) => {
       const crit = getCriterion(pack, pc.id);
       const scs = crit?.wcag ?? pc.scs;
-      return blankItem(
+      const item = blankItem(
         pc.id,
-        packAutomatability(scs),
+        packAutomatability(scs, crit),
         // THE STANDARD'S OWN LOCALE, not a literal "fr". Identical output for RGAA, which
         // publishes in French and only in French — but the PACK is what says so, and a
         // standard publishing in another language must not be titled through a locale this
@@ -59431,8 +61383,21 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
         // signature would be asserting something about a country standard that is not true.
         crit ? localize(pack, crit.titlePlain, pack.defaultLocale) : void 0,
         harvestSubjects(subjectsForPackCriterion2(standard, pc.id, scs), docs),
-        limits
+        limits,
+        (pc.candidateFindings ?? []).map((finding) => ({
+          ruleId: finding.ruleId,
+          tests: crit?.automation?.rules.find((rule) => rule.id === finding.ruleId)?.tests ?? [],
+          file: finding.file,
+          line: finding.line,
+          message: finding.message,
+          ...finding.snippet ? { snippet: finding.snippet } : {}
+        })),
+        Object.keys(crit?.tests ?? {}).map((test) => `${pc.id}.${test}`)
       );
+      return {
+        ...item,
+        ...Object.values(crit?.automation?.tests ?? {}).includes("rendered") ? { needsRenderedEvidence: true } : {}
+      };
     });
   }
   return audit2.residualRisks.map(
@@ -59443,7 +61408,7 @@ function unrenderedResidual(audit2, items) {
   const audited = audit2.scope.pagesAudited;
   const readSomePage = audited === void 0 ? (audit2.scope.pages ?? []).length > 0 : audited.length > 0;
   if (readSomePage) return [];
-  return items.filter((it) => it.automatability === "needs-rendering").map((it) => it.criteriaId);
+  return items.filter((it) => it.automatability === "needs-rendering" || it.needsRenderedEvidence === true).map((it) => it.criteriaId);
 }
 function readCitation(c2) {
   if (typeof c2 !== "string") return c2;
@@ -60113,6 +62078,21 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   if (pack) out2.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
     out2.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` \u2014 ${it.title}` : ""}  _(${it.automatability})_`);
+    if (it.signals?.length) {
+      out2.push(
+        "",
+        lang === "fr" ? "> **Signaux automatiques \xE0 adjudicer** \u2014 ces constats sont non conclusifs : ils ne valent pas NC sans lecture du test RGAA et de ses alternatives/cas particuliers." : "> **Automatic signals to adjudicate** \u2014 these observations are non-conclusive: they are not NC until the standard test, alternatives and particular cases have been read.",
+        ""
+      );
+      for (const signal of it.signals) {
+        const refs = signal.tests.map((test) => `${it.criteriaId}.${test}`).join(", ");
+        out2.push(
+          `- \`${signal.ruleId}\` \u2192 ${refs || it.criteriaId} \u2014 \`${signal.file}:${signal.line}\`${signal.selector ? ` (\`${signal.selector}\`)` : ""}: ${signal.message}`
+        );
+        if (signal.snippet?.trim()) out2.push(`  - \`${signal.snippet.trim().replace(/\s+/g, " ").slice(0, SNIPPET_SHOWN)}\``);
+      }
+      out2.push("");
+    }
     const pop = it.population;
     const popNote = pop ? ` \u2014 ${pop.classes} ${s.classes}, ${pop.occurrences} ${s.occurrences}${pop.pages ? `, ${pop.pages} ${s.pagesWord}` : ""}${it.evidenceComplete === false ? ` \u26A0 ${s.incomplete}` : ""}` : "";
     out2.push("", `> ${s.evidence} (${it.evidence.length}${it.evidenceTruncated ? ` / ${it.evidenceTruncated.total}` : ""})${popNote}:`, "");
@@ -60159,7 +62139,8 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
     }
     if (pack) {
       const tests = crit?.tests ?? {};
-      const keys = Object.keys(tests);
+      const openTests = new Set(it.testIds?.map((id) => id.slice(`${it.criteriaId}.`.length)) ?? []);
+      const keys = Object.keys(tests).filter((key2) => !openTests.size || openTests.has(key2));
       out2.push(...glossaryBlock(pack, crit, lang));
       out2.push(...siblingBlock(pack, it.criteriaId, lang, s));
       if (keys.length) {
@@ -64089,7 +66070,8 @@ function packAuditDocument(input, packKey, lang) {
       findings: d.findings.map((f) => packFinding(f, [d.id])),
       ...d.justification ? { justification: d.justification } : {},
       ...d.decidedBy ? { decidedBy: d.decidedBy } : {},
-      ...d.inapplicable ? { inapplicable: true } : {}
+      ...d.inapplicable ? { inapplicable: true } : {},
+      ...pc?.automation ? { automation: pc.automation } : {}
     };
   });
   const findings = [...seen].map(([f, ids]) => packFinding(f, ids));
@@ -64112,7 +66094,7 @@ function packAuditDocument(input, packKey, lang) {
   const residualRisks = criteria.filter((c2) => c2.status === "manual").map((c2) => ({
     criteriaId: c2.id,
     reason: c2.justification ?? "",
-    automatability: packAutomatability(getCriterion(pack, c2.id)?.wcag ?? [])
+    automatability: packAutomatability(getCriterion(pack, c2.id)?.wcag ?? [], getCriterion(pack, c2.id))
   }));
   return {
     tool: "ultra11y",
@@ -64448,7 +66430,13 @@ var S = {
     gridLegend: "`C` conforme \xB7 `NC` non conforme \xB7 `\u2014` non applicable \xB7 `?` \xE0 \xE9valuer",
     gridDropped: "_La grille compl\xE8te ne tient pas dans un commentaire GitHub (64 Kio) \u2014 elle est dans la fiche par page du livrable._",
     pageMoreCriteria: (n) => `_\u2026 et ${n} autre(s) crit\xE8re(s) non conforme(s) sur cette page \u2014 voir la fiche de page dans l'artefact._`,
-    noCriterionForFindings: (n) => `${n} constat(s) sur cette page ne rendent aucun crit\xE8re du r\xE9f\xE9rentiel non conforme : leur r\xE8gle sort du p\xE9rim\xE8tre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont d\xE9taill\xE9s dans l'artefact.`
+    noCriterionForFindings: (n) => `${n} constat(s) sur cette page ne rendent aucun crit\xE8re du r\xE9f\xE9rentiel non conforme : leur r\xE8gle sort du p\xE9rim\xE8tre d'application de chacun. Ils comptent dans les colonnes ci-dessus, et sont d\xE9taill\xE9s dans l'artefact.`,
+    runScope: "P\xE9rim\xE8tre de ce run",
+    renderedActuallyTested: (n) => `${n} page(s) rendue(s) r\xE9ellement test\xE9e(s)`,
+    noRenderedExecuted: "0 page rendue : aucun test rendered n'a \xE9t\xE9 ex\xE9cut\xE9",
+    staticTested: (tests, ids) => `${tests} test(s) static \u2014 crit\xE8res : ${ids || "\u2014"}`,
+    renderedContract: (tests, ids) => `${tests} test(s) rendered pr\xE9vus \u2014 crit\xE8res : ${ids || "\u2014"}`,
+    judgmentContract: (tests, criteria) => `${tests} test(s) judgment sur ${criteria} crit\xE8re(s), transmis \xE0 l'IA seulement quand ils restent applicables et non tranch\xE9s`
   },
   en: {
     title: "ultra11y accessibility audit",
@@ -64518,7 +66506,13 @@ var S = {
     gridLegend: "`C` conforming \xB7 `NC` non-conforming \xB7 `\u2014` not applicable \xB7 `?` to assess",
     gridDropped: "_The full grid does not fit in a GitHub comment (64 KiB) \u2014 it is in the deliverable's per-page sheet._",
     pageMoreCriteria: (n) => `_\u2026 and ${n} more non-conforming criterion(ia) on this page \u2014 see its sheet in the artifact._`,
-    noCriterionForFindings: (n) => `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`
+    noCriterionForFindings: (n) => `${n} finding(s) on this page make no criterion of the standard non-conforming: their rule falls outside every criterion's applicability. They are counted in the columns above, and detailed in the artifact.`,
+    runScope: "Scope of this run",
+    renderedActuallyTested: (n) => `${n} rendered page(s) actually tested`,
+    noRenderedExecuted: "0 rendered pages: no rendered test was executed",
+    staticTested: (tests, ids) => `${tests} static test(s) \u2014 criteria: ${ids || "\u2014"}`,
+    renderedContract: (tests, ids) => `${tests} planned rendered test(s) \u2014 criteria: ${ids || "\u2014"}`,
+    judgmentContract: (tests, criteria) => `${tests} judgment test(s) across ${criteria} criterion(ia), sent to AI only while applicable and undecided`
   }
 };
 var MAX_ROWS = 50;
@@ -64596,6 +66590,20 @@ function runCoverage(result, standard, lang) {
     agentRuled
   };
 }
+function runScopeLines(result, standard, lang) {
+  const s = S[lang];
+  const pages = result.scope.pagesAudited?.length ?? 0;
+  const out2 = [`> **${s.runScope}** \u2014 ${pages === 0 ? s.noRenderedExecuted : s.renderedActuallyTested(pages)}`];
+  const automation = automationOverview(standard);
+  if (!automation) return out2;
+  const ids = (values) => values.map((id) => `\`${id}\``).join(" \xB7 ");
+  out2.push(
+    `> ${s.staticTested(automation.tests.static, ids(automation.criteria.static))}`,
+    `> ${s.renderedContract(automation.tests.rendered, ids(automation.criteria.rendered))}`,
+    `> ${s.judgmentContract(automation.tests.judgment, automation.criteria.judgment.length)}`
+  );
+  return out2;
+}
 var cell = (v) => v.replace(/\|/g, "\\|");
 function criterionTableHead(s) {
   return [`| ${s.severity} | ${s.criterion} | ${s.defectsCol} | ${s.occurrences} | ${s.pagesCol} |`, "| --- | --- | ---: | ---: | ---: |"];
@@ -64637,6 +66645,7 @@ function stepSummary(result, opts = {}) {
   const out2 = [];
   out2.push(`## ${s.title} \u2014 ${stdLabel}`, "");
   out2.push(`\`${result.date}\` \xB7 ${result.scope.files} ${s.files} \xB7 **${coverage.text}**${coverage.detail ? ` \xB7 ${coverage.detail}` : ""}`, "");
+  out2.push(...runScopeLines(result, standard, lang), "");
   if (coverage.agentRuled) out2.push(`> ${agentMarkNote(lang)}`, "");
   const baseDir = opts.baseDir ?? process.cwd();
   const all = findingsForStandard(result, standard);
@@ -64694,6 +66703,7 @@ function prComment(result, opts = {}) {
   head.push(`### ${s.title} \u2014 ${stdLabel}`, "");
   head.push(blocking ? s.verdictFail(blocking) : normative.length ? s.verdictWarn : s.verdictPass, "");
   head.push(`\`${result.date}\` \xB7 ${result.scope.files} ${s.files} \xB7 **${coverage.text}**${coverage.detail ? ` \xB7 ${coverage.detail}` : ""}`, "");
+  head.push(...runScopeLines(result, standard, lang), "");
   if (coverage.agentRuled) head.push(`> ${agentMarkNote(lang)}`, "");
   if (orphans) head.push(`> ${s.unattributed(orphans)}`, "");
   const tail = [];
@@ -65424,7 +67434,16 @@ var T4 = {
     openComposite: "Rapport complet, en un seul fichier (imprimable en PDF)",
     openPages: "Rapport page par page",
     noScreenshot: "Aucune capture d'\xE9cran pour cette page.",
-    screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`
+    screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`,
+    scopeTitle: "P\xE9rim\xE8tre r\xE9ellement test\xE9",
+    renderedPages: (n) => `${n} page(s) rendue(s) r\xE9ellement test\xE9e(s)`,
+    noRenderedPages: "Aucune page rendue : les tests rendered n'ont pas \xE9t\xE9 ex\xE9cut\xE9s dans ce run.",
+    automation: (s, sc, r, rc, j, jc) => `Contrat RGAA : ${s} test(s) static sur ${sc} crit\xE8re(s), ${r} rendered sur ${rc}, ${j} judgment sur ${jc}.`,
+    exhaustive: "Grille exhaustive des crit\xE8res",
+    exhaustiveCaption: "Une ligne par crit\xE8re ; S/R/J indique le nombre de tests static, rendered et judgment.",
+    automationCol: "Tests S / R / J",
+    decidedBy: "D\xE9cid\xE9 par",
+    owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "\xE0 adjuger" }
   },
   en: {
     reportTitle: "Conformance report",
@@ -65474,7 +67493,16 @@ var T4 = {
     openComposite: "Full report, in a single file (printable to PDF)",
     openPages: "Page-by-page report",
     noScreenshot: "No screenshot for this page.",
-    screenshotAlt: (n) => `Screenshot of the ${n} page`
+    screenshotAlt: (n) => `Screenshot of the ${n} page`,
+    scopeTitle: "Actual tested scope",
+    renderedPages: (n) => `${n} rendered page(s) actually tested`,
+    noRenderedPages: "No rendered page: the rendered tests were not executed in this run.",
+    automation: (s, sc, r, rc, j, jc) => `RGAA contract: ${s} static test(s) across ${sc} criterion(ia), ${r} rendered across ${rc}, ${j} judgment across ${jc}.`,
+    exhaustive: "Exhaustive criteria grid",
+    exhaustiveCaption: "One row per criterion; S/R/J is the number of static, rendered and judgment tests.",
+    automationCol: "S / R / J tests",
+    decidedBy: "Decided by",
+    owner: { engine: "engine", scan: "scan", agent: "AI", pending: "to adjudicate" }
   }
 };
 function ticks(text) {
@@ -65583,6 +67611,60 @@ function findingsBlocks(result, standard, lang, level, crops, refusals) {
   }
   return out2;
 }
+function scopeBlocks(result, standard, lang) {
+  const t3 = T4[lang];
+  const pages = result.scope.pagesAudited?.length ?? 0;
+  const items = [[{ text: `${result.scope.files} ${t3.files}` }], [{ text: t3.renderedPages(pages) }]];
+  const automation = automationOverview(standard);
+  if (automation) {
+    items.push([
+      {
+        text: t3.automation(
+          automation.tests.static,
+          automation.criteria.static.length,
+          automation.tests.rendered,
+          automation.criteria.rendered.length,
+          automation.tests.judgment,
+          automation.criteria.judgment.length
+        )
+      }
+    ]);
+  }
+  const out2 = [
+    { kind: "heading", level: 2, text: t3.scopeTitle, id: "scope" },
+    { kind: "list", items }
+  ];
+  if (pages === 0) out2.push({ kind: "note", tone: "warn", runs: ticks(t3.noRenderedPages) });
+  return out2;
+}
+function criteriaGridBlocks(result, standard, lang) {
+  const t3 = T4[lang];
+  const groups = isCore(standard) ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
+  const pack = isCore(standard) ? void 0 : loadPack(standard);
+  const rows = [];
+  for (const row of groups.flatMap((group) => group.rows)) {
+    const criterion = pack?.criteria.find((entry) => entry.id === row.id);
+    const tiers = Object.values(criterion?.automation?.tests ?? {});
+    const n = (tier) => tiers.filter((value) => value === tier).length;
+    const status = row.inapplicable ? "NA" : row.status;
+    const owner = row.status === "manual" ? t3.owner.pending : t3.owner[row.decidedBy ?? "engine"];
+    rows.push([
+      { text: pack && criterion ? `${pack.name} ${row.id} \u2014 ${titlePlain(pack, criterion, lang)}` : row.label },
+      { status, text: "" },
+      { text: pack ? `${n("static")} / ${n("rendered")} / ${n("judgment")}` : "\u2014", align: "end" },
+      { text: owner }
+    ]);
+  }
+  return [
+    { kind: "heading", level: 2, text: t3.exhaustive, id: "criteria" },
+    {
+      kind: "table",
+      caption: t3.exhaustiveCaption,
+      columns: [{ text: t3.criterion }, { text: t3.status }, { text: t3.automationCol, align: "end" }, { text: t3.decidedBy }],
+      rows
+    }
+  ];
+}
 function scoreboardBlocks(result, standard, lang, sheetHref) {
   const t3 = T4[lang];
   const scope = pagesOf(result);
@@ -65684,7 +67766,9 @@ function indexDoc(result, opts = {}) {
     blocks.push({ kind: "heading", level: 2, text: t3.documents, id: "documents" });
     blocks.push({ kind: "list", items: opts.links.map((l) => [{ text: l.text, href: l.href }]) });
   }
+  blocks.push(...scopeBlocks(result, standard, lang));
   blocks.push(...synthesisBlocks(result, standard, lang));
+  blocks.push(...criteriaGridBlocks(result, standard, lang));
   if (h2.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
   blocks.push(...scoreboardBlocks(result, standard, lang));
   return { lang, title: `${t3.indexTitle} \u2014 ${stdName(standard)}`, subtitle: h2.runs, ...opts.nav ? { nav: opts.nav } : {}, blocks };
@@ -65694,7 +67778,7 @@ function compositeDoc(result, opts = {}) {
   const lang = opts.lang ?? "en";
   const t3 = T4[lang];
   const h2 = headline(result, standard, lang);
-  const blocks = [...synthesisBlocks(result, standard, lang)];
+  const blocks = [...scopeBlocks(result, standard, lang), ...synthesisBlocks(result, standard, lang), ...criteriaGridBlocks(result, standard, lang)];
   if (h2.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
   blocks.push(...findingsBlocks(result, standard, lang, 2, opts.crops, opts.refusals));
   blocks.push(...scoreboardBlocks(result, standard, lang));
@@ -67435,6 +69519,10 @@ function methodView(standard, lang, opts = {}) {
   }).filter((b) => opts.tier ? b.tier === opts.tier : b.count > 0);
   const sourceIds = [...coverage].filter(([, c2]) => c2.sourceIsEnough).map(([id]) => id);
   const failableFromSource = [...coverage].filter(([, c2]) => !c2.sourceIsEnough && c2.canFailFrom.includes("source")).map(([id]) => id);
+  const evidenceTiers = ["source", "cross-file", "rendered-page", "browser"].map((tier) => {
+    const ids = [...coverage].filter(([, criterion]) => criterion.canFailFrom.includes(tier)).map(([id]) => id);
+    return { tier, count: ids.length, ids, ...TIER_GUIDE[tier] };
+  }).filter((entry) => entry.count > 0);
   const pack = isCore(standard) ? void 0 : getPack(standard);
   return {
     standard,
@@ -67450,6 +69538,7 @@ function methodView(standard, lang, opts = {}) {
       ids: failableFromSource,
       note: "These cannot be PROVEN conformant from source, but an engine rule can still fail them outright."
     },
+    evidenceTiers,
     ...pack?.sampleMethodology ? {
       sample: {
         requiredKinds: pack.sampleMethodology.requiredKinds.map((k) => ({ id: k.id, label: k.label[lang] ?? k.label[pack.defaultLocale] })),

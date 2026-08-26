@@ -47,6 +47,22 @@ export interface PackCriterion {
   // failure). Optional/additive: a pack WITHOUT `appliesTo` keeps the legacy fan-out
   // (every mapped SC's findings attach) so third-party packs are unaffected.
   appliesTo?: { ruleIds: string[] };
+  /** Explicit automation contract at the standard's TEST granularity.
+   *
+   * `tests` classifies every numbered test. `rules` then says whether a rule firing is a
+   * complete normative failure (`decisive-nc`), merely evidence an adjudicator must inspect
+   * (`candidate`), or a non-normative recommendation (`advisory`). `completeBySilence` is an
+   * intentionally rare opt-in: only then may a fully measured, silent run prove C. */
+  automation?: {
+    tests: Record<string, "static" | "rendered" | "judgment">;
+    rules: Array<{
+      id: string;
+      tests: string[];
+      effect: "decisive-nc" | "candidate" | "advisory";
+      rationale?: string;
+    }>;
+    completeBySilence?: boolean;
+  };
   // The criterion's own wording asks MORE than the WCAG SCs it maps to, so a `C` on those
   // SCs is not an answer to it. RGAA 8.6 asks whether the page title is *pertinent*; WCAG
   // 2.4.2 only that a title exists. RGAA 13.3 asks whether a downloadable document has an

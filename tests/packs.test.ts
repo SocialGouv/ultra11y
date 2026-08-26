@@ -157,11 +157,14 @@ describe("derivePackResults (WCAG → pack projection)", () => {
   it("projects a WCAG-keyed audit onto RGAA criteria with NC-dominates", () => {
     const results = derivePackResults(synthetic(), "rgaa");
     const byId = new Map(results.map((r) => [r.id, r]));
-    // RGAA 8.3 maps to WCAG 3.1.1 (NC in the fixture) → NC, carrying the finding.
-    expect(byId.get("8.3")?.status).toBe("NC");
-    expect(byId.get("8.3")?.findings.length).toBe(1);
-    // RGAA 1.1 maps to 1.1.1 (C in the fixture) → C.
-    expect(byId.get("1.1")?.status).toBe("C");
+    // WCAG's missing-html-lang rule cannot exclude RGAA's alternative of declaring language
+    // on every text ancestor, so the evidence is routed without inventing an RGAA NC.
+    expect(byId.get("8.3")?.status).toBe("manual");
+    expect(byId.get("8.3")?.findings).toEqual([]);
+    expect(byId.get("8.3")?.candidateFindings).toHaveLength(1);
+    // A broader WCAG C cannot prove every numbered RGAA 1.1 test; without explicit complete
+    // measurement the projection stays fail-closed.
+    expect(byId.get("1.1")?.status).toBe("manual");
     // A criterion whose SCs are absent from the audit → NA.
     const na = results.find((r) => r.scs.every((sc) => sc !== "3.1.1" && sc !== "1.1.1"));
     expect(na?.status).toBe(INAPPLICABLE_STATUS);

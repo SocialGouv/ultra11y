@@ -147,6 +147,7 @@ export function packAuditDocument(input: AuditResult | PackAuditResult, packKey:
       ...(d.justification ? { justification: d.justification } : {}),
       ...(d.decidedBy ? { decidedBy: d.decidedBy } : {}),
       ...(d.inapplicable ? { inapplicable: true } : {}),
+      ...(pc?.automation ? { automation: pc.automation } : {}),
     };
   });
   // One entry per finding, carrying EVERY criterion it counts against: a single missing
@@ -180,7 +181,7 @@ export function packAuditDocument(input: AuditResult | PackAuditResult, packKey:
     .map((c) => ({
       criteriaId: c.id,
       reason: c.justification ?? "",
-      automatability: packAutomatability(getCriterion(pack, c.id)?.wcag ?? []),
+      automatability: packAutomatability(getCriterion(pack, c.id)?.wcag ?? [], getCriterion(pack, c.id)),
     }));
 
   return {

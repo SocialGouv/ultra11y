@@ -164,17 +164,20 @@ describe("job summary", () => {
     });
 
     const md = stepSummary(result, { standard: "rgaa", lang: "fr" });
-    expect(md).toContain("12/106 critères tranchés dans ce run");
-    expect(md).toContain("94 à compléter par scan ou adjudication");
+    expect(md).toContain("11/106 critères tranchés dans ce run");
+    expect(md).toContain("95 à compléter par scan ou adjudication");
     expect(md).not.toContain("92 %");
     expect(md).not.toContain("4 occurrence(s)");
     expect(md).toContain("Aucune non-conformité détectée");
     expect(md).not.toContain("| Sévérité | Critère |");
 
     const comment = prComment(result, { standard: "rgaa", lang: "fr" });
-    expect(comment).toContain("12/106 critères tranchés dans ce run");
+    expect(comment).toContain("11/106 critères tranchés dans ce run");
     expect(comment).not.toContain("92 %");
     expect(comment).not.toMatch(/4 constat\(s\).*aucune page/);
+    expect(comment).toContain("0 page rendue : aucun test rendered n'a été exécuté");
+    expect(comment).toContain("17 test(s) static — critères :");
+    expect(comment).toContain("238 test(s) judgment sur 97 critère(s)");
   });
 
   it("says so plainly when nothing was found", () => {

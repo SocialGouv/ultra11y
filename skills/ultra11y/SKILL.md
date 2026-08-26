@@ -79,7 +79,7 @@ adjudicates. So the engine's clean run is a starting point, never a verdict — 
 >    decides what its terms mean. An auditor block that cites `8.3.1` after reading it is
 >    grounded; one that cites it from memory is a guess wearing a reference. Before auditing
 >    against a country standard, run the plan (`ultra11y_method`): it tells you how many of its
->    criteria no tool will decide for you — for RGAA, **57 of 106**. See `references/mcp.md`.
+>    criteria that still need adjudication to earn C — for RGAA, **104 of 106**. See `references/mcp.md`.
 > 6. **The FINAL rendered semantic HTML must be correct.** The engine sees only source; a
 >    component library (DSFR/MUI…) or `.vue`/`.svelte`/`.astro` SFC hides the real markup, so
 >    a green source audit is not proof. Verify the produced semantic HTML — install the
@@ -113,6 +113,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/forbidden-patterns.md` | 15 anti-patterns: bad → why → native fix → criterion |
 | `references/focus-and-logic.md` | The focus/keyboard criteria you own, and how to reason about them |
 | `references/criteria.md` | The 55 criteria: level, automatability class, engine rules, pack mapping (generated) |
+| `references/rgaa-automation.md` | RGAA 4.1.2: generated 106-criterion / 258-test matrix, decisive rules, candidate signals and silence policy |
 | `references/act.md` | What the engine is measured to catch — and what it demonstrably does not (generated) |
 
 | Running the tool | |

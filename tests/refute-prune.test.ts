@@ -36,6 +36,7 @@ writeFileSync(
 <h1>Bienvenue</h1>
 <img src="hero.png" alt="Un randonneur sur une crête">
 <label for="email">Email</label><input id="email" type="email">
+<input type="image" src="submit.png">
 <a href="/aide">Contacter le support</a>
 </main></body></html>`,
 );

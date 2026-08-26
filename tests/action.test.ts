@@ -1,7 +1,9 @@
 // The shipped composite action. It is consumed as `maxgfr/ultra11y@vN`, so a mistake here
 // breaks every user's CI and cannot be caught by a unit test of src/ — gate its structure.
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
@@ -595,6 +597,55 @@ describe("the adjudication tier", () => {
     for (const f of adjudicationSteps().filter((s) => s.name?.includes("fold"))) {
       expect(f.run).toContain("inputs.gate-adjudicated");
     }
+    const operationalGate = ACTION.runs.steps.find((step) => step.name === "Require at least one operational agent pass")!;
+    expect(operationalGate.if).toContain("always()");
+    expect(operationalGate.env).toMatchObject({
+      PASS1: expect.stringContaining("agentpass1.outputs.conclusion"),
+      PASS2: expect.stringContaining("agentpass2.outputs.conclusion"),
+      PASS3: expect.stringContaining("agentpass3.outputs.conclusion"),
+      FILE1: expect.stringContaining("agentpass1.outputs.execution_file"),
+      FILE2: expect.stringContaining("agentpass2.outputs.execution_file"),
+      FILE3: expect.stringContaining("agentpass3.outputs.execution_file"),
+    });
+    expect(operationalGate.run).toContain('"$attempted" -gt 0');
+    expect(operationalGate.run).toContain('"$succeeded" -eq 0');
+    expect(operationalGate.run).toContain("result.is_error !== true");
+    expect(operationalGate.run).toContain('echo "ok=false" >> "$GITHUB_OUTPUT"');
+    expect(operationalGate.run).not.toContain("exit 1");
+    const finalGate = ACTION.runs.steps.find((step) => step.name === "Gate")!;
+    expect(finalGate.if).toContain("steps.agentoperational.outputs.ok == 'false'");
+    expect(finalGate.run).toContain("every attempted Claude Code adjudication pass failed operationally");
+  });
+
+  it("detects is_error inside a green Claude execution log before the final gate", () => {
+    const operationalGate = ACTION.runs.steps.find((step) => step.name === "Require at least one operational agent pass")!;
+    const dir = mkdtempSync(join(tmpdir(), "u11y-agent-operation-"));
+    const executionFile = join(dir, "execution.jsonl");
+    const output = join(dir, "output");
+    const run = (isError: boolean) => {
+      writeFileSync(
+        executionFile,
+        `${JSON.stringify({ subtype: "init" })}\n${JSON.stringify({ type: "result", subtype: "success", is_error: isError, num_turns: 1 })}\n`,
+      );
+      writeFileSync(output, "");
+      const result = spawnSync("bash", ["-c", operationalGate.run ?? ""], {
+        encoding: "utf8",
+        env: { ...process.env, PASS1: "success", FILE1: executionFile, PASS2: "", FILE2: "", PASS3: "", FILE3: "", GITHUB_OUTPUT: output },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      return readFileSync(output, "utf8");
+    };
+
+    expect(run(true)).toContain("ok=false");
+    expect(run(false)).toContain("ok=true");
+
+    writeFileSync(output, "");
+    const blank = spawnSync("bash", ["-c", operationalGate.run ?? ""], {
+      encoding: "utf8",
+      env: { ...process.env, PASS1: "", FILE1: "", PASS2: "", FILE2: "", PASS3: "", FILE3: "", GITHUB_OUTPUT: output },
+    });
+    expect(blank.status, blank.stderr).toBe(0);
+    expect(readFileSync(output, "utf8")).toContain("ok=false");
   });
 
   // Removing the bound has to mean REMOVING THE FLAG, not passing a very large number:
@@ -1031,6 +1082,17 @@ describe("the pull-request digest's links", () => {
     expect(name).toContain("inputs.report == 'true'");
     expect(name).toContain("inputs.html == 'true'");
     expect(name).toContain("ultra11y-{0}");
+  });
+});
+
+describe("the RGAA report artifact", () => {
+  it("carries the exhaustive test-level automation matrix beside static and integral reports", () => {
+    const step = ACTION.runs.steps.find((candidate) => candidate.name?.includes("RGAA automation matrix"));
+    expect(step).toBeDefined();
+    expect(step?.if).toContain("inputs.report == 'true'");
+    expect(step?.if).toContain("inputs.html == 'true'");
+    expect(step?.if).toContain("inputs.standard == 'rgaa'");
+    expect(step?.run).toContain("audits/rgaa-automation.md");
   });
 });
 

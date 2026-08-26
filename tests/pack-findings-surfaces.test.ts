@@ -113,14 +113,18 @@ describe("the two new declarative rules", () => {
     expect(packRuleIds(DOC('<select><optgroup label="Europe"><option>a</option></optgroup></select>'))).not.toContain("pack:rgaa:optgroup-without-label");
   });
 
-  it("flags a dir value that is not rtl/ltr/auto (RGAA test 8.10.2)", () => {
+  it("flags a dir value that is not rtl/ltr (RGAA test 8.10.2)", () => {
     expect(packRuleIds(DOC('<p dir="rlt">texte</p>'))).toContain("pack:rgaa:dir-value-invalid");
   });
 
-  it("accepts every valid dir value", () => {
-    for (const v of ["rtl", "ltr", "auto"]) {
+  it("accepts the two values admitted by RGAA", () => {
+    for (const v of ["rtl", "ltr"]) {
       expect(packRuleIds(DOC(`<p dir="${v}">texte</p>`)), v).not.toContain("pack:rgaa:dir-value-invalid");
     }
+  });
+
+  it("reports HTML's auto value because RGAA 4.1.2 admits only rtl or ltr", () => {
+    expect(packRuleIds(DOC('<p dir="auto">texte</p>'))).toContain("pack:rgaa:dir-value-invalid");
   });
 
   it("says nothing about an element with no dir at all", () => {
@@ -134,16 +138,17 @@ describe("the two new declarative rules", () => {
 });
 
 describe("the work that is NOT a non-conformity is still shown", () => {
-  // 57 of RGAA's 106 criteria are judgment-tier and can only derive `manual`. The report listed them one bare line
+  // Most RGAA criteria still need adjudication to earn C. The report listed them one bare line
   // each, and the PRD skipped them entirely (`if (!pr.findings.length) continue`) — so the
   // backlog of an RGAA audit was silently missing ~93% of the job.
   const r = () => runAudit({ inputs: [PAGE] });
 
-  it("report §5 names each criterion's own numbered tests", () => {
+  it("report §5 summarizes the work without repeating the exhaustive grid", () => {
     const md = renderPackReport(r(), loadPack("rgaa"), "fr");
-    expect(md).toMatch(/tests à trancher/);
-    // 6.1 — the page carries a link, so its purpose is genuinely still to rule on.
-    expect(md).toMatch(/`6\.1\.1`/);
+    const toRule = md.slice(md.indexOf("## 5."));
+    expect(toRule).toMatch(/\d+ critère\(s\) \/ \d+ test\(s\) restent à trancher/);
+    expect(toRule).toContain("grille exhaustive ci-dessus");
+    expect(toRule).not.toMatch(/RGAA 6\.1|`6\.1\.1`/);
   });
 
   it("does NOT list a criterion whose subject the page does not contain", () => {
@@ -152,8 +157,8 @@ describe("the work that is NOT a non-conformity is still shown", () => {
     // thoroughness, it is thirteen rows of work that does not exist. « Non applicable » is the
     // normative verdict for a criterion with no subject, and it keeps the backlog honest.
     const md = renderPackReport(r(), loadPack("rgaa"), "fr");
-    const toRule = md.slice(md.indexOf("tests à trancher"));
-    expect(toRule).not.toMatch(/`11\.2\.1`/);
+    const toRule = md.slice(md.indexOf("## 5."));
+    expect(toRule).not.toMatch(/RGAA 11\.2/);
   });
 
   it("report §5 points at the command that produces the full wording", () => {

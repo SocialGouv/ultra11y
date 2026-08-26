@@ -82,6 +82,8 @@ const L = {
     manualWarn:
       "Adjugez-les avec `verify --manual` (l'agent décide depuis la source, de façon gatée) ; les critères de rendu passent par `scan`. Aucun ne doit être marqué « conforme » sans justification enregistrée et gatée.",
     testsToRule: "tests à trancher",
+    manualSummary: (criteria: number, tests: number) =>
+      `**${criteria} critère(s) / ${tests} test(s) restent à trancher.** Leur statut et leur répartition S/R/J figurent déjà dans la grille exhaustive ci-dessus ; ils ne sont pas répétés ici.`,
     manualHowTo:
       "Générez la worklist : `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Chaque item y porte l'énoncé complet de ses tests, sa note technique, ses cas particuliers, sa guidance et les termes que le référentiel définit.",
     // These three justifications appear ONLY in a pack report (the core has no derivation to
@@ -119,6 +121,21 @@ const L = {
       `✂️ ${hidden} autre(s) constat(s) sur cette page ne sont pas listés ici (${total} au total) — voir la fiche de page.`,
     advCount: "recommandation(s)",
     screenshotAlt: (n: string) => `Capture d'écran de la page ${n}`,
+    renderedPages: (n: number) => `Pages rendues réellement testées : ${n}`,
+    noRenderedPages: "aucune page n'a été rendue ; les tests `rendered` n'ont donc pas été exécutés dans ce run",
+    automationContract: "Contrat d'automatisation RGAA",
+    automationCounts: (s: number, sc: number, r: number, rc: number, j: number, jc: number) =>
+      `${s} test(s) static sur ${sc} critère(s) · ${r} rendered sur ${rc} · ${j} judgment sur ${jc}`,
+    staticCriteria: "Critères avec au moins un test static",
+    renderedCriteria: "Critères avec au moins un test rendered",
+    exhaustiveTitle: "Grille exhaustive des critères",
+    exhaustiveNote:
+      "Une ligne par critère. S/R/J indique le nombre de tests static, rendered et judgment du contrat ; le statut reste « à évaluer » tant que les tests non conclusifs n'ont pas été adjugés.",
+    criterionCol: "Critère",
+    statusCol: "Statut",
+    automationCol: "Tests S / R / J",
+    decidedByCol: "Décidé par",
+    owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "à adjuger" },
   },
   en: {
     title: (std: string) => `Accessibility audit report — ${std}`,
@@ -163,6 +180,8 @@ const L = {
     manualWarn:
       "Adjudicate these with `verify --manual` (the agent decides from source, gated); rendering criteria go to `scan`. None may be marked “conforming” without a recorded, gated justification.",
     testsToRule: "tests to rule on",
+    manualSummary: (criteria: number, tests: number) =>
+      `**${criteria} criterion(ia) / ${tests} test(s) remain to be ruled on.** Their status and S/R/J split are already in the exhaustive grid above, so they are not repeated here.`,
     manualHowTo:
       "Generate the worklist: `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Each item carries the full wording of its tests, its technical note, its particular cases, its guidance and the terms the standard defines.",
     outOfScope: "Outside what the engine can decide for this standard — manual verification.",
@@ -194,6 +213,21 @@ const L = {
     perPageMore: (hidden: number, total: number) => `✂️ ${hidden} further finding(s) on this page are not listed here (${total} in total) — see its page sheet.`,
     advCount: "recommendation(s)",
     screenshotAlt: (n: string) => `Screenshot of the ${n} page`,
+    renderedPages: (n: number) => `Rendered pages actually tested: ${n}`,
+    noRenderedPages: "no page was rendered; the `rendered` tests were therefore not executed in this run",
+    automationContract: "RGAA automation contract",
+    automationCounts: (s: number, sc: number, r: number, rc: number, j: number, jc: number) =>
+      `${s} static test(s) across ${sc} criterion(ia) · ${r} rendered across ${rc} · ${j} judgment across ${jc}`,
+    staticCriteria: "Criteria with at least one static test",
+    renderedCriteria: "Criteria with at least one rendered test",
+    exhaustiveTitle: "Exhaustive criteria grid",
+    exhaustiveNote:
+      "One row per criterion. S/R/J is the number of static, rendered and judgment tests in the contract; a status stays “to assess” until non-conclusive tests have been adjudicated.",
+    criterionCol: "Criterion",
+    statusCol: "Status",
+    automationCol: "S / R / J tests",
+    decidedByCol: "Decided by",
+    owner: { engine: "engine", scan: "scan", agent: "AI", pending: "to adjudicate" },
   },
 } as const;
 
@@ -321,6 +355,52 @@ export function reportCoverage(groups: ReportGroup[]): { decided: number; total:
   return { decided: t.c + t.nc, total: t.c + t.nc + t.manual };
 }
 
+export interface AutomationOverview {
+  tests: { static: number; rendered: number; judgment: number };
+  criteria: { static: string[]; rendered: string[]; judgment: string[] };
+}
+
+/** The standard's declared test-level contract. This is a plan, not runtime coverage: the
+ *  report prints the latter separately from `scope.pagesAudited`, so a source-only run can
+ *  never make planned rendered tests look as though they ran. */
+export function automationOverview(standard: StandardId): AutomationOverview | undefined {
+  if (isCore(standard)) return undefined;
+  const pack = loadPack(standard);
+  const tests = { static: 0, rendered: 0, judgment: 0 };
+  const criteria = { static: [] as string[], rendered: [] as string[], judgment: [] as string[] };
+  for (const criterion of pack.criteria) {
+    const tiers = Object.values(criterion.automation?.tests ?? {});
+    for (const tier of tiers) tests[tier]++;
+    for (const tier of ["static", "rendered", "judgment"] as const) if (tiers.includes(tier)) criteria[tier].push(criterion.id);
+  }
+  return { tests, criteria };
+}
+
+function automationCell(standard: StandardId, id: string): string {
+  if (isCore(standard)) return "—";
+  const tiers = Object.values(loadPack(standard).criteria.find((criterion) => criterion.id === id)?.automation?.tests ?? {});
+  const n = (tier: "static" | "rendered" | "judgment") => tiers.filter((value) => value === tier).length;
+  return `${n("static")} / ${n("rendered")} / ${n("judgment")}`;
+}
+
+function exhaustiveGrid(groups: ReportGroup[], standard: StandardId, lang: Lang): string[] {
+  const s = L[lang];
+  const out = [
+    `## ${s.exhaustiveTitle}`,
+    "",
+    `> ${s.exhaustiveNote}`,
+    "",
+    `| ${s.criterionCol} | ${s.statusCol} | ${s.automationCol} | ${s.decidedByCol} |`,
+    "| --- | :---: | :---: | --- |",
+  ];
+  for (const row of groups.flatMap((group) => group.rows)) {
+    const owner = row.status === "manual" ? s.owner.pending : s.owner[row.decidedBy ?? "engine"];
+    out.push(`| ${row.label} | ${row.inapplicable ? "NA" : row.status === "manual" ? "?" : row.status} | ${automationCell(standard, row.id)} | ${owner} |`);
+  }
+  out.push("");
+  return out;
+}
+
 /** One `##` section of a rendered report, kept WHOLE.
  *
  *  `lines` is exactly what was rendered — heading included — so a consumer that keeps a
@@ -424,6 +504,23 @@ function render(
   out.push(`- **${s.tool}** : ultra11y v${r.version} (${s.toolNote})`);
   out.push(`- **${s.scope}** : ${r.scope.files} ${s.files} — ${r.scope.inputs.join(", ")}`);
   out.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% (${s.rateNote})`);
+  const renderedPages = r.scope.pagesAudited?.length ?? 0;
+  out.push(`- **${s.renderedPages(renderedPages)}**${renderedPages === 0 ? ` — ${s.noRenderedPages}` : ""}`);
+  const automation = automationOverview(opts.standard);
+  if (automation) {
+    out.push(
+      `- **${s.automationContract}** : ${s.automationCounts(
+        automation.tests.static,
+        automation.criteria.static.length,
+        automation.tests.rendered,
+        automation.criteria.rendered.length,
+        automation.tests.judgment,
+        automation.criteria.judgment.length,
+      )}`,
+      `- **${s.staticCriteria}** : ${automation.criteria.static.map((id) => `\`${id}\``).join(" · ") || "—"}`,
+      `- **${s.renderedCriteria}** : ${automation.criteria.rendered.map((id) => `\`${id}\``).join(" · ") || "—"}`,
+    );
+  }
   if (r.scope.dedup) out.push(`- **${s.dedup}** : ${r.scope.dedup.canonicalFiles} ${s.canonical}, ${r.scope.dedup.duplicateFiles} ${s.duplicate}`);
   out.push("", `> ⚠️ ${s.warn}`, "");
   // Partial-audit advisory banner (owner decision) — a pack audit whose scan coverage
@@ -459,6 +556,12 @@ function render(
   // the NA column only says how many of the conformities were reached that way.
   out.push(`> ${s.naSubset(tot.c + tot.nc + tot.manual)}`, "");
 
+  // One compact, complete grid shared with the HTML report and the PR comment (which embeds
+  // whole report sections). The status lists below remain the gated audit trail; this table is
+  // the readable index that prevents an exhaustive report from becoming 106 disconnected
+  // bullets spread across three sections.
+  out.push(...exhaustiveGrid(opts.groups, opts.standard, lang));
+
   // 2. non-conformities by priority — one auditor block per NC criterion (core or
   // pack), the SAME human language `prd`/GitHub issues use (src/auditor.ts
   // `renderAuditorUnit`), grouped by severity like `renderAuditorBacklog`. Reuses
@@ -473,7 +576,8 @@ function render(
       const group = ncUnits.filter((u) => u.severity === sev);
       if (!group.length) continue;
       out.push(`### ${ICON[sev]} ${s.sev[sev]} (${group.length})`, "");
-      for (const u of group) out.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "####", ...(opts.cropFor ? { cropFor: opts.cropFor } : {}) }));
+      for (const u of group)
+        out.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "####", technical: false, ...(opts.cropFor ? { cropFor: opts.cropFor } : {}) }));
     }
   }
 
@@ -484,7 +588,7 @@ function render(
   if (advisoryUnits.length) {
     out.push(`## 💡 ${s.recTitle}`, "", `> ${s.recNote}`, "");
     for (const u of advisoryUnits)
-      out.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###", ...(opts.cropFor ? { cropFor: opts.cropFor } : {}) }));
+      out.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###", technical: false, ...(opts.cropFor ? { cropFor: opts.cropFor } : {}) }));
   }
 
   // « Grille par page » — the per-page criterion matrix. RGAA is a per-page norm, so this is
@@ -616,19 +720,25 @@ function render(
   out.push(na.length ? `> ${s.naNote}\n` : "");
   out.push(na.length ? na.map((x) => `- ${x.label}${x.justification ? ` — _${x.justification}_` : ""}`).join("\n") : s.nothing, "");
 
-  // 5. manual worklist. Under a country standard this is where nearly the whole audit lives
-  // (57 of RGAA's 106 criteria can only ever derive `manual`), so a bare label per line hid
-  // the actual work. Name the criterion's own numbered tests: that is what has to be ruled
-  // on, and what `verify --manual` hands the agent.
+  // 5. manual worklist. The exhaustive grid already names every criterion and its S/R/J split.
+  // Repeating up to 97 full official titles here made the report twice as long without adding
+  // information. Test-level packs therefore get a compact count; `verify --manual` remains
+  // the exhaustive operational detail with wording, methodologies and evidence.
   out.push(`## ${s.manualTitle}`, "", `> ${s.manualWarn}`, "");
   const manual = rows.filter((x) => x.status === "manual");
   if (!manual.length) out.push(s.nothing, "");
   else {
     const pack5 = isCore(opts.standard) ? undefined : loadPack(opts.standard);
-    for (const x of manual) {
-      const tests = pack5 ? packTestIds(pack5, x.id) : [];
-      const testRef = tests.length ? ` — ${s.testsToRule}: ${tests.map((t) => `\`${t}\``).join(" · ")}` : "";
-      out.push(`- ${x.label}${x.justification ? ` — _${x.justification}_` : ""}${testRef}`);
+    const exhaustiveContract = pack5?.criteria.every((criterion) => criterion.automation !== undefined) === true;
+    if (pack5 && exhaustiveContract) {
+      const tests = manual.reduce((count, row) => count + packTestIds(pack5, row.id).length, 0);
+      out.push(s.manualSummary(manual.length, tests));
+    } else {
+      for (const x of manual) {
+        const tests = pack5 ? packTestIds(pack5, x.id) : [];
+        const testRef = tests.length ? ` — ${tests.length} ${s.testsToRule}` : "";
+        out.push(`- ${x.label}${x.justification ? ` — _${x.justification}_` : ""}${testRef}`);
+      }
     }
     out.push("", `> ${s.manualHowTo}`, "");
   }

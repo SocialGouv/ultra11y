@@ -20,6 +20,8 @@ const F = (over: Partial<Finding> = {}): Finding => ({
   sourceEnd: 20,
   ...over,
 });
+const PF = (over: Partial<Finding> = {}): Finding =>
+  F({ ruleId: "input-image-alt-missing", selectorHint: 'input[type="image"]', snippet: '<input type="image" src="x">', ...over });
 
 const audit = (findings: Finding[]): AuditResult => ({
   tool: "ultra11y",
@@ -82,13 +84,13 @@ describe("rules table", () => {
   });
 
   it("carries the pack criterion as a tag when a standard is projected", () => {
-    const rule = toSarif(audit([F()]), { standard: "rgaa" }).runs[0]?.tool.driver.rules[0];
+    const rule = toSarif(audit([PF()]), { standard: "rgaa" }).runs[0]?.tool.driver.rules[0];
     expect(rule?.properties?.tags).toContain("rgaa:1.1");
   });
 
   it("does not resurrect baseline findings from the retained criterion grid", () => {
-    const old = F({ sourceStart: 10, sourceEnd: 20 });
-    const fresh = F({ sourceStart: 50, sourceEnd: 60 });
+    const old = PF({ sourceStart: 10, sourceEnd: 20 });
+    const fresh = PF({ sourceStart: 50, sourceEnd: 60 });
     const full = audit([old, fresh]);
     const baselineView = { ...full, findings: [fresh] };
     const results = toSarif(baselineView, { standard: "rgaa" }).runs[0]?.results ?? [];
@@ -173,7 +175,7 @@ describe("message", () => {
   });
 
   it("speaks the pack's criterion id when a standard is projected", () => {
-    const text = toSarif(audit([F()]), { standard: "rgaa", lang: "fr" }).runs[0]?.results[0]?.message.text ?? "";
+    const text = toSarif(audit([PF()]), { standard: "rgaa", lang: "fr" }).runs[0]?.results[0]?.message.text ?? "";
     expect(text).toContain("RGAA 1.1");
   });
 });

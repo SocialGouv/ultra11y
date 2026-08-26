@@ -123,8 +123,25 @@ export interface AgentFinding {
 export interface AdjudicationItem {
   criteriaId: string;
   automatability: Automatability;
+  /** A deterministic rendered test exists, but the criterion still needs judgment for a C.
+   * This keeps the missing-render warning independent from the final verdict owner. */
+  needsRenderedEvidence?: boolean;
   title?: string;
+  /** Exact numbered tests still open on this criterion. Pack worklists persist this so the
+   *  AI cannot silently skip a judgment test or re-review a test already decided NC. */
+  testIds?: string[];
   evidence: Evidence[];
+  /** Static/rendered findings whose rule contract is explicitly non-conclusive. These are
+   * leads for the adjudicator, never findings that can be folded without a fresh verdict. */
+  signals?: Array<{
+    ruleId: string;
+    tests: string[];
+    file: string;
+    line: number;
+    selector?: string;
+    message: string;
+    snippet?: string;
+  }>;
   /** What the harvest actually found, before collapsing to classes. */
   population?: EvidencePopulation;
   /** False when even the CLASS count exceeded the cap, so some distinct thing was never
@@ -325,7 +342,14 @@ function collapse(
  *  residual risks the same way this worklist labels its items — two answers for one criterion
  *  would have `audit --standard rgaa` and `verify --manual --standard rgaa` disagree about
  *  whether a browser is needed. */
-export function packAutomatability(scs: readonly string[]): Automatability {
+export function packAutomatability(scs: readonly string[], criterion?: PackCriterion): Automatability {
+  if (criterion?.automation) {
+    const tiers = Object.values(criterion.automation.tests);
+    if (criterion.automation.completeBySilence === true) return tiers.includes("rendered") ? "needs-rendering" : "static";
+    // A deterministic failure detector is not a positive conformance proof. Unless the
+    // criterion explicitly closes by measured silence, its residual C verdict is judgment.
+    return "judgment";
+  }
   const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a): a is Automatability => !!a);
   return autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
 }
@@ -336,13 +360,17 @@ function blankItem(
   title: string | undefined,
   harvested: Harvested[],
   limits: AdjudicationLimits,
+  signals: AdjudicationItem["signals"] = [],
+  testIds: string[] = [],
 ): AdjudicationItem {
   const { evidence, population, complete, markup } = collapse(harvested, limits);
   return {
     criteriaId,
     automatability,
     ...(title ? { title } : {}),
+    ...(testIds.length ? { testIds } : {}),
     evidence,
+    ...(signals.length ? { signals } : {}),
     ...(markup.length ? { markup } : {}),
     population,
     evidenceComplete: complete,
@@ -377,7 +405,7 @@ function subjectsForPackCriterion(standard: StandardId, id: string, scs: string[
  *  For the WCAG core: one item per residual-risk (manual) success criterion.
  *
  *  For a COUNTRY STANDARD: one item per PACK criterion that derives `manual` — which is where
- *  almost the whole standard lives (57 of RGAA's 106 criteria can only ever derive `manual`).
+ *  almost the whole standard lives (97 of RGAA's 106 criteria carry judgment tests).
  *  Keying by the pack's own criteria is not cosmetic: it is what lets an item carry the
  *  criterion's numbered tests, and therefore what lets `normativeRefResolves` check a citation
  *  against THIS criterion's tests instead of accepting any id of the right shape. */
@@ -393,9 +421,9 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
       .map((pc) => {
         const crit = getCriterion(pack, pc.id);
         const scs = crit?.wcag ?? pc.scs;
-        return blankItem(
+        const item = blankItem(
           pc.id,
-          packAutomatability(scs),
+          packAutomatability(scs, crit),
           // THE STANDARD'S OWN LOCALE, not a literal "fr". Identical output for RGAA, which
           // publishes in French and only in French — but the PACK is what says so, and a
           // standard publishing in another language must not be titled through a locale this
@@ -405,7 +433,20 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
           crit ? localize(pack, crit.titlePlain, pack.defaultLocale) : undefined,
           harvestSubjects(subjectsForPackCriterion(standard, pc.id, scs), docs),
           limits,
+          (pc.candidateFindings ?? []).map((finding) => ({
+            ruleId: finding.ruleId,
+            tests: crit?.automation?.rules.find((rule) => rule.id === finding.ruleId)?.tests ?? [],
+            file: finding.file,
+            line: finding.line,
+            message: finding.message,
+            ...(finding.snippet ? { snippet: finding.snippet } : {}),
+          })),
+          Object.keys(crit?.tests ?? {}).map((test) => `${pc.id}.${test}`),
         );
+        return {
+          ...item,
+          ...(Object.values(crit?.automation?.tests ?? {}).includes("rendered") ? { needsRenderedEvidence: true } : {}),
+        };
       });
   }
 
@@ -436,7 +477,7 @@ export function unrenderedResidual(audit: AuditResult, items: AdjudicationItem[]
   const audited = audit.scope.pagesAudited;
   const readSomePage = audited === undefined ? (audit.scope.pages ?? []).length > 0 : audited.length > 0;
   if (readSomePage) return [];
-  return items.filter((it) => it.automatability === "needs-rendering").map((it) => it.criteriaId);
+  return items.filter((it) => it.automatability === "needs-rendering" || it.needsRenderedEvidence === true).map((it) => it.criteriaId);
 }
 
 /** Read a citation whichever way it was written.
@@ -1668,7 +1709,7 @@ function glossaryBlock(pack: StandardPack, crit: PackCriterion | undefined, lang
  *  from, which is as useful to a human reviewing a brief as to a model. The invitation to go
  *  read it is not a fact but an instruction, and it is only true where a web tool exists —
  *  in CI the adjudicator holds Read/Grep/Glob/Edit/Write and nothing else, and proposing a
- *  tool it cannot call costs turns it needs for the 96 criteria in front of it. So the
+ *  tool it cannot call costs turns it needs for the many criteria in front of it. So the
  *  sentence is gated on `web` and the caller decides (see `--web` / `--no-web`).
  *
  *  What the sentence says matters as much as when it appears: the vendored text decides, a
@@ -1820,6 +1861,23 @@ export function formatAdjudication(
   if (pack) out.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
     out.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` — ${it.title}` : ""}  _(${it.automatability})_`);
+    if (it.signals?.length) {
+      out.push(
+        "",
+        lang === "fr"
+          ? "> **Signaux automatiques à adjudicer** — ces constats sont non conclusifs : ils ne valent pas NC sans lecture du test RGAA et de ses alternatives/cas particuliers."
+          : "> **Automatic signals to adjudicate** — these observations are non-conclusive: they are not NC until the standard test, alternatives and particular cases have been read.",
+        "",
+      );
+      for (const signal of it.signals) {
+        const refs = signal.tests.map((test) => `${it.criteriaId}.${test}`).join(", ");
+        out.push(
+          `- \`${signal.ruleId}\` → ${refs || it.criteriaId} — \`${signal.file}:${signal.line}\`${signal.selector ? ` (\`${signal.selector}\`)` : ""}: ${signal.message}`,
+        );
+        if (signal.snippet?.trim()) out.push(`  - \`${signal.snippet.trim().replace(/\s+/g, " ").slice(0, SNIPPET_SHOWN)}\``);
+      }
+      out.push("");
+    }
     const pop = it.population;
     const popNote = pop
       ? ` — ${pop.classes} ${s.classes}, ${pop.occurrences} ${s.occurrences}${pop.pages ? `, ${pop.pages} ${s.pagesWord}` : ""}${it.evidenceComplete === false ? ` ⚠ ${s.incomplete}` : ""}`
@@ -1861,7 +1919,7 @@ export function formatAdjudication(
     //
     // `ADJUDICATION` is keyed by WCAG success criterion: 52 keys, all three-segment. A pack
     // criterion id has two, so this lookup could only ever miss under `--standard rgaa` —
-    // and it did, on every one of the 96 criteria an RGAA audit hands over. The brief shipped
+    // and it did, on every RGAA criterion the audit handed over. The brief shipped
     // the numbered tests and no instrument for reading them.
     //
     // Under a pack the instrument is the standard's OWN méthodologie de test, rendered under
@@ -1901,7 +1959,8 @@ export function formatAdjudication(
     // technique code (which the pack gate has always refused).
     if (pack) {
       const tests = crit?.tests ?? {};
-      const keys = Object.keys(tests);
+      const openTests = new Set(it.testIds?.map((id) => id.slice(`${it.criteriaId}.`.length)) ?? []);
+      const keys = Object.keys(tests).filter((key) => !openTests.size || openTests.has(key));
       // A DEFINITION IS READ BEFORE THE WORDING THAT USES IT. The glossary used to sit below
       // the tests, which is backwards for any criterion whose applicability turns on a defined
       // term — and RGAA 5.1 turns on nothing else: « tableau de données complexe » means one

@@ -164,7 +164,7 @@ describe("present coverage", () => {
 describe("pack projection", () => {
   const rgaa = (a: AuditResult, pageId?: string) => new Map(derivePackResults(a, "rgaa", pageId).map((c) => [c.id, c]));
 
-  it("rescues a pack criterion the run left undecided, on the page that measured it", () => {
+  it("does not rescue a partially covered pack criterion from rule silence", () => {
     // RGAA 11.9 maps onto 2.5.3 + 4.1.2 — both judgment SCs, so it derives `manual` run-wide.
     // Its own rules (button names) are engine + axe rules, and both ran on this page.
     const a = audit(
@@ -174,8 +174,8 @@ describe("pack projection", () => {
       ],
       FULL,
     );
-    expect(rgaa(a, "accueil").get("11.9")?.status).toBe("C");
-    expect(rgaa(a, "accueil").get("11.9")?.decidedBy).toBe("scan");
+    expect(rgaa(a, "accueil").get("11.9")?.status).toBe("manual");
+    expect(rgaa(a, "accueil").get("11.9")?.decidedBy).toBeUndefined();
   });
 
   it("leaves a criterion no rule decides to the agent", () => {

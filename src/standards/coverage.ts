@@ -62,7 +62,11 @@ const CROSS_RULE_IDS = new Set(CROSS_RULES.map((r) => r.id));
  */
 export function ruleTier(ruleId: string, pack?: StandardPack): Tier {
   // A pack's own declarative rule runs inside the static pipeline.
-  if (ruleId.startsWith("pack:")) return "source";
+  if (ruleId.startsWith("pack:")) {
+    const prefix = pack ? `pack:${pack.key}:` : "";
+    const own = prefix && ruleId.startsWith(prefix) ? pack?.rules?.find((rule) => rule.id === ruleId.slice(prefix.length)) : undefined;
+    return own?.doc ? "rendered-page" : "source";
+  }
   // Agent findings are the model's ruling, by construction.
   if (ruleId.startsWith("agent:")) return "judgment";
   // axe checks and the dynamic probes only ever come back from `scan`.
@@ -182,6 +186,33 @@ function packCoverage(pack: StandardPack, pc: PackCriterion): Coverage {
       engineRules: [],
       applicabilityDeclared: false,
       why: "the pack declares no rule applicability, so this is inferred from the WCAG success criteria it maps to.",
+    };
+  }
+
+  if (pc.automation) {
+    const decisiveRules = pc.automation.rules.filter((rule) => rule.effect === "decisive-nc").map((rule) => rule.id);
+    const failTiers = dedupe(decisiveRules.map((rule) => ruleTier(rule, pack)));
+    const testTiers = Object.values(pc.automation.tests);
+    const evidenceTiers = dedupe(pc.automation.rules.map((rule) => ruleTier(rule.id, pack)));
+    const renderedTier: Tier = evidenceTiers.includes("rendered-page") ? "rendered-page" : "browser";
+    // A decisive rule may prove NC without proving C. The contract opts into conformity by
+    // silence separately; without that opt-in, the remaining positive claim is judgment even
+    // when every numbered test has a deterministic failure detector. This keeps the plan in
+    // lockstep with `judgmentGuard`/`measuredRescue` instead of advertising a rendered or
+    // source verdict the projection will correctly refuse to publish.
+    const tier: Tier = pc.automation.completeBySilence === true ? (testTiers.includes("rendered") ? renderedTier : "source") : "judgment";
+    const candidates = pc.automation.rules.filter((rule) => rule.effect === "candidate").length;
+    return {
+      tier,
+      sourceIsEnough: tier === "source" && pc.automation.completeBySilence === true,
+      canFailFrom: failTiers,
+      alsoNeeds: evidenceTiers.filter((value) => value !== tier),
+      engineRules: [...declared],
+      applicabilityDeclared: true,
+      why:
+        tier === "judgment"
+          ? `the test-level matrix leaves a judgment step; ${decisiveRules.length} rule(s) may prove NC and ${candidates} non-conclusive signal(s) are routed to adjudication.`
+          : `the test-level matrix is complete at the ${tier} tier and explicitly ${pc.automation.completeBySilence ? "allows" : "forbids"} conformity by measured silence.`,
     };
   }
 
