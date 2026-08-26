@@ -2,7 +2,7 @@
   "wcagVersion": "2.2",
   "source": "https://www.w3.org/TR/WCAG22/",
   "criteriaSource": "https://github.com/w3c/wcag",
-  "provenance": "Full WCAG 2.x SC universe (all levels incl. AAA, and the removed 4.1.1 Parsing) fetched from raw.githubusercontent.com/w3c/wcag@main on 2026-08-25 via `node scripts/build-standards.mjs --refresh-universe`. Classification: core-AA = ships in src/data/wcag.json (the shipped WCAG 2.2 AA core); out-of-core = WCAG AAA; removed = obsolete (4.1.1).",
+  "provenance": "Full WCAG 2.x SC universe (all levels incl. AAA, and the removed 4.1.1 Parsing) fetched from raw.githubusercontent.com/w3c/wcag@main on 2026-08-26 via `node scripts/build-standards.mjs --refresh-universe`. Classification: core-AA = ships in src/data/wcag.json (the shipped WCAG 2.2 AA core); out-of-core = WCAG AAA; removed = obsolete (4.1.1).",
   "criteria": [
     {
       "id": "1.1.1",
