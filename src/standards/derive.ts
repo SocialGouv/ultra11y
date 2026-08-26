@@ -45,6 +45,17 @@ export interface PackCriterionResult {
   inapplicable?: boolean;
 }
 
+/** Whether subject harvesting only PROVISIONALLY closed a judgment criterion.
+ *
+ * The absence is useful evidence for the adjudicator, but it is not a published verdict:
+ * every official `judgment` test still has to pass through the agent. Keep the raw derived
+ * result intact for that worklist, while report/page projections use this predicate to show
+ * the row as open until an agent has confirmed `NA`. */
+export function isProvisionalJudgmentInapplicable(result: PackCriterionResult, criterion?: PackCriterion): boolean {
+  if (result.status !== INAPPLICABLE_STATUS || result.inapplicable !== true || result.decidedBy === "agent") return false;
+  return Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
+}
+
 // NC dominates (a real failure anywhere fails the criterion); then a decided C; then
 // manual (residual); else nothing of that kind exists here. Mirrors the core's aggregation.
 //
