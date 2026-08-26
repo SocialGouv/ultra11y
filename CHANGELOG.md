@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.38.0](https://github.com/maxgfr/ultra11y/compare/v5.37.1...v5.38.0) (2026-08-26)
+
+
+### Features
+
+* **rgaa:** expand deterministic criterion coverage ([0c0ab6b](https://github.com/maxgfr/ultra11y/commit/0c0ab6bf9c9699fe9594c9197ab74318e7a88d5a))
+
 ## [5.37.1](https://github.com/maxgfr/ultra11y/compare/v5.37.0...v5.37.1) (2026-08-26)
 
 
