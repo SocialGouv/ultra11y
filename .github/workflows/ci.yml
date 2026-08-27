@@ -318,6 +318,9 @@ jobs:
   # exists. Re-adjudicate those criteria — `Adjudication (keyed)`, which records the ledger —
   # and commit the result as the reviewable claim it is.
   ledger-gate:
+    # The double rendered audit is a certification check, not a fast feedback check. Keep it
+    # available on demand without making every push and pull request wait for it.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -357,7 +360,7 @@ jobs:
       # grid, so it should exercise the pipeline a project on RGAA actually runs — a
       # pack-keyed document written by `audit`, carried through `scan --merge`, replayed and
       # checked. Running the first two steps on the core and only re-keying at the end would
-      # leave the shipped path untested by the one job that runs on every push.
+      # leave the shipped path untested by this manually dispatched certification job.
       - name: Audit and render the fixture
         run: |
           node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard rgaa --out audits --json > /dev/null
