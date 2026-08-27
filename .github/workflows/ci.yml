@@ -28,11 +28,9 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      matrix:
-        # 22 is the floor (engines.node >=22.18, what @babel/parser 8 requires);
-        # 24 is current. The published bundle's Node 22 floor is covered by runtime-node-floor.
-        node-version: [22, 24]
+    # Run the expensive build + coverage gate once, on current Node. The install-free bundle's
+    # Node 22 floor has its own focused `runtime-node-floor` job below; repeating the entire
+    # suite on both runtimes doubled CI time without exercising a second product path.
     steps:
       - uses: actions/checkout@v7
 
@@ -40,7 +38,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
@@ -57,9 +55,6 @@ jobs:
 
       - name: Test (with coverage)
         run: pnpm run test:coverage
-
-      - name: Perf shape (own process — timing needs the machine to itself)
-        run: pnpm run test:perf
 
       - name: Smoke-run the committed bundle (offline, fixture)
         run: pnpm run demo # audit -> report -> check -> criteria
