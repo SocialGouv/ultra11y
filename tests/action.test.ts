@@ -549,11 +549,14 @@ describe("the adjudication tier", () => {
     expect(idx("left to assess")).toBeLessThan(idx("Gate"));
   });
 
-  // The API tier must not cap its own worklist: `judge --max` bounds spend and would silently
-  // leave the tail unruled, which is the same omission by another route.
-  it("never caps the API tier's worklist", () => {
+  // Production callers remain unbounded by default. A caller may nevertheless request a
+  // deliberately partial smoke run; the residue/gate below still names everything omitted.
+  it("only caps the API tier when the caller explicitly requests a bounded smoke run", () => {
     const api = adjudicationSteps().find((s) => s.run?.includes("judge"));
-    expect(api?.run, "--max would truncate the worklist").not.toContain("--max ");
+    expect(ACTION.inputs["adjudicate-max"]?.default).toBe("");
+    expect(api?.env?.MAX_ITEMS).toBe("${{ inputs.adjudicate-max }}");
+    expect(api?.run).toContain('args+=(--max "$MAX_ITEMS")');
+    expect(api?.run).toContain("must be a positive integer");
   });
 
   // The agent tier is billed PER ITEM — a full RGAA worklist runs to ~90 — and it had no way
@@ -724,6 +727,13 @@ describe("the adjudication tier", () => {
       expect(ACTION.inputs["adjudicate-budget-usd"]).toBeDefined();
     });
 
+    it("can bound a smoke run by criterion count without weakening the fold", () => {
+      const run = String(cli()?.run ?? "");
+      expect(cli()?.env?.MAX_ITEMS).toBe("${{ inputs.adjudicate-max }}");
+      expect(run).toContain('args+=(--max "$MAX_ITEMS")');
+      expect(run).toContain("must be a positive integer");
+    });
+
     // The list exists only because claude-code-action refuses events it does not parse. A
     // local process has no such notion, so this runner is the one that works on `push`.
     it("carries no event allowlist, which is the point of it", () => {
@@ -866,6 +876,8 @@ describe("the adjudication tier", () => {
     // …and stay overridable, because a derived default is still a guess.
     expect(ACTION.inputs["adjudicate-max-turns"]).toBeTruthy();
     expect(ACTION.inputs["adjudicate-max-turns"]?.default).toBe("");
+    expect(ACTION.inputs["adjudicate-max"]).toBeTruthy();
+    expect(ACTION.inputs["adjudicate-max"]?.default).toBe("");
   });
 
   // An input arrives from a caller's workflow, which is free to wire an event payload into
@@ -1363,7 +1375,7 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     expect(job().steps.some((s) => s.uses?.startsWith("actions/setup-node@"))).toBe(true);
   });
 
-  it("carries a timeout, so a wedged model call cannot burn six hours", () => {
+  it("defaults to a bounded Haiku smoke run, while leaving every strict control dispatchable", () => {
     // Dispatch-controlled, because `max-turns: unlimited` makes this the only thing that
     // stops the run — so what has to hold is that the INPUT it reads defaults to a real
     // ceiling, not merely that the key is present.
@@ -1372,13 +1384,31 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     // A STRING, because every workflow_dispatch input is one — asserting `number` here is
     // what pushed `type: number` into the workflow and made it undispatchable.
     expect(declared?.type ?? "string").toBe("string");
-    // Run 32964151165 reached 83/91 criterion-sized Claude calls before GitHub killed the
-    // job at the former 60-minute default. The workflow still needs time to retry refusals,
-    // measure the final grid, and upload it, so the default must cover a complete strict run.
-    expect(Number(declared?.default)).toBeGreaterThanOrEqual(120);
-    // 360 is GitHub's own hard stop on a hosted runner; a default above it would be a promise
-    // this workflow cannot keep.
-    expect(Number(declared?.default)).toBeLessThanOrEqual(360);
+    expect(Number(declared?.default)).toBe(20);
+    const inputs = WF.on?.workflow_dispatch?.inputs ?? {};
+    expect(inputs.model?.default).toBe("haiku");
+    expect(inputs["max-items"]?.default).toBe("5");
+    expect(inputs.grain?.default).toBe("worklist");
+    expect(inputs.ledger?.default).toBe("false");
+    expect(inputs.passes?.default).toBe("1");
+    expect(inputs["require-decided"]?.default).toBe("false");
+    expect(inputs.refute?.default).toBe(false);
+    const agent = job().steps.find((step) => step.name === "Adjudicate with an agent");
+    expect(agent?.with?.["adjudicate-max"]).toContain("inputs.max-items");
+    expect(agent?.with?.crawl).toContain("inputs.max-items == ''");
+
+    for (const expensive of [
+      "Install dependencies",
+      "Cache Playwright browsers",
+      "Install the browser tier",
+      "Serve the fixture site",
+      "Measure the unruled criteria BEFORE adjudication",
+    ]) {
+      expect(job().steps.find((step) => step.name === expensive)?.if, `${expensive} must stay out of the default smoke`).toBe("inputs.max-items == ''");
+    }
+
+    const summary = job().steps.find((step) => step.name === "Report what each tier actually decided");
+    expect(summary?.run).toContain('if [ -n "${BEFORE:-}" ]');
   });
 
   // `mode: both` measured the agent pass twice and called it both: the agent step is a fresh
@@ -1443,17 +1473,17 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     expect(run).not.toMatch(/\n\s*exit 0\s*$/);
   });
 
-  it("retries by default and only makes an undecided residue fatal when explicitly requested", () => {
-    expect(WF.on?.workflow_dispatch?.inputs?.passes?.default).toBe("3");
+  it("uses one smoke pass by default and only makes an undecided residue fatal when explicitly requested", () => {
+    expect(WF.on?.workflow_dispatch?.inputs?.passes?.default).toBe("1");
     expect(WF.on?.workflow_dispatch?.inputs?.["require-decided"]?.default).toBe("false");
 
     const after = job().steps.find((s) => s.name === "Measure and gate AFTER refutation");
     expect(String(after?.run)).toContain('if [ "$REQUIRE_DECIDED" != "false" ]');
   });
 
-  it("defaults the keyed full audit to the read-only per-criterion runner shared with GitLab", () => {
+  it("defaults the keyed smoke to the read-only batched runner shared with GitLab", () => {
     expect(WF.on?.workflow_dispatch?.inputs?.runner?.default).toBe("cli");
-    expect(WF.on?.workflow_dispatch?.inputs?.grain?.default).toBe("criterion");
+    expect(WF.on?.workflow_dispatch?.inputs?.grain?.default).toBe("worklist");
   });
 
   it("uploads the audit produced by the trial, not only the pre-refutation action artifact", () => {

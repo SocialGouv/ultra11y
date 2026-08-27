@@ -245,10 +245,10 @@ describe("what the CLI audits, the MCP server audits too", () => {
     const pages = r.pages as { id: string; basis: string }[];
     expect(pages.map((p) => p.id)).toEqual(["accueil"]);
     expect(pages[0]!.basis).toBe("snapshot");
-    // 8.5 (title presence) is fully decidable only on a full document — proof the snapshot
-    // was ingested. 8.3 stays open because RGAA also admits per-text language declarations.
+    // 8.5 (title presence) and 8.3 (a declared default language) are fully decidable only on
+    // a full document — proof the snapshot was ingested and document-wide silence completed.
     expect(r.markdown as string).toMatch(/\| 8\.5 \| C \|/);
-    expect(r.markdown as string).toMatch(/\| 8\.3 \| \? \|/);
+    expect(r.markdown as string).toMatch(/\| 8\.3 \| C \|/);
   });
 
   it("refuses to project when no page is in scope, instead of returning an empty grid", () => {

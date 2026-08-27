@@ -183,6 +183,10 @@ inputs:
     description: "Dollar ceiling handed to each `adjudicate-runner: cli` invocation. Empty leaves it unbounded and lets the wall clock be the only stop. This is the bound to reach for rather than `adjudicate-max-turns`, which the CLI runner ignores: `--max-turns` is not one of its flags, and the CLI swallows an unknown flag without a word, so a turn budget there would look like a ceiling and be nothing at all."
     required: false
     default: ""
+  adjudicate-max:
+    description: "Maximum number of still-undecided criteria submitted to the adjudicator in this run. Empty is unbounded. Use a small value for a cheap CI smoke test: the accepted verdicts are still folded through the normal gate and every omitted criterion stays honestly « to assess »."
+    required: false
+    default: ""
   adjudicate-passes:
     description: 'How many times `adjudicate: agent` may go round. Each pass re-derives the worklist from what is STILL undecided — a criterion the previous pass never reached, or whose verdict the gate refused — so a second pass only ever costs the residue, and a run that decided everything stops on its own. Default 1 (one pass, the historical behaviour). Raise it when completeness matters more than the bill: measured on a real run, an adjudicator stopped after 22 turns of a 228 budget with 42 criteria still `null`, and a single pass had no way to come back to them. Capped at 3.'
     required: false
@@ -687,10 +691,20 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
+        MAX_ITEMS: ${{ inputs.adjudicate-max }}
       run: |
         args=(--in audits/audit-latest.json --out audits --apply)
         args+=(--standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}')
         if [ -n '${{ inputs.adjudicate-model }}' ]; then args+=(--model '${{ inputs.adjudicate-model }}'); fi
+        if [ -n "${MAX_ITEMS:-}" ]; then
+          case "$MAX_ITEMS" in
+            0|*[!0-9]*)
+              echo "::error::ultra11y: adjudicate-max='$MAX_ITEMS' must be a positive integer."
+              exit 1
+              ;;
+            *) args+=(--max "$MAX_ITEMS") ;;
+          esac
+        fi
         # Record what this pass paid for, so the next run replays it for free. Only ACCEPTED
         # verdicts are written — a refused one in the ledger would be laundered back in.
         if [ -n '${{ inputs.ledger }}' ] && [ '${{ inputs.ledger }}' != 'false' ]; then
@@ -744,6 +758,7 @@ runs:
         MODEL: ${{ inputs.adjudicate-model }}
         EFFORT: ${{ inputs.adjudicate-effort }}
         BUDGET: ${{ inputs.adjudicate-budget-usd }}
+        MAX_ITEMS: ${{ inputs.adjudicate-max }}
         LEDGER: ${{ inputs.ledger }}
         GATE: ${{ inputs.gate-adjudicated }}
       run: |
@@ -777,6 +792,15 @@ runs:
         if [ -n "${MODEL:-}" ]; then args+=(--model "$MODEL"); fi
         if [ -n "${EFFORT:-}" ]; then args+=(--effort "$EFFORT"); fi
         if [ -n "${BUDGET:-}" ]; then args+=(--max-budget-usd "$BUDGET"); fi
+        if [ -n "${MAX_ITEMS:-}" ]; then
+          case "$MAX_ITEMS" in
+            0|*[!0-9]*)
+              echo "::error::ultra11y: adjudicate-max='$MAX_ITEMS' must be a positive integer."
+              exit 1
+              ;;
+            *) args+=(--max "$MAX_ITEMS") ;;
+          esac
+        fi
         if [ -n "$LEDGER" ] && [ "$LEDGER" != 'false' ]; then
           if [ "$LEDGER" = 'true' ]; then args+=(--ledger ".ultra11y/verdicts/$STANDARD.json"); else args+=(--ledger "$LEDGER"); fi
         fi

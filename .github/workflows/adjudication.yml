@@ -1,5 +1,11 @@
 # The ADJUDICATION tier, exercised for real — the half `ci.yml` cannot prove.
 #
+# DEFAULT DISPATCH = CHEAP SMOKE: Haiku receives at most five source-level criteria in one
+# batch. There is no browser baseline, strict completeness gate, or claim-by-claim refutation.
+# This proves the credential, Claude CLI transport, verdict parser and fold without pretending
+# to certify RGAA conformance. Set `max-items` to empty to restore the rendered, unbounded audit;
+# then opt into criterion grain, more passes, refutation and a strict gate as needed.
+#
 # `ci.yml` proves the keyless path: with no credential the tier evaporates and the audit still
 # ships. It stops there on purpose, because the keyed path costs money on every run — and the
 # two tiers do not cost remotely the same:
@@ -53,7 +59,7 @@
 # evidence. Each refusal travels back with the criterion, and pass 2 closed all three on 60
 # turns; pass 3 found nothing left to do and cost nothing. That round trip IS the mechanism:
 # the gate does not merely reject, it tells the next adjudicator what was wrong. So `passes`
-# defaults to 3.
+# historically defaulted to 3 for strict runs.
 #
 # WHERE THIS STANDS NOW, on the per-page bar, which is the one a deliverable is read at.
 #
@@ -105,43 +111,47 @@ on:
         options: [action, cli]
         default: cli
       grain:
-        description: "How much the model rules on at once. `criterion` (default) sends one criterion per call: more calls, but each of the 106 RGAA criteria is handled independently and a stopped run loses at most one verdict. Needs `runner: cli`; select `worklist` when explicitly testing the historical action runner."
+        description: "How much the model rules on at once. `worklist` (default) batches criteria for a fast smoke test; `criterion` isolates each one for a slower certification-style run. Needs `runner: cli`; the historical action runner only supports worklist."
         type: choice
         options: [worklist, criterion]
-        default: criterion
+        default: worklist
       ledger:
         description: "Whether the committed verdict ledger may answer first. `true` is the production shape and makes a paid pass cover only what the ledger did not. SET IT FALSE TO MEASURE ANYTHING: with a current ledger the replay decides all 106 criteria before the model is invoked, the worklist reaches it empty, and the run comes back green having adjudicated nothing — which is exactly what run 32706213834 did, in 7 minutes, reporting « 0 criterion(ia) adjudicated »."
         type: choice
         options: ["true", "false"]
-        default: "true"
+        default: "false"
       refute:
         description: "Put the adjudicated claims on trial afterwards, and APPLY the outcome (`judge --refute` → `verify --apply --prune`). Not a formality: measured on a full RGAA pass with Haiku, the adjudicator returned 74 non-conformities where a stronger model through the same gate found 57, and 19 of them landed on criteria the committed ledger had cleared. The gate cannot see it — it proves the cited test belongs to the criterion, never that the reading was right — so with a cheap model this is the only pass that catches an over-accusing one. Costs one call per non-conformity and per cleared citation."
         type: boolean
-        default: true
+        default: false
       standard:
         description: 'Standard to report against'
         type: choice
         options: [wcag, rgaa]
         default: rgaa
       model:
-        description: 'Model id for the tier under test. Empty lets each tier choose its own default.'
+        description: 'Model id for the tier under test. Defaults to Haiku because this workflow is a transport/fold smoke test, not the production accessibility verdict.'
         type: string
-        default: ''
+        default: 'haiku'
+      max-items:
+        description: "Smoke-test ceiling: submit only this many still-open criteria. Five exercises the real Haiku transport and fold without buying a certification run; empty restores the full worklist."
+        type: string
+        default: "5"
       max-turns:
         description: "Turn budget for the agent tier. Empty derives it from the worklist; a number pins it; 'unlimited' removes the bound entirely (the job's timeout then becomes the only stop)."
         type: string
         default: ''
       passes:
-        description: "How many times the agent tier goes round on what is still undecided. The fold is per-verdict, so a later pass only ever costs the residue of the one before it — and stops early when there is none. Three by default so an early or refused answer is retried before the remaining IDs are reported; with the diagnostic completeness default, honest residue is warning-only."
+        description: "How many times the agent tier goes round on what is still undecided. One is the fast smoke default; raise it only for a completeness run because later passes buy only the residue."
         type: choice
         options: ["1", "2", "3"]
-        default: "3"
+        default: "1"
       timeout:
-        description: 'Job ceiling in minutes. The 120-minute default covers the measured 91-call RGAA criterion run plus retries, final measurement, and artifact upload. GitHub kills a hosted-runner job at 360 whatever this says; only a self-hosted runner goes beyond.'
+        description: 'Job ceiling in minutes. The 20-minute default covers the bounded Haiku smoke run. A full criterion-by-criterion run needs an explicit larger value (historically 120).'
         type: string
-        default: "120"
+        default: "20"
       require-decided:
-        description: "Whether an honest residue should fail this diagnostic workflow. `false` (default) runs up to three adjudication passes, names every criterion still open, and keeps the run green. `true` gates the RUN's grid; `pages` gates every page's grid. Use a strict value only for a deliverable that requires completeness, not to test whether the model and transport work."
+        description: "Whether an honest residue should fail this diagnostic workflow. `false` (default) names every criterion still open after the configured pass count and keeps the run green. `true` gates the RUN's grid; `pages` gates every page's grid. Use a strict value only for a deliverable that requires completeness, not to test whether the model and transport work."
         type: choice
         options: ["pages", "true", "false"]
         default: "false"
@@ -196,17 +206,21 @@ jobs:
       # NOTHING for a package already declared in devDependencies, which is how this repository
       # silently degraded to Docker once before.
       - uses: pnpm/action-setup@v6
+        if: inputs.max-items == ''
       - name: Install dependencies
+        if: inputs.max-items == ''
         run: pnpm install --frozen-lockfile
       # The browsers live outside the pnpm store (~/.cache/ms-playwright) and weigh ~170MB —
       # the one download this job makes that the package cache does not cover. Keyed on the
       # lockfile, exactly like `browser-tier` and `action` in ci.yml, so a cache hit skips it.
       - name: Cache Playwright browsers
+        if: inputs.max-items == ''
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install the browser tier
+        if: inputs.max-items == ''
         # NO --with-deps, for the reason the other two browser jobs in this repository give:
         # it shells out to apt, which on the Azure runners hangs for 30min+ whenever their
         # ubuntu mirror misbehaves — measured twice in one day, once for 3h27. The GitHub
@@ -227,6 +241,7 @@ jobs:
       # a download instead of a navigation. No page links to that file either, for the same
       # reason: it is audited as SOURCE, never crawled.
       - name: Serve the fixture site
+        if: inputs.max-items == ''
         run: |
           nohup python3 -m http.server 8932 --directory tests/fixtures/realworld > /tmp/fixture.log 2>&1 &
           deadline=$(( SECONDS + 30 ))
@@ -257,6 +272,7 @@ jobs:
       # audits/audit-latest.json with --out audits), so each mode starts from this same grid.
       - name: Measure the unruled criteria BEFORE adjudication
         id: before
+        if: inputs.max-items == ''
         run: |
           # THE BASELINE HAS TO INCLUDE THE SCAN, or the delta below credits the model with
           # work a browser did. Each `uses: ./` step re-audits AND re-scans from scratch, so
@@ -302,6 +318,7 @@ jobs:
           # and `ledger-gate` in ci.yml then replays it on every push for free.
           ledger: "true"
           adjudicate-model: ${{ inputs.model }}
+          adjudicate-max: ${{ inputs.max-items }}
           adjudicate-max-turns: ${{ inputs.max-turns }}
           adjudicate-passes: ${{ inputs.passes }}
           artifact-name: adjudication-api
@@ -315,7 +332,7 @@ jobs:
           #
           # `crawl`, not `urls`: the site-level criteria are decided across pages, so a scan
           # that renders one of them leaves the other four unmeasured and the grid says so.
-          crawl: http://127.0.0.1:8932/
+          crawl: ${{ inputs.max-items == '' && 'http://127.0.0.1:8932/' || '' }}
           crawl-max: "12"
           runtime: local
 
@@ -350,12 +367,13 @@ jobs:
           # thing to switch OFF when the point of the run is to watch the model work.
           ledger: ${{ inputs.ledger }}
           adjudicate-model: ${{ inputs.model }}
+          adjudicate-max: ${{ inputs.max-items }}
           adjudicate-max-turns: ${{ inputs.max-turns }}
           adjudicate-passes: ${{ inputs.passes }}
           artifact-name: adjudication-agent
           # Same rendered pages as the API tier above, so the two modes are compared over the
           # same evidence.
-          crawl: http://127.0.0.1:8932/
+          crawl: ${{ inputs.max-items == '' && 'http://127.0.0.1:8932/' || '' }}
           crawl-max: "12"
           runtime: local
           # THE GATE THIS WHOLE WORKFLOW EXISTS FOR. Without it the job reports success on a
@@ -564,7 +582,7 @@ jobs:
             tier=${pair%%:*}
             after=${pair#*:}
             if [ -z "$after" ]; then continue; fi
-            if [ "$after" -ge "${BEFORE:-0}" ]; then
+            if [ -n "${BEFORE:-}" ] && [ "$after" -ge "$BEFORE" ]; then
               echo "::warning::the $tier adjudication decided nothing — ${BEFORE:-?} criteria before, $after after"
             fi
           done
