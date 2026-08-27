@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.38.1](https://github.com/maxgfr/ultra11y/compare/v5.38.0...v5.38.1) (2026-08-27)
+
+
+### Bug Fixes
+
+* harden RGAA auditing and adjudication ([0a7b3a8](https://github.com/maxgfr/ultra11y/commit/0a7b3a8f781048144c1302728d64911ae6590205))
+
 # [5.38.0](https://github.com/maxgfr/ultra11y/compare/v5.37.1...v5.38.0) (2026-08-26)
 
 
