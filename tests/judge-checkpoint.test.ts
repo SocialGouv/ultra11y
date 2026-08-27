@@ -9,7 +9,7 @@
 // loses at most ONE criterion". It was false as first built, because isolating the model CALL
 // buys nothing while the WRITE is still one all-or-nothing operation at the end.
 import { describe, expect, it, vi } from "vitest";
-import { judgeAll, type LlmOptions, type RawVerdict } from "../src/llm.js";
+import { isProviderUnavailableError, judgeAll, type LlmOptions, type RawVerdict } from "../src/llm.js";
 import type { AdjudicationItem } from "../src/adjudicate.js";
 
 const item = (criteriaId: string): AdjudicationItem => ({ criteriaId, evidence: [], verdict: "" }) as unknown as AdjudicationItem;
@@ -93,5 +93,26 @@ describe("judgeAll hands verdicts over as they land", () => {
       { backend },
     );
     expect(peak).toBe(4);
+  });
+
+  it("stops scheduling new batches after a systemic provider failure", async () => {
+    const called: string[] = [];
+    const result = await judgeAll([batch("1.1"), batch("1.2"), batch("1.3")], {
+      concurrency: 1,
+      backend: async (items) => {
+        called.push(items[0]?.criteriaId as string);
+        throw new Error("api status 429");
+      },
+      abortOnError: isProviderUnavailableError,
+    });
+
+    expect(called).toEqual(["1.1"]);
+    expect(result.failures).toContain("provider unavailable — stopped before 2 remaining batch(es)");
+  });
+
+  it("distinguishes provider saturation from a bad model response", () => {
+    expect(isProviderUnavailableError(new Error("the CLI reported an error (success, api status 429)"))).toBe(true);
+    expect(isProviderUnavailableError(new Error("Codex turn failed: service unavailable"))).toBe(true);
+    expect(isProviderUnavailableError(new Error("invalid JSON verdict"))).toBe(false);
   });
 });

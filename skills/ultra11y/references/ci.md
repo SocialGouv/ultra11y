@@ -65,7 +65,7 @@ criterion.
 ## The verdict ledger (`ledger`) — a complete grid in CI, with no model
 
 Of the 55 WCAG 2.2 AA criteria the engine decides a handful; **38 are judgment calls**, and
-under RGAA 92 criteria carry judgment tests and **104 of 106** still need adjudication to earn C. Inside a coding agent the agent rules on
+under RGAA 92 criteria carry judgment tests and **103 of 106** still need adjudication to earn C. Inside a coding agent the agent rules on
 them. In CI nobody does — so before the ledger, a CI grid was partial by construction and the
 only way to close it was to pay for an agent pass on every run.
 

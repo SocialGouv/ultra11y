@@ -2505,11 +2505,15 @@
           "axe:aria-roles",
           "axe:aria-valid-attr",
           "axe:aria-valid-attr-value",
+          "axe:button-name",
+          "axe:input-button-name",
           "axe:nested-interactive",
           "axe:presentation-role-conflict",
+          "button-empty-name",
           "cross-prop-drilled-name-lost",
           "disabled-context-content",
           "invalid-aria-role",
+          "label-in-name-mismatch",
           "menuitem-empty-name",
           "nested-interactive",
           "presentational-children-focusable",
@@ -2518,7 +2522,7 @@
       },
       "automation": {
         "tests": {
-          "1": "judgment",
+          "1": "static",
           "2": "judgment",
           "3": "static"
         },
@@ -2596,6 +2600,18 @@
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
+            "id": "axe:button-name",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:input-button-name",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
             "id": "axe:nested-interactive",
             "tests": ["1", "2", "3"],
             "effect": "candidate",
@@ -2606,6 +2622,12 @@
             "tests": ["1", "2", "3"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "button-empty-name",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
           },
           {
             "id": "cross-prop-drilled-name-lost",
@@ -2626,8 +2648,14 @@
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
-            "id": "menuitem-empty-name",
+            "id": "label-in-name-mismatch",
             "tests": ["3"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "menuitem-empty-name",
+            "tests": ["1"],
             "effect": "decisive-nc",
             "rationale": "The observed failure exhausts the cited RGAA test."
           },
@@ -2988,7 +3016,8 @@
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           }
-        ]
+        ],
+        "completeBySilence": true
       }
     },
     {
@@ -4680,14 +4709,7 @@
       "particularCases": ["Pour le test 11.9.2, voir cas particuliers critère 11.2."],
       "wcag": ["2.5.3", "4.1.2"],
       "appliesTo": {
-        "ruleIds": [
-          "axe:button-name",
-          "axe:input-button-name",
-          "button-empty-name",
-          "cross-icon-only-unnamed",
-          "icon-only-control-unnamed",
-          "label-in-name-mismatch"
-        ]
+        "ruleIds": ["cross-icon-only-unnamed", "form-button-empty-name", "form-label-in-name-mismatch", "icon-only-control-unnamed"]
       },
       "automation": {
         "tests": {
@@ -4696,40 +4718,28 @@
         },
         "rules": [
           {
-            "id": "axe:button-name",
-            "tests": ["1"],
-            "effect": "decisive-nc",
-            "rationale": "The observed failure exhausts the cited RGAA test."
-          },
-          {
-            "id": "axe:input-button-name",
-            "tests": ["1"],
-            "effect": "decisive-nc",
-            "rationale": "The observed failure exhausts the cited RGAA test."
-          },
-          {
-            "id": "button-empty-name",
-            "tests": ["1"],
-            "effect": "decisive-nc",
-            "rationale": "The observed failure exhausts the cited RGAA test."
-          },
-          {
             "id": "cross-icon-only-unnamed",
             "tests": ["1"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
+            "id": "form-button-empty-name",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "form-label-in-name-mismatch",
+            "tests": ["2"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
             "id": "icon-only-control-unnamed",
             "tests": ["1"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
-          },
-          {
-            "id": "label-in-name-mismatch",
-            "tests": ["2"],
-            "effect": "decisive-nc",
-            "rationale": "The observed failure exhausts the cited RGAA test."
           }
         ]
       }

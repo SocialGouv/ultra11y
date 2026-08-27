@@ -23,7 +23,7 @@ describe("RGAA test-level automation contract", () => {
       static: tiers.filter((tier) => tier === "static").length,
       rendered: tiers.filter((tier) => tier === "rendered").length,
       judgment: tiers.filter((tier) => tier === "judgment").length,
-    }).toEqual({ static: 26, rendered: 3, judgment: 229 });
+    }).toEqual({ static: 27, rendered: 3, judgment: 228 });
     expect(pack.criteria.filter((criterion) => Object.values(criterion.automation!.tests).includes("judgment"))).toHaveLength(92);
   });
 
@@ -37,12 +37,12 @@ describe("RGAA test-level automation contract", () => {
 
   it("keeps the public README aligned with the generated automation contract", () => {
     const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
-    expect(readme).toContain("26 `static` tests across 19 criteria");
+    expect(readme).toContain("27 `static` tests across 19 criteria");
     expect(readme).toContain("3 `rendered` tests across 3 criteria");
     expect(readme).toContain("21 distinct criteria that can produce a deterministic `NC`");
     expect(readme).toContain("49 criteria receive a normative engine signal");
-    expect(readme).toContain("229 `judgment` tests across 92 criteria");
-    expect(readme).toContain("104 of 106 criteria require adjudication to earn `C`");
+    expect(readme).toContain("228 `judgment` tests across 92 criteria");
+    expect(readme).toContain("103 of 106 criteria require adjudication to earn `C`");
   });
 
   it("allows C by silence only on the explicit, fully covered allowlist", () => {
@@ -51,7 +51,7 @@ describe("RGAA test-level automation contract", () => {
         .filter((criterion) => criterion.automation?.completeBySilence)
         .map((criterion) => criterion.id)
         .sort(),
-    ).toEqual(["10.1", "8.5"]);
+    ).toEqual(["10.1", "8.3", "8.5"]);
     expect(
       packAutomatability(
         [],
@@ -94,7 +94,8 @@ describe("RGAA test-level automation contract", () => {
       { test: "5.7.4", tier: "static", rules: ["headers-attr-dangling"] },
       { test: "5.8.1", tier: "static", rules: ["layout-table-data-markup"] },
       { test: "6.2.1", tier: "static", rules: ["axe:link-name", "link-empty-name"] },
-      { test: "7.1.3", tier: "static", rules: ["menuitem-empty-name"] },
+      { test: "7.1.1", tier: "static", rules: ["axe:button-name", "axe:input-button-name", "button-empty-name", "menuitem-empty-name"] },
+      { test: "7.1.3", tier: "static", rules: ["label-in-name-mismatch"] },
       { test: "8.1.1", tier: "rendered", rules: ["pack:rgaa:doctype-missing"] },
       { test: "8.2.1", tier: "static", rules: ["axe:duplicate-id", "axe:duplicate-id-active", "axe:duplicate-id-aria", "duplicate-attribute", "duplicate-id"] },
       { test: "8.3.1", tier: "static", rules: ["document-language-missing"] },
@@ -113,8 +114,8 @@ describe("RGAA test-level automation contract", () => {
       { test: "11.5.1", tier: "static", rules: ["radio-checkbox-group-ungrouped"] },
       { test: "11.6.1", tier: "static", rules: ["axe:fieldset", "fieldset-legend-missing"] },
       { test: "11.8.2", tier: "static", rules: ["pack:rgaa:optgroup-without-label"] },
-      { test: "11.9.1", tier: "static", rules: ["axe:button-name", "axe:input-button-name", "button-empty-name"] },
-      { test: "11.9.2", tier: "static", rules: ["label-in-name-mismatch"] },
+      { test: "11.9.1", tier: "static", rules: ["form-button-empty-name"] },
+      { test: "11.9.2", tier: "static", rules: ["form-label-in-name-mismatch"] },
     ]);
   });
 
@@ -149,7 +150,7 @@ describe("RGAA test-level automation contract", () => {
     expect(openJudgment.length).toBeLessThan(92);
     expect(allJudgment).toHaveLength(92);
     expect(allJudgment.filter((id) => !worklist.has(id))).toEqual([]);
-    expect(items).toHaveLength(99);
+    expect(items).toHaveLength(98);
     for (const id of allJudgment) {
       const criterion = pack.criteria.find((row) => row.id === id)!;
       const expected = Object.entries(criterion.automation!.tests)

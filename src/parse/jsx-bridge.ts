@@ -12,7 +12,7 @@ import { lineStartsOf } from "./html.js";
 // React → HTML attribute spellings the rules look for (matches parse/jsx.ts).
 // Applied AFTER lowercasing, so e.g. tabIndex→tabindex falls out of lowercasing
 // and only className/htmlFor need an explicit remap.
-const RENAME: Record<string, string> = { classname: "class", htmlfor: "for" };
+const RENAME: Record<string, string> = { classname: "class", htmlfor: "for", xmllang: "xml:lang" };
 
 function asNode(v: unknown): AstNode | undefined {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as AstNode) : undefined;
@@ -142,13 +142,21 @@ export function jsxAstToDoc(ast: AstFile, source: string, file: string): Doc {
     let tag = "#fragment";
     let attribs: Record<string, string> = {};
     let spread = false;
+    let jsxAttributes: El["jsxAttributes"];
     if (node.type === "JSXElement") {
       const opening = asNode(node.openingElement);
       const raw = jsxName(opening ? asNode(opening.name) : undefined);
       tag = isIntrinsic(raw) ? raw.toLowerCase() : raw;
       if (opening) {
         attribs = attribsOf(opening, source);
-        spread = asNodes(opening.attributes).some((a) => a.type === "JSXSpreadAttribute");
+        jsxAttributes = asNodes(opening.attributes)
+          .filter((a) => a.type === "JSXSpreadAttribute" || a.type === "JSXAttribute")
+          .map((a) =>
+            a.type === "JSXSpreadAttribute"
+              ? { spread: true as const, start: a.start ?? 0 }
+              : { name: normAttrName(jsxName(asNode(a.name))), start: a.start ?? 0 },
+          );
+        spread = jsxAttributes.some((attribute) => attribute.spread);
       }
     }
     const el: El = {
@@ -162,6 +170,7 @@ export function jsxAstToDoc(ast: AstFile, source: string, file: string): Doc {
       start: node.start ?? 0,
       end: node.end ?? 0,
       ...(spread ? { spread: true } : {}),
+      ...(jsxAttributes?.length ? { jsxAttributes } : {}),
       ...(arm ? { branchArm: arm } : {}),
     };
     elements.push(el);

@@ -88,7 +88,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 |---|---|---|---|---|---|
 | 2.5.1 | Pointer Gestures | A | judgment | — | 13.10 |
 | 2.5.2 | Pointer Cancellation | A | judgment | — | 13.11 |
-| 2.5.3 | Label in Name | A | judgment | label-in-name-mismatch | 6.1, 7.1, 11.2, 11.9 |
+| 2.5.3 | Label in Name | A | judgment | label-in-name-mismatch, form-label-in-name-mismatch | 6.1, 7.1, 11.2, 11.9 |
 | 2.5.4 | Motion Actuation | A | judgment | — | 13.12 |
 | 2.5.7 | Dragging Movements | AA | judgment | — | — |
 | 2.5.8 | Target Size (Minimum) | AA | needs-rendering | — | — |
@@ -125,5 +125,5 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 4.1.2 | Name, Role, Value | A | judgment | iframe-title-missing, invalid-aria-role, aria-ref-missing-id, redundant-aria, clickable-noninteractive, aria-required-children, aria-hidden-focusable, nested-interactive, invalid-aria-attr, invalid-aria-value, aria-required-attr, aria-prohibited-attr, duplicate-id, duplicate-attribute, control-label-missing, placeholder-as-label, form-field-multiple-labels, select-has-option, button-empty-name, icon-only-control-unnamed, control-name-title-only, field-purpose-incomplete, disabled-context-content, presentational-children-focusable, decorative-marked-exposed, menuitem-empty-name | 1.2, 1.3, 1.9, 2.1, 2.2, 4.13, 5.3, 7.1, 7.2, 8.2, 9.1, 10.8, 11.1, 11.9, 12.6, 13.3, 13.4 |
+| 4.1.2 | Name, Role, Value | A | judgment | iframe-title-missing, invalid-aria-role, aria-ref-missing-id, redundant-aria, clickable-noninteractive, aria-required-children, aria-hidden-focusable, nested-interactive, invalid-aria-attr, invalid-aria-value, aria-required-attr, aria-prohibited-attr, duplicate-id, duplicate-attribute, control-label-missing, placeholder-as-label, form-field-multiple-labels, select-has-option, button-empty-name, form-button-empty-name, icon-only-control-unnamed, control-name-title-only, field-purpose-incomplete, disabled-context-content, presentational-children-focusable, decorative-marked-exposed, menuitem-empty-name | 1.2, 1.3, 1.9, 2.1, 2.2, 4.13, 5.3, 7.1, 7.2, 8.2, 9.1, 10.8, 11.1, 11.9, 12.6, 13.3, 13.4 |
 | 4.1.3 | Status Messages | AA | judgment | live-region-conflict, status-message-not-assertive | 7.5 |

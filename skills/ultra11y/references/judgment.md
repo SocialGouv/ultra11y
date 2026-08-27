@@ -126,8 +126,8 @@ Then `node scripts/ultra11y.mjs verify --apply VERIFY.todo.json` is green again 
 criteria — which is the granularity that matters, since 97 of RGAA's 106 criteria carry
 judgment tests and may still need adjudication to earn C. Each item carries, inline:
 
-In total, **104 of RGAA's 106** criteria still need adjudication to earn C; the other seven
-beyond the 97 have deterministic failure detectors but no complete positive proof.
+In total, **103 of RGAA's 106** criteria still need adjudication to earn C. Of those, 92 carry
+explicit judgment tests; 11 more have deterministic failure detectors but no complete positive proof.
 
 - the criterion's **numbered tests, in full** (`11.2.1` … `11.2.6`) — what actually has to be
   ruled on;

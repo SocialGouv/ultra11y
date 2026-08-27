@@ -34,7 +34,7 @@ import { renderPackReport } from "../src/report.js";
 import { renderPrdDoc, renderBacklog, renderPerCriterion } from "../src/prd.js";
 import { annotations, stepSummary } from "../src/annotate.js";
 import { toSarif } from "../src/sarif.js";
-import { loadPack } from "../src/standards/index.js";
+import { derivePackResults, isProvisionalJudgmentInapplicable, loadPack } from "../src/standards/index.js";
 import { packAuditDocument, packCriteriaOf, packCriterionLabel, isPackAudit, unwrapAudit } from "../src/standards/document.js";
 import type { AuditResult, Finding } from "../src/types.js";
 
@@ -196,5 +196,23 @@ describe("the pack-keyed audit document", () => {
     const sum = (k: "c" | "nc" | "na" | "manual") => doc.themes.reduce((n, t) => n + t[k], 0);
     expect(sum("c") + sum("nc") + sum("manual")).toBe(106);
     expect(sum("na")).toBeLessThanOrEqual(sum("c"));
+  });
+
+  it("publishes provisional judgment inapplicability as manual in JSON, tallies and residual risks", () => {
+    const source = audit();
+    const provisionalIds = derivePackResults(source, "rgaa")
+      .filter((row) => isProvisionalJudgmentInapplicable(row))
+      .map((row) => row.id);
+    expect(provisionalIds.length).toBeGreaterThan(0);
+    const doc = packAuditDocument(source, "rgaa", "fr");
+    for (const id of provisionalIds) {
+      const c = doc.criteria.find((row) => row.id === id)!;
+      expect(c.status).toBe("manual");
+      expect(c.inapplicable).toBeUndefined();
+      expect(c.justification).toContain("l'IA doit confirmer");
+      expect(doc.residualRisks.some((risk) => risk.criteriaId === id && risk.reason.length > 0)).toBe(true);
+    }
+    const tallyManual = doc.themes.reduce((n, theme) => n + theme.manual, 0);
+    expect(tallyManual).toBe(doc.criteria.filter((c) => c.status === "manual").length);
   });
 });

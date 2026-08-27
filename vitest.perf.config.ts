@@ -7,7 +7,8 @@ export default defineConfig({
   test: {
     include: ["tests/perf-shape.test.ts"],
     pool: "forks",
-    poolOptions: { forks: { singleFork: true } },
+    maxWorkers: 1,
+    isolate: false,
     fileParallelism: false,
   },
 });

@@ -131,6 +131,27 @@ describe("radio-checkbox-group-ungrouped (1.3.1 / 3.3.2)", () => {
     expect(findOf(`<form><input type="radio" name="g"></form>`, "radio-checkbox-group-ungrouped")).toHaveLength(0);
     expect(findOf(`<form><input type="radio" name="a"><input type="radio" name="b"></form>`, "radio-checkbox-group-ungrouped")).toHaveLength(0);
   });
+
+  it("scopes same-name controls by their form owner", () => {
+    expect(
+      findOf(`<form id="a"><input type="radio" name="choice"></form><form id="b"><input type="radio" name="choice"></form>`, "radio-checkbox-group-ungrouped"),
+    ).toHaveLength(0);
+    expect(
+      findOf(
+        `<form id="a"></form><form id="b"></form><input form="a" type="checkbox" name="choice"><input form="b" type="checkbox" name="choice">`,
+        "radio-checkbox-group-ungrouped",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("still groups controls with the same explicit form owner", () => {
+    expect(
+      findOf(
+        `<form id="survey"></form><input form="survey" type="radio" name="choice"><input form="survey" type="radio" name="choice">`,
+        "radio-checkbox-group-ungrouped",
+      ),
+    ).toHaveLength(1);
+  });
 });
 
 describe("date-fields-ungrouped (3.3.2)", () => {

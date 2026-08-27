@@ -8,7 +8,8 @@ export default defineConfig({
   test: {
     include: ["tests/browser-tier.e2e.test.ts"],
     pool: "forks",
-    poolOptions: { forks: { singleFork: true } },
+    maxWorkers: 1,
+    isolate: false,
     fileParallelism: false,
     testTimeout: 120_000,
     hookTimeout: 180_000,

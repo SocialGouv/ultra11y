@@ -6,6 +6,12 @@ import { attr, hasAttr, boundAttr, hasBoundAttr, descendants, ancestors } from "
 import { isIntrinsic } from "./parse/jsx-bridge.js";
 
 const collapse = (s: string): string => s.replace(/\s+/g, " ").trim();
+const BUTTON_INPUT = new Set(["button", "submit", "reset"]);
+
+/** Native input types whose `value` is visibly rendered as the button label. */
+export function isButtonInput(el: El): boolean {
+  return el.tag === "input" && BUTTON_INPUT.has((attr(el, "type") ?? "text").trim().toLowerCase());
+}
 
 /** JSX/SFC: the element's content/name may be injected at runtime in a way the static
  *  parse can't see — a `<slot>` projection or a child component (which can render
@@ -20,13 +26,21 @@ export function mayInjectContent(el: El): boolean {
 // high-confidence suppression rather than a general visibility model.
 const HIDDEN_STYLE = /(^|;)\s*(display\s*:\s*none|visibility\s*:\s*(hidden|collapse))\s*(;|$)/i;
 
+function isLocallyDisplayHidden(el: El): boolean {
+  const hidden = attr(el, "hidden");
+  // A literal HTML/JSX boolean attribute is definitely hidden. A JSX expression such as
+  // `hidden={busy}` is conditional, though: treating mere attribute presence as always
+  // hidden can erase the only possible label of a control and create a false positive.
+  const staticallyHidden = hidden !== undefined && !hidden.includes("{");
+  return staticallyHidden || HIDDEN_STYLE.test(attr(el, "style") ?? "");
+}
+
 /** Is the element not rendered at all — `[hidden]`, or an inline `display:none` /
  *  `visibility:hidden` on itself or an ancestor? Such an element is in no focus order and
  *  exposes nothing, whatever its ARIA says. */
 export function isDisplayHidden(el: El): boolean {
   for (const node of [el, ...ancestors(el)]) {
-    if (hasAttr(node, "hidden")) return true;
-    if (HIDDEN_STYLE.test(attr(node, "style") ?? "")) return true;
+    if (isLocallyDisplayHidden(node)) return true;
   }
   return false;
 }
@@ -68,13 +82,18 @@ function embeddedImageName(n: El, doc?: Doc): string {
 }
 
 /** Text content of a subtree, with <img> names and <svg><title> folded in. */
-function nameFromContent(el: El, doc?: Doc): string {
+function nameFromContent(el: El, doc?: Doc, includeHiddenSubtree = false): string {
   let out = "";
   const walk = (n: HNode): void => {
     if (n.type === "text") {
       out += n.data;
       return;
     }
+    // Hidden descendants do not contribute to a name-from-content computation. Check this
+    // before the image/SVG branches: an aria-hidden image's alt and a hidden SVG's title are
+    // hidden too. Only the descendant's own state is checked here because aria-labelledby is
+    // allowed to reference a hidden root; its otherwise-exposed descendants still name it.
+    if (!includeHiddenSubtree && (isLocallyDisplayHidden(n) || attr(n, "aria-hidden") === "true")) return;
     if (n.tag === "img") {
       const a = embeddedImageName(n, doc);
       if (a) out += " " + a;
@@ -82,14 +101,55 @@ function nameFromContent(el: El, doc?: Doc): string {
     }
     if (n.tag === "svg") {
       const title = descendants(n).find((d) => d.tag === "title");
-      if (title) out += " " + nameFromContent(title, doc);
+      if (title && (includeHiddenSubtree || (!isLocallyDisplayHidden(title) && attr(title, "aria-hidden") !== "true"))) {
+        out += " " + nameFromContent(title, doc, includeHiddenSubtree);
+      }
       return;
     }
-    // aria-hidden subtrees contribute nothing
-    if (attr(n, "aria-hidden") === "true") return;
     for (const c of n.children) walk(c);
   };
   for (const c of el.children) walk(c);
+  return collapse(out);
+}
+
+/** Literal text that can safely be treated as a control's visible label in source.
+ *
+ * Hidden subtrees and aria-hidden decoration (including icon-font/SVG text) are excluded:
+ * neither can prove a spoken visible label in a static parse. The rendered tier remains the
+ * authority when CSS turns source text into a glyph or otherwise changes what is visible. */
+export function visibleLabelText(el: El): string {
+  let out = "";
+  const nonText = new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img"]);
+  const walk = (n: HNode): void => {
+    if (n.type === "text") {
+      out += n.data;
+      return;
+    }
+    if (isLocallyDisplayHidden(n) || attr(n, "aria-hidden") === "true" || nonText.has(n.tag)) return;
+    for (const child of n.children) walk(child);
+  };
+  for (const child of el.children) walk(child);
+  if (isButtonInput(el)) {
+    const value = (attr(el, "value") ?? "").trim();
+    if (value && !value.includes("{")) out += ` ${value}`;
+  }
+  return collapse(out);
+}
+
+/** Literal text that can visibly paint, regardless of accessibility-tree exposure.
+ * `aria-hidden` removes semantics, not pixels; only rendering-hidden subtrees are excluded. */
+export function visuallyRenderedText(el: El): string {
+  let out = "";
+  const nonText = new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img"]);
+  const walk = (n: HNode): void => {
+    if (n.type === "text") {
+      out += n.data;
+      return;
+    }
+    if (isLocallyDisplayHidden(n) || nonText.has(n.tag)) return;
+    for (const child of n.children) walk(child);
+  };
+  for (const child of el.children) walk(child);
   return collapse(out);
 }
 
@@ -99,12 +159,11 @@ function ariaLabelledbyText(el: El, doc: Doc): string {
   const parts: string[] = [];
   for (const id of ids.split(/\s+/).filter(Boolean)) {
     const ref = doc.byId.get(id);
-    if (ref) parts.push(nameFromContent(ref) || (attr(ref, "aria-label") ?? "").trim());
+    if (ref) parts.push(nameFromContent(ref, doc, isHiddenFromAT(ref)) || (attr(ref, "aria-label") ?? "").trim());
   }
   return collapse(parts.join(" "));
 }
 
-const BUTTON_INPUT = new Set(["button", "submit", "reset"]);
 const NAMELESS_BY_DEFAULT = new Set(["submit", "reset"]); // UA supplies a default label
 
 /** Compute the accessible name of an element (links, buttons, images, generic). */
@@ -123,6 +182,7 @@ export function accessibleName(el: El, doc: Doc): string {
   }
   if (el.tag === "input") {
     const type = (attr(el, "type") ?? "text").toLowerCase();
+    if (type === "image") return (boundAttr(el, "alt") ?? attr(el, "title") ?? "").trim();
     if (BUTTON_INPUT.has(type)) {
       const value = (attr(el, "value") ?? "").trim();
       if (value) return value;

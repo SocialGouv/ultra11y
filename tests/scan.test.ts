@@ -155,6 +155,18 @@ describe("cleanTempContexts", () => {
 });
 
 describe("mergeDynamic", () => {
+  it("does not re-credit an agent conformity in the automatic pass rate", () => {
+    const audit = runAudit({ inputs: [`${FIX}conforming/good.html`] });
+    const agentC = audit.criteria.find((c) => c.status === "C");
+    expect(agentC).toBeDefined();
+    agentC!.decidedBy = "agent";
+    const dyn = { tool: "ultra11y" as const, engine: "test", target: "fixture", date: "2026-08-26", findings: [] };
+    const merged = mergeDynamic(audit, dyn);
+    const automatic = merged.criteria.filter((c) => c.status === "NC" || (c.status === "C" && c.decidedBy !== "agent"));
+    const expected = Math.round((automatic.filter((c) => c.status === "C").length / automatic.length) * 100);
+    expect(merged.conformancePct).toBe(expected);
+  });
+
   it("upgrades a needs-rendering 'manual' SC to NC and drops it from residual risks", () => {
     const audit = runAudit({ inputs: [`${FIX}conforming/good.html`] });
     expect(audit.criteria.find((c) => c.id === "1.4.3")?.status).toBe("manual");

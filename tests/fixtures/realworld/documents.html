@@ -40,8 +40,15 @@
 
     <h2>Archives</h2>
     <p>Les documents antérieurs à 2024 sont fournis sur demande.</p>
-    <!-- button-empty-name · RGAA 11.9 · WCAG 4.1.2 — un bouton sans intitulé. -->
+    <!-- button-empty-name · RGAA 7.1 · WCAG 4.1.2 — un bouton script hors formulaire sans intitulé. -->
     <button type="button"></button>
+
+    <!-- form-button-empty-name / form-label-in-name-mismatch · RGAA 11.9 — les deux
+         variantes de bouton de formulaire doivent rester distinctes des commandes script. -->
+    <form action="/documents/preparer" method="post">
+      <button type="button"></button>
+      <button type="button" aria-label="Consulter">Télécharger les archives</button>
+    </form>
 
     <footer>
       <nav aria-label="Navigation de pied de page">

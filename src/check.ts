@@ -9,7 +9,18 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AuditResult, Lang } from "./types.js";
 import { automatability, hasSC } from "./wcag.js";
-import { type StandardId, CORE, criterionCoverage, getCriterion, isCore, loadPack, hasId, idCaptureSource, derivePackResults } from "./standards/index.js";
+import {
+  type StandardId,
+  CORE,
+  criterionCoverage,
+  getCriterion,
+  isCore,
+  loadPack,
+  hasId,
+  idCaptureSource,
+  derivePackResults,
+  isProvisionalJudgmentInapplicable,
+} from "./standards/index.js";
 import { buildWorklist, applyVerdicts, type VerifyItem } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import { isPagesReport, pageCriterionRows } from "./pages-report.js";
@@ -29,7 +40,7 @@ const M = {
     rateMissing: "Taux de réussite absent de l'en-tête du rapport.",
     rateRange: (v: string) => `Taux de réussite hors bornes (0–100) : ${v}%.`,
     rateInconsistent: (v: string, expected: number, c: number, nc: number) =>
-      `Taux de réussite incohérent avec la synthèse : l'en-tête indique ${v}% alors que C ÷ (C+NC) = ${c} ÷ ${c + nc} = ${expected}%.`,
+      `Taux de réussite incohérent avec la synthèse : l'en-tête indique ${v}% alors que C automatique ÷ (C automatique+NC) = ${c} ÷ ${c + nc} = ${expected}%.`,
     overProject: (id: string) =>
       `Critère sur-projeté : ${id} est marqué non conforme dans le rapport mais l'audit ne le dérive pas comme NC (élément hors périmètre du critère).`,
     underProject: (id: string) => `Critère absent : l'audit dérive ${id} comme non conforme mais le rapport ne le présente pas.`,
@@ -48,7 +59,7 @@ const M = {
     rateMissing: "Pass rate missing from the report header.",
     rateRange: (v: string) => `Pass rate out of range (0–100): ${v}%.`,
     rateInconsistent: (v: string, expected: number, c: number, nc: number) =>
-      `Pass rate inconsistent with the synthesis table: header says ${v}% but C ÷ (C+NC) = ${c} ÷ ${c + nc} = ${expected}%.`,
+      `Pass rate inconsistent with the synthesis table: header says ${v}% but automatic C ÷ (automatic C+NC) = ${c} ÷ ${c + nc} = ${expected}%.`,
     overProject: (id: string) =>
       `Over-projected criterion: ${id} is marked non-conformant in the report but the audit does not derive it as NC (element outside the criterion's scope).`,
     underProject: (id: string) => `Missing criterion: the audit derives ${id} as non-conformant but the report does not present it.`,
@@ -134,8 +145,11 @@ export function checkReport(md: string, standard: StandardId = "wcag", lang: Lan
   // arithmetically consistent with the report's own C/NC synthesis totals (a report that
   // claims 99% while its table implies 17% is lying). The rate is defined as C ÷ (C + NC),
   // rounded — mirroring src/audit.ts's conformancePct — so we recompute it from the Total
-  // row and fail on a material disagreement (±1 for rounding). Core (WCAG) only: a pack
-  // report's header rate is the WCAG-derived pct, not its own theme table's C/NC.
+  // row and fail on a material disagreement (±1 for rounding). Agent-adjudicated
+  // conformities appear in the synthesis, but deliberately do not enter the AUTOMATIC rate;
+  // the exhaustive grid identifies those rows so they can be subtracted before comparing.
+  // This applies equally to core and pack reports: both headers are now computed on their own
+  // active standard, and letting packs skip the check is how a 16% header shipped beside C=0.
   const rateM = /^-\s+\*\*[^*\n]*\*\*\s*:\s*(\d+(?:[.,]\d+)?)\s*%/m.exec(md);
   if (!rateM) {
     // A per-page report carries one rate PER PAGE, inside each page's own block, and no
@@ -146,10 +160,11 @@ export function checkReport(md: string, standard: StandardId = "wcag", lang: Lan
     if (pct < 0 || pct > 100) issues.push(s.rateRange(rateM[1]!));
     // A per-page report has no single synthesis table to be consistent WITH: its rates are
     // per page and each is computed from that page's own grid. Range still applies.
-    else if (core && !perPage) {
+    else if (!perPage) {
       const totals = synthesisTotals(md);
       if (totals) {
-        const { c, nc } = totals;
+        const { nc } = totals;
+        const c = Math.max(0, totals.c - agentConformities(md));
         const expected = c + nc === 0 ? 100 : Math.round((c / (c + nc)) * 100);
         if (Math.abs(pct - expected) > 1) issues.push(s.rateInconsistent(rateM[1]!, expected, c, nc));
       }
@@ -300,6 +315,23 @@ function synthesisTotals(md: string): { c: number; nc: number } | null {
   const m = /^\|\s*\*\*[^|*]+\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|/m.exec(md);
   if (!m) return null;
   return { c: Number.parseInt(m[1]!, 10), nc: Number.parseInt(m[2]!, 10) };
+}
+
+/** Conformities in the exhaustive grid that were ruled by the agent. They are genuine
+ *  published statuses and belong in the synthesis tally, but the header explicitly labels
+ *  its rate automatic, so they are excluded from that one ratio. The grid is the only report
+ *  surface that records both status and provenance for NA as well as ordinary C. */
+function agentConformities(md: string): number {
+  let count = 0;
+  for (const line of md.split("\n")) {
+    if (!line.startsWith("|")) continue;
+    const cells = line
+      .slice(1, line.endsWith("|") ? -1 : undefined)
+      .split("|")
+      .map((cell) => cell.trim());
+    if (cells.length === 4 && (cells[1] === "C" || cells[1] === "NA") && (cells[3] === "AI" || cells[3] === "IA")) count++;
+  }
+  return count;
 }
 
 /** The body of section N (between "## N." and the next "## "). */
@@ -485,7 +517,17 @@ export function checkDecided(
   const fr = lang === "fr";
   const rows = isCore(standard)
     ? audit.criteria.map((c) => ({ id: c.id, status: c.status, decidedBy: c.decidedBy }))
-    : derivePackResults(audit, standard).map((c) => ({ id: c.id, status: c.status, decidedBy: c.decidedBy }));
+    : (() => {
+        const activePack = loadPack(standard);
+        return derivePackResults(audit, standard).map((c) => ({
+          id: c.id,
+          // Subject absence is evidence for adjudicating a judgment criterion, not a verdict.
+          // `verify` and every report surface already keep this shape open; the completeness
+          // gate must ask the same question or it under-reports the residual work.
+          status: isProvisionalJudgmentInapplicable(c, getCriterion(activePack, c.id)) ? ("manual" as const) : c.status,
+          decidedBy: c.decidedBy,
+        }));
+      })();
   const issues: string[] = [];
 
   const declared = new Map<string, UndecidedAllowance>();

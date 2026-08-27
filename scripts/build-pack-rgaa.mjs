@@ -221,6 +221,7 @@ const RULE_TO_CRITERIA = {
   "aria-hidden-focusable": ["7.1"], "redundant-aria": ["7.1"], "nested-interactive": ["7.1"],
   "cross-prop-drilled-name-lost": ["7.1"],
   "presentational-children-focusable": ["7.1"], "menuitem-empty-name": ["7.1"],
+  "button-empty-name": ["7.1"], "label-in-name-mismatch": ["7.1"],
   "clickable-noninteractive": ["7.3"], "live-region-conflict": ["7.5"], "status-message-not-assertive": ["7.5"],
   // Dynamic tier (scan --local): the live-region probe projects onto WCAG 4.1.3 → RGAA 7.5
   // (status messages) — the WCAG-faithful home. Ara ALSO classifies the source finding under
@@ -233,6 +234,7 @@ const RULE_TO_CRITERIA = {
   "axe:aria-required-attr": ["7.1"], "axe:aria-required-children": ["7.1"], "axe:aria-required-parent": ["7.1"],
   "axe:aria-valid-attr": ["7.1"], "axe:aria-valid-attr-value": ["7.1"], "axe:nested-interactive": ["7.1"],
   "axe:aria-hidden-focus": ["7.1"], "axe:presentation-role-conflict": ["7.1"],
+  "axe:button-name": ["7.1"], "axe:input-button-name": ["7.1"],
   // Theme 8 — document (8.2 valid code, 8.3 default lang, 8.4 lang relevant, 8.5 title, 8.7/8.8 lang changes)
   "duplicate-id": ["8.2"], "axe:duplicate-id": ["8.2"], "axe:duplicate-id-aria": ["8.2"], "axe:duplicate-id-active": ["8.2"],
   "html-lang-missing": ["8.3"], "axe:html-has-lang": ["8.3"],
@@ -258,11 +260,11 @@ const RULE_TO_CRITERIA = {
   "control-label-missing": ["11.1"], "label-for-dangling": ["11.1"], "placeholder-as-label": ["11.1"],
   "form-field-multiple-labels": ["11.1"], "select-has-option": ["11.1"], "control-name-title-only": ["11.1"],
   "radio-checkbox-group-ungrouped": ["11.5"], "date-fields-ungrouped": ["11.5"],
-  "field-purpose-incomplete": ["11.1", "11.13"], "fieldset-legend-missing": ["11.6"], "button-empty-name": ["11.9"],
-  "autocomplete-token-invalid": ["11.13"], "label-in-name-mismatch": ["11.9"],
+  "field-purpose-incomplete": ["11.1", "11.13"], "fieldset-legend-missing": ["11.6"], "form-button-empty-name": ["11.9"],
+  "autocomplete-token-invalid": ["11.13"], "form-label-in-name-mismatch": ["11.9"],
   "error-not-associated": ["11.10"], "aria-invalid-no-description": ["11.10"],
   "axe:label": ["11.1"], "axe:form-field-multiple-labels": ["11.1"], "axe:select-name": ["11.1"], "axe:label-title-only": ["11.1"],
-  "axe:autocomplete-valid": ["11.13"], "axe:fieldset": ["11.6"], "axe:input-button-name": ["11.9"], "axe:button-name": ["11.9"],
+  "axe:autocomplete-valid": ["11.13"], "axe:fieldset": ["11.6"],
   // Theme 12 — navigation (12.7 skip link, 12.8 tab order, 12.9 keyboard trap)
   "skip-link-target-missing": ["12.7"], "axe:skip-link": ["12.7"], "axe:bypass": ["12.7"],
   "positive-tabindex": ["12.8"], "axe:tabindex": ["12.8"],
@@ -316,15 +318,20 @@ const DECISIVE_RULE_TESTS = {
   "11.1|control-label-missing": ["1"],
   "11.6|axe:fieldset": ["1"],
   "11.6|fieldset-legend-missing": ["1"],
-  "11.9|axe:button-name": ["1"],
-  "11.9|axe:input-button-name": ["1"],
-  "11.9|button-empty-name": ["1"],
-  "11.9|label-in-name-mismatch": ["2"],
+  "11.9|form-button-empty-name": ["1"],
+  "11.9|form-label-in-name-mismatch": ["2"],
   "11.5|radio-checkbox-group-ungrouped": ["1"],
   "5.7|headers-attr-dangling": ["4"],
   "5.7|table-scope-invalid": ["2", "3"],
   "5.8|layout-table-data-markup": ["1"],
-  "7.1|menuitem-empty-name": ["3"],
+  // An absent accessible name fails the prerequisite name/role/value test (7.1.1).
+  // Test 7.1.3 asks whether an already-accessible name/role is pertinent; it cannot be the
+  // attachment for a component that has no name at all.
+  "7.1|menuitem-empty-name": ["1"],
+  "7.1|button-empty-name": ["1"],
+  "7.1|axe:button-name": ["1"],
+  "7.1|axe:input-button-name": ["1"],
+  "7.1|label-in-name-mismatch": ["3"],
 };
 
 // Candidate evidence is test-scoped too. The fallback remains all tests only when one rule id
@@ -388,7 +395,7 @@ const CANDIDATE_RULE_TESTS = {
   "13.8|axe:marquee": ["1"],
 };
 
-const COMPLETE_BY_SILENCE = new Set(["8.5", "10.1"]);
+const COMPLETE_BY_SILENCE = new Set(["8.3", "8.5", "10.1"]);
 const renderedTier = (ruleId) =>
   ruleId.startsWith("rendered-") || ruleId.startsWith("dyn-") || ruleId.startsWith("axe:") ? "rendered" : "static";
 const mergeTestTier = (current, next) => (current === "static" || next === "static" ? "static" : next);

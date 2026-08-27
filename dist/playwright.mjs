@@ -136,10 +136,30 @@ var COLLECT_SNAPSHOT = `(() => {
 var PRELUDE = `
 const __sel = (e) => {
   if (!e || !e.tagName) return '\u2014';
-  const t = e.tagName.toLowerCase();
-  if (e.id) return t + '#' + e.id;
-  const c = typeof e.className === 'string' ? e.className.trim().split(/\\s+/)[0] : '';
-  return c ? t + '.' + c : t;
+  const esc = (v) => (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(v) : String(v).replace(/[^a-zA-Z0-9_-]/g, '\\\\$&');
+  const unique = (s) => { try { return document.querySelectorAll(s).length === 1; } catch { return false; } };
+  const short = (n) => {
+    const t = n.tagName.toLowerCase();
+    if (n.id) return t + '#' + esc(n.id);
+    const c = typeof n.className === 'string' ? n.className.trim().split(/\\s+/)[0] : '';
+    return c ? t + '.' + esc(c) : t;
+  };
+  const first = short(e);
+  if (unique(first)) return first;
+  const parts = [];
+  for (let n = e; n && n.tagName; n = n.parentElement) {
+    let part = short(n);
+    if (n.id && unique(part)) { parts.unshift(part); return parts.join(' > '); }
+    const parent = n.parentElement;
+    if (parent) {
+      const same = Array.from(parent.children).filter((x) => x.tagName === n.tagName);
+      if (same.length > 1) part += ':nth-of-type(' + (same.indexOf(n) + 1) + ')';
+    }
+    parts.unshift(part);
+    const path = parts.join(' > ');
+    if (unique(path)) return path;
+  }
+  return parts.join(' > ') || first;
 };
 const __vis = (e) => {
   const r = e.getBoundingClientRect();

@@ -17,6 +17,9 @@ export interface El {
   // JSX only: the element carries a {...spread} attribute (props could inject a
   // name/aria). Undefined for HTML. Used by the cross-file rules.
   spread?: boolean;
+  // JSX only: source-order metadata for ordinary/spread attributes. Missing on the HTML/SFC
+  // parser, where a dynamic spread is conservatively treated as able to override anything.
+  jsxAttributes?: { name?: string; spread?: true; start: number }[];
   // JSX only: identity of the conditional arm this element was lowered from
   // (`{cond ? <A/> : <B/>}` / `{cond && <A/>}`). Elements in different arms of the same
   // conditional are mutually exclusive at runtime, so order-sensitive rules
@@ -191,6 +194,19 @@ export function hasDynamicSpread(el: El): boolean {
   if (el.spread) return true;
   for (const k in el.attribs) if (k === "v-bind" || k.startsWith("{")) return true;
   return false;
+}
+
+/** Whether a dynamic spread can still supply one of several equivalent attributes.
+ *
+ * JSX carries source-order metadata, so later explicit props close that spelling. HTML/SFC
+ * parsing does not, and therefore stays conservative: a detected spread remains effective. */
+export function dynamicSpreadMayProvide(el: El, names: string[]): boolean {
+  if (!hasDynamicSpread(el)) return false;
+  if (!el.jsxAttributes) return true;
+  const spreads = el.jsxAttributes.filter((attribute) => attribute.spread);
+  if (!spreads.length) return true;
+  const lastSpread = Math.max(...spreads.map((attribute) => attribute.start));
+  return !names.every((name) => el.jsxAttributes!.some((attribute) => attribute.name === name && attribute.start > lastSpread));
 }
 
 export function isVoid(tag: string): boolean {

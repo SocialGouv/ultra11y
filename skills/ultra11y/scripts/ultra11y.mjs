@@ -949,7 +949,7 @@ var wcag_default = {
       level: "A",
       addedIn: "2.1",
       automatability: "judgment",
-      ruleIds: ["label-in-name-mismatch"],
+      ruleIds: ["label-in-name-mismatch", "form-label-in-name-mismatch"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html",
       techniques: [
         "ARIA14",
@@ -1342,6 +1342,7 @@ Note: For this success criterion, "the same order relative to other page content
         "form-field-multiple-labels",
         "select-has-option",
         "button-empty-name",
+        "form-button-empty-name",
         "icon-only-control-unnamed",
         "control-name-title-only",
         "field-purpose-incomplete",
@@ -5419,6 +5420,14 @@ function hasDynamicSpread(el) {
   if (el.spread) return true;
   for (const k in el.attribs) if (k === "v-bind" || k.startsWith("{")) return true;
   return false;
+}
+function dynamicSpreadMayProvide(el, names) {
+  if (!hasDynamicSpread(el)) return false;
+  if (!el.jsxAttributes) return true;
+  const spreads = el.jsxAttributes.filter((attribute) => attribute.spread);
+  if (!spreads.length) return true;
+  const lastSpread = Math.max(...spreads.map((attribute) => attribute.start));
+  return !names.every((name2) => el.jsxAttributes.some((attribute) => attribute.name === name2 && attribute.start > lastSpread));
 }
 function textContent(node) {
   if (node.type === "text") return node.data;
@@ -19716,7 +19725,7 @@ function walkAst(root, visit) {
 }
 
 // src/parse/jsx-bridge.ts
-var RENAME = { classname: "class", htmlfor: "for" };
+var RENAME = { classname: "class", htmlfor: "for", xmllang: "xml:lang" };
 function asNode2(v) {
   return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
 }
@@ -19819,13 +19828,17 @@ function jsxAstToDoc(ast, source, file) {
     let tag = "#fragment";
     let attribs = {};
     let spread = false;
+    let jsxAttributes;
     if (node.type === "JSXElement") {
       const opening2 = asNode2(node.openingElement);
       const raw = jsxName(opening2 ? asNode2(opening2.name) : void 0);
       tag = isIntrinsic(raw) ? raw.toLowerCase() : raw;
       if (opening2) {
         attribs = attribsOf(opening2, source);
-        spread = asNodes2(opening2.attributes).some((a) => a.type === "JSXSpreadAttribute");
+        jsxAttributes = asNodes2(opening2.attributes).filter((a) => a.type === "JSXSpreadAttribute" || a.type === "JSXAttribute").map(
+          (a) => a.type === "JSXSpreadAttribute" ? { spread: true, start: a.start ?? 0 } : { name: normAttrName(jsxName(asNode2(a.name))), start: a.start ?? 0 }
+        );
+        spread = jsxAttributes.some((attribute) => attribute.spread);
       }
     }
     const el = {
@@ -19839,6 +19852,7 @@ function jsxAstToDoc(ast, source, file) {
       start: node.start ?? 0,
       end: node.end ?? 0,
       ...spread ? { spread: true } : {},
+      ...jsxAttributes?.length ? { jsxAttributes } : {},
       ...arm ? { branchArm: arm } : {}
     };
     elements.push(el);
@@ -42010,11 +42024,15 @@ var rgaa_default = {
           "axe:aria-roles",
           "axe:aria-valid-attr",
           "axe:aria-valid-attr-value",
+          "axe:button-name",
+          "axe:input-button-name",
           "axe:nested-interactive",
           "axe:presentation-role-conflict",
+          "button-empty-name",
           "cross-prop-drilled-name-lost",
           "disabled-context-content",
           "invalid-aria-role",
+          "label-in-name-mismatch",
           "menuitem-empty-name",
           "nested-interactive",
           "presentational-children-focusable",
@@ -42023,7 +42041,7 @@ var rgaa_default = {
       },
       automation: {
         tests: {
-          "1": "judgment",
+          "1": "static",
           "2": "judgment",
           "3": "static"
         },
@@ -42101,6 +42119,18 @@ var rgaa_default = {
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
+            id: "axe:button-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:input-button-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
             id: "axe:nested-interactive",
             tests: ["1", "2", "3"],
             effect: "candidate",
@@ -42111,6 +42141,12 @@ var rgaa_default = {
             tests: ["1", "2", "3"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "button-empty-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
           },
           {
             id: "cross-prop-drilled-name-lost",
@@ -42131,8 +42167,14 @@ var rgaa_default = {
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
-            id: "menuitem-empty-name",
+            id: "label-in-name-mismatch",
             tests: ["3"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "menuitem-empty-name",
+            tests: ["1"],
             effect: "decisive-nc",
             rationale: "The observed failure exhausts the cited RGAA test."
           },
@@ -42493,7 +42535,8 @@ var rgaa_default = {
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           }
-        ]
+        ],
+        completeBySilence: true
       }
     },
     {
@@ -44185,14 +44228,7 @@ var rgaa_default = {
       particularCases: ["Pour le test 11.9.2, voir cas particuliers crit\xE8re 11.2."],
       wcag: ["2.5.3", "4.1.2"],
       appliesTo: {
-        ruleIds: [
-          "axe:button-name",
-          "axe:input-button-name",
-          "button-empty-name",
-          "cross-icon-only-unnamed",
-          "icon-only-control-unnamed",
-          "label-in-name-mismatch"
-        ]
+        ruleIds: ["cross-icon-only-unnamed", "form-button-empty-name", "form-label-in-name-mismatch", "icon-only-control-unnamed"]
       },
       automation: {
         tests: {
@@ -44201,40 +44237,28 @@ var rgaa_default = {
         },
         rules: [
           {
-            id: "axe:button-name",
-            tests: ["1"],
-            effect: "decisive-nc",
-            rationale: "The observed failure exhausts the cited RGAA test."
-          },
-          {
-            id: "axe:input-button-name",
-            tests: ["1"],
-            effect: "decisive-nc",
-            rationale: "The observed failure exhausts the cited RGAA test."
-          },
-          {
-            id: "button-empty-name",
-            tests: ["1"],
-            effect: "decisive-nc",
-            rationale: "The observed failure exhausts the cited RGAA test."
-          },
-          {
             id: "cross-icon-only-unnamed",
             tests: ["1"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
+            id: "form-button-empty-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "form-label-in-name-mismatch",
+            tests: ["2"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
             id: "icon-only-control-unnamed",
             tests: ["1"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
-          },
-          {
-            id: "label-in-name-mismatch",
-            tests: ["2"],
-            effect: "decisive-nc",
-            rationale: "The observed failure exhausts the cited RGAA test."
           }
         ]
       }
@@ -47629,14 +47653,22 @@ function harvestSubjects(ids, docs) {
 
 // src/name.ts
 var collapse = (s) => s.replace(/\s+/g, " ").trim();
+var BUTTON_INPUT = /* @__PURE__ */ new Set(["button", "submit", "reset"]);
+function isButtonInput(el) {
+  return el.tag === "input" && BUTTON_INPUT.has((attr(el, "type") ?? "text").trim().toLowerCase());
+}
 function mayInjectContent(el) {
   return descendants(el).some((d) => d.tag === "slot" || d.tag !== "#fragment" && !isIntrinsic(d.tag));
 }
 var HIDDEN_STYLE = /(^|;)\s*(display\s*:\s*none|visibility\s*:\s*(hidden|collapse))\s*(;|$)/i;
+function isLocallyDisplayHidden(el) {
+  const hidden = attr(el, "hidden");
+  const staticallyHidden = hidden !== void 0 && !hidden.includes("{");
+  return staticallyHidden || HIDDEN_STYLE.test(attr(el, "style") ?? "");
+}
 function isDisplayHidden(el) {
   for (const node of [el, ...ancestors(el)]) {
-    if (hasAttr(node, "hidden")) return true;
-    if (HIDDEN_STYLE.test(attr(node, "style") ?? "")) return true;
+    if (isLocallyDisplayHidden(node)) return true;
   }
   return false;
 }
@@ -47655,13 +47687,14 @@ function embeddedImageName(n, doc) {
   if (labelled) return doc ? ariaLabelledbyText(n, doc) || labelled : labelled;
   return (boundAttr(n, "aria-label") ?? attr(n, "alt") ?? attr(n, "title") ?? "").trim();
 }
-function nameFromContent(el, doc) {
+function nameFromContent(el, doc, includeHiddenSubtree = false) {
   let out2 = "";
   const walk3 = (n) => {
     if (n.type === "text") {
       out2 += n.data;
       return;
     }
+    if (!includeHiddenSubtree && (isLocallyDisplayHidden(n) || attr(n, "aria-hidden") === "true")) return;
     if (n.tag === "img") {
       const a = embeddedImageName(n, doc);
       if (a) out2 += " " + a;
@@ -47669,13 +47702,46 @@ function nameFromContent(el, doc) {
     }
     if (n.tag === "svg") {
       const title2 = descendants(n).find((d) => d.tag === "title");
-      if (title2) out2 += " " + nameFromContent(title2, doc);
+      if (title2 && (includeHiddenSubtree || !isLocallyDisplayHidden(title2) && attr(title2, "aria-hidden") !== "true")) {
+        out2 += " " + nameFromContent(title2, doc, includeHiddenSubtree);
+      }
       return;
     }
-    if (attr(n, "aria-hidden") === "true") return;
     for (const c2 of n.children) walk3(c2);
   };
   for (const c2 of el.children) walk3(c2);
+  return collapse(out2);
+}
+function visibleLabelText(el) {
+  let out2 = "";
+  const nonText = /* @__PURE__ */ new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img"]);
+  const walk3 = (n) => {
+    if (n.type === "text") {
+      out2 += n.data;
+      return;
+    }
+    if (isLocallyDisplayHidden(n) || attr(n, "aria-hidden") === "true" || nonText.has(n.tag)) return;
+    for (const child of n.children) walk3(child);
+  };
+  for (const child of el.children) walk3(child);
+  if (isButtonInput(el)) {
+    const value = (attr(el, "value") ?? "").trim();
+    if (value && !value.includes("{")) out2 += ` ${value}`;
+  }
+  return collapse(out2);
+}
+function visuallyRenderedText(el) {
+  let out2 = "";
+  const nonText = /* @__PURE__ */ new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img"]);
+  const walk3 = (n) => {
+    if (n.type === "text") {
+      out2 += n.data;
+      return;
+    }
+    if (isLocallyDisplayHidden(n) || nonText.has(n.tag)) return;
+    for (const child of n.children) walk3(child);
+  };
+  for (const child of el.children) walk3(child);
   return collapse(out2);
 }
 function ariaLabelledbyText(el, doc) {
@@ -47684,11 +47750,10 @@ function ariaLabelledbyText(el, doc) {
   const parts2 = [];
   for (const id of ids.split(/\s+/).filter(Boolean)) {
     const ref = doc.byId.get(id);
-    if (ref) parts2.push(nameFromContent(ref) || (attr(ref, "aria-label") ?? "").trim());
+    if (ref) parts2.push(nameFromContent(ref, doc, isHiddenFromAT(ref)) || (attr(ref, "aria-label") ?? "").trim());
   }
   return collapse(parts2.join(" "));
 }
-var BUTTON_INPUT = /* @__PURE__ */ new Set(["button", "submit", "reset"]);
 var NAMELESS_BY_DEFAULT = /* @__PURE__ */ new Set(["submit", "reset"]);
 function accessibleName(el, doc) {
   const labelledby = ariaLabelledbyText(el, doc);
@@ -47701,6 +47766,7 @@ function accessibleName(el, doc) {
   }
   if (el.tag === "input") {
     const type = (attr(el, "type") ?? "text").toLowerCase();
+    if (type === "image") return (boundAttr(el, "alt") ?? attr(el, "title") ?? "").trim();
     if (BUTTON_INPUT.has(type)) {
       const value = (attr(el, "value") ?? "").trim();
       if (value) return value;
@@ -48474,7 +48540,7 @@ var menuitemEmptyName = {
   criteria: ["4.1.2"],
   severity: "bloquant",
   run(doc) {
-    return doc.elements.filter((el) => ["menuitem", "menuitemcheckbox", "menuitemradio"].includes((attr(el, "role") ?? "").trim().toLowerCase())).filter((el) => !isHiddenFromAT(el) && !mayInjectContent(el) && accessibleName(el, doc).trim() === "").map((el) => ({ criteriaId: "4.1.2", el, msgId: "menuitem-empty-name" }));
+    return doc.elements.filter((el) => ["menuitem", "menuitemcheckbox", "menuitemradio"].includes((attr(el, "role") ?? "").trim().toLowerCase())).filter((el) => !isHiddenFromAT(el) && !hasDynamicSpread(el) && !mayInjectContent(el) && accessibleName(el, doc).trim() === "").map((el) => ({ criteriaId: "4.1.2", el, msgId: "menuitem-empty-name" }));
   }
 };
 var nestedInteractive = {
@@ -48725,6 +48791,9 @@ function titleSetByFramework(doc) {
 function declaredLanguage(el) {
   return (attr(el, "lang") ?? "").trim() || (attr(el, "xml:lang") ?? "").trim();
 }
+function spreadMayDeclareLanguage(el) {
+  return dynamicSpreadMayProvide(el, ["lang", "xml:lang"]);
+}
 var htmlLangMissing = {
   id: "html-lang-missing",
   criteria: ["3.1.1"],
@@ -48735,6 +48804,7 @@ var htmlLangMissing = {
     if (!html) return [];
     const lang = declaredLanguage(html);
     if (lang) return [];
+    if (spreadMayDeclareLanguage(html)) return [];
     return [
       {
         criteriaId: "3.1.1",
@@ -48753,6 +48823,7 @@ var documentLanguageMissing = {
     const html = elementsByTag(doc, "html")[0];
     if (!html) return [];
     if (declaredLanguage(html)) return [];
+    if (spreadMayDeclareLanguage(html)) return [];
     const ignored = /* @__PURE__ */ new Set(["script", "style", "title", "noscript", "template", "svg"]);
     const uncovered = doc.elements.find((el) => {
       if (ignored.has(el.tag) || isDisplayHidden(el)) return false;
@@ -49355,9 +49426,27 @@ function hasIconChild(el) {
 var isButton = (el) => {
   if (el.tag === "button") return true;
   if ((attr(el, "role") ?? "") === "button") return true;
-  if (el.tag === "input") return (attr(el, "type") ?? "").toLowerCase() === "button";
+  if (el.tag === "input") return isButtonInput(el) || (attr(el, "type") ?? "").trim().toLowerCase() === "image";
   return false;
 };
+function formOwner(el, doc) {
+  const literal = attr(el, "form");
+  if (literal === void 0 && hasBoundAttr(el, "form")) return void 0;
+  if (literal !== void 0) {
+    const explicit = literal.trim();
+    if (explicit.includes("{")) return void 0;
+    if (!explicit) return null;
+    const owner = doc.byId.get(explicit);
+    return owner?.tag === "form" ? owner : null;
+  }
+  return ancestors(el).find((ancestor) => ancestor.tag === "form") ?? null;
+}
+function isFormButton(el, doc) {
+  if (!isButton(el)) return false;
+  const role = (attr(el, "role") ?? "").trim().toLowerCase();
+  if (role && role !== "button") return false;
+  return formOwner(el, doc)?.tag === "form";
+}
 var linkEmptyName = {
   id: "link-empty-name",
   criteria: ["2.4.4"],
@@ -49379,26 +49468,34 @@ var linkEmptyName = {
     return out2;
   }
 };
+function emptyButtonFindings(doc, formSpecific) {
+  const out2 = [];
+  for (const el of doc.elements) {
+    if (!isButton(el)) continue;
+    if (isFormButton(el, doc) !== formSpecific) continue;
+    if (isNameExempt(el)) continue;
+    if (accessibleName(el, doc) !== "") continue;
+    if (mayInjectContent(el)) continue;
+    if (hasIconChild(el)) continue;
+    out2.push({
+      criteriaId: "4.1.2",
+      el,
+      msgId: "button-empty-name"
+    });
+  }
+  return out2;
+}
 var buttonEmptyName = {
   id: "button-empty-name",
   criteria: ["4.1.2"],
   severity: "bloquant",
-  run(doc) {
-    const out2 = [];
-    for (const el of doc.elements) {
-      if (!isButton(el)) continue;
-      if (isNameExempt(el)) continue;
-      if (accessibleName(el, doc) !== "") continue;
-      if (mayInjectContent(el)) continue;
-      if (hasIconChild(el)) continue;
-      out2.push({
-        criteriaId: "4.1.2",
-        el,
-        msgId: "button-empty-name"
-      });
-    }
-    return out2;
-  }
+  run: (doc) => emptyButtonFindings(doc, false)
+};
+var formButtonEmptyName = {
+  id: "form-button-empty-name",
+  criteria: ["4.1.2"],
+  severity: "bloquant",
+  run: (doc) => emptyButtonFindings(doc, true)
 };
 var iconOnlyControlUnnamed = {
   id: "icon-only-control-unnamed",
@@ -49439,7 +49536,9 @@ var controlNameTitleOnly = {
       if (!title2 || title2.includes("{")) continue;
       if (hasAttr(el, "aria-label") || hasAttr(el, "aria-labelledby")) continue;
       if (mayInjectContent(el)) continue;
+      if (el.tag === "input" && (attr(el, "type") ?? "").trim().toLowerCase() === "image" && (boundAttr(el, "alt") ?? "").trim()) continue;
       if (el.tag === "input" && (attr(el, "value") ?? "").trim()) continue;
+      if (el.tag === "input" && ["submit", "reset"].includes((attr(el, "type") ?? "").trim().toLowerCase())) continue;
       if (field && controlLabel(el, doc).via !== "title") continue;
       const hasContentName = visibleText(el).trim() !== "" || descendants(el).some(
         (d) => d.tag === "img" && (attr(d, "alt") ?? "").trim() !== "" || d.tag === "svg" && descendants(d).some((x) => x.tag === "title" && visibleText(x).trim() !== "")
@@ -49456,39 +49555,55 @@ var controlNameTitleOnly = {
   }
 };
 var normalizeName = (s) => s.toLowerCase().replace(/[\u2018\u2019\u201c\u201d]/g, "'").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+function labelInNameMismatchFindings(doc, formSpecific) {
+  const out2 = [];
+  for (const el of doc.elements) {
+    if (!isIntrinsic(el.tag)) continue;
+    const link = el.tag === "a" && hasAttr(el, "href");
+    const role = (attr(el, "role") ?? "").trim().toLowerCase();
+    if (!link && !isButton(el) && !["button", "link", "menuitem", "tab", "checkbox", "radio", "switch"].includes(role)) continue;
+    if (isFormButton(el, doc) !== formSpecific) continue;
+    if (isNameExempt(el)) continue;
+    const ariaLabel = (attr(el, "aria-label") ?? "").trim();
+    if (!ariaLabel || ariaLabel.includes("{")) continue;
+    if (hasAttr(el, "aria-labelledby")) continue;
+    const visible2 = visibleLabelText(el);
+    if (!visible2 || visible2.includes("{")) continue;
+    if (visible2.length < 3) continue;
+    if (mayInjectContent(el)) continue;
+    const name2 = normalizeName(ariaLabel);
+    const label = normalizeName(visible2);
+    if (!label || !name2 || name2.includes(label)) continue;
+    out2.push({
+      criteriaId: "2.5.3",
+      el,
+      msgId: "label-in-name-mismatch",
+      params: { visible: visible2, name: ariaLabel }
+    });
+  }
+  return out2;
+}
 var labelInNameMismatch = {
   id: "label-in-name-mismatch",
   criteria: ["2.5.3"],
   severity: "majeur",
-  run(doc) {
-    const out2 = [];
-    for (const el of doc.elements) {
-      if (!isIntrinsic(el.tag)) continue;
-      const link = el.tag === "a" && hasAttr(el, "href");
-      const role = (attr(el, "role") ?? "").trim().toLowerCase();
-      if (!link && !isButton(el) && !["button", "link", "menuitem", "tab", "checkbox", "radio", "switch"].includes(role)) continue;
-      if (isNameExempt(el)) continue;
-      const ariaLabel = (attr(el, "aria-label") ?? "").trim();
-      if (!ariaLabel || ariaLabel.includes("{")) continue;
-      if (hasAttr(el, "aria-labelledby")) continue;
-      const visible2 = visibleText(el).trim();
-      if (!visible2 || visible2.includes("{")) continue;
-      if (visible2.length < 3) continue;
-      if (mayInjectContent(el)) continue;
-      const name2 = normalizeName(ariaLabel);
-      const label = normalizeName(visible2);
-      if (!label || !name2 || name2.includes(label)) continue;
-      out2.push({
-        criteriaId: "2.5.3",
-        el,
-        msgId: "label-in-name-mismatch",
-        params: { visible: visible2, name: ariaLabel }
-      });
-    }
-    return out2;
-  }
+  run: (doc) => labelInNameMismatchFindings(doc, false)
 };
-var linksRules = [linkEmptyName, buttonEmptyName, iconOnlyControlUnnamed, controlNameTitleOnly, labelInNameMismatch];
+var formLabelInNameMismatch = {
+  id: "form-label-in-name-mismatch",
+  criteria: ["2.5.3"],
+  severity: "majeur",
+  run: (doc) => labelInNameMismatchFindings(doc, true)
+};
+var linksRules = [
+  linkEmptyName,
+  buttonEmptyName,
+  formButtonEmptyName,
+  iconOnlyControlUnnamed,
+  controlNameTitleOnly,
+  labelInNameMismatch,
+  formLabelInNameMismatch
+];
 
 // src/autofill.ts
 var AUTOFILL_FIELD_NAMES = /* @__PURE__ */ new Set([
@@ -49840,6 +49955,18 @@ var GROUPING_ROLES = /* @__PURE__ */ new Set(["radiogroup", "group"]);
 function inGroupingContext(el) {
   return ancestors(el).some((a) => a.tag === "fieldset" || GROUPING_ROLES.has((attr(a, "role") ?? "").trim().toLowerCase()));
 }
+function formOwner2(el, doc) {
+  const literal = attr(el, "form");
+  if (literal === void 0 && hasBoundAttr(el, "form")) return void 0;
+  if (literal !== void 0) {
+    const explicit = literal.trim();
+    if (explicit.includes("{")) return void 0;
+    if (!explicit) return null;
+    const owner = doc.byId.get(explicit);
+    return owner?.tag === "form" ? owner : null;
+  }
+  return ancestors(el).find((ancestor) => ancestor.tag === "form") ?? null;
+}
 function isSubmitControl(el) {
   if (el.tag === "button") return (attr(el, "type") ?? "submit").trim().toLowerCase() !== "button";
   if (el.tag === "input") return ["submit", "reset"].includes((attr(el, "type") ?? "").trim().toLowerCase());
@@ -49882,22 +50009,25 @@ var radioCheckboxGroupUngrouped = {
       if (type !== "radio" && type !== "checkbox") continue;
       const name2 = (attr(el, "name") ?? "").trim();
       if (!name2 || name2.includes("{")) continue;
-      const key2 = `${type}::${name2}`;
+      const owner = formOwner2(el, doc);
+      if (owner === void 0) continue;
+      const key2 = `${type}::${name2}::${owner ? owner.start : "none"}`;
       const list = groups.get(key2);
       if (list) list.push(el);
       else groups.set(key2, [el]);
     }
     const out2 = [];
-    for (const [key2, members] of groups) {
+    for (const members of groups.values()) {
       if (members.length < 2) continue;
       if (members.some(hasDynamicSpread)) continue;
       if (members.some(inGroupingContext)) continue;
-      const type = key2.slice(0, key2.indexOf("::"));
+      const type = (attr(members[0], "type") ?? "").trim().toLowerCase();
+      const name2 = (attr(members[0], "name") ?? "").trim();
       out2.push({
         criteriaId: "1.3.1",
         el: members[0],
         msgId: "radio-checkbox-group-ungrouped",
-        params: { type, name: key2.slice(key2.indexOf("::") + 2), count: members.length }
+        params: { type, name: name2, count: members.length }
       });
     }
     return out2;
@@ -50317,6 +50447,13 @@ var cssGeneratedContentInformative = {
     return out2;
   }
 };
+var INPUTS_WITHOUT_TEXT = /* @__PURE__ */ new Set(["hidden", "checkbox", "radio", "range", "color", "file", "image", "button"]);
+function hasRelevantText(el) {
+  if (visuallyRenderedText(el)) return true;
+  if (el.tag === "input") return !INPUTS_WITHOUT_TEXT.has((attr(el, "type") ?? "text").trim().toLowerCase());
+  if (el.tag === "textarea") return true;
+  return false;
+}
 function spacingImportantRule(id, property, minimum) {
   return {
     id,
@@ -50328,6 +50465,7 @@ function spacingImportantRule(id, property, minimum) {
       const declaration = new RegExp(`(?:^|;)\\s*${escaped}\\s*:\\s*([^;!]+)\\s*!important(?=\\s*;|$)`, "gi");
       for (const el of doc.elements) {
         if (["script", "style", "svg", "canvas", "video", "img"].includes(el.tag) || isDisplayHidden(el)) continue;
+        if (!hasRelevantText(el)) continue;
         const style = attr(el, "style") ?? "";
         const chainStyles = [el, ...ancestors(el)].map((node) => (attr(node, "style") ?? "").toLowerCase());
         if (chainStyles.some((value2) => /(?:^|;)\s*(?:left|right|top|bottom)\s*:\s*-\d+(?:px|em|rem)/.test(value2))) continue;
@@ -51824,6 +51962,7 @@ function newAccum() {
   return {
     byCriterion: /* @__PURE__ */ new Map(),
     applicable: /* @__PURE__ */ new Map(),
+    uncertainStatic: /* @__PURE__ */ new Map(),
     allFindings: [],
     packFindings: [],
     fileCount: 0,
@@ -51871,6 +52010,18 @@ function foldDoc(acc, doc, graph) {
   }
   for (const [id, pred] of STATIC_PREDS) {
     if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
+  }
+  const htmlRoot = elementsByTag(doc, "html")[0];
+  const lang = htmlRoot ? (attr(htmlRoot, "lang") ?? "").trim() : "";
+  const xmlLang = htmlRoot ? (attr(htmlRoot, "xml:lang") ?? "").trim() : "";
+  const languageSpreadMayApply = htmlRoot && dynamicSpreadMayProvide(htmlRoot, ["lang", "xml:lang"]);
+  const languagePinnedAfterSpread = htmlRoot && (Boolean(lang) && !dynamicSpreadMayProvide(htmlRoot, ["lang"]) || Boolean(xmlLang) && !dynamicSpreadMayProvide(htmlRoot, ["xml:lang"]));
+  const languageMayRemainDynamic = languageSpreadMayApply && !(lang || xmlLang ? languagePinnedAfterSpread : false);
+  if (htmlRoot && languageMayRemainDynamic) {
+    acc.uncertainStatic.set(
+      "3.1.1",
+      "The page language may be supplied or overridden by a dynamic spread on <html>; inspect the rendered element or the spread value before deciding conformity."
+    );
   }
   for (const [id, pred] of SUBJECT_PREDS) {
     if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
@@ -52066,6 +52217,10 @@ function finalize(acc, inputs, extra = {}) {
         justification = "No element in scope is concerned by this success criterion \u2014 nothing contradicts it, and nothing of that kind exists here.";
       } else if (normativeFs.length > 0) {
         status = "NC";
+      } else if (acc.uncertainStatic.has(c2.sc)) {
+        status = "manual";
+        justification = acc.uncertainStatic.get(c2.sc);
+        residualRisks.push({ criteriaId: c2.sc, reason: justification, automatability: c2.automatability });
       } else {
         status = "C";
       }
@@ -56737,7 +56892,7 @@ import { join as join31 } from "path";
 // src/standards/derive.ts
 function isProvisionalJudgmentInapplicable(result, criterion) {
   if (result.status !== INAPPLICABLE_STATUS || result.inapplicable !== true || result.decidedBy === "agent") return false;
-  return Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
+  return result.judgment === true || Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
 }
 function aggregate2(results) {
   if (results.some((r) => r.status === "NC")) return "NC";
@@ -56762,7 +56917,7 @@ function packCriteriaForFinding(pack, finding) {
   }).map((pc) => pc.id);
 }
 function packConformancePct(derived) {
-  const c2 = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent").length;
+  const c2 = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent" && !isProvisionalJudgmentInapplicable(d)).length;
   const nc = derived.filter((d) => d.status === "NC").length;
   return c2 + nc === 0 ? 100 : Math.round(c2 / (c2 + nc) * 100);
 }
@@ -56898,7 +57053,8 @@ function derivePackResults(audit2, packKey, pageId) {
     }
     const base = judgmentGuard(deriveBase(pc), pc);
     const derived = enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
-    return measuredRescue(derived, pc, cov, ran, pageId);
+    const measured = measuredRescue(derived, pc, cov, ran, pageId);
+    return isProvisionalJudgmentInapplicable(measured, pc) ? { ...measured, judgment: true } : measured;
   });
 }
 function findingsForStandard(audit2, standard) {
@@ -57758,7 +57914,7 @@ function toRuleOnSection(r, standard, lang) {
   if (isCore(standard)) return [];
   const s = L2[lang];
   const pack = loadPack(standard);
-  const manual = derivePackResults(r, standard).filter((pc) => pc.status === "manual");
+  const manual = derivePackResults(r, standard).filter((pc) => pc.status === "manual" || isProvisionalJudgmentInapplicable(pc));
   if (!manual.length) return [];
   const out2 = [`## ${s.toRuleOn} (${manual.length})`, "", `> ${s.toRuleOnNote}`, ""];
   for (const pc of manual) {
@@ -60483,7 +60639,7 @@ var M = {
     na: (id) => `Crit\xE8re NA sans justification : ${id}.`,
     rateMissing: "Taux de r\xE9ussite absent de l'en-t\xEAte du rapport.",
     rateRange: (v) => `Taux de r\xE9ussite hors bornes (0\u2013100) : ${v}%.`,
-    rateInconsistent: (v, expected, c2, nc) => `Taux de r\xE9ussite incoh\xE9rent avec la synth\xE8se : l'en-t\xEAte indique ${v}% alors que C \xF7 (C+NC) = ${c2} \xF7 ${c2 + nc} = ${expected}%.`,
+    rateInconsistent: (v, expected, c2, nc) => `Taux de r\xE9ussite incoh\xE9rent avec la synth\xE8se : l'en-t\xEAte indique ${v}% alors que C automatique \xF7 (C automatique+NC) = ${c2} \xF7 ${c2 + nc} = ${expected}%.`,
     overProject: (id) => `Crit\xE8re sur-projet\xE9 : ${id} est marqu\xE9 non conforme dans le rapport mais l'audit ne le d\xE9rive pas comme NC (\xE9l\xE9ment hors p\xE9rim\xE8tre du crit\xE8re).`,
     underProject: (id) => `Crit\xE8re absent : l'audit d\xE9rive ${id} comme non conforme mais le rapport ne le pr\xE9sente pas.`,
     semanticMissing: (p) => `Gate s\xE9mantique : aucun artefact de verdicts trouv\xE9 (${p}). G\xE9n\xE9rez la worklist (\`verify --report <md>\`), statuez, puis relancez \u2014 ou passez \`--verdicts <fichier>\`.`,
@@ -60498,7 +60654,7 @@ var M = {
     na: (id) => `NA criterion without a justification: ${id}.`,
     rateMissing: "Pass rate missing from the report header.",
     rateRange: (v) => `Pass rate out of range (0\u2013100): ${v}%.`,
-    rateInconsistent: (v, expected, c2, nc) => `Pass rate inconsistent with the synthesis table: header says ${v}% but C \xF7 (C+NC) = ${c2} \xF7 ${c2 + nc} = ${expected}%.`,
+    rateInconsistent: (v, expected, c2, nc) => `Pass rate inconsistent with the synthesis table: header says ${v}% but automatic C \xF7 (automatic C+NC) = ${c2} \xF7 ${c2 + nc} = ${expected}%.`,
     overProject: (id) => `Over-projected criterion: ${id} is marked non-conformant in the report but the audit does not derive it as NC (element outside the criterion's scope).`,
     underProject: (id) => `Missing criterion: the audit derives ${id} as non-conformant but the report does not present it.`,
     semanticMissing: (p) => `Semantic gate: no verdicts artifact found (${p}). Generate the worklist (\`verify --report <md>\`), adjudicate it, then re-run \u2014 or pass \`--verdicts <file>\`.`,
@@ -60553,10 +60709,11 @@ function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
   } else {
     const pct2 = parseFloat(rateM[1].replace(",", "."));
     if (pct2 < 0 || pct2 > 100) issues.push(s.rateRange(rateM[1]));
-    else if (core && !perPage) {
+    else if (!perPage) {
       const totals = synthesisTotals(md);
       if (totals) {
-        const { c: c2, nc } = totals;
+        const { nc } = totals;
+        const c2 = Math.max(0, totals.c - agentConformities(md));
         const expected = c2 + nc === 0 ? 100 : Math.round(c2 / (c2 + nc) * 100);
         if (Math.abs(pct2 - expected) > 1) issues.push(s.rateInconsistent(rateM[1], expected, c2, nc));
       }
@@ -60637,6 +60794,15 @@ function synthesisTotals(md) {
   if (!m) return null;
   return { c: Number.parseInt(m[1], 10), nc: Number.parseInt(m[2], 10) };
 }
+function agentConformities(md) {
+  let count = 0;
+  for (const line of md.split("\n")) {
+    if (!line.startsWith("|")) continue;
+    const cells = line.slice(1, line.endsWith("|") ? -1 : void 0).split("|").map((cell2) => cell2.trim());
+    if (cells.length === 4 && (cells[1] === "C" || cells[1] === "NA") && (cells[3] === "AI" || cells[3] === "IA")) count++;
+  }
+  return count;
+}
 function sectionBody(md, n) {
   const start2 = new RegExp(`^##\\s+${n}\\.`, "m").exec(md);
   if (!start2) return "";
@@ -60700,7 +60866,17 @@ function isUndecidedFile(v) {
 }
 function checkDecided(audit2, standard = CORE2, lang = "en", opts = {}) {
   const fr = lang === "fr";
-  const rows = isCore(standard) ? audit2.criteria.map((c2) => ({ id: c2.id, status: c2.status, decidedBy: c2.decidedBy })) : derivePackResults(audit2, standard).map((c2) => ({ id: c2.id, status: c2.status, decidedBy: c2.decidedBy }));
+  const rows = isCore(standard) ? audit2.criteria.map((c2) => ({ id: c2.id, status: c2.status, decidedBy: c2.decidedBy })) : (() => {
+    const activePack = loadPack(standard);
+    return derivePackResults(audit2, standard).map((c2) => ({
+      id: c2.id,
+      // Subject absence is evidence for adjudicating a judgment criterion, not a verdict.
+      // `verify` and every report surface already keep this shape open; the completeness
+      // gate must ask the same question or it under-reports the residual work.
+      status: isProvisionalJudgmentInapplicable(c2, getCriterion(activePack, c2.id)) ? "manual" : c2.status,
+      decidedBy: c2.decidedBy
+    }));
+  })();
   const issues = [];
   const declared = /* @__PURE__ */ new Map();
   for (const e of opts.allow?.entries ?? []) {
@@ -62882,6 +63058,10 @@ function apiKeyFromEnv() {
 function modelFromEnv() {
   return process.env.ULTRA11Y_LLM_MODEL?.trim() || DEFAULT_MODEL;
 }
+function isProviderUnavailableError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /(?:api status|http)\s*(?:429|5\d\d)|\b429\b.*rate.?limit|rate.?limit|overload|service unavailable/i.test(message);
+}
 var VERDICT_TOOL = {
   name: "record_verdicts",
   description: "Record one verdict per criterion presented. Never invent a criterion that was not presented. A criterion you cannot decide from the evidence stays `manual` with a reason \u2014 that is a correct answer, not a failure.",
@@ -63033,9 +63213,13 @@ async function judgeAll(batches, opts) {
   const queue = [...batches];
   const backend = opts.backend ?? judgeBatch;
   const lanes = Math.max(1, opts.concurrency ?? CONCURRENCY);
+  let aborted = false;
   await Promise.all(
     Array.from({ length: Math.min(lanes, queue.length) }, async () => {
-      for (let b = queue.shift(); b !== void 0; b = queue.shift()) {
+      for (; ; ) {
+        if (aborted) return;
+        const b = queue.shift();
+        if (b === void 0) return;
         try {
           const landed = await backend(b.items, b.prompt, opts);
           const checked = validateBatchVerdicts(b.items, landed);
@@ -63044,11 +63228,13 @@ async function judgeAll(batches, opts) {
           if (checked.accepted.length) opts.onVerdicts?.(checked.accepted);
         } catch (e) {
           failures.push(e instanceof Error ? e.message : String(e));
+          if (opts.abortOnError?.(e)) aborted = true;
         }
         opts.onProgress?.(++done, batches.length);
       }
     })
   );
+  if (aborted && queue.length) failures.push(`provider unavailable \u2014 stopped before ${queue.length} remaining batch(es)`);
   return { verdicts, failures };
 }
 function applyRawVerdicts(items, verdicts) {
@@ -64223,7 +64409,7 @@ function recomputeTallies2(merged) {
       manual: inG.filter((c2) => c2.status === "manual").length
     };
   });
-  const decided = merged.criteria.filter((c2) => c2.status === "C" || c2.status === "NC");
+  const decided = merged.criteria.filter((c2) => c2.status === "NC" || c2.status === "C" && c2.decidedBy !== "agent");
   const conform = decided.filter((c2) => c2.status === "C").length;
   merged.conformancePct = decided.length === 0 ? 100 : Math.round(conform / decided.length * 100);
   merged.findings.sort((a, b) => sevRank[b.severity] - sevRank[a.severity]);
@@ -64274,10 +64460,30 @@ import { resolve as resolve12 } from "path";
 var PRELUDE = `
 const __sel = (e) => {
   if (!e || !e.tagName) return '\u2014';
-  const t = e.tagName.toLowerCase();
-  if (e.id) return t + '#' + e.id;
-  const c = typeof e.className === 'string' ? e.className.trim().split(/\\s+/)[0] : '';
-  return c ? t + '.' + c : t;
+  const esc = (v) => (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(v) : String(v).replace(/[^a-zA-Z0-9_-]/g, '\\\\$&');
+  const unique = (s) => { try { return document.querySelectorAll(s).length === 1; } catch { return false; } };
+  const short = (n) => {
+    const t = n.tagName.toLowerCase();
+    if (n.id) return t + '#' + esc(n.id);
+    const c = typeof n.className === 'string' ? n.className.trim().split(/\\s+/)[0] : '';
+    return c ? t + '.' + esc(c) : t;
+  };
+  const first = short(e);
+  if (unique(first)) return first;
+  const parts = [];
+  for (let n = e; n && n.tagName; n = n.parentElement) {
+    let part = short(n);
+    if (n.id && unique(part)) { parts.unshift(part); return parts.join(' > '); }
+    const parent = n.parentElement;
+    if (parent) {
+      const same = Array.from(parent.children).filter((x) => x.tagName === n.tagName);
+      if (same.length > 1) part += ':nth-of-type(' + (same.indexOf(n) + 1) + ')';
+    }
+    parts.unshift(part);
+    const path = parts.join(' > ');
+    if (unique(path)) return path;
+  }
+  return parts.join(' > ') || first;
 };
 const __vis = (e) => {
   const r = e.getBoundingClientRect();
@@ -66421,19 +66627,23 @@ function packAuditDocument(input, packKey, lang) {
   const audit2 = unwrapAudit(input);
   const pack = loadPack(packKey);
   const derived = derivePackResults(audit2, packKey);
+  const provisionalNaReason = lang === "fr" ? "Aucun sujet d\xE9tect\xE9 par le moteur ; l'IA doit confirmer la non-applicabilit\xE9 de ce crit\xE8re de jugement." : "The engine detected no subject; the AI must confirm that this judgment criterion is not applicable.";
   const seen = /* @__PURE__ */ new Map();
   const criteria = derived.map((d) => {
     const pc = getCriterion(pack, d.id);
+    const provisionalNa = isProvisionalJudgmentInapplicable(d, pc);
     for (const f of d.findings) (seen.get(f) ?? seen.set(f, []).get(f)).push(d.id);
     return {
       id: d.id,
       theme: d.theme,
       title: pc ? titlePlain(pack, pc, lang) : d.id,
-      status: d.status,
+      // Subject absence is evidence for adjudicating a judgment criterion, not a verdict.
+      // Publish the same open row as the Markdown report, worklist and completeness gates.
+      status: provisionalNa ? "manual" : d.status,
       findings: d.findings.map((f) => packFinding(f, [d.id])),
-      ...d.justification ? { justification: d.justification } : {},
-      ...d.decidedBy ? { decidedBy: d.decidedBy } : {},
-      ...d.inapplicable ? { inapplicable: true } : {},
+      ...provisionalNa ? { justification: provisionalNaReason } : d.justification ? { justification: d.justification } : {},
+      ...d.decidedBy && !provisionalNa ? { decidedBy: d.decidedBy } : {},
+      ...d.inapplicable && !provisionalNa ? { inapplicable: true } : {},
       ...pc?.automation ? { automation: pc.automation } : {}
     };
   });
@@ -74184,12 +74394,16 @@ async function cmdRefute(p, todoPath) {
   };
   let spent = 0;
   let failed2 = 0;
+  let attempted = 0;
+  let providerUnavailable = false;
   const byN = new Map(items.map((it) => [it.n, it]));
   const queue = [...pending];
   const worker = async () => {
     for (; ; ) {
+      if (providerUnavailable) return;
       const item = queue.shift();
       if (!item) return;
+      attempted++;
       try {
         const verdicts = await (runner === "codex" ? refuteBatchCodex : refuteBatchCli)(
           [item],
@@ -74205,15 +74419,18 @@ async function cmdRefute(p, todoPath) {
         }
       } catch (e) {
         failed2++;
+        if (isProviderUnavailableError(e)) providerUnavailable = true;
         console.error(`ultra11y judge: item #${item.n} (${item.criteriaId}) \u2014 ${e instanceof Error ? e.message : String(e)}`);
       }
       writeFileSync21(todoPath, JSON.stringify(items, null, 2) + "\n");
     }
   };
   await Promise.all(Array.from({ length: Math.min(lanes, queue.length) }, worker));
+  if (providerUnavailable && queue.length)
+    console.error(`ultra11y judge: provider unavailable \u2014 stopped before ${queue.length} remaining item(s) instead of repeating the same failed request.`);
   const tally = (v) => items.filter((it) => (it.verdict ?? "").trim().toLowerCase() === v).length;
   console.log(
-    lang === "fr" ? `\u2713 ${pending.length - failed2}/${pending.length} entr\xE9e(s) mise(s) \xE0 l'\xE9preuve \u2192 ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})` : `\u2713 ${pending.length - failed2}/${pending.length} entry(ies) tried \u2192 ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`
+    lang === "fr" ? `\u2713 ${attempted - failed2}/${pending.length} entr\xE9e(s) mise(s) \xE0 l'\xE9preuve \u2192 ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})` : `\u2713 ${attempted - failed2}/${pending.length} entry(ies) tried \u2192 ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`
   );
   if (spent > 0) console.log(lang === "fr" ? `  ${spent.toFixed(4)} $ d\xE9pens\xE9(s).` : `  $${spent.toFixed(4)} spent.`);
   return failed2 ? 1 : 0;
@@ -74335,6 +74552,7 @@ async function cmdJudge(p) {
     // subscription turns reach provider limits faster. `--concurrency` overrides it for a
     // runner with room.
     concurrency: runner === "claude" || runner === "codex" ? cliConcurrency : void 0,
+    abortOnError: isProviderUnavailableError,
     maxBudgetUsd: Number.isFinite(maxBudgetUsd) ? maxBudgetUsd : void 0,
     effort,
     timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : void 0,
@@ -74802,7 +75020,7 @@ function diffAgainstExternal(p, result, scope, standard, lang, file) {
   const ours = /* @__PURE__ */ new Map();
   for (const page of derivePages(result, scope)) {
     const m = /* @__PURE__ */ new Map();
-    for (const c2 of derivePackResults(pageView(result, page), standard, page.id)) m.set(c2.id, c2.status);
+    for (const c2 of pageCriterionRows(result, page, standard, lang)) m.set(c2.id, c2.status);
     ours.set(page.id, m);
   }
   const d = diffSides({ byPage: ours }, sideOfExternal(ext2));
@@ -75100,7 +75318,8 @@ async function main(argv) {
     split: ["criterion", "page"],
     runtime: ["auto", "local", "docker"],
     provider: ["auto", "github", "gitlab", "jira"],
-    grain: ["criterion", "page", "page-criterion", "single", "file"],
+    // Union: tickets owns the tracker grains; judge additionally accepts batch.
+    grain: ["criterion", "page", "page-criterion", "single", "file", "batch"],
     // The union over every command that takes it: `mcp` serves stdio|http, `tickets`
     // picks cli|rest. Listing one command's values made the guard cry wolf on the other.
     transport: ["stdio", "http", "auto", "cli", "rest"]

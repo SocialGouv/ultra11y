@@ -3,9 +3,9 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AuditResult } from "../src/types.js";
-import { prdUnits, partitionUnits, renderBacklog, renderPerCriterion, renderPrdDoc, writePrd } from "../src/prd.js";
+import { prdUnits, partitionUnits, renderBacklog, renderPerCriterion, renderPrdDoc, toRuleOnSection, writePrd } from "../src/prd.js";
 import { runAudit } from "../src/audit.js";
-import { derivePackResults, packConformancePct } from "../src/standards/index.js";
+import { derivePackResults, isProvisionalJudgmentInapplicable, packConformancePct } from "../src/standards/index.js";
 
 const FIXTURES = new URL("./fixtures/", import.meta.url).pathname;
 
@@ -236,6 +236,13 @@ describe("PRD header rate uses the pack projection tally, not core conformancePc
     const expected = packConformancePct(derivePackResults(bad, "rgaa"));
     const doc = renderPrdDoc(bad, "fr", "rgaa");
     expect(doc).toMatch(new RegExp(`Taux de réussite automatique\\*\\* : ${expected}%`));
+  });
+
+  it("lists provisional judgment inapplicability among the criteria still to rule on", () => {
+    const derived = derivePackResults(bad, "rgaa");
+    const expected = derived.filter((row) => row.status === "manual" || isProvisionalJudgmentInapplicable(row)).length;
+    expect(expected).toBeGreaterThan(derived.filter((row) => row.status === "manual").length);
+    expect(toRuleOnSection(bad, "rgaa", "fr")[0]).toBe(`## Critères à trancher (${expected})`);
   });
 
   it("renderPrdDoc (core) is UNCHANGED — shows r.conformancePct", () => {

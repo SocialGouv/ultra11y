@@ -194,6 +194,68 @@ None.
     expect(r.issues).toHaveLength(0);
   });
 
+  it("gates pack arithmetic too — rejects the former 16% header beside C=0 / NC=21", () => {
+    const report = (pct: number) => `# Rapport d'audit d'accessibilité — RGAA 4.1.2
+- **Taux de réussite automatique** : ${pct}% (sous-ensemble décidable : C ÷ (C + NC))
+
+## 1. Synthèse par thématique
+| Thématique | C | NC | NA | À évaluer |
+|---|---|---|---|---|
+| 1. Images | 0 | 21 | 0 | 85 |
+| **Total** | **0** | **21** | **0** | **85** |
+
+## 2. Non-conformités (par priorité)
+Aucune.
+
+## 3. Critères conformes (C)
+Aucun.
+
+## 4. Critères conformes faute de sujet
+Aucun.
+
+## 5. Critères à adjuger
+85 critères restent à trancher.
+`;
+
+    const broken = checkReport(report(16), "rgaa", "fr");
+    expect(broken.ok).toBe(false);
+    expect(broken.issues.join("\n")).toMatch(/16%.*0.*21.*0%/);
+    expect(checkReport(report(0), "rgaa", "fr").ok).toBe(true);
+  });
+
+  it("excludes agent conformities from a pack report's automatic rate", () => {
+    const report = (pct: number) => `# Rapport d'audit d'accessibilité — RGAA 4.1.2
+- **Taux de réussite automatique** : ${pct}% (sous-ensemble décidable : C automatique ÷ (C automatique + NC))
+
+## Grille exhaustive
+| Critère | Statut | Automatisation | Décidé par |
+| --- | :---: | :---: | --- |
+| RGAA 1.1 — Image | C | 1 / 0 / 0 | moteur |
+| RGAA 2.1 — Cadre | C | 0 / 0 / 1 | IA |
+| RGAA 3.1 — Couleur | NC | 1 / 0 / 0 | moteur |
+
+## 1. Synthèse par thématique
+| Thématique | C | NC | NA | À évaluer |
+|---|---|---|---|---|
+| 1. Images | 2 | 1 | 0 | 0 |
+| **Total** | **2** | **1** | **0** | **0** |
+
+## 2. Non-conformités (par priorité)
+Aucune.
+## 3. Critères conformes (C)
+- RGAA 1.1 — Image
+### Critères conformes adjugés par l'IA
+- RGAA 2.1 — Cadre
+## 4. Critères conformes faute de sujet
+Aucun.
+## 5. Critères à adjuger
+Aucun.
+`;
+
+    expect(checkReport(report(50), "rgaa", "fr").ok).toBe(true);
+    expect(checkReport(report(67), "rgaa", "fr").issues.join("\n")).toMatch(/67%.*1.*2.*50%/);
+  });
+
   it("gates a derived pack report against the pack's own 2-segment ids", () => {
     const rgaaReport = `# Rapport — RGAA 4.1.2
 - **Taux** : 50%

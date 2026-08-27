@@ -31,6 +31,7 @@ const SEED: Record<string, string> = {
   "on-input-context-change": `<main><form><label for="ch">Country</label><select id="ch" onchange="this.form.submit()"><option>FR</option></select></form></main>`,
   // 2.5.3 label in name
   "label-in-name-mismatch": `<main><button aria-label="Submit">Send now</button></main>`,
+  "form-label-in-name-mismatch": `<main><form><button aria-label="Submit">Send now</button></form></main>`,
   // images (1.1.1)
   "img-alt-missing": `<main><img src="x.png"></main>`,
   "input-image-alt-missing": `<main><input type="image" src="go.png"></main>`,
@@ -76,6 +77,7 @@ const SEED: Record<string, string> = {
   "form-field-multiple-labels": `<main><form><label for="a">One</label><label for="a">Two</label><input id="a"></form></main>`,
   "fieldset-legend-missing": `<main><form><fieldset><input type="radio" name="r"><input type="radio" name="r"></fieldset></form></main>`,
   "button-empty-name": `<main><button></button></main>`,
+  "form-button-empty-name": `<main><form><button type="button"></button></form></main>`,
   "select-has-option": `<main><form><label for="s">Pick</label><select id="s"></select></form></main>`,
   "disabled-context-content": `<main><form><fieldset disabled><legend>Recap</legend><label for="dc">SIREN</label><input id="dc" type="text" value="1"></fieldset></form></main>`,
   "radio-checkbox-group-ungrouped": `<main><form><label for="r1">A</label><input id="r1" type="radio" name="g"><label for="r2">B</label><input id="r2" type="radio" name="g"></form></main>`,

@@ -13,6 +13,7 @@ import {
   isCore,
   loadPack,
   derivePackResults,
+  isProvisionalJudgmentInapplicable,
   packConformancePct,
   packTestIds,
   packTestsCited,
@@ -381,7 +382,7 @@ export function toRuleOnSection(r: AuditResult, standard: StandardId, lang: Lang
   if (isCore(standard)) return [];
   const s = L[lang];
   const pack = loadPack(standard);
-  const manual = derivePackResults(r, standard).filter((pc) => pc.status === "manual");
+  const manual = derivePackResults(r, standard).filter((pc) => pc.status === "manual" || isProvisionalJudgmentInapplicable(pc));
   if (!manual.length) return [];
   const out: string[] = [`## ${s.toRuleOn} (${manual.length})`, "", `> ${s.toRuleOnNote}`, ""];
   for (const pc of manual) {

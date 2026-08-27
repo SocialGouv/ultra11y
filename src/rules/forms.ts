@@ -1,6 +1,6 @@
 // Theme 11 — Forms: every field has a programmatic label + group/structure checks.
 import type { Doc, El } from "../parse/html.js";
-import { attr, hasAttr, hasDynamicSpread, descendants, ancestors, visibleText, textContent } from "../parse/html.js";
+import { attr, hasAttr, hasBoundAttr, hasDynamicSpread, descendants, ancestors, visibleText, textContent } from "../parse/html.js";
 import { isIntrinsic } from "../parse/jsx-bridge.js";
 import { controlLabel, isFormField, mayInjectContent, isNameExempt } from "../name.js";
 import { isValidAutocomplete, CREDENTIAL_FIELDS } from "../autofill.js";
@@ -345,6 +345,22 @@ function inGroupingContext(el: El): boolean {
   return ancestors(el).some((a) => a.tag === "fieldset" || GROUPING_ROLES.has((attr(a, "role") ?? "").trim().toLowerCase()));
 }
 
+/** HTML radio groups are scoped by form owner as well as name. Checkbox clusters follow the
+ * same boundary here: identical field names in independent forms do not prove one semantic
+ * group. Undefined means JSX/SFC computes the owner dynamically, so grouping is undecidable. */
+function formOwner(el: El, doc: Doc): El | null | undefined {
+  const literal = attr(el, "form");
+  if (literal === undefined && hasBoundAttr(el, "form")) return undefined;
+  if (literal !== undefined) {
+    const explicit = literal.trim();
+    if (explicit.includes("{")) return undefined;
+    if (!explicit) return null;
+    const owner = doc.byId.get(explicit);
+    return owner?.tag === "form" ? owner : null;
+  }
+  return ancestors(el).find((ancestor) => ancestor.tag === "form") ?? null;
+}
+
 // A read-only recap wrapped in <fieldset disabled> or an [inert] container still holds
 // controls the user perceives, but AT may skip them or announce them as unavailable
 // (RGAA 7.1 + 10.8, WCAG 4.1.2). Suppressed when the disable is a TRANSIENT submission
@@ -398,22 +414,25 @@ const radioCheckboxGroupUngrouped: Rule = {
       if (type !== "radio" && type !== "checkbox") continue;
       const name = (attr(el, "name") ?? "").trim();
       if (!name || name.includes("{")) continue; // no name, or a dynamic {expr} — not a provable group
-      const key = `${type}::${name}`;
+      const owner = formOwner(el, doc);
+      if (owner === undefined) continue;
+      const key = `${type}::${name}::${owner ? owner.start : "none"}`;
       const list = groups.get(key);
       if (list) list.push(el);
       else groups.set(key, [el]);
     }
     const out: RuleFinding[] = [];
-    for (const [key, members] of groups) {
+    for (const members of groups.values()) {
       if (members.length < 2) continue; // a lone control is not a group
       if (members.some(hasDynamicSpread)) continue; // a spread may inject role/group context
       if (members.some(inGroupingContext)) continue; // already grouped
-      const type = key.slice(0, key.indexOf("::"));
+      const type = (attr(members[0]!, "type") ?? "").trim().toLowerCase();
+      const name = (attr(members[0]!, "name") ?? "").trim();
       out.push({
         criteriaId: "1.3.1",
         el: members[0]!,
         msgId: "radio-checkbox-group-ungrouped",
-        params: { type, name: key.slice(key.indexOf("::") + 2), count: members.length },
+        params: { type, name, count: members.length },
       });
     }
     return out;

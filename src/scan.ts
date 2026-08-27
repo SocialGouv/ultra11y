@@ -780,7 +780,11 @@ export function recomputeTallies(merged: AuditResult): void {
       manual: inG.filter((c) => c.status === "manual").length,
     };
   });
-  const decided = merged.criteria.filter((c) => c.status === "C" || c.status === "NC");
+  // This is the AUTOMATIC pass rate. Agent-confirmed C/NA rows stay out of both numerator
+  // and denominator, exactly as adjudication and checkReport define it; agent NC still counts
+  // because evidenced failure safely lowers the rate. A later scan merge must not re-credit
+  // human/model judgments as automatic checks.
+  const decided = merged.criteria.filter((c) => c.status === "NC" || (c.status === "C" && c.decidedBy !== "agent"));
   const conform = decided.filter((c) => c.status === "C").length;
   merged.conformancePct = decided.length === 0 ? 100 : Math.round((conform / decided.length) * 100);
   merged.findings.sort((a, b) => sevRank[b.severity] - sevRank[a.severity]);

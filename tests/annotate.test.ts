@@ -166,20 +166,20 @@ describe("job summary", () => {
     const md = stepSummary(result, { standard: "rgaa", lang: "fr" });
     // Ten subject-absence closures belong to judgment criteria: useful evidence for the
     // worklist, but not published as decided until the agent confirms NA.
-    expect(md).toContain("1/106 critères tranchés dans ce run");
-    expect(md).toContain("105 à compléter par scan ou adjudication");
+    expect(md).toContain("2/106 critères tranchés dans ce run");
+    expect(md).toContain("104 à compléter par scan ou adjudication");
     expect(md).not.toContain("92 %");
     expect(md).not.toContain("4 occurrence(s)");
     expect(md).toContain("Aucune non-conformité détectée");
     expect(md).not.toContain("| Sévérité | Critère |");
 
     const comment = prComment(result, { standard: "rgaa", lang: "fr" });
-    expect(comment).toContain("1/106 critères tranchés dans ce run");
+    expect(comment).toContain("2/106 critères tranchés dans ce run");
     expect(comment).not.toContain("92 %");
     expect(comment).not.toMatch(/4 constat\(s\).*aucune page/);
     expect(comment).toContain("0 page rendue : aucun test rendered n'a été exécuté");
-    expect(comment).toContain("26 test(s) static — critères :");
-    expect(comment).toContain("229 test(s) judgment sur 92 critère(s), tous transmis à l'IA");
+    expect(comment).toContain("27 test(s) static — critères :");
+    expect(comment).toContain("228 test(s) judgment sur 92 critère(s), tous transmis à l'IA");
     expect(comment).toContain("49 critère(s) reçoivent un signal normatif");
     expect(comment).toContain("21 critère(s) peuvent produire un NC décisif");
     expect(comment).toContain("41 reçoivent des preuves candidates");

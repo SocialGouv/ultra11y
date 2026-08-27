@@ -534,6 +534,12 @@ describe("CLI gate & input hardening", () => {
     expect(r.err.toLowerCase()).toContain("--lang");
   });
 
+  it("accepts judge --grain batch without the generic ticket-grain warning", async () => {
+    const r = await run(["judge", "--in", join(tmpdir(), "missing-judge-audit.json"), "--runner", "claude", "--grain", "batch"]);
+    expect(r.err).not.toContain("is not one of criterion|page|page-criterion|single|file");
+    expect(r.err).toContain("--in file not found");
+  });
+
   it("a single-dash flag typo (-grph) is surfaced as unknown", async () => {
     const r = await run(["audit", `${FIX}conforming/good.html`, "-grph"]);
     expect(r.err.toLowerCase()).toContain("unknown flag");

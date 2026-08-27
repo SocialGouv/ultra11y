@@ -20,7 +20,7 @@ import { VERSION, SCHEMA_VERSION } from "./types.js";
 import { allSC, allGuidelines } from "./wcag.js";
 import { parseSource } from "./parse/source.js";
 import { attachSignals, isSnapshotDom, snapshotPageId } from "./snapshot.js";
-import { attr, elementsByTag, type Doc, type CaptureProvenance } from "./parse/html.js";
+import { attr, dynamicSpreadMayProvide, elementsByTag, type Doc, type CaptureProvenance } from "./parse/html.js";
 import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir, readCaptureDir, capturesForSources } from "./capture.js";
 import { isFullDocument } from "./rules/rule.js";
 import { renderedRulesFor, renderedRulesRan, renderedTestedScs } from "./rules/rendered.js";
@@ -373,6 +373,9 @@ function subjectMatterReason(sc: string, files: number): string {
 interface Accum {
   byCriterion: Map<string, Finding[]>;
   applicable: Map<string, boolean>; // static criteria only
+  // Static criteria whose source shape makes the deterministic rule inconclusive. A clean
+  // rule run is not conformity here: the criterion remains manual and enters residualRisks.
+  uncertainStatic: Map<string, string>;
   allFindings: Finding[];
   packFindings: Finding[]; // declarative pack-rule findings (namespaced pack:<key>:<id>)
   fileCount: number;
@@ -433,6 +436,7 @@ function newAccum(): Accum {
   return {
     byCriterion: new Map(),
     applicable: new Map(),
+    uncertainStatic: new Map(),
     allFindings: [],
     packFindings: [],
     fileCount: 0,
@@ -507,6 +511,19 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
   }
   for (const [id, pred] of STATIC_PREDS) {
     if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
+  }
+  const htmlRoot = elementsByTag(doc, "html")[0];
+  const lang = htmlRoot ? (attr(htmlRoot, "lang") ?? "").trim() : "";
+  const xmlLang = htmlRoot ? (attr(htmlRoot, "xml:lang") ?? "").trim() : "";
+  const languageSpreadMayApply = htmlRoot && dynamicSpreadMayProvide(htmlRoot, ["lang", "xml:lang"]);
+  const languagePinnedAfterSpread =
+    htmlRoot && ((Boolean(lang) && !dynamicSpreadMayProvide(htmlRoot, ["lang"])) || (Boolean(xmlLang) && !dynamicSpreadMayProvide(htmlRoot, ["xml:lang"])));
+  const languageMayRemainDynamic = languageSpreadMayApply && !(lang || xmlLang ? languagePinnedAfterSpread : false);
+  if (htmlRoot && languageMayRemainDynamic) {
+    acc.uncertainStatic.set(
+      "3.1.1",
+      "The page language may be supplied or overridden by a dynamic spread on <html>; inspect the rendered element or the spread value before deciding conformity.",
+    );
   }
   // OR-folded across the whole scope: one document carrying the subject matter keeps the
   // criterion open for the entire audit (see SUBJECT_MATTER, rule 2).
@@ -822,6 +839,10 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
         justification = "No element in scope is concerned by this success criterion — nothing contradicts it, and nothing of that kind exists here.";
       } else if (normativeFs.length > 0) {
         status = "NC";
+      } else if (acc.uncertainStatic.has(c.sc)) {
+        status = "manual";
+        justification = acc.uncertainStatic.get(c.sc);
+        residualRisks.push({ criteriaId: c.sc, reason: justification!, automatability: c.automatability });
       } else {
         status = "C";
       }

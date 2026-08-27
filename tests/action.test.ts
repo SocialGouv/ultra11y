@@ -707,6 +707,14 @@ describe("the adjudication tier", () => {
       expect(finalGate.run).toContain("every attempted Claude CLI adjudication pass failed operationally");
     });
 
+    it("does not start another paid pass after systemic provider saturation", () => {
+      const run = String(cli()?.run ?? "");
+      expect(run).toContain("ultra11y-provider-unavailable");
+      expect(run).toMatch(/grep[^\n]+provider unavailable/);
+      expect(run).toMatch(/provider unavailable[^\n]+stopping before pass/);
+      expect(run).toContain("break");
+    });
+
     // `--max-turns` is not a flag of the Claude Code CLI, and the CLI swallows unknown flags
     // without a word — so passing one would read as a ceiling in every log and be an
     // unbounded run. The bound that exists is the dollar one.
@@ -1407,20 +1415,32 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     expect(summary?.env?.REFUTE_IDS).toContain("steps.after_refute.outputs.ids");
   });
 
-  it("applies completed refutations and reports a partial judge failure without failing", () => {
+  it("captures the exact report path emitted by the CLI instead of guessing from the directory", () => {
+    const trial = job().steps.find((s) => s.name === "Put the claims on trial");
+    const run = String(trial?.run);
+
+    expect(run).toMatch(/REPORT=\$\(node scripts\/ultra11y\.mjs report/);
+    expect(run).toContain('[ ! -f "$REPORT" ]');
+    expect(run).not.toMatch(/ls audits\/\*\.md/);
+  });
+
+  it("applies completed refutations before making an operational judge or apply failure fatal", () => {
     const trial = job().steps.find((s) => s.name === "Put the claims on trial");
     const run = String(trial?.run);
     const judge = run.indexOf("node scripts/ultra11y.mjs judge --refute");
     const apply = run.indexOf("node scripts/ultra11y.mjs verify --apply");
+    const judgeExit = run.indexOf('exit "$judge_status"');
+    const applyExit = run.indexOf('exit "$apply_status"');
 
     expect(judge).toBeGreaterThanOrEqual(0);
     expect(run).toContain("|| judge_status=$?");
     expect(apply, "partial judge output must be applied instead of lost to set -e").toBeGreaterThan(judge);
     expect(run).toContain("|| apply_status=$?");
-    expect(run).toContain("::warning::the refuter stopped early");
-    expect(run).toContain("::warning::the trial reopened or left unsupported claims");
-    expect(run.lastIndexOf("exit 0"), "an honest residue is reported, not treated as a broken workflow").toBeGreaterThan(apply);
-    expect(run).not.toContain('exit "$judge_status"');
+    expect(run).toContain("::error::the refuter stopped early");
+    expect(run).toContain("::error::the trial could not apply every completed answer");
+    expect(judgeExit, "a broken refuter must make the workflow red after its partial answers are applied").toBeGreaterThan(apply);
+    expect(applyExit, "an operational apply failure must not be hidden by the later completeness gate").toBeGreaterThan(apply);
+    expect(run).not.toMatch(/\n\s*exit 0\s*$/);
   });
 
   it("retries by default and only makes an undecided residue fatal when explicitly requested", () => {
@@ -1439,10 +1459,19 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
   it("uploads the audit produced by the trial, not only the pre-refutation action artifact", () => {
     const steps = job().steps;
     const trial = steps.findIndex((s) => s.name === "Put the claims on trial");
+    const report = steps.findIndex((s) => s.name === "Regenerate the report AFTER refutation");
     const upload = steps.findIndex((s) => s.name === "Upload the post-refutation audit");
+    expect(report, "the Markdown report must be regenerated from the mutated audit").toBeGreaterThan(trial);
+    expect(upload).toBeGreaterThan(report);
     expect(upload).toBeGreaterThan(trial);
     expect(steps[upload]?.uses).toMatch(/^actions\/upload-artifact@/);
     expect(steps[upload]?.with?.path).toContain("audits/audit-latest.json");
+
+    const regenerate = String(steps[report]?.run);
+    expect(regenerate).toMatch(/REPORT=\$\(node scripts\/ultra11y\.mjs report/);
+    expect(regenerate).toContain('[ ! -f "$REPORT" ]');
+    expect(regenerate).toContain('check --report "$REPORT"');
+    expect(regenerate, "a rejected post-refutation report must print the check issues into the workflow log").not.toContain("--quiet");
   });
 });
 

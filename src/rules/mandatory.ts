@@ -1,6 +1,6 @@
 // Theme 8 — Mandatory elements (the statically-checkable slice).
 import type { Doc, El, HNode } from "../parse/html.js";
-import { attr, hasAttr, visibleText, allIds, elementsByTag, ancestors } from "../parse/html.js";
+import { attr, hasAttr, dynamicSpreadMayProvide, visibleText, allIds, elementsByTag, ancestors } from "../parse/html.js";
 import { isDisplayHidden } from "../name.js";
 import { type Rule, type RuleFinding, shellHeadInjected } from "./rule.js";
 
@@ -18,6 +18,12 @@ function declaredLanguage(el: El): string {
   return (attr(el, "lang") ?? "").trim() || (attr(el, "xml:lang") ?? "").trim();
 }
 
+/** A JSX spread can provide either language spelling unless later explicit attributes
+ * override both. HTML/SFC parsing carries no source-order metadata, so it stays conservative. */
+function spreadMayDeclareLanguage(el: El): boolean {
+  return dynamicSpreadMayProvide(el, ["lang", "xml:lang"]);
+}
+
 const htmlLangMissing: Rule = {
   id: "html-lang-missing",
   criteria: ["3.1.1"],
@@ -28,6 +34,7 @@ const htmlLangMissing: Rule = {
     if (!html) return [];
     const lang = declaredLanguage(html);
     if (lang) return [];
+    if (spreadMayDeclareLanguage(html)) return [];
     return [
       {
         criteriaId: "3.1.1",
@@ -51,6 +58,7 @@ const documentLanguageMissing: Rule = {
     const html = elementsByTag(doc, "html")[0];
     if (!html) return [];
     if (declaredLanguage(html)) return [];
+    if (spreadMayDeclareLanguage(html)) return [];
     const ignored = new Set(["script", "style", "title", "noscript", "template", "svg"]);
     const uncovered = doc.elements.find((el) => {
       if (ignored.has(el.tag) || isDisplayHidden(el)) return false;

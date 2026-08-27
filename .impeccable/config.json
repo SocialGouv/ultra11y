@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "<img>",
+        "createdAt": "2026-08-27T08:24:44.394Z",
+        "reason": "False positive: literal markup token in an audit subject description, not a rendered image element."
+      }
+    ]
+  }
+}

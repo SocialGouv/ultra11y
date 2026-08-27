@@ -227,6 +227,7 @@ jobs:
 
       - name: The check gate blocks an invented criterion (exit 1)
         run: |
+          # shellcheck disable=SC2016 # the literal Markdown contains no shell expansions
           printf '## 1.\n## 2.\n- **9.9.9 — fake** — `x:1` (`d`)\n## 3.\n## 4.\n## 5.\n- **Rate** : 50%%\n' > "$RUNNER_TEMP/bad.md"
           if node scripts/ultra11y.mjs check --report "$RUNNER_TEMP/bad.md"; then
             echo "expected non-zero exit for an invented criterion"; exit 1
@@ -540,7 +541,12 @@ jobs:
           <body><main><h1>Contact</h1><img src="a.png"></main></body></html>
           HTML
           (cd "$RUNNER_TEMP/site" && nohup python3 -m http.server 8931 > /dev/null 2>&1 &)
-          for i in $(seq 1 30); do curl -sSf -o /dev/null http://127.0.0.1:8931/ && break; sleep 1; done
+          attempt=0
+          until curl -sSf -o /dev/null http://127.0.0.1:8931/; do
+            attempt=$((attempt + 1))
+            if [ "$attempt" -ge 30 ]; then echo "::error::the two-page fixture server never came up"; exit 1; fi
+            sleep 1
+          done
 
       - name: Crawl, scan, snapshot and report page by page
         uses: ./
@@ -807,11 +813,12 @@ jobs:
           path: ${{ runner.temp }}/dl
       - name: index.html is at the root of the unzipped artifact
         run: |
-          [ -f "$RUNNER_TEMP/dl/audits/index.html" ] || { echo "::error::index.html is not where a reader will look"; ls -R "$RUNNER_TEMP/dl" | head -40; exit 1; }
+          [ -f "$RUNNER_TEMP/dl/audits/index.html" ] || { echo "::error::index.html is not where a reader will look"; find "$RUNNER_TEMP/dl" -maxdepth 4 -print | head -40; exit 1; }
           # The images it references survived the round trip.
           missing=0
-          for src in $(grep -rhoE 'src="\./[^"]+"' "$RUNNER_TEMP/dl/audits/pages/"*.html | sed 's/src="\.\///;s/"$//' | sort -u); do
+          while IFS= read -r src; do
+            [ -n "$src" ] || continue
             [ -f "$RUNNER_TEMP/dl/audits/pages/$src" ] || { echo "::error::missing after unzip: $src"; missing=1; }
-          done
+          done < <(grep -rhoE 'src="\./[^"]+"' "$RUNNER_TEMP/dl/audits/pages/"*.html | sed 's/src="\.\///;s/"$//' | sort -u)
           [ "$missing" = 0 ] || exit 1
           echo "the artifact opens, and its images are in it"

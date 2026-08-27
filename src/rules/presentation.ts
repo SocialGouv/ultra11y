@@ -3,7 +3,7 @@
 // blocks zooming is a DEFINITE failure detectable from the markup alone.
 import type { Doc, El } from "../parse/html.js";
 import { attr, textContent, ancestors } from "../parse/html.js";
-import { isDisplayHidden } from "../name.js";
+import { isDisplayHidden, visuallyRenderedText } from "../name.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
 const metaViewportZoomBlock: Rule = {
@@ -75,6 +75,16 @@ const cssGeneratedContentInformative: Rule = {
 
 type SpacingProperty = "letter-spacing" | "word-spacing" | "line-height";
 
+const INPUTS_WITHOUT_TEXT = new Set(["hidden", "checkbox", "radio", "range", "color", "file", "image", "button"]);
+function hasRelevantText(el: El): boolean {
+  if (visuallyRenderedText(el)) return true;
+  // Text-like inputs may be empty in source and receive user text at runtime; submit/reset
+  // controls also expose a user-agent label. Spacing restrictions apply to that text.
+  if (el.tag === "input") return !INPUTS_WITHOUT_TEXT.has((attr(el, "type") ?? "text").trim().toLowerCase());
+  if (el.tag === "textarea") return true;
+  return false;
+}
+
 /** A narrow but decisive form of the ACT text-spacing rules. An author-important value below
  * the RGAA threshold prevents the user's required override. Values that need computed font
  * size (`px`, `rem`, `calc`) stay for the rendered probe rather than being guessed here. */
@@ -89,6 +99,10 @@ function spacingImportantRule(id: string, property: SpacingProperty, minimum: nu
       const declaration = new RegExp(`(?:^|;)\\s*${escaped}\\s*:\\s*([^;!]+)\\s*!important(?=\\s*;|$)`, "gi");
       for (const el of doc.elements) {
         if (["script", "style", "svg", "canvas", "video", "img"].includes(el.tag) || isDisplayHidden(el)) continue;
+        // Text-spacing only applies to passages of text. A declaration on an empty layout
+        // wrapper, media-only node, or hidden/aria-hidden decoration cannot itself prove a
+        // failure; a visible descendant makes the inherited restriction relevant again.
+        if (!hasRelevantText(el)) continue;
         const style = attr(el, "style") ?? "";
         // Visually-hidden/off-canvas text and a scroll container cannot lose visible text
         // through spacing. These are ACT inapplicable cases, not conforming exceptions.

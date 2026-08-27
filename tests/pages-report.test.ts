@@ -39,7 +39,7 @@ function auditOfPages(pages: { id: string; name: string; url: string; dom: strin
 }
 
 const GOOD = '<html lang="fr"><head><title>Accueil</title></head><body><main><h1>Bonjour</h1></main></body></html>';
-const BAD = '<html lang="fr"><head><title>Contact</title></head><body><main><img src="a.png"><button></button></main></body></html>';
+const BAD = '<html lang="fr"><head><title>Contact</title></head><body><main><img src="a.png"><form><button type="button"></button></form></main></body></html>';
 
 describe("renderPageReport", () => {
   const { result, derived } = auditOfPages([
@@ -64,7 +64,7 @@ describe("renderPageReport", () => {
   it("marks the page's own status, which is not the scope-wide one", () => {
     expect(md).toMatch(/\| 1\.1 —[^|]*\|[^|]*\| \? \|/); // missing alt is a signal until image purpose is adjudicated
     expect(md).toMatch(/\| 11\.9 —[^|]*\|[^|]*\| NC \|/); // the unnamed button is a decisive failure
-    expect(md).toMatch(/\| 8\.3 —[^|]*\|[^|]*\| \? \|/); // presence alone does not clear both RGAA alternatives
+    expect(md).toMatch(/\| 8\.3 —[^|]*\|[^|]*\| C \|/); // exhaustive language rule ran and found a declared page language
   });
 
   it("renders each non-conformity through the shared auditor block, occurrence line included", () => {
@@ -169,7 +169,7 @@ describe("the index", () => {
     // fix it. Listing twelve near-identical lines is what would trade an empty report for an
     // unreadable one — but the count and the adjudicable items must not move.
     const p = derived.find((x) => x.id === "contact")!;
-    const one = p.findings.find((f) => f.ruleId === "button-empty-name")!;
+    const one = p.findings.find((f) => f.ruleId === "form-button-empty-name")!;
     // Twelve occurrences of one rule on one selector, as a design-system defect produces. The
     // clones must reach the CRITERION's own finding list — that is what prdUnits reads.
     const clones = Array.from({ length: 11 }, (_, i) => ({ ...one, col: 40 + i }));

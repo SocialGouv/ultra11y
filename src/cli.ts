@@ -66,7 +66,7 @@ import {
 import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, unreadableCaptures, type VerdictLedger, writeLedger } from "./ledger.js";
 import { DEFAULT_CLI_MODEL, EFFORT_LEVELS, judgeBatchCli, refuteBatchCli } from "./agent-cli.js";
 import { CODEX_EFFORT_LEVELS, judgeBatchCodex, refuteBatchCodex } from "./agent-codex.js";
-import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, batchWorklist, judgeAll, modelFromEnv, type LlmOptions } from "./llm.js";
+import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, batchWorklist, isProviderUnavailableError, judgeAll, modelFromEnv, type LlmOptions } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable, localTierStatus } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
@@ -94,12 +94,12 @@ import {
   type CssDigest,
   type StyleDigest,
 } from "./snapshot.js";
-import { attributePages, derivePages, pageScopesFrom, pageView, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
-import { pagesForStandard, renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
+import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
+import { pageCriterionRows, pagesForStandard, renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
 import { crawlBound, crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
 import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
-import { resolveStandard, getPack, isCore, derivePackResults, findingsForStandard, type StandardId } from "./standards/index.js";
+import { resolveStandard, getPack, isCore, findingsForStandard, type StandardId } from "./standards/index.js";
 import { auditDocumentFor, packAuditDocument, unwrapAudit } from "./standards/document.js";
 import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
@@ -3502,12 +3502,16 @@ async function cmdRefute(p: ParsedArgs, todoPath: string): Promise<number> {
   };
   let spent = 0;
   let failed = 0;
+  let attempted = 0;
+  let providerUnavailable = false;
   const byN = new Map(items.map((it) => [it.n, it]));
   const queue = [...pending];
   const worker = async (): Promise<void> => {
     for (;;) {
+      if (providerUnavailable) return;
       const item = queue.shift();
       if (!item) return;
+      attempted++;
       try {
         const verdicts = await (runner === "codex" ? refuteBatchCodex : refuteBatchCli)(
           [item],
@@ -3525,6 +3529,7 @@ async function cmdRefute(p: ParsedArgs, todoPath: string): Promise<number> {
         // One item's failure is one item's, exactly as a failed adjudication batch is: it stays
         // unadjudicated, `applyVerdicts` refuses to pass over it, and the run says so.
         failed++;
+        if (isProviderUnavailableError(e)) providerUnavailable = true;
         console.error(`ultra11y judge: item #${item.n} (${item.criteriaId}) — ${e instanceof Error ? e.message : String(e)}`);
       }
       // Written after every item, not at the end: this pass is per-item precisely so a killed
@@ -3533,11 +3538,13 @@ async function cmdRefute(p: ParsedArgs, todoPath: string): Promise<number> {
     }
   };
   await Promise.all(Array.from({ length: Math.min(lanes, queue.length) }, worker));
+  if (providerUnavailable && queue.length)
+    console.error(`ultra11y judge: provider unavailable — stopped before ${queue.length} remaining item(s) instead of repeating the same failed request.`);
   const tally = (v: string) => items.filter((it) => (it.verdict ?? "").trim().toLowerCase() === v).length;
   console.log(
     lang === "fr"
-      ? `✓ ${pending.length - failed}/${pending.length} entrée(s) mise(s) à l'épreuve → ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`
-      : `✓ ${pending.length - failed}/${pending.length} entry(ies) tried → ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`,
+      ? `✓ ${attempted - failed}/${pending.length} entrée(s) mise(s) à l'épreuve → ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`
+      : `✓ ${attempted - failed}/${pending.length} entry(ies) tried → ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`,
   );
   if (spent > 0) console.log(lang === "fr" ? `  ${spent.toFixed(4)} $ dépensé(s).` : `  $${spent.toFixed(4)} spent.`);
   return failed ? 1 : 0;
@@ -3729,6 +3736,7 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
     // subscription turns reach provider limits faster. `--concurrency` overrides it for a
     // runner with room.
     concurrency: runner === "claude" || runner === "codex" ? cliConcurrency : undefined,
+    abortOnError: isProviderUnavailableError,
     maxBudgetUsd: Number.isFinite(maxBudgetUsd) ? maxBudgetUsd : undefined,
     effort,
     timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : undefined,
@@ -4432,7 +4440,7 @@ function diffAgainstExternal(p: ParsedArgs, result: AuditResult, scope: PageScop
   const ours = new Map<string, Map<string, Status>>();
   for (const page of derivePages(result, scope)) {
     const m = new Map<string, Status>();
-    for (const c of derivePackResults(pageView(result, page), standard, page.id)) m.set(c.id, c.status);
+    for (const c of pageCriterionRows(result, page, standard, lang)) m.set(c.id, c.status);
     ours.set(page.id, m);
   }
 
@@ -4809,7 +4817,8 @@ export async function main(argv: string[]): Promise<number> {
     split: ["criterion", "page"],
     runtime: ["auto", "local", "docker"],
     provider: ["auto", "github", "gitlab", "jira"],
-    grain: ["criterion", "page", "page-criterion", "single", "file"],
+    // Union: tickets owns the tracker grains; judge additionally accepts batch.
+    grain: ["criterion", "page", "page-criterion", "single", "file", "batch"],
     // The union over every command that takes it: `mcp` serves stdio|http, `tickets`
     // picks cli|rest. Listing one command's values made the guard cry wolf on the other.
     transport: ["stdio", "http", "auto", "cli", "rest"],

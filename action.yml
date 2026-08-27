@@ -791,10 +791,18 @@ runs:
         case "$passes" in 1|2|3) ;; *) passes=1 ;; esac
         ok=1
         for i in $(seq 1 "$passes"); do
-          if node "$ENGINE" judge "${args[@]}"; then
+          pass_log="$RUNNER_TEMP/ultra11y-provider-unavailable-$i.log"
+          if node "$ENGINE" judge "${args[@]}" 2>&1 | tee "$pass_log"; then
             ok=0
           else
             echo "ultra11y: CLI adjudication pass $i did not apply cleanly."
+          fi
+          # The engine already stops scheduling fresh batches after provider saturation. Carry
+          # that circuit breaker across the OUTER retry loop too: another process would forget
+          # the prior 429/5xx and pay for the same bounded retries all over again.
+          if grep -Eqi 'provider unavailable|api status 429|http 429|rate.?limit|service unavailable|overload' "$pass_log"; then
+            echo "::error::ultra11y: provider unavailable — stopping before pass $((i + 1)) instead of repeating failed paid requests."
+            break
           fi
         done
         if [ "$ok" = '0' ]; then

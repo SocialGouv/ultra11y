@@ -376,6 +376,21 @@ describe("packConformancePct", () => {
     expect(packConformancePct(derived)).toBe(67);
     expect(packConformancePct(derived)).not.toBe(corePct);
   });
+
+  it("does not credit provisional judgment NA — the former 16% header beside a C=0 tally", () => {
+    // The production regression had 4 absence-derived judgment rows hidden behind raw C,
+    // 21 NC and 81 genuinely manual rows: raw arithmetic said 4 / 25 = 16%, while every
+    // published surface correctly reopened those four and displayed C=0 / NC=21 / manual=85.
+    const provisional = (id: string): PackCriterionResult => ({ ...row(id, "C"), inapplicable: true, judgment: true });
+    const derived = [
+      ...Array.from({ length: 4 }, (_, i) => provisional(`p${i}`)),
+      ...Array.from({ length: 21 }, (_, i) => row(`nc${i}`, "NC")),
+      ...Array.from({ length: 81 }, (_, i) => row(`m${i}`, "manual")),
+    ];
+
+    expect(Math.round((4 / (4 + 21)) * 100)).toBe(16); // the previous, incorrect calculation
+    expect(packConformancePct(derived)).toBe(0);
+  });
 });
 
 // ABSENCE IS A PER-PAGE FACT, and asking it of the whole run left criteria open for ever.

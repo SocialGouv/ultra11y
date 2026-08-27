@@ -413,9 +413,15 @@ jobs:
           fi
           # The report is what `verify --report` parses the non-conformities out of; the audit
           # is where the claimed CONFORMITIES now live, so no ledger is needed for either half.
-          node scripts/ultra11y.mjs report --in audits/audit-latest.json \
-            --standard '${{ inputs.standard }}' --out audits > /dev/null
-          REPORT=$(/bin/ls audits/*.md | head -1)
+          # `report` prints the file it just wrote. Use that public result rather than choosing
+          # the first Markdown file in a directory that also contains VERIFY.md and the RGAA
+          # automation appendix — lexical order is not a report-path contract.
+          REPORT=$(node scripts/ultra11y.mjs report --in audits/audit-latest.json \
+            --standard '${{ inputs.standard }}' --out audits)
+          if [ ! -f "$REPORT" ]; then
+            echo "::error::report returned a path that does not exist: $REPORT"
+            exit 1
+          fi
           node scripts/ultra11y.mjs verify --report "$REPORT" \
             --in audits/audit-latest.json --standard '${{ inputs.standard }}' --out audits --max-verify 0
           # `judge` writes each finished verdict before reporting a partial-run failure. A
@@ -434,15 +440,18 @@ jobs:
             || apply_status=$?
 
           if [ "$judge_status" -ne 0 ]; then
-            echo "::warning::the refuter stopped early (exit $judge_status); its completed verdicts were still applied"
+            echo "::error::the refuter stopped early (exit $judge_status); its completed verdicts were still applied"
           fi
           if [ "$apply_status" -ne 0 ]; then
-            echo "::warning::the trial reopened or left unsupported claims (exit $apply_status); the final residue below is the result"
+            echo "::error::the trial could not apply every completed answer (exit $apply_status); the final residue below is still measured"
           fi
           # A refuted conformity correctly returns to « to assess ». That is an audit result,
           # not an infrastructure failure. The optional post-trial completeness gate below is
           # the one place that may turn such a residue red when the dispatch explicitly asks.
-          exit 0
+          # Operational failures are different: preserve and apply their partial output, then
+          # keep the job red so a provider or fold failure cannot masquerade as a valid trial.
+          if [ "$judge_status" -ne 0 ]; then exit "$judge_status"; fi
+          if [ "$apply_status" -ne 0 ]; then exit "$apply_status"; fi
 
       # `verify --apply --prune` MUTATES the audit. In run 32854529215 it reopened eighteen
       # conformities, but the workflow kept displaying and gating the three-item count measured
@@ -475,6 +484,29 @@ jobs:
             if [ -n "$UNDECIDABLE_FILE" ]; then args+=(--allow-undecided "$UNDECIDABLE_FILE"); fi
             node scripts/ultra11y.mjs "${args[@]}"
           fi
+
+      # The first Markdown report was the INPUT to the trial. `verify --apply --prune` then
+      # mutates audit-latest.json, so that report is deliberately stale. Re-render from the
+      # final audit even when the trial or completeness gate went red: the diagnostic artifact
+      # must describe the JSON beside it, including every reopened criterion.
+      - name: Regenerate the report AFTER refutation
+        id: report_after_refute
+        if: always() && inputs.mode != 'api' && inputs.refute
+        run: |
+          set -euo pipefail
+          if [ ! -f audits/audit-latest.json ]; then
+            echo "::warning::no post-refutation audit exists to report"
+            exit 0
+          fi
+          REPORT=$(node scripts/ultra11y.mjs report --in audits/audit-latest.json \
+            --standard '${{ inputs.standard }}' --out audits)
+          if [ ! -f "$REPORT" ]; then
+            echo "::error::report returned a path that does not exist: $REPORT"
+            exit 1
+          fi
+          node scripts/ultra11y.mjs check --report "$REPORT" \
+            --standard '${{ inputs.standard }}'
+          echo "path=$REPORT" >> "$GITHUB_OUTPUT"
 
       # The composite action uploaded its artifact BEFORE the outer trial. Keep that useful
       # input, and also persist the document the final gate actually read so a red run can be

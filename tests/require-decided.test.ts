@@ -12,7 +12,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { checkDecided, isUndecidedFile } from "../src/check.js";
+import { buildAdjudicationWorklist } from "../src/adjudicate.js";
 import { unreadableCaptures } from "../src/ledger.js";
+import { derivePackResults, getCriterion, isProvisionalJudgmentInapplicable, loadPack } from "../src/standards/index.js";
+import { runAudit } from "../src/audit.js";
+import { derivePages, pageView } from "../src/pages.js";
 import type { AuditResult, CriterionResult, Finding } from "../src/types.js";
 import { INAPPLICABLE_STATUS } from "../src/types.js";
 
@@ -86,6 +90,25 @@ describe("check --require-decided", () => {
     expect(isUndecidedFile({ entries: [] })).toBe(true);
     expect(isUndecidedFile({ criteria: [] })).toBe(false);
     expect(isUndecidedFile(null)).toBe(false);
+  });
+
+  it("counts every provisional judgment NA that verify keeps open", () => {
+    const fixture = new URL("./fixtures/conforming/good.html", import.meta.url).pathname;
+    const a = runAudit({ inputs: [fixture] });
+    const pack = loadPack("rgaa");
+    const provisional = derivePackResults(a, "rgaa")
+      .filter((row) => isProvisionalJudgmentInapplicable(row, getCriterion(pack, row.id)))
+      .map((row) => row.id);
+    const verifyOpen = buildAdjudicationWorklist(a, { standard: "rgaa" })
+      .map((row) => row.criteriaId)
+      .sort();
+    const gate = checkDecided(a, "rgaa", "en");
+
+    expect(provisional.length).toBeGreaterThan(0); // proves the regression shape engaged
+    expect(gate.undecided).toHaveLength(verifyOpen.length);
+    expect(gate.undecided).toEqual(expect.arrayContaining(verifyOpen));
+    expect(gate.undecided).toEqual(expect.arrayContaining(provisional));
+    expect(gate.provenance.undecided).toBe(verifyOpen.length);
   });
 });
 
@@ -164,6 +187,29 @@ describe("check --require-decided=pages", () => {
     expect(perPage.ok).toBe(false);
     expect(perPage.pages?.map((p) => p.name)).toEqual(["Accueil", "Contact"]);
     expect(perPage.pages?.every((p) => p.undecided.includes("1.1.1"))).toBe(true);
+  });
+
+  it("keeps provisional judgment NA open on every affected page", () => {
+    const a = withPages([{ id: "2.4.2", status: "C" }]);
+    a.scope.subjectsSeen = [];
+    a.scope.pageSubjects = { accueil: [], contact: [] };
+    const pack = loadPack("rgaa");
+    const pages = derivePages(a, a.scope.pages!);
+    const provisionalByPage = new Map(
+      pages.map((page) => [
+        page.id,
+        derivePackResults(pageView(a, page), "rgaa", page.id)
+          .filter((row) => isProvisionalJudgmentInapplicable(row, getCriterion(pack, row.id)))
+          .map((row) => row.id),
+      ]),
+    );
+    const gate = checkDecided(a, "rgaa", "en", { pages: true });
+
+    expect([...provisionalByPage.values()].every((ids) => ids.length > 0)).toBe(true);
+    expect(gate.pages?.map((page) => page.id)).toEqual(["accueil", "contact"]);
+    for (const page of gate.pages ?? []) {
+      expect(page.undecided).toEqual(expect.arrayContaining(provisionalByPage.get(page.id)!));
+    }
   });
 
   it("states what is open EVERYWHERE once, and what is specific to a page on that page", () => {

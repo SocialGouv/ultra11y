@@ -933,7 +933,7 @@
       "level": "A",
       "addedIn": "2.1",
       "automatability": "judgment",
-      "ruleIds": ["label-in-name-mismatch"],
+      "ruleIds": ["label-in-name-mismatch", "form-label-in-name-mismatch"],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html",
       "techniques": [
         "ARIA14",
@@ -1320,6 +1320,7 @@
         "form-field-multiple-labels",
         "select-has-option",
         "button-empty-name",
+        "form-button-empty-name",
         "icon-only-control-unnamed",
         "control-name-title-only",
         "field-purpose-incomplete",

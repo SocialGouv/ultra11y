@@ -20,7 +20,7 @@
 import type { AuditResult, PackAuditResult, PackCriterionEntry, PackFinding, PackThemeTally, Finding, Lang, ResidualRisk } from "../types.js";
 import { SCHEMA_VERSION } from "../types.js";
 import { packAutomatability } from "../adjudicate.js";
-import { derivePackResults, packConformancePct, packCriteriaForFinding } from "./derive.js";
+import { derivePackResults, isProvisionalJudgmentInapplicable, packConformancePct, packCriteriaForFinding } from "./derive.js";
 import { CORE_KEY, loadPack } from "./registry.js";
 import { themeName, titlePlain, getCriterion, hasId } from "./pack.js";
 import { standardLabel } from "./index.js";
@@ -121,6 +121,10 @@ export function packAuditDocument(input: AuditResult | PackAuditResult, packKey:
   const audit = unwrapAudit(input) as AuditResult;
   const pack = loadPack(packKey);
   const derived = derivePackResults(audit, packKey);
+  const provisionalNaReason =
+    lang === "fr"
+      ? "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement."
+      : "The engine detected no subject; the AI must confirm that this judgment criterion is not applicable.";
 
   // THE DERIVATION DECIDES WHICH FINDINGS COUNT, not the raw rule→criterion mapping.
   //
@@ -137,16 +141,19 @@ export function packAuditDocument(input: AuditResult | PackAuditResult, packKey:
   const seen = new Map<Finding, string[]>();
   const criteria: PackCriterionEntry[] = derived.map((d) => {
     const pc = getCriterion(pack, d.id);
+    const provisionalNa = isProvisionalJudgmentInapplicable(d, pc);
     for (const f of d.findings) (seen.get(f) ?? seen.set(f, []).get(f)!).push(d.id);
     return {
       id: d.id,
       theme: d.theme,
       title: pc ? titlePlain(pack, pc, lang) : d.id,
-      status: d.status,
+      // Subject absence is evidence for adjudicating a judgment criterion, not a verdict.
+      // Publish the same open row as the Markdown report, worklist and completeness gates.
+      status: provisionalNa ? "manual" : d.status,
       findings: d.findings.map((f) => packFinding(f, [d.id])),
-      ...(d.justification ? { justification: d.justification } : {}),
-      ...(d.decidedBy ? { decidedBy: d.decidedBy } : {}),
-      ...(d.inapplicable ? { inapplicable: true } : {}),
+      ...(provisionalNa ? { justification: provisionalNaReason } : d.justification ? { justification: d.justification } : {}),
+      ...(d.decidedBy && !provisionalNa ? { decidedBy: d.decidedBy } : {}),
+      ...(d.inapplicable && !provisionalNa ? { inapplicable: true } : {}),
       ...(pc?.automation ? { automation: pc.automation } : {}),
     };
   });

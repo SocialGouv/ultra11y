@@ -80,6 +80,10 @@ export interface LlmOptions {
   /** Batches in flight at once. The Messages backend defaults to 4; local CLI transports use
    *  a deliberately small caller-selected concurrency. */
   concurrency?: number;
+  /** A systemic backend failure (rate limit/provider outage) makes every remaining batch
+   *  equally impossible. Stop scheduling new work after the in-flight lanes finish, while
+   *  preserving every verdict that already landed. */
+  abortOnError?: (error: unknown) => boolean;
   /** Injected for tests. Defaults to the global fetch. */
   fetchImpl?: typeof fetch;
   /** Injected for tests, a CLI backend's counterpart to `fetchImpl`: it takes the argv and
@@ -116,6 +120,13 @@ export interface LlmOptions {
    *  without waiting out the real curve. */
   backoffMs?: (attempt: number) => number;
   onProgress?: (done: number, total: number) => void;
+}
+
+/** Provider saturation is shared state, not a property of one criterion. Transport backends
+ *  surface it only after their own bounded retries have already been exhausted. */
+export function isProviderUnavailableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /(?:api status|http)\s*(?:429|5\d\d)|\b429\b.*rate.?limit|rate.?limit|overload|service unavailable/i.test(message);
 }
 
 // The verdict shape the model must return. It mirrors AdjudicationItem exactly, because the
@@ -319,9 +330,13 @@ export async function judgeAll(
   const queue = [...batches];
   const backend = opts.backend ?? judgeBatch;
   const lanes = Math.max(1, opts.concurrency ?? CONCURRENCY);
+  let aborted = false;
   await Promise.all(
     Array.from({ length: Math.min(lanes, queue.length) }, async () => {
-      for (let b = queue.shift(); b !== undefined; b = queue.shift()) {
+      for (;;) {
+        if (aborted) return;
+        const b = queue.shift();
+        if (b === undefined) return;
         try {
           const landed = await backend(b.items, b.prompt, opts);
           const checked = validateBatchVerdicts(b.items, landed);
@@ -332,11 +347,13 @@ export async function judgeAll(
           if (checked.accepted.length) opts.onVerdicts?.(checked.accepted);
         } catch (e) {
           failures.push(e instanceof Error ? e.message : String(e));
+          if (opts.abortOnError?.(e)) aborted = true;
         }
         opts.onProgress?.(++done, batches.length);
       }
     }),
   );
+  if (aborted && queue.length) failures.push(`provider unavailable — stopped before ${queue.length} remaining batch(es)`);
   return { verdicts, failures };
 }
 

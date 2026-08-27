@@ -53,7 +53,11 @@ export interface PackCriterionResult {
  * the row as open until an agent has confirmed `NA`. */
 export function isProvisionalJudgmentInapplicable(result: PackCriterionResult, criterion?: PackCriterion): boolean {
   if (result.status !== INAPPLICABLE_STATUS || result.inapplicable !== true || result.decidedBy === "agent") return false;
-  return Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
+  // `derivePackResults` stamps the fact on the result so downstream arithmetic that only
+  // receives the derived rows (not the pack) can make the same publication decision as the
+  // report. Keep the criterion lookup as a compatibility fallback for callers holding a row
+  // produced before that stamp was added.
+  return result.judgment === true || Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
 }
 
 // NC dominates (a real failure anywhere fails the criterion); then a decided C; then
@@ -117,7 +121,10 @@ export function packConformancePct(derived: PackCriterionResult[]): number {
   // (`recomputeTallies` in src/adjudicate.ts): this number is the AUTOMATIC pass rate, and
   // a judgement — however well gated — is not an automatic verification. An agent NC still
   // counts; lowering the rate off evidenced findings is the safe direction.
-  const c = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent").length;
+  // Subject harvesting may only PROVISIONALLY conclude that a judgment criterion is
+  // inapplicable. The report publishes that row as manual until the agent confirms NA, so the
+  // headline arithmetic must use the same status rather than credit a hidden conformity.
+  const c = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent" && !isProvisionalJudgmentInapplicable(d)).length;
   const nc = derived.filter((d) => d.status === "NC").length;
   return c + nc === 0 ? 100 : Math.round((c / (c + nc)) * 100);
 }
@@ -472,7 +479,11 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
     }
     const base = judgmentGuard(deriveBase(pc), pc);
     const derived = enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
-    return measuredRescue(derived, pc, cov, ran, pageId);
+    const measured = measuredRescue(derived, pc, cov, ran, pageId);
+    // Preserve the raw absence-derived `C` for the adjudication worklist, but carry enough
+    // metadata for consumers that do not also receive the pack (notably
+    // `packConformancePct`) to publish/count it as the open judgment it still is.
+    return isProvisionalJudgmentInapplicable(measured, pc) ? { ...measured, judgment: true } : measured;
   });
 }
 

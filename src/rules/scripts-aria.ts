@@ -407,7 +407,7 @@ const menuitemEmptyName: Rule = {
   run(doc: Doc): RuleFinding[] {
     return doc.elements
       .filter((el) => ["menuitem", "menuitemcheckbox", "menuitemradio"].includes((attr(el, "role") ?? "").trim().toLowerCase()))
-      .filter((el) => !isHiddenFromAT(el) && !mayInjectContent(el) && accessibleName(el, doc).trim() === "")
+      .filter((el) => !isHiddenFromAT(el) && !hasDynamicSpread(el) && !mayInjectContent(el) && accessibleName(el, doc).trim() === "")
       .map((el) => ({ criteriaId: "4.1.2", el, msgId: "menuitem-empty-name" }));
   },
 };

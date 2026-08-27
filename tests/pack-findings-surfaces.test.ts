@@ -169,8 +169,9 @@ describe("the work that is NOT a non-conformity is still shown", () => {
     const doc = renderPrdDoc(r(), "fr", "rgaa");
     expect(doc).toMatch(/Critères à trancher \(\d+\)/);
     expect(doc).toMatch(/RGAA 6\.1/);
-    // …and not the form theme, which this page has nothing for.
-    expect(doc).not.toMatch(/RGAA 11\.2\b/);
+    // A judgment criterion with no detected subject is only provisionally inapplicable:
+    // the PRD must keep it open until the adjudicator confirms NA.
+    expect(doc).toMatch(/RGAA 11\.2\b/);
   });
 
   it("and says plainly that they are NOT non-conformities", () => {
