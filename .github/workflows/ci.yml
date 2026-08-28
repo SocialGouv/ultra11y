@@ -784,6 +784,7 @@ jobs:
           echo "front door: $(wc -c < "$PAGE_RUN/audits/index.html") bytes"
 
       - name: Every non-conformity that could be shown, is
+        working-directory: ${{ runner.temp }}/ultra11y-action-e2e/pages
         run: |
           # /contact.html carries an unnamed image input. Unlike a merely candidate finding,
           # this is a decisive RGAA non-conformity. It was snapshotted, so the pixel tier has
