@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.38.3](https://github.com/maxgfr/ultra11y/compare/v5.38.2...v5.38.3) (2026-08-28)
+
+
+### Bug Fixes
+
+* keep GitLab pin aligned after releases [skip ci] ([66452aa](https://github.com/maxgfr/ultra11y/commit/66452aaa5592027e08610d33523238e0d405817a))
+
 ## [5.38.2](https://github.com/maxgfr/ultra11y/compare/v5.38.1...v5.38.2) (2026-08-28)
 
 
