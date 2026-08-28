@@ -1383,28 +1383,25 @@ describe("the keyed adjudication workflow is singular, exhaustive and bounded", 
     expect(agent?.with?.crawl).toBe("http://127.0.0.1:8932/");
     expect(agent?.with?.["crawl-max"]).toBe("0");
     expect(agent?.with?.["require-rendered"]).toBe("true");
-    expect(agent?.with?.["require-decided"]).toBe("false");
+    expect(agent?.with?.["require-decided"]).toBe("pages");
+    expect(agent?.with?.["undecidable-file"]).toBe(".ultra11y/undecidable-rgaa.json");
   });
 
-  it("trials every claim in bounded batches", () => {
-    const trial = job().steps.find((s) => s.name === "Put every model claim on trial");
-    const run = String(trial?.run);
-    expect(run).toMatch(/REPORT=\$\(node scripts\/ultra11y\.mjs report/);
-    expect(run).toContain("--max-verify 0");
-    expect(run).toContain("--grain batch");
-    expect(run).toContain('--model "$MODEL"');
-    expect(run).toContain('--effort "$EFFORT"');
-    expect(run).toContain("--concurrency 4");
-    expect(run).toContain("--max-budget-usd 6");
-    expect(run).toContain('--prune --ledger "$FRESH_LEDGER"');
+  it("does not buy a second model fold after the exhaustive adjudication", () => {
+    const workflow = job()
+      .steps.map((step) => `${step.name ?? ""}\n${String(step.run ?? "")}`)
+      .join("\n");
+    expect(workflow).not.toContain("Put every model claim on trial");
+    expect(workflow).not.toContain("judge --refute");
+    expect(workflow).not.toContain("--max-verify 0");
   });
 
-  it("gates the mutated audit across all 106 criteria and all nine pages", () => {
+  it("gates the adjudicated audit across all 106 criteria and all nine pages", () => {
     const steps = job().steps;
-    const trial = steps.findIndex((s) => s.name === "Put every model claim on trial");
+    const adjudication = steps.findIndex((s) => s.name === "Audit, crawl and adjudicate once");
     const after = steps.findIndex((s) => s.name === "Gate all 106 criteria on all nine pages");
-    expect(trial).toBeGreaterThanOrEqual(0);
-    expect(after).toBeGreaterThan(trial);
+    expect(adjudication).toBeGreaterThanOrEqual(0);
+    expect(after).toBeGreaterThan(adjudication);
 
     const gate = String(steps[after]?.run);
     expect(gate).toContain("--require-decided=pages");
@@ -1414,35 +1411,16 @@ describe("the keyed adjudication workflow is singular, exhaustive and bounded", 
     expect(gate).toContain("page.criteria.length !== 106");
   });
 
-  it("captures the exact report path emitted by the CLI instead of guessing from the directory", () => {
-    const trial = job().steps.find((s) => s.name === "Put every model claim on trial");
-    const run = String(trial?.run);
+  it("captures the exact final report path emitted by the CLI instead of guessing from the directory", () => {
+    const report = job().steps.find((s) => s.name === "Render the final report");
+    const run = String(report?.run);
 
     expect(run).toMatch(/REPORT=\$\(node scripts\/ultra11y\.mjs report/);
     expect(run).toContain('test -f "$REPORT"');
     expect(run).not.toMatch(/ls audits\/\*\.md/);
   });
 
-  it("applies completed refutations before making an operational judge or apply failure fatal", () => {
-    const trial = job().steps.find((s) => s.name === "Put every model claim on trial");
-    const run = String(trial?.run);
-    const judge = run.indexOf("node scripts/ultra11y.mjs judge --refute");
-    const apply = run.indexOf("node scripts/ultra11y.mjs verify --apply");
-    const judgeExit = run.indexOf('exit "$judge_status"');
-    const applyExit = run.indexOf('exit "$apply_status"');
-
-    expect(judge).toBeGreaterThanOrEqual(0);
-    expect(run).toContain("|| judge_status=$?");
-    expect(apply, "partial judge output must be applied instead of lost to set -e").toBeGreaterThan(judge);
-    expect(run).toContain("|| apply_status=$?");
-    expect(run).toContain("::error::the refuter stopped early");
-    expect(run).toContain("::error::the refutation fold failed");
-    expect(judgeExit, "a broken refuter must make the workflow red after its partial answers are applied").toBeGreaterThan(apply);
-    expect(applyExit, "an operational apply failure must not be hidden by the later completeness gate").toBeGreaterThan(apply);
-    expect(run).not.toMatch(/\n\s*exit 0\s*$/);
-  });
-
-  it("always uploads the post-refutation audit and page snapshots", () => {
+  it("always uploads the adjudicated audit and page snapshots", () => {
     const upload = job().steps.find((s) => s.name === "Upload the final adjudication");
     expect(upload?.if).toBe("always()");
     expect(upload?.uses).toMatch(/^actions\/upload-artifact@/);

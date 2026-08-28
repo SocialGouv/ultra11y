@@ -1,11 +1,11 @@
 # One paid, exhaustive path. The ordinary CI replays the committed ledger for free; this
 # manual workflow deliberately starts from an empty run ledger so it proves that the keyed
-# Claude transport, the composite Action, the browser tier and both model folds still work.
+# Claude transport, the composite Action and the browser tier still work.
 #
 # Cost controls are fixed rather than dispatch inputs: Haiku, low effort, batches of eight,
-# two adjudication passes over residue only, concurrency four for the adversarial review and
-# a dollar ceiling on both model phases. One composite invocation performs one audit and one
-# unbounded crawl; there is no baseline pass or runner matrix duplicating that work.
+# two adjudication passes over residue only and a five-dollar ceiling. One composite invocation
+# performs one audit and one unbounded crawl; there is no baseline pass, refutation fold or
+# runner matrix duplicating that work.
 name: Adjudication (keyed)
 
 on:
@@ -27,11 +27,8 @@ jobs:
       # This repository uses the Claude subscription/OAuth transport. Do not expose an API key:
       # it would make the billing route ambiguous and is unnecessary for `--runner cli`.
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      MODEL: haiku
-      EFFORT: low
       STANDARD: rgaa
       LANG_OPT: fr
-      FRESH_LEDGER: audits/fresh-rgaa-ledger.json
       UNDECIDABLE_FILE: .ultra11y/undecidable-rgaa.json
     steps:
       - uses: actions/checkout@v7
@@ -106,41 +103,9 @@ jobs:
           crawl-max: "0"
           runtime: local
           require-rendered: "true"
-          # Completeness is gated after the second reading, against the document it mutates.
-          require-decided: "false"
-
-      - name: Put every model claim on trial
-        env:
-          ULTRA11Y_CLAUDE_BIN: ${{ runner.temp }}/a11y-adjudicator/node_modules/.bin/claude
-        run: |
-          set -euo pipefail
-          REPORT=$(node scripts/ultra11y.mjs report --in audits/audit-latest.json \
-            --standard "$STANDARD" --lang "$LANG_OPT" --out audits)
-          test -f "$REPORT"
-
-          node scripts/ultra11y.mjs verify --report "$REPORT" \
-            --in audits/audit-latest.json --conformities audits/audit-latest.json \
-            --standard "$STANDARD" --lang "$LANG_OPT" --out audits --max-verify 0
-
-          judge_status=0
-          node scripts/ultra11y.mjs judge --refute audits/VERIFY.todo.json \
-            --standard "$STANDARD" --lang "$LANG_OPT" --runner cli --grain batch \
-            --model "$MODEL" --effort "$EFFORT" --concurrency 4 --max-budget-usd 6 \
-            || judge_status=$?
-
-          apply_status=0
-          node scripts/ultra11y.mjs verify --apply audits/VERIFY.todo.json --report "$REPORT" \
-            --in audits/audit-latest.json --standard "$STANDARD" --lang "$LANG_OPT" \
-            --out audits --prune --ledger "$FRESH_LEDGER" || apply_status=$?
-
-          if [ "$judge_status" -ne 0 ]; then
-            echo "::error::the refuter stopped early (exit $judge_status); completed verdicts were applied"
-            exit "$judge_status"
-          fi
-          if [ "$apply_status" -ne 0 ]; then
-            echo "::error::the refutation fold failed (exit $apply_status)"
-            exit "$apply_status"
-          fi
+          # The Action gates the exact audit it just adjudicated, including every page grid.
+          require-decided: pages
+          undecidable-file: .ultra11y/undecidable-rgaa.json
 
       - name: Gate all 106 criteria on all nine pages
         run: |
