@@ -202,6 +202,45 @@ describe("replayLedger — parity with the adjudicated audit, without a model", 
     expect(applied.applied).toBeGreaterThan(0);
   });
 
+  it("moves grounded off-harvest snapshot citations to the current checkout", () => {
+    const snapshot = (root: string): string => {
+      const path = join(root, PAGES_DIR, "accueil", "dom.html");
+      mkdirSync(join(root, PAGES_DIR, "accueil"), { recursive: true });
+      writeFileSync(path, `<!-- ultra11y:capture v="1" page="accueil" url="https://example.test/" -->\n${PAGE_HTML}`);
+      return path;
+    };
+    const first = snapshot(mkdtempSync(join(tmpdir(), "u11y-ledger-off-harvest-first-")));
+    const second = snapshot(mkdtempSync(join(tmpdir(), "u11y-ledger-off-harvest-second-")));
+    const original = auditOf(first);
+    const items = buildAdjudicationWorklist(original).map((item) =>
+      item.criteriaId === "2.4.4"
+        ? {
+            ...item,
+            verdict: "C" as const,
+            justification: "The link remains understandable in its surrounding page structure.",
+            // A grounded neighbour in the audited page, deliberately not a 2.4.4 harvest
+            // anchor. This is the exact shape that used to retain the first machine's path.
+            citations: [{ file: first, line: 6, selector: "main", snippet: "<main>" }],
+          }
+        : { ...item, verdict: "manual" as const, reason: "undecidable" as const },
+    );
+    const adj = file(items);
+    const folded = applyAdjudication(original, adj, { cwd: process.cwd() });
+    expect(folded.rejectedCriteria).not.toContain("2.4.4");
+    const accepted = new Set(adj.items.map((item) => item.criteriaId).filter((id) => !folded.rejectedCriteria.includes(id)));
+    const ledger = mergeLedger(undefined, "wcag", entriesFrom(adj, accepted, original.date));
+
+    const audit = auditOf(second);
+    const rp = replayLedger(audit, ledger, { cwd: process.cwd() });
+    const moved = rp.adj.items.find((item) => item.criteriaId === "2.4.4")?.citations?.[0];
+    const applied = applyAdjudication(audit, rp.adj, { cwd: process.cwd(), residualReasons: rp.residualReasons });
+
+    expect(typeof moved).toBe("object");
+    expect(typeof moved === "string" ? moved : moved?.file).toBe(second);
+    expect(rp.stale).toEqual([]);
+    expect(applied.rejectedCriteria).not.toContain("2.4.4");
+  });
+
   it("drops a verdict as stale when the evidence it read changed, and says so", () => {
     const f = page("stale.html");
     const { ledger } = recordLedger(f);

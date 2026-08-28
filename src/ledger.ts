@@ -119,7 +119,11 @@ export function evidenceFingerprint(evidence: Evidence[]): string {
  *  content, so all that moves is the line number — the very drift `groundFinding` was written to
  *  tolerate. An anchor with no counterpart in today's evidence is left untouched, and the fold
  *  refuses it, which is the correct outcome. */
-function reanchor<T extends { file: string; line: number; selector?: string; snippet?: string }>(stored: T[] | undefined, today: Evidence[]): T[] | undefined {
+function reanchor<T extends { file: string; line: number; selector?: string; snippet?: string }>(
+  stored: T[] | undefined,
+  today: Evidence[],
+  currentFiles: ReadonlyMap<string, string>,
+): T[] | undefined {
   if (!stored?.length) return stored;
   const byKey = new Map(today.map((e) => [anchorKey(e), e]));
   const byLocation = new Map<string, Evidence[]>();
@@ -136,7 +140,17 @@ function reanchor<T extends { file: string; line: number; selector?: string; sni
     // note rather than a DOM snippet. A unique anchor at the same canonical file+line is still
     // enough to move the path; applyAdjudication re-grounds the claim afterwards.
     const now = exact ?? (atLine.length === 1 ? atLine[0] : atLine.find((evidence) => norm(evidence.snippet) === norm(s.snippet ?? "")));
-    return now && (now.line !== s.line || now.file !== s.file) ? { ...s, file: now.file, line: now.line } : s;
+    if (now && (now.line !== s.line || now.file !== s.file)) return { ...s, file: now.file, line: now.line };
+
+    // An adjudicator may legitimately cite a neighbour or supporting source that was inside
+    // the audited snapshot but was not itself one of THIS criterion's harvested anchors. The
+    // fold accepts that only after grounding it in a file the audit read. Such an off-harvest
+    // citation has no `today` counterpart for the exact/snippet lookup above, yet its checkout
+    // prefix still has to move: a macOS path committed to the ledger does not exist on Linux.
+    // `scope.inputs` is the authoritative current checkout mapping. Move the FILE only and
+    // keep the claimed line/snippet strict; applyAdjudication will re-ground both afterwards.
+    const currentFile = currentFiles.get(canonicalFile(s.file));
+    return currentFile && currentFile !== s.file ? { ...s, file: currentFile } : s;
   });
 }
 
@@ -313,6 +327,11 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
   const obsolete: string[] = [];
   const missing: string[] = [];
   const residualReasons: Record<string, string> = {};
+  const currentFiles = new Map<string, string>();
+  for (const input of audit.scope.inputs) {
+    const canonical = canonicalFile(input);
+    if (canonical.startsWith(`${PAGES_DIR}/`)) currentFiles.set(canonical, input);
+  }
 
   for (const e of ledger.entries) if (!open.has(e.criteriaId)) obsolete.push(e.criteriaId);
 
@@ -339,9 +358,9 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
       verdict: e.verdict,
       justification: e.justification ?? "",
       reason: e.reason ?? null,
-      findings: reanchor(e.findings, it.evidence) ?? [],
-      ...(e.citations ? { citations: reanchor(e.citations, it.evidence) ?? [] } : {}),
-      ...(e.recommendations ? { recommendations: reanchor(e.recommendations, it.evidence) ?? [] } : {}),
+      findings: reanchor(e.findings, it.evidence, currentFiles) ?? [],
+      ...(e.citations ? { citations: reanchor(e.citations, it.evidence, currentFiles) ?? [] } : {}),
+      ...(e.recommendations ? { recommendations: reanchor(e.recommendations, it.evidence, currentFiles) ?? [] } : {}),
       decidedBy: "agent",
     });
   }

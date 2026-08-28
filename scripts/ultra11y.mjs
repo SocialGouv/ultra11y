@@ -63072,7 +63072,7 @@ function evidenceFingerprint(evidence) {
   return `sha256:${createHash6("sha256").update(`${keys.length}
 ${keys.join("\n")}`).digest("hex").slice(0, 32)}`;
 }
-function reanchor(stored, today2) {
+function reanchor(stored, today2, currentFiles) {
   if (!stored?.length) return stored;
   const byKey2 = new Map(today2.map((e) => [anchorKey2(e), e]));
   const byLocation = /* @__PURE__ */ new Map();
@@ -63086,7 +63086,9 @@ function reanchor(stored, today2) {
     const exact = byKey2.get(anchorKey2(s));
     const atLine = byLocation.get(`${canonicalFile2(s.file)}:${s.line}`) ?? [];
     const now = exact ?? (atLine.length === 1 ? atLine[0] : atLine.find((evidence) => norm3(evidence.snippet) === norm3(s.snippet ?? "")));
-    return now && (now.line !== s.line || now.file !== s.file) ? { ...s, file: now.file, line: now.line } : s;
+    if (now && (now.line !== s.line || now.file !== s.file)) return { ...s, file: now.file, line: now.line };
+    const currentFile = currentFiles.get(canonicalFile2(s.file));
+    return currentFile && currentFile !== s.file ? { ...s, file: currentFile } : s;
   });
 }
 function emptyLedger(standard = CORE2) {
@@ -63190,6 +63192,11 @@ function replayLedger(audit2, ledger, opts = {}) {
   const obsolete = [];
   const missing = [];
   const residualReasons = {};
+  const currentFiles = /* @__PURE__ */ new Map();
+  for (const input of audit2.scope.inputs) {
+    const canonical = canonicalFile2(input);
+    if (canonical.startsWith(`${PAGES_DIR}/`)) currentFiles.set(canonical, input);
+  }
   for (const e of ledger.entries) if (!open.has(e.criteriaId)) obsolete.push(e.criteriaId);
   for (const it of worklist) {
     const e = byId2.get(it.criteriaId);
@@ -63210,9 +63217,9 @@ function replayLedger(audit2, ledger, opts = {}) {
       verdict: e.verdict,
       justification: e.justification ?? "",
       reason: e.reason ?? null,
-      findings: reanchor(e.findings, it.evidence) ?? [],
-      ...e.citations ? { citations: reanchor(e.citations, it.evidence) ?? [] } : {},
-      ...e.recommendations ? { recommendations: reanchor(e.recommendations, it.evidence) ?? [] } : {},
+      findings: reanchor(e.findings, it.evidence, currentFiles) ?? [],
+      ...e.citations ? { citations: reanchor(e.citations, it.evidence, currentFiles) ?? [] } : {},
+      ...e.recommendations ? { recommendations: reanchor(e.recommendations, it.evidence, currentFiles) ?? [] } : {},
       decidedBy: "agent"
     });
   }

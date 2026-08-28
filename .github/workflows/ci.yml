@@ -549,7 +549,7 @@ jobs:
           HTML
           cat > "$RUNNER_TEMP/site/contact.html" <<'HTML'
           <!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Contact</title></head>
-          <body><main><h1>Contact</h1><img src="a.png"></main></body></html>
+          <body><main><h1>Contact</h1><input type="image" src="a.png"></main></body></html>
           HTML
           (cd "$RUNNER_TEMP/site" && nohup python3 -m http.server 8931 > /dev/null 2>&1 &)
           attempt=0
@@ -595,7 +595,7 @@ jobs:
             const contact = p.find(x => x.id === "contact-html");
             const accueil = p.find(x => x.id === "accueil");
             if (!contact || !accueil) { console.error("::error::a crawled page is missing from the grid"); process.exit(1); }
-            if (contact.findings.length === 0) { console.error("::error::the alt-less image on /contact.html was not attributed to it"); process.exit(1); }
+            if (contact.findings.length === 0) { console.error("::error::the unnamed image input on /contact.html was not attributed to it"); process.exit(1); }
             if (accueil.findings.length !== 0) { console.error("::error::a finding leaked onto the clean page"); process.exit(1); }
             console.log("pages:", p.map(x => x.id + " " + x.conformancePct + "%").join(", "));
           '
@@ -785,7 +785,8 @@ jobs:
 
       - name: Every non-conformity that could be shown, is
         run: |
-          # /contact.html carries the alt-less image. It was snapshotted, so the pixel tier has
+          # /contact.html carries an unnamed image input. Unlike a merely candidate finding,
+          # this is a decisive RGAA non-conformity. It was snapshotted, so the pixel tier has
           # a capture, a box digest and a byte offset — it must produce a crop.
           node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" pages --in "$PAGE_RUN/audits/audit-latest.json" \
             --standard rgaa --format report --split page --evidence --html --out "$PAGE_RUN/audits/pages"
