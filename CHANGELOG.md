@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.38.4](https://github.com/maxgfr/ultra11y/compare/v5.38.3...v5.38.4) (2026-08-28)
+
+
+### Bug Fixes
+
+* **ci:** gate the single keyed adjudication directly ([60d7400](https://github.com/maxgfr/ultra11y/commit/60d740097dc99c7528e712f2db2bb13215530a8a))
+
 ## [5.38.3](https://github.com/maxgfr/ultra11y/compare/v5.38.2...v5.38.3) (2026-08-28)
 
 
