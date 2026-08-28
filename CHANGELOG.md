@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.38.2](https://github.com/maxgfr/ultra11y/compare/v5.38.1...v5.38.2) (2026-08-28)
+
+
+### Bug Fixes
+
+* make exhaustive audits replayable and CI efficient [skip ci] ([62b40a7](https://github.com/maxgfr/ultra11y/commit/62b40a75f657d811b3193e01ea0c2ed077f8cca1))
+* replay ledger citations across CI checkouts [skip ci] ([2054f46](https://github.com/maxgfr/ultra11y/commit/2054f4692d9d4e50528abd49d3f949bc788e1eaf))
+
 ## [5.38.1](https://github.com/maxgfr/ultra11y/compare/v5.38.0...v5.38.1) (2026-08-27)
 
 
