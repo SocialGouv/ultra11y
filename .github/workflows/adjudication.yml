@@ -3,7 +3,7 @@
 # Claude transport, the composite Action and the browser tier still work.
 #
 # Cost controls are fixed rather than dispatch inputs: Haiku, low effort, batches of eight,
-# two adjudication passes over residue only and a five-dollar ceiling. One composite invocation
+# up to three adjudication passes over residue only and a five-dollar ceiling. One composite invocation
 # performs one audit and one unbounded crawl; there is no baseline pass, refutation fold or
 # runner matrix duplicating that work.
 name: Adjudication (keyed)
@@ -30,6 +30,7 @@ jobs:
       STANDARD: rgaa
       LANG_OPT: fr
       UNDECIDABLE_FILE: .ultra11y/undecidable-rgaa.json
+      CURRENT_UNDECIDABLE: audits/current-undecidable-rgaa.json
     steps:
       - uses: actions/checkout@v7
 
@@ -97,22 +98,31 @@ jobs:
           adjudicate-model: haiku
           adjudicate-effort: low
           adjudicate-budget-usd: "5"
-          adjudicate-passes: "2"
+          adjudicate-passes: "3"
           ledger: audits/fresh-rgaa-ledger.json
           crawl: http://127.0.0.1:8932/
           crawl-max: "0"
           runtime: local
           require-rendered: "true"
-          # The Action gates the exact audit it just adjudicated, including every page grid.
-          require-decided: pages
+          # A fresh model can decide an approved manual exception. Filter stale exceptions
+          # before the strict outer gate so that this harmless improvement cannot turn CI red.
+          require-decided: "false"
           undecidable-file: .ultra11y/undecidable-rgaa.json
 
       - name: Gate all 106 criteria on all nine pages
         run: |
           set -euo pipefail
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const audit = require(`${process.cwd()}/audits/audit-latest.json`);
+          const approved = require(`${process.cwd()}/.ultra11y/undecidable-rgaa.json`);
+          const unresolved = new Set(audit.criteria.filter((criterion) => criterion.status === "manual").map((criterion) => criterion.id));
+          const current = { ...approved, entries: approved.entries.filter((entry) => unresolved.has(entry.criteriaId)) };
+          fs.writeFileSync(process.env.CURRENT_UNDECIDABLE, `${JSON.stringify(current, null, 2)}\n`);
+          NODE
           node scripts/ultra11y.mjs check --in audits/audit-latest.json \
             --standard "$STANDARD" --lang "$LANG_OPT" --require-decided=pages \
-            --allow-undecided "$UNDECIDABLE_FILE"
+            --allow-undecided "$CURRENT_UNDECIDABLE"
           node scripts/ultra11y.mjs check --in audits/audit-latest.json \
             --standard "$STANDARD" --lang "$LANG_OPT" --require-rendered
 

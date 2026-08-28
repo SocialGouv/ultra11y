@@ -264,6 +264,33 @@ describe("RGAA 7.4 — the three ways a script changes context", () => {
 });
 
 // ---------------------------------------------------------------------------------------
+describe("RGAA 7.2 — scripts and their alternatives", () => {
+  it("uses script evidence instead of the inherited ARIA population", () => {
+    expect(subjects("7.2")).toEqual(["scriptAlternatives"]);
+    const evidence = harvestOn("7.2", '<div aria-label="generic" onclick="go()">Go</div>');
+    expect(evidence).toHaveLength(1);
+    expect(evidence.some((x) => x.ev.note?.includes("script handler"))).toBe(true);
+  });
+
+  it("shows both a script and its explicit noscript alternative", () => {
+    const evidence = harvestOn("7.2", '<script src="app.js"></script><noscript><a href="/simple">Version simple</a></noscript>');
+    expect(evidence.some((x) => x.ev.selector === "script")).toBe(true);
+    expect(evidence.some((x) => x.ev.selector === "noscript")).toBe(true);
+  });
+
+  it("closes as not applicable only when the scope runs no script", () => {
+    expect(EXISTENCE_SUBJECTS.has("scriptAlternatives")).toBe(true);
+    const absent = rgaa(auditPage("<p>Rien que du texte.</p>"), "7.2");
+    expect(absent.inapplicable).toBe(true);
+    expect(absent.status).toBe("C");
+
+    const present = rgaa(auditPage('<button onclick="go()">Go</button>'), "7.2");
+    expect(present.inapplicable).toBeUndefined();
+    expect(present.status).toBe("manual");
+  });
+});
+
+// ---------------------------------------------------------------------------------------
 describe("RGAA 13.3 / 13.4 — a question about nothing, when nothing is downloadable", () => {
   it("counts an office document as an element species whose absence is a fact", () => {
     expect(EXISTENCE_SUBJECTS.has("downloadDocs")).toBe(true);

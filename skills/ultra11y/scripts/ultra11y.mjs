@@ -47196,6 +47196,36 @@ var SUBJECTS = {
     ),
     ...linesOf(d, /\b(?:flash|flashing|strobe|setInterval|requestAnimationFrame|classList\.(?:add|remove|replace|toggle))\b|animation(?:-name)?\s*:/i).filter((l) => !/^\s*(?:<!--|\/\/|\/\*)/.test(l.text)).map((l) => hAt(d, l.line, "flash-code", `possible scripted/CSS flash mechanism: ${l.text}`, `flash-code|${l.text}`))
   ]),
+  // RGAA 7.2 — the script AND the alternative whose relevance must be judged. Inheriting
+  // WCAG 4.1.2 used to hand this criterion every ARIA-bearing element in the repository while
+  // omitting inline handlers entirely. On the realworld fixture that meant 33 unrelated
+  // anchors and none of its three scripts; Haiku correctly refused to invent an association.
+  // Keep the population narrow: scripts/handlers establish applicability, while noscript and
+  // non-text fallbacks are the concrete alternatives covered by tests 7.2.1 and 7.2.2.
+  scriptAlternatives: (docs) => docs.flatMap((d) => [
+    ...elementsByTag(d, "script").map(
+      (e) => h(
+        d,
+        e,
+        `<script${attr(e, "src") ? ` src="${attr(e, "src")}"` : ""}> \u2014 identify its alternative and compare the information or function`,
+        `script|${attr(e, "src") ?? t(e, 100)}`
+      )
+    ),
+    ...linesOf(d, /\bon[A-Z][A-Za-z]*\s*=|\son[a-z]+\s*=\s*["']/).map(
+      (l) => hAt(d, l.line, "handler", `script handler \u2014 identify any alternative offering the same information or function: ${l.text}`, `handler|${l.text}`)
+    ),
+    ...elementsByTag(d, "noscript").map(
+      (e) => h(d, e, `<noscript> alternative \u2014 does it provide content and functions similar to the associated script?`, `noscript|${t(e, 120)}`)
+    ),
+    ...d.elements.filter((e) => ["canvas", "object", "embed"].includes(e.tag) && (t(e, 120) !== "" || e.children.some((child) => child.type === "element"))).map(
+      (e) => h(
+        d,
+        e,
+        `<${e.tag}> fallback \u2014 if a script updates this non-text element, is its alternative updated and relevant?`,
+        `script-fallback|${e.tag}|${t(e, 120)}`
+      )
+    )
+  ]),
   // A change of context initiated by a script. RGAA 7.4 / WCAG 3.2.1-3.2.2.
   //
   // THE SUBJECT IS THE SCRIPT, and getting that wrong cost a release. This used to be a list of
@@ -47559,6 +47589,7 @@ var PACK_SUBJECTS = {
     // Theme 7 — scripts. "Is each script operable by keyboard AND pointer?" is about the
     // handlers and the focusable surface, never about the page's headings and lists.
     "7.1": ["aria", "pointerHandlers"],
+    "7.2": ["scriptAlternatives"],
     "7.3": ["pointerHandlers", "focusables"],
     "7.4": ["contextChange"],
     "7.5": ["liveRegions"],
@@ -47607,6 +47638,7 @@ var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set([
   "downloadDocs",
   "newWindow",
   "contextChange",
+  "scriptAlternatives",
   // A page that declares no default language has no language code for 8.4 to be about. The
   // `<html>` element is always there; the attribute is what this subject looks for.
   "declaredLang"

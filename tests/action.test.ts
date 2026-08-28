@@ -1378,12 +1378,12 @@ describe("the keyed adjudication workflow is singular, exhaustive and bounded", 
     expect(agent?.with?.["adjudicate-model"]).toBe("haiku");
     expect(agent?.with?.["adjudicate-effort"]).toBe("low");
     expect(agent?.with?.["adjudicate-budget-usd"]).toBe("5");
-    expect(agent?.with?.["adjudicate-passes"]).toBe("2");
+    expect(agent?.with?.["adjudicate-passes"]).toBe("3");
     expect(agent?.with?.ledger).toBe("audits/fresh-rgaa-ledger.json");
     expect(agent?.with?.crawl).toBe("http://127.0.0.1:8932/");
     expect(agent?.with?.["crawl-max"]).toBe("0");
     expect(agent?.with?.["require-rendered"]).toBe("true");
-    expect(agent?.with?.["require-decided"]).toBe("pages");
+    expect(agent?.with?.["require-decided"]).toBe("false");
     expect(agent?.with?.["undecidable-file"]).toBe(".ultra11y/undecidable-rgaa.json");
   });
 
@@ -1405,7 +1405,8 @@ describe("the keyed adjudication workflow is singular, exhaustive and bounded", 
 
     const gate = String(steps[after]?.run);
     expect(gate).toContain("--require-decided=pages");
-    expect(gate).toContain('--allow-undecided "$UNDECIDABLE_FILE"');
+    expect(gate).toContain('criterion.status === "manual"');
+    expect(gate).toContain('--allow-undecided "$CURRENT_UNDECIDABLE"');
     expect(gate).toContain("--require-rendered");
     expect(gate).toContain("grid.pages.length !== 9");
     expect(gate).toContain("page.criteria.length !== 106");
