@@ -75,6 +75,14 @@ describe("toDynamicResult — residual-criteria probes (local runtime)", () => {
     expect(merged.findings.some((f) => f.ruleId === "dyn-focus-visible")).toBe(true);
     expect(merged.residualRisks.some((r) => r.criteriaId === "2.4.7")).toBe(false);
   });
+
+  it("does not duplicate a dynamic finding when an unchanged scan is merged twice", () => {
+    const audit = runAudit({ inputs: [`${FIX}conforming/good.html`] });
+    const once = mergeDynamic(audit, dyn);
+    const twice = mergeDynamic(once, dyn);
+    expect(twice.findings).toHaveLength(once.findings.length);
+    expect(twice.criteria.find((c) => c.id === "2.4.7")?.findings).toHaveLength(once.criteria.find((c) => c.id === "2.4.7")?.findings.length ?? 0);
+  });
 });
 
 describe("toDynamicResult — stateful probes (input-overflow + live-region)", () => {

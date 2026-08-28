@@ -1,10 +1,22 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { type AdjudicationFile, type AdjudicationItem, applyAdjudication, buildAdjudicationWorklist } from "../src/adjudicate.js";
 import { runAudit } from "../src/audit.js";
-import { emptyLedger, entriesFrom, evidenceFingerprint, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, writeLedger } from "../src/ledger.js";
+import {
+  emptyLedger,
+  entriesFrom,
+  evidenceFingerprint,
+  isLedger,
+  ledgerPath,
+  mergeLedger,
+  pruneLedger,
+  readLedger,
+  replayLedger,
+  writeLedger,
+} from "../src/ledger.js";
+import { PAGES_DIR } from "../src/snapshot.js";
 
 const dir = mkdtempSync(join(tmpdir(), "u11y-ledger-"));
 
@@ -100,6 +112,28 @@ describe("evidenceFingerprint", () => {
   it("normalises whitespace, so a re-indent is not a change", () => {
     expect(evidenceFingerprint([ev({ snippet: '<img    alt="x">' })])).toBe(evidenceFingerprint([ev({ snippet: '<img\n  alt="x">' })]));
   });
+
+  it("ignores the checkout prefix of a page snapshot, but keeps its page identity", () => {
+    const a = ev({ file: `/tmp/runner-a/repo/${PAGES_DIR}/accueil/dom.html` });
+    const b = ev({ file: `/home/runner/work/repo/${PAGES_DIR}/accueil/dom.html` });
+    const other = ev({ file: `/home/runner/work/repo/${PAGES_DIR}/contact/dom.html` });
+    expect(evidenceFingerprint([a])).toBe(evidenceFingerprint([b]));
+    expect(evidenceFingerprint([a])).not.toBe(evidenceFingerprint([other]));
+  });
+
+  it("ignores a capture header's transport URL but not the captured page identity", () => {
+    const atA = ev({
+      file: `${PAGES_DIR}/accueil/dom.html`,
+      snippet: '<!-- ultra11y:capture v="1" page="accueil" url="http://127.0.0.1:8932/" -->',
+    });
+    const atB = ev({
+      file: `${PAGES_DIR}/accueil/dom.html`,
+      snippet: '<!-- ultra11y:capture v="1" page="accueil" url="https://ci.example.test/" -->',
+    });
+    const other = ev({ ...atB, file: `${PAGES_DIR}/contact/dom.html` });
+    expect(evidenceFingerprint([atA])).toBe(evidenceFingerprint([atB]));
+    expect(evidenceFingerprint([atA])).not.toBe(evidenceFingerprint([other]));
+  });
 });
 
 // THE POINT OF THE WHOLE MECHANISM. A CI job has no model in the loop, so before the ledger it
@@ -143,6 +177,29 @@ describe("replayLedger — parity with the adjudicated audit, without a model", 
     expect(rp.stale).toEqual([]);
     expect(r.rejected).toBe(0);
     expect(r.applied).toBeGreaterThan(0);
+  });
+
+  it("reanchors snapshot citations when the same audit is replayed in another checkout", () => {
+    const snapshot = (root: string): string => {
+      const path = join(root, PAGES_DIR, "accueil", "dom.html");
+      mkdirSync(join(root, PAGES_DIR, "accueil"), { recursive: true });
+      writeFileSync(path, `<!-- ultra11y:capture v="1" page="accueil" url="https://example.test/" -->\n${PAGE_HTML}`);
+      return path;
+    };
+    const first = snapshot(mkdtempSync(join(tmpdir(), "u11y-ledger-first-")));
+    const second = snapshot(mkdtempSync(join(tmpdir(), "u11y-ledger-second-")));
+    const { ledger } = recordLedger(first);
+    // Claude commonly omits this optional field. The evidence content and location still
+    // identify the unique anchor, so checkout portability must not depend on it.
+    const image = ledger.entries.find((entry) => entry.criteriaId === "1.1.1");
+    if (image?.citations) image.citations = image.citations.map((citation) => ({ ...citation, selector: "" }));
+    const audit = auditOf(second);
+    const rp = replayLedger(audit, ledger, { cwd: process.cwd() });
+    const applied = applyAdjudication(audit, rp.adj, { cwd: process.cwd(), residualReasons: rp.residualReasons });
+
+    expect(rp.stale).toEqual([]);
+    expect(applied.rejected).toBe(0);
+    expect(applied.applied).toBeGreaterThan(0);
   });
 
   it("drops a verdict as stale when the evidence it read changed, and says so", () => {
@@ -253,6 +310,55 @@ describe("mergeLedger", () => {
     const merged = mergeLedger(rgaa, "wcag", [entry("1.1.1", "2026-08-17")]);
     expect(merged.standard).toBe("wcag");
     expect(merged.entries.map((e) => e.criteriaId)).toEqual(["1.1.1"]);
+  });
+});
+
+describe("pruneLedger", () => {
+  const entry = (criteriaId: string, verdict: "C" | "NC", findings?: Array<{ file: string; line: number; selector: string; message: string }>) => ({
+    criteriaId,
+    verdict,
+    ...(findings ? { findings } : {}),
+    evidenceFingerprint: `sha256:${criteriaId}`,
+    evidenceCount: 1,
+    date: "2026-08-28",
+    decidedBy: "agent" as const,
+  });
+
+  it("removes only the withdrawn NC anchor and canonicalizes snapshot checkout prefixes", () => {
+    const ledger = mergeLedger(undefined, "rgaa", [
+      entry("1.1", "NC", [
+        { file: "/runner/a/.ultra11y/pages/home/dom.html", line: 8, selector: "img.hero", message: "bad alt" },
+        { file: "src/card.tsx", line: 12, selector: "img.logo", message: "missing alt" },
+      ]),
+    ]);
+    const result = pruneLedger(
+      ledger,
+      [
+        {
+          n: 1,
+          criteriaId: "1.1",
+          file: "/runner/b/.ultra11y/pages/home/dom.html",
+          line: 8,
+          selector: "img.hero",
+          claim: "bad alt",
+          verdict: "refuted",
+          note: "",
+          kind: "nc",
+        },
+      ],
+      [],
+      [],
+    );
+    expect(result.removedFindings).toBe(1);
+    expect(result.removedEntries).toBe(0);
+    expect(result.ledger.entries[0]!.findings?.map((finding) => finding.message)).toEqual(["missing alt"]);
+  });
+
+  it("deletes reopened NC and withdrawn conformity entries so replay cannot resurrect them", () => {
+    const ledger = mergeLedger(undefined, "rgaa", [entry("1.1", "NC", []), entry("11.2", "C")]);
+    const result = pruneLedger(ledger, [], ["1.1"], ["11.2"]);
+    expect(result.removedEntries).toBe(2);
+    expect(result.ledger.entries).toEqual([]);
   });
 });
 

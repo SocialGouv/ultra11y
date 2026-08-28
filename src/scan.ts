@@ -18,6 +18,7 @@ import { parseSitemapUrls, crawlUrls, crawlBound, nameFromUrl } from "./crawl.js
 import { sampleScope } from "./sample.js";
 import {
   COLLECT_SNAPSHOT,
+  PAGES_DIR,
   SNAPSHOT_VERSION,
   slugifyPageId,
   validateSnapshotMeta,
@@ -27,6 +28,17 @@ import {
   type SnapshotProbes,
 } from "./snapshot.js";
 import { today } from "./util.js";
+import { findingId } from "./baseline.js";
+
+/** Snapshot findings are repository artefacts, not checkout-local files. `audit` may ingest
+ * them as `.ultra11y/pages/...` while a following `scan --cwd "$PWD"` sees an absolute path;
+ * treating those as different findings doubled a one-pass crawl from 850 to 1,348 findings. */
+const portableFindingId = (finding: Finding): string => {
+  const posix = finding.file.replace(/\\/g, "/");
+  const marker = `${PAGES_DIR}/`;
+  const at = posix.lastIndexOf(marker);
+  return findingId(at >= 0 ? { ...finding, file: posix.slice(at) } : finding);
+};
 
 export const IMAGE_TAG = "ultra11y-dyn:1";
 const MOUNT = "/work/input.html";
@@ -679,6 +691,7 @@ function resolveHostAnchor(file: string, snippet: string): { line: number; col: 
  *  clean criterion that axe flags becomes NC; tallies + conformance recompute. */
 export function mergeDynamic(audit: AuditResult, dynamic: DynamicResult, lang: Lang = "en"): AuditResult {
   const merged: AuditResult = JSON.parse(JSON.stringify(audit)) as AuditResult;
+  const seenFindings = new Set(merged.findings.map(portableFindingId));
   // Record the normative page sample the dynamic tier ran over (Task 5) — drives the
   // report's « Constats par page » section. Storage-state paths were already dropped upstream.
   if (dynamic.sample) merged.scope.sample = dynamic.sample;
@@ -745,8 +758,12 @@ export function mergeDynamic(audit: AuditResult, dynamic: DynamicResult, lang: L
           }
         : {}),
     };
-    c.findings.push(finding);
-    merged.findings.push(finding);
+    const id = portableFindingId(finding);
+    if (!seenFindings.has(id)) {
+      seenFindings.add(id);
+      c.findings.push(finding);
+      merged.findings.push(finding);
+    }
     // An ADVISORY dynamic finding (best-practice-only axe violation) is attached but never
     // authoritative: it must NOT flip the criterion to NC nor clear its justification, and
     // the criterion stays in residualRisks. A normative dynamic finding behaves as before.
@@ -812,6 +829,32 @@ export function recomputeTallies(merged: AuditResult): void {
  *     applicability, never remove it). */
 export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditResult {
   const merged: AuditResult = JSON.parse(JSON.stringify(base)) as AuditResult;
+  // The adjudication worklist re-reads `scope.inputs`. Without the snapshot inputs the audit
+  // contained rendered findings and page coverage, but its ledger fingerprint was rebuilt
+  // from source only — valid verdicts therefore went stale on every fresh CI run.
+  const inputIdentity = (input: string) => {
+    const posix = input.replace(/\\/g, "/");
+    const at = posix.lastIndexOf(PAGES_DIR);
+    return at >= 0 ? posix.slice(at) : posix;
+  };
+  const knownInputs = new Set(base.scope.inputs.map(inputIdentity));
+  const snapshotRootCovered = knownInputs.has(PAGES_DIR);
+  const addedInputs = snap.scope.inputs.filter((input) => {
+    const identity = inputIdentity(input);
+    return !knownInputs.has(identity) && !(snapshotRootCovered && identity.startsWith(`${PAGES_DIR}/`));
+  });
+  merged.scope.inputs = [...base.scope.inputs, ...addedInputs];
+  if (addedInputs.length === snap.scope.inputs.length) merged.scope.files = base.scope.files + snap.scope.files;
+  merged.scope.langs = [...new Set([...(base.scope.langs ?? []), ...(snap.scope.langs ?? [])])];
+  if (!merged.scope.langs.length) delete merged.scope.langs;
+  merged.scope.subjectsSeen = [...new Set([...(base.scope.subjectsSeen ?? []), ...(snap.scope.subjectsSeen ?? [])])].sort();
+  if (!merged.scope.subjectsSeen.length) delete merged.scope.subjectsSeen;
+  const pageSubjects: Record<string, string[]> = { ...(base.scope.pageSubjects ?? {}) };
+  for (const [page, subjects] of Object.entries(snap.scope.pageSubjects ?? {})) {
+    pageSubjects[page] = [...new Set([...(pageSubjects[page] ?? []), ...subjects])].sort();
+  }
+  if (Object.keys(pageSubjects).length) merged.scope.pageSubjects = pageSubjects;
+  const seenFindings = new Set(merged.findings.map(portableFindingId));
   // The base was a SOURCE audit; the snapshot audit is the run that actually read the pages.
   // Deep-copying only the base's scope would throw that evidence away and downgrade genuinely
   // audited pages to "not-audited" — the inverse of the guard, and a false statement in the
@@ -843,8 +886,12 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
   for (const f of snap.findings) {
     const c = byId.get(f.criteriaId);
     if (!c) continue;
-    c.findings.push(f);
-    merged.findings.push(f);
+    const id = portableFindingId(f);
+    if (!seenFindings.has(id)) {
+      seenFindings.add(id);
+      c.findings.push(f);
+      merged.findings.push(f);
+    }
     if (!f.advisory) {
       c.status = "NC";
       delete c.inapplicable; // a finding is proof the subject is in scope after all
@@ -853,7 +900,18 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
   }
   // Declarative pack-rule findings live outside the WCAG core verdict; they are carried over
   // untouched so a pack projection sees the snapshot's hits too.
-  if (snap.packFindings?.length) merged.packFindings = [...(merged.packFindings ?? []), ...snap.packFindings];
+  if (snap.packFindings?.length) {
+    const pack = [...(merged.packFindings ?? [])];
+    const seenPack = new Set(pack.map(portableFindingId));
+    for (const finding of snap.packFindings) {
+      const id = portableFindingId(finding);
+      if (!seenPack.has(id)) {
+        seenPack.add(id);
+        pack.push(finding);
+      }
+    }
+    merged.packFindings = pack;
+  }
 
   // A criterion the static pass closed for want of a subject, which the snapshot then MEASURED.
   // Both read `C`, so the discriminator is the FLAG, not the status — and testing the status

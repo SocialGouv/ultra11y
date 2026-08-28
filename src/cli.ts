@@ -51,6 +51,7 @@ import {
   VERIFY_MAX,
   type ConformityClaim,
   type VerifyItem,
+  verifyGroundingInputs,
 } from "./verify.js";
 import { pruneRefuted, type PruneResult } from "./refute.js";
 import { groundItems } from "./grounding.js";
@@ -63,7 +64,18 @@ import {
   unrenderedResidual,
   type AdjudicationFile,
 } from "./adjudicate.js";
-import { entriesFrom, isLedger, ledgerPath, mergeLedger, readLedger, replayLedger, unreadableCaptures, type VerdictLedger, writeLedger } from "./ledger.js";
+import {
+  entriesFrom,
+  isLedger,
+  ledgerPath,
+  mergeLedger,
+  pruneLedger,
+  readLedger,
+  replayLedger,
+  unreadableCaptures,
+  type VerdictLedger,
+  writeLedger,
+} from "./ledger.js";
 import { DEFAULT_CLI_MODEL, EFFORT_LEVELS, judgeBatchCli, refuteBatchCli } from "./agent-cli.js";
 import { CODEX_EFFORT_LEVELS, judgeBatchCodex, refuteBatchCodex } from "./agent-codex.js";
 import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, batchWorklist, isProviderUnavailableError, judgeAll, modelFromEnv, type LlmOptions } from "./llm.js";
@@ -127,7 +139,7 @@ Usage:
   ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file)
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y judge    --in <audit.json> [--concurrency <n>] [--ledger [<path>]] [--lang auto|en|fr]
-  ultra11y judge    --refute <VERIFY.todo.json> --runner claude|codex [--standard <pack>] [--model <id>] [--effort <level>] [--concurrency <n>] [--max-budget-usd <n> (Claude only)] [--timeout <s>]   (put the already-written claims on trial — one call per item, read-only; cli aliases claude)
+  ultra11y judge    --refute <VERIFY.todo.json> --runner claude|codex [--standard <pack>] [--grain batch|criterion] [--model <id>] [--effort <level>] [--concurrency <n>] [--max-budget-usd <n> (Claude only)] [--timeout <s>]   (put every already-written claim on trial — batches of 8 by default, read-only; cli aliases claude)
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
@@ -423,11 +435,12 @@ Options:
                      so a later run replays them for free (default:
                      .ultra11y/verdicts/<standard>.json). Replay re-derives the evidence
                      and re-runs the same gate; a verdict whose evidence changed is
-                     dropped as stale and its criterion says so
+                     dropped as stale and its criterion says so. With verify --prune,
+                     withdrawn claims are removed from the ledger as well
   --conformities <file>
-                     verify: the CLAIMED CONFORMITIES to put on trial — a verdict ledger or an
-                     adjudication file. Defaults to the standard's ledger
-                     (.ultra11y/verdicts/<standard>.json) when one exists, so the conformity
+                     verify: the CLAIMED CONFORMITIES to put on trial — an audit, verdict
+                     ledger or adjudication file. Defaults to --in's current audit, then the
+                     standard's ledger (.ultra11y/verdicts/<standard>.json), so the conformity
                      half of the gate runs without being asked for: nothing used to challenge
                      an agent's C verdict, and a criterion cleared because its subject was
                      PRESENT rather than RIGHT shipped as a conformance claim. Each cited anchor
@@ -2900,9 +2913,7 @@ function cmdVerify(p: ParsedArgs): number {
     // Content-level grounding of every verdict that passed adjudication: the cited
     // file/line/snippet must still exist and match the source (see src/grounding.ts).
     const passing = items.filter((it) => typeof it.verdict === "string" && ["supported", "partial"].includes(it.verdict.trim().toLowerCase()));
-    const grounding = groundItems(
-      passing.map((it) => ({ file: it.file, line: it.line, selector: it.selector, snippet: (it as { snippet?: string }).snippet })),
-    );
+    const grounding = groundItems(verifyGroundingInputs(passing));
     // --prune: APPLY the outcome instead of only reporting it. See src/refute.ts for why a
     // gate that can only go red is the wrong shape for a cheap adjudicator's run, and for the
     // asymmetry between withdrawing a non-conformity and withdrawing a conformity.
@@ -2915,9 +2926,13 @@ function cmdVerify(p: ParsedArgs): number {
     if (p.flags.json) console.log(JSON.stringify({ ...r, ok, grounding, ...(pruned ? { pruned } : {}) }, null, 2));
     else if (ok)
       console.log(
-        lang === "fr"
-          ? `✓ ${r.total} non-conformités vérifiées, toutes étayées et ancrées dans la source${grounding.moved ? ` (${grounding.moved} déplacée(s))` : ""}.`
-          : `✓ ${r.total} non-conformities verified, all supported and grounded in source${grounding.moved ? ` (${grounding.moved} moved)` : ""}.`,
+        pruned
+          ? lang === "fr"
+            ? `✓ ${r.total} revendication(s) contre-expertisée(s), retraits appliqués et verdicts conservés ancrés dans la source${grounding.moved ? ` (${grounding.moved} déplacé(s))` : ""}.`
+            : `✓ ${r.total} claim(s) reviewed, withdrawals applied, and retained verdicts grounded in source${grounding.moved ? ` (${grounding.moved} moved)` : ""}.`
+          : lang === "fr"
+            ? `✓ ${r.total} revendication(s) vérifiée(s), toutes étayées et ancrées dans la source${grounding.moved ? ` (${grounding.moved} déplacée(s))` : ""}.`
+            : `✓ ${r.total} claim(s) verified, all supported and grounded in source${grounding.moved ? ` (${grounding.moved} moved)` : ""}.`,
       );
     else {
       if (!r.ok)
@@ -2970,16 +2985,39 @@ function applyPrune(p: ParsedArgs, standard: StandardId, items: VerifyItem[], la
     return undefined;
   }
   const pruned = pruneRefuted(audit, standard, items, lang);
+  const ledgerFile = ledgerTarget(p, standard);
+  let ledgerRepair: ReturnType<typeof pruneLedger> | undefined;
+  if (ledgerFile) {
+    const ledger = readLedger(ledgerFile);
+    if (!ledger || ledger.standard !== standard) {
+      console.error(
+        lang === "fr"
+          ? `ultra11y verify : registre --ledger introuvable, invalide ou d'un autre référentiel : ${ledgerFile}.`
+          : `ultra11y verify: --ledger file missing, invalid, or for another standard: ${ledgerFile}.`,
+      );
+      return undefined;
+    }
+    ledgerRepair = pruneLedger(ledger, items, pruned.reopenedCriteria, pruned.clearedConformities);
+  }
   const out = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
+  if (ledgerFile && ledgerRepair) {
+    writeLedger(ledgerFile, ledgerRepair.ledger);
+    if (!p.flags.json)
+      console.log(
+        lang === "fr"
+          ? `✓ Registre réparé : ${ledgerRepair.removedEntries} verdict(s) et ${ledgerRepair.removedFindings} constat(s) retirés → ${ledgerFile}`
+          : `✓ Ledger repaired: ${ledgerRepair.removedEntries} verdict(s) and ${ledgerRepair.removedFindings} finding(s) removed → ${ledgerFile}`,
+      );
+  }
   if (!p.flags.json) {
+    const reopened = [...new Set([...pruned.reopenedCriteria, ...pruned.clearedConformities])];
     console.log(
       lang === "fr"
-        ? `✓ Contre-expertise appliquée : ${pruned.removedFindings} non-conformité(s) supprimée(s), ${pruned.reopenedCriteria.length + pruned.clearedConformities.length} critère(s) de retour à « à évaluer ».`
-        : `✓ Trial applied: ${pruned.removedFindings} non-conformity(ies) deleted, ${pruned.reopenedCriteria.length + pruned.clearedConformities.length} criterion(ia) back to “to assess”.`,
+        ? `✓ Contre-expertise appliquée : ${pruned.removedFindings} non-conformité(s) supprimée(s), ${reopened.length} critère(s) de retour à « à évaluer ».`
+        : `✓ Trial applied: ${pruned.removedFindings} non-conformity(ies) deleted, ${reopened.length} criterion(ia) back to “to assess”.`,
     );
-    const reopened = [...pruned.reopenedCriteria, ...pruned.clearedConformities];
     if (reopened.length) console.log(`  ${reopened.join(", ")}`);
     // A withdrawn claim against an ENGINE verdict is left alone on purpose (src/refute.ts),
     // and saying so is the difference between « handled » and « silently dropped ».
@@ -3128,6 +3166,21 @@ function cmdVerifyWorklist(p: ParsedArgs, langIn: Lang): number {
 function conformityClaimsFor(p: ParsedArgs, standard: StandardId, lang: Lang): ConformityClaim[] {
   if (p.flags.conformities === false || p.flags["no-conformities"] === true) return [];
   const named = typeof p.flags.conformities === "string" && p.flags.conformities ? p.flags.conformities : undefined;
+  // `--in` is the exact audit the report came from, so its current conformance claims outrank
+  // a durable ledger that may describe the preceding run. This matters after prune +
+  // re-adjudicate: trying the old ledger again can bill the refuter for claims the current
+  // audit no longer makes. An explicit --conformities still wins.
+  if (!named) {
+    const inFlag = p.flags.in;
+    if (typeof inFlag === "string" && inFlag && inFlag !== "-") {
+      try {
+        const audit = unwrapAudit(JSON.parse(readText(inFlag))) as AuditResult;
+        if (Array.isArray(audit.criteria)) return conformityClaimsFromAudit(audit, standard);
+      } catch {
+        // The command that owns --in reports malformed input; the ledger remains a fallback.
+      }
+    }
+  }
   const path = named ?? ledgerPath(standard);
   if (!existsSync(path)) {
     // Loud when a path WAS named, because a typo there would otherwise verify nothing and
@@ -3139,18 +3192,14 @@ function conformityClaimsFor(p: ParsedArgs, standard: StandardId, lang: Lang): C
       );
       return [];
     }
-    // NO LEDGER — fall back to the audit itself, which now carries the citations each agent
-    // verdict was settled on. This used to return nothing, and « nothing » is what made the
-    // conformity trial silently optional: `judge --apply` without `--ledger` produced an audit
-    // whose every `C` was beyond reach of a second reader, which is exactly the run a cheap
-    // adjudicator makes dangerous.
-    return claimsFromAudit(p, standard, lang);
+    return [];
   }
   try {
-    const parsed = JSON.parse(readText(path)) as { entries?: ConformityClaim[]; items?: ConformityClaim[] };
-    // A ledger stores `entries`, an adjudication file stores `items`; both carry the two
-    // fields this needs, so either is accepted rather than making the caller convert one.
-    return parsed.entries ?? parsed.items ?? [];
+    const parsed = JSON.parse(readText(path)) as { entries?: ConformityClaim[]; items?: ConformityClaim[]; criteria?: unknown[] };
+    if (parsed.entries) return parsed.entries;
+    if (parsed.items) return parsed.items;
+    const audit = unwrapAudit(parsed) as AuditResult;
+    return Array.isArray(audit.criteria) ? conformityClaimsFromAudit(audit, standard) : [];
   } catch {
     if (named)
       console.error(
@@ -3158,30 +3207,6 @@ function conformityClaimsFor(p: ParsedArgs, standard: StandardId, lang: Lang): C
           ? `ultra11y verify : le fichier --conformities n'est pas du JSON valide : ${named}.`
           : `ultra11y verify: --conformities file is not valid JSON: ${named}.`,
       );
-    return [];
-  }
-}
-
-/** The claimed conformities carried by the audit under `--in`, for a run that recorded no
- *  ledger. Silent on every failure that is not a real problem — no `--in` (the `--report`
- *  path does not require one), `-` for stdin (already consumed), an unreadable or non-JSON
- *  file: the caller is verifying non-conformities either way, and a noisy warning here would
- *  fire on every ordinary `verify --report <md>`. A malformed `--in` that matters is reported
- *  by the command that actually reads it. */
-function claimsFromAudit(p: ParsedArgs, standard: StandardId, lang: Lang): ConformityClaim[] {
-  const inFlag = p.flags.in;
-  if (typeof inFlag !== "string" || !inFlag || inFlag === "-") return [];
-  try {
-    const audit = JSON.parse(readText(inFlag)) as AuditResult;
-    const claims = conformityClaimsFromAudit(audit, standard);
-    if (claims.length)
-      console.error(
-        lang === "fr"
-          ? `ultra11y verify : aucun registre — ${claims.length} conformité(s) revendiquée(s) lues dans ${inFlag}.`
-          : `ultra11y verify: no ledger — ${claims.length} claimed conformity(ies) read from ${inFlag}.`,
-      );
-    return claims;
-  } catch {
     return [];
   }
 }
@@ -3438,9 +3463,9 @@ function judgeRunner(value: unknown, fallback: JudgeRunner): JudgeRunner | null 
  * command a pipeline can run, so no pipeline ran one, and the pass that catches an
  * over-accusing adjudicator was the only pass in the tool nothing could invoke.
  *
- * ONE ITEM PER INVOCATION, always — there is no `--grain` here. Batching claims would put the
- * reviewer back in the position the adjudicator was in, reading eight elements at once, and
- * the entire value of this pass is one reader looking at one element with one question.
+ * Every claim keeps its own numbered verdict. `batch` (default) amortises the prompt and CLI
+ * startup across eight independent claims; `criterion` preserves the historical one-call-per-
+ * item isolation for a caller that values it above cost.
  *
  * Local CLI runners only. The api tier has no tools, and a reviewer who cannot OPEN the cited
  * file can only re-read the claim it was given — which is not a second reading, it is an echo.
@@ -3503,19 +3528,28 @@ async function cmdRefute(p: ParsedArgs, todoPath: string): Promise<number> {
   let spent = 0;
   let failed = 0;
   let attempted = 0;
+  let calls = 0;
   let providerUnavailable = false;
   const byN = new Map(items.map((it) => [it.n, it]));
-  const queue = [...pending];
+  const grain = typeof p.flags.grain === "string" ? p.flags.grain : "batch";
+  if (grain !== "batch" && grain !== "criterion") {
+    console.error(`ultra11y judge: --grain '${grain}' is not valid for refutation — expected 'batch' or 'criterion'.`);
+    return 2;
+  }
+  const size = grain === "criterion" ? 1 : 8;
+  const queue: VerifyItem[][] = [];
+  for (let at = 0; at < pending.length; at += size) queue.push(pending.slice(at, at + size));
   const worker = async (): Promise<void> => {
     for (;;) {
       if (providerUnavailable) return;
-      const item = queue.shift();
-      if (!item) return;
-      attempted++;
+      const batch = queue.shift();
+      if (!batch) return;
+      attempted += batch.length;
+      calls++;
       try {
         const verdicts = await (runner === "codex" ? refuteBatchCodex : refuteBatchCli)(
-          [item],
-          formatWorklist([item], p.flags.semantic === true, standard, lang),
+          batch,
+          formatWorklist(batch, p.flags.semantic === true, standard, lang),
           { ...opts, onCost: (c) => (spent += c) },
           lang,
         );
@@ -3526,26 +3560,31 @@ async function cmdRefute(p: ParsedArgs, todoPath: string): Promise<number> {
           target.note = v.note ?? "";
         }
       } catch (e) {
-        // One item's failure is one item's, exactly as a failed adjudication batch is: it stays
-        // unadjudicated, `applyVerdicts` refuses to pass over it, and the run says so.
-        failed++;
+        // A failed batch leaves each of its claims unadjudicated; a later invocation resumes
+        // exactly those items because successful batches were checkpointed below.
+        failed += batch.length;
         if (isProviderUnavailableError(e)) providerUnavailable = true;
-        console.error(`ultra11y judge: item #${item.n} (${item.criteriaId}) — ${e instanceof Error ? e.message : String(e)}`);
+        console.error(
+          `ultra11y judge: batch #${batch.map((item) => item.n).join(", #")} (${batch.map((item) => item.criteriaId).join(", ")}) — ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
-      // Written after every item, not at the end: this pass is per-item precisely so a killed
-      // run keeps what it paid for.
+      // Written after every batch, not at the end: a killed run keeps every individual verdict
+      // returned by the completed batches and resumes only the blank items.
       writeFileSync(todoPath, JSON.stringify(items, null, 2) + "\n");
     }
   };
   await Promise.all(Array.from({ length: Math.min(lanes, queue.length) }, worker));
   if (providerUnavailable && queue.length)
-    console.error(`ultra11y judge: provider unavailable — stopped before ${queue.length} remaining item(s) instead of repeating the same failed request.`);
+    console.error(
+      `ultra11y judge: provider unavailable — stopped before ${queue.reduce((count, batch) => count + batch.length, 0)} remaining item(s) instead of repeating the same failed request.`,
+    );
   const tally = (v: string) => items.filter((it) => (it.verdict ?? "").trim().toLowerCase() === v).length;
   console.log(
     lang === "fr"
       ? `✓ ${attempted - failed}/${pending.length} entrée(s) mise(s) à l'épreuve → ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`
       : `✓ ${attempted - failed}/${pending.length} entry(ies) tried → ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`,
   );
+  console.log(lang === "fr" ? `  ${calls} appel(s), grain ${grain}.` : `  ${calls} call(s), ${grain} grain.`);
   if (spent > 0) console.log(lang === "fr" ? `  ${spent.toFixed(4)} $ dépensé(s).` : `  $${spent.toFixed(4)} spent.`);
   return failed ? 1 : 0;
 }

@@ -41,6 +41,11 @@ edit("src/types.ts", (s) => s.replace(/(export const VERSION = ")[^"]+(";)/, `$1
 edit("skills/ultra11y/SKILL.md", setVersionField);
 edit("skills/review-a11y/SKILL.md", setVersionField);
 
+// GitLab installs the published package rather than consuming the repository checkout. Keep
+// its default exact pin on the release that owns the template, so a later `latest` cannot
+// silently change an old pipeline's audit semantics.
+edit("skills/ultra11y/templates/gitlab-ci.yml", (s) => s.replace(/(ULTRA11Y_VERSION:\s*')[^']+(')/, `$1${version}$2`));
+
 // The plugin manifests — what carries the automatic-review hook. A stale version here is
 // what makes an installed plugin report the wrong engine, so every harness's manifest is
 // rewritten (verify-skill-bundle.mjs fails the build if they drift). Codex resolves

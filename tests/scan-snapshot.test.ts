@@ -8,6 +8,8 @@ import { pageScopesFrom, derivePages } from "../src/pages.js";
 import { runAudit } from "../src/audit.js";
 import type { AuditResult } from "../src/types.js";
 import { INAPPLICABLE_STATUS } from "../src/types.js";
+import { buildAdjudicationWorklist } from "../src/adjudicate.js";
+import { evidenceFingerprint } from "../src/ledger.js";
 
 // `scan` drives a browser over each page but used to keep only the findings. A page with no
 // snapshot is `basis: "attributed"` (src/pages.ts honesty rule 2), so its criteria can never
@@ -257,6 +259,42 @@ describe("mergeSnapshotAudit", () => {
     const before = JSON.stringify(b);
     mergeSnapshotAudit(b, snapAuditOf('<html lang="fr"><head><title>x</title></head><body><img src="a.png"></body></html>'));
     expect(JSON.stringify(b)).toBe(before);
+  });
+
+  it("keeps snapshot evidence in the worklist and is idempotent on an unchanged rerun", () => {
+    const root = tmp();
+    const source = join(root, "page.html");
+    writeFileSync(source, '<html lang="fr"><head><title>Accueil</title></head><body><main><h1>Accueil</h1><img src="a.png" alt="Logo"></main></body></html>');
+    const dir = join(root, PAGES_DIR, "accueil");
+    mkdirSync(dir, { recursive: true });
+    const dom = join(dir, "dom.html");
+    writeFileSync(
+      dom,
+      '<!-- ultra11y:capture v="1" page="accueil" url="https://exemple.fr/" -->\n<html lang="fr"><head><title>Accueil</title></head><body><main><h1>Accueil</h1><img src="a.png" alt="Logo"></main></body></html>',
+    );
+
+    const baseAudit = runAudit({ inputs: [source] });
+    const snapshotAudit = runAudit({ inputs: [dom] });
+    const once = mergeSnapshotAudit(baseAudit, snapshotAudit);
+    const checkoutRelative = structuredClone(snapshotAudit);
+    const relative = `${PAGES_DIR}/accueil/dom.html`;
+    for (const finding of checkoutRelative.findings) finding.file = relative;
+    for (const criterion of checkoutRelative.criteria) for (const finding of criterion.findings) finding.file = relative;
+    for (const finding of checkoutRelative.packFindings ?? []) finding.file = relative;
+    const twice = mergeSnapshotAudit(once, checkoutRelative);
+    const fresh = runAudit({ inputs: [source, join(root, PAGES_DIR)] });
+    const fingerprints = (audit: AuditResult) =>
+      Object.fromEntries(buildAdjudicationWorklist(audit).map((item) => [item.criteriaId, evidenceFingerprint(item.evidence)]));
+
+    expect(once.scope.inputs).toContain(dom);
+    expect(twice.findings).toHaveLength(once.findings.length);
+    expect(fingerprints(twice)).toEqual(fingerprints(once));
+    expect(fingerprints(once)).toEqual(fingerprints(fresh));
+
+    const baseWithSnapshotDir = runAudit({ inputs: [source, join(root, PAGES_DIR)] });
+    const directoryMerge = mergeSnapshotAudit(baseWithSnapshotDir, snapshotAudit);
+    expect(directoryMerge.scope.inputs).toEqual(baseWithSnapshotDir.scope.inputs);
+    expect(directoryMerge.findings).toHaveLength(baseWithSnapshotDir.findings.length);
   });
 });
 

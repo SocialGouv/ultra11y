@@ -25,9 +25,16 @@
 variables:
   ULTRA11Y_STANDARD: wcag
   ULTRA11Y_LANG: en
-  # `criterion` sends one criterion per model call: it costs more calls and it means a run
-  # that stops early loses at most ONE criterion instead of everything it had already ruled on.
-  ULTRA11Y_GRAIN: criterion
+  # Exact by default: a CI report must say which engine produced it. The release script keeps
+  # this pin aligned with the package version; override only for a deliberate upgrade test.
+  ULTRA11Y_VERSION: '5.38.1'
+  # Batches of 8 amortise the prompt; each accepted verdict is checkpointed before the next
+  # batch, and later passes receive only the residue.
+  ULTRA11Y_GRAIN: batch
+  ULTRA11Y_CRAWL_MAX: '0'
+  # `false` is the economical report-only default. Set `pages` for a certification: every
+  # criterion on every captured page must then have a verdict or the job fails.
+  ULTRA11Y_REQUIRE_DECIDED: 'false'
   # A dollar ceiling per call. The turn budget the GitHub Action derives has no equivalent
   # here on purpose — `--max-turns` is not a flag of the Claude Code CLI, and the CLI swallows
   # unknown flags without a word, so it would look like a bound and be none.
@@ -41,20 +48,22 @@ variables:
   variables:
     ENGINE: node_modules/ultra11y/scripts/ultra11y.mjs
   before_script:
-    - npm i --no-save ultra11y
+    - npm i --no-save --save-exact "ultra11y@${ULTRA11Y_VERSION}"
+    - test "$(node -p "require('ultra11y/package.json').version")" = "$ULTRA11Y_VERSION"
 
 ultra11y:audit:
   extends: .ultra11y:base
   stage: test
   script:
-    - node "$ENGINE" audit . --out audits --json > /dev/null
+    - node "$ENGINE" audit . --standard "$ULTRA11Y_STANDARD" --lang "$ULTRA11Y_LANG" --out audits --json > /dev/null
     # Render before you adjudicate, when a URL is in reach. A criterion about computed colour
     # or visible focus cannot be settled from source, and asking a model to try costs money to
     # be told so.
     - |
       if [ -n "$ULTRA11Y_URL" ]; then
         npx --yes playwright install --with-deps chromium
-        node "$ENGINE" scan --crawl "$ULTRA11Y_URL" --max 12 --runtime local --cwd "$PWD" \
+        node "$ENGINE" scan --crawl "$ULTRA11Y_URL" --max "$ULTRA11Y_CRAWL_MAX" \
+          --runtime local --cwd "$PWD" --standard "$ULTRA11Y_STANDARD" \
           --merge audits/audit-latest.json --out audits
       fi
 
@@ -83,7 +92,16 @@ ultra11y:audit:
     - node "$ENGINE" report --in audits/audit-latest.json --out audits --standard "$ULTRA11Y_STANDARD" --lang "$ULTRA11Y_LANG"
     # The gate. `--fail-on bloquant` fails the job on a blocking non-conformity; add
     # `check --require-decided` to also fail while any criterion is still « to assess ».
-    - node "$ENGINE" audit . --in audits/audit-latest.json --fail-on bloquant
+    - |
+      if [ -n "$ULTRA11Y_URL" ]; then
+        node "$ENGINE" check --in audits/audit-latest.json --standard "$ULTRA11Y_STANDARD" --require-rendered
+      fi
+      if [ "$ULTRA11Y_REQUIRE_DECIDED" = "pages" ]; then
+        node "$ENGINE" check --in audits/audit-latest.json --standard "$ULTRA11Y_STANDARD" --require-decided=pages
+      elif [ "$ULTRA11Y_REQUIRE_DECIDED" = "true" ]; then
+        node "$ENGINE" check --in audits/audit-latest.json --standard "$ULTRA11Y_STANDARD" --require-decided
+      fi
+    - node "$ENGINE" audit --in audits/audit-latest.json --standard "$ULTRA11Y_STANDARD" --fail-on bloquant
   artifacts:
     when: always
     paths:

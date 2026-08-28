@@ -7,7 +7,8 @@ name: ACT corpus refresh
 #
 #   - nothing changed upstream -> green no-op.
 #   - changed + every gate green -> commit + push straight to main, then trigger
-#     release.yml and ci.yml explicitly (a GITHUB_TOKEN push does NOT trigger them).
+#     ci.yml explicitly (a GITHUB_TOKEN push does NOT trigger it); a successful CI then
+#     triggers release.yml on the exact validated SHA.
 #   - any gate red -> nothing is pushed and no PR is opened; the run fails and the
 #     next daily cron retries. A red run is the signal to look at it by hand — most
 #     likely a NEW upstream rule that must be classified in src/act.ts, or a rule
@@ -108,8 +109,6 @@ jobs:
           git pull --rebase origin main
           git push origin HEAD:main
 
-      - name: Trigger release.yml and ci.yml on main
+      - name: Trigger CI on main
         if: steps.detect.outputs.changed == 'true'
-        run: |
-          gh workflow run release.yml --ref main
-          gh workflow run ci.yml --ref main
+        run: gh workflow run ci.yml --ref main

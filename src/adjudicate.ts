@@ -9,14 +9,14 @@
 // folds the verdicts back into the audit, FAIL-CLOSED: no null verdict, no unjustified
 // C/NA, no ungroundable NC, no reasonless manual, full coverage of the residual set. The
 // decisions are the AGENT's, statically, gated — not a deferral to a human.
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { mkdirSync, statSync, writeFileSync } from "node:fs";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import type { AuditResult, Automatability, CriterionCitation, Finding, Lang, PackCriterionAdjudication, ResidualRisk, Severity, Status } from "./types.js";
 import { SCHEMA_VERSION } from "./types.js";
 import { discover } from "./discover.js";
 import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
-import { attachSignals, snapshotPageId } from "./snapshot.js";
+import { attachSignals, PAGES_DIR, snapshotPageId } from "./snapshot.js";
 import { loadConfig } from "./config.js";
 import { type Harvested, harvestSubjects, isSnapshotFile, PACK_SUBJECTS, pageOfDoc, SC_SUBJECTS } from "./adjudicate-subjects.js";
 import type { Doc } from "./parse/html.js";
@@ -44,6 +44,7 @@ import {
 import { guidanceForCriterion } from "./guidance/index.js";
 import { guidanceExampleBlock } from "./prd.js";
 import { INAPPLICABLE_STATUS } from "./types.js";
+import { derivePages, pageGridModel } from "./pages.js";
 
 /** Cap on CONTENT CLASSES shown per criterion — not on anchors.
  *
@@ -124,6 +125,9 @@ export interface AgentFinding {
 export interface AdjudicationItem {
   criteriaId: string;
   automatability: Automatability;
+  /** Feedback from an adversarial review that reopened this criterion. It is context for the
+   * next adjudicator, never a verdict and never copied into the final decision implicitly. */
+  previousReview?: string;
   /** A deterministic rendered test exists, but the criterion still needs judgment for a C.
    * This keeps the missing-render warning independent from the final verdict owner. */
   needsRenderedEvidence?: boolean;
@@ -412,13 +416,42 @@ function packResultNeedsAdjudication(pc: ReturnType<typeof derivePackResults>[nu
   return isProvisionalJudgmentInapplicable(pc, criterion);
 }
 
+/** Candidate rules are observations the pack deliberately leaves to judgment. When a
+ * criterion has no subject harvester of its own (reflow is document-wide), those findings are
+ * also the only concrete anchors the model can cite. Prefer persisted snapshot anchors over
+ * transient URLs and keep the signal's wording as the note the adjudicator reads. */
+function candidateFindingEvidence(findings: readonly Finding[], limit: number): Evidence[] {
+  const snapshots = findings.filter((finding) => isSnapshotFile(finding.file));
+  const local = findings.filter((finding) => !/^https?:\/\//i.test(finding.file));
+  const pool = snapshots.length ? snapshots : local;
+  const seen = new Set<string>();
+  const evidence: Evidence[] = [];
+  for (const finding of pool) {
+    const key = `${finding.file}:${finding.line}:${finding.selectorHint}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    evidence.push({
+      file: finding.file,
+      line: finding.line,
+      selector: finding.selectorHint === "document" ? "" : finding.selectorHint,
+      snippet: finding.snippet,
+      note: finding.message,
+      ...(finding.page ? { pages: [finding.page] } : {}),
+    });
+    if (evidence.length >= limit) break;
+  }
+  return evidence;
+}
+
 /** Build the adjudication worklist.
  *
  *  For the WCAG core: one item per residual-risk (manual) success criterion.
  *
  *  For a COUNTRY STANDARD: one item per PACK criterion that derives `manual`, plus every
- *  judgment criterion provisionally closed for absence — 97 of RGAA's 106 criteria carry
- *  judgment tests, and all 97 pass through the agent unless already decided or definitively NC.
+ *  judgment criterion provisionally closed for absence. When the audit carries pages, a
+ *  criterion that is definitively NC for the RUN is also included if some page cells are still
+ *  open: the deterministic finding settles the run, not the unaffected pages, and the strict
+ *  page gate must not be structurally impossible to satisfy.
  *  Keying by the pack's own criteria is not cosmetic: it is what lets an item carry the
  *  criterion's numbered tests, and therefore what lets `normativeRefResolves` check a citation
  *  against THIS criterion's tests instead of accepting any id of the right shape. */
@@ -429,8 +462,18 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
 
   if (standard !== undefined && !isCore(standard)) {
     const pack = loadPack(standard);
+    const pages = derivePages(audit, audit.scope.pages ?? []);
+    const grid = pageGridModel(audit, pages, standard, "en");
+    const openOnPage = new Set([...grid.status.entries()].filter(([, byPage]) => [...byPage.values()].some((status) => status === "manual")).map(([id]) => id));
+    const alreadyAdjudicated = new Set(
+      audit.packAdjudication?.standard === standard
+        ? audit.packAdjudication.criteria.filter((criterion) => criterion.status !== "manual").map((criterion) => criterion.id)
+        : [],
+    );
     return derivePackResults(audit, standard)
-      .filter((pc) => packResultNeedsAdjudication(pc, getCriterion(pack, pc.id)))
+      .filter(
+        (pc) => packResultNeedsAdjudication(pc, getCriterion(pack, pc.id)) || (pc.status === "NC" && openOnPage.has(pc.id) && !alreadyAdjudicated.has(pc.id)),
+      )
       .map((pc) => {
         const crit = getCriterion(pack, pc.id);
         const scs = crit?.wcag ?? pc.scs;
@@ -456,8 +499,21 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
           })),
           Object.keys(crit?.tests ?? {}).map((test) => `${pc.id}.${test}`),
         );
+        const candidates = item.evidence.length ? [] : candidateFindingEvidence(pc.candidateFindings ?? [], limits.maxClasses);
         return {
           ...item,
+          ...(pc.status === "manual" && pc.justification?.match(/Contre-expertise\s*:/i) ? { previousReview: pc.justification } : {}),
+          ...(candidates.length
+            ? {
+                evidence: candidates,
+                population: {
+                  classes: candidates.length,
+                  occurrences: candidates.length,
+                  files: new Set(candidates.map((evidence) => evidence.file)).size,
+                  pages: new Set(candidates.flatMap((evidence) => evidence.pages ?? [])).size,
+                },
+              }
+            : {}),
           ...(Object.values(crit?.automation?.tests ?? {}).includes("rendered") ? { needsRenderedEvidence: true } : {}),
         };
       });
@@ -524,6 +580,36 @@ function auditFiles(audit: AuditResult, cwd?: string): Set<string> {
   } catch {
     return new Set();
   }
+}
+
+/** Snapshot paths identify committed evidence, not the runner checkout that happened to hold
+ * it. Keep ordinary source paths strict while comparing any snapshot through its published
+ * `.ultra11y/pages/<id>/…` suffix. */
+function canonicalEvidenceFile(file: string): string {
+  const posix = file.replace(/\\/g, "/");
+  const marker = `${PAGES_DIR}/`;
+  const at = posix.lastIndexOf(marker);
+  return at >= 0 ? posix.slice(at) : posix;
+}
+
+/** A directory input scopes its supporting files too. The parser may select only markup, but
+ * an adjudicator is explicitly told to open linked CSS/JS to answer judgment criteria. Such a
+ * citation remains bounded to the audited directory and is still content-grounded. */
+function withinAuditInput(file: string, audit: AuditResult, cwd?: string): boolean {
+  const target = resolve(cwd ?? process.cwd(), file);
+  for (const input of audit.scope.inputs) {
+    if (input === "-" || input === "<stdin>") continue;
+    const root = resolve(cwd ?? process.cwd(), input);
+    try {
+      if (statSync(root).isDirectory()) {
+        const rel = relative(root, target);
+        if (rel === "" || (rel !== ".." && !rel.startsWith("../") && !isAbsolute(rel))) return true;
+      } else if (root === target) return true;
+    } catch {
+      // A glob or vanished input is covered by the discovered-file set when possible.
+    }
+  }
+  return false;
 }
 
 /** Does this citation name evidence the criterion actually carries?
@@ -634,10 +720,11 @@ function overlap(cite: { snippet?: string }, anchor: { snippet?: string }): numb
  *  always did. */
 function anchorFor(
   evidence: Evidence[],
-  c: { file: string; line: number; snippet?: string },
+  c: { file: string; line: number; selector?: string; snippet?: string },
   drift: number,
 ): { at: Evidence; representative: boolean } | undefined {
-  const reps = evidence.filter((e) => e.file === c.file && Math.abs(e.line - c.line) <= drift);
+  const citedFile = canonicalEvidenceFile(c.file);
+  const reps = evidence.filter((e) => canonicalEvidenceFile(e.file) === citedFile && Math.abs(e.line - c.line) <= drift);
   const best = (cands: Evidence[]): Evidence | undefined => {
     let top: Evidence | undefined;
     let score = -1;
@@ -652,6 +739,19 @@ function anchorFor(
   };
   const rep = best(reps);
   if (rep) return { at: rep, representative: true };
+  // Browser probes are first attached to a compact snapshot anchor (often line 1), while the
+  // persisted DOM may later be pretty-printed and cited at its real element line. On the same
+  // canonical snapshot file, an exact selector or recognisable content can bridge that
+  // serializer drift; ordinary source files keep the configured line bound.
+  if (snapshotPageId(c.file) !== undefined) {
+    const anywhere = evidence.filter((e) => {
+      if (canonicalEvidenceFile(e.file) !== citedFile) return false;
+      const selectorMatch = !!c.selector && !!e.selector && c.selector === e.selector;
+      return selectorMatch || (overlap(c, e) > 0 && recognisablySame(c, e));
+    });
+    const moved = best(anywhere);
+    if (moved) return { at: moved, representative: true };
+  }
   const siblings = evidence.filter((e) => cites0(e.alsoAt ?? [], c, drift));
   const sib = best(siblings);
   return sib ? { at: sib, representative: false } : undefined;
@@ -661,7 +761,7 @@ function cites0(anchors: string[], c: { file: string; line: number }, drift: num
   for (const a of anchors) {
     const at = a.lastIndexOf(":");
     if (at < 0) continue;
-    if (a.slice(0, at) !== c.file) continue;
+    if (canonicalEvidenceFile(a.slice(0, at)) !== canonicalEvidenceFile(c.file)) continue;
     const line = Number.parseInt(a.slice(at + 1), 10);
     if (Number.isFinite(line) && Math.abs(line - c.line) <= drift) return true;
   }
@@ -828,18 +928,17 @@ export function applyAdjudication(
   }
   const byId = new Map(adj.items.map((it) => [it.criteriaId, it]));
 
-  // Coverage. Under the core that means every residual success criterion; under a pack it
-  // mirrors `buildAdjudicationWorklist`, including provisionally-inapplicable judgment rows.
+  // Coverage must use the exact same definition of "open" as the producer. Re-deriving only
+  // the run-level manual rows here made a strict page worklist impossible to fold: criteria
+  // reopened to close manual page cells were accepted by the model, then rejected as surplus.
   const packMode = !isCore(adj.standard);
   const open = new Set<string>();
   if (packMode) {
-    const pack = loadPack(adj.standard);
-    for (const pc of derivePackResults(audit, adj.standard)) {
-      if (!packResultNeedsAdjudication(pc, getCriterion(pack, pc.id))) continue;
-      open.add(pc.id);
-      if (byId.has(pc.id)) continue;
-      if (Object.hasOwn(expected, pc.id)) uncovered(pc.id);
-      else blame(pc.id, `criterion ${pc.id}: missing from the adjudication (coverage gap)`);
+    for (const item of buildAdjudicationWorklist(audit, { standard: adj.standard, cwd: opts.cwd })) {
+      open.add(item.criteriaId);
+      if (byId.has(item.criteriaId)) continue;
+      if (Object.hasOwn(expected, item.criteriaId)) uncovered(item.criteriaId);
+      else blame(item.criteriaId, `criterion ${item.criteriaId}: missing from the adjudication (coverage gap)`);
     }
   } else {
     for (const r of audit.residualRisks) {
@@ -870,6 +969,8 @@ export function applyAdjudication(
   let scopeCache: Set<string> | undefined;
   const { citationDrift } = adjudicationLimits(opts.cwd);
   const scopeFiles = (): Set<string> => (scopeCache ??= auditFiles(audit, opts.cwd));
+  const inAuditScope = (file: string): boolean =>
+    scopeFiles().has(file) || scopeFiles().has(canonicalEvidenceFile(file)) || withinAuditInput(file, audit, opts.cwd);
   // Which pack criteria the ENGINE already ruled non-conformant, indexed by the exact anchor
   // it ruled them on. Memoised: only an NC on a criterion that HAS a mechanical neighbour ever
   // asks for it, which is a minority of a worklist. `agent:` findings are excluded on purpose
@@ -976,7 +1077,7 @@ export function applyAdjudication(
           // bound — a file outside the audited scope is still refused — and it is not the last
           // one: `groundFinding` below still has to find the cited content at that file:line in
           // the real source, which is what "not fabricated" actually means.
-          if (!cites0(anchors, c, citationDrift) && !scopeFiles().has(c.file)) {
+          if (!cites0(anchors, c, citationDrift) && !inAuditScope(c.file)) {
             blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c.file}:${c.line} is not among this criterion's harvested evidence (fabricated?)`);
           }
           // GROUND THE ANCHOR, NOT THE TRANSCRIPTION.
@@ -1117,7 +1218,25 @@ export function applyAdjudication(
               `criterion ${it.criteriaId}: this anchor (${f.file}:${f.line}) is already the engine's non-conformity on ${adj.standard} ${presupposed.id} — « ${presupposed.title} ». ${it.criteriaId} asks the NEXT question about the same subject and presupposes it is there, so on this element it is not non-conformant: it has no subject. Report it on ${presupposed.id} (the engine already did), or rule ${it.criteriaId} on a different element.`,
             );
         }
-        toGround(it.criteriaId, { file: f.file, line: f.line, selector: f.selector, snippet: f.snippet });
+        // A candidate browser rule is evidence too. Its human-readable measurement lives in
+        // `note`, not in the DOM, and a model may copy that note into `snippet`. Once the
+        // finding resolves to this criterion's harvested anchor, ground the authoritative
+        // file/line/selector as the fallback instead of searching page markup for the probe's
+        // prose. Off-harvest findings keep the strict literal path.
+        const anchor = anchorFor(it.evidence, f, citationDrift);
+        const cite = { file: f.file, line: f.line, selector: f.selector, snippet: f.snippet };
+        if (anchor && recognisablySame(f, anchor.at)) {
+          toGround(it.criteriaId, cite, {
+            file: anchor.at.file,
+            line: anchor.at.line,
+            selector: anchor.at.selector,
+            snippet: anchor.at.snippet,
+          });
+        } else {
+          if (!anchor && !inAuditScope(f.file))
+            blame(it.criteriaId, `criterion ${it.criteriaId}: finding ${f.file}:${f.line} is not among this criterion's harvested evidence (fabricated?)`);
+          toGround(it.criteriaId, cite, undefined, anchor ? undefined : offHarvestHint(it.criteriaId, it.evidence));
+        }
       }
     } else if (v === "manual") {
       if (!it.reason || !MANUAL_REASONS.has(it.reason))
@@ -1874,6 +1993,15 @@ export function formatAdjudication(
   if (pack) out.push(`> ${s.packIntro(pack.name)}`, "");
   for (const it of items) {
     out.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` — ${it.title}` : ""}  _(${it.automatability})_`);
+    if (it.previousReview?.trim()) {
+      out.push(
+        "",
+        lang === "fr"
+          ? `> **Retour de la contre-expertise précédente** — ${it.previousReview.trim()}`
+          : `> **Previous adversarial review** — ${it.previousReview.trim()}`,
+        "",
+      );
+    }
     if (it.signals?.length) {
       out.push(
         "",

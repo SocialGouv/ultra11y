@@ -21,7 +21,7 @@ import {
   derivePackResults,
   isProvisionalJudgmentInapplicable,
 } from "./standards/index.js";
-import { buildWorklist, applyVerdicts, type VerifyItem } from "./verify.js";
+import { buildWorklist, applyVerdicts, type VerifyItem, verifyGroundingInputs } from "./verify.js";
 import { groundItems } from "./grounding.js";
 import { isPagesReport, pageCriterionRows } from "./pages-report.js";
 import { attributePages, derivePages, pagesOf } from "./pages.js";
@@ -298,10 +298,7 @@ export function checkSemantic(md: string, opts: SemanticOptions): SemanticResult
 
   // Content-level re-validation of every verdict that passed the adjudication gate.
   const passing = items.filter((it) => typeof it.verdict === "string" && ["supported", "partial"].includes(it.verdict.trim().toLowerCase()));
-  const grounding = groundItems(
-    passing.map((it) => ({ file: it.file, line: it.line, selector: it.selector, snippet: (it as { snippet?: string }).snippet })),
-    { cwd: opts.cwd },
-  );
+  const grounding = groundItems(verifyGroundingInputs(passing), { cwd: opts.cwd });
   for (const issue of grounding.issues) issues.push(s.semanticGround(issue));
 
   return { ok: issues.length === 0, issues, total: gate.total, grounded: grounding.grounded, moved: grounding.moved, failed: grounding.failed };

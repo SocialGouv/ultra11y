@@ -32,7 +32,12 @@ export interface GroundingSummary {
  *  the citation" (report line ↔ element line drift across renderers is expected). */
 const WINDOW = 10;
 
-const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+/** Compare content, not serializer typography. Browser snapshots may wrap an element's text
+ * over several lines and models commonly preserve straight rather than typographic quotes.
+ * Attribute names, values and letter case remain strict: `minWidth` cannot masquerade as
+ * `min-width`. */
+const norm = (s: string) =>
+  s.normalize("NFKC").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").replace(/>\s+/g, ">").replace(/\s+</g, "<").trim();
 
 /** Streams/aggregates have no on-disk source to re-open. */
 const isUnresolvable = (file: string) => !file || file === "-" || file === "<stdin>" || file === "stdin";
@@ -46,10 +51,17 @@ interface Probe {
   ci: boolean;
 }
 
+/** Evidence harvesters sometimes use a semantic label where no stable DOM selector exists.
+ * These tokens describe the evidence kind; treating them as tag selectors would require a
+ * fictitious `<handler>` element and reject an otherwise valid file+line citation. Keep this
+ * allow-list narrow so a misspelled real selector still fails closed. */
+const SEMANTIC_SELECTORS: ReadonlySet<string> = new Set(["handler"]);
+
 /** Tokens a CSS selector implies about the markup: tags probe as `<tag` (case-insensitive),
  *  attribute names as bare names (case-insensitive), ids/classes as bare names (case-SENSITIVE).
  *  Combinators and pseudo-classes are ignored — this is a fuzzy anchor, not a DOM query. */
 function selectorProbes(selector: string): Probe[] {
+  if (SEMANTIC_SELECTORS.has(selector.trim().toLowerCase())) return [];
   const probes: Probe[] = [];
   for (const simple of selector.split(/[\s>+~,]+/)) {
     if (!simple || simple === "—") continue;

@@ -72,6 +72,22 @@ describe("refuteSystemPrompt states the job", () => {
 });
 
 describe("refuteBatchCli", () => {
+  it("returns an independent verdict for every claim in a batch", async () => {
+    const spawnImpl = ok("", {
+      structured_output: {
+        verdicts: [
+          { n: 1, verdict: "supported", note: "the first anchor supports its claim" },
+          { n: 2, verdict: "refuted", note: "the second anchor does not" },
+        ],
+      },
+    });
+    const out = await refuteBatchCli([item(1), item(2)], "worklist", { ...base, spawnImpl });
+    expect(out).toEqual([
+      { n: 1, verdict: "supported", note: "the first anchor supports its claim" },
+      { n: 2, verdict: "refuted", note: "the second anchor does not" },
+    ]);
+  });
+
   it("reads the verdicts out of the CLI's structured output", async () => {
     const spawnImpl = ok("", { structured_output: { verdicts: [{ n: 1, verdict: "refuted", note: "l'élément cité est conforme" }] } });
     const out = await refuteBatchCli([item(1)], "worklist", { ...base, spawnImpl });

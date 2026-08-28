@@ -36,6 +36,19 @@ describe("groundFinding", () => {
     expect(r.ok).toBe(true);
   });
 
+  it("matches DOM line wraps and typographic apostrophes", () => {
+    const wrapped = join(dir, "wrapped.html");
+    writeFileSync(wrapped, '<button aria-describedby="tip">Qu’est-ce que le TLS ?</button>\n<span id="tip">\n  Une aide lisible.\n</span>\n');
+    expect(groundFinding({ file: wrapped, line: 1, snippet: '<button aria-describedby="tip">Qu\'est-ce que le TLS ?</button>' }).ok).toBe(true);
+    expect(groundFinding({ file: wrapped, line: 2, snippet: '<span id="tip">Une aide lisible.</span>' }).ok).toBe(true);
+  });
+
+  it("does not normalize identifiers or CSS property spellings", () => {
+    const css = join(dir, "styles.json");
+    writeFileSync(css, '{"decls":{"minWidth":"1200px"}}');
+    expect(groundFinding({ file: css, line: 1, snippet: '"min-width":"1200px"' }).ok).toBe(false);
+  });
+
   it("passes-with-moved when the snippet drifted outside the cited-line window", () => {
     // The <img> sits at line 5; cite line 30 — outside the ±10 window, still in the file.
     const r = groundFinding({ file, line: 30, snippet: '<img src="hero.png">' });
@@ -64,6 +77,14 @@ describe("groundFinding", () => {
     expect(groundFinding({ file, line: 6, selector: "p.lead" }).ok).toBe(true);
     const miss = groundFinding({ file, line: 6, selector: "video#player" });
     expect(miss.ok).toBe(false);
+  });
+
+  it("treats a harvester semantic selector as file+line evidence, not a fictitious tag", () => {
+    const script = join(dir, "handler.tsx");
+    writeFileSync(script, "export const Form = () => <form onSubmit={() => location.assign('/done')} />;\n");
+    expect(groundFinding({ file: script, line: 1, selector: "handler" }).ok).toBe(true);
+    // The exemption stays narrow: an ordinary bare selector must still exist in source.
+    expect(groundFinding({ file: script, line: 1, selector: "video" }).ok).toBe(false);
   });
 
   it("selector match outside the window counts as moved", () => {

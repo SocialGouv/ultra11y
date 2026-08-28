@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
 import { runAudit } from "../src/audit.js";
 import { applyAdjudication, buildAdjudicationWorklist, type AdjudicationFile, type AdjudicationItem } from "../src/adjudicate.js";
 import { pageCriterionRows, pageTally } from "../src/pages-report.js";
-import { derivePages, pagesOf, attributePages } from "../src/pages.js";
+import { derivePages, pagesOf, attributePages, pageGridModel } from "../src/pages.js";
 import type { AuditResult, PageScope } from "../src/types.js";
 
 const dir = mkdtempSync(join(tmpdir(), "u11y-grid-adj-"));
@@ -81,5 +81,58 @@ describe("the per-page grid carries what the adjudication decided", () => {
     // The column has to stay honest: filling it is the point, faking it is the failure.
     const rows = rowsFor(adjudicated());
     expect(rows.some((r) => r.status === "manual")).toBe(true);
+  });
+});
+
+describe("a strict page grid can adjudicate a run-level non-conformity", () => {
+  it("puts an NC criterion back on the worklist and accepts its adjudication when another page is still open", () => {
+    const bad = join(dir, "bad-page.html");
+    const good = join(dir, "good-page.html");
+    writeFileSync(
+      bad,
+      '<!doctype html><html lang="fr"><head><title>Bad</title></head><body><main><h1>Bad</h1><input type="image" src="/x.png"></main></body></html>',
+    );
+    writeFileSync(good, '<!doctype html><html lang="fr"><head><title>Good</title></head><body><main><h1>Good</h1><p>Texte</p></main></body></html>');
+    const audit = runAudit({ inputs: [bad, good] });
+    audit.scope.pages = [
+      { id: "bad", name: "Bad", url: "https://x/bad", sources: [bad], basis: "snapshot" },
+      { id: "good", name: "Good", url: "https://x/good", sources: [good], basis: "snapshot" },
+    ];
+    audit.scope.pagesAudited = ["bad", "good"];
+    attributePages(audit, audit.scope.pages);
+
+    const before = pageGridModel(audit, derivePages(audit, audit.scope.pages), "rgaa", "fr");
+    expect(before.status.get("1.1")?.get("bad")).toBe("NC");
+    expect(before.status.get("1.1")?.get("good")).toBe("manual");
+
+    const target = buildAdjudicationWorklist(audit, { standard: "rgaa" }).find((item) => item.criteriaId === "1.1");
+    expect(target, "the page gate would otherwise be impossible to close").toBeDefined();
+    const abstained = applyAdjudication(
+      audit,
+      file([
+        {
+          ...target!,
+          verdict: "manual",
+          reason: "undecidable",
+          justification: "The available evidence does not settle the unaffected page.",
+        },
+      ]),
+    );
+    const afterAbstention = pageGridModel(abstained.audit, derivePages(abstained.audit, abstained.audit.scope.pages ?? []), "rgaa", "fr");
+    expect(afterAbstention.status.get("1.1")?.get("bad"), "an agent abstention must not erase a deterministic failure").toBe("NC");
+
+    const folded = applyAdjudication(
+      audit,
+      file([
+        {
+          ...target!,
+          verdict: "NA",
+          justification: "No informative image is present on the unaffected rendered page.",
+          findings: [],
+        },
+      ]),
+    );
+    expect(folded.issues.join("\n")).not.toMatch(/not open for adjudication/);
+    expect(folded.audit.packAdjudication?.criteria.find((criterion) => criterion.id === "1.1")?.status).toBe("NA");
   });
 });

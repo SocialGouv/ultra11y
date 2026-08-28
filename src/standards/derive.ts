@@ -451,14 +451,24 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
   // ruleId — so a sibling rule on the same SC is never pulled onto the secondary criterion.
   const enabledSecondary = (pack.secondaryMappings ?? []).filter((m) => m.enabled === true);
   const secondarySources = enabledSecondary.length ? [...audit.criteria.flatMap((c) => c.findings), ...myPackFindings] : [];
-  // An agent adjudication recorded AT THIS PACK'S GRANULARITY wins over the derivation. The
-  // engine's projection is an inference from WCAG; a recorded verdict is a decision taken on
-  // the pack's own criterion, against its own numbered tests. Nothing else in the pipeline
-  // needs to know: report, per-page grid, PRD and packConformancePct all read this function.
+  // A decided agent adjudication recorded AT THIS PACK'S GRANULARITY wins over the derivation.
+  // A `manual` record is an abstention, not a verdict: it may preserve an open row, but it may
+  // never erase an NC the deterministic or rendered tier already proved.
   const adjudicated = audit.packAdjudication?.standard === packKey ? new Map(audit.packAdjudication.criteria.map((c) => [c.id, c])) : undefined;
 
   return pack.criteria.map((pc) => {
+    const base = judgmentGuard(deriveBase(pc), pc);
+    const derived = enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
+    const measured = measuredRescue(derived, pc, cov, ran, pageId);
     const decided = adjudicated?.get(pc.id);
+    if (decided?.status === "manual") {
+      return {
+        ...measured,
+        status: measured.status === "NC" ? "NC" : "manual",
+        ...(decided.justification ? { justification: decided.justification } : {}),
+        decidedBy: "agent" as const,
+      };
+    }
     if (decided) {
       // A recorded `NA` — from a ledger written before this engine stopped reporting a third
       // column, or from a model that still speaks it — means "nothing of that kind is in
@@ -477,9 +487,6 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
         decidedBy: "agent" as const,
       };
     }
-    const base = judgmentGuard(deriveBase(pc), pc);
-    const derived = enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
-    const measured = measuredRescue(derived, pc, cov, ran, pageId);
     // Preserve the raw absence-derived `C` for the adjudication worklist, but carry enough
     // metadata for consumers that do not also receive the pack (notably
     // `packConformancePct`) to publish/count it as the open judgment it still is.

@@ -65,6 +65,12 @@ const bad = (m) => {
   console.log(`  FAIL ${m}`);
 };
 
+const gitlabTemplate = readFileSync(join(root, "skills/ultra11y/templates/gitlab-ci.yml"), "utf8");
+const gitlabVersion = gitlabTemplate.match(/ULTRA11Y_VERSION:\s*'([^']+)'/)?.[1];
+gitlabVersion === pkg.version
+  ? ok(`GitLab template pins package ${gitlabVersion}`)
+  : bad(`GitLab template pin "${gitlabVersion ?? "missing"}" != package version "${pkg.version}" — add it to scripts/sync-version.mjs`);
+
 // 1. No SKILL.md at the repo root (would make `skills add` install it alone).
 existsSync(join(root, "SKILL.md"))
   ? bad("a SKILL.md exists at the repo ROOT — `skills add` would install it alone, dropping the engine. Move it under skills/<name>/SKILL.md")

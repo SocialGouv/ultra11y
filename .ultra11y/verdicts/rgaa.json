@@ -5,20 +5,103 @@
   "standard": "rgaa",
   "entries": [
     {
-      "criteriaId": "1.3",
-      "verdict": "C",
-      "justification": "The logo.png image carries information and has a textual alternative via the title attribute 'Logo Orbit', which pertinently identifies the image. Other images in the evidence either lack textual alternatives (a criterion 1.1 issue, not 1.3) or are not information-carrying.",
-      "citations": [
+      "criteriaId": "1.1",
+      "verdict": "NC",
+      "findings": [
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 59,
-          "selector": "img",
-          "snippet": "<img src=\"/img/logo.png\" alt=\"\" title=\"Logo Orbit\">"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 71,
+          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">",
+          "message": "Image without any text alternative (no alt, title, aria-label, or aria-labelledby)",
+          "normativeRef": "1.1.1",
+          "severity": "bloquant"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 77,
+          "snippet": "<canvas id=\"latence\" width=\"600\" height=\"200\"></canvas>",
+          "message": "Canvas element without fallback content, accessible name (aria-label/aria-labelledby), or role=\"img\"",
+          "normativeRef": "1.1.8",
+          "severity": "bloquant"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 80,
+          "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>",
+          "message": "Object element with no accessible name (no title, aria-label, aria-labelledby, or role=\"img\")",
+          "normativeRef": "1.1.6",
+          "severity": "bloquant"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 84,
+          "snippet": "<svg viewBox=\"0 0 100 40\"><rect x=\"0\" y=\"10\" width=\"20\" height=\"30\"></rect><rect x=\"30\" y=\"4\" width=\"20\" height=\"36\"></rect></svg>",
+          "message": "SVG element without accessible name: missing role=\"img\" and missing alternative text (no aria-label, aria-labelledby, or <title>)",
+          "normativeRef": "1.1.5",
+          "severity": "bloquant"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 30,
+          "snippet": "<table>",
+          "message": "Data table with no header elements. First row contains header-like content (Formule, Prix, Sites) but uses <td> instead of <th>",
+          "normativeRef": "1.1.1",
+          "severity": "bloquant"
         }
       ],
-      "evidenceFingerprint": "sha256:9c77d99c7837695f616c63e33d834c23",
-      "evidenceCount": 30,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:448996d21e64320ae696cdc16066d212",
+      "evidenceCount": 5,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "1.2",
+      "verdict": "NC",
+      "justification": "Image at line 74 has alt=\"\" (correctly marked as attempting to be decorative) but also possesses title=\"Logo Orbit\" attribute. Per test 1.2.1, a decorative image must have alt=\"\" and must lack other attributes that provide alternative text. The presence of the title attribute makes this image accessible to screen readers despite the empty alt, violating the requirement.",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 74,
+          "message": "Decorative image with empty alt but contains title attribute, violating 1.2.1 requirement that decorative images must not have title",
+          "normativeRef": "1.2.1",
+          "snippet": "<img src=\"/img/logo.png\" alt=\"\" title=\"Logo Orbit\">",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:a553880e4727382c436c0616b2dca901",
+      "evidenceCount": 33,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "1.3",
+      "verdict": "NA",
+      "justification": "Criterion 1.3 applies only to images that have a text alternative. The majority of images bearing information in this site fail criterion 1.1 first (lack any alternative). Per the RGAA definition and test 1.3.1, this criterion only evaluates the relevance of alternatives for images that possess them. Since the main images lack alternatives entirely, 1.3 does not apply to them. The logo image at accueil/dom.html:74 has an alternative (title=\"Logo Orbit\"), but the alternative exists and the image's role is primarily decorative branding rather than information-bearing.",
+      "citations": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 71,
+          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 77,
+          "snippet": "<canvas id=\"latence\" width=\"600\" height=\"200\"></canvas>"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 80,
+          "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 84,
+          "snippet": "<svg viewBox=\"0 0 100 40\"><rect x=\"0\" y=\"10\" width=\"20\" height=\"30\"></rect><rect x=\"30\" y=\"4\" width=\"20\" height=\"36\"></rect></svg>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:a553880e4727382c436c0616b2dca901",
+      "evidenceCount": 33,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
@@ -62,40 +145,43 @@
     {
       "criteriaId": "1.6",
       "verdict": "NC",
-      "justification": "Plusieurs images porteuses d'information manquent de description détaillée selon les tests 1.6.1, 1.6.5, 1.6.7.",
-      "citations": [
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 56,
-          "selector": "img",
-          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 62,
-          "selector": "canvas#latence",
-          "snippet": "<canvas id=\"latence\" width=\"600\" height=\"200\"></canvas>"
-        }
-      ],
       "findings": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 56,
-          "message": "Image réseau manque d'attribut longdesc, aria-label ou aria-describedby",
+          "line": 71,
           "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">",
-          "normativeRef": "1.6.1"
+          "message": "Image porteuse d'information (diagramme réseau) sans description détaillée : pas de longdesc, pas de aria-describedby, pas de figcaption, pas de lien/bouton adjacent",
+          "normativeRef": "1.6.1",
+          "severity": "majeur"
         },
         {
           "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 62,
-          "message": "Canvas latence manque de description détaillée via aria-label, aria-labelledby ou contenu textuel",
+          "line": 80,
+          "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>",
+          "message": "Objet SVG porteur d'information (carte réseau) sans description détaillée",
+          "normativeRef": "1.6.2",
+          "severity": "majeur"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 77,
           "snippet": "<canvas id=\"latence\" width=\"600\" height=\"200\"></canvas>",
-          "normativeRef": "1.6.7"
+          "message": "Canvas porteur d'information (graphique latence) sans contenu textuel de repli, sans aria-label, sans aria-labelledby, sans contenu entre les balises, sans lien adjacent",
+          "normativeRef": "1.6.7",
+          "severity": "majeur"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 84,
+          "snippet": "<svg viewBox=\"0 0 100 40\"><rect x=\"0\" y=\"10\" width=\"20\" height=\"30\"></rect><rect x=\"30\" y=\"4\" width=\"20\" height=\"36\"></rect></svg>",
+          "message": "Image vectorielle SVG porteuse d'information (graphique de comparaison) sans nom accessible, sans aria-label, sans aria-labelledby, sans aria-describedby, sans lien adjacent",
+          "normativeRef": "1.6.5",
+          "severity": "majeur"
         }
       ],
       "evidenceFingerprint": "sha256:448996d21e64320ae696cdc16066d212",
       "evidenceCount": 5,
-      "date": "2026-08-23",
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
@@ -117,83 +203,27 @@
     },
     {
       "criteriaId": "1.8",
-      "verdict": "NC",
-      "justification": "Multiple images and embedded content lack proper text alternatives or replacement mechanisms required by criterion 1.8.",
+      "verdict": "NA",
+      "justification": "Les images présentes (graphiques réseau, logo, canvas, object SVG, SVG chart) ne contiennent pas de texte destiné à être affiché (ce sont des graphiques purs). Le critère 1.8 concerne les images textes — images affichant du texte — et ne s'applique donc pas aux éléments moissonnés qui sont des représentations graphiques sans contenu textuel.",
       "citations": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 56,
-          "selector": "img",
-          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 62,
-          "selector": "canvas#latence",
-          "snippet": "<canvas id=\"latence\" width=\"600\" height=\"200\"></canvas>"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 65,
-          "selector": "object",
-          "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>"
-        }
-      ],
-      "findings": [
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 56,
-          "selector": "img",
-          "message": "Image with no alt attribute and no replacement mechanism",
-          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">",
-          "normativeRef": "1.8.1"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 62,
-          "selector": "canvas#latence",
-          "message": "Canvas element with no fallback content",
-          "snippet": "<canvas id=\"latence\" width=\"600\" height=\"200\"></canvas>",
-          "normativeRef": "1.8.5"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 65,
-          "selector": "object",
-          "message": "Object element with embedded SVG has no accessible name",
-          "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>",
-          "normativeRef": "1.8.3"
+          "line": 84,
+          "snippet": "<svg viewBox=\"0 0 100 40\"><rect x=\"0\" y=\"10\" width=\"20\" height=\"30\"></rect><rect x=\"30\" y=\"4\" width=\"20\" height=\"36\"></rect></svg>"
         }
       ],
       "evidenceFingerprint": "sha256:448996d21e64320ae696cdc16066d212",
       "evidenceCount": 5,
-      "date": "2026-08-23",
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "1.9",
-      "verdict": "NC",
-      "justification": "Les images identifiées ne sont pas correctement liées à des légendes via l'élément figure et figcaption, ou via aria-label/aria-describedby.",
-      "citations": [
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 56,
-          "selector": "img",
-          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">"
-        }
-      ],
-      "findings": [
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 56,
-          "message": "Image réseau n'est pas contenue dans un élément figure avec figcaption",
-          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">",
-          "normativeRef": "1.9.1"
-        }
-      ],
-      "evidenceFingerprint": "sha256:9c77d99c7837695f616c63e33d834c23",
-      "evidenceCount": 30,
-      "date": "2026-08-23",
+      "verdict": "NA",
+      "justification": "No images with captions exist in the audited scope. Criterion 1.9 applies only to images that are associated with legends (captions). The evidence shows no <figure>, <figcaption>, or adjacent captioned images, placing this criterion outside the scope of the actual content present.",
+      "evidenceFingerprint": "sha256:a553880e4727382c436c0616b2dca901",
+      "evidenceCount": 33,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
@@ -221,31 +251,53 @@
     },
     {
       "criteriaId": "3.1",
-      "verdict": "C",
-      "justification": "Information is conveyed through visible text content, not through color alone. All examined links and text elements remain distinguishable when considering their text content, not relying on color as the sole means of conveying meaning.",
+      "verdict": "NA",
+      "justification": "The gray text is styled for visual presentation, but the information is conveyed by the text content itself ('Facturation à la seconde, sans engagement'), not by the color. Criterion 3.1 addresses cases where information would be lost without the color; here, the meaning is preserved in the actual text, making the criterion inapplicable.",
       "citations": [
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 51,
-          "selector": "p",
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 59,
           "snippet": "<p style=\"color:#bbbbbb;background:#ffffff\">Facturation à la seconde, sans engagement.</p>"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 14,
-          "selector": "a.skip-link",
-          "snippet": "<a class=\"skip-link\" href=\"#contenu\">Aller au contenu</a>"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 19,
-          "selector": "a",
-          "snippet": "<a href=\"/\">Accueil</a>"
         }
       ],
-      "evidenceFingerprint": "sha256:59b4378b41e1b379d5658a52c92a6b79",
-      "evidenceCount": 23,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:e35960424510c134f18446b77d8479b0",
+      "evidenceCount": 24,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "3.2",
+      "verdict": "NC",
+      "justification": "The text at line 59 uses color rgb(187,187,187) on background rgb(255,255,255). The computed contrast ratio is approximately 1.8:1. Per test 3.2.1, normal text (16px, not bold) must have at least 4.5:1 contrast. This text fails to meet that requirement with no mechanism for user adjustment provided.",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 59,
+          "message": "Text contrast ratio 1.8:1 is below minimum 4.5:1 for normal text",
+          "normativeRef": "3.2.1",
+          "snippet": "<p style=\"color:#bbbbbb;background:#ffffff\">Facturation à la seconde, sans engagement.</p>",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:79b78e65ededd94872d4c0e4a4925bc1",
+      "evidenceCount": 1,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "3.3",
+      "verdict": "NA",
+      "justification": "Criterion 3.3 applies to UI components and graphical elements carrying information through color. The gray paragraph is plain text content, not a UI component (button, form field, etc.) or graphic element. The contrast requirement for text is covered under criterion 3.2, making 3.3 not applicable here.",
+      "citations": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 59,
+          "snippet": "<p style=\"color:#bbbbbb;background:#ffffff\">Facturation à la seconde, sans engagement.</p>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:79b78e65ededd94872d4c0e4a4925bc1",
+      "evidenceCount": 1,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
@@ -313,6 +365,25 @@
       "decidedBy": "agent"
     },
     {
+      "criteriaId": "4.3",
+      "verdict": "NC",
+      "justification": "The video element at line 29 lacks <track kind=\"captions\"> elements and has no adjacent link or button providing an alternative version with captions. Test 4.3.1 requires that each pre-recorded synchronized media possess either embedded captions or an alternative via adjacent link/button. Neither condition is met.",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/medias-html/dom.html",
+          "line": 29,
+          "message": "Synchronized video element lacks subtitle track and no adjacent alternative with captions",
+          "normativeRef": "4.3.1",
+          "snippet": "<video src=\"/media/presentation.mp4\" width=\"640\" height=\"360\" controls=\"\"></video>",
+          "severity": "bloquant"
+        }
+      ],
+      "evidenceFingerprint": "sha256:ee9c48fe9d139769b13e2e20fa4ba9fc",
+      "evidenceCount": 9,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
       "criteriaId": "4.4",
       "verdict": "NA",
       "justification": "Criterion 4.4 applies only to synchronized temporal media that already have synchronized subtitles. The video element (line 29 medias-html) is present but does not have synchronized subtitles associated with it. Since the prerequisite (existing synchronized subtitles) is not met for any media in scope, this criterion is not applicable.",
@@ -332,51 +403,44 @@
     },
     {
       "criteriaId": "4.7",
-      "verdict": "C",
-      "justification": "Les images sont clairement identifiables par des attributs alt, title, ou id.",
+      "verdict": "NA",
+      "justification": "Les évidences moissonnées pour ce critère concernent des images (reseau.png, logo.png, canvas, object SVG, svg chart), qui ne sont pas des médias temporels au sens du critère 4.7. Un média temporel est défini comme du contenu consultable via plugin ou via consultation d'un flux audio/vidéo. Les images listées ne correspondent pas à cette définition. Le critère 4.7 ne s'applique donc pas aux éléments identifiés.",
       "citations": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 59,
-          "selector": "img",
-          "snippet": "<img src=\"/img/logo.png\" alt=\"\" title=\"Logo Orbit\">"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 62,
-          "selector": "canvas#latence",
-          "snippet": "<canvas id=\"latence\" width=\"600\" height=\"200\"></canvas>"
+          "line": 71,
+          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">"
         }
       ],
       "evidenceFingerprint": "sha256:448996d21e64320ae696cdc16066d212",
       "evidenceCount": 5,
-      "date": "2026-08-23",
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "4.8",
       "verdict": "NC",
-      "justification": "Les médias non temporels manquent d'alternatives textuelles appropriées.",
-      "citations": [
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 56,
-          "selector": "img",
-          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">"
-        }
-      ],
       "findings": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 56,
-          "message": "Image sans alternative textuelle appropriée",
-          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">",
-          "normativeRef": "4.8.1"
+          "line": 80,
+          "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>",
+          "message": "Média non temporel (object SVG) dépourvu de lien ou bouton adjacent permettant d'accéder à une alternative",
+          "normativeRef": "4.8.1",
+          "severity": "majeur"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 77,
+          "snippet": "<canvas id=\"latence\" width=\"600\" height=\"200\"></canvas>",
+          "message": "Média non temporel (canvas) dépourvu de lien ou bouton adjacent permettant d'accéder à une alternative",
+          "normativeRef": "4.8.1",
+          "severity": "majeur"
         }
       ],
       "evidenceFingerprint": "sha256:448996d21e64320ae696cdc16066d212",
       "evidenceCount": 5,
-      "date": "2026-08-23",
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
@@ -394,6 +458,40 @@
       "evidenceFingerprint": "sha256:448996d21e64320ae696cdc16066d212",
       "evidenceCount": 5,
       "date": "2026-08-23",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "4.10",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 132,
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "message": "Audio element with autoplay attribute lacks controls attribute. User cannot stop playback or control volume independently. Duration is not documented as ≤3 seconds.",
+          "normativeRef": "4.10.1",
+          "severity": "majeur"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/medias-html/dom.html",
+          "line": 35,
+          "snippet": "<audio src=\"/media/journal-incidents.mp3\" autoplay=\"\"></audio>",
+          "message": "Audio element with autoplay attribute lacks controls attribute. User cannot stop playback or control volume independently.",
+          "normativeRef": "4.10.1",
+          "severity": "majeur"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/medias-html/dom.html",
+          "line": 40,
+          "snippet": "<marquee>Maintenance planifiée le 12 septembre de 2 h à 4 h.</marquee>",
+          "message": "Moving content (marquee) starts automatically with no user control to pause, stop, or hide it.",
+          "normativeRef": "4.10.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:ee9c48fe9d139769b13e2e20fa4ba9fc",
+      "evidenceCount": 9,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
@@ -518,164 +616,356 @@
     },
     {
       "criteriaId": "4.13",
-      "verdict": "C",
-      "justification": "Les médias identifiés utilisent des balises HTML5 standard (audio, video, canvas, button) et attributs ARIA (aria-describedby, role) appropriés pour l'accessibilité avec les technologies d'assistance.",
-      "citations": [
+      "verdict": "NC",
+      "findings": [
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 79,
-          "selector": "button",
-          "snippet": "<button type=\"button\" aria-describedby=\"astuce-tls\">Qu'est-ce que le TLS ?</button>"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 132,
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "message": "Temporal media (audio) element has no accessible interface components. No controls attribute provides no name, role, value, or accessible state changes. No alternative compatible with accessibility API is provided.",
+          "normativeRef": "4.13.1",
+          "severity": "majeur"
         },
         {
-          "file": ".ultra11y/pages/cadres-html/dom.html",
-          "line": 12,
-          "selector": "nav",
-          "snippet": "<nav aria-label=\"Navigation principale\">"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/medias-html/dom.html",
+          "line": 40,
+          "snippet": "<marquee>Maintenance planifiée le 12 septembre de 2 h à 4 h.</marquee>",
+          "message": "Moving content element (marquee) provides no accessible interface components. No mechanism allows assistive technology users to pause, stop, or access equivalent functionality.",
+          "normativeRef": "4.13.1",
+          "severity": "majeur"
         }
       ],
-      "evidenceFingerprint": "sha256:540fad271166ec947cce7ac0127883f3",
-      "evidenceCount": 25,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:ed83fd94d0b3e51faa63d5a4a29cafd5",
+      "evidenceCount": 28,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "5.1",
-      "verdict": "NA",
-      "justification": "Aucun tableau de données COMPLEXE au sens du glossaire RGAA (en-têtes non répartis uniquement sur la première ligne et/ou la première colonne, ou dont la portée n'est pas valable pour l'ensemble de la ligne ou de la colonne) n'existe dans le périmètre. Examen des cinq tableaux relevés, structure lue dans le DOM capturé et dans la source : (1) tarifs-html:30 — grille 3 colonnes sans aucun <th> ; sans en-tête il n'y a pas de structure complexe (le défaut relève de 5.6) ; (2) tarifs-html:52 — trois <th> tous situés sur la première ligne, portée implicite valable pour toute la colonne ; (3) tarifs-html:73 — deux <th> (« Offre », « Remise ») sur la seule première ligne, grille 2×2 ; les attributs headers fautifs (headers=\"remise-annuelle\" pointant sur un id inexistant) sont un défaut de liaison, ils ne rendent pas la grille complexe ; (4) tarifs-html:87 — role=\"presentation\" : tableau de mise en forme, donc hors de la définition « tableau de données » ; (5) embed/disponibilite.html:11 — <th scope=\"col\"> sur la première ligne et <th scope=\"row\"> en première colonne, portées explicites et valables. Le test 5.1.1 n'a donc aucun sujet dans le périmètre.",
-      "citations": [
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 30,
-          "selector": "table",
-          "snippet": "<table>"
-        },
+      "verdict": "NC",
+      "findings": [
         {
           "file": ".ultra11y/pages/tarifs-html/dom.html",
           "line": 52,
-          "selector": "table",
-          "snippet": "<table>"
-        },
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 73,
-          "selector": "table",
-          "snippet": "<table>"
-        },
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 87,
-          "selector": "table",
-          "snippet": "<table role=\"presentation\">"
-        },
-        {
-          "file": "tests/fixtures/realworld/embed/disponibilite.html",
-          "line": 11,
-          "selector": "table",
-          "snippet": "<table>"
+          "snippet": "<table>\n        <tbody><tr>\n          <th class=\"sortable\"><button type=\"button\">Ressource</button></th>\n          <th>Découverte</th>\n          <th>Équipe</th>\n        </tr>",
+          "message": "Tableau de données complexe (« Quotas par formule » — lignes 52-68) sans résumé. Le tableau contient des en-têtes en première ligne (Ressource, Découverte, Équipe) et des en-têtes implicites en première colonne (Visites mensuelles, Aperçus par branche), structure complexe sans descriptif. Aucun <caption>, aucun attribut summary, aucun aria-describedby ne fournit de résumé expliquant la structure du tableau.",
+          "normativeRef": "5.1.1",
+          "severity": "majeur"
         }
       ],
-      "evidenceFingerprint": "sha256:b4345a9deca68298cfaeb20673b49cbe",
-      "evidenceCount": 5,
-      "date": "2026-08-24",
+      "evidenceFingerprint": "sha256:b745604ac6217edd010ca392f2fad3b5",
+      "evidenceCount": 6,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "5.2",
       "verdict": "NA",
-      "justification": "Le test 5.2.1 porte sur « les résumés de tableaux de données complexes (tels que déterminés par le test 5.1.1) ». Deux conditions manquent, cumulativement : (a) aucun tableau du périmètre n'est complexe — les cinq tableaux relevés sont soit un tableau de mise en forme (tarifs-html:87, role=\"presentation\"), soit des tableaux de données simples dont les en-têtes tiennent sur la première ligne et/ou la première colonne avec une portée valable (tarifs-html:52 et :73, embed/disponibilite.html:11), soit une grille sans aucun <th> (tarifs-html:30) ; (b) aucun de ces tableaux ne porte de résumé — la moisson relève summary=\"\" sur les cinq, et aucun <caption> ne contient de passage décrivant la nature ou la structure du tableau (les deux captions existantes sont des titres, jugés au critère 5.5). L'ensemble sur lequel porte 5.2 est donc vide.",
-      "citations": [
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 30,
-          "selector": "table",
-          "snippet": "<table>"
-        },
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 52,
-          "selector": "table",
-          "snippet": "<table>"
-        },
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 73,
-          "selector": "table",
-          "snippet": "<table>"
-        },
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 87,
-          "selector": "table",
-          "snippet": "<table role=\"presentation\">"
-        },
-        {
-          "file": "tests/fixtures/realworld/embed/disponibilite.html",
-          "line": 11,
-          "selector": "table",
-          "snippet": "<table>"
-        }
-      ],
-      "evidenceFingerprint": "sha256:b4345a9deca68298cfaeb20673b49cbe",
-      "evidenceCount": 5,
-      "date": "2026-08-24",
+      "justification": "This criterion applies only to complex data tables that have a summary. The complex table found (disponibilite.html:11) has a caption but no summary element (no <caption> with structural description, no summary attribute, no aria-describedby). Since no complex table with a summary is present, the criterion does not apply.",
+      "evidenceFingerprint": "sha256:b745604ac6217edd010ca392f2fad3b5",
+      "evidenceCount": 6,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "5.3",
       "verdict": "C",
-      "justification": "Un seul tableau de mise en forme dans le périmètre : celui de la page Tarifs, <table role=\"presentation\"> (.ultra11y/pages/tarifs-html/dom.html:87, source tests/fixtures/realworld/tarifs.html:93). Les deux conditions cumulatives du test 5.3.1 sont réunies. (a) L'élément <table> est bien pourvu de role=\"presentation\". (b) Le contenu linéarisé reste compréhensible : le tableau tient sur une seule colonne et deux lignes — la cellule d'en-tête « Colonne de mise en page » puis une cellule contenant <label for=\"devis\">Nombre de sites à migrer</label> et son champ associé. Lu hors structure de tableau, l'ordre d'accès aux cellules (intitulé, puis le couple étiquette + champ correctement lié par for/id) suit l'ordre visuel et reste intelligible ; aucun contenu principal n'est rejeté après un contenu secondaire. Les quatre autres tableaux cités dans les évidences sont des tableaux de données (comparatif des formules, quotas par formule, remises annuelles, disponibilité mensuelle) et sortent du champ de 5.3 ; ils ne sont donc pas cités ici. Réserve non normative : ce tableau de mise en forme conserve un <th scope=\"col\">, c'est-à-dire du balisage propre aux tableaux de données — cela relève du critère 5.8, que 5.3 ne teste pas.",
+      "justification": "The single layout table at tarifs-html line 87 has role=\"presentation\" attribute, meeting the requirement. When linearized, the content order (table header 'Colonne de mise en page' followed by form control label 'Nombre de sites à migrer' and input field) remains understandable. The visual layout does not interfere with the logical reading order.",
       "citations": [
         {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
           "line": 87,
-          "selector": "table",
           "snippet": "<table role=\"presentation\">"
         }
       ],
-      "evidenceFingerprint": "sha256:b4345a9deca68298cfaeb20673b49cbe",
-      "evidenceCount": 5,
-      "date": "2026-08-24",
+      "evidenceFingerprint": "sha256:b745604ac6217edd010ca392f2fad3b5",
+      "evidenceCount": 6,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "5.4",
+      "verdict": "C",
+      "justification": "Both data tables with titles use the <caption> element to correctly associate their titles programmatically. The caption element is the correct method for associating a title with a table according to test 5.4.1. Both captions are properly contained within the <table> element.",
+      "citations": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 73,
+          "snippet": "<caption>Remises appliquées au paiement annuel</caption>"
+        },
+        {
+          "file": "tests/fixtures/realworld/embed/disponibilite.html",
+          "line": 12,
+          "snippet": "<caption>Disponibilité mensuelle par service</caption>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:b745604ac6217edd010ca392f2fad3b5",
+      "evidenceCount": 6,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "5.5",
       "verdict": "C",
-      "justification": "Deux tableaux de données du périmètre sont pourvus d'un titre, tous deux au moyen d'une balise <caption> (la seule technique pleinement supportée selon le glossaire), et chacun identifie le contenu du tableau de manière claire et concise — test 5.5.1 validé. (1) tarifs-html:73 — <caption>Remises appliquées au paiement annuel</caption> : le tableau croise « Offre » et « Remise », le titre en nomme exactement le sujet (les remises) et la condition (le paiement annuel), sans être générique du type « Tableau 1 ». (2) embed/disponibilite.html:11 — <caption>Disponibilité mensuelle par service</caption> : le tableau croise « Service » (Hébergement, Diffusion) et « Disponibilité » (99,98 %, 99,95 %) ; le titre nomme la donnée mesurée, sa périodicité et son axe de découpage. Les deux titres sont distincts l'un de l'autre et de tout autre intitulé de leur page. Les trois autres tableaux relevés n'ont ni <caption>, ni title, ni aria-label / aria-labelledby (tarifs-html:30 et :52), ou ne sont pas des tableaux de données (tarifs-html:87, role=\"presentation\") : ils sortent du champ de 5.5, qui ne juge que la pertinence des titres existants. L'absence de titre sur le tableau « Quotas par formule » est un défaut réel, mais il relève du critère 5.4.",
+      "justification": "Both table titles that are present identify the content clearly and concisely: 'Remises appliquées au paiement annuel' (Annual payment discounts) and 'Disponibilité mensuelle par service' (Monthly availability by service). Both captions describe the subject matter in a way that allows users to understand what the table contains without reading its entire contents.",
       "citations": [
         {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
           "line": 73,
-          "selector": "table",
-          "snippet": "<table>"
+          "snippet": "<caption>Remises appliquées au paiement annuel</caption>"
         },
         {
           "file": "tests/fixtures/realworld/embed/disponibilite.html",
-          "line": 11,
-          "selector": "table",
-          "snippet": "<table>"
+          "line": 12,
+          "snippet": "<caption>Disponibilité mensuelle par service</caption>"
         }
       ],
-      "evidenceFingerprint": "sha256:b4345a9deca68298cfaeb20673b49cbe",
-      "evidenceCount": 5,
-      "date": "2026-08-24",
+      "evidenceFingerprint": "sha256:b745604ac6217edd010ca392f2fad3b5",
+      "evidenceCount": 6,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "5.6",
+      "verdict": "NC",
+      "justification": "Two data tables fail to properly declare their headers. The first table at line 30 uses <td> elements for what are clearly intended as column headers, directly violating 5.6.1 which requires headers to be structured with <th> or role=\"columnheader\". The second table at line 52 has <th> elements but lacks the required scope or id attributes to properly associate them with data cells, preventing assistive technologies from understanding the header-cell relationships.",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 30,
+          "snippet": "<table>\n        <tbody><tr>\n          <td>Formule</td>\n          <td>Prix</td>\n          <td>Sites</td>\n        </tr>",
+          "message": "Data table headers are not structured with <th> elements. The first row contains headers marked as <td> instead of <th>, violating the requirement that column headers must be declared with <th> or role=\"columnheader\".",
+          "normativeRef": "5.6.1",
+          "severity": "majeur"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 52,
+          "snippet": "<table>\n        <tbody><tr>\n          <th class=\"sortable\"><button type=\"button\">Ressource</button></th>\n          <th>Découverte</th>\n          <th>Équipe</th>\n        </tr>",
+          "message": "Table has <th> elements but they lack scope attributes or id values needed to identify whether they are column or row headers. Without scope or id, the relationship between headers and data cells is unclear.",
+          "normativeRef": "5.6.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:b745604ac6217edd010ca392f2fad3b5",
+      "evidenceCount": 6,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "5.7",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 30,
+          "snippet": "<table>",
+          "message": "Data table without proper header markup. First row contains data cells (<td>) instead of header cells (<th>). Headers should use <th> with scope, id, or WAI-ARIA role",
+          "normativeRef": "5.7.1",
+          "severity": "bloquant"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 52,
+          "snippet": "<table>",
+          "message": "Table header cells (<th>) lack required attributes. Headers should have scope=\"col\"/scope=\"row\", id attribute, or role=\"columnheader\"/role=\"rowheader\"",
+          "normativeRef": "5.7.1",
+          "severity": "bloquant"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 73,
+          "snippet": "<table>",
+          "message": "Table cell references non-existent header id. Cell has headers=\"remise-annuelle\" but only \"remise\" id exists in the table",
+          "normativeRef": "5.7.4",
+          "severity": "bloquant"
+        }
+      ],
+      "evidenceFingerprint": "sha256:b745604ac6217edd010ca392f2fad3b5",
+      "evidenceCount": 6,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "5.8",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 87,
+          "snippet": "<table role=\"presentation\">",
+          "message": "Layout table (role=\"presentation\") incorrectly uses data table markup (<th> element). Layout tables must not use <th>, <thead>, <tfoot>, <caption>, or elements with rowheader/columnheader roles",
+          "normativeRef": "5.8.1",
+          "severity": "bloquant"
+        }
+      ],
+      "evidenceFingerprint": "sha256:b745604ac6217edd010ca392f2fad3b5",
+      "evidenceCount": 6,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "6.1",
+      "verdict": "NC",
+      "justification": "Test 6.1.1 and 6.1.2 require that links be explicit - their purpose must be understandable from the link text or context. The link at line 104 is completely empty, providing no accessible name. The link at line 107 contains only a bare SVG icon with no text or alternative, making its purpose unclear.",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 104,
+          "snippet": "<a href=\"/contact.html\"></a>",
+          "message": "Link has no text content and no alternative text. Cannot determine the function or destination of the link. Test 6.1.1 requires that a link's purpose be understandable either from the link text alone or from the link text combined with context.",
+          "normativeRef": "6.1.1",
+          "severity": "bloquant"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 107,
+          "snippet": "<a href=\"/tarifs.html#comparatif\">\n            <svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\"><path d=\"M0 0 L16 16\"></path></svg>\n          </a>",
+          "message": "Link contains only an SVG icon with no accessible text. The SVG has no title, aria-label, or other text alternative. The link's purpose cannot be determined from its content alone, violating test 6.1.2 for image links.",
+          "normativeRef": "6.1.2",
+          "severity": "bloquant"
+        }
+      ],
+      "evidenceFingerprint": "sha256:c9073a65c9439a0fff324810f6e5c95f",
+      "evidenceCount": 23,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "6.2",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 104,
+          "snippet": "<a href=\"/contact.html\"></a>",
+          "message": "Link with no accessible name. Element contains no text and has no aria-label, aria-labelledby, or title attribute",
+          "normativeRef": "6.2.1",
+          "severity": "bloquant"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 107,
+          "snippet": "<a href=\"/tarifs.html#comparatif\">",
+          "message": "Link containing only SVG icon with no accessible name. SVG lacks alternative text and link has no aria-label or title",
+          "normativeRef": "6.2.1",
+          "severity": "bloquant"
+        }
+      ],
+      "evidenceFingerprint": "sha256:c9073a65c9439a0fff324810f6e5c95f",
+      "evidenceCount": 23,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "7.1",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/cadres-html/dom.html",
+          "line": 36,
+          "message": "Invalid ARIA role 'panneau' is not defined in the WAI-ARIA specification. This violates test 7.1.1 which requires components to have coherent roles.",
+          "normativeRef": "7.1.1",
+          "severity": "majeur",
+          "snippet": "<div role=\"panneau\">Choisissez ce que le widget affiche.</div>"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/cadres-html/dom.html",
+          "line": 39,
+          "message": "aria-labelledby attribute references a non-existent id 'titre-supprime'. This fails test 7.1.1 as the component lacks proper accessible name.",
+          "normativeRef": "7.1.1",
+          "severity": "majeur",
+          "snippet": "<section aria-labelledby=\"titre-supprime\">"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/cadres-html/dom.html",
+          "line": 54,
+          "message": "Typo in ARIA attribute: 'aria-labeledby' should be 'aria-labelledby'. Also references non-existent id. Violates test 7.1.3 for accessible name.",
+          "normativeRef": "7.1.3",
+          "severity": "majeur",
+          "snippet": "<div role=\"button\" tabindex=\"0\" aria-labeledby=\"titre-supprime\">Prévisualiser</div>"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/cadres-html/dom.html",
+          "line": 57,
+          "message": "Invalid aria-expanded value 'yes'. The aria-expanded attribute only accepts 'true' or 'false' (or 'undefined'). Violates test 7.1.2 for correct rendering by assistive technologies.",
+          "normativeRef": "7.1.2",
+          "severity": "majeur",
+          "snippet": "<div role=\"button\" tabindex=\"0\" aria-expanded=\"yes\">Afficher les options avancées</div>"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/cadres-html/dom.html",
+          "line": 60,
+          "message": "Checkbox role is missing required aria-checked attribute. Violates test 7.1.1 which requires components to have appropriate states accessible via API.",
+          "normativeRef": "7.1.1",
+          "severity": "majeur",
+          "snippet": "<div role=\"checkbox\" tabindex=\"0\">Activer les journaux détaillés</div>"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 65,
+          "message": "Tab role contains a focusable child element (link). According to ARIA patterns, only presentational children are allowed in tab roles. Violates test 7.1.1.",
+          "normativeRef": "7.1.1",
+          "severity": "majeur",
+          "snippet": "<div role=\"tab\" aria-selected=\"false\"><a href=\"/tarifs.html\">Voir les tarifs</a></div>"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 68,
+          "message": "Button with role='menuitem' has no accessible name. Violates test 7.1.1 which requires components to have explicit names.",
+          "normativeRef": "7.1.1",
+          "severity": "majeur",
+          "snippet": "<div role=\"menu\"><button type=\"button\" role=\"menuitem\"></button></div>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:0fac48ade23604b215dee42240ff4197",
+      "evidenceCount": 29,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "7.2",
-      "verdict": "C",
-      "justification": "Les éléments scriptés identifiés (boutons avec aria-describedby, formulaires) ont des alternatives textuelles pertinentes.",
+      "verdict": "NA",
+      "justification": "Criterion 7.2 evaluates the relevance of alternatives to scripts that have alternatives. The evidence and examination of the captured pages show scripts being used (onclick handlers, form submission handlers), but does not present evidence that meaningful alternatives are offered to these scripts (such as <noscript> content, alternative pages, or fallback mechanisms). Since no script alternatives are evident in the scope, criterion 7.2 does not apply.",
       "citations": [
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 56,
-          "selector": "img",
-          "snippet": "<img src=\"/img/reseau.png\" width=\"640\" height=\"320\">"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 139,
+          "snippet": "<div onclick=\"ouvrirAssistance()\">Ouvrir une demande d'assistance</div>"
         }
       ],
-      "evidenceFingerprint": "sha256:9c77d99c7837695f616c63e33d834c23",
-      "evidenceCount": 30,
-      "date": "2026-08-23",
+      "evidenceFingerprint": "sha256:a553880e4727382c436c0616b2dca901",
+      "evidenceCount": 33,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "7.3",
+      "verdict": "NC",
+      "justification": "Two distinct violations of RGAA 7.3 tests are present in the evidence. First, the div with onclick at line 139 is not keyboard accessible (fails 7.3.1's first condition) and no alternative keyboard-accessible element performing the same action exists (fails 7.3.1's second condition). Second, the input at line 167 prevents Tab key navigation via event.preventDefault(), directly violating 7.3.2 which prohibits scripts from suppressing focus.",
+      "findings": [
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 139,
+          "selector": "div[onclick]",
+          "snippet": "<div onclick=\"ouvrirAssistance()\">Ouvrir une demande d'assistance</div>",
+          "message": "Element carries onclick handler but is not focusable (no tabindex) and not keyboard activable. No keyboard equivalent found in the page for the same action.",
+          "normativeRef": "7.3.1",
+          "severity": "bloquant"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 167,
+          "selector": "input#confirmation",
+          "snippet": "<input id=\"confirmation\" name=\"confirmation\" type=\"text\" onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\">",
+          "message": "Script uses event.preventDefault() on Tab key, creating a keyboard trap. User cannot navigate away from this field using Tab, violating the requirement that scripts must not suppress focus.",
+          "normativeRef": "7.3.2",
+          "severity": "bloquant"
+        }
+      ],
+      "evidenceFingerprint": "sha256:e8fa4cf8247f4ba4c6b05672be4cfe94",
+      "evidenceCount": 7,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
@@ -702,6 +992,96 @@
       "evidenceFingerprint": "sha256:2e8c2343b8636cbf652e13d2c0c6cc01",
       "evidenceCount": 8,
       "date": "2026-08-23",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "7.5",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 148,
+          "selector": "div[role='alert']",
+          "message": "Success message 'Votre demande a été enregistrée' incorrectly uses role='alert' (intended for errors). Test 7.5.1 requires role='status' for success/result messages.",
+          "snippet": "<div aria-live=\"polite\" role=\"alert\">Votre demande a été enregistrée.</div>",
+          "normativeRef": "7.5.1",
+          "severity": "majeur"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 151,
+          "selector": "div.error",
+          "message": "Error message uses aria-live='polite' (low priority) instead of aria-live='assertive' (immediate) or role='alert'. Test 7.5.2 requires immediate announcement for errors.",
+          "snippet": "<div aria-live=\"polite\" class=\"error\">Le service de tickets est momentanément indisponible.</div>",
+          "normativeRef": "7.5.2",
+          "severity": "majeur"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 120,
+          "selector": "span#siret-error",
+          "message": "Error message has no aria-live or role attribute to announce it. Test 7.5.2 requires role='alert' or aria-live='assertive' + aria-atomic='true' for error messages.",
+          "snippet": "<span class=\"error-message\" id=\"siret-error\">Le SIRET doit comporter quatorze chiffres.</span>",
+          "normativeRef": "7.5.2",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:784ed6f917d85ba0235deb847396f247",
+      "evidenceCount": 5,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "8.1",
+      "verdict": "NC",
+      "justification": "L'évidence moissonnée indique que la page cadres-html (page=\"cadres-html\" doctype=(none on the page)) n'a délibérément pas de <!DOCTYPE>. La source test cadres.html:4 confirme explicitement l'absence : « CETTE PAGE N'A DÉLIBÉRÉMENT PAS DE <!DOCTYPE> ». Ceci viole le test 8.1.1 qui requiert la présence d'une balise DOCTYPE avant la balise <html>.",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/cadres-html/dom.html",
+          "line": 1,
+          "snippet": "<!-- ultra11y:capture v=\"1\" name=\"Intégrations — Orbit, hébergement statique\" page=\"cadres-html\" url=\"http://127.0.0.1:8937/cadres.html\" -->",
+          "message": "La page cadres-html n'a pas de déclaration DOCTYPE. Le navigateur ne peut pas déterminer le type de document HTML.",
+          "normativeRef": "8.1.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:4befb334d60d24921a6864f3926b330e",
+      "evidenceCount": 4,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "8.2",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/cadres-html/dom.html",
+          "line": 36,
+          "message": "Role attribute contains an invalid value 'panneau' which is not defined in the WAI-ARIA specification. This violates test 8.2.1 (attributes must respect specification rules).",
+          "normativeRef": "8.2.1",
+          "severity": "majeur",
+          "snippet": "<div role=\"panneau\">Choisissez ce que le widget affiche.</div>"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/cadres-html/dom.html",
+          "line": 54,
+          "message": "Attribute name has a typo: 'aria-labeledby' should be 'aria-labelledby'. The browser silently ignores this invalid attribute name, violating test 8.2.1.",
+          "normativeRef": "8.2.1",
+          "severity": "majeur",
+          "snippet": "<div role=\"button\" tabindex=\"0\" aria-labeledby=\"titre-supprime\">Prévisualiser</div>"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/cadres-html/dom.html",
+          "line": 57,
+          "message": "Attribute value 'yes' is invalid for aria-expanded. Valid values are 'true' or 'false' only. Violates test 8.2.1 (attributes and values must follow specification).",
+          "normativeRef": "8.2.1",
+          "severity": "majeur",
+          "snippet": "<div role=\"button\" tabindex=\"0\" aria-expanded=\"yes\">Afficher les options avancées</div>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:ed83fd94d0b3e51faa63d5a4a29cafd5",
+      "evidenceCount": 28,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
@@ -776,210 +1156,332 @@
       "decidedBy": "agent"
     },
     {
-      "criteriaId": "8.9",
-      "verdict": "C",
-      "justification": "Aucune balise sémantique du périmètre n'est détournée à des seules fins de présentation (test 8.9.1). Chaque titre moissonné porte l'intitulé de la section qui le suit (h1/h2/h3 d'accueil, cadres, contact, documents, médias, mentions légales, plan, recherche, tarifs et des deux documents encadrés) ; chaque <ul> regroupe une vraie liste (navigations, listes de documents, listes de liens) ; les trois tableaux de tarifs-html:30/52/73 et celui de disponibilite.html:11 portent des données tabulaires ; et le seul tableau de mise en forme, tarifs-html:87, déclare role=\"presentation\" — exactement la sortie que la méthodologie 8.9.1 admet, sachant que <table> est de toute façon exclu de la liste des balises visées par le test. Le balisage de présentation constaté ailleurs sur le site relève d'un autre critère et pas de 8.9 : <center>/<font> (index.html:55), align/bgcolor (index.html:58), le mot écrit lettre à lettre (index.html:61) et <marquee> (medias.html:46) sont des balises et attributs DE présentation, donc RGAA 10.1 (tests 10.1.1, 10.1.2, 10.1.3) — ils sont employés conformément à leur finalité de spécification, pas détournés d'elle, ce que la définition « uniquement à des fins de présentation » exige. De même, le <h2></h2> vide de plan-html:43 est un titre sans intitulé (9.1) et non un titre créé pour un effet typographique ; le <dt> orphelin hors de toute <dl> de plan-html:52 relève du test 9.3.3 (listes de description) ; le <span> et les <div> enfants directs de <ul> sont des balises explicitement exclues du test 8.9.1 et relèvent de 9.3.1 ; et le <th scope=\"col\"> conservé dans le tableau de mise en forme est visé nommément par le test 5.8.1.",
-      "citations": [
+      "criteriaId": "8.7",
+      "verdict": "NC",
+      "findings": [
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 39,
-          "selector": "h2",
-          "snippet": "<h2>Déployez votre site en une commande</h2>"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 47,
+          "selector": "p",
+          "message": "English text with lang='' (empty language attribute). The page has no default language declared on <html>, and this English passage lacks proper language indication. Test 8.7.1 requires language indication on element or parent.",
+          "snippet": "<p lang=\"\">Service provided as is, without warranty of any kind.</p>",
+          "normativeRef": "8.7.1",
+          "severity": "majeur"
         },
         {
-          "file": ".ultra11y/pages/cadres-html/dom.html",
-          "line": 23,
-          "selector": "h1",
-          "snippet": "<h1>Intégrations</h1>"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 24,
-          "selector": "h1",
-          "snippet": "<h1>Contact et gestion du compte</h1>"
-        },
-        {
-          "file": ".ultra11y/pages/documents-html/dom.html",
-          "line": 25,
-          "selector": "ul",
-          "snippet": "<ul>"
-        },
-        {
-          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
-          "line": 36,
-          "selector": "h2",
-          "snippet": "<h2>Éditeur</h2>"
-        },
-        {
-          "file": ".ultra11y/pages/plan-html/dom.html",
-          "line": 26,
-          "selector": "h4",
-          "snippet": "<h4>Toutes les pages</h4>"
-        },
-        {
-          "file": ".ultra11y/pages/plan-html/dom.html",
-          "line": 43,
-          "selector": "h2",
-          "snippet": "<h2></h2>"
-        },
-        {
-          "file": ".ultra11y/pages/plan-html/dom.html",
-          "line": 52,
-          "selector": "dt",
-          "snippet": "<dt>Aperçu par branche</dt>"
-        },
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 30,
-          "selector": "table",
-          "snippet": "<table>"
-        },
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 87,
-          "selector": "table",
-          "snippet": "<table role=\"presentation\">"
-        },
-        {
-          "file": "tests/fixtures/realworld/embed/disponibilite.html",
-          "line": 11,
-          "selector": "table",
-          "snippet": "<table>"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 2,
+          "selector": "html",
+          "message": "No default language declared on <html> element. When a page contains passages in different languages, a default language must be specified.",
+          "snippet": "<html><head>",
+          "normativeRef": "8.7.1",
+          "severity": "majeur"
         }
       ],
-      "evidenceFingerprint": "sha256:b23b4b976f90df051be327f7eb7d9fda",
-      "evidenceCount": 58,
-      "date": "2026-08-24",
+      "evidenceFingerprint": "sha256:af5734331f40d344d90ed7e4f83ac0d1",
+      "evidenceCount": 4,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "8.8",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 2,
+          "selector": "html",
+          "message": "Language code 'francais' is not a valid ISO 639 code. Test 8.8.1 requires valid language codes (e.g., 'fr' for French).",
+          "snippet": "<html lang=\"francais\"><head>",
+          "normativeRef": "8.8.1",
+          "severity": "majeur"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 47,
+          "selector": "p",
+          "message": "Empty language code lang=''. Test 8.8.1 requires valid and pertinent language codes.",
+          "snippet": "<p lang=\"\">Service provided as is, without warranty of any kind.</p>",
+          "normativeRef": "8.8.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:af5734331f40d344d90ed7e4f83ac0d1",
+      "evidenceCount": 4,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "8.9",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 42,
+          "selector": "center > font",
+          "message": "Deprecated presentational elements <center> and <font> used solely for visual styling. Test 8.9.1 prohibits using semantic tags only for presentation. These elements have no semantic meaning and should be replaced with semantic elements styled with CSS.",
+          "snippet": "<center><font color=\"#999999\" size=\"4\">Orbit héberge vos pages statiques sans configuration.</font></center>",
+          "normativeRef": "8.9.1",
+          "severity": "majeur"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 45,
+          "selector": "p",
+          "message": "Presentational HTML attributes 'align' and 'bgcolor' used for visual styling. Test 8.9.1 requires semantic markup not based on presentation attributes.",
+          "snippet": "<p align=\"center\" bgcolor=\"#ffffff\">Un réseau mondial, douze points de présence.</p>",
+          "normativeRef": "8.9.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:c253502b127b6ad00d5a1e9602e5d285",
+      "evidenceCount": 59,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "8.10",
+      "verdict": "NC",
+      "justification": "L'évidence moissonnée indique une page mentions-legales-html avec un attribut dir=\"right\" à la ligne 50. Le test 8.10.2 exige que la valeur de l'attribut dir soit conforme (rtl ou ltr). La valeur « right » n'est pas un attribut conforme selon la spécification HTML. Cela viole la condition de conformité du test 8.10.2.",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 50,
+          "snippet": "<p dir=\"right\">Sens de lecture forcé pour la traduction arabe de cette page.</p>",
+          "message": "L'attribut dir=\"right\" utilise une valeur invalide. Les valeurs valides sont 'ltr' (gauche à droite) ou 'rtl' (droite à gauche).",
+          "normativeRef": "8.10.2",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:af5734331f40d344d90ed7e4f83ac0d1",
+      "evidenceCount": 4,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "9.1",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/plan-html/dom.html",
+          "line": 26,
+          "selector": "h4",
+          "message": "Improper heading hierarchy: h4 follows h1 without intermediate h2 or h3 levels. Test 9.1.1 requires pertinent hierarchy between heading levels.",
+          "snippet": "<h4>Toutes les pages</h4>",
+          "normativeRef": "9.1.1",
+          "severity": "majeur"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/plan-html/dom.html",
+          "line": 43,
+          "selector": "h2",
+          "message": "Empty heading element with no content. Test 9.1.2 requires heading content to be pertinent. An empty heading provides no meaningful structure.",
+          "snippet": "<h2></h2>",
+          "normativeRef": "9.1.2",
+          "severity": "majeur"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/plan-html/dom.html",
+          "line": 59,
+          "selector": "h1",
+          "message": "Multiple h1 elements on the same page (lines 23 and 59). While hierarchy skips are not absolutely forbidden, multiple h1s suggest improper structure. Test 9.1.1 evaluates hierarchy pertinence.",
+          "snippet": "<h1>Nouveautés</h1>",
+          "normativeRef": "9.1.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:ce0e0502de199be0b5a1a91df0db7e4d",
+      "evidenceCount": 65,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "9.2",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/plan-html/dom.html",
+          "line": 57,
+          "snippet": "<main>",
+          "message": "Second visible <main> element without hidden attribute. Test 9.2.1 requires a unique visible <main> element; all other occurrences must have hidden attribute or be display:none.",
+          "normativeRef": "9.2.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:e8955a8dc54c3111165c17966d9a1915",
+      "evidenceCount": 11,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "9.3",
+      "verdict": "NC",
+      "justification": "Test 9.3.1 requires that information grouped visually as an unordered list either use <ul> and <li> tags, OR use role=\"list\" and role=\"listitem\" attributes. The list at line 47 uses <ul role=\"list\"> but its children are <div> elements without role=\"listitem\", failing both structural approaches.",
+      "findings": [
+        {
+          "file": ".ultra11y/pages/cadres-html/dom.html",
+          "line": 47,
+          "selector": "ul[role=\"list\"]",
+          "snippet": "<ul role=\"list\">",
+          "message": "Unordered list with role=\"list\" contains <div> children (lines 48-49) instead of <li> elements or elements with role=\"listitem\". This violates the structural requirement for list markup.",
+          "normativeRef": "9.3.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:d0c8e2789469803cceca68d6f20de39c",
+      "evidenceCount": 13,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "9.4",
       "verdict": "NA",
-      "justification": "Le sujet du critère — une citation — n'existe nulle part dans le périmètre audité, donc les tests 9.4.1 (citation courte, <q>) et 9.4.2 (bloc de citation, <blockquote>) ont une population vide. Les 58 évidences présentées sont des conteneurs de structure (titres h1 à h4, listes <ul>, tableaux, un <dt>) qui encadrent le texte éditorial propre au site — présentation de l'offre, mentions légales, quotas tarifaires, plan du site, contenus encadrés — et aucun de ces contenus ne reproduit un passage attribué à une source tierce. La vérification a été menée dans les deux sens : aucun passage cité (guillemets ou attribution) n'apparaît dans le contenu rendu des neuf pages ni des deux documents encadrés — les seuls guillemets français du dépôt sont dans des commentaires HTML, non restitués — et symétriquement aucune balise <q>, <blockquote> ni aucun attribut cite= n'est présent, ce qui écarte aussi l'hypothèse d'une citation mal indiquée. Rien n'étant concerné, le verdict est NA et non NC.",
+      "justification": "No <q> or <blockquote> elements are present in any of the audited pages. The evidence list contains headings, lists, and other structural elements but no content marked as citations. Tests 9.4.1 and 9.4.2 specifically require identifying citations visually present in the page and verifying they use the correct elements. Since no citations exist in the captured content, this criterion does not apply to the audited scope.",
+      "evidenceFingerprint": "sha256:c253502b127b6ad00d5a1e9602e5d285",
+      "evidenceCount": 59,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "10.2",
+      "verdict": "C",
+      "justification": "All meaningful content is present in HTML elements, not dependent on CSS visibility. Examining the DOM structure: headings contain text content, lists contain list items with text, forms contain inputs with labels, tables contain cell content. CSS-generated content (::after with content: 'Nouveau') is decorative. Styled elements like those with color:#bbbbbb have their text in the HTML. When CSS is disabled, this content remains present and accessible. Test 10.2.1 is satisfied.",
       "citations": [
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 30,
+          "snippet": "<main id=\"contenu\">"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
           "line": 39,
-          "selector": "h2",
           "snippet": "<h2>Déployez votre site en une commande</h2>"
         },
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 72,
-          "selector": "ul",
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 87,
           "snippet": "<ul>"
-        },
-        {
-          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
-          "line": 44,
-          "selector": "h2",
-          "snippet": "<h2>Conditions</h2>"
-        },
-        {
-          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
-          "line": 52,
-          "selector": "h2",
-          "snippet": "<h2>Accessibilité</h2>"
-        },
-        {
-          "file": ".ultra11y/pages/medias-html/dom.html",
-          "line": 42,
-          "selector": "h2",
-          "snippet": "<h2>Webinaire en direct</h2>"
-        },
-        {
-          "file": ".ultra11y/pages/plan-html/dom.html",
-          "line": 52,
-          "selector": "dt",
-          "snippet": "<dt>Aperçu par branche</dt>"
-        },
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 73,
-          "selector": "table",
-          "snippet": "<table>"
-        },
-        {
-          "file": "tests/fixtures/realworld/embed/disponibilite.html",
-          "line": 9,
-          "selector": "h1",
-          "snippet": "<h1>Disponibilité des services</h1>"
         }
       ],
-      "evidenceFingerprint": "sha256:b23b4b976f90df051be327f7eb7d9fda",
-      "evidenceCount": 58,
-      "date": "2026-08-24",
+      "evidenceFingerprint": "sha256:dfca14c6d1aecb8fcc191fd8b2911d97",
+      "evidenceCount": 61,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "10.3",
       "verdict": "C",
-      "justification": "Test 10.3.1 : l'ordre d'implémentation des contenus est l'ordre de lecture, et il reste logique feuilles de styles désactivées. La vérification s'appuie sur les captures rendues : pour chacune des neuf pages, l'ordre DOM des éléments rendus a été confronté à leur position verticale mesurée (boxes.json), et il coïncide — les seuls écarts relevés sont des éléments en ligne partagés sur une même ligne visuelle (cellules <th> d'une même rangée sur tarifs-html, deux champs côte à côte sur accueil, un bouton à côté d'un lien sur contact-html), jamais un bloc remonté ou descendu. Le CSSOM capturé (css.json) ne contient aucune règle qui sorte un contenu du flux dans l'ordre : ni float, ni order de flexbox ou de grille, ni changement de direction. Les deux seules règles hors flux sont .skip-link{position:absolute;left:-9999px} — le lien d'évitement, qui sans CSS revient en tête de document, c'est-à-dire précisément à sa place — et .astuce-contenu{position:absolute;display:none}, dont le texte, sans CSS, s'affiche à sa place dans le <li>, immédiatement après le bouton qu'il explique. Les titres moissonnés précèdent chacun la section qu'ils annoncent, les listes de navigation ouvrent leur page et les tableaux suivent le titre qui les nomme : l'enchaînement reste cohérent sans styles. Les défauts de structure constatés par ailleurs sur ce corpus (titre vide et saut de niveau sur plan-html, <dt> orphelin) portent sur le niveau et l'intitulé des éléments, pas sur leur ORDRE d'implémentation, qui est le seul objet du test 10.3.1 ; ils sont traités par 9.1 et 9.3.",
+      "justification": "The HTML source order is logical and coherent. Reading through the DOM in source order produces a comprehensible sequence: skip link, header with navigation, main content (headings and sections in logical order), footer. No CSS reordering via flexbox order properties, CSS Grid placement, or other positioning techniques disrupts this natural reading flow. When CSS is disabled, the content order remains appropriate and comprehensible. Test 10.3.1 is satisfied.",
       "citations": [
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 39,
-          "selector": "h2",
-          "snippet": "<h2>Déployez votre site en une commande</h2>"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 14,
+          "snippet": "<a class=\"skip-link\" href=\"#contenu\">Aller au contenu</a>"
         },
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 53,
-          "selector": "h3",
-          "snippet": "<h3>Pourquoi Orbit</h3>"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 18,
+          "snippet": "<header>"
         },
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 72,
-          "selector": "ul",
-          "snippet": "<ul>"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 13,
-          "selector": "ul",
-          "snippet": "<ul>"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 26,
-          "selector": "h2",
-          "snippet": "<h2>Nous écrire</h2>"
-        },
-        {
-          "file": ".ultra11y/pages/plan-html/dom.html",
-          "line": 23,
-          "selector": "h1",
-          "snippet": "<h1>Plan du site</h1>"
-        },
-        {
-          "file": ".ultra11y/pages/plan-html/dom.html",
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
           "line": 30,
-          "selector": "ul",
-          "snippet": "<ul>"
-        },
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 29,
-          "selector": "h2",
-          "snippet": "<h2>Comparatif des formules</h2>"
-        },
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 30,
-          "selector": "table",
-          "snippet": "<table>"
-        },
-        {
-          "file": ".ultra11y/pages/mentions-legales-html/dom.html",
-          "line": 34,
-          "selector": "h1",
-          "snippet": "<h1>Mentions légales</h1>"
+          "snippet": "<main id=\"contenu\">"
         }
       ],
-      "evidenceFingerprint": "sha256:b23b4b976f90df051be327f7eb7d9fda",
-      "evidenceCount": 58,
-      "date": "2026-08-24",
+      "evidenceFingerprint": "sha256:c253502b127b6ad00d5a1e9602e5d285",
+      "evidenceCount": 59,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "10.4",
+      "verdict": "NC",
+      "justification": "Test 10.4.2 requires that text can be enlarged to 200%. The meta viewport with user-scalable=no directly blocks this capability. Test 10.4.1 requires that text remains present and readable when enlarged. The .entrefilet paragraph fails this because its fixed height (20px) combined with overflow:hidden causes text to disappear when zoom is applied.",
+      "findings": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 5,
+          "selector": "meta[name=\"viewport\"]",
+          "snippet": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1\">",
+          "message": "Meta viewport has user-scalable=no and maximum-scale=1, which disables zoom scaling entirely. This prevents users from enlarging text to 200% using the browser's zoom function.",
+          "normativeRef": "10.4.2",
+          "severity": "bloquant"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 111,
+          "selector": "p.entrefilet",
+          "snippet": "<p class=\"entrefilet\"> Le réseau Orbit compte douze points de présence répartis sur quatre continents, et une latence médiane inférieure à trent",
+          "message": "Text in .entrefilet class is constrained by CSS (height:20px, overflow:hidden, white-space:nowrap) which truncates content when text is enlarged. At 200% zoom, the content is cut off and becomes unreadable.",
+          "normativeRef": "10.4.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:4dfb0c061dfe3e2b5635b2c5b1a2c641",
+      "evidenceCount": 3,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "10.5",
+      "verdict": "C",
+      "justification": "The captured evidence shows one element with explicit CSS color declarations (line 59: color:#bbbbbb; background:#ffffff). Both color and background-color are declared together, satisfying tests 10.5.1 and 10.5.2. Across the styles.json, links and text elements with color declarations consistently include background-color values. The CSS structure shows proper pairing of foreground and background colors. Tests 10.5.1 and 10.5.2 are satisfied.",
+      "citations": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 59,
+          "snippet": "<p style=\"color:#bbbbbb;background:#ffffff\">Facturation à la seconde, sans engagement.</p>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:79b78e65ededd94872d4c0e4a4925bc1",
+      "evidenceCount": 1,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "10.6",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "tests/fixtures/realworld/styles.css",
+          "line": 73,
+          "message": "Links inside list items have no underline (text-decoration: none) and no explicit hover/focus states. Combined with global focus outline removal (line 59), links are distinguished by color only without required visual feedback at hover or focus.",
+          "normativeRef": "10.6.1",
+          "severity": "bloquant",
+          "snippet": "p a,\nli a {\n  color: #0000ee;\n  text-decoration: none;\n  font-weight: inherit;\n}"
+        },
+        {
+          "file": "tests/fixtures/realworld/styles.css",
+          "line": 59,
+          "message": "Focus outline is globally removed (*:focus { outline: none }) with no replacement styling for links, violating the requirement for visual focus indication other than color change.",
+          "normativeRef": "10.6.1",
+          "severity": "bloquant",
+          "snippet": "*:focus {\n  outline: none;\n}"
+        }
+      ],
+      "evidenceFingerprint": "sha256:e35960424510c134f18446b77d8479b0",
+      "evidenceCount": 24,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "10.8",
+      "verdict": "NC",
+      "justification": "The test 10.8.1 requires that hidden content either has a vocation to be ignored by assistive technologies OR is made available through user action. The button at line 145 is aria-hidden but visible and focusable to keyboard users, violating the coherence requirement. Most decorative elements (SVG icons with aria-hidden) are appropriately hidden; however, this functionally-visible, focusable button must remain accessible.",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 145,
+          "snippet": "<button type=\"button\" aria-hidden=\"true\">Historique des demandes</button>",
+          "message": "Button with visible text is hidden from assistive technologies via aria-hidden=\"true\" while remaining focusable. Content should be available to screen readers since it serves a functional purpose for users.",
+          "normativeRef": "10.8.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:68de6277db53e24691ce7825b064590a",
+      "evidenceCount": 30,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
@@ -1017,203 +1519,190 @@
       "decidedBy": "agent"
     },
     {
-      "criteriaId": "10.14",
+      "criteriaId": "10.11",
       "verdict": "NC",
       "findings": [
         {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 1,
+          "message": "Body element has min-width: 1200px set in CSS, forcing horizontal scrolling at 320px viewport width. Content cannot reflow to fit viewport.",
+          "normativeRef": "10.11.1",
+          "severity": "bloquant",
+          "snippet": "Horizontal scrolling at 320px width — content does not reflow."
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/tarifs-html/dom.html",
+          "line": 1,
+          "message": "Input field with class 'champ-etroit' is constrained to 18px width at 320px viewport, causing entered text to be truncated and unreadable.",
+          "normativeRef": "10.11.1",
+          "severity": "bloquant",
+          "snippet": "Champ rempli dont la valeur saisie est tronquée/illisible à 320px de large"
+        }
+      ],
+      "evidenceFingerprint": "sha256:f85057300faa8b5d29117784ed5fef14",
+      "evidenceCount": 9,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "10.12",
+      "verdict": "NC",
+      "justification": "Test 10.12.1 requires that text remains readable when spacing is modified (line-height to 1.5x, paragraph spacing to 2em, letter-spacing to 0.12em, word-spacing to 0.16em). The .entrefilet paragraph with fixed height and overflow:hidden truncates content when these properties are applied, violating the readability requirement.",
+      "findings": [
+        {
           "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 80,
+          "line": 111,
+          "selector": "p.entrefilet",
+          "snippet": "<p class=\"entrefilet\"> Le réseau Orbit compte douze points de présence répartis sur quatre continents, et une latence médiana inférieure à trent",
+          "message": "Text spacing properties (line-height, letter-spacing, word-spacing) cannot be increased without loss of content. The .entrefilet element uses fixed height (20px) with overflow:hidden, causing text to be cut off when spacing increases.",
+          "normativeRef": "10.12.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:29a998d27cefeca3ebac03f5ff96a40f",
+      "evidenceCount": 1,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "10.13",
+      "verdict": "NC",
+      "justification": "Test 10.13.1 requires that additional content appearing on hover/focus can be dismissed by user action without moving focus/pointer. The tooltip is revealed only on :hover CSS without :focus equivalent, making it inaccessible to keyboard users. No Escape key handler or other dismissal mechanism is present. Test 10.14.1 requires that content appearing via CSS :hover also appears on keyboard focus or activation - the missing :focus-within rule violates this.",
+      "findings": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 95,
           "selector": "span#astuce-tls.astuce-contenu",
           "snippet": "<span role=\"tooltip\" id=\"astuce-tls\" class=\"astuce-contenu\">",
-          "message": "L'infobulle « Un certificat TLS chiffre le trafic entre le visiteur et votre site. » est un contenu additionnel masqué par display:none et révélé par le seul mécanisme CSS .astuce:hover .astuce-contenu{display:block}. Le CSSOM capturé de la page (css.json) ne contient qu'une seule règle de focus, :focus{outline:none} : aucune règle :focus ni :focus-within ne révèle ce contenu, et la page ne porte aucun script. Le contenu n'apparaît donc ni à la prise de focus du bouton <button aria-describedby=\"astuce-tls\"> qui le déclenche (accueil/dom.html:79), ni à son activation au clavier, ni par l'activation ou la prise de focus d'un autre composant : aucune des trois conditions du test 10.14.1 n'est remplie. La sonde de survol de la capture confirme la révélation au seul survol du pointeur. Correctif : ajouter .astuce:focus-within .astuce-contenu{display:block} en jumeau de la règle :hover.",
-          "normativeRef": "10.14.1",
+          "message": "Tooltip content appears only on hover (via CSS :hover rule in styles.css:129-131). There is no :focus or :focus-within rule, so the tooltip is not accessible to keyboard users. Additionally, no mechanism exists to dismiss the tooltip by user action (e.g., Escape key handler).",
+          "normativeRef": "10.13.1",
           "severity": "majeur"
-        },
+        }
+      ],
+      "evidenceFingerprint": "sha256:ed83fd94d0b3e51faa63d5a4a29cafd5",
+      "evidenceCount": 28,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "10.14",
+      "verdict": "NC",
+      "justification": "Test 10.14.1 requires that content appearing via CSS :hover also appears on component activation via keyboard or on focus, or via activation/focus of another component. The tooltip style rule reveals content only on :hover with no :focus-within or :focus alternative, making it inaccessible to keyboard-only users.",
+      "findings": [
         {
           "file": "tests/fixtures/realworld/styles.css",
           "line": 129,
           "selector": ".astuce:hover .astuce-contenu",
-          "snippet": ".astuce:hover .astuce-contenu {",
-          "message": "Règle CSS qui révèle le contenu additionnel #astuce-tls au seul survol du pointeur, sans jumelle :focus/:focus-within dans la feuille de styles — c'est le mécanisme qui met en échec le test 10.14.1 sur la page d'accueil.",
+          "snippet": ".astuce:hover .astuce-contenu { display: block; }",
+          "message": "Additional content (.astuce-contenu) is revealed only via CSS :hover pseudo-class. No corresponding :focus, :focus-within, or other keyboard-accessible trigger exists. Keyboard users cannot access this tooltip through any means other than hovering with pointer.",
           "normativeRef": "10.14.1",
           "severity": "majeur"
         }
       ],
       "evidenceFingerprint": "sha256:41bbca2186a29d42e0d2fb7bffab39b2",
       "evidenceCount": 11,
-      "date": "2026-08-24",
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
-      "criteriaId": "11.2",
-      "verdict": "C",
-      "justification": "Toutes les étiquettes présentes dans le périmètre permettent de connaître la fonction exacte de leur champ. Test 11.2.1 : chaque <label> associé à un champ nomme l'information attendue — « Adresse e-mail de secours », « Adresse e-mail de facturation », « Pays », « Offre concernée », « Devise », « Début de la migration », « Fin souhaitée », « Mot de passe du compte », « SIRET », « Société », « Tapez SUPPRIMER pour confirmer », « Rechercher sur le site », « Nombre de sites à migrer », « Votre adresse e-mail », « Numéro SIRET », « Adresse e-mail », « Mot de passe ». Test 11.2.2 : le seul champ étiqueté par un attribut title, contact-html:35, porte title=\"Objet du message\", qui est pertinent (le fait qu'il soit nommé UNIQUEMENT par title relève de 11.1, pas de la pertinence). Tests 11.2.3 et 11.2.4 : aucun champ du périmètre n'est étiqueté par aria-label ni par aria-labelledby, population vide. Test 11.2.5 : pour tous les champs disposant à la fois d'un intitulé visible et d'un nom accessible, le nom accessible EST ce texte visible, puisqu'il provient du <label> lui-même ; la condition « contient au moins l'intitulé visible » est donc satisfaite. Test 11.2.6 : aucun champ n'est étiqueté par un bouton adjacent. Trois cas ont été examinés puis écartés du périmètre de 11.2. Le champ contact-html:53 porte deux <label for=\"telephone\"> (« Téléphone » et « Sans indicatif ») : la note de la définition « Étiquette de champ de formulaire » impose d'évaluer la pertinence de 11.2 sur le NOM ACCESSIBLE, qui concatène ici les deux labels en « Téléphone Sans indicatif » — pertinent ; la duplication elle-même est un défaut de 11.1. Les boutons radio contact-html:88/90 (« Oui » / « Non ») ne sont pas rendus insuffisants par leur étiquette mais par l'absence de regroupement portant la question : la définition « Champs de même nature » traite explicitement ce cas (« Un ensemble de boutons radio […] qui se rapportent à une question […] lorsque les intitulés de label ne sont pas suffisants »), et il est instruit par 11.5 et 11.6. Enfin les champs contact-html:29 et 32 (aucune étiquette, placeholder tenant lieu d'étiquette) sortent de la population de 11.2, qui porte sur la pertinence des étiquettes existantes : leur absence relève de 11.1, et l'<input type=\"image\"> d'accueil/dom.html:101 n'est pas un champ de saisie au sens du glossaire.",
-      "citations": [
+      "criteriaId": "11.1",
+      "verdict": "NC",
+      "findings": [
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 99,
-          "selector": "input#newsletter-email",
-          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" required=\"\">"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 29,
+          "selector": "input[name='societe']",
+          "snippet": "<input type=\"text\" name=\"societe\"></p>",
+          "message": "Form field 'societe' lacks any accessible name: no label, no title, no aria-label, no aria-labelledby, and no adjacent button",
+          "normativeRef": "11.1.1",
+          "severity": "bloquant"
         },
         {
-          "file": ".ultra11y/pages/contact-html/dom.html",
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 32,
+          "selector": "input[name='courriel']",
+          "snippet": "<input type=\"text\" name=\"courriel\" placeholder=\"Votre adresse e-mail\"></p>",
+          "message": "Form field relies on placeholder only as its label, which is not a reliable mechanism per RGAA 11.1.1",
+          "normativeRef": "11.1.1",
+          "severity": "bloquant"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
           "line": 35,
-          "selector": "input",
-          "snippet": "<input type=\"text\" name=\"objet\" title=\"Objet du message\"></p>"
+          "selector": "input[name='objet']",
+          "snippet": "<input type=\"text\" name=\"objet\" title=\"Objet du message\"></p>",
+          "message": "Form field relies on title attribute only. Per test 11.1.3, when using only title, the field must be accompanied by visible text or focus-revealed text accolé to the field; title alone is insufficient",
+          "normativeRef": "11.1.3",
+          "severity": "bloquant"
         },
         {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 40,
-          "selector": "input#courriel-secondaire",
-          "snippet": "<input id=\"courriel-secondaire\" name=\"email\" type=\"email\">"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 57,
+          "selector": "label[for='champ-supprime']",
+          "snippet": "<label for=\"champ-supprime\">Numéro de client</label></p>",
+          "message": "Label's for attribute references non-existent element 'champ-supprime'. No field with id='champ-supprime' exists in the form.",
+          "normativeRef": "11.1.2",
+          "severity": "bloquant"
         },
         {
-          "file": ".ultra11y/pages/contact-html/dom.html",
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
           "line": 53,
           "selector": "input#telephone",
-          "snippet": "<input id=\"telephone\" name=\"telephone\" type=\"tel\">"
+          "snippet": "<input id=\"telephone\" name=\"telephone\" type=\"tel\">",
+          "message": "Form field 'telephone' is referenced by two label elements (lines 51-52), creating ambiguity about which label applies per test 11.1.2",
+          "normativeRef": "11.1.2",
+          "severity": "bloquant"
         },
         {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 62,
-          "selector": "select#pays",
-          "snippet": "<select id=\"pays\" name=\"pays\"></select>"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 68,
-          "selector": "select#offre",
-          "snippet": "<select id=\"offre\" name=\"offre\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 104,
-          "selector": "input#debut",
-          "snippet": "<input id=\"debut\" type=\"date\" name=\"debut\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 112,
-          "selector": "input#motdepasse",
-          "snippet": "<input id=\"motdepasse\" type=\"password\" name=\"motdepasse\" autocomplete=\"off\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 119,
-          "selector": "input#siret",
-          "snippet": "<input id=\"siret\" name=\"siret\" type=\"text\" aria-invalid=\"true\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 167,
-          "selector": "input#confirmation",
-          "snippet": "<input id=\"confirmation\" name=\"confirmation\" type=\"text\" onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\">"
-        },
-        {
-          "file": ".ultra11y/pages/recherche-html/dom.html",
-          "line": 33,
-          "selector": "input#requete",
-          "snippet": "<input id=\"requete\" name=\"q\" type=\"search\" tabindex=\"3\">"
-        },
-        {
-          "file": ".ultra11y/pages/tarifs-html/dom.html",
-          "line": 96,
-          "selector": "input#devis.champ-etroit",
-          "snippet": "<input id=\"devis\" name=\"devis\" type=\"text\" class=\"champ-etroit\">"
-        },
-        {
-          "file": "tests/fixtures/realworld/LoginForm.tsx",
-          "line": 21,
-          "selector": "input#email",
-          "snippet": "<input id=\"email\" name=\"email\" type=\"email\" autoComplete=\"email\" required />"
-        },
-        {
-          "file": "tests/fixtures/realworld/embed/facturation.html",
-          "line": 13,
-          "selector": "input#siret",
-          "snippet": "<input type=\"text\" id=\"siret\" name=\"siret\" autocomplete=\"off\" /></p>"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 121,
+          "selector": "input[type='image']",
+          "snippet": "<input type=\"image\" src=\"/img/envoyer.png\">",
+          "message": "Image button lacks accessible name: no alt attribute, no aria-label, no title, no aria-labelledby",
+          "normativeRef": "11.1.1",
+          "severity": "bloquant"
         }
       ],
       "evidenceFingerprint": "sha256:024f68e19582d298798d623d5eb2a626",
       "evidenceCount": 27,
-      "date": "2026-08-24",
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.2",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 29,
+          "snippet": "<input type=\"text\" name=\"societe\"></p>",
+          "message": "Champ de formulaire (input type=\"text\" name=\"societe\") dépourvu d'étiquette : pas de <label>, pas d'attribut title, pas d'aria-label, pas d'aria-labelledby, pas de placeholder. Le champ n'a aucun moyen pour l'utilisateur ou les technologies d'assistance de connaître sa fonction.",
+          "normativeRef": "11.2.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:024f68e19582d298798d623d5eb2a626",
+      "evidenceCount": 27,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "11.3",
-      "verdict": "C",
-      "justification": "Les champs de même fonction répétés dans une page et dans l'ensemble de pages portent des étiquettes cohérentes, au sens du glossaire « Étiquettes cohérentes » (formulées sans ambiguïté pour que l'utilisateur sache que l'information demandée est la même). Test 11.3.1 (dans une même page) : sur contact-html, le SIRET est demandé deux fois et étiqueté « SIRET » aux deux endroits (dom.html:119 dans le formulaire de saisie, dom.html:130 dans le récapitulatif) ; les deux champs de date d'une même opération portent « Début de la migration » et « Fin souhaitée », qui se lisent comme les deux bornes d'un même intervalle ; les trois adresses électroniques de la page sont toutes libellées « Adresse e-mail … » et ne se distinguent que par leur usage. Test 11.3.2 (dans l'ensemble de pages) : la saisie d'une adresse électronique est libellée « Votre adresse e-mail » (accueil, inscription à l'infolettre), « Adresse e-mail de secours » et « Adresse e-mail de facturation » (contact) et « Adresse e-mail » (formulaire de connexion) — même formulation de base, qualificatif distinct pour chaque fonction distincte, jamais de synonyme concurrent (pas de « courriel » ici et « e-mail » là) ; le SIRET est libellé « SIRET » sur contact et « Numéro SIRET » dans le document encadré facturation.html, deux formulations qui désignent sans ambiguïté la même information ; le mot de passe est libellé « Mot de passe du compte » sur contact et « Mot de passe » sur le formulaire de connexion. Aucune paire de champs de même fonction ne reçoit d'étiquettes divergentes. Deux éléments de la moisson sortent du périmètre : le champ contact-html:29 (« societe ») n'a aucune étiquette, ce qui relève de 11.1 et non de la cohérence des étiquettes, et le bouton tarifs-html:116 (aria-label=\"Souscrire\" pour un texte visible « Demander un devis ») n'est pas un champ de saisie de formulaire au sens du glossaire — c'est un bouton, instruit par 11.9.",
-      "citations": [
+      "verdict": "NC",
+      "justification": "Test 11.3.1 requires that repeated fields with the same function within a page have consistent labels. The contact form contains multiple email input fields with different label texts ('Votre adresse e-mail', 'Adresse e-mail de secours', 'Adresse e-mail de facturation'), causing ambiguity about whether these are truly the same type of input or different purposes.",
+      "findings": [
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 99,
-          "selector": "input#newsletter-email",
-          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" required=\"\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
+          "file": "tests/fixtures/realworld/contact.html",
           "line": 40,
-          "selector": "input#courriel-secondaire",
-          "snippet": "<input id=\"courriel-secondaire\" name=\"email\" type=\"email\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 46,
-          "selector": "input#courriel-facturation",
-          "snippet": "<input id=\"courriel-facturation\" name=\"facturation\" type=\"text\" autocomplete=\"e-mail\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 104,
-          "selector": "input#debut",
-          "snippet": "<input id=\"debut\" type=\"date\" name=\"debut\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 106,
-          "selector": "input#fin",
-          "snippet": "<input id=\"fin\" type=\"date\" name=\"fin\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 112,
-          "selector": "input#motdepasse",
-          "snippet": "<input id=\"motdepasse\" type=\"password\" name=\"motdepasse\" autocomplete=\"off\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 119,
-          "selector": "input#siret",
-          "snippet": "<input id=\"siret\" name=\"siret\" type=\"text\" aria-invalid=\"true\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 130,
-          "selector": "input#recap-siret",
-          "snippet": "<input id=\"recap-siret\" type=\"text\" value=\"00000000000000\">"
-        },
-        {
-          "file": "tests/fixtures/realworld/LoginForm.tsx",
-          "line": 21,
-          "selector": "input#email",
-          "snippet": "<input id=\"email\" name=\"email\" type=\"email\" autoComplete=\"email\" required />"
-        },
-        {
-          "file": "tests/fixtures/realworld/LoginForm.tsx",
-          "line": 24,
-          "selector": "input#password",
-          "snippet": "<input id=\"password\" name=\"password\" type=\"password\" autoComplete=\"current-password\" required />"
-        },
-        {
-          "file": "tests/fixtures/realworld/embed/facturation.html",
-          "line": 13,
-          "selector": "input#siret",
-          "snippet": "<input type=\"text\" id=\"siret\" name=\"siret\" autocomplete=\"off\" /></p>"
+          "snippet": "<input type=\"text\" name=\"courriel\" placeholder=\"Votre adresse e-mail\" />",
+          "message": "Email field on contact page is labeled (via placeholder) as 'Votre adresse e-mail', while another email field on the same page (line 48) is labeled 'Adresse e-mail de secours', and a third (line 54) is 'Adresse e-mail de facturation'. Same-function fields have inconsistent labels.",
+          "normativeRef": "11.3.1",
+          "severity": "majeur"
         }
       ],
-      "evidenceFingerprint": "sha256:044fb6034ea91ad83a854d539702fc38",
-      "evidenceCount": 28,
-      "date": "2026-08-24",
+      "evidenceFingerprint": "sha256:8e7a6c22427366bf5e5f5bdeff8a5310",
+      "evidenceCount": 29,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
@@ -1263,318 +1752,437 @@
       "decidedBy": "agent"
     },
     {
-      "criteriaId": "11.7",
-      "verdict": "C",
-      "justification": "Test 11.7.1 : le périmètre audité ne contient qu'un seul regroupement de champs de même nature doté d'une légende, et cette légende est pertinente. Il s'agit du <fieldset disabled> de contact-html (dom.html:125) dont la <legend>Récapitulatif</legend> (dom.html:126) titre les deux champs cités ci-dessous, « Société » et « SIRET » — un bloc d'identité de l'entreprise repris en fin de formulaire. L'intitulé « Récapitulatif » dit exactement ce qu'est ce groupe : le rappel des informations déjà saisies, et il le distingue sans ambiguïté du bloc de saisie qui le précède, où les mêmes deux informations sont demandées. La géométrie de la capture confirme que la légende est bien rendue en tête du groupe (x=32, y=918, juste au-dessus des deux champs à y=951). Les autres regroupements moissonnés sortent de la population du test, qui ne porte que sur les légendes existantes : le <fieldset> de contact-html:94 (radios « canal ») n'a AUCUNE légende — absence instruite par le test 11.6.1 — et le couple de radios « rappel » de contact-html:88/90 n'est enfermé dans aucun regroupement, ce qui relève du test 11.5.1. Aucune légende non pertinente n'existe donc dans le périmètre.",
-      "citations": [
+      "criteriaId": "11.5",
+      "verdict": "NC",
+      "findings": [
         {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 128,
-          "selector": "input#recap-societe",
-          "snippet": "<input id=\"recap-societe\" type=\"text\" value=\"Orbit\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 130,
-          "selector": "input#recap-siret",
-          "snippet": "<input id=\"recap-siret\" type=\"text\" value=\"00000000000000\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 96,
-          "selector": "input#canal-mail",
-          "snippet": "<input id=\"canal-mail\" type=\"radio\" name=\"canal\" value=\"mail\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 98,
-          "selector": "input#canal-tel",
-          "snippet": "<input id=\"canal-tel\" type=\"radio\" name=\"canal\" value=\"tel\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
           "line": 88,
           "selector": "input#rappel-oui",
-          "snippet": "<input id=\"rappel-oui\" type=\"radio\" name=\"rappel\" value=\"oui\">"
+          "snippet": "<input id=\"rappel-oui\" type=\"radio\" name=\"rappel\" value=\"oui\">",
+          "message": "Two radio buttons with same name 'rappel' (lines 88 and 90) are not grouped within fieldset, role='group', or role='radiogroup' as required by test 11.5.1",
+          "normativeRef": "11.5.1",
+          "severity": "bloquant"
         },
         {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 90,
-          "selector": "input#rappel-non",
-          "snippet": "<input id=\"rappel-non\" type=\"radio\" name=\"rappel\" value=\"non\">"
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 104,
+          "selector": "input#debut",
+          "snippet": "<input id=\"debut\" type=\"date\" name=\"debut\">",
+          "message": "Two date fields ('debut' and 'fin', lines 104-106) are of the same nature and should be grouped within fieldset or role='group', but are not",
+          "normativeRef": "11.5.1",
+          "severity": "bloquant"
+        }
+      ],
+      "evidenceFingerprint": "sha256:024f68e19582d298798d623d5eb2a626",
+      "evidenceCount": 27,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.6",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 94,
+          "selector": "fieldset",
+          "snippet": "<fieldset>",
+          "message": "Fieldset contains radio buttons of same nature (canal-mail, canal-tel) but lacks a legend element. Per test 11.6.1, fieldsets with grouped same-nature fields must have a legend.",
+          "normativeRef": "11.6.1",
+          "severity": "bloquant"
         }
       ],
       "evidenceFingerprint": "sha256:b9956f22d25c083ec69b6294734e16b4",
       "evidenceCount": 38,
-      "date": "2026-08-24",
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.7",
+      "verdict": "C",
+      "justification": "Le seul regroupement de champs de même nature disposant d'une légende sur la page contact-html est le fieldset « Récapitulatif » (ligne 125-131), qui comporte la légende « Récapitulatif ». Cette légende est pertinente : elle identifie clairement le regroupement comme un récapitulatif des informations saisies, ce qui correspond exactement au contenu des champs (input Société et input SIRET désactivés affichant des valeurs pré-remplies). Le critère 11.7 demande que les légendes existantes soient pertinentes ; cette condition est satisfaite.",
+      "citations": [
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 126,
+          "snippet": "<legend>Récapitulatif</legend>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:b9956f22d25c083ec69b6294734e16b4",
+      "evidenceCount": 38,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.8",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 69,
+          "selector": "optgroup",
+          "snippet": "<optgroup>",
+          "message": "The optgroup element grouping items 'Découverte' and 'Équipe' lacks a label attribute. Per test 11.8.2, each optgroup must have a label attribute.",
+          "normativeRef": "11.8.2",
+          "severity": "bloquant"
+        }
+      ],
+      "evidenceFingerprint": "sha256:024f68e19582d298798d623d5eb2a626",
+      "evidenceCount": 27,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.9",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 121,
+          "selector": "input[type='image']",
+          "snippet": "<input type=\"image\" src=\"/img/envoyer.png\">",
+          "message": "Image button in form lacks accessible name: no alt attribute, no aria-label, no title. Per test 11.9.1, buttons must have a pertinent accessible name.",
+          "normativeRef": "11.9.1",
+          "severity": "bloquant"
+        }
+      ],
+      "evidenceFingerprint": "sha256:024f68e19582d298798d623d5eb2a626",
+      "evidenceCount": 27,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.10",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 119,
+          "normativeRef": "11.10.4",
+          "message": "The field with aria-invalid=\"true\" has an associated error message (span#siret-error) but the message is not linked to the field via aria-describedby. Test 11.10.4 requires either the error message to be in the label or properly associated via aria-describedby or aria-labelledby.",
+          "snippet": "<input id=\"siret\" name=\"siret\" type=\"text\" aria-invalid=\"true\">",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:58c4b350aa5549ae7ad0eb67131df570",
+      "evidenceCount": 29,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "11.11",
       "verdict": "C",
-      "justification": "Les deux tests portent sur les messages d'erreur de saisie retrouvables dans les documents audités. Le seul message d'erreur de saisie du périmètre est celui du champ SIRET (.ultra11y/pages/contact-html/dom.html:120) : « Le SIRET doit comporter quatorze chiffres. » Il énonce le type de donnée attendu (des chiffres) ET le format (quatorze caractères) — 11.11.1 est validé pour ce message. Le format étant univoque, un exemple de valeur n'est pas nécessaire au sens du « si nécessaire » de 11.11.2 ; le récapitulatif voisin affiche d'ailleurs une valeur de la forme attendue, à quatorze chiffres (dom.html:130). Les autres champs contraints reposent sur la validation native HTML5 — input#newsletter-email (type=email, required) sur accueil, et les champs email / mot de passe de LoginForm (type=email et type=password, required) — dont les messages d'aide à la saisie (« veuillez saisir une adresse e-mail valide ») sont explicitement admis par la note technique du critère comme suggestion du type et du format attendus. Aucun autre message d'erreur de saisie n'existe dans le périmètre : le seul autre texte de type « erreur » de contact-html est un message d'état de service (indisponibilité du service de tickets), qui ne concerne aucune saisie. Réserve non normative, qui n'établit aucun échec de test : le texte d'erreur dynamique de LoginForm (une chaîne d'état rendue dans un <p role=\"alert\">) n'est pas déterminable en source seule, ce composant n'ayant pas de capture rendue.",
+      "justification": "The contact form displays an error message for the SIRET field: 'Le SIRET doit comporter quatorze chiffres' (The SIRET must contain fourteen digits). This message clearly indicates the expected format (14 digits), satisfying test 11.11.1 which requires format suggestions. The criterion's note indicates that format validation through error messages is intended to satisfy the requirement for facilitating error correction.",
       "citations": [
         {
           "file": ".ultra11y/pages/contact-html/dom.html",
           "line": 120,
-          "selector": "span#siret-error.error-message",
           "snippet": "<span class=\"error-message\" id=\"siret-error\">Le SIRET doit comporter quatorze chiffres.</span>"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 119,
-          "selector": "input#siret",
-          "snippet": "<input id=\"siret\" name=\"siret\" type=\"text\" aria-invalid=\"true\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 130,
-          "selector": "input#recap-siret",
-          "snippet": "<input id=\"recap-siret\" type=\"text\" value=\"00000000000000\">"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 99,
-          "selector": "input#newsletter-email",
-          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" required=\"\">"
-        },
-        {
-          "file": "tests/fixtures/realworld/LoginForm.tsx",
-          "line": 21,
-          "selector": "input#email",
-          "snippet": "<input id=\"email\" name=\"email\" type=\"email\" autoComplete=\"email\" required />"
-        },
-        {
-          "file": "tests/fixtures/realworld/LoginForm.tsx",
-          "line": 24,
-          "selector": "input#password",
-          "snippet": "<input id=\"password\" name=\"password\" type=\"password\" autoComplete=\"current-password\" required />"
         }
       ],
       "evidenceFingerprint": "sha256:58c4b350aa5549ae7ad0eb67131df570",
       "evidenceCount": 29,
-      "date": "2026-08-24",
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "11.12",
-      "verdict": "C",
-      "justification": "Deux formulaires du périmètre entrent dans le champ du critère, et chacun satisfait une des conditions alternatives des deux tests. (1) La suppression de compte (contact-html, action=\"/compte/suppression\") : sa validation supprime des données personnelles, et elle est subordonnée à un mécanisme de confirmation explicite réalisé PAR UN CHAMP DE FORMULAIRE — l'utilisateur doit saisir « SUPPRIMER » dans input#confirmation, étiqueté « Tapez SUPPRIMER pour confirmer » (.ultra11y/pages/contact-html/dom.html:167), avant que le bouton « Supprimer définitivement mon compte » n'ait d'effet. C'est la troisième condition de 11.12.1 (« mécanisme de confirmation explicite […] ou une étape supplémentaire », la méthodologie officielle donnant la case à cocher « par exemple ») et la seconde condition de 11.12.2 (« mécanisme de demande de confirmation explicite de la suppression […] via un champ de formulaire »). (2) Le formulaire de facturation encadré (tests/fixtures/realworld/embed/facturation.html:13, action=\"/facturation\", bouton « Mettre à jour ») modifie une donnée à caractère financier et juridique (le numéro SIRET) : le formulaire est lui-même, et en permanence, le mécanisme de modification de cette donnée — après validation, l'utilisateur rouvre la même page et re-soumet la valeur corrigée, ce qui remplit la première condition de 11.12.1 (« modifier […] les données après la validation du formulaire »). Les autres formulaires du périmètre ne modifient ni ne suppriment de données et n'emportent aucune conséquence financière, juridique, ni de test ou d'examen : /contact (envoi d'un message, avec de surcroît un récapitulatif des données saisies avant validation, dom.html:128 et :130), /newsletter (abonnement), /recherche (interrogation), et LoginForm (authentification) — ils sortent du champ du critère. Réserve hors critère : le piège au clavier porté par l'attribut onkeydown de input#confirmation relève de RGAA 12.9, pas de 11.12.",
-      "citations": [
+      "verdict": "NC",
+      "findings": [
         {
           "file": ".ultra11y/pages/contact-html/dom.html",
           "line": 167,
           "selector": "input#confirmation",
-          "snippet": "<input id=\"confirmation\" name=\"confirmation\" type=\"text\" onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\">"
-        },
-        {
-          "file": "tests/fixtures/realworld/embed/facturation.html",
-          "line": 13,
-          "selector": "input#siret",
-          "snippet": "<input type=\"text\" id=\"siret\" name=\"siret\" autocomplete=\"off\" /></p>"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 128,
-          "selector": "input#recap-societe",
-          "snippet": "<input id=\"recap-societe\" type=\"text\" value=\"Orbit\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 130,
-          "selector": "input#recap-siret",
-          "snippet": "<input id=\"recap-siret\" type=\"text\" value=\"00000000000000\">"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 29,
-          "selector": "input",
-          "snippet": "<input type=\"text\" name=\"societe\"></p>"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 99,
-          "selector": "input#newsletter-email",
-          "snippet": "<input id=\"newsletter-email\" name=\"email\" type=\"email\" autocomplete=\"email\" required=\"\">"
-        },
-        {
-          "file": ".ultra11y/pages/recherche-html/dom.html",
-          "line": 33,
-          "selector": "input#requete",
-          "snippet": "<input id=\"requete\" name=\"q\" type=\"search\" tabindex=\"3\">"
-        },
-        {
-          "file": "tests/fixtures/realworld/LoginForm.tsx",
-          "line": 21,
-          "selector": "input#email",
-          "snippet": "<input id=\"email\" name=\"email\" type=\"email\" autoComplete=\"email\" required />"
+          "snippet": "<input id=\"confirmation\" name=\"confirmation\" type=\"text\" onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\">",
+          "message": "Account deletion form requires text input typing 'SUPPRIMER' for confirmation. This is neither a checkbox (<input type=\"checkbox\">) nor a distinct additional step as required by RGAA 11.12.1. The criterion specifically prescribes checkbox-based confirmation or a separate step; a text field on the same form does not meet either requirement. No recovery mechanism for deleted data is evident.",
+          "normativeRef": "11.12.1",
+          "severity": "majeur"
         }
       ],
       "evidenceFingerprint": "sha256:58c4b350aa5549ae7ad0eb67131df570",
       "evidenceCount": 29,
-      "date": "2026-08-24",
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "11.13",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 40,
+          "normativeRef": "11.13.1",
+          "message": "The email field (courriel-secondaire) lacks an autocomplete attribute. Test 11.13.1 requires form fields collecting user information to have an autocomplete attribute with a valid value from the autocomplete vocabulary.",
+          "snippet": "<input id=\"courriel-secondaire\" name=\"email\" type=\"email\">",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:48dfa56d5ace52e54c7ecee54cdd697c",
+      "evidenceCount": 23,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "12.1",
       "verdict": "C",
-      "justification": "L'ensemble de pages dispose de navigation principale et navigation de pied de page, plus un plan du site.",
+      "justification": "The page set contains two distinct navigation systems satisfying test 12.1.1. First, a navigation principale menu appears in the header across all pages (evident in all captured pages' `<nav aria-label=\"Navigation principale\">` elements). Second, a dedicated sitemap page exists at /plan.html with title 'Plan du site' listing pages in organized sections. These two systems (menu + sitemap) satisfy the criterion's requirement: 'Un menu de navigation et un plan du site sont présents'.",
       "citations": [
         {
           "file": ".ultra11y/pages/cadres-html/dom.html",
           "line": 12,
-          "selector": "nav",
           "snippet": "<nav aria-label=\"Navigation principale\">"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 23,
+          "snippet": "<h1>Plan du site</h1>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 29,
+          "snippet": "<nav>"
         }
       ],
       "evidenceFingerprint": "sha256:62f347035a4d07e79bcfa5e1d6824b6e",
       "evidenceCount": 4,
-      "date": "2026-08-23",
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "12.2",
       "verdict": "C",
-      "justification": "Le header et footer sont présents et positionnés de manière cohérente sur toutes les pages.",
+      "justification": "Test 12.2.1 requires navigation to be in the same place visually and in the same order in the source across pages in a page set. Evidence shows consistent positioning: the header element with navigation principale appears at the start of body on all inspected pages (cadres-html, contact-html, documents-html, medias-html, plan-html, tarifs-html). The navigation structure (`<header><nav aria-label=\"Navigation principale\"><ul><li><a>...`) is identical across pages. While some pages show fewer navigation links (filtered by page relevance), the structural order within the DOM remains consistent: the menu always appears in header before main content. The footer navigation also maintains consistent positioning across pages.",
       "citations": [
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 18,
-          "selector": "header",
+          "file": ".ultra11y/pages/cadres-html/dom.html",
+          "line": 11,
+          "snippet": "<header>"
+        },
+        {
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 11,
+          "snippet": "<header>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 11,
           "snippet": "<header>"
         }
       ],
       "evidenceFingerprint": "sha256:26d38fac039028bb2aae5a4dc7105c50",
       "evidenceCount": 29,
-      "date": "2026-08-23",
-      "decidedBy": "agent"
-    },
-    {
-      "criteriaId": "12.3",
-      "verdict": "C",
-      "justification": "Une page de plan du site est présente et pertinente, listant les pages principales du site.",
-      "citations": [
-        {
-          "file": ".ultra11y/pages/cadres-html/dom.html",
-          "line": 12,
-          "selector": "nav",
-          "snippet": "<nav aria-label=\"Navigation principale\">"
-        }
-      ],
-      "evidenceFingerprint": "sha256:62f347035a4d07e79bcfa5e1d6824b6e",
-      "evidenceCount": 4,
-      "date": "2026-08-23",
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "12.4",
-      "verdict": "C",
-      "justification": "Le plan du site est accessible depuis le pied de page de manière cohérente sur tous les pages.",
-      "citations": [
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 63,
+          "message": "The sitemap page (plan-html) has no footer navigation containing a 'Plan du site' link. Footer only contains audio and copyright, making sitemap inaccessible from its own page via the same functionality used on other pages.",
+          "normativeRef": "12.4.1",
+          "severity": "majeur",
+          "snippet": "<footer>"
+        },
+        {
+          "file": ".ultra11y/pages/recherche-html/dom.html",
+          "line": 41,
+          "message": "The search results page (recherche-html) has no footer navigation containing 'Plan du site' link. The sitemap is not accessible from this page via the same functionality as it is from contact and tarifs pages.",
+          "normativeRef": "12.4.1",
+          "severity": "majeur",
+          "snippet": "<footer>"
+        },
         {
           "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 18,
-          "selector": "header",
-          "snippet": "<header>"
+          "line": 125,
+          "message": "The home page footer contains no navigation landmark linking to the sitemap. Other pages consistently provide 'Plan du site' link in footer navigation, but this page breaks the pattern.",
+          "normativeRef": "12.4.1",
+          "severity": "majeur",
+          "snippet": "<footer>"
         }
       ],
       "evidenceFingerprint": "sha256:9c8f750b4f62c6be26d229533d09c32a",
       "evidenceCount": 33,
-      "date": "2026-08-23",
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "12.5",
-      "verdict": "C",
-      "justification": "Un formulaire de recherche est présent et accessible de manière consistante à travers l'ensemble des pages.",
-      "citations": [
+      "verdict": "NC",
+      "findings": [
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 18,
-          "selector": "header",
+          "file": ".ultra11y/pages/contact-html/dom.html",
+          "line": 11,
+          "message": "The contact page does not provide access to the search engine from header, footer, or any consistent interface element. The search form exists only on dedicated recherche.html page, not accessible identically from this page.",
+          "normativeRef": "12.5.1",
+          "severity": "majeur",
           "snippet": "<header>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 12,
+          "message": "The sitemap page navigation does not include link to search page. Navigation links in header lack 'Recherche' reference, and no search functionality appears on this page.",
+          "normativeRef": "12.5.1",
+          "severity": "majeur",
+          "snippet": "<nav aria-label=\"Navigation principale\">"
         }
       ],
       "evidenceFingerprint": "sha256:26d38fac039028bb2aae5a4dc7105c50",
       "evidenceCount": 29,
-      "date": "2026-08-23",
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "12.6",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": ".ultra11y/pages/documents-html/dom.html",
+          "line": 22,
+          "message": "The documents page is missing a <main> landmark element entirely. The h1 'Documents à télécharger' starts at line 22 without a containing main element, making the primary content zone not identifiable or reachable via landmark navigation.",
+          "normativeRef": "12.6.1",
+          "severity": "bloquant",
+          "snippet": "<h1>Documents à télécharger</h1>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 57,
+          "message": "The plan du site page contains two <main> landmark elements (at lines 22 and 57). Only one main landmark is allowed per page. Multiple main landmarks violate the requirement that the main content zone be uniquely identified and reachable.",
+          "normativeRef": "12.6.1",
+          "severity": "bloquant",
+          "snippet": "<main>"
+        },
+        {
+          "file": ".ultra11y/pages/plan-html/dom.html",
+          "line": 29,
+          "message": "An unnamed <nav> element appears on the plan page at line 29. When multiple navigation landmarks exist, each must have distinguishing aria-label or aria-labelledby. This unnamed navigation cannot be distinguished from the named 'Navigation principale' nav, violating test 12.6.1.",
+          "normativeRef": "12.6.1",
+          "severity": "majeur",
+          "snippet": "<nav>"
+        },
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 18,
+          "message": "The header contains 9 navigation links (Accueil, Tarifs, Contact, Médias, Intégrations, Documents, Recherche, Plan du site, Mentions légales) in plain links without <nav> landmark. Navigation links should be grouped within <nav> element to identify them as navigation zone for test 12.6.1.",
+          "normativeRef": "12.6.1",
+          "severity": "majeur",
+          "snippet": "<header>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:e8955a8dc54c3111165c17966d9a1915",
+      "evidenceCount": 11,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "12.7",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/recherche-html/dom.html",
+          "line": 11,
+          "normativeRef": "12.7.1",
+          "message": "The skip link targets href=\"#principal\" but the main content zone is identified as id=\"contenu\" (line 24). The skip link target does not exist, making it non-functional. Test 12.7.1 requires a functional skip link to the main content zone.",
+          "snippet": "<a class=\"skip-link\" href=\"#principal\">Aller au contenu</a>",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:e8955a8dc54c3111165c17966d9a1915",
+      "evidenceCount": 11,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "12.8",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/recherche-html/dom.html",
+          "line": 34,
+          "normativeRef": "12.8.1",
+          "message": "The button has tabindex=\"1\" while the preceding input field has tabindex=\"3\". This causes the button to receive focus before the input field, violating the natural reading order of the form. Test 12.8.1 requires tabulation order to remain coherent with content order.",
+          "snippet": "<button type=\"submit\" tabindex=\"1\">Rechercher</button>",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:1a38abe6c2d075b2179fa3d35ac07d13",
+      "evidenceCount": 3,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "12.9",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 167,
+          "normativeRef": "12.9.1",
+          "message": "The input field traps keyboard focus by preventing the Tab key and refocusing itself. The onkeydown handler executes event.preventDefault() when the Tab key is pressed, preventing users from navigating to the next focusable element. Test 12.9.1 requires users to be able to move to the next or previous focusable element or be informed of an alternative mechanism.",
+          "snippet": "<input id=\"confirmation\" name=\"confirmation\" type=\"text\" onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\">",
+          "severity": "bloquant"
+        }
+      ],
+      "evidenceFingerprint": "sha256:e8fa4cf8247f4ba4c6b05672be4cfe94",
+      "evidenceCount": 7,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "12.10",
+      "verdict": "NA",
+      "justification": "No keyboard shortcuts using only a single key (letter, number, or punctuation) were found anywhere in the audited scope. The only keyboard event handler identified is for the Tab key (a modifier key scenario, not a single key shortcut). Since nothing in the audited scope concerns single-key shortcuts, this criterion does not apply.",
+      "evidenceFingerprint": "sha256:9a271f2a916b0b6ee6cecb2426f0b320",
+      "evidenceCount": 0,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
       "criteriaId": "12.11",
-      "verdict": "C",
-      "justification": "Le test 12.11.1 ne porte que sur les contenus additionnels QUI CONTIENNENT des composants d'interface manipulables au clavier (la note technique donne l'exemple de l'infobulle proposant un lien). Le seul contenu additionnel du périmètre est l'infobulle #astuce-tls (.ultra11y/pages/accueil/dom.html:80), révélée par la règle « .astuce:hover .astuce-contenu { display: block } » de la feuille liée en accueil/dom.html:7 (tests/fixtures/realworld/styles.css) — c'est le seul sélecteur :hover révélant du contenu de tout le périmètre. Son contenu est exclusivement textuel (« Un certificat TLS chiffre le trafic entre le visiteur et votre site. ») : il ne comporte aucun lien, aucun bouton, aucun champ, donc aucun composant d'interface à atteindre au clavier — le test est validé pour ce contenu. Son déclencheur est de surcroît un <button> natif, atteignable au clavier (dom.html:79). Les autres évidences moissonnées ne portent pas le sujet du critère : le div role=\"button\" tabindex=\"0\" aria-expanded (cadres-html/dom.html:57) est focusable et ne révèle aucun contenu dans la page ; le div onclick=\"ouvrirAssistance()\" (contact-html/dom.html:139) n'ouvre aucun contenu additionnel — la fonction n'est définie nulle part et aucune page du périmètre ne contient de <script> —, son inopérabilité au clavier relevant de RGAA 7.3 ; l'<object> (accueil/dom.html:65) et les deux <iframe> (cadres-html/dom.html:27 et :31) concernent la sortie du focus d'un contenu embarqué, soit RGAA 12.9 ; les preventDefault (contact-html/dom.html:167 et LoginForm.tsx:16) relèvent respectivement du piège au clavier (12.9) et de la soumission d'un formulaire, non d'un contenu additionnel. Enfin, le fait que l'infobulle n'apparaisse pas à la prise de focus et ne se masque pas avec Échap — mesuré par la sonde hover de la capture accueil — relève de RGAA 10.13, hors du champ de 12.11.",
-      "citations": [
+      "verdict": "NC",
+      "findings": [
         {
           "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 80,
+          "line": 95,
           "selector": "span#astuce-tls.astuce-contenu",
-          "snippet": "<span role=\"tooltip\" id=\"astuce-tls\" class=\"astuce-contenu\">"
+          "snippet": "<span role=\"tooltip\" id=\"astuce-tls\" class=\"astuce-contenu\">Un certificat TLS chiffre le trafic entre le visiteur et votre site.</span>",
+          "message": "The tooltip content (role=\"tooltip\") associated via aria-describedby to the button at line 94 is only revealed on :hover in the stylesheet, not on keyboard focus. The CSS rule at tests/fixtures/realworld/styles.css:129 contains only '.astuce:hover .astuce-contenu { display: block; }' without the ':focus-within' selector needed for keyboard access. Keyboard users cannot see this additional content when focusing the button.",
+          "normativeRef": "12.11.1",
+          "severity": "majeur"
         },
         {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 79,
-          "selector": "button",
-          "snippet": "<button type=\"button\" aria-describedby=\"astuce-tls\">Qu’est-ce que le TLS ?</button>"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 7,
-          "selector": "link",
-          "snippet": "<link rel=\"stylesheet\" href=\"/styles.css\">"
-        },
-        {
-          "file": ".ultra11y/pages/cadres-html/dom.html",
-          "line": 57,
-          "selector": "div",
-          "snippet": "<div role=\"button\" tabindex=\"0\" aria-expanded=\"yes\">Afficher les options avancées</div>"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 139,
-          "selector": "div",
-          "snippet": "<div onclick=\"ouvrirAssistance()\">Ouvrir une demande d’assistance</div>"
-        },
-        {
-          "file": ".ultra11y/pages/accueil/dom.html",
-          "line": 65,
-          "selector": "object",
-          "snippet": "<object data=\"/img/carte-reseau.svg\" type=\"image/svg+xml\"></object>"
-        },
-        {
-          "file": ".ultra11y/pages/cadres-html/dom.html",
-          "line": 27,
-          "selector": "iframe",
-          "snippet": "<iframe src=\"/embed/disponibilite.html\" width=\"600\" height=\"300\"></iframe>"
-        },
-        {
-          "file": ".ultra11y/pages/cadres-html/dom.html",
-          "line": 31,
-          "selector": "iframe",
-          "snippet": "<iframe src=\"/embed/facturation.html\" width=\"600\" height=\"400\"></iframe>"
-        },
-        {
-          "file": ".ultra11y/pages/contact-html/dom.html",
-          "line": 167,
-          "selector": "handler",
-          "snippet": "<input id=\"confirmation\" name=\"confirmation\" type=\"text\" onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\">"
-        },
-        {
-          "file": "tests/fixtures/realworld/LoginForm.tsx",
-          "line": 16,
-          "selector": "handler",
-          "snippet": "e.preventDefault();"
-        },
-        {
-          "file": "tests/fixtures/realworld/contact.html",
-          "line": 179,
-          "selector": "handler",
-          "snippet": "onkeydown=\"if (event.key === 'Tab') { event.preventDefault(); this.focus(); }\""
+          "file": "tests/fixtures/realworld/styles.css",
+          "line": 129,
+          "snippet": ".astuce:hover .astuce-contenu { display: block; }",
+          "message": "The :hover-only rule lacks the :focus-within selector required to make the tooltip keyboard-accessible. When a keyboard user focuses the button with aria-describedby=\"astuce-tls\", the tooltip remains hidden because this CSS rule does not apply to :focus-within state.",
+          "normativeRef": "12.11.1",
+          "severity": "majeur"
         }
       ],
       "evidenceFingerprint": "sha256:41bbca2186a29d42e0d2fb7bffab39b2",
       "evidenceCount": 11,
-      "date": "2026-08-24",
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "13.1",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/mentions-legales-html/dom.html",
+          "line": 16,
+          "snippet": "<meta http-equiv=\"refresh\" content=\"3600;url=/mentions-legales.html\">",
+          "message": "Meta refresh with 3600-second timeout lacks user control mechanism. Test 13.1.1 requires one of: user can stop/restart refresh, user can increase timeout by 10x (to 36000 seconds), user receives warning 20 seconds before with option to extend, or timeout is 20 hours minimum (72000 seconds). This timeout of 1 hour meets none of these conditions.",
+          "normativeRef": "13.1.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:083af177602f9d0cf45e7497a0fab012",
+      "evidenceCount": 1,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     },
     {
@@ -1660,6 +2268,86 @@
       "evidenceFingerprint": "sha256:448996d21e64320ae696cdc16066d212",
       "evidenceCount": 5,
       "date": "2026-08-23",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "13.8",
+      "verdict": "NC",
+      "findings": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/accueil/dom.html",
+          "line": 132,
+          "snippet": "<audio src=\"/media/jingle-orbit.mp3\" autoplay=\"\"></audio>",
+          "message": "Audio element with autoplay attribute has no controls attribute, preventing user from stopping or restarting. Test 13.8.1 requires one of: duration < 5 seconds, user can stop/restart, user can show/hide content, or user can see all information without the motion. Without visible controls and no evidence the audio is < 5 seconds, this fails the test.",
+          "normativeRef": "13.8.1",
+          "severity": "majeur"
+        },
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/medias-html/dom.html",
+          "line": 40,
+          "snippet": "<marquee>Maintenance planifiée le 12 septembre de 2 h à 4 h.</marquee>",
+          "message": "Marquee element creates scrolling/blinking content with no native stop mechanism. Test 13.8.2 requires one of: duration < 5 seconds, user can stop/restart, user can show/hide content, or user can see all information without the blinking. The marquee element provides none of these.",
+          "normativeRef": "13.8.2",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:9b4a20ac17b4e33fea58f57ef3c9fceb",
+      "evidenceCount": 10,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "13.9",
+      "verdict": "NC",
+      "justification": "Test 13.9.1 requires that content is consultable in both portrait and landscape orientations. The stylesheet applies a CSS transform that rotates the entire page when viewed in portrait mode, effectively preventing portrait viewing. This violates the requirement that content must be accessible regardless of screen orientation.",
+      "findings": [
+        {
+          "file": ".ultra11y/pages/accueil/dom.html",
+          "line": 2,
+          "selector": "html",
+          "snippet": "<html lang=\"francais\" xml:lang=\"en\"><head>",
+          "message": "CSS media query at styles.css:135-139 applies transform:rotate(90deg) to html in portrait orientation. This locks the page to landscape view only, preventing users with devices in portrait orientation from viewing content normally.",
+          "normativeRef": "13.9.1",
+          "severity": "majeur"
+        }
+      ],
+      "evidenceFingerprint": "sha256:23e4ff805b1dab6700396c0aad215549",
+      "evidenceCount": 9,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "13.10",
+      "verdict": "NA",
+      "justification": "The captured evidence concerns a div element with an onclick handler, which is a simple pointer interaction (single-point tap/click). Test 13.10.1 applies to multipoint contact (e.g., pinch gestures, two-finger taps) and test 13.10.2 applies to trajectory-based gestures (e.g., following a drawn path). A simple tap is neither multipoint nor trajectory-based, so these tests do not apply to the evidence provided.",
+      "evidenceFingerprint": "sha256:1f931c1e65934d6c4276bc47c3a9337c",
+      "evidenceCount": 1,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "13.11",
+      "verdict": "C",
+      "justification": "The div element carries an inline onclick handler which, by standard HTML/JavaScript behavior, triggers on the 'click' event. The 'click' event is fired when the pointer is released (not pressed). This means users can move the pointer away from the element before releasing to cancel the action. Test 13.11.1 condition 1 states 'The action is triggered when the pointer is released', which is satisfied by this standard click event behavior, allowing the action to be cancelled by moving away before release.",
+      "citations": [
+        {
+          "file": "/private/var/folders/pz/tpqs6qkx41sdm04rm630llhm0000gn/T/tmp.SDLPn7Jpsd/.ultra11y/pages/contact-html/dom.html",
+          "line": 139,
+          "snippet": "<div onclick=\"ouvrirAssistance()\">Ouvrir une demande d'assistance</div>"
+        }
+      ],
+      "evidenceFingerprint": "sha256:1f931c1e65934d6c4276bc47c3a9337c",
+      "evidenceCount": 1,
+      "date": "2026-08-28",
+      "decidedBy": "agent"
+    },
+    {
+      "criteriaId": "13.12",
+      "verdict": "NA",
+      "justification": "The evidence presents a div with an onclick handler for a simple pointer interaction. Tests 13.12.1 and 13.12.2 concern functionalities available through device motion (motion sensors like accelerometers) or gestures directed toward the device. No evidence of device motion APIs (devicemotion, deviceorientation, etc.) was found in the audited scope. Since no device motion functionality exists to test, this criterion does not apply.",
+      "evidenceFingerprint": "sha256:1f931c1e65934d6c4276bc47c3a9337c",
+      "evidenceCount": 1,
+      "date": "2026-08-28",
       "decidedBy": "agent"
     }
   ]

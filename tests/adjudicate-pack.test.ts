@@ -96,6 +96,52 @@ describe("the worklist is keyed by the standard actually in play", () => {
     expect(it11?.evidence.some((e) => e.snippet.includes("hero.png"))).toBe(true);
   });
 
+  it("uses a candidate rule as evidence when a document-wide criterion has no subject harvest", () => {
+    const a = audit();
+    const core = a.criteria.find((criterion) => criterion.id === "1.4.10")!;
+    const finding = {
+      ruleId: "dyn-reflow",
+      criteriaId: "1.4.10",
+      file: PAGE,
+      line: 1,
+      col: 1,
+      selectorHint: "document",
+      severity: "majeur" as const,
+      message: "Horizontal scrolling at 320px width.",
+      remediation: "Fix the reflow.",
+      snippet: "",
+      page: "page",
+    };
+    core.status = "NC";
+    core.findings.push(finding);
+    a.findings.push(finding);
+
+    const item = buildAdjudicationWorklist(a, { standard: "rgaa" }).find((candidate) => candidate.criteriaId === "10.11");
+    expect(item?.signals?.some((signal) => signal.ruleId === "dyn-reflow")).toBe(true);
+    expect(item?.evidence).toContainEqual(expect.objectContaining({ file: PAGE, line: 1, note: "Horizontal scrolling at 320px width." }));
+
+    const folded = applyAdjudication(
+      a,
+      adjFile([
+        {
+          ...item!,
+          verdict: "NC",
+          findings: [
+            {
+              file: PAGE,
+              line: 1,
+              message: "The page requires horizontal scrolling at 320px.",
+              snippet: "Horizontal scrolling at 320px width.",
+              normativeRef: "10.11.1",
+            },
+          ],
+        },
+      ]),
+    );
+    expect(folded.issues.join("\n")).not.toMatch(/cited snippet not found/);
+    expect(folded.audit.packAdjudication?.criteria.find((criterion) => criterion.id === "10.11")?.status).toBe("NC");
+  });
+
   it("does not duplicate evidence when several mapped SCs harvest the same element", () => {
     for (const item of rgaaItems()) {
       const keys = item.evidence.map((e) => `${e.file}:${e.line}:${e.selector}`);

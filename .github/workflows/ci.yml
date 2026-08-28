@@ -351,11 +351,10 @@ jobs:
             sleep 1
           done
 
-      # AUDIT TWICE, SCAN TWICE, and it is not a slip. The first audit has no captures to read;
-      # the scan then writes .ultra11y/pages/, and the second audit ingests them — which is what
-      # anchors a criterion's evidence in the rendered DOM instead of only in the source. The
-      # ledger's citations point at those anchors, so a single pass would replay against a grid
-      # the verdicts were never ruled on. It is exactly what the composite action does.
+      # ONE AUDIT, ONE SCAN. `scan --merge` audits the snapshots it just wrote and carries
+      # those inputs into the adjudication worklist. Repeating either phase only duplicates
+      # findings, lengthens the crawl and makes ledger fingerprints depend on acquisition
+      # history rather than on the pages under test.
       # `--standard rgaa` on every step, including `audit` and `scan`. This job gates the RGAA
       # grid, so it should exercise the pipeline a project on RGAA actually runs — a
       # pack-keyed document written by `audit`, carried through `scan --merge`, replayed and
@@ -364,10 +363,7 @@ jobs:
       - name: Audit and render the fixture
         run: |
           node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard rgaa --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --standard rgaa \
-            --runtime local --cwd "$PWD" --merge audits/audit-latest.json --out audits
-          node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard rgaa --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --standard rgaa \
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 0 --standard rgaa \
             --runtime local --cwd "$PWD" --merge audits/audit-latest.json --out audits
 
       # Not `| tee`: a pipeline reports the exit status of its LAST command, so piping this
@@ -440,13 +436,29 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Every composite invocation owns its mutable audit/snapshot tree. Reusing the checkout
+      # made a later negative gate overwrite the rendered audit whose crops were asserted at
+      # the end of the job — the assertion then inspected a different scenario.
+      - name: Isolate the action scenarios
+        run: |
+          root="$RUNNER_TEMP/ultra11y-action-e2e"
+          mkdir -p "$root"/{code,keyless,pages,browser,coverage}
+          {
+            echo "CODE_RUN=$root/code"
+            echo "KEYLESS_RUN=$root/keyless"
+            echo "PAGE_RUN=$root/pages"
+            echo "BROWSER_RUN=$root/browser"
+            echo "COVERAGE_RUN=$root/coverage"
+          } >> "$GITHUB_ENV"
+
       # Report-only over a fixture with known defects. `sarif: false` keeps the job free of
       # `security-events: write`, so it runs on a fork's PR too.
       - name: Run the action on a non-conforming fixture
         id: audit
         uses: ./
         with:
-          paths: tests/fixtures/non-conforming/bad.html
+          working-directory: ${{ runner.temp }}/ultra11y-action-e2e/code
+          paths: ${{ github.workspace }}/tests/fixtures/non-conforming/bad.html
           standard: rgaa
           since: ""
           fail-on: ""
@@ -462,10 +474,10 @@ jobs:
         run: |
           echo "findings=$FINDINGS conformance=$CONFORMANCE report=$REPORT"
           [ "$FINDINGS" -gt 0 ] || { echo "::error::the action reported no finding on a fixture built to fail"; exit 1; }
-          [ -s "$REPORT" ] || { echo "::error::no report written at '$REPORT'"; exit 1; }
-          grep -q "RGAA" "$REPORT" || { echo "::error::the report is not keyed on the requested standard"; exit 1; }
+          [ -s "$CODE_RUN/$REPORT" ] || { echo "::error::no report written at '$CODE_RUN/$REPORT'"; exit 1; }
+          grep -q "RGAA" "$CODE_RUN/$REPORT" || { echo "::error::the report is not keyed on the requested standard"; exit 1; }
           # The per-page step must degrade, not fail, when nothing was scanned.
-          if [ -d audits/pages ]; then
+          if [ -d "$CODE_RUN/audits/pages" ]; then
             echo "::error::per-page dossiers written with no page in scope"; exit 1
           fi
           echo "ok"
@@ -480,7 +492,8 @@ jobs:
         id: keyless
         uses: ./
         with:
-          paths: tests/fixtures/non-conforming/bad.html
+          working-directory: ${{ runner.temp }}/ultra11y-action-e2e/keyless
+          paths: ${{ github.workspace }}/tests/fixtures/non-conforming/bad.html
           since: ""
           fail-on: ""
           sarif: "false"
@@ -493,7 +506,7 @@ jobs:
           REPORT: ${{ steps.keyless.outputs.report-path }}
           FINDINGS: ${{ steps.keyless.outputs.findings }}
         run: |
-          if [ ! -s "$REPORT" ]; then
+          if [ ! -s "$KEYLESS_RUN/$REPORT" ]; then
             echo "::error::the keyless adjudication path swallowed the report"; exit 1
           fi
           if [ "$FINDINGS" -le 0 ]; then
@@ -549,7 +562,8 @@ jobs:
       - name: Crawl, scan, snapshot and report page by page
         uses: ./
         with:
-          paths: tests/fixtures/conforming
+          working-directory: ${{ runner.temp }}/ultra11y-action-e2e/pages
+          paths: ${{ github.workspace }}/tests/fixtures/conforming
           standard: rgaa
           since: ""
           fail-on: ""
@@ -567,15 +581,15 @@ jobs:
 
       - name: Every crawled page is a snapshot, and has its own dossier
         run: |
-          ls .ultra11y/pages
+          ls "$PAGE_RUN/.ultra11y/pages"
           for id in accueil contact-html; do
-            [ -f ".ultra11y/pages/$id/dom.html" ] || { echo "::error::no snapshot for $id"; exit 1; }
-            [ -f "audits/pages/page-$id.md" ] || { echo "::error::no per-page dossier for $id"; exit 1; }
+            [ -f "$PAGE_RUN/.ultra11y/pages/$id/dom.html" ] || { echo "::error::no snapshot for $id"; exit 1; }
+            [ -f "$PAGE_RUN/audits/pages/page-$id.md" ] || { echo "::error::no per-page dossier for $id"; exit 1; }
           done
           # The point of snapshotting: the page-scoped rules run, so a page can be CONFORMING.
-          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" pages --in audits/audit-latest.json --standard rgaa --json > pages.json
+          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" pages --in "$PAGE_RUN/audits/audit-latest.json" --standard rgaa --json > "$PAGE_RUN/pages.json"
           node -e '
-            const p = require("./pages.json").pages;
+            const p = require(process.env.PAGE_RUN + "/pages.json").pages;
             if (p.length < 2) { console.error("::error::expected the crawled pages in scope, got " + p.length); process.exit(1); }
             if (!p.every(x => x.basis === "snapshot")) { console.error("::error::a crawled page is not snapshot-based"); process.exit(1); }
             const contact = p.find(x => x.id === "contact-html");
@@ -601,7 +615,8 @@ jobs:
       - name: The action builds its own browser tier, and scans with it
         uses: ./
         with:
-          paths: tests/fixtures/conforming
+          working-directory: ${{ runner.temp }}/ultra11y-action-e2e/browser
+          paths: ${{ github.workspace }}/tests/fixtures/conforming
           standard: rgaa
           since: ""
           fail-on: ""
@@ -624,12 +639,12 @@ jobs:
           test -d "$RUNNER_TEMP/ultra11y-browser/node_modules/.bin" || true
           # And the scan really produced a rendered verdict through it: a snapshot with the
           # measurement beside it, which is what makes a rendering criterion decidable at all.
-          test -f .ultra11y/pages/accueil/probes.json \
+          test -f "$BROWSER_RUN/.ultra11y/pages/accueil/probes.json" \
             || { echo "::error::no probes.json — the tier was installed but the scan did not measure through it"; exit 1; }
-          test -f .ultra11y/pages/accueil/axe.json \
+          test -f "$BROWSER_RUN/.ultra11y/pages/accueil/axe.json" \
             || { echo "::error::no axe.json — axe did not run through the installed tier"; exit 1; }
           node -e '
-            const a = JSON.parse(require("fs").readFileSync("audits/audit-latest.json", "utf8"));
+            const a = JSON.parse(require("fs").readFileSync(process.env.BROWSER_RUN + "/audits/audit-latest.json", "utf8"));
             const cov = (a.scope.pageCoverage || {})["accueil"] || {};
             if (!cov.axe) { console.error("::error::pageCoverage.axe is not set — axe did not run"); process.exit(1); }
             if (!(cov.scs || []).length) { console.error("::error::no probed criteria recorded"); process.exit(1); }
@@ -643,7 +658,7 @@ jobs:
       # months while doing nothing.
       - name: Declare a page this run never captured
         run: |
-          cat > .ultra11yrc.json <<'RC'
+          cat > "$COVERAGE_RUN/.ultra11yrc.json" <<'RC'
           { "standard": "rgaa", "sample": { "pages": [
             { "id": "accueil", "name": "Accueil", "url": "http://127.0.0.1:8931/" },
             { "id": "jamais-balayee", "name": "Jamais balayée", "url": "http://127.0.0.1:8931/nope.html" }
@@ -655,7 +670,8 @@ jobs:
         continue-on-error: true
         uses: ./
         with:
-          paths: tests/fixtures/conforming
+          working-directory: ${{ runner.temp }}/ultra11y-action-e2e/coverage
+          paths: ${{ github.workspace }}/tests/fixtures/conforming
           standard: rgaa
           since: ""
           fail-on: ""
@@ -669,7 +685,6 @@ jobs:
       - name: …and it is the gate that failed, not a crash
         run: |
           set -euo pipefail
-          rm -f .ultra11yrc.json
           [ "${{ steps.coverage-gate.outcome }}" = "failure" ] || {
             echo "::error::require-sample left the job green on a sample declaring an uncaptured page"; exit 1; }
           echo "the action's coverage gate engaged and failed the job, as it must"
@@ -680,28 +695,28 @@ jobs:
       - name: The sample-coverage gate passes when every declared page was captured
         run: |
           set -euo pipefail
-          cat > .ultra11yrc.json <<'RC'
+          cat > "$PAGE_RUN/.ultra11yrc.json" <<'RC'
           { "standard": "rgaa", "sample": { "pages": [
             { "id": "accueil", "name": "Accueil", "url": "http://127.0.0.1:8931/" },
             { "id": "contact-html", "name": "Contact", "url": "http://127.0.0.1:8931/contact.html" }
           ] } }
           RC
-          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" check --require-sample --standard rgaa
+          (cd "$PAGE_RUN" && node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" check --require-sample --standard rgaa)
 
       - name: …and FAILS, naming the page, when one was declared and never captured
         run: |
           set -euo pipefail
-          cat > .ultra11yrc.json <<'RC'
+          cat > "$PAGE_RUN/.ultra11yrc.json" <<'RC'
           { "standard": "rgaa", "sample": { "pages": [
             { "id": "accueil", "name": "Accueil", "url": "http://127.0.0.1:8931/" },
             { "id": "jamais-balayee", "name": "Jamais balayée", "url": "http://127.0.0.1:8931/nope.html" }
           ] } }
           RC
-          out=$(node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" check --require-sample --standard rgaa 2>&1) && {
+          out=$(cd "$PAGE_RUN" && node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" check --require-sample --standard rgaa 2>&1) && {
             echo "::error::the coverage gate passed on an uncaptured declared page"; exit 1; }
           echo "$out"
           echo "$out" | grep -q "Jamais balayée" || { echo "::error::the gate did not NAME the missing page"; exit 1; }
-          rm -f .ultra11yrc.json
+          rm -f "$PAGE_RUN/.ultra11yrc.json"
 
       # The page-by-page comment, on the only audit in this repo that actually carries pages.
       # The DOCUMENT is unit-tested (tests/pr-comment-pages.test.ts, against the same
@@ -727,7 +742,7 @@ jobs:
           # a runner-provided default variable, and the version that tried it still read the
           # pull request. Unsetting it for the child process is not a matter of precedence.
           render() { env -u GITHUB_REF -u ULTRA11Y_PR node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" report \
-            --in audits/audit-latest.json --standard rgaa --lang fr --format github > /dev/null 2> "$1"; }
+            --in "$PAGE_RUN/audits/audit-latest.json" --standard rgaa --lang fr --format github > /dev/null 2> "$1"; }
           render comment.log
           # With no pull request in view the post is skipped — and reaching "skipped" is exactly
           # what proves the render ran first, since it is rendered before it is pushed.
@@ -742,16 +757,17 @@ jobs:
       # assertions are therefore NOT optional.
       - name: The artifact has a front door, and it is self-contained
         run: |
-          [ -f audits/index.html ] || { echo "::error::no audits/index.html — the artifact has no entry point"; exit 1; }
-          ls audits/ultra11y-rgaa-*.html >/dev/null 2>&1 || { echo "::error::no detachable single-file report"; exit 1; }
+          [ -f "$PAGE_RUN/audits/index.html" ] || { echo "::error::no audits/index.html — the artifact has no entry point"; exit 1; }
+          ls "$PAGE_RUN"/audits/ultra11y-rgaa-*.html >/dev/null 2>&1 || { echo "::error::no detachable single-file report"; exit 1; }
           # NOTHING may point outside the artifact: it is read after being unzipped somewhere
           # else, so an absolute URL or a `../..` climb is a broken image for every reader. A
           # grep would wave `https://` through on a bad anchor, so this is parsed properly.
           node -e '
             const { readdirSync, readFileSync } = require("fs");
             let bad = 0;
-            for (const f of readdirSync("audits").filter((x) => x.endsWith(".html"))) {
-              const html = readFileSync("audits/" + f, "utf8");
+            const dir = process.env.PAGE_RUN + "/audits";
+            for (const f of readdirSync(dir).filter((x) => x.endsWith(".html"))) {
+              const html = readFileSync(dir + "/" + f, "utf8");
               if (/<script/i.test(html)) { console.error("::error::" + f + " carries a script"); bad = 1; }
               for (const m of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
                 const ref = m[1];
@@ -765,29 +781,29 @@ jobs:
             }
             process.exit(bad);
           '
-          echo "front door: $(wc -c < audits/index.html) bytes"
+          echo "front door: $(wc -c < "$PAGE_RUN/audits/index.html") bytes"
 
       - name: Every non-conformity that could be shown, is
         run: |
           # /contact.html carries the alt-less image. It was snapshotted, so the pixel tier has
           # a capture, a box digest and a byte offset — it must produce a crop.
-          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" pages --in audits/audit-latest.json \
-            --standard rgaa --format report --split page --evidence --html --out audits/pages
-          crops=$(find audits/pages/assets -name '*.png' -path '*/*/*' 2>/dev/null | wc -l)
+          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" pages --in "$PAGE_RUN/audits/audit-latest.json" \
+            --standard rgaa --format report --split page --evidence --html --out "$PAGE_RUN/audits/pages"
+          crops=$(find "$PAGE_RUN/audits/pages/assets" -name '*.png' -path '*/*/*' 2>/dev/null | wc -l)
           [ "$crops" -gt 0 ] || { echo "::error::the evidence tier drew nothing on a snapshotted page with a real defect"; exit 1; }
           echo "crops: $crops"
           # The sheets illustrate their own occurrences, and the crop bullet never becomes one.
-          grep -qE '^ *- !\[' audits/pages/page-contact-html.md || { echo "::error::no crop hung off an occurrence"; exit 1; }
+          grep -qE '^ *- !\[' "$PAGE_RUN/audits/pages/page-contact-html.md" || { echo "::error::no crop hung off an occurrence"; exit 1; }
           # THE CONTRACT: an illustrated sheet adjudicates EXACTLY like a bare one. The crop
           # bullet carries no `[ ]`, so `verify` must not see one more item — nor one fewer,
           # which is how an occurrence would escape adjudication by hiding under a picture.
           # Both runs pass --standard, or the pack sheet is parsed against WCAG ids and both
           # sides quietly collapse to a number that proves nothing.
-          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" pages --in audits/audit-latest.json \
+          node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" pages --in "$PAGE_RUN/audits/audit-latest.json" \
             --standard rgaa --format report --split page --out "$RUNNER_TEMP/bare"
           count() { node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" verify --report "$1" --standard rgaa --json \
             | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).count'; }
-          with=$(count audits/pages/page-contact-html.md)
+          with=$(count "$PAGE_RUN/audits/pages/page-contact-html.md")
           without=$(count "$RUNNER_TEMP/bare/page-contact-html.md")
           echo "verify worklist — illustrated: $with · bare: $without"
           [ "$with" = "$without" ] || { echo "::error::the crop sub-bullet changed the verify worklist ($with vs $without)"; exit 1; }
@@ -801,8 +817,8 @@ jobs:
         with:
           name: action-e2e
           path: |
-            audits/
-            .ultra11y/pages/
+            ${{ runner.temp }}/ultra11y-action-e2e/pages/audits/
+            ${{ runner.temp }}/ultra11y-action-e2e/pages/.ultra11y/pages/
           if-no-files-found: warn
 
       - uses: actions/download-artifact@v8

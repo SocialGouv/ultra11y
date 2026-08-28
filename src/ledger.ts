@@ -35,6 +35,7 @@ import { PAGES_DIR } from "./snapshot.js";
 import { CORE, type StandardId } from "./standards/index.js";
 import type { AuditResult } from "./types.js";
 import { SCHEMA_VERSION } from "./types.js";
+import type { VerifyItem } from "./verify.js";
 
 /** Where a ledger lives by default, relative to the audited repository root. Committed on
  *  purpose: a verdict is a claim about this codebase, so it belongs in review alongside it. */
@@ -75,8 +76,26 @@ export interface VerdictLedger {
 
 const norm = (s: string) => s.replace(/\s+/g, " ").trim();
 
+/** A snapshot is a committed, repo-relative artefact even when the browser happened to write
+ * it through an absolute `--cwd`. Hashing the runner's checkout prefix made the same page
+ * evidence stale on another machine. Keep ordinary source paths strict, but key snapshots on
+ * their published `.ultra11y/pages/<id>/dom.html` identity. */
+const canonicalFile = (file: string): string => {
+  const posix = file.replace(/\\/g, "/");
+  const marker = `${PAGES_DIR}/`;
+  const at = posix.lastIndexOf(marker);
+  return at >= 0 ? posix.slice(at) : posix;
+};
+
 /** The line-independent identity of one piece of evidence: what the agent actually read. */
-const anchorKey = (e: { file: string; selector?: string; snippet?: string }) => `${e.file}|${e.selector ?? ""}|${norm(e.snippet ?? "")}`;
+const anchorKey = (e: { file: string; selector?: string; snippet?: string }) => {
+  const file = canonicalFile(e.file);
+  let snippet = norm(e.snippet ?? "");
+  // The capture header records transport provenance, not page evidence. A local port or CI
+  // hostname changing must not stale a verdict about the same DOM/doctype.
+  if (file.startsWith(`${PAGES_DIR}/`) && snippet.startsWith("<!-- ultra11y:capture ")) snippet = snippet.replace(/\surl="[^"]*"/, "");
+  return `${file}|${e.selector ?? ""}|${snippet}`;
+};
 
 /** Fingerprint the evidence a criterion was ruled against. Order-independent (the harvester's
  *  traversal order is not a property of the code) and line-independent (see module header). */
@@ -103,9 +122,21 @@ export function evidenceFingerprint(evidence: Evidence[]): string {
 function reanchor<T extends { file: string; line: number; selector?: string; snippet?: string }>(stored: T[] | undefined, today: Evidence[]): T[] | undefined {
   if (!stored?.length) return stored;
   const byKey = new Map(today.map((e) => [anchorKey(e), e]));
+  const byLocation = new Map<string, Evidence[]>();
+  for (const evidence of today) {
+    const key = `${canonicalFile(evidence.file)}:${evidence.line}`;
+    const matches = byLocation.get(key);
+    if (matches) matches.push(evidence);
+    else byLocation.set(key, [evidence]);
+  }
   return stored.map((s) => {
-    const now = byKey.get(anchorKey(s));
-    return now && now.line !== s.line ? { ...s, line: now.line } : s;
+    const exact = byKey.get(anchorKey(s));
+    const atLine = byLocation.get(`${canonicalFile(s.file)}:${s.line}`) ?? [];
+    // Models often omit the optional selector, while candidate browser measurements carry a
+    // note rather than a DOM snippet. A unique anchor at the same canonical file+line is still
+    // enough to move the path; applyAdjudication re-grounds the claim afterwards.
+    const now = exact ?? (atLine.length === 1 ? atLine[0] : atLine.find((evidence) => norm(evidence.snippet) === norm(s.snippet ?? "")));
+    return now && (now.line !== s.line || now.file !== s.file) ? { ...s, file: now.file, line: now.line } : s;
   });
 }
 
@@ -189,6 +220,60 @@ export function mergeLedger(existing: VerdictLedger | undefined, standard: Stand
   const byId = new Map(base.entries.map((e) => [e.criteriaId, e]));
   for (const e of fresh) byId.set(e.criteriaId, e);
   return { ...base, schemaVersion: SCHEMA_VERSION, standard, entries: [...byId.values()] };
+}
+
+export interface PrunedLedgerResult {
+  ledger: VerdictLedger;
+  removedEntries: number;
+  removedFindings: number;
+}
+
+/** Remove claims withdrawn by `verify --prune` from the reusable verdict ledger too.
+ * Otherwise the repaired audit is honest for one run, then the next replay resurrects the
+ * exact claim the independent reviewer rejected. Reopened criteria are deleted wholesale;
+ * a criterion that remains NC keeps only its still-supported findings. */
+export function pruneLedger(
+  ledger: VerdictLedger,
+  items: VerifyItem[],
+  reopenedCriteria: readonly string[],
+  clearedConformities: readonly string[],
+): PrunedLedgerResult {
+  const dropCriteria = new Set([...reopenedCriteria, ...clearedConformities]);
+  const withdrawn = new Map<string, Set<string>>();
+  const findingKey = (f: { file: string; line: number; selector?: string }) => `${canonicalFile(f.file)}|${f.line}|${(f.selector ?? "").trim()}`;
+  for (const item of items) {
+    if ((item.verdict ?? "").trim().toLowerCase() !== "refuted" && (item.verdict ?? "").trim().toLowerCase() !== "unsupported") continue;
+    if (item.kind === "c") continue;
+    const set = withdrawn.get(item.criteriaId) ?? new Set<string>();
+    set.add(findingKey(item));
+    withdrawn.set(item.criteriaId, set);
+  }
+
+  let removedEntries = 0;
+  let removedFindings = 0;
+  const entries: LedgerEntry[] = [];
+  for (const entry of ledger.entries) {
+    if (dropCriteria.has(entry.criteriaId)) {
+      removedEntries++;
+      continue;
+    }
+    const anchors = withdrawn.get(entry.criteriaId);
+    if (!anchors?.size || !entry.findings?.length) {
+      entries.push(entry);
+      continue;
+    }
+    const findings = entry.findings.filter((finding) => {
+      const keep = !anchors.has(findingKey(finding));
+      if (!keep) removedFindings++;
+      return keep;
+    });
+    if (entry.verdict === "NC" && findings.length === 0) {
+      removedEntries++;
+      continue;
+    }
+    entries.push({ ...entry, findings });
+  }
+  return { ledger: { ...ledger, entries }, removedEntries, removedFindings };
 }
 
 export interface ReplayResult {

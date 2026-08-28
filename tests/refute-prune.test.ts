@@ -166,6 +166,11 @@ describe("a refuted conformity goes back to « to assess », never to NC", () =>
   it("drops the citations it was cleared on, so nothing re-reads a withdrawn claim", () => {
     expect(packCrit(r.audit, cleared)?.citations).toBeUndefined();
   });
+
+  it("carries the review note into the next adjudication brief", () => {
+    const work = buildAdjudicationWorklist(r.audit, { standard: "rgaa" });
+    expect(work.find((item) => item.criteriaId === cleared)?.previousReview).toMatch(/présence, pas pertinence/i);
+  });
 });
 
 describe("it applies only what was actually refuted", () => {

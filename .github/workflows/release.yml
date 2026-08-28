@@ -1,9 +1,8 @@
 name: Release
 
-# Conventional-Commit-driven releases, fully in CI. On every push to `main`,
-# semantic-release inspects the commits since the last release and, when they
+# Conventional-Commit-driven releases, fully in CI. After CI succeeds on `main`,
+# semantic-release checks out that exact validated SHA and, when its commits
 # warrant one (feat → minor, fix → patch, `!`/BREAKING → major):
-#   - runs the full gate (typecheck / test / reproducible bundles),
 #   - computes the next version and syncs it across package.json / src/types.ts /
 #     SKILL.md / CHANGELOG.md and rebuilds the bundle (scripts/sync-version.mjs),
 #   - commits the bump back to `main` as `chore(release): <v> [skip ci]`,
@@ -19,8 +18,9 @@ name: Release
 # THIS workflow file (`release.yml`). Change the file name and the exchange stops matching.
 # The GitHub side still uses the built-in GITHUB_TOKEN.
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
   workflow_dispatch: {}
 
 # Serialise releases, never cancel one: the publish chain (bump commit → tag → GitHub
@@ -38,12 +38,20 @@ permissions:
 
 jobs:
   release:
+    # A push and an explicit CI dispatch on main are both reviewed release intents. Never
+    # publish a pull-request merge ref, a failed run, or a CI run from another branch.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch'))
     runs-on: ubuntu-latest
     # install + full gate + semantic-release + npm publish; nothing here needs GitHub's six-hour default.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0 # full history + tags, required to analyze commits since last release
           persist-credentials: true # let @semantic-release/git push the bump commit
 
@@ -67,7 +75,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Gate — typecheck / lint / test / reproducible bundles
+      # A direct manual release is still safe: unlike workflow_run it has no successful CI
+      # proof attached, so it performs the gates here. The normal path skips this duplicate.
+      - name: Gate direct manual release — typecheck / lint / test / reproducible bundles
+        if: github.event_name == 'workflow_dispatch'
         run: |
           pnpm run typecheck
           pnpm run lint

@@ -105,18 +105,13 @@ jobs:
           for _ in $(seq 1 50); do curl -sf -o /dev/null http://127.0.0.1:8932/ && break; sleep 0.2; done
           curl -sf -o /dev/null http://127.0.0.1:8932/
 
-      # AUDIT AND SCAN TWICE, and it is not a duplicate: the first pass has no captures to
-      # read, the scan writes .ultra11y/pages/, and the second ingests them. A worklist
-      # measured without that second pass is a different worklist from the one each runner is
-      # handed — 80 criteria to adjudicate from source alone, 41 once a page is scanned.
+      # One audit and one scan produce the canonical rendered worklist: `scan --merge` audits
+      # the snapshots it writes. A second pair only doubles the crawl and findings.
       - name: Measure the worklist BEFORE either runner
         id: before
         run: |
           node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard '${{ inputs.standard }}' --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --runtime local --cwd "$PWD" \
-            --standard '${{ inputs.standard }}' --merge audits/audit-latest.json --out audits
-          node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard '${{ inputs.standard }}' --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --runtime local --cwd "$PWD" \
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 0 --runtime local --cwd "$PWD" \
             --standard '${{ inputs.standard }}' --merge audits/audit-latest.json --out audits
           node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
             --standard '${{ inputs.standard }}' --out /tmp/before --json > /tmp/before.json
@@ -149,7 +144,7 @@ jobs:
           require-decided: "false"
           artifact-name: adjudication-${{ matrix.runner }}
           crawl: http://127.0.0.1:8932/
-          crawl-max: "12"
+          crawl-max: "0"
           runtime: local
 
       - name: Measure what it left

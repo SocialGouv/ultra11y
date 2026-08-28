@@ -386,6 +386,51 @@ describe("writeWorklist", () => {
     expect(count).toBe(5);
     expect(readFileSync(mdPath, "utf8")).toContain("--semantic");
   });
+
+  it("carries exact completed claims across regeneration but retries changed claims", () => {
+    const out = mkdtempSync(join(tmpdir(), "ultra11y-verify-resume-"));
+    const items = buildWorklist(report, "wcag", 2);
+    writeWorklist(items, out, false);
+    const todoPath = join(out, "VERIFY.todo.json");
+    const filled = JSON.parse(readFileSync(todoPath, "utf8")) as VerifyItem[];
+    filled[0]!.verdict = "supported";
+    filled[0]!.note = "source re-opened";
+    filled[1]!.verdict = "refuted";
+    writeFileSync(todoPath, JSON.stringify(filled));
+
+    writeWorklist([items[0]!, { ...items[1]!, claim: `${items[1]!.claim} changed` }], out, false);
+    const regenerated = JSON.parse(readFileSync(todoPath, "utf8")) as VerifyItem[];
+    expect(regenerated[0]!.verdict).toBe("supported");
+    expect(regenerated[0]!.note).toBe("source re-opened");
+    expect(regenerated[1]!.verdict).toBeNull();
+  });
+
+  it("migrates legacy per-citation conformities only when every anchor was upheld", () => {
+    const out = mkdtempSync(join(tmpdir(), "ultra11y-verify-group-resume-"));
+    const legacy: VerifyItem[] = [
+      { n: 1, criteriaId: "12.2", file: "a.html", line: 2, selector: "nav", claim: "navigation stable", verdict: "supported", note: "a", kind: "c" },
+      { n: 2, criteriaId: "12.2", file: "b.html", line: 3, selector: "nav", claim: "navigation stable", verdict: "partial", note: "b", kind: "c" },
+    ];
+    writeFileSync(join(out, "VERIFY.todo.json"), JSON.stringify(legacy));
+    const grouped: VerifyItem = {
+      ...legacy[0]!,
+      verdict: null,
+      note: "",
+      citations: [
+        { file: "a.html", line: 2, selector: "nav", snippet: "<nav>A</nav>" },
+        { file: "b.html", line: 3, selector: "nav", snippet: "<nav>B</nav>" },
+      ],
+    };
+    writeWorklist([grouped], out, false);
+    let regenerated = JSON.parse(readFileSync(join(out, "VERIFY.todo.json"), "utf8")) as VerifyItem[];
+    expect(regenerated[0]!.verdict).toBe("partial");
+
+    legacy[1]!.verdict = "refuted";
+    writeFileSync(join(out, "VERIFY.todo.json"), JSON.stringify(legacy));
+    writeWorklist([grouped], out, false);
+    regenerated = JSON.parse(readFileSync(join(out, "VERIFY.todo.json"), "utf8")) as VerifyItem[];
+    expect(regenerated[0]!.verdict).toBeNull();
+  });
 });
 
 // Pins the shared renderer (src/auditor.ts `occurrenceLine`) directly to the parser it

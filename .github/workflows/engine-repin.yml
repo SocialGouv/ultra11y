@@ -4,8 +4,8 @@ name: Engine re-pin
 # already current, the job is a green no-op. Otherwise it re-pins, rebuilds
 # the bundle, and runs the same gates as ci.yml:
 #   - all green -> commit + push straight to main (no PR for the happy path),
-#     then explicitly trigger release.yml and ci.yml (a GITHUB_TOKEN push does
-#     NOT itself trigger other workflows).
+#     then explicitly trigger ci.yml (a GITHUB_TOKEN push does not trigger it);
+#     release.yml follows that CI on the exact validated SHA.
 #   - any gate red -> nothing is pushed and no PR is opened; the run just
 #     fails and the next daily cron retries. A red run is the signal to
 #     investigate locally.
@@ -168,14 +168,12 @@ jobs:
           git push origin HEAD:main
           echo "pushed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Trigger release.yml and ci.yml on main
+      - name: Trigger CI on main
         # A push authenticated with GITHUB_TOKEN does not itself trigger other
         # workflows (a documented GitHub Actions guard against push loops) —
-        # both must be started explicitly.
+        # CI must be started explicitly; release follows its successful workflow_run.
         if: steps.detect.outputs.repin == 'true'
-        run: |
-          gh workflow run release.yml --ref main
-          gh workflow run ci.yml --ref main
+        run: gh workflow run ci.yml --ref main
 
       # A red re-pin means this repo has stopped following the engine. Nothing
       # used to carry that signal out of the Actions tab, so ultrasec failed

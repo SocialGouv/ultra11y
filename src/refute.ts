@@ -79,10 +79,21 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
   const withdrawn = items.filter((it) => WITHDRAWN.has((it.verdict ?? "").trim().toLowerCase()));
   const removedNc = new Map<string, Set<string>>(); // criterion → anchors to delete
   const withdrawnC = new Set<string>();
+  const notes = new Map<string, string[]>();
   for (const it of withdrawn) {
     if (it.kind === "c") withdrawnC.add(it.criteriaId);
     else (removedNc.get(it.criteriaId) ?? removedNc.set(it.criteriaId, new Set()).get(it.criteriaId)!).add(key(it.file, it.line, it.selector));
+    if (it.note?.trim()) {
+      const criterionNotes = notes.get(it.criteriaId) ?? [];
+      if (!criterionNotes.includes(it.note.trim())) criterionNotes.push(it.note.trim());
+      notes.set(it.criteriaId, criterionNotes);
+    }
   }
+
+  const withReview = (criterionId: string, base: string) => {
+    const review = notes.get(criterionId);
+    return review?.length ? `${base} Contre-expertise : ${review.join(" ")}` : base;
+  };
 
   const reopenedCriteria: string[] = [];
   const clearedConformities: string[] = [];
@@ -121,14 +132,14 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
         rec.findings = keep;
         if (!keep.some((f) => !f.advisory)) {
           reopenedCriteria.push(rec.id);
-          setOpen(reason.nc);
+          setOpen(withReview(rec.id, reason.nc));
         }
       }
     }
     if (withdrawnC.has(rec.id) && isAgent) {
       acted.add(rec.id);
       clearedConformities.push(rec.id);
-      setOpen(reason.c);
+      setOpen(withReview(rec.id, reason.c));
     }
   };
 

@@ -10,19 +10,23 @@ own fixture; the numbers are stated so they can be argued with.
 ultra11y audit <src> --standard rgaa --out audits
 
 # 2. The browser closes the mechanical ones, also for free. DO NOT SKIP THIS.
-ultra11y scan --crawl <url> --standard rgaa --merge audits/audit-latest.json --out audits
-ultra11y audit <src> --standard rgaa --out audits     # re-ingest the captures
+ultra11y scan --crawl <url> --max 0 --standard rgaa \
+  --merge audits/audit-latest.json --out audits
 
-# 3. The model rules on what is left — one criterion per call, recorded.
-ultra11y judge --in audits/audit-latest.json --out audits --apply \
-  --standard rgaa --runner claude --grain criterion \
-  --model claude-haiku-4-5-20251001 --max-budget-usd <n> --concurrency 4 --ledger
+# 3. Replay the committed ledger, then send only the residue to Haiku in batches of 8.
+ultra11y verify --apply .ultra11y/verdicts/rgaa.json \
+  --in audits/audit-latest.json --standard rgaa --out audits
+for pass in 1 2 3; do
+  ultra11y judge --in audits/audit-latest.json --out audits --apply \
+    --standard rgaa --runner claude --grain batch \
+    --model haiku --max-budget-usd <n> --concurrency 4 --ledger
+done
 
 # 4. A second reader puts those claims on trial, and the outcome is APPLIED.
 ultra11y report --in audits/audit-latest.json --standard rgaa --out audits
 ultra11y verify --report audits/<report>.md --in audits/audit-latest.json --out audits --max-verify 0
 ultra11y judge --refute audits/VERIFY.todo.json --standard rgaa --runner claude \
-  --model claude-haiku-4-5-20251001 --concurrency 4
+  --grain batch --model haiku --concurrency 4
 ultra11y verify --apply audits/VERIFY.todo.json --report audits/<report>.md \
   --in audits/audit-latest.json --out audits --prune --ledger
 
@@ -49,7 +53,7 @@ what it cost.
 |---|---|
 | `--runner claude` | Claude subscription/OAuth, read-only tools, safe mode, real dollar ceiling, wall-clock kill and reported cost. `--runner cli` is its compatibility alias. |
 | `--runner codex` | ChatGPT subscription through local `codex exec`, ephemeral/read-only/offline with config, rules and hooks ignored. It inherits the account model unless pinned. Use `--timeout`/`--max`; Codex has no `--max-budget-usd`. |
-| `--grain criterion` | One call per criterion, `criteriaId` pinned to that one criterion. A run cut short loses one criterion instead of everything it had ruled on. |
+| `--grain batch` | Batches of 8 criteria amortise the system prompt and normative context. Verdicts are checkpointed during the run; each loop pass re-reads the updated audit and receives only the refused or unanswered residue. Use `criterion` only to diagnose a stubborn criterion. |
 | `--ledger` | A verdict paid for once becomes a claim re-verified on every push by `ledger-gate`. |
 
 Not the others, and for concrete reasons: `--runner api` reports no cost, honours no timeout
@@ -107,7 +111,7 @@ Three things now stand between that and a deliverable, and only the third is a m
 
 ## What it costs
 
-Per pass, at criterion grain, for a full RGAA worklist:
+Before batching, at criterion grain, for a full RGAA worklist:
 
 | | tokens in |
 |---|---:|
@@ -122,11 +126,16 @@ find in the source is cut to an opening. No test's WORDING is ever abridged.
 `tests/adjudicate-context-budget.test.ts` ratchets the result — this is the bill, not a
 micro-benchmark.
 
-The refutation pass costs one call per non-conformity and one per cleared citation. The
-worklist is capped at 40 by default and the coverage check is rebuilt UNCAPPED, so a bounded
-worklist fails the gate as `missing` rather than passing over the half it tried — which is why
-step 4 passes `--max-verify 0`. Lower it deliberately if you must, and then say what was
-dropped: a silent cap reads exactly like full coverage.
+The refutation pass groups up to eight independent claims per model call by default, writes
+each numbered answer separately, and checkpoints every batch. Regenerating a worklist in the
+same directory preserves only byte-identical completed claims; changed and new claims return
+to `null`, so a repair loop pays only for what changed. A claimed conformity is one item with
+its complete citation set, not one paid call per anchor; this is required for cross-page
+criteria whose proof is the set. The worklist is capped at 40 by default
+and the coverage check is rebuilt UNCAPPED, so a bounded worklist fails the gate as `missing`
+rather than passing over the half it tried — which is why step 4 passes `--max-verify 0`.
+Lower it deliberately if you must, and then say what was dropped: a silent cap reads exactly
+like full coverage.
 
 ## When it goes wrong
 
@@ -134,8 +143,9 @@ dropped: a silent cap reads exactly like full coverage.
   carries its reason in its own justification; it is almost always a brief that never stated
   the rule, or a harvest with no anchor on the criterion's subject — not a model that gave up.
 - **The ledger replays as stale.** Its fingerprint covers the evidence the harvest READ FROM
-  DISK. A ledger recorded with no `.ultra11y/pages/` fingerprints a smaller set than a real run
-  rebuilds, and every entry is dropped as stale, silently. Adjudicate where the captures are.
+  DISK. `scan --merge` now carries the snapshot inputs into that harvest, and snapshot paths
+  are checkout-independent. A genuinely changed content class still expires its criterion;
+  re-adjudicate only the named residue.
 - **The trial refuses an engine verdict.** It is left untouched and counted, on purpose: a
   criterion the engine decides is recomputed from source every run, and a rule that produces a
   false positive is fixed in the rule.

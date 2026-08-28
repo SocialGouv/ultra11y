@@ -121,7 +121,7 @@ on:
         options: ["true", "false"]
         default: "false"
       refute:
-        description: "Put the adjudicated claims on trial afterwards, and APPLY the outcome (`judge --refute` → `verify --apply --prune`). Not a formality: measured on a full RGAA pass with Haiku, the adjudicator returned 74 non-conformities where a stronger model through the same gate found 57, and 19 of them landed on criteria the committed ledger had cleared. The gate cannot see it — it proves the cited test belongs to the criterion, never that the reading was right — so with a cheap model this is the only pass that catches an over-accusing one. Costs one call per non-conformity and per cleared citation."
+        description: "Put the adjudicated claims on trial afterwards, and APPLY the outcome (`judge --refute` → `verify --apply --prune`). Not a formality: measured on a full RGAA pass with Haiku, the adjudicator returned 74 non-conformities where a stronger model through the same gate found 57, and 19 of them landed on criteria the committed ledger had cleared. The gate cannot see it — it proves the cited test belongs to the criterion, never that the reading was right — so with a cheap model this is the only pass that catches an over-accusing one. Batches up to 8 claims per call."
         type: boolean
         default: false
       standard:
@@ -281,18 +281,13 @@ jobs:
           # keyboard-trap probe closes 12.9. Reading the agent tier against 80 would report 42
           # criteria it never touched.
           #
-          # THE AUDIT RUNS TWICE, and that is not a slip. The first pass has no captures to read;
-          # the scan then writes `.ultra11y/pages/`, and the second pass ingests them — which is
-          # what anchors a criterion's evidence in the rendered DOM instead of only in the
-          # source. It is exactly what the composite action does internally, and a baseline that
-          # skipped it would measure a different grid from the one each tier is handed.
+          # `scan --merge` audits and folds its own snapshots, so one pass is the exact grid the
+          # composite hands to the adjudicator. Repeating it wastes a full crawl and contaminates
+          # ledger fingerprints with duplicated acquisition history.
           # `--standard` on the audit and the scan too: the standard re-keys the DOCUMENT, and
           # a baseline measured on a core-keyed one is not the artefact either tier is handed.
           node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard '${{ inputs.standard }}' --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --runtime local --cwd "$PWD" \
-            --standard '${{ inputs.standard }}' --merge audits/audit-latest.json --out audits
-          node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard '${{ inputs.standard }}' --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 12 --runtime local --cwd "$PWD" \
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 0 --runtime local --cwd "$PWD" \
             --standard '${{ inputs.standard }}' --merge audits/audit-latest.json --out audits
           node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
             --standard '${{ inputs.standard }}' --out /tmp/before --json > /tmp/before.json
@@ -333,7 +328,7 @@ jobs:
           # `crawl`, not `urls`: the site-level criteria are decided across pages, so a scan
           # that renders one of them leaves the other four unmeasured and the grid says so.
           crawl: ${{ inputs.max-items == '' && 'http://127.0.0.1:8932/' || '' }}
-          crawl-max: "12"
+          crawl-max: "0"
           runtime: local
 
       # Measured HERE, not at the end. The agent step below is a fresh `uses: ./` whose own
@@ -374,7 +369,7 @@ jobs:
           # Same rendered pages as the API tier above, so the two modes are compared over the
           # same evidence.
           crawl: ${{ inputs.max-items == '' && 'http://127.0.0.1:8932/' || '' }}
-          crawl-max: "12"
+          crawl-max: "0"
           runtime: local
           # THE GATE THIS WHOLE WORKFLOW EXISTS FOR. Without it the job reports success on a
           # grid nobody filled — which is precisely what happened on run 32385981037: green,
@@ -441,7 +436,8 @@ jobs:
             exit 1
           fi
           node scripts/ultra11y.mjs verify --report "$REPORT" \
-            --in audits/audit-latest.json --standard '${{ inputs.standard }}' --out audits --max-verify 0
+            --in audits/audit-latest.json --conformities audits/audit-latest.json \
+            --standard '${{ inputs.standard }}' --out audits --max-verify 0
           # `judge` writes each finished verdict before reporting a partial-run failure. A
           # provider 429 in run 32861687494 left 33/105 valid trials on disk, but `set -e`
           # skipped `verify --apply` and the so-called post-refutation audit was still the
@@ -450,11 +446,15 @@ jobs:
           judge_status=0
           node scripts/ultra11y.mjs judge --refute audits/VERIFY.todo.json \
             --standard '${{ inputs.standard }}' --runner cli \
-            --model '${{ inputs.model }}' --concurrency 4 || judge_status=$?
+            --grain batch --model '${{ inputs.model }}' --concurrency 4 || judge_status=$?
 
           apply_status=0
+          ledger_args=()
+          if [ '${{ inputs.ledger }}' = 'true' ]; then
+            ledger_args=(--ledger ".ultra11y/verdicts/${{ inputs.standard }}.json")
+          fi
           node scripts/ultra11y.mjs verify --apply audits/VERIFY.todo.json --report "$REPORT" \
-            --in audits/audit-latest.json --standard '${{ inputs.standard }}' --out audits --prune \
+            --in audits/audit-latest.json --standard '${{ inputs.standard }}' --out audits --prune "${ledger_args[@]}" \
             || apply_status=$?
 
           if [ "$judge_status" -ne 0 ]; then

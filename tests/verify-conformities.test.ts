@@ -26,7 +26,7 @@ const claim = (over: Partial<ConformityClaim> = {}): ConformityClaim => ({
 });
 
 describe("the conformity worklist", () => {
-  it("puts one item on trial per citation the agent cleared the criterion on", () => {
+  it("puts one evidence-set item on trial per claimed conformity", () => {
     const items = buildConformityWorklist([
       claim({
         citations: [
@@ -35,9 +35,10 @@ describe("the conformity worklist", () => {
         ],
       }),
     ]);
-    expect(items).toHaveLength(2);
-    expect(items.every((i) => i.kind === "c")).toBe(true);
-    expect(items.map((i) => i.file)).toEqual(["a.html", "b.html"]);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.kind).toBe("c");
+    expect(items[0]!.file).toBe("a.html");
+    expect(items[0]!.citations?.map((citation) => citation.file)).toEqual(["a.html", "b.html"]);
   });
 
   it("carries the agent's own justification as the claim, not a paraphrase of it", () => {

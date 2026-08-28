@@ -3,7 +3,7 @@
 // support-checking, then (--apply) reduces a filled worklist to pass/fail:
 // any refuted/unsupported (or unadjudicated) claim fails the gate. Guards against
 // fabricated non-conformities surviving into the final report.
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AuditResult, CriterionCitation, Lang } from "./types.js";
 import { getSC, scTitle } from "./wcag.js";
@@ -42,6 +42,9 @@ export interface VerifyItem {
   /** Absent ⇒ `nc`, so every worklist written before conformities were verified reads
    *  unchanged and every stored verdicts file still applies. */
   kind?: VerifyKind;
+  /** A claimed conformity is established by its evidence SET, especially for cross-page
+   * criteria. The primary file/line fields remain for compatibility and display. */
+  citations?: CriterionCitation[];
 }
 
 const plain = (s: string) => s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
@@ -154,8 +157,8 @@ export interface ConformityClaim {
 }
 
 /**
- * The adversarial worklist over CLAIMED CONFORMITIES — one item per citation an agent
- * cleared a criterion on.
+ * The adversarial worklist over CLAIMED CONFORMITIES — one item per claim, carrying the full
+ * citation set the agent cleared it on.
  *
  * The source is the ledger (or an adjudication file), not the report, and that is not an
  * implementation convenience: a report's conforming section is a LIST of criteria, with no
@@ -221,7 +224,13 @@ export function refuteSchema(items: VerifyItem[]): Record<string, unknown> {
  *  claim kept ships as a conformance statement about a site nobody checked. */
 export function refuteSystemPrompt(lang: Lang = "en"): string {
   const s = T[lang];
-  return [s.refuteRole, "", s.supported, s.partial, s.refuted, s.unsupported, "", s.refuteInverted, s.refuteAttach, s.refuteDoubt, s.refuteNever].join("\n");
+  const setRule =
+    lang === "fr"
+      ? "Pour une conformité qui porte `citations`, ouvrez et jugez le faisceau COMPLET : un critère transversal n'a pas à être prouvé par chaque ancre isolément."
+      : "For a conformity carrying `citations`, open and judge the COMPLETE evidence set: a cross-cutting criterion need not be proved by each anchor in isolation.";
+  return [s.refuteRole, "", s.supported, s.partial, s.refuted, s.unsupported, "", s.refuteInverted, setRule, s.refuteAttach, s.refuteDoubt, s.refuteNever].join(
+    "\n",
+  );
 }
 
 export function conformityClaimsFromAudit(audit: AuditResult, standard: StandardId): ConformityClaim[] {
@@ -243,22 +252,29 @@ export function buildConformityWorklist(claims: ConformityClaim[], startAt = 0, 
   const items: VerifyItem[] = [];
   for (const c of claims) {
     if (c.verdict !== "C") continue;
-    for (const cite of c.citations ?? []) {
-      if (items.length >= max) return items;
-      items.push({
-        n: startAt + items.length + 1,
-        criteriaId: c.criteriaId,
-        file: cite.file,
-        line: cite.line ?? 1,
-        selector: cite.selector ?? "",
-        // The claim under trial is the justification the agent wrote. Attacking a paraphrase
-        // of it would let a bad justification survive by never being read.
-        claim: (c.justification ?? "").replace(/\s+/g, " ").trim(),
-        verdict: null,
-        note: "",
-        kind: "c",
-      });
-    }
+    const citations: CriterionCitation[] = (c.citations ?? []).map((cite) => ({
+      file: cite.file,
+      line: cite.line ?? 1,
+      selector: cite.selector ?? "",
+      snippet: cite.snippet ?? "",
+    }));
+    const primary = citations[0];
+    if (!primary) continue;
+    if (items.length >= max) return items;
+    items.push({
+      n: startAt + items.length + 1,
+      criteriaId: c.criteriaId,
+      file: primary.file,
+      line: primary.line ?? 1,
+      selector: primary.selector ?? "",
+      // The claim under trial is the justification the agent wrote. Attacking a paraphrase
+      // of it would let a bad justification survive by never being read.
+      claim: (c.justification ?? "").replace(/\s+/g, " ").trim(),
+      verdict: null,
+      note: "",
+      kind: "c",
+      citations,
+    });
   }
   return items;
 }
@@ -363,6 +379,12 @@ export function formatWorklist(items: VerifyItem[], semantic: boolean, standard:
   };
   const renderItem = (it: VerifyItem) => {
     out.push(`- [ ] #${it.n} **${it.criteriaId}** @ \`${it.file}:${it.line}\` (\`${it.selector}\`) — ${it.claim}`);
+    if (it.kind === "c" && (it.citations?.length ?? 0) > 1) {
+      out.push(lang === "fr" ? "  - Faisceau complet à vérifier ensemble :" : "  - Complete evidence set to verify together:");
+      for (const cite of it.citations ?? []) {
+        out.push(`    - \`${cite.file}:${cite.line}\` (\`${cite.selector}\`)${cite.snippet ? ` — \`${cite.snippet.slice(0, 160)}\`` : ""}`);
+      }
+    }
     // Ground the judgment in the active standard's reference so the verdict is checked
     // against real conditions, not a guess.
     if (core) {
@@ -418,7 +440,39 @@ export interface ApplyResult {
 // with the same anchor the two claims would collide — the coverage gate would then read a
 // conformity verdict as covering the non-conformity, and let it through unadjudicated.
 // Absent `kind` means `nc`, so every verdicts file written before this still keys identically.
-const itemKey = (it: VerifyItem): string => `${it.kind ?? "nc"}|${it.criteriaId}|${it.file}|${it.line}|${it.selector}`;
+const canonicalFile = (file: string): string => {
+  const posix = file.replace(/\\/g, "/");
+  const marker = ".ultra11y/pages/";
+  const at = posix.lastIndexOf(marker);
+  return at >= 0 ? posix.slice(at) : posix;
+};
+const citationKey = (cite: CriterionCitation): string => {
+  const file = canonicalFile(cite.file);
+  let snippet = cite.snippet;
+  if (file.startsWith(".ultra11y/pages/") && snippet.startsWith("<!-- ultra11y:capture ")) snippet = snippet.replace(/\surl="[^"]*"/, "");
+  return `${file}:${cite.line}:${cite.selector}:${snippet}`;
+};
+const citationSetKey = (it: VerifyItem): string => (it.kind === "c" ? (it.citations ?? []).map(citationKey).sort().join("||") : "");
+const itemKey = (it: VerifyItem): string => `${it.kind ?? "nc"}|${it.criteriaId}|${it.file}|${it.line}|${it.selector}|${citationSetKey(it)}`;
+
+/** Exact claim identity used only to resume an interrupted/re-generated trial. Unlike the
+ * coverage key above, this includes the claim text: a changed assertion must be reviewed
+ * again even when it still points at the same element. Snapshot paths are checkout-neutral,
+ * so a worklist produced in another runner can still resume safely. */
+const resumableItemKey = (it: VerifyItem): string => {
+  return `${it.kind ?? "nc"}|${it.criteriaId}|${canonicalFile(it.file)}|${it.line}|${it.selector}|${it.claim}|${citationSetKey(it)}`;
+};
+const legacyConformityKey = (criteriaId: string, file: string, line: number, selector: string, claim: string): string =>
+  `${criteriaId}|${canonicalFile(file)}|${line}|${selector}|${claim}`;
+
+/** Every source anchor a passing claim asks the grounding gate to re-open. */
+export function verifyGroundingInputs(items: VerifyItem[]): Array<{ file: string; line: number; selector?: string; snippet?: string }> {
+  return items.flatMap((it) =>
+    it.kind === "c" && it.citations?.length
+      ? it.citations.map((cite) => ({ file: cite.file, line: cite.line, selector: cite.selector, snippet: cite.snippet }))
+      : [{ file: it.file, line: it.line, selector: it.selector, snippet: (it as { snippet?: string }).snippet }],
+  );
+}
 
 // Only these two verdicts clear the gate. Everything else — refuted, unsupported,
 // null/unadjudicated, AND any unknown/typo/mis-cased token — must FAIL, so a
@@ -485,7 +539,44 @@ export function writeWorklist(items: VerifyItem[], outDir: string, semantic: boo
   mkdirSync(outDir, { recursive: true });
   const todoPath = join(outDir, "VERIFY.todo.json");
   const mdPath = join(outDir, "VERIFY.md");
-  writeFileSync(todoPath, JSON.stringify(items, null, 2) + "\n");
-  writeFileSync(mdPath, formatWorklist(items, semantic, standard, lang));
+  // Preserve completed decisions when a repaired audit regenerates the same claims. This is
+  // both a resume mechanism and a token bound: only new or materially changed claims go back
+  // to the refuter. Malformed/foreign files are ignored; generation itself never fails because
+  // an old cache cannot be read.
+  let carried = items;
+  if (existsSync(todoPath)) {
+    try {
+      const previous = JSON.parse(readFileSync(todoPath, "utf8")) as VerifyItem[];
+      const byClaim = new Map(previous.map((it) => [resumableItemKey(it), it]));
+      const legacyConformities = new Map(
+        previous
+          .filter((it) => it.kind === "c" && !it.citations?.length)
+          .map((it) => [legacyConformityKey(it.criteriaId, it.file, it.line, it.selector, it.claim), it]),
+      );
+      carried = items.map((it) => {
+        const old = byClaim.get(resumableItemKey(it));
+        const verdict = normalizeVerdict(old?.verdict);
+        if (old && verdict && ["supported", "partial", "refuted", "unsupported"].includes(verdict)) {
+          return { ...it, verdict: verdict as Exclude<Verdict, null>, note: typeof old.note === "string" ? old.note : "" };
+        }
+        // Safe one-time migration from the historical one-item-per-citation shape: only carry
+        // when EVERY citation was independently upheld. Any refuted/unsupported/missing anchor
+        // leaves the new evidence-set claim open so the reviewer can assess the combination.
+        if (it.kind === "c" && it.citations?.length) {
+          const oldSet = it.citations.map((cite) => legacyConformities.get(legacyConformityKey(it.criteriaId, cite.file, cite.line, cite.selector, it.claim)));
+          const verdicts = oldSet.map((candidate) => normalizeVerdict(candidate?.verdict));
+          if (oldSet.every(Boolean) && verdicts.every((candidate) => candidate === "supported" || candidate === "partial")) {
+            const notes = [...new Set(oldSet.map((candidate) => candidate?.note?.trim()).filter(Boolean))];
+            return { ...it, verdict: verdicts.includes("partial") ? "partial" : "supported", note: notes.join(" ") };
+          }
+        }
+        return it;
+      });
+    } catch {
+      // A stale worklist is expendable; the new one remains the source of truth.
+    }
+  }
+  writeFileSync(todoPath, JSON.stringify(carried, null, 2) + "\n");
+  writeFileSync(mdPath, formatWorklist(carried, semantic, standard, lang));
   return { todoPath, mdPath, count: items.length };
 }
