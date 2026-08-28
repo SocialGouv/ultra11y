@@ -25,6 +25,7 @@
           "src/types.ts",
           "skills/ultra11y/SKILL.md",
           "skills/review-a11y/SKILL.md",
+          "skills/ultra11y/templates/gitlab-ci.yml",
           ".claude-plugin/plugin.json",
           ".claude-plugin/marketplace.json",
           ".codex-plugin/plugin.json",

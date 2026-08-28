@@ -69,7 +69,13 @@ const gitlabTemplate = readFileSync(join(root, "skills/ultra11y/templates/gitlab
 const gitlabVersion = gitlabTemplate.match(/ULTRA11Y_VERSION:\s*'([^']+)'/)?.[1];
 gitlabVersion === pkg.version
   ? ok(`GitLab template pins package ${gitlabVersion}`)
-  : bad(`GitLab template pin "${gitlabVersion ?? "missing"}" != package version "${pkg.version}" — add it to scripts/sync-version.mjs`);
+  : bad(`GitLab template pin "${gitlabVersion ?? "missing"}" != package version "${pkg.version}" — keep it in scripts/sync-version.mjs and the release assets`);
+const releaseConfig = JSON.parse(readFileSync(join(root, ".releaserc.json"), "utf8"));
+const gitRelease = releaseConfig.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === "@semantic-release/git");
+const releaseAssets = new Set(gitRelease?.[1]?.assets ?? []);
+releaseAssets.has("skills/ultra11y/templates/gitlab-ci.yml")
+  ? ok("release commit carries the version-pinned GitLab template")
+  : bad("@semantic-release/git omits skills/ultra11y/templates/gitlab-ci.yml — every release would leave its exact package pin behind");
 
 // 1. No SKILL.md at the repo root (would make `skills add` install it alone).
 existsSync(join(root, "SKILL.md"))

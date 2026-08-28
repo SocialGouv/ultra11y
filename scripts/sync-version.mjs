@@ -62,5 +62,5 @@ edit(".codex-plugin/plugin.json", setJsonVersion);
 edit(".opencode/plugins/ultra11y.js", (s) => s.replace(/(const ULTRA11Y_PLUGIN_VERSION = ")[^"]+(")/, `$1${version}$2`));
 
 console.log(
-  `sync-version: set ${version} in package.json, src/types.ts, skills/ultra11y/SKILL.md, skills/review-a11y/SKILL.md, .claude-plugin/plugin.json, .claude-plugin/marketplace.json, .codex-plugin/plugin.json`,
+  `sync-version: set ${version} in package.json, src/types.ts, both SKILL.md files, the GitLab template, and every plugin manifest`,
 );

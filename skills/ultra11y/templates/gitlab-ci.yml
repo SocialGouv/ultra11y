@@ -27,7 +27,7 @@ variables:
   ULTRA11Y_LANG: en
   # Exact by default: a CI report must say which engine produced it. The release script keeps
   # this pin aligned with the package version; override only for a deliberate upgrade test.
-  ULTRA11Y_VERSION: '5.38.1'
+  ULTRA11Y_VERSION: '5.38.2'
   # Batches of 8 amortise the prompt; each accepted verdict is checkpointed before the next
   # batch, and later passes receive only the residue.
   ULTRA11Y_GRAIN: batch
