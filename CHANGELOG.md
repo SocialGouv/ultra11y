@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.38.5](https://github.com/maxgfr/ultra11y/compare/v5.38.4...v5.38.5) (2026-08-28)
+
+
+### Bug Fixes
+
+* **adjudicate:** route RGAA script alternatives to the model ([84577a4](https://github.com/maxgfr/ultra11y/commit/84577a41a5c33a5d81de349fc6e3856f2a195fcd))
+
 ## [5.38.4](https://github.com/maxgfr/ultra11y/compare/v5.38.3...v5.38.4) (2026-08-28)
 
 
