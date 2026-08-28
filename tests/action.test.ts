@@ -1325,18 +1325,16 @@ describe("the agent tier can go round again on what is still undecided", () => {
   });
 });
 
-// The keyed path is the half ci.yml cannot prove: the composite action resolves its
-// credential TWICE by two different mechanisms — bash reads the process environment, the
-// `uses:` step reads the `env` expression context — and only a run with a real credential
-// exercises the second. This workflow is the only thing in the repository that does, so its
-// shape is worth pinning even though it is dispatched by hand.
-describe("the keyed adjudication workflow can actually reach the tier it exists to test", () => {
-  const WF = parse(readFileSync(join(ROOT, ".github/workflows/adjudication.yml"), "utf8")) as {
-    on?: { workflow_dispatch?: { inputs?: Record<string, { default?: unknown; type?: string }> } };
+// This is the paid end-to-end path CI cannot run on every push. Keep one runner and one
+// acquisition pass: a comparison matrix doubles both the browser work and the model bill.
+describe("the keyed adjudication workflow is singular, exhaustive and bounded", () => {
+  const raw = readFileSync(join(ROOT, ".github/workflows/adjudication.yml"), "utf8");
+  const WF = parse(raw) as {
+    on?: { workflow_dispatch?: unknown };
+    concurrency?: { group?: string; "cancel-in-progress"?: boolean };
     jobs: Record<
       string,
       {
-        // An expression now: the dispatch sets its own ceiling. See the timeout test.
         "timeout-minutes"?: number | string;
         env?: Record<string, string>;
         steps: { id?: string; name?: string; uses?: string; run?: string; if?: string; with?: Record<string, string>; env?: Record<string, string> }[];
@@ -1349,113 +1347,84 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     return j;
   };
 
-  // Wiring only ANTHROPIC_API_KEY locked an OAuth-only repository out of `mode: agent` —
-  // the mode that needs no API key at all, and the common case for a team already running
-  // Claude Code. The workflow refused at its second step and the tier was never reached.
-  it("wires both credentials, because the two tiers do not accept the same one", () => {
+  it("exposes one dispatch and removes the paid runner comparison", () => {
+    expect(WF.on?.workflow_dispatch).toBeDefined();
+    expect(existsSync(join(ROOT, ".github/workflows/adjudication-compare.yml"))).toBe(false);
+    expect(job().steps.filter((step) => step.uses === "./")).toHaveLength(1);
+    expect(raw).not.toMatch(/matrix:|adjudication-runner.*action|Adjudicate with the API/);
+  });
+
+  it("serialises paid dispatches instead of cancelling or racing them", () => {
+    expect(WF.concurrency?.group).toBe("adjudication-keyed");
+    expect(WF.concurrency?.["cancel-in-progress"]).toBe(false);
+    expect(job()["timeout-minutes"]).toBe(60);
+  });
+
+  it("uses only the subscription credential", () => {
     const env = job().env ?? {};
-    expect(env.ANTHROPIC_API_KEY).toContain("secrets.ANTHROPIC_API_KEY");
     expect(env.CLAUDE_CODE_OAUTH_TOKEN).toContain("secrets.CLAUDE_CODE_OAUTH_TOKEN");
+    expect(env.ANTHROPIC_API_KEY).toBeUndefined();
   });
 
-  it("requires the API key only for the tier that cannot do without it", () => {
-    const refuse = job().steps.find((s) => s.name?.startsWith("Refuse early"));
-    expect(refuse, "the workflow must still refuse a run it cannot perform").toBeTruthy();
-    const run = String(refuse?.run);
-    // agent → either credential; api → the key and nothing else.
-    expect(run).toContain("\"$MODE\" != 'agent'");
-    expect(run).toContain("\"$MODE\" != 'api'");
-    expect(run).toContain("CLAUDE_CODE_OAUTH_TOKEN");
-  });
-
-  // The engine is the committed zero-dep bundle, so nothing is installed — but package.json
-  // declares engines.node >= 22.18, and a job that pins no Node runs on whatever the runner
-  // image ships that week.
   it("pins Node, like every other workflow that runs the engine", () => {
     expect(job().steps.some((s) => s.uses?.startsWith("actions/setup-node@"))).toBe(true);
   });
 
-  it("defaults to a bounded Haiku smoke run, while leaving every strict control dispatchable", () => {
-    // Dispatch-controlled, because `max-turns: unlimited` makes this the only thing that
-    // stops the run — so what has to hold is that the INPUT it reads defaults to a real
-    // ceiling, not merely that the key is present.
-    expect(String(WF.jobs.adjudicate?.["timeout-minutes"])).toBe("${{ fromJSON(inputs.timeout) }}");
-    const declared = WF.on?.workflow_dispatch?.inputs?.timeout;
-    // A STRING, because every workflow_dispatch input is one — asserting `number` here is
-    // what pushed `type: number` into the workflow and made it undispatchable.
-    expect(declared?.type ?? "string").toBe("string");
-    expect(Number(declared?.default)).toBe(20);
-    const inputs = WF.on?.workflow_dispatch?.inputs ?? {};
-    expect(inputs.model?.default).toBe("haiku");
-    expect(inputs["max-items"]?.default).toBe("5");
-    expect(inputs.grain?.default).toBe("worklist");
-    expect(inputs.ledger?.default).toBe("false");
-    expect(inputs.passes?.default).toBe("1");
-    expect(inputs["require-decided"]?.default).toBe("false");
-    expect(inputs.refute?.default).toBe(false);
-    const agent = job().steps.find((step) => step.name === "Adjudicate with an agent");
-    expect(agent?.with?.["adjudicate-max"]).toContain("inputs.max-items");
-    expect(agent?.with?.crawl).toContain("inputs.max-items == ''");
-
-    for (const expensive of [
-      "Install dependencies",
-      "Cache Playwright browsers",
-      "Install the browser tier",
-      "Serve the fixture site",
-      "Measure the unruled criteria BEFORE adjudication",
-    ]) {
-      expect(job().steps.find((step) => step.name === expensive)?.if, `${expensive} must stay out of the default smoke`).toBe("inputs.max-items == ''");
-    }
-
-    const summary = job().steps.find((step) => step.name === "Report what each tier actually decided");
-    expect(summary?.run).toContain('if [ -n "${BEFORE:-}" ]');
+  it("runs the full fixture once with the bounded batched Haiku CLI", () => {
+    const agent = job().steps.find((step) => step.name === "Audit, crawl and adjudicate once");
+    expect(agent?.with?.adjudicate).toBe("agent");
+    expect(agent?.with?.["adjudicate-runner"]).toBe("cli");
+    expect(agent?.with?.["adjudicate-grain"]).toBe("worklist");
+    expect(agent?.with?.["adjudicate-model"]).toBe("haiku");
+    expect(agent?.with?.["adjudicate-effort"]).toBe("low");
+    expect(agent?.with?.["adjudicate-budget-usd"]).toBe("5");
+    expect(agent?.with?.["adjudicate-passes"]).toBe("2");
+    expect(agent?.with?.ledger).toBe("audits/fresh-rgaa-ledger.json");
+    expect(agent?.with?.crawl).toBe("http://127.0.0.1:8932/");
+    expect(agent?.with?.["crawl-max"]).toBe("0");
+    expect(agent?.with?.["require-rendered"]).toBe("true");
+    expect(agent?.with?.["require-decided"]).toBe("false");
   });
 
-  // `mode: both` measured the agent pass twice and called it both: the agent step is a fresh
-  // `uses: ./` whose own audit step rewrites audits/audit-latest.json from scratch, so the
-  // API verdicts are gone by the time a single trailing measurement runs.
-  it("measures each tier where its verdicts still exist", () => {
-    const steps = job().steps;
-    const at = (needle: string): number => steps.findIndex((s) => s.name?.includes(needle));
-    const apiRun = at("Adjudicate with the API");
-    const apiRead = at("What the API tier decided");
-    const agentRun = at("Adjudicate with an agent");
-    expect(apiRun, "the API tier must still run").toBeGreaterThanOrEqual(0);
-    expect(apiRead, "the API tier must be measured").toBeGreaterThan(apiRun);
-    expect(apiRead, "the API tier must be measured BEFORE the agent re-audits over it").toBeLessThan(agentRun);
-    expect(at("What the agent tier decided")).toBeGreaterThan(agentRun);
+  it("trials every claim in bounded batches", () => {
+    const trial = job().steps.find((s) => s.name === "Put every model claim on trial");
+    const run = String(trial?.run);
+    expect(run).toMatch(/REPORT=\$\(node scripts\/ultra11y\.mjs report/);
+    expect(run).toContain("--max-verify 0");
+    expect(run).toContain("--grain batch");
+    expect(run).toContain('--model "$MODEL"');
+    expect(run).toContain('--effort "$EFFORT"');
+    expect(run).toContain("--concurrency 4");
+    expect(run).toContain("--max-budget-usd 6");
+    expect(run).toContain('--prune --ledger "$FRESH_LEDGER"');
   });
 
-  it("remeasures and re-gates the audit after refutation mutates its verdicts", () => {
+  it("gates the mutated audit across all 106 criteria and all nine pages", () => {
     const steps = job().steps;
-    const trial = steps.findIndex((s) => s.name === "Put the claims on trial");
-    const after = steps.findIndex((s) => s.name === "Measure and gate AFTER refutation");
+    const trial = steps.findIndex((s) => s.name === "Put every model claim on trial");
+    const after = steps.findIndex((s) => s.name === "Gate all 106 criteria on all nine pages");
     expect(trial).toBeGreaterThanOrEqual(0);
-    expect(after, "a refuted conformity must not disappear behind the pre-trial count").toBeGreaterThan(trial);
+    expect(after).toBeGreaterThan(trial);
 
     const gate = String(steps[after]?.run);
-    expect(gate).toContain("verify --manual");
-    expect(gate).toContain("check --in audits/audit-latest.json");
-    expect(gate).toContain("--require-decided");
-    expect(gate).toContain("--allow-undecided");
-
-    const summary = steps.find((s) => s.name === "Report what each tier actually decided");
-    expect(String(summary?.run)).toContain("after refutation");
-    expect(summary?.env?.AFTER_REFUTE).toContain("steps.after_refute.outputs.manual");
-    expect(summary?.env?.REFUTE_IDS).toContain("steps.after_refute.outputs.ids");
+    expect(gate).toContain("--require-decided=pages");
+    expect(gate).toContain('--allow-undecided "$UNDECIDABLE_FILE"');
+    expect(gate).toContain("--require-rendered");
+    expect(gate).toContain("grid.pages.length !== 9");
+    expect(gate).toContain("page.criteria.length !== 106");
   });
 
   it("captures the exact report path emitted by the CLI instead of guessing from the directory", () => {
-    const trial = job().steps.find((s) => s.name === "Put the claims on trial");
+    const trial = job().steps.find((s) => s.name === "Put every model claim on trial");
     const run = String(trial?.run);
 
     expect(run).toMatch(/REPORT=\$\(node scripts\/ultra11y\.mjs report/);
-    expect(run).toContain('[ ! -f "$REPORT" ]');
+    expect(run).toContain('test -f "$REPORT"');
     expect(run).not.toMatch(/ls audits\/\*\.md/);
   });
 
   it("applies completed refutations before making an operational judge or apply failure fatal", () => {
-    const trial = job().steps.find((s) => s.name === "Put the claims on trial");
+    const trial = job().steps.find((s) => s.name === "Put every model claim on trial");
     const run = String(trial?.run);
     const judge = run.indexOf("node scripts/ultra11y.mjs judge --refute");
     const apply = run.indexOf("node scripts/ultra11y.mjs verify --apply");
@@ -1467,41 +1436,18 @@ describe("the keyed adjudication workflow can actually reach the tier it exists 
     expect(apply, "partial judge output must be applied instead of lost to set -e").toBeGreaterThan(judge);
     expect(run).toContain("|| apply_status=$?");
     expect(run).toContain("::error::the refuter stopped early");
-    expect(run).toContain("::error::the trial could not apply every completed answer");
+    expect(run).toContain("::error::the refutation fold failed");
     expect(judgeExit, "a broken refuter must make the workflow red after its partial answers are applied").toBeGreaterThan(apply);
     expect(applyExit, "an operational apply failure must not be hidden by the later completeness gate").toBeGreaterThan(apply);
     expect(run).not.toMatch(/\n\s*exit 0\s*$/);
   });
 
-  it("uses one smoke pass by default and only makes an undecided residue fatal when explicitly requested", () => {
-    expect(WF.on?.workflow_dispatch?.inputs?.passes?.default).toBe("1");
-    expect(WF.on?.workflow_dispatch?.inputs?.["require-decided"]?.default).toBe("false");
-
-    const after = job().steps.find((s) => s.name === "Measure and gate AFTER refutation");
-    expect(String(after?.run)).toContain('if [ "$REQUIRE_DECIDED" != "false" ]');
-  });
-
-  it("defaults the keyed smoke to the read-only batched runner shared with GitLab", () => {
-    expect(WF.on?.workflow_dispatch?.inputs?.runner?.default).toBe("cli");
-    expect(WF.on?.workflow_dispatch?.inputs?.grain?.default).toBe("worklist");
-  });
-
-  it("uploads the audit produced by the trial, not only the pre-refutation action artifact", () => {
-    const steps = job().steps;
-    const trial = steps.findIndex((s) => s.name === "Put the claims on trial");
-    const report = steps.findIndex((s) => s.name === "Regenerate the report AFTER refutation");
-    const upload = steps.findIndex((s) => s.name === "Upload the post-refutation audit");
-    expect(report, "the Markdown report must be regenerated from the mutated audit").toBeGreaterThan(trial);
-    expect(upload).toBeGreaterThan(report);
-    expect(upload).toBeGreaterThan(trial);
-    expect(steps[upload]?.uses).toMatch(/^actions\/upload-artifact@/);
-    expect(steps[upload]?.with?.path).toContain("audits/audit-latest.json");
-
-    const regenerate = String(steps[report]?.run);
-    expect(regenerate).toMatch(/REPORT=\$\(node scripts\/ultra11y\.mjs report/);
-    expect(regenerate).toContain('[ ! -f "$REPORT" ]');
-    expect(regenerate).toContain('check --report "$REPORT"');
-    expect(regenerate, "a rejected post-refutation report must print the check issues into the workflow log").not.toContain("--quiet");
+  it("always uploads the post-refutation audit and page snapshots", () => {
+    const upload = job().steps.find((s) => s.name === "Upload the final adjudication");
+    expect(upload?.if).toBe("always()");
+    expect(upload?.uses).toMatch(/^actions\/upload-artifact@/);
+    expect(upload?.with?.path).toContain("audits/");
+    expect(upload?.with?.path).toContain(".ultra11y/pages/");
   });
 });
 

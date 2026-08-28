@@ -1,588 +1,186 @@
-# The ADJUDICATION tier, exercised for real — the half `ci.yml` cannot prove.
+# One paid, exhaustive path. The ordinary CI replays the committed ledger for free; this
+# manual workflow deliberately starts from an empty run ledger so it proves that the keyed
+# Claude transport, the composite Action, the browser tier and both model folds still work.
 #
-# DEFAULT DISPATCH = CHEAP SMOKE: Haiku receives at most five source-level criteria in one
-# batch. There is no browser baseline, strict completeness gate, or claim-by-claim refutation.
-# This proves the credential, Claude CLI transport, verdict parser and fold without pretending
-# to certify RGAA conformance. Set `max-items` to empty to restore the rendered, unbounded audit;
-# then opt into criterion grain, more passes, refutation and a strict gate as needed.
-#
-# `ci.yml` proves the keyless path: with no credential the tier evaporates and the audit still
-# ships. It stops there on purpose, because the keyed path costs money on every run — and the
-# two tiers do not cost remotely the same:
-#
-#   api    ~$0.20 per WCAG run, ~$0.50 per RGAA one. One Messages call per batch of 8 criteria
-#          over harvested evidence; the worklist is re-sent whole each time and no batch is
-#          large enough to earn prompt caching.
-#   agent  MEASURED at $21.22 for one RGAA run on Sonnet over a source-only audit (run
-#          32363798488): 80 criteria, 243 turns, 30 minutes. Two orders of magnitude above the
-#          API tier, and that is the point of it rather than a fault: it OPENS the files each
-#          criterion cites, which is what "link purpose IN CONTEXT" actually asks for.
-#
-# THE 80 IN THAT MEASUREMENT WAS ITSELF A DEFECT, and it is fixed below: the run audited
-# sources only, so the rendering criteria reached the model at all — and came back
-# `needs-rendered-dom`, correctly and expensively. This workflow serves the fixture and scans it
-# before adjudicating, which is what the composite does for every consumer. Measured on run
-# 32385981037 (Haiku, 3 passes): the worklist started at 41 instead of 80, the run took 10
-# minutes instead of 30, and 7 criteria were left — 10.14, 11.11, 11.12, 12.1, 12.5, 12.9, 12.11.
-#
-# EVERY ONE OF THOSE SEVEN WAS A TOOL FAILURE, not a model one, and the fix was never a bigger
-# model. Haiku is what this workflow is dispatched with, deliberately: what a cheap adjudicator
-# cannot do is the measure of what the tool failed to hand it.
-#
-#   12.1, 12.5     ruled NC with no `file`, and refused. Their NC is shaped like an ABSENCE
-#                  (« no second navigation system »), and nothing in the per-criterion brief
-#                  said an absence is still observed on an element of a page — because the
-#                  brief carried no verdict contract at all (it was rendered `preamble: false`,
-#                  which dropped the very rules the gate enforces).
-#   11.11, 11.12   ruled `needs-rendered-dom` over capture-anchored evidence, and refused. Same
-#                  root cause: the note saying the rendered page is on disk lived in the
-#                  preamble the brief did not carry.
-#   12.9           never answered. Its subject is a keyboard trap, and the harvest handed it one
-#                  anchor: `e.preventDefault();` from a React submit handler. A trap is a
-#                  property of the tab ring, so `probeKeyboardTrap` now walks it — 12.9 closes
-#                  on the measurement, with no model in the loop.
-#   10.14, 12.11   never answered, and could not have been: their subject is CSS-revealed
-#                  additional content and no harvester levied any. `additionalContent` does now.
-#
-# So the fixture is a small SITE, not one page — a menu, a search form, a sitemap page, a
-# contact form with format hints and a review step, and a CSS tooltip revealed on hover AND on
-# focus. Criteria about an « ensemble de pages » cannot be posed, let alone answered, on a
-# single document.
-#
-# Putting either tier on every push would bill a fleet of PRs for a signal that changes rarely;
-# the agent tier would do it at twenty dollars a go. Pair it with `ledger` so the next run
-# replays the verdicts instead of buying them again.
-#
-# ONE PASS IS NOT ENOUGH, AND THAT IS THE DESIGN RATHER THAN A DEFECT. Measured on run
-# 32416252443 (Haiku, RGAA, the fixed engine): pass 1 ruled 35 of 38 and the gate refused three
-# — 9.4 as an uncited `C`, 10.14 and 12.11 as `needs-rendered-dom` over capture-anchored
-# evidence. Each refusal travels back with the criterion, and pass 2 closed all three on 60
-# turns; pass 3 found nothing left to do and cost nothing. That round trip IS the mechanism:
-# the gate does not merely reject, it tells the next adjudicator what was wrong. So `passes`
-# historically defaulted to 3 for strict runs.
-#
-# WHERE THIS STANDS NOW, on the per-page bar, which is the one a deliverable is read at.
-#
-#   run 32508717451 — Sonnet 5, RGAA, `require-decided: pages`, engine at v5.22.1.
-#     37 criteria, 105 of 106 closed, $12.90, RED. The survivor was 10.1, and it was not the
-#     model's doing: it ruled `C` three times and the gate refused all three, because 10.1 had
-#     no evidence to cite. 13.2 was refused twice for the same reason. FIVE criteria were
-#     arriving with an empty harvest, three of them pointing at a subject inherited from a WCAG
-#     mapping that answers a different question.
-#
-#   run 32513023189 — same model, same bar, engine at v5.24.0.
-#     34 criteria, **106 of 106**, $6.87, GREEN — « Grille complète : les 106 critères portent
-#     un verdict », on the run AND on each of the five pages. Half the bill of the run before
-#     it, because three of the five criteria are now decided by measurement and never reach a
-#     model at all.
-#
-# ONE REFUSAL SURVIVES IN THAT GREEN RUN, and it is worth naming rather than polishing away:
-# pass 1 cited `styles.css:56` for 10.14 and the gate refused it as not among the criterion's
-# harvested anchors. The model had opened the file the brief pointed it at and cited a real
-# line of it; the harvest carries the `<link rel=stylesheet>`, not the rule inside. Pass 3
-# closed the criterion, so the loop absorbed it for about $0.77. Loosening the grounding rule
-# to accept it would weaken the check that exists to catch a fabricated citation, which is a
-# bad trade for one pass — the fix, if it is worth making, is to harvest the CSS rules 10.14
-# actually turns on, not to let the gate take a citation it cannot verify.
-#
-# So it is dispatched by hand, and it reports the number that actually separates the two
-# modes: how many criteria stayed `manual`. That is where the API mode decloses — it rules
-# from harvested evidence alone (capped at 30 items per criterion, snippets truncated), while
-# the agent mode can open the files, which is what "link purpose IN CONTEXT" really asks for.
-#
-# It is also the ONLY place `anthropics/claude-code-action` runs in this repository. The
-# composite action resolves the credential TWICE, by two different mechanisms — the
-# tier-resolution step reads it from the process environment in bash, the `uses:` step reads
-# it through the `env` expression context — and only a keyed run exercises the second. That is
-# why this file exists rather than a comment asserting the path is fine.
+# Cost controls are fixed rather than dispatch inputs: Haiku, low effort, batches of eight,
+# two adjudication passes over residue only, concurrency four for the adversarial review and
+# a dollar ceiling on both model phases. One composite invocation performs one audit and one
+# unbounded crawl; there is no baseline pass or runner matrix duplicating that work.
 name: Adjudication (keyed)
 
 on:
-  workflow_dispatch:
-    inputs:
-      mode:
-        description: "Which tier to exercise. `agent` is the default because it is the one THIS repository can run: its only credential is CLAUDE_CODE_OAUTH_TOKEN, and the Messages API behind `api` accepts nothing but an ANTHROPIC_API_KEY. Defaulting to `both` meant the default dispatch died in the credential guard before measuring anything — nine seconds, no baseline, no adjudication, a red run that said nothing about the code. Pick `api` or `both` only in a repository that actually holds an API key; the comparison they buy is real, but it is not free and it is not available here."
-        type: choice
-        options: [agent, api, both]
-        default: agent
-      runner:
-        description: "WHO drives the agent tier. `cli` (default) has the engine spawn a headless, read-only `claude -p` and fold structured verdicts itself; it is the production path shared with GitLab. `action` keeps the historical three claude-code-action passes for transport comparisons, but it needs a writable verdict file and is less reliable on a large grid."
-        type: choice
-        options: [action, cli]
-        default: cli
-      grain:
-        description: "How much the model rules on at once. `worklist` (default) batches criteria for a fast smoke test; `criterion` isolates each one for a slower certification-style run. Needs `runner: cli`; the historical action runner only supports worklist."
-        type: choice
-        options: [worklist, criterion]
-        default: worklist
-      ledger:
-        description: "Whether the committed verdict ledger may answer first. `true` is the production shape and makes a paid pass cover only what the ledger did not. SET IT FALSE TO MEASURE ANYTHING: with a current ledger the replay decides all 106 criteria before the model is invoked, the worklist reaches it empty, and the run comes back green having adjudicated nothing — which is exactly what run 32706213834 did, in 7 minutes, reporting « 0 criterion(ia) adjudicated »."
-        type: choice
-        options: ["true", "false"]
-        default: "false"
-      refute:
-        description: "Put the adjudicated claims on trial afterwards, and APPLY the outcome (`judge --refute` → `verify --apply --prune`). Not a formality: measured on a full RGAA pass with Haiku, the adjudicator returned 74 non-conformities where a stronger model through the same gate found 57, and 19 of them landed on criteria the committed ledger had cleared. The gate cannot see it — it proves the cited test belongs to the criterion, never that the reading was right — so with a cheap model this is the only pass that catches an over-accusing one. Batches up to 8 claims per call."
-        type: boolean
-        default: false
-      standard:
-        description: 'Standard to report against'
-        type: choice
-        options: [wcag, rgaa]
-        default: rgaa
-      model:
-        description: 'Model id for the tier under test. Defaults to Haiku because this workflow is a transport/fold smoke test, not the production accessibility verdict.'
-        type: string
-        default: 'haiku'
-      max-items:
-        description: "Smoke-test ceiling: submit only this many still-open criteria. Five exercises the real Haiku transport and fold without buying a certification run; empty restores the full worklist."
-        type: string
-        default: "5"
-      max-turns:
-        description: "Turn budget for the agent tier. Empty derives it from the worklist; a number pins it; 'unlimited' removes the bound entirely (the job's timeout then becomes the only stop)."
-        type: string
-        default: ''
-      passes:
-        description: "How many times the agent tier goes round on what is still undecided. One is the fast smoke default; raise it only for a completeness run because later passes buy only the residue."
-        type: choice
-        options: ["1", "2", "3"]
-        default: "1"
-      timeout:
-        description: 'Job ceiling in minutes. The 20-minute default covers the bounded Haiku smoke run. A full criterion-by-criterion run needs an explicit larger value (historically 120).'
-        type: string
-        default: "20"
-      require-decided:
-        description: "Whether an honest residue should fail this diagnostic workflow. `false` (default) names every criterion still open after the configured pass count and keeps the run green. `true` gates the RUN's grid; `pages` gates every page's grid. Use a strict value only for a deliverable that requires completeness, not to test whether the model and transport work."
-        type: choice
-        options: ["pages", "true", "false"]
-        default: "false"
-      undecidable-file:
-        description: 'Path to a committed list of criteria this fixture genuinely cannot decide, each with its reason. Empty by default, and it should stay empty: every entry is a criterion the tool failed to give evidence for, and the fix belongs in the engine rather than in an exemption.'
-        type: string
-        default: ''
+  workflow_dispatch: {}
 
-# `contents: read` is enough BECAUSE the composite action hands claude-code-action the job's
-# own `github.token`. Without that it would mint a GitHub App token over OIDC and this job
-# would need `id-token: write` — a dependency worth naming here, since it is decided in a file
-# this one only reaches through `uses: ./`.
 permissions:
   contents: read
+
+# A second paid dispatch waits instead of racing the first and buying the same verdicts twice.
+concurrency:
+  group: adjudication-keyed
+  cancel-in-progress: false
 
 jobs:
   adjudicate:
     runs-on: ubuntu-latest
-    # Dispatch-controlled, because with `max-turns: unlimited` this becomes the ONLY thing
-    # that stops the run.
-    #
-    # 360 is not a ceiling this file gets to choose: GitHub terminates a job on a hosted
-    # runner at six hours of execution whatever `timeout-minutes` says, and there is no input
-    # anywhere that lifts it. A longer run needs a self-hosted runner, where the limit is five
-    # days. Setting a bigger number here does not buy time, it only hides where the run died.
-    timeout-minutes: ${{ fromJSON(inputs.timeout) }}
+    timeout-minutes: 60
     env:
-      # BOTH credentials, because the two modes do not accept the same one. `api` calls the
-      # Messages API, which takes an ANTHROPIC_API_KEY and nothing else; `agent` shells out to
-      # claude-code-action, which also accepts the OAuth token a Pro/Max subscriber mints with
-      # `claude setup-token`. Wiring only the first made `mode: agent` unrunnable for a
-      # subscriber with no API key at all — and that is the common case for this repository.
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # This repository uses the Claude subscription/OAuth transport. Do not expose an API key:
+      # it would make the billing route ambiguous and is unnecessary for `--runner cli`.
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      MODEL: haiku
+      EFFORT: low
+      STANDARD: rgaa
+      LANG_OPT: fr
+      FRESH_LEDGER: audits/fresh-rgaa-ledger.json
+      UNDECIDABLE_FILE: .ultra11y/undecidable-rgaa.json
     steps:
       - uses: actions/checkout@v7
 
-      # The engine is the committed zero-dep bundle, so there is nothing to install — but
-      # there IS a floor: package.json declares `engines.node >= 22.18.0`, and a job that
-      # never pins Node inherits whatever the runner image happens to ship that week.
+      - uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: pnpm
 
-      # THE BROWSER TIER, so the rendering criteria are given a browser instead of being
-      # rediscovered as `needs-rendered-dom` at the end of a paid cascade.
-      #
-      # It comes from the REPOSITORY'S OWN lockfile — `@playwright/test` and
-      # `@axe-core/playwright` are dependencies here — so `scan --runtime local` resolves the
-      # same versions whose browsers `playwright install` downloads. This is the pattern the
-      # `action` job in ci.yml already proves; `npm i --no-save --omit=dev <pkg>` installs
-      # NOTHING for a package already declared in devDependencies, which is how this repository
-      # silently degraded to Docker once before.
-      - uses: pnpm/action-setup@v6
-        if: inputs.max-items == ''
       - name: Install dependencies
-        if: inputs.max-items == ''
         run: pnpm install --frozen-lockfile
-      # The browsers live outside the pnpm store (~/.cache/ms-playwright) and weigh ~170MB —
-      # the one download this job makes that the package cache does not cover. Keyed on the
-      # lockfile, exactly like `browser-tier` and `action` in ci.yml, so a cache hit skips it.
+
       - name: Cache Playwright browsers
-        if: inputs.max-items == ''
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-      - name: Install the browser tier
-        if: inputs.max-items == ''
-        # NO --with-deps, for the reason the other two browser jobs in this repository give:
-        # it shells out to apt, which on the Azure runners hangs for 30min+ whenever their
-        # ubuntu mirror misbehaves — measured twice in one day, once for 3h27. The GitHub
-        # ubuntu image already ships every library chromium-for-testing needs.
+
+      - name: Install Chromium
         run: pnpm exec playwright install chromium
 
-      # THE FIXTURE IS A SITE, and it is served whole.
-      #
-      # `tests/fixtures/realworld` used to be one page, and a third of the criteria this
-      # workflow adjudicates cannot be posed on one page: RGAA 12.1 asks whether an « ensemble
-      # de pages » has two navigation systems, 12.5 whether the search engine is reachable
-      # identically ACROSS pages, 12.2 and 12.4 whether the navigation sits in the same place on
-      # each. Handed a single document, the adjudicator ruled NC on an absence it could not
-      # anchor, and the gate refused it — correctly, and at the price of a paid pass.
-      #
-      # `/` is the entry now, and it resolves to `index.html`, so python never renders its
-      # directory listing — which is what used to link `LoginForm.tsx` and make Chromium start
-      # a download instead of a navigation. No page links to that file either, for the same
-      # reason: it is audited as SOURCE, never crawled.
-      - name: Serve the fixture site
-        if: inputs.max-items == ''
+      - name: Serve the nine-page fixture
         run: |
           nohup python3 -m http.server 8932 --directory tests/fixtures/realworld > /tmp/fixture.log 2>&1 &
           deadline=$(( SECONDS + 30 ))
           until curl -sSf -o /dev/null http://127.0.0.1:8932/; do
-            if [ $SECONDS -ge $deadline ]; then echo "::error::the fixture server never came up"; exit 1; fi
+            if [ $SECONDS -ge $deadline ]; then
+              echo "::error::the fixture server never came up"
+              cat /tmp/fixture.log
+              exit 1
+            fi
             sleep 1
           done
 
-      - name: Refuse early if the credential this mode needs is missing
-        env:
-          MODE: ${{ inputs.mode }}
+      - name: Require the Claude subscription credential
         run: |
-          # Split by mode, because the two tiers do not accept the same credential and a
-          # blanket "ANTHROPIC_API_KEY or bust" locks an OAuth-only repository out of the very
-          # path it came here to test.
-          if [ "$MODE" != 'agent' ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-            echo "::error::mode=$MODE exercises the API tier, which accepts nothing but ANTHROPIC_API_KEY — set that secret, or dispatch with mode=agent"
-            exit 1
-          fi
-          if [ "$MODE" != 'api' ] && [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
-            echo "::error::mode=$MODE exercises the agent tier; set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN (\`claude setup-token\`)"
+          if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is required for the keyed Haiku run"
             exit 1
           fi
 
-      # The baseline: what the deterministic engine alone leaves undecided. Every number below
-      # is read against this one — and it is valid for BOTH modes, because each `uses: ./`
-      # below re-audits the fixture from scratch (`Audit the code` carries no `if:` and writes
-      # audits/audit-latest.json with --out audits), so each mode starts from this same grid.
-      - name: Measure the unruled criteria BEFORE adjudication
-        id: before
-        if: inputs.max-items == ''
-        run: |
-          # THE BASELINE HAS TO INCLUDE THE SCAN, or the delta below credits the model with
-          # work a browser did. Each `uses: ./` step re-audits AND re-scans from scratch, so
-          # the number a tier starts from is the post-render one — measured on this fixture:
-          # 80 criteria to adjudicate from source alone, 41 once a page is scanned, 38 once the
-          # keyboard-trap probe closes 12.9. Reading the agent tier against 80 would report 42
-          # criteria it never touched.
-          #
-          # `scan --merge` audits and folds its own snapshots, so one pass is the exact grid the
-          # composite hands to the adjudicator. Repeating it wastes a full crawl and contaminates
-          # ledger fingerprints with duplicated acquisition history.
-          # `--standard` on the audit and the scan too: the standard re-keys the DOCUMENT, and
-          # a baseline measured on a core-keyed one is not the artefact either tier is handed.
-          node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard '${{ inputs.standard }}' --out audits --json > /dev/null
-          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 0 --runtime local --cwd "$PWD" \
-            --standard '${{ inputs.standard }}' --merge audits/audit-latest.json --out audits
-          node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
-            --standard '${{ inputs.standard }}' --out /tmp/before --json > /tmp/before.json
-          n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/before.json","utf8")).count')
-          echo "manual=$n" >> "$GITHUB_OUTPUT"
-          echo "unruled before (source + rendered page): $n"
-
-      - name: Adjudicate with the API
-        if: inputs.mode == 'api' || inputs.mode == 'both'
+      # The Action owns the complete acquisition and first judgment phase: one source audit,
+      # one crawl with no page cap, then batched Haiku adjudication. FRESH_LEDGER does not exist
+      # before this step, so no committed verdict can make the paid path a no-op; accepted
+      # verdicts are nevertheless checkpointed there and survive in the final artifact.
+      - name: Audit, crawl and adjudicate once
         uses: ./
         with:
           paths: tests/fixtures/realworld
-          standard: ${{ inputs.standard }}
+          standard: rgaa
+          lang: fr
           since: ""
           fail-on: ""
           sarif: "false"
+          annotations: "false"
           comment: "false"
-          adjudicate: api
-          # RECORD WHAT THIS RUN PAID FOR. Without it the verdicts are computed, folded into an
-          # audit that dies with the job, and bought again on the next dispatch — which is the
-          # exact cost `.ultra11y/verdicts/<standard>.json` exists to stop. The action copies
-          # the ledger beside the report, so it travels in the artifact ready to be committed,
-          # and `ledger-gate` in ci.yml then replays it on every push for free.
-          ledger: "true"
-          adjudicate-model: ${{ inputs.model }}
-          adjudicate-max: ${{ inputs.max-items }}
-          adjudicate-max-turns: ${{ inputs.max-turns }}
-          adjudicate-passes: ${{ inputs.passes }}
-          artifact-name: adjudication-api
-          # RENDER BEFORE ADJUDICATING. The composite runs `Scan the pages` before the
-          # adjudication tier on purpose, so by the time a model is asked anything, computed
-          # contrast, 320px reflow, 200% zoom, text spacing and the tab ring are already
-          # measured — and the criteria that need them never reach the worklist. `local`, never
-          # `auto`: Docker cannot reach the host's loopback, and an `auto` that degrades there
-          # fails with an obscure ERR_CONNECTION_REFUSED instead of an explicit missing-tier
-          # error.
-          #
-          # `crawl`, not `urls`: the site-level criteria are decided across pages, so a scan
-          # that renders one of them leaves the other four unmeasured and the grid says so.
-          crawl: ${{ inputs.max-items == '' && 'http://127.0.0.1:8932/' || '' }}
-          crawl-max: "0"
-          runtime: local
-
-      # Measured HERE, not at the end. The agent step below is a fresh `uses: ./` whose own
-      # audit step rewrites audits/audit-latest.json from scratch, discarding these verdicts —
-      # so a single reading taken after both steps reports the agent pass twice and labels the
-      # result `both`. Two tiers, two measurements.
-      - name: What the API tier decided
-        id: after_api
-        if: inputs.mode == 'api' || inputs.mode == 'both'
-        run: |
-          node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
-            --standard '${{ inputs.standard }}' --out /tmp/after-api --json > /tmp/after-api.json
-          n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/after-api.json","utf8")).count')
-          echo "manual=$n" >> "$GITHUB_OUTPUT"
-          echo "unruled after api: $n"
-
-      - name: Adjudicate with an agent
-        if: inputs.mode == 'agent' || inputs.mode == 'both'
-        uses: ./
-        with:
-          paths: tests/fixtures/realworld
-          standard: ${{ inputs.standard }}
-          since: ""
-          fail-on: ""
-          sarif: "false"
-          comment: "false"
+          report: "false"
+          html: "false"
+          evidence: "false"
+          pages-report: "false"
           adjudicate: agent
-          adjudicate-runner: ${{ inputs.runner }}
-          adjudicate-grain: ${{ inputs.grain }}
-          # Same as the API step above: the ledger is the deliverable of a paid run — and the
-          # thing to switch OFF when the point of the run is to watch the model work.
-          ledger: ${{ inputs.ledger }}
-          adjudicate-model: ${{ inputs.model }}
-          adjudicate-max: ${{ inputs.max-items }}
-          adjudicate-max-turns: ${{ inputs.max-turns }}
-          adjudicate-passes: ${{ inputs.passes }}
-          artifact-name: adjudication-agent
-          # Same rendered pages as the API tier above, so the two modes are compared over the
-          # same evidence.
-          crawl: ${{ inputs.max-items == '' && 'http://127.0.0.1:8932/' || '' }}
+          adjudicate-runner: cli
+          adjudicate-grain: worklist
+          adjudicate-model: haiku
+          adjudicate-effort: low
+          adjudicate-budget-usd: "5"
+          adjudicate-passes: "2"
+          ledger: audits/fresh-rgaa-ledger.json
+          crawl: http://127.0.0.1:8932/
           crawl-max: "0"
           runtime: local
-          # THE GATE THIS WHOLE WORKFLOW EXISTS FOR. Without it the job reports success on a
-          # grid nobody filled — which is precisely what happened on run 32385981037: green,
-          # with seven criteria « à évaluer » and a warning nobody was watching. It goes on the
-          # AGENT step alone; the `api` step above is the comparison tier and gating it would
-          # stop the run before the tier under test had even started.
-          require-decided: ${{ inputs.require-decided }}
-          undecidable-file: ${{ inputs.undecidable-file }}
+          require-rendered: "true"
+          # Completeness is gated after the second reading, against the document it mutates.
+          require-decided: "false"
 
-      # `always()`, and that is now load-bearing rather than tidy: `require-decided` on the step
-      # above turns an incomplete grid into a FAILED step, and without this the run would go red
-      # while saying nothing at all about which criteria are open — the one fact anybody reading
-      # a red adjudication needs. The condition it used to carry is folded in.
-      - name: What the agent tier decided
-        id: after_agent
-        if: always() && (inputs.mode == 'agent' || inputs.mode == 'both')
-        run: |
-          if [ ! -f audits/audit-latest.json ]; then
-            echo "::warning::no audit was produced — the agent tier died before writing one"
-            exit 0
-          fi
-          node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
-            --standard '${{ inputs.standard }}' --out /tmp/after-agent --json > /tmp/after-agent.json
-          n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/after-agent.json","utf8")).count')
-          ids=$(node -p 'const j=JSON.parse(require("fs").readFileSync("/tmp/after-agent.json","utf8"));(j.items||[]).map(x=>x.criteriaId).join(", ")')
-          echo "manual=$n" >> "$GITHUB_OUTPUT"
-          echo "ids=$ids" >> "$GITHUB_OUTPUT"
-          echo "unruled after agent: $n${ids:+ — $ids}"
-
-      # ---- THE SECOND READING ------------------------------------------------------------
-      #
-      # No pipeline ran this, and with a cheap adjudicator it is not optional. Measured on a
-      # full RGAA pass with Haiku: 74 non-conformities where a stronger model, through the same
-      # gate, found 57 — and 19 of them on criteria the committed ledger had CLEARED. The gate
-      # cannot catch that: `normativeRefResolves` proves the cited test belongs to the
-      # adjudicated criterion, never that the reading was right. An over-accusing adjudicator
-      # passes it cleanly.
-      #
-      # `--prune` is what makes this a pipeline step rather than a tripwire. Without it the job
-      # can only go red, every run, and a job that can only go red is a job somebody switches
-      # off. With it, a refuted non-conformity is deleted, a refuted conformity sends its
-      # criterion back to « à évaluer », and the step fails only on a claim nobody TRIED —
-      # unadjudicated, missing or invalid.
-      - name: Put the claims on trial
-        if: always() && inputs.mode != 'api' && inputs.refute
+      - name: Put every model claim on trial
         env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ULTRA11Y_CLAUDE_BIN: ${{ runner.temp }}/a11y-adjudicator/node_modules/.bin/claude
         run: |
           set -euo pipefail
-          if [ ! -f audits/audit-latest.json ]; then
-            echo "::warning::no audit to put on trial — the adjudication tier died before writing one"
-            exit 0
-          fi
-          # The report is what `verify --report` parses the non-conformities out of; the audit
-          # is where the claimed CONFORMITIES now live, so no ledger is needed for either half.
-          # `report` prints the file it just wrote. Use that public result rather than choosing
-          # the first Markdown file in a directory that also contains VERIFY.md and the RGAA
-          # automation appendix — lexical order is not a report-path contract.
           REPORT=$(node scripts/ultra11y.mjs report --in audits/audit-latest.json \
-            --standard '${{ inputs.standard }}' --out audits)
-          if [ ! -f "$REPORT" ]; then
-            echo "::error::report returned a path that does not exist: $REPORT"
-            exit 1
-          fi
+            --standard "$STANDARD" --lang "$LANG_OPT" --out audits)
+          test -f "$REPORT"
+
           node scripts/ultra11y.mjs verify --report "$REPORT" \
             --in audits/audit-latest.json --conformities audits/audit-latest.json \
-            --standard '${{ inputs.standard }}' --out audits --max-verify 0
-          # `judge` writes each finished verdict before reporting a partial-run failure. A
-          # provider 429 in run 32861687494 left 33/105 valid trials on disk, but `set -e`
-          # skipped `verify --apply` and the so-called post-refutation audit was still the
-          # pre-refutation one. Keep the trial red, but apply every grounded answer it did
-          # manage to return before exposing the mutated audit to the final gate.
+            --standard "$STANDARD" --lang "$LANG_OPT" --out audits --max-verify 0
+
           judge_status=0
           node scripts/ultra11y.mjs judge --refute audits/VERIFY.todo.json \
-            --standard '${{ inputs.standard }}' --runner cli \
-            --grain batch --model '${{ inputs.model }}' --concurrency 4 || judge_status=$?
+            --standard "$STANDARD" --lang "$LANG_OPT" --runner cli --grain batch \
+            --model "$MODEL" --effort "$EFFORT" --concurrency 4 --max-budget-usd 6 \
+            || judge_status=$?
 
           apply_status=0
-          ledger_args=()
-          if [ '${{ inputs.ledger }}' = 'true' ]; then
-            ledger_args=(--ledger ".ultra11y/verdicts/${{ inputs.standard }}.json")
-          fi
           node scripts/ultra11y.mjs verify --apply audits/VERIFY.todo.json --report "$REPORT" \
-            --in audits/audit-latest.json --standard '${{ inputs.standard }}' --out audits --prune "${ledger_args[@]}" \
-            || apply_status=$?
+            --in audits/audit-latest.json --standard "$STANDARD" --lang "$LANG_OPT" \
+            --out audits --prune --ledger "$FRESH_LEDGER" || apply_status=$?
 
           if [ "$judge_status" -ne 0 ]; then
-            echo "::error::the refuter stopped early (exit $judge_status); its completed verdicts were still applied"
+            echo "::error::the refuter stopped early (exit $judge_status); completed verdicts were applied"
+            exit "$judge_status"
           fi
           if [ "$apply_status" -ne 0 ]; then
-            echo "::error::the trial could not apply every completed answer (exit $apply_status); the final residue below is still measured"
+            echo "::error::the refutation fold failed (exit $apply_status)"
+            exit "$apply_status"
           fi
-          # A refuted conformity correctly returns to « to assess ». That is an audit result,
-          # not an infrastructure failure. The optional post-trial completeness gate below is
-          # the one place that may turn such a residue red when the dispatch explicitly asks.
-          # Operational failures are different: preserve and apply their partial output, then
-          # keep the job red so a provider or fold failure cannot masquerade as a valid trial.
-          if [ "$judge_status" -ne 0 ]; then exit "$judge_status"; fi
-          if [ "$apply_status" -ne 0 ]; then exit "$apply_status"; fi
 
-      # `verify --apply --prune` MUTATES the audit. In run 32854529215 it reopened eighteen
-      # conformities, but the workflow kept displaying and gating the three-item count measured
-      # before the trial. The job was red by accident (the earlier gate had already failed),
-      # while its summary and artifact both described a grid that no longer existed. Measure
-      # the mutated document, then hold THAT document to the same completeness bar.
-      - name: Measure and gate AFTER refutation
-        id: after_refute
-        if: always() && inputs.mode != 'api' && inputs.refute
-        env:
-          REQUIRE_DECIDED: ${{ inputs.require-decided }}
-          UNDECIDABLE_FILE: ${{ inputs.undecidable-file }}
+      - name: Gate all 106 criteria on all nine pages
         run: |
           set -euo pipefail
-          if [ ! -f audits/audit-latest.json ]; then
-            echo "::warning::no post-refutation audit exists to measure"
-            exit 0
-          fi
+          node scripts/ultra11y.mjs check --in audits/audit-latest.json \
+            --standard "$STANDARD" --lang "$LANG_OPT" --require-decided=pages \
+            --allow-undecided "$UNDECIDABLE_FILE"
+          node scripts/ultra11y.mjs check --in audits/audit-latest.json \
+            --standard "$STANDARD" --lang "$LANG_OPT" --require-rendered
 
-          node scripts/ultra11y.mjs verify --manual --in audits/audit-latest.json \
-            --standard '${{ inputs.standard }}' --out /tmp/after-refute --json > /tmp/after-refute.json
-          n=$(node -p 'JSON.parse(require("fs").readFileSync("/tmp/after-refute.json","utf8")).count')
-          ids=$(node -p 'const j=JSON.parse(require("fs").readFileSync("/tmp/after-refute.json","utf8"));(j.items||[]).map(x=>x.criteriaId).join(", ")')
-          echo "manual=$n" >> "$GITHUB_OUTPUT"
-          echo "ids=$ids" >> "$GITHUB_OUTPUT"
-          echo "unruled after refutation: $n${ids:+ — $ids}"
+          node scripts/ultra11y.mjs pages --in audits/audit-latest.json \
+            --standard "$STANDARD" --lang "$LANG_OPT" --json --out audits > /dev/null
+          node - <<'NODE'
+          const grid = require(`${process.cwd()}/audits/pages.json`);
+          if (grid.pages.length !== 9) {
+            throw new Error(`expected all 9 fixture pages, got ${grid.pages.length}`);
+          }
+          for (const page of grid.pages) {
+            if (page.criteria.length !== 106) {
+              throw new Error(`${page.id}: expected 106 criteria, got ${page.criteria.length}`);
+            }
+          }
+          console.log(`verified ${grid.pages.length} pages × 106 RGAA criteria`);
+          NODE
 
-          if [ "$REQUIRE_DECIDED" != "false" ]; then
-            args=(check --in audits/audit-latest.json --standard '${{ inputs.standard }}' "--require-decided=$REQUIRE_DECIDED")
-            if [ -n "$UNDECIDABLE_FILE" ]; then args+=(--allow-undecided "$UNDECIDABLE_FILE"); fi
-            node scripts/ultra11y.mjs "${args[@]}"
-          fi
-
-      # The first Markdown report was the INPUT to the trial. `verify --apply --prune` then
-      # mutates audit-latest.json, so that report is deliberately stale. Re-render from the
-      # final audit even when the trial or completeness gate went red: the diagnostic artifact
-      # must describe the JSON beside it, including every reopened criterion.
-      - name: Regenerate the report AFTER refutation
-        id: report_after_refute
-        if: always() && inputs.mode != 'api' && inputs.refute
+      - name: Render the final report
         run: |
           set -euo pipefail
-          if [ ! -f audits/audit-latest.json ]; then
-            echo "::warning::no post-refutation audit exists to report"
-            exit 0
-          fi
           REPORT=$(node scripts/ultra11y.mjs report --in audits/audit-latest.json \
-            --standard '${{ inputs.standard }}' --out audits)
-          if [ ! -f "$REPORT" ]; then
-            echo "::error::report returned a path that does not exist: $REPORT"
-            exit 1
-          fi
-          node scripts/ultra11y.mjs check --report "$REPORT" \
-            --standard '${{ inputs.standard }}'
-          echo "path=$REPORT" >> "$GITHUB_OUTPUT"
+            --standard "$STANDARD" --lang "$LANG_OPT" --out audits)
+          test -f "$REPORT"
+          node scripts/ultra11y.mjs check --report "$REPORT" --standard "$STANDARD"
 
-      # The composite action uploaded its artifact BEFORE the outer trial. Keep that useful
-      # input, and also persist the document the final gate actually read so a red run can be
-      # audited without reconstructing state from log lines.
-      - name: Upload the post-refutation audit
-        if: always() && inputs.mode != 'api' && inputs.refute
+      - name: Upload the final adjudication
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: adjudication-agent-post-refutation
+          name: adjudication-rgaa-haiku
           if-no-files-found: warn
           retention-days: 14
           path: |
-            audits/audit-latest.json
-            audits/*.md
-            audits/VERIFY*.json
-            audits/ADJUDICATE*.json
-
-      # The metric. A tier that ruled on nothing is a tier that cost money to change nothing,
-      # and it should be visible as such rather than buried in a green check. `always()` so a
-      # tier that died still leaves its baseline on the summary.
-      - name: Report what each tier actually decided
-        if: always()
-        env:
-          BEFORE: ${{ steps.before.outputs.manual }}
-          AFTER_API: ${{ steps.after_api.outputs.manual }}
-          AFTER_AGENT: ${{ steps.after_agent.outputs.manual }}
-          AGENT_IDS: ${{ steps.after_agent.outputs.ids }}
-          AFTER_REFUTE: ${{ steps.after_refute.outputs.manual }}
-          REFUTE_IDS: ${{ steps.after_refute.outputs.ids }}
-        run: |
-          {
-            echo "### Adjudication (${{ inputs.mode }}, ${{ inputs.standard }})"
-            echo ""
-            echo "| tier | criteria left to assess |"
-            echo "| --- | ---: |"
-            echo "| before (engine alone) | ${BEFORE:-—} |"
-            if [ -n "${AFTER_API:-}" ]; then echo "| after \`api\` | $AFTER_API |"; fi
-            if [ -n "${AFTER_AGENT:-}" ]; then echo "| after \`agent\` | $AFTER_AGENT |"; fi
-            if [ -n "${AFTER_REFUTE:-}" ]; then echo "| after refutation | $AFTER_REFUTE |"; fi
-            if [ -n "${AGENT_IDS:-}" ]; then
-              echo ""
-              echo "Still « à évaluer » after the agent tier: ${AGENT_IDS}."
-            fi
-            if [ -n "${REFUTE_IDS:-}" ]; then
-              echo ""
-              echo "Still « à évaluer » after refutation: ${REFUTE_IDS}."
-              echo "These are the final open claims: the post-trial completeness gate reads this"
-              echo "list, not the pre-trial count. Read the refusal/refutation above before"
-              echo "changing the harvester, the brief, or the model."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          FINAL_AGENT=${AFTER_REFUTE:-${AFTER_AGENT:-}}
-          for pair in "api:${AFTER_API:-}" "agent:${FINAL_AGENT:-}"; do
-            tier=${pair%%:*}
-            after=${pair#*:}
-            if [ -z "$after" ]; then continue; fi
-            if [ -n "${BEFORE:-}" ] && [ "$after" -ge "$BEFORE" ]; then
-              echo "::warning::the $tier adjudication decided nothing — ${BEFORE:-?} criteria before, $after after"
-            fi
-          done
+            audits/
+            .ultra11y/pages/
