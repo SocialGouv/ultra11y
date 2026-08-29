@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.40.0](https://github.com/maxgfr/ultra11y/compare/v5.39.2...v5.40.0) (2026-08-29)
+
+
+### Features
+
+* **skill:** split detailed Claude reports from compact CI ([533f3cb](https://github.com/maxgfr/ultra11y/commit/533f3cb850271f6cd89f07e54339eea5f1b30896))
+
 ## [5.39.2](https://github.com/maxgfr/ultra11y/compare/v5.39.1...v5.39.2) (2026-08-29)
 
 
