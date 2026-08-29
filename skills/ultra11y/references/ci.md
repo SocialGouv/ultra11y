@@ -510,10 +510,11 @@ Five surfaces come out of it:
   folded block per page naming every conforming, non-conforming and not-yet-verifiable criterion.
   A manual criterion is labelled “impossible to verify” only when `undecidable-file` declares it
   by id with a reason; an unfinished adjudication remains “to verify”. `pages-report: compact`
-  emits only this file plus `pages.json`, so an exhaustive keyed run pays for no second render,
-  screenshots, evidence crops or remediation report. During an active adjudication refresh, a
-  fresh verdict supersedes a now-stale allowance without failing the paid run; deterministic
-  replay remains strict and asks the repository to remove stale entries.
+  packages only this file, `pages.json`, `audit-latest.json` and the portable verdict ledger;
+  adjudication worklists, screenshots, evidence crops and remediation reports stay out of the
+  download. An exhaustive keyed run therefore pays for no second render. During an active
+  adjudication refresh, a fresh verdict supersedes a now-stale allowance without failing the
+  paid run; deterministic replay remains strict and asks the repository to remove stale entries.
 - **The per-page dossiers**, in the uploaded artifact (`pages-report: 'true'`, the default):
   `audits/pages/index.md` plus one sheet per page — its screenshot, every criterion of the
   standard with its status on that page, and each non-conformity as the ordinary auditor block.

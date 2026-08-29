@@ -1,7 +1,7 @@
 // The shipped composite action. It is consumed as `maxgfr/ultra11y@vN`, so a mistake here
 // breaks every user's CI and cannot be caught by a unit test of src/ — gate its structure.
 import { describe, it, expect } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -185,6 +185,34 @@ describe("it covers both halves of the ask: the code and the pages", () => {
     const step = ACTION.runs.steps.find((s) => s.name === "Per-page report");
     expect(step?.run).toContain("PAGES_REPORT_MODE");
     expect(step?.run).toMatch(/if \[ "\$PAGES_REPORT_MODE" = 'true' \]; then/);
+  });
+
+  it("packages only the compact result, source audit and ledger", () => {
+    const prepare = ACTION.runs.steps.find((s) => s.name === "Prepare report artifact");
+    const upload = ACTION.runs.steps.find((s) => s.name === "Upload the report");
+    expect(prepare?.run).toContain("audit-latest.json pages.json pages-status.md");
+    expect(prepare?.run).toContain('"verdicts-${STANDARD}.json"');
+    expect(prepare?.run).not.toContain("ADJUDICATE");
+    expect(upload?.with?.path).toContain("steps.artifact-files.outputs.path");
+
+    const dir = mkdtempSync(join(tmpdir(), "u11y-compact-artifact-"));
+    const runnerTemp = join(dir, "runner-temp");
+    const output = join(dir, "output");
+    mkdirSync(join(dir, "audits"));
+    mkdirSync(runnerTemp);
+    for (const file of ["audit-latest.json", "pages.json", "pages-status.md", "verdicts-rgaa.json", "ADJUDICATE.md"]) {
+      writeFileSync(join(dir, "audits", file), file);
+    }
+    const result = spawnSync("bash", ["-euo", "pipefail", "-c", prepare?.run ?? ""], {
+      cwd: dir,
+      env: { ...process.env, PAGES_REPORT_MODE: "compact", STANDARD: "rgaa", RUNNER_TEMP: runnerTemp, GITHUB_OUTPUT: output },
+      encoding: "utf8",
+    });
+    expect(result.status, result.stderr).toBe(0);
+    const artifactPath = readFileSync(output, "utf8")
+      .trim()
+      .replace(/^path=/, "");
+    expect(readdirSync(artifactPath).sort()).toEqual(["audit-latest.json", "pages-status.md", "pages.json", "verdicts-rgaa.json"]);
   });
 
   it("renders all four honest status buckets from the real compact-summary program", () => {

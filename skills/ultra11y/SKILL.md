@@ -252,7 +252,8 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 - **"Audit these URLs page by page, in CI"** → the shipped Action takes `urls`, `sitemap`,
   `crawl` or `sample`, snapshots every page it visits and writes every criterion's status under
   every page both in the job summary and in `audits/pages-status.md`. Use
-  `pages-report: compact` for that status-only artifact (no remediation report, HTML or crops),
+  `pages-report: compact` for that status-only package: the Markdown, page JSON, source audit
+  and verdict ledger only (no adjudication worklists, remediation report, HTML or crops),
   or keep the default `true` for the detailed page dossiers too. Request a `pages`/`full` PR
   comment when the same grid is wanted on the pull request; read
   **`references/ci.md`**.

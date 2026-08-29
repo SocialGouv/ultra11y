@@ -1900,13 +1900,35 @@ runs:
           echo "ultra11y: the verdict ledger travels in the artifact as verdicts-${STANDARD}.json."
         fi
 
+    # `audits/` also contains the adjudication worklists. They are useful while the model is
+    # running, but they are neither results nor a remediation report. Compact mode packages
+    # only the two page surfaces, the source audit and the portable verdict ledger so the
+    # download stays as small and readable as the job summary.
+    - name: Prepare report artifact
+      id: artifact-files
+      if: inputs.report == 'true' || inputs.html == 'true' || inputs.pages-report != 'false'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        PAGES_REPORT_MODE: ${{ inputs.pages-report }}
+        STANDARD: ${{ inputs.standard }}
+      run: |
+        artifact_path="$PWD/audits"
+        if [ "$PAGES_REPORT_MODE" = 'compact' ]; then
+          artifact_path=$(mktemp -d "$RUNNER_TEMP/ultra11y-compact.XXXXXX")
+          for file in audit-latest.json pages.json pages-status.md "verdicts-${STANDARD}.json"; do
+            if [ -f "audits/$file" ]; then cp "audits/$file" "$artifact_path/$file"; fi
+          done
+        fi
+        echo "path=$artifact_path/" >> "$GITHUB_OUTPUT"
+
     - name: Upload the report
       id: upload
       if: inputs.report == 'true' || inputs.html == 'true' || inputs.pages-report != 'false'
       uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard) }}
-        path: ${{ inputs.working-directory }}/audits/
+        path: ${{ steps.artifact-files.outputs.path }}
         if-no-files-found: warn
         retention-days: ${{ inputs.artifact-retention-days }}
 
