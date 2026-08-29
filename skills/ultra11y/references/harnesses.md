@@ -25,6 +25,11 @@ Two things are worth knowing before the table:
 The plugin carries both skills *and* the hook. `hooks/hooks.json` → `hooks/pre-tool-use.mjs`
 → `ultra11y hook --claude-code`. The engine resolves from `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`.
 
+For a requested full audit, Claude Code follows `references/claude-code-report.md`: it acts as
+the auditor directly, then publishes the evidenced Markdown, HTML and per-page dossiers. The
+headless `judge --runner claude` transport is for CI or another unattended caller; nesting it
+inside the active Claude Code session wastes context and gives the report a weaker reader.
+
 The review arrives as `permissionDecision: "deny"` on the pending command, with the findings
 in `additionalContext`.
 

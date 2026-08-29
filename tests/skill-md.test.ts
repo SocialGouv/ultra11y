@@ -188,7 +188,7 @@ describe("skill docs stay in sync with the CLI", () => {
 });
 
 describe("SKILL.md routes to the references (progressive disclosure)", () => {
-  it("ships exactly the thirty-nine reference docs", () => {
+  it("ships exactly the forty reference docs", () => {
     expect(refFiles.sort()).toEqual([
       "act.md",
       "adjudication.md",
@@ -196,6 +196,7 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "authoring.md",
       "automation.md",
       "ci.md",
+      "claude-code-report.md",
       "correction.md",
       "criteria.md",
       "cross-file.md",
@@ -235,6 +236,21 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
   it("mentions every reference file that exists", () => {
     for (const f of refFiles) {
       expect(body, `SKILL.md never routes to references/${f}`).toContain(`references/${f}`);
+    }
+  });
+
+  it("routes Claude Code to a detailed evidenced report and CI to the compact exhaustive surface", () => {
+    const claude = refBodies["claude-code-report.md"] ?? "";
+    const ci = refBodies["ci.md"] ?? "";
+    expect(body).toContain("references/claude-code-report.md");
+    expect(claude).toContain("report --in audits/audit-latest.json");
+    expect(claude).toContain("--html --evidence");
+    expect(claude).toContain("--format report --split page");
+    expect(claude).toContain("verify --report");
+    expect(claude).toContain("--require-decided=pages");
+    expect(claude).not.toMatch(/ultra11y\.mjs judge[^\n]*--runner claude/);
+    for (const setting of ["report: 'false'", "html: 'false'", "evidence: 'false'", "pages-report: compact", "require-decided: pages"]) {
+      expect(ci).toContain(setting);
     }
   });
 });

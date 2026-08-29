@@ -38,6 +38,30 @@ Page by page, with a real browser, in the same step:
       comment-kind: pages           # the page-by-page grid, under its own sticky marker
 ```
 
+For an exhaustive certification run whose output must stay small, use the compact profile:
+
+```yaml
+  - uses: maxgfr/ultra11y@v5
+    with:
+      standard: rgaa
+      crawl: http://localhost:3000
+      crawl-max: '0'
+      ledger: 'true'
+      require-rendered: 'true'
+      require-decided: pages
+      undecidable-file: .ultra11y/undecidable-rgaa.json
+      report: 'false'
+      html: 'false'
+      evidence: 'false'
+      pages-report: compact
+```
+
+This still gates every criterion on every captured page. Its visible summary lists the complete
+page-by-page grid, while its artifact contains only `pages-status.md`, `pages.json`,
+`audit-latest.json` and the portable verdict ledger. Use the detailed Claude Code route when a
+human-readable conformance dossier is the deliverable; CI's job here is exhaustive evidence,
+fast feedback and a clean handoff.
+
 A page sweep is usually a **second job** — it needs a built app, a database, a browser — and
 it can comment alongside the code gate above without either overwriting the other, because
 each kind has its own marker. Give the two jobs distinct `artifact-name`s too: artifact names

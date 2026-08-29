@@ -119,6 +119,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | Running the tool | |
 |---|---|
 | `references/runbook.md` | **The reliable run**: the one recipe, the transport to use and why, and what a pass costs. Read this before paying for an adjudication |
+| `references/claude-code-report.md` | Claude Code's detailed publication route: rendered scope, direct adjudication, adversarial verification, Markdown + HTML + per-page evidence |
 | `references/audit.md` | The audit loop end to end, and the normative page sample |
 | `references/judgment.md` | The adjudication + refutation worklists, verdict vocabulary, fail-closed fold |
 | `references/verify.md` | The `check`/`verify` gates |
@@ -144,6 +145,11 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 
 ## Choose by situation
 
+- **"Produce a detailed audit/report in Claude Code"** → use the active Claude session as the
+  auditor, close the rendered and judgment criteria, challenge its claims, then publish the
+  dated Markdown report, printable HTML and evidenced per-page dossiers. Read
+  **`references/claude-code-report.md`**. This is the interactive publication profile; finish
+  with its full deliverable set. The compact summary is the CI branch below.
 - **"Audit / compliance report"** → `node scripts/ultra11y.mjs audit … --json`, then
   `report` (synthesis table + one **auditor conformance block** per NC criterion — same
   block `prd` and `tickets` use), then `check`; read **`references/audit.md`**.

@@ -523,6 +523,13 @@ node scripts/ultra11y.mjs check  --report audits/wcag-YYYY-MM-DD.md # integrity 
 
 ### A report someone will actually open
 
+There are two deliberate publication profiles. In an interactive Claude Code audit, the skill
+produces the detailed deliverable: adjudicated Markdown, a printable single-file HTML report,
+per-page HTML/Markdown dossiers, screenshots and annotated evidence. In GitHub Actions,
+`pages-report: compact` with `report`, `html` and `evidence` disabled still gates every criterion
+on every page but uploads only the status Markdown, page JSON, source audit and verdict ledger.
+The CI profile is a gate and handoff; it is not a second remediation report.
+
 `--html` turns the audit into a page: `audits/index.html` as the entry point, plus — from
 `report` — a detachable single file that prints to PDF. Self-contained — no script, no
 external asset, nothing pointing outside the directory — and it passes this engine's own
