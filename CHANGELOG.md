@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.39.0](https://github.com/maxgfr/ultra11y/compare/v5.38.5...v5.39.0) (2026-08-29)
+
+
+### Features
+
+* **action:** publish compact per-page status results ([3d118f4](https://github.com/maxgfr/ultra11y/commit/3d118f49565314d97ae2a3e80cb16d9c31706198))
+
 ## [5.38.5](https://github.com/maxgfr/ultra11y/compare/v5.38.4...v5.38.5) (2026-08-28)
 
 
