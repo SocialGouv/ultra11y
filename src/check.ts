@@ -509,7 +509,7 @@ export function checkDecided(
   audit: AuditResult,
   standard: StandardId = CORE,
   lang: Lang = "en",
-  opts: { allow?: UndecidedFile; pages?: boolean } = {},
+  opts: { allow?: UndecidedFile; pages?: boolean; allowStale?: boolean } = {},
 ): DecidedResult {
   const fr = lang === "fr";
   const rows = isCore(standard)
@@ -563,6 +563,11 @@ export function checkDecided(
   const openAnywhere = new Set([...open, ...perPage.flatMap((p) => p.undecided)]);
   for (const id of declared.keys()) {
     if (!openAnywhere.has(id)) {
+      // A paid refresh is allowed to improve on yesterday's explicit residual: the new verdict
+      // wins and the obsolete declaration is ignored for this run. The default stays strict so
+      // a deterministic gate still forces the repository to clean exceptions that outlived
+      // their subject. The GitHub Action enables this only while an adjudicator is active.
+      if (opts.allowStale) continue;
       issues.push(
         fr
           ? `Critère ${id} déclaré indécidable, mais il porte désormais un verdict — retirez-le de la liste.`

@@ -80,7 +80,7 @@ inputs:
     required: false
     default: 'true'
   pages-report:
-    description: 'Also write the per-page report (one sheet per page, with its screenshot) into the uploaded artifact.'
+    description: 'Publish the complete criterion list page by page in the job summary and artifact. `true` also writes the detailed page dossiers (findings, screenshots/evidence when enabled); `compact` writes only `pages-status.md` + `pages.json`, with no remediation/fix report; `false` disables the page surface.'
     required: false
     default: 'true'
   start:
@@ -258,8 +258,11 @@ outputs:
     description: 'Path of the machine-readable per-page grid (`{ pages: [{ id, name, url, basis, criteria: [{ id, status, decidedBy }], conformancePct, decided, total }], unattributed }`), when `pages-report` is enabled and a page was in scope. Empty otherwise.'
     value: ${{ steps.pages.outputs.json-path }}
   pages-report-path:
-    description: 'Path of the per-page dossier directory (`index.md` plus one sheet per page, and their HTML mirrors when `html` is on). Empty when no page was in scope.'
+    description: 'Path of the per-page deliverable: the dossier directory in `true` mode, or the compact `pages-status.md` in `compact` mode. Empty when no page was in scope.'
     value: ${{ steps.pages.outputs.report-path }}
+  pages-summary-path:
+    description: 'Path of the compact human-readable page-by-page status list (`pages-status.md`). It contains every criterion on every page and is also appended to the GitHub job summary.'
+    value: ${{ steps.pages.outputs.summary-path }}
   pages-count:
     description: 'Number of pages in scope. `0` means nothing was scanned or snapshotted — which is a different statement from a clean sweep, and the two must not be read alike.'
     value: ${{ steps.pages.outputs.count }}
@@ -294,6 +297,7 @@ runs:
         ADJUDICATE_GRAIN: ${{ inputs.adjudicate-grain }}
         REQUIRE_RENDERED: ${{ inputs.require-rendered }}
         COMMENT_KIND: ${{ inputs.comment-kind }}
+        PAGES_REPORT: ${{ inputs.pages-report }}
       run: |
         echo "path=$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" >> "$GITHUB_OUTPUT"
         node "$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" --version
@@ -368,6 +372,13 @@ runs:
           digest|pages|full|'') ;;
           *)
             echo "::error::ultra11y: comment-kind='${COMMENT_KIND}' is not a kind — expected 'digest', 'pages' or 'full'."
+            exit 1
+            ;;
+        esac
+        case "${PAGES_REPORT:-}" in
+          true|false|compact|'') ;;
+          *)
+            echo "::error::ultra11y: pages-report='${PAGES_REPORT}' is not a mode — expected 'true', 'compact' or 'false'."
             exit 1
             ;;
         esac
@@ -1577,6 +1588,10 @@ runs:
         if [ "$SCOPE" = 'pages' ]; then decided='--require-decided=pages'; else decided='--require-decided'; fi
         args=(--in audits/audit-latest.json "$decided" --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}')
         if [ -n '${{ inputs.undecidable-file }}' ]; then args+=(--allow-undecided '${{ inputs.undecidable-file }}'); fi
+        # A refresh may settle a criterion that yesterday's file declared impossible. The fresh
+        # verdict wins without reddening a PAID run for improving; deterministic replay remains
+        # strict and still requires stale declarations to be removed from the repository.
+        if [ '${{ inputs.adjudicate }}' != 'none' ]; then args+=(--allow-stale-undecided); fi
         if node "$ENGINE" check "${args[@]}"; then
           echo "ok=true" >> "$GITHUB_OUTPUT"
         else
@@ -1611,11 +1626,15 @@ runs:
     # standard, each non-conformity), plus an index. Uploaded with the rest of audits/.
     - name: Per-page report
       id: pages
-      if: inputs.pages-report == 'true'
+      if: inputs.pages-report != 'false'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
         ENGINE: ${{ steps.engine.outputs.path }}
+        LANG_OPT: ${{ inputs.lang }}
+        STANDARD: ${{ inputs.standard }}
+        UNDECIDABLE_FILE: ${{ inputs.undecidable-file }}
+        PAGES_REPORT_MODE: ${{ inputs.pages-report }}
       run: |
         # The dossiers. `--evidence` and `--html` follow the SAME inputs the compliance report
         # obeys — they did not, and the result was a documented artifact layout that did not
@@ -1623,40 +1642,99 @@ runs:
         # cited `dom.html:412 (div.card)` with no picture while the report beside them carried
         # annotated crops of those very defects.
         args=(--in audits/audit-latest.json --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}')
-        sheets=("${args[@]}" --format report --split page --out audits/pages)
-        if [ '${{ inputs.evidence }}' = 'true' ]; then
-          sheets+=(--evidence)
-          if [ -n '${{ inputs.evidence-max }}' ]; then sheets+=(--evidence-max '${{ inputs.evidence-max }}'); fi
-        fi
-        if [ '${{ inputs.html }}' = 'true' ]; then sheets+=(--html); fi
-
         # No page in scope is not a failure — it just means nothing was scanned or snapshotted.
         # The outputs below then stay empty/0, which is the honest answer and NOT the same
         # statement as a clean sweep.
         {
           echo "json-path="
           echo "report-path="
+          echo "summary-path="
           echo "count=0"
           echo "failing=0"
         } >> "$GITHUB_OUTPUT"
 
-        if ! node "$ENGINE" pages "${sheets[@]}"; then
+        # JSON is the single projection from which the compact human surface is built. Compact
+        # mode stops here: no screenshots, evidence crops or remediation blocks, and no second
+        # page derivation. That makes it the cheap CI result for exhaustive adjudication runs.
+        if ! node "$ENGINE" pages "${args[@]}" --json --out audits > /dev/null; then
           echo "ultra11y: no page in scope — skipping the per-page report."
           exit 0
         fi
 
-        # The same projection, for a machine. `--json --out` writes <dir>/pages.json beside
-        # the sheets it mirrors, so the artifact carries one file a later job can read without
-        # re-deriving anything — and the action publishes its PATH, never its contents: a
-        # criterion × page matrix is not a scalar and a step output is size-capped.
-        node "$ENGINE" pages "${args[@]}" --json --out audits > /dev/null
+        # One compact, literal document for BOTH GitHub's visible job result and the artifact.
+        # It lists every id on every page. A manual criterion is called "impossible to verify"
+        # only when the project's named allowance file says so with a reason; an unfinished
+        # adjudication remains visibly "to verify" and can never masquerade as an exception.
+        node <<'NODE'
+        const fs = require("node:fs");
+        const grid = JSON.parse(fs.readFileSync("audits/pages.json", "utf8"));
+        const fr = process.env.LANG_OPT === "fr";
+        let allowances = [];
+        if (process.env.UNDECIDABLE_FILE && fs.existsSync(process.env.UNDECIDABLE_FILE)) {
+          try {
+            const parsed = JSON.parse(fs.readFileSync(process.env.UNDECIDABLE_FILE, "utf8"));
+            if (Array.isArray(parsed.entries)) allowances = parsed.entries.filter((entry) => entry?.criteriaId && String(entry.reason ?? "").trim());
+          } catch {}
+        }
+        const declared = new Map(allowances.map((entry) => [entry.criteriaId, String(entry.reason).trim()]));
+        const h = (value) => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const code = (value) => `\`${String(value).replace(/`/g, "%60")}\``;
+        const ids = (criteria) => criteria.map((criterion) => code(criterion.id)).join(" · ") || "—";
+        const labels = fr
+          ? { title: "Résultats d’accessibilité page par page", intro: "Chaque critère du référentiel est listé sur chaque page.", c: "Conformes", nc: "Non conformes", impossible: "Impossibles à vérifier", pending: "À vérifier", na: "Non applicables", reasons: "Motifs des vérifications impossibles", pages: "pages", criteria: "critères par page" }
+          : { title: "Page-by-page accessibility results", intro: "Every criterion of the standard is listed on every page.", c: "Conforming", nc: "Non-conforming", impossible: "Impossible to verify", pending: "To verify", na: "Not applicable", reasons: "Why verification is impossible", pages: "pages", criteria: "criteria per page" };
+        const totals = new Set(grid.pages.map((page) => page.criteria.length));
+        const total = totals.size === 1 ? [...totals][0] : Math.max(0, ...totals);
+        const out = [`# ${labels.title}`, "", `> ${grid.pages.length} ${labels.pages} · ${total} ${labels.criteria}. ${labels.intro}`, ""];
+        for (const page of grid.pages) {
+          const groups = { c: [], nc: [], impossible: [], pending: [], na: [] };
+          for (const criterion of page.criteria) {
+            if (criterion.status === "C") groups.c.push(criterion);
+            else if (criterion.status === "NC") groups.nc.push(criterion);
+            else if (criterion.status === "NA") groups.na.push(criterion);
+            else if (declared.has(criterion.id)) groups.impossible.push(criterion);
+            else groups.pending.push(criterion);
+          }
+          const tally = `${groups.c.length} ${labels.c.toLowerCase()} · ${groups.nc.length} ${labels.nc.toLowerCase()} · ${groups.impossible.length} ${labels.impossible.toLowerCase()}${groups.pending.length ? ` · ${groups.pending.length} ${labels.pending.toLowerCase()}` : ""}`;
+          out.push("<details>", `<summary><strong>${h(page.name)}</strong> — ${tally}</summary>`, "", `- ✅ **${labels.c} (${groups.c.length})** : ${ids(groups.c)}`, `- ❌ **${labels.nc} (${groups.nc.length})** : ${ids(groups.nc)}`);
+          if (groups.na.length) out.push(`- ➖ **${labels.na} (${groups.na.length})** : ${ids(groups.na)}`);
+          out.push(`- ⚪ **${labels.impossible} (${groups.impossible.length})** : ${ids(groups.impossible)}`);
+          if (groups.pending.length) out.push(`- ⚠️ **${labels.pending} (${groups.pending.length})** : ${ids(groups.pending)}`);
+          out.push("", `_${code(page.url)}_`, "", "</details>", "");
+        }
+        const used = allowances.filter((entry) => grid.pages.some((page) => page.criteria.some((criterion) => criterion.id === entry.criteriaId && criterion.status === "manual")));
+        if (used.length) {
+          out.push(`## ${labels.reasons}`, "");
+          for (const entry of used) out.push(`- ${code(entry.criteriaId)} — ${h(String(entry.reason).trim())}`);
+          out.push("");
+        }
+        const markdown = `${out.join("\n").trimEnd()}\n`;
+        fs.writeFileSync("audits/pages-status.md", markdown);
+        if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
+        NODE
 
+        # Detailed mode keeps the historical dossiers. Compact mode deliberately omits them:
+        # the user asked for statuses, not a second remediation/fix report.
+        report_path=audits/pages-status.md
+        if [ "$PAGES_REPORT_MODE" = 'true' ]; then
+          sheets=("${args[@]}" --format report --split page --out audits/pages)
+          if [ '${{ inputs.evidence }}' = 'true' ]; then
+            sheets+=(--evidence)
+            if [ -n '${{ inputs.evidence-max }}' ]; then sheets+=(--evidence-max '${{ inputs.evidence-max }}'); fi
+          fi
+          if [ '${{ inputs.html }}' = 'true' ]; then sheets+=(--html); fi
+          node "$ENGINE" pages "${sheets[@]}"
+          report_path=audits/pages
+        fi
+
+        export REPORT_PATH="$report_path"
         node -e '
           const j = JSON.parse(require("fs").readFileSync("audits/pages.json", "utf8"));
           const failing = j.pages.filter((p) => p.criteria.some((c) => c.status === "NC")).length;
           const out = require("fs");
           out.appendFileSync(process.env.GITHUB_OUTPUT, "json-path=audits/pages.json\n");
-          out.appendFileSync(process.env.GITHUB_OUTPUT, "report-path=audits/pages\n");
+          out.appendFileSync(process.env.GITHUB_OUTPUT, "report-path=" + process.env.REPORT_PATH + "\n");
+          out.appendFileSync(process.env.GITHUB_OUTPUT, "summary-path=audits/pages-status.md\n");
           out.appendFileSync(process.env.GITHUB_OUTPUT, "count=" + j.pages.length + "\n");
           out.appendFileSync(process.env.GITHUB_OUTPUT, "failing=" + failing + "\n");
         '
@@ -1696,7 +1774,7 @@ runs:
         ULTRA11Y_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         # `report-artifact` wins when set: a run whose part is merged away downstream must name
         # the deliverable that SURVIVES, not the one it uploaded.
-        ULTRA11Y_ARTIFACT_NAME: ${{ (inputs.report == 'true' || inputs.html == 'true') && (inputs.report-artifact != '' && inputs.report-artifact || (inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard))) || '' }}
+        ULTRA11Y_ARTIFACT_NAME: ${{ (inputs.report == 'true' || inputs.html == 'true' || inputs.pages-report != 'false') && (inputs.report-artifact != '' && inputs.report-artifact || (inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard))) || '' }}
       run: node "$ENGINE" report --in audits/audit-latest.json --standard '${{ inputs.standard }}' --lang '${{ inputs.lang }}' --format github
 
     # Tickets. REST is why this works in a container job or on a self-hosted runner, where
@@ -1807,7 +1885,7 @@ runs:
     # nothing saying so. Copied beside the report so the artifact carries what the run decided,
     # ready to be read and committed.
     - name: Carry the verdict ledger into the artifact
-      if: (inputs.report == 'true' || inputs.html == 'true') && inputs.ledger != '' && inputs.ledger != 'false'
+      if: (inputs.report == 'true' || inputs.html == 'true' || inputs.pages-report != 'false') && inputs.ledger != '' && inputs.ledger != 'false'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1824,7 +1902,7 @@ runs:
 
     - name: Upload the report
       id: upload
-      if: inputs.report == 'true' || inputs.html == 'true'
+      if: inputs.report == 'true' || inputs.html == 'true' || inputs.pages-report != 'false'
       uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard) }}

@@ -4,22 +4,10 @@
   "standard": "rgaa",
   "entries": [
     {
-      "criteriaId": "4.5",
-      "reason": "L'audiodescription d'un média temporel ne peut être tranchée qu'en REGARDANT le média. Le critère demande d'abord si une audiodescription est « nécessaire » — c'est-à-dire s'il existe une information visuelle que la bande son ne restitue pas — et cette question porte sur le contenu de /media/presentation.mp4, qu'aucun moteur statique, aucune capture de DOM et aucun agent ne peut visionner. Ce qui EST établi et ne dépend pas du visionnage : l'élément <video> de medias.html est vide, il ne porte aucun <track kind=\"descriptions\">, aucun lien adjacent vers une version audiodécrite n'existe, et il n'y a aucun <track> nulle part dans le périmètre. Autrement dit, si l'audiodescription est nécessaire, le critère est non conforme ; c'est la nécessité elle-même qui demande un humain.",
-      "recordedBy": "adjudication fan-out, second pass",
-      "date": "2026-08-24"
-    },
-    {
       "criteriaId": "13.7",
       "reason": "Les changements brusques de luminosité et les effets de flash sont un phénomène TEMPOREL : ils se constatent en observant une page qui bouge, pas une capture figée. Le périmètre ne contient aucun <script> et aucune animation CSS, ce qui écarte la piste scriptée — mais le média vidéo /media/presentation.mp4 reste hors de portée pour la même raison que 4.5 : il faudrait le visionner pour savoir s'il contient des flashs. Un auditeur humain doit lire la vidéo, au besoin avec un analyseur de flash (PEAT), et conclure.",
       "recordedBy": "adjudication fan-out, second pass",
       "date": "2026-08-24"
-    },
-    {
-      "criteriaId": "12.3",
-      "reason": "Le crawl a capturé les neuf pages connues et le plan du site contient des liens fonctionnels vers leurs sections principales. Ce périmètre fermé ne peut toutefois pas établir que ces neuf pages représentent l'architecture GÉNÉRALE complète du site : une section absente du crawl serait également absente de la preuve. La contre-expertise Haiku sur le faisceau complet de neuf captures a donc refusé, à juste titre, de transformer cette absence d'information en conformité. Un responsable connaissant l'arborescence publiée doit confirmer que le plan est représentatif.",
-      "recordedBy": "adversarial Haiku review, complete citation set",
-      "date": "2026-08-28"
     }
   ]
 }

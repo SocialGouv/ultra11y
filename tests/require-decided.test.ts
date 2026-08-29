@@ -86,6 +86,15 @@ describe("check --require-decided", () => {
     expect(r.issues.join(" ")).toMatch(/now carries a verdict/);
   });
 
+  it("lets an explicit refresh accept a new verdict that supersedes yesterday's exception", () => {
+    const r = checkDecided(audit([{ id: "2.4.4", status: "C" }]), "wcag", "en", {
+      allow: { entries: [{ criteriaId: "2.4.4", reason: "was undecidable before this refresh" }] },
+      allowStale: true,
+    });
+    expect(r.ok).toBe(true);
+    expect(r.issues).toEqual([]);
+  });
+
   it("recognises an allowance file by its entries array, and nothing else", () => {
     expect(isUndecidedFile({ entries: [] })).toBe(true);
     expect(isUndecidedFile({ criteria: [] })).toBe(false);

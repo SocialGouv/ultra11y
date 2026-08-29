@@ -27,10 +27,6 @@ jobs:
       # This repository uses the Claude subscription/OAuth transport. Do not expose an API key:
       # it would make the billing route ambiguous and is unnecessary for `--runner cli`.
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      STANDARD: rgaa
-      LANG_OPT: fr
-      UNDECIDABLE_FILE: .ultra11y/undecidable-rgaa.json
-      CURRENT_UNDECIDABLE: audits/current-undecidable-rgaa.json
     steps:
       - uses: actions/checkout@v7
 
@@ -91,7 +87,11 @@ jobs:
           report: "false"
           html: "false"
           evidence: "false"
-          pages-report: "false"
+          # One compact status document is written both to the visible job summary and to the
+          # artifact. No HTML, screenshots, evidence crops or remediation/fix report.
+          pages-report: compact
+          artifact-name: adjudication-rgaa-haiku
+          artifact-retention-days: "14"
           adjudicate: agent
           adjudicate-runner: cli
           adjudicate-grain: worklist
@@ -104,30 +104,14 @@ jobs:
           crawl-max: "0"
           runtime: local
           require-rendered: "true"
-          # A fresh model can decide an approved manual exception. Filter stale exceptions
-          # before the strict outer gate so that this harmless improvement cannot turn CI red.
-          require-decided: "false"
+          # Completeness belongs to the Action: it gates all 106 criteria on every page after
+          # writing the visible summary and artifact, while named residual risks stay explicit.
+          require-decided: pages
           undecidable-file: .ultra11y/undecidable-rgaa.json
 
-      - name: Gate all 106 criteria on all nine pages
+      - name: Verify the nine-page shape
         run: |
           set -euo pipefail
-          node - <<'NODE'
-          const fs = require("node:fs");
-          const audit = require(`${process.cwd()}/audits/audit-latest.json`);
-          const approved = require(`${process.cwd()}/.ultra11y/undecidable-rgaa.json`);
-          const unresolved = new Set(audit.criteria.filter((criterion) => criterion.status === "manual").map((criterion) => criterion.id));
-          const current = { ...approved, entries: approved.entries.filter((entry) => unresolved.has(entry.criteriaId)) };
-          fs.writeFileSync(process.env.CURRENT_UNDECIDABLE, `${JSON.stringify(current, null, 2)}\n`);
-          NODE
-          node scripts/ultra11y.mjs check --in audits/audit-latest.json \
-            --standard "$STANDARD" --lang "$LANG_OPT" --require-decided=pages \
-            --allow-undecided "$CURRENT_UNDECIDABLE"
-          node scripts/ultra11y.mjs check --in audits/audit-latest.json \
-            --standard "$STANDARD" --lang "$LANG_OPT" --require-rendered
-
-          node scripts/ultra11y.mjs pages --in audits/audit-latest.json \
-            --standard "$STANDARD" --lang "$LANG_OPT" --json --out audits > /dev/null
           node - <<'NODE'
           const grid = require(`${process.cwd()}/audits/pages.json`);
           if (grid.pages.length !== 9) {
@@ -140,22 +124,3 @@ jobs:
           }
           console.log(`verified ${grid.pages.length} pages × 106 RGAA criteria`);
           NODE
-
-      - name: Render the final report
-        run: |
-          set -euo pipefail
-          REPORT=$(node scripts/ultra11y.mjs report --in audits/audit-latest.json \
-            --standard "$STANDARD" --lang "$LANG_OPT" --out audits)
-          test -f "$REPORT"
-          node scripts/ultra11y.mjs check --report "$REPORT" --standard "$STANDARD"
-
-      - name: Upload the final adjudication
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: adjudication-rgaa-haiku
-          if-no-files-found: warn
-          retention-days: 14
-          path: |
-            audits/
-            .ultra11y/pages/

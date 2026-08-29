@@ -435,7 +435,9 @@ is the source of truth; CI rebuilds it from the vendored DINUM data and rejects 
 - **A shipped GitHub Action** — `uses: maxgfr/ultra11y@v5` audits the **code** (PR diff) and,
   optionally, the **pages** (it can start your app, wait for it, then scan real URLs or your
   declared sample). The engine ships inside the action, so there is nothing to install and no
-  `setup-node`. The gate runs **last**, after SARIF, annotations, the summary, the sticky PR
+  `setup-node`. With pages in scope, its job summary and `pages-status.md` artifact list every
+  criterion under every page; `pages-report: compact` keeps only that clean status result and
+  omits detailed remediation dossiers, HTML and crops. The gate runs **last**, after SARIF, annotations, the summary, the sticky PR
   comment and the report — a red job is never a dead end. `adjudicate: api|agent` optionally
   rules on the judgment criteria that would otherwise stay « à évaluer » in CI, reading its key
   from the job environment and skipping itself without one. `ultra11y init --ci` writes a

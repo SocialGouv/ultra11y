@@ -474,6 +474,10 @@ Options:
                      decide. An entry with no reason fails the gate, and one whose criterion
                      now carries a verdict fails it too.
                      (default: VERIFY.todo.json next to the report)
+  --allow-stale-undecided
+                     check --require-decided: ignore named allowances whose criteria gained a
+                     verdict in THIS refresh. Intended for paid adjudication refreshes; the
+                     default remains strict so stale exceptions are cleaned from the repo.
   --run <dir>        orchestrate: the run dir holding the worklists (ADJUDICATE.todo.json,
                      VERIFY.todo.json); artifacts land under <dir>/orchestration/
   --phase <name>     orchestrate: emit one phase only — adjudicate | verify-report
@@ -730,6 +734,7 @@ const BOOLEAN_FLAGS = new Set([
   "require-decided",
   "require-sample",
   "require-rendered",
+  "allow-stale-undecided",
   "manual",
   // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
   // verdict discards the whole adjudication. The default is per-verdict.
@@ -2748,7 +2753,10 @@ function cmdCheck(p: ParsedArgs): number {
       return 2;
     }
   }
-  const decided = requireDecided && audit ? checkDecided(audit, standard, lang, { allow, pages: requireDecidedPages }) : null;
+  const decided =
+    requireDecided && audit
+      ? checkDecided(audit, standard, lang, { allow, pages: requireDecidedPages, allowStale: p.flags["allow-stale-undecided"] === true })
+      : null;
   // COVERAGE, one level below completeness: did the run capture every page it says it audits?
   // Needs no audit JSON — it holds the repository's declared sample against the snapshots on
   // disk, which is what a sweep either produced or did not.

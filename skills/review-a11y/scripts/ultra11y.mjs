@@ -60998,6 +60998,7 @@ function checkDecided(audit2, standard = CORE2, lang = "en", opts = {}) {
   const openAnywhere = /* @__PURE__ */ new Set([...open, ...perPage.flatMap((p) => p.undecided)]);
   for (const id of declared.keys()) {
     if (!openAnywhere.has(id)) {
+      if (opts.allowStale) continue;
       issues.push(
         fr ? `Crit\xE8re ${id} d\xE9clar\xE9 ind\xE9cidable, mais il porte d\xE9sormais un verdict \u2014 retirez-le de la liste.` : `Criterion ${id} is declared undecidable but now carries a verdict \u2014 remove it from the list.`
       );
@@ -72506,6 +72507,10 @@ Options:
                      decide. An entry with no reason fails the gate, and one whose criterion
                      now carries a verdict fails it too.
                      (default: VERIFY.todo.json next to the report)
+  --allow-stale-undecided
+                     check --require-decided: ignore named allowances whose criteria gained a
+                     verdict in THIS refresh. Intended for paid adjudication refreshes; the
+                     default remains strict so stale exceptions are cleaned from the repo.
   --run <dir>        orchestrate: the run dir holding the worklists (ADJUDICATE.todo.json,
                      VERIFY.todo.json); artifacts land under <dir>/orchestration/
   --phase <name>     orchestrate: emit one phase only \u2014 adjudicate | verify-report
@@ -72745,6 +72750,7 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "require-decided",
   "require-sample",
   "require-rendered",
+  "allow-stale-undecided",
   "manual",
   // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
   // verdict discards the whole adjudication. The default is per-verdict.
@@ -74214,7 +74220,7 @@ function cmdCheck(p) {
       return 2;
     }
   }
-  const decided = requireDecided && audit2 ? checkDecided(audit2, standard, lang, { allow, pages: requireDecidedPages }) : null;
+  const decided = requireDecided && audit2 ? checkDecided(audit2, standard, lang, { allow, pages: requireDecidedPages, allowStale: p.flags["allow-stale-undecided"] === true }) : null;
   const covered = requireSample ? checkSampleCaptured(".", lang) : null;
   const renderedGate = requireRendered && audit2 ? checkRendered(audit2, standard, lang, { allow }) : null;
   const res = md ? checkReport(md, standard, lang, { audit: audit2 }) : { ok: true, issues: [] };

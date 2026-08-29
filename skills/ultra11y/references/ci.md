@@ -492,12 +492,11 @@ Every scanned page is also **persisted as a snapshot** and folded into the audit
 a conforming verdict — the static rules never ran against its DOM — so without it the per-page
 grid is almost empty and the job reports far less than it measured.
 
-Four surfaces come out of it:
+Five surfaces come out of it:
 
 - **The scoreboard**, in the explicit `pages`/`full` sticky PR comment and the artifact: one
-  row per page with its rate and its blocking/major/minor counts, plus a `basis` column. It is
-  omitted from the ordinary job summary so the run-level result is not buried under a second
-  dashboard. The `basis` column is not
+  row per page with its rate and its blocking/major/minor counts, plus a `basis` column. The
+  `basis` column is not
   decoration — a page marked *source* has no snapshot, so its silence is not conformity.
   It appears on a clean run too, which is exactly when a reviewer wants to see *which* pages
   passed.
@@ -507,6 +506,14 @@ Four surfaces come out of it:
   the wrong one for acting: « 65 / 6 » says nothing about *which* six, and until now the ids
   lived only in an artifact nobody downloads. Every status comes from the same
   `pageCriterionRows` the dossiers render, so the summary and the deliverable cannot disagree.
+- **The compact status result**, in the visible job summary and `audits/pages-status.md`: one
+  folded block per page naming every conforming, non-conforming and not-yet-verifiable criterion.
+  A manual criterion is labelled “impossible to verify” only when `undecidable-file` declares it
+  by id with a reason; an unfinished adjudication remains “to verify”. `pages-report: compact`
+  emits only this file plus `pages.json`, so an exhaustive keyed run pays for no second render,
+  screenshots, evidence crops or remediation report. During an active adjudication refresh, a
+  fresh verdict supersedes a now-stale allowance without failing the paid run; deterministic
+  replay remains strict and asks the repository to remove stale entries.
 - **The per-page dossiers**, in the uploaded artifact (`pages-report: 'true'`, the default):
   `audits/pages/index.md` plus one sheet per page — its screenshot, every criterion of the
   standard with its status on that page, and each non-conformity as the ordinary auditor block.
@@ -517,7 +524,7 @@ Four surfaces come out of it:
   unattributed }`.
 
 The action publishes the page dimension as **outputs** too, so a later job needs neither the
-artifact nor a re-derivation: `pages-json-path`, `pages-report-path`, `pages-count` and
+artifact nor a re-derivation: `pages-json-path`, `pages-report-path`, `pages-summary-path`, `pages-count` and
 `pages-failing`. The two paths are paths on purpose — a criterion × page matrix is not a scalar,
 a step output is size-capped, and truncating a grid into one would be a silent lie about
 coverage.
@@ -594,6 +601,7 @@ audits/
 ├── <std>-<date>.md                   ← the Markdown report, illustrated by the same crops
 ├── audit-latest.json                 ← the machine-readable audit (unchanged)
 ├── pages.json                        ← the per-page grid, for a machine (`pages-json-path`)
+├── pages-status.md                   ← every criterion grouped by status under every page
 ├── assets/
 │   ├── <page-id>.png                 ← the page screenshot
 │   └── <page-id>/<hash>.png          ← one annotated crop per distinct defect on that page

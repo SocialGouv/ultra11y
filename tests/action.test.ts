@@ -1,7 +1,7 @@
 // The shipped composite action. It is consumed as `maxgfr/ultra11y@vN`, so a mistake here
 // breaks every user's CI and cannot be caught by a unit test of src/ — gate its structure.
 import { describe, it, expect } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -171,6 +171,66 @@ describe("it covers both halves of the ask: the code and the pages", () => {
     expect(step?.run).toContain("pages.json");
   });
 
+  it("writes every page's criterion statuses to the artifact and the visible job summary", () => {
+    const step = ACTION.runs.steps.find((s) => s.name === "Per-page report");
+    expect(ACTION.inputs["pages-report"]?.description).toContain("compact");
+    expect(step?.if).toContain("!= 'false'");
+    expect(step?.run).toContain("audits/pages-status.md");
+    expect(step?.run).toContain("GITHUB_STEP_SUMMARY");
+    expect(step?.run).toContain("Impossible to verify");
+    expect(step?.run).toContain("À vérifier");
+  });
+
+  it("keeps compact mode free of detailed remediation dossiers", () => {
+    const step = ACTION.runs.steps.find((s) => s.name === "Per-page report");
+    expect(step?.run).toContain("PAGES_REPORT_MODE");
+    expect(step?.run).toMatch(/if \[ "\$PAGES_REPORT_MODE" = 'true' \]; then/);
+  });
+
+  it("renders all four honest status buckets from the real compact-summary program", () => {
+    const run = ACTION.runs.steps.find((s) => s.name === "Per-page report")?.run ?? "";
+    const program = /node <<'NODE'\n([\s\S]*?)\nNODE/.exec(run)?.[1];
+    expect(program).toBeTruthy();
+
+    const dir = mkdtempSync(join(tmpdir(), "u11y-pages-status-"));
+    mkdirSync(join(dir, "audits"));
+    writeFileSync(
+      join(dir, "audits/pages.json"),
+      JSON.stringify({
+        pages: [
+          {
+            name: "Accueil <public>",
+            url: "https://example.test/",
+            criteria: [
+              { id: "1.1", status: "C" },
+              { id: "1.2", status: "NC" },
+              { id: "1.3", status: "manual" },
+              { id: "1.4", status: "manual" },
+            ],
+          },
+        ],
+      }),
+    );
+    writeFileSync(join(dir, "undecidable.json"), JSON.stringify({ entries: [{ criteriaId: "1.3", reason: "The video must be watched." }] }));
+    const summary = join(dir, "summary.md");
+    const result = spawnSync(process.execPath, ["-e", program!], {
+      cwd: dir,
+      env: { ...process.env, LANG_OPT: "fr", UNDECIDABLE_FILE: "undecidable.json", GITHUB_STEP_SUMMARY: summary },
+      encoding: "utf8",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    const artifact = readFileSync(join(dir, "audits/pages-status.md"), "utf8");
+    expect(readFileSync(summary, "utf8")).toBe(artifact);
+    expect(artifact).toContain("1 conformes · 1 non conformes · 1 impossibles à vérifier · 1 à vérifier");
+    expect(artifact).toContain("**Conformes (1)** : `1.1`");
+    expect(artifact).toContain("**Non conformes (1)** : `1.2`");
+    expect(artifact).toContain("**Impossibles à vérifier (1)** : `1.3`");
+    expect(artifact).toContain("**À vérifier (1)** : `1.4`");
+    expect(artifact).toContain("Accueil &lt;public&gt;");
+    expect(artifact).toContain("The video must be watched.");
+  });
+
   // Unbounded by default: a sweep that silently stopped at 20 pages produced a report merely
   // SHORTER than the site, and a shorter deliverable reads exactly like a complete one.
   it("crawls without a cap unless the caller asks for one", () => {
@@ -198,14 +258,14 @@ describe("it publishes the page dimension as outputs", () => {
   // A criterion × page matrix is not a scalar and a step output is size-capped: the PATH is
   // the honest contract, and truncating a grid into an output would be a silent lie.
   it("publishes the path to the grid, never the grid itself", () => {
-    for (const key of ["pages-json-path", "pages-report-path"]) {
+    for (const key of ["pages-json-path", "pages-report-path", "pages-summary-path"]) {
       expect(OUT[key]?.description ?? "").toMatch(/path/i);
     }
   });
 
   it("wires every one of them to a step that exists", () => {
     const ids = new Set(ACTION.runs.steps.map((s) => s.id).filter(Boolean));
-    for (const key of ["pages-json-path", "pages-report-path", "pages-count", "pages-failing"]) {
+    for (const key of ["pages-json-path", "pages-report-path", "pages-summary-path", "pages-count", "pages-failing"]) {
       const m = /steps\.([a-z0-9_-]+)\.outputs/.exec(OUT[key]?.value ?? "");
       expect(m, `${key} is not wired to a step output`).toBeTruthy();
       expect(ids.has(m![1] as string), `${key} names step "${m![1]}", which does not exist`).toBe(true);
@@ -1383,8 +1443,13 @@ describe("the keyed adjudication workflow is singular, exhaustive and bounded", 
     expect(agent?.with?.crawl).toBe("http://127.0.0.1:8932/");
     expect(agent?.with?.["crawl-max"]).toBe("0");
     expect(agent?.with?.["require-rendered"]).toBe("true");
-    expect(agent?.with?.["require-decided"]).toBe("false");
+    expect(agent?.with?.["require-decided"]).toBe("pages");
     expect(agent?.with?.["undecidable-file"]).toBe(".ultra11y/undecidable-rgaa.json");
+    expect(agent?.with?.["pages-report"]).toBe("compact");
+    expect(agent?.with?.report).toBe("false");
+    expect(agent?.with?.html).toBe("false");
+    expect(agent?.with?.evidence).toBe("false");
+    expect(agent?.with?.["artifact-name"]).toBe("adjudication-rgaa-haiku");
   });
 
   it("does not buy a second model fold after the exhaustive adjudication", () => {
@@ -1396,37 +1461,32 @@ describe("the keyed adjudication workflow is singular, exhaustive and bounded", 
     expect(workflow).not.toContain("--max-verify 0");
   });
 
-  it("gates the adjudicated audit across all 106 criteria and all nine pages", () => {
+  it("gates all criteria inside the Action, then verifies the 9 × 106 output shape", () => {
     const steps = job().steps;
     const adjudication = steps.findIndex((s) => s.name === "Audit, crawl and adjudicate once");
-    const after = steps.findIndex((s) => s.name === "Gate all 106 criteria on all nine pages");
+    const after = steps.findIndex((s) => s.name === "Verify the nine-page shape");
     expect(adjudication).toBeGreaterThanOrEqual(0);
     expect(after).toBeGreaterThan(adjudication);
 
-    const gate = String(steps[after]?.run);
-    expect(gate).toContain("--require-decided=pages");
-    expect(gate).toContain('criterion.status === "manual"');
-    expect(gate).toContain('--allow-undecided "$CURRENT_UNDECIDABLE"');
-    expect(gate).toContain("--require-rendered");
-    expect(gate).toContain("grid.pages.length !== 9");
-    expect(gate).toContain("page.criteria.length !== 106");
+    const agent = steps[adjudication];
+    expect(agent?.with?.["require-decided"]).toBe("pages");
+    expect(agent?.with?.["require-rendered"]).toBe("true");
+    expect(agent?.with?.["undecidable-file"]).toBe(".ultra11y/undecidable-rgaa.json");
+    const completeness = ACTION.runs.steps.find((step) => step.name === "Completeness gate");
+    expect(completeness?.run).toContain("--allow-stale-undecided");
+
+    const shape = String(steps[after]?.run);
+    expect(shape).not.toContain("--require-decided");
+    expect(shape).toContain("grid.pages.length !== 9");
+    expect(shape).toContain("page.criteria.length !== 106");
   });
 
-  it("captures the exact final report path emitted by the CLI instead of guessing from the directory", () => {
-    const report = job().steps.find((s) => s.name === "Render the final report");
-    const run = String(report?.run);
-
-    expect(run).toMatch(/REPORT=\$\(node scripts\/ultra11y\.mjs report/);
-    expect(run).toContain('test -f "$REPORT"');
-    expect(run).not.toMatch(/ls audits\/\*\.md/);
-  });
-
-  it("always uploads the adjudicated audit and page snapshots", () => {
-    const upload = job().steps.find((s) => s.name === "Upload the final adjudication");
-    expect(upload?.if).toBe("always()");
-    expect(upload?.uses).toMatch(/^actions\/upload-artifact@/);
-    expect(upload?.with?.path).toContain("audits/");
-    expect(upload?.with?.path).toContain(".ultra11y/pages/");
+  it("delegates the single compact artifact to the Action and does not render a fix report", () => {
+    expect(job().steps.find((s) => s.name === "Render the final report")).toBeUndefined();
+    expect(job().steps.find((s) => s.name === "Upload the final adjudication")).toBeUndefined();
+    const agent = job().steps.find((step) => step.name === "Audit, crawl and adjudicate once");
+    expect(agent?.with?.["pages-report"]).toBe("compact");
+    expect(agent?.with?.["artifact-retention-days"]).toBe("14");
   });
 });
 
