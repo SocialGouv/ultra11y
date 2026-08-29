@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.39.2](https://github.com/maxgfr/ultra11y/compare/v5.39.1...v5.39.2) (2026-08-29)
+
+
+### Performance Improvements
+
+* **action:** trim compact report artifacts ([56d0556](https://github.com/maxgfr/ultra11y/commit/56d0556249e78121987ce6e583fa05b545b82837))
+
 ## [5.39.1](https://github.com/maxgfr/ultra11y/compare/v5.39.0...v5.39.1) (2026-08-29)
 
 
