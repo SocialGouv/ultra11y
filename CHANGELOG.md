@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.39.1](https://github.com/maxgfr/ultra11y/compare/v5.39.0...v5.39.1) (2026-08-29)
+
+
+### Bug Fixes
+
+* **ci:** refresh the RGAA verdict ledger ([b71444f](https://github.com/maxgfr/ultra11y/commit/b71444f8bd17e3cc99c9348fc1ea0b6e7f5855e5))
+
 # [5.39.0](https://github.com/maxgfr/ultra11y/compare/v5.38.5...v5.39.0) (2026-08-29)
 
 
