@@ -5,9 +5,10 @@
 # Cost controls are fixed rather than dispatch inputs: Haiku, low effort, batches of eight,
 # and up to three adjudication passes over residue only. The CLI ceiling applies to EACH batch,
 # not a whole pass: 106 RGAA criteria make at most 14 batches, so $0.35 caps a nominal full pass
-# at $4.90 (excluding rare transport retries). One composite invocation performs one audit and
-# one unbounded crawl; there is no baseline pass, refutation fold or runner matrix duplicating
-# that work.
+# at $4.90 and all three nominal passes at $14.70. Rare transport retries start a fresh process
+# with a fresh per-batch ceiling, so neither figure is a hard aggregate run cap. One composite
+# invocation performs one audit and one unbounded crawl; there is no baseline pass, refutation
+# fold or runner matrix duplicating that work.
 name: Adjudication (keyed)
 
 on:
@@ -99,7 +100,7 @@ jobs:
           adjudicate-grain: worklist
           adjudicate-model: haiku
           adjudicate-effort: low
-          # Per batch: ceil(106 / 8) × $0.35 = $4.90 for a nominal full pass.
+          # Per batch: ceil(106 / 8) × $0.35 = $4.90/pass, $14.70 for three nominal passes.
           adjudicate-budget-usd: "0.35"
           adjudicate-passes: "3"
           ledger: audits/fresh-rgaa-ledger.json

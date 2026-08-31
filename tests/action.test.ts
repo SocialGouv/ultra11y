@@ -1465,7 +1465,7 @@ describe("the keyed adjudication workflow is singular, exhaustive and bounded", 
     expect(agent?.with?.["adjudicate-grain"]).toBe("worklist");
     expect(agent?.with?.["adjudicate-model"]).toBe("haiku");
     expect(agent?.with?.["adjudicate-effort"]).toBe("low");
-    expect(agent?.with?.["adjudicate-budget-usd"]).toBe("5");
+    expect(agent?.with?.["adjudicate-budget-usd"]).toBe("0.35");
     expect(agent?.with?.["adjudicate-passes"]).toBe("3");
     expect(agent?.with?.ledger).toBe("audits/fresh-rgaa-ledger.json");
     expect(agent?.with?.crawl).toBe("http://127.0.0.1:8932/");
