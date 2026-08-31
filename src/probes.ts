@@ -185,11 +185,29 @@ export const TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
 // always report "no visible change" as a false pass — so for a visually-hidden but
 // focusable radio/checkbox we measure the PROXY (label[for], wrapping label, or the
 // aria-labelledby target) instead, keyed by the input (which is what Tab focuses).
+//
+// AND THE PROXY'S PSEUDO-ELEMENTS, WHICH IS WHERE THE RING ACTUALLY IS. Having gone to
+// the trouble of finding the label, reading only the label's OWN computed style measures
+// the one box the design system does not paint: DSFR, GOV.UK, USWDS and Bootstrap all
+// draw the control — the box, the tick, and the focus ring — in `label::before`. The
+// label element itself never changes on focus, so every custom checkbox and radio came
+// back "focus not visible".
+//
+// Measured on a real 37-page audit: TWELVE findings, all of them `<label class="fr-label">`
+// proxies for DSFR checkboxes and radios, all false. Worse than noise — RGAA 10.7 is not on
+// the `completeBySilence` allowlist, so one bogus NC on three pages left the criterion
+// « to assess » on the thirty-four others, and no adjudication can reach it: a criterion
+// already decided run-wide never enters the worklist.
+//
+// So `snap` reads the element and both generated boxes, and the check compares the same
+// three. Symmetry is the whole contract here: comparing a two-part snapshot against a
+// one-part one would report a change on every element that has a `::before` at all.
 export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables): string {
   const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
   return `(() => { ${PRELUDE}
   const sel = 'a[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
-  const snap = (e) => { const s = getComputedStyle(e); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
+  const __style = (e, pseudo) => { const s = getComputedStyle(e, pseudo); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
+  const snap = (e) => [__style(e, null), __style(e, '::before'), __style(e, '::after')].join('#');
   // Visually-hidden radio/checkbox → measure its visible label/proxy, not the input.
   const proxyFor = (e) => {
     const type = (e.getAttribute('type') || '').toLowerCase();
@@ -235,8 +253,12 @@ export const FOCUS_CHECK_PROBE = `(() => {
   if (!key || !window.__u11yF || !window.__u11yF[key]) return null;
   const rec = window.__u11yF[key];
   const proxy = document.querySelector('[data-u11y-fp="' + key + '"]') || e;
-  const s = getComputedStyle(proxy);
-  const now = [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|');
+  // THE SAME THREE BOXES pass 1 snapshotted, in the same order. A design system that paints
+  // its control in label::before -- DSFR, GOV.UK, USWDS, Bootstrap -- puts the focus ring
+  // there too, and reading only the element would report every one of them as unfocusable.
+  // (No backticks in this comment: it lives inside a template literal.)
+  const st = (pseudo) => { const s = getComputedStyle(proxy, pseudo); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
+  const now = [st(null), st('::before'), st('::after')].join('#');
   return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
 })()`;
 

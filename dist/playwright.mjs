@@ -236,7 +236,8 @@ function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables
   const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
   return `(() => { ${PRELUDE}
   const sel = 'a[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
-  const snap = (e) => { const s = getComputedStyle(e); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
+  const __style = (e, pseudo) => { const s = getComputedStyle(e, pseudo); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
+  const snap = (e) => [__style(e, null), __style(e, '::before'), __style(e, '::after')].join('#');
   // Visually-hidden radio/checkbox \u2192 measure its visible label/proxy, not the input.
   const proxyFor = (e) => {
     const type = (e.getAttribute('type') || '').toLowerCase();
@@ -278,8 +279,12 @@ var FOCUS_CHECK_PROBE = `(() => {
   if (!key || !window.__u11yF || !window.__u11yF[key]) return null;
   const rec = window.__u11yF[key];
   const proxy = document.querySelector('[data-u11y-fp="' + key + '"]') || e;
-  const s = getComputedStyle(proxy);
-  const now = [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|');
+  // THE SAME THREE BOXES pass 1 snapshotted, in the same order. A design system that paints
+  // its control in label::before -- DSFR, GOV.UK, USWDS, Bootstrap -- puts the focus ring
+  // there too, and reading only the element would report every one of them as unfocusable.
+  // (No backticks in this comment: it lives inside a template literal.)
+  const st = (pseudo) => { const s = getComputedStyle(proxy, pseudo); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
+  const now = [st(null), st('::before'), st('::after')].join('#');
   return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
 })()`;
 var FOCUS_OBSCURED_PROBE = `(() => { ${PRELUDE}

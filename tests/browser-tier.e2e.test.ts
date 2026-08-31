@@ -486,3 +486,75 @@ describe("a page the browser fails on does not take the scan with it", () => {
     expect(refused[0]?.detail ?? "", "the refusal carries nothing a reader could act on").not.toBe("");
   }, 180_000);
 });
+
+// RGAA 10.7 ON A CONTROL WHOSE RING LIVES IN A PSEUDO-ELEMENT.
+//
+// `focusSetupExpr` already proxies a visually-hidden radio/checkbox to its visible label —
+// that part was right. What it then measured was the label's OWN computed style, and the
+// label is the one box a design system does not paint: DSFR, GOV.UK, USWDS and Bootstrap all
+// draw the control AND its focus ring in `label::before`.
+//
+// Measured on a real 37-page audit before this was fixed: twelve 10.7 findings, every one of
+// them a `<label class="fr-label">` proxying a DSFR checkbox or radio, every one false. And
+// 10.7 is not on the `completeBySilence` allowlist, so a bogus NC on three pages left the
+// criterion « to assess » on the other thirty-four, out of reach of any adjudication — a
+// criterion already decided run-wide never enters the worklist.
+//
+// This drives the two probe strings directly rather than a whole audit: the bug is a
+// disagreement between them, so the test that catches it has to see both.
+describe("focus visibility on a pseudo-element ring", () => {
+  // The DSFR shape, reduced to what matters: the input is focusable but not painted, the
+  // label paints the box in ::before, and the focus ring lands on that ::before.
+  const RING = ".grp input:focus + label::before { outline: 2px solid #0a76f6; outline-offset: 2px; }";
+  const page$ = (ring: string) => `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Cases</title>
+<style>
+  .grp input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .grp label { position: relative; padding-left: 2rem; display: inline-block; }
+  .grp label::before { content: ""; position: absolute; left: 0; top: 0;
+    width: 1rem; height: 1rem; border: 1px solid #161616; background: #fff; }
+  ${ring}
+</style></head>
+<body><main><h1>Cases</h1>
+  <div class="grp"><input type="checkbox" id="c1"><label for="c1">Un</label></div>
+</main></body></html>`;
+
+  /** Tag + snapshot, Tab once, ask the check probe what it saw. */
+  async function focusHit(html: string) {
+    const { focusSetupExpr, FOCUS_CHECK_PROBE } = await import("../src/probes.js");
+    const context = await browser!.newContext();
+    const page = await context.newPage();
+    try {
+      await page.setContent(html);
+      const tagged = await page.evaluate(focusSetupExpr());
+      await page.keyboard.press("Tab");
+      const hit = (await page.evaluate(FOCUS_CHECK_PROBE)) as { changed: boolean; html: string } | null;
+      return { tagged, hit };
+    } finally {
+      await page.close();
+      await context.close();
+    }
+  }
+
+  it("sees the ring a design system paints in label::before", async () => {
+    if (!browserAvailable) return;
+    const { tagged, hit } = await focusHit(page$(RING));
+    expect(tagged).toBe(1);
+    expect(hit).not.toBeNull();
+    // The proxy is the LABEL — that part was already right, and is worth pinning.
+    expect(hit?.html).toContain("<label");
+    // …and the ring on its ::before counts as a visible change. `false` here is the bug.
+    expect(hit?.changed).toBe(true);
+  }, 60_000);
+
+  // The other half of the contract. A "fix" that made the comparison always report `changed`
+  // would pass the test above and silence 10.7 everywhere — worse than the false positive it
+  // replaced, and invisible without this.
+  it("still reports a control with no indicator at all", async () => {
+    if (!browserAvailable) return;
+    const { tagged, hit } = await focusHit(page$(".grp input:focus + label::before { outline: none; }"));
+    expect(tagged).toBe(1);
+    expect(hit).not.toBeNull();
+    expect(hit?.changed).toBe(false);
+  }, 60_000);
+});
