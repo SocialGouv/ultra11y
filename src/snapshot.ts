@@ -89,6 +89,13 @@ export interface SnapshotProbes {
   /** 2.1.2 — focus that Tab cannot move off. Same story as `focusObscured`, and the more
    *  expensive one to lose: a keyboard trap is a `bloquant`. */
   keyboardTrap?: { selector: string; html: string; detail: string }[];
+  /** 4.1.3 — content updated by an interaction and landing outside any live region. */
+  liveRegion?: { selector: string; html: string; detail: string }[];
+  /** The three stresses applied to a FILLED input, each folding onto the criterion its own
+   *  stress evidences (320px reflow 1.4.10, 200% zoom 1.4.4, text spacing 1.4.12). */
+  inputOverflowReflow?: { selector: string; html: string; detail: string }[];
+  inputOverflowZoom?: { selector: string; html: string; detail: string }[];
+  inputOverflowSpacing?: { selector: string; html: string; detail: string }[];
   reflow?: { horizontalScroll: boolean };
   probed?: string[];
   /** Why a probe did not run — or did not FINISH — when it did not. The complement of

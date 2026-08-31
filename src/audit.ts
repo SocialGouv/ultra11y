@@ -766,6 +766,15 @@ function probeFindings(probes: NonNullable<RenderSignals["probes"]>, file: strin
     ["hover", "hover"],
     ["reflowZoom", "reflow-zoom"],
     ["textSpacing", "text-spacing"],
+    // The STATEFUL families — measured after the page was typed into, and `probed` credits
+    // their criteria all the same. Which document a post-interaction observation is attached
+    // to is an attribution question; dropping it is a correctness one, and only one of the two
+    // can publish « conforme » over a failure a browser reproduced. Anchored at the page like
+    // every other probe finding, which is where the attribution that matters already lives.
+    ["liveRegion", "live-region"],
+    ["inputOverflowReflow", "input-overflow-reflow"],
+    ["inputOverflowZoom", "input-overflow-zoom"],
+    ["inputOverflowSpacing", "input-overflow-spacing"],
   ];
   for (const [key, engine] of buckets) {
     const hits = probes[key] as { selector: string; html: string; detail: string }[] | undefined;

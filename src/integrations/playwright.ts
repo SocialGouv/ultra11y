@@ -167,7 +167,7 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
   let probes: unknown;
   if (opts.probes) {
     try {
-      probes = await runLiveProbes(page, probeOptions(opts.probes));
+      probes = await runLiveProbes(page, { ...probeOptions(opts.probes), ...(opts.liveRegion ? { liveRegion: opts.liveRegion } : {}) });
     } catch (e) {
       // LOUD, not silent. A swallowed probe failure is indistinguishable from a page with
       // nothing wrong: the criteria it would have decided simply stay « to assess », run after
@@ -315,7 +315,12 @@ export function sweepTarget(url: string): string {
  *  criteria stayed « à évaluer » for the whole audit — including on the five pages that HAD
  *  been probed. Opt out with `check: { probes: false }`. */
 export function sweepCheckOptions(check?: SweepOptions["check"]): SweepOptions["check"] & { failOn: false | undefined } {
-  return { failOn: false, probes: true, ...check } as SweepOptions["check"] & { failOn: false | undefined };
+  // `liveRegion: true` joins it for the same reason and on the same argument. 4.1.3 was the
+  // last needs-rendering criterion no suite-driven run could reach, so the partial-audit
+  // banner was structurally permanent and RGAA 7.5 met a paid adjudicator every time —
+  // carrying whatever `aria-live` happened to be in the source, which is not where a status
+  // message lives. Clicks stay off: a sweep is usually authenticated.
+  return { failOn: false, probes: true, liveRegion: true, ...check } as SweepOptions["check"] & { failOn: false | undefined };
 }
 
 export function sweepSample(opts: SweepOptions = {}): void {

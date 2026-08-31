@@ -644,7 +644,120 @@ async function runLiveProbes(page, opts = {}) {
       out.probed.push("1.4.13");
     }
   }
+  if (want("4.1.3") && opts.liveRegion) {
+    const clicks = typeof opts.liveRegion === "object" && opts.liveRegion.clicks === true;
+    const r = await bounded("4.1.3", () => probeLiveRegion(page, opts.lang ?? "fr", clicks));
+    if (r) {
+      out.liveRegion = r;
+      out.probed.push("4.1.3");
+    }
+  }
   return out;
+}
+var DESTRUCTIVE_NAME_RE = "\\b(supprim|retir|effac|envoy|valid|confirm|pay|achet|command|delete|remove|eras|clear|send|submit|buy|order)";
+function liveRegionExpr(detail, allowClicks) {
+  const d = JSON.stringify(detail);
+  const clickLoop = allowClicks ? `
+  // click button[type=button] only (never a submit/link), skipping destructive names
+  const dangerous = new RegExp(${JSON.stringify(DESTRUCTIVE_NAME_RE)}, 'i');
+  const nameOf = (b) => {
+    let n = (b.getAttribute('aria-label') || '') + ' ' + (b.textContent || '') + ' ' + (b.getAttribute('title') || '');
+    // ALL aria-labelledby ids (attribute trimmed): a destructive verb may sit in ANY
+    // referenced id, and the value may carry stray leading/trailing whitespace.
+    for (const id of (b.getAttribute('aria-labelledby') || '').trim().split(/\\s+/)) {
+      if (!id) continue;
+      const t = document.getElementById(id);
+      if (t) n += ' ' + (t.textContent || '');
+    }
+    // Icon-only buttons: the name lives in img[alt] (an attribute \u2014 invisible to
+    // textContent) or an svg <title> (belt-and-braces; textContent usually includes it).
+    for (const im of Array.from(b.querySelectorAll('img[alt]'))) n += ' ' + (im.getAttribute('alt') || '');
+    for (const ti of Array.from(b.querySelectorAll('svg title'))) n += ' ' + (ti.textContent || '');
+    return n;
+  };
+  for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
+    if (count >= 20 || hits.length >= 10) break;
+    if (b.disabled || !__vis(b)) continue;
+    if (dangerous.test(nameOf(b))) continue; // defense-in-depth: never click a destructive-named button
+    const before = location.href;
+    try { b.click(); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return hits; }
+    drain();
+    count++;
+  }` : `
+  // click interactions disabled (authenticated scan without --interact-clicks)`;
+  return `(async () => { ${PRELUDE}
+  const isLive = (node) => {
+    let el = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
+    while (el && el !== document.documentElement) {
+      const live = (el.getAttribute && el.getAttribute('aria-live')) || '';
+      const role = (el.getAttribute && el.getAttribute('role')) || '';
+      if (live === 'polite' || live === 'assertive') return true;
+      if (role === 'status' || role === 'alert' || role === 'log') return true;
+      el = el.parentElement;
+    }
+    return false;
+  };
+  const hits = [];
+  const seen = new Set();
+  const records = [];
+  const obs = new MutationObserver((muts) => { for (const m of muts) records.push(m); });
+  obs.observe(document.body, { subtree: true, childList: true, characterData: true });
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  const drain = () => {
+    for (const m of records.splice(0)) {
+      const targets = m.type === 'characterData' ? [m.target] : Array.from(m.addedNodes);
+      for (const t of targets) {
+        if (!t || (t.textContent || '').trim().length === 0) continue;
+        if (isLive(t)) continue;
+        const host = t.nodeType === 1 ? t : t.parentElement;
+        if (!host || !__vis(host)) continue;
+        const key = __sel(host);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        hits.push({ selector: key, html: __html(host), detail: ${d} });
+      }
+    }
+  };
+  let count = 0;${clickLoop}
+  // toggle checkbox/radio, then restore
+  for (const t of Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'))) {
+    if (count >= 40 || hits.length >= 10) break;
+    if (t.disabled || !__vis(t)) continue;
+    const before = location.href;
+    const prev = t.checked;
+    try { t.click(); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return hits; }
+    drain();
+    try { if (t.checked !== prev) { t.checked = prev; t.dispatchEvent(new Event('change', { bubbles: true })); } } catch (_) {}
+    count++;
+  }
+  // fill text inputs, then restore
+  for (const inp of Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="search"], textarea'))) {
+    if (count >= 60 || hits.length >= 10) break;
+    if (inp.disabled || inp.readOnly || !__vis(inp)) continue;
+    const before = location.href;
+    const prev = inp.value == null ? '' : String(inp.value);
+    try { inp.value = 'test 123'; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return hits; }
+    drain();
+    try { inp.value = prev; inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    count++;
+  }
+  obs.disconnect();
+  return hits.slice(0, 10);
+})()`;
+}
+var LIVE_REGION_DETAIL = {
+  fr: "Mise \xE0 jour de contenu d\xE9clench\xE9e par une interaction hors d'une r\xE9gion live (aria-live / role=status|alert|log) \u2014 probablement non restitu\xE9e aux technologies d'assistance.",
+  en: "Content update triggered by an interaction outside any live region (aria-live / role=status|alert|log) \u2014 likely not announced to assistive technology."
+};
+async function probeLiveRegion(page, lang, allowClicks) {
+  const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
+  return await page.evaluate(liveRegionExpr(detail, allowClicks));
 }
 var REMOVE_TEXT_SPACING_STEP = `(() => {
   const sheets = Array.from(document.querySelectorAll('style'));
@@ -854,7 +967,7 @@ async function checkA11y(page, opts = {}) {
   let probes;
   if (opts.probes) {
     try {
-      probes = await runLiveProbes(page, probeOptions(opts.probes));
+      probes = await runLiveProbes(page, { ...probeOptions(opts.probes), ...opts.liveRegion ? { liveRegion: opts.liveRegion } : {} });
     } catch (e) {
       console.warn(
         `ultra11y: the live probes failed on this page \u2014 ${e instanceof Error ? e.message : String(e)}. The snapshot was still recorded; the criteria they decide stay to assess.`
@@ -904,7 +1017,7 @@ function sweepTarget(url) {
   }
 }
 function sweepCheckOptions(check) {
-  return { failOn: false, probes: true, ...check };
+  return { failOn: false, probes: true, liveRegion: true, ...check };
 }
 function sweepSample(opts = {}) {
   const pages = samplePagesFor(opts);

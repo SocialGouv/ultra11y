@@ -128,6 +128,19 @@ export interface CheckOptions {
    *  YOUR pages, and a screen with 400 focusables should be able to say so rather than being
    *  quietly cut off at 120. */
   probes?: boolean | string[] | ProbeTuning;
+  /** Also measure 4.1.3 STATUS MESSAGES — content updated by an interaction and announced to
+   *  nobody.
+   *
+   *  Separate from `probes` because it is a different promise. The probes above stress the page
+   *  and put it back; this one FILLS its fields and toggles its controls to see what the update
+   *  lands in, and a framework that reacted to that has reacted. Restored, but observed.
+   *
+   *  Off by default here and ON in a sweep, the same asymmetry `probes` carries: a sweep exists
+   *  for nothing but recording the sample and asserts nothing afterwards. `{ clicks: true }`
+   *  additionally presses `button[type=button]` (destructive-sounding names skipped, navigation
+   *  aborts the pass) — never the default on an authenticated session, where a server mutation
+   *  is invisible to any check this side of the network. */
+  liveRegion?: boolean | { clicks?: boolean };
   /** Run AXE-CORE on the page before recording it.
    *
    *  `scan` has always driven axe; your suite never did — and your suite is the only tier that

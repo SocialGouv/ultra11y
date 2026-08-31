@@ -716,7 +716,28 @@ export async function probeHover(page: Any, limits: ProbeLimits = PROBE_DEFAULTS
  *  Read-only by contract: no fill, no click, no navigation. The stateful probes stay in
  *  `scanLocal`, where the safety contract for driving a page is already stated and where a
  *  mutation cannot surprise a test that owns the session. */
-export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?: Partial<ProbeLimits> } = {}): Promise<LiveProbeResult> {
+/** What the caller asks `runLiveProbes` for.
+ *
+ *  `liveRegion` is the one option that changes the CONTRACT rather than the tuning. Every other
+ *  probe here measures and puts back: the viewport is restored, the injected stylesheet
+ *  removed, the root font-size reset. This one fills the page's text inputs and toggles its
+ *  controls to see what gets announced — restored, but observed by anything watching — and
+ *  with `clicks` it presses buttons whose side effects nothing can restore. So it is off unless
+ *  asked for, and its clicks are off even then. */
+export interface LiveProbeOptions {
+  only?: string[];
+  limits?: Partial<ProbeLimits>;
+  /** Measure 4.1.3 Status Messages. `true` performs the RESTORED interactions only (fill a
+   *  field, toggle a control); `{ clicks: true }` also presses `button[type=button]`, which no
+   *  `location.href` check can undo on an authenticated application. */
+  liveRegion?: boolean | { clicks?: boolean };
+  /** The language the live-region finding is worded in. Defaults to French, which is what
+   *  every other probe in this module already hard-codes into its `detail` — one document
+   *  should not carry two languages of finding. */
+  lang?: keyof typeof LIVE_REGION_DETAIL;
+}
+
+export async function runLiveProbes(page: Any, opts: LiveProbeOptions = {}): Promise<LiveProbeResult> {
   const limits: ProbeLimits = { ...PROBE_DEFAULTS, ...opts.limits };
   const only = opts.only?.length ? new Set(opts.only) : null;
   const want = (id: string): boolean => only === null || only.has(id);
@@ -872,7 +893,154 @@ export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?:
       out.probed.push("1.4.13");
     }
   }
+  // LAST, AND FOR A REASON THE ORDER ABOVE ALREADY STATES TWICE: this is the only probe here
+  // that changes the page rather than stressing it. Its fills and toggles are restored, but a
+  // framework that reacted to them has reacted, so nothing measured after it would be
+  // measuring the page the caller handed over. Running it at the end costs the tail of the
+  // budget and nothing else.
+  if (want("4.1.3") && opts.liveRegion) {
+    const clicks = typeof opts.liveRegion === "object" && opts.liveRegion.clicks === true;
+    const r = await bounded("4.1.3", () => probeLiveRegion(page, opts.lang ?? "fr", clicks));
+    if (r) {
+      out.liveRegion = r;
+      out.probed.push("4.1.3");
+    }
+  }
   return out;
+}
+
+// (5) LIVE_REGION_PROBE — WCAG 4.1.3 Status Messages (honest heuristic, severity mineur).
+// Install a MutationObserver on <body>, perform ONLY the safe interactions above, and flag
+// a text update whose nearest ancestor is NOT a live region (aria-live / role=status|alert
+// |log) — it was likely never announced to assistive tech. location.href is asserted after
+// each interaction (abort + restore on any change). Interactions and hits are bounded.
+//
+// HEURISTIC HONESTY: an EXPECTED context change (a dialog opening, an accordion panel
+// expanding after its toggle) also mutates non-live text and can fire this probe — such
+// updates don't necessarily need a live region. That is why the finding is `mineur` with
+// "likely/probablement" framing, deliberately: it points the auditor at the update, it does
+// not claim certainty.
+//
+// CLICK SAFETY (authenticated scans): even a `button[type="button"]` click can trigger a
+// server MUTATION (delete a row, send a message) that the location.href assertion cannot
+// see. So the click loop is emitted ONLY when `allowClicks` is true — the caller disables
+// it by default whenever a storageState (authenticated session) is in use, re-enabled via
+// `scan --interact-clicks`; unauthenticated scans keep clicks on. Defense-in-depth on top:
+// even when clicks are on, a button whose accessible name matches a destructive/submitting
+// verb (fr/en: supprimer, retirer, effacer, envoyer, valider, confirmer, payer, delete,
+// remove, send, submit, confirm, pay, …) is never clicked. Fill/toggle interactions always
+// run (they are the confirmed real-world need) and are restored.
+export const DESTRUCTIVE_NAME_RE = "\\b(supprim|retir|effac|envoy|valid|confirm|pay|achet|command|delete|remove|eras|clear|send|submit|buy|order)";
+export function liveRegionExpr(detail: string, allowClicks: boolean): string {
+  const d = JSON.stringify(detail);
+  const clickLoop = allowClicks
+    ? `
+  // click button[type=button] only (never a submit/link), skipping destructive names
+  const dangerous = new RegExp(${JSON.stringify(DESTRUCTIVE_NAME_RE)}, 'i');
+  const nameOf = (b) => {
+    let n = (b.getAttribute('aria-label') || '') + ' ' + (b.textContent || '') + ' ' + (b.getAttribute('title') || '');
+    // ALL aria-labelledby ids (attribute trimmed): a destructive verb may sit in ANY
+    // referenced id, and the value may carry stray leading/trailing whitespace.
+    for (const id of (b.getAttribute('aria-labelledby') || '').trim().split(/\\s+/)) {
+      if (!id) continue;
+      const t = document.getElementById(id);
+      if (t) n += ' ' + (t.textContent || '');
+    }
+    // Icon-only buttons: the name lives in img[alt] (an attribute — invisible to
+    // textContent) or an svg <title> (belt-and-braces; textContent usually includes it).
+    for (const im of Array.from(b.querySelectorAll('img[alt]'))) n += ' ' + (im.getAttribute('alt') || '');
+    for (const ti of Array.from(b.querySelectorAll('svg title'))) n += ' ' + (ti.textContent || '');
+    return n;
+  };
+  for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
+    if (count >= 20 || hits.length >= 10) break;
+    if (b.disabled || !__vis(b)) continue;
+    if (dangerous.test(nameOf(b))) continue; // defense-in-depth: never click a destructive-named button
+    const before = location.href;
+    try { b.click(); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return hits; }
+    drain();
+    count++;
+  }`
+    : `
+  // click interactions disabled (authenticated scan without --interact-clicks)`;
+  return `(async () => { ${PRELUDE}
+  const isLive = (node) => {
+    let el = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
+    while (el && el !== document.documentElement) {
+      const live = (el.getAttribute && el.getAttribute('aria-live')) || '';
+      const role = (el.getAttribute && el.getAttribute('role')) || '';
+      if (live === 'polite' || live === 'assertive') return true;
+      if (role === 'status' || role === 'alert' || role === 'log') return true;
+      el = el.parentElement;
+    }
+    return false;
+  };
+  const hits = [];
+  const seen = new Set();
+  const records = [];
+  const obs = new MutationObserver((muts) => { for (const m of muts) records.push(m); });
+  obs.observe(document.body, { subtree: true, childList: true, characterData: true });
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  const drain = () => {
+    for (const m of records.splice(0)) {
+      const targets = m.type === 'characterData' ? [m.target] : Array.from(m.addedNodes);
+      for (const t of targets) {
+        if (!t || (t.textContent || '').trim().length === 0) continue;
+        if (isLive(t)) continue;
+        const host = t.nodeType === 1 ? t : t.parentElement;
+        if (!host || !__vis(host)) continue;
+        const key = __sel(host);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        hits.push({ selector: key, html: __html(host), detail: ${d} });
+      }
+    }
+  };
+  let count = 0;${clickLoop}
+  // toggle checkbox/radio, then restore
+  for (const t of Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'))) {
+    if (count >= 40 || hits.length >= 10) break;
+    if (t.disabled || !__vis(t)) continue;
+    const before = location.href;
+    const prev = t.checked;
+    try { t.click(); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return hits; }
+    drain();
+    try { if (t.checked !== prev) { t.checked = prev; t.dispatchEvent(new Event('change', { bubbles: true })); } } catch (_) {}
+    count++;
+  }
+  // fill text inputs, then restore
+  for (const inp of Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="search"], textarea'))) {
+    if (count >= 60 || hits.length >= 10) break;
+    if (inp.disabled || inp.readOnly || !__vis(inp)) continue;
+    const before = location.href;
+    const prev = inp.value == null ? '' : String(inp.value);
+    try { inp.value = 'test 123'; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return hits; }
+    drain();
+    try { inp.value = prev; inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    count++;
+  }
+  obs.disconnect();
+  return hits.slice(0, 10);
+})()`;
+}
+export const LIVE_REGION_DETAIL = {
+  fr: "Mise à jour de contenu déclenchée par une interaction hors d'une région live (aria-live / role=status|alert|log) — probablement non restituée aux technologies d'assistance.",
+  en: "Content update triggered by an interaction outside any live region (aria-live / role=status|alert|log) — likely not announced to assistive technology.",
+};
+
+export async function probeLiveRegion(page: Any, lang: keyof typeof LIVE_REGION_DETAIL, allowClicks: boolean): Promise<ProbeHit[]> {
+  const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
+  // NO `.catch(() => [])` HERE ANY MORE. It turned a probe that never ran into a probe that
+  // found nothing, and the callers then credited 4.1.3 either way — the same shape of false
+  // conformity the tab-ring walks used to produce. Each caller has its own guard, and each one
+  // records the failure where it belongs (`skipped`) instead of publishing silence.
+  return (await page.evaluate(liveRegionExpr(detail, allowClicks))) as ProbeHit[];
 }
 
 /** Undo the text-spacing override. Identified by its own declaration rather than by a handle,
@@ -899,6 +1067,9 @@ export interface LiveProbeResult {
   reflowZoom: ProbeHit[];
   textSpacing: ProbeHit[];
   reflow: { horizontalScroll: boolean };
+  /** 4.1.3 — content updated by an interaction outside any live region. Present only when the
+   *  caller opted in: unlike every other probe here, this one TYPES INTO the page. */
+  liveRegion?: ProbeHit[];
   /** The success criteria actually probed on THIS page. Absence of a hit only means
    *  something when the probe ran, which is why this travels with the hits. */
   probed: string[];

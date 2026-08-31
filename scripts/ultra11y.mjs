@@ -52573,7 +52573,16 @@ function probeFindings(probes, file, page) {
     ["keyboardTrap", "keyboard-trap"],
     ["hover", "hover"],
     ["reflowZoom", "reflow-zoom"],
-    ["textSpacing", "text-spacing"]
+    ["textSpacing", "text-spacing"],
+    // The STATEFUL families — measured after the page was typed into, and `probed` credits
+    // their criteria all the same. Which document a post-interaction observation is attached
+    // to is an attribution question; dropping it is a correctness one, and only one of the two
+    // can publish « conforme » over a failure a browser reproduced. Anchored at the page like
+    // every other probe finding, which is where the attribution that matters already lives.
+    ["liveRegion", "live-region"],
+    ["inputOverflowReflow", "input-overflow-reflow"],
+    ["inputOverflowZoom", "input-overflow-zoom"],
+    ["inputOverflowSpacing", "input-overflow-spacing"]
   ];
   for (const [key2, engine] of buckets) {
     const hits = probes[key2];
@@ -58986,7 +58995,12 @@ var L5 = {
     wcagStd: "WCAG 2.2 niveau AA",
     date: "Date",
     tool: "Outil",
+    // TWO NOTES, BECAUSE THERE ARE TWO KINDS OF RUN — and the header used to publish the
+    // first one over both. A sweep that captured thirty-seven real pages, measured them in a
+    // browser and had an adjudicator rule on the result introduced itself as a preliminary
+    // static pass, which is the one thing it was not.
     toolNote: "moteur statique \u2014 audit pr\xE9liminaire, crit\xE8res de jugement \xE0 adjuger par l'agent IA (statique, gat\xE9), rendu via `scan`",
+    toolNoteRendered: (pages) => `moteur statique + tier rendu \u2014 ${pages} page(s) captur\xE9e(s) audit\xE9e(s) sur leur DOM r\xE9el, crit\xE8res de jugement adjug\xE9s par l'agent IA (gat\xE9)`,
     scope: "P\xE9rim\xE8tre",
     files: "fichier(s)",
     rate: "Taux de r\xE9ussite automatique (v\xE9rifications statiques)",
@@ -59033,7 +59047,12 @@ var L5 = {
     duplicate: "doublon(s) identique(s) ignor\xE9(s)",
     truncated: (l, t3, s) => `P\xE9rim\xE8tre tronqu\xE9 : ${l}/${t3} fichiers audit\xE9s (priorit\xE9 d'abord), ${s} ignor\xE9(s). \xC9largir avec --max-files.`,
     rendered: (n, libs) => `Verdict source pr\xE9liminaire : ${n} fichier(s) rendent des composants de biblioth\xE8que (${libs}) dont le HTML produit n'est pas visible en analyse statique. Auditez la sortie de build (\`render\` / \`audit <dist>\`) ou \`scan\` avant de conclure.`,
+    // THE FACT SURVIVES, THE INSTRUCTION DOES NOT. Those source files really do render opaque
+    // components — but « auditez la sortie de build avant de conclure » is spent advice in a
+    // document whose scope line says the produced HTML of N pages was read.
+    renderedAudited: (n, libs, pages) => `${n} fichier(s) rendent des composants de biblioth\xE8que (${libs}) invisibles en analyse statique \u2014 leur HTML produit a \xE9t\xE9 audit\xE9 sur ${pages} page(s) captur\xE9e(s). Les composants sans capture restent des angles morts.`,
     sourceTemplate: (n, exts) => `Verdict source pr\xE9liminaire : ${n} composant(s) ${exts} audit\xE9(s) en SOURCE (template). Les slots, snippets et liaisons dynamiques (:attr, {@render}) sont invisibles en analyse statique \u2014 auditez le rendu (\`render\` / \`scan\`) avant de conclure.`,
+    sourceTemplateAudited: (n, exts, pages) => `${n} composant(s) ${exts} audit\xE9(s) en SOURCE (template) ; leurs slots et liaisons dynamiques ont \xE9t\xE9 audit\xE9s sur ${pages} page(s) captur\xE9e(s). Les composants sans capture restent des angles morts.`,
     captures: (n) => `${n} fichier(s) de capture rendus audit\xE9s \xE0 pleine fid\xE9lit\xE9 (DOM r\xE9el) \u2014 le vrai HTML produit, pas l'appel de composant.`,
     blindSpots: (n) => `${n} composant(s) sans capture rendue (angles morts) \u2014 audit\xE9s sur source opaque uniquement ; auditez leur DOM rendu (\`render --setup\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
@@ -59069,6 +59088,7 @@ var L5 = {
     date: "Date",
     tool: "Tool",
     toolNote: "static engine \u2014 preliminary audit; judgment criteria adjudicated by the AI agent (statically, gated), rendering via `scan`",
+    toolNoteRendered: (pages) => `static engine + rendered tier \u2014 ${pages} captured page(s) audited on their real DOM; judgment criteria adjudicated by the AI agent (gated)`,
     scope: "Scope",
     files: "file(s)",
     rate: "Automatic static-check pass rate",
@@ -59111,7 +59131,9 @@ var L5 = {
     duplicate: "identical duplicate(s) skipped",
     truncated: (l, t3, s) => `Scope truncated: ${l}/${t3} files audited (highest-priority first), ${s} skipped. Widen with --max-files.`,
     rendered: (n, libs) => `Preliminary source verdict: ${n} file(s) render component-library components (${libs}) whose produced HTML is invisible to static analysis. Audit the build output (\`render\` / \`audit <dist>\`) or \`scan\` before concluding.`,
+    renderedAudited: (n, libs, pages) => `${n} file(s) render component-library components (${libs}) invisible to static analysis \u2014 their produced HTML was audited on ${pages} captured page(s). Components with no capture remain blind spots.`,
     sourceTemplate: (n, exts) => `Preliminary source verdict: ${n} ${exts} component(s) audited as SOURCE (template). Slots, snippets and dynamic bindings (:attr, {@render}) are invisible to static analysis \u2014 audit the rendered output (\`render\` / \`scan\`) before concluding.`,
+    sourceTemplateAudited: (n, exts, pages) => `${n} ${exts} component(s) audited as SOURCE (template); their slots and dynamic bindings were audited on ${pages} captured page(s). Components with no capture remain blind spots.`,
     captures: (n) => `${n} rendered capture file(s) audited at full fidelity (real DOM) \u2014 the true produced HTML, not the component call.`,
     blindSpots: (n) => `${n} component(s) without a rendered capture (blind spots) \u2014 audited from opaque source only; audit their rendered DOM (\`render --setup\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
@@ -59156,10 +59178,15 @@ var NEEDS_RENDERING = [
   { sc: "2.4.11", label: { fr: "focus masqu\xE9", en: "focus obscured" } },
   { sc: "4.1.3", label: { fr: "r\xE9gions live", en: "live regions" } }
 ];
-function untestedNeedsRendering(r) {
+function untestedNeedsRendering(r, established = /* @__PURE__ */ new Set()) {
   const tested = new Set(r.scope.scan?.testedScs ?? []);
   for (const f of r.findings) if (f.ruleId.startsWith("dyn-")) tested.add(f.criteriaId);
-  return NEEDS_RENDERING.filter((c2) => !tested.has(c2.sc)).map((c2) => c2.sc);
+  return NEEDS_RENDERING.filter((c2) => !tested.has(c2.sc) && !established.has(c2.sc)).map((c2) => c2.sc);
+}
+function establishedScs(derived) {
+  const out2 = /* @__PURE__ */ new Set();
+  for (const d of derived) if (d.status === "NC" || d.decidedBy === "agent") for (const sc of d.scs) out2.add(sc);
+  return out2;
 }
 function partialAuditBanner(lang, untested = NEEDS_RENDERING.map((c2) => c2.sc)) {
   const set = new Set(untested);
@@ -59248,11 +59275,11 @@ function render(r, lang, opts) {
   const out2 = [];
   out2.push(`# ${s.title(opts.std)}`, "");
   out2.push(`- **${s.date}** : ${r.date}`);
-  out2.push(`- **${s.tool}** : ultra11y v${r.version} (${s.toolNote})`);
+  const pagesRead = r.scope.pagesAudited?.length ?? 0;
+  out2.push(`- **${s.tool}** : ultra11y v${r.version} (${pagesRead > 0 ? s.toolNoteRendered(pagesRead) : s.toolNote})`);
   out2.push(`- **${s.scope}** : ${r.scope.files} ${s.files} \u2014 ${r.scope.inputs.join(", ")}`);
   out2.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% (${s.rateNote})`);
-  const renderedPages = r.scope.pagesAudited?.length ?? 0;
-  out2.push(`- **${s.renderedPages(renderedPages)}**${renderedPages === 0 ? ` \u2014 ${s.noRenderedPages}` : ""}`);
+  out2.push(`- **${s.renderedPages(pagesRead)}**${pagesRead === 0 ? ` \u2014 ${s.noRenderedPages}` : ""}`);
   const automation = automationOverview(opts.standard);
   if (automation) {
     out2.push(
@@ -59273,8 +59300,14 @@ function render(r, lang, opts) {
   if (opts.partialAudit?.length) out2.push(`> \u{1F6A8} ${partialAuditBanner(lang, opts.partialAudit)}`, "");
   if (opts.derivedOf) out2.push(`> \u21AA\uFE0F ${s.derived(opts.derivedOf)}`, "");
   if (r.scope.truncated) out2.push(`> \u2702\uFE0F ${s.truncated(r.scope.truncated.limit, r.scope.truncated.total, r.scope.truncated.skipped)}`, "");
-  if (r.scope.rendered) out2.push(`> \u{1F9E9} ${s.rendered(r.scope.rendered.files, r.scope.rendered.opaqueLibraries.join(", "))}`, "");
-  if (r.scope.sourceTemplate) out2.push(`> \u{1F9E9} ${s.sourceTemplate(r.scope.sourceTemplate.files, r.scope.sourceTemplate.extensions.join(", "))}`, "");
+  if (r.scope.rendered) {
+    const { files, opaqueLibraries } = r.scope.rendered;
+    out2.push(`> \u{1F9E9} ${pagesRead > 0 ? s.renderedAudited(files, opaqueLibraries.join(", "), pagesRead) : s.rendered(files, opaqueLibraries.join(", "))}`, "");
+  }
+  if (r.scope.sourceTemplate) {
+    const { files, extensions } = r.scope.sourceTemplate;
+    out2.push(`> \u{1F9E9} ${pagesRead > 0 ? s.sourceTemplateAudited(files, extensions.join(", "), pagesRead) : s.sourceTemplate(files, extensions.join(", "))}`, "");
+  }
   if (r.scope.captures) out2.push(`> \u2705 ${s.captures(r.scope.captures.files)}`, "");
   if (r.scope.captureCoverage?.blindSpots.length) out2.push(`> \u26A0\uFE0F ${s.blindSpots(r.scope.captureCoverage.blindSpots.length)}`, "");
   const rows = opts.groups.flatMap((g) => g.rows);
@@ -59438,7 +59471,7 @@ function renderPackReport(r, pack, lang = "en", outDir, cropFor) {
     groups: packReportGroups(r, pack, lang),
     derivedOf: std,
     standard: pack.key,
-    partialAudit: untestedNeedsRendering(r),
+    partialAudit: untestedNeedsRendering(r, establishedScs(derived)),
     headerRatePct: packConformancePct(derived),
     // Forwarded, unlike before: without it the per-page screenshots resolved against the
     // CWD instead of the report's own directory, so a pack report written to `audits/`
@@ -64721,6 +64754,10 @@ function probesOf(out2) {
     ...out2.hover ? { hover: out2.hover } : {},
     ...out2.reflowZoom ? { reflowZoom: out2.reflowZoom } : {},
     ...out2.textSpacing ? { textSpacing: out2.textSpacing } : {},
+    ...out2.liveRegion ? { liveRegion: out2.liveRegion } : {},
+    ...out2.inputOverflowReflow ? { inputOverflowReflow: out2.inputOverflowReflow } : {},
+    ...out2.inputOverflowZoom ? { inputOverflowZoom: out2.inputOverflowZoom } : {},
+    ...out2.inputOverflowSpacing ? { inputOverflowSpacing: out2.inputOverflowSpacing } : {},
     reflow: out2.reflow,
     probed: out2.probed ?? [],
     // The complement of `probed`, persisted for the same reason: a report reading this
@@ -65584,6 +65621,111 @@ async function probeHover(page, limits = PROBE_DEFAULTS, deadline) {
   }
   return hits;
 }
+var DESTRUCTIVE_NAME_RE = "\\b(supprim|retir|effac|envoy|valid|confirm|pay|achet|command|delete|remove|eras|clear|send|submit|buy|order)";
+function liveRegionExpr(detail, allowClicks) {
+  const d = JSON.stringify(detail);
+  const clickLoop = allowClicks ? `
+  // click button[type=button] only (never a submit/link), skipping destructive names
+  const dangerous = new RegExp(${JSON.stringify(DESTRUCTIVE_NAME_RE)}, 'i');
+  const nameOf = (b) => {
+    let n = (b.getAttribute('aria-label') || '') + ' ' + (b.textContent || '') + ' ' + (b.getAttribute('title') || '');
+    // ALL aria-labelledby ids (attribute trimmed): a destructive verb may sit in ANY
+    // referenced id, and the value may carry stray leading/trailing whitespace.
+    for (const id of (b.getAttribute('aria-labelledby') || '').trim().split(/\\s+/)) {
+      if (!id) continue;
+      const t = document.getElementById(id);
+      if (t) n += ' ' + (t.textContent || '');
+    }
+    // Icon-only buttons: the name lives in img[alt] (an attribute \u2014 invisible to
+    // textContent) or an svg <title> (belt-and-braces; textContent usually includes it).
+    for (const im of Array.from(b.querySelectorAll('img[alt]'))) n += ' ' + (im.getAttribute('alt') || '');
+    for (const ti of Array.from(b.querySelectorAll('svg title'))) n += ' ' + (ti.textContent || '');
+    return n;
+  };
+  for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
+    if (count >= 20 || hits.length >= 10) break;
+    if (b.disabled || !__vis(b)) continue;
+    if (dangerous.test(nameOf(b))) continue; // defense-in-depth: never click a destructive-named button
+    const before = location.href;
+    try { b.click(); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return hits; }
+    drain();
+    count++;
+  }` : `
+  // click interactions disabled (authenticated scan without --interact-clicks)`;
+  return `(async () => { ${PRELUDE}
+  const isLive = (node) => {
+    let el = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
+    while (el && el !== document.documentElement) {
+      const live = (el.getAttribute && el.getAttribute('aria-live')) || '';
+      const role = (el.getAttribute && el.getAttribute('role')) || '';
+      if (live === 'polite' || live === 'assertive') return true;
+      if (role === 'status' || role === 'alert' || role === 'log') return true;
+      el = el.parentElement;
+    }
+    return false;
+  };
+  const hits = [];
+  const seen = new Set();
+  const records = [];
+  const obs = new MutationObserver((muts) => { for (const m of muts) records.push(m); });
+  obs.observe(document.body, { subtree: true, childList: true, characterData: true });
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  const drain = () => {
+    for (const m of records.splice(0)) {
+      const targets = m.type === 'characterData' ? [m.target] : Array.from(m.addedNodes);
+      for (const t of targets) {
+        if (!t || (t.textContent || '').trim().length === 0) continue;
+        if (isLive(t)) continue;
+        const host = t.nodeType === 1 ? t : t.parentElement;
+        if (!host || !__vis(host)) continue;
+        const key = __sel(host);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        hits.push({ selector: key, html: __html(host), detail: ${d} });
+      }
+    }
+  };
+  let count = 0;${clickLoop}
+  // toggle checkbox/radio, then restore
+  for (const t of Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'))) {
+    if (count >= 40 || hits.length >= 10) break;
+    if (t.disabled || !__vis(t)) continue;
+    const before = location.href;
+    const prev = t.checked;
+    try { t.click(); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return hits; }
+    drain();
+    try { if (t.checked !== prev) { t.checked = prev; t.dispatchEvent(new Event('change', { bubbles: true })); } } catch (_) {}
+    count++;
+  }
+  // fill text inputs, then restore
+  for (const inp of Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="search"], textarea'))) {
+    if (count >= 60 || hits.length >= 10) break;
+    if (inp.disabled || inp.readOnly || !__vis(inp)) continue;
+    const before = location.href;
+    const prev = inp.value == null ? '' : String(inp.value);
+    try { inp.value = 'test 123'; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return hits; }
+    drain();
+    try { inp.value = prev; inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    count++;
+  }
+  obs.disconnect();
+  return hits.slice(0, 10);
+})()`;
+}
+var LIVE_REGION_DETAIL = {
+  fr: "Mise \xE0 jour de contenu d\xE9clench\xE9e par une interaction hors d'une r\xE9gion live (aria-live / role=status|alert|log) \u2014 probablement non restitu\xE9e aux technologies d'assistance.",
+  en: "Content update triggered by an interaction outside any live region (aria-live / role=status|alert|log) \u2014 likely not announced to assistive technology."
+};
+async function probeLiveRegion(page, lang, allowClicks) {
+  const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
+  return await page.evaluate(liveRegionExpr(detail, allowClicks));
+}
 
 // src/scan-local.ts
 var LOCAL_ENGINE = "axe-core@playwright (local)";
@@ -65823,107 +65965,6 @@ async function probeDialogs(page) {
   });
   return hits.slice(0, 12);
 }
-var DESTRUCTIVE_NAME_RE = "\\b(supprim|retir|effac|envoy|valid|confirm|pay|achet|command|delete|remove|eras|clear|send|submit|buy|order)";
-function liveRegionExpr(detail, allowClicks) {
-  const d = JSON.stringify(detail);
-  const clickLoop = allowClicks ? `
-  // click button[type=button] only (never a submit/link), skipping destructive names
-  const dangerous = new RegExp(${JSON.stringify(DESTRUCTIVE_NAME_RE)}, 'i');
-  const nameOf = (b) => {
-    let n = (b.getAttribute('aria-label') || '') + ' ' + (b.textContent || '') + ' ' + (b.getAttribute('title') || '');
-    // ALL aria-labelledby ids (attribute trimmed): a destructive verb may sit in ANY
-    // referenced id, and the value may carry stray leading/trailing whitespace.
-    for (const id of (b.getAttribute('aria-labelledby') || '').trim().split(/\\s+/)) {
-      if (!id) continue;
-      const t = document.getElementById(id);
-      if (t) n += ' ' + (t.textContent || '');
-    }
-    // Icon-only buttons: the name lives in img[alt] (an attribute \u2014 invisible to
-    // textContent) or an svg <title> (belt-and-braces; textContent usually includes it).
-    for (const im of Array.from(b.querySelectorAll('img[alt]'))) n += ' ' + (im.getAttribute('alt') || '');
-    for (const ti of Array.from(b.querySelectorAll('svg title'))) n += ' ' + (ti.textContent || '');
-    return n;
-  };
-  for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
-    if (count >= 20 || hits.length >= 10) break;
-    if (b.disabled || !__vis(b)) continue;
-    if (dangerous.test(nameOf(b))) continue; // defense-in-depth: never click a destructive-named button
-    const before = location.href;
-    try { b.click(); } catch (_) {}
-    await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
-    drain();
-    count++;
-  }` : `
-  // click interactions disabled (authenticated scan without --interact-clicks)`;
-  return `(async () => { ${PRELUDE}
-  const isLive = (node) => {
-    let el = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
-    while (el && el !== document.documentElement) {
-      const live = (el.getAttribute && el.getAttribute('aria-live')) || '';
-      const role = (el.getAttribute && el.getAttribute('role')) || '';
-      if (live === 'polite' || live === 'assertive') return true;
-      if (role === 'status' || role === 'alert' || role === 'log') return true;
-      el = el.parentElement;
-    }
-    return false;
-  };
-  const hits = [];
-  const seen = new Set();
-  const records = [];
-  const obs = new MutationObserver((muts) => { for (const m of muts) records.push(m); });
-  obs.observe(document.body, { subtree: true, childList: true, characterData: true });
-  const settle = () => new Promise((r) => setTimeout(r, 40));
-  const drain = () => {
-    for (const m of records.splice(0)) {
-      const targets = m.type === 'characterData' ? [m.target] : Array.from(m.addedNodes);
-      for (const t of targets) {
-        if (!t || (t.textContent || '').trim().length === 0) continue;
-        if (isLive(t)) continue;
-        const host = t.nodeType === 1 ? t : t.parentElement;
-        if (!host || !__vis(host)) continue;
-        const key = __sel(host);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        hits.push({ selector: key, html: __html(host), detail: ${d} });
-      }
-    }
-  };
-  let count = 0;${clickLoop}
-  // toggle checkbox/radio, then restore
-  for (const t of Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'))) {
-    if (count >= 40 || hits.length >= 10) break;
-    if (t.disabled || !__vis(t)) continue;
-    const before = location.href;
-    const prev = t.checked;
-    try { t.click(); } catch (_) {}
-    await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
-    drain();
-    try { if (t.checked !== prev) { t.checked = prev; t.dispatchEvent(new Event('change', { bubbles: true })); } } catch (_) {}
-    count++;
-  }
-  // fill text inputs, then restore
-  for (const inp of Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="search"], textarea'))) {
-    if (count >= 60 || hits.length >= 10) break;
-    if (inp.disabled || inp.readOnly || !__vis(inp)) continue;
-    const before = location.href;
-    const prev = inp.value == null ? '' : String(inp.value);
-    try { inp.value = 'test 123'; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
-    await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
-    drain();
-    try { inp.value = prev; inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
-    count++;
-  }
-  obs.disconnect();
-  return hits.slice(0, 10);
-})()`;
-}
-var LIVE_REGION_DETAIL = {
-  fr: "Mise \xE0 jour de contenu d\xE9clench\xE9e par une interaction hors d'une r\xE9gion live (aria-live / role=status|alert|log) \u2014 probablement non restitu\xE9e aux technologies d'assistance.",
-  en: "Content update triggered by an interaction outside any live region (aria-live / role=status|alert|log) \u2014 likely not announced to assistive technology."
-};
 function clicksAllowed(storageState, interactClicks) {
   return interactClicks === true || !storageState;
 }
@@ -65946,10 +65987,6 @@ function landedOnRequestedPage(requested, landed) {
   if (a.hash && a.hash !== b.hash) return false;
   if (a.search && a.search !== b.search) return false;
   return true;
-}
-async function probeLiveRegion(page, lang, allowClicks) {
-  const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
-  return await page.evaluate(liveRegionExpr(detail, allowClicks)).catch(() => []);
 }
 var AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
@@ -66038,7 +66075,7 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
     if (opts.interact) await page.evaluate(RESTORE_INPUTS_STEP).catch(() => {
     });
     const dialogFocus = opts.interact ? await probeDialogs(page).catch(() => empty) : [];
-    const liveRegion = opts.interact ? await probeLiveRegion(page, l, opts.allowClicks).catch(() => empty) : [];
+    const liveRegion = opts.interact ? await ran("4.1.3", empty, () => probeLiveRegion(page, l, opts.allowClicks)) : [];
     return {
       url: page.url() || target,
       landedUrl,

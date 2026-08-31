@@ -67,6 +67,42 @@ describe("a probe hit persisted in a snapshot is a non-conformity after re-inges
     expect(of(r, "2.4.11")?.status).toBe("NC");
   });
 
+  // The same defect, in the family that measures a page AFTER an interaction. `probed` claims
+  // 4.1.3 and the three input-overflow stresses claim 1.4.4 / 1.4.10 / 1.4.12 — so a hit that
+  // does not survive the snapshot is a conformity published over an observed failure. Which
+  // document the measurement is attached to is an attribution question; dropping it is a
+  // correctness one, and only one of the two can produce a false « conforme ».
+  it("folds a status message announced to nobody into 4.1.3", () => {
+    const r = auditWith({
+      probed: [...PROBED, "4.1.3"],
+      liveRegion: [{ selector: "div.fr-alert", html: "<div class=fr-alert>", detail: "Mise à jour de contenu hors d'une région live." }],
+    });
+    expect(r.findings.some((f) => f.ruleId === "dyn-live-region" && f.criteriaId === "4.1.3")).toBe(true);
+    expect(of(r, "4.1.3")?.status).toBe("NC");
+  });
+
+  it("folds a typed value clipped under each stress onto the criterion that stress evidences", () => {
+    const hit = (d: string) => [{ selector: "input#x", html: "<input id=x>", detail: d }];
+    const r = auditWith({
+      probed: PROBED,
+      inputOverflowReflow: hit("valeur saisie tronquée à 320 px"),
+      inputOverflowZoom: hit("valeur saisie tronquée à 200 %"),
+      inputOverflowSpacing: hit("valeur saisie tronquée sous l'espacement forcé"),
+    });
+    const stresses: [string, string][] = [
+      ["dyn-input-overflow-reflow", "1.4.10"],
+      ["dyn-input-overflow-zoom", "1.4.4"],
+      ["dyn-input-overflow-spacing", "1.4.12"],
+    ];
+    for (const [rule, sc] of stresses) {
+      expect(
+        r.findings.some((f) => f.ruleId === rule && f.criteriaId === sc),
+        `${rule} was dropped`,
+      ).toBe(true);
+      expect(of(r, sc)?.status, sc).toBe("NC");
+    }
+  });
+
   it("still clears both when the walk was complete and found nothing", () => {
     // The other half: this must not turn into a blanket refusal to conclude. A ring that was
     // walked with no hit is a measurement, and it is allowed to say so.

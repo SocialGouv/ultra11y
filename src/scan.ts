@@ -233,9 +233,15 @@ function pageIdFor(url: string): string {
  *  A straight projection — no filtering, no inference. `probed` arrives from the producer
  *  because the producer is the only thing that knows whether a probe ran at all: a caller
  *  reading `textSpacing: []` cannot tell "measured, nothing clipped" from "never applied the
- *  override". The stateful probes (input overflow, live region) are deliberately absent: they
- *  measure a page that has been TYPED INTO, and the snapshot beside them is the pristine one,
- *  so filing them here would attach a measurement to a document that never had that state. */
+ *  override".
+ *
+ *  THE STATEFUL FAMILIES RIDE ALONG TOO, which they did not use to. The objection was that they
+ *  measure a page that has been TYPED INTO while the snapshot beside them is the pristine one —
+ *  true, and an attribution point. But `probed` credits their criteria either way, so leaving
+ *  them out did not make the record more careful: it made a run that had OBSERVED a clipped
+ *  value or an unannounced status message publish conformity on it. A finding attached to the
+ *  right page and the wrong DOM state is a citation an auditor can check; a finding thrown away
+ *  is a conformity nobody can. */
 function probesOf(out: RunnerOutput): SnapshotProbes {
   return {
     ...(out.focusVisible ? { focusVisible: out.focusVisible } : {}),
@@ -248,6 +254,10 @@ function probesOf(out: RunnerOutput): SnapshotProbes {
     ...(out.hover ? { hover: out.hover } : {}),
     ...(out.reflowZoom ? { reflowZoom: out.reflowZoom } : {}),
     ...(out.textSpacing ? { textSpacing: out.textSpacing } : {}),
+    ...(out.liveRegion ? { liveRegion: out.liveRegion } : {}),
+    ...(out.inputOverflowReflow ? { inputOverflowReflow: out.inputOverflowReflow } : {}),
+    ...(out.inputOverflowZoom ? { inputOverflowZoom: out.inputOverflowZoom } : {}),
+    ...(out.inputOverflowSpacing ? { inputOverflowSpacing: out.inputOverflowSpacing } : {}),
     reflow: out.reflow,
     probed: out.probed ?? [],
     // The complement of `probed`, persisted for the same reason: a report reading this

@@ -22,12 +22,15 @@ import {
   focusSetupExpr,
   HOVER_SETUP_PROBE,
   hoverVisibleExpr,
+  LIVE_REGION_DETAIL,
+  liveRegionExpr,
   PRELUDE,
   REMOVE_TEXT_SPACING_STEP,
   probeFocusRing,
   probeFocusVisible,
   probeHover,
   probeKeyboardTrapRing,
+  probeLiveRegion,
   REFLOW_PROBE,
   REFLOW_ZOOM_PROBE,
   TEXT_SPACING_CSS,
@@ -382,131 +385,6 @@ async function probeDialogs(page: Any): Promise<ProbeHit[]> {
   return hits.slice(0, 12);
 }
 
-// (5) LIVE_REGION_PROBE — WCAG 4.1.3 Status Messages (honest heuristic, severity mineur).
-// Install a MutationObserver on <body>, perform ONLY the safe interactions above, and flag
-// a text update whose nearest ancestor is NOT a live region (aria-live / role=status|alert
-// |log) — it was likely never announced to assistive tech. location.href is asserted after
-// each interaction (abort + restore on any change). Interactions and hits are bounded.
-//
-// HEURISTIC HONESTY: an EXPECTED context change (a dialog opening, an accordion panel
-// expanding after its toggle) also mutates non-live text and can fire this probe — such
-// updates don't necessarily need a live region. That is why the finding is `mineur` with
-// "likely/probablement" framing, deliberately: it points the auditor at the update, it does
-// not claim certainty.
-//
-// CLICK SAFETY (authenticated scans): even a `button[type="button"]` click can trigger a
-// server MUTATION (delete a row, send a message) that the location.href assertion cannot
-// see. So the click loop is emitted ONLY when `allowClicks` is true — the caller disables
-// it by default whenever a storageState (authenticated session) is in use, re-enabled via
-// `scan --interact-clicks`; unauthenticated scans keep clicks on. Defense-in-depth on top:
-// even when clicks are on, a button whose accessible name matches a destructive/submitting
-// verb (fr/en: supprimer, retirer, effacer, envoyer, valider, confirmer, payer, delete,
-// remove, send, submit, confirm, pay, …) is never clicked. Fill/toggle interactions always
-// run (they are the confirmed real-world need) and are restored.
-const DESTRUCTIVE_NAME_RE = "\\b(supprim|retir|effac|envoy|valid|confirm|pay|achet|command|delete|remove|eras|clear|send|submit|buy|order)";
-function liveRegionExpr(detail: string, allowClicks: boolean): string {
-  const d = JSON.stringify(detail);
-  const clickLoop = allowClicks
-    ? `
-  // click button[type=button] only (never a submit/link), skipping destructive names
-  const dangerous = new RegExp(${JSON.stringify(DESTRUCTIVE_NAME_RE)}, 'i');
-  const nameOf = (b) => {
-    let n = (b.getAttribute('aria-label') || '') + ' ' + (b.textContent || '') + ' ' + (b.getAttribute('title') || '');
-    // ALL aria-labelledby ids (attribute trimmed): a destructive verb may sit in ANY
-    // referenced id, and the value may carry stray leading/trailing whitespace.
-    for (const id of (b.getAttribute('aria-labelledby') || '').trim().split(/\\s+/)) {
-      if (!id) continue;
-      const t = document.getElementById(id);
-      if (t) n += ' ' + (t.textContent || '');
-    }
-    // Icon-only buttons: the name lives in img[alt] (an attribute — invisible to
-    // textContent) or an svg <title> (belt-and-braces; textContent usually includes it).
-    for (const im of Array.from(b.querySelectorAll('img[alt]'))) n += ' ' + (im.getAttribute('alt') || '');
-    for (const ti of Array.from(b.querySelectorAll('svg title'))) n += ' ' + (ti.textContent || '');
-    return n;
-  };
-  for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
-    if (count >= 20 || hits.length >= 10) break;
-    if (b.disabled || !__vis(b)) continue;
-    if (dangerous.test(nameOf(b))) continue; // defense-in-depth: never click a destructive-named button
-    const before = location.href;
-    try { b.click(); } catch (_) {}
-    await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
-    drain();
-    count++;
-  }`
-    : `
-  // click interactions disabled (authenticated scan without --interact-clicks)`;
-  return `(async () => { ${PRELUDE}
-  const isLive = (node) => {
-    let el = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
-    while (el && el !== document.documentElement) {
-      const live = (el.getAttribute && el.getAttribute('aria-live')) || '';
-      const role = (el.getAttribute && el.getAttribute('role')) || '';
-      if (live === 'polite' || live === 'assertive') return true;
-      if (role === 'status' || role === 'alert' || role === 'log') return true;
-      el = el.parentElement;
-    }
-    return false;
-  };
-  const hits = [];
-  const seen = new Set();
-  const records = [];
-  const obs = new MutationObserver((muts) => { for (const m of muts) records.push(m); });
-  obs.observe(document.body, { subtree: true, childList: true, characterData: true });
-  const settle = () => new Promise((r) => setTimeout(r, 40));
-  const drain = () => {
-    for (const m of records.splice(0)) {
-      const targets = m.type === 'characterData' ? [m.target] : Array.from(m.addedNodes);
-      for (const t of targets) {
-        if (!t || (t.textContent || '').trim().length === 0) continue;
-        if (isLive(t)) continue;
-        const host = t.nodeType === 1 ? t : t.parentElement;
-        if (!host || !__vis(host)) continue;
-        const key = __sel(host);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        hits.push({ selector: key, html: __html(host), detail: ${d} });
-      }
-    }
-  };
-  let count = 0;${clickLoop}
-  // toggle checkbox/radio, then restore
-  for (const t of Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'))) {
-    if (count >= 40 || hits.length >= 10) break;
-    if (t.disabled || !__vis(t)) continue;
-    const before = location.href;
-    const prev = t.checked;
-    try { t.click(); } catch (_) {}
-    await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
-    drain();
-    try { if (t.checked !== prev) { t.checked = prev; t.dispatchEvent(new Event('change', { bubbles: true })); } } catch (_) {}
-    count++;
-  }
-  // fill text inputs, then restore
-  for (const inp of Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="search"], textarea'))) {
-    if (count >= 60 || hits.length >= 10) break;
-    if (inp.disabled || inp.readOnly || !__vis(inp)) continue;
-    const before = location.href;
-    const prev = inp.value == null ? '' : String(inp.value);
-    try { inp.value = 'test 123'; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
-    await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
-    drain();
-    try { inp.value = prev; inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
-    count++;
-  }
-  obs.disconnect();
-  return hits.slice(0, 10);
-})()`;
-}
-const LIVE_REGION_DETAIL = {
-  fr: "Mise à jour de contenu déclenchée par une interaction hors d'une région live (aria-live / role=status|alert|log) — probablement non restituée aux technologies d'assistance.",
-  en: "Content update triggered by an interaction outside any live region (aria-live / role=status|alert|log) — likely not announced to assistive technology.",
-};
-
 /** Should the live-region probe CLICK buttons? Never by default on an authenticated scan
  *  (a storageState session is loaded — a click could trigger a server mutation the
  *  location.href assertion cannot see); `scan --interact-clicks` re-enables explicitly.
@@ -567,11 +445,6 @@ export function landedOnRequestedPage(requested: string, landed: string): boolea
   if (a.hash && a.hash !== b.hash) return false;
   if (a.search && a.search !== b.search) return false;
   return true;
-}
-
-async function probeLiveRegion(page: Any, lang: Lang, allowClicks: boolean): Promise<ProbeHit[]> {
-  const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
-  return (await page.evaluate(liveRegionExpr(detail, allowClicks)).catch(() => [])) as ProbeHit[];
 }
 
 // ---- CI probe-string guard ------------------------------------------------------------
@@ -775,7 +648,9 @@ async function runOnPage(
     // measurement probe would leak that state into the measurements. Dialog focus issues
     // fold into the same 2.4.7 focus-visible bucket.
     const dialogFocus = opts.interact ? await probeDialogs(page).catch(() => empty) : [];
-    const liveRegion = opts.interact ? await probeLiveRegion(page, l, opts.allowClicks).catch(() => empty) : [];
+    // Through the same guard as every other probe, so a page whose live-region pass THREW is
+    // recorded as unmeasured rather than as clean.
+    const liveRegion = opts.interact ? await ran("4.1.3", empty, () => probeLiveRegion(page, l, opts.allowClicks)) : [];
     return {
       url: (page.url() as string) || target,
       landedUrl,

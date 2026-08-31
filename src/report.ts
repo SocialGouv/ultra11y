@@ -27,6 +27,7 @@ import {
   packTestIds,
   title as packTitle,
   themeName,
+  type PackCriterionResult,
   type StandardPack,
 } from "./standards/index.js";
 
@@ -45,7 +46,13 @@ const L = {
     wcagStd: "WCAG 2.2 niveau AA",
     date: "Date",
     tool: "Outil",
+    // TWO NOTES, BECAUSE THERE ARE TWO KINDS OF RUN — and the header used to publish the
+    // first one over both. A sweep that captured thirty-seven real pages, measured them in a
+    // browser and had an adjudicator rule on the result introduced itself as a preliminary
+    // static pass, which is the one thing it was not.
     toolNote: "moteur statique — audit préliminaire, critères de jugement à adjuger par l'agent IA (statique, gaté), rendu via `scan`",
+    toolNoteRendered: (pages: number) =>
+      `moteur statique + tier rendu — ${pages} page(s) capturée(s) auditée(s) sur leur DOM réel, critères de jugement adjugés par l'agent IA (gaté)`,
     scope: "Périmètre",
     files: "fichier(s)",
     rate: "Taux de réussite automatique (vérifications statiques)",
@@ -102,8 +109,15 @@ const L = {
       `Périmètre tronqué : ${l}/${t} fichiers audités (priorité d'abord), ${s} ignoré(s). Élargir avec --max-files.`,
     rendered: (n: number, libs: string) =>
       `Verdict source préliminaire : ${n} fichier(s) rendent des composants de bibliothèque (${libs}) dont le HTML produit n'est pas visible en analyse statique. Auditez la sortie de build (\`render\` / \`audit <dist>\`) ou \`scan\` avant de conclure.`,
+    // THE FACT SURVIVES, THE INSTRUCTION DOES NOT. Those source files really do render opaque
+    // components — but « auditez la sortie de build avant de conclure » is spent advice in a
+    // document whose scope line says the produced HTML of N pages was read.
+    renderedAudited: (n: number, libs: string, pages: number) =>
+      `${n} fichier(s) rendent des composants de bibliothèque (${libs}) invisibles en analyse statique — leur HTML produit a été audité sur ${pages} page(s) capturée(s). Les composants sans capture restent des angles morts.`,
     sourceTemplate: (n: number, exts: string) =>
       `Verdict source préliminaire : ${n} composant(s) ${exts} audité(s) en SOURCE (template). Les slots, snippets et liaisons dynamiques (:attr, {@render}) sont invisibles en analyse statique — auditez le rendu (\`render\` / \`scan\`) avant de conclure.`,
+    sourceTemplateAudited: (n: number, exts: string, pages: number) =>
+      `${n} composant(s) ${exts} audité(s) en SOURCE (template) ; leurs slots et liaisons dynamiques ont été audités sur ${pages} page(s) capturée(s). Les composants sans capture restent des angles morts.`,
     captures: (n: number) => `${n} fichier(s) de capture rendus audités à pleine fidélité (DOM réel) — le vrai HTML produit, pas l'appel de composant.`,
     blindSpots: (n: number) =>
       `${n} composant(s) sans capture rendue (angles morts) — audités sur source opaque uniquement ; auditez leur DOM rendu (\`render --setup\`).`,
@@ -144,6 +158,8 @@ const L = {
     date: "Date",
     tool: "Tool",
     toolNote: "static engine — preliminary audit; judgment criteria adjudicated by the AI agent (statically, gated), rendering via `scan`",
+    toolNoteRendered: (pages: number) =>
+      `static engine + rendered tier — ${pages} captured page(s) audited on their real DOM; judgment criteria adjudicated by the AI agent (gated)`,
     scope: "Scope",
     files: "file(s)",
     rate: "Automatic static-check pass rate",
@@ -195,8 +211,12 @@ const L = {
     truncated: (l: number, t: number, s: number) => `Scope truncated: ${l}/${t} files audited (highest-priority first), ${s} skipped. Widen with --max-files.`,
     rendered: (n: number, libs: string) =>
       `Preliminary source verdict: ${n} file(s) render component-library components (${libs}) whose produced HTML is invisible to static analysis. Audit the build output (\`render\` / \`audit <dist>\`) or \`scan\` before concluding.`,
+    renderedAudited: (n: number, libs: string, pages: number) =>
+      `${n} file(s) render component-library components (${libs}) invisible to static analysis — their produced HTML was audited on ${pages} captured page(s). Components with no capture remain blind spots.`,
     sourceTemplate: (n: number, exts: string) =>
       `Preliminary source verdict: ${n} ${exts} component(s) audited as SOURCE (template). Slots, snippets and dynamic bindings (:attr, {@render}) are invisible to static analysis — audit the rendered output (\`render\` / \`scan\`) before concluding.`,
+    sourceTemplateAudited: (n: number, exts: string, pages: number) =>
+      `${n} ${exts} component(s) audited as SOURCE (template); their slots and dynamic bindings were audited on ${pages} captured page(s). Components with no capture remain blind spots.`,
     captures: (n: number) => `${n} rendered capture file(s) audited at full fidelity (real DOM) — the true produced HTML, not the component call.`,
     blindSpots: (n: number) =>
       `${n} component(s) without a rendered capture (blind spots) — audited from opaque source only; audit their rendered DOM (\`render --setup\`).`,
@@ -272,10 +292,31 @@ const NEEDS_RENDERING: readonly { sc: string; label: Record<Lang, string> }[] = 
  *  scope.scan.testedScs (the merge-time stamp); back-compat: a dyn-* probe finding proves
  *  its SC was measured even on an audit merged before the stamp existed. Non-empty ⇒ the
  *  partial-audit advisory shows, naming exactly these criteria. */
-export function untestedNeedsRendering(r: AuditResult): string[] {
+export function untestedNeedsRendering(r: AuditResult, established: ReadonlySet<string> = new Set()): string[] {
   const tested = new Set(r.scope.scan?.testedScs ?? []);
   for (const f of r.findings) if (f.ruleId.startsWith("dyn-")) tested.add(f.criteriaId);
-  return NEEDS_RENDERING.filter((c) => !tested.has(c.sc)).map((c) => c.sc);
+  // A CRITERION THE DOCUMENT ITSELF RULES ON IS NOT ONE « NOBODY TESTED ».
+  //
+  // The banner and the grid are two claims in one document, and they were allowed to
+  // contradict each other: egapro's report published « les critères à restituer (régions live)
+  // n'ont pas été testés » above a grid ruling RGAA 7.5 non-conformant with three cited
+  // findings. A reader cannot act on both.
+  //
+  // ESTABLISHED, not merely decided. A criterion conforming because nothing contradicted it is
+  // exactly what this banner exists to warn about, so silence never clears it — only a verdict
+  // something stands behind (an NC carries its findings; an adjudication carries its citations,
+  // gated). The caller supplies the set, because the verdicts live at the standard's own
+  // granularity, not at the WCAG success criterion's.
+  return NEEDS_RENDERING.filter((c) => !tested.has(c.sc) && !established.has(c.sc)).map((c) => c.sc);
+}
+
+/** The WCAG success criteria a pack projection has actually SETTLED — an NC (which always
+ *  carries its findings) or an agent adjudication (gated on a resolvable citation). A
+ *  conformity reached by silence is deliberately not one of them. */
+export function establishedScs(derived: readonly PackCriterionResult[]): Set<string> {
+  const out = new Set<string>();
+  for (const d of derived) if (d.status === "NC" || d.decidedBy === "agent") for (const sc of d.scs) out.add(sc);
+  return out;
 }
 
 /** The partial-audit advisory text (no leading `> `) — shared by the report banner and the
@@ -508,11 +549,15 @@ function render(
   const out: string[] = [];
   out.push(`# ${s.title(opts.std)}`, "");
   out.push(`- **${s.date}** : ${r.date}`);
-  out.push(`- **${s.tool}** : ultra11y v${r.version} (${s.toolNote})`);
+  // WHAT THIS RUN DID, read off the run rather than off the engine's capabilities. `pagesAudited`
+  // is the repository's existing answer to « was a page snapshot actually read? » — present and
+  // non-empty means this audit ingested rendered DOM; absent means an audit predating the field,
+  // which must keep the old wording rather than be retroactively re-described.
+  const pagesRead = r.scope.pagesAudited?.length ?? 0;
+  out.push(`- **${s.tool}** : ultra11y v${r.version} (${pagesRead > 0 ? s.toolNoteRendered(pagesRead) : s.toolNote})`);
   out.push(`- **${s.scope}** : ${r.scope.files} ${s.files} — ${r.scope.inputs.join(", ")}`);
   out.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% (${s.rateNote})`);
-  const renderedPages = r.scope.pagesAudited?.length ?? 0;
-  out.push(`- **${s.renderedPages(renderedPages)}**${renderedPages === 0 ? ` — ${s.noRenderedPages}` : ""}`);
+  out.push(`- **${s.renderedPages(pagesRead)}**${pagesRead === 0 ? ` — ${s.noRenderedPages}` : ""}`);
   const automation = automationOverview(opts.standard);
   if (automation) {
     out.push(
@@ -538,8 +583,14 @@ function render(
   if (opts.partialAudit?.length) out.push(`> 🚨 ${partialAuditBanner(lang, opts.partialAudit)}`, "");
   if (opts.derivedOf) out.push(`> ↪️ ${s.derived(opts.derivedOf)}`, "");
   if (r.scope.truncated) out.push(`> ✂️ ${s.truncated(r.scope.truncated.limit, r.scope.truncated.total, r.scope.truncated.skipped)}`, "");
-  if (r.scope.rendered) out.push(`> 🧩 ${s.rendered(r.scope.rendered.files, r.scope.rendered.opaqueLibraries.join(", "))}`, "");
-  if (r.scope.sourceTemplate) out.push(`> 🧩 ${s.sourceTemplate(r.scope.sourceTemplate.files, r.scope.sourceTemplate.extensions.join(", "))}`, "");
+  if (r.scope.rendered) {
+    const { files, opaqueLibraries } = r.scope.rendered;
+    out.push(`> 🧩 ${pagesRead > 0 ? s.renderedAudited(files, opaqueLibraries.join(", "), pagesRead) : s.rendered(files, opaqueLibraries.join(", "))}`, "");
+  }
+  if (r.scope.sourceTemplate) {
+    const { files, extensions } = r.scope.sourceTemplate;
+    out.push(`> 🧩 ${pagesRead > 0 ? s.sourceTemplateAudited(files, extensions.join(", "), pagesRead) : s.sourceTemplate(files, extensions.join(", "))}`, "");
+  }
   if (r.scope.captures) out.push(`> ✅ ${s.captures(r.scope.captures.files)}`, "");
   if (r.scope.captureCoverage?.blindSpots.length) out.push(`> ⚠️ ${s.blindSpots(r.scope.captureCoverage.blindSpots.length)}`, "");
 
@@ -837,7 +888,7 @@ export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang 
     groups: packReportGroups(r, pack, lang),
     derivedOf: std,
     standard: pack.key,
-    partialAudit: untestedNeedsRendering(r),
+    partialAudit: untestedNeedsRendering(r, establishedScs(derived)),
     headerRatePct: packConformancePct(derived),
     // Forwarded, unlike before: without it the per-page screenshots resolved against the
     // CWD instead of the report's own directory, so a pack report written to `audits/`

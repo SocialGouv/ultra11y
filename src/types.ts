@@ -435,6 +435,13 @@ export interface RenderSignals {
     textSpacing?: { selector: string; html: string; detail: string }[];
     /** 2.1.2 — focus that Tab cannot move off. */
     keyboardTrap?: { selector: string; html: string; detail: string }[];
+    /** 4.1.3 — content updated by an interaction, outside any live region. */
+    liveRegion?: { selector: string; html: string; detail: string }[];
+    /** A FILLED input clipped under each stress — 320px (1.4.10), 200% zoom (1.4.4), the
+     *  text-spacing override (1.4.12). */
+    inputOverflowReflow?: { selector: string; html: string; detail: string }[];
+    inputOverflowZoom?: { selector: string; html: string; detail: string }[];
+    inputOverflowSpacing?: { selector: string; html: string; detail: string }[];
     reflow?: { horizontalScroll: boolean };
     probed?: string[];
     /** Why a probe did not run, or did not finish. Never a verdict — the complement of
