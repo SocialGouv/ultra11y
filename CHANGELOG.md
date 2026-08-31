@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.41.0](https://github.com/maxgfr/ultra11y/compare/v5.40.2...v5.41.0) (2026-08-31)
+
+
+### Bug Fixes
+
+* **probes:** lire l'anneau de focus dans les pseudo-éléments du proxy ([cb334a7](https://github.com/maxgfr/ultra11y/commit/cb334a759f74c729d0d42809ca6c45013ff6b97c))
+
+
+### Features
+
+* **engine:** re-pin vendored engines ([dd7aacd](https://github.com/maxgfr/ultra11y/commit/dd7aacd1d26444d8e1c5f3adcd5789b9c7363bea))
+
 ## [5.40.2](https://github.com/maxgfr/ultra11y/compare/v5.40.1...v5.40.2) (2026-08-31)
 
 
