@@ -56992,7 +56992,7 @@ function judgmentGuard(r, pc) {
   return { ...r, status: "manual", judgment: true };
 }
 function measuredRescue(r, pc, cov, ran, pageId) {
-  if (r.status !== "manual" || pc.judgment || r.outOfScope || pc.automation?.completeBySilence !== true) return r;
+  if (r.status !== "manual" || pc.judgment || r.outOfScope || pc.automation && pc.automation.completeBySilence !== true) return r;
   if (!criterionMeasuredOn(pc.appliesTo?.ruleIds, pc.wcag, cov, ran)) return r;
   const { scopedOut: _scopedOut, judgment: _judgment, ...rest } = r;
   return { ...rest, status: "C", decidedBy: "scan", justification: measuredReason(pc, pageId) };
@@ -63329,6 +63329,12 @@ function apiKeyFromEnv() {
 function modelFromEnv() {
   return process.env.ULTRA11Y_LLM_MODEL?.trim() || DEFAULT_MODEL;
 }
+var BudgetExceededError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "BudgetExceededError";
+  }
+};
 function isProviderUnavailableError(error) {
   const message = error instanceof Error ? error.message : String(error);
   return /(?:api status|http)\s*(?:429|5\d\d)|\b429\b.*rate.?limit|rate.?limit|overload|service unavailable/i.test(message);
@@ -63481,6 +63487,7 @@ async function judgeAll(batches, opts) {
   const verdicts = [];
   const failures = [];
   let done = 0;
+  let total = batches.length;
   const queue = [...batches];
   const backend = opts.backend ?? judgeBatch;
   const lanes = Math.max(1, opts.concurrency ?? CONCURRENCY);
@@ -63498,10 +63505,18 @@ async function judgeAll(batches, opts) {
           verdicts.push(...checked.accepted);
           if (checked.accepted.length) opts.onVerdicts?.(checked.accepted);
         } catch (e) {
+          if (e instanceof BudgetExceededError && b.items.length > 1 && opts.render) {
+            const half = Math.ceil(b.items.length / 2);
+            const parts2 = [b.items.slice(0, half), b.items.slice(half)];
+            queue.unshift(...parts2.map((items) => ({ items, prompt: opts.render(items) })));
+            total += parts2.length - 1;
+            opts.onProgress?.(done, total);
+            continue;
+          }
           failures.push(e instanceof Error ? e.message : String(e));
           if (opts.abortOnError?.(e)) aborted = true;
         }
-        opts.onProgress?.(++done, batches.length);
+        opts.onProgress?.(++done, total);
       }
     })
   );
@@ -63707,6 +63722,14 @@ async function runCli2(argv, prompt, opts, extract) {
     }
     if (env.is_error || env.subtype !== "success") {
       lastError = `the CLI reported an error (${env.subtype ?? "unknown"}${env.api_error_status ? `, api status ${env.api_error_status}` : ""}).`;
+      if (env.subtype === "error_max_budget_usd") {
+        try {
+          const salvaged = extract(env);
+          if (Array.isArray(salvaged) ? salvaged.length > 0 : salvaged !== void 0) return salvaged;
+        } catch {
+        }
+        throw new BudgetExceededError(`ultra11y judge: ${lastError}`);
+      }
       if (env.api_error_status && (env.api_error_status === 429 || env.api_error_status >= 500)) continue;
       break;
     }
@@ -74910,6 +74933,9 @@ async function cmdJudge(p) {
     // runner with room.
     concurrency: runner === "claude" || runner === "codex" ? cliConcurrency : void 0,
     abortOnError: isProviderUnavailableError,
+    // The seam that lets a budget abort be halved rather than lost: the same renderer
+    // `batchWorklist` used, so a re-queued half is prompted exactly like a first-class batch.
+    render: render2,
     maxBudgetUsd: Number.isFinite(maxBudgetUsd) ? maxBudgetUsd : void 0,
     effort,
     timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : void 0,

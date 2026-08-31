@@ -22,7 +22,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import type { AdjudicationItem } from "./adjudicate.js";
-import { VERDICT_TOOL } from "./llm.js";
+import { BudgetExceededError, VERDICT_TOOL } from "./llm.js";
 import type { LlmOptions, RawVerdict } from "./llm.js";
 import type { Lang } from "./types.js";
 import { refuteSchema, refuteSystemPrompt, type VerifyItem } from "./verify.js";
@@ -350,6 +350,21 @@ async function runCli<T>(argv: string[], prompt: string, opts: LlmOptions, extra
     }
     if (env.is_error || env.subtype !== "success") {
       lastError = `the CLI reported an error (${env.subtype ?? "unknown"}${env.api_error_status ? `, api status ${env.api_error_status}` : ""}).`;
+      // A BUDGET ABORT IS NOT AN EMPTY ANSWER. The ceiling can trip after the model has
+      // already produced its structured output, so LOOK before giving up — this envelope was
+      // paid for either way. `extract` is allowed to throw (usually it does: an abort with no
+      // final answer has nothing to parse), and that is the ordinary case, not an error.
+      if (env.subtype === "error_max_budget_usd") {
+        try {
+          const salvaged = extract(env);
+          if (Array.isArray(salvaged) ? salvaged.length > 0 : salvaged !== undefined) return salvaged;
+        } catch {
+          /* nothing usable in the envelope — fall through to the typed throw below */
+        }
+        // Not retried: attempt 2 is a fresh process with a fresh ceiling and the same work,
+        // so it buys the same abort at full price. Split it instead — see BudgetExceededError.
+        throw new BudgetExceededError(`ultra11y judge: ${lastError}`);
+      }
       // Only a transport fault is worth another attempt; a refusal is not.
       if (env.api_error_status && (env.api_error_status === 429 || env.api_error_status >= 500)) continue;
       break;

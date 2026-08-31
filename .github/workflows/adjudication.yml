@@ -3,10 +3,18 @@
 # Claude transport, the composite Action and the browser tier still work.
 #
 # Cost controls are fixed rather than dispatch inputs: Haiku, low effort, batches of eight,
-# and up to three adjudication passes over residue only. The CLI ceiling applies to EACH batch,
-# not a whole pass: 106 RGAA criteria make at most 14 batches, so $0.35 caps a nominal full pass
-# at $4.90 and all three nominal passes at $14.70. Rare transport retries start a fresh process
-# with a fresh per-batch ceiling, so neither figure is a hard aggregate run cap. One composite
+# and up to three adjudication passes over residue only.
+#
+# THE CLI CEILING IS PER INVOCATION. Not per pass, and not per run. 106 RGAA criteria make at
+# most 14 batches, so $0.35 puts a NOMINAL full pass around $4.90 and three nominal passes
+# around $14.70 -- nominal, because nothing enforces either number. A transport retry starts a
+# fresh process with a fresh ceiling, and a batch the ceiling aborts is halved and requeued with
+# a fresh ceiling per half. Read those figures as an order of magnitude, never as a cap.
+#
+# And size the ceiling above what one batch actually costs at the chosen model and effort:
+# below that, every batch aborts and is paid for anyway. $0.35 is calibrated for Haiku at `low`
+# on this nine-page fixture (measured: ~$2.9 for 13 batches). It is NOT a figure to copy onto a
+# bigger model, a higher effort, or a repository with more evidence per criterion. One composite
 # invocation performs one audit and one unbounded crawl; there is no baseline pass, refutation
 # fold or runner matrix duplicating that work.
 name: Adjudication (keyed)

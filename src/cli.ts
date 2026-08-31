@@ -3784,6 +3784,9 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
     // runner with room.
     concurrency: runner === "claude" || runner === "codex" ? cliConcurrency : undefined,
     abortOnError: isProviderUnavailableError,
+    // The seam that lets a budget abort be halved rather than lost: the same renderer
+    // `batchWorklist` used, so a re-queued half is prompted exactly like a first-class batch.
+    render,
     maxBudgetUsd: Number.isFinite(maxBudgetUsd) ? maxBudgetUsd : undefined,
     effort,
     timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : undefined,

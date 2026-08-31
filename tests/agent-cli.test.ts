@@ -6,6 +6,7 @@
 // model's behaviour on a real brief; that needs a real run, and it is the only part that does.
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_CLI_MODEL, EFFORT_LEVELS, batchSchema, cliArgv, judgeBatchCli, reconcileIds, verdictsFromText } from "../src/agent-cli.js";
+import { BudgetExceededError } from "../src/llm.js";
 import type { AdjudicationItem } from "../src/adjudicate.js";
 import type { LlmOptions } from "../src/llm.js";
 import { verdictSystemPrompt } from "../src/verdict-rules.js";
@@ -219,5 +220,47 @@ describe("the criterion id comes back as the id, not as the heading", () => {
     }));
     const out = await judgeBatchCli([item("1.1.1")], "p", { ...base, spawnImpl: run });
     expect(out[0]?.verdict).toBe("NA");
+  });
+});
+
+// A BUDGET ABORT IS THE ONE FAILURE WORTH SPLITTING RATHER THAN RETRYING OR MOURNING.
+//
+// `--max-budget-usd` is a ceiling per INVOCATION, not per pass — so the same criteria in two
+// calls get two ceilings, and a retry (same work, fresh process, fresh ceiling) just buys the
+// same abort again at full price. Measured on a real run before any of this existed: 30 batch
+// invocations, $38.90 spent, 12 verdicts kept, 69 of 106 criteria left « to assess ».
+describe("a batch the CLI aborted on its dollar ceiling", () => {
+  const BUDGET = { is_error: true, subtype: "error_max_budget_usd", api_error_status: null };
+
+  it("is reported as a typed budget failure rather than a generic one", async () => {
+    const run = vi.fn(async () => ({ code: 1, stdout: JSON.stringify({ ...BUDGET, total_cost_usd: 2.14, result: "" }), stderr: "" }));
+    await expect(judgeBatchCli(ITEMS, "p", { ...base, spawnImpl: run })).rejects.toBeInstanceOf(BudgetExceededError);
+  });
+
+  // Not retried, and that is the point: four attempts at four ceilings is four times the bill
+  // for the same abort. `MAX_ATTEMPTS` stays 4 for TRANSPORT faults, which really are transient.
+  it("is not retried", async () => {
+    const run = vi.fn(async () => ({ code: 1, stdout: JSON.stringify({ ...BUDGET, total_cost_usd: 2.14, result: "" }), stderr: "" }));
+    await expect(judgeBatchCli(ITEMS, "p", { ...base, spawnImpl: run })).rejects.toThrow();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  // The ceiling can trip AFTER the model produced its answer. That envelope was paid for; read
+  // it before throwing it away.
+  it("keeps the verdicts the aborted envelope still carried", async () => {
+    const run = vi.fn(async () => ({
+      code: 1,
+      stdout: JSON.stringify({ ...BUDGET, total_cost_usd: 2.14, result: VERDICTS }),
+      stderr: "",
+    }));
+    await expect(judgeBatchCli(ITEMS, "p", { ...base, spawnImpl: run })).resolves.toHaveLength(1);
+  });
+
+  // The cost is booked whatever happens — the money left the account before the abort did.
+  it("still books what the aborted invocation cost", async () => {
+    const costs: number[] = [];
+    const run = vi.fn(async () => ({ code: 1, stdout: JSON.stringify({ ...BUDGET, total_cost_usd: 2.14, result: "" }), stderr: "" }));
+    await expect(judgeBatchCli(ITEMS, "p", { ...base, spawnImpl: run, onCost: (usd) => costs.push(usd) })).rejects.toThrow();
+    expect(costs).toEqual([2.14]);
   });
 });

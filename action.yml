@@ -180,7 +180,7 @@ inputs:
     required: false
     default: "worklist"
   adjudicate-budget-usd:
-    description: "Dollar ceiling handed to each `adjudicate-runner: cli` invocation. Empty leaves it unbounded and lets the wall clock be the only stop. This is the bound to reach for rather than `adjudicate-max-turns`, which the CLI runner ignores: `--max-turns` is not one of its flags, and the CLI swallows an unknown flag without a word, so a turn budget there would look like a ceiling and be nothing at all."
+    description: "Dollar ceiling handed to each `adjudicate-runner: cli` invocation. Empty leaves it unbounded and lets the wall clock be the only stop. This is the bound to reach for rather than `adjudicate-max-turns`, which the CLI runner ignores: `--max-turns` is not one of its flags, and the CLI swallows an unknown flag without a word, so a turn budget there would look like a ceiling and be nothing at all. READ IT AS PER INVOCATION AND NOTHING ELSE: it is not a per-pass cap and not a run cap, so `batches x passes x ceiling` is the shape of the worst case, and a batch the ceiling aborts is HALVED and requeued (each half getting its own fresh ceiling) rather than lost. Set it too low and you pay for aborts: measured on a real repository at $0.70 with `opus`/`high`, a batch of eight cost $0.88 to $2.00, so 29 of 30 invocations aborted -- $38.90 spent, 12 verdicts kept. Size it above what one batch of eight actually costs on YOUR model and effort, or leave it empty."
     required: false
     default: ""
   adjudicate-max:

@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { BATCH_SIZE, DEFAULT_MODEL, applyRawVerdicts, batchWorklist, judgeAll, judgeBatch, modelFromEnv, type RawVerdict } from "../src/llm.js";
+import {
+  BATCH_SIZE,
+  BudgetExceededError,
+  DEFAULT_MODEL,
+  applyRawVerdicts,
+  batchWorklist,
+  judgeAll,
+  judgeBatch,
+  modelFromEnv,
+  type RawVerdict,
+} from "../src/llm.js";
 import { applyAdjudication, buildAdjudicationWorklist, formatAdjudication, type AdjudicationFile, type AdjudicationItem } from "../src/adjudicate.js";
 import { runAudit } from "../src/audit.js";
 import { SCHEMA_VERSION } from "../src/types.js";
@@ -325,5 +335,68 @@ describe("`judge --max` and `--apply` together", () => {
     // that it was not refused up front for being bounded.
     expect(code).not.toBe(2);
     expect(out).not.toMatch(/requires a COMPLETE adjudication/);
+  });
+});
+
+// SPLITTING A BATCH THE PROVIDER ABORTED ON ITS DOLLAR CEILING.
+//
+// `--max-budget-usd` bounds ONE invocation, so the same criteria split across two calls get two
+// ceilings. That makes halving the right response to a budget abort, where retrying is not:
+// a retry is the same work in a fresh process against a fresh ceiling, i.e. the same abort at
+// full price. Measured on the run that motivated this — 30 invocations, $38.90, 12 verdicts
+// kept out of 84 criteria, because every over-budget batch was discarded whole.
+describe("judgeAll on a budget abort", () => {
+  const items = (n: number) => Array.from({ length: n }, (_, i) => item(`1.1.${i + 1}`));
+  const verdictsFor = (batch: AdjudicationItem[]): RawVerdict[] =>
+    batch.map((it) => ({ criteriaId: it.criteriaId, verdict: "manual", reason: "undecidable" }) as unknown as RawVerdict);
+
+  it("halves the batch and rules on the halves instead of losing all eight", async () => {
+    const sizes: number[] = [];
+    // Refuses anything wider than four, exactly as a real ceiling does on a batch that is too
+    // much work for it — and rules normally once the halves are small enough.
+    const backend = async (batch: AdjudicationItem[]): Promise<RawVerdict[]> => {
+      sizes.push(batch.length);
+      if (batch.length > 4) throw new BudgetExceededError("ultra11y judge: the CLI reported an error (error_max_budget_usd).");
+      return verdictsFor(batch);
+    };
+    const r = await judgeAll([{ items: items(8), prompt: "p" }], { backend, render: (s) => `p:${s.length}`, concurrency: 1 });
+    expect(sizes).toEqual([8, 4, 4]);
+    expect(r.verdicts).toHaveLength(8);
+    expect(r.failures).toEqual([]);
+  });
+
+  it("re-renders each half rather than reusing the prompt of the batch it came from", async () => {
+    const prompts: string[] = [];
+    const backend = async (batch: AdjudicationItem[], prompt: string): Promise<RawVerdict[]> => {
+      prompts.push(prompt);
+      if (batch.length > 1) throw new BudgetExceededError("error_max_budget_usd");
+      return verdictsFor(batch);
+    };
+    await judgeAll([{ items: items(2), prompt: "WHOLE" }], { backend, render: (s) => `HALF:${s[0]?.criteriaId}`, concurrency: 1 });
+    expect(prompts).toEqual(["WHOLE", "HALF:1.1.1", "HALF:1.1.2"]);
+  });
+
+  // The floor. One criterion that still overruns is a real failure, and it is reported as one
+  // — never split forever, never silently dropped.
+  it("reports a single criterion that still overruns, and loses only that one", async () => {
+    const backend = async (batch: AdjudicationItem[]): Promise<RawVerdict[]> => {
+      // The pair overruns, and so does 1.1.2 on its own — 1.1.1 is the only thing that fits.
+      if (batch.length > 1 || batch[0]?.criteriaId === "1.1.2") throw new BudgetExceededError("error_max_budget_usd");
+      return verdictsFor(batch);
+    };
+    const r = await judgeAll([{ items: items(2), prompt: "p" }], { backend, render: (s) => `p:${s.length}`, concurrency: 1 });
+    expect(r.verdicts.map((v) => v.criteriaId)).toEqual(["1.1.1"]);
+    expect(r.failures.join(" ")).toContain("error_max_budget_usd");
+  });
+
+  // Without a renderer there is no way to prompt a half, so the old behaviour stands rather
+  // than a batch being sent under someone else's prompt.
+  it("keeps the whole-batch loss when no renderer was supplied", async () => {
+    const backend = async (): Promise<RawVerdict[]> => {
+      throw new BudgetExceededError("error_max_budget_usd");
+    };
+    const r = await judgeAll([{ items: items(8), prompt: "p" }], { backend, concurrency: 1 });
+    expect(r.verdicts).toHaveLength(0);
+    expect(r.failures).toHaveLength(1);
   });
 });

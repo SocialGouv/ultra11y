@@ -120,6 +120,29 @@ export interface LlmOptions {
    *  without waiting out the real curve. */
   backoffMs?: (attempt: number) => number;
   onProgress?: (done: number, total: number) => void;
+  /** Re-render the prompt for an arbitrary slice of a worklist — the same function
+   *  `batchWorklist` was given. Supplying it lets `judgeAll` HALVE a batch the provider
+   *  aborted on `--max-budget-usd` and requeue both halves, because that ceiling is per
+   *  invocation: the same criteria in two calls get two ceilings. Without it a budget abort
+   *  costs the whole batch, which is the behaviour before this option existed. */
+  render?: (items: AdjudicationItem[]) => string;
+}
+
+/** The CLI stopped because `--max-budget-usd` was reached.
+ *
+ *  Typed, and not folded into the generic failure, because it is the ONE failure whose right
+ *  answer is neither "retry" nor "give up": the ceiling is per INVOCATION, so the same work
+ *  split across two invocations gets two ceilings. `judgeAll` halves the batch and requeues it,
+ *  which turns a loss of eight criteria into a loss of one.
+ *
+ *  Measured on a real run before this existed — 30 batch invocations, $38.90 spent, 12 verdicts
+ *  kept: every batch that passed the ceiling was thrown away whole, having already been paid
+ *  for. The cost is booked (`onCost` fires before this throws); only the work was lost. */
+export class BudgetExceededError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BudgetExceededError";
+  }
 }
 
 /** Provider saturation is shared state, not a property of one criterion. Transport backends
@@ -327,6 +350,9 @@ export async function judgeAll(
   const verdicts: RawVerdict[] = [];
   const failures: string[] = [];
   let done = 0;
+  // Not `batches.length`: a budget abort splits a batch in two and requeues both, so the
+  // denominator the progress callback reports has to grow with the queue.
+  let total = batches.length;
   const queue = [...batches];
   const backend = opts.backend ?? judgeBatch;
   const lanes = Math.max(1, opts.concurrency ?? CONCURRENCY);
@@ -346,10 +372,23 @@ export async function judgeAll(
           // behind what it had already ruled on rather than nothing at all.
           if (checked.accepted.length) opts.onVerdicts?.(checked.accepted);
         } catch (e) {
+          // A BUDGET ABORT IS HALVED, NOT MOURNED. The ceiling is per invocation, so two calls
+          // get two ceilings: re-queueing the halves converts « eight criteria lost » into at
+          // worst « one criterion lost », and a batch that only just overran usually lands
+          // whole on the retry. Bounded by construction — halving 8 reaches 1 in three steps —
+          // and a single item that still overruns is a real failure, reported as one.
+          if (e instanceof BudgetExceededError && b.items.length > 1 && opts.render) {
+            const half = Math.ceil(b.items.length / 2);
+            const parts = [b.items.slice(0, half), b.items.slice(half)];
+            queue.unshift(...parts.map((items) => ({ items, prompt: opts.render!(items) })));
+            total += parts.length - 1;
+            opts.onProgress?.(done, total);
+            continue;
+          }
           failures.push(e instanceof Error ? e.message : String(e));
           if (opts.abortOnError?.(e)) aborted = true;
         }
-        opts.onProgress?.(++done, batches.length);
+        opts.onProgress?.(++done, total);
       }
     }),
   );
