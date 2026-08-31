@@ -3,9 +3,11 @@
 # Claude transport, the composite Action and the browser tier still work.
 #
 # Cost controls are fixed rather than dispatch inputs: Haiku, low effort, batches of eight,
-# up to three adjudication passes over residue only and a five-dollar ceiling. One composite invocation
-# performs one audit and one unbounded crawl; there is no baseline pass, refutation fold or
-# runner matrix duplicating that work.
+# and up to three adjudication passes over residue only. The CLI ceiling applies to EACH batch,
+# not a whole pass: 106 RGAA criteria make at most 14 batches, so $0.35 caps a nominal full pass
+# at $4.90 (excluding rare transport retries). One composite invocation performs one audit and
+# one unbounded crawl; there is no baseline pass, refutation fold or runner matrix duplicating
+# that work.
 name: Adjudication (keyed)
 
 on:
@@ -97,7 +99,8 @@ jobs:
           adjudicate-grain: worklist
           adjudicate-model: haiku
           adjudicate-effort: low
-          adjudicate-budget-usd: "5"
+          # Per batch: ceil(106 / 8) × $0.35 = $4.90 for a nominal full pass.
+          adjudicate-budget-usd: "0.35"
           adjudicate-passes: "3"
           ledger: audits/fresh-rgaa-ledger.json
           crawl: http://127.0.0.1:8932/
