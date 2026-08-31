@@ -59000,7 +59000,7 @@ var L5 = {
     // browser and had an adjudicator rule on the result introduced itself as a preliminary
     // static pass, which is the one thing it was not.
     toolNote: "moteur statique \u2014 audit pr\xE9liminaire, crit\xE8res de jugement \xE0 adjuger par l'agent IA (statique, gat\xE9), rendu via `scan`",
-    toolNoteRendered: (pages) => `moteur statique + tier rendu \u2014 ${pages} page(s) captur\xE9e(s) audit\xE9e(s) sur leur DOM r\xE9el, crit\xE8res de jugement adjug\xE9s par l'agent IA (gat\xE9)`,
+    toolNoteRendered: (pages, adjudicated) => `moteur statique + tier rendu \u2014 ${pages} page(s) captur\xE9e(s) audit\xE9e(s) sur leur DOM r\xE9el${adjudicated > 0 ? `, ${adjudicated} crit\xE8re(s) de jugement adjug\xE9(s) par l'agent IA (gat\xE9)` : ", aucun crit\xE8re de jugement adjug\xE9"}`,
     scope: "P\xE9rim\xE8tre",
     files: "fichier(s)",
     rate: "Taux de r\xE9ussite automatique (v\xE9rifications statiques)",
@@ -59062,9 +59062,9 @@ var L5 = {
     // THE FACT SURVIVES, THE INSTRUCTION DOES NOT. Those source files really do render opaque
     // components — but « auditez la sortie de build avant de conclure » is spent advice in a
     // document whose scope line says the produced HTML of N pages was read.
-    renderedAudited: (n, libs, pages) => `${n} fichier(s) rendent des composants de biblioth\xE8que (${libs}) invisibles en analyse statique \u2014 leur HTML produit a \xE9t\xE9 audit\xE9 sur ${pages} page(s) captur\xE9e(s). Les composants sans capture restent des angles morts.`,
+    renderedAudited: (n, libs, pages) => `${n} fichier(s) rendent des composants de biblioth\xE8que (${libs}) invisibles en analyse statique. ${pages} page(s) ont \xE9t\xE9 captur\xE9es et audit\xE9es sur leur DOM r\xE9el ; ce que ces composants produisent AILLEURS, sur une page non captur\xE9e, reste un angle mort.`,
     sourceTemplate: (n, exts) => `Verdict source pr\xE9liminaire : ${n} composant(s) ${exts} audit\xE9(s) en SOURCE (template). Les slots, snippets et liaisons dynamiques (:attr, {@render}) sont invisibles en analyse statique \u2014 auditez le rendu (\`render\` / \`scan\`) avant de conclure.`,
-    sourceTemplateAudited: (n, exts, pages) => `${n} composant(s) ${exts} audit\xE9(s) en SOURCE (template) ; leurs slots et liaisons dynamiques ont \xE9t\xE9 audit\xE9s sur ${pages} page(s) captur\xE9e(s). Les composants sans capture restent des angles morts.`,
+    sourceTemplateAudited: (n, exts, pages) => `${n} composant(s) ${exts} audit\xE9(s) en SOURCE (template) \u2014 slots et liaisons dynamiques invisibles en analyse statique. ${pages} page(s) ont \xE9t\xE9 captur\xE9es et audit\xE9es sur leur DOM r\xE9el ; ce qu'ils rendent sur une page non captur\xE9e reste un angle mort.`,
     captures: (n) => `${n} fichier(s) de capture rendus audit\xE9s \xE0 pleine fid\xE9lit\xE9 (DOM r\xE9el) \u2014 le vrai HTML produit, pas l'appel de composant.`,
     blindSpots: (n) => `${n} composant(s) sans capture rendue (angles morts) \u2014 audit\xE9s sur source opaque uniquement ; auditez leur DOM rendu (\`render --setup\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
@@ -59100,7 +59100,7 @@ var L5 = {
     date: "Date",
     tool: "Tool",
     toolNote: "static engine \u2014 preliminary audit; judgment criteria adjudicated by the AI agent (statically, gated), rendering via `scan`",
-    toolNoteRendered: (pages) => `static engine + rendered tier \u2014 ${pages} captured page(s) audited on their real DOM; judgment criteria adjudicated by the AI agent (gated)`,
+    toolNoteRendered: (pages, adjudicated) => `static engine + rendered tier \u2014 ${pages} captured page(s) audited on their real DOM${adjudicated > 0 ? `; ${adjudicated} judgment criterion/criteria adjudicated by the AI agent (gated)` : "; no judgment criterion adjudicated"}`,
     scope: "Scope",
     files: "file(s)",
     rate: "Automatic static-check pass rate",
@@ -59153,9 +59153,9 @@ var L5 = {
     duplicate: "identical duplicate(s) skipped",
     truncated: (l, t3, s) => `Scope truncated: ${l}/${t3} files audited (highest-priority first), ${s} skipped. Widen with --max-files.`,
     rendered: (n, libs) => `Preliminary source verdict: ${n} file(s) render component-library components (${libs}) whose produced HTML is invisible to static analysis. Audit the build output (\`render\` / \`audit <dist>\`) or \`scan\` before concluding.`,
-    renderedAudited: (n, libs, pages) => `${n} file(s) render component-library components (${libs}) invisible to static analysis \u2014 their produced HTML was audited on ${pages} captured page(s). Components with no capture remain blind spots.`,
+    renderedAudited: (n, libs, pages) => `${n} file(s) render component-library components (${libs}) invisible to static analysis. ${pages} page(s) were captured and audited on their real DOM; what those components produce ELSEWHERE, on a page nobody captured, remains a blind spot.`,
     sourceTemplate: (n, exts) => `Preliminary source verdict: ${n} ${exts} component(s) audited as SOURCE (template). Slots, snippets and dynamic bindings (:attr, {@render}) are invisible to static analysis \u2014 audit the rendered output (\`render\` / \`scan\`) before concluding.`,
-    sourceTemplateAudited: (n, exts, pages) => `${n} ${exts} component(s) audited as SOURCE (template); their slots and dynamic bindings were audited on ${pages} captured page(s). Components with no capture remain blind spots.`,
+    sourceTemplateAudited: (n, exts, pages) => `${n} ${exts} component(s) audited as SOURCE (template) \u2014 slots and dynamic bindings invisible to static analysis. ${pages} page(s) were captured and audited on their real DOM; what they render on a page nobody captured remains a blind spot.`,
     captures: (n) => `${n} rendered capture file(s) audited at full fidelity (real DOM) \u2014 the true produced HTML, not the component call.`,
     blindSpots: (n) => `${n} component(s) without a rendered capture (blind spots) \u2014 audited from opaque source only; audit their rendered DOM (\`render --setup\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
@@ -59207,7 +59207,12 @@ function untestedNeedsRendering(r, established = /* @__PURE__ */ new Set()) {
 }
 function establishedScs(derived) {
   const out2 = /* @__PURE__ */ new Set();
-  for (const d of derived) if (d.status === "NC" || d.decidedBy === "agent") for (const sc of d.scs) out2.add(sc);
+  for (const d of derived) {
+    if (d.status !== "NC" && d.decidedBy !== "agent") continue;
+    const carried = new Set(d.findings.map((f) => f.criteriaId).filter((id) => d.scs.includes(id)));
+    if (carried.size === 0 && d.scs.length === 1) carried.add(d.scs[0]);
+    for (const sc of carried) out2.add(sc);
+  }
   return out2;
 }
 function partialAuditBanner(lang, untested = NEEDS_RENDERING.map((c2) => c2.sc)) {
@@ -59323,7 +59328,8 @@ function render(r, lang, opts) {
   out2.push(`# ${s.title(opts.std)}`, "");
   out2.push(`- **${s.date}** : ${r.date}`);
   const pagesRead = r.scope.pagesAudited?.length ?? 0;
-  out2.push(`- **${s.tool}** : ultra11y v${r.version} (${pagesRead > 0 ? s.toolNoteRendered(pagesRead) : s.toolNote})`);
+  const adjudicated = opts.conformance ? opts.conformance.provenance.agent : r.criteria.filter((c2) => c2.decidedBy === "agent").length;
+  out2.push(`- **${s.tool}** : ultra11y v${r.version} (${pagesRead > 0 ? s.toolNoteRendered(pagesRead, adjudicated) : s.toolNote})`);
   out2.push(`- **${s.scope}** : ${r.scope.files} ${s.files} \u2014 ${r.scope.inputs.join(", ")}`);
   if (opts.conformance) {
     const { rate, provenance, autoDecided, autoValidated } = opts.conformance;
@@ -65456,7 +65462,13 @@ var TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
 function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables) {
   const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
   return `(() => { ${PRELUDE}
-  const sel = 'a[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
+  // FOCUSABLE MEANS FOCUSABLE, NOT "the six tags we thought of". This list decides which
+  // elements get tagged, and since the walk may now license a conformity, an element missing
+  // from it is not merely unmeasured -- it is silently cleared. A page whose only control is a
+  // <summary> tagged nothing at all, so the count was zero, so the ring was "vacuously whole",
+  // so 2.4.7 and 2.4.11 closed without a single Tab press.
+  // (No backticks in this comment: it lives inside a template literal.)
+  const sel = 'a[href],area[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,iframe,audio[controls],video[controls],[contenteditable]:not([contenteditable="false"]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
   // A BOX THAT IS ANIMATING CANNOT BE COMPARED ACROSS TIME, so it contributes a constant.
   //
   // The snapshot is taken before Tab and re-read after it, and the properties compared include
@@ -65489,6 +65501,7 @@ function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables
   for (const el of Array.from(document.querySelectorAll('[data-u11y-f],[data-u11y-fp]'))) { el.removeAttribute('data-u11y-f'); el.removeAttribute('data-u11y-fp'); }
   const roots = ${rootExpr};
   const focusables = [];
+  let total = 0;
   for (const root of Array.from(roots)) {
     if (root.matches && root.matches(sel)) focusables.push(root);
     for (const e of Array.from(root.querySelectorAll(sel))) focusables.push(e);
@@ -65499,20 +65512,27 @@ function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables
     const proxy = proxyFor(e);
     if (!proxy) continue;
     const key = 'k' + n;
+    total++;
+    if (n >= ${maxFocusables}) continue; // tagged the cap; keep COUNTING so the caller knows it was cut
     e.setAttribute('data-u11y-f', key);
     proxy.setAttribute('data-u11y-fp', key);
     window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy) };
     n++;
-    if (n >= ${maxFocusables}) break;
   }
-  return n;
+  return { n: n, total: total };
 })()`;
 }
 var FOCUS_CHECK_PROBE = `(() => {
   const e = document.activeElement;
+  // FOCUS LEFT THE DOCUMENT \u2014 the normal end of a tab ring, and nothing to measure.
   if (!e || e === document.body || e === document.documentElement) return null;
   const key = e.getAttribute && e.getAttribute('data-u11y-f');
-  if (!key || !window.__u11yF || !window.__u11yF[key]) return null;
+  // FOCUS IS ON SOMETHING THE SETUP NEVER TAGGED, which is a different fact entirely and used
+  // to be reported as the same one. A skip link revealed only on focus, a widget that moves
+  // focus into a node the selector does not match -- Tab crossed it, nothing measured it, and
+  // the walk went on to call itself whole. The caller needs to know the ring contained an
+  // element it cannot speak for. (No backticks here: this lives inside a template literal.)
+  if (!key || !window.__u11yF || !window.__u11yF[key]) return { untagged: true, key: '', changed: true, selector: '', html: '' };
   const rec = window.__u11yF[key];
   const proxy = document.querySelector('[data-u11y-fp="' + key + '"]') || e;
   // THE SAME THREE BOXES pass 1 snapshotted, in the same order. A design system that paints
@@ -65567,6 +65587,7 @@ var FOCUS_OBSCURED_PROBE = `(() => { ${PRELUDE}
 var HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
   const out = [];
   let n = 0;
+  let total = 0;
   for (const e of Array.from(document.querySelectorAll('[aria-describedby]'))) {
     const id = (e.getAttribute('aria-describedby') || '').split(/\\s+/)[0];
     if (!id) continue;
@@ -65575,26 +65596,34 @@ var HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
     const s = getComputedStyle(t);
     const hidden = s.display === 'none' || s.visibility === 'hidden' || t.getBoundingClientRect().height === 0;
     if (!hidden) continue;
+    total++;
+    if (n >= 10) continue; // tagged ten; keep COUNTING so the caller knows what it did not see
     const key = 'h' + n;
     e.setAttribute('data-u11y-h', key);
     out.push({ key: key, target: id, selector: __sel(e) });
     n++;
-    if (n >= 10) break;
   }
+  for (const o of out) o.total = total;
   return out;
 })()`;
 function hoverVisibleExpr(id, wantHidden = false) {
   const j = JSON.stringify(id);
   return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
 }
-function cappedRing(count, limits) {
-  return count >= limits.maxFocusables ? `the setup pass stopped tagging at ${limits.maxFocusables} focusable elements (probes.maxFocusables), so everything past that was never focused and never measured` : void 0;
+function readSetup(raw, limits) {
+  if (typeof raw === "number") return { count: raw, capped: raw >= limits.maxFocusables };
+  const o = raw ?? {};
+  const count = o.n ?? 0;
+  return { count, capped: (o.total ?? count) > count };
+}
+function cappedRing(capped, limits) {
+  return capped ? `the setup pass stopped tagging at ${limits.maxFocusables} focusable elements (probes.maxFocusables), so everything past that was never focused and never measured` : void 0;
 }
 async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
   return (await probeFocusRing(page, scope, limits, deadline)).visible;
 }
 async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
-  const count = await page.evaluate(focusSetupExpr(scope, limits.maxFocusables));
+  const { count, capped } = readSetup(await page.evaluate(focusSetupExpr(scope, limits.maxFocusables)), limits);
   if (!count) return { visible: [], obscured: [], complete: true };
   const hits = [];
   const obscured = [];
@@ -65602,6 +65631,7 @@ async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadlin
   const limit = tabPressBudget(count, limits);
   let prevKey = null;
   let cutShort = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
+  let untagged = 0;
   for (let i2 = 0; i2 < limit; i2++) {
     if (deadline?.out()) {
       cutShort = `the probe budget of ${limits.budgetMs}ms ran out after ${seen.size} of the ${count} focusable elements \u2014 the rest of the ring was never focused`;
@@ -65610,6 +65640,10 @@ async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadlin
     await page.keyboard.press("Tab");
     const r = await page.evaluate(FOCUS_CHECK_PROBE);
     if (!r) continue;
+    if (r.untagged) {
+      untagged++;
+      continue;
+    }
     if (r.key === prevKey) continue;
     if (seen.has(r.key)) {
       cutShort = void 0;
@@ -65640,7 +65674,7 @@ async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadlin
     }
   }
   if (cutShort && seen.size >= count) cutShort = void 0;
-  const why = cappedRing(count, limits) ?? cutShort;
+  const why = cappedRing(capped, limits) ?? cutShort ?? (untagged > 0 ? `Tab crossed ${untagged} element(s) the tagging pass never matched \u2014 a control focusable in the browser but not by this selector (a skip link revealed on focus, a widget moving focus into an untagged node). They were never compared, so this page is not cleared` : void 0);
   return { visible: hits, obscured, complete: !why, ...why ? { why } : {} };
 }
 var NATIVE_SEGMENT_STOPS = {
@@ -65662,7 +65696,7 @@ var FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
   return { key: key || __sel(e), tagged: !!key, selector: __sel(e), html: __html(e), segments: stops[type] || 1 };
 })()`;
 async function probeKeyboardTrapRing(page, limits = PROBE_DEFAULTS, deadline) {
-  const count = await page.evaluate(focusSetupExpr("", limits.maxFocusables));
+  const { count, capped } = readSetup(await page.evaluate(focusSetupExpr("", limits.maxFocusables)), limits);
   if (!count || count < 2) return { hits: [], complete: true };
   const hits = [];
   const seen = /* @__PURE__ */ new Set();
@@ -65718,14 +65752,23 @@ async function probeKeyboardTrapRing(page, limits = PROBE_DEFAULTS, deadline) {
     prev = now;
   }
   if (cutShort && seen.size >= count) cutShort = void 0;
-  const why = cappedRing(count, limits) ?? cutShort;
+  const why = cappedRing(capped, limits) ?? cutShort;
   return { hits, complete: !why, ...why ? { why } : {} };
 }
-async function probeHover(page, limits = PROBE_DEFAULTS, deadline) {
-  const triggers = await page.evaluate(HOVER_SETUP_PROBE);
+async function probeHoverWalk(page, limits = PROBE_DEFAULTS, deadline) {
+  const setup = await page.evaluate(HOVER_SETUP_PROBE);
+  const triggers = setup;
   const hits = [];
-  for (const tr of triggers.slice(0, Math.max(1, limits.maxTriggers))) {
-    if (deadline?.out()) break;
+  let cutShort;
+  const tried = triggers.slice(0, Math.max(1, limits.maxTriggers));
+  if (tried.length < triggers.length) {
+    cutShort = `only ${tried.length} of the ${triggers.length} hover triggers on this page were opened (probes.maxTriggers) \u2014 the rest were never asked whether Escape dismisses them`;
+  }
+  for (const tr of tried) {
+    if (deadline?.out()) {
+      cutShort = `the probe budget of ${limits.budgetMs}ms ran out with triggers left unopened`;
+      break;
+    }
     try {
       await page.hover(`[data-u11y-h="${tr.key}"]`, { timeout: actionTimeout(limits, deadline) });
     } catch {
@@ -65746,9 +65789,14 @@ async function probeHover(page, limits = PROBE_DEFAULTS, deadline) {
         detail: `Le contenu r\xE9v\xE9l\xE9 au survol (aria-describedby #${tr.target}) ne se masque pas avec \xC9chap \u2014 Contenu au survol ou au focus (1.4.13).`
       });
     }
-    if (hits.length >= Math.min(limits.maxHits, 8)) break;
+    if (hits.length >= Math.min(limits.maxHits, 8)) {
+      cutShort = "the recording cap filled with triggers left unopened \u2014 enough was found to fail the page, not enough to clear the rest of it";
+      break;
+    }
   }
-  return hits;
+  const capped = setup[0]?.total;
+  const why = cutShort ?? (typeof capped === "number" && capped > triggers.length ? `only ${triggers.length} of the ${capped} hover triggers on this page were tagged \u2014 the rest were never opened` : void 0);
+  return { hits, complete: !why, ...why ? { why } : {} };
 }
 var DESTRUCTIVE_NAME_RE = "\\b(supprim|retir|effac|envoy|valid|confirm|pay|achet|command|delete|remove|eras|clear|send|submit|buy|order)";
 function liveRegionExpr(detail, allowClicks) {
@@ -65772,17 +65820,23 @@ function liveRegionExpr(detail, allowClicks) {
     return n;
   };
   for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
-    if (count >= 20 || hits.length >= 10) break;
+    if (count >= 20 || hits.length >= 10) { untried += 1; continue; }
     if (b.disabled || !__vis(b)) continue;
-    if (dangerous.test(nameOf(b))) continue; // defense-in-depth: never click a destructive-named button
+    if (dangerous.test(nameOf(b))) { untried += 1; continue; } // defense-in-depth: never click a destructive-named button
     const before = location.href;
     try { b.click(); } catch (_) {}
     await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
+    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
     drain();
     count++;
   }` : `
-  // click interactions disabled (authenticated scan without --interact-clicks)`;
+  // CLICKS DISABLED, and the buttons are counted rather than ignored. A status message very
+  // often appears after a button press and nothing else, so a pass that never pressed one has
+  // not measured 4.1.3 on this page -- it has measured the fields. Reporting how many it
+  // declined is what lets the caller withhold the credit instead of publishing silence.
+  for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
+    if (!b.disabled && __vis(b)) untried += 1;
+  }`;
   return `(async () => { ${PRELUDE}
   const isLive = (node) => {
     let el = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
@@ -65816,35 +65870,52 @@ function liveRegionExpr(detail, allowClicks) {
       }
     }
   };
-  let count = 0;${clickLoop}
+  let count = 0;
+  // How many candidate interactions this pass did NOT perform -- caps, a destructive-sounding
+  // name, clicks turned off. A probe that skipped half a page has not measured it, and the
+  // caller may not read its silence as conformity.
+  let untried = 0;${clickLoop}
   // toggle checkbox/radio, then restore
   for (const t of Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'))) {
-    if (count >= 40 || hits.length >= 10) break;
+    if (count >= 40 || hits.length >= 10) { untried += 1; continue; }
     if (t.disabled || !__vis(t)) continue;
     const before = location.href;
     const prev = t.checked;
+    // A RADIO IS NOT A CHECKBOX: clicking one UNCHECKS its pair, and restoring only the one we
+    // clicked left the group with nothing selected -- a form the caller's next assertion, or
+    // the user, finds broken. Remember which member of the group was checked and put THAT back.
+    let group = null;
+    if (t.type === 'radio' && t.name) {
+      try {
+        const form = t.form || document;
+        for (const r of Array.from(form.querySelectorAll('input[type="radio"]'))) { if (r.name === t.name && r.checked) { group = r; break; } }
+      } catch (_) {}
+    }
     try { t.click(); } catch (_) {}
     await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
+    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
     drain();
-    try { if (t.checked !== prev) { t.checked = prev; t.dispatchEvent(new Event('change', { bubbles: true })); } } catch (_) {}
+    try {
+      if (group) { if (!group.checked) { group.checked = true; group.dispatchEvent(new Event('change', { bubbles: true })); } }
+      else if (t.checked !== prev) { t.checked = prev; t.dispatchEvent(new Event('change', { bubbles: true })); }
+    } catch (_) {}
     count++;
   }
   // fill text inputs, then restore
   for (const inp of Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="search"], textarea'))) {
-    if (count >= 60 || hits.length >= 10) break;
+    if (count >= 60 || hits.length >= 10) { untried += 1; continue; }
     if (inp.disabled || inp.readOnly || !__vis(inp)) continue;
     const before = location.href;
     const prev = inp.value == null ? '' : String(inp.value);
     try { inp.value = 'test 123'; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
     await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
+    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
     drain();
     try { inp.value = prev; inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
     count++;
   }
   obs.disconnect();
-  return hits.slice(0, 10);
+  return { hits: hits.slice(0, 10), untried: untried, navigated: false };
 })()`;
 }
 var LIVE_REGION_DETAIL = {
@@ -65853,7 +65924,23 @@ var LIVE_REGION_DETAIL = {
 };
 async function probeLiveRegion(page, lang, allowClicks) {
   const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
-  return await page.evaluate(liveRegionExpr(detail, allowClicks));
+  const r = await page.evaluate(liveRegionExpr(detail, allowClicks));
+  const hits = r?.hits ?? [];
+  if (r?.navigated) {
+    return {
+      hits,
+      complete: false,
+      why: "an interaction navigated away mid-pass \u2014 everything after it happened on another page, and this one was not finished"
+    };
+  }
+  if (r?.untried > 0) {
+    return {
+      hits,
+      complete: false,
+      why: `${r.untried} interactive element(s) were never exercised (clicks disabled, a destructive-sounding name, or a cap) \u2014 a status message that only appears after one of them would not have been seen`
+    };
+  }
+  return { hits, complete: true };
 }
 
 // src/scan-local.ts
@@ -65861,6 +65948,12 @@ var LOCAL_ENGINE = "axe-core@playwright (local)";
 var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
 function localTestedScs(interact) {
   return interact ? [...LOCAL_TESTED_SCS, "4.1.3"] : [...LOCAL_TESTED_SCS];
+}
+function measuredScs(outs, interact) {
+  const union = /* @__PURE__ */ new Set();
+  for (const o of outs) for (const sc of o.probed ?? []) union.add(sc);
+  if (!outs.some((o) => o.probed !== void 0)) return localTestedScs(interact);
+  return [...union].sort();
 }
 var PW_SPEC = "@playwright/test";
 var AXE_SPEC = "@axe-core/playwright";
@@ -66183,28 +66276,58 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
     const keyboardTrap = trapWalk.hits;
     if (trapWalk.complete) probed.push("2.1.2");
     else skipped.push({ sc: "2.1.2", why: trapWalk.why ?? "the walk of the tab ring did not cross the whole of it" });
-    const hover = await ran("1.4.13", empty, () => probeHover(page));
+    const hoverWalk = await probeHoverWalk(page).catch((e) => ({
+      hits: empty,
+      complete: false,
+      why: String(e?.message ?? e).slice(0, 160)
+    }));
+    const hover = hoverWalk.hits;
+    if (hoverWalk.complete) probed.push("1.4.13");
+    else skipped.push({ sc: "1.4.13", why: hoverWalk.why ?? "the hover pass did not open every trigger on the page" });
     const l = opts.lang;
-    if (opts.interact) await page.evaluate(FILL_INPUTS_STEP).catch(() => {
-    });
+    const stressed = async (sc, run2) => {
+      if (!opts.interact) return empty;
+      try {
+        return await run2();
+      } catch (e) {
+        const at = probed.indexOf(sc);
+        if (at >= 0) probed.splice(at, 1);
+        skipped.push({ sc, why: `the filled-input stress for this criterion failed: ${String(e?.message ?? e).slice(0, 120)}` });
+        return empty;
+      }
+    };
+    let filled = opts.interact;
+    if (opts.interact) {
+      filled = await page.evaluate(FILL_INPUTS_STEP).then(() => true).catch(() => false);
+      if (!filled)
+        for (const sc of ["1.4.4", "1.4.10", "1.4.12"])
+          skipped.push({ sc, why: "the page's inputs could not be filled, so the filled-input stress never ran" });
+    }
     const reflowZoom = await ran("1.4.4", [], async () => await page.evaluate(REFLOW_ZOOM_PROBE));
-    const inputOverflowZoom = opts.interact ? await page.evaluate(inputOverflowZoomExpr(INPUT_OVERFLOW_DETAIL.zoom[l], CELL_SUFFIX[l])).catch(() => []) : [];
+    const inputOverflowZoom = filled ? await stressed("1.4.4", async () => await page.evaluate(inputOverflowZoomExpr(INPUT_OVERFLOW_DETAIL.zoom[l], CELL_SUFFIX[l]))) : empty;
     const reflow = await ran("1.4.10", { horizontalScroll: false }, async () => {
       await page.setViewportSize({ width: 320, height: 800 });
       return await page.evaluate(REFLOW_PROBE);
     });
-    const inputOverflowReflow = opts.interact ? await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.reflow[l], CELL_SUFFIX[l])).catch(() => []) : [];
+    const inputOverflowReflow = filled ? await stressed("1.4.10", async () => await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.reflow[l], CELL_SUFFIX[l]))) : empty;
     await page.setViewportSize({ width: 1280, height: 900 }).catch(() => {
     });
     const textSpacing = await ran("1.4.12", [], async () => {
       await page.addStyleTag({ content: TEXT_SPACING_CSS });
       return await page.evaluate(TEXT_SPACING_PROBE);
     });
-    const inputOverflowSpacing = opts.interact ? await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.spacing[l], CELL_SUFFIX[l])).catch(() => []) : [];
+    const inputOverflowSpacing = filled ? await stressed("1.4.12", async () => await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.spacing[l], CELL_SUFFIX[l]))) : empty;
     if (opts.interact) await page.evaluate(RESTORE_INPUTS_STEP).catch(() => {
     });
     const dialogFocus = opts.interact ? await probeDialogs(page).catch(() => empty) : [];
-    const liveRegion = opts.interact ? await ran("4.1.3", empty, () => probeLiveRegion(page, l, opts.allowClicks)) : [];
+    const liveWalk = opts.interact ? await probeLiveRegion(page, l, opts.allowClicks).catch((e) => ({
+      hits: empty,
+      complete: false,
+      why: String(e?.message ?? e).slice(0, 160)
+    })) : { hits: empty, complete: false, why: "stateful probes are off (`scan --no-interact`)" };
+    const liveRegion = liveWalk.hits;
+    if (liveWalk.complete) probed.push("4.1.3");
+    else skipped.push({ sc: "4.1.3", why: liveWalk.why ?? "the live-region pass did not exercise the whole page" });
     return {
       url: page.url() || target,
       landedUrl,
@@ -66253,7 +66376,7 @@ async function runScanLocal(opts) {
       snapshot: Boolean(opts.snapshotRoot)
     });
     const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, opts.target) : void 0;
-    return { ...toDynamicResult(out2, opts.target, lang, LOCAL_ENGINE), testedScs: localTestedScs(interact), ...id ? { snapshots: [id] } : {} };
+    return { ...toDynamicResult(out2, opts.target, lang, LOCAL_ENGINE), testedScs: measuredScs([out2], interact), ...id ? { snapshots: [id] } : {} };
   } finally {
     await browser.close();
   }
@@ -66265,6 +66388,7 @@ async function runScanManyLocal(urls, opts) {
   const browser = await launchChromium(chromium);
   const findings = [];
   const snapshots = [];
+  const outs = [];
   const redirected = [];
   try {
     for (const url of urls) {
@@ -66300,6 +66424,7 @@ async function runScanManyLocal(urls, opts) {
         continue;
       }
       findings.push(...toDynamicResult(out2, url, lang, LOCAL_ENGINE).findings);
+      outs.push(out2);
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, url) : void 0;
       if (id) snapshots.push(id);
     }
@@ -66312,7 +66437,7 @@ async function runScanManyLocal(urls, opts) {
     target: `${urls.length} page(s)`,
     date: today(),
     findings,
-    testedScs: localTestedScs(interact),
+    testedScs: measuredScs(outs, interact),
     ...snapshots.length ? { snapshots } : {},
     ...redirected.length ? { redirected } : {}
   };
@@ -66324,6 +66449,7 @@ async function runSampleScanLocal(pages, opts) {
   const browser = await launchChromium(chromium);
   const findings = [];
   const snapshots = [];
+  const outs = [];
   const redirected = [];
   try {
     for (const page of pages) {
@@ -66360,6 +66486,7 @@ async function runSampleScanLocal(pages, opts) {
         continue;
       }
       findings.push(...tagSampleFindings(toDynamicResult(out2, page.url, lang, LOCAL_ENGINE).findings, page));
+      outs.push(out2);
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, page.url, page) : void 0;
       if (id) snapshots.push(id);
     }
@@ -66375,7 +66502,7 @@ async function runSampleScanLocal(pages, opts) {
     date: today(),
     findings,
     sample: sampleScope({ pages: scanned }),
-    testedScs: localTestedScs(interact),
+    testedScs: measuredScs(outs, interact),
     ...snapshots.length ? { snapshots } : {},
     ...redirected.length ? { redirected } : {}
   };

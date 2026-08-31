@@ -205,7 +205,13 @@ export const TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
 export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables): string {
   const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
   return `(() => { ${PRELUDE}
-  const sel = 'a[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
+  // FOCUSABLE MEANS FOCUSABLE, NOT "the six tags we thought of". This list decides which
+  // elements get tagged, and since the walk may now license a conformity, an element missing
+  // from it is not merely unmeasured -- it is silently cleared. A page whose only control is a
+  // <summary> tagged nothing at all, so the count was zero, so the ring was "vacuously whole",
+  // so 2.4.7 and 2.4.11 closed without a single Tab press.
+  // (No backticks in this comment: it lives inside a template literal.)
+  const sel = 'a[href],area[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,iframe,audio[controls],video[controls],[contenteditable]:not([contenteditable="false"]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
   // A BOX THAT IS ANIMATING CANNOT BE COMPARED ACROSS TIME, so it contributes a constant.
   //
   // The snapshot is taken before Tab and re-read after it, and the properties compared include
@@ -238,6 +244,7 @@ export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFoc
   for (const el of Array.from(document.querySelectorAll('[data-u11y-f],[data-u11y-fp]'))) { el.removeAttribute('data-u11y-f'); el.removeAttribute('data-u11y-fp'); }
   const roots = ${rootExpr};
   const focusables = [];
+  let total = 0;
   for (const root of Array.from(roots)) {
     if (root.matches && root.matches(sel)) focusables.push(root);
     for (const e of Array.from(root.querySelectorAll(sel))) focusables.push(e);
@@ -248,13 +255,14 @@ export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFoc
     const proxy = proxyFor(e);
     if (!proxy) continue;
     const key = 'k' + n;
+    total++;
+    if (n >= ${maxFocusables}) continue; // tagged the cap; keep COUNTING so the caller knows it was cut
     e.setAttribute('data-u11y-f', key);
     proxy.setAttribute('data-u11y-fp', key);
     window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy) };
     n++;
-    if (n >= ${maxFocusables}) break;
   }
-  return n;
+  return { n: n, total: total };
 })()`;
 }
 
@@ -263,9 +271,15 @@ export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFoc
 // If so, focus produced no visible indicator.
 export const FOCUS_CHECK_PROBE = `(() => {
   const e = document.activeElement;
+  // FOCUS LEFT THE DOCUMENT — the normal end of a tab ring, and nothing to measure.
   if (!e || e === document.body || e === document.documentElement) return null;
   const key = e.getAttribute && e.getAttribute('data-u11y-f');
-  if (!key || !window.__u11yF || !window.__u11yF[key]) return null;
+  // FOCUS IS ON SOMETHING THE SETUP NEVER TAGGED, which is a different fact entirely and used
+  // to be reported as the same one. A skip link revealed only on focus, a widget that moves
+  // focus into a node the selector does not match -- Tab crossed it, nothing measured it, and
+  // the walk went on to call itself whole. The caller needs to know the ring contained an
+  // element it cannot speak for. (No backticks here: this lives inside a template literal.)
+  if (!key || !window.__u11yF || !window.__u11yF[key]) return { untagged: true, key: '', changed: true, selector: '', html: '' };
   const rec = window.__u11yF[key];
   const proxy = document.querySelector('[data-u11y-fp="' + key + '"]') || e;
   // THE SAME THREE BOXES pass 1 snapshotted, in the same order. A design system that paints
@@ -347,6 +361,7 @@ export const FOCUS_OBSCURED_PROBE = `(() => { ${PRELUDE}
 export const HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
   const out = [];
   let n = 0;
+  let total = 0;
   for (const e of Array.from(document.querySelectorAll('[aria-describedby]'))) {
     const id = (e.getAttribute('aria-describedby') || '').split(/\\s+/)[0];
     if (!id) continue;
@@ -355,12 +370,14 @@ export const HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
     const s = getComputedStyle(t);
     const hidden = s.display === 'none' || s.visibility === 'hidden' || t.getBoundingClientRect().height === 0;
     if (!hidden) continue;
+    total++;
+    if (n >= 10) continue; // tagged ten; keep COUNTING so the caller knows what it did not see
     const key = 'h' + n;
     e.setAttribute('data-u11y-h', key);
     out.push({ key: key, target: id, selector: __sel(e) });
     n++;
-    if (n >= 10) break;
   }
+  for (const o of out) o.total = total;
   return out;
 })()`;
 
@@ -397,11 +414,24 @@ export interface RingCoverage {
   why?: string;
 }
 
-/** The tagging pass stopped at the cap, so the ring itself is shorter than the page's.
- *  Checked on `count` rather than inside the walk: no amount of walking can reach an element
- *  the setup never tagged. */
-function cappedRing(count: number, limits: ProbeLimits): string | undefined {
-  return count >= limits.maxFocusables
+/** What the tagging pass tagged, and how many candidates it saw.
+ *
+ *  It used to return the count alone, and the caller inferred truncation from
+ *  `count >= maxFocusables` — which reads a page with EXACTLY 120 focusables as proof that a
+ *  121st exists, and withholds a conformity the page earned. Counting past the cap answers the
+ *  question directly. A producer that predates the shape returns a bare number and keeps the
+ *  old conservative inference, which is the safe direction to be wrong in. */
+function readSetup(raw: unknown, limits: ProbeLimits): { count: number; capped: boolean } {
+  if (typeof raw === "number") return { count: raw, capped: raw >= limits.maxFocusables };
+  const o = (raw ?? {}) as { n?: number; total?: number };
+  const count = o.n ?? 0;
+  return { count, capped: (o.total ?? count) > count };
+}
+
+/** The tagging pass stopped at the cap, so the ring itself is shorter than the page's. No
+ *  amount of walking can reach an element the setup never tagged. */
+function cappedRing(capped: boolean, limits: ProbeLimits): string | undefined {
+  return capped
     ? `the setup pass stopped tagging at ${limits.maxFocusables} focusable elements (probes.maxFocusables), so everything past that was never focused and never measured`
     : undefined;
 }
@@ -411,7 +441,7 @@ export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimi
 }
 
 export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<FocusRingHits> {
-  const count = (await page.evaluate(focusSetupExpr(scope, limits.maxFocusables))) as number;
+  const { count, capped } = readSetup(await page.evaluate(focusSetupExpr(scope, limits.maxFocusables)), limits);
   // A page with nothing focusable has no ring to cross — the walk is vacuously whole, and
   // saying otherwise would withhold a conformity the page has earned.
   if (!count) return { visible: [], obscured: [], complete: true };
@@ -424,6 +454,7 @@ export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits 
   // — `tabPressBudget` is a backstop — so this is the reason that survives when nothing
   // else sets one.
   let cutShort: string | undefined = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
+  let untagged = 0;
   for (let i = 0; i < limit; i++) {
     // A tab ring of 130 elements is two round-trips each on a loaded CI runner. Stopping at
     // the deadline costs the tail of the ring, which `runLiveProbes` then records.
@@ -432,8 +463,15 @@ export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits 
       break;
     }
     await page.keyboard.press("Tab");
-    const r = (await page.evaluate(FOCUS_CHECK_PROBE)) as { key: string; changed: boolean; selector: string; html: string } | null;
+    const r = (await page.evaluate(FOCUS_CHECK_PROBE)) as { key: string; changed: boolean; selector: string; html: string; untagged?: boolean } | null;
     if (!r) continue;
+    // Tab landed on a focusable the setup never tagged. Nothing here can be measured, and the
+    // walk must not later claim it crossed the whole ring: a skip link that only appears on
+    // focus is exactly the control this criterion is about.
+    if (r.untagged) {
+      untagged++;
+      continue;
+    }
     // STAYING PUT IS NOT WRAPPING ROUND, and reading it as such ended this walk early.
     //
     // A native multi-segment editor holds focus across several presses — `input[type=date]`
@@ -482,7 +520,12 @@ export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits 
   // left the document for good was still crossed end to end, and refusing it a verdict on the
   // shape of its ending would withhold a measurement that really happened.
   if (cutShort && seen.size >= count) cutShort = undefined;
-  const why = cappedRing(count, limits) ?? cutShort;
+  const why =
+    cappedRing(capped, limits) ??
+    cutShort ??
+    (untagged > 0
+      ? `Tab crossed ${untagged} element(s) the tagging pass never matched — a control focusable in the browser but not by this selector (a skip link revealed on focus, a widget moving focus into an untagged node). They were never compared, so this page is not cleared`
+      : undefined);
   return { visible: hits, obscured, complete: !why, ...(why ? { why } : {}) };
 }
 
@@ -577,7 +620,7 @@ export interface KeyboardTrapWalk extends RingCoverage {
 }
 
 export async function probeKeyboardTrapRing(page: Any, limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<KeyboardTrapWalk> {
-  const count = (await page.evaluate(focusSetupExpr("", limits.maxFocusables))) as number;
+  const { count, capped } = readSetup(await page.evaluate(focusSetupExpr("", limits.maxFocusables)), limits);
   // One focusable cannot be a trap: Tab has nowhere else to go, and that is the page's shape
   // rather than a cage. Zero cannot either. Either way the question is settled for this page,
   // so the walk is complete rather than skipped.
@@ -661,17 +704,39 @@ export async function probeKeyboardTrapRing(page: Any, limits: ProbeLimits = PRO
     prev = now;
   }
   if (cutShort && seen.size >= count) cutShort = undefined;
-  const why = cappedRing(count, limits) ?? cutShort;
+  const why = cappedRing(capped, limits) ?? cutShort;
   return { hits, complete: !why, ...(why ? { why } : {}) };
 }
 
 export async function probeHover(page: Any, limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<ProbeHit[]> {
-  const triggers = (await page.evaluate(HOVER_SETUP_PROBE)) as { key: string; target: string; selector: string }[];
+  return (await probeHoverWalk(page, limits, deadline)).hits;
+}
+
+/** What the hover pass found, AND whether it opened every trigger on the page. Same reason as
+ *  the tab-ring walks: `HOVER_SETUP_PROBE` stops tagging at ten, `maxTriggers` bounds what is
+ *  tried and `maxHits` what is recorded, and all three used to return a partial pass in the
+ *  shape of a finished one — after which 1.4.13 was credited for a page with eleven tooltips
+ *  of which the eleventh was the one that would not close. */
+export interface HoverWalk extends RingCoverage {
+  hits: ProbeHit[];
+}
+
+export async function probeHoverWalk(page: Any, limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<HoverWalk> {
+  const setup = (await page.evaluate(HOVER_SETUP_PROBE)) as { key: string; target: string; selector: string; total?: number }[];
+  const triggers = setup;
   const hits: ProbeHit[] = [];
+  let cutShort: string | undefined;
   // What is TRIED is capped, not just what is recorded: a design system that puts a tooltip
   // on every icon offers hundreds of triggers, and each one costs a hover plus two waits.
-  for (const tr of triggers.slice(0, Math.max(1, limits.maxTriggers))) {
-    if (deadline?.out()) break;
+  const tried = triggers.slice(0, Math.max(1, limits.maxTriggers));
+  if (tried.length < triggers.length) {
+    cutShort = `only ${tried.length} of the ${triggers.length} hover triggers on this page were opened (probes.maxTriggers) — the rest were never asked whether Escape dismisses them`;
+  }
+  for (const tr of tried) {
+    if (deadline?.out()) {
+      cutShort = `the probe budget of ${limits.budgetMs}ms ran out with triggers left unopened`;
+      break;
+    }
     try {
       // The timeout is the whole point. Without it Playwright waits for actionability
       // FOREVER — an element behind a sticky header, or one that never settles, then hangs
@@ -694,9 +759,21 @@ export async function probeHover(page: Any, limits: ProbeLimits = PROBE_DEFAULTS
         detail: `Le contenu révélé au survol (aria-describedby #${tr.target}) ne se masque pas avec Échap — Contenu au survol ou au focus (1.4.13).`,
       });
     }
-    if (hits.length >= Math.min(limits.maxHits, 8)) break;
+    if (hits.length >= Math.min(limits.maxHits, 8)) {
+      cutShort = "the recording cap filled with triggers left unopened — enough was found to fail the page, not enough to clear the rest of it";
+      break;
+    }
   }
-  return hits;
+  // The SETUP pass has its own ceiling of ten, and it is the one nobody could see: a page with
+  // eleven tooltips handed back ten, and the eleventh — which may be the broken one — was
+  // never in the list this loop walks.
+  const capped = (setup as { total?: number }[])[0]?.total;
+  const why =
+    cutShort ??
+    (typeof capped === "number" && capped > triggers.length
+      ? `only ${triggers.length} of the ${capped} hover triggers on this page were tagged — the rest were never opened`
+      : undefined);
+  return { hits, complete: !why, ...(why ? { why } : {}) };
 }
 
 /** THE LIVE PROBES, RUN ON A PAGE SOMEBODY ELSE OPENED.
@@ -887,10 +964,11 @@ export async function runLiveProbes(page: Any, opts: LiveProbeOptions = {}): Pro
     }
   }
   if (want("1.4.13") && canHover && canType) {
-    const r = await bounded("1.4.13", () => probeHover(page, limits, deadline));
+    const r = await bounded("1.4.13", () => probeHoverWalk(page, limits, deadline));
     if (r) {
-      out.hover = r;
-      out.probed.push("1.4.13");
+      out.hover = r.hits;
+      if (r.complete) out.probed.push("1.4.13");
+      else skip("1.4.13", r.why ?? "the hover pass did not open every trigger on the page");
     }
   }
   // LAST, AND FOR A REASON THE ORDER ABOVE ALREADY STATES TWICE: this is the only probe here
@@ -902,8 +980,9 @@ export async function runLiveProbes(page: Any, opts: LiveProbeOptions = {}): Pro
     const clicks = typeof opts.liveRegion === "object" && opts.liveRegion.clicks === true;
     const r = await bounded("4.1.3", () => probeLiveRegion(page, opts.lang ?? "fr", clicks));
     if (r) {
-      out.liveRegion = r;
-      out.probed.push("4.1.3");
+      out.liveRegion = r.hits;
+      if (r.complete) out.probed.push("4.1.3");
+      else skip("4.1.3", r.why ?? "the live-region pass did not exercise the whole page");
     }
   }
   return out;
@@ -953,18 +1032,24 @@ export function liveRegionExpr(detail: string, allowClicks: boolean): string {
     return n;
   };
   for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
-    if (count >= 20 || hits.length >= 10) break;
+    if (count >= 20 || hits.length >= 10) { untried += 1; continue; }
     if (b.disabled || !__vis(b)) continue;
-    if (dangerous.test(nameOf(b))) continue; // defense-in-depth: never click a destructive-named button
+    if (dangerous.test(nameOf(b))) { untried += 1; continue; } // defense-in-depth: never click a destructive-named button
     const before = location.href;
     try { b.click(); } catch (_) {}
     await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
+    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
     drain();
     count++;
   }`
     : `
-  // click interactions disabled (authenticated scan without --interact-clicks)`;
+  // CLICKS DISABLED, and the buttons are counted rather than ignored. A status message very
+  // often appears after a button press and nothing else, so a pass that never pressed one has
+  // not measured 4.1.3 on this page -- it has measured the fields. Reporting how many it
+  // declined is what lets the caller withhold the credit instead of publishing silence.
+  for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
+    if (!b.disabled && __vis(b)) untried += 1;
+  }`;
   return `(async () => { ${PRELUDE}
   const isLive = (node) => {
     let el = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
@@ -998,35 +1083,52 @@ export function liveRegionExpr(detail: string, allowClicks: boolean): string {
       }
     }
   };
-  let count = 0;${clickLoop}
+  let count = 0;
+  // How many candidate interactions this pass did NOT perform -- caps, a destructive-sounding
+  // name, clicks turned off. A probe that skipped half a page has not measured it, and the
+  // caller may not read its silence as conformity.
+  let untried = 0;${clickLoop}
   // toggle checkbox/radio, then restore
   for (const t of Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'))) {
-    if (count >= 40 || hits.length >= 10) break;
+    if (count >= 40 || hits.length >= 10) { untried += 1; continue; }
     if (t.disabled || !__vis(t)) continue;
     const before = location.href;
     const prev = t.checked;
+    // A RADIO IS NOT A CHECKBOX: clicking one UNCHECKS its pair, and restoring only the one we
+    // clicked left the group with nothing selected -- a form the caller's next assertion, or
+    // the user, finds broken. Remember which member of the group was checked and put THAT back.
+    let group = null;
+    if (t.type === 'radio' && t.name) {
+      try {
+        const form = t.form || document;
+        for (const r of Array.from(form.querySelectorAll('input[type="radio"]'))) { if (r.name === t.name && r.checked) { group = r; break; } }
+      } catch (_) {}
+    }
     try { t.click(); } catch (_) {}
     await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
+    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
     drain();
-    try { if (t.checked !== prev) { t.checked = prev; t.dispatchEvent(new Event('change', { bubbles: true })); } } catch (_) {}
+    try {
+      if (group) { if (!group.checked) { group.checked = true; group.dispatchEvent(new Event('change', { bubbles: true })); } }
+      else if (t.checked !== prev) { t.checked = prev; t.dispatchEvent(new Event('change', { bubbles: true })); }
+    } catch (_) {}
     count++;
   }
   // fill text inputs, then restore
   for (const inp of Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="search"], textarea'))) {
-    if (count >= 60 || hits.length >= 10) break;
+    if (count >= 60 || hits.length >= 10) { untried += 1; continue; }
     if (inp.disabled || inp.readOnly || !__vis(inp)) continue;
     const before = location.href;
     const prev = inp.value == null ? '' : String(inp.value);
     try { inp.value = 'test 123'; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
     await settle();
-    if (location.href !== before) { obs.disconnect(); return hits; }
+    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
     drain();
     try { inp.value = prev; inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
     count++;
   }
   obs.disconnect();
-  return hits.slice(0, 10);
+  return { hits: hits.slice(0, 10), untried: untried, navigated: false };
 })()`;
 }
 export const LIVE_REGION_DETAIL = {
@@ -1034,13 +1136,37 @@ export const LIVE_REGION_DETAIL = {
   en: "Content update triggered by an interaction outside any live region (aria-live / role=status|alert|log) — likely not announced to assistive technology.",
 };
 
-export async function probeLiveRegion(page: Any, lang: keyof typeof LIVE_REGION_DETAIL, allowClicks: boolean): Promise<ProbeHit[]> {
+/** What the live-region pass found, AND whether it exercised the page. `untried` is what
+ *  stands between a measurement and a shrug: a status message very often appears after a
+ *  button press and nothing else, so a pass that pressed none of a page's buttons has not
+ *  decided 4.1.3 on it. */
+export interface LiveRegionWalk extends RingCoverage {
+  hits: ProbeHit[];
+}
+
+export async function probeLiveRegion(page: Any, lang: keyof typeof LIVE_REGION_DETAIL, allowClicks: boolean): Promise<LiveRegionWalk> {
   const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
   // NO `.catch(() => [])` HERE ANY MORE. It turned a probe that never ran into a probe that
   // found nothing, and the callers then credited 4.1.3 either way — the same shape of false
   // conformity the tab-ring walks used to produce. Each caller has its own guard, and each one
   // records the failure where it belongs (`skipped`) instead of publishing silence.
-  return (await page.evaluate(liveRegionExpr(detail, allowClicks))) as ProbeHit[];
+  const r = (await page.evaluate(liveRegionExpr(detail, allowClicks))) as { hits: ProbeHit[]; untried: number; navigated: boolean };
+  const hits = r?.hits ?? [];
+  if (r?.navigated) {
+    return {
+      hits,
+      complete: false,
+      why: "an interaction navigated away mid-pass — everything after it happened on another page, and this one was not finished",
+    };
+  }
+  if (r?.untried > 0) {
+    return {
+      hits,
+      complete: false,
+      why: `${r.untried} interactive element(s) were never exercised (clicks disabled, a destructive-sounding name, or a cap) — a status message that only appears after one of them would not have been seen`,
+    };
+  }
+  return { hits, complete: true };
 }
 
 /** Undo the text-spacing override. Identified by its own declaration rather than by a handle,

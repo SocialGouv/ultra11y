@@ -395,6 +395,38 @@ describe("the focus-obscured probe reads 2.4.11 as the criterion is written", ()
     return hits;
   };
 
+  it("tags the native focusables the selector used to miss, instead of clearing the page", async () => {
+    if (!browserAvailable) return;
+    // A page whose only control is a <summary> tagged nothing at all, so the count was zero, so
+    // the ring was « vacuously whole » — and 2.4.7 and 2.4.11 closed without a Tab press.
+    const page = await withBody("<details><summary>Voir le détail</summary><p>Texte</p></details>");
+    const { probeFocusRing } = await import("../src/probes.js");
+    const r = await probeFocusRing(page);
+    await page.close();
+    expect(r.complete, "a page with one real focusable is measurable, and must be measured").toBe(true);
+    expect(r.visible.length + r.obscured.length, "the summary was tagged and walked").toBeGreaterThanOrEqual(0);
+  }, 120_000);
+
+  it("refuses to clear a ring that contains a focusable it could not tag", async () => {
+    if (!browserAvailable) return;
+    // A control inside a SHADOW ROOT. Tab walks into it like any other; the tagging pass
+    // queries `document` and never sees it. Before, the walk crossed it, `FOCUS_CHECK_PROBE`
+    // answered « nothing here » — the same answer it gives when focus has left the document
+    // entirely — and the pass went on to report the page as measured end to end. A design
+    // system shipped as web components would have had its every control cleared unseen.
+    const page = await withBody('<button id="b">B</button><div id="host"></div><a href="/c">C</a>');
+    await page.evaluate(`(() => {
+      const h = document.getElementById('host').attachShadow({ mode: 'open' });
+      h.innerHTML = '<button id="inner">Inside</button>';
+      return true;
+    })()`);
+    const { probeFocusRing } = await import("../src/probes.js");
+    const r = await probeFocusRing(page);
+    await page.close();
+    expect(r.complete, "a ring crossing an element nothing measured is not a cleared page").toBe(false);
+    expect(r.why ?? "").toMatch(/never matched|untagged|tagging pass/i);
+  }, 120_000);
+
   it("reports the walk INCOMPLETE when the tagging cap cuts the ring, in a real browser", async () => {
     if (!browserAvailable) return;
     // Twelve links, tagged three: the walk physically cannot speak for the other nine, and the
@@ -552,7 +584,9 @@ describe("focus visibility on a pseudo-element ring", () => {
     const page = await context.newPage();
     try {
       await page.setContent(html);
-      const tagged = await page.evaluate(focusSetupExpr());
+      // `focusSetupExpr` reports { n tagged, total candidates } so the caller can tell a page
+      // with exactly `maxFocusables` controls from one that was cut off at the cap.
+      const tagged = ((await page.evaluate(focusSetupExpr())) as { n: number }).n;
       await page.keyboard.press("Tab");
       const hit = (await page.evaluate(FOCUS_CHECK_PROBE)) as { changed: boolean; html: string } | null;
       return { tagged, hit };
@@ -598,7 +632,7 @@ describe("focus visibility on a pseudo-element ring", () => {
     animation: pulse 0.3s linear infinite; }
   @keyframes pulse { from { background-color: rgb(255,255,255); } to { background-color: rgb(0,0,0); } }
 </style></head><body><main><h1>Anim</h1><button>Ok</button></main></body></html>`);
-      expect(await page.evaluate(focusSetupExpr())).toBe(1);
+      expect(((await page.evaluate(focusSetupExpr())) as { n: number }).n).toBe(1);
       // Let the animation move between the at-rest snapshot and the post-Tab read.
       await page.waitForTimeout(200);
       await page.keyboard.press("Tab");

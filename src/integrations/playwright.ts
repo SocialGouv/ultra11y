@@ -315,12 +315,21 @@ export function sweepTarget(url: string): string {
  *  criteria stayed « à évaluer » for the whole audit — including on the five pages that HAD
  *  been probed. Opt out with `check: { probes: false }`. */
 export function sweepCheckOptions(check?: SweepOptions["check"]): SweepOptions["check"] & { failOn: false | undefined } {
-  // `liveRegion: true` joins it for the same reason and on the same argument. 4.1.3 was the
-  // last needs-rendering criterion no suite-driven run could reach, so the partial-audit
-  // banner was structurally permanent and RGAA 7.5 met a paid adjudicator every time —
-  // carrying whatever `aria-live` happened to be in the source, which is not where a status
-  // message lives. Clicks stay off: a sweep is usually authenticated.
-  return { failOn: false, probes: true, liveRegion: true, ...check } as SweepOptions["check"] & { failOn: false | undefined };
+  // `liveRegion` does NOT join it, and the asymmetry with `probes` is the point a second time.
+  //
+  // It was on here for one release-in-progress, on the argument that a sweep asserts nothing
+  // afterwards. Two things make that the wrong default. It is the only probe that changes the
+  // page rather than stressing it — it types into fields and toggles controls, and a framework
+  // that reacted has reacted: an autosave, a validation, a request, in the worst case a route
+  // change that leaves the axe pass measuring a page the snapshot is not of. And it buys less
+  // than it looked: with clicks off (which they must be on an authenticated sweep, where a
+  // server mutation is invisible to any check this side of the network) the pass never presses
+  // a button, so it now correctly WITHHOLDS 4.1.3 on any page that has one.
+  //
+  // So it stays a deliberate opt-in — `check: { liveRegion: true }`, or `{ liveRegion: { clicks:
+  // true } }` on a disposable environment — where the caller can weigh both against their own
+  // application.
+  return { failOn: false, probes: true, ...check } as SweepOptions["check"] & { failOn: false | undefined };
 }
 
 export function sweepSample(opts: SweepOptions = {}): void {

@@ -107,12 +107,19 @@ describe("live-region click policy (authenticated-scan safety)", () => {
     expect(clicksAllowed(".auth/user.json", true)).toBe(true); // explicit opt-in
   });
 
-  it("the noClicks variant carries NO button-click loop; the clicks variant does, with the destructive-name skip", () => {
+  it("the noClicks variant PRESSES no button — and counts the ones it declined", () => {
     const withClicks = sources["liveRegionExpr(clicks)"]!;
     const noClicks = sources["liveRegionExpr(noClicks)"]!;
     expect(withClicks).toContain('button[type="button"]');
     expect(withClicks).toMatch(/supprim.*delete|delete.*supprim/); // fr + en destructive verbs present
-    expect(noClicks).not.toContain('button[type="button"]');
+    // THE ASSERTION IS ABOUT PRESSING, not about naming. It used to forbid the selector
+    // outright, which was the same thing while the only reason to look at a button was to
+    // press it. It no longer is: the noClicks variant now ENUMERATES the buttons it is not
+    // going to press, so the caller can withhold 4.1.3 instead of publishing the silence of a
+    // pass that never exercised the one interaction a status message usually needs. Counting
+    // is not clicking, and the property that matters is still pinned exactly.
+    expect(noClicks, "the noClicks variant must never press a button").not.toMatch(/\bb\.click\s*\(/);
+    expect(noClicks, "…but it must still count what it declined").toContain("untried");
     // fill/toggle interactions (the confirmed real-world need) remain in BOTH variants
     for (const s of [withClicks, noClicks]) {
       expect(s).toContain('input[type="checkbox"], input[type="radio"]');

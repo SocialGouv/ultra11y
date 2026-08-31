@@ -47,6 +47,18 @@ describe("the tool line says what this run did, not what the engine can do", () 
   it("does the same in English", () => {
     expect(renderReport(rendered, "en")).not.toContain("preliminary audit");
   });
+
+  it("does not claim an adjudication the run never performed", () => {
+    // Counted off the core grid, a PACK report announced « aucun critère de jugement adjugé »
+    // four lines above a provenance line reading « 98 adjudication »: two numbers for one fact,
+    // from two sources, in one header.
+    const md = renderPackReport(rendered, loadPack("rgaa"), "fr");
+    const note = md.split("\n").find((l) => l.startsWith("- **Outil**")) ?? "";
+    const provenance = md.split("\n").find((l) => l.includes("Provenance des décisions")) ?? "";
+    const claimed = /(\d+) critère\(s\) de jugement adjugé/.exec(note)?.[1] ?? "0";
+    const counted = /(\d+) adjudication/.exec(provenance)?.[1] ?? "0";
+    expect(claimed, "the tool line and the provenance line must count the same thing").toBe(counted);
+  });
 });
 
 describe("the opaque-library caveat stops telling a reader to do what the run already did", () => {

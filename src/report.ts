@@ -51,8 +51,8 @@ const L = {
     // browser and had an adjudicator rule on the result introduced itself as a preliminary
     // static pass, which is the one thing it was not.
     toolNote: "moteur statique — audit préliminaire, critères de jugement à adjuger par l'agent IA (statique, gaté), rendu via `scan`",
-    toolNoteRendered: (pages: number) =>
-      `moteur statique + tier rendu — ${pages} page(s) capturée(s) auditée(s) sur leur DOM réel, critères de jugement adjugés par l'agent IA (gaté)`,
+    toolNoteRendered: (pages: number, adjudicated: number) =>
+      `moteur statique + tier rendu — ${pages} page(s) capturée(s) auditée(s) sur leur DOM réel${adjudicated > 0 ? `, ${adjudicated} critère(s) de jugement adjugé(s) par l'agent IA (gaté)` : ", aucun critère de jugement adjugé"}`,
     scope: "Périmètre",
     files: "fichier(s)",
     rate: "Taux de réussite automatique (vérifications statiques)",
@@ -127,11 +127,11 @@ const L = {
     // components — but « auditez la sortie de build avant de conclure » is spent advice in a
     // document whose scope line says the produced HTML of N pages was read.
     renderedAudited: (n: number, libs: string, pages: number) =>
-      `${n} fichier(s) rendent des composants de bibliothèque (${libs}) invisibles en analyse statique — leur HTML produit a été audité sur ${pages} page(s) capturée(s). Les composants sans capture restent des angles morts.`,
+      `${n} fichier(s) rendent des composants de bibliothèque (${libs}) invisibles en analyse statique. ${pages} page(s) ont été capturées et auditées sur leur DOM réel ; ce que ces composants produisent AILLEURS, sur une page non capturée, reste un angle mort.`,
     sourceTemplate: (n: number, exts: string) =>
       `Verdict source préliminaire : ${n} composant(s) ${exts} audité(s) en SOURCE (template). Les slots, snippets et liaisons dynamiques (:attr, {@render}) sont invisibles en analyse statique — auditez le rendu (\`render\` / \`scan\`) avant de conclure.`,
     sourceTemplateAudited: (n: number, exts: string, pages: number) =>
-      `${n} composant(s) ${exts} audité(s) en SOURCE (template) ; leurs slots et liaisons dynamiques ont été audités sur ${pages} page(s) capturée(s). Les composants sans capture restent des angles morts.`,
+      `${n} composant(s) ${exts} audité(s) en SOURCE (template) — slots et liaisons dynamiques invisibles en analyse statique. ${pages} page(s) ont été capturées et auditées sur leur DOM réel ; ce qu'ils rendent sur une page non capturée reste un angle mort.`,
     captures: (n: number) => `${n} fichier(s) de capture rendus audités à pleine fidélité (DOM réel) — le vrai HTML produit, pas l'appel de composant.`,
     blindSpots: (n: number) =>
       `${n} composant(s) sans capture rendue (angles morts) — audités sur source opaque uniquement ; auditez leur DOM rendu (\`render --setup\`).`,
@@ -172,8 +172,8 @@ const L = {
     date: "Date",
     tool: "Tool",
     toolNote: "static engine — preliminary audit; judgment criteria adjudicated by the AI agent (statically, gated), rendering via `scan`",
-    toolNoteRendered: (pages: number) =>
-      `static engine + rendered tier — ${pages} captured page(s) audited on their real DOM; judgment criteria adjudicated by the AI agent (gated)`,
+    toolNoteRendered: (pages: number, adjudicated: number) =>
+      `static engine + rendered tier — ${pages} captured page(s) audited on their real DOM${adjudicated > 0 ? `; ${adjudicated} judgment criterion/criteria adjudicated by the AI agent (gated)` : "; no judgment criterion adjudicated"}`,
     scope: "Scope",
     files: "file(s)",
     rate: "Automatic static-check pass rate",
@@ -238,11 +238,11 @@ const L = {
     rendered: (n: number, libs: string) =>
       `Preliminary source verdict: ${n} file(s) render component-library components (${libs}) whose produced HTML is invisible to static analysis. Audit the build output (\`render\` / \`audit <dist>\`) or \`scan\` before concluding.`,
     renderedAudited: (n: number, libs: string, pages: number) =>
-      `${n} file(s) render component-library components (${libs}) invisible to static analysis — their produced HTML was audited on ${pages} captured page(s). Components with no capture remain blind spots.`,
+      `${n} file(s) render component-library components (${libs}) invisible to static analysis. ${pages} page(s) were captured and audited on their real DOM; what those components produce ELSEWHERE, on a page nobody captured, remains a blind spot.`,
     sourceTemplate: (n: number, exts: string) =>
       `Preliminary source verdict: ${n} ${exts} component(s) audited as SOURCE (template). Slots, snippets and dynamic bindings (:attr, {@render}) are invisible to static analysis — audit the rendered output (\`render\` / \`scan\`) before concluding.`,
     sourceTemplateAudited: (n: number, exts: string, pages: number) =>
-      `${n} ${exts} component(s) audited as SOURCE (template); their slots and dynamic bindings were audited on ${pages} captured page(s). Components with no capture remain blind spots.`,
+      `${n} ${exts} component(s) audited as SOURCE (template) — slots and dynamic bindings invisible to static analysis. ${pages} page(s) were captured and audited on their real DOM; what they render on a page nobody captured remains a blind spot.`,
     captures: (n: number) => `${n} rendered capture file(s) audited at full fidelity (real DOM) — the true produced HTML, not the component call.`,
     blindSpots: (n: number) =>
       `${n} component(s) without a rendered capture (blind spots) — audited from opaque source only; audit their rendered DOM (\`render --setup\`).`,
@@ -341,7 +341,18 @@ export function untestedNeedsRendering(r: AuditResult, established: ReadonlySet<
  *  conformity reached by silence is deliberately not one of them. */
 export function establishedScs(derived: readonly PackCriterionResult[]): Set<string> {
   const out = new Set<string>();
-  for (const d of derived) if (d.status === "NC" || d.decidedBy === "agent") for (const sc of d.scs) out.add(sc);
+  for (const d of derived) {
+    if (d.status !== "NC" && d.decidedBy !== "agent") continue;
+    // THE SC THE CONSTAT CARRIES, not every SC the criterion happens to map to. RGAA 10.7
+    // projects from 1.4.1 AND 2.4.7; one `dyn-focus-visible` hit fails it on 2.4.7 alone, and
+    // crediting 1.4.1 with it would delete « information par la couleur » from the banner on
+    // the strength of a measurement nobody made.
+    const carried = new Set(d.findings.map((f) => f.criteriaId).filter((id) => d.scs.includes(id)));
+    // A criterion mapped to exactly one SC needs no attribution: there is nowhere else the
+    // verdict could be about. This is the ordinary case, and the one 7.5 → 4.1.3 falls in.
+    if (carried.size === 0 && d.scs.length === 1) carried.add(d.scs[0]!);
+    for (const sc of carried) out.add(sc);
+  }
   return out;
 }
 
@@ -640,7 +651,13 @@ function render(
   // non-empty means this audit ingested rendered DOM; absent means an audit predating the field,
   // which must keep the old wording rather than be retroactively re-described.
   const pagesRead = r.scope.pagesAudited?.length ?? 0;
-  out.push(`- **${s.tool}** : ultra11y v${r.version} (${pagesRead > 0 ? s.toolNoteRendered(pagesRead) : s.toolNote})`);
+  // ONE SOURCE FOR ONE FACT. Counted off `r.criteria` first, which is the CORE grid — so a pack
+  // report, whose rows are the pack's own criteria, introduced itself as having adjudicated
+  // nothing four lines above a provenance line reading « 98 adjudication ». A document is not
+  // allowed to disagree with itself in its own header; when a pack supplies its provenance,
+  // that is the number.
+  const adjudicated = opts.conformance ? opts.conformance.provenance.agent : r.criteria.filter((c) => c.decidedBy === "agent").length;
+  out.push(`- **${s.tool}** : ultra11y v${r.version} (${pagesRead > 0 ? s.toolNoteRendered(pagesRead, adjudicated) : s.toolNote})`);
   out.push(`- **${s.scope}** : ${r.scope.files} ${s.files} — ${r.scope.inputs.join(", ")}`);
   // THE HEADLINE, AND THE ORDER IT IS READ IN.
   //

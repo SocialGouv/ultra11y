@@ -28,7 +28,7 @@ import {
   REMOVE_TEXT_SPACING_STEP,
   probeFocusRing,
   probeFocusVisible,
-  probeHover,
+  probeHoverWalk,
   probeKeyboardTrapRing,
   probeLiveRegion,
   REFLOW_PROBE,
@@ -56,6 +56,30 @@ export const LOCAL_ENGINE = "axe-core@playwright (local)";
 const LOCAL_TESTED_SCS: readonly string[] = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
 export function localTestedScs(interact: boolean): string[] {
   return interact ? [...LOCAL_TESTED_SCS, "4.1.3"] : [...LOCAL_TESTED_SCS];
+}
+
+/** WHAT THIS RUN MEASURED, as opposed to what this runtime is CAPABLE of measuring.
+ *
+ *  `localTestedScs` is a capability list: a constant, published verbatim on every
+ *  `DynamicResult` whatever happened on the pages. `runOnPage` has always computed the truth
+ *  per page — a probe that threw, a tab ring cut off at the tagging cap, a live-region pass
+ *  that declined half the buttons — and then that truth was thrown away one function up.
+ *
+ *  The consequence is not a false `C` (that is `probed`'s job, per page, and it is honest) but
+ *  a false COVERAGE REPORT: `scope.scan.testedScs` is what `untestedNeedsRendering` reads, so a
+ *  run whose rings were all truncated still published « nothing left to test » and the
+ *  partial-audit banner vanished.
+ *
+ *  The union is the right shape here and the intersection is not: this field answers « was it
+ *  measured ANYWHERE in this run? », while « on which pages? » is `probed`'s question and only
+ *  that one may conclude. Empty stays empty — a sweep that measured nothing says so. */
+function measuredScs(outs: readonly RunnerOutput[], interact: boolean): string[] {
+  const union = new Set<string>();
+  for (const o of outs) for (const sc of o.probed ?? []) union.add(sc);
+  // A runtime that recorded nothing at all is one that predates per-page accounting, not one
+  // that measured nothing: fall back to the capability list rather than erasing coverage.
+  if (!outs.some((o) => o.probed !== undefined)) return localTestedScs(interact);
+  return [...union].sort();
 }
 
 // Playwright + AxeBuilder are resolved at runtime (never typed deps of this package),
@@ -613,13 +637,50 @@ async function runOnPage(
     const keyboardTrap = trapWalk.hits;
     if (trapWalk.complete) probed.push("2.1.2");
     else skipped.push({ sc: "2.1.2", why: trapWalk.why ?? "the walk of the tab ring did not cross the whole of it" });
-    const hover = await ran("1.4.13", empty, () => probeHover(page));
+    const hoverWalk = await probeHoverWalk(page).catch((e: unknown) => ({
+      hits: empty,
+      complete: false,
+      why: String((e as Error)?.message ?? e).slice(0, 160),
+    }));
+    const hover = hoverWalk.hits;
+    if (hoverWalk.complete) probed.push("1.4.13");
+    else skipped.push({ sc: "1.4.13", why: hoverWalk.why ?? "the hover pass did not open every trigger on the page" });
     const l = opts.lang;
-    if (opts.interact) await page.evaluate(FILL_INPUTS_STEP).catch(() => {});
+    // A STRESS THAT FAILED WITHDRAWS THE CRITERION IT WAS MEASURING.
+    //
+    // The three input-overflow passes measure the SAME criteria as the pristine stresses beside
+    // them (320px → 1.4.10, 200% zoom → 1.4.4, spacing → 1.4.12), and each swallowed its own
+    // failure with `.catch(() => [])` while the pristine one went on writing the SC into
+    // `probed`. So a field whose typed value vanished at 200% zoom could have its measurement
+    // throw, be replaced by an empty list, and the criterion still close as conforming — a
+    // constat lost and a `C` published over it.
+    const stressed = async (sc: string, run: () => Promise<ProbeHit[]>): Promise<ProbeHit[]> => {
+      if (!opts.interact) return empty;
+      try {
+        return await run();
+      } catch (e: unknown) {
+        const at = probed.indexOf(sc);
+        if (at >= 0) probed.splice(at, 1);
+        skipped.push({ sc, why: `the filled-input stress for this criterion failed: ${String((e as Error)?.message ?? e).slice(0, 120)}` });
+        return empty;
+      }
+    };
+    // Filling is part of every one of them, so its failure costs all three rather than being
+    // absorbed into three empty results that look like clean pages.
+    let filled = opts.interact;
+    if (opts.interact) {
+      filled = await page
+        .evaluate(FILL_INPUTS_STEP)
+        .then(() => true)
+        .catch(() => false);
+      if (!filled)
+        for (const sc of ["1.4.4", "1.4.10", "1.4.12"])
+          skipped.push({ sc, why: "the page's inputs could not be filled, so the filled-input stress never ran" });
+    }
     const reflowZoom = await ran("1.4.4", [] as ProbeHit[], async () => (await page.evaluate(REFLOW_ZOOM_PROBE)) as ProbeHit[]);
-    const inputOverflowZoom = opts.interact
-      ? ((await page.evaluate(inputOverflowZoomExpr(INPUT_OVERFLOW_DETAIL.zoom[l], CELL_SUFFIX[l])).catch(() => [])) as ProbeHit[])
-      : [];
+    const inputOverflowZoom = filled
+      ? await stressed("1.4.4", async () => (await page.evaluate(inputOverflowZoomExpr(INPUT_OVERFLOW_DETAIL.zoom[l], CELL_SUFFIX[l]))) as ProbeHit[])
+      : empty;
     // THE RESIZE IS PART OF THE MEASUREMENT, not a step before it. A `setViewportSize` that
     // failed leaves the probe reading a 1280px layout, and a horizontal scroll seen there
     // would be filed as a 320px reflow failure — a non-conformity this engine would have
@@ -628,9 +689,9 @@ async function runOnPage(
       await page.setViewportSize({ width: 320, height: 800 });
       return (await page.evaluate(REFLOW_PROBE)) as { horizontalScroll: boolean };
     });
-    const inputOverflowReflow = opts.interact
-      ? ((await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.reflow[l], CELL_SUFFIX[l])).catch(() => [])) as ProbeHit[])
-      : [];
+    const inputOverflowReflow = filled
+      ? await stressed("1.4.10", async () => (await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.reflow[l], CELL_SUFFIX[l]))) as ProbeHit[])
+      : empty;
     await page.setViewportSize({ width: 1280, height: 900 }).catch(() => {});
     // Same reasoning: without the override applied, this probe measures the page's own
     // spacing, and its silence says nothing at all about 1.4.12.
@@ -638,9 +699,9 @@ async function runOnPage(
       await page.addStyleTag({ content: TEXT_SPACING_CSS });
       return (await page.evaluate(TEXT_SPACING_PROBE)) as ProbeHit[];
     });
-    const inputOverflowSpacing = opts.interact
-      ? ((await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.spacing[l], CELL_SUFFIX[l])).catch(() => [])) as ProbeHit[])
-      : [];
+    const inputOverflowSpacing = filled
+      ? await stressed("1.4.12", async () => (await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.spacing[l], CELL_SUFFIX[l]))) as ProbeHit[])
+      : empty;
     if (opts.interact) await page.evaluate(RESTORE_INPUTS_STEP).catch(() => {});
     // Stateful interaction probes last, and LIVE-REGION IS THE TERMINAL PROBE: unlike the
     // fill/toggle interactions (restored) its button-click DOM mutations are NOT restored
@@ -650,7 +711,18 @@ async function runOnPage(
     const dialogFocus = opts.interact ? await probeDialogs(page).catch(() => empty) : [];
     // Through the same guard as every other probe, so a page whose live-region pass THREW is
     // recorded as unmeasured rather than as clean.
-    const liveRegion = opts.interact ? await ran("4.1.3", empty, () => probeLiveRegion(page, l, opts.allowClicks)) : [];
+    // Same rule as the tab-ring walks: a pass that declined half the page's interactions has
+    // not measured 4.1.3 on it, whatever its silence looks like.
+    const liveWalk = opts.interact
+      ? await probeLiveRegion(page, l, opts.allowClicks).catch((e: unknown) => ({
+          hits: empty,
+          complete: false,
+          why: String((e as Error)?.message ?? e).slice(0, 160),
+        }))
+      : { hits: empty, complete: false, why: "stateful probes are off (`scan --no-interact`)" };
+    const liveRegion = liveWalk.hits;
+    if (liveWalk.complete) probed.push("4.1.3");
+    else skipped.push({ sc: "4.1.3", why: liveWalk.why ?? "the live-region pass did not exercise the whole page" });
     return {
       url: (page.url() as string) || target,
       landedUrl,
@@ -718,7 +790,7 @@ export async function runScanLocal(opts: LocalScanOpts): Promise<DynamicResult> 
       snapshot: Boolean(opts.snapshotRoot),
     });
     const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, opts.target) : undefined;
-    return { ...toDynamicResult(out, opts.target, lang, LOCAL_ENGINE), testedScs: localTestedScs(interact), ...(id ? { snapshots: [id] } : {}) };
+    return { ...toDynamicResult(out, opts.target, lang, LOCAL_ENGINE), testedScs: measuredScs([out], interact), ...(id ? { snapshots: [id] } : {}) };
   } finally {
     await browser.close();
   }
@@ -742,6 +814,9 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
   const browser = await launchChromium(chromium);
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];
+  // Kept so the run-level coverage stamp can be built from what each page ACTUALLY measured
+  // rather than from what this runtime is capable of measuring — see `measuredScs`.
+  const outs: RunnerOutput[] = [];
   const redirected: ScanRedirect[] = [];
   try {
     for (const url of urls) {
@@ -803,6 +878,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
         continue;
       }
       findings.push(...toDynamicResult(out, url, lang, LOCAL_ENGINE).findings);
+      outs.push(out);
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, url) : undefined;
       if (id) snapshots.push(id);
     }
@@ -815,7 +891,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
     target: `${urls.length} page(s)`,
     date: today(),
     findings,
-    testedScs: localTestedScs(interact),
+    testedScs: measuredScs(outs, interact),
     ...(snapshots.length ? { snapshots } : {}),
     ...(redirected.length ? { redirected } : {}),
   };
@@ -834,6 +910,9 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
   const browser = await launchChromium(chromium);
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];
+  // Kept so the run-level coverage stamp can be built from what each page ACTUALLY measured
+  // rather than from what this runtime is capable of measuring — see `measuredScs`.
+  const outs: RunnerOutput[] = [];
   const redirected: ScanRedirect[] = [];
   try {
     for (const page of pages) {
@@ -882,6 +961,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
         continue;
       }
       findings.push(...tagSampleFindings(toDynamicResult(out, page.url, lang, LOCAL_ENGINE).findings, page));
+      outs.push(out);
       // The sample page's declared id/name/auth/notes win over anything derived from the
       // URL: that identity is what the report and the per-page grid speak.
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, page.url, page) : undefined;
@@ -904,7 +984,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
     date: today(),
     findings,
     sample: sampleScope({ pages: scanned }),
-    testedScs: localTestedScs(interact),
+    testedScs: measuredScs(outs, interact),
     ...(snapshots.length ? { snapshots } : {}),
     ...(redirected.length ? { redirected } : {}),
   };

@@ -62,7 +62,8 @@ describe("the live-region probe is opt-in on a page somebody else owns", () => {
     const page = fakePage();
     await runLiveProbes(page, { liveRegion: true });
     const expr = page.seen.find((s) => s.includes("MutationObserver")) ?? "";
-    expect(expr).toContain("click interactions disabled");
+    expect(expr, "the default pass must never press a button").not.toMatch(/\bb\.click\s*\(/);
+    expect(expr, "…and must count the ones it declined, so the caller can withhold 4.1.3").toContain("CLICKS DISABLED");
     const clicking = fakePage();
     await runLiveProbes(clicking, { liveRegion: { clicks: true } });
     expect(clicking.seen.find((s) => s.includes("MutationObserver")) ?? "").toContain('button[type="button"]');
@@ -88,12 +89,19 @@ describe("the live-region probe is opt-in on a page somebody else owns", () => {
   });
 });
 
-describe("a sweep turns it on, because a sweep asserts nothing afterwards", () => {
-  it("is on by default", () => {
-    expect(sweepCheckOptions().liveRegion).toBe(true);
+describe("even a sweep does not turn it on by itself", () => {
+  it("is off by default — it is the only probe that CHANGES the page", () => {
+    // It was on here for one release-in-progress. Two things settled it the other way: this is
+    // the only pass that types into the caller's page rather than stressing and restoring it
+    // (an autosave, a validation, in the worst case a route change that leaves the axe pass on
+    // a different page from the snapshot) — and with clicks off, which they must be on an
+    // authenticated sweep, it now correctly withholds 4.1.3 on any page that has a button.
+    expect(sweepCheckOptions().liveRegion).toBeUndefined();
+    expect(sweepCheckOptions().probes, "the read-only probes stay on — that asymmetry is unchanged").toBe(true);
   });
 
-  it("can be turned off", () => {
-    expect(sweepCheckOptions({ liveRegion: false }).liveRegion).toBe(false);
+  it("can be turned on deliberately, clicks and all", () => {
+    expect(sweepCheckOptions({ liveRegion: true }).liveRegion).toBe(true);
+    expect(sweepCheckOptions({ liveRegion: { clicks: true } }).liveRegion).toEqual({ clicks: true });
   });
 });
