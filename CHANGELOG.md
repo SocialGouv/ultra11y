@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.41.2](https://github.com/maxgfr/ultra11y/compare/v5.41.1...v5.41.2) (2026-08-31)
+
+
+### Bug Fixes
+
+* **probes:** ne pas lire une boîte animée comme un indicateur de focus ([88d22a5](https://github.com/maxgfr/ultra11y/commit/88d22a5426830b401cb327373a3498bb0b04403d))
+
 ## [5.41.1](https://github.com/maxgfr/ultra11y/compare/v5.41.0...v5.41.1) (2026-08-31)
 
 
