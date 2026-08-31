@@ -69060,6 +69060,7 @@ var T4 = {
     date: "Date",
     files: "fichiers",
     rate: "r\xE9ussite automatique",
+    conformityRate: "de conformit\xE9 (crit\xE8res valid\xE9s \xF7 applicables)",
     synthesis: "Synth\xE8se",
     synthCaption: (h2) => `Nombre de crit\xE8res par statut, regroup\xE9s par ${h2}.`,
     byGuideline: "r\xE8gle WCAG",
@@ -69073,7 +69074,10 @@ var T4 = {
     coverage: (d, t3) => `Couverture : ${d}/${t3} crit\xE8re(s) d\xE9cid\xE9(s). Le taux ne porte que sur eux et ne dit rien des ${t3 - d} autres.`,
     ncTitle: "Non-conformit\xE9s",
     ncCaption: "Une entr\xE9e par crit\xE8re non conforme.",
-    noNc: "Aucune non-conformit\xE9 relev\xE9e par le moteur statique. Les crit\xE8res \xAB \xE0 \xE9valuer \xBB restent \xE0 trancher.",
+    // NOT « par le moteur statique ». This document is also rendered for a run that captured
+    // real pages, measured them in a browser and had an adjudicator rule on the result;
+    // naming one tier there tells the reader the other two did not happen.
+    noNc: "Aucune non-conformit\xE9 relev\xE9e sur ce p\xE9rim\xE8tre. Les crit\xE8res \xAB \xE0 \xE9valuer \xBB restent \xE0 trancher.",
     recTitle: "Recommandations (non normatives)",
     recNote: "Bonnes pratiques sans test normatif en \xE9chec : elles ne rendent aucun crit\xE8re non conforme et n'entrent pas dans le taux.",
     occurrences: "Occurrences",
@@ -69119,6 +69123,7 @@ var T4 = {
     date: "Date",
     files: "files",
     rate: "automatic pass rate",
+    conformityRate: "conformity (validated \xF7 applicable criteria)",
     synthesis: "Synthesis",
     synthCaption: (h2) => `Criteria count per status, grouped by ${h2}.`,
     byGuideline: "WCAG guideline",
@@ -69132,7 +69137,7 @@ var T4 = {
     coverage: (d, t3) => `Coverage: ${d}/${t3} criteria decided. The rate covers only those and says nothing about the other ${t3 - d}.`,
     ncTitle: "Non-conformities",
     ncCaption: "One entry per non-conforming criterion.",
-    noNc: "No non-conformity found by the static engine. The criteria left to assess are still open.",
+    noNc: "No non-conformity found in this scope. The criteria left to assess are still open.",
     recTitle: "Recommendations (non-normative)",
     recNote: "Good practices with no failing normative test: they never make a criterion non-conforming and do not enter the rate.",
     occurrences: "Occurrences",
@@ -69178,15 +69183,17 @@ function ticks(text) {
 var stdName = (standard) => isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name;
 function headline(result, standard, lang) {
   const t3 = T4[lang];
-  const groups = isCore(standard) ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
+  const core = isCore(standard);
+  const groups = core ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
   const { decided, total } = reportCoverage(groups);
   const agentRuled = groups.some((g) => g.rows.some((r) => r.decidedBy === "agent" && r.status === "C"));
+  const pct2 = core ? result.conformancePct : conformanceRate(reportTotals(groups)).pct;
   return {
     runs: [
       { text: result.date, mono: true },
       { text: ` \xB7 ${result.scope.files} ${t3.files} \xB7 ` },
-      { text: `${formatRate(decided === 0 ? null : result.conformancePct, decided, total)}${agentRuled ? "*" : ""}`, strong: true },
-      { text: ` ${t3.rate}` }
+      { text: `${formatRate(decided === 0 ? null : pct2, decided, total)}${agentRuled ? "*" : ""}`, strong: true },
+      { text: ` ${core ? t3.rate : t3.conformityRate}` }
     ],
     agentRuled,
     decided,
@@ -69486,7 +69493,7 @@ function pageDoc(result, page, opts = {}) {
   );
   blocks.push(...refusalBlocks(opts.refusals?.(page.id)));
   blocks.push(...pageGridBlocks(result, page, standard, lang));
-  const view = { ...result, criteria: page.criteria, findings: page.findings };
+  const view = pageView(result, page);
   const { nc, advisory } = partitionUnits(prdUnits(view, standard, lang));
   blocks.push({ kind: "heading", level: 2, text: t3.ncTitle });
   if (!nc.length) blocks.push({ kind: "para", runs: [{ text: t3.noNc }] });

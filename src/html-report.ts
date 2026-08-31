@@ -22,10 +22,11 @@ import {
   unattributedFindings,
   unattributedNote,
   pageGridModel,
+  pageView,
 } from "./pages.js";
 import { pageCoverage, pageCriterionRows, pageRatePct, pageTally } from "./pages-report.js";
 import { partitionUnits, prdUnits, type PrdUnit } from "./prd.js";
-import { automationOverview, packReportGroups, reportCoverage, reportGroups, reportTotals, tallyRows } from "./report.js";
+import { automationOverview, conformanceRate, packReportGroups, reportCoverage, reportGroups, reportTotals, tallyRows } from "./report.js";
 import { CORE, type StandardId, isCore, loadPack, standardLabel, titlePlain } from "./standards/index.js";
 import { findingsForStandard } from "./standards/derive.js";
 import type { Block, Cell, Doc, Run } from "./html.js";
@@ -69,6 +70,7 @@ const T = {
     date: "Date",
     files: "fichiers",
     rate: "réussite automatique",
+    conformityRate: "de conformité (critères validés ÷ applicables)",
     synthesis: "Synthèse",
     synthCaption: (h: string) => `Nombre de critères par statut, regroupés par ${h}.`,
     byGuideline: "règle WCAG",
@@ -82,7 +84,10 @@ const T = {
     coverage: (d: number, t: number) => `Couverture : ${d}/${t} critère(s) décidé(s). Le taux ne porte que sur eux et ne dit rien des ${t - d} autres.`,
     ncTitle: "Non-conformités",
     ncCaption: "Une entrée par critère non conforme.",
-    noNc: "Aucune non-conformité relevée par le moteur statique. Les critères « à évaluer » restent à trancher.",
+    // NOT « par le moteur statique ». This document is also rendered for a run that captured
+    // real pages, measured them in a browser and had an adjudicator rule on the result;
+    // naming one tier there tells the reader the other two did not happen.
+    noNc: "Aucune non-conformité relevée sur ce périmètre. Les critères « à évaluer » restent à trancher.",
     recTitle: "Recommandations (non normatives)",
     recNote: "Bonnes pratiques sans test normatif en échec : elles ne rendent aucun critère non conforme et n'entrent pas dans le taux.",
     occurrences: "Occurrences",
@@ -130,6 +135,7 @@ const T = {
     date: "Date",
     files: "files",
     rate: "automatic pass rate",
+    conformityRate: "conformity (validated ÷ applicable criteria)",
     synthesis: "Synthesis",
     synthCaption: (h: string) => `Criteria count per status, grouped by ${h}.`,
     byGuideline: "WCAG guideline",
@@ -143,7 +149,7 @@ const T = {
     coverage: (d: number, t: number) => `Coverage: ${d}/${t} criteria decided. The rate covers only those and says nothing about the other ${t - d}.`,
     ncTitle: "Non-conformities",
     ncCaption: "One entry per non-conforming criterion.",
-    noNc: "No non-conformity found by the static engine. The criteria left to assess are still open.",
+    noNc: "No non-conformity found in this scope. The criteria left to assess are still open.",
     recTitle: "Recommendations (non-normative)",
     recNote: "Good practices with no failing normative test: they never make a criterion non-conforming and do not enter the rate.",
     occurrences: "Occurrences",
@@ -198,15 +204,25 @@ const stdName = (standard: StandardId): string => (isCore(standard) ? "WCAG 2.2 
 /** The run's identity line, and the rate WITH its denominator and its agent mark. */
 function headline(result: AuditResult, standard: StandardId, lang: Lang): { runs: Run[]; agentRuled: boolean; decided: number; total: number } {
   const t = T[lang];
-  const groups = isCore(standard) ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
+  const core = isCore(standard);
+  const groups = core ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
   const { decided, total } = reportCoverage(groups);
   const agentRuled = groups.some((g) => g.rows.some((r) => r.decidedBy === "agent" && r.status === "C"));
+  // ONE SET, NOT TWO. The denominator was read off the PACK's derived criteria while the
+  // percentage stayed `result.conformancePct`, which is the CORE audit's ratio over the WCAG
+  // success criteria — so « 29 % (101/106) » described a rate over 55 criteria and a coverage
+  // over 106, side by side, as though they were one measurement.
+  //
+  // A pack dashboard now shows the standard's own conformity rate, the same number and the
+  // same formula the Markdown report leads with (src/report.ts `conformanceRate`), so the two
+  // documents cannot state different figures for the same run.
+  const pct = core ? result.conformancePct : conformanceRate(reportTotals(groups)).pct;
   return {
     runs: [
       { text: result.date, mono: true },
       { text: ` · ${result.scope.files} ${t.files} · ` },
-      { text: `${formatRate(decided === 0 ? null : result.conformancePct, decided, total)}${agentRuled ? "*" : ""}`, strong: true },
-      { text: ` ${t.rate}` },
+      { text: `${formatRate(decided === 0 ? null : pct, decided, total)}${agentRuled ? "*" : ""}`, strong: true },
+      { text: ` ${core ? t.rate : t.conformityRate}` },
     ],
     agentRuled,
     decided,
@@ -559,7 +575,13 @@ export function pageDoc(result: AuditResult, page: PageResult, opts: HtmlReportO
 
   // The page's OWN findings, through the same view the Markdown sheet uses — so a criterion
   // cannot be non-conforming here and conforming there.
-  const view: AuditResult = { ...result, criteria: page.criteria, findings: page.findings };
+  //
+  // `pageView`, not a second copy of it. The copy that used to live here replaced `criteria`
+  // and `findings` and kept the run-wide `packFindings`, so every declarative pack-rule finding
+  // — one per capture, on a 37-page audit — was printed on all thirty-seven cards. The
+  // Markdown sheet has filtered them by page since it was written (src/pages.ts): two renderers
+  // of one fact, and only one of them was right.
+  const view = pageView(result, page);
   const { nc, advisory } = partitionUnits(prdUnits(view, standard, lang));
   blocks.push({ kind: "heading", level: 2, text: t.ncTitle });
   if (!nc.length) blocks.push({ kind: "para", runs: [{ text: t.noNc }] });

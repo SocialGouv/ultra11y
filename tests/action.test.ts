@@ -1569,3 +1569,29 @@ describe("the pull-request RGAA lane is deterministic and rendered", () => {
     expect(audit?.with?.["artifact-name"]).toBe("ultra11y-pr-static-rgaa");
   });
 });
+
+// P2.4 — WHAT THE ACTION PUBLISHES ABOUT A RUN MUST DESCRIBE THE RUN IT FINISHED.
+describe("the published scalars are read off the audit as it finally stands", () => {
+  it("recomputes findings and conformance after the scan and the adjudication", () => {
+    // They were written by the SOURCE audit step and never touched again, so a run that
+    // scanned 37 pages, merged ten rendering non-conformities and had an adjudicator rule on
+    // nine criteria published the numbers from before any of it.
+    expect(RAW).toMatch(/id: totals/);
+    const outputs = RAW.slice(RAW.indexOf("outputs:"), RAW.indexOf("runs:"));
+    expect(outputs).toContain("steps.totals.outputs.findings || steps.audit.outputs.findings");
+    expect(outputs).toContain("steps.totals.outputs.conformance || steps.audit.outputs.conformance");
+  });
+
+  it("places the recompute BEFORE the gate, which may end the job", () => {
+    expect(RAW.indexOf("id: totals")).toBeLessThan(RAW.indexOf("- name: Gate"));
+  });
+
+  it("says out loud that the source gate counts no DOM non-conformity", () => {
+    // The default gate re-audits the source — that is what makes its verdict a pure function
+    // of the commit — and the scan's findings are in the artifact all the same. Silent, a
+    // green tick was the only thing anyone read.
+    const gate = RAW.slice(RAW.indexOf("- name: Gate"));
+    expect(gate).toMatch(/NOT counted by this gate/);
+    expect(gate).toMatch(/gate-adjudicated/);
+  });
+});
