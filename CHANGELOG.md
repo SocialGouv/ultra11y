@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.40.1](https://github.com/maxgfr/ultra11y/compare/v5.40.0...v5.40.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* **ci:** align adjudication budget contract ([ceabdc6](https://github.com/maxgfr/ultra11y/commit/ceabdc6e4240b3b369e1ac4a5b83ab2a087e3b25))
+* **ci:** cap keyed adjudication per batch ([aaf625e](https://github.com/maxgfr/ultra11y/commit/aaf625e2f474e397caeaf977fa0398215bc373aa))
+* harden adjudication completeness and audit scaling ([76a4872](https://github.com/maxgfr/ultra11y/commit/76a48723330461b2ee358858d759ae182f0a1381))
+
 # [5.40.0](https://github.com/maxgfr/ultra11y/compare/v5.39.2...v5.40.0) (2026-08-29)
 
 
