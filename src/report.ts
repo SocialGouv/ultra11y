@@ -57,6 +57,20 @@ const L = {
     files: "fichier(s)",
     rate: "Taux de réussite automatique (vérifications statiques)",
     rateNote: "sous-ensemble décidable par la machine : C ÷ (C + NC)",
+    // THE HEADLINE OF A COUNTRY-STANDARD DELIVERABLE. Worded as the standard words it, with
+    // both operands in the open — a reader who cannot recompute the number cannot defend it.
+    conformanceRate: (std: string) => `Taux de conformité ${std}`,
+    conformanceProvisional: "provisoire",
+    conformanceFormula: (v: number, a: number) => `critères validés ÷ critères applicables (${v} ÷ ${a})`,
+    conformanceNa: (na: number) => `${na} critère(s) non applicable(s) exclu(s) du dénominateur`,
+    conformanceOpen: (open: number) =>
+      `${open} critère(s) encore à évaluer, comptés au dénominateur et pas au numérateur — le taux publié est donc un plancher`,
+    decidedLine: "Décidés",
+    decidedNote: (c: number, nc: number, na: number, open: number) =>
+      `${c} conforme(s), ${nc} non conforme(s), ${na} conforme(s) faute de sujet, ${open} à évaluer`,
+    provenance: "Provenance des décisions",
+    provenanceNote: (engine: number, scan: number, agent: number) => `${engine} moteur · ${scan} navigateur · ${agent} adjudication`,
+    autoRateNote: (c: number, d: number) => `critères validés par le moteur seul ÷ critères décidés sans l'agent (${c} ÷ ${d})`,
     warn: "Ce rapport couvre le sous-ensemble de critères vérifiables automatiquement. Les critères « à évaluer » (rendu / jugement) sont adjugés par l'agent IA (`verify --manual`, de façon gatée) ; le rendu passe par `scan` (voir la dernière section).",
     derived: (std: string) =>
       `Rapport ${std}. Chaque critère est jugé sur ses propres tests ; la vérification d'intégrité (\`check\`/\`verify\`) opère sur le même périmètre.`,
@@ -164,6 +178,18 @@ const L = {
     files: "file(s)",
     rate: "Automatic static-check pass rate",
     rateNote: "machine-decidable subset: C ÷ (C + NC)",
+    conformanceRate: (std: string) => `${std} conformity rate`,
+    conformanceProvisional: "provisional",
+    conformanceFormula: (v: number, a: number) => `validated criteria ÷ applicable criteria (${v} ÷ ${a})`,
+    conformanceNa: (na: number) => `${na} criterion/criteria not applicable, excluded from the denominator`,
+    conformanceOpen: (open: number) =>
+      `${open} criterion/criteria still to assess, counted in the denominator and not in the numerator — the published rate is a floor`,
+    decidedLine: "Decided",
+    decidedNote: (c: number, nc: number, na: number, open: number) =>
+      `${c} conforming, ${nc} non-conforming, ${na} conforming for want of a subject, ${open} to assess`,
+    provenance: "Where the decisions came from",
+    provenanceNote: (engine: number, scan: number, agent: number) => `${engine} engine · ${scan} browser · ${agent} adjudication`,
+    autoRateNote: (c: number, d: number) => `criteria validated by the engine alone ÷ criteria decided without the agent (${c} ÷ ${d})`,
     warn: "This report covers the subset of criteria checkable automatically. The “to assess” criteria (rendering / judgment) are adjudicated by the AI agent (`verify --manual`, gated); rendering goes through `scan` (see the last section).",
     derived: (std: string) =>
       `${std} report. Every criterion is judged on its own tests; the integrity gates (\`check\`/\`verify\`) operate on the same scope.`,
@@ -397,6 +423,62 @@ export function reportCoverage(groups: ReportGroup[]): { decided: number; total:
   return { decided: t.c + t.nc, total: t.c + t.nc + t.manual };
 }
 
+/** THE OFFICIAL RGAA CONFORMITY RATE, and the operands a reader has to be able to check.
+ *
+ *  « Critères validés ÷ critères APPLICABLES », the non-applicable ones excluded from the
+ *  denominator — the formula the French state fixes for a declaration of accessibility
+ *  (accessibilite.numerique.gouv.fr, obligations / évaluation de conformité). It is the only
+ *  one of the three a legal declaration may reproduce as it stands.
+ *
+ *  NA leaves BOTH halves, not just the denominator: this engine reports a criterion with no
+ *  subject in scope as CONFORMING (INAPPLICABLE_STATUS), so `na` is a subset of `c` and has to
+ *  be subtracted from it as well — otherwise every absent subject would count as a criterion
+ *  somebody validated.
+ *
+ *  `open` is what makes the number PROVISIONAL. A criterion still to assess sits in the
+ *  denominator and not in the numerator, so the published rate is a floor: it can only rise
+ *  as the open ones close. A rate presented as final while five criteria are open is a claim
+ *  the audit has not made. */
+export interface ConformanceRate {
+  pct: number;
+  validated: number;
+  applicable: number;
+  na: number;
+  open: number;
+  decided: number;
+  total: number;
+}
+
+export function conformanceRate(t: ReportTally): ConformanceRate {
+  const validated = Math.max(0, t.c - t.na);
+  const applicable = validated + t.nc + t.manual;
+  return {
+    // No applicable criterion is not a failure — it is a scope with nothing of any kind in it,
+    // and the repository's convention for an empty denominator is 100 (src/audit.ts
+    // conformancePct). Divergent conventions on the same question is how two numbers describing
+    // one grid start disagreeing.
+    pct: applicable === 0 ? 100 : Math.round((validated / applicable) * 100),
+    validated,
+    applicable,
+    na: t.na,
+    open: t.manual,
+    decided: t.c + t.nc,
+    total: t.c + t.nc + t.manual,
+  };
+}
+
+/** Who settled each criterion — the engine's own tests, a browser measurement, or an
+ *  adjudication. Published beside the rate because « 80 % » means something different when
+ *  half of it was ruled by a model than when the engine proved it. */
+export function decisionProvenance(rows: ReportRow[]): { engine: number; scan: number; agent: number } {
+  const decided = rows.filter((r) => r.status !== "manual");
+  return {
+    engine: decided.filter((r) => !r.decidedBy || r.decidedBy === "engine").length,
+    scan: decided.filter((r) => r.decidedBy === "scan").length,
+    agent: decided.filter((r) => r.decidedBy === "agent").length,
+  };
+}
+
 export interface AutomationOverview {
   tests: { static: number; rendered: number; judgment: number };
   criteria: { static: string[]; rendered: string[]; judgment: string[] };
@@ -537,6 +619,10 @@ function render(
     derivedOf?: string;
     partialAudit?: string[];
     headerRatePct?: number;
+    /** The country standard's OWN conformity rate, which leads the header when a pack report
+     *  supplies it. Absent for the core WCAG report, which is a different document for a
+     *  different reader and keeps its automatic rate as the headline. */
+    conformance?: { rate: ConformanceRate; provenance: { engine: number; scan: number; agent: number }; autoDecided: number; autoValidated: number };
     // Where this report will be WRITTEN. Only used to resolve the per-page screenshots
     // relatively; absent ⇒ paths relative to the CWD, which is what stdout wants.
     outDir?: string;
@@ -556,7 +642,31 @@ function render(
   const pagesRead = r.scope.pagesAudited?.length ?? 0;
   out.push(`- **${s.tool}** : ultra11y v${r.version} (${pagesRead > 0 ? s.toolNoteRendered(pagesRead) : s.toolNote})`);
   out.push(`- **${s.scope}** : ${r.scope.files} ${s.files} — ${r.scope.inputs.join(", ")}`);
-  out.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% (${s.rateNote})`);
+  // THE HEADLINE, AND THE ORDER IT IS READ IN.
+  //
+  // The automatic rate led this header, and on egapro it published « 17 % » — arithmetically
+  // right, and taken away by every reader of a document whose own table reads 91 C / 10 NC.
+  // `packConformancePct` counts the conformities NO agent ruled on: two out of twelve. It is a
+  // measure of how much the engine settled alone, not of how conformant the site is, and it
+  // was never labelled as the first thing.
+  //
+  // So a pack report leads with the standard's own formula, names it, publishes both operands,
+  // says how many criteria are still open — and keeps the automatic rate underneath, with its
+  // numerator and its denominator, where it can be read for what it is.
+  if (opts.conformance) {
+    const { rate, provenance, autoDecided, autoValidated } = opts.conformance;
+    const title = `${s.conformanceRate(opts.std)}${rate.open > 0 ? ` (${s.conformanceProvisional})` : ""}`;
+    const notes = [s.conformanceFormula(rate.validated, rate.applicable), s.conformanceNa(rate.na)];
+    if (rate.open > 0) notes.push(s.conformanceOpen(rate.open));
+    out.push(`- **${title}** : ${rate.pct}% — ${notes.join(" ; ")}`);
+    out.push(
+      `- **${s.decidedLine}** : ${rate.decided}/${rate.total} — ${s.decidedNote(rate.validated, rate.total - rate.validated - rate.na - rate.open, rate.na, rate.open)}`,
+    );
+    out.push(`- **${s.provenance}** : ${s.provenanceNote(provenance.engine, provenance.scan, provenance.agent)}`);
+    out.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% — ${s.autoRateNote(autoValidated, autoDecided)}`);
+  } else {
+    out.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% (${s.rateNote})`);
+  }
   out.push(`- **${s.renderedPages(pagesRead)}**${pagesRead === 0 ? ` — ${s.noRenderedPages}` : ""}`);
   const automation = automationOverview(opts.standard);
   if (automation) {
@@ -882,14 +992,23 @@ export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang 
   // criterion lacks a dynamic verdict — the banner names exactly which ones (a Docker-only
   // scan covers reflow but not the local probes). The core WCAG report carries its own §5
   // manual worklist and is not flagged here.
+  const groups = packReportGroups(r, pack, lang);
+  const rows = groups.flatMap((g) => g.rows);
+  const tally = reportTotals(groups);
+  // The automatic rate's own two operands, computed exactly as `packConformancePct` computes
+  // its ratio — one formula, published with its numerator and its denominator so a reader can
+  // tell it apart from the conformity rate above it at a glance.
+  const autoValidated = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent" && !isProvisionalJudgmentInapplicable(d)).length;
+  const autoDecided = autoValidated + derived.filter((d) => d.status === "NC").length;
   return render(r, lang, {
     std,
     groupHead: L[lang].byTheme,
-    groups: packReportGroups(r, pack, lang),
+    groups,
     derivedOf: std,
     standard: pack.key,
     partialAudit: untestedNeedsRendering(r, establishedScs(derived)),
     headerRatePct: packConformancePct(derived),
+    conformance: { rate: conformanceRate(tally), provenance: decisionProvenance(rows), autoDecided, autoValidated },
     // Forwarded, unlike before: without it the per-page screenshots resolved against the
     // CWD instead of the report's own directory, so a pack report written to `audits/`
     // carried links that only worked when read from the repo root.

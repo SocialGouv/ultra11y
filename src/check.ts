@@ -41,6 +41,10 @@ const M = {
     rateRange: (v: string) => `Taux de réussite hors bornes (0–100) : ${v}%.`,
     rateInconsistent: (v: string, expected: number, c: number, nc: number) =>
       `Taux de réussite incohérent avec la synthèse : l'en-tête indique ${v}% alors que C automatique ÷ (C automatique+NC) = ${c} ÷ ${c + nc} = ${expected}%.`,
+    rateArithmetic: (v: string, a: number, b: number, expected: number) =>
+      `Taux incohérent avec les opérandes qu'il publie : ${v}% annoncé pour ${a} ÷ ${b} = ${expected}%.`,
+    rateOperands: (a: number, b: number, admissible: string) =>
+      `Opérandes de taux introuvables dans la synthèse : ${a} ÷ ${b}. Les seuls couples que la grille autorise sont ${admissible}.`,
     overProject: (id: string) =>
       `Critère sur-projeté : ${id} est marqué non conforme dans le rapport mais l'audit ne le dérive pas comme NC (élément hors périmètre du critère).`,
     underProject: (id: string) => `Critère absent : l'audit dérive ${id} comme non conforme mais le rapport ne le présente pas.`,
@@ -60,6 +64,10 @@ const M = {
     rateRange: (v: string) => `Pass rate out of range (0–100): ${v}%.`,
     rateInconsistent: (v: string, expected: number, c: number, nc: number) =>
       `Pass rate inconsistent with the synthesis table: header says ${v}% but automatic C ÷ (automatic C+NC) = ${c} ÷ ${c + nc} = ${expected}%.`,
+    rateArithmetic: (v: string, a: number, b: number, expected: number) =>
+      `Rate inconsistent with the operands it publishes: ${v}% announced for ${a} ÷ ${b} = ${expected}%.`,
+    rateOperands: (a: number, b: number, admissible: string) =>
+      `Rate operands not found in the synthesis table: ${a} ÷ ${b}. The only pairs the grid allows are ${admissible}.`,
     overProject: (id: string) =>
       `Over-projected criterion: ${id} is marked non-conformant in the report but the audit does not derive it as NC (element outside the criterion's scope).`,
     underProject: (id: string) => `Missing criterion: the audit derives ${id} as non-conformant but the report does not present it.`,
@@ -150,24 +158,60 @@ export function checkReport(md: string, standard: StandardId = "wcag", lang: Lan
   // the exhaustive grid identifies those rows so they can be subtracted before comparing.
   // This applies equally to core and pack reports: both headers are now computed on their own
   // active standard, and letting packs skip the check is how a 16% header shipped beside C=0.
-  const rateM = /^-\s+\*\*[^*\n]*\*\*\s*:\s*(\d+(?:[.,]\d+)?)\s*%/m.exec(md);
-  if (!rateM) {
+  // EVERY RATE IN THE HEADER, NOT JUST THE FIRST ONE.
+  //
+  // A pack report now publishes two: the standard's own conformity rate (validated ÷
+  // APPLICABLE, the formula a declaration of accessibility may reproduce) and, underneath, the
+  // automatic pass rate. Checking only the first would have left whichever came second free to
+  // say anything — and that is exactly how a 17 % headline shipped beside a grid of 91 C.
+  //
+  // A rate that PUBLISHES ITS OPERANDS is checked twice: the percentage must follow from the
+  // pair, and the pair must be one the synthesis table actually allows. That is stronger than
+  // the old single check and, unlike matching on a label, it cannot drift when a string is
+  // translated or reworded.
+  const rateLines = [...md.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*(\d+(?:[.,]\d+)?)\s*%([^\n]*)$/gm)];
+  if (rateLines.length === 0) {
     // A per-page report carries one rate PER PAGE, inside each page's own block, and no
     // document-level rate to find in a header. Its absence is the correct shape, not a lie.
     if (!perPage) issues.push(s.rateMissing);
   } else {
-    const pct = parseFloat(rateM[1]!.replace(",", "."));
-    if (pct < 0 || pct > 100) issues.push(s.rateRange(rateM[1]!));
-    // A per-page report has no single synthesis table to be consistent WITH: its rates are
-    // per page and each is computed from that page's own grid. Range still applies.
-    else if (!perPage) {
-      const totals = synthesisTotals(md);
-      if (totals) {
-        const { nc } = totals;
-        const c = Math.max(0, totals.c - agentConformities(md));
-        const expected = c + nc === 0 ? 100 : Math.round((c / (c + nc)) * 100);
-        if (Math.abs(pct - expected) > 1) issues.push(s.rateInconsistent(rateM[1]!, expected, c, nc));
+    const totals = perPage ? null : synthesisTotals(md);
+    // The two ratios the grid licenses, each as its own (numerator, denominator).
+    const validated = totals ? Math.max(0, totals.c - totals.na) : 0;
+    const autoC = totals ? Math.max(0, totals.c - agentConformities(md)) : 0;
+    const admissible: [number, number][] = totals
+      ? [
+          [validated, validated + totals.nc + totals.manual],
+          [autoC, autoC + totals.nc],
+        ]
+      : [];
+    let checkedOne = false;
+    for (const m of rateLines) {
+      const raw = m[1]!;
+      const pct = parseFloat(raw.replace(",", "."));
+      if (pct < 0 || pct > 100) {
+        issues.push(s.rateRange(raw));
+        continue;
       }
+      const ops = /\((\d+)\s*÷\s*(\d+)\)/.exec(m[2] ?? "");
+      if (!ops) continue;
+      const a = Number.parseInt(ops[1]!, 10);
+      const b = Number.parseInt(ops[2]!, 10);
+      const expected = b === 0 ? 100 : Math.round((a / b) * 100);
+      if (Math.abs(pct - expected) > 1) issues.push(s.rateArithmetic(raw, a, b, expected));
+      if (totals && !admissible.some(([x, y]) => x === a && y === b)) {
+        issues.push(s.rateOperands(a, b, admissible.map(([x, y]) => `${x} ÷ ${y}`).join(", ")));
+      }
+      checkedOne = true;
+    }
+    // A header whose rates name no operands (the core WCAG report) keeps the original gate on
+    // its first one: consistency with the automatic ratio the grid derives.
+    if (!checkedOne && !perPage && totals) {
+      const { nc } = totals;
+      const c = autoC;
+      const expected = c + nc === 0 ? 100 : Math.round((c / (c + nc)) * 100);
+      const first = rateLines[0]![1]!;
+      if (Math.abs(parseFloat(first.replace(",", ".")) - expected) > 1) issues.push(s.rateInconsistent(first, expected, c, nc));
     }
   }
 
@@ -308,10 +352,12 @@ export function checkSemantic(md: string, opts: SemanticOptions): SemanticResult
  *  `| **Total** | **C** | **NC** | **NA** | **To assess** |` (label is localized but
  *  always bold; the data rows' numeric cells are NOT bold, so only the Total row matches).
  *  null when no such row is present (nothing to cross-check against). */
-function synthesisTotals(md: string): { c: number; nc: number } | null {
+function synthesisTotals(md: string): { c: number; nc: number; na: number; manual: number } | null {
   const m = /^\|\s*\*\*[^|*]+\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|/m.exec(md);
   if (!m) return null;
-  return { c: Number.parseInt(m[1]!, 10), nc: Number.parseInt(m[2]!, 10) };
+  // NA is a SUBSET of C (src/report.ts tallyRows), which is why the conformity rate below has
+  // to subtract it from both halves rather than from the denominator alone.
+  return { c: Number.parseInt(m[1]!, 10), nc: Number.parseInt(m[2]!, 10), na: Number.parseInt(m[3]!, 10), manual: Number.parseInt(m[4]!, 10) };
 }
 
 /** Conformities in the exhaustive grid that were ruled by the agent. They are genuine

@@ -59005,6 +59005,18 @@ var L5 = {
     files: "fichier(s)",
     rate: "Taux de r\xE9ussite automatique (v\xE9rifications statiques)",
     rateNote: "sous-ensemble d\xE9cidable par la machine : C \xF7 (C + NC)",
+    // THE HEADLINE OF A COUNTRY-STANDARD DELIVERABLE. Worded as the standard words it, with
+    // both operands in the open — a reader who cannot recompute the number cannot defend it.
+    conformanceRate: (std) => `Taux de conformit\xE9 ${std}`,
+    conformanceProvisional: "provisoire",
+    conformanceFormula: (v, a) => `crit\xE8res valid\xE9s \xF7 crit\xE8res applicables (${v} \xF7 ${a})`,
+    conformanceNa: (na) => `${na} crit\xE8re(s) non applicable(s) exclu(s) du d\xE9nominateur`,
+    conformanceOpen: (open) => `${open} crit\xE8re(s) encore \xE0 \xE9valuer, compt\xE9s au d\xE9nominateur et pas au num\xE9rateur \u2014 le taux publi\xE9 est donc un plancher`,
+    decidedLine: "D\xE9cid\xE9s",
+    decidedNote: (c2, nc, na, open) => `${c2} conforme(s), ${nc} non conforme(s), ${na} conforme(s) faute de sujet, ${open} \xE0 \xE9valuer`,
+    provenance: "Provenance des d\xE9cisions",
+    provenanceNote: (engine, scan2, agent) => `${engine} moteur \xB7 ${scan2} navigateur \xB7 ${agent} adjudication`,
+    autoRateNote: (c2, d) => `crit\xE8res valid\xE9s par le moteur seul \xF7 crit\xE8res d\xE9cid\xE9s sans l'agent (${c2} \xF7 ${d})`,
     warn: "Ce rapport couvre le sous-ensemble de crit\xE8res v\xE9rifiables automatiquement. Les crit\xE8res \xAB \xE0 \xE9valuer \xBB (rendu / jugement) sont adjug\xE9s par l'agent IA (`verify --manual`, de fa\xE7on gat\xE9e) ; le rendu passe par `scan` (voir la derni\xE8re section).",
     derived: (std) => `Rapport ${std}. Chaque crit\xE8re est jug\xE9 sur ses propres tests ; la v\xE9rification d'int\xE9grit\xE9 (\`check\`/\`verify\`) op\xE8re sur le m\xEAme p\xE9rim\xE8tre.`,
     synthTitle: (by) => `1. Synth\xE8se par ${by}`,
@@ -59093,6 +59105,16 @@ var L5 = {
     files: "file(s)",
     rate: "Automatic static-check pass rate",
     rateNote: "machine-decidable subset: C \xF7 (C + NC)",
+    conformanceRate: (std) => `${std} conformity rate`,
+    conformanceProvisional: "provisional",
+    conformanceFormula: (v, a) => `validated criteria \xF7 applicable criteria (${v} \xF7 ${a})`,
+    conformanceNa: (na) => `${na} criterion/criteria not applicable, excluded from the denominator`,
+    conformanceOpen: (open) => `${open} criterion/criteria still to assess, counted in the denominator and not in the numerator \u2014 the published rate is a floor`,
+    decidedLine: "Decided",
+    decidedNote: (c2, nc, na, open) => `${c2} conforming, ${nc} non-conforming, ${na} conforming for want of a subject, ${open} to assess`,
+    provenance: "Where the decisions came from",
+    provenanceNote: (engine, scan2, agent) => `${engine} engine \xB7 ${scan2} browser \xB7 ${agent} adjudication`,
+    autoRateNote: (c2, d) => `criteria validated by the engine alone \xF7 criteria decided without the agent (${c2} \xF7 ${d})`,
     warn: "This report covers the subset of criteria checkable automatically. The \u201Cto assess\u201D criteria (rendering / judgment) are adjudicated by the AI agent (`verify --manual`, gated); rendering goes through `scan` (see the last section).",
     derived: (std) => `${std} report. Every criterion is judged on its own tests; the integrity gates (\`check\`/\`verify\`) operate on the same scope.`,
     synthTitle: (by) => `1. Synthesis by ${by}`,
@@ -59216,6 +59238,31 @@ function reportCoverage(groups) {
   const t3 = reportTotals(groups);
   return { decided: t3.c + t3.nc, total: t3.c + t3.nc + t3.manual };
 }
+function conformanceRate(t3) {
+  const validated = Math.max(0, t3.c - t3.na);
+  const applicable = validated + t3.nc + t3.manual;
+  return {
+    // No applicable criterion is not a failure — it is a scope with nothing of any kind in it,
+    // and the repository's convention for an empty denominator is 100 (src/audit.ts
+    // conformancePct). Divergent conventions on the same question is how two numbers describing
+    // one grid start disagreeing.
+    pct: applicable === 0 ? 100 : Math.round(validated / applicable * 100),
+    validated,
+    applicable,
+    na: t3.na,
+    open: t3.manual,
+    decided: t3.c + t3.nc,
+    total: t3.c + t3.nc + t3.manual
+  };
+}
+function decisionProvenance(rows) {
+  const decided = rows.filter((r) => r.status !== "manual");
+  return {
+    engine: decided.filter((r) => !r.decidedBy || r.decidedBy === "engine").length,
+    scan: decided.filter((r) => r.decidedBy === "scan").length,
+    agent: decided.filter((r) => r.decidedBy === "agent").length
+  };
+}
 function automationOverview(standard) {
   if (isCore(standard)) return void 0;
   const pack = loadPack(standard);
@@ -59278,7 +59325,20 @@ function render(r, lang, opts) {
   const pagesRead = r.scope.pagesAudited?.length ?? 0;
   out2.push(`- **${s.tool}** : ultra11y v${r.version} (${pagesRead > 0 ? s.toolNoteRendered(pagesRead) : s.toolNote})`);
   out2.push(`- **${s.scope}** : ${r.scope.files} ${s.files} \u2014 ${r.scope.inputs.join(", ")}`);
-  out2.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% (${s.rateNote})`);
+  if (opts.conformance) {
+    const { rate, provenance, autoDecided, autoValidated } = opts.conformance;
+    const title2 = `${s.conformanceRate(opts.std)}${rate.open > 0 ? ` (${s.conformanceProvisional})` : ""}`;
+    const notes = [s.conformanceFormula(rate.validated, rate.applicable), s.conformanceNa(rate.na)];
+    if (rate.open > 0) notes.push(s.conformanceOpen(rate.open));
+    out2.push(`- **${title2}** : ${rate.pct}% \u2014 ${notes.join(" ; ")}`);
+    out2.push(
+      `- **${s.decidedLine}** : ${rate.decided}/${rate.total} \u2014 ${s.decidedNote(rate.validated, rate.total - rate.validated - rate.na - rate.open, rate.na, rate.open)}`
+    );
+    out2.push(`- **${s.provenance}** : ${s.provenanceNote(provenance.engine, provenance.scan, provenance.agent)}`);
+    out2.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% \u2014 ${s.autoRateNote(autoValidated, autoDecided)}`);
+  } else {
+    out2.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% (${s.rateNote})`);
+  }
   out2.push(`- **${s.renderedPages(pagesRead)}**${pagesRead === 0 ? ` \u2014 ${s.noRenderedPages}` : ""}`);
   const automation = automationOverview(opts.standard);
   if (automation) {
@@ -59465,14 +59525,20 @@ function packReportGroups(r, pack, lang = "en") {
 function renderPackReport(r, pack, lang = "en", outDir, cropFor) {
   const derived = derivePackResults(r, pack.key);
   const std = `${pack.name} ${pack.baseVersion}`;
+  const groups = packReportGroups(r, pack, lang);
+  const rows = groups.flatMap((g) => g.rows);
+  const tally = reportTotals(groups);
+  const autoValidated = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent" && !isProvisionalJudgmentInapplicable(d)).length;
+  const autoDecided = autoValidated + derived.filter((d) => d.status === "NC").length;
   return render(r, lang, {
     std,
     groupHead: L5[lang].byTheme,
-    groups: packReportGroups(r, pack, lang),
+    groups,
     derivedOf: std,
     standard: pack.key,
     partialAudit: untestedNeedsRendering(r, establishedScs(derived)),
     headerRatePct: packConformancePct(derived),
+    conformance: { rate: conformanceRate(tally), provenance: decisionProvenance(rows), autoDecided, autoValidated },
     // Forwarded, unlike before: without it the per-page screenshots resolved against the
     // CWD instead of the report's own directory, so a pack report written to `audits/`
     // carried links that only worked when read from the repo root.
@@ -61161,6 +61227,8 @@ var M = {
     rateMissing: "Taux de r\xE9ussite absent de l'en-t\xEAte du rapport.",
     rateRange: (v) => `Taux de r\xE9ussite hors bornes (0\u2013100) : ${v}%.`,
     rateInconsistent: (v, expected, c2, nc) => `Taux de r\xE9ussite incoh\xE9rent avec la synth\xE8se : l'en-t\xEAte indique ${v}% alors que C automatique \xF7 (C automatique+NC) = ${c2} \xF7 ${c2 + nc} = ${expected}%.`,
+    rateArithmetic: (v, a, b, expected) => `Taux incoh\xE9rent avec les op\xE9randes qu'il publie : ${v}% annonc\xE9 pour ${a} \xF7 ${b} = ${expected}%.`,
+    rateOperands: (a, b, admissible) => `Op\xE9randes de taux introuvables dans la synth\xE8se : ${a} \xF7 ${b}. Les seuls couples que la grille autorise sont ${admissible}.`,
     overProject: (id) => `Crit\xE8re sur-projet\xE9 : ${id} est marqu\xE9 non conforme dans le rapport mais l'audit ne le d\xE9rive pas comme NC (\xE9l\xE9ment hors p\xE9rim\xE8tre du crit\xE8re).`,
     underProject: (id) => `Crit\xE8re absent : l'audit d\xE9rive ${id} comme non conforme mais le rapport ne le pr\xE9sente pas.`,
     semanticMissing: (p) => `Gate s\xE9mantique : aucun artefact de verdicts trouv\xE9 (${p}). G\xE9n\xE9rez la worklist (\`verify --report <md>\`), statuez, puis relancez \u2014 ou passez \`--verdicts <fichier>\`.`,
@@ -61176,6 +61244,8 @@ var M = {
     rateMissing: "Pass rate missing from the report header.",
     rateRange: (v) => `Pass rate out of range (0\u2013100): ${v}%.`,
     rateInconsistent: (v, expected, c2, nc) => `Pass rate inconsistent with the synthesis table: header says ${v}% but automatic C \xF7 (automatic C+NC) = ${c2} \xF7 ${c2 + nc} = ${expected}%.`,
+    rateArithmetic: (v, a, b, expected) => `Rate inconsistent with the operands it publishes: ${v}% announced for ${a} \xF7 ${b} = ${expected}%.`,
+    rateOperands: (a, b, admissible) => `Rate operands not found in the synthesis table: ${a} \xF7 ${b}. The only pairs the grid allows are ${admissible}.`,
     overProject: (id) => `Over-projected criterion: ${id} is marked non-conformant in the report but the audit does not derive it as NC (element outside the criterion's scope).`,
     underProject: (id) => `Missing criterion: the audit derives ${id} as non-conformant but the report does not present it.`,
     semanticMissing: (p) => `Semantic gate: no verdicts artifact found (${p}). Generate the worklist (\`verify --report <md>\`), adjudicate it, then re-run \u2014 or pass \`--verdicts <file>\`.`,
@@ -61224,20 +61294,42 @@ function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
     const item = naItem.exec(line);
     if (item && !line.includes("_")) issues.push(s.na(item[1]));
   }
-  const rateM = /^-\s+\*\*[^*\n]*\*\*\s*:\s*(\d+(?:[.,]\d+)?)\s*%/m.exec(md);
-  if (!rateM) {
+  const rateLines = [...md.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*(\d+(?:[.,]\d+)?)\s*%([^\n]*)$/gm)];
+  if (rateLines.length === 0) {
     if (!perPage) issues.push(s.rateMissing);
   } else {
-    const pct2 = parseFloat(rateM[1].replace(",", "."));
-    if (pct2 < 0 || pct2 > 100) issues.push(s.rateRange(rateM[1]));
-    else if (!perPage) {
-      const totals = synthesisTotals(md);
-      if (totals) {
-        const { nc } = totals;
-        const c2 = Math.max(0, totals.c - agentConformities(md));
-        const expected = c2 + nc === 0 ? 100 : Math.round(c2 / (c2 + nc) * 100);
-        if (Math.abs(pct2 - expected) > 1) issues.push(s.rateInconsistent(rateM[1], expected, c2, nc));
+    const totals = perPage ? null : synthesisTotals(md);
+    const validated = totals ? Math.max(0, totals.c - totals.na) : 0;
+    const autoC = totals ? Math.max(0, totals.c - agentConformities(md)) : 0;
+    const admissible = totals ? [
+      [validated, validated + totals.nc + totals.manual],
+      [autoC, autoC + totals.nc]
+    ] : [];
+    let checkedOne = false;
+    for (const m of rateLines) {
+      const raw = m[1];
+      const pct2 = parseFloat(raw.replace(",", "."));
+      if (pct2 < 0 || pct2 > 100) {
+        issues.push(s.rateRange(raw));
+        continue;
       }
+      const ops = /\((\d+)\s*÷\s*(\d+)\)/.exec(m[2] ?? "");
+      if (!ops) continue;
+      const a = Number.parseInt(ops[1], 10);
+      const b = Number.parseInt(ops[2], 10);
+      const expected = b === 0 ? 100 : Math.round(a / b * 100);
+      if (Math.abs(pct2 - expected) > 1) issues.push(s.rateArithmetic(raw, a, b, expected));
+      if (totals && !admissible.some(([x, y]) => x === a && y === b)) {
+        issues.push(s.rateOperands(a, b, admissible.map(([x, y]) => `${x} \xF7 ${y}`).join(", ")));
+      }
+      checkedOne = true;
+    }
+    if (!checkedOne && !perPage && totals) {
+      const { nc } = totals;
+      const c2 = autoC;
+      const expected = c2 + nc === 0 ? 100 : Math.round(c2 / (c2 + nc) * 100);
+      const first = rateLines[0][1];
+      if (Math.abs(parseFloat(first.replace(",", ".")) - expected) > 1) issues.push(s.rateInconsistent(first, expected, c2, nc));
     }
   }
   if (!core && pack && opts.audit && !perPage) {
@@ -61310,7 +61402,7 @@ function checkSemantic(md, opts) {
 function synthesisTotals(md) {
   const m = /^\|\s*\*\*[^|*]+\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|/m.exec(md);
   if (!m) return null;
-  return { c: Number.parseInt(m[1], 10), nc: Number.parseInt(m[2], 10) };
+  return { c: Number.parseInt(m[1], 10), nc: Number.parseInt(m[2], 10), na: Number.parseInt(m[3], 10), manual: Number.parseInt(m[4], 10) };
 }
 function agentConformities(md) {
   let count = 0;
