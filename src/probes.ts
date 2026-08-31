@@ -367,6 +367,11 @@ export const HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
     if (!id) continue;
     const t = document.getElementById(id);
     if (!t) continue;
+    // THE TRIGGER ITSELF HAS TO BE THERE. 1.4.13 is about content revealed on hover or focus,
+    // and an element that is not rendered reveals nothing to anybody -- hovering it was always
+    // futile, and once an unreachable trigger started withholding the criterion, that futility
+    // would have turned into a page nobody could ever clear.
+    if (!__vis(e)) continue;
     const s = getComputedStyle(t);
     const hidden = s.display === 'none' || s.visibility === 'hidden' || t.getBoundingClientRect().height === 0;
     if (!hidden) continue;
@@ -726,6 +731,7 @@ export async function probeHoverWalk(page: Any, limits: ProbeLimits = PROBE_DEFA
   const triggers = setup;
   const hits: ProbeHit[] = [];
   let cutShort: string | undefined;
+  let unreachable = 0;
   // What is TRIED is capped, not just what is recorded: a design system that puts a tooltip
   // on every icon offers hundreds of triggers, and each one costs a hover plus two waits.
   const tried = triggers.slice(0, Math.max(1, limits.maxTriggers));
@@ -743,6 +749,11 @@ export async function probeHoverWalk(page: Any, limits: ProbeLimits = PROBE_DEFA
       // the caller's test instead of costing this trigger.
       await page.hover(`[data-u11y-h="${tr.key}"]`, { timeout: actionTimeout(limits, deadline) });
     } catch {
+      // NOT « one trigger less to worry about ». A trigger that will not become actionable —
+      // covered by a sticky bar, detached mid-pass, never settling — is one whose tooltip was
+      // never opened and never asked whether Escape dismisses it. Swallowing the exception and
+      // walking on left 1.4.13 credited for a page this pass had not finished looking at.
+      unreachable++;
       continue;
     }
     await page.waitForTimeout(150);
@@ -772,7 +783,8 @@ export async function probeHoverWalk(page: Any, limits: ProbeLimits = PROBE_DEFA
     cutShort ??
     (typeof capped === "number" && capped > triggers.length
       ? `only ${triggers.length} of the ${capped} hover triggers on this page were tagged — the rest were never opened`
-      : undefined);
+      : undefined) ??
+    (unreachable > 0 ? `${unreachable} hover trigger(s) never became actionable, so their content was never opened or dismissed` : undefined);
   return { hits, complete: !why, ...(why ? { why } : {}) };
 }
 

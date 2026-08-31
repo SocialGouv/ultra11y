@@ -216,12 +216,20 @@ function headline(result: AuditResult, standard: StandardId, lang: Lang): { runs
   // A pack dashboard now shows the standard's own conformity rate, the same number and the
   // same formula the Markdown report leads with (src/report.ts `conformanceRate`), so the two
   // documents cannot state different figures for the same run.
-  const pct = core ? result.conformancePct : conformanceRate(reportTotals(groups)).pct;
+  // AND ITS OWN OPERANDS. Half-fixing this was worse than not: the percentage became the
+  // standard's conformity rate while the parenthesis kept `decided/total`, so the header read
+  // « 80 % (101/106) » — a rate over 74 applicable criteria beside a coverage over 106, which
+  // is the very mismatch the fix was for. A rate is published with the two numbers it was
+  // computed from or it is not checkable.
+  const rate = core ? null : conformanceRate(reportTotals(groups));
+  const pct = rate ? rate.pct : result.conformancePct;
+  const num = rate ? rate.validated : decided;
+  const den = rate ? rate.applicable : total;
   return {
     runs: [
       { text: result.date, mono: true },
       { text: ` · ${result.scope.files} ${t.files} · ` },
-      { text: `${formatRate(decided === 0 ? null : pct, decided, total)}${agentRuled ? "*" : ""}`, strong: true },
+      { text: `${formatRate(den === 0 ? null : pct, num, den)}${agentRuled ? "*" : ""}`, strong: true },
       { text: ` ${core ? t.rate : t.conformityRate}` },
     ],
     agentRuled,

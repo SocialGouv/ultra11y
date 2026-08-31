@@ -220,7 +220,12 @@ describe.runIf(true)("the browser tier, driven for real", () => {
     for (const sc of ["2.4.7", "2.4.11"]) {
       expect(probes.probed, `${sc} lost its coverage on a page whose ring was walked end to end`).toContain(sc);
     }
-    expect(probes.skipped ?? [], "nothing was cut short on this page, so nothing should be explained away").toEqual([]);
+    // …and 1.4.13 is the one thing this page CANNOT settle, correctly. Its `.ghost` trigger is
+    // deliberately never actionable (zero-sized, off-screen), so the hover pass could not open
+    // the tooltip it carries and has nothing to say about whether Escape dismisses it. That
+    // used to be swallowed and the criterion credited anyway; naming it is the whole point.
+    expect(probes.skipped ?? []).toEqual([{ sc: "1.4.13", why: "1 hover trigger(s) never became actionable, so their content was never opened or dismissed" }]);
+    expect(probes.probed, "…and it must NOT be credited").not.toContain("1.4.13");
   }, 120_000);
 });
 

@@ -29,12 +29,15 @@ const base = runAudit({ inputs: [`${FIX}non-conforming/bad.html`] });
 const text = (blocks: Block[] | { blocks: Block[] }): string => JSON.stringify(blocks);
 
 describe("the dashboard's rate and its denominator describe one set", () => {
-  it("shows the standard's OWN conformity rate on a pack dashboard", () => {
+  it("shows the standard's OWN conformity rate on a pack dashboard, WITH its own operands", () => {
     const doc = compositeDoc(base, { standard: "rgaa", lang: "fr" });
-    const expected = conformanceRate(reportTotals(packReportGroups(base, loadPack("rgaa"), "fr"))).pct;
+    const r = conformanceRate(reportTotals(packReportGroups(base, loadPack("rgaa"), "fr")));
     const head = JSON.stringify(doc.subtitle ?? doc.blocks.slice(0, 3));
-    expect(head, "the dashboard must not quote the core WCAG ratio over a pack's denominator").toContain(`${expected} %`);
-    expect(expected).not.toBe(base.conformancePct);
+    expect(head, "the dashboard must not quote the core WCAG ratio over a pack's denominator").toContain(`${r.pct} %`);
+    // Half-fixing this was worse than not fixing it: the percentage became the conformity rate
+    // while the parenthesis kept `decided/total`, so the header read « 80 % (101/106) ».
+    expect(head, "the parenthesis must carry the operands the percentage was computed from").toContain(`(${r.validated}/${r.applicable})`);
+    expect(r.pct).not.toBe(base.conformancePct);
   });
 
   it("leaves the core WCAG dashboard on its own automatic rate", () => {

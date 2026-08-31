@@ -677,6 +677,19 @@ async function runOnPage(
         for (const sc of ["1.4.4", "1.4.10", "1.4.12"])
           skipped.push({ sc, why: "the page's inputs could not be filled, so the filled-input stress never ran" });
     }
+    // …AND THE CREDIT HAS TO GO WITH IT. Writing `skipped` was not enough: the pristine zoom,
+    // reflow and spacing probes run AFTER the fill and push those same three criteria into
+    // `probed` through `ran`, so a page whose fields were never filled — and whose typed values
+    // were therefore never tested at 200 %, at 320px or under the spacing override — still came
+    // back « measured » on all three. The withdrawal runs at the end, once those probes have
+    // had their say.
+    const withdrawUnfilled = (): void => {
+      if (filled || !opts.interact) return;
+      for (const sc of ["1.4.4", "1.4.10", "1.4.12"]) {
+        const at = probed.indexOf(sc);
+        if (at >= 0) probed.splice(at, 1);
+      }
+    };
     const reflowZoom = await ran("1.4.4", [] as ProbeHit[], async () => (await page.evaluate(REFLOW_ZOOM_PROBE)) as ProbeHit[]);
     const inputOverflowZoom = filled
       ? await stressed("1.4.4", async () => (await page.evaluate(inputOverflowZoomExpr(INPUT_OVERFLOW_DETAIL.zoom[l], CELL_SUFFIX[l]))) as ProbeHit[])
@@ -708,6 +721,7 @@ async function runOnPage(
     // (a page's own click handler can change anything), so reordering it before any
     // measurement probe would leak that state into the measurements. Dialog focus issues
     // fold into the same 2.4.7 focus-visible bucket.
+    withdrawUnfilled();
     const dialogFocus = opts.interact ? await probeDialogs(page).catch(() => empty) : [];
     // Through the same guard as every other probe, so a page whose live-region pass THREW is
     // recorded as unmeasured rather than as clean.

@@ -36,6 +36,7 @@ function entry(verdict: LedgerEntry["verdict"], evidence: Evidence[], extra: Par
     verdict,
     evidenceFingerprint: evidenceFingerprint(evidence),
     evidenceAnchors: evidenceAnchorsOf(evidence),
+    evidenceFiles: evidenceFilesOf(evidence),
     evidenceCount: evidence.length,
     date: "2026-08-24",
     decidedBy: "agent",
@@ -44,7 +45,7 @@ function entry(verdict: LedgerEntry["verdict"], evidence: Evidence[], extra: Par
 }
 
 // Re-exported by the module under test; imported here separately so the fixture reads plainly.
-import { evidenceAnchorsOf } from "../src/ledger.js";
+import { evidenceAnchorsOf, evidenceFilesOf } from "../src/ledger.js";
 
 const whole = { harvestComplete: true };
 
@@ -54,7 +55,8 @@ describe("a conformity survives what it already covered", () => {
   });
 
   it("holds when the evidence SHRANK — whitening a set covers its parts", () => {
-    const r = verdictStillHolds(entry("C", [A, B, C]), [A, B], whole);
+    // `src/c.tsx` was deleted, which is why it contributes nothing now.
+    const r = verdictStillHolds(entry("C", [A, B, C]), [A, B], { ...whole, fileExists: () => false });
     expect(r.holds).toBe(true);
   });
 
@@ -89,6 +91,41 @@ describe("the guards, which are why this is not a laundering machine", () => {
     const r = verdictStillHolds(entry("C", [A, B, C]), [A, B], { harvestComplete: false });
     expect(r.holds).toBe(false);
     expect(r.holds === false && r.why).toMatch(/capture|harvest|incomplet/i);
+  });
+
+  it("checks the harvest BEFORE the byte-identical fast path, not after it", () => {
+    // The guard sat below the fingerprint check, so the one case it exists for walked straight
+    // past it: a declared capture goes missing, it happened to contribute no anchor to THIS
+    // criterion, the remaining anchors hash the same — and the verdict was replayed out of a
+    // harvest the run itself reports as incomplete.
+    const e = entry("C", [A, B]);
+    expect(verdictStillHolds(e, [A, B], whole).holds, "identical evidence, complete harvest").toBe(true);
+    const r = verdictStillHolds(e, [A, B], { harvestComplete: false });
+    expect(r.holds, "identical evidence is not identical when the run could not read everything").toBe(false);
+    expect(r.holds === false && r.why).toMatch(/INCOMPLETE/);
+  });
+
+  it("refuses a shrinkage no deletion explains", () => {
+    // « Nothing new appeared » is half a licence. Evidence also gets smaller when the run
+    // failed to READ a file the verdict was ruled against — a path out of scope, a glob that
+    // stopped matching — and that is a coverage hole wearing the costume of a deletion.
+    const e = entry("C", [A, B, C]);
+    const stillOnDisk = (f: string) => f === "src/c.tsx";
+    const r = verdictStillHolds(e, [A, B], { harvestComplete: true, fileExists: stillOnDisk });
+    expect(r.holds).toBe(false);
+    expect(r.holds === false && r.why).toMatch(/src\/c\.tsx/);
+  });
+
+  it("accepts the same shrinkage once the file is really gone", () => {
+    const e = entry("C", [A, B, C]);
+    expect(verdictStillHolds(e, [A, B], { harvestComplete: true, fileExists: () => false }).holds).toBe(true);
+  });
+
+  it("survives a corrupt anchor field instead of throwing on it", () => {
+    // `isLedger` validates the envelope, not every field. An entry carrying a number here used
+    // to reach `.split()` and take the whole replay down with it.
+    const broken = { ...entry("C", [A, B]), evidenceAnchors: 42 as unknown as string };
+    expect(verdictStillHolds(broken, [A], whole).holds).toBe(false);
   });
 
   it("does not accept a verdict over NOTHING, even though zero is a subset of everything", () => {

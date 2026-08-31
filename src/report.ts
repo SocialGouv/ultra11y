@@ -61,6 +61,8 @@ const L = {
     // both operands in the open — a reader who cannot recompute the number cannot defend it.
     conformanceRate: (std: string) => `Taux de conformité ${std}`,
     conformanceProvisional: "provisoire",
+    conformanceNone: (na: number) =>
+      `non calculable — aucun critère applicable dans ce périmètre (${na} critère(s) conforme(s) faute de sujet, aucun autre décidé ni ouvert). Un dénominateur vide n'est pas un taux de 100 %.`,
     conformanceFormula: (v: number, a: number) => `critères validés ÷ critères applicables (${v} ÷ ${a})`,
     conformanceNa: (na: number) => `${na} critère(s) non applicable(s) exclu(s) du dénominateur`,
     conformanceOpen: (open: number) =>
@@ -180,6 +182,8 @@ const L = {
     rateNote: "machine-decidable subset: C ÷ (C + NC)",
     conformanceRate: (std: string) => `${std} conformity rate`,
     conformanceProvisional: "provisional",
+    conformanceNone: (na: number) =>
+      `not computable — no applicable criterion in this scope (${na} conforming for want of a subject, none other decided or open). An empty denominator is not a rate of 100%.`,
     conformanceFormula: (v: number, a: number) => `validated criteria ÷ applicable criteria (${v} ÷ ${a})`,
     conformanceNa: (na: number) => `${na} criterion/criteria not applicable, excluded from the denominator`,
     conformanceOpen: (open: number) =>
@@ -675,7 +679,12 @@ function render(
     const title = `${s.conformanceRate(opts.std)}${rate.open > 0 ? ` (${s.conformanceProvisional})` : ""}`;
     const notes = [s.conformanceFormula(rate.validated, rate.applicable), s.conformanceNa(rate.na)];
     if (rate.open > 0) notes.push(s.conformanceOpen(rate.open));
-    out.push(`- **${title}** : ${rate.pct}% — ${notes.join(" ; ")}`);
+    // NO APPLICABLE CRITERION IS NOT A HUNDRED PER CENT. `conformanceRate` returns 100 for an
+    // empty denominator, which is this repository's convention for every other rate and is the
+    // right answer for arithmetic — but « 100 % — validés ÷ applicables (0 ÷ 0) » printed at
+    // the top of a conformance deliverable is a claim nobody made. The rate is not computable,
+    // and the honest header says so.
+    out.push(rate.applicable === 0 ? `- **${title}** : ${s.conformanceNone(rate.na)}` : `- **${title}** : ${rate.pct}% — ${notes.join(" ; ")}`);
     out.push(
       `- **${s.decidedLine}** : ${rate.decided}/${rate.total} — ${s.decidedNote(rate.validated, rate.total - rate.validated - rate.na - rate.open, rate.na, rate.open)}`,
     );

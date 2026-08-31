@@ -366,6 +366,11 @@ var HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
     if (!id) continue;
     const t = document.getElementById(id);
     if (!t) continue;
+    // THE TRIGGER ITSELF HAS TO BE THERE. 1.4.13 is about content revealed on hover or focus,
+    // and an element that is not rendered reveals nothing to anybody -- hovering it was always
+    // futile, and once an unreachable trigger started withholding the criterion, that futility
+    // would have turned into a page nobody could ever clear.
+    if (!__vis(e)) continue;
     const s = getComputedStyle(t);
     const hidden = s.display === 'none' || s.visibility === 'hidden' || t.getBoundingClientRect().height === 0;
     if (!hidden) continue;
@@ -530,6 +535,7 @@ async function probeHoverWalk(page, limits = PROBE_DEFAULTS, deadline) {
   const triggers = setup;
   const hits = [];
   let cutShort;
+  let unreachable = 0;
   const tried = triggers.slice(0, Math.max(1, limits.maxTriggers));
   if (tried.length < triggers.length) {
     cutShort = `only ${tried.length} of the ${triggers.length} hover triggers on this page were opened (probes.maxTriggers) \u2014 the rest were never asked whether Escape dismisses them`;
@@ -542,6 +548,7 @@ async function probeHoverWalk(page, limits = PROBE_DEFAULTS, deadline) {
     try {
       await page.hover(`[data-u11y-h="${tr.key}"]`, { timeout: actionTimeout(limits, deadline) });
     } catch {
+      unreachable++;
       continue;
     }
     await page.waitForTimeout(150);
@@ -565,7 +572,7 @@ async function probeHoverWalk(page, limits = PROBE_DEFAULTS, deadline) {
     }
   }
   const capped = setup[0]?.total;
-  const why = cutShort ?? (typeof capped === "number" && capped > triggers.length ? `only ${triggers.length} of the ${capped} hover triggers on this page were tagged \u2014 the rest were never opened` : void 0);
+  const why = cutShort ?? (typeof capped === "number" && capped > triggers.length ? `only ${triggers.length} of the ${capped} hover triggers on this page were tagged \u2014 the rest were never opened` : void 0) ?? (unreachable > 0 ? `${unreachable} hover trigger(s) never became actionable, so their content was never opened or dismissed` : void 0);
   return { hits, complete: !why, ...why ? { why } : {} };
 }
 async function runLiveProbes(page, opts = {}) {

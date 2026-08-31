@@ -1586,6 +1586,22 @@ describe("the published scalars are read off the audit as it finally stands", ()
     expect(RAW.indexOf("id: totals")).toBeLessThan(RAW.indexOf("- name: Gate"));
   });
 
+  it("counts the snapshot tier too, and only what could have failed THIS threshold", () => {
+    const gate = RAW.slice(RAW.indexOf("- name: Gate"));
+    // `rendered-*` is the snapshot tier — contrast and colour decided offline from a captured
+    // page — and it is as invisible to a source re-audit as a live browser measurement.
+    expect(gate).toContain('"rendered-"');
+    // And a `mineur` finding under `fail-on: blocking` is not something the gate is hiding.
+    expect(gate).toMatch(/THRESHOLD/);
+    expect(RAW).toContain("FAIL_ON: ${{ inputs.fail-on }}");
+  });
+
+  it("never publishes a conformance value the audit does not carry", () => {
+    // Written unchecked, an audit predating the field published the string "undefined" — a
+    // value a caller cannot tell from a real one, where an EMPTY output falls back.
+    expect(RAW).toMatch(/typeof j\.conformancePct === "number"/);
+  });
+
   it("says out loud that the source gate counts no DOM non-conformity", () => {
     // The default gate re-audits the source — that is what makes its verdict a pure function
     // of the commit — and the scan's findings are in the artifact all the same. Silent, a

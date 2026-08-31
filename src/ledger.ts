@@ -81,6 +81,16 @@ export interface LedgerEntry {
   evidenceAnchors?: string;
   /** How many evidence items were harvested — carried for the reader, never trusted. */
   evidenceCount: number;
+  /** THE FILES THAT EVIDENCE CAME FROM, canonical and sorted.
+   *
+   *  The anchor set answers « is anything NEW? ». It cannot answer the other half — « is
+   *  anything MISSING because nobody read it? » — and those two failures point opposite ways.
+   *  A file deleted from the repository legitimately stops contributing; a file still sitting
+   *  on disk that this run did not read is a coverage hole, and reading its silence as a
+   *  shrunken codebase replays a verdict over code nobody looked at.
+   *
+   *  Absent on an entry recorded before this field existed, which keeps the strict rule. */
+  evidenceFiles?: string[];
   /** ISO date the verdict was recorded. */
   date: string;
   /** Who ruled. Only ever "agent": the engine's own verdicts are recomputed every run and
@@ -132,6 +142,11 @@ export function evidenceFingerprint(evidence: Evidence[]): string {
 /** One short hash per anchor — the same identity `evidenceFingerprint` digests, kept as a SET
  *  so a replay can ask which pieces are new rather than only whether anything moved. Sorted and
  *  de-duplicated so the committed file has a stable diff. */
+/** The canonical files one criterion's evidence was read from, deduplicated and sorted. */
+export function evidenceFilesOf(evidence: Evidence[]): string[] {
+  return [...new Set(evidence.map((e) => canonicalFile(e.file)))].sort();
+}
+
 export function evidenceAnchorsOf(evidence: Evidence[]): string {
   const out = new Set<string>();
   for (const e of evidence) out.add(anchorHash(e));
@@ -166,19 +181,29 @@ const anchorHash = (e: { file: string; selector?: string; snippet?: string }): s
  *    whose evidence had gone to nothing published it as an agent conformity, citation gate and
  *    all. Evidence that has gone to nothing is a criterion nobody looked at — not a criterion
  *    with nothing left to fail — and the two must not be published as the same claim. */
-export function verdictStillHolds(entry: LedgerEntry, today: Evidence[], opts: { harvestComplete: boolean }): { holds: true } | { holds: false; why: string } {
+export function verdictStillHolds(
+  entry: LedgerEntry,
+  today: Evidence[],
+  opts: { harvestComplete: boolean; fileExists?: (file: string) => boolean },
+): { holds: true } | { holds: false; why: string } {
   const stale = (why: string) => ({ holds: false as const, why });
-  // The fast path, and the only path a legacy entry has: byte-identical evidence.
-  if (evidenceFingerprint(today) === entry.evidenceFingerprint) return { holds: true };
   const was = entry.evidenceCount;
-  if (!entry.evidenceAnchors) {
-    return stale(
-      `Ledger verdict is STALE — the evidence changed since it was recorded on ${entry.date} (${was} item(s) then, ${today.length} now), and the entry predates anchor recording, so what changed cannot be established. Re-adjudicate this criterion.`,
-    );
-  }
+  // BEFORE THE FAST PATH, NOT AFTER IT. This guard sat below the byte-identical check, which
+  // let the one case it exists for walk straight past it: a declared capture goes missing, it
+  // happened to contribute no anchor to THIS criterion when the verdict was recorded, the
+  // remaining source anchors hash the same — and a `C` is replayed out of a harvest the run
+  // itself reports as incomplete. « Identical to what we could read » is not « identical », and
+  // only one of the two licenses a conformity.
   if (!opts.harvestComplete) {
     return stale(
-      `Ledger verdict is STALE — this run's harvest is INCOMPLETE (page captures the audit says it read are missing from disk), so a smaller evidence set says nothing about the code. Re-run with the captures present, then re-adjudicate if it still differs.`,
+      `Ledger verdict is STALE — this run's harvest is INCOMPLETE (page captures the audit says it read are missing from disk), so neither what it found nor what it did not says anything about the code. Re-run with the captures present.`,
+    );
+  }
+  // The fast path, and the only path a legacy entry has: byte-identical evidence.
+  if (evidenceFingerprint(today) === entry.evidenceFingerprint) return { holds: true };
+  if (typeof entry.evidenceAnchors !== "string" || !entry.evidenceAnchors) {
+    return stale(
+      `Ledger verdict is STALE — the evidence changed since it was recorded on ${entry.date} (${was} item(s) then, ${today.length} now), and the entry records no anchor set, so what changed cannot be established. Re-adjudicate this criterion.`,
     );
   }
   // An NC survives new code by construction. Whether its constat is still there is the
@@ -196,6 +221,31 @@ export function verdictStillHolds(entry: LedgerEntry, today: Evidence[], opts: {
   if (added.length > 0) {
     return stale(
       `Ledger verdict is STALE — ${added.length} piece(s) of evidence are NEW since the verdict was recorded on ${entry.date} (${was} item(s) then, ${today.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`,
+    );
+  }
+  // AND THE OTHER HALF OF THE SUBSET RULE: is the shrinkage EXPLAINED?
+  //
+  // « Nothing new appeared » is only half a licence. Evidence also gets smaller when this run
+  // failed to READ a file the verdict was ruled against — a path that fell out of the scope, a
+  // glob that stopped matching, a checkout missing a directory — and that is a coverage hole
+  // wearing the costume of a deletion. `unreadableCaptures` above catches the page-capture
+  // shape of it and nothing else; this catches the ordinary-source shape. A file DELETED from
+  // the repository legitimately stops contributing. A file still sitting on disk that produced
+  // nothing today is a question, not an answer.
+  // RESOLVED AGAINST THIS CHECKOUT AND NOWHERE ELSE. A ledger travels: an entry recorded on a
+  // macOS laptop carries paths that do not exist on a Linux runner, and probing them as
+  // absolute would either find somebody else's file or — worse, on the machine that recorded
+  // them — find the ORIGINAL checkout still on disk and declare every verdict stale. Joining
+  // to the current root turns a foreign absolute path into one that simply is not there, which
+  // skips the check rather than failing it. Skipping is the safe direction: this guard exists
+  // to catch a file the run should have read, not to accuse one it never claimed.
+  const exists = opts.fileExists ?? ((f: string) => existsSync(f));
+  const contributing = new Set(evidenceFilesOf(today));
+  const silent = (entry.evidenceFiles ?? []).filter((f) => !contributing.has(f) && exists(f));
+  if (silent.length > 0) {
+    const shown = silent.slice(0, 4);
+    return stale(
+      `Ledger verdict is STALE — ${silent.length} file(s) the verdict was ruled against are still on disk but produced no evidence in this run (${shown.join(", ")}${silent.length > shown.length ? ", and more" : ""}). Evidence that shrank because nobody read it is not evidence that shrank because the code did.`,
     );
   }
   return { holds: true };
@@ -314,6 +364,7 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
       ...(it.recommendations?.length ? { recommendations: it.recommendations } : {}),
       evidenceFingerprint: evidenceFingerprint(it.evidence),
       evidenceAnchors: evidenceAnchorsOf(it.evidence),
+      evidenceFiles: evidenceFilesOf(it.evidence),
       evidenceCount: it.evidence.length,
       date,
       decidedBy: "agent",
@@ -424,12 +475,25 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
   const residualReasons: Record<string, string> = {};
   // Whether this run read everything it says it read. The subset rule below is only sound over
   // a complete harvest — see `verdictStillHolds`.
-  const harvestComplete = unreadableCaptures(audit, opts.cwd ?? ".").length === 0;
   const currentFiles = new Map<string, string>();
   for (const input of audit.scope.inputs) {
     const canonical = canonicalFile(input);
     if (canonical.startsWith(`${PAGES_DIR}/`)) currentFiles.set(canonical, input);
   }
+  // DID THIS RUN READ EVERY PAGE IT SAYS IT READ?
+  //
+  // `unreadableCaptures` answers that against ONE root, and a replay does not always run from
+  // the root the audit did — a temp checkout, a monorepo package, a `--cwd` elsewhere. Asked
+  // that way it reported every capture missing and staled the whole ledger on a run where
+  // nothing was wrong. So a capture counts as read when it is where the AUDIT'S OWN INPUTS say
+  // it is, or where this checkout would put it; only a page neither answer can find is a hole.
+  const root = opts.cwd ?? ".";
+  const unreadable = (audit.scope.pagesAudited ?? []).filter((id) => {
+    const canonical = `${PAGES_DIR}/${id}/dom.html`;
+    const fromInputs = currentFiles.get(canonical);
+    return !(fromInputs && existsSync(fromInputs)) && !existsSync(join(root, canonical));
+  });
+  const harvestComplete = unreadable.length === 0;
 
   for (const e of ledger.entries) if (!open.has(e.criteriaId)) obsolete.push(e.criteriaId);
 
@@ -440,7 +504,10 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
       residualReasons[it.criteriaId] = "No verdict in the ledger — this criterion has never been adjudicated. Run an adjudication pass to record one.";
       continue;
     }
-    const held = verdictStillHolds(e, it.evidence, { harvestComplete });
+    const held = verdictStillHolds(e, it.evidence, {
+      harvestComplete,
+      fileExists: (f) => existsSync(join(opts.cwd ?? ".", f)),
+    });
     if (!held.holds) {
       stale.push(it.criteriaId);
       residualReasons[it.criteriaId] = held.why;

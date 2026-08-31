@@ -59008,6 +59008,7 @@ var L5 = {
     // both operands in the open — a reader who cannot recompute the number cannot defend it.
     conformanceRate: (std) => `Taux de conformit\xE9 ${std}`,
     conformanceProvisional: "provisoire",
+    conformanceNone: (na) => `non calculable \u2014 aucun crit\xE8re applicable dans ce p\xE9rim\xE8tre (${na} crit\xE8re(s) conforme(s) faute de sujet, aucun autre d\xE9cid\xE9 ni ouvert). Un d\xE9nominateur vide n'est pas un taux de 100 %.`,
     conformanceFormula: (v, a) => `crit\xE8res valid\xE9s \xF7 crit\xE8res applicables (${v} \xF7 ${a})`,
     conformanceNa: (na) => `${na} crit\xE8re(s) non applicable(s) exclu(s) du d\xE9nominateur`,
     conformanceOpen: (open) => `${open} crit\xE8re(s) encore \xE0 \xE9valuer, compt\xE9s au d\xE9nominateur et pas au num\xE9rateur \u2014 le taux publi\xE9 est donc un plancher`,
@@ -59106,6 +59107,7 @@ var L5 = {
     rateNote: "machine-decidable subset: C \xF7 (C + NC)",
     conformanceRate: (std) => `${std} conformity rate`,
     conformanceProvisional: "provisional",
+    conformanceNone: (na) => `not computable \u2014 no applicable criterion in this scope (${na} conforming for want of a subject, none other decided or open). An empty denominator is not a rate of 100%.`,
     conformanceFormula: (v, a) => `validated criteria \xF7 applicable criteria (${v} \xF7 ${a})`,
     conformanceNa: (na) => `${na} criterion/criteria not applicable, excluded from the denominator`,
     conformanceOpen: (open) => `${open} criterion/criteria still to assess, counted in the denominator and not in the numerator \u2014 the published rate is a floor`,
@@ -59335,7 +59337,7 @@ function render(r, lang, opts) {
     const title2 = `${s.conformanceRate(opts.std)}${rate.open > 0 ? ` (${s.conformanceProvisional})` : ""}`;
     const notes = [s.conformanceFormula(rate.validated, rate.applicable), s.conformanceNa(rate.na)];
     if (rate.open > 0) notes.push(s.conformanceOpen(rate.open));
-    out2.push(`- **${title2}** : ${rate.pct}% \u2014 ${notes.join(" ; ")}`);
+    out2.push(rate.applicable === 0 ? `- **${title2}** : ${s.conformanceNone(rate.na)}` : `- **${title2}** : ${rate.pct}% \u2014 ${notes.join(" ; ")}`);
     out2.push(
       `- **${s.decidedLine}** : ${rate.decided}/${rate.total} \u2014 ${s.decidedNote(rate.validated, rate.total - rate.validated - rate.na - rate.open, rate.na, rate.open)}`
     );
@@ -61233,6 +61235,8 @@ var M = {
     rateRange: (v) => `Taux de r\xE9ussite hors bornes (0\u2013100) : ${v}%.`,
     rateInconsistent: (v, expected, c2, nc) => `Taux de r\xE9ussite incoh\xE9rent avec la synth\xE8se : l'en-t\xEAte indique ${v}% alors que C automatique \xF7 (C automatique+NC) = ${c2} \xF7 ${c2 + nc} = ${expected}%.`,
     rateArithmetic: (v, a, b, expected) => `Taux incoh\xE9rent avec les op\xE9randes qu'il publie : ${v}% annonc\xE9 pour ${a} \xF7 ${b} = ${expected}%.`,
+    rateUngrounded: (a, b) => `Taux avec op\xE9randes (${a} \xF7 ${b}) mais aucune table de synth\xE8se pour les v\xE9rifier : la ligne Total est absente ou non reconnue.`,
+    synthesisImpossible: (c2, na) => `Synth\xE8se impossible : NA (${na}) d\xE9passe C (${c2}), alors que NA est un sous-ensemble de C. La table est corrompue ou \xE9dit\xE9e \xE0 la main.`,
     rateOperands: (a, b, admissible) => `Op\xE9randes de taux introuvables dans la synth\xE8se : ${a} \xF7 ${b}. Les seuls couples que la grille autorise sont ${admissible}.`,
     overProject: (id) => `Crit\xE8re sur-projet\xE9 : ${id} est marqu\xE9 non conforme dans le rapport mais l'audit ne le d\xE9rive pas comme NC (\xE9l\xE9ment hors p\xE9rim\xE8tre du crit\xE8re).`,
     underProject: (id) => `Crit\xE8re absent : l'audit d\xE9rive ${id} comme non conforme mais le rapport ne le pr\xE9sente pas.`,
@@ -61250,6 +61254,8 @@ var M = {
     rateRange: (v) => `Pass rate out of range (0\u2013100): ${v}%.`,
     rateInconsistent: (v, expected, c2, nc) => `Pass rate inconsistent with the synthesis table: header says ${v}% but automatic C \xF7 (automatic C+NC) = ${c2} \xF7 ${c2 + nc} = ${expected}%.`,
     rateArithmetic: (v, a, b, expected) => `Rate inconsistent with the operands it publishes: ${v}% announced for ${a} \xF7 ${b} = ${expected}%.`,
+    rateUngrounded: (a, b) => `Rate publishes operands (${a} \xF7 ${b}) but there is no synthesis table to check them against: the Total row is missing or unrecognised.`,
+    synthesisImpossible: (c2, na) => `Impossible synthesis: NA (${na}) exceeds C (${c2}), while NA is a subset of C. The table is corrupt or hand-edited.`,
     rateOperands: (a, b, admissible) => `Rate operands not found in the synthesis table: ${a} \xF7 ${b}. The only pairs the grid allows are ${admissible}.`,
     overProject: (id) => `Over-projected criterion: ${id} is marked non-conformant in the report but the audit does not derive it as NC (element outside the criterion's scope).`,
     underProject: (id) => `Missing criterion: the audit derives ${id} as non-conformant but the report does not present it.`,
@@ -61299,11 +61305,20 @@ function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
     const item = naItem.exec(line);
     if (item && !line.includes("_")) issues.push(s.na(item[1]));
   }
-  const rateLines = [...md.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*(\d+(?:[.,]\d+)?)\s*%([^\n]*)$/gm)];
+  const header4 = md.slice(0, /^##\s/m.exec(md)?.index ?? md.length);
+  const rateLines = [...header4.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*\**\s*(\d+(?:[.,]\d+)?)\s*%([^\n]*)$/gm)];
+  if (perPage) {
+    for (const m of md.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*\**\s*(\d+(?:[.,]\d+)?)\s*%/gm)) {
+      const raw = m[1];
+      const pct2 = parseFloat(raw.replace(",", "."));
+      if (pct2 < 0 || pct2 > 100) issues.push(s.rateRange(raw));
+    }
+  }
   if (rateLines.length === 0) {
     if (!perPage) issues.push(s.rateMissing);
   } else {
     const totals = perPage ? null : synthesisTotals(md);
+    if (totals && totals.na > totals.c) issues.push(s.synthesisImpossible(totals.c, totals.na));
     const validated = totals ? Math.max(0, totals.c - totals.na) : 0;
     const autoC = totals ? Math.max(0, totals.c - agentConformities(md)) : 0;
     const admissible = totals ? [
@@ -61323,10 +61338,11 @@ function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
       const a = Number.parseInt(ops[1], 10);
       const b = Number.parseInt(ops[2], 10);
       const expected = b === 0 ? 100 : Math.round(a / b * 100);
-      if (Math.abs(pct2 - expected) > 1) issues.push(s.rateArithmetic(raw, a, b, expected));
+      if (pct2 !== expected) issues.push(s.rateArithmetic(raw, a, b, expected));
       if (totals && !admissible.some(([x, y]) => x === a && y === b)) {
         issues.push(s.rateOperands(a, b, admissible.map(([x, y]) => `${x} \xF7 ${y}`).join(", ")));
       }
+      if (!totals && !perPage) issues.push(s.rateUngrounded(a, b));
       checkedOne = true;
     }
     if (!checkedOne && !perPage && totals) {
@@ -63616,6 +63632,9 @@ function evidenceFingerprint(evidence) {
   return `sha256:${createHash6("sha256").update(`${keys.length}
 ${keys.join("\n")}`).digest("hex").slice(0, 32)}`;
 }
+function evidenceFilesOf(evidence) {
+  return [...new Set(evidence.map((e) => canonicalFile2(e.file)))].sort();
+}
 function evidenceAnchorsOf(evidence) {
   const out2 = /* @__PURE__ */ new Set();
   for (const e of evidence) out2.add(anchorHash(e));
@@ -63624,16 +63643,16 @@ function evidenceAnchorsOf(evidence) {
 var anchorHash = (e) => createHash6("sha256").update(anchorKey2(e)).digest("hex").slice(0, 16);
 function verdictStillHolds(entry, today2, opts) {
   const stale = (why) => ({ holds: false, why });
-  if (evidenceFingerprint(today2) === entry.evidenceFingerprint) return { holds: true };
   const was = entry.evidenceCount;
-  if (!entry.evidenceAnchors) {
-    return stale(
-      `Ledger verdict is STALE \u2014 the evidence changed since it was recorded on ${entry.date} (${was} item(s) then, ${today2.length} now), and the entry predates anchor recording, so what changed cannot be established. Re-adjudicate this criterion.`
-    );
-  }
   if (!opts.harvestComplete) {
     return stale(
-      `Ledger verdict is STALE \u2014 this run's harvest is INCOMPLETE (page captures the audit says it read are missing from disk), so a smaller evidence set says nothing about the code. Re-run with the captures present, then re-adjudicate if it still differs.`
+      `Ledger verdict is STALE \u2014 this run's harvest is INCOMPLETE (page captures the audit says it read are missing from disk), so neither what it found nor what it did not says anything about the code. Re-run with the captures present.`
+    );
+  }
+  if (evidenceFingerprint(today2) === entry.evidenceFingerprint) return { holds: true };
+  if (typeof entry.evidenceAnchors !== "string" || !entry.evidenceAnchors) {
+    return stale(
+      `Ledger verdict is STALE \u2014 the evidence changed since it was recorded on ${entry.date} (${was} item(s) then, ${today2.length} now), and the entry records no anchor set, so what changed cannot be established. Re-adjudicate this criterion.`
     );
   }
   if (entry.verdict === "NC") return { holds: true };
@@ -63647,6 +63666,15 @@ function verdictStillHolds(entry, today2, opts) {
   if (added.length > 0) {
     return stale(
       `Ledger verdict is STALE \u2014 ${added.length} piece(s) of evidence are NEW since the verdict was recorded on ${entry.date} (${was} item(s) then, ${today2.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`
+    );
+  }
+  const exists = opts.fileExists ?? ((f) => existsSync22(f));
+  const contributing = new Set(evidenceFilesOf(today2));
+  const silent = (entry.evidenceFiles ?? []).filter((f) => !contributing.has(f) && exists(f));
+  if (silent.length > 0) {
+    const shown = silent.slice(0, 4);
+    return stale(
+      `Ledger verdict is STALE \u2014 ${silent.length} file(s) the verdict was ruled against are still on disk but produced no evidence in this run (${shown.join(", ")}${silent.length > shown.length ? ", and more" : ""}). Evidence that shrank because nobody read it is not evidence that shrank because the code did.`
     );
   }
   return { holds: true };
@@ -63711,6 +63739,7 @@ function entriesFrom(adj, accepted, date) {
       ...it.recommendations?.length ? { recommendations: it.recommendations } : {},
       evidenceFingerprint: evidenceFingerprint(it.evidence),
       evidenceAnchors: evidenceAnchorsOf(it.evidence),
+      evidenceFiles: evidenceFilesOf(it.evidence),
       evidenceCount: it.evidence.length,
       date,
       decidedBy: "agent"
@@ -63772,12 +63801,18 @@ function replayLedger(audit2, ledger, opts = {}) {
   const obsolete = [];
   const missing = [];
   const residualReasons = {};
-  const harvestComplete = unreadableCaptures(audit2, opts.cwd ?? ".").length === 0;
   const currentFiles = /* @__PURE__ */ new Map();
   for (const input of audit2.scope.inputs) {
     const canonical = canonicalFile2(input);
     if (canonical.startsWith(`${PAGES_DIR}/`)) currentFiles.set(canonical, input);
   }
+  const root = opts.cwd ?? ".";
+  const unreadable = (audit2.scope.pagesAudited ?? []).filter((id) => {
+    const canonical = `${PAGES_DIR}/${id}/dom.html`;
+    const fromInputs = currentFiles.get(canonical);
+    return !(fromInputs && existsSync22(fromInputs)) && !existsSync22(join36(root, canonical));
+  });
+  const harvestComplete = unreadable.length === 0;
   for (const e of ledger.entries) if (!open.has(e.criteriaId)) obsolete.push(e.criteriaId);
   for (const it of worklist) {
     const e = byId2.get(it.criteriaId);
@@ -63786,7 +63821,10 @@ function replayLedger(audit2, ledger, opts = {}) {
       residualReasons[it.criteriaId] = "No verdict in the ledger \u2014 this criterion has never been adjudicated. Run an adjudication pass to record one.";
       continue;
     }
-    const held = verdictStillHolds(e, it.evidence, { harvestComplete });
+    const held = verdictStillHolds(e, it.evidence, {
+      harvestComplete,
+      fileExists: (f) => existsSync22(join36(opts.cwd ?? ".", f))
+    });
     if (!held.holds) {
       stale.push(it.criteriaId);
       residualReasons[it.criteriaId] = held.why;
@@ -65592,6 +65630,11 @@ var HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
     if (!id) continue;
     const t = document.getElementById(id);
     if (!t) continue;
+    // THE TRIGGER ITSELF HAS TO BE THERE. 1.4.13 is about content revealed on hover or focus,
+    // and an element that is not rendered reveals nothing to anybody -- hovering it was always
+    // futile, and once an unreachable trigger started withholding the criterion, that futility
+    // would have turned into a page nobody could ever clear.
+    if (!__vis(e)) continue;
     const s = getComputedStyle(t);
     const hidden = s.display === 'none' || s.visibility === 'hidden' || t.getBoundingClientRect().height === 0;
     if (!hidden) continue;
@@ -65759,6 +65802,7 @@ async function probeHoverWalk(page, limits = PROBE_DEFAULTS, deadline) {
   const triggers = setup;
   const hits = [];
   let cutShort;
+  let unreachable = 0;
   const tried = triggers.slice(0, Math.max(1, limits.maxTriggers));
   if (tried.length < triggers.length) {
     cutShort = `only ${tried.length} of the ${triggers.length} hover triggers on this page were opened (probes.maxTriggers) \u2014 the rest were never asked whether Escape dismisses them`;
@@ -65771,6 +65815,7 @@ async function probeHoverWalk(page, limits = PROBE_DEFAULTS, deadline) {
     try {
       await page.hover(`[data-u11y-h="${tr.key}"]`, { timeout: actionTimeout(limits, deadline) });
     } catch {
+      unreachable++;
       continue;
     }
     await page.waitForTimeout(150);
@@ -65794,7 +65839,7 @@ async function probeHoverWalk(page, limits = PROBE_DEFAULTS, deadline) {
     }
   }
   const capped = setup[0]?.total;
-  const why = cutShort ?? (typeof capped === "number" && capped > triggers.length ? `only ${triggers.length} of the ${capped} hover triggers on this page were tagged \u2014 the rest were never opened` : void 0);
+  const why = cutShort ?? (typeof capped === "number" && capped > triggers.length ? `only ${triggers.length} of the ${capped} hover triggers on this page were tagged \u2014 the rest were never opened` : void 0) ?? (unreachable > 0 ? `${unreachable} hover trigger(s) never became actionable, so their content was never opened or dismissed` : void 0);
   return { hits, complete: !why, ...why ? { why } : {} };
 }
 var DESTRUCTIVE_NAME_RE = "\\b(supprim|retir|effac|envoy|valid|confirm|pay|achet|command|delete|remove|eras|clear|send|submit|buy|order)";
@@ -66302,6 +66347,13 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
         for (const sc of ["1.4.4", "1.4.10", "1.4.12"])
           skipped.push({ sc, why: "the page's inputs could not be filled, so the filled-input stress never ran" });
     }
+    const withdrawUnfilled = () => {
+      if (filled || !opts.interact) return;
+      for (const sc of ["1.4.4", "1.4.10", "1.4.12"]) {
+        const at = probed.indexOf(sc);
+        if (at >= 0) probed.splice(at, 1);
+      }
+    };
     const reflowZoom = await ran("1.4.4", [], async () => await page.evaluate(REFLOW_ZOOM_PROBE));
     const inputOverflowZoom = filled ? await stressed("1.4.4", async () => await page.evaluate(inputOverflowZoomExpr(INPUT_OVERFLOW_DETAIL.zoom[l], CELL_SUFFIX[l]))) : empty;
     const reflow = await ran("1.4.10", { horizontalScroll: false }, async () => {
@@ -66318,6 +66370,7 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
     const inputOverflowSpacing = filled ? await stressed("1.4.12", async () => await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.spacing[l], CELL_SUFFIX[l]))) : empty;
     if (opts.interact) await page.evaluate(RESTORE_INPUTS_STEP).catch(() => {
     });
+    withdrawUnfilled();
     const dialogFocus = opts.interact ? await probeDialogs(page).catch(() => empty) : [];
     const liveWalk = opts.interact ? await probeLiveRegion(page, l, opts.allowClicks).catch((e) => ({
       hits: empty,
@@ -69186,12 +69239,15 @@ function headline(result, standard, lang) {
   const groups = core ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
   const { decided, total } = reportCoverage(groups);
   const agentRuled = groups.some((g) => g.rows.some((r) => r.decidedBy === "agent" && r.status === "C"));
-  const pct2 = core ? result.conformancePct : conformanceRate(reportTotals(groups)).pct;
+  const rate = core ? null : conformanceRate(reportTotals(groups));
+  const pct2 = rate ? rate.pct : result.conformancePct;
+  const num3 = rate ? rate.validated : decided;
+  const den = rate ? rate.applicable : total;
   return {
     runs: [
       { text: result.date, mono: true },
       { text: ` \xB7 ${result.scope.files} ${t3.files} \xB7 ` },
-      { text: `${formatRate(decided === 0 ? null : pct2, decided, total)}${agentRuled ? "*" : ""}`, strong: true },
+      { text: `${formatRate(den === 0 ? null : pct2, num3, den)}${agentRuled ? "*" : ""}`, strong: true },
       { text: ` ${core ? t3.rate : t3.conformityRate}` }
     ],
     agentRuled,

@@ -43,6 +43,10 @@ const M = {
       `Taux de réussite incohérent avec la synthèse : l'en-tête indique ${v}% alors que C automatique ÷ (C automatique+NC) = ${c} ÷ ${c + nc} = ${expected}%.`,
     rateArithmetic: (v: string, a: number, b: number, expected: number) =>
       `Taux incohérent avec les opérandes qu'il publie : ${v}% annoncé pour ${a} ÷ ${b} = ${expected}%.`,
+    rateUngrounded: (a: number, b: number) =>
+      `Taux avec opérandes (${a} ÷ ${b}) mais aucune table de synthèse pour les vérifier : la ligne Total est absente ou non reconnue.`,
+    synthesisImpossible: (c: number, na: number) =>
+      `Synthèse impossible : NA (${na}) dépasse C (${c}), alors que NA est un sous-ensemble de C. La table est corrompue ou éditée à la main.`,
     rateOperands: (a: number, b: number, admissible: string) =>
       `Opérandes de taux introuvables dans la synthèse : ${a} ÷ ${b}. Les seuls couples que la grille autorise sont ${admissible}.`,
     overProject: (id: string) =>
@@ -66,6 +70,10 @@ const M = {
       `Pass rate inconsistent with the synthesis table: header says ${v}% but automatic C ÷ (automatic C+NC) = ${c} ÷ ${c + nc} = ${expected}%.`,
     rateArithmetic: (v: string, a: number, b: number, expected: number) =>
       `Rate inconsistent with the operands it publishes: ${v}% announced for ${a} ÷ ${b} = ${expected}%.`,
+    rateUngrounded: (a: number, b: number) =>
+      `Rate publishes operands (${a} ÷ ${b}) but there is no synthesis table to check them against: the Total row is missing or unrecognised.`,
+    synthesisImpossible: (c: number, na: number) =>
+      `Impossible synthesis: NA (${na}) exceeds C (${c}), while NA is a subset of C. The table is corrupt or hand-edited.`,
     rateOperands: (a: number, b: number, admissible: string) =>
       `Rate operands not found in the synthesis table: ${a} ÷ ${b}. The only pairs the grid allows are ${admissible}.`,
     overProject: (id: string) =>
@@ -169,7 +177,26 @@ export function checkReport(md: string, standard: StandardId = "wcag", lang: Lan
   // pair, and the pair must be one the synthesis table actually allows. That is stronger than
   // the old single check and, unlike matching on a label, it cannot drift when a string is
   // translated or reworded.
-  const rateLines = [...md.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*(\d+(?:[.,]\d+)?)\s*%([^\n]*)$/gm)];
+  //
+  // SCOPED TO THE HEADER, and to bulleted lines that carry a percentage AS THEIR VALUE. The
+  // scan used to run over the whole document, so an ordinary metric further down whose value
+  // happens to be a percentage — « - **Opacité à 50 %** : 50 % » — was compared to the
+  // automatic ratio and refused a perfectly good report. The header is everything before the
+  // first `## `, which is exactly where a document-level rate belongs.
+  const header = md.slice(0, /^##\s/m.exec(md)?.index ?? md.length);
+  const rateLines = [...header.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*\**\s*(\d+(?:[.,]\d+)?)\s*%([^\n]*)$/gm)];
+  // A PER-PAGE REPORT HAS NO DOCUMENT-LEVEL RATE, so the block above finds nothing and passes
+  // it — which left every one of its rates, one per page, unchecked by anything. Its grids are
+  // per page and comparing them here would need the whole per-page derivation, so this does
+  // the one check that needs nothing: a percentage outside 0–100 is wrong whatever grid it
+  // came from, and `999 %` is exactly the shape a hand-edited deliverable takes.
+  if (perPage) {
+    for (const m of md.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*\**\s*(\d+(?:[.,]\d+)?)\s*%/gm)) {
+      const raw = m[1]!;
+      const pct = parseFloat(raw.replace(",", "."));
+      if (pct < 0 || pct > 100) issues.push(s.rateRange(raw));
+    }
+  }
   if (rateLines.length === 0) {
     // A per-page report carries one rate PER PAGE, inside each page's own block, and no
     // document-level rate to find in a header. Its absence is the correct shape, not a lie.
@@ -177,6 +204,11 @@ export function checkReport(md: string, standard: StandardId = "wcag", lang: Lan
   } else {
     const totals = perPage ? null : synthesisTotals(md);
     // The two ratios the grid licenses, each as its own (numerator, denominator).
+    // `na` is a SUBSET of `c` by construction (src/report.ts tallyRows), so `c - na` is never
+    // negative in a table this tool wrote. Clamping it silently turned an impossible synthesis
+    // — one that would have to be corrupt or hand-edited — into a legal operand pair, so it is
+    // reported instead of hidden.
+    if (totals && totals.na > totals.c) issues.push(s.synthesisImpossible(totals.c, totals.na));
     const validated = totals ? Math.max(0, totals.c - totals.na) : 0;
     const autoC = totals ? Math.max(0, totals.c - agentConformities(md)) : 0;
     const admissible: [number, number][] = totals
@@ -198,10 +230,18 @@ export function checkReport(md: string, standard: StandardId = "wcag", lang: Lan
       const a = Number.parseInt(ops[1]!, 10);
       const b = Number.parseInt(ops[2]!, 10);
       const expected = b === 0 ? 100 : Math.round((a / b) * 100);
-      if (Math.abs(pct - expected) > 1) issues.push(s.rateArithmetic(raw, a, b, expected));
+      // EXACT, not within a point. The ±1 tolerance below exists for a rate whose operands are
+      // not published and may have been rounded elsewhere; here both integers are in the
+      // document and the same `Math.round` produced the number, so `49 % (1 ÷ 2)` is simply
+      // wrong and there is nothing to be lenient about.
+      if (pct !== expected) issues.push(s.rateArithmetic(raw, a, b, expected));
       if (totals && !admissible.some(([x, y]) => x === a && y === b)) {
         issues.push(s.rateOperands(a, b, admissible.map(([x, y]) => `${x} ÷ ${y}`).join(", ")));
       }
+      // A rate that names its operands and NO synthesis table to check them against is a
+      // number nobody can trace. That state is reachable by deleting the Total row, which is
+      // precisely how someone would hide an operand pair the grid does not license.
+      if (!totals && !perPage) issues.push(s.rateUngrounded(a, b));
       checkedOne = true;
     }
     // A header whose rates name no operands (the core WCAG report) keeps the original gate on
