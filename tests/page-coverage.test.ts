@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 import { coverageFor, criterionMeasuredOn, intersectCoverage, renderedProvesOn, unionCoverage } from "../src/coverage.js";
 import { derivePages, pagesOf } from "../src/pages.js";
 import { derivePackResults } from "../src/standards/derive.js";
+import { registerRuntimePack } from "../src/standards/index.js";
 import type { AuditResult, CriterionResult, PageCoverage, PageScope } from "../src/types.js";
 
 // ---- fixtures -----------------------------------------------------------------------------
@@ -176,6 +177,49 @@ describe("pack projection", () => {
     );
     expect(rgaa(a, "accueil").get("11.9")?.status).toBe("manual");
     expect(rgaa(a, "accueil").get("11.9")?.decidedBy).toBeUndefined();
+  });
+
+  // A PACK THAT DECLARES NO AUTOMATION CONTRACT HAS NOT REFUSED ANYTHING.
+  //
+  // 5.36.0 made `completeBySilence` the opt-in that lets measured silence prove conformity, and
+  // wired it into `measuredRescue` as `pc.automation?.completeBySilence !== true`. On RGAA that
+  // reads correctly — all 106 criteria ship a contract, and exactly three opt in. On a pack that
+  // ships NO contract it read `undefined !== true` and refused the rescue, so the measure tier
+  // was silently dead for every third-party pack, with no way to opt back in. This pins the
+  // difference between "the pack said no" and "the pack said nothing".
+  it("still rescues a measured criterion when the pack declares no automation contract", () => {
+    const key = "synthnoautomation";
+    const v = registerRuntimePack({
+      key,
+      name: "SynthNoAutomation",
+      org: "O",
+      country: "US",
+      baseVersion: "1",
+      wcagVersion: "2.2",
+      locales: ["en"],
+      defaultLocale: "en",
+      license: "x",
+      source: "x",
+      attribution: "x",
+      idPattern: "^\\d+\\.\\d+$",
+      themes: [{ number: 1, name: { en: "Colour" }, count: 1 }],
+      criteria: [
+        {
+          id: "1.1",
+          theme: 1,
+          title: { en: "Contrast" },
+          titlePlain: { en: "Contrast" },
+          wcag: ["1.4.3"],
+          appliesTo: { ruleIds: ["rendered-contrast"] },
+        },
+      ],
+    });
+    expect(v.ok).toBe(true);
+
+    const a = audit([{ id: "1.4.3", guideline: "1.4", status: "manual", findings: [] }], FULL);
+    const c = new Map(derivePackResults(a, key, "accueil").map((x) => [x.id, x])).get("1.1");
+    expect(c?.status).toBe("C");
+    expect(c?.decidedBy).toBe("scan");
   });
 
   it("leaves a criterion no rule decides to the agent", () => {

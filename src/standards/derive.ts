@@ -225,11 +225,18 @@ function judgmentGuard(r: PackCriterionResult, pc: PackCriterion): PackCriterion
  *  `judgmentGuard` then reopened as « à évaluer ». A criterion that already carries a verdict
  *  keeps it; this only ever touches `manual`.
  *
- *  Three refusals:
+ *  Four refusals:
  *   • `judgment` criteria. « All its rules were silent » does not answer a question about
  *     PERTINENCE, which is the whole reason `judgmentGuard` exists. Read from the PACK, not
  *     from the derived flag: that flag is only set when the guard actually intercepted a `C`.
  *   • `outOfScope`: no core success criterion to project from at all, which no measurement fixes.
+ *   • a criterion whose pack DECLARES an automation contract without `completeBySilence`. That
+ *     contract is the pack saying, test by test, that silence here does not prove conformity —
+ *     and it outranks a measurement that only shows the rules ran. Written as `pc.automation &&`
+ *     rather than `pc.automation?.` DELIBERATELY, and it is the same shape as `judgmentGuard`:
+ *     a pack that declares NO contract has not refused anything, so optional chaining would
+ *     read its silence as a refusal and kill this tier for every pack but RGAA — which is
+ *     exactly what it did, without a test to notice.
  *   • an ADJUDICATED verdict never reaches here — the adjudication branch returns before this.
  *     An agent that ruled « undecidable » examined the criterion and said so; a rule that
  *     measured something narrower must not overturn it. That is what keeps RGAA 11.9 (« chaque
@@ -242,7 +249,7 @@ function measuredRescue(
   ran: PageCoverage | undefined,
   pageId: string | undefined,
 ): PackCriterionResult {
-  if (r.status !== "manual" || pc.judgment || r.outOfScope || pc.automation?.completeBySilence !== true) return r;
+  if (r.status !== "manual" || pc.judgment || r.outOfScope || (pc.automation && pc.automation.completeBySilence !== true)) return r;
   if (!criterionMeasuredOn(pc.appliesTo?.ruleIds, pc.wcag, cov, ran)) return r;
   // The stale explanations go with the stale status: `scopedOut` and `judgment` say why the
   // criterion STAYED open, and it no longer is.
