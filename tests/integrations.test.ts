@@ -181,14 +181,19 @@ describe("packaging", () => {
     expect(pkg.files).toContain("dist");
   });
 
-  it("ships no chunk nothing imports — tsup keeps `clean: false` on this entry", () => {
-    // `check:build` diffs the tracked dist files, which catches a MODIFIED chunk and a NEW
-    // one but never a stale EXTRA. tsup.config.ts keeps `clean: false` for the dist entry, so
-    // when a shared chunk's content hash changes its predecessor stays on disk, gets
-    // committed, and SHIPS — `dist` is in `files[]`. One did: `payload-DzQb84Kw.d.ts`, an
-    // older API (no `axe?: boolean | "auto"`) that no entry point had imported for months.
-    // A consumer never resolves it, so nothing breaks; it is simply a second, wrong answer
-    // to "what does this package's type surface look like", published alongside the right one.
+  it("ships no chunk nothing imports", () => {
+    // `check:build` diffs the tracked dist files, which catches a MODIFIED chunk and a NEW one
+    // but never a stale EXTRA. So when a shared chunk's content hash changed, its predecessor
+    // stayed on disk, got committed, and SHIPPED — `dist` is in `files[]`. Twice:
+    // `payload-DzQb84Kw.d.ts`, an older API (no `axe?: boolean | "auto"`) no entry point had
+    // imported for months, and `payload-DvcIA6VQ.d.ts` the day `liveRegion` joined CheckOptions.
+    // A consumer never resolves one, so nothing breaks; it is simply a second, wrong answer to
+    // "what does this package's type surface look like", published beside the right one.
+    //
+    // The dist entry now builds with `clean: true`, which makes it structurally impossible —
+    // `dist/` holds nothing but build output, unlike `scripts/`, where hand-written scripts sit
+    // beside the generated bundle and a clean would be destructive. This test stays as the
+    // belt to that braces: it is what caught both.
     const entries = new Set<string>();
     for (const sub of ["./playwright", "./cypress", "./cypress/plugin"]) {
       const e = pkg.exports[sub] as Record<string, string>;

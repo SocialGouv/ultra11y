@@ -46,7 +46,13 @@ export default defineConfig([
     platform: "node",
     bundle: true,
     dts: true,
-    clean: false,
+    // CLEAN, unlike the engine entry above — and the asymmetry is the point. `scripts/` holds
+    // hand-written scripts beside the generated bundle, so wiping it would be destructive;
+    // `dist/` holds nothing but build output. Left uncleaned, a `dts` chunk whose content hash
+    // changes leaves its predecessor behind, and the stale one is then COMMITTED and PUBLISHED:
+    // `check:build` compares what changed, never what is left over, so only
+    // tests/integrations.test.ts caught it.
+    clean: true,
     minify: false,
     // Each entry is self-contained: shared chunks would need a fourth published path and
     // buy nothing at this size.
