@@ -72,6 +72,10 @@ adjudicates. So the engine's clean run is a starting point, never a verdict — 
 >    grid to the same bar: a criterion failing on one route is settled for the run and may still
 >    be nobody's verdict on the routes it never fired on, which is what a per-page deliverable is
 >    actually judged on.
+>    **The emitted worklist is authoritative.** It may deliberately contain a criterion whose
+>    run-wide status is already `NC`, because that failure did not decide the criterion on the
+>    other pages. Such an item is not redundant: return one grounded verdict for it (or an
+>    explicit `manual` reason), never leave it blank because the global tally looks decided.
 > 5. **Look the criterion up; never recall it.** `criteria [--standard <pack>] <id>` — or
 >    `ultra11y_criteria` over MCP — returns the criterion's own wording, its **numbered
 >    tests**, and the glossary definitions those tests cite. RGAA 8.3 is not "the page needs a

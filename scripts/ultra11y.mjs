@@ -5473,8 +5473,8 @@ function allIds(doc) {
 }
 function snippet(doc, el, max = 120) {
   const lineStart = doc.lineStarts[el.line - 1] ?? 0;
-  let end = doc.source.indexOf("\n", lineStart);
-  if (end === -1) end = doc.source.length;
+  const nextLineStart = doc.lineStarts[el.line];
+  const end = nextLineStart === void 0 ? doc.source.length : Math.max(lineStart, nextLineStart - 1);
   const from = Math.min(Math.max(el.start, lineStart), end);
   const tagEnd = doc.source.indexOf(">", from);
   const to = Math.min(from + max, Math.max(Math.min(end, from + max), tagEnd === -1 ? end : tagEnd + 1));
@@ -63277,6 +63277,7 @@ var VERDICT_KINDS = `Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict mis
    - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected, and so is a finding with no \`file\` at all. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the criterion's OWN numbered tests, listed in its brief under \xAB tests to rule on \xBB. A WCAG id looks alike, denotes an unrelated test, and is rejected.
    - \`NA\` (not applicable) \u2014 REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
    - \`manual\` (still undecidable) \u2014 REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide it, and no capture in this run carries its subject) or \`undecidable\` (the evidence cannot settle it either way).`;
+var WORKLIST_RULE = `THE WORKLIST IS THE RESIDUAL. Return exactly one verdict for EVERY criterion presented \u2014 never omit an item because the engine already reported a run-wide \`NC\`. The strict page gate deliberately puts such a criterion back on the worklist when page-level cells remain open. It is not surplus and it is not already resolved for this task: inspect the complete evidence and rule it. If the evidence cannot settle it, return \`manual\` with a reason; never leave its verdict blank.`;
 var ABSENCE_RULE = `AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. \xAB No second navigation system \xBB, \xAB no search engine \xBB, \xAB no error message suggests the expected format \xBB \u2014 an absence is OBSERVED somewhere: cite the element and the page you observed it on. And when the criterion's subject exists nowhere in the audited scope, the verdict is \`NA\` with its justification, never \`NC\`.
 
 AND CITE FROM THIS CRITERION'S OWN ANCHORS, NOT THE THING YOU ARE RULING OUT. An absence pulls you toward the element you are arguing ABOUT \u2014 the search form that is not a site search engine, the menu that is not a second navigation system \u2014 and that element is, precisely because it is off-topic, absent from what this criterion was harvested. A citation on one of the criterion's own anchors is vouched for by the harvest; one outside it has its snippet verified LITERALLY, character for character, and a retyping then fails. Cite the region you inspected \u2014 the \`header\`, the \`nav\`, the \`footer\` the brief listed \u2014 and say in the justification what you did not find in it.`;
@@ -63284,7 +63285,7 @@ var CAPTURE_RULE = `THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidenc
 var NEVER_GUESS_RULE = `Never guess. A criterion you cannot decide from real evidence stays \`manual\` with its reason \u2014 that is a valid, honest verdict, and it is worth more than a verdict the gate throws away.`;
 var SCOPE_RULE = `Rule ONLY on the criteria presented. Never introduce another \u2014 a verdict for a criterion nobody asked about is dropped, and under the fold it would otherwise overwrite what the deterministic engine already decided.`;
 var CONFORMITY_RULE = `A \`C\` WILL BE ATTACKED, exactly as an \`NC\` is. Every conformity you record goes into an adversarial worklist where a second reader opens your citations and asks whether they ESTABLISH the criterion or merely show that its subject exists \u2014 a present \`alt\` is not a relevant \`alt\`, a present \`<title>\` is not a title that describes the page. Cite the evidence that answers the criterion's own question, and when the evidence only proves presence, the honest verdict is \`manual\`.`;
-var TAIL = [ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE, CONFORMITY_RULE];
+var TAIL = [WORKLIST_RULE, ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE, CONFORMITY_RULE];
 function verdictRulesMd(startAt) {
   const lines = [`${startAt}. ${VERDICT_KINDS}`];
   TAIL.forEach((rule, i2) => lines.push(`${startAt + 1 + i2}. ${rule}`));
@@ -63572,7 +63573,9 @@ function claudeBin() {
 }
 function batchSchema(items) {
   const schema = structuredClone(VERDICT_TOOL.input_schema);
-  const id = schema.properties.verdicts.items.properties.criteriaId;
+  const verdicts = schema.properties.verdicts;
+  verdicts.description = `Exactly one verdict for each of these ${items.length} worklist criteria. Do not omit criteria already reported non-conforming run-wide: page-level cells may still be open.`;
+  const id = verdicts.items.properties.criteriaId;
   id.enum = items.map((i2) => i2.criteriaId);
   id.description = `The criterion id EXACTLY as given \u2014 the bare id (e.g. "1.2.1"), never the heading or the title beside it.`;
   return schema;

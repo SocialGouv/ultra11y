@@ -10,5 +10,8 @@ export default defineConfig({
     maxWorkers: 1,
     isolate: false,
     fileParallelism: false,
+    // The assertions compare growth ratios, not absolute speed. Give shared CI runners enough
+    // wall time to finish both curves without weakening the complexity guard itself.
+    testTimeout: 30_000,
   },
 });

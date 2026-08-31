@@ -22,6 +22,9 @@ for pass in 1 2 3; do
     --model haiku --max-budget-usd <n> --concurrency 4 --ledger
 done
 
+# The worklist is authoritative. A run-wide NC may be present because other page cells remain
+# open: every emitted item gets one grounded verdict, or an explicit manual reason.
+
 # 4. A second reader puts those claims on trial, and the outcome is APPLIED.
 ultra11y report --in audits/audit-latest.json --standard rgaa --out audits
 ultra11y verify --report audits/<report>.md --in audits/audit-latest.json --out audits --max-verify 0

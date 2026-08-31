@@ -114,10 +114,10 @@ describe("verdictsFromText", () => {
 describe("judgeBatchCli", () => {
   it("sends the rendered worklist on stdin, not in argv", async () => {
     const run = ok(VERDICTS);
-    await judgeBatchCli([item("1.1.1")], "THE WORKLIST", { ...base, spawnImpl: run });
+    await judgeBatchCli([item("1.1.1")], "WORKLIST_PAYLOAD_SENTINEL", { ...base, spawnImpl: run });
     const [argv, input] = run.mock.calls[0] as unknown as [string[], string];
-    expect(input).toBe("THE WORKLIST");
-    expect(argv.join(" ")).not.toContain("THE WORKLIST");
+    expect(input).toBe("WORKLIST_PAYLOAD_SENTINEL");
+    expect(argv.join(" ")).not.toContain("WORKLIST_PAYLOAD_SENTINEL");
   });
 
   it("reports what the invocation actually cost", async () => {
@@ -182,9 +182,15 @@ describe("the criterion id comes back as the id, not as the heading", () => {
   // adjudication that had been paid for vanished with no message at all.
   it("pins the ids in the schema, so the wrong shape cannot come back", () => {
     const schema = batchSchema([item("1.2.1"), item("4.1.2")]) as {
-      properties: { verdicts: { items: { properties: { criteriaId: { enum?: string[] } } } } };
+      properties: {
+        verdicts: {
+          description?: string;
+          items: { properties: { criteriaId: { enum?: string[] } } };
+        };
+      };
     };
     expect(schema.properties.verdicts.items.properties.criteriaId.enum).toEqual(["1.2.1", "4.1.2"]);
+    expect(schema.properties.verdicts.description).toContain("Exactly one verdict for each of these 2 worklist criteria");
   });
 
   // The schema is the defence; this is the one behind it, for a CLI too old to honour

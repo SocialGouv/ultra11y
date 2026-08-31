@@ -56,6 +56,9 @@ jobs:
       - name: Test (with coverage)
         run: pnpm run test:coverage
 
+      - name: Guard performance shape
+        run: pnpm run test:perf
+
       - name: Smoke-run the committed bundle (offline, fixture)
         run: pnpm run demo # audit -> report -> check -> criteria
 

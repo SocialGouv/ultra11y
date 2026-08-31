@@ -63,4 +63,17 @@ describe("parseHtml", () => {
     const img = elementsByTag(doc, "img")[0]!;
     expect(snippet(doc, img)).toContain("<img");
   });
+
+  it("anchors snippets at the target in a minified single-line document", () => {
+    const minified = parseHtml('<main><input id="first"><span>middle</span><input id="target" aria-label="Target"></main>', "minified.html");
+    const target = getById(minified, "target")!;
+    expect(snippet(minified, target)).toMatch(/^<input id="target" aria-label="Target">/);
+    expect(snippet(minified, target)).not.toContain('id="first"');
+  });
+
+  it("uses the indexed next-line boundary for ordinary multiline source", () => {
+    const multiline = parseHtml('<main>\n  <input id="target">\n  <p>next line</p>\n</main>', "multiline.html");
+    const target = getById(multiline, "target")!;
+    expect(snippet(multiline, target)).toBe('<input id="target">');
+  });
 });

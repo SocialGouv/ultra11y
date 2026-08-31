@@ -131,9 +131,21 @@ export function claudeBin(): string[] {
  *  structured output against this schema, so the wrong shape cannot come back at all. */
 export function batchSchema(items: AdjudicationItem[]): Record<string, unknown> {
   const schema = structuredClone(VERDICT_TOOL.input_schema) as {
-    properties: { verdicts: { items: { properties: { criteriaId: Record<string, unknown> } } } };
+    properties: {
+      verdicts: {
+        description?: string;
+        items: { properties: { criteriaId: Record<string, unknown> } };
+      };
+    };
   };
-  const id = schema.properties.verdicts.items.properties.criteriaId;
+  const verdicts = schema.properties.verdicts;
+  // Anthropic structured outputs support array minItems only at 0 or 1, not exact batch
+  // cardinality. Keep completeness in the shared worklist contract and repeat it beside the
+  // array the model is filling. A hard unsupported constraint could turn a useful 7/8 response
+  // into a provider error and lose all seven valid verdicts; validateBatchVerdicts deliberately
+  // preserves those seven and names the missing item for the next pass.
+  verdicts.description = `Exactly one verdict for each of these ${items.length} worklist criteria. Do not omit criteria already reported non-conforming run-wide: page-level cells may still be open.`;
+  const id = verdicts.items.properties.criteriaId;
   id.enum = items.map((i) => i.criteriaId);
   id.description = `The criterion id EXACTLY as given — the bare id (e.g. "1.2.1"), never the heading or the title beside it.`;
   return schema as unknown as Record<string, unknown>;

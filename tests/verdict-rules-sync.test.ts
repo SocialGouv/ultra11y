@@ -28,6 +28,8 @@ const CLAUSES: [name: string, probe: RegExp][] = [
   ["the rendered page may be on disk", /\.ultra11y\/pages\/<id>\//],
   ["needs-rendered-dom is refused over a capture", /`needs-rendered-dom` is refused/],
   ["never guess", /Never guess/],
+  ["every worklist item gets a verdict", /exactly one verdict for EVERY criterion presented/],
+  ["a run-wide NC can be a page-grid residual", /run-wide `NC`[\s\S]{0,240}page-level cells/],
   ["rule only on the criteria presented", /Rule ONLY on the criteria presented/],
   // The conformity half of the gate is only a deterrent if the adjudicator is told about it
   // BEFORE it rules. Nothing used to challenge a `C`, so a criterion cleared on presence
@@ -84,6 +86,6 @@ describe("the numbering is the only thing that varies between surfaces", () => {
         .split("\n")
         .filter((l) => /^\d+\. /.test(l))
         .map((l) => l.split(".")[0]),
-    ).toEqual(["2", "3", "4", "5", "6", "7"]);
+    ).toEqual(["2", "3", "4", "5", "6", "7", "8"]);
   });
 });

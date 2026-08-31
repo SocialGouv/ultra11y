@@ -290,8 +290,12 @@ export function allIds(doc: Doc): { id: string; el: El }[] {
  *  its whole subtree. */
 export function snippet(doc: Doc, el: El, max = 120): string {
   const lineStart = doc.lineStarts[el.line - 1] ?? 0;
-  let end = doc.source.indexOf("\n", lineStart);
-  if (end === -1) end = doc.source.length;
+  // `lineStarts` already indexes the next line. Searching for `\n` from this line's start for
+  // EVERY finding rescanned an entire minified one-line document each time: 8k dangling-label
+  // findings × a 650 kB line turned an otherwise-linear audit quadratic. The next recorded
+  // offset gives the same boundary in O(1); on the last/only line the document end is it.
+  const nextLineStart = doc.lineStarts[el.line];
+  const end = nextLineStart === undefined ? doc.source.length : Math.max(lineStart, nextLineStart - 1);
   const from = Math.min(Math.max(el.start, lineStart), end);
   // A JSX element usually opens on one line and carries its attributes on the next ones, so
   // stopping at the line break showed "<a" and nothing else. Read to the end of the OPENING

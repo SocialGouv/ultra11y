@@ -26,6 +26,13 @@ export const VERDICT_KINDS = `Rule it (the apply gate is FAIL-CLOSED — a verdi
    - \`NA\` (not applicable) — REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
    - \`manual\` (still undecidable) — REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide it, and no capture in this run carries its subject) or \`undecidable\` (the evidence cannot settle it either way).`;
 
+/** The worklist, not the run-level tally, is the source of truth for what remains to rule.
+ *
+ *  Measured on the realworld fixture: the agent left 17 items blank because their decisive
+ *  failures already made the run-wide grid NC. Those items were deliberately present because
+ *  other page cells were still open; the run finished 106/106 globally and failed every page. */
+export const WORKLIST_RULE = `THE WORKLIST IS THE RESIDUAL. Return exactly one verdict for EVERY criterion presented — never omit an item because the engine already reported a run-wide \`NC\`. The strict page gate deliberately puts such a criterion back on the worklist when page-level cells remain open. It is not surplus and it is not already resolved for this task: inspect the complete evidence and rule it. If the evidence cannot settle it, return \`manual\` with a reason; never leave its verdict blank.`;
+
 /** An absence is observed somewhere. Measured: 12.1 and 12.5 lost to this on one run. */
 export const ABSENCE_RULE = `AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. « No second navigation system », « no search engine », « no error message suggests the expected format » — an absence is OBSERVED somewhere: cite the element and the page you observed it on. And when the criterion's subject exists nowhere in the audited scope, the verdict is \`NA\` with its justification, never \`NC\`.
 
@@ -49,7 +56,7 @@ export const SCOPE_RULE = `Rule ONLY on the criteria presented. Never introduce 
 export const CONFORMITY_RULE = `A \`C\` WILL BE ATTACKED, exactly as an \`NC\` is. Every conformity you record goes into an adversarial worklist where a second reader opens your citations and asks whether they ESTABLISH the criterion or merely show that its subject exists — a present \`alt\` is not a relevant \`alt\`, a present \`<title>\` is not a title that describes the page. Cite the evidence that answers the criterion's own question, and when the evidence only proves presence, the honest verdict is \`manual\`.`;
 
 /** The clauses in the order every surface states them, after the verdict kinds. */
-const TAIL = [ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE, CONFORMITY_RULE];
+const TAIL = [WORKLIST_RULE, ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE, CONFORMITY_RULE];
 
 /** Render the rules as a numbered Markdown list starting at `startAt`.
  *
