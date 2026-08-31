@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.40.2](https://github.com/maxgfr/ultra11y/compare/v5.40.1...v5.40.2) (2026-08-31)
+
+
+### Bug Fixes
+
+* **derive:** keep the measure tier alive for packs that declare no automation contract ([f220683](https://github.com/maxgfr/ultra11y/commit/f220683159cc3033075d221abcfd8f45561adb5d))
+* **judge:** halve a batch the dollar ceiling aborted instead of losing it whole ([e4ce8b5](https://github.com/maxgfr/ultra11y/commit/e4ce8b53757a2e10eecf245dd6916f0b8f832859))
+
 ## [5.40.1](https://github.com/maxgfr/ultra11y/compare/v5.40.0...v5.40.1) (2026-08-31)
 
 
