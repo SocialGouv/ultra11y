@@ -63611,6 +63611,41 @@ function evidenceFingerprint(evidence) {
   return `sha256:${createHash6("sha256").update(`${keys.length}
 ${keys.join("\n")}`).digest("hex").slice(0, 32)}`;
 }
+function evidenceAnchorsOf(evidence) {
+  const out2 = /* @__PURE__ */ new Set();
+  for (const e of evidence) out2.add(anchorHash(e));
+  return [...out2].sort().join(",");
+}
+var anchorHash = (e) => createHash6("sha256").update(anchorKey2(e)).digest("hex").slice(0, 16);
+function verdictStillHolds(entry, today2, opts) {
+  const stale = (why) => ({ holds: false, why });
+  if (evidenceFingerprint(today2) === entry.evidenceFingerprint) return { holds: true };
+  const was = entry.evidenceCount;
+  if (!entry.evidenceAnchors) {
+    return stale(
+      `Ledger verdict is STALE \u2014 the evidence changed since it was recorded on ${entry.date} (${was} item(s) then, ${today2.length} now), and the entry predates anchor recording, so what changed cannot be established. Re-adjudicate this criterion.`
+    );
+  }
+  if (!opts.harvestComplete) {
+    return stale(
+      `Ledger verdict is STALE \u2014 this run's harvest is INCOMPLETE (page captures the audit says it read are missing from disk), so a smaller evidence set says nothing about the code. Re-run with the captures present, then re-adjudicate if it still differs.`
+    );
+  }
+  if (entry.verdict === "NC") return { holds: true };
+  if (today2.length === 0) {
+    return stale(
+      `Ledger verdict is STALE \u2014 the harvest for this criterion is now EMPTY where it held ${was} item(s) on ${entry.date}. Nothing was examined, which is not the same claim as nothing being wrong.`
+    );
+  }
+  const recorded = new Set(entry.evidenceAnchors.split(","));
+  const added = evidenceAnchorsOf(today2).split(",").filter((h2) => h2 && !recorded.has(h2));
+  if (added.length > 0) {
+    return stale(
+      `Ledger verdict is STALE \u2014 ${added.length} piece(s) of evidence are NEW since the verdict was recorded on ${entry.date} (${was} item(s) then, ${today2.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`
+    );
+  }
+  return { holds: true };
+}
 function reanchor(stored, today2, currentFiles) {
   if (!stored?.length) return stored;
   const byKey2 = new Map(today2.map((e) => [anchorKey2(e), e]));
@@ -63670,6 +63705,7 @@ function entriesFrom(adj, accepted, date) {
       ...it.findings?.length ? { findings: it.findings } : {},
       ...it.recommendations?.length ? { recommendations: it.recommendations } : {},
       evidenceFingerprint: evidenceFingerprint(it.evidence),
+      evidenceAnchors: evidenceAnchorsOf(it.evidence),
       evidenceCount: it.evidence.length,
       date,
       decidedBy: "agent"
@@ -63731,6 +63767,7 @@ function replayLedger(audit2, ledger, opts = {}) {
   const obsolete = [];
   const missing = [];
   const residualReasons = {};
+  const harvestComplete = unreadableCaptures(audit2, opts.cwd ?? ".").length === 0;
   const currentFiles = /* @__PURE__ */ new Map();
   for (const input of audit2.scope.inputs) {
     const canonical = canonicalFile2(input);
@@ -63744,10 +63781,10 @@ function replayLedger(audit2, ledger, opts = {}) {
       residualReasons[it.criteriaId] = "No verdict in the ledger \u2014 this criterion has never been adjudicated. Run an adjudication pass to record one.";
       continue;
     }
-    const now = evidenceFingerprint(it.evidence);
-    if (now !== e.evidenceFingerprint) {
+    const held = verdictStillHolds(e, it.evidence, { harvestComplete });
+    if (!held.holds) {
       stale.push(it.criteriaId);
-      residualReasons[it.criteriaId] = `Ledger verdict is STALE \u2014 the evidence changed since it was recorded on ${e.date} (${e.evidenceCount} item(s) then, ${it.evidence.length} now). Re-adjudicate this criterion.`;
+      residualReasons[it.criteriaId] = held.why;
       continue;
     }
     fresh.push(it.criteriaId);

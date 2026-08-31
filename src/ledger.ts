@@ -57,6 +57,28 @@ export interface LedgerEntry {
   recommendations?: AgentFinding[];
   /** Fingerprint of the evidence this verdict was ruled against (see module header). */
   evidenceFingerprint: string;
+  /** THE ANCHOR SET behind that fingerprint — one short hash per piece of evidence, sorted,
+   *  comma-joined.
+   *
+   *  A fingerprint answers one question — « is this the same evidence? » — and on a living
+   *  application the answer is always no. It cannot answer the question that decides whether a
+   *  verdict still covers today's code: « is anything here NEW? ». That needs the set, not its
+   *  digest.
+   *
+   *  HASHES, not the anchors themselves, because this file is committed and reviewed: one
+   *  criterion in egapro's grid carries 634 anchors, and spelling them out would bury its
+   *  justification under half a megabyte of snippets. Sixteen hex characters of SHA-256 each —
+   *  a collision here keeps a verdict that should have expired, which is why they are not
+   *  shortened further.
+   *
+   *  ONE STRING, not an array, for the same reason the entries are id-sorted: `JSON.stringify`
+   *  puts each array item on its own line, so the real ledger would gain some nine thousand
+   *  lines and every re-adjudication would produce a diff nobody reads. A ledger nobody reads
+   *  is a ledger that stops being reviewed, which is the whole reason it is committed.
+   *
+   *  Absent on an entry recorded before this field existed. Absent means « no set to compare »,
+   *  which keeps the old strict rule — never « nothing was there ». */
+  evidenceAnchors?: string;
   /** How many evidence items were harvested — carried for the reader, never trusted. */
   evidenceCount: number;
   /** ISO date the verdict was recorded. */
@@ -105,6 +127,78 @@ export function evidenceFingerprint(evidence: Evidence[]): string {
     .update(`${keys.length}\n${keys.join("\n")}`)
     .digest("hex")
     .slice(0, 32)}`;
+}
+
+/** One short hash per anchor — the same identity `evidenceFingerprint` digests, kept as a SET
+ *  so a replay can ask which pieces are new rather than only whether anything moved. Sorted and
+ *  de-duplicated so the committed file has a stable diff. */
+export function evidenceAnchorsOf(evidence: Evidence[]): string {
+  const out = new Set<string>();
+  for (const e of evidence) out.add(anchorHash(e));
+  return [...out].sort().join(",");
+}
+
+const anchorHash = (e: { file: string; selector?: string; snippet?: string }): string => createHash("sha256").update(anchorKey(e)).digest("hex").slice(0, 16);
+
+/** Does a stored verdict still cover today's harvest?
+ *
+ *  THE RULE, and it is a deliberate weakening of the one it replaces. A `C` says « everything I
+ *  saw is conforming », so evidence that is a SUBSET of what was whitened is still covered —
+ *  whitening a set covers its parts. What must expire it is evidence that is NEW: code the
+ *  adjudicator never read. An `NC` is not expired by new code at all; more code cannot un-fail
+ *  a criterion, and whether its cited constat survives is decided downstream by the citation
+ *  gate and the re-grounding, which are unchanged.
+ *
+ *  Before this, `evidenceFingerprint` had to match exactly. On a living application that meant
+ *  the ledger amortised nothing: measured on egapro, replaying the committed 48-entry ledger
+ *  against the run of 31/08 expired 27 entries — every one carrying twenty anchors or more.
+ *
+ *  TWO GUARDS, and both exist because the failure they prevent is a false « conforme » rather
+ *  than a wasted dollar:
+ *
+ *  • `harvestComplete`. An incomplete harvest is not a shrunken codebase. A checkout whose page
+ *    captures are missing harvests strictly less of everything, and reading that as « the code
+ *    shrank » would replay every page verdict as though those pages had been audited this run.
+ *    `unreadableCaptures` already names exactly that trap; this is where it becomes a refusal.
+ *  • An EMPTY harvest, which is not a subset worth honouring even though zero is a subset of
+ *    everything. This guard was written, removed on the argument that the citation gate would
+ *    catch it, and put back when the test proved otherwise: replaying a `C` onto a criterion
+ *    whose evidence had gone to nothing published it as an agent conformity, citation gate and
+ *    all. Evidence that has gone to nothing is a criterion nobody looked at — not a criterion
+ *    with nothing left to fail — and the two must not be published as the same claim. */
+export function verdictStillHolds(entry: LedgerEntry, today: Evidence[], opts: { harvestComplete: boolean }): { holds: true } | { holds: false; why: string } {
+  const stale = (why: string) => ({ holds: false as const, why });
+  // The fast path, and the only path a legacy entry has: byte-identical evidence.
+  if (evidenceFingerprint(today) === entry.evidenceFingerprint) return { holds: true };
+  const was = entry.evidenceCount;
+  if (!entry.evidenceAnchors) {
+    return stale(
+      `Ledger verdict is STALE — the evidence changed since it was recorded on ${entry.date} (${was} item(s) then, ${today.length} now), and the entry predates anchor recording, so what changed cannot be established. Re-adjudicate this criterion.`,
+    );
+  }
+  if (!opts.harvestComplete) {
+    return stale(
+      `Ledger verdict is STALE — this run's harvest is INCOMPLETE (page captures the audit says it read are missing from disk), so a smaller evidence set says nothing about the code. Re-run with the captures present, then re-adjudicate if it still differs.`,
+    );
+  }
+  // An NC survives new code by construction. Whether its constat is still there is the
+  // citation gate's question, and it is asked on every replay whatever this returns.
+  if (entry.verdict === "NC") return { holds: true };
+  if (today.length === 0) {
+    return stale(
+      `Ledger verdict is STALE — the harvest for this criterion is now EMPTY where it held ${was} item(s) on ${entry.date}. Nothing was examined, which is not the same claim as nothing being wrong.`,
+    );
+  }
+  const recorded = new Set(entry.evidenceAnchors.split(","));
+  const added = evidenceAnchorsOf(today)
+    .split(",")
+    .filter((h) => h && !recorded.has(h));
+  if (added.length > 0) {
+    return stale(
+      `Ledger verdict is STALE — ${added.length} piece(s) of evidence are NEW since the verdict was recorded on ${entry.date} (${was} item(s) then, ${today.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`,
+    );
+  }
+  return { holds: true };
 }
 
 /** Move a stored anchor onto TODAY's line for the same piece of evidence.
@@ -219,6 +313,7 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
       ...(it.findings?.length ? { findings: it.findings } : {}),
       ...(it.recommendations?.length ? { recommendations: it.recommendations } : {}),
       evidenceFingerprint: evidenceFingerprint(it.evidence),
+      evidenceAnchors: evidenceAnchorsOf(it.evidence),
       evidenceCount: it.evidence.length,
       date,
       decidedBy: "agent",
@@ -327,6 +422,9 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
   const obsolete: string[] = [];
   const missing: string[] = [];
   const residualReasons: Record<string, string> = {};
+  // Whether this run read everything it says it read. The subset rule below is only sound over
+  // a complete harvest — see `verdictStillHolds`.
+  const harvestComplete = unreadableCaptures(audit, opts.cwd ?? ".").length === 0;
   const currentFiles = new Map<string, string>();
   for (const input of audit.scope.inputs) {
     const canonical = canonicalFile(input);
@@ -342,11 +440,10 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
       residualReasons[it.criteriaId] = "No verdict in the ledger — this criterion has never been adjudicated. Run an adjudication pass to record one.";
       continue;
     }
-    const now = evidenceFingerprint(it.evidence);
-    if (now !== e.evidenceFingerprint) {
+    const held = verdictStillHolds(e, it.evidence, { harvestComplete });
+    if (!held.holds) {
       stale.push(it.criteriaId);
-      residualReasons[it.criteriaId] =
-        `Ledger verdict is STALE — the evidence changed since it was recorded on ${e.date} (${e.evidenceCount} item(s) then, ${it.evidence.length} now). Re-adjudicate this criterion.`;
+      residualReasons[it.criteriaId] = held.why;
       continue;
     }
     fresh.push(it.criteriaId);

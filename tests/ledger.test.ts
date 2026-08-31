@@ -241,6 +241,55 @@ describe("replayLedger — parity with the adjudicated audit, without a model", 
     expect(applied.rejectedCriteria).not.toContain("2.4.4");
   });
 
+  // THE BUDGET LEVER, end to end. The exact fingerprint made the ledger amortise nothing on a
+  // living application: measured on egapro, replaying the committed 48-entry ledger against the
+  // run of 31/08 expired 27 of them. A verdict that expires every run is a verdict paid for
+  // every run.
+  it("KEEPS a verdict when part of the code it whitened was DELETED — a conformity covers its parts", () => {
+    // TWO links, so removing one leaves the criteria that read links with a strictly SMALLER
+    // evidence set rather than an empty one. That is the case the relaxation is for: nothing
+    // added, nothing rewritten, less to look at than the adjudicator already cleared.
+    const TWO = PAGE_HTML.replace('<a href="/pricing">Read more</a>', '<a href="/pricing">Read more</a>\n<a href="/contact">Talk to sales</a>');
+    const f = page("shrunk.html", TWO);
+    const { ledger } = recordLedger(f);
+    expect(replayLedger(auditOf(f), ledger, { cwd: process.cwd() }).stale, "nothing changed yet").toEqual([]);
+
+    writeFileSync(f, TWO.replace('\n<a href="/contact">Talk to sales</a>', ""));
+    const after = auditOf(f);
+    const rp = replayLedger(after, ledger, { cwd: process.cwd() });
+
+    expect(rp.stale, "a smaller evidence set is still covered by the verdict that whitened the larger one").toEqual([]);
+    expect(rp.fresh.length).toBeGreaterThan(0);
+    // …and the replayed verdicts still go through the SAME fold, with the same refusals.
+    const r = applyAdjudication(after, rp.adj, { cwd: process.cwd(), residualReasons: rp.residualReasons });
+    expect(r.audit.criteria.filter((c) => c.decidedBy === "agent").length).toBeGreaterThan(0);
+  });
+
+  it("REOPENS one whose evidence went to nothing, rather than replaying a verdict over an empty harvest", () => {
+    // The other half, and the one that cost this rule an iteration: the fold's citation gate
+    // does NOT catch this on its own — a `C` replayed onto a criterion with no anchors left was
+    // published as an agent conformity. « Nobody looked » is not « nothing left to fail ».
+    const f = page("emptied.html");
+    const { ledger } = recordLedger(f);
+    writeFileSync(f, PAGE_HTML.replace('<a href="/pricing">Read more</a>\n', ""));
+    const after = auditOf(f);
+    const rp = replayLedger(after, ledger, { cwd: process.cwd() });
+
+    expect(rp.stale, "the criteria whose only subject was the deleted link must reopen").toContain("2.4.5");
+    expect(rp.residualReasons["2.4.5"]).toMatch(/EMPTY/);
+    const r = applyAdjudication(after, rp.adj, { cwd: process.cwd(), residualReasons: rp.residualReasons });
+    expect(r.audit.criteria.find((c) => c.id === "2.4.5")!.decidedBy).not.toBe("agent");
+  });
+
+  it("still expires it when something was ADDED", () => {
+    const f = page("grown.html");
+    const { ledger } = recordLedger(f);
+    writeFileSync(f, PAGE_HTML.replace("</main>", '<img src="b.png" alt="A second, entirely new picture">\n</main>'));
+    const rp = replayLedger(auditOf(f), ledger, { cwd: process.cwd() });
+    expect(rp.stale, "code the adjudicator never read must reopen the criterion it belongs to").toContain("1.1.1");
+    expect(rp.residualReasons["1.1.1"]).toMatch(/NEW since the verdict was recorded/);
+  });
+
   it("drops a verdict as stale when the evidence it read changed, and says so", () => {
     const f = page("stale.html");
     const { ledger } = recordLedger(f);
@@ -253,7 +302,12 @@ describe("replayLedger — parity with the adjudicated audit, without a model", 
     expect(rp.stale).toContain("1.1.1");
     expect(rp.fresh).not.toContain("1.1.1");
     expect(rp.residualReasons["1.1.1"]).toMatch(/STALE/);
-    expect(rp.residualReasons["1.1.1"]).toMatch(/evidence changed/i);
+    // An EDITED alt text is a removal and an addition at once — the old anchor is gone and a
+    // new one is there — so it expires the verdict under the subset rule exactly as it did
+    // under the exact fingerprint. The reason now names WHAT changed rather than only that
+    // something did, which is the difference between « re-adjudicate » and « re-adjudicate,
+    // and here is the piece nobody has read ».
+    expect(rp.residualReasons["1.1.1"]).toMatch(/NEW since the verdict was recorded/i);
 
     // …and the criterion is back to « to assess », carrying that reason rather than a blank.
     const r = applyAdjudication(after, rp.adj, { cwd: process.cwd(), residualReasons: rp.residualReasons });
