@@ -331,12 +331,16 @@ tests**:
   41 receive candidate evidence, with overlap. One additional criterion receives only an
   advisory signal. A candidate is forwarded to adjudication and never changes a verdict by
   itself.
-- Only **8.3, 8.5 and 10.1** may earn `C` from a complete silent measurement. For the other
+- Only **8.3 and 8.5** may earn `C` from a complete silent measurement. For the other
   mechanically detectable tests, silence can mean “no subject found” or “an alternative or
-  exception still needs judging”, so it cannot prove conformity.
+  exception still needs judging”, so it cannot prove conformity. 10.1 was on that list and
+  left it: its rule tolerates `<u>`, tolerates `width`/`height` on nine tags where the
+  glossary names five, and covers “presentation built out of spaces” with two heuristics —
+  every one of them a deliberate under-report, which is the safe direction for a finding and
+  the wrong one for a conformity.
 - The remaining **228 `judgment` tests across 92 criteria** all enter the AI worklist,
   including an apparently absent subject whose `NA` still needs confirmation. Overall,
-  **103 of 106 criteria require adjudication to earn `C`**.
+  **104 of 106 criteria require adjudication to earn `C`**.
 
 The number can grow, but the useful target is **more observed, exact failures**, not a larger
 marketing count. The best next candidates are complete rendered probes for zoom/reflow and

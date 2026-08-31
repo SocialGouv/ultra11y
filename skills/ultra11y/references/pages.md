@@ -318,8 +318,8 @@ criterion means one definite failure fired *somewhere* — not that the engine c
 criterion. On a page where the failure did not fire, the engine knows "no definite failure
 here", which is not "conforming": alt relevance, link purpose and reading order are still
 nobody's verdict. So only criteria whose test-level matrix opts into `completeBySilence` earn
-`C` from a fully measured silent run — under RGAA that is **8.3, 8.5 and 10.1, and
-those three only**. A rule that covers one sub-test, one precondition or one allowed mechanism
+`C` from a fully measured silent run — under RGAA that is **8.3 and 8.5, and
+those two only**. A rule that covers one sub-test, one precondition or one allowed mechanism
 cannot close the rest of the criterion. Everything else stays « à évaluer » until `scan`, the
 snapshot tier or an adjudication decides it. Before this rule a page with no images scored 100%
 on « chaque image a-t-elle une alternative pertinente ? », a rate computed over criteria nobody

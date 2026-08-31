@@ -159,10 +159,10 @@ describe("the documented RGAA figures match the pack", () => {
 
   it("distinguishes explicit judgment tests from criteria that need adjudication for C", () => {
     expect(judgmentTestCriteria).toBe(92);
-    expect(adjudicationCount).toBe(103);
+    expect(adjudicationCount).toBe(104);
     expect(read("skills/ultra11y/references/judgment.md")).toMatch(/92 (?:of RGAA's|criteria)/);
     for (const doc of ["skills/ultra11y/SKILL.md", "skills/ultra11y/references/ci.md", "skills/ultra11y/references/mcp.md"]) {
-      expect(read(doc), doc).toMatch(/103 of 106/);
+      expect(read(doc), doc).toMatch(/104 of 106/);
     }
   });
 
@@ -170,11 +170,11 @@ describe("the documented RGAA figures match the pack", () => {
     const canC = allCriteria(loadPack("rgaa"))
       .filter((c) => c.automation?.completeBySilence === true)
       .map((c) => c.id);
-    expect(canC.sort()).toEqual(["10.1", "8.3", "8.5"]);
+    expect(canC.sort()).toEqual(["8.3", "8.5"]);
 
     // …and the doc says so, rather than the five it used to list.
     const pages = read("skills/ultra11y/references/pages.md");
-    expect(pages).toMatch(/\*\*8\.3, 8\.5 and 10\.1, and\s*\n?those three only\*\*/);
+    expect(pages).toMatch(/\*\*8\.3 and 8\.5, and\s*\n?those two only\*\*/);
     expect(pages).toMatch(/completeBySilence/);
   });
 });

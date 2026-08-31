@@ -43513,8 +43513,7 @@ var rgaa_default = {
             effect: "decisive-nc",
             rationale: "The observed failure exhausts the cited RGAA test."
           }
-        ],
-        completeBySilence: true
+        ]
       }
     },
     {

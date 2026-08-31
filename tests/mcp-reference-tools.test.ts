@@ -144,7 +144,7 @@ describe("ultra11y_method", () => {
     const r = await j("ultra11y_method", { standard: "rgaa", tier: "judgment", detail: "full" });
     expect(r.buckets).toHaveLength(1);
     const ids = r.buckets[0].criteria.map((c: { id: string }) => c.id);
-    expect(ids.length).toBe(103);
+    expect(ids.length).toBe(104); // 10.1 joined them when it left `completeBySilence`
     expect(ids).toContain("11.2");
     expect(r.buckets[0].criteria[0].why).toBeTruthy();
     expect(r.buckets[0].criteria[0].title).toBeTruthy();

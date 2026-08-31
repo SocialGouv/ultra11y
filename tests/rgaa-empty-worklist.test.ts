@@ -154,10 +154,20 @@ describe("RGAA 10.1 — presentational markup, which is a closed list and theref
     expect(rgaa(auditPage('<center><font color="red">t</font></center>'), "10.1").status).toBe("NC");
   });
 
-  it("is CONFORMING — measured — on a captured page with none of it", () => {
+  it("STAYS OPEN on a captured page with none of it — the rule is narrower than the criterion", () => {
+    // 10.1 was on the `completeBySilence` allowlist and left it. Every one of the three
+    // narrowings above is documented on its own line in this very describe: `<u>` deliberately
+    // untouched, `width`/`height` tolerated on nine tags where the glossary names five,
+    // « presentation built out of spaces » covered by two heuristics chosen for being
+    // distinctive rather than exhaustive.
+    //
+    // Each is the right call for a FINDING — under-reporting never manufactures a
+    // non-conformity — and the wrong one for a CONFORMITY. « This rule found nothing » and
+    // « this criterion is satisfied » are not the same claim when the rule was written to look
+    // at less than the criterion asks about. The correction costs money: 10.1 now reaches an
+    // adjudicator on every run.
     const c = rgaa(auditPage("<p>Du texte ordinaire.</p>"), "10.1");
-    expect(c.status).toBe("C");
-    expect(c.decidedBy).toBe("scan");
+    expect(c.status).toBe("manual");
   });
 
   it("no longer inherits `readingOrder`, which answers a different question", () => {

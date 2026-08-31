@@ -66,7 +66,7 @@ The 106 criterion rows below are the one-by-one routing review. â€œAI + signalsâ
 | 9.2 | 0 / 0 / 1 | 0 / 3 / 0 | no | AI + signals |
 | 9.3 | 3 / 0 / 0 | 5 / 0 / 0 | no | deterministic NC + AI residual |
 | 9.4 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
-| 10.1 | 3 / 0 / 0 | 3 / 0 / 0 | yes | deterministic |
+| 10.1 | 3 / 0 / 0 | 3 / 0 / 0 | no | deterministic NC + AI residual |
 | 10.2 | 0 / 0 / 1 | 0 / 1 / 0 | no | AI + signals |
 | 10.3 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
 | 10.4 | 0 / 0 / 2 | 0 / 5 / 0 | no | AI + signals |

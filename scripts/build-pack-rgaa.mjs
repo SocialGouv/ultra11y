@@ -395,7 +395,31 @@ const CANDIDATE_RULE_TESTS = {
   "13.8|axe:marquee": ["1"],
 };
 
-const COMPLETE_BY_SILENCE = new Set(["8.3", "8.5", "10.1"]);
+// WHICH CRITERIA MAY BE CONCLUDED FROM A CLEAN ENGINE PASS — the shortest list in this file,
+// and the one that decides whether silence is evidence.
+//
+// 10.1 LEFT IT, and the correction goes the expensive way round: this criterion now reaches an
+// adjudicator on every run it did not reach before. It is there because the rule behind it
+// (src/rules/presentation.ts) is deliberately NARROWER than the criterion it serves, and each
+// narrowing was the right call on its own:
+//
+//   • `<u>` is excluded wholesale, because the RGAA forbids it only outside HTML5 and flagging
+//     it would manufacture a non-conformity on conforming markup;
+//   • `width`/`height` are tolerated on nine tags where the glossary names five, because
+//     `<video width>` and `<iframe width>` are conforming HTML5 and red-flagging them would
+//     fail ordinary accessible markup;
+//   • test 10.1.3 — presentation built out of spaces — is TWO heuristics (a word spelled one
+//     letter at a time, three or more non-breaking spaces), chosen because they are
+//     distinctive enough not to guess.
+//
+// Every one of those is a deliberate under-report, which is the safe direction for a FINDING
+// and the wrong one for a CONFORMITY. « This rule found nothing » and « this criterion is
+// satisfied » are not the same claim when the rule was written to look at less than the
+// criterion asks about.
+//
+// Nothing was added to this list to compensate. The budget lever is the verdict ledger
+// (src/ledger.ts), not a wider definition of what silence proves.
+const COMPLETE_BY_SILENCE = new Set(["8.3", "8.5"]);
 const renderedTier = (ruleId) =>
   ruleId.startsWith("rendered-") || ruleId.startsWith("dyn-") || ruleId.startsWith("axe:") ? "rendered" : "static";
 const mergeTestTier = (current, next) => (current === "static" || next === "static" ? "static" : next);

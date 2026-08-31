@@ -42,7 +42,7 @@ describe("RGAA test-level automation contract", () => {
     expect(readme).toContain("21 distinct criteria that can produce a deterministic `NC`");
     expect(readme).toContain("49 criteria receive a normative engine signal");
     expect(readme).toContain("228 `judgment` tests across 92 criteria");
-    expect(readme).toContain("103 of 106 criteria require adjudication to earn `C`");
+    expect(readme).toContain("104 of 106 criteria require adjudication to earn `C`");
   });
 
   it("allows C by silence only on the explicit, fully covered allowlist", () => {
@@ -51,19 +51,24 @@ describe("RGAA test-level automation contract", () => {
         .filter((criterion) => criterion.automation?.completeBySilence)
         .map((criterion) => criterion.id)
         .sort(),
-    ).toEqual(["10.1", "8.3", "8.5"]);
+    ).toEqual(["8.3", "8.5"]);
     expect(
       packAutomatability(
         [],
         pack.criteria.find((criterion) => criterion.id === "8.5"),
       ),
     ).toBe("static");
+    // 10.1 LEFT THE ALLOWLIST, so its clean pass is evidence and not a verdict. The rule
+    // behind it tolerates `<u>`, tolerates `width`/`height` on nine tags where the glossary
+    // names five, and covers « presentation built out of spaces » with two heuristics — each
+    // a deliberate under-report, which is the safe direction for a finding and the wrong one
+    // for a conformity.
     expect(
       packAutomatability(
         [],
         pack.criteria.find((criterion) => criterion.id === "10.1"),
       ),
-    ).toBe("static");
+    ).toBe("judgment");
     expect(
       packAutomatability(
         [],

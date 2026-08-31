@@ -200,7 +200,7 @@ nothing.
 ```
 
 Steps 2 and 5 are the ones that make it a rule engine rather than a linter. Skipping step 2
-means auditing without knowing that 92 criteria carry judgment tests and **103 of 106** still need adjudication to earn C;
+means auditing without knowing that 92 criteria carry judgment tests and **104 of 106** still need adjudication to earn C;
 skipping the lookups in step 5 means ruling on criteria from memory.
 
 **A criterion nobody tested is untested, never conformant.** Every tool description repeats
