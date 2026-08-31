@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.41.1](https://github.com/maxgfr/ultra11y/compare/v5.41.0...v5.41.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* **ci:** ne plus faire rougir le lane payant sur un « je ne sais pas » du modèle ([ec49d8d](https://github.com/maxgfr/ultra11y/commit/ec49d8d4c31cc7415a46c9f8b1e30cc7ffe4d8dd))
+
 # [5.41.0](https://github.com/maxgfr/ultra11y/compare/v5.40.2...v5.41.0) (2026-08-31)
 
 

@@ -3,7 +3,7 @@ name: review-a11y
 description: "Use to REVIEW changed frontend code for accessibility: staged files, a working diff, branch, or PR; prompts such as 'review a11y', 'is this accessible?', or 'anything to fix before merge?'; and hook or CI findings on a change. Run the bundled install-free engine with cross-file JSX/TSX analysis, then adjudicate candidates and return a severity-ranked WCAG 2.2 AA review with file:line fixes, residual rendering risks, and a verdict. Use `ultra11y` instead for whole-repo audits, dated conformance reports, country standards, PRD backlogs, or authoring accessible markup."
 license: MIT
 metadata:
-  version: 5.41.0
+  version: 5.41.1
 ---
 
 # review-a11y — accessibility review of changed code
