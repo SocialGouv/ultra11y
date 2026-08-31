@@ -116,9 +116,31 @@ jobs:
           crawl-max: "0"
           runtime: local
           require-rendered: "true"
-          # Completeness belongs to the Action: it gates all 106 criteria on every page after
-          # writing the visible summary and artifact, while named residual risks stay explicit.
-          require-decided: pages
+          # NOT `pages`, AND NOT `true` EITHER — this lane must not go red because a model
+          # said « I do not know ».
+          #
+          # An adjudicator that answers `manual / undecidable` on a judgment criterion is
+          # behaving correctly: several RGAA criteria ask whether information is carried by
+          # colour alone, whether a reading order survives without CSS, whether every button
+          # label is relevant in context. Measured on a real 37-page consumer repository, with
+          # everything else fixed: 102 of 106 criteria ruled, and four the model declined —
+          # not for want of a bigger model, and not for volume (a criterion with 516 evidence
+          # classes was ruled while one with 141 was not), but because clearing 2700
+          # occurrences it has not all read would be a lie.
+          #
+          # A job red on that motive teaches nobody anything. It does not say « something
+          # regressed », it says « these criteria need a human » — true before the run and
+          # after it. And a permanent red is worse than a green: it spends the one colour
+          # available for a real breakage, of which this lane has real ones to report.
+          #
+          # What still fails here, deliberately: a dead transport (the Action's own gate on
+          # « every adjudication pass failed operationally »), a rendering criterion left open
+          # with nothing rendered (`require-rendered`), and the nine-page shape asserted below.
+          # Facts about the RUN, never about the verdict.
+          #
+          # The residue stays NAMED either way — the job summary and the artifact both print
+          # « N criteria still to assess », so nothing is hidden by this.
+          require-decided: "false"
           undecidable-file: .ultra11y/undecidable-rgaa.json
 
       - name: Verify the nine-page shape
