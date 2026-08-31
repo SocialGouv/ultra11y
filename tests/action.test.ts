@@ -1471,7 +1471,14 @@ describe("the keyed adjudication workflow is singular, exhaustive and bounded", 
     expect(agent?.with?.crawl).toBe("http://127.0.0.1:8932/");
     expect(agent?.with?.["crawl-max"]).toBe("0");
     expect(agent?.with?.["require-rendered"]).toBe("true");
-    expect(agent?.with?.["require-decided"]).toBe("pages");
+    // NOT `pages`, and the value is pinned because it is a POLICY, not an oversight: this lane
+    // must not go red because the model answered « I do not know ». Several RGAA criteria ask
+    // whether information is carried by colour alone, or whether every button label is relevant
+    // in context — measured on a real 37-page repository, four of them were declined after
+    // everything else was ruled, and declining was the correct answer. What still fails here is
+    // named in the workflow: a dead transport, an unrendered rendering criterion, the 9 × 106
+    // shape below.
+    expect(agent?.with?.["require-decided"]).toBe("false");
     expect(agent?.with?.["undecidable-file"]).toBe(".ultra11y/undecidable-rgaa.json");
     expect(agent?.with?.["pages-report"]).toBe("compact");
     expect(agent?.with?.report).toBe("false");
@@ -1497,7 +1504,10 @@ describe("the keyed adjudication workflow is singular, exhaustive and bounded", 
     expect(after).toBeGreaterThan(adjudication);
 
     const agent = steps[adjudication];
-    expect(agent?.with?.["require-decided"]).toBe("pages");
+    // The completeness gate is off (see above) — the shape assertion below is what this lane
+    // holds instead, and it is deterministic: nine pages, 106 criteria each, whatever any model
+    // decided about them.
+    expect(agent?.with?.["require-decided"]).toBe("false");
     expect(agent?.with?.["require-rendered"]).toBe("true");
     expect(agent?.with?.["undecidable-file"]).toBe(".ultra11y/undecidable-rgaa.json");
     const completeness = ACTION.runs.steps.find((step) => step.name === "Completeness gate");
