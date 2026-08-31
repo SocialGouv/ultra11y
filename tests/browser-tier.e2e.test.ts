@@ -547,6 +547,44 @@ describe("focus visibility on a pseudo-element ring", () => {
     expect(hit?.changed).toBe(true);
   }, 60_000);
 
+  // THE RISK THE PSEUDO-ELEMENT READ INTRODUCES, TESTED RATHER THAN ASSUMED.
+  //
+  // Reading `::before` and `::after` on EVERY focusable — not just label proxies — means an
+  // animation on a generated box can make the two reads differ for a reason that has nothing
+  // to do with focus. The compared properties are outline, box-shadow, border, background,
+  // colour and text-decoration, and a pulsing background hits one of them squarely.
+  //
+  // That would be a FALSE PASS: a control with no focus indicator reported as having one,
+  // which is strictly worse than the false positive this change removed — a missed
+  // non-conformity is invisible, a false one is merely noisy.
+  it("does not read an animated pseudo-element as a focus indicator", async () => {
+    if (!browserAvailable) return;
+    const { focusSetupExpr, FOCUS_CHECK_PROBE } = await import("../src/probes.js");
+    const context = await browser!.newContext();
+    const page = await context.newPage();
+    try {
+      await page.setContent(`<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Anim</title>
+<style>
+  button { outline: none; position: relative; }
+  button:focus { outline: none; }
+  button::before { content: ""; position: absolute; inset: 0;
+    animation: pulse 0.3s linear infinite; }
+  @keyframes pulse { from { background-color: rgb(255,255,255); } to { background-color: rgb(0,0,0); } }
+</style></head><body><main><h1>Anim</h1><button>Ok</button></main></body></html>`);
+      expect(await page.evaluate(focusSetupExpr())).toBe(1);
+      // Let the animation move between the at-rest snapshot and the post-Tab read.
+      await page.waitForTimeout(200);
+      await page.keyboard.press("Tab");
+      const hit = (await page.evaluate(FOCUS_CHECK_PROBE)) as { changed: boolean } | null;
+      expect(hit).not.toBeNull();
+      expect(hit?.changed).toBe(false);
+    } finally {
+      await page.close();
+      await context.close();
+    }
+  }, 60_000);
+
   // The other half of the contract. A "fix" that made the comparison always report `changed`
   // would pass the test above and silence 10.7 everywhere — worse than the false positive it
   // replaced, and invisible without this.

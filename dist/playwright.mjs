@@ -236,7 +236,22 @@ function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables
   const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
   return `(() => { ${PRELUDE}
   const sel = 'a[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
-  const __style = (e, pseudo) => { const s = getComputedStyle(e, pseudo); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
+  // A BOX THAT IS ANIMATING CANNOT BE COMPARED ACROSS TIME, so it contributes a constant.
+  //
+  // The snapshot is taken before Tab and re-read after it, and the properties compared include
+  // background-color and colour \u2014 so a pseudo-element pulsing on a keyframe animation differs
+  // between the two reads for a reason that has nothing to do with focus. That reads as \xAB the
+  // focus is visible \xBB on a control that has no indicator at all: a MISSED non-conformity,
+  // strictly worse than the false positive the pseudo-element read was added to remove.
+  //
+  // A transition is not affected and must not be excluded: it only moves on a state change,
+  // so its at-rest value is stable and a focus transition is exactly what we want to see.
+  //
+  // When every part of an element is animated, both sides collapse to the same constant and
+  // the probe reports \xAB no visible change \xBB \u2014 a finding rather than a silent pass. That is the
+  // safe direction: this tool would rather name something a human can dismiss than clear
+  // something nobody will look at again.
+  const __style = (e, pseudo) => { const s = getComputedStyle(e, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
   const snap = (e) => [__style(e, null), __style(e, '::before'), __style(e, '::after')].join('#');
   // Visually-hidden radio/checkbox \u2192 measure its visible label/proxy, not the input.
   const proxyFor = (e) => {
@@ -283,7 +298,9 @@ var FOCUS_CHECK_PROBE = `(() => {
   // its control in label::before -- DSFR, GOV.UK, USWDS, Bootstrap -- puts the focus ring
   // there too, and reading only the element would report every one of them as unfocusable.
   // (No backticks in this comment: it lives inside a template literal.)
-  const st = (pseudo) => { const s = getComputedStyle(proxy, pseudo); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
+  // Same three boxes, same animation exclusion as pass 1 -- an animating box contributes a
+  // constant on both sides, so it can never fabricate a difference (nor hide a real one).
+  const st = (pseudo) => { const s = getComputedStyle(proxy, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
   const now = [st(null), st('::before'), st('::after')].join('#');
   return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
 })()`;
