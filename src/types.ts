@@ -428,11 +428,18 @@ export interface RenderSignals {
    *  at — because an empty hit list is only evidence for those. */
   probes?: {
     focusVisible?: { selector: string; html: string; detail: string }[];
+    /** 2.4.11 — the focused component entirely hidden behind author-created content. */
+    focusObscured?: { selector: string; html: string; detail: string }[];
     hover?: { selector: string; html: string; detail: string }[];
     reflowZoom?: { selector: string; html: string; detail: string }[];
     textSpacing?: { selector: string; html: string; detail: string }[];
+    /** 2.1.2 — focus that Tab cannot move off. */
+    keyboardTrap?: { selector: string; html: string; detail: string }[];
     reflow?: { horizontalScroll: boolean };
     probed?: string[];
+    /** Why a probe did not run, or did not finish. Never a verdict — the complement of
+     *  `probed`, which is the only field allowed to license a conformity. */
+    skipped?: { sc: string; why: string }[];
   };
   /** What AXE-CORE found on this page, when the producer ran it.
    *

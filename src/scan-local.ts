@@ -27,7 +27,7 @@ import {
   probeFocusRing,
   probeFocusVisible,
   probeHover,
-  probeKeyboardTrap,
+  probeKeyboardTrapRing,
   REFLOW_PROBE,
   REFLOW_ZOOM_PROBE,
   TEXT_SPACING_CSS,
@@ -693,12 +693,17 @@ async function runOnPage(
     // criterion may be read as conformity. So each probe records itself here only when it
     // really ran, and a probe that threw records nothing.
     const probed: string[] = [];
+    // The complement of `probed`, and the only place the difference between the two is ever
+    // written down: a criterion missing from `probed` with nothing here is indistinguishable
+    // from one nobody thought to measure.
+    const skipped: { sc: string; why: string }[] = [];
     const ran = async <T>(sc: string, fallback: T, run: () => Promise<T>): Promise<T> => {
       try {
         const r = await run();
         probed.push(sc);
         return r;
-      } catch {
+      } catch (e: unknown) {
+        skipped.push({ sc, why: String((e as Error)?.message ?? e).slice(0, 160) });
         return fallback;
       }
     };
@@ -706,16 +711,35 @@ async function runOnPage(
     // component entirely hidden behind author-created content (2.4.11)? Both are asked of the
     // same element at the same moment, so walking twice would double the cost of the most
     // expensive probe here to learn nothing extra.
-    const focusRing = await ran("2.4.7", { visible: empty, obscured: empty }, () => probeFocusRing(page));
+    //
+    // AND ONLY A WALK THAT CROSSED THE WHOLE RING MAY SPEAK FOR THE PAGE. The walk stops early
+    // in three ordinary ways (the tagging cap, the wall-clock budget, the recording caps), and
+    // `probeFocusRing` now says which. Crediting 2.4.7 / 2.4.11 regardless published « measured,
+    // nothing found » over the part of the ring nobody reached — and 2.4.11 was credited even
+    // when the walk had THROWN, because its `push` sat outside the guard entirely.
+    const focusRing = await probeFocusRing(page).catch((e: unknown) => ({
+      visible: empty,
+      obscured: empty,
+      complete: false,
+      why: String((e as Error)?.message ?? e).slice(0, 160),
+    }));
     const focusVisible = focusRing.visible;
-    // Recorded as its own measured criterion — the ring was walked, so 2.4.11 has an answer
-    // whether or not it found anything, and an empty result must not read as "not measured".
-    probed.push("2.4.11");
+    for (const sc of ["2.4.7", "2.4.11"]) {
+      if (focusRing.complete) probed.push(sc);
+      else skipped.push({ sc, why: focusRing.why ?? "the walk of the tab ring did not cross the whole of it" });
+    }
     // Straight after the focus walk, on the same pristine DOM and reusing the tagging it has
     // just laid down. Before the inputs are filled and before any viewport change: a tab ring
     // measured at 320px, or with every field carrying injected text, is not the ring a keyboard
     // user meets.
-    const keyboardTrap = await ran("2.1.2", empty, () => probeKeyboardTrap(page));
+    const trapWalk = await probeKeyboardTrapRing(page).catch((e: unknown) => ({
+      hits: empty,
+      complete: false,
+      why: String((e as Error)?.message ?? e).slice(0, 160),
+    }));
+    const keyboardTrap = trapWalk.hits;
+    if (trapWalk.complete) probed.push("2.1.2");
+    else skipped.push({ sc: "2.1.2", why: trapWalk.why ?? "the walk of the tab ring did not cross the whole of it" });
     const hover = await ran("1.4.13", empty, () => probeHover(page));
     const l = opts.lang;
     if (opts.interact) await page.evaluate(FILL_INPUTS_STEP).catch(() => {});
@@ -772,6 +796,9 @@ async function runOnPage(
       // order they finish, and a snapshot that differs only by list order would show up as a
       // change in every diff of a committed `.ultra11y/pages` tree.
       probed: [...probed].sort(),
+      // Sorted for the same reason as `probed`: a persisted artefact that differs only by list
+      // order shows up as a change in every diff of a committed `.ultra11y/pages` tree.
+      ...(skipped.length ? { skipped: [...skipped].sort((a, b) => a.sc.localeCompare(b.sc)) } : {}),
       ...(snapshot ? { snapshot: { ...snapshot, ...(screenshot ? { screenshot } : {}) } } : {}),
     };
   } finally {

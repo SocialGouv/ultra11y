@@ -74,11 +74,26 @@ export interface SnapshotMeta {
  *  only for the criteria that were actually looked at. */
 export interface SnapshotProbes {
   focusVisible?: { selector: string; html: string; detail: string }[];
+  /** 2.4.11 — the focused component entirely hidden behind author-created content.
+   *
+   *  NAMED HERE BECAUSE A FAMILY THE FORMAT DOES NOT NAME IS A SILENT CONFORMITY. Every
+   *  producer already wrote this array into `probes.json` (the file is the payload, verbatim),
+   *  and `probed` already credited 2.4.11 — but neither this interface nor `probeFindings`
+   *  knew the key, so a real obstruction measured in a browser came back `C` from the offline
+   *  re-audit. A false positive gets argued away in review; a false CONFORME is what a
+   *  declaration of accessibility then repeats. */
+  focusObscured?: { selector: string; html: string; detail: string }[];
   hover?: { selector: string; html: string; detail: string }[];
   reflowZoom?: { selector: string; html: string; detail: string }[];
   textSpacing?: { selector: string; html: string; detail: string }[];
+  /** 2.1.2 — focus that Tab cannot move off. Same story as `focusObscured`, and the more
+   *  expensive one to lose: a keyboard trap is a `bloquant`. */
+  keyboardTrap?: { selector: string; html: string; detail: string }[];
   reflow?: { horizontalScroll: boolean };
   probed?: string[];
+  /** Why a probe did not run — or did not FINISH — when it did not. The complement of
+   *  `probed`, carried for the report and never for a verdict. */
+  skipped?: { sc: string; why: string }[];
 }
 
 export interface Snapshot {

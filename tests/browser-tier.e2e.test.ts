@@ -208,6 +208,20 @@ describe.runIf(true)("the browser tier, driven for real", () => {
     expect(r.criteria.find((c) => c.id === "2.1.2")?.status, "measured on every page in scope, and nothing found").toBe("C");
     expect(r.scope.scan?.testedScs ?? []).toContain("2.1.2");
   }, 120_000);
+
+  // THE OTHER HALF OF « ONLY A COMPLETE WALK MAY CONCLUDE »: that an ordinary page still gets
+  // its verdict. Withholding `probed` on a partial ring is only safe if a whole ring is
+  // recognised as whole — otherwise the fix trades a false conformity for a criterion that can
+  // never close, on every page, and the deliverable pays a paid adjudicator for it.
+  it("recognises an ordinary tab ring as crossed whole, so 2.4.7 and 2.4.11 still close", async () => {
+    if (!browserAvailable) return;
+    await check({ probes: true });
+    const probes = JSON.parse(readFileSync(join(root, PAGES_DIR, "fiche", "probes.json"), "utf8"));
+    for (const sc of ["2.4.7", "2.4.11"]) {
+      expect(probes.probed, `${sc} lost its coverage on a page whose ring was walked end to end`).toContain(sc);
+    }
+    expect(probes.skipped ?? [], "nothing was cut short on this page, so nothing should be explained away").toEqual([]);
+  }, 120_000);
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -380,6 +394,18 @@ describe("the focus-obscured probe reads 2.4.11 as the criterion is written", ()
     await page.close();
     return hits;
   };
+
+  it("reports the walk INCOMPLETE when the tagging cap cuts the ring, in a real browser", async () => {
+    if (!browserAvailable) return;
+    // Twelve links, tagged three: the walk physically cannot speak for the other nine, and the
+    // cap is the one truncation no amount of tabbing can recover from.
+    const page = await withBody(Array.from({ length: 12 }, (_, i) => `<a href="/${i}">L${i}</a>`).join(""));
+    const { probeFocusRing, PROBE_DEFAULTS } = await import("../src/probes.js");
+    const r = await probeFocusRing(page, "", { ...PROBE_DEFAULTS, maxFocusables: 3 });
+    await page.close();
+    expect(r.complete, "a ring truncated at the tagging cap must not claim to have measured the page").toBe(false);
+    expect(r.why ?? "").toMatch(/3 focusable/);
+  }, 120_000);
 
   it("fires when a fixed bar covers the focused component entirely", async () => {
     if (!browserAvailable) return;

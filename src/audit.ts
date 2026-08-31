@@ -757,6 +757,12 @@ function probeFindings(probes: NonNullable<RenderSignals["probes"]>, file: strin
   };
   const buckets: [keyof typeof probes, Exclude<DynamicEngine, "axe" | "reflow">][] = [
     ["focusVisible", "focus-visible"],
+    // The two the fold used to skip while `probed` credited their criteria anyway — so a
+    // browser that had FOUND the failure published conformity on it. Both are produced by the
+    // same walk of the tab ring as `focusVisible`, by every producer, and were sitting in
+    // `probes.json` unread.
+    ["focusObscured", "focus-obscured"],
+    ["keyboardTrap", "keyboard-trap"],
     ["hover", "hover"],
     ["reflowZoom", "reflow-zoom"],
     ["textSpacing", "text-spacing"],

@@ -366,21 +366,31 @@ function hoverVisibleExpr(id, wantHidden = false) {
   const j = JSON.stringify(id);
   return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
 }
+function cappedRing(count, limits) {
+  return count >= limits.maxFocusables ? `the setup pass stopped tagging at ${limits.maxFocusables} focusable elements (probes.maxFocusables), so everything past that was never focused and never measured` : void 0;
+}
 async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
   const count = await page.evaluate(focusSetupExpr(scope, limits.maxFocusables));
-  if (!count) return { visible: [], obscured: [] };
+  if (!count) return { visible: [], obscured: [], complete: true };
   const hits = [];
   const obscured = [];
   const seen = /* @__PURE__ */ new Set();
   const limit = tabPressBudget(count, limits);
   let prevKey = null;
+  let cutShort = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
   for (let i = 0; i < limit; i++) {
-    if (deadline?.out()) break;
+    if (deadline?.out()) {
+      cutShort = `the probe budget of ${limits.budgetMs}ms ran out after ${seen.size} of the ${count} focusable elements \u2014 the rest of the ring was never focused`;
+      break;
+    }
     await page.keyboard.press("Tab");
     const r = await page.evaluate(FOCUS_CHECK_PROBE);
     if (!r) continue;
     if (r.key === prevKey) continue;
-    if (seen.has(r.key)) break;
+    if (seen.has(r.key)) {
+      cutShort = void 0;
+      break;
+    }
     seen.add(r.key);
     prevKey = r.key;
     if (!r.changed) {
@@ -400,9 +410,14 @@ async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadlin
         });
       }
     }
-    if (hits.length >= 20 && obscured.length >= 20) break;
+    if (hits.length >= 20 && obscured.length >= 20) {
+      cutShort = `both recording caps filled at ${seen.size} of the ${count} focusable elements \u2014 enough was found to fail the page, not enough to clear the rest of it`;
+      break;
+    }
   }
-  return { visible: hits, obscured };
+  if (cutShort && seen.size >= count) cutShort = void 0;
+  const why = cappedRing(count, limits) ?? cutShort;
+  return { visible: hits, obscured, complete: !why, ...why ? { why } : {} };
 }
 var NATIVE_SEGMENT_STOPS = {
   date: 5,
@@ -422,27 +437,42 @@ var FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
   const type = e.tagName === 'INPUT' ? (e.getAttribute('type') || 'text').toLowerCase() : '';
   return { key: key || __sel(e), tagged: !!key, selector: __sel(e), html: __html(e), segments: stops[type] || 1 };
 })()`;
-async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
+async function probeKeyboardTrapRing(page, limits = PROBE_DEFAULTS, deadline) {
   const count = await page.evaluate(focusSetupExpr("", limits.maxFocusables));
-  if (!count || count < 2) return [];
+  if (!count || count < 2) return { hits: [], complete: true };
   const hits = [];
   const seen = /* @__PURE__ */ new Set();
   const confirmPresses = 2;
   const limit = tabPressBudget(count, limits);
   let prev = null;
+  let cutShort = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
   for (let i = 0; i < limit; i++) {
-    if (deadline?.out()) break;
+    if (deadline?.out()) {
+      cutShort = `the probe budget of ${limits.budgetMs}ms ran out after ${seen.size} of the ${count} focusable elements \u2014 the rest of the ring was never walked`;
+      break;
+    }
     await page.keyboard.press("Tab");
     const now = await page.evaluate(FOCUS_WHERE_PROBE);
-    if (!now) break;
+    if (!now) {
+      cutShort = void 0;
+      break;
+    }
     if (prev?.tagged && now.tagged && now.key === prev.key) {
       const budget = Math.max(confirmPresses, (now.segments ?? 1) - 1);
       let stuck = true;
+      let confirmed = true;
       for (let k = 0; k < budget && stuck; k++) {
-        if (deadline?.out()) break;
+        if (deadline?.out()) {
+          confirmed = false;
+          break;
+        }
         await page.keyboard.press("Tab");
         const again = await page.evaluate(FOCUS_WHERE_PROBE);
         stuck = again !== null && again.tagged === true && again.key === now.key;
+      }
+      if (!confirmed) {
+        cutShort = `the probe budget of ${limits.budgetMs}ms ran out while confirming whether focus could leave ${now.selector} \u2014 an unconfirmed suspicion is not a non-conformity`;
+        break;
       }
       if (stuck) {
         hits.push({
@@ -450,16 +480,22 @@ async function probeKeyboardTrap(page, limits = PROBE_DEFAULTS, deadline) {
           html: now.html,
           detail: `Le focus reste sur cet \xE9l\xE9ment apr\xE8s ${1 + budget} appuis sur Tab, alors que la page compte ${count} \xE9l\xE9ments focalisables \u2014 pi\xE8ge au clavier (2.1.2).`
         });
+        cutShort = void 0;
         break;
       }
     }
     if (now.key !== prev?.key) {
-      if (seen.has(now.key)) break;
+      if (seen.has(now.key)) {
+        cutShort = void 0;
+        break;
+      }
       seen.add(now.key);
     }
     prev = now;
   }
-  return hits;
+  if (cutShort && seen.size >= count) cutShort = void 0;
+  const why = cappedRing(count, limits) ?? cutShort;
+  return { hits, complete: !why, ...why ? { why } : {} };
 }
 async function probeHover(page, limits = PROBE_DEFAULTS, deadline) {
   const triggers = await page.evaluate(HOVER_SETUP_PROBE);
@@ -586,15 +622,19 @@ async function runLiveProbes(page, opts = {}) {
     if (r) {
       out.focusVisible = r.visible;
       out.focusObscured = r.obscured;
-      if (want("2.4.7")) out.probed.push("2.4.7");
-      if (want("2.4.11")) out.probed.push("2.4.11");
+      for (const sc of ["2.4.7", "2.4.11"]) {
+        if (!want(sc)) continue;
+        if (r.complete) out.probed.push(sc);
+        else skip(sc, r.why ?? "the walk of the tab ring did not cross the whole of it");
+      }
     }
   }
   if (want("2.1.2") && canType) {
-    const r = await bounded("2.1.2", () => probeKeyboardTrap(page, limits, deadline));
+    const r = await bounded("2.1.2", () => probeKeyboardTrapRing(page, limits, deadline));
     if (r) {
-      out.keyboardTrap = r;
-      out.probed.push("2.1.2");
+      out.keyboardTrap = r.hits;
+      if (r.complete) out.probed.push("2.1.2");
+      else skip("2.1.2", r.why ?? "the walk of the tab ring did not cross the whole of it");
     }
   }
   if (want("1.4.13") && canHover && canType) {

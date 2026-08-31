@@ -239,11 +239,20 @@ function pageIdFor(url: string): string {
 function probesOf(out: RunnerOutput): SnapshotProbes {
   return {
     ...(out.focusVisible ? { focusVisible: out.focusVisible } : {}),
+    // The two families this projection used to drop. They are not stateful — both come out of
+    // the ONE walk of the pristine tab ring, before any fill or click — so they describe the
+    // very document persisted beside them. Dropping them while still writing `probed` is what
+    // turned a measured keyboard trap into a silent `C`.
+    ...(out.focusObscured ? { focusObscured: out.focusObscured } : {}),
+    ...(out.keyboardTrap ? { keyboardTrap: out.keyboardTrap } : {}),
     ...(out.hover ? { hover: out.hover } : {}),
     ...(out.reflowZoom ? { reflowZoom: out.reflowZoom } : {}),
     ...(out.textSpacing ? { textSpacing: out.textSpacing } : {}),
     reflow: out.reflow,
     probed: out.probed ?? [],
+    // The complement of `probed`, persisted for the same reason: a report reading this
+    // snapshot later must be able to say WHY a criterion was not measured here.
+    ...(out.skipped?.length ? { skipped: out.skipped } : {}),
   };
 }
 

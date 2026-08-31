@@ -373,11 +373,37 @@ export function hoverVisibleExpr(id: string, wantHidden = false): string {
  *  130-element ring is the expensive part (two round-trips per press on a loaded CI runner),
  *  and both questions are asked of the same focused element at the same moment. Walking twice
  *  would double the cost of the most expensive probe in the tier to learn nothing extra. */
-export interface FocusRingHits {
+export interface FocusRingHits extends RingCoverage {
   /** 2.4.7 — focus produced no visible change. */
   visible: ProbeHit[];
   /** 2.4.11 — the focused component was entirely hidden behind author-created content. */
   obscured: ProbeHit[];
+}
+
+/** DID THE WALK CROSS THE WHOLE RING?
+ *
+ *  Both walks below stop early in three ordinary ways — the setup pass stops tagging at
+ *  `maxFocusables`, the wall-clock budget runs out mid-ring, the hit caps stop the recording
+ *  — and each one used to return its partial result in the shape of a finished one. The caller
+ *  then wrote 2.4.7 / 2.4.11 / 2.1.2 into `probed`, which is the field that licenses reading
+ *  an empty hit list as conformity. A ring cut off at element 120 of 300 was therefore
+ *  published as « measured, nothing wrong » for the 180 nobody looked at.
+ *
+ *  `complete` is what the caller must consult before crediting anything, and `why` is what it
+ *  puts in `skipped` when it cannot. */
+export interface RingCoverage {
+  complete: boolean;
+  /** The reason the walk stopped short. Absent exactly when `complete` is true. */
+  why?: string;
+}
+
+/** The tagging pass stopped at the cap, so the ring itself is shorter than the page's.
+ *  Checked on `count` rather than inside the walk: no amount of walking can reach an element
+ *  the setup never tagged. */
+function cappedRing(count: number, limits: ProbeLimits): string | undefined {
+  return count >= limits.maxFocusables
+    ? `the setup pass stopped tagging at ${limits.maxFocusables} focusable elements (probes.maxFocusables), so everything past that was never focused and never measured`
+    : undefined;
 }
 
 export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<ProbeHit[]> {
@@ -386,16 +412,25 @@ export async function probeFocusVisible(page: Any, scope = "", limits: ProbeLimi
 
 export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<FocusRingHits> {
   const count = (await page.evaluate(focusSetupExpr(scope, limits.maxFocusables))) as number;
-  if (!count) return { visible: [], obscured: [] };
+  // A page with nothing focusable has no ring to cross — the walk is vacuously whole, and
+  // saying otherwise would withhold a conformity the page has earned.
+  if (!count) return { visible: [], obscured: [], complete: true };
   const hits: ProbeHit[] = [];
   const obscured: ProbeHit[] = [];
   const seen = new Set<string>();
   const limit = tabPressBudget(count, limits);
   let prevKey: string | null = null;
+  // Pessimistic until the ring closes. The loop running out of presses is not a normal ending
+  // — `tabPressBudget` is a backstop — so this is the reason that survives when nothing
+  // else sets one.
+  let cutShort: string | undefined = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
   for (let i = 0; i < limit; i++) {
     // A tab ring of 130 elements is two round-trips each on a loaded CI runner. Stopping at
     // the deadline costs the tail of the ring, which `runLiveProbes` then records.
-    if (deadline?.out()) break;
+    if (deadline?.out()) {
+      cutShort = `the probe budget of ${limits.budgetMs}ms ran out after ${seen.size} of the ${count} focusable elements — the rest of the ring was never focused`;
+      break;
+    }
     await page.keyboard.press("Tab");
     const r = (await page.evaluate(FOCUS_CHECK_PROBE)) as { key: string; changed: boolean; selector: string; html: string } | null;
     if (!r) continue;
@@ -412,7 +447,10 @@ export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits 
     // A wrap is returning to a key seen EARLIER in the walk. Being on the key we were already
     // on is the control eating a keystroke, and the loop's own `limit` still bounds it.
     if (r.key === prevKey) continue;
-    if (seen.has(r.key)) break; // wrapped around the tab ring
+    if (seen.has(r.key)) {
+      cutShort = undefined; // wrapped around the tab ring — the ring is closed, the walk is whole
+      break;
+    }
     seen.add(r.key);
     prevKey = r.key;
     if (!r.changed) {
@@ -435,9 +473,17 @@ export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits 
         });
       }
     }
-    if (hits.length >= 20 && obscured.length >= 20) break;
+    if (hits.length >= 20 && obscured.length >= 20) {
+      cutShort = `both recording caps filled at ${seen.size} of the ${count} focusable elements — enough was found to fail the page, not enough to clear the rest of it`;
+      break;
+    }
   }
-  return { visible: hits, obscured };
+  // …unless every tagged element was in fact visited. A ring that never wraps because focus
+  // left the document for good was still crossed end to end, and refusing it a verdict on the
+  // shape of its ending would withhold a measurement that really happened.
+  if (cutShort && seen.size >= count) cutShort = undefined;
+  const why = cappedRing(count, limits) ?? cutShort;
+  return { visible: hits, obscured, complete: !why, ...(why ? { why } : {}) };
 }
 
 // HOW MANY TAB STOPS ONE NATIVE CONTROL LEGITIMATELY HOLDS.
@@ -520,23 +566,42 @@ export const FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
  *  Everything else — focus leaving for the browser chrome, the ring wrapping round to its first
  *  element — is a page behaving correctly, and returns no hit. */
 export async function probeKeyboardTrap(page: Any, limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<ProbeHit[]> {
+  return (await probeKeyboardTrapRing(page, limits, deadline)).hits;
+}
+
+/** What one walk of the ring found, AND whether it crossed the whole of it. The hits alone
+ *  cannot say: an empty list is « no cage anywhere » or « the budget ran out on the third
+ *  element », and only the first may be read as conformity on 2.1.2. */
+export interface KeyboardTrapWalk extends RingCoverage {
+  hits: ProbeHit[];
+}
+
+export async function probeKeyboardTrapRing(page: Any, limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<KeyboardTrapWalk> {
   const count = (await page.evaluate(focusSetupExpr("", limits.maxFocusables))) as number;
   // One focusable cannot be a trap: Tab has nowhere else to go, and that is the page's shape
-  // rather than a cage. Zero cannot either.
-  if (!count || count < 2) return [];
+  // rather than a cage. Zero cannot either. Either way the question is settled for this page,
+  // so the walk is complete rather than skipped.
+  if (!count || count < 2) return { hits: [], complete: true };
   const hits: ProbeHit[] = [];
   const seen = new Set<string>();
   const confirmPresses = 2;
   const limit = tabPressBudget(count, limits);
   type Where = { key: string; tagged?: boolean; selector: string; html: string; segments?: number };
   let prev: Where | null = null;
+  let cutShort: string | undefined = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
   for (let i = 0; i < limit; i++) {
-    if (deadline?.out()) break;
+    if (deadline?.out()) {
+      cutShort = `the probe budget of ${limits.budgetMs}ms ran out after ${seen.size} of the ${count} focusable elements — the rest of the ring was never walked`;
+      break;
+    }
     await page.keyboard.press("Tab");
     const now = (await page.evaluate(FOCUS_WHERE_PROBE)) as Where | null;
     // Focus left the page. The ring ended the way it should; nothing to report and nothing
     // left to walk.
-    if (!now) break;
+    if (!now) {
+      cutShort = undefined;
+      break;
+    }
     if (prev?.tagged && now.tagged && now.key === prev.key) {
       // Stuck for one press. Confirm before accusing: press again, and only call it a trap if
       // focus is STILL on the same element every time.
@@ -547,11 +612,23 @@ export async function probeKeyboardTrap(page: Any, limits: ProbeLimits = PROBE_D
       // segments is the control working, not a cage.
       const budget = Math.max(confirmPresses, (now.segments ?? 1) - 1);
       let stuck = true;
+      // A CONFIRMATION THE BUDGET CUT IS NOT A CONFIRMATION. `stuck` starts true, so a
+      // deadline firing on the first press left it true and the walk accused a control it had
+      // pressed Tab on exactly once — a `bloquant` non-conformity manufactured out of our own
+      // clock running out. The walk stops and says so instead.
+      let confirmed = true;
       for (let k = 0; k < budget && stuck; k++) {
-        if (deadline?.out()) break;
+        if (deadline?.out()) {
+          confirmed = false;
+          break;
+        }
         await page.keyboard.press("Tab");
         const again = (await page.evaluate(FOCUS_WHERE_PROBE)) as Where | null;
         stuck = again !== null && again.tagged === true && again.key === now.key;
+      }
+      if (!confirmed) {
+        cutShort = `the probe budget of ${limits.budgetMs}ms ran out while confirming whether focus could leave ${now.selector} — an unconfirmed suspicion is not a non-conformity`;
+        break;
       }
       if (stuck) {
         hits.push({
@@ -560,6 +637,9 @@ export async function probeKeyboardTrap(page: Any, limits: ProbeLimits = PROBE_D
           detail: `Le focus reste sur cet élément après ${1 + budget} appuis sur Tab, alors que la page compte ${count} éléments focalisables — piège au clavier (2.1.2).`,
         });
         // One cage is the finding; walking further inside it only produces the same hit again.
+        // The measurement REACHED ITS CONCLUSION — 2.1.2 fails on this page — so the walk
+        // counts as complete even though it stopped mid-ring.
+        cutShort = undefined;
         break;
       }
     }
@@ -572,12 +652,17 @@ export async function probeKeyboardTrap(page: Any, limits: ProbeLimits = PROBE_D
     // tests/fixtures/realworld/contact.html: the seeded trap on `#confirmation` was reported by
     // a hand walk and by nothing else.
     if (now.key !== prev?.key) {
-      if (seen.has(now.key)) break;
+      if (seen.has(now.key)) {
+        cutShort = undefined; // the ring came full circle — a complete, escapable cycle
+        break;
+      }
       seen.add(now.key);
     }
     prev = now;
   }
-  return hits;
+  if (cutShort && seen.size >= count) cutShort = undefined;
+  const why = cappedRing(count, limits) ?? cutShort;
+  return { hits, complete: !why, ...(why ? { why } : {}) };
 }
 
 export async function probeHover(page: Any, limits: ProbeLimits = PROBE_DEFAULTS, deadline?: ProbeDeadline): Promise<ProbeHit[]> {
@@ -756,8 +841,16 @@ export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?:
     if (r) {
       out.focusVisible = r.visible;
       out.focusObscured = r.obscured;
-      if (want("2.4.7")) out.probed.push("2.4.7");
-      if (want("2.4.11")) out.probed.push("2.4.11");
+      // WHAT IT FOUND IS KEPT EITHER WAY; WHAT IT MAY CONCLUDE IS NOT.
+      //
+      // A hit is a failure the browser reproduced on an element it really did focus, so a
+      // truncated walk's hits are as good as a whole one's. Its SILENCE is not: nobody looked
+      // at the tail of that ring, and `probed` is precisely the claim that somebody did.
+      for (const sc of ["2.4.7", "2.4.11"]) {
+        if (!want(sc)) continue;
+        if (r.complete) out.probed.push(sc);
+        else skip(sc, r.why ?? "the walk of the tab ring did not cross the whole of it");
+      }
     }
   }
   // AFTER focus visibility, and for the same reason it comes late: it walks the tab ring, which
@@ -765,10 +858,11 @@ export async function runLiveProbes(page: Any, opts: { only?: string[]; limits?:
   // `probeFocusVisible` has just laid down, so on the common path it costs the walk and not the
   // setup.
   if (want("2.1.2") && canType) {
-    const r = await bounded("2.1.2", () => probeKeyboardTrap(page, limits, deadline));
+    const r = await bounded("2.1.2", () => probeKeyboardTrapRing(page, limits, deadline));
     if (r) {
-      out.keyboardTrap = r;
-      out.probed.push("2.1.2");
+      out.keyboardTrap = r.hits;
+      if (r.complete) out.probed.push("2.1.2");
+      else skip("2.1.2", r.why ?? "the walk of the tab ring did not cross the whole of it");
     }
   }
   if (want("1.4.13") && canHover && canType) {
