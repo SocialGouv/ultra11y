@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.42.1](https://github.com/maxgfr/ultra11y/compare/v5.42.0...v5.42.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **probes,snapshot:** ne plus fabriquer de piège clavier, ni croire une couverture d'une autre époque ([92a3443](https://github.com/maxgfr/ultra11y/commit/92a34434d369f6eb4b6b688213c4050f4121d9cd))
+
 # [5.42.0](https://github.com/maxgfr/ultra11y/compare/v5.41.2...v5.42.0) (2026-09-01)
 
 
