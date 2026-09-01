@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.42.0](https://github.com/maxgfr/ultra11y/compare/v5.41.2...v5.42.0) (2026-09-01)
+
+
+### Bug Fixes
+
+* **build:** ne plus publier un chunk `dist/` que plus rien n'importe ([7a476ee](https://github.com/maxgfr/ultra11y/commit/7a476ee300bee6eb3b5830c5b093f89a0979d789))
+* **html-report,action:** un tableau de bord qui décrit le même run que le rapport d'à côté ([7995e40](https://github.com/maxgfr/ultra11y/commit/7995e40a67abcbc79e2a054ac5f2aebb8ba3b7a9))
+* **ledger,probes,check:** fermer la deuxième série de trous trouvés en relecture adverse ([d653da0](https://github.com/maxgfr/ultra11y/commit/d653da0e8706a54a2dfabb68db5590c55fcacb6a))
+* **probes,report:** fermer les faux conformes qu'une relecture adverse a trouvés après coup ([7a9a169](https://github.com/maxgfr/ultra11y/commit/7a9a169b0056792a106bdb679feaa70ab13cd74f))
+* **probes:** ne plus conclure « conforme » sur une mesure jetée ou inachevée ([21f71a3](https://github.com/maxgfr/ultra11y/commit/21f71a30107a3051ad15922db8c911d7f608fb6a))
+* **report:** brancher les trois bandeaux sur ce que le run a fait, et mesurer 4.1.3 ([c1886f5](https://github.com/maxgfr/ultra11y/commit/c1886f54ba63de63c976d2118e797a9108450489))
+* **rgaa:** 10.1 quitte `completeBySilence` — sa règle regarde moins que son critère ([44984f6](https://github.com/maxgfr/ultra11y/commit/44984f6bce33a73c97c6be05732f66227c48871b))
+
+
+### Features
+
+* **ledger:** un verdict couvre ce qu'il a blanchi, pas seulement ce qui n'a pas bougé ([bd53d53](https://github.com/maxgfr/ultra11y/commit/bd53d53713536d92719d57a9b52a7f6ce941c5b4))
+* **report:** publier le taux de conformité officiel du référentiel, pas celui du moteur ([2156b21](https://github.com/maxgfr/ultra11y/commit/2156b2105f4da01a8538d985ac5af66b7f71f874))
+
 ## [5.41.2](https://github.com/maxgfr/ultra11y/compare/v5.41.1...v5.41.2) (2026-08-31)
 
 

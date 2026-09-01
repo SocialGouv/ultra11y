@@ -10,7 +10,7 @@
       "name": "ultra11y",
       "source": "./",
       "description": "Automatic accessibility review before commit, push and pull request, plus detailed evidenced Markdown, HTML and per-page WCAG 2.2 AA / RGAA reports in Claude Code.",
-      "version": "5.41.2",
+      "version": "5.42.0",
       "author": { "name": "maxgfr" },
       "homepage": "https://github.com/maxgfr/ultra11y",
       "repository": "https://github.com/maxgfr/ultra11y",
