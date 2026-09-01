@@ -19,7 +19,7 @@ import type {
 import { VERSION, SCHEMA_VERSION } from "./types.js";
 import { allSC, allGuidelines } from "./wcag.js";
 import { parseSource } from "./parse/source.js";
-import { attachSignals, isSnapshotDom, snapshotPageId } from "./snapshot.js";
+import { attachSignals, isSnapshotDom, PROBES_VERSION, snapshotPageId, WALK_DEPENDENT_SCS } from "./snapshot.js";
 import { attr, dynamicSpreadMayProvide, elementsByTag, type Doc, type CaptureProvenance } from "./parse/html.js";
 import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir, readCaptureDir, capturesForSources } from "./capture.js";
 import { isFullDocument } from "./rules/rule.js";
@@ -573,7 +573,14 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
     // silence meaningful: a criterion with no hit is conforming only where the probe ran.
     const probes = doc.signals?.probes;
     if (probes) {
+      // A CLAIM IS ONLY WORTH THE CONTRACT IT WAS WRITTEN UNDER. Before v2, `probed` named the
+      // criteria a pass had STARTED on, not the ones it finished — so a tab ring cut off at the
+      // tagging cap, a hover pass that opened ten of eleven tooltips and a live-region pass that
+      // pressed no button all made the same claim as a complete one. Reading those files as if
+      // they had been written under this engine's rule reinstates the defect the rule closed.
+      const trusted = (probes.v ?? 1) >= PROBES_VERSION;
       for (const sc of probes.probed ?? []) {
+        if (!trusted && WALK_DEPENDENT_SCS.includes(sc)) continue;
         const seen = acc.probedScs.get(sc) ?? new Set<string>();
         seen.add(pageId);
         acc.probedScs.set(sc, seen);

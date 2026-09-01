@@ -37,6 +37,11 @@ import type { AxNode, BoxDigest, BoxEntry, CssDigest, RenderSignals, StyleDigest
 export type { AxNode, BoxDigest, BoxEntry, CssDigest, RenderSignals, StyleDigest, StyleEntry };
 
 export const SNAPSHOT_VERSION = 1;
+
+// The coverage contract that travels inside `probes.json` lives with the probes that write it
+// (src/probes.ts) and is re-exported here, where the format is defined, so a reader of either
+// module finds it.
+export { PROBES_VERSION, WALK_DEPENDENT_SCS } from "./probes.js";
 export const PAGES_DIR = ".ultra11y/pages";
 
 export interface SnapshotViewport {
@@ -73,6 +78,8 @@ export interface SnapshotMeta {
  *  nothing. `probed` is the load-bearing half: the absence of a hit means "nothing found"
  *  only for the criteria that were actually looked at. */
 export interface SnapshotProbes {
+  /** The coverage contract this file was written against. See PROBES_VERSION. */
+  v?: number;
   focusVisible?: { selector: string; html: string; detail: string }[];
   /** 2.4.11 — the focused component entirely hidden behind author-created content.
    *

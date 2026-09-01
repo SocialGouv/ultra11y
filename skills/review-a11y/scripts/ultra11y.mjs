@@ -37528,6 +37528,605 @@ function parseSourceWithAst(source, file, opts = {}) {
 import { existsSync as existsSync12, mkdirSync as mkdirSync4, readFileSync as readFileSync14, readdirSync as readdirSync4, writeFileSync as writeFileSync5 } from "fs";
 import { dirname as dirname6, join as join25 } from "path";
 
+// src/probes.ts
+var PROBES_VERSION = 2;
+var WALK_DEPENDENT_SCS = ["1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
+var PRELUDE = `
+const __sel = (e) => {
+  if (!e || !e.tagName) return '\u2014';
+  const esc = (v) => (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(v) : String(v).replace(/[^a-zA-Z0-9_-]/g, '\\\\$&');
+  const unique = (s) => { try { return document.querySelectorAll(s).length === 1; } catch { return false; } };
+  const short = (n) => {
+    const t = n.tagName.toLowerCase();
+    if (n.id) return t + '#' + esc(n.id);
+    const c = typeof n.className === 'string' ? n.className.trim().split(/\\s+/)[0] : '';
+    return c ? t + '.' + esc(c) : t;
+  };
+  const first = short(e);
+  if (unique(first)) return first;
+  const parts = [];
+  for (let n = e; n && n.tagName; n = n.parentElement) {
+    let part = short(n);
+    if (n.id && unique(part)) { parts.unshift(part); return parts.join(' > '); }
+    const parent = n.parentElement;
+    if (parent) {
+      const same = Array.from(parent.children).filter((x) => x.tagName === n.tagName);
+      if (same.length > 1) part += ':nth-of-type(' + (same.indexOf(n) + 1) + ')';
+    }
+    parts.unshift(part);
+    const path = parts.join(' > ');
+    if (unique(path)) return path;
+  }
+  return parts.join(' > ') || first;
+};
+const __vis = (e) => {
+  const r = e.getBoundingClientRect();
+  if (r.width <= 4 || r.height <= 4) return false; // tiny / 1px sr-only boxes
+  const s = getComputedStyle(e);
+  if (s.display === 'none' || s.visibility === 'hidden' || parseFloat(s.opacity) === 0) return false;
+  // visually-hidden "screen-reader-only" pattern (clip rect / clip-path inset) \u2014 present in
+  // the a11y tree but not painted; must not be measured for clipping/target-size.
+  if (s.clip && s.clip !== 'auto' && s.clip !== 'rect(auto, auto, auto, auto)') return false;
+  if (s.clipPath && (s.clipPath.indexOf('inset(100%') >= 0 || s.clipPath.indexOf('inset(50%') >= 0)) return false;
+  return true;
+};
+const __html = (e) => (e.outerHTML || '').slice(0, 160);
+`;
+var PROBE_DEFAULTS = {
+  reflowWidth: 320,
+  maxFocusables: 120,
+  maxHits: 20,
+  maxTriggers: 60,
+  actionTimeoutMs: 1e3,
+  budgetMs: 2e4
+};
+function actionTimeout(limits, deadline) {
+  const left = deadline ? deadline.left() : limits.actionTimeoutMs;
+  return Math.max(1, Math.min(limits.actionTimeoutMs, left || limits.actionTimeoutMs));
+}
+var REFLOW_PROBE = `(() => {
+  const el = document.scrollingElement || document.documentElement;
+  return { horizontalScroll: el.scrollWidth > el.clientWidth + 2 };
+})()`;
+var REFLOW_ZOOM_PROBE = `(() => { ${PRELUDE}
+  const root = document.documentElement;
+  const prev = root.style.fontSize;
+  root.style.fontSize = '200%';
+  const hits = [];
+  for (const e of Array.from(document.querySelectorAll('p,li,h1,h2,h3,h4,h5,h6,td,th,button,a,label,span'))) {
+    if (!__vis(e)) continue;
+    if ((e.textContent || '').trim().length < 8) continue;
+    const s = getComputedStyle(e);
+    const clip = s.overflow === 'hidden' || s.overflowY === 'hidden' || s.overflowX === 'hidden';
+    const noWrap = s.whiteSpace === 'nowrap' || s.textOverflow === 'ellipsis';
+    if ((clip || noWrap) && (e.scrollHeight > e.clientHeight + 6 || e.scrollWidth > e.clientWidth + 6)) {
+      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqu\xE9/masqu\xE9 \xE0 200% (conteneur overflow:hidden / nowrap) \u2014 perte de contenu au zoom (1.4.4).' });
+    }
+    if (hits.length >= 12) break;
+  }
+  root.style.fontSize = prev;
+  return hits;
+})()`;
+var TEXT_SPACING_CSS = "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }";
+var TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
+  const hits = [];
+  for (const e of Array.from(document.querySelectorAll('p,li,span,a,button,h1,h2,h3,h4,h5,h6,td,th,label,div'))) {
+    if (!__vis(e)) continue;
+    if ((e.textContent || '').trim().length < 8) continue;
+    const s = getComputedStyle(e);
+    const clipped = (s.overflowX === 'hidden' || s.overflowY === 'hidden' || s.overflow === 'hidden') && (e.scrollHeight > e.clientHeight + 2 || e.scrollWidth > e.clientWidth + 2);
+    const ellipsis = s.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 2;
+    if (clipped || ellipsis) {
+      // No criterion id in the text: every rendering already names the criterion this finding
+      // belongs to, and a hard-coded \xAB 1.4.12 \xBB is a WCAG number appearing inside a deliverable
+      // that may be keyed on another standard entirely.
+      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqu\xE9/masqu\xE9 sous l\\'espacement de texte impos\xE9 \u2014 perte de contenu.' });
+    }
+    if (hits.length >= 20) break;
+  }
+  return hits;
+})()`;
+function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables) {
+  const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
+  return `(() => { ${PRELUDE}
+  // FOCUSABLE MEANS FOCUSABLE, NOT "the six tags we thought of". This list decides which
+  // elements get tagged, and since the walk may now license a conformity, an element missing
+  // from it is not merely unmeasured -- it is silently cleared. A page whose only control is a
+  // <summary> tagged nothing at all, so the count was zero, so the ring was "vacuously whole",
+  // so 2.4.7 and 2.4.11 closed without a single Tab press.
+  //
+  // AND NOT iframe / audio[controls] / video[controls], which were here for one release and
+  // had to come back out. They are genuinely focusable, but their focus lives in another
+  // document: everything below reads the PARENT'S activeElement, which stays the host element
+  // press after press while the user tabs through the controls inside. The trap walk reads
+  // exactly that as a cage, so an ordinary page with a video player, a payment frame, a map or
+  // a support widget was reported as a bloquant 2.1.2 -- a blocker manufactured out of our own
+  // blindness, able to fail somebody else's gate. The measurement we cannot make is not a
+  // finding; Tab still crosses them, the walk still records that it crossed something it never
+  // measured, and the page is not cleared either.
+  // (No backticks in this comment: it lives inside a template literal.)
+  const sel = 'a[href],area[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[contenteditable]:not([contenteditable="false"]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
+  // A BOX THAT IS ANIMATING CANNOT BE COMPARED ACROSS TIME, so it contributes a constant.
+  //
+  // The snapshot is taken before Tab and re-read after it, and the properties compared include
+  // background-color and colour \u2014 so a pseudo-element pulsing on a keyframe animation differs
+  // between the two reads for a reason that has nothing to do with focus. That reads as \xAB the
+  // focus is visible \xBB on a control that has no indicator at all: a MISSED non-conformity,
+  // strictly worse than the false positive the pseudo-element read was added to remove.
+  //
+  // A transition is not affected and must not be excluded: it only moves on a state change,
+  // so its at-rest value is stable and a focus transition is exactly what we want to see.
+  //
+  // When every part of an element is animated, both sides collapse to the same constant and
+  // the probe reports \xAB no visible change \xBB \u2014 a finding rather than a silent pass. That is the
+  // safe direction: this tool would rather name something a human can dismiss than clear
+  // something nobody will look at again.
+  const __style = (e, pseudo) => { const s = getComputedStyle(e, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
+  const snap = (e) => [__style(e, null), __style(e, '::before'), __style(e, '::after')].join('#');
+  // Visually-hidden radio/checkbox \u2192 measure its visible label/proxy, not the input.
+  const proxyFor = (e) => {
+    const type = (e.getAttribute('type') || '').toLowerCase();
+    const custom = e.tagName === 'INPUT' && (type === 'radio' || type === 'checkbox') && !__vis(e);
+    if (!custom) return __vis(e) ? e : null;
+    let p = null;
+    if (e.id) { try { p = document.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(e.id) : e.id) + '"]'); } catch (_) {} }
+    if (!p) p = e.closest('label');
+    if (!p) { const lb = (e.getAttribute('aria-labelledby') || '').split(/\\s+/)[0]; if (lb) p = document.getElementById(lb); }
+    return (p && __vis(p)) ? p : null;
+  };
+  // Fresh authoritative pass: drop any tags a previous (whole-document or dialog) pass left.
+  for (const el of Array.from(document.querySelectorAll('[data-u11y-f],[data-u11y-fp]'))) { el.removeAttribute('data-u11y-f'); el.removeAttribute('data-u11y-fp'); }
+  const roots = ${rootExpr};
+  const focusables = [];
+  let total = 0;
+  for (const root of Array.from(roots)) {
+    if (root.matches && root.matches(sel)) focusables.push(root);
+    for (const e of Array.from(root.querySelectorAll(sel))) focusables.push(e);
+  }
+  window.__u11yF = {};
+  let n = 0;
+  for (const e of focusables) {
+    const proxy = proxyFor(e);
+    if (!proxy) continue;
+    const key = 'k' + n;
+    total++;
+    if (n >= ${maxFocusables}) continue; // tagged the cap; keep COUNTING so the caller knows it was cut
+    e.setAttribute('data-u11y-f', key);
+    proxy.setAttribute('data-u11y-fp', key);
+    window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy) };
+    n++;
+  }
+  return { n: n, total: total };
+})()`;
+}
+var FOCUS_CHECK_PROBE = `(() => {
+  const e = document.activeElement;
+  // FOCUS LEFT THE DOCUMENT \u2014 the normal end of a tab ring, and nothing to measure.
+  if (!e || e === document.body || e === document.documentElement) return null;
+  const key = e.getAttribute && e.getAttribute('data-u11y-f');
+  // FOCUS IS ON SOMETHING THE SETUP NEVER TAGGED, which is a different fact entirely and used
+  // to be reported as the same one. A skip link revealed only on focus, a widget that moves
+  // focus into a node the selector does not match -- Tab crossed it, nothing measured it, and
+  // the walk went on to call itself whole. The caller needs to know the ring contained an
+  // element it cannot speak for. (No backticks here: this lives inside a template literal.)
+  if (!key || !window.__u11yF || !window.__u11yF[key]) return { untagged: true, key: '', changed: true, selector: '', html: '' };
+  const rec = window.__u11yF[key];
+  const proxy = document.querySelector('[data-u11y-fp="' + key + '"]') || e;
+  // THE SAME THREE BOXES pass 1 snapshotted, in the same order. A design system that paints
+  // its control in label::before -- DSFR, GOV.UK, USWDS, Bootstrap -- puts the focus ring
+  // there too, and reading only the element would report every one of them as unfocusable.
+  // (No backticks in this comment: it lives inside a template literal.)
+  // Same three boxes, same animation exclusion as pass 1 -- an animating box contributes a
+  // constant on both sides, so it can never fabricate a difference (nor hide a real one).
+  const st = (pseudo) => { const s = getComputedStyle(proxy, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
+  const now = [st(null), st('::before'), st('::after')].join('#');
+  return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
+})()`;
+var FOCUS_OBSCURED_PROBE = `(() => { ${PRELUDE}
+  const e = document.activeElement;
+  if (!e || e === document.body || e === document.documentElement) return null;
+  const key = e.getAttribute && e.getAttribute('data-u11y-f');
+  if (!key) return null;
+  const r = e.getBoundingClientRect();
+  if (r.width < 1 || r.height < 1) return null;         // nothing to obscure
+  const vw = window.innerWidth, vh = window.innerHeight;
+  // Sample a 5\xD75 grid inset by a pixel, keeping only points inside the viewport. A component
+  // scrolled off-screen leaves no sampleable point and is NOT reported: out of view is not
+  // obscured, and the criterion is about content laid over it.
+  const xs = [0.02, 0.25, 0.5, 0.75, 0.98], pts = [];
+  for (const fx of xs) for (const fy of xs) {
+    const x = r.left + r.width * fx, y = r.top + r.height * fy;
+    if (x >= 0 && y >= 0 && x < vw && y < vh) pts.push([x, y]);
+  }
+  if (!pts.length) return null;
+  // The topmost element over a point, for each sampled point. The focused element counts as
+  // visible when it \u2014 or anything inside it \u2014 is on top: an icon inside a button is the button
+  // being visible, and reading that as occlusion would fail every well-built page.
+  let occluder = null;
+  for (const [x, y] of pts) {
+    const top = document.elementsFromPoint(x, y)[0];
+    if (!top) continue;
+    if (top === e || e.contains(top)) return null;      // some part of it is on top \u2192 pass
+    if (!occluder) occluder = top;
+  }
+  if (!occluder) return null;
+  // AUTHOR-CREATED OVERLAY, or nothing. Walk up from the occluder looking for the fixed/sticky
+  // ancestor that puts it over the page; without one this is ordinary layout, not obscuring.
+  let overlay = null;
+  for (let n = occluder; n && n !== document.documentElement; n = n.parentElement) {
+    const pos = getComputedStyle(n).position;
+    if (pos === 'fixed' || pos === 'sticky') { overlay = n; break; }
+  }
+  if (!overlay) return null;
+  if (overlay.contains(e)) return null;                 // it is the component's own container
+  return { key: key, selector: __sel(e), html: __html(e), overlay: __sel(overlay) };
+})()`;
+var HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
+  const out = [];
+  let n = 0;
+  let total = 0;
+  for (const e of Array.from(document.querySelectorAll('[aria-describedby]'))) {
+    const id = (e.getAttribute('aria-describedby') || '').split(/\\s+/)[0];
+    if (!id) continue;
+    const t = document.getElementById(id);
+    if (!t) continue;
+    // THE TRIGGER ITSELF HAS TO BE THERE. 1.4.13 is about content revealed on hover or focus,
+    // and an element that is not rendered reveals nothing to anybody -- hovering it was always
+    // futile, and once an unreachable trigger started withholding the criterion, that futility
+    // would have turned into a page nobody could ever clear.
+    if (!__vis(e)) continue;
+    const s = getComputedStyle(t);
+    const hidden = s.display === 'none' || s.visibility === 'hidden' || t.getBoundingClientRect().height === 0;
+    if (!hidden) continue;
+    total++;
+    if (n >= 10) continue; // tagged ten; keep COUNTING so the caller knows what it did not see
+    const key = 'h' + n;
+    e.setAttribute('data-u11y-h', key);
+    out.push({ key: key, target: id, selector: __sel(e) });
+    n++;
+  }
+  for (const o of out) o.total = total;
+  return out;
+})()`;
+function hoverVisibleExpr(id, wantHidden = false) {
+  const j = JSON.stringify(id);
+  return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
+}
+function readSetup(raw, limits) {
+  if (typeof raw === "number") return { count: raw, capped: raw >= limits.maxFocusables };
+  const o = raw ?? {};
+  const count = o.n ?? 0;
+  return { count, capped: (o.total ?? count) > count };
+}
+function cappedRing(capped, limits) {
+  return capped ? `the setup pass stopped tagging at ${limits.maxFocusables} focusable elements (probes.maxFocusables), so everything past that was never focused and never measured` : void 0;
+}
+async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
+  return (await probeFocusRing(page, scope, limits, deadline)).visible;
+}
+async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
+  const { count, capped } = readSetup(await page.evaluate(focusSetupExpr(scope, limits.maxFocusables)), limits);
+  if (!count) return { visible: [], obscured: [], complete: true };
+  const hits = [];
+  const obscured = [];
+  const seen = /* @__PURE__ */ new Set();
+  const limit = tabPressBudget(count, limits);
+  let prevKey = null;
+  let cutShort = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
+  let untagged = 0;
+  for (let i2 = 0; i2 < limit; i2++) {
+    if (deadline?.out()) {
+      cutShort = `the probe budget of ${limits.budgetMs}ms ran out after ${seen.size} of the ${count} focusable elements \u2014 the rest of the ring was never focused`;
+      break;
+    }
+    await page.keyboard.press("Tab");
+    const r = await page.evaluate(FOCUS_CHECK_PROBE);
+    if (!r) continue;
+    if (r.untagged) {
+      untagged++;
+      continue;
+    }
+    if (r.key === prevKey) continue;
+    if (seen.has(r.key)) {
+      cutShort = void 0;
+      break;
+    }
+    seen.add(r.key);
+    prevKey = r.key;
+    if (!r.changed) {
+      hits.push({
+        selector: r.selector,
+        html: r.html,
+        detail: "Le focus clavier ne produit aucun changement visible (outline/box-shadow/bordure/fond) \u2014 focus non visible."
+      });
+    }
+    if (obscured.length < 20 && !deadline?.out()) {
+      const o = await page.evaluate(FOCUS_OBSCURED_PROBE);
+      if (o) {
+        obscured.push({
+          selector: o.selector,
+          html: o.html,
+          detail: `Le composant qui re\xE7oit le focus clavier est enti\xE8rement masqu\xE9 par un contenu ajout\xE9 par l'auteur (${o.overlay}) \u2014 il est impossible de voir o\xF9 l'on se trouve au clavier.`
+        });
+      }
+    }
+    if (hits.length >= 20 && obscured.length >= 20) {
+      cutShort = `both recording caps filled at ${seen.size} of the ${count} focusable elements \u2014 enough was found to fail the page, not enough to clear the rest of it`;
+      break;
+    }
+  }
+  if (cutShort && seen.size >= count) cutShort = void 0;
+  const why = cappedRing(capped, limits) ?? cutShort ?? (untagged > 0 ? `Tab crossed ${untagged} element(s) the tagging pass never matched \u2014 a control focusable in the browser but not by this selector (a skip link revealed on focus, a widget moving focus into an untagged node). They were never compared, so this page is not cleared` : void 0);
+  return { visible: hits, obscured, complete: !why, ...why ? { why } : {} };
+}
+var NATIVE_SEGMENT_STOPS = {
+  date: 5,
+  time: 5,
+  "datetime-local": 8,
+  month: 4,
+  week: 4
+};
+function tabPressBudget(count, limits) {
+  return Math.min(count * 2 + 20, limits.maxFocusables * 2 + 20);
+}
+var FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
+  const e = document.activeElement;
+  if (!e || e === document.body || e === document.documentElement) return null;
+  const key = e.getAttribute && e.getAttribute('data-u11y-f');
+  const stops = ${JSON.stringify(NATIVE_SEGMENT_STOPS)};
+  const type = e.tagName === 'INPUT' ? (e.getAttribute('type') || 'text').toLowerCase() : '';
+  return { key: key || __sel(e), tagged: !!key, selector: __sel(e), html: __html(e), segments: stops[type] || 1 };
+})()`;
+async function probeKeyboardTrapRing(page, limits = PROBE_DEFAULTS, deadline) {
+  const { count, capped } = readSetup(await page.evaluate(focusSetupExpr("", limits.maxFocusables)), limits);
+  if (!count || count < 2) return { hits: [], complete: true };
+  const hits = [];
+  const seen = /* @__PURE__ */ new Set();
+  const confirmPresses = 2;
+  const limit = tabPressBudget(count, limits);
+  let prev = null;
+  let cutShort = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
+  for (let i2 = 0; i2 < limit; i2++) {
+    if (deadline?.out()) {
+      cutShort = `the probe budget of ${limits.budgetMs}ms ran out after ${seen.size} of the ${count} focusable elements \u2014 the rest of the ring was never walked`;
+      break;
+    }
+    await page.keyboard.press("Tab");
+    const now = await page.evaluate(FOCUS_WHERE_PROBE);
+    if (!now) {
+      cutShort = void 0;
+      break;
+    }
+    if (prev?.tagged && now.tagged && now.key === prev.key) {
+      const budget = Math.max(confirmPresses, (now.segments ?? 1) - 1);
+      let stuck = true;
+      let confirmed = true;
+      for (let k = 0; k < budget && stuck; k++) {
+        if (deadline?.out()) {
+          confirmed = false;
+          break;
+        }
+        await page.keyboard.press("Tab");
+        const again = await page.evaluate(FOCUS_WHERE_PROBE);
+        stuck = again !== null && again.tagged === true && again.key === now.key;
+      }
+      if (!confirmed) {
+        cutShort = `the probe budget of ${limits.budgetMs}ms ran out while confirming whether focus could leave ${now.selector} \u2014 an unconfirmed suspicion is not a non-conformity`;
+        break;
+      }
+      if (stuck) {
+        hits.push({
+          selector: now.selector,
+          html: now.html,
+          detail: `Le focus reste sur cet \xE9l\xE9ment apr\xE8s ${1 + budget} appuis sur Tab, alors que la page compte ${count} \xE9l\xE9ments focalisables \u2014 pi\xE8ge au clavier (2.1.2).`
+        });
+        cutShort = void 0;
+        break;
+      }
+    }
+    if (now.key !== prev?.key) {
+      if (seen.has(now.key)) {
+        cutShort = void 0;
+        break;
+      }
+      seen.add(now.key);
+    }
+    prev = now;
+  }
+  if (cutShort && seen.size >= count) cutShort = void 0;
+  const why = cappedRing(capped, limits) ?? cutShort;
+  return { hits, complete: !why, ...why ? { why } : {} };
+}
+async function probeHoverWalk(page, limits = PROBE_DEFAULTS, deadline) {
+  const setup = await page.evaluate(HOVER_SETUP_PROBE);
+  const triggers = setup;
+  const hits = [];
+  let cutShort;
+  let unreachable = 0;
+  const tried = triggers.slice(0, Math.max(1, limits.maxTriggers));
+  if (tried.length < triggers.length) {
+    cutShort = `only ${tried.length} of the ${triggers.length} hover triggers on this page were opened (probes.maxTriggers) \u2014 the rest were never asked whether Escape dismisses them`;
+  }
+  for (const tr of tried) {
+    if (deadline?.out()) {
+      cutShort = `the probe budget of ${limits.budgetMs}ms ran out with triggers left unopened`;
+      break;
+    }
+    try {
+      await page.hover(`[data-u11y-h="${tr.key}"]`, { timeout: actionTimeout(limits, deadline) });
+    } catch {
+      unreachable++;
+      continue;
+    }
+    await page.waitForTimeout(150);
+    const shown = await page.evaluate(hoverVisibleExpr(tr.target));
+    if (!shown) continue;
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(100);
+    const dismissed = await page.evaluate(hoverVisibleExpr(tr.target, true));
+    await page.mouse.move(2, 2).catch(() => {
+    });
+    if (!dismissed) {
+      hits.push({
+        selector: tr.selector,
+        html: "",
+        detail: `Le contenu r\xE9v\xE9l\xE9 au survol (aria-describedby #${tr.target}) ne se masque pas avec \xC9chap \u2014 Contenu au survol ou au focus (1.4.13).`
+      });
+    }
+    if (hits.length >= Math.min(limits.maxHits, 8)) {
+      cutShort = "the recording cap filled with triggers left unopened \u2014 enough was found to fail the page, not enough to clear the rest of it";
+      break;
+    }
+  }
+  const capped = setup[0]?.total;
+  const why = cutShort ?? (typeof capped === "number" && capped > triggers.length ? `only ${triggers.length} of the ${capped} hover triggers on this page were tagged \u2014 the rest were never opened` : void 0) ?? (unreachable > 0 ? `${unreachable} hover trigger(s) never became actionable, so their content was never opened or dismissed` : void 0);
+  return { hits, complete: !why, ...why ? { why } : {} };
+}
+var DESTRUCTIVE_NAME_RE = "\\b(supprim|retir|effac|envoy|valid|confirm|pay|achet|command|delete|remove|eras|clear|send|submit|buy|order)";
+function liveRegionExpr(detail, allowClicks) {
+  const d = JSON.stringify(detail);
+  const clickLoop = allowClicks ? `
+  // click button[type=button] only (never a submit/link), skipping destructive names
+  const dangerous = new RegExp(${JSON.stringify(DESTRUCTIVE_NAME_RE)}, 'i');
+  const nameOf = (b) => {
+    let n = (b.getAttribute('aria-label') || '') + ' ' + (b.textContent || '') + ' ' + (b.getAttribute('title') || '');
+    // ALL aria-labelledby ids (attribute trimmed): a destructive verb may sit in ANY
+    // referenced id, and the value may carry stray leading/trailing whitespace.
+    for (const id of (b.getAttribute('aria-labelledby') || '').trim().split(/\\s+/)) {
+      if (!id) continue;
+      const t = document.getElementById(id);
+      if (t) n += ' ' + (t.textContent || '');
+    }
+    // Icon-only buttons: the name lives in img[alt] (an attribute \u2014 invisible to
+    // textContent) or an svg <title> (belt-and-braces; textContent usually includes it).
+    for (const im of Array.from(b.querySelectorAll('img[alt]'))) n += ' ' + (im.getAttribute('alt') || '');
+    for (const ti of Array.from(b.querySelectorAll('svg title'))) n += ' ' + (ti.textContent || '');
+    return n;
+  };
+  for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
+    if (count >= 20 || hits.length >= 10) { untried += 1; continue; }
+    if (b.disabled || !__vis(b)) continue;
+    if (dangerous.test(nameOf(b))) { untried += 1; continue; } // defense-in-depth: never click a destructive-named button
+    const before = location.href;
+    try { b.click(); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
+    drain();
+    count++;
+  }` : `
+  // CLICKS DISABLED, and the buttons are counted rather than ignored. A status message very
+  // often appears after a button press and nothing else, so a pass that never pressed one has
+  // not measured 4.1.3 on this page -- it has measured the fields. Reporting how many it
+  // declined is what lets the caller withhold the credit instead of publishing silence.
+  for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
+    if (!b.disabled && __vis(b)) untried += 1;
+  }`;
+  return `(async () => { ${PRELUDE}
+  const isLive = (node) => {
+    let el = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
+    while (el && el !== document.documentElement) {
+      const live = (el.getAttribute && el.getAttribute('aria-live')) || '';
+      const role = (el.getAttribute && el.getAttribute('role')) || '';
+      if (live === 'polite' || live === 'assertive') return true;
+      if (role === 'status' || role === 'alert' || role === 'log') return true;
+      el = el.parentElement;
+    }
+    return false;
+  };
+  const hits = [];
+  const seen = new Set();
+  const records = [];
+  const obs = new MutationObserver((muts) => { for (const m of muts) records.push(m); });
+  obs.observe(document.body, { subtree: true, childList: true, characterData: true });
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  const drain = () => {
+    for (const m of records.splice(0)) {
+      const targets = m.type === 'characterData' ? [m.target] : Array.from(m.addedNodes);
+      for (const t of targets) {
+        if (!t || (t.textContent || '').trim().length === 0) continue;
+        if (isLive(t)) continue;
+        const host = t.nodeType === 1 ? t : t.parentElement;
+        if (!host || !__vis(host)) continue;
+        const key = __sel(host);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        hits.push({ selector: key, html: __html(host), detail: ${d} });
+      }
+    }
+  };
+  let count = 0;
+  // How many candidate interactions this pass did NOT perform -- caps, a destructive-sounding
+  // name, clicks turned off. A probe that skipped half a page has not measured it, and the
+  // caller may not read its silence as conformity.
+  let untried = 0;${clickLoop}
+  // toggle checkbox/radio, then restore
+  for (const t of Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'))) {
+    if (count >= 40 || hits.length >= 10) { untried += 1; continue; }
+    if (t.disabled || !__vis(t)) continue;
+    const before = location.href;
+    const prev = t.checked;
+    // A RADIO IS NOT A CHECKBOX: clicking one UNCHECKS its pair, and restoring only the one we
+    // clicked left the group with nothing selected -- a form the caller's next assertion, or
+    // the user, finds broken. Remember which member of the group was checked and put THAT back.
+    let group = null;
+    if (t.type === 'radio' && t.name) {
+      try {
+        const form = t.form || document;
+        for (const r of Array.from(form.querySelectorAll('input[type="radio"]'))) { if (r.name === t.name && r.checked) { group = r; break; } }
+      } catch (_) {}
+    }
+    try { t.click(); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
+    drain();
+    try {
+      if (group) { if (!group.checked) { group.checked = true; group.dispatchEvent(new Event('change', { bubbles: true })); } }
+      else if (t.checked !== prev) { t.checked = prev; t.dispatchEvent(new Event('change', { bubbles: true })); }
+    } catch (_) {}
+    count++;
+  }
+  // fill text inputs, then restore
+  for (const inp of Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="search"], textarea'))) {
+    if (count >= 60 || hits.length >= 10) { untried += 1; continue; }
+    if (inp.disabled || inp.readOnly || !__vis(inp)) continue;
+    const before = location.href;
+    const prev = inp.value == null ? '' : String(inp.value);
+    try { inp.value = 'test 123'; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+    await settle();
+    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
+    drain();
+    try { inp.value = prev; inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    count++;
+  }
+  obs.disconnect();
+  return { hits: hits.slice(0, 10), untried: untried, navigated: false };
+})()`;
+}
+var LIVE_REGION_DETAIL = {
+  fr: "Mise \xE0 jour de contenu d\xE9clench\xE9e par une interaction hors d'une r\xE9gion live (aria-live / role=status|alert|log) \u2014 probablement non restitu\xE9e aux technologies d'assistance.",
+  en: "Content update triggered by an interaction outside any live region (aria-live / role=status|alert|log) \u2014 likely not announced to assistive technology."
+};
+async function probeLiveRegion(page, lang, allowClicks) {
+  const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
+  const r = await page.evaluate(liveRegionExpr(detail, allowClicks));
+  const hits = r?.hits ?? [];
+  if (r?.navigated) {
+    return {
+      hits,
+      complete: false,
+      why: "an interaction navigated away mid-pass \u2014 everything after it happened on another page, and this one was not finished"
+    };
+  }
+  if (r?.untried > 0) {
+    return {
+      hits,
+      complete: false,
+      why: `${r.untried} interactive element(s) were never exercised (clicks disabled, a destructive-sounding name, or a cap) \u2014 a status message that only appears after one of them would not have been seen`
+    };
+  }
+  return { hits, complete: true };
+}
+
 // src/collector.ts
 var COLLECTED_CSS = [
   "color",
@@ -52456,7 +53055,9 @@ function foldDoc(acc, doc, graph) {
     }
     const probes = doc.signals?.probes;
     if (probes) {
+      const trusted = (probes.v ?? 1) >= PROBES_VERSION;
       for (const sc of probes.probed ?? []) {
+        if (!trusted && WALK_DEPENDENT_SCS.includes(sc)) continue;
         const seen = acc.probedScs.get(sc) ?? /* @__PURE__ */ new Set();
         seen.add(pageId);
         acc.probedScs.set(sc, seen);
@@ -64931,6 +65532,9 @@ function probesOf(out2) {
     ...out2.inputOverflowZoom ? { inputOverflowZoom: out2.inputOverflowZoom } : {},
     ...out2.inputOverflowSpacing ? { inputOverflowSpacing: out2.inputOverflowSpacing } : {},
     reflow: out2.reflow,
+    // The contract this file is written under, so a future reader knows what `probed` means
+    // here (src/probes.ts PROBES_VERSION).
+    v: PROBES_VERSION,
     probed: out2.probed ?? [],
     // The complement of `probed`, persisted for the same reason: a report reading this
     // snapshot later must be able to say WHY a criterion was not measured here.
@@ -65399,595 +66003,6 @@ function mergeSnapshotAudit(base, snap) {
 import { existsSync as existsSync27, statSync as statSync14 } from "fs";
 import { createRequire } from "module";
 import { resolve as resolve12 } from "path";
-
-// src/probes.ts
-var PRELUDE = `
-const __sel = (e) => {
-  if (!e || !e.tagName) return '\u2014';
-  const esc = (v) => (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(v) : String(v).replace(/[^a-zA-Z0-9_-]/g, '\\\\$&');
-  const unique = (s) => { try { return document.querySelectorAll(s).length === 1; } catch { return false; } };
-  const short = (n) => {
-    const t = n.tagName.toLowerCase();
-    if (n.id) return t + '#' + esc(n.id);
-    const c = typeof n.className === 'string' ? n.className.trim().split(/\\s+/)[0] : '';
-    return c ? t + '.' + esc(c) : t;
-  };
-  const first = short(e);
-  if (unique(first)) return first;
-  const parts = [];
-  for (let n = e; n && n.tagName; n = n.parentElement) {
-    let part = short(n);
-    if (n.id && unique(part)) { parts.unshift(part); return parts.join(' > '); }
-    const parent = n.parentElement;
-    if (parent) {
-      const same = Array.from(parent.children).filter((x) => x.tagName === n.tagName);
-      if (same.length > 1) part += ':nth-of-type(' + (same.indexOf(n) + 1) + ')';
-    }
-    parts.unshift(part);
-    const path = parts.join(' > ');
-    if (unique(path)) return path;
-  }
-  return parts.join(' > ') || first;
-};
-const __vis = (e) => {
-  const r = e.getBoundingClientRect();
-  if (r.width <= 4 || r.height <= 4) return false; // tiny / 1px sr-only boxes
-  const s = getComputedStyle(e);
-  if (s.display === 'none' || s.visibility === 'hidden' || parseFloat(s.opacity) === 0) return false;
-  // visually-hidden "screen-reader-only" pattern (clip rect / clip-path inset) \u2014 present in
-  // the a11y tree but not painted; must not be measured for clipping/target-size.
-  if (s.clip && s.clip !== 'auto' && s.clip !== 'rect(auto, auto, auto, auto)') return false;
-  if (s.clipPath && (s.clipPath.indexOf('inset(100%') >= 0 || s.clipPath.indexOf('inset(50%') >= 0)) return false;
-  return true;
-};
-const __html = (e) => (e.outerHTML || '').slice(0, 160);
-`;
-var PROBE_DEFAULTS = {
-  reflowWidth: 320,
-  maxFocusables: 120,
-  maxHits: 20,
-  maxTriggers: 60,
-  actionTimeoutMs: 1e3,
-  budgetMs: 2e4
-};
-function actionTimeout(limits, deadline) {
-  const left = deadline ? deadline.left() : limits.actionTimeoutMs;
-  return Math.max(1, Math.min(limits.actionTimeoutMs, left || limits.actionTimeoutMs));
-}
-var REFLOW_PROBE = `(() => {
-  const el = document.scrollingElement || document.documentElement;
-  return { horizontalScroll: el.scrollWidth > el.clientWidth + 2 };
-})()`;
-var REFLOW_ZOOM_PROBE = `(() => { ${PRELUDE}
-  const root = document.documentElement;
-  const prev = root.style.fontSize;
-  root.style.fontSize = '200%';
-  const hits = [];
-  for (const e of Array.from(document.querySelectorAll('p,li,h1,h2,h3,h4,h5,h6,td,th,button,a,label,span'))) {
-    if (!__vis(e)) continue;
-    if ((e.textContent || '').trim().length < 8) continue;
-    const s = getComputedStyle(e);
-    const clip = s.overflow === 'hidden' || s.overflowY === 'hidden' || s.overflowX === 'hidden';
-    const noWrap = s.whiteSpace === 'nowrap' || s.textOverflow === 'ellipsis';
-    if ((clip || noWrap) && (e.scrollHeight > e.clientHeight + 6 || e.scrollWidth > e.clientWidth + 6)) {
-      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqu\xE9/masqu\xE9 \xE0 200% (conteneur overflow:hidden / nowrap) \u2014 perte de contenu au zoom (1.4.4).' });
-    }
-    if (hits.length >= 12) break;
-  }
-  root.style.fontSize = prev;
-  return hits;
-})()`;
-var TEXT_SPACING_CSS = "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }";
-var TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
-  const hits = [];
-  for (const e of Array.from(document.querySelectorAll('p,li,span,a,button,h1,h2,h3,h4,h5,h6,td,th,label,div'))) {
-    if (!__vis(e)) continue;
-    if ((e.textContent || '').trim().length < 8) continue;
-    const s = getComputedStyle(e);
-    const clipped = (s.overflowX === 'hidden' || s.overflowY === 'hidden' || s.overflow === 'hidden') && (e.scrollHeight > e.clientHeight + 2 || e.scrollWidth > e.clientWidth + 2);
-    const ellipsis = s.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 2;
-    if (clipped || ellipsis) {
-      // No criterion id in the text: every rendering already names the criterion this finding
-      // belongs to, and a hard-coded \xAB 1.4.12 \xBB is a WCAG number appearing inside a deliverable
-      // that may be keyed on another standard entirely.
-      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqu\xE9/masqu\xE9 sous l\\'espacement de texte impos\xE9 \u2014 perte de contenu.' });
-    }
-    if (hits.length >= 20) break;
-  }
-  return hits;
-})()`;
-function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables) {
-  const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
-  return `(() => { ${PRELUDE}
-  // FOCUSABLE MEANS FOCUSABLE, NOT "the six tags we thought of". This list decides which
-  // elements get tagged, and since the walk may now license a conformity, an element missing
-  // from it is not merely unmeasured -- it is silently cleared. A page whose only control is a
-  // <summary> tagged nothing at all, so the count was zero, so the ring was "vacuously whole",
-  // so 2.4.7 and 2.4.11 closed without a single Tab press.
-  // (No backticks in this comment: it lives inside a template literal.)
-  const sel = 'a[href],area[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,iframe,audio[controls],video[controls],[contenteditable]:not([contenteditable="false"]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
-  // A BOX THAT IS ANIMATING CANNOT BE COMPARED ACROSS TIME, so it contributes a constant.
-  //
-  // The snapshot is taken before Tab and re-read after it, and the properties compared include
-  // background-color and colour \u2014 so a pseudo-element pulsing on a keyframe animation differs
-  // between the two reads for a reason that has nothing to do with focus. That reads as \xAB the
-  // focus is visible \xBB on a control that has no indicator at all: a MISSED non-conformity,
-  // strictly worse than the false positive the pseudo-element read was added to remove.
-  //
-  // A transition is not affected and must not be excluded: it only moves on a state change,
-  // so its at-rest value is stable and a focus transition is exactly what we want to see.
-  //
-  // When every part of an element is animated, both sides collapse to the same constant and
-  // the probe reports \xAB no visible change \xBB \u2014 a finding rather than a silent pass. That is the
-  // safe direction: this tool would rather name something a human can dismiss than clear
-  // something nobody will look at again.
-  const __style = (e, pseudo) => { const s = getComputedStyle(e, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
-  const snap = (e) => [__style(e, null), __style(e, '::before'), __style(e, '::after')].join('#');
-  // Visually-hidden radio/checkbox \u2192 measure its visible label/proxy, not the input.
-  const proxyFor = (e) => {
-    const type = (e.getAttribute('type') || '').toLowerCase();
-    const custom = e.tagName === 'INPUT' && (type === 'radio' || type === 'checkbox') && !__vis(e);
-    if (!custom) return __vis(e) ? e : null;
-    let p = null;
-    if (e.id) { try { p = document.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(e.id) : e.id) + '"]'); } catch (_) {} }
-    if (!p) p = e.closest('label');
-    if (!p) { const lb = (e.getAttribute('aria-labelledby') || '').split(/\\s+/)[0]; if (lb) p = document.getElementById(lb); }
-    return (p && __vis(p)) ? p : null;
-  };
-  // Fresh authoritative pass: drop any tags a previous (whole-document or dialog) pass left.
-  for (const el of Array.from(document.querySelectorAll('[data-u11y-f],[data-u11y-fp]'))) { el.removeAttribute('data-u11y-f'); el.removeAttribute('data-u11y-fp'); }
-  const roots = ${rootExpr};
-  const focusables = [];
-  let total = 0;
-  for (const root of Array.from(roots)) {
-    if (root.matches && root.matches(sel)) focusables.push(root);
-    for (const e of Array.from(root.querySelectorAll(sel))) focusables.push(e);
-  }
-  window.__u11yF = {};
-  let n = 0;
-  for (const e of focusables) {
-    const proxy = proxyFor(e);
-    if (!proxy) continue;
-    const key = 'k' + n;
-    total++;
-    if (n >= ${maxFocusables}) continue; // tagged the cap; keep COUNTING so the caller knows it was cut
-    e.setAttribute('data-u11y-f', key);
-    proxy.setAttribute('data-u11y-fp', key);
-    window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy) };
-    n++;
-  }
-  return { n: n, total: total };
-})()`;
-}
-var FOCUS_CHECK_PROBE = `(() => {
-  const e = document.activeElement;
-  // FOCUS LEFT THE DOCUMENT \u2014 the normal end of a tab ring, and nothing to measure.
-  if (!e || e === document.body || e === document.documentElement) return null;
-  const key = e.getAttribute && e.getAttribute('data-u11y-f');
-  // FOCUS IS ON SOMETHING THE SETUP NEVER TAGGED, which is a different fact entirely and used
-  // to be reported as the same one. A skip link revealed only on focus, a widget that moves
-  // focus into a node the selector does not match -- Tab crossed it, nothing measured it, and
-  // the walk went on to call itself whole. The caller needs to know the ring contained an
-  // element it cannot speak for. (No backticks here: this lives inside a template literal.)
-  if (!key || !window.__u11yF || !window.__u11yF[key]) return { untagged: true, key: '', changed: true, selector: '', html: '' };
-  const rec = window.__u11yF[key];
-  const proxy = document.querySelector('[data-u11y-fp="' + key + '"]') || e;
-  // THE SAME THREE BOXES pass 1 snapshotted, in the same order. A design system that paints
-  // its control in label::before -- DSFR, GOV.UK, USWDS, Bootstrap -- puts the focus ring
-  // there too, and reading only the element would report every one of them as unfocusable.
-  // (No backticks in this comment: it lives inside a template literal.)
-  // Same three boxes, same animation exclusion as pass 1 -- an animating box contributes a
-  // constant on both sides, so it can never fabricate a difference (nor hide a real one).
-  const st = (pseudo) => { const s = getComputedStyle(proxy, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
-  const now = [st(null), st('::before'), st('::after')].join('#');
-  return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
-})()`;
-var FOCUS_OBSCURED_PROBE = `(() => { ${PRELUDE}
-  const e = document.activeElement;
-  if (!e || e === document.body || e === document.documentElement) return null;
-  const key = e.getAttribute && e.getAttribute('data-u11y-f');
-  if (!key) return null;
-  const r = e.getBoundingClientRect();
-  if (r.width < 1 || r.height < 1) return null;         // nothing to obscure
-  const vw = window.innerWidth, vh = window.innerHeight;
-  // Sample a 5\xD75 grid inset by a pixel, keeping only points inside the viewport. A component
-  // scrolled off-screen leaves no sampleable point and is NOT reported: out of view is not
-  // obscured, and the criterion is about content laid over it.
-  const xs = [0.02, 0.25, 0.5, 0.75, 0.98], pts = [];
-  for (const fx of xs) for (const fy of xs) {
-    const x = r.left + r.width * fx, y = r.top + r.height * fy;
-    if (x >= 0 && y >= 0 && x < vw && y < vh) pts.push([x, y]);
-  }
-  if (!pts.length) return null;
-  // The topmost element over a point, for each sampled point. The focused element counts as
-  // visible when it \u2014 or anything inside it \u2014 is on top: an icon inside a button is the button
-  // being visible, and reading that as occlusion would fail every well-built page.
-  let occluder = null;
-  for (const [x, y] of pts) {
-    const top = document.elementsFromPoint(x, y)[0];
-    if (!top) continue;
-    if (top === e || e.contains(top)) return null;      // some part of it is on top \u2192 pass
-    if (!occluder) occluder = top;
-  }
-  if (!occluder) return null;
-  // AUTHOR-CREATED OVERLAY, or nothing. Walk up from the occluder looking for the fixed/sticky
-  // ancestor that puts it over the page; without one this is ordinary layout, not obscuring.
-  let overlay = null;
-  for (let n = occluder; n && n !== document.documentElement; n = n.parentElement) {
-    const pos = getComputedStyle(n).position;
-    if (pos === 'fixed' || pos === 'sticky') { overlay = n; break; }
-  }
-  if (!overlay) return null;
-  if (overlay.contains(e)) return null;                 // it is the component's own container
-  return { key: key, selector: __sel(e), html: __html(e), overlay: __sel(overlay) };
-})()`;
-var HOVER_SETUP_PROBE = `(() => { ${PRELUDE}
-  const out = [];
-  let n = 0;
-  let total = 0;
-  for (const e of Array.from(document.querySelectorAll('[aria-describedby]'))) {
-    const id = (e.getAttribute('aria-describedby') || '').split(/\\s+/)[0];
-    if (!id) continue;
-    const t = document.getElementById(id);
-    if (!t) continue;
-    // THE TRIGGER ITSELF HAS TO BE THERE. 1.4.13 is about content revealed on hover or focus,
-    // and an element that is not rendered reveals nothing to anybody -- hovering it was always
-    // futile, and once an unreachable trigger started withholding the criterion, that futility
-    // would have turned into a page nobody could ever clear.
-    if (!__vis(e)) continue;
-    const s = getComputedStyle(t);
-    const hidden = s.display === 'none' || s.visibility === 'hidden' || t.getBoundingClientRect().height === 0;
-    if (!hidden) continue;
-    total++;
-    if (n >= 10) continue; // tagged ten; keep COUNTING so the caller knows what it did not see
-    const key = 'h' + n;
-    e.setAttribute('data-u11y-h', key);
-    out.push({ key: key, target: id, selector: __sel(e) });
-    n++;
-  }
-  for (const o of out) o.total = total;
-  return out;
-})()`;
-function hoverVisibleExpr(id, wantHidden = false) {
-  const j = JSON.stringify(id);
-  return `(() => { const t = document.getElementById(${j}); if (!t) return ${wantHidden ? "true" : "false"}; const s = getComputedStyle(t); const shown = s.display !== 'none' && s.visibility !== 'hidden' && t.getBoundingClientRect().height > 0; return ${wantHidden ? "!shown" : "shown"}; })()`;
-}
-function readSetup(raw, limits) {
-  if (typeof raw === "number") return { count: raw, capped: raw >= limits.maxFocusables };
-  const o = raw ?? {};
-  const count = o.n ?? 0;
-  return { count, capped: (o.total ?? count) > count };
-}
-function cappedRing(capped, limits) {
-  return capped ? `the setup pass stopped tagging at ${limits.maxFocusables} focusable elements (probes.maxFocusables), so everything past that was never focused and never measured` : void 0;
-}
-async function probeFocusVisible(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
-  return (await probeFocusRing(page, scope, limits, deadline)).visible;
-}
-async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadline) {
-  const { count, capped } = readSetup(await page.evaluate(focusSetupExpr(scope, limits.maxFocusables)), limits);
-  if (!count) return { visible: [], obscured: [], complete: true };
-  const hits = [];
-  const obscured = [];
-  const seen = /* @__PURE__ */ new Set();
-  const limit = tabPressBudget(count, limits);
-  let prevKey = null;
-  let cutShort = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
-  let untagged = 0;
-  for (let i2 = 0; i2 < limit; i2++) {
-    if (deadline?.out()) {
-      cutShort = `the probe budget of ${limits.budgetMs}ms ran out after ${seen.size} of the ${count} focusable elements \u2014 the rest of the ring was never focused`;
-      break;
-    }
-    await page.keyboard.press("Tab");
-    const r = await page.evaluate(FOCUS_CHECK_PROBE);
-    if (!r) continue;
-    if (r.untagged) {
-      untagged++;
-      continue;
-    }
-    if (r.key === prevKey) continue;
-    if (seen.has(r.key)) {
-      cutShort = void 0;
-      break;
-    }
-    seen.add(r.key);
-    prevKey = r.key;
-    if (!r.changed) {
-      hits.push({
-        selector: r.selector,
-        html: r.html,
-        detail: "Le focus clavier ne produit aucun changement visible (outline/box-shadow/bordure/fond) \u2014 focus non visible."
-      });
-    }
-    if (obscured.length < 20 && !deadline?.out()) {
-      const o = await page.evaluate(FOCUS_OBSCURED_PROBE);
-      if (o) {
-        obscured.push({
-          selector: o.selector,
-          html: o.html,
-          detail: `Le composant qui re\xE7oit le focus clavier est enti\xE8rement masqu\xE9 par un contenu ajout\xE9 par l'auteur (${o.overlay}) \u2014 il est impossible de voir o\xF9 l'on se trouve au clavier.`
-        });
-      }
-    }
-    if (hits.length >= 20 && obscured.length >= 20) {
-      cutShort = `both recording caps filled at ${seen.size} of the ${count} focusable elements \u2014 enough was found to fail the page, not enough to clear the rest of it`;
-      break;
-    }
-  }
-  if (cutShort && seen.size >= count) cutShort = void 0;
-  const why = cappedRing(capped, limits) ?? cutShort ?? (untagged > 0 ? `Tab crossed ${untagged} element(s) the tagging pass never matched \u2014 a control focusable in the browser but not by this selector (a skip link revealed on focus, a widget moving focus into an untagged node). They were never compared, so this page is not cleared` : void 0);
-  return { visible: hits, obscured, complete: !why, ...why ? { why } : {} };
-}
-var NATIVE_SEGMENT_STOPS = {
-  date: 5,
-  time: 5,
-  "datetime-local": 8,
-  month: 4,
-  week: 4
-};
-function tabPressBudget(count, limits) {
-  return Math.min(count * 2 + 20, limits.maxFocusables * 2 + 20);
-}
-var FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
-  const e = document.activeElement;
-  if (!e || e === document.body || e === document.documentElement) return null;
-  const key = e.getAttribute && e.getAttribute('data-u11y-f');
-  const stops = ${JSON.stringify(NATIVE_SEGMENT_STOPS)};
-  const type = e.tagName === 'INPUT' ? (e.getAttribute('type') || 'text').toLowerCase() : '';
-  return { key: key || __sel(e), tagged: !!key, selector: __sel(e), html: __html(e), segments: stops[type] || 1 };
-})()`;
-async function probeKeyboardTrapRing(page, limits = PROBE_DEFAULTS, deadline) {
-  const { count, capped } = readSetup(await page.evaluate(focusSetupExpr("", limits.maxFocusables)), limits);
-  if (!count || count < 2) return { hits: [], complete: true };
-  const hits = [];
-  const seen = /* @__PURE__ */ new Set();
-  const confirmPresses = 2;
-  const limit = tabPressBudget(count, limits);
-  let prev = null;
-  let cutShort = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
-  for (let i2 = 0; i2 < limit; i2++) {
-    if (deadline?.out()) {
-      cutShort = `the probe budget of ${limits.budgetMs}ms ran out after ${seen.size} of the ${count} focusable elements \u2014 the rest of the ring was never walked`;
-      break;
-    }
-    await page.keyboard.press("Tab");
-    const now = await page.evaluate(FOCUS_WHERE_PROBE);
-    if (!now) {
-      cutShort = void 0;
-      break;
-    }
-    if (prev?.tagged && now.tagged && now.key === prev.key) {
-      const budget = Math.max(confirmPresses, (now.segments ?? 1) - 1);
-      let stuck = true;
-      let confirmed = true;
-      for (let k = 0; k < budget && stuck; k++) {
-        if (deadline?.out()) {
-          confirmed = false;
-          break;
-        }
-        await page.keyboard.press("Tab");
-        const again = await page.evaluate(FOCUS_WHERE_PROBE);
-        stuck = again !== null && again.tagged === true && again.key === now.key;
-      }
-      if (!confirmed) {
-        cutShort = `the probe budget of ${limits.budgetMs}ms ran out while confirming whether focus could leave ${now.selector} \u2014 an unconfirmed suspicion is not a non-conformity`;
-        break;
-      }
-      if (stuck) {
-        hits.push({
-          selector: now.selector,
-          html: now.html,
-          detail: `Le focus reste sur cet \xE9l\xE9ment apr\xE8s ${1 + budget} appuis sur Tab, alors que la page compte ${count} \xE9l\xE9ments focalisables \u2014 pi\xE8ge au clavier (2.1.2).`
-        });
-        cutShort = void 0;
-        break;
-      }
-    }
-    if (now.key !== prev?.key) {
-      if (seen.has(now.key)) {
-        cutShort = void 0;
-        break;
-      }
-      seen.add(now.key);
-    }
-    prev = now;
-  }
-  if (cutShort && seen.size >= count) cutShort = void 0;
-  const why = cappedRing(capped, limits) ?? cutShort;
-  return { hits, complete: !why, ...why ? { why } : {} };
-}
-async function probeHoverWalk(page, limits = PROBE_DEFAULTS, deadline) {
-  const setup = await page.evaluate(HOVER_SETUP_PROBE);
-  const triggers = setup;
-  const hits = [];
-  let cutShort;
-  let unreachable = 0;
-  const tried = triggers.slice(0, Math.max(1, limits.maxTriggers));
-  if (tried.length < triggers.length) {
-    cutShort = `only ${tried.length} of the ${triggers.length} hover triggers on this page were opened (probes.maxTriggers) \u2014 the rest were never asked whether Escape dismisses them`;
-  }
-  for (const tr of tried) {
-    if (deadline?.out()) {
-      cutShort = `the probe budget of ${limits.budgetMs}ms ran out with triggers left unopened`;
-      break;
-    }
-    try {
-      await page.hover(`[data-u11y-h="${tr.key}"]`, { timeout: actionTimeout(limits, deadline) });
-    } catch {
-      unreachable++;
-      continue;
-    }
-    await page.waitForTimeout(150);
-    const shown = await page.evaluate(hoverVisibleExpr(tr.target));
-    if (!shown) continue;
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(100);
-    const dismissed = await page.evaluate(hoverVisibleExpr(tr.target, true));
-    await page.mouse.move(2, 2).catch(() => {
-    });
-    if (!dismissed) {
-      hits.push({
-        selector: tr.selector,
-        html: "",
-        detail: `Le contenu r\xE9v\xE9l\xE9 au survol (aria-describedby #${tr.target}) ne se masque pas avec \xC9chap \u2014 Contenu au survol ou au focus (1.4.13).`
-      });
-    }
-    if (hits.length >= Math.min(limits.maxHits, 8)) {
-      cutShort = "the recording cap filled with triggers left unopened \u2014 enough was found to fail the page, not enough to clear the rest of it";
-      break;
-    }
-  }
-  const capped = setup[0]?.total;
-  const why = cutShort ?? (typeof capped === "number" && capped > triggers.length ? `only ${triggers.length} of the ${capped} hover triggers on this page were tagged \u2014 the rest were never opened` : void 0) ?? (unreachable > 0 ? `${unreachable} hover trigger(s) never became actionable, so their content was never opened or dismissed` : void 0);
-  return { hits, complete: !why, ...why ? { why } : {} };
-}
-var DESTRUCTIVE_NAME_RE = "\\b(supprim|retir|effac|envoy|valid|confirm|pay|achet|command|delete|remove|eras|clear|send|submit|buy|order)";
-function liveRegionExpr(detail, allowClicks) {
-  const d = JSON.stringify(detail);
-  const clickLoop = allowClicks ? `
-  // click button[type=button] only (never a submit/link), skipping destructive names
-  const dangerous = new RegExp(${JSON.stringify(DESTRUCTIVE_NAME_RE)}, 'i');
-  const nameOf = (b) => {
-    let n = (b.getAttribute('aria-label') || '') + ' ' + (b.textContent || '') + ' ' + (b.getAttribute('title') || '');
-    // ALL aria-labelledby ids (attribute trimmed): a destructive verb may sit in ANY
-    // referenced id, and the value may carry stray leading/trailing whitespace.
-    for (const id of (b.getAttribute('aria-labelledby') || '').trim().split(/\\s+/)) {
-      if (!id) continue;
-      const t = document.getElementById(id);
-      if (t) n += ' ' + (t.textContent || '');
-    }
-    // Icon-only buttons: the name lives in img[alt] (an attribute \u2014 invisible to
-    // textContent) or an svg <title> (belt-and-braces; textContent usually includes it).
-    for (const im of Array.from(b.querySelectorAll('img[alt]'))) n += ' ' + (im.getAttribute('alt') || '');
-    for (const ti of Array.from(b.querySelectorAll('svg title'))) n += ' ' + (ti.textContent || '');
-    return n;
-  };
-  for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
-    if (count >= 20 || hits.length >= 10) { untried += 1; continue; }
-    if (b.disabled || !__vis(b)) continue;
-    if (dangerous.test(nameOf(b))) { untried += 1; continue; } // defense-in-depth: never click a destructive-named button
-    const before = location.href;
-    try { b.click(); } catch (_) {}
-    await settle();
-    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
-    drain();
-    count++;
-  }` : `
-  // CLICKS DISABLED, and the buttons are counted rather than ignored. A status message very
-  // often appears after a button press and nothing else, so a pass that never pressed one has
-  // not measured 4.1.3 on this page -- it has measured the fields. Reporting how many it
-  // declined is what lets the caller withhold the credit instead of publishing silence.
-  for (const b of Array.from(document.querySelectorAll('button[type="button"]'))) {
-    if (!b.disabled && __vis(b)) untried += 1;
-  }`;
-  return `(async () => { ${PRELUDE}
-  const isLive = (node) => {
-    let el = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
-    while (el && el !== document.documentElement) {
-      const live = (el.getAttribute && el.getAttribute('aria-live')) || '';
-      const role = (el.getAttribute && el.getAttribute('role')) || '';
-      if (live === 'polite' || live === 'assertive') return true;
-      if (role === 'status' || role === 'alert' || role === 'log') return true;
-      el = el.parentElement;
-    }
-    return false;
-  };
-  const hits = [];
-  const seen = new Set();
-  const records = [];
-  const obs = new MutationObserver((muts) => { for (const m of muts) records.push(m); });
-  obs.observe(document.body, { subtree: true, childList: true, characterData: true });
-  const settle = () => new Promise((r) => setTimeout(r, 40));
-  const drain = () => {
-    for (const m of records.splice(0)) {
-      const targets = m.type === 'characterData' ? [m.target] : Array.from(m.addedNodes);
-      for (const t of targets) {
-        if (!t || (t.textContent || '').trim().length === 0) continue;
-        if (isLive(t)) continue;
-        const host = t.nodeType === 1 ? t : t.parentElement;
-        if (!host || !__vis(host)) continue;
-        const key = __sel(host);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        hits.push({ selector: key, html: __html(host), detail: ${d} });
-      }
-    }
-  };
-  let count = 0;
-  // How many candidate interactions this pass did NOT perform -- caps, a destructive-sounding
-  // name, clicks turned off. A probe that skipped half a page has not measured it, and the
-  // caller may not read its silence as conformity.
-  let untried = 0;${clickLoop}
-  // toggle checkbox/radio, then restore
-  for (const t of Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'))) {
-    if (count >= 40 || hits.length >= 10) { untried += 1; continue; }
-    if (t.disabled || !__vis(t)) continue;
-    const before = location.href;
-    const prev = t.checked;
-    // A RADIO IS NOT A CHECKBOX: clicking one UNCHECKS its pair, and restoring only the one we
-    // clicked left the group with nothing selected -- a form the caller's next assertion, or
-    // the user, finds broken. Remember which member of the group was checked and put THAT back.
-    let group = null;
-    if (t.type === 'radio' && t.name) {
-      try {
-        const form = t.form || document;
-        for (const r of Array.from(form.querySelectorAll('input[type="radio"]'))) { if (r.name === t.name && r.checked) { group = r; break; } }
-      } catch (_) {}
-    }
-    try { t.click(); } catch (_) {}
-    await settle();
-    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
-    drain();
-    try {
-      if (group) { if (!group.checked) { group.checked = true; group.dispatchEvent(new Event('change', { bubbles: true })); } }
-      else if (t.checked !== prev) { t.checked = prev; t.dispatchEvent(new Event('change', { bubbles: true })); }
-    } catch (_) {}
-    count++;
-  }
-  // fill text inputs, then restore
-  for (const inp of Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="search"], textarea'))) {
-    if (count >= 60 || hits.length >= 10) { untried += 1; continue; }
-    if (inp.disabled || inp.readOnly || !__vis(inp)) continue;
-    const before = location.href;
-    const prev = inp.value == null ? '' : String(inp.value);
-    try { inp.value = 'test 123'; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
-    await settle();
-    if (location.href !== before) { obs.disconnect(); return { hits: hits, untried: untried, navigated: true }; }
-    drain();
-    try { inp.value = prev; inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
-    count++;
-  }
-  obs.disconnect();
-  return { hits: hits.slice(0, 10), untried: untried, navigated: false };
-})()`;
-}
-var LIVE_REGION_DETAIL = {
-  fr: "Mise \xE0 jour de contenu d\xE9clench\xE9e par une interaction hors d'une r\xE9gion live (aria-live / role=status|alert|log) \u2014 probablement non restitu\xE9e aux technologies d'assistance.",
-  en: "Content update triggered by an interaction outside any live region (aria-live / role=status|alert|log) \u2014 likely not announced to assistive technology."
-};
-async function probeLiveRegion(page, lang, allowClicks) {
-  const detail = LIVE_REGION_DETAIL[lang] ?? LIVE_REGION_DETAIL.en;
-  const r = await page.evaluate(liveRegionExpr(detail, allowClicks));
-  const hits = r?.hits ?? [];
-  if (r?.navigated) {
-    return {
-      hits,
-      complete: false,
-      why: "an interaction navigated away mid-pass \u2014 everything after it happened on another page, and this one was not finished"
-    };
-  }
-  if (r?.untried > 0) {
-    return {
-      hits,
-      complete: false,
-      why: `${r.untried} interactive element(s) were never exercised (clicks disabled, a destructive-sounding name, or a cap) \u2014 a status message that only appears after one of them would not have been seen`
-    };
-  }
-  return { hits, complete: true };
-}
-
-// src/scan-local.ts
 var LOCAL_ENGINE = "axe-core@playwright (local)";
 var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
 function localTestedScs(interact) {

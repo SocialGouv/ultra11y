@@ -27,6 +27,7 @@ import {
   type SnapshotMeta,
   type SnapshotProbes,
 } from "./snapshot.js";
+import { PROBES_VERSION } from "./probes.js";
 import { today } from "./util.js";
 import { findingId } from "./baseline.js";
 
@@ -259,6 +260,9 @@ function probesOf(out: RunnerOutput): SnapshotProbes {
     ...(out.inputOverflowZoom ? { inputOverflowZoom: out.inputOverflowZoom } : {}),
     ...(out.inputOverflowSpacing ? { inputOverflowSpacing: out.inputOverflowSpacing } : {}),
     reflow: out.reflow,
+    // The contract this file is written under, so a future reader knows what `probed` means
+    // here (src/probes.ts PROBES_VERSION).
+    v: PROBES_VERSION,
     probed: out.probed ?? [],
     // The complement of `probed`, persisted for the same reason: a report reading this
     // snapshot later must be able to say WHY a criterion was not measured here.

@@ -133,6 +133,7 @@ var COLLECT_SNAPSHOT = `(() => {
 })()`;
 
 // src/probes.ts
+var PROBES_VERSION = 2;
 var PRELUDE = `
 const __sel = (e) => {
   if (!e || !e.tagName) return '\u2014';
@@ -240,8 +241,18 @@ function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables
   // from it is not merely unmeasured -- it is silently cleared. A page whose only control is a
   // <summary> tagged nothing at all, so the count was zero, so the ring was "vacuously whole",
   // so 2.4.7 and 2.4.11 closed without a single Tab press.
+  //
+  // AND NOT iframe / audio[controls] / video[controls], which were here for one release and
+  // had to come back out. They are genuinely focusable, but their focus lives in another
+  // document: everything below reads the PARENT'S activeElement, which stays the host element
+  // press after press while the user tabs through the controls inside. The trap walk reads
+  // exactly that as a cage, so an ordinary page with a video player, a payment frame, a map or
+  // a support widget was reported as a bloquant 2.1.2 -- a blocker manufactured out of our own
+  // blindness, able to fail somebody else's gate. The measurement we cannot make is not a
+  // finding; Tab still crosses them, the walk still records that it crossed something it never
+  // measured, and the page is not cleared either.
   // (No backticks in this comment: it lives inside a template literal.)
-  const sel = 'a[href],area[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,iframe,audio[controls],video[controls],[contenteditable]:not([contenteditable="false"]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
+  const sel = 'a[href],area[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[contenteditable]:not([contenteditable="false"]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
   // A BOX THAT IS ANIMATING CANNOT BE COMPARED ACROSS TIME, so it contributes a constant.
   //
   // The snapshot is taken before Tab and re-read after it, and the properties compared include
@@ -587,6 +598,7 @@ async function runLiveProbes(page, opts = {}) {
   const size = canResize ? page.viewportSize() ?? null : null;
   const restore = size ?? { width: 1280, height: 900 };
   const out = {
+    v: PROBES_VERSION,
     focusVisible: [],
     hover: [],
     keyboardTrap: [],
@@ -701,6 +713,12 @@ async function runLiveProbes(page, opts = {}) {
       out.liveRegion = r.hits;
       if (r.complete) out.probed.push("4.1.3");
       else skip("4.1.3", r.why ?? "the live-region pass did not exercise the whole page");
+    }
+  }
+  for (const [bucket, sc] of UNREADABLE_BY_OLDER) {
+    if (out[bucket]?.length) {
+      const at = out.probed.indexOf(sc);
+      if (at >= 0) out.probed.splice(at, 1);
     }
   }
   return out;
@@ -856,6 +874,11 @@ var REMOVE_TEXT_SPACING_STEP = `(() => {
   }
   return true;
 })()`;
+var UNREADABLE_BY_OLDER = [
+  ["focusObscured", "2.4.11"],
+  ["keyboardTrap", "2.1.2"],
+  ["liveRegion", "4.1.3"]
+];
 
 // src/integrations/core.ts
 import { spawnSync } from "child_process";
@@ -1055,9 +1078,13 @@ async function checkA11y(page, opts = {}) {
     );
   }
   let probes;
-  if (opts.probes) {
+  if (opts.probes || opts.liveRegion) {
     try {
-      probes = await runLiveProbes(page, { ...probeOptions(opts.probes), ...opts.liveRegion ? { liveRegion: opts.liveRegion } : {} });
+      probes = await runLiveProbes(page, {
+        ...probeOptions(opts.probes),
+        ...opts.probes ? {} : { only: ["4.1.3"] },
+        ...opts.liveRegion ? { liveRegion: opts.liveRegion } : {}
+      });
     } catch (e) {
       console.warn(
         `ultra11y: the live probes failed on this page \u2014 ${e instanceof Error ? e.message : String(e)}. The snapshot was still recorded; the criteria they decide stay to assess.`

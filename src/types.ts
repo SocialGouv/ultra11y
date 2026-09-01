@@ -427,6 +427,8 @@ export interface RenderSignals {
    *  text spacing, focus visibility, hover). Carries `probed` — the criteria actually looked
    *  at — because an empty hit list is only evidence for those. */
   probes?: {
+    /** The coverage contract this capture was written against (src/snapshot.ts PROBES_VERSION). */
+    v?: number;
     focusVisible?: { selector: string; html: string; detail: string }[];
     /** 2.4.11 — the focused component entirely hidden behind author-created content. */
     focusObscured?: { selector: string; html: string; detail: string }[];

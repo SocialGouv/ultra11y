@@ -15,7 +15,7 @@ import { join } from "node:path";
 
 import { runAudit } from "../src/audit.js";
 import { untestedNeedsRendering } from "../src/report.js";
-import { PAGES_DIR, SNAPSHOT_VERSION, writeSnapshot, type StyleEntry } from "../src/snapshot.js";
+import { PAGES_DIR, PROBES_VERSION, SNAPSHOT_VERSION, writeSnapshot, type StyleEntry } from "../src/snapshot.js";
 
 let root: string;
 beforeEach(() => {
@@ -66,7 +66,9 @@ describe("a live probe is the other way a criterion gets measured", () => {
   // keyboard-trap probe landed and 2.4.11 when the focus-obscured probe joined the same walk
   // of the tab ring; this fixture has to follow, or the banner assertion below measures a
   // sweep no runtime performs.
-  const probed = { probed: ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11"] };
+  // `v` is what makes `probed` believable for the criteria whose claim depends on a walk having
+  // FINISHED; a file without it predates that check and is not read as one that passed it.
+  const probed = { v: PROBES_VERSION, probed: ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11"] };
 
   it("concludes C when the probe ran on every page and observed nothing", () => {
     const r = auditPages(2, () => ({ probes: probed }));

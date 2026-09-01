@@ -12,6 +12,7 @@
 // so a test that owns its page and asserts a line later must ask for it — while a sweep exists
 // for nothing but recording the sample and asserts nothing afterwards.
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { liveRegionExpr, LIVE_REGION_DETAIL, runLiveProbes } from "../src/probes.js";
 import { sweepCheckOptions } from "../src/integrations/playwright.js";
@@ -103,5 +104,21 @@ describe("even a sweep does not turn it on by itself", () => {
   it("can be turned on deliberately, clicks and all", () => {
     expect(sweepCheckOptions({ liveRegion: true }).liveRegion).toBe(true);
     expect(sweepCheckOptions({ liveRegion: { clicks: true } }).liveRegion).toEqual({ clicks: true });
+  });
+});
+
+describe("the option works on its own, which is the only way an option exists", () => {
+  it("runs the live-region pass with `probes` off", async () => {
+    // It rode inside a guard that only asked about `probes`, so `{ liveRegion: true }` alone —
+    // the exact call its own documentation describes — did nothing at all, silently.
+    const page = fakePage();
+    await runLiveProbes(page, { liveRegion: true, only: ["4.1.3"] });
+    expect(ranLiveRegion(page)).toBe(true);
+  });
+
+  it("is honoured by checkA11y without `probes`", () => {
+    // The plugin guard is what was broken, so it is what is pinned.
+    const src = readFileSync(new URL("../src/integrations/playwright.ts", import.meta.url), "utf8");
+    expect(src).toContain("if (opts.probes || opts.liveRegion)");
   });
 });

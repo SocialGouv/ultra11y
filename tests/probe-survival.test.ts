@@ -21,7 +21,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { runAudit } from "../src/audit.js";
-import { PAGES_DIR, SNAPSHOT_VERSION, writeSnapshot } from "../src/snapshot.js";
+import { PAGES_DIR, PROBES_VERSION, SNAPSHOT_VERSION, writeSnapshot } from "../src/snapshot.js";
 
 let root: string;
 beforeEach(() => {
@@ -41,7 +41,9 @@ function auditWith(probes: Record<string, unknown>) {
   writeSnapshot(root, {
     meta: { v: SNAPSHOT_VERSION, id: "p0", name: "P0", url: "https://x/0" },
     dom: DOM,
-    probes: probes as never,
+    // Stamped like a real producer's: `probed` is only believed for the walk-dependent criteria
+    // when the file says which contract it was written under (src/probes.ts PROBES_VERSION).
+    probes: { v: PROBES_VERSION, ...probes } as never,
   });
   return runAudit({ inputs: [join(root, PAGES_DIR)] });
 }

@@ -139,7 +139,10 @@ export interface CheckOptions {
    *  for nothing but recording the sample and asserts nothing afterwards. `{ clicks: true }`
    *  additionally presses `button[type=button]` (destructive-sounding names skipped, navigation
    *  aborts the pass) — never the default on an authenticated session, where a server mutation
-   *  is invisible to any check this side of the network. */
+   *  is invisible to any check this side of the network.
+   *
+   *  PLAYWRIGHT ONLY, like `probes` beside it: the Cypress integration records a page and runs
+   *  no live probe at all, so both are inert there. Stated rather than left to be discovered. */
   liveRegion?: boolean | { clicks?: boolean };
   /** Run AXE-CORE on the page before recording it.
    *

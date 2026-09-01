@@ -165,9 +165,21 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
   // Guarded as a whole: a probe run that throws costs the measurements, never the snapshot and
   // never the caller's test.
   let probes: unknown;
-  if (opts.probes) {
+  // `opts.liveRegion` OPENS THIS DOOR TOO. It rode inside a guard that only asked about
+  // `probes`, so `{ liveRegion: true }` on its own — the exact call the option's own
+  // documentation describes — did nothing at all, silently. An option that has to be paired
+  // with another one to exist is not an option, it is a trap.
+  //
+  // `probes: false, liveRegion: true` is a coherent ask and now works: `probeOptions(false)`
+  // returns no tuning, `runLiveProbes` runs only what `only` allows, and 4.1.3 is measured
+  // without pressing Tab or narrowing the viewport.
+  if (opts.probes || opts.liveRegion) {
     try {
-      probes = await runLiveProbes(page, { ...probeOptions(opts.probes), ...(opts.liveRegion ? { liveRegion: opts.liveRegion } : {}) });
+      probes = await runLiveProbes(page, {
+        ...probeOptions(opts.probes),
+        ...(opts.probes ? {} : { only: ["4.1.3"] }),
+        ...(opts.liveRegion ? { liveRegion: opts.liveRegion } : {}),
+      });
     } catch (e) {
       // LOUD, not silent. A swallowed probe failure is indistinguishable from a page with
       // nothing wrong: the criteria it would have decided simply stay « to assess », run after

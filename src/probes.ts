@@ -12,6 +12,27 @@
 // module: no Playwright import, no engine import, nothing but strings evaluated in a page and
 // a caller-supplied `page`. Both runtimes use it, so a probe means the same thing in each.
 
+/** THE COVERAGE CONTRACT INSIDE `probes.json`, versioned apart from the snapshot itself.
+ *
+ *  `SNAPSHOT_VERSION` describes the DIRECTORY — a dom, some digests, a screenshot — and it has
+ *  not changed. What changed is the meaning of one field: up to 5.42.0, `probed` was written
+ *  for a walk of the tab ring, of the hover triggers or of the page's interactions with NO
+ *  completeness check at all, so a ring cut off at the tagging cap made the same claim as a
+ *  whole one. A snapshot outlives the engine that wrote it, and believing an older file's claim
+ *  for those criteria reinstates the exact defect the check was added to close.
+ *
+ *  v2 = `probed` is written only for a pass that finished. Absent = v1 = it means whatever the
+ *  producer of the day felt like, and the criteria whose completeness is now tracked are not
+ *  credited from it. */
+export const PROBES_VERSION = 2;
+
+/** The criteria whose `probed` claim depends on a walk having FINISHED — the tab ring (2.4.7,
+ *  2.4.11, 2.1.2), the hover triggers (1.4.13) and the page's interactions (4.1.3). The digest
+ *  and one-shot measurements are deliberately absent: a 320px reflow either ran or it did not,
+ *  and there is no half of it to have been cut short, so withholding it would cost coverage for
+ *  nothing. */
+export const WALK_DEPENDENT_SCS: readonly string[] = ["1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
+
 /** One thing a probe observed. Structurally identical to `ProbeHit` in src/scan.ts, restated
  *  here so this module keeps no dependency on the scan runtime. */
 export interface ProbeHit {
@@ -210,8 +231,18 @@ export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFoc
   // from it is not merely unmeasured -- it is silently cleared. A page whose only control is a
   // <summary> tagged nothing at all, so the count was zero, so the ring was "vacuously whole",
   // so 2.4.7 and 2.4.11 closed without a single Tab press.
+  //
+  // AND NOT iframe / audio[controls] / video[controls], which were here for one release and
+  // had to come back out. They are genuinely focusable, but their focus lives in another
+  // document: everything below reads the PARENT'S activeElement, which stays the host element
+  // press after press while the user tabs through the controls inside. The trap walk reads
+  // exactly that as a cage, so an ordinary page with a video player, a payment frame, a map or
+  // a support widget was reported as a bloquant 2.1.2 -- a blocker manufactured out of our own
+  // blindness, able to fail somebody else's gate. The measurement we cannot make is not a
+  // finding; Tab still crosses them, the walk still records that it crossed something it never
+  // measured, and the page is not cleared either.
   // (No backticks in this comment: it lives inside a template literal.)
-  const sel = 'a[href],area[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,iframe,audio[controls],video[controls],[contenteditable]:not([contenteditable="false"]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
+  const sel = 'a[href],area[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[contenteditable]:not([contenteditable="false"]),[tabindex]:not([tabindex="-1"]),[role=button]:not([disabled])';
   // A BOX THAT IS ANIMATING CANNOT BE COMPARED ACROSS TIME, so it contributes a constant.
   //
   // The snapshot is taken before Tab and re-read after it, and the properties compared include
@@ -841,6 +872,7 @@ export async function runLiveProbes(page: Any, opts: LiveProbeOptions = {}): Pro
   const size = (canResize ? (page.viewportSize() ?? null) : null) as { width: number; height: number } | null;
   const restore = size ?? { width: 1280, height: 900 };
   const out: LiveProbeResult = {
+    v: PROBES_VERSION,
     focusVisible: [],
     hover: [],
     keyboardTrap: [],
@@ -995,6 +1027,17 @@ export async function runLiveProbes(page: Any, opts: LiveProbeOptions = {}): Pro
       out.liveRegion = r.hits;
       if (r.complete) out.probed.push("4.1.3");
       else skip("4.1.3", r.why ?? "the live-region pass did not exercise the whole page");
+    }
+  }
+  // WHAT AN OLDER READER WOULD MISREAD IS NOT CLAIMED. The finding itself is kept — it is the
+  // COVERAGE CLAIM that is withdrawn — so this engine still folds the hit into a
+  // non-conformity, while a 5.41.x one that cannot see the bucket is left with an undecided
+  // criterion instead of a `C` published over a failure a browser reproduced. Costs nothing on
+  // a clean page, which is every page that has nothing to hide.
+  for (const [bucket, sc] of UNREADABLE_BY_OLDER) {
+    if (out[bucket]?.length) {
+      const at = out.probed.indexOf(sc);
+      if (at >= 0) out.probed.splice(at, 1);
     }
   }
   return out;
@@ -1193,7 +1236,20 @@ export const REMOVE_TEXT_SPACING_STEP = `(() => {
 })()`;
 
 /** What `runLiveProbes` measured, and which criteria it is entitled to speak for. */
+/** Buckets an engine older than this one does not know how to fold, and the criterion each is
+ *  the sole evidence for. A writer that fills one of these and still declares the criterion
+ *  measured hands a 5.41.x reader a silence it will publish as `C` — over a finding a browser
+ *  reproduced. Nothing in a future version can fix a reader that already shipped; not making
+ *  the claim is what a writer can do. */
+const UNREADABLE_BY_OLDER: readonly ["focusObscured" | "keyboardTrap" | "liveRegion", string][] = [
+  ["focusObscured", "2.4.11"],
+  ["keyboardTrap", "2.1.2"],
+  ["liveRegion", "4.1.3"],
+];
+
 export interface LiveProbeResult {
+  /** The coverage contract this result is written under. See PROBES_VERSION. */
+  v?: number;
   focusVisible: ProbeHit[];
   /** 2.4.11 — the focused component entirely hidden behind author-created content. Optional
    *  so every existing caller and fixture that omits it stays valid. */
