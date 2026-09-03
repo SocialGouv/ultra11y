@@ -55,7 +55,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "verify:bundle": "node scripts/verify-skill-bundle.mjs",
-    "check:build": "tsup && node scripts/copy-bundle.mjs && git diff --exit-code -- scripts/ultra11y.mjs skills/ultra11y/scripts/ultra11y.mjs skills/review-a11y/scripts/ultra11y.mjs dist && node scripts/build-extension-icons.mjs --check && node scripts/verify-skill-bundle.mjs && node scripts/sync-engine.mjs --check",
+    "check:build": "tsup && node scripts/copy-bundle.mjs && git diff --exit-code -- scripts/ultra11y.mjs skills/ultra11y/scripts/ultra11y.mjs skills/review-a11y/scripts/ultra11y.mjs dist && node scripts/build-extension-icons.mjs --check && node scripts/verify-skill-bundle.mjs",
     "build:wcag": "node scripts/build-standards.mjs",
     "check:standards": "node scripts/build-standards.mjs --check",
     "build:pack:rgaa": "node scripts/build-pack-rgaa.mjs",

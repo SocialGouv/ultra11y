@@ -445,10 +445,9 @@ jobs:
       - name: Isolate the action scenarios
         run: |
           root="$RUNNER_TEMP/ultra11y-action-e2e"
-          mkdir -p "$root"/{code,keyless,pages,browser,coverage}
+          mkdir -p "$root"/{code,pages,browser,coverage}
           {
             echo "CODE_RUN=$root/code"
-            echo "KEYLESS_RUN=$root/keyless"
             echo "PAGE_RUN=$root/pages"
             echo "BROWSER_RUN=$root/browser"
             echo "COVERAGE_RUN=$root/coverage"
@@ -467,6 +466,7 @@ jobs:
           fail-on: ""
           sarif: "false"
           comment: "false"
+          adjudicate: none
           artifact-name: action-e2e-code
 
       - name: It reports what it found, through its declared outputs
@@ -482,38 +482,6 @@ jobs:
           # The per-page step must degrade, not fail, when nothing was scanned.
           if [ -d "$CODE_RUN/audits/pages" ]; then
             echo "::error::per-page dossiers written with no page in scope"; exit 1
-          fi
-          echo "ok"
-
-      # The adjudication tier, on the one path CI can prove for free: NO key in the
-      # environment. The tier must then evaporate — the job stays green and the report is
-      # still written, with the judgment criteria still « to assess ». That is not a corner
-      # case: it is exactly what a fork's pull request looks like, where secrets are never
-      # exposed. The keyed path costs money per run, so it lives in a dispatchable workflow
-      # (.github/workflows/adjudication.yml) instead of on every push.
-      - name: The adjudication tier degrades when no key is present
-        id: keyless
-        uses: ./
-        with:
-          working-directory: ${{ runner.temp }}/ultra11y-action-e2e/keyless
-          paths: ${{ github.workspace }}/tests/fixtures/non-conforming/bad.html
-          since: ""
-          fail-on: ""
-          sarif: "false"
-          comment: "false"
-          adjudicate: api
-          artifact-name: action-e2e-keyless-adjudication
-
-      - name: It still produced its report rather than dying on a missing secret
-        env:
-          REPORT: ${{ steps.keyless.outputs.report-path }}
-          FINDINGS: ${{ steps.keyless.outputs.findings }}
-        run: |
-          if [ ! -s "$KEYLESS_RUN/$REPORT" ]; then
-            echo "::error::the keyless adjudication path swallowed the report"; exit 1
-          fi
-          if [ "$FINDINGS" -le 0 ]; then
-            echo "::error::the keyless adjudication path lost the findings"; exit 1
           fi
           echo "ok"
 
@@ -572,6 +540,7 @@ jobs:
           fail-on: ""
           sarif: "false"
           comment: "false"
+          adjudicate: none
           # The target is a HOST loopback URL — a Docker container can never reach it, so
           # this scan MUST run on the local tier. With `auto` (the default) a broken local
           # install degrades silently to Docker and dies on ERR_CONNECTION_REFUSED, which is
@@ -625,6 +594,7 @@ jobs:
           fail-on: ""
           sarif: "false"
           comment: "false"
+          adjudicate: none
           runtime: local
           browser: install
           urls: http://127.0.0.1:8931/
@@ -680,6 +650,7 @@ jobs:
           fail-on: ""
           sarif: "false"
           comment: "false"
+          adjudicate: none
           report: "false"
           html: "false"
           require-sample: "true"

@@ -49,9 +49,23 @@ describe("GitHub workflow economy", () => {
 
   it("isolates every stateful composite-action scenario", () => {
     const raw = read(".github/workflows/ci.yml");
-    for (const dir of ["code", "keyless", "pages", "browser", "coverage"]) {
+    for (const dir of ["code", "pages", "browser", "coverage"]) {
       expect(raw).toContain(`working-directory: \${{ runner.temp }}/ultra11y-action-e2e/${dir}`);
     }
+  });
+
+  it("keeps every composite-action scenario away from LLM adjudication", () => {
+    const raw = read(".github/workflows/ci.yml");
+    const doc = parse(raw) as {
+      jobs: Record<string, { steps?: Array<{ uses?: string; with?: Record<string, unknown> }> }>;
+    };
+    const localActionSteps = Object.values(doc.jobs)
+      .flatMap((job) => job.steps ?? [])
+      .filter((step) => step.uses === "./");
+
+    expect(localActionSteps.length).toBeGreaterThan(0);
+    for (const step of localActionSteps) expect(step.with?.adjudicate).toBe("none");
+    expect(raw).not.toMatch(/^\s*adjudicate:\s*(?:api|agent)\s*$/m);
   });
 
   it("releases only after CI has validated the exact SHA", () => {
@@ -59,7 +73,7 @@ describe("GitHub workflow economy", () => {
     expect(release).toContain("workflow_run:");
     expect(release).toContain("github.event.workflow_run.head_sha");
     expect(release).not.toMatch(/^\s{2}push:/m);
-    for (const workflow of ["standards-refresh.yml", "act-refresh.yml", "engine-repin.yml"]) {
+    for (const workflow of ["standards-refresh.yml", "act-refresh.yml"]) {
       expect(read(`.github/workflows/${workflow}`)).not.toContain("gh workflow run release.yml");
     }
   });

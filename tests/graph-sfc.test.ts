@@ -44,7 +44,7 @@ describe("graph — SFC (.vue/.svelte/.astro) synthesizes a self component def",
   });
 });
 
-// Engine re-pin regression coverage (v2.10.0+): the codeindex engine's own candidate
+// Vendored codeindex regression coverage (v2.10.0+): the engine's own candidate
 // probe (JS_EXT_PROBES) resolves an EXTENSIONLESS specifier to a .vue/.svelte/.astro/
 // .html/.htm target (see src/graph/engine-resolve.ts). The .vue case is pinned by
 // tests/fixtures/golden-graph (extensionless import of Widget.vue). .svelte and .astro
