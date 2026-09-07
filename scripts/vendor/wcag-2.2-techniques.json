@@ -2,7 +2,7 @@
   "source": "https://github.com/w3c/wcag",
   "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/",
   "license": "W3C Document License (code samples: W3C Software License)",
-  "fetchedAt": "2026-09-06",
+  "fetchedAt": "2026-09-07",
   "criteria": {
     "1.1.1": {
       "slug": "non-text-content",
@@ -710,9 +710,9 @@
     "3.2.4": {
       "slug": "consistent-identification",
       "brief": {
-        "goal": "Actions are more predictable across pages.",
-        "whattodo": "Identify repeating functions consistently.",
-        "whyitsimportant": "Consistently identified actions are especially important to people with disabilities."
+        "goal": "Users can recognize the same functionality when it appears on different web pages.",
+        "whattodo": "Consistently identify components that have the same functionality throughout a set of web pages.",
+        "whyitsimportant": "Consistent identification helps users recognize familiar functionality when it appears on different web pages, making websites easier to learn, navigate, and use."
       }
     },
     "3.2.6": {

@@ -942,7 +942,7 @@
         "fr": "Identification cohérente"
       },
       "summary": {
-        "en": "Identify repeating functions consistently. Actions are more predictable across pages. Consistently identified actions are especially important to people with disabilities."
+        "en": "Consistently identify components that have the same functionality throughout a set of web pages. Users can recognize the same functionality when it appears on different web pages. Consistent identification helps users recognize familiar functionality when it appears on different web pages, making websites easier to learn, navigate, and use."
       },
       "examples": [],
       "reference": "https://www.w3.org/WAI/WCAG22/Understanding/consistent-identification.html"

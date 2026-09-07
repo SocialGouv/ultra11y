@@ -2300,7 +2300,7 @@ var wcag_universe_default = {
   wcagVersion: "2.2",
   source: "https://www.w3.org/TR/WCAG22/",
   criteriaSource: "https://github.com/w3c/wcag",
-  provenance: "Full WCAG 2.x SC universe (all levels incl. AAA, and the removed 4.1.1 Parsing) fetched from raw.githubusercontent.com/w3c/wcag@main on 2026-09-06 via `node scripts/build-standards.mjs --refresh-universe`. Classification: core-AA = ships in src/data/wcag.json (the shipped WCAG 2.2 AA core); out-of-core = WCAG AAA; removed = obsolete (4.1.1).",
+  provenance: "Full WCAG 2.x SC universe (all levels incl. AAA, and the removed 4.1.1 Parsing) fetched from raw.githubusercontent.com/w3c/wcag@main on 2026-09-07 via `node scripts/build-standards.mjs --refresh-universe`. Classification: core-AA = ships in src/data/wcag.json (the shipped WCAG 2.2 AA core); out-of-core = WCAG AAA; removed = obsolete (4.1.1).",
   criteria: [
     {
       id: "1.1.1",
@@ -57624,7 +57624,7 @@ var wcag_default2 = {
         fr: "Identification coh\xE9rente"
       },
       summary: {
-        en: "Identify repeating functions consistently. Actions are more predictable across pages. Consistently identified actions are especially important to people with disabilities."
+        en: "Consistently identify components that have the same functionality throughout a set of web pages. Users can recognize the same functionality when it appears on different web pages. Consistent identification helps users recognize familiar functionality when it appears on different web pages, making websites easier to learn, navigate, and use."
       },
       examples: [],
       reference: "https://www.w3.org/WAI/WCAG22/Understanding/consistent-identification.html"
