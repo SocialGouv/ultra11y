@@ -23,10 +23,22 @@ import {
   unattributedNote,
   pageGridModel,
   pageView,
+  type PageResolver,
+  pageResolver,
 } from "./pages.js";
 import { pageCoverage, pageCriterionRows, pageRatePct, pageTally } from "./pages-report.js";
 import { partitionUnits, prdUnits, type PrdUnit } from "./prd.js";
-import { automationOverview, conformanceRate, packReportGroups, reportCoverage, reportGroups, reportTotals, tallyRows } from "./report.js";
+import {
+  automationOverview,
+  conformanceRate,
+  packReportGroups,
+  reportCoverage,
+  reportGroups,
+  reportTotals,
+  summaryModel,
+  summaryPagesText,
+  tallyRows,
+} from "./report.js";
 import { CORE, type StandardId, isCore, loadPack, standardLabel, titlePlain } from "./standards/index.js";
 import { findingsForStandard } from "./standards/derive.js";
 import type { Block, Cell, Doc, Run } from "./html.js";
@@ -238,6 +250,54 @@ function headline(result: AuditResult, standard: StandardId, lang: Lang): { runs
   };
 }
 
+/** The summary the Markdown report opens with — level, what to fix, the road to the next level —
+ *  from the same `summaryModel`, so the dashboard and the document word it identically. */
+function summaryBlocks(result: AuditResult, standard: StandardId, lang: Lang): Block[] {
+  const core = isCore(standard);
+  const groups = core ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
+  const resolver = pageResolver(result);
+  const { nc, advisory } = partitionUnits(prdUnits(result, standard, lang));
+  const m = summaryModel(lang, standardLabel(standard), standard, reportTotals(groups), nc, advisory.length, resolver);
+  const out: Block[] = [
+    { kind: "heading", level: 2, text: m.title, id: "summary" },
+    { kind: "para", runs: [{ text: m.headline[0], strong: true }, ...ticks(` ${m.headline[1]}`)] },
+    { kind: "list", items: m.facts.map((f) => [{ text: `${f.label} : `, strong: true }, ...ticks(f.value)]) },
+    { kind: "heading", level: 3, text: m.fix.title },
+  ];
+  if (m.fix.none) out.push({ kind: "para", runs: [{ text: m.fix.none }] });
+  else {
+    const [priority, criterion, occurrences, fix] = m.fix.columns;
+    const pagesColumn = m.fix.pagesColumn;
+    out.push({
+      kind: "table",
+      caption: m.fix.intro ?? "",
+      columns: [
+        { text: priority! },
+        { text: criterion! },
+        { text: occurrences!, align: "end" },
+        ...(pagesColumn ? [{ text: pagesColumn }] : []),
+        { text: fix! },
+      ],
+      rows: m.fix.rows.map((r) => [
+        { text: `${r.icon} ${r.priority}` },
+        { text: r.criterion },
+        { text: String(r.occurrences), align: "end" as const },
+        // Page names only: a cell carries one link, and the occurrence tables in the full report
+        // link every page.
+        ...(pagesColumn ? [{ text: summaryPagesText(r.pages, lang, (name) => name) }] : []),
+        { text: r.fix },
+      ]),
+    });
+  }
+  if (m.fix.pagesNote) out.push({ kind: "note", tone: "info", runs: ticks(m.fix.pagesNote) });
+  if (m.fix.advisory) out.push({ kind: "para", runs: [{ text: m.fix.advisory, em: true }] });
+  if (m.next) {
+    out.push({ kind: "heading", level: 3, text: m.next.title });
+    out.push({ kind: "list", items: m.next.steps.map(([what, rest]) => [{ text: what, strong: true }, ...ticks(rest)]) });
+  }
+  return out;
+}
+
 /** §1 — the synthesis grid, then the coverage sentence under it. */
 function synthesisBlocks(result: AuditResult, standard: StandardId, lang: Lang): Block[] {
   const t = T[lang];
@@ -283,7 +343,7 @@ function synthesisBlocks(result: AuditResult, standard: StandardId, lang: Lang):
 
 /** One non-conformity, from `auditorUnitModel` — the same decisions the Markdown block makes,
  *  presented as a table of occurrences with their crops rather than as a checklist. */
-function criterionBlocks(unit: PrdUnit, standard: StandardId, lang: Lang, level: 2 | 3 | 4, crops?: CropLookup): Block[] {
+function criterionBlocks(unit: PrdUnit, standard: StandardId, lang: Lang, level: 2 | 3 | 4, crops?: CropLookup, pages?: PageResolver): Block[] {
   const t = T[lang];
   const m = auditorUnitModel(unit, standard, lang, { collapse: true });
   const out: Block[] = [{ kind: "heading", level, text: `${m.icon} ${m.label}`, id: `c-${unit.criteriaId}` }];
@@ -296,9 +356,27 @@ function criterionBlocks(unit: PrdUnit, standard: StandardId, lang: Lang, level:
   if (m.fixes.length) out.push({ kind: "para", runs: [{ text: `${m.conformanceTerms.conformant} : `, strong: true }, { text: m.fixes.join(" ; ") }] });
 
   const hasEvidence = crops ? m.normative.some((f) => crops(f)) : false;
-  const columns = [{ text: t.where }, { text: t.selector }, { text: t.what }, ...(hasEvidence ? [{ text: t.evidence }] : [])];
+  // THE PAGE, FIRST. An RGAA reader locates a defect by the page it is on; the file and selector
+  // are what the developer needs next. Only when the audit has pages — a source-only run has
+  // nothing to put there, and an empty column would read as « on no page ».
+  const withPages = pages !== undefined && pages.pages.length > 0;
+  const columns = [
+    ...(withPages ? [{ text: t.page }] : []),
+    { text: t.where },
+    { text: t.selector },
+    { text: t.what },
+    ...(hasEvidence ? [{ text: t.evidence }] : []),
+  ];
   const rows = m.normative.map((f) => {
-    const cells: Cell[] = [{ text: `${f.file}:${f.line}`, mono: true }, { text: f.selectorHint, mono: true }, { text: resolveOccurrence(f, lang) }];
+    const page = withPages ? pages.pageOf(f) : undefined;
+    const cells: Cell[] = [
+      // Name AND address, as text: the artifact links nothing outside itself (html-emit.ts
+      // `externalReferences`), and the URL is what the reader came to this column for.
+      ...(withPages ? [page ? { text: `${page.name} (${page.url})` } : { text: "—" }] : []),
+      { text: `${f.file}:${f.line}`, mono: true },
+      { text: f.selectorHint, mono: true },
+      { text: resolveOccurrence(f, lang) },
+    ];
     if (hasEvidence) cells.push({ text: crops?.(f) ? "▣" : "" });
     return cells;
   });
@@ -327,13 +405,14 @@ function resolveOccurrence(f: Finding, lang: Lang): string {
 /** §2 + §Recommendations — every non-conformity, then the advisory units. */
 function findingsBlocks(result: AuditResult, standard: StandardId, lang: Lang, level: 2 | 3, crops?: CropLookup, refusals?: RefusalLookup): Block[] {
   const t = T[lang];
+  const resolver = pageResolver(result);
   const { nc, advisory } = partitionUnits(prdUnits(result, standard, lang));
   const out: Block[] = [{ kind: "heading", level: 2, text: t.ncTitle, id: "nc" }];
   // Before the first figure, not after the last: a reader who stops scrolling must already
   // know that the pictures below are a subset of the occurrences listed beside them.
   out.push(...refusalBlocks(refusals?.(null)));
   if (!nc.length) out.push({ kind: "para", runs: [{ text: t.noNc }] });
-  for (const u of nc) out.push(...criterionBlocks(u, standard, lang, level === 2 ? 3 : 4, crops));
+  for (const u of nc) out.push(...criterionBlocks(u, standard, lang, level === 2 ? 3 : 4, crops, resolver));
   if (advisory.length) {
     out.push({ kind: "heading", level: 2, text: t.recTitle, id: "rec" });
     out.push({ kind: "note", tone: "info", runs: ticks(t.recNote) });
@@ -510,7 +589,7 @@ export function indexDoc(result: AuditResult, opts: HtmlReportOpts & { links?: {
   const lang = opts.lang ?? "en";
   const t = T[lang];
   const h = headline(result, standard, lang);
-  const blocks: Block[] = [];
+  const blocks: Block[] = [...summaryBlocks(result, standard, lang)];
   if (opts.links?.length) {
     blocks.push({ kind: "heading", level: 2, text: t.documents, id: "documents" });
     blocks.push({ kind: "list", items: opts.links.map((l) => [{ text: l.text, href: l.href }]) });
@@ -529,7 +608,12 @@ export function compositeDoc(result: AuditResult, opts: HtmlReportOpts = {}): Do
   const lang = opts.lang ?? "en";
   const t = T[lang];
   const h = headline(result, standard, lang);
-  const blocks: Block[] = [...scopeBlocks(result, standard, lang), ...synthesisBlocks(result, standard, lang), ...criteriaGridBlocks(result, standard, lang)];
+  const blocks: Block[] = [
+    ...summaryBlocks(result, standard, lang),
+    ...scopeBlocks(result, standard, lang),
+    ...synthesisBlocks(result, standard, lang),
+    ...criteriaGridBlocks(result, standard, lang),
+  ];
   if (h.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
   blocks.push(...findingsBlocks(result, standard, lang, 2, opts.crops, opts.refusals));
   blocks.push(...scoreboardBlocks(result, standard, lang));

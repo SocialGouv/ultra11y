@@ -711,6 +711,15 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
     // Where DINUM publishes each criterion. Cited by the adjudication brief so a reader can
     // reach the normative page — the vendored text above stays the authority either way.
     criterionUrl: "https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#{id}",
+    // The three levels a French declaration of accessibility may state, fixed by the arrêté of
+    // 20 September 2019 (accessibilite.numerique.gouv.fr, obligations): every applicable
+    // criterion validated, at least half of them, or fewer. The report summary names the
+    // audited site's level from this scale and says what separates it from the next one.
+    conformityLevels: [
+      { min: 100, label: { fr: "Totalement conforme", en: "Fully compliant" } },
+      { min: 50, label: { fr: "Partiellement conforme", en: "Partially compliant" } },
+      { min: 0, label: { fr: "Non conforme", en: "Non-compliant" } },
+    ],
     // Auditor-display vocabulary (FR): the nouns an RGAA auditor reads. Rendered by the
     // `prd` auditor block + GitHub issues; see src/standards/vocabulary.ts.
     vocabulary: {

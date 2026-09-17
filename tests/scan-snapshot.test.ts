@@ -84,6 +84,14 @@ describe("writeRunnerSnapshot", () => {
     expect(snap?.meta.notes).toBe("Se connecter d'abord");
   });
 
+  it("carries the sample page's declared sources, so source findings land on the page", () => {
+    const root = tmp();
+    writeRunnerSnapshot(root, out(), "https://exemple.fr/", { id: "accueil", name: "Accueil", url: "https://exemple.fr/", sources: ["src/app/page.tsx"] });
+    const snap = readSnapshot(join(root, PAGES_DIR, "accueil"));
+    expect(snap?.meta.sources).toEqual(["src/app/page.tsx"]);
+    expect(pageScopesFrom([snap!])[0]?.sources).toEqual(["src/app/page.tsx"]);
+  });
+
   it("writes the screenshot when the runner captured one", () => {
     const root = tmp();
     // a 1x1 PNG

@@ -28,6 +28,11 @@ describe("mdText", () => {
     expect(mdText('dans <div role="img" aria-label="…">')).toBe('dans `<div role="img" aria-label="…">`');
   });
 
+  it("puts a doctype in a code span too, whatever its case", () => {
+    expect(mdText("aucun <!DOCTYPE> avant <html>")).toBe("aucun `<!DOCTYPE>` avant `<html>`");
+    expect(mdText("Émettez <!doctype html> en première ligne")).toBe("Émettez `<!doctype html>` en première ligne");
+  });
+
   it("is idempotent — a tag already in a code span is left alone", () => {
     expect(mdText("scope sur les `<th>`")).toBe("scope sur les `<th>`");
     expect(mdText(mdText("les <th> du tableau"))).toBe("les `<th>` du tableau");

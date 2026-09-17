@@ -4,7 +4,7 @@
 // --write / report default output) live in artifacts.e2e.test.ts.
 import { describe, it, expect, afterAll } from "vitest";
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { VERSION } from "../../src/types.js";
 import { runCli, auditJson, FIX, mkTmp, cleanupTmp } from "./helpers.js";
 
@@ -182,10 +182,20 @@ describe("e2e: check", () => {
     const report = makeReport();
     expect(runCli(["check", "--report", report]).code).toBe(0);
 
-    const doctored = join(mkTmp(), "doctored.md");
+    // Beside the original: the report links its technical annex by a bare file name.
+    const doctored = join(dirname(report), "doctored.md");
     const body = readFileSync(report, "utf8") + "\n### 🔴 9.9.9 — Critère inventé\nQuelque chose de fabriqué.\n";
     writeFileSync(doctored, body);
     expect(runCli(["check", "--report", doctored]).code).toBe(1);
+  });
+
+  it("refuses a report whose technical annex is missing (exit 2) — its occurrences live there", () => {
+    const report = makeReport();
+    const moved = join(mkTmp(), "moved.md");
+    writeFileSync(moved, readFileSync(report, "utf8"));
+    const r = runCli(["check", "--report", moved]);
+    expect(r.code).toBe(2);
+    expect(r.stderr).toMatch(/annex/);
   });
 });
 

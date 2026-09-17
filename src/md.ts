@@ -1,3 +1,5 @@
+import { isLinkableUrl } from "./util.js";
+
 // MARKDOWN-SAFE TEXT — because a report about HTML has to be able to SAY "h1".
 //
 // The message catalogue names elements the way a developer reads them: `<h1>`, `<button>`,
@@ -20,7 +22,9 @@ const CODE_SPAN = /`[^`]*`/g;
 // `<div role="img" aria-label="…">`. The name must follow `<` IMMEDIATELY, which is what keeps
 // prose like "ratio < 3:1" and "a < b > c" untouched, and the `>` must be present, which keeps
 // "x<y" untouched too.
-const TAG = /<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?\/?>/g;
+// A doctype too: `<!DOCTYPE html>` is markup to a Markdown renderer, and a message about the
+// missing doctype lost the very word it was about.
+const TAG = /<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?\/?>|<!DOCTYPE(?:\s[^<>]*)?>/gi;
 
 /** One message, safe to drop into Markdown: every bare HTML tag becomes a code span.
  *
@@ -41,4 +45,14 @@ export function mdText(s: string): string {
 
 function escapeTags(s: string): string {
   return s.replace(TAG, (tag) => `\`${tag}\``);
+}
+
+/** A Markdown link whose text and destination survive whatever a page name or URL contains.
+ *  The destination goes between angle brackets — CommonMark's form for one with spaces or
+ *  parentheses — and the brackets that would close either half early are escaped. */
+export function mdLink(text: string, url: string): string {
+  const label = text.replace(/([\\[\]])/g, "\\$1");
+  if (!isLinkableUrl(url)) return label;
+  const dest = url.replace(/</g, "%3C").replace(/>/g, "%3E");
+  return `[${label}](<${dest}>)`;
 }

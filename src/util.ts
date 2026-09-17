@@ -30,6 +30,13 @@ export function isUrlPath(file: string): boolean {
   return /^https?:\/\//i.test(file);
 }
 
+/** Whether a page address may become a link: http(s), or a path with no scheme at all. A page
+ *  URL comes from a config file or a crawl, and a `javascript:` or `data:` one must stay text in
+ *  a deliverable people click through. */
+export function isLinkableUrl(url: string): boolean {
+  return isUrlPath(url) || !/^[a-z][a-z0-9+.-]*:/i.test(url.trim());
+}
+
 /** A POSIX, repo-relative path for CI consumers (SARIF artifact URIs, GitHub annotations).
  *  GitHub anchors on paths relative to the checkout, so an absolute path — the user passed
  *  one on the command line — would silently fail to annotate. Relativise it when it sits
