@@ -39,11 +39,13 @@ non-conformity.
    ```
    node scripts/ultra11y.mjs report --in audit.json --out audits
    ```
-   → `audits/wcag-YYYY-MM-DD.md` (5 sections, see `references/methodology.md`); section 2
-   renders one **auditor conformance block** per NC criterion (theme, criterion + official
-   wording, test(s), WCAG mapping + level, finding, expected state, verification,
-   `file:line` occurrences), grouped by severity — the SAME block `prd` and `tickets`
-   emit (see `references/prd.md`), so report and backlog never drift. For a country
+   → `audits/wcag-YYYY-MM-DD.md`, the report for every reader (level, what to fix, on which
+   pages and URLs, then 5 sections), and beside it `audits/annexe-technique-wcag-YYYY-MM-DD.md`,
+   the technical annex (method, `file:line` occurrences, commands, exhaustive grid) — see
+   `references/methodology.md`. The annex's section A renders one compact **auditor block**
+   per NC criterion, grouped by severity — built from the SAME units `prd` and `tickets`
+   emit (see `references/prd.md`), so report and backlog never drift. Keep both files
+   together: `check`/`verify --report` read the annex the report links to. For a country
    standard, add `--standard rgaa` (see `references/standards.md`). Pass `--lang` to match
    your conversation; without it, `auto` resolves the audit's `scope.langs` → the
    standard's default locale → English. Add `--json` to `report` for a machine summary

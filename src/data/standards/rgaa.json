@@ -13,6 +13,29 @@
   "attribution": "RGAA 4.1.2 © DINUM (Direction interministérielle du numérique) — Licence Ouverte / Etalab 2.0",
   "idPattern": "^\\d+\\.\\d+$",
   "criterionUrl": "https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#{id}",
+  "conformityLevels": [
+    {
+      "min": 100,
+      "label": {
+        "fr": "Totalement conforme",
+        "en": "Fully compliant"
+      }
+    },
+    {
+      "min": 50,
+      "label": {
+        "fr": "Partiellement conforme",
+        "en": "Partially compliant"
+      }
+    },
+    {
+      "min": 0,
+      "label": {
+        "fr": "Non conforme",
+        "en": "Non-compliant"
+      }
+    }
+  ],
   "vocabulary": {
     "theme": {
       "fr": "Thématique"

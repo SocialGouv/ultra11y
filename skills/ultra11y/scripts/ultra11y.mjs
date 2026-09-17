@@ -2,7 +2,7 @@
 
 // src/cli.ts
 import { realpathSync as realpathSync7, writeFileSync as writeFileSync21, mkdirSync as mkdirSync18, existsSync as existsSync39, readFileSync as readFileSync34, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
-import { join as join52, relative as relative6, resolve as resolve17, sep as sep7, dirname as dirname17 } from "path";
+import { join as join52, relative as relative6, resolve as resolve17, sep as sep7, dirname as dirname18 } from "path";
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
@@ -19940,6 +19940,9 @@ function ext(path) {
 function isUrlPath(file) {
   return /^https?:\/\//i.test(file);
 }
+function isLinkableUrl(url) {
+  return isUrlPath(url) || !/^[a-z][a-z0-9+.-]*:/i.test(url.trim());
+}
 function repoRelative(file, baseDir) {
   if (typeof file !== "string" || !file) return "";
   const posix3 = file.split("\\").join("/").replace(/^\.\//, "");
@@ -20130,7 +20133,7 @@ function rrf(lists, keyOf2, k = 60) {
   return score;
 }
 function subtokens(raw) {
-  const folded = foldText(raw).replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
+  const folded2 = foldText(raw).replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
   const out2 = [];
   const seen = /* @__PURE__ */ new Set();
   const push = (t3) => {
@@ -20139,7 +20142,7 @@ function subtokens(raw) {
     out2.push(t3);
   };
   if (!/\s/.test(raw.trim())) push(foldText(raw).toLowerCase().replace(/[^a-z0-9_]+/g, ""));
-  for (const part of folded.split(/[^A-Za-z0-9]+/)) push(part.toLowerCase());
+  for (const part of folded2.split(/[^A-Za-z0-9]+/)) push(part.toLowerCase());
   return out2;
 }
 function stemOf(term) {
@@ -21736,7 +21739,7 @@ function extractMarkdown(content) {
   const scan2 = stripFences(body22);
   const lines = scan2.split(/\r?\n/);
   const headings2 = [];
-  let title2 = frontTitle;
+  let title = frontTitle;
   let summary;
   let summaryClosed = false;
   for (const line of lines) {
@@ -21744,7 +21747,7 @@ function extractMarkdown(content) {
     if (h2) {
       const text = cleanProse(h2[2]);
       headings2.push(text);
-      if (!title2 && h2[1].length === 1) title2 = text;
+      if (!title && h2[1].length === 1) title = text;
       if (!summary && h2[1].length >= 2) summaryClosed = true;
       continue;
     }
@@ -21774,7 +21777,7 @@ function extractMarkdown(content) {
   while (m = inline.exec(scan2)) addRef(m[1]);
   const refdef = /^\s*\[[^\]]+\]:\s+(\S+)/gm;
   while (m = refdef.exec(scan2)) addRef(m[1]);
-  return { title: title2, summary, headings: headings2, refs };
+  return { title, summary, headings: headings2, refs };
 }
 var init_markdown = __esm({
   "src/extract/markdown.ts"() {
@@ -32556,8 +32559,8 @@ var init_encode = __esm({
 function symbolText(rel2, name2, signature, summary) {
   return [name2, signature ?? "", summary ?? "", rel2.replace(/\//g, " ")].join("\n");
 }
-function fileText(rel2, title2, summary, headings2) {
-  return [title2 ?? "", summary ?? "", ...headings2, rel2.replace(/\//g, " ")].join("\n");
+function fileText(rel2, title, summary, headings2) {
+  return [title ?? "", summary ?? "", ...headings2, rel2.replace(/\//g, " ")].join("\n");
 }
 function embeddingUnits(scan2) {
   const units = [];
@@ -40729,6 +40732,29 @@ var rgaa_default = {
   attribution: "RGAA 4.1.2 \xA9 DINUM (Direction interminist\xE9rielle du num\xE9rique) \u2014 Licence Ouverte / Etalab 2.0",
   idPattern: "^\\d+\\.\\d+$",
   criterionUrl: "https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#{id}",
+  conformityLevels: [
+    {
+      min: 100,
+      label: {
+        fr: "Totalement conforme",
+        en: "Fully compliant"
+      }
+    },
+    {
+      min: 50,
+      label: {
+        fr: "Partiellement conforme",
+        en: "Partially compliant"
+      }
+    },
+    {
+      min: 0,
+      label: {
+        fr: "Non conforme",
+        en: "Non-compliant"
+      }
+    }
+  ],
   vocabulary: {
     theme: {
       fr: "Th\xE9matique"
@@ -47260,8 +47286,8 @@ function validatePack(raw, opts = {}) {
       if (themes && !themeNumbers.has(theme)) err2(`criteria[${i2}].theme`, `criterion "${String(id)}" references unknown theme ${theme}`);
       countByTheme.set(theme, (countByTheme.get(theme) ?? 0) + 1);
     }
-    const title2 = c2?.title;
-    if (!title2 || typeof title2[loc] !== "string") err2(`criteria[${i2}].title`, `criterion "${String(id)}" missing title[${loc}]`);
+    const title = c2?.title;
+    if (!title || typeof title[loc] !== "string") err2(`criteria[${i2}].title`, `criterion "${String(id)}" missing title[${loc}]`);
     const titlePlain2 = c2?.titlePlain;
     if (!titlePlain2 || typeof titlePlain2[loc] !== "string") err2(`criteria[${i2}].titlePlain`, `criterion "${String(id)}" missing titlePlain[${loc}]`);
     if (c2?.appliesTo !== void 0) {
@@ -47421,6 +47447,23 @@ function validatePack(raw, opts = {}) {
           warn(`vocabulary.${k}`, `term "${k}" has no string for the default locale "${loc}" \u2014 default used`);
         }
       }
+    }
+  }
+  if (p.conformityLevels !== void 0) {
+    if (!Array.isArray(p.conformityLevels)) {
+      warn("conformityLevels", "conformityLevels must be an array of { min, label } \u2014 ignored");
+    } else {
+      p.conformityLevels.forEach((l, i2) => {
+        const ll = l;
+        if (!ll || typeof ll !== "object" || Array.isArray(ll)) {
+          warn(`conformityLevels[${i2}]`, "each level must be an object { min, label } \u2014 ignored");
+          return;
+        }
+        if (typeof ll.min !== "number" || ll.min < 0 || ll.min > 100) warn(`conformityLevels[${i2}].min`, "min must be a percentage between 0 and 100");
+        const label = ll.label;
+        if (!label || typeof label !== "object" || Array.isArray(label) || typeof label[loc] !== "string")
+          warn(`conformityLevels[${i2}].label`, `level should carry label[${loc}]`);
+      });
     }
   }
   if (p.sampleMethodology !== void 0) {
@@ -48929,9 +48972,9 @@ function nameFromContent(el, doc, includeHiddenSubtree = false) {
       return;
     }
     if (n.tag === "svg") {
-      const title2 = descendants(n).find((d) => d.tag === "title");
-      if (title2 && (includeHiddenSubtree || !isLocallyDisplayHidden(title2) && attr(title2, "aria-hidden") !== "true")) {
-        out2 += " " + nameFromContent(title2, doc, includeHiddenSubtree);
+      const title = descendants(n).find((d) => d.tag === "title");
+      if (title && (includeHiddenSubtree || !isLocallyDisplayHidden(title) && attr(title, "aria-hidden") !== "true")) {
+        out2 += " " + nameFromContent(title, doc, includeHiddenSubtree);
       }
       return;
     }
@@ -49081,8 +49124,8 @@ var decorativeAltMisuse = {
       const alt = attr(el, "alt");
       const role = (attr(el, "role") ?? "").trim();
       const ariaLabel = (attr(el, "aria-label") ?? "").trim();
-      const title2 = (attr(el, "title") ?? "").trim();
-      if (alt === "" && (ariaLabel || title2)) {
+      const title = (attr(el, "title") ?? "").trim();
+      if (alt === "" && (ariaLabel || title)) {
         out2.push({
           criteriaId: "1.1.1",
           el,
@@ -49201,10 +49244,10 @@ var iframeTitleMissing = {
     for (const el of doc.elements) {
       if (el.tag !== "iframe") continue;
       if (isNameExempt(el)) continue;
-      const title2 = (attr(el, "title") ?? "").trim();
+      const title = (attr(el, "title") ?? "").trim();
       const aria = (attr(el, "aria-label") ?? "").trim();
       const labelledby = (attr(el, "aria-labelledby") ?? "").trim();
-      if (title2 || aria || labelledby) continue;
+      if (title || aria || labelledby) continue;
       if (hasBoundAttr(el, "aria-labelledby")) continue;
       out2.push({
         criteriaId: "4.1.2",
@@ -50544,14 +50587,14 @@ var tableEmptyDataCell = {
     const out2 = [];
     for (const t3 of doc.elements) {
       if (t3.tag !== "table" || isLayoutTable(t3)) continue;
-      for (const cell2 of descendants(t3)) {
-        if (cell2.tag !== "td") continue;
-        if (mayInjectContent(cell2)) continue;
-        if (cell2.children.some((c2) => c2.type === "element")) continue;
-        if ((attr(cell2, "aria-label") ?? "").trim() || hasAttr(cell2, "aria-labelledby")) continue;
-        const txt = visibleText(cell2);
+      for (const cell3 of descendants(t3)) {
+        if (cell3.tag !== "td") continue;
+        if (mayInjectContent(cell3)) continue;
+        if (cell3.children.some((c2) => c2.type === "element")) continue;
+        if ((attr(cell3, "aria-label") ?? "").trim() || hasAttr(cell3, "aria-labelledby")) continue;
+        const txt = visibleText(cell3);
         if (txt !== "" && txt !== "-") continue;
-        out2.push({ criteriaId: "1.3.1", el: cell2, msgId: "table-empty-data-cell", advisory: true });
+        out2.push({ criteriaId: "1.3.1", el: cell3, msgId: "table-empty-data-cell", advisory: true });
       }
     }
     return out2;
@@ -50760,8 +50803,8 @@ var controlNameTitleOnly = {
       const field = !link && !isButton(el) && isFormField(el);
       if (!link && !isButton(el) && !field) continue;
       if (isNameExempt(el)) continue;
-      const title2 = (attr(el, "title") ?? "").trim();
-      if (!title2 || title2.includes("{")) continue;
+      const title = (attr(el, "title") ?? "").trim();
+      if (!title || title.includes("{")) continue;
       if (hasAttr(el, "aria-label") || hasAttr(el, "aria-labelledby")) continue;
       if (mayInjectContent(el)) continue;
       if (el.tag === "input" && (attr(el, "type") ?? "").trim().toLowerCase() === "image" && (boundAttr(el, "alt") ?? "").trim()) continue;
@@ -53737,9 +53780,6 @@ function listTheme(pack, n) {
 function themeName(pack, n, lang) {
   const t3 = pack.themes.find((x) => x.number === n);
   return t3 ? localize(pack, t3.name, lang) : void 0;
-}
-function title(pack, c2, lang) {
-  return localize(pack, c2.title, lang);
 }
 function titlePlain(pack, c2, lang) {
   return localize(pack, c2.titlePlain, lang);
@@ -58128,7 +58168,7 @@ function decide(payload, deps = {}) {
 
 // src/report.ts
 import { copyFileSync, existsSync as existsSync19, mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
-import { join as join31, relative as relative3 } from "path";
+import { dirname as dirname10, join as join31, relative as relative3 } from "path";
 
 // src/prd.ts
 import { mkdirSync as mkdirSync6, writeFileSync as writeFileSync7 } from "fs";
@@ -58590,7 +58630,7 @@ function guidanceEntriesFor(standard, criterionId, wcagRefs) {
 
 // src/md.ts
 var CODE_SPAN = /`[^`]*`/g;
-var TAG = /<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?\/?>/g;
+var TAG = /<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?\/?>|<!DOCTYPE(?:\s[^<>]*)?>/gi;
 function mdText(s) {
   let out2 = "";
   let last = 0;
@@ -58604,6 +58644,356 @@ function mdText(s) {
 function escapeTags(s) {
   return s.replace(TAG, (tag) => `\`${tag}\``);
 }
+function mdLink(text, url) {
+  const label = text.replace(/([\\[\]])/g, "\\$1");
+  if (!isLinkableUrl(url)) return label;
+  const dest = url.replace(/</g, "%3C").replace(/>/g, "%3E");
+  return `[${label}](<${dest}>)`;
+}
+
+// src/pages.ts
+function pageScopesFrom(snapshots) {
+  return snapshots.map((s) => ({
+    id: s.meta.id,
+    name: s.meta.name,
+    url: s.meta.url,
+    ...s.meta.auth !== void 0 ? { auth: s.meta.auth } : {},
+    ...s.meta.route ? { route: s.meta.route } : {},
+    ...s.meta.sources ? { sources: s.meta.sources } : {},
+    ...s.meta.notes ? { notes: s.meta.notes } : {},
+    basis: "snapshot"
+  }));
+}
+function pageScopesFromSample(sample) {
+  return (sample?.pages ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    url: p.url,
+    ...p.auth !== void 0 ? { auth: p.auth } : {},
+    ...p.notes ? { notes: p.notes } : {},
+    basis: "attributed"
+  }));
+}
+function pagesOf(result) {
+  const fromScope = result.scope.pages ?? [];
+  const audited = result.scope.pagesAudited;
+  const checked = audited === void 0 ? fromScope : fromScope.map((p) => p.basis === "snapshot" && !audited.includes(p.id) ? { ...p, basis: "not-audited" } : p);
+  const ids = new Set(checked.map((p) => p.id));
+  const urls = new Set(checked.map((p) => p.url));
+  const extra = pageScopesFromSample(result.scope.sample).filter((p) => !ids.has(p.id) && !urls.has(p.url));
+  const cov = result.scope.pageCoverage;
+  const stamped = cov ? [...checked, ...extra].map((p) => cov[p.id] ? { ...p, coverage: cov[p.id] } : p) : [...checked, ...extra];
+  return stamped.map((p) => p.basis === "snapshot" ? p : p.coverage ? { ...p, coverage: void 0 } : p);
+}
+function pathMatch2(a, b) {
+  const x = a.split("\\").join("/");
+  const y = b.split("\\").join("/");
+  return x === y || x.endsWith(`/${y}`) || y.endsWith(`/${x}`);
+}
+function attributePages(result, pages) {
+  if (!pages.length) return;
+  const byName = new Map(pages.map((p) => [p.name.toLowerCase(), p.id]));
+  const byUrl = new Map(pages.map((p) => [p.url, p.id]));
+  const byId2 = new Set(pages.map((p) => p.id));
+  for (const f of [...result.findings, ...result.packFindings ?? []]) {
+    if (f.page) continue;
+    const snapId = snapshotPageId(f.file) ?? snapshotPageId(f.origin?.capture);
+    if (snapId) {
+      if (byId2.has(snapId)) f.page = snapId;
+      continue;
+    }
+    if (isUrlPath(f.file)) {
+      const hit = byUrl.get(f.file);
+      if (hit) f.page = hit;
+      continue;
+    }
+    const sampleName = f.sample?.page?.toLowerCase();
+    if (sampleName && byName.has(sampleName)) {
+      f.page = byName.get(sampleName);
+      continue;
+    }
+    const src = f.origin?.sourceFile ?? f.file;
+    for (const p of pages) {
+      if (p.sources?.some((s) => pathMatch2(src, s))) {
+        f.page = p.id;
+        break;
+      }
+    }
+  }
+}
+function pageResolver(result) {
+  const pages = pagesOf(result);
+  if (!pages.length) return { pages, pageOf: () => void 0, approximate: () => false };
+  attributePages(result, pages);
+  const byId2 = new Map(pages.map((p) => [p.id, p]));
+  const stamped = /* @__PURE__ */ new Map();
+  for (const f of [...result.findings, ...result.packFindings ?? []]) if (f.page) stamped.set(findingId(f), f.page);
+  const pageOf = (f) => {
+    const id = f.page ?? stamped.get(findingId(f));
+    return id === void 0 ? void 0 : byId2.get(id);
+  };
+  const exact = (f) => snapshotPageId(f.file) !== void 0 || snapshotPageId(f.origin?.capture) !== void 0 || isUrlPath(f.file) || Boolean(f.sample?.page);
+  const shared = (f) => {
+    const src = f.origin?.sourceFile ?? f.file;
+    return pages.filter((p) => p.sources?.some((s) => pathMatch2(src, s))).length > 1;
+  };
+  return { pages, pageOf, approximate: (f) => pageOf(f) !== void 0 && !exact(f) && shared(f) };
+}
+function occurrencesByPage(findings, resolver) {
+  const counts = /* @__PURE__ */ new Map();
+  let orphans = 0;
+  let approximate = false;
+  for (const f of findings) {
+    const page = resolver.pageOf(f);
+    if (!page) {
+      orphans++;
+      continue;
+    }
+    if (resolver.approximate(f)) approximate = true;
+    const entry = counts.get(page.id);
+    if (entry) entry.count++;
+    else counts.set(page.id, { page, count: 1 });
+  }
+  const order = new Map(resolver.pages.map((p, i2) => [p.id, i2]));
+  const pages = [...counts.values()].sort((a, b) => b.count - a.count || (order.get(a.page.id) ?? 0) - (order.get(b.page.id) ?? 0));
+  return { pages, orphans, approximate };
+}
+function unattributedFindings(result) {
+  return [...result.findings, ...result.packFindings ?? []].filter((f) => !f.page);
+}
+function pageStatus(c2, pageFindings, basis, coverage) {
+  if (pageFindings.some((f) => !f.advisory)) return "NC";
+  if (c2.decidedBy === void 0 && basis === "snapshot" && automatability(c2.id) === "needs-rendering" && renderedProvesOn(c2.id, coverage)) return "C";
+  if (c2.status === "manual") return "manual";
+  if (c2.status === "NA") return "NA";
+  if (c2.inapplicable) return c2.status;
+  if (c2.decidedBy === "agent" || c2.decidedBy === "scan") return c2.status;
+  if (automatability(c2.id) !== "static") return "manual";
+  return basis === "snapshot" ? "C" : "manual";
+}
+function measuredHereReason(sc, cov) {
+  if (cov?.scs?.includes(sc)) {
+    return `Measured in a real browser ON THIS PAGE \u2014 the probe acted on it (zoom, 320px viewport, text-spacing override, Tab, hover) and observed nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
+  }
+  if (cov?.axe) {
+    return `Measured by axe-core ON THIS PAGE \u2014 it ran in the browser against this page's DOM and reported nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
+  }
+  const rules = renderedRulesFor(sc);
+  return `Measured on this page's rendered snapshot: ${rules.join(", ")} ran against its computed styles and boxes and raised nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
+}
+function pct(criteria) {
+  const c2 = criteria.filter((x) => x.status === "C").length;
+  const nc = criteria.filter((x) => x.status === "NC").length;
+  const decided = c2 + nc;
+  return { rate: decided === 0 ? null : Math.round(c2 / decided * 100), decided, total: criteria.length };
+}
+function derivePages(result, pages) {
+  if (!pages.length) return [];
+  const out2 = [];
+  for (const p of pages) {
+    const own = result.findings.filter((f) => f.page === p.id);
+    const criteria = result.criteria.map((c2) => {
+      const pf = own.filter((f) => f.criteriaId === c2.id);
+      const status = pageStatus(c2, pf, p.basis, p.coverage);
+      const measured = status === "C" && c2.status !== "C" && c2.decidedBy === void 0;
+      const decidedBy = c2.decidedBy ?? (measured ? "scan" : void 0);
+      const justification = measured ? measuredHereReason(c2.id, p.coverage) : c2.justification;
+      return {
+        id: c2.id,
+        guideline: c2.guideline,
+        status,
+        findings: pf,
+        ...justification ? { justification } : {},
+        ...decidedBy ? { decidedBy } : {},
+        // Carried, not recomputed: a finding on THIS page proves the subject exists after all,
+        // and `pageStatus` has already turned that into an NC above.
+        ...c2.inapplicable && status === c2.status ? { inapplicable: true } : {}
+      };
+    });
+    const { rate, decided, total } = pct(criteria);
+    out2.push({
+      id: p.id,
+      name: p.name,
+      url: p.url,
+      ...p.auth !== void 0 ? { auth: p.auth } : {},
+      basis: p.basis,
+      criteria,
+      findings: own,
+      conformancePct: rate,
+      decided,
+      total
+    });
+  }
+  return out2;
+}
+var MARK = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
+var L = {
+  fr: {
+    title: "Grille par page",
+    note: "Statut de chaque crit\xE8re, page par page. `C` conforme \xB7 `NC` non conforme \xB7 `\u2014` non applicable \xB7 `?` \xE0 \xE9valuer.",
+    criterion: "Crit\xE8re",
+    theme: "Th\xE9matique",
+    none: "Aucune page dans le p\xE9rim\xE8tre : aucun instantan\xE9 (.ultra11y/pages) ni \xE9chantillon scann\xE9.",
+    basisNote: "Une page marqu\xE9e \xAB source \xBB n'a pas d'instantan\xE9 : ses constats proviennent du code, donc l'absence de constat n'y vaut PAS conformit\xE9 \u2014 les crit\xE8res restent \xAB \xE0 \xE9valuer \xBB.",
+    unattributed: (n) => `${n} constat(s) non rattach\xE9(s) \xE0 une page (code partag\xE9, fichier hors routes) \u2014 compt\xE9s dans l'audit global, jamais r\xE9partis d'office.`,
+    rate: "Taux",
+    snapshot: "instantan\xE9",
+    source: "source",
+    notAudited: "non audit\xE9",
+    notAuditedNote: "Une page marqu\xE9e \xAB non audit\xE9 \xBB a bien un instantan\xE9, mais CET audit ne l'a pas lu (il ne portait que sur les sources). L'absence de constat n'y vaut donc PAS conformit\xE9 \u2014 relancez l'audit en incluant `.ultra11y/pages`.",
+    agentMark: "`C*` : conformit\xE9 tranch\xE9e par l'agent IA \xE0 partir des \xE9vidences cit\xE9es (gat\xE9), et non prouv\xE9e par le moteur d\xE9terministe.",
+    originNote: (o) => `Les colonnes sont les URL des pages, relatives \xE0 \`${o}\`.`
+  },
+  en: {
+    title: "Per-page grid",
+    note: "Each criterion's status, page by page. `C` conforming \xB7 `NC` non-conforming \xB7 `\u2014` not applicable \xB7 `?` to assess.",
+    criterion: "Criterion",
+    theme: "Theme",
+    none: "No page in scope: no snapshot (.ultra11y/pages) and no scanned sample.",
+    basisNote: 'A page marked "source" has no snapshot: its findings come from the code, so the absence of a finding there does NOT mean conforming \u2014 those criteria stay "to assess".',
+    unattributed: (n) => `${n} unattributed finding(s) (shared code, file outside any route) \u2014 counted in the overall audit, never spread across pages.`,
+    rate: "Rate",
+    snapshot: "snapshot",
+    source: "source",
+    notAudited: "not audited",
+    notAuditedNote: 'A page marked "not audited" does have a snapshot, but THIS audit never read it (it covered sources only). Absence of a finding there does NOT mean conforming \u2014 re-run the audit with `.ultra11y/pages` in scope.',
+    agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
+    originNote: (o) => `Columns are the pages' URLs, relative to \`${o}\`.`
+  }
+};
+function formatRate(rate, decided, total) {
+  return `${rate === null ? "\u2014" : `${rate} %`} (${decided}/${total})`;
+}
+function agentMarkNote(lang) {
+  return L[lang].agentMark;
+}
+function pageBasisWarning(basis, lang) {
+  if (basis === "snapshot") return void 0;
+  return basis === "not-audited" ? L[lang].notAuditedNote : L[lang].basisNote;
+}
+function basisLabel(basis, lang) {
+  const s = L[lang];
+  return basis === "snapshot" ? s.snapshot : basis === "not-audited" ? s.notAudited : s.source;
+}
+function unattributedNote(n, lang) {
+  return L[lang].unattributed(n);
+}
+function pageColumnLabel(page, origin) {
+  let label = page.url;
+  if (origin && page.url.startsWith(origin)) {
+    const rest = page.url.slice(origin.length);
+    label = rest === "" ? "/" : rest;
+  }
+  return `${label}${page.auth ? " \u{1F512}" : ""}`;
+}
+function commonOrigin(pages) {
+  if (!pages.length) return void 0;
+  let origin;
+  for (const p of pages) {
+    let o;
+    try {
+      o = new URL(p.url).origin;
+    } catch {
+      return void 0;
+    }
+    if (origin === void 0) origin = o;
+    else if (origin !== o) return void 0;
+  }
+  return origin;
+}
+function pageOriginNote(origin, lang) {
+  return origin ? L[lang].originNote(origin) : void 0;
+}
+function pageView(result, page) {
+  const own = result.scope.pageSubjects?.[page.id];
+  return {
+    ...result,
+    ...own ? { scope: { ...result.scope, subjectsSeen: own } } : {},
+    criteria: page.criteria,
+    findings: page.findings,
+    ...result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {}
+  };
+}
+function pageGridModel(result, derived, standard, lang) {
+  const status = /* @__PURE__ */ new Map();
+  const put = (rowId, pageId, s) => {
+    const m = status.get(rowId) ?? /* @__PURE__ */ new Map();
+    m.set(pageId, s);
+    status.set(rowId, m);
+  };
+  if (isCore(standard)) {
+    const rows2 = [...result.criteria].sort((a, b) => compareSC(a.id, b.id)).map((c2) => ({ id: c2.id, label: `${c2.id} ${scTitle(c2.id, lang) ?? ""}`.trim(), group: c2.guideline }));
+    for (const p of derived) for (const c2 of p.criteria) put(c2.id, p.id, c2.status);
+    return { rows: rows2, status };
+  }
+  const pack = loadPack(standard);
+  const rows = pack.criteria.map((pc) => ({ id: pc.id, label: pc.id, group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim() }));
+  for (const p of derived) {
+    for (const pc of derivePackResults(pageView(result, p), standard, p.id)) {
+      const criterion = pack.criteria.find((row) => row.id === pc.id);
+      put(pc.id, p.id, isProvisionalJudgmentInapplicable(pc, criterion) ? "manual" : pc.status);
+    }
+  }
+  return { rows, status };
+}
+function renderRedirected(redirected, lang = "en") {
+  const fr = lang === "fr";
+  const out2 = [
+    fr ? `> \u26A0\uFE0F **${redirected.length} page(s) n'ont pas \xE9t\xE9 enregistr\xE9es** \u2014 le navigateur n'est pas rest\xE9 sur l'adresse demand\xE9e. Les enregistrer aurait d\xE9crit un autre \xE9cran sous le nom demand\xE9. Elles ne comptent donc ni comme conformes ni comme non conformes : elles manquent.` : `> \u26A0\uFE0F **${redirected.length} page(s) were not recorded** \u2014 the browser did not stay on the address asked for. Recording them would have described another screen under the requested name. They count as neither conforming nor non-conforming: they are missing.`,
+    "",
+    fr ? "| Page | Demand\xE9 | Atteint | Motif |" : "| Page | Requested | Landed | Reason |",
+    "| --- | --- | --- | --- |"
+  ];
+  for (const r of redirected) {
+    const why = r.reason === "http-status" ? fr ? `HTTP ${r.status ?? "\u2265 400"} \u2014 page d'erreur rendue \xE0 la m\xEAme adresse` : `HTTP ${r.status ?? "\u2265 400"} \u2014 error page served at the same address` : r.reason === "error" ? fr ? `le navigateur a \xE9chou\xE9 sur cette page${r.detail ? ` \u2014 ${r.detail}` : ""}` : `the browser failed on this page${r.detail ? ` \u2014 ${r.detail}` : ""}` : fr ? "redirection" : "redirect";
+    out2.push(`| ${r.name} (\`${r.id}\`) | \`${r.requested}\` | \`${r.landed}\` | ${why} |`);
+  }
+  return out2;
+}
+function gridRate(rows, status, pageId) {
+  let c2 = 0;
+  let nc = 0;
+  for (const row of rows) {
+    const st = status.get(row.id)?.get(pageId);
+    if (st === "C") c2++;
+    else if (st === "NC") nc++;
+  }
+  const decided = c2 + nc;
+  return [decided === 0 ? null : Math.round(c2 / decided * 100), decided, rows.length];
+}
+function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
+  const s = L[lang];
+  const out2 = [];
+  out2.push(`## \u{1F4CA} ${s.title}`, "");
+  const derived = derivePages(result, pages);
+  if (!derived.length) {
+    out2.push(s.none, "");
+    return out2.join("\n");
+  }
+  out2.push(`> ${s.note}`, "");
+  if (derived.some((p) => p.basis === "attributed")) out2.push(`> \u26A0\uFE0F ${s.basisNote}`, "");
+  const origin = commonOrigin(derived);
+  const originNote = pageOriginNote(origin, lang);
+  if (originNote) out2.push(`> ${originNote}`, "");
+  const head = [s.criterion, ...derived.map((p) => pageColumnLabel(p, origin))];
+  out2.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
+  const { rows, status } = pageGridModel(result, derived, standard, lang);
+  out2.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id))}**`).join(" | ")} |`);
+  out2.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
+  let group = "";
+  for (const row of rows) {
+    if (row.group !== group) {
+      group = row.group;
+      out2.push(`| **${group}** | ${derived.map(() => "").join(" | ")} |`);
+    }
+    const cells = derived.map((p) => MARK[status.get(row.id)?.get(p.id) ?? "manual"]);
+    out2.push(`| ${row.label} | ${cells.join(" | ")} |`);
+  }
+  out2.push("");
+  const orphans = unattributedFindings(result);
+  if (orphans.length) out2.push(`> ${s.unattributed(orphans.length)}`, "");
+  return out2.join("\n");
+}
 
 // src/auditor.ts
 var SEV_ORDER = ["bloquant", "majeur", "mineur"];
@@ -58612,7 +59002,7 @@ var SEV_LABEL = {
   fr: { bloquant: "Bloquant", majeur: "Majeur", mineur: "Mineur" },
   en: { bloquant: "Blocking", majeur: "Major", mineur: "Minor" }
 };
-var L = {
+var L2 = {
   fr: {
     lead: "Lecture auditeur",
     tail: "Correspondance normative.",
@@ -58649,7 +59039,16 @@ var L = {
     no: "non",
     unknown: "inconnu",
     reproSteps: "\xE9tat requis / \xE9tapes pour reproduire",
-    associatedRec: "Recommandations associ\xE9es (non normatives)"
+    associatedRec: "Recommandations associ\xE9es (non normatives)",
+    // Compact (report) reading.
+    fix: "Correction attendue",
+    level: "niveau",
+    showOccurrences: (n) => `Voir les ${n} occurrences`,
+    pagesLabel: "Pages",
+    allPages: (n) => `toutes les pages (${n}/${n})`,
+    morePages: (n) => `+${n} autre(s)`,
+    offPage: (n) => `${n} occurrence(s) sans page identifi\xE9e`,
+    atLeast: "au moins sur"
   },
   en: {
     lead: "Auditor view",
@@ -58687,10 +59086,21 @@ var L = {
     no: "no",
     unknown: "unknown",
     reproSteps: "required state / steps to reproduce",
-    associatedRec: "Related recommendations (non-normative)"
+    associatedRec: "Related recommendations (non-normative)",
+    // Compact (report) reading.
+    fix: "Expected fix",
+    level: "level",
+    showOccurrences: (n) => `Show the ${n} occurrences`,
+    pagesLabel: "Pages",
+    allPages: (n) => `all pages (${n}/${n})`,
+    morePages: (n) => `+${n} more`,
+    offPage: (n) => `${n} occurrence(s) on no page`,
+    atLeast: "at least on"
   }
 };
 var uniq = (xs) => [...new Set(xs.filter(Boolean))];
+var PAGES_LISTED_MAX = 10;
+var COMPACT_OPEN_MAX = 5;
 function groupOccurrences(findings, collapse3) {
   if (!collapse3) return findings.map((f) => [f]);
   const groups = /* @__PURE__ */ new Map();
@@ -58732,9 +59142,10 @@ function relatedLine(related, lang, opts) {
   return `  - \u21B3 ${resolveNote(related, lang)} : \`${related.file}:${related.line}\`${sel}`;
 }
 function renderAuditorUnit(unit, standard, lang, opts = {}) {
-  const s = L[lang];
-  if (unit.advisory) return renderAdvisoryUnit(unit, lang, opts);
+  const s = L2[lang];
+  if (unit.advisory) return opts.compact ? renderCompactAdvisory(unit, lang) : renderAdvisoryUnit(unit, lang, opts);
   const m = auditorUnitModel(unit, standard, lang, opts);
+  if (opts.compact) return renderCompactUnit(m, lang, opts);
   const out2 = [];
   if (opts.heading) out2.push(`${opts.heading} ${m.icon} ${m.label}`, "");
   out2.push(`> ${m.normativeNote}`, "");
@@ -58764,9 +59175,12 @@ function renderAuditorUnit(unit, standard, lang, opts = {}) {
   return out2;
 }
 function auditorUnitModel(unit, standard, lang, opts = {}) {
-  const s = L[lang];
+  const s = L2[lang];
   const v = vocabularyFor(standard, lang);
   const fields = [];
+  let criterion = { label: v.criterion, value: unit.criteriaId };
+  let tests = [];
+  let level;
   if (isCore(standard)) {
     const sc = getSC(unit.criteriaId);
     if (sc) {
@@ -58774,7 +59188,9 @@ function auditorUnitModel(unit, standard, lang, opts = {}) {
       const gl = `${sc.guideline} ${guidelineTitle(sc.guideline, lang) ?? ""}`.trim();
       fields.push({ label: v.theme, value: [pr, gl].filter(Boolean).join(" \xB7 ") });
     }
-    fields.push({ label: v.criterion, value: `${unit.criteriaId}${sc ? ` \u2014 ${unit.title}` : ""}` });
+    criterion = { label: v.criterion, value: `${unit.criteriaId}${sc ? ` \u2014 ${unit.title}` : ""}` };
+    fields.push(criterion);
+    level = sc?.level;
     const techs = techniques(unit.criteriaId);
     if (techs.length) fields.push({ label: v.test, value: techs.join(", ") });
     fields.push({ label: "WCAG", value: `${unit.criteriaId}${sc ? ` (${sc.level})` : ""}` });
@@ -58782,13 +59198,15 @@ function auditorUnitModel(unit, standard, lang, opts = {}) {
     const pack = loadPack(standard);
     const pc = pack.criteria.find((c2) => c2.id === unit.criteriaId);
     if (pc) fields.push({ label: v.theme, value: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trimEnd() });
-    fields.push({ label: v.criterion, value: `${unit.criteriaId} \u2014 ${unit.title}` });
+    criterion = { label: v.criterion, value: `${unit.criteriaId} \u2014 ${unit.title}` };
+    fields.push(criterion);
     const testNums = packTestIdsCited(
       pack,
       unit.criteriaId,
       unit.findings.filter((f) => !f.advisory).map((f) => f.normativeRef)
     );
     if (testNums.length) fields.push({ label: `${v.test}(s)`, value: testNums.join(" \xB7 ") });
+    tests = testNums;
   }
   fields.push({ label: s.priority, value: `${ICON[unit.severity]} ${SEV_LABEL[lang][unit.severity]}` });
   const normative = unit.findings.filter((f) => !f.advisory);
@@ -58798,6 +59216,9 @@ function auditorUnitModel(unit, standard, lang, opts = {}) {
     label: unit.label,
     normativeNote: v.normativeNote ?? `${s.lead} \u2014 ${standardLabel(standard)}. ${s.tail}`,
     fields,
+    criterion,
+    tests,
+    ...level ? { level } : {},
     conformanceTerms: { conformant: v.conformant, nonConformant: v.nonConformant },
     normative,
     advisories: unit.findings.filter((f) => f.advisory),
@@ -58808,7 +59229,7 @@ function auditorUnitModel(unit, standard, lang, opts = {}) {
   };
 }
 function renderTechnicalSection(ncView, unit, standard, lang, opts) {
-  const s = L[lang];
+  const s = L2[lang];
   const out2 = [`${subHeading(opts.heading)} ${s.technical}`, ""];
   const files = uniq(ncView.findings.filter((f) => !isUrlLocation(f.file)).map((f) => f.file));
   if (files.length) {
@@ -58838,7 +59259,7 @@ function renderTechnicalSection(ncView, unit, standard, lang, opts) {
   return out2;
 }
 function renderReproductionContext(normative, lang) {
-  const s = L[lang];
+  const s = L2[lang];
   const seen = /* @__PURE__ */ new Set();
   const qualifying = [];
   for (const f of normative) {
@@ -58860,8 +59281,62 @@ function renderReproductionContext(normative, lang) {
   out2.push(`- _${s.reproSteps}_`, "");
   return out2;
 }
+function renderCompactUnit(m, lang, opts) {
+  const s = L2[lang];
+  const out2 = [];
+  if (opts.heading) out2.push(`${opts.heading} ${m.icon} ${m.label}`, "");
+  const qualifier = m.tests.length ? ` (${m.tests.join(", ")})` : m.level ? ` (${s.level} ${m.level})` : "";
+  out2.push(`**${m.criterion.label}** : ${m.criterion.value}${qualifier}`, "");
+  out2.push(`**${s.finding}** : ${m.occurrences} ${s.occ} \u2014 ${m.messages.map(mdText).join(" ; ")}`, "");
+  const where = opts.pages?.pages.length ? pagesLine(m.normative, opts.pages, lang) : void 0;
+  if (where) out2.push(`**${s.pagesLabel}** : ${where}`, "");
+  if (m.fixes.length) out2.push(`**${s.fix}** : ${m.fixes.map(mdText).join(" ; ")}`, "");
+  const fold = m.occurrences > COMPACT_OPEN_MAX;
+  if (fold) out2.push("<details>", `<summary>${s.showOccurrences(m.occurrences)}</summary>`, "");
+  for (const group of m.groups) {
+    if (group.count > 1) out2.push(`- **\`${group.lead.selectorHint}\`** \u2014 ${mdText(resolveMessage(group.lead, lang))} \xB7 \xD7${group.count}`);
+    for (const f of group.findings) {
+      const indent = group.count > 1 ? "  " : "";
+      out2.push(indent + occurrenceLine(f, lang, { marker: "checkbox" }));
+      renderOccurrenceDetails(out2, f, lang, s, indent, opts.cropFor);
+    }
+  }
+  if (fold) out2.push("", "</details>");
+  out2.push("");
+  if (m.advisories.length) {
+    out2.push(`_${s.associatedRec}_`, "");
+    for (const f of m.advisories) out2.push(occurrenceLine(f, lang, { marker: "advisory" }));
+    out2.push("");
+  }
+  return out2;
+}
+function pagesLine(findings, resolver, lang) {
+  const s = L2[lang];
+  const { pages, orphans, approximate } = occurrencesByPage(findings, resolver);
+  const parts2 = [];
+  const total = resolver.pages.length;
+  const everywhere = pages.length > 3 && pages.length === total;
+  if (everywhere) parts2.push(s.allPages(total));
+  else {
+    parts2.push(...pages.slice(0, PAGES_LISTED_MAX).map(({ page, count }) => `${mdLink(page.name, page.url)} (${count})`));
+    if (pages.length > PAGES_LISTED_MAX) parts2.push(s.morePages(pages.length - PAGES_LISTED_MAX));
+  }
+  if (orphans) parts2.push(s.offPage(orphans));
+  if (!pages.length && !orphans) return void 0;
+  return `${approximate && !everywhere && pages.length ? `${s.atLeast} ` : ""}${parts2.join(" \xB7 ")}`;
+}
+function renderCompactAdvisory(unit, lang) {
+  const s = L2[lang];
+  const messages = uniq(unit.findings.map((f) => resolveMessage(f, lang)));
+  const fixes = uniq(unit.findings.map((f) => resolveRemediation(f, lang)));
+  const shown = unit.findings.slice(0, 3).map((f) => `\`${f.file}:${f.line}\``);
+  const more = unit.findings.length > shown.length ? ` +${unit.findings.length - shown.length}` : "";
+  const where = ` (${unit.findings.length} ${s.occ} : ${shown.join(", ")}${more})`;
+  const suggestion = fixes.length ? ` \u2014 _${s.suggestion}_ : ${fixes.map(mdText).join(" ; ")}` : "";
+  return [`- ${ADVISORY_ICON} **${unit.label}** \u2014 ${messages.map(mdText).join(" ; ")}${where}${suggestion}`];
+}
 function renderAdvisoryUnit(unit, lang, opts) {
-  const s = L[lang];
+  const s = L2[lang];
   const out2 = [];
   if (opts.heading) out2.push(`${opts.heading} ${ADVISORY_ICON} ${unit.label}`, "");
   out2.push(`> ${s.advisoryTag} \u2014 ${s.advisoryNote}`, "");
@@ -58880,7 +59355,7 @@ function renderAdvisoryUnit(unit, lang, opts) {
   return out2;
 }
 function auditorHeader(r, lang, standard) {
-  const s = L[lang];
+  const s = L2[lang];
   const v = vocabularyFor(standard, lang);
   return [
     `# ${v.auditorHeading} \u2014 ${standardLabel(standard)}`,
@@ -58893,7 +59368,7 @@ function auditorHeader(r, lang, standard) {
   ];
 }
 function renderAuditorBacklog(r, lang = "en", standard = "wcag", opts = {}) {
-  const s = L[lang];
+  const s = L2[lang];
   const technical = opts.technical ?? true;
   const { nc, advisory } = partitionUnits(prdUnits(r, standard, lang));
   const out2 = auditorHeader(r, lang, standard);
@@ -58926,7 +59401,7 @@ function renderAuditorPerCriterion(r, lang = "en", standard = "wcag", opts = {})
 var SEV_ORDER2 = ["bloquant", "majeur", "mineur"];
 var SEV_RANK = { bloquant: 0, majeur: 1, mineur: 2 };
 var ICON2 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
-var L2 = {
+var L3 = {
   fr: {
     title: (std) => `Plan de correction d'accessibilit\xE9 \u2014 ${std}`,
     date: "Date",
@@ -59005,11 +59480,11 @@ function prdUnits(r, standard = "wcag", lang = "en") {
     const byCrit = /* @__PURE__ */ new Map();
     for (const f of r.findings) (byCrit.get(f.criteriaId) ?? byCrit.set(f.criteriaId, []).get(f.criteriaId)).push(f);
     for (const [criteriaId, fs2] of byCrit) {
-      const title2 = scTitle(criteriaId, lang);
+      const title = scTitle(criteriaId, lang);
       units.push({
         criteriaId,
-        title: title2 ?? criteriaId,
-        label: title2 ? `${criteriaId} \u2014 ${title2}` : criteriaId,
+        title: title ?? criteriaId,
+        label: title ? `${criteriaId} \u2014 ${title}` : criteriaId,
         refs: [],
         severity: mostSevere(fs2),
         findings: sortFindings(fs2),
@@ -59051,7 +59526,7 @@ function guidanceFor(unit, standard) {
   return guidanceEntriesFor(standard, unit.criteriaId, unit.refs);
 }
 function guidanceExampleBlock(entries, lang) {
-  const s = L2[lang];
+  const s = L3[lang];
   for (const e of entries) {
     const ex = (e.examples ?? []).find((x) => x.bad || x.good);
     if (!ex) continue;
@@ -59064,7 +59539,7 @@ function guidanceExampleBlock(entries, lang) {
   return [];
 }
 function unitBlock(unit, lang, heading, standard) {
-  const s = L2[lang];
+  const s = L3[lang];
   const out2 = [];
   const refs = isCore(standard) && unit.refs.length ? `  \xB7  WCAG ${unit.refs.join(", ")}` : "";
   out2.push(`${heading} ${ICON2[unit.severity]} ${unit.label}${refs}`, "");
@@ -59081,10 +59556,10 @@ function unitBlock(unit, lang, heading, standard) {
   out2.push("");
   return out2;
 }
-function header(r, lang, title2, note = L2[lang].note, ratePct) {
-  const s = L2[lang];
+function header(r, lang, title, note = L3[lang].note, ratePct) {
+  const s = L3[lang];
   return [
-    `# ${title2}`,
+    `# ${title}`,
     "",
     `- **${s.date}** : ${r.date}`,
     `- **${s.scope}** : ${r.scope.files} ${s.files} \u2014 ${r.scope.inputs.join(", ")}`,
@@ -59095,7 +59570,7 @@ function header(r, lang, title2, note = L2[lang].note, ratePct) {
   ];
 }
 function renderBacklog(r, lang = "en", standard = "wcag") {
-  const s = L2[lang];
+  const s = L3[lang];
   const units = prdUnits(r, standard, lang);
   const ratePct = isCore(standard) ? void 0 : packConformancePct(derivePackResults(r, standard));
   const out2 = header(r, lang, s.title(standardLabel(standard)), void 0, ratePct);
@@ -59113,7 +59588,7 @@ function renderBacklog(r, lang = "en", standard = "wcag") {
   return out2.join("\n");
 }
 function renderPerCriterion(r, lang = "en", standard = "wcag") {
-  const s = L2[lang];
+  const s = L3[lang];
   const ratePct = isCore(standard) ? void 0 : packConformancePct(derivePackResults(r, standard));
   return prdUnits(r, standard, lang).map((u) => {
     const out2 = header(r, lang, s.prdTitle(u.label), void 0, ratePct);
@@ -59126,19 +59601,19 @@ function epicsOf(units, standard, lang) {
   const groups = /* @__PURE__ */ new Map();
   for (const u of units) {
     let key2;
-    let title2;
+    let title;
     if (pack) {
       const themeNum = pack.criteria.find((c2) => c2.id === u.criteriaId)?.theme ?? 0;
       key2 = String(themeNum).padStart(3, "0");
-      title2 = (themeNum ? themeName(pack, themeNum, lang) : void 0) ?? `#${themeNum}`;
+      title = (themeNum ? themeName(pack, themeNum, lang) : void 0) ?? `#${themeNum}`;
     } else {
       const g = getSC(u.criteriaId)?.guideline ?? u.criteriaId;
       key2 = g;
-      title2 = `${g} ${guidelineTitle(g, lang) ?? ""}`.trim();
+      title = `${g} ${guidelineTitle(g, lang) ?? ""}`.trim();
     }
     let epic = groups.get(key2);
     if (!epic) {
-      epic = { key: key2, title: title2, units: [] };
+      epic = { key: key2, title, units: [] };
       groups.set(key2, epic);
     }
     epic.units.push(u);
@@ -59146,7 +59621,7 @@ function epicsOf(units, standard, lang) {
   return [...groups.values()].sort((a, b) => a.key.localeCompare(b.key, void 0, { numeric: true }));
 }
 function acceptanceCriteria(unit, standard, lang, opts = {}) {
-  const s = L2[lang];
+  const s = L3[lang];
   const prefix2 = opts.checkbox ? "- [ ] " : "- ";
   const hints = [...new Set(unit.findings.map((f) => `\`${f.selectorHint}\``))].slice(0, 3).join(", ") || "\u2014";
   const line = (req, ref) => `${prefix2}**${s.given}** ${s.givenElements(hints)} \xB7 **${s.when}** ${s.acWhen} \xB7 **${s.then}** \xAB ${req} \xBB (${ref}).`;
@@ -59165,22 +59640,22 @@ function acceptanceCriteria(unit, standard, lang, opts = {}) {
 }
 function toRuleOnSection(r, standard, lang) {
   if (isCore(standard)) return [];
-  const s = L2[lang];
+  const s = L3[lang];
   const pack = loadPack(standard);
   const manual = derivePackResults(r, standard).filter((pc) => pc.status === "manual" || isProvisionalJudgmentInapplicable(pc));
   if (!manual.length) return [];
   const out2 = [`## ${s.toRuleOn} (${manual.length})`, "", `> ${s.toRuleOnNote}`, ""];
   for (const pc of manual) {
     const crit = pack.criteria.find((c2) => c2.id === pc.id);
-    const title2 = crit ? titlePlain(pack, crit, lang) : pc.id;
+    const title = crit ? titlePlain(pack, crit, lang) : pc.id;
     const tests = packTestIds(pack, pc.id);
-    out2.push(`- [ ] **${pack.name} ${pc.id}** \u2014 ${title2}${tests.length ? `  \xB7  ${s.tests}: ${tests.map((t3) => `\`${t3}\``).join(" ")}` : ""}`);
+    out2.push(`- [ ] **${pack.name} ${pc.id}** \u2014 ${title}${tests.length ? `  \xB7  ${s.tests}: ${tests.map((t3) => `\`${t3}\``).join(" ")}` : ""}`);
   }
   out2.push("");
   return out2;
 }
 function renderPrdDoc(r, lang = "en", standard = "wcag") {
-  const s = L2[lang];
+  const s = L3[lang];
   const units = prdUnits(r, standard, lang);
   const ratePct = isCore(standard) ? void 0 : packConformancePct(derivePackResults(r, standard));
   const out2 = header(r, lang, s.title(standardLabel(standard)), s.docNote, ratePct);
@@ -59231,313 +59706,6 @@ function writePrd(r, opts) {
   const p = join30(opts.out, `prd-${r.date}.md`);
   writeFileSync7(p, remediation ? renderBacklog(r, opts.lang, opts.standard) : renderAuditorBacklog(r, opts.lang, opts.standard, { technical }));
   return [p];
-}
-
-// src/pages.ts
-function pageScopesFrom(snapshots) {
-  return snapshots.map((s) => ({
-    id: s.meta.id,
-    name: s.meta.name,
-    url: s.meta.url,
-    ...s.meta.auth !== void 0 ? { auth: s.meta.auth } : {},
-    ...s.meta.route ? { route: s.meta.route } : {},
-    ...s.meta.sources ? { sources: s.meta.sources } : {},
-    ...s.meta.notes ? { notes: s.meta.notes } : {},
-    basis: "snapshot"
-  }));
-}
-function pageScopesFromSample(sample) {
-  return (sample?.pages ?? []).map((p) => ({
-    id: p.id,
-    name: p.name,
-    url: p.url,
-    ...p.auth !== void 0 ? { auth: p.auth } : {},
-    ...p.notes ? { notes: p.notes } : {},
-    basis: "attributed"
-  }));
-}
-function pagesOf(result) {
-  const fromScope = result.scope.pages ?? [];
-  const audited = result.scope.pagesAudited;
-  const checked = audited === void 0 ? fromScope : fromScope.map((p) => p.basis === "snapshot" && !audited.includes(p.id) ? { ...p, basis: "not-audited" } : p);
-  const ids = new Set(checked.map((p) => p.id));
-  const urls = new Set(checked.map((p) => p.url));
-  const extra = pageScopesFromSample(result.scope.sample).filter((p) => !ids.has(p.id) && !urls.has(p.url));
-  const cov = result.scope.pageCoverage;
-  const stamped = cov ? [...checked, ...extra].map((p) => cov[p.id] ? { ...p, coverage: cov[p.id] } : p) : [...checked, ...extra];
-  return stamped.map((p) => p.basis === "snapshot" ? p : p.coverage ? { ...p, coverage: void 0 } : p);
-}
-function pathMatch2(a, b) {
-  const x = a.split("\\").join("/");
-  const y = b.split("\\").join("/");
-  return x === y || x.endsWith(`/${y}`) || y.endsWith(`/${x}`);
-}
-function attributePages(result, pages) {
-  if (!pages.length) return;
-  const byName = new Map(pages.map((p) => [p.name.toLowerCase(), p.id]));
-  const byUrl = new Map(pages.map((p) => [p.url, p.id]));
-  const byId2 = new Set(pages.map((p) => p.id));
-  for (const f of [...result.findings, ...result.packFindings ?? []]) {
-    if (f.page) continue;
-    const snapId = snapshotPageId(f.file) ?? snapshotPageId(f.origin?.capture);
-    if (snapId) {
-      if (byId2.has(snapId)) f.page = snapId;
-      continue;
-    }
-    if (isUrlPath(f.file)) {
-      const hit = byUrl.get(f.file);
-      if (hit) f.page = hit;
-      continue;
-    }
-    const sampleName = f.sample?.page?.toLowerCase();
-    if (sampleName && byName.has(sampleName)) {
-      f.page = byName.get(sampleName);
-      continue;
-    }
-    const src = f.origin?.sourceFile ?? f.file;
-    for (const p of pages) {
-      if (p.sources?.some((s) => pathMatch2(src, s))) {
-        f.page = p.id;
-        break;
-      }
-    }
-  }
-}
-function unattributedFindings(result) {
-  return [...result.findings, ...result.packFindings ?? []].filter((f) => !f.page);
-}
-function pageStatus(c2, pageFindings, basis, coverage) {
-  if (pageFindings.some((f) => !f.advisory)) return "NC";
-  if (c2.decidedBy === void 0 && basis === "snapshot" && automatability(c2.id) === "needs-rendering" && renderedProvesOn(c2.id, coverage)) return "C";
-  if (c2.status === "manual") return "manual";
-  if (c2.status === "NA") return "NA";
-  if (c2.inapplicable) return c2.status;
-  if (c2.decidedBy === "agent" || c2.decidedBy === "scan") return c2.status;
-  if (automatability(c2.id) !== "static") return "manual";
-  return basis === "snapshot" ? "C" : "manual";
-}
-function measuredHereReason(sc, cov) {
-  if (cov?.scs?.includes(sc)) {
-    return `Measured in a real browser ON THIS PAGE \u2014 the probe acted on it (zoom, 320px viewport, text-spacing override, Tab, hover) and observed nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
-  }
-  if (cov?.axe) {
-    return `Measured by axe-core ON THIS PAGE \u2014 it ran in the browser against this page's DOM and reported nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
-  }
-  const rules = renderedRulesFor(sc);
-  return `Measured on this page's rendered snapshot: ${rules.join(", ")} ran against its computed styles and boxes and raised nothing. The criterion is non-conforming elsewhere in scope; here it was measured, and it passed.`;
-}
-function pct(criteria) {
-  const c2 = criteria.filter((x) => x.status === "C").length;
-  const nc = criteria.filter((x) => x.status === "NC").length;
-  const decided = c2 + nc;
-  return { rate: decided === 0 ? null : Math.round(c2 / decided * 100), decided, total: criteria.length };
-}
-function derivePages(result, pages) {
-  if (!pages.length) return [];
-  const out2 = [];
-  for (const p of pages) {
-    const own = result.findings.filter((f) => f.page === p.id);
-    const criteria = result.criteria.map((c2) => {
-      const pf = own.filter((f) => f.criteriaId === c2.id);
-      const status = pageStatus(c2, pf, p.basis, p.coverage);
-      const measured = status === "C" && c2.status !== "C" && c2.decidedBy === void 0;
-      const decidedBy = c2.decidedBy ?? (measured ? "scan" : void 0);
-      const justification = measured ? measuredHereReason(c2.id, p.coverage) : c2.justification;
-      return {
-        id: c2.id,
-        guideline: c2.guideline,
-        status,
-        findings: pf,
-        ...justification ? { justification } : {},
-        ...decidedBy ? { decidedBy } : {},
-        // Carried, not recomputed: a finding on THIS page proves the subject exists after all,
-        // and `pageStatus` has already turned that into an NC above.
-        ...c2.inapplicable && status === c2.status ? { inapplicable: true } : {}
-      };
-    });
-    const { rate, decided, total } = pct(criteria);
-    out2.push({
-      id: p.id,
-      name: p.name,
-      url: p.url,
-      ...p.auth !== void 0 ? { auth: p.auth } : {},
-      basis: p.basis,
-      criteria,
-      findings: own,
-      conformancePct: rate,
-      decided,
-      total
-    });
-  }
-  return out2;
-}
-var MARK = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
-var L3 = {
-  fr: {
-    title: "Grille par page",
-    note: "Statut de chaque crit\xE8re, page par page. `C` conforme \xB7 `NC` non conforme \xB7 `\u2014` non applicable \xB7 `?` \xE0 \xE9valuer.",
-    criterion: "Crit\xE8re",
-    theme: "Th\xE9matique",
-    none: "Aucune page dans le p\xE9rim\xE8tre : aucun instantan\xE9 (.ultra11y/pages) ni \xE9chantillon scann\xE9.",
-    basisNote: "Une page marqu\xE9e \xAB source \xBB n'a pas d'instantan\xE9 : ses constats proviennent du code, donc l'absence de constat n'y vaut PAS conformit\xE9 \u2014 les crit\xE8res restent \xAB \xE0 \xE9valuer \xBB.",
-    unattributed: (n) => `${n} constat(s) non rattach\xE9(s) \xE0 une page (code partag\xE9, fichier hors routes) \u2014 compt\xE9s dans l'audit global, jamais r\xE9partis d'office.`,
-    rate: "Taux",
-    snapshot: "instantan\xE9",
-    source: "source",
-    notAudited: "non audit\xE9",
-    notAuditedNote: "Une page marqu\xE9e \xAB non audit\xE9 \xBB a bien un instantan\xE9, mais CET audit ne l'a pas lu (il ne portait que sur les sources). L'absence de constat n'y vaut donc PAS conformit\xE9 \u2014 relancez l'audit en incluant `.ultra11y/pages`.",
-    agentMark: "`C*` : conformit\xE9 tranch\xE9e par l'agent IA \xE0 partir des \xE9vidences cit\xE9es (gat\xE9), et non prouv\xE9e par le moteur d\xE9terministe.",
-    originNote: (o) => `Les colonnes sont les URL des pages, relatives \xE0 \`${o}\`.`
-  },
-  en: {
-    title: "Per-page grid",
-    note: "Each criterion's status, page by page. `C` conforming \xB7 `NC` non-conforming \xB7 `\u2014` not applicable \xB7 `?` to assess.",
-    criterion: "Criterion",
-    theme: "Theme",
-    none: "No page in scope: no snapshot (.ultra11y/pages) and no scanned sample.",
-    basisNote: 'A page marked "source" has no snapshot: its findings come from the code, so the absence of a finding there does NOT mean conforming \u2014 those criteria stay "to assess".',
-    unattributed: (n) => `${n} unattributed finding(s) (shared code, file outside any route) \u2014 counted in the overall audit, never spread across pages.`,
-    rate: "Rate",
-    snapshot: "snapshot",
-    source: "source",
-    notAudited: "not audited",
-    notAuditedNote: 'A page marked "not audited" does have a snapshot, but THIS audit never read it (it covered sources only). Absence of a finding there does NOT mean conforming \u2014 re-run the audit with `.ultra11y/pages` in scope.',
-    agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
-    originNote: (o) => `Columns are the pages' URLs, relative to \`${o}\`.`
-  }
-};
-function formatRate(rate, decided, total) {
-  return `${rate === null ? "\u2014" : `${rate} %`} (${decided}/${total})`;
-}
-function agentMarkNote(lang) {
-  return L3[lang].agentMark;
-}
-function pageBasisWarning(basis, lang) {
-  if (basis === "snapshot") return void 0;
-  return basis === "not-audited" ? L3[lang].notAuditedNote : L3[lang].basisNote;
-}
-function basisLabel(basis, lang) {
-  const s = L3[lang];
-  return basis === "snapshot" ? s.snapshot : basis === "not-audited" ? s.notAudited : s.source;
-}
-function unattributedNote(n, lang) {
-  return L3[lang].unattributed(n);
-}
-function pageColumnLabel(page, origin) {
-  let label = page.url;
-  if (origin && page.url.startsWith(origin)) {
-    const rest = page.url.slice(origin.length);
-    label = rest === "" ? "/" : rest;
-  }
-  return `${label}${page.auth ? " \u{1F512}" : ""}`;
-}
-function commonOrigin(pages) {
-  if (!pages.length) return void 0;
-  let origin;
-  for (const p of pages) {
-    let o;
-    try {
-      o = new URL(p.url).origin;
-    } catch {
-      return void 0;
-    }
-    if (origin === void 0) origin = o;
-    else if (origin !== o) return void 0;
-  }
-  return origin;
-}
-function pageOriginNote(origin, lang) {
-  return origin ? L3[lang].originNote(origin) : void 0;
-}
-function pageView(result, page) {
-  const own = result.scope.pageSubjects?.[page.id];
-  return {
-    ...result,
-    ...own ? { scope: { ...result.scope, subjectsSeen: own } } : {},
-    criteria: page.criteria,
-    findings: page.findings,
-    ...result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {}
-  };
-}
-function pageGridModel(result, derived, standard, lang) {
-  const status = /* @__PURE__ */ new Map();
-  const put = (rowId, pageId, s) => {
-    const m = status.get(rowId) ?? /* @__PURE__ */ new Map();
-    m.set(pageId, s);
-    status.set(rowId, m);
-  };
-  if (isCore(standard)) {
-    const rows2 = [...result.criteria].sort((a, b) => compareSC(a.id, b.id)).map((c2) => ({ id: c2.id, label: `${c2.id} ${scTitle(c2.id, lang) ?? ""}`.trim(), group: c2.guideline }));
-    for (const p of derived) for (const c2 of p.criteria) put(c2.id, p.id, c2.status);
-    return { rows: rows2, status };
-  }
-  const pack = loadPack(standard);
-  const rows = pack.criteria.map((pc) => ({ id: pc.id, label: pc.id, group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim() }));
-  for (const p of derived) {
-    for (const pc of derivePackResults(pageView(result, p), standard, p.id)) {
-      const criterion = pack.criteria.find((row) => row.id === pc.id);
-      put(pc.id, p.id, isProvisionalJudgmentInapplicable(pc, criterion) ? "manual" : pc.status);
-    }
-  }
-  return { rows, status };
-}
-function renderRedirected(redirected, lang = "en") {
-  const fr = lang === "fr";
-  const out2 = [
-    fr ? `> \u26A0\uFE0F **${redirected.length} page(s) n'ont pas \xE9t\xE9 enregistr\xE9es** \u2014 le navigateur n'est pas rest\xE9 sur l'adresse demand\xE9e. Les enregistrer aurait d\xE9crit un autre \xE9cran sous le nom demand\xE9. Elles ne comptent donc ni comme conformes ni comme non conformes : elles manquent.` : `> \u26A0\uFE0F **${redirected.length} page(s) were not recorded** \u2014 the browser did not stay on the address asked for. Recording them would have described another screen under the requested name. They count as neither conforming nor non-conforming: they are missing.`,
-    "",
-    fr ? "| Page | Demand\xE9 | Atteint | Motif |" : "| Page | Requested | Landed | Reason |",
-    "| --- | --- | --- | --- |"
-  ];
-  for (const r of redirected) {
-    const why = r.reason === "http-status" ? fr ? `HTTP ${r.status ?? "\u2265 400"} \u2014 page d'erreur rendue \xE0 la m\xEAme adresse` : `HTTP ${r.status ?? "\u2265 400"} \u2014 error page served at the same address` : r.reason === "error" ? fr ? `le navigateur a \xE9chou\xE9 sur cette page${r.detail ? ` \u2014 ${r.detail}` : ""}` : `the browser failed on this page${r.detail ? ` \u2014 ${r.detail}` : ""}` : fr ? "redirection" : "redirect";
-    out2.push(`| ${r.name} (\`${r.id}\`) | \`${r.requested}\` | \`${r.landed}\` | ${why} |`);
-  }
-  return out2;
-}
-function gridRate(rows, status, pageId) {
-  let c2 = 0;
-  let nc = 0;
-  for (const row of rows) {
-    const st = status.get(row.id)?.get(pageId);
-    if (st === "C") c2++;
-    else if (st === "NC") nc++;
-  }
-  const decided = c2 + nc;
-  return [decided === 0 ? null : Math.round(c2 / decided * 100), decided, rows.length];
-}
-function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
-  const s = L3[lang];
-  const out2 = [];
-  out2.push(`## \u{1F4CA} ${s.title}`, "");
-  const derived = derivePages(result, pages);
-  if (!derived.length) {
-    out2.push(s.none, "");
-    return out2.join("\n");
-  }
-  out2.push(`> ${s.note}`, "");
-  if (derived.some((p) => p.basis === "attributed")) out2.push(`> \u26A0\uFE0F ${s.basisNote}`, "");
-  const origin = commonOrigin(derived);
-  const originNote = pageOriginNote(origin, lang);
-  if (originNote) out2.push(`> ${originNote}`, "");
-  const head = [s.criterion, ...derived.map((p) => pageColumnLabel(p, origin))];
-  out2.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
-  const { rows, status } = pageGridModel(result, derived, standard, lang);
-  out2.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id))}**`).join(" | ")} |`);
-  out2.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
-  let group = "";
-  for (const row of rows) {
-    if (row.group !== group) {
-      group = row.group;
-      out2.push(`| **${group}** | ${derived.map(() => "").join(" | ")} |`);
-    }
-    const cells = derived.map((p) => MARK[status.get(row.id)?.get(p.id) ?? "manual"]);
-    out2.push(`| ${row.label} | ${cells.join(" | ")} |`);
-  }
-  out2.push("");
-  const orphans = unattributedFindings(result);
-  if (orphans.length) out2.push(`> ${s.unattributed(orphans.length)}`, "");
-  return out2.join("\n");
 }
 
 // src/pages-report.ts
@@ -59757,12 +59925,12 @@ function renderPageReport(result, page, opts = {}) {
   }
   return out2.join("\n");
 }
-function header2(result, pages, standard, lang, title2) {
+function header2(result, pages, standard, lang, title) {
   const s = L4[lang];
   return [
     pagesReportMarker(standard),
     "",
-    `# ${title2}`,
+    `# ${title}`,
     "",
     `- **${s.date}** : ${result.date}`,
     `- **${s.standard}** : ${isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name}`,
@@ -59841,17 +60009,17 @@ var L5 = {
     provenance: "Provenance des d\xE9cisions",
     provenanceNote: (engine, scan2, agent) => `${engine} moteur \xB7 ${scan2} navigateur \xB7 ${agent} adjudication`,
     autoRateNote: (c2, d) => `crit\xE8res valid\xE9s par le moteur seul \xF7 crit\xE8res d\xE9cid\xE9s sans l'agent (${c2} \xF7 ${d})`,
-    warn: "Ce rapport couvre le sous-ensemble de crit\xE8res v\xE9rifiables automatiquement. Les crit\xE8res \xAB \xE0 \xE9valuer \xBB (rendu / jugement) sont adjug\xE9s par l'agent IA (`verify --manual`, de fa\xE7on gat\xE9e) ; le rendu passe par `scan` (voir la derni\xE8re section).",
+    warn: "Ce rapport couvre le sous-ensemble de crit\xE8res v\xE9rifiables automatiquement. Les crit\xE8res \xAB \xE0 \xE9valuer \xBB (rendu / jugement) sont adjug\xE9s par l'agent IA (`verify --manual`, de fa\xE7on gat\xE9e) ; le rendu passe par `scan` (voir la section 5).",
     derived: (std) => `Rapport ${std}. Chaque crit\xE8re est jug\xE9 sur ses propres tests ; la v\xE9rification d'int\xE9grit\xE9 (\`check\`/\`verify\`) op\xE8re sur le m\xEAme p\xE9rim\xE8tre.`,
     synthTitle: (by) => `1. Synth\xE8se par ${by}`,
     byGuideline: "r\xE8gle WCAG",
     byTheme: "th\xE9matique",
     th: (head) => [head, "C", "NC", "NA", "\xC0 \xE9valuer"],
-    naSubset: (n) => `**NA est un sous-ensemble de C**, jamais une quatri\xE8me colonne : un crit\xE8re conforme faute de sujet dans le p\xE9rim\xE8tre est compt\xE9 en C, et NA dit seulement combien de conformit\xE9s ont \xE9t\xE9 atteintes ainsi. Le nombre de crit\xE8res est C + NC + \xAB \xC0 \xE9valuer \xBB = ${n}.`,
+    naSubset: (n) => `**NA est inclus dans C** (crit\xE8re conforme faute de sujet), jamais en plus : C + NC + \xAB \xC0 \xE9valuer \xBB = ${n} crit\xE8res.`,
     total: "Total",
     ncTitle: "2. Non-conformit\xE9s (par priorit\xE9)",
     recTitle: "Recommandations (non normatives)",
-    recNote: "Bonnes pratiques SANS test normatif du r\xE9f\xE9rentiel actif \u2014 ce ne sont PAS des non-conformit\xE9s et elles n'entrent pas dans le taux de r\xE9ussite. Libre \xE0 l'\xE9quipe de les suivre.",
+    recNote: "Bonnes pratiques sans test normatif : ce ne sont PAS des non-conformit\xE9s et elles n'entrent dans aucun taux.",
     sev: { bloquant: "Bloquant", majeur: "Majeur", mineur: "Mineur" },
     none: "Aucune non-conformit\xE9 d\xE9tect\xE9e par le moteur statique.",
     cTitle: "3. Crit\xE8res conformes (C)",
@@ -59864,12 +60032,12 @@ var L5 = {
     basisCol: "Base",
     rateCol: "Taux",
     naTitle: "4. Crit\xE8res conformes faute de sujet",
-    naNote: "Rien de ce type n'existe dans le p\xE9rim\xE8tre audit\xE9 : aucun tableau, aucun m\xE9dia, aucun champ selon le crit\xE8re. Ces crit\xE8res sont conformes \u2014 rien ne les contredit \u2014 mais rien n'a \xE9t\xE9 v\xE9rifi\xE9 non plus. Chacun dit ce qui a \xE9t\xE9 cherch\xE9 et sur quel p\xE9rim\xE8tre, pour que l'affirmation reste r\xE9futable.",
-    manualTitle: "5. Crit\xE8res \xE0 adjuger (jugement / rendu) \u2014 non d\xE9cid\xE9s par le moteur statique",
-    manualWarn: "Adjugez-les avec `verify --manual` (l'agent d\xE9cide depuis la source, de fa\xE7on gat\xE9e) ; les crit\xE8res de rendu passent par `scan`. Aucun ne doit \xEAtre marqu\xE9 \xAB conforme \xBB sans justification enregistr\xE9e et gat\xE9e.",
+    naNote: "Rien de ce type dans le p\xE9rim\xE8tre audit\xE9 (aucun tableau, m\xE9dia ou champ, selon le crit\xE8re) : conformes, mais sans rien \xE0 v\xE9rifier. Chaque ligne dit ce qui a \xE9t\xE9 cherch\xE9, pour que l'affirmation reste r\xE9futable.",
+    manualTitle: "5. Crit\xE8res \xE0 \xE9valuer (jugement / rendu)",
+    manualWarn: "Jugement : `verify --manual` (l'agent d\xE9cide depuis la source, de fa\xE7on gat\xE9e) ; rendu : `scan`. Aucun crit\xE8re n'est marqu\xE9 \xAB conforme \xBB sans justification enregistr\xE9e et gat\xE9e.",
     testsToRule: "tests \xE0 trancher",
-    manualSummary: (criteria, tests) => `**${criteria} crit\xE8re(s) / ${tests} test(s) restent \xE0 trancher.** Leur statut et leur r\xE9partition S/R/J figurent d\xE9j\xE0 dans la grille exhaustive ci-dessus ; ils ne sont pas r\xE9p\xE9t\xE9s ici.`,
-    manualHowTo: "G\xE9n\xE9rez la worklist : `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Chaque item y porte l'\xE9nonc\xE9 complet de ses tests, sa note technique, ses cas particuliers, sa guidance et les termes que le r\xE9f\xE9rentiel d\xE9finit.",
+    manualSummary: (criteria, tests) => `**${criteria} crit\xE8re(s) / ${tests} test(s) restent \xE0 trancher.** Leur statut et leur r\xE9partition S/R/J figurent dans la grille exhaustive (section E).`,
+    manualHowTo: "Worklist compl\xE8te (\xE9nonc\xE9s des tests, notes techniques, glossaire) : `verify --manual --in <audit.json> --standard <pack> --out <dir>`.",
     // These three justifications appear ONLY in a pack report (the core has no derivation to
     // explain), so they are worded in the pack's terms: they used to describe the engine's
     // internals — « mappé sur des SC hors WCAG 2.2 AA », « les CS WCAG auxquels il est
@@ -59896,7 +60064,8 @@ var L5 = {
     partialAudit: (list) => `Audit partiel \u2014 les crit\xE8res \xAB \xE0 restituer \xBB (${list}) n'ont pas \xE9t\xE9 test\xE9s. Lancez \`ultra11y scan --sample\` (Playwright + axe + sondes) sur l'\xE9chantillon, puis fusionnez avec \`scan --merge\`.`,
     // Task 5 — « Constats par page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Constats par page",
-    perPageNote: "Constats regroup\xE9s par page de l'\xE9chantillon audit\xE9 (rendu dynamique).",
+    perPageNote: "Pour chaque page de l'\xE9chantillon : sa capture d'\xE9cran et les crit\xE8res non conformes relev\xE9s sur cette page.",
+    pageNcCriteria: (n) => `${n} crit\xE8re(s) non conforme(s) sur cette page`,
     transverseNote: (list) => `\xC9l\xE9ments transverses audit\xE9s sur chaque page : ${list}.`,
     authYes: "\u{1F512} authentification requise",
     authNo: "\u{1F310} public",
@@ -59916,7 +60085,103 @@ var L5 = {
     statusCol: "Statut",
     automationCol: "Tests S / R / J",
     decidedByCol: "D\xE9cid\xE9 par",
-    owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "\xE0 adjuger" }
+    owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "\xE0 adjuger" },
+    // THE SUMMARY — what a reader who stops after one screen must take away: the level, what to
+    // fix, and what separates the site from the next level.
+    methodTitle: "M\xE9thode, couverture et avertissements",
+    conformanceShort: (v, a) => `crit\xE8res valid\xE9s \xF7 crit\xE8res applicables (${v} \xF7 ${a})`,
+    denominatorLine: "Calcul du taux",
+    summaryTitle: "R\xE9sum\xE9",
+    levelHead: (std, label) => `Niveau de conformit\xE9 ${std} : ${label}`,
+    levelProvisional: "provisoire",
+    levelProvisionalNote: (open) => `${open} crit\xE8re(s) restent \xE0 \xE9valuer ; leur d\xE9cision ne peut que maintenir ou relever ce niveau.`,
+    levelSettled: "tous les crit\xE8res du p\xE9rim\xE8tre sont d\xE9cid\xE9s.",
+    levelNone: (std) => `Niveau de conformit\xE9 ${std} : non calculable`,
+    levelNoneNote: "aucun crit\xE8re applicable dans ce p\xE9rim\xE8tre.",
+    verdictHead: (std, state) => `Conformit\xE9 ${std} : ${state}`,
+    verdictFailed: (nc) => [`non atteinte`, `${nc} crit\xE8re(s) non conforme(s).`],
+    verdictOpen: (open) => [`non \xE9tablie`, `aucune non-conformit\xE9 relev\xE9e, mais ${open} crit\xE8re(s) restent \xE0 \xE9valuer.`],
+    verdictMet: ["atteinte", "tous les crit\xE8res du p\xE9rim\xE8tre audit\xE9 sont conformes."],
+    rateLabel: "Taux de conformit\xE9",
+    rateValue: (pct2, v, a) => `${pct2} % \u2014 ${v} crit\xE8re(s) valid\xE9(s) sur ${a} applicable(s)`,
+    rangeValue: (hi, best) => `jusqu'\xE0 ${hi} % selon l'issue des crit\xE8res \xE0 \xE9valuer${best ? ` (au mieux \xAB ${best} \xBB en l'\xE9tat)` : ""}`,
+    tallyLabel: (n) => `Bilan des ${n} crit\xE8res`,
+    tallyValue: (c2, nc, na, open) => `${c2} conforme(s) \xB7 ${nc} non conforme(s) \xB7 ${na} non applicable(s) \xB7 ${open} \xE0 \xE9valuer`,
+    scaleLabel: "\xC9chelle",
+    scaleBelow: (label, min) => `${label} sous ${min} %`,
+    scaleFrom: (label, min) => `${label} d\xE8s ${min} %`,
+    scaleAll: (label) => `${label} \xE0 100 %`,
+    fixTitle: "Ce qu'il faut corriger",
+    fixIntro: (n) => `${n} crit\xE8re(s) non conforme(s), du plus au moins bloquant.`,
+    fixDetail: "Le d\xE9tail par page est en section 2.",
+    fixGeneric: "Corrigez chaque \xE9l\xE9ment signal\xE9 sur les pages concern\xE9es (liste pr\xE9cise dans l'annexe technique).",
+    fixCols: ["Priorit\xE9", "Crit\xE8re", "Occurrences", "Correction attendue"],
+    fixNone: "Aucune non-conformit\xE9 relev\xE9e : rien \xE0 corriger \xE0 ce stade.",
+    moreFixes: (n) => `(+${n} autre(s) correction(s))`,
+    pagesCol: "Pages",
+    allPages: (n) => `toutes les pages (${n}/${n})`,
+    morePages: (n) => `+${n} autre(s)`,
+    offPage: (n) => `${n} sans page`,
+    atLeast: "(au moins)",
+    noPagesNote: "Aucune URL : cet audit porte sur le code source, aucune page du site n'a \xE9t\xE9 analys\xE9e. Les anomalies ne peuvent donc pas encore \xEAtre situ\xE9es sur des pages ; l'annexe technique indique comment compl\xE9ter l'analyse.",
+    noPagesNoteTech: "Aucune page dans le p\xE9rim\xE8tre : pour situer chaque anomalie sur une URL, lancez `ultra11y scan --sample --merge <audit.json>` (\xE9chantillon d\xE9clar\xE9 dans `.ultra11yrc.json`, avec les `sources` de chaque page) ou capturez les pages dans `.ultra11y/pages/` avant l'audit.",
+    approximateNote: "\xAB (au moins) \xBB : l'anomalie est dans un fichier source d\xE9clar\xE9 par plusieurs pages ; elle n'est rattach\xE9e qu'\xE0 la premi\xE8re, la liste des pages peut donc \xEAtre incompl\xE8te.",
+    fixAdvisory: (n) => `S'y ajoute(nt) ${n} recommandation(s) non normative(s), sans effet sur le niveau.`,
+    nextTitle: "Pour atteindre un meilleur niveau",
+    nextTitleCore: "Prochaines \xE9tapes",
+    // Each step is [what to do, why it matters]: the first half is emphasized by every renderer.
+    stepFix: (nc, pct2, v, a, floor, level) => [
+      `Corriger les ${nc} crit\xE8re(s) non conforme(s)`,
+      ` : le taux passe \xE0 ${floor ? "au moins " : ""}${pct2} % (${v} \xF7 ${a})${level ? `, soit \xAB ${level} \xBB` : ""}.`
+    ],
+    stepFixCore: (nc) => [`Corriger les ${nc} crit\xE8re(s) non conforme(s)`, ` list\xE9s ci-dessus, puis refaire l'audit.`],
+    stepTarget: (label, min, need, a, missing, fromNc, fromOpen) => [
+      `Viser \xAB ${label} \xBB (${min} %)`,
+      ` : ${need} crit\xE8re(s) valid\xE9(s) sur ${a} sont n\xE9cessaires, il en manque ${missing} \u2014 ${fromNc > 0 ? `${fromNc} par la correction des non-conformit\xE9s, ${fromOpen} parmi les crit\xE8res \xE0 \xE9valuer` : "\xE0 valider parmi les crit\xE8res \xE0 \xE9valuer"}.`
+    ],
+    stepOpen: (open) => [
+      `Faire \xE9valuer les ${open} crit\xE8re(s) restants`,
+      ` : ils demandent un jugement ou un test sur les pages affich\xE9es. Tant qu'ils ne sont pas \xE9valu\xE9s, le niveau annonc\xE9 est un minimum.`
+    ],
+    stepOpenCore: (open) => [
+      `Faire \xE9valuer les ${open} crit\xE8re(s) restants`,
+      ` : ils demandent un jugement ou un test sur les pages affich\xE9es. Tant qu'ils ne sont pas \xE9valu\xE9s, la conformit\xE9 ne peut pas \xEAtre \xE9tablie.`
+    ],
+    stepTop: [
+      "Niveau le plus \xE9lev\xE9 atteint",
+      " : aucune non-conformit\xE9 ni crit\xE8re ouvert. Rejouez l'audit \xE0 chaque \xE9volution du site pour le maintenir."
+    ],
+    ncVerify: "Chaque bloc donne le constat, la correction attendue et les occurrences \xE0 cocher. Contr\xF4lez chaque occurrence (inspecteur, lecteur d'\xE9cran), corrigez, puis rejouez l'audit.",
+    showCriteria: (n) => `Voir les ${n} crit\xE8re(s)`,
+    annexTitle: "Annexe \u2014 grille exhaustive des crit\xE8res",
+    // THE READER'S REPORT and ITS TECHNICAL ANNEX.
+    pagesAudited: "Pages audit\xE9es",
+    morePagesAudited: (n) => `+${n} autre(s)`,
+    sourceOnlyScope: (files) => `code source uniquement (${files} fichier(s)) \u2014 aucune page du site n'a \xE9t\xE9 analys\xE9e`,
+    annexPointer: (href) => `\u{1F4CE} Emplacements dans le code, m\xE9thode et commandes : [annexe technique](${href})`,
+    partialAuditBusiness: (list) => `Audit partiel : les points qui se v\xE9rifient sur les pages affich\xE9es (${list}) n'ont pas encore \xE9t\xE9 test\xE9s. L'annexe technique indique comment compl\xE9ter l'analyse.`,
+    scopeCaveat: "Le p\xE9rim\xE8tre analys\xE9 est incomplet (fichiers non analys\xE9s ou composants jamais affich\xE9s) : voir l'annexe technique.",
+    ncIntro: "Pour chaque crit\xE8re : le probl\xE8me constat\xE9, les pages o\xF9 il appara\xEEt et la correction attendue. Les emplacements pr\xE9cis dans le code sont dans l'annexe technique.",
+    problem: "Probl\xE8me constat\xE9",
+    pagesConcerned: "Pages concern\xE9es",
+    pagesConcernedAtLeast: "Pages concern\xE9es (au moins)",
+    everyPage: (n) => `Toutes les pages audit\xE9es (${n})`,
+    morePagesConcerned: (n) => `+${n} autre(s) page(s) \u2014 voir la grille par page`,
+    orphanOccurrences: (n) => `${n} occurrence(s) sans page identifi\xE9e (dans le code source)`,
+    whereCode: "O\xF9",
+    inCodeOnly: (n) => `${n} occurrence(s) dans le code source \u2014 emplacements dans l'annexe technique`,
+    expectedFix: "Correction attendue",
+    occShort: (n) => `${n} occurrence(s)`,
+    suggestion: "Suggestion",
+    pageRatesNoteBusiness: "Une ligne par page audit\xE9e : son adresse et son taux de r\xE9ussite sur les crit\xE8res d\xE9j\xE0 d\xE9cid\xE9s pour cette page (entre parenth\xE8ses : crit\xE8res d\xE9cid\xE9s / crit\xE8res du r\xE9f\xE9rentiel).",
+    manualBusiness: (n) => `**${n} crit\xE8re(s) restent \xE0 \xE9valuer.** Ils demandent un jugement (pertinence d'une alternative, d'un intitul\xE9, d'un titre\u2026) ou un test sur les pages affich\xE9es. Tant qu'ils ne sont pas \xE9valu\xE9s, le taux et le niveau annonc\xE9s sont des minimums ; la marche \xE0 suivre est dans l'annexe technique.`,
+    annexDocTitle: (std, date) => `Annexe technique \u2014 audit ${std} du ${date}`,
+    annexBack: (href) => `Compl\xE8te le rapport [${href}](${href}) : emplacements dans le code, m\xE9thode de l'audit et commandes. Le rapport, lui, s'adresse \xE0 tous les lecteurs.`,
+    annexNcTitle: "A. Non-conformit\xE9s \u2014 emplacements dans le code",
+    annexRecTitle: "B. Recommandations \u2014 emplacements dans le code",
+    annexPagesTitle: "C. Pages \u2014 base de jugement et constats",
+    annexManualTitle: "D. Crit\xE8res \xE0 \xE9valuer \u2014 marche \xE0 suivre",
+    annexGridTitle: "E. Grille exhaustive des crit\xE8res"
   },
   en: {
     title: (std) => `Accessibility audit report \u2014 ${std}`,
@@ -59940,17 +60205,17 @@ var L5 = {
     provenance: "Where the decisions came from",
     provenanceNote: (engine, scan2, agent) => `${engine} engine \xB7 ${scan2} browser \xB7 ${agent} adjudication`,
     autoRateNote: (c2, d) => `criteria validated by the engine alone \xF7 criteria decided without the agent (${c2} \xF7 ${d})`,
-    warn: "This report covers the subset of criteria checkable automatically. The \u201Cto assess\u201D criteria (rendering / judgment) are adjudicated by the AI agent (`verify --manual`, gated); rendering goes through `scan` (see the last section).",
+    warn: "This report covers the subset of criteria checkable automatically. The \u201Cto assess\u201D criteria (rendering / judgment) are adjudicated by the AI agent (`verify --manual`, gated); rendering goes through `scan` (see section 5).",
     derived: (std) => `${std} report. Every criterion is judged on its own tests; the integrity gates (\`check\`/\`verify\`) operate on the same scope.`,
     synthTitle: (by) => `1. Synthesis by ${by}`,
     byGuideline: "WCAG guideline",
     byTheme: "theme",
     th: (head) => [head, "C", "NC", "NA", "To assess"],
-    naSubset: (n) => `**NA is a subset of C**, never a fourth column: a criterion conforming for want of a subject in scope is counted under C, and NA only says how many conformities were reached that way. The criterion count is C + NC + \u201CTo assess\u201D = ${n}.`,
+    naSubset: (n) => `**NA is included in C** (conforming for want of a subject), never on top of it: C + NC + \u201CTo assess\u201D = ${n} criteria.`,
     total: "Total",
     ncTitle: "2. Non-conformities (by priority)",
     recTitle: "Recommendations (non-normative)",
-    recNote: "Good practices with NO normative test of the active standard \u2014 these are NOT non-conformities and do not enter the pass rate. The team may adopt them at will.",
+    recNote: "Good practices with no normative test: these are NOT non-conformities and enter no rate.",
     sev: { bloquant: "Blocking", majeur: "Major", mineur: "Minor" },
     none: "No non-conformity detected by the static engine.",
     cTitle: "3. Conforming criteria (C)",
@@ -59963,12 +60228,12 @@ var L5 = {
     basisCol: "Basis",
     rateCol: "Rate",
     naTitle: "4. Conforming for want of a subject",
-    naNote: "Nothing of that kind exists in the audited scope: no table, no media, no form control, depending on the criterion. These are conforming \u2014 nothing contradicts them \u2014 but nothing was verified either. Each says what was looked for and over how much, so the claim stays falsifiable.",
-    manualTitle: "5. Criteria to adjudicate (judgment / rendering) \u2014 not decided by the static engine",
-    manualWarn: "Adjudicate these with `verify --manual` (the agent decides from source, gated); rendering criteria go to `scan`. None may be marked \u201Cconforming\u201D without a recorded, gated justification.",
+    naNote: "Nothing of that kind in the audited scope (no table, media or form control, depending on the criterion): conforming, with nothing to verify. Each line says what was looked for, so the claim stays falsifiable.",
+    manualTitle: "5. Criteria to assess (judgment / rendering)",
+    manualWarn: "Judgment: `verify --manual` (the agent decides from source, gated); rendering: `scan`. No criterion is marked \u201Cconforming\u201D without a recorded, gated justification.",
     testsToRule: "tests to rule on",
-    manualSummary: (criteria, tests) => `**${criteria} criterion(ia) / ${tests} test(s) remain to be ruled on.** Their status and S/R/J split are already in the exhaustive grid above, so they are not repeated here.`,
-    manualHowTo: "Generate the worklist: `verify --manual --in <audit.json> --standard <pack> --out <dir>`. Each item carries the full wording of its tests, its technical note, its particular cases, its guidance and the terms the standard defines.",
+    manualSummary: (criteria, tests) => `**${criteria} criterion(ia) / ${tests} test(s) remain to be ruled on.** Their status and S/R/J split are in the exhaustive grid (section E).`,
+    manualHowTo: "Full worklist (test wording, technical notes, glossary): `verify --manual --in <audit.json> --standard <pack> --out <dir>`.",
     outOfScope: "Outside what the engine can decide for this standard \u2014 manual verification.",
     scopedOut: "The failures found concern elements outside this criterion's scope \u2014 assess separately.",
     judgment: "The criterion asks more than the engine can establish \u2014 rule on it.",
@@ -59988,7 +60253,8 @@ var L5 = {
     partialAudit: (list) => `Partial audit \u2014 the needs-rendering criteria (${list}) were not tested. Run \`ultra11y scan --sample\` (Playwright + axe + probes) on the sample, then merge with \`scan --merge\`.`,
     // Task 5 — « Findings per page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Findings per page",
-    perPageNote: "Findings grouped by the audited sample page (dynamic rendering).",
+    perPageNote: "For each sample page: its screenshot and the criteria found non-conforming on that page.",
+    pageNcCriteria: (n) => `${n} non-conforming criterion/criteria on this page`,
     transverseNote: (list) => `Transverse elements audited on every page: ${list}.`,
     authYes: "\u{1F512} authentication required",
     authNo: "\u{1F310} public",
@@ -60008,7 +60274,96 @@ var L5 = {
     statusCol: "Status",
     automationCol: "S / R / J tests",
     decidedByCol: "Decided by",
-    owner: { engine: "engine", scan: "scan", agent: "AI", pending: "to adjudicate" }
+    owner: { engine: "engine", scan: "scan", agent: "AI", pending: "to adjudicate" },
+    methodTitle: "Method, coverage and caveats",
+    conformanceShort: (v, a) => `validated criteria \xF7 applicable criteria (${v} \xF7 ${a})`,
+    denominatorLine: "How the rate is computed",
+    summaryTitle: "Summary",
+    levelHead: (std, label) => `${std} conformity level: ${label}`,
+    levelProvisional: "provisional",
+    levelProvisionalNote: (open) => `${open} criterion/criteria still to assess; deciding them can only keep or raise this level.`,
+    levelSettled: "every criterion in scope is decided.",
+    levelNone: (std) => `${std} conformity level: not computable`,
+    levelNoneNote: "no applicable criterion in this scope.",
+    verdictHead: (std, state) => `${std} conformance: ${state}`,
+    verdictFailed: (nc) => [`not met`, `${nc} non-conforming criterion/criteria.`],
+    verdictOpen: (open) => [`not established`, `no non-conformity found, but ${open} criterion/criteria still to assess.`],
+    verdictMet: ["met", "every criterion in the audited scope conforms."],
+    rateLabel: "Conformity rate",
+    rateValue: (pct2, v, a) => `${pct2}% \u2014 ${v} validated out of ${a} applicable criterion/criteria`,
+    rangeValue: (hi, best) => `up to ${hi}% depending on the criteria still to assess${best ? ` (at best \u201C${best}\u201D as things stand)` : ""}`,
+    tallyLabel: (n) => `The ${n} criteria`,
+    tallyValue: (c2, nc, na, open) => `${c2} conforming \xB7 ${nc} non-conforming \xB7 ${na} not applicable \xB7 ${open} to assess`,
+    scaleLabel: "Scale",
+    scaleBelow: (label, min) => `${label} below ${min}%`,
+    scaleFrom: (label, min) => `${label} from ${min}%`,
+    scaleAll: (label) => `${label} at 100%`,
+    fixTitle: "What to fix",
+    fixIntro: (n) => `${n} non-conforming criterion/criteria, most blocking first.`,
+    fixDetail: "The per-page detail is in section 2.",
+    fixGeneric: "Fix each element reported on the pages concerned (exact list in the technical annex).",
+    fixCols: ["Priority", "Criterion", "Occurrences", "Expected fix"],
+    fixNone: "No non-conformity found: nothing to fix at this stage.",
+    moreFixes: (n) => `(+${n} more fix(es))`,
+    pagesCol: "Pages",
+    allPages: (n) => `all pages (${n}/${n})`,
+    morePages: (n) => `+${n} more`,
+    offPage: (n) => `${n} on no page`,
+    atLeast: "(at least)",
+    noPagesNote: "No URL: this audit read source code, and no page of the site was analysed. The defects therefore cannot be located on pages yet; the technical annex explains how to complete the analysis.",
+    noPagesNoteTech: "No page in scope: to locate each defect on a URL, run `ultra11y scan --sample --merge <audit.json>` (sample declared in `.ultra11yrc.json`, with each page's `sources`) or capture the pages into `.ultra11y/pages/` before the audit.",
+    approximateNote: "\u201C(at least)\u201D: the defect is in a source file several pages declare; it is attributed to the first of them only, so the page list may be incomplete.",
+    fixAdvisory: (n) => `Plus ${n} non-normative recommendation(s), with no effect on the level.`,
+    nextTitle: "Reaching a better level",
+    nextTitleCore: "Next steps",
+    stepFix: (nc, pct2, v, a, floor, level) => [
+      `Fix the ${nc} non-conforming criterion/criteria`,
+      `: the rate rises to ${floor ? "at least " : ""}${pct2}% (${v} \xF7 ${a})${level ? `, i.e. \u201C${level}\u201D` : ""}.`
+    ],
+    stepFixCore: (nc) => [`Fix the ${nc} non-conforming criterion/criteria`, ` listed above, then run the audit again.`],
+    stepTarget: (label, min, need, a, missing, fromNc, fromOpen) => [
+      `Aim for \u201C${label}\u201D (${min}%)`,
+      `: ${need} validated criteria out of ${a} are required, ${missing} missing \u2014 ${fromNc > 0 ? `${fromNc} from fixing the non-conformities, ${fromOpen} from the criteria still to assess` : "to validate among the criteria still to assess"}.`
+    ],
+    stepOpen: (open) => [
+      `Have the ${open} remaining criterion/criteria assessed`,
+      `: they need a judgment or a test on the displayed pages. Until they are, the announced level is a minimum.`
+    ],
+    stepOpenCore: (open) => [
+      `Have the ${open} remaining criterion/criteria assessed`,
+      `: they need a judgment or a test on the displayed pages. Until they are, conformance cannot be established.`
+    ],
+    stepTop: ["Highest level reached", ": no non-conformity and no open criterion. Re-run the audit whenever the site changes to keep it."],
+    ncVerify: "Each block gives the finding, the expected fix and the occurrences to tick. Check each occurrence (inspector, screen reader), fix, then re-run the audit.",
+    showCriteria: (n) => `Show the ${n} criterion/criteria`,
+    annexTitle: "Appendix \u2014 exhaustive criteria grid",
+    pagesAudited: "Pages audited",
+    morePagesAudited: (n) => `+${n} more`,
+    sourceOnlyScope: (files) => `source code only (${files} file(s)) \u2014 no page of the site was analysed`,
+    annexPointer: (href) => `\u{1F4CE} Code locations, method and commands: [technical annex](${href})`,
+    partialAuditBusiness: (list) => `Partial audit: the points checked on displayed pages (${list}) have not been tested yet. The technical annex explains how to complete the analysis.`,
+    scopeCaveat: "The analysed scope is incomplete (files not analysed, or components never displayed): see the technical annex.",
+    ncIntro: "For each criterion: the problem found, the pages it appears on and the expected fix. The exact code locations are in the technical annex.",
+    problem: "Problem found",
+    pagesConcerned: "Pages concerned",
+    pagesConcernedAtLeast: "Pages concerned (at least)",
+    everyPage: (n) => `Every audited page (${n})`,
+    morePagesConcerned: (n) => `+${n} more page(s) \u2014 see the per-page grid`,
+    orphanOccurrences: (n) => `${n} occurrence(s) on no known page (in the source code)`,
+    whereCode: "Where",
+    inCodeOnly: (n) => `${n} occurrence(s) in the source code \u2014 locations in the technical annex`,
+    expectedFix: "Expected fix",
+    occShort: (n) => `${n} occurrence(s)`,
+    suggestion: "Suggestion",
+    pageRatesNoteBusiness: "One row per audited page: its address and its pass rate over the criteria already decided for that page (in brackets: criteria decided / criteria in the standard).",
+    manualBusiness: (n) => `**${n} criterion/criteria still to assess.** They need a judgment (is an alternative, a label, a title relevant\u2026) or a test on the displayed pages. Until they are assessed, the announced rate and level are minimums; the procedure is in the technical annex.`,
+    annexDocTitle: (std, date) => `Technical annex \u2014 ${std} audit of ${date}`,
+    annexBack: (href) => `Completes the report [${href}](${href}): code locations, audit method and commands. The report itself is written for every reader.`,
+    annexNcTitle: "A. Non-conformities \u2014 code locations",
+    annexRecTitle: "B. Recommendations \u2014 code locations",
+    annexPagesTitle: "C. Pages \u2014 basis of judgment and findings",
+    annexManualTitle: "D. Criteria to assess \u2014 procedure",
+    annexGridTitle: "E. Exhaustive criteria grid"
   }
 };
 var NEEDS_RENDERING = [
@@ -60093,6 +60448,38 @@ function decisionProvenance(rows) {
     agent: decided.filter((r) => r.decidedBy === "agent").length
   };
 }
+function conformityScale(standard, lang) {
+  if (isCore(standard)) return [];
+  const pack = loadPack(standard);
+  return (pack.conformityLevels ?? []).filter((l) => typeof l.min === "number" && l.min >= 0 && l.min <= 100).map((l) => ({ min: l.min, label: localize(pack, l.label, lang) })).filter((l) => l.label).sort((a, b) => b.min - a.min);
+}
+function levelAt(scale, validated, applicable) {
+  if (applicable === 0) return void 0;
+  return scale.find((l) => validated * 100 >= l.min * applicable);
+}
+function reportSummary(tally, scale) {
+  const rate = conformanceRate(tally);
+  const { validated: v, applicable: a, open } = rate;
+  const nc = tally.nc;
+  const pct2 = (x) => a === 0 ? 100 : Math.round(x / a * 100);
+  const level = levelAt(scale, v, a);
+  const summary = { rate, scale, ceilingPct: pct2(v + open) };
+  if (level) summary.level = level;
+  const best = levelAt(scale, v + open, a);
+  if (best && open > 0) summary.best = best;
+  if (nc > 0) {
+    const after = levelAt(scale, v + nc, a);
+    summary.afterFix = { validated: v + nc, pct: pct2(v + nc), ...after ? { level: after } : {} };
+  }
+  const above = scale.filter((l) => level ? l.min > level.min : true).sort((x, y) => x.min - y.min)[0];
+  if (above && a > 0) {
+    const need = Math.ceil(above.min * a / 100);
+    const missing = Math.max(0, need - v);
+    const fromNc = Math.min(nc, missing);
+    summary.next = { level: above, need, missing, fromNc, fromOpen: missing - fromNc };
+  }
+  return summary;
+}
 function automationOverview(standard) {
   if (isCore(standard)) return void 0;
   const pack = loadPack(standard);
@@ -60116,21 +60503,157 @@ function automationCell(standard, id) {
   const n = (tier) => tiers.filter((value) => value === tier).length;
   return `${n("static")} / ${n("rendered")} / ${n("judgment")}`;
 }
-function exhaustiveGrid(groups, standard, lang) {
+function exhaustiveGrid(groups, standard, lang, title) {
   const s = L5[lang];
+  const rows = groups.flatMap((group) => group.rows);
   const out2 = [
-    `## ${s.exhaustiveTitle}`,
+    `## ${title}`,
     "",
     `> ${s.exhaustiveNote}`,
+    "",
+    "<details>",
+    `<summary>${s.showCriteria(rows.length)}</summary>`,
     "",
     `| ${s.criterionCol} | ${s.statusCol} | ${s.automationCol} | ${s.decidedByCol} |`,
     "| --- | :---: | :---: | --- |"
   ];
-  for (const row of groups.flatMap((group) => group.rows)) {
+  for (const row of rows) {
     const owner = row.status === "manual" ? s.owner.pending : s.owner[row.decidedBy ?? "engine"];
     out2.push(`| ${row.label} | ${row.inapplicable ? "NA" : row.status === "manual" ? "?" : row.status} | ${automationCell(standard, row.id)} | ${owner} |`);
   }
-  out2.push("");
+  out2.push("", "</details>", "");
+  return out2;
+}
+function folded(summary, lines) {
+  return ["<details>", `<summary>${summary}</summary>`, "", ...lines, "", "</details>", ""];
+}
+function cell(text) {
+  return mdText(text).replace(/\s*\n\s*/g, " ").replace(/\|/g, "\\|");
+}
+function scaleText(scale, lang) {
+  const s = L5[lang];
+  const asc = [...scale].sort((a, b) => a.min - b.min);
+  return asc.map((l, i2) => {
+    const next = asc[i2 + 1];
+    if (l.min === 0 && next) return s.scaleBelow(l.label, next.min);
+    if (l.min === 100) return s.scaleAll(l.label);
+    return s.scaleFrom(l.label, l.min);
+  }).join(" \xB7 ");
+}
+var SUMMARY_PAGES_MAX = 3;
+function summaryModel(lang, std, standard, tot, ncUnits, advisories, resolver) {
+  const s = L5[lang];
+  const scale = conformityScale(standard, lang);
+  const sum = reportSummary(tot, scale);
+  const { rate } = sum;
+  const leveled = scale.length > 0 && (rate.applicable === 0 || sum.level !== void 0);
+  let headline2;
+  if (leveled && rate.applicable === 0) headline2 = [s.levelNone(std), `\u2014 ${s.levelNoneNote}`];
+  else if (leveled) {
+    const head = s.levelHead(std, sum.level.label);
+    headline2 = rate.open > 0 ? [head, `(${s.levelProvisional}) \u2014 ${s.levelProvisionalNote(rate.open)}`] : [head, `\u2014 ${s.levelSettled}`];
+  } else {
+    const [state, note] = tot.nc > 0 ? s.verdictFailed(tot.nc) : rate.open > 0 ? s.verdictOpen(rate.open) : s.verdictMet;
+    headline2 = [s.verdictHead(std, state), `\u2014 ${note}`];
+  }
+  const facts = [];
+  if (!isCore(standard) && rate.applicable > 0) {
+    const range = rate.open > 0 ? ` ; ${s.rangeValue(sum.ceilingPct, leveled ? sum.best?.label : void 0)}` : "";
+    facts.push({ label: s.rateLabel, value: `${s.rateValue(rate.pct, rate.validated, rate.applicable)}${range}` });
+  }
+  facts.push({ label: s.tallyLabel(rate.total), value: s.tallyValue(rate.validated, tot.nc, rate.na, rate.open) });
+  if (leveled) facts.push({ label: s.scaleLabel, value: scaleText(scale, lang) });
+  const withPages = resolver !== void 0 && resolver.pages.length > 0;
+  const rows = ncUnits.map((u) => {
+    const m = auditorUnitModel(u, standard, lang);
+    const fixes = readerFixes(m.normative, lang);
+    const fix = (fixes[0] ?? "") + (fixes.length > 1 ? ` ${s.moreFixes(fixes.length - 1)}` : "");
+    if (!withPages) return { icon: m.icon, priority: s.sev[u.severity], criterion: u.label, occurrences: m.occurrences, fix };
+    const found = occurrencesByPage(m.normative, resolver);
+    const total = resolver.pages.length;
+    const all = found.pages.length > SUMMARY_PAGES_MAX && found.pages.length === total ? total : void 0;
+    const listed = all ? [] : found.pages.slice(0, SUMMARY_PAGES_MAX).map(({ page }) => ({ name: page.name, url: page.url }));
+    const pages = {
+      listed,
+      more: all ? 0 : Math.max(0, found.pages.length - SUMMARY_PAGES_MAX),
+      ...all ? { all } : {},
+      orphans: found.orphans,
+      approximate: found.approximate && !all
+    };
+    return { icon: m.icon, priority: s.sev[u.severity], criterion: u.label, occurrences: m.occurrences, pages, fix };
+  });
+  const pagesNote = !ncUnits.length ? void 0 : !withPages ? s.noPagesNote : rows.some((r) => r.pages?.approximate) ? s.approximateNote : void 0;
+  const steps = [];
+  if (leveled && rate.applicable > 0) {
+    if (sum.afterFix) {
+      const reached = sum.afterFix.level && sum.afterFix.level.min !== sum.level?.min ? sum.afterFix.level.label : void 0;
+      steps.push(s.stepFix(tot.nc, sum.afterFix.pct, sum.afterFix.validated, rate.applicable, rate.open > 0, reached));
+    }
+    if (sum.next && sum.next.fromOpen > 0) {
+      const n = sum.next;
+      steps.push(s.stepTarget(n.level.label, n.level.min, n.need, rate.applicable, n.missing, n.fromNc, n.fromOpen));
+    }
+    if (rate.open > 0) steps.push(s.stepOpen(rate.open));
+    if (!steps.length) steps.push(s.stepTop);
+  } else {
+    if (tot.nc > 0) steps.push(s.stepFixCore(tot.nc));
+    if (rate.open > 0) steps.push(s.stepOpenCore(rate.open));
+  }
+  return {
+    title: s.summaryTitle,
+    headline: headline2,
+    facts,
+    fix: {
+      title: s.fixTitle,
+      ...ncUnits.length ? { intro: s.fixIntro(ncUnits.length) } : { none: s.fixNone },
+      columns: s.fixCols,
+      ...withPages ? { pagesColumn: s.pagesCol } : {},
+      rows,
+      ...pagesNote ? { pagesNote } : {},
+      ...advisories ? { advisory: s.fixAdvisory(advisories) } : {}
+    },
+    ...steps.length ? { next: { title: leveled && sum.next ? s.nextTitle : s.nextTitleCore, steps } } : {}
+  };
+}
+function summaryPagesText(p, lang, link) {
+  const s = L5[lang];
+  if (!p) return "\u2014";
+  const parts2 = [];
+  if (p.all) parts2.push(s.allPages(p.all));
+  else if (p.listed.length) parts2.push(p.listed.map((x) => link(x.name, x.url)).join(", ") + (p.more ? ` ${s.morePages(p.more)}` : ""));
+  if (p.orphans) parts2.push(s.offPage(p.orphans));
+  if (!parts2.length) return "\u2014";
+  return parts2.join(" \xB7 ") + (p.approximate ? ` ${s.atLeast}` : "");
+}
+function pagesCell(p, lang) {
+  return summaryPagesText(p, lang, (name2, url) => mdLink(mdText(name2), url)).replace(/\|/g, "\\|");
+}
+function renderSummary(m, lang) {
+  const s = L5[lang];
+  const out2 = [`## ${m.title}`, "", `**${m.headline[0]}** ${m.headline[1]}`, ""];
+  for (const f of m.facts) out2.push(`- **${f.label}** : ${f.value}`);
+  out2.push("", `### ${m.fix.title}`, "");
+  if (m.fix.none) out2.push(m.fix.none, "");
+  else {
+    out2.push(`${m.fix.intro} ${s.fixDetail}`, "");
+    const [priority2, criterion, occurrences, fix] = m.fix.columns;
+    if (m.fix.pagesColumn) {
+      out2.push(`| ${priority2} | ${criterion} | ${occurrences} | ${m.fix.pagesColumn} | ${fix} |`, "| --- | --- | :---: | --- | --- |");
+      for (const r of m.fix.rows)
+        out2.push(`| ${r.icon} ${r.priority} | ${cell(r.criterion)} | ${r.occurrences} | ${pagesCell(r.pages, lang)} | ${cell(r.fix)} |`);
+    } else {
+      out2.push(`| ${priority2} | ${criterion} | ${occurrences} | ${fix} |`, "| --- | --- | :---: | --- |");
+      for (const r of m.fix.rows) out2.push(`| ${r.icon} ${r.priority} | ${cell(r.criterion)} | ${r.occurrences} | ${cell(r.fix)} |`);
+    }
+    out2.push("");
+  }
+  if (m.fix.pagesNote) out2.push(`> ${m.fix.pagesNote}`, "");
+  if (m.fix.advisory) out2.push(`_${m.fix.advisory}_`, "");
+  if (m.next) {
+    out2.push(`### ${m.next.title}`, "");
+    m.next.steps.forEach(([what, rest], i2) => out2.push(`${i2 + 1}. **${what}**${rest}`));
+    out2.push("");
+  }
   return out2;
 }
 function renderPageRates(r, pages, standard, lang) {
@@ -60147,61 +60670,145 @@ function renderPageRates(r, pages, standard, lang) {
   out2.push("");
   return out2;
 }
+function reportFileName(standard, date) {
+  return `${isCore(standard) ? "wcag" : standard}-${date}.md`;
+}
+function annexFileName(standard, date, lang) {
+  return `${lang === "fr" ? "annexe-technique" : "technical-annex"}-${isCore(standard) ? "wcag" : standard}-${date}.md`;
+}
+function annexMarker(file) {
+  return `<!-- ultra11y:annex ${file} -->`;
+}
+var ANNEX_LINK = /\]\(<?((?:annexe-technique|technical-annex)-[A-Za-z0-9._-]+\.md)>?\)/g;
+function joinReportDocuments(report, annex) {
+  return `${report.trimEnd()}
+
+${annex}`;
+}
+function withReportAnnexes(md, reportPath, read) {
+  const names = [...new Set([...md.matchAll(ANNEX_LINK)].map((m) => m[1]))];
+  let out2 = md;
+  for (const name2 of names) {
+    if (md.includes(annexMarker(name2))) continue;
+    const path = join31(dirname10(reportPath), name2);
+    let annex;
+    try {
+      annex = read(path);
+    } catch {
+      throw new Error(`technical annex not found: ${path} (linked from ${reportPath}) \u2014 re-run \`ultra11y report\`, which writes both files.`);
+    }
+    out2 = joinReportDocuments(out2, annex);
+  }
+  return out2;
+}
+function partialAuditBusiness(lang, untested) {
+  const set = new Set(untested);
+  return L5[lang].partialAuditBusiness(
+    NEEDS_RENDERING.filter((c2) => set.has(c2.sc)).map((c2) => c2.label[lang]).join(", ")
+  );
+}
+function urlText(url) {
+  return isLinkableUrl(url) ? `<${url.replace(/</g, "%3C").replace(/>/g, "%3E")}>` : `\`${url}\``;
+}
+function renderReaderUnit(u, standard, lang, resolver, cropFor) {
+  const s = L5[lang];
+  const m = auditorUnitModel(u, standard, lang);
+  const out2 = [`#### ${m.icon} ${m.label}`, "", `**${m.criterion.label}** : ${m.criterion.value}`, ""];
+  out2.push(`**${s.problem}** : ${readerMessages(m.normative, lang).map(mdText).join(" ; ")} (${s.occShort(m.occurrences)})`, "");
+  const example = cropFor ? m.normative.map((f) => cropFor(f)).find((c2) => c2 !== void 0) : void 0;
+  if (example) out2.push(`![${example.alt}](${example.href})`, "");
+  if (resolver.pages.length) {
+    const { pages, orphans, approximate } = occurrencesByPage(m.normative, resolver);
+    const total = resolver.pages.length;
+    const lines = [];
+    if (pages.length > 3 && pages.length === total) lines.push(`- ${s.everyPage(total)}`);
+    else {
+      for (const { page, count } of pages.slice(0, READER_PAGES_MAX)) lines.push(`- ${mdText(page.name)} : ${urlText(page.url)} (${count})`);
+      if (pages.length > READER_PAGES_MAX) lines.push(`- ${s.morePagesConcerned(pages.length - READER_PAGES_MAX)}`);
+    }
+    if (orphans) lines.push(`- ${s.orphanOccurrences(orphans)}`);
+    out2.push(`**${approximate ? s.pagesConcernedAtLeast : s.pagesConcerned}** :`, "", ...lines, "");
+  } else {
+    out2.push(`**${s.whereCode}** : ${s.inCodeOnly(m.occurrences)}`, "");
+  }
+  const fixes = readerFixes(m.normative, lang);
+  if (fixes.length) out2.push(`**${s.expectedFix}** : ${fixes.map(mdText).join(" ; ")}`, "");
+  return out2;
+}
+function readerMessages(findings, lang) {
+  const own = findings.filter((f) => !f.ruleId.startsWith("axe:"));
+  const from = own.length ? own : findings;
+  return [...new Set(from.map((f) => resolveMessage(f, lang).replace(/\s*\(axe: [^)]*\)\s*$/, "")))].filter(Boolean);
+}
+var STOCK_REMEDIATION = /* @__PURE__ */ new Set(["dyn-remediation", "dyn-reflow"]);
+function readerFixes(findings, lang) {
+  const specific = findings.filter((f) => !STOCK_REMEDIATION.has(f.msg?.id ?? ""));
+  const fixes = [...new Set(specific.map((f) => resolveRemediation(f, lang)))].filter(Boolean);
+  return fixes.length ? fixes : findings.length ? [L5[lang].fixGeneric] : [];
+}
+function pageFailingCriteria(r, page, standard, lang) {
+  const normative = (fs2) => fs2.filter((f) => !f.advisory).length;
+  if (isCore(standard)) {
+    return pageCriterionRows(r, page, standard, lang).filter((row) => row.status === "NC").map((row) => ({
+      label: `${row.id} \u2014 ${scTitle(row.id, lang) ?? ""}`.trim(),
+      count: normative(page.criteria.find((c2) => c2.id === row.id)?.findings ?? [])
+    }));
+  }
+  const pack = loadPack(standard);
+  const byId2 = new Map(derivePackResults(pageView(r, page), standard, page.id).map((x) => [x.id, x]));
+  return pageCriterionRows(r, page, standard, lang).filter((row) => row.status === "NC").map((row) => ({ label: `${pack.name} ${row.label}`, count: normative(byId2.get(row.id)?.findings ?? []) }));
+}
+var READER_PAGES_MAX = 10;
+function renderReaderAdvisory(u, lang, resolver) {
+  const s = L5[lang];
+  const messages = readerMessages(u.findings, lang);
+  const fixes = readerFixes(u.findings, lang);
+  let where = s.occShort(u.findings.length);
+  if (resolver.pages.length) {
+    const { pages } = occurrencesByPage(u.findings, resolver);
+    if (pages.length) {
+      const shown = pages.slice(0, 3).map(({ page }) => mdLink(mdText(page.name), page.url));
+      where += ` : ${shown.join(", ")}${pages.length > 3 ? ` ${s.morePages(pages.length - 3)}` : ""}`;
+    }
+  }
+  const suggestion = fixes.length ? ` \u2014 _${s.suggestion}_ : ${fixes.map(mdText).join(" ; ")}` : "";
+  return `- \u{1F4A1} **${u.label}** \u2014 ${messages.map(mdText).join(" ; ")} (${where})${suggestion}`;
+}
 function render(r, lang, opts) {
   const s = L5[lang];
+  const reportFile = reportFileName(opts.standard, r.date);
+  const annexFile = annexFileName(opts.standard, r.date, lang);
+  const rows = opts.groups.flatMap((g) => g.rows);
+  const tot = reportTotals(opts.groups);
+  const resolver = pageResolver(r);
+  const pageScope = resolver.pages;
+  const { nc: ncUnits, advisory: advisoryUnits } = partitionUnits(prdUnits(r, opts.standard, lang));
+  const pagesRead = r.scope.pagesAudited?.length ?? 0;
   const out2 = [];
   out2.push(`# ${s.title(opts.std)}`, "");
   out2.push(`- **${s.date}** : ${r.date}`);
-  const pagesRead = r.scope.pagesAudited?.length ?? 0;
-  const adjudicated = opts.conformance ? opts.conformance.provenance.agent : r.criteria.filter((c2) => c2.decidedBy === "agent").length;
-  out2.push(`- **${s.tool}** : ultra11y v${r.version} (${pagesRead > 0 ? s.toolNoteRendered(pagesRead, adjudicated) : s.toolNote})`);
-  out2.push(`- **${s.scope}** : ${r.scope.files} ${s.files} \u2014 ${r.scope.inputs.join(", ")}`);
-  if (opts.conformance) {
-    const { rate, provenance, autoDecided, autoValidated } = opts.conformance;
-    const title2 = `${s.conformanceRate(opts.std)}${rate.open > 0 ? ` (${s.conformanceProvisional})` : ""}`;
-    const notes = [s.conformanceFormula(rate.validated, rate.applicable), s.conformanceNa(rate.na)];
-    if (rate.open > 0) notes.push(s.conformanceOpen(rate.open));
-    out2.push(rate.applicable === 0 ? `- **${title2}** : ${s.conformanceNone(rate.na)}` : `- **${title2}** : ${rate.pct}% \u2014 ${notes.join(" ; ")}`);
+  if (pageScope.length) {
+    const names = pageScope.slice(0, 8).map((p) => mdText(p.name));
     out2.push(
-      `- **${s.decidedLine}** : ${rate.decided}/${rate.total} \u2014 ${s.decidedNote(rate.validated, rate.total - rate.validated - rate.na - rate.open, rate.na, rate.open)}`
+      `- **${s.pagesAudited}** : ${pageScope.length} \u2014 ${names.join(", ")}${pageScope.length > 8 ? ` ${s.morePagesAudited(pageScope.length - 8)}` : ""}`
     );
-    out2.push(`- **${s.provenance}** : ${s.provenanceNote(provenance.engine, provenance.scan, provenance.agent)}`);
-    out2.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% \u2014 ${s.autoRateNote(autoValidated, autoDecided)}`);
+  } else {
+    out2.push(`- **${s.scope}** : ${s.sourceOnlyScope(r.scope.files)}`);
+  }
+  if (opts.conformance) {
+    const { rate } = opts.conformance;
+    const title = `${s.conformanceRate(opts.std)}${rate.open > 0 ? ` (${s.conformanceProvisional})` : ""}`;
+    out2.push(
+      rate.applicable === 0 ? `- **${title}** : ${s.conformanceNone(rate.na)}` : `- **${title}** : ${rate.pct}% \u2014 ${s.conformanceShort(rate.validated, rate.applicable)}`
+    );
   } else {
     out2.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% (${s.rateNote})`);
   }
-  out2.push(`- **${s.renderedPages(pagesRead)}**${pagesRead === 0 ? ` \u2014 ${s.noRenderedPages}` : ""}`);
-  const automation = automationOverview(opts.standard);
-  if (automation) {
-    out2.push(
-      `- **${s.automationContract}** : ${s.automationCounts(
-        automation.tests.static,
-        automation.criteria.static.length,
-        automation.tests.rendered,
-        automation.criteria.rendered.length,
-        automation.tests.judgment,
-        automation.criteria.judgment.length
-      )}`,
-      `- **${s.staticCriteria}** : ${automation.criteria.static.map((id) => `\`${id}\``).join(" \xB7 ") || "\u2014"}`,
-      `- **${s.renderedCriteria}** : ${automation.criteria.rendered.map((id) => `\`${id}\``).join(" \xB7 ") || "\u2014"}`
-    );
-  }
-  if (r.scope.dedup) out2.push(`- **${s.dedup}** : ${r.scope.dedup.canonicalFiles} ${s.canonical}, ${r.scope.dedup.duplicateFiles} ${s.duplicate}`);
-  out2.push("", `> \u26A0\uFE0F ${s.warn}`, "");
-  if (opts.partialAudit?.length) out2.push(`> \u{1F6A8} ${partialAuditBanner(lang, opts.partialAudit)}`, "");
-  if (opts.derivedOf) out2.push(`> \u21AA\uFE0F ${s.derived(opts.derivedOf)}`, "");
-  if (r.scope.truncated) out2.push(`> \u2702\uFE0F ${s.truncated(r.scope.truncated.limit, r.scope.truncated.total, r.scope.truncated.skipped)}`, "");
-  if (r.scope.rendered) {
-    const { files, opaqueLibraries } = r.scope.rendered;
-    out2.push(`> \u{1F9E9} ${pagesRead > 0 ? s.renderedAudited(files, opaqueLibraries.join(", "), pagesRead) : s.rendered(files, opaqueLibraries.join(", "))}`, "");
-  }
-  if (r.scope.sourceTemplate) {
-    const { files, extensions } = r.scope.sourceTemplate;
-    out2.push(`> \u{1F9E9} ${pagesRead > 0 ? s.sourceTemplateAudited(files, extensions.join(", "), pagesRead) : s.sourceTemplate(files, extensions.join(", "))}`, "");
-  }
-  if (r.scope.captures) out2.push(`> \u2705 ${s.captures(r.scope.captures.files)}`, "");
-  if (r.scope.captureCoverage?.blindSpots.length) out2.push(`> \u26A0\uFE0F ${s.blindSpots(r.scope.captureCoverage.blindSpots.length)}`, "");
-  const rows = opts.groups.flatMap((g) => g.rows);
+  out2.push("");
+  if (opts.partialAudit?.length) out2.push(`> \u{1F6A8} ${partialAuditBusiness(lang, opts.partialAudit)}`, "");
+  if (r.scope.truncated || r.scope.captureCoverage?.blindSpots.length) out2.push(`> \u26A0\uFE0F ${s.scopeCaveat}`, "");
+  out2.push(`> ${s.annexPointer(annexFile)}`, "");
+  out2.push(...renderSummary(summaryModel(lang, opts.std, opts.standard, tot, ncUnits, advisoryUnits.length, resolver), lang));
   const th = s.th(opts.groupHead);
   out2.push(`## ${s.synthTitle(opts.groupHead)}`, "");
   out2.push(`| ${th.join(" | ")} |`);
@@ -60210,43 +60817,52 @@ function render(r, lang, opts) {
     const t3 = tallyRows(g.rows);
     out2.push(`| ${g.key} ${g.title} | ${t3.c} | ${t3.nc} | ${t3.na} | ${t3.manual} |`);
   }
-  const tot = reportTotals(opts.groups);
   out2.push(`| **${s.total}** | **${tot.c}** | **${tot.nc}** | **${tot.na}** | **${tot.manual}** |`, "");
   out2.push(`> ${s.naSubset(tot.c + tot.nc + tot.manual)}`, "");
-  out2.push(...exhaustiveGrid(opts.groups, opts.standard, lang));
   out2.push(`## ${s.ncTitle}`, "");
-  const { nc: ncUnits, advisory: advisoryUnits } = partitionUnits(prdUnits(r, opts.standard, lang));
   if (ncUnits.length === 0) {
     out2.push(s.none, "");
   } else {
+    out2.push(`> ${s.ncIntro}`, "");
     for (const sev of SEV_ORDER3) {
       const group = ncUnits.filter((u) => u.severity === sev);
       if (!group.length) continue;
       out2.push(`### ${ICON3[sev]} ${s.sev[sev]} (${group.length})`, "");
-      for (const u of group)
-        out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "####", technical: false, ...opts.cropFor ? { cropFor: opts.cropFor } : {} }));
+      for (const u of group) out2.push(...renderReaderUnit(u, opts.standard, lang, resolver, opts.cropFor));
     }
   }
   if (advisoryUnits.length) {
     out2.push(`## \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
-    for (const u of advisoryUnits)
-      out2.push(...renderAuditorUnit(u, opts.standard, lang, { heading: "###", technical: false, ...opts.cropFor ? { cropFor: opts.cropFor } : {} }));
+    for (const u of advisoryUnits) out2.push(renderReaderAdvisory(u, lang, resolver));
+    out2.push("");
   }
-  const pageScope = pagesOf(r);
-  if (pageScope.length) attributePages(r, pageScope);
-  if (pageScope.length) out2.push(...renderPageRates(r, derivePages(r, pageScope), opts.standard, lang));
-  if (pageScope.length) out2.push(renderPageGrid(r, pageScope, opts.standard, lang));
+  const derivedPages = pageScope.length ? derivePages(r, pageScope) : [];
+  if (derivedPages.length) {
+    out2.push(`## \u{1F4CB} ${s.pageRatesTitle}`, "", `> ${s.pageRatesNoteBusiness}`, "");
+    out2.push(`| ${s.pageCol} | ${s.urlCol} | ${s.rateCol} |`, "| --- | --- | --- |");
+    for (const p of derivedPages) {
+      const criteria = pageCriterionRows(r, p, opts.standard, lang);
+      const cov = pageCoverage(criteria);
+      out2.push(`| ${mdText(p.name)}${p.auth ? " \u{1F512}" : ""} | ${urlText(p.url)} | ${formatRate(pageRatePct(criteria), cov.decided, cov.total)} |`);
+    }
+    out2.push("");
+  }
   if (pageScope.length) {
-    const derived = derivePages(r, pageScope);
+    const grid = renderPageGrid(r, pageScope, opts.standard, lang);
+    const cut = grid.indexOf("\n");
+    const body3 = grid.slice(cut + 1).split("\n");
+    if (grid.includes("\n| ")) out2.push(grid.slice(0, cut), "", ...folded(s.showCriteria(rows.length), body3));
+    else out2.push(grid);
+  }
+  if (derivedPages.length) {
     out2.push(`## \u{1F4C4} ${s.perPageTitle}`, "", `> ${s.perPageNote}`, "");
     if (r.scope.sample?.transverse?.length) out2.push(`> ${s.transverseNote(r.scope.sample.transverse.join(", "))}`, "");
     if (r.scope.redirected?.length) out2.push(...renderRedirected(r.scope.redirected, lang), "");
-    const pack = isCore(opts.standard) ? void 0 : loadPack(opts.standard);
-    for (const pg of derived) {
-      const nc = pg.findings.filter((f) => !f.advisory);
+    for (const pg of derivedPages) {
       const adv = pg.findings.filter((f) => f.advisory);
       out2.push("<details>", `<summary>${pg.name} \u2014 <code>${pg.url}</code> \u2014 ${pg.auth ? s.authYes : s.authNo}</summary>`, "");
-      out2.push(`- ${nc.length} ${s.ncCount}${adv.length ? ` \xB7 ${adv.length} ${s.advCount}` : ""}`);
+      const failing = pageFailingCriteria(r, pg, opts.standard, lang);
+      out2.push(`- ${s.pageNcCriteria(failing.length)}${adv.length ? ` \xB7 ${adv.length} ${s.advCount}` : ""}`);
       const notes = pageScope.find((x) => x.id === pg.id)?.notes;
       if (notes) out2.push(`- _${notes}_`);
       const shot = join31(PAGES_DIR, pg.id, "screen.png");
@@ -60260,14 +60876,10 @@ function render(r, lang, opts) {
           } catch {
           }
         }
-        out2.push("", `![${s.screenshotAlt(pg.name)}](${href})`);
+        out2.push("", `![${s.screenshotAlt(pg.name)}](${href})`, "");
       }
-      for (const f of nc.slice(0, PER_PAGE_MAX)) {
-        const crits = pack ? packCriteriaForFinding(pack, f) : [];
-        const label = crits.length ? crits.join(", ") : f.criteriaId;
-        out2.push(`  - [${label}] \`${f.selectorHint}\` \u2014 ${mdText(resolveMessage(f, lang))}`);
-      }
-      if (nc.length > PER_PAGE_MAX) out2.push(`  - _${s.perPageMore(nc.length - PER_PAGE_MAX, nc.length)}_`);
+      for (const { label, count } of failing.slice(0, PER_PAGE_MAX)) out2.push(`- ${label} (${s.occShort(count)})`);
+      if (failing.length > PER_PAGE_MAX) out2.push(`- _${s.perPageMore(failing.length - PER_PAGE_MAX, failing.length)}_`);
       out2.push("", "</details>", "");
     }
   }
@@ -60277,44 +60889,173 @@ function render(r, lang, opts) {
   const byAgent = conform.filter((x) => x.decidedBy === "agent");
   if (!conform.length) out2.push(s.nothing, "");
   else {
-    if (byEngine.length) out2.push(...byEngine.map((x) => `- ${x.label}`), "");
+    if (byEngine.length)
+      out2.push(
+        ...folded(
+          s.showCriteria(byEngine.length),
+          byEngine.map((x) => `- ${x.label}`)
+        )
+      );
     if (byAgent.length) {
       out2.push(`### ${s.cAgentTitle}`, "", `> ${s.cAgentNote}`, "");
-      out2.push(...byAgent.map((x) => `- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}`), "");
+      out2.push(
+        ...folded(
+          s.showCriteria(byAgent.length),
+          byAgent.map((x) => `- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}`)
+        )
+      );
     }
   }
   out2.push(`## ${s.naTitle}`, "");
   const na = rows.filter((x) => x.inapplicable);
-  out2.push(na.length ? `> ${s.naNote}
-` : "");
-  out2.push(na.length ? na.map((x) => `- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}`).join("\n") : s.nothing, "");
-  out2.push(`## ${s.manualTitle}`, "", `> ${s.manualWarn}`, "");
+  if (!na.length) out2.push(s.nothing, "");
+  else {
+    out2.push(`> ${s.naNote}`, "");
+    out2.push(
+      ...folded(
+        s.showCriteria(na.length),
+        na.map((x) => `- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}`)
+      )
+    );
+  }
+  out2.push(`## ${s.manualTitle}`, "");
   const manual = rows.filter((x) => x.status === "manual");
+  const pack5 = isCore(opts.standard) ? void 0 : loadPack(opts.standard);
+  const exhaustiveContract = pack5?.criteria.every((criterion) => criterion.automation !== void 0) === true;
   if (!manual.length) out2.push(s.nothing, "");
   else {
-    const pack5 = isCore(opts.standard) ? void 0 : loadPack(opts.standard);
-    const exhaustiveContract = pack5?.criteria.every((criterion) => criterion.automation !== void 0) === true;
+    out2.push(s.manualBusiness(manual.length), "");
+    if (!exhaustiveContract)
+      out2.push(
+        ...folded(
+          s.showCriteria(manual.length),
+          manual.map((x) => `- ${x.label}`)
+        )
+      );
+  }
+  const ax = [annexMarker(annexFile), `# ${s.annexDocTitle(opts.std, r.date)}`, "", `> ${s.annexBack(reportFile)}`, ""];
+  const adjudicated = opts.conformance ? opts.conformance.provenance.agent : r.criteria.filter((c2) => c2.decidedBy === "agent").length;
+  ax.push(`- **${s.tool}** : ultra11y v${r.version} (${pagesRead > 0 ? s.toolNoteRendered(pagesRead, adjudicated) : s.toolNote})`);
+  ax.push(`- **${s.scope}** : ${r.scope.files} ${s.files} \u2014 ${r.scope.inputs.join(", ")}`);
+  if (opts.conformance) {
+    const { rate, provenance, autoDecided, autoValidated } = opts.conformance;
+    if (rate.applicable > 0) {
+      const notes = [s.conformanceNa(rate.na)];
+      if (rate.open > 0) notes.push(s.conformanceOpen(rate.open));
+      ax.push(`- **${s.denominatorLine}** : ${notes.join(" ; ")}`);
+    }
+    ax.push(
+      `- **${s.decidedLine}** : ${rate.decided}/${rate.total} \u2014 ${s.decidedNote(rate.validated, rate.total - rate.validated - rate.na - rate.open, rate.na, rate.open)}`
+    );
+    ax.push(`- **${s.provenance}** : ${s.provenanceNote(provenance.engine, provenance.scan, provenance.agent)}`);
+    ax.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% \u2014 ${s.autoRateNote(autoValidated, autoDecided)}`);
+  }
+  ax.push(`- **${s.renderedPages(pagesRead)}**${pagesRead === 0 ? ` \u2014 ${s.noRenderedPages}` : ""}`);
+  const automation = automationOverview(opts.standard);
+  if (automation) {
+    ax.push(
+      `- **${s.automationContract}** : ${s.automationCounts(
+        automation.tests.static,
+        automation.criteria.static.length,
+        automation.tests.rendered,
+        automation.criteria.rendered.length,
+        automation.tests.judgment,
+        automation.criteria.judgment.length
+      )}`,
+      `- **${s.staticCriteria}** : ${automation.criteria.static.map((id) => `\`${id}\``).join(" \xB7 ") || "\u2014"}`,
+      `- **${s.renderedCriteria}** : ${automation.criteria.rendered.map((id) => `\`${id}\``).join(" \xB7 ") || "\u2014"}`
+    );
+  }
+  if (r.scope.dedup) ax.push(`- **${s.dedup}** : ${r.scope.dedup.canonicalFiles} ${s.canonical}, ${r.scope.dedup.duplicateFiles} ${s.duplicate}`);
+  ax.push("");
+  ax.push(`> \u26A0\uFE0F ${s.warn}`, "");
+  if (opts.partialAudit?.length) ax.push(`> \u{1F6A8} ${partialAuditBanner(lang, opts.partialAudit)}`, "");
+  if (!pageScope.length) ax.push(`> \u{1F9ED} ${s.noPagesNoteTech}`, "");
+  if (opts.derivedOf) ax.push(`> \u21AA\uFE0F ${s.derived(opts.derivedOf)}`, "");
+  if (r.scope.truncated) ax.push(`> \u2702\uFE0F ${s.truncated(r.scope.truncated.limit, r.scope.truncated.total, r.scope.truncated.skipped)}`, "");
+  if (r.scope.rendered) {
+    const { files, opaqueLibraries } = r.scope.rendered;
+    ax.push(`> \u{1F9E9} ${pagesRead > 0 ? s.renderedAudited(files, opaqueLibraries.join(", "), pagesRead) : s.rendered(files, opaqueLibraries.join(", "))}`, "");
+  }
+  if (r.scope.sourceTemplate) {
+    const { files, extensions } = r.scope.sourceTemplate;
+    ax.push(`> \u{1F9E9} ${pagesRead > 0 ? s.sourceTemplateAudited(files, extensions.join(", "), pagesRead) : s.sourceTemplate(files, extensions.join(", "))}`, "");
+  }
+  if (r.scope.captures) ax.push(`> \u2705 ${s.captures(r.scope.captures.files)}`, "");
+  if (r.scope.captureCoverage?.blindSpots.length) ax.push(`> \u26A0\uFE0F ${s.blindSpots(r.scope.captureCoverage.blindSpots.length)}`, "");
+  ax.push(`## ${s.annexNcTitle}`, "");
+  if (ncUnits.length === 0) ax.push(s.none, "");
+  else {
+    ax.push(`> ${s.ncVerify}`, "");
+    for (const sev of SEV_ORDER3) {
+      const group = ncUnits.filter((u) => u.severity === sev);
+      if (!group.length) continue;
+      ax.push(`### ${ICON3[sev]} ${s.sev[sev]} (${group.length})`, "");
+      for (const u of group)
+        ax.push(
+          ...renderAuditorUnit(u, opts.standard, lang, {
+            heading: "####",
+            technical: false,
+            compact: true,
+            ...pageScope.length ? { pages: resolver } : {},
+            ...opts.cropFor ? { cropFor: opts.cropFor } : {}
+          })
+        );
+    }
+  }
+  if (advisoryUnits.length) {
+    ax.push(`## ${s.annexRecTitle}`, "", `> ${s.recNote}`, "");
+    for (const u of advisoryUnits) ax.push(...renderAuditorUnit(u, opts.standard, lang, { compact: true }));
+    ax.push("");
+  }
+  if (derivedPages.length) {
+    const table = renderPageRates(r, derivedPages, opts.standard, lang);
+    ax.push(`## ${s.annexPagesTitle}`, "", ...table.slice(2));
+    const pack = isCore(opts.standard) ? void 0 : loadPack(opts.standard);
+    for (const pg of derivedPages) {
+      const nc = pg.findings.filter((f) => !f.advisory);
+      const adv = pg.findings.filter((f) => f.advisory);
+      ax.push("<details>", `<summary>${pg.name} \u2014 <code>${pg.url}</code> \u2014 ${pg.auth ? s.authYes : s.authNo}</summary>`, "");
+      ax.push(`- ${nc.length} ${s.ncCount}${adv.length ? ` \xB7 ${adv.length} ${s.advCount}` : ""}`);
+      for (const f of nc.slice(0, PER_PAGE_MAX)) {
+        const crits = pack ? packCriteriaForFinding(pack, f) : [];
+        const label = crits.length ? crits.join(", ") : f.criteriaId;
+        ax.push(`  - [${label}] \`${f.selectorHint}\` \u2014 ${mdText(resolveMessage(f, lang))}`);
+      }
+      if (nc.length > PER_PAGE_MAX) ax.push(`  - _${s.perPageMore(nc.length - PER_PAGE_MAX, nc.length)}_`);
+      ax.push("", "</details>", "");
+    }
+  }
+  ax.push(`## ${s.annexManualTitle}`, "");
+  if (!manual.length) ax.push(s.nothing, "");
+  else {
     if (pack5 && exhaustiveContract) {
       const tests = manual.reduce((count, row) => count + packTestIds(pack5, row.id).length, 0);
-      out2.push(s.manualSummary(manual.length, tests));
+      ax.push(s.manualSummary(manual.length, tests), "");
     } else {
-      for (const x of manual) {
+      const lines = manual.map((x) => {
         const tests = pack5 ? packTestIds(pack5, x.id) : [];
         const testRef = tests.length ? ` \u2014 ${tests.length} ${s.testsToRule}` : "";
-        out2.push(`- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}${testRef}`);
-      }
+        return `- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}${testRef}`;
+      });
+      ax.push(...folded(s.showCriteria(manual.length), lines));
     }
-    out2.push("", `> ${s.manualHowTo}`, "");
+    ax.push(`> ${s.manualWarn} ${s.manualHowTo}`, "");
   }
-  return out2.join("\n");
+  ax.push(...exhaustiveGrid(opts.groups, opts.standard, lang, s.annexGridTitle));
+  return { report: out2.join("\n"), annex: ax.join("\n"), reportFile, annexFile };
+}
+function renderReportDocuments(r, lang = "en", outDir, cropFor) {
+  const s = L5[lang];
+  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups: reportGroups(r, lang), standard: CORE2, outDir, ...cropFor ? { cropFor } : {} });
 }
 function reportGroups(r, lang = "en") {
   const byGuideline = /* @__PURE__ */ new Map();
   for (const c2 of r.criteria) {
-    const title2 = scTitle(c2.id, lang);
+    const title = scTitle(c2.id, lang);
     const row = {
       id: c2.id,
-      label: title2 ? `${c2.id} \u2014 ${title2}` : c2.id,
+      label: title ? `${c2.id} \u2014 ${title}` : c2.id,
       status: c2.status,
       findings: c2.findings,
       justification: c2.justification,
@@ -60326,8 +61067,8 @@ function reportGroups(r, lang = "en") {
   return r.guidelines.map((g) => ({ key: g.key, title: guidelineTitle(g.key, lang) ?? g.title, rows: byGuideline.get(g.key) ?? [] }));
 }
 function renderReport(r, lang = "en", outDir, cropFor) {
-  const s = L5[lang];
-  return render(r, lang, { std: s.wcagStd, groupHead: s.byGuideline, groups: reportGroups(r, lang), standard: CORE2, outDir, ...cropFor ? { cropFor } : {} });
+  const docs = renderReportDocuments(r, lang, outDir, cropFor);
+  return joinReportDocuments(docs.report, docs.annex);
 }
 function packReportGroups(r, pack, lang = "en") {
   const derived = derivePackResults(r, pack.key);
@@ -60340,7 +61081,9 @@ function packReportGroups(r, pack, lang = "en") {
     const provisionalNa = isProvisionalJudgmentInapplicable(pr, pc);
     const row = {
       id: pr.id,
-      label: `${pack.name} ${pr.id} \u2014 ${title(pack, pc, lang)}`,
+      // PLAIN, not the official title with its glossary links: `[image porteuse d'information](#…)`
+      // points at anchors no report carries, and reads as markup in every grid and list.
+      label: `${pack.name} ${pr.id} \u2014 ${titlePlain(pack, pc, lang)}`,
       status: provisionalNa ? "manual" : pr.status,
       findings: pr.findings,
       ...pr.decidedBy ? { decidedBy: pr.decidedBy } : {},
@@ -60354,6 +61097,10 @@ function packReportGroups(r, pack, lang = "en") {
   return pack.themes.map((t3) => ({ key: `${t3.number}.`, title: themeName(pack, t3.number, lang) ?? "", rows: byTheme.get(t3.number) ?? [] }));
 }
 function renderPackReport(r, pack, lang = "en", outDir, cropFor) {
+  const docs = renderPackReportDocuments(r, pack, lang, outDir, cropFor);
+  return joinReportDocuments(docs.report, docs.annex);
+}
+function renderPackReportDocuments(r, pack, lang = "en", outDir, cropFor) {
   const derived = derivePackResults(r, pack.key);
   const std = `${pack.name} ${pack.baseVersion}`;
   const groups = packReportGroups(r, pack, lang);
@@ -60377,13 +61124,14 @@ function renderPackReport(r, pack, lang = "en", outDir, cropFor) {
     ...cropFor ? { cropFor } : {}
   });
 }
-function writeReport(r, opts) {
-  const core = isCore(opts.standard);
-  const md = core ? renderReport(r, opts.lang, opts.out, opts.cropFor) : renderPackReport(r, loadPack(opts.standard), opts.lang, opts.out, opts.cropFor);
+function writeReportFiles(r, opts) {
+  const docs = isCore(opts.standard) ? renderReportDocuments(r, opts.lang, opts.out, opts.cropFor) : renderPackReportDocuments(r, loadPack(opts.standard), opts.lang, opts.out, opts.cropFor);
   mkdirSync7(opts.out, { recursive: true });
-  const path = join31(opts.out, `${core ? "wcag" : opts.standard}-${r.date}.md`);
-  writeFileSync8(path, md);
-  return path;
+  const path = join31(opts.out, docs.reportFile);
+  const annexPath = join31(opts.out, docs.annexFile);
+  writeFileSync8(annexPath, docs.annex);
+  writeFileSync8(path, docs.report);
+  return { path, annexPath };
 }
 
 // src/gh-cli.ts
@@ -60587,8 +61335,8 @@ function buildTickets(result, opts) {
   const backlogOpts = opts.technical !== void 0 ? { technical: opts.technical } : {};
   const baseDir = opts.baseDir ?? "";
   const clamp2 = (body3) => clampBody(body3, limit, lang);
-  const ticketFromUnit = (unit, title2, scope2) => ({
-    title: title2,
+  const ticketFromUnit = (unit, title, scope2) => ({
+    title,
     body: clamp2(renderCriterionBody(unit, standard, lang, bodyOpts)),
     labels: labelsFor(unit.severity, unit.advisory === true, tag),
     severity: unit.severity,
@@ -61621,7 +62369,7 @@ function renderCriteriaReference() {
 
 // src/check.ts
 import { existsSync as existsSync22, readFileSync as readFileSync19, readdirSync as readdirSync5 } from "fs";
-import { dirname as dirname10, join as join33 } from "path";
+import { dirname as dirname11, join as join33 } from "path";
 
 // src/verify.ts
 import { existsSync as existsSync20, mkdirSync as mkdirSync8, readFileSync as readFileSync17, writeFileSync as writeFileSync9 } from "fs";
@@ -62129,8 +62877,7 @@ function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
     const item = naItem.exec(line);
     if (item && !line.includes("_")) issues.push(s.na(item[1]));
   }
-  const header4 = md.slice(0, /^##\s/m.exec(md)?.index ?? md.length);
-  const rateLines = [...header4.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*\**\s*(\d+(?:[.,]\d+)?)\s*%([^\n]*)$/gm)];
+  const rateLines = documentHeaders(md).flatMap((header4) => [...header4.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*\**\s*(\d+(?:[.,]\d+)?)\s*%([^\n]*)$/gm)]);
   if (perPage) {
     for (const m of md.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*\**\s*(\d+(?:[.,]\d+)?)\s*%/gm)) {
       const raw = m[1];
@@ -62225,7 +62972,7 @@ function checkSemantic(md, opts) {
   const standard = opts.standard ?? "wcag";
   const s = M[lang];
   const empty = { total: 0, grounded: 0, moved: 0, failed: 0 };
-  const artifact = opts.verdictsPath ?? join33(dirname10(opts.reportPath), "VERIFY.todo.json");
+  const artifact = opts.verdictsPath ?? join33(dirname11(opts.reportPath), "VERIFY.todo.json");
   if (!existsSync22(artifact)) return { ok: false, issues: [s.semanticMissing(artifact)], ...empty };
   let items;
   try {
@@ -62253,10 +63000,36 @@ function agentConformities(md) {
   let count = 0;
   for (const line of md.split("\n")) {
     if (!line.startsWith("|")) continue;
-    const cells = line.slice(1, line.endsWith("|") ? -1 : void 0).split("|").map((cell2) => cell2.trim());
+    const cells = line.slice(1, line.endsWith("|") ? -1 : void 0).split("|").map((cell3) => cell3.trim());
     if (cells.length === 4 && (cells[1] === "C" || cells[1] === "NA") && (cells[3] === "AI" || cells[3] === "IA")) count++;
   }
   return count;
+}
+function documentHeaders(md) {
+  const headers = [];
+  let current = [];
+  let fence = null;
+  for (const line of md.split("\n")) {
+    const f = /^\s*(```+|~~~+)/.exec(line);
+    if (f) {
+      const mark = f[1];
+      if (fence === null) fence = mark[0].repeat(mark.length);
+      else if (mark.startsWith(fence[0]) && mark.length >= fence.length) fence = null;
+    }
+    if (fence === null && /^#\s/.test(line)) {
+      if (current?.length) headers.push(current.join("\n"));
+      current = [line];
+      continue;
+    }
+    if (fence === null && /^##\s/.test(line)) {
+      if (current?.length) headers.push(current.join("\n"));
+      current = null;
+      continue;
+    }
+    current?.push(line);
+  }
+  if (current?.length) headers.push(current.join("\n"));
+  return headers;
 }
 function sectionBody(md, n) {
   const start2 = new RegExp(`^##\\s+${n}\\.`, "m").exec(md);
@@ -63324,12 +64097,12 @@ function packAutomatability(scs, criterion) {
   const autos = scs.map((sc) => getSC(sc)?.automatability).filter((a) => !!a);
   return autos.includes("needs-rendering") ? "needs-rendering" : "judgment";
 }
-function blankItem(criteriaId, automatability2, title2, harvested, limits, signals = [], testIds = []) {
+function blankItem(criteriaId, automatability2, title, harvested, limits, signals = [], testIds = []) {
   const { evidence, population, complete, markup } = collapse2(harvested, limits);
   return {
     criteriaId,
     automatability: automatability2,
-    ...title2 ? { title: title2 } : {},
+    ...title ? { title } : {},
     ...testIds.length ? { testIds } : {},
     evidence,
     ...signals.length ? { signals } : {},
@@ -64433,7 +65206,7 @@ function pruneRefuted(audit2, standard, items, lang = "en") {
 // src/ledger.ts
 import { createHash as createHash6 } from "crypto";
 import { existsSync as existsSync23, mkdirSync as mkdirSync10, readFileSync as readFileSync20, writeFileSync as writeFileSync11 } from "fs";
-import { dirname as dirname11, join as join35 } from "path";
+import { dirname as dirname12, join as join35 } from "path";
 var LEDGER_DIR = ".ultra11y/verdicts";
 function ledgerPath(standard, root = ".") {
   return join35(root, LEDGER_DIR, `${standard}.json`);
@@ -64542,7 +65315,7 @@ function unreadableCaptures(audit2, cwd = ".") {
   return (audit2.scope.pagesAudited ?? []).filter((id) => !existsSync23(join35(cwd, PAGES_DIR, id, "dom.html")));
 }
 function writeLedger(path, ledger) {
-  mkdirSync10(dirname11(path), { recursive: true });
+  mkdirSync10(dirname12(path), { recursive: true });
   const sorted = { ...ledger, entries: [...ledger.entries].sort((a, b) => a.criteriaId.localeCompare(b.criteriaId, "en", { numeric: true })) };
   writeFileSync11(path, `${JSON.stringify(sorted, null, 2)}
 `);
@@ -65152,7 +65925,7 @@ async function runCli2(argv, prompt, opts, extract) {
 import { spawn as spawn3 } from "child_process";
 import { existsSync as existsSync25, mkdtempSync as mkdtempSync3, rmSync as rmSync4, writeFileSync as writeFileSync12 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
-import { delimiter as delimiter2, dirname as dirname12, join as join37 } from "path";
+import { delimiter as delimiter2, dirname as dirname13, join as join37 } from "path";
 var MAX_ATTEMPTS3 = 4;
 var CODEX_EFFORT_LEVELS = ["minimal", "low", "medium", "high", "xhigh"];
 var DEFAULT_CODEX_TIMEOUT_MS = 10 * 6e4;
@@ -65216,7 +65989,7 @@ function codexArgv(opts, schemaPath) {
     "multi_agent",
     "--strict-config",
     "--cd",
-    dirname12(schemaPath),
+    dirname13(schemaPath),
     "--skip-git-repo-check",
     "--sandbox",
     "read-only",
@@ -65784,7 +66557,13 @@ function writeRunnerSnapshot(root, out2, target, page) {
     // probes/axe drop this function used to have: measured, then thrown away on the way out.
     ...collected.doctype !== void 0 ? { doctype: collected.doctype } : {},
     ...page?.auth !== void 0 ? { auth: page.auth } : {},
-    ...page?.notes ? { notes: page.notes } : {}
+    ...page?.notes ? { notes: page.notes } : {},
+    // The sample's `sources` are the one declared link between a page and the code that renders
+    // it: `attributePages` uses them to put a SOURCE finding on its page, and the capture comment
+    // cites the first as the component behind the DOM. Forwarding auth and notes but not these
+    // left every source finding of a scanned sample « on no page » — the report could say which
+    // URL a defect was measured on, never which URL the code defect lives on.
+    ...page?.sources?.length ? { sources: page.sources } : {}
   };
   const v = validateSnapshotMeta(meta2);
   if (!v.ok || !v.meta) return void 0;
@@ -67440,7 +68219,7 @@ function writeCi(root, enginePath, failOn) {
 
 // src/install/json-edit.ts
 import { copyFileSync as copyFileSync2, existsSync as existsSync29, mkdirSync as mkdirSync12, readFileSync as readFileSync23, renameSync as renameSync3, rmSync as rmSync6, writeFileSync as writeFileSync16 } from "fs";
-import { dirname as dirname13 } from "path";
+import { dirname as dirname14 } from "path";
 var SettingsParseError = class extends Error {
   constructor(path, cause) {
     super(`${path} is not valid JSON (${cause}) \u2014 fix or move it, then run install again. It has NOT been modified.`);
@@ -67454,7 +68233,7 @@ function stamp() {
 }
 function writeTextWithBackup(path, content, marker = "ultra11y") {
   if (existsSync29(path) && readFileSync23(path, "utf8") === content) return { path, changed: false };
-  mkdirSync12(dirname13(path), { recursive: true });
+  mkdirSync12(dirname14(path), { recursive: true });
   let backup;
   if (existsSync29(path)) {
     backup = `${path}.${marker}-backup-${stamp()}`;
@@ -67633,7 +68412,7 @@ import { join as join42 } from "path";
 // src/install/paths.ts
 import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync31, mkdirSync as mkdirSync13, readFileSync as readFileSync25, realpathSync as realpathSync4, statSync as statSync15 } from "fs";
 import { homedir as homedir2 } from "os";
-import { dirname as dirname14, join as join41 } from "path";
+import { dirname as dirname15, join as join41 } from "path";
 function codexHome() {
   return process.env.CODEX_HOME || join41(homedir2(), ".codex");
 }
@@ -67668,13 +68447,13 @@ function installedCliCommand() {
 function packageRoot() {
   let dir;
   try {
-    dir = dirname14(realpathSync4(process.argv[1] ?? ""));
+    dir = dirname15(realpathSync4(process.argv[1] ?? ""));
   } catch {
     return null;
   }
   for (let i2 = 0; i2 < 6 && dir && dir !== "/"; i2++) {
     if (existsSync31(join41(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
-    dir = dirname14(dir);
+    dir = dirname15(dir);
   }
   return null;
 }
@@ -68221,7 +69000,7 @@ function criterionLabel(f, standard) {
 }
 function ruleFor(f, standard, lang) {
   const sc = f.criteriaId;
-  const title2 = scTitle(sc, lang);
+  const title = scTitle(sc, lang);
   const level = levelFor(f);
   const core = isCore(standard);
   const pack = core ? null : loadPack(standard);
@@ -68229,7 +69008,7 @@ function ruleFor(f, standard, lang) {
   const tags = core ? ["accessibility", `wcag:${sc}`] : ["accessibility", ...packIds.map((id) => `${pack.key}:${id}`)];
   if (f.advisory) tags.push("recommendation");
   const label = core ? `WCAG ${sc}` : `${pack.name} ${packIds.join(", ")}`;
-  const shortDescription = core && title2 ? `${f.ruleId} \u2014 ${label} ${title2}` : `${f.ruleId} \u2014 ${label}`;
+  const shortDescription = core && title ? `${f.ruleId} \u2014 ${label} ${title}` : `${f.ruleId} \u2014 ${label}`;
   return {
     id: f.ruleId,
     shortDescription: { text: shortDescription },
@@ -68323,10 +69102,10 @@ function annotations(result, opts = {}) {
     if (criterion === null) continue;
     const level = f.advisory ? "notice" : LEVEL2[f.severity];
     const file = repoRelative(f.file, baseDir);
-    const title2 = `${criterion} \xB7 ${f.ruleId}`;
+    const title = `${criterion} \xB7 ${f.ruleId}`;
     const body3 = `${resolveMessage(f, lang)}
 ${resolveRemediation(f, lang)}`;
-    out2.push(`::${level} file=${escProp(file)},line=${Math.max(1, f.line)},col=${Math.max(1, f.col)},title=${escProp(title2)}::${esc(body3)}`);
+    out2.push(`::${level} file=${escProp(file)},line=${Math.max(1, f.line)},col=${Math.max(1, f.col)},title=${escProp(title)}::${esc(body3)}`);
   }
   return out2;
 }
@@ -68590,20 +69369,20 @@ function runScopeLines(result, standard, lang, includePageNames = false) {
   );
   return out2;
 }
-var cell = (v) => v.replace(/\|/g, "\\|");
+var cell2 = (v) => v.replace(/\|/g, "\\|");
 function criterionTableHead(s) {
   return [`| ${s.severity} | ${s.criterion} | ${s.defectsCol} | ${s.occurrences} | ${s.pagesCol} |`, "| --- | --- | ---: | ---: | ---: |"];
 }
 function criterionRow(c2) {
-  return `| ${ICON5[c2.severity]} ${c2.severity} | ${cell(c2.criterion)} | ${c2.defects.length} | ${c2.occurrences} | ${c2.pages || "\u2014"} |`;
+  return `| ${ICON5[c2.severity]} ${c2.severity} | ${cell2(c2.criterion)} | ${c2.defects.length} | ${c2.occurrences} | ${c2.pages || "\u2014"} |`;
 }
 function defectRow(g) {
-  return `| ${ICON5[g.severity]} ${g.severity} | \`${cell(g.where)}\` (\`${cell(g.selectorHint)}\`) | ${cell(mdText(g.message))} | ${g.occurrences} | ${g.pages || "\u2014"} |`;
+  return `| ${ICON5[g.severity]} ${g.severity} | \`${cell2(g.where)}\` (\`${cell2(g.selectorHint)}\`) | ${cell2(mdText(g.message))} | ${g.occurrences} | ${g.pages || "\u2014"} |`;
 }
 function criterionDetails(c2, s) {
   const out2 = [
     "<details>",
-    `<summary><b>${cell(c2.criterion)}</b> \u2014 ${s.criterionDefects(c2.defects.length)}</summary>`,
+    `<summary><b>${cell2(c2.criterion)}</b> \u2014 ${s.criterionDefects(c2.defects.length)}</summary>`,
     // GFM only renders Markdown inside <details> after a blank line — at EVERY level of
     // nesting, and these folds sit inside the page and digest folds.
     "",
@@ -68740,7 +69519,7 @@ function pageBlock(result, page, standard, lang, baseDir) {
   const withTests = nc.some((r) => r.tests.length);
   const out2 = [
     "<details>",
-    `<summary><b>${cell(page.name)}</b>${page.auth ? " \u{1F512}" : ""} \u2014 ${counts}</summary>`,
+    `<summary><b>${cell2(page.name)}</b>${page.auth ? " \u{1F512}" : ""} \u2014 ${counts}</summary>`,
     // GFM only renders Markdown inside <details> after a blank line; without it the table
     // ships to the reader as literal pipes.
     "",
@@ -68753,16 +69532,16 @@ function pageBlock(result, page, standard, lang, baseDir) {
   }
   out2.push(withTests ? `| ${s.criterion} | ${s.testsCol} |` : `| ${s.criterion} |`, withTests ? "| --- | --- |" : "| --- |");
   for (const r of nc) {
-    out2.push(withTests ? `| ${cell(r.label)} | ${r.tests.map((t3) => `\`${t3}\``).join(" ")} |` : `| ${cell(r.label)} |`);
+    out2.push(withTests ? `| ${cell2(r.label)} | ${r.tests.map((t3) => `\`${t3}\``).join(" ")} |` : `| ${cell2(r.label)} |`);
   }
   const defects = groupFindings(pageFindings, standard, lang, baseDir);
   const blocking = groupByCriterion(defects.filter((g) => g.severity === "bloquant"));
   const rest = groupByCriterion(defects.filter((g) => g.severity !== "bloquant"));
   const shownBlocking = Math.min(blocking.length, PAGE_CRITERIA_SHOWN);
   const shownRest = Math.min(rest.length, Math.max(0, PAGE_CRITERIA_SHOWN - shownBlocking));
-  const half = (rows2, shown, title2) => {
+  const half = (rows2, shown, title) => {
     if (!rows2.length) return [];
-    return ["", `**${title2}**`, "", ...criterionSection(rows2, s, shown, s.pageMoreCriteria)];
+    return ["", `**${title}**`, "", ...criterionSection(rows2, s, shown, s.pageMoreCriteria)];
   };
   out2.push(...half(blocking, shownBlocking, s.blockingNc), ...half(rest, shownRest, s.nonBlockingNc));
   out2.push("", "</details>");
@@ -68773,7 +69552,7 @@ function fullGridBlock(result, derived, standard, s, lang) {
   if (!rows.length || !derived.length) return [];
   const origin = commonOrigin(derived);
   const originNote = pageOriginNote(origin, lang);
-  const head = [s.criterion, ...derived.map((p) => cell(pageColumnLabel(p, origin)))];
+  const head = [s.criterion, ...derived.map((p) => cell2(pageColumnLabel(p, origin)))];
   const out2 = [
     "<details>",
     `<summary><b>${s.fullGrid}</b> \u2014 ${rows.length} \xD7 ${derived.length}</summary>`,
@@ -68786,7 +69565,7 @@ function fullGridBlock(result, derived, standard, s, lang) {
     `| ${head.map(() => "---").join(" | ")} |`
   ];
   for (const row of rows) {
-    out2.push(`| ${cell(row.label)} | ${derived.map((p) => GRID_MARK[status.get(row.id)?.get(p.id) ?? "manual"]).join(" | ")} |`);
+    out2.push(`| ${cell2(row.label)} | ${derived.map((p) => GRID_MARK[status.get(row.id)?.get(p.id) ?? "manual"]).join(" | ")} |`);
   }
   out2.push("", "</details>");
   return out2;
@@ -69493,6 +70272,51 @@ function headline(result, standard, lang) {
     total
   };
 }
+function summaryBlocks(result, standard, lang) {
+  const core = isCore(standard);
+  const groups = core ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
+  const resolver = pageResolver(result);
+  const { nc, advisory } = partitionUnits(prdUnits(result, standard, lang));
+  const m = summaryModel(lang, standardLabel(standard), standard, reportTotals(groups), nc, advisory.length, resolver);
+  const out2 = [
+    { kind: "heading", level: 2, text: m.title, id: "summary" },
+    { kind: "para", runs: [{ text: m.headline[0], strong: true }, ...ticks(` ${m.headline[1]}`)] },
+    { kind: "list", items: m.facts.map((f) => [{ text: `${f.label} : `, strong: true }, ...ticks(f.value)]) },
+    { kind: "heading", level: 3, text: m.fix.title }
+  ];
+  if (m.fix.none) out2.push({ kind: "para", runs: [{ text: m.fix.none }] });
+  else {
+    const [priority2, criterion, occurrences, fix] = m.fix.columns;
+    const pagesColumn = m.fix.pagesColumn;
+    out2.push({
+      kind: "table",
+      caption: m.fix.intro ?? "",
+      columns: [
+        { text: priority2 },
+        { text: criterion },
+        { text: occurrences, align: "end" },
+        ...pagesColumn ? [{ text: pagesColumn }] : [],
+        { text: fix }
+      ],
+      rows: m.fix.rows.map((r) => [
+        { text: `${r.icon} ${r.priority}` },
+        { text: r.criterion },
+        { text: String(r.occurrences), align: "end" },
+        // Page names only: a cell carries one link, and the occurrence tables in the full report
+        // link every page.
+        ...pagesColumn ? [{ text: summaryPagesText(r.pages, lang, (name2) => name2) }] : [],
+        { text: r.fix }
+      ])
+    });
+  }
+  if (m.fix.pagesNote) out2.push({ kind: "note", tone: "info", runs: ticks(m.fix.pagesNote) });
+  if (m.fix.advisory) out2.push({ kind: "para", runs: [{ text: m.fix.advisory, em: true }] });
+  if (m.next) {
+    out2.push({ kind: "heading", level: 3, text: m.next.title });
+    out2.push({ kind: "list", items: m.next.steps.map(([what, rest]) => [{ text: what, strong: true }, ...ticks(rest)]) });
+  }
+  return out2;
+}
 function synthesisBlocks(result, standard, lang) {
   const t3 = T4[lang];
   const core = isCore(standard);
@@ -69534,7 +70358,7 @@ function synthesisBlocks(result, standard, lang) {
     { kind: "note", tone: "warn", runs: ticks(t3.manualWarn) }
   ];
 }
-function criterionBlocks(unit, standard, lang, level, crops) {
+function criterionBlocks(unit, standard, lang, level, crops, pages) {
   const t3 = T4[lang];
   const m = auditorUnitModel(unit, standard, lang, { collapse: true });
   const out2 = [{ kind: "heading", level, text: `${m.icon} ${m.label}`, id: `c-${unit.criteriaId}` }];
@@ -69546,9 +70370,24 @@ function criterionBlocks(unit, standard, lang, level, crops) {
   });
   if (m.fixes.length) out2.push({ kind: "para", runs: [{ text: `${m.conformanceTerms.conformant} : `, strong: true }, { text: m.fixes.join(" ; ") }] });
   const hasEvidence = crops ? m.normative.some((f) => crops(f)) : false;
-  const columns = [{ text: t3.where }, { text: t3.selector }, { text: t3.what }, ...hasEvidence ? [{ text: t3.evidence }] : []];
+  const withPages = pages !== void 0 && pages.pages.length > 0;
+  const columns = [
+    ...withPages ? [{ text: t3.page }] : [],
+    { text: t3.where },
+    { text: t3.selector },
+    { text: t3.what },
+    ...hasEvidence ? [{ text: t3.evidence }] : []
+  ];
   const rows = m.normative.map((f) => {
-    const cells = [{ text: `${f.file}:${f.line}`, mono: true }, { text: f.selectorHint, mono: true }, { text: resolveOccurrence(f, lang) }];
+    const page = withPages ? pages.pageOf(f) : void 0;
+    const cells = [
+      // Name AND address, as text: the artifact links nothing outside itself (html-emit.ts
+      // `externalReferences`), and the URL is what the reader came to this column for.
+      ...withPages ? [page ? { text: `${page.name} (${page.url})` } : { text: "\u2014" }] : [],
+      { text: `${f.file}:${f.line}`, mono: true },
+      { text: f.selectorHint, mono: true },
+      { text: resolveOccurrence(f, lang) }
+    ];
     if (hasEvidence) cells.push({ text: crops?.(f) ? "\u25A3" : "" });
     return cells;
   });
@@ -69566,11 +70405,12 @@ function resolveOccurrence(f, lang) {
 }
 function findingsBlocks(result, standard, lang, level, crops, refusals) {
   const t3 = T4[lang];
+  const resolver = pageResolver(result);
   const { nc, advisory } = partitionUnits(prdUnits(result, standard, lang));
   const out2 = [{ kind: "heading", level: 2, text: t3.ncTitle, id: "nc" }];
   out2.push(...refusalBlocks(refusals?.(null)));
   if (!nc.length) out2.push({ kind: "para", runs: [{ text: t3.noNc }] });
-  for (const u of nc) out2.push(...criterionBlocks(u, standard, lang, level === 2 ? 3 : 4, crops));
+  for (const u of nc) out2.push(...criterionBlocks(u, standard, lang, level === 2 ? 3 : 4, crops, resolver));
   if (advisory.length) {
     out2.push({ kind: "heading", level: 2, text: t3.recTitle, id: "rec" });
     out2.push({ kind: "note", tone: "info", runs: ticks(t3.recNote) });
@@ -69728,7 +70568,7 @@ function indexDoc(result, opts = {}) {
   const lang = opts.lang ?? "en";
   const t3 = T4[lang];
   const h2 = headline(result, standard, lang);
-  const blocks = [];
+  const blocks = [...summaryBlocks(result, standard, lang)];
   if (opts.links?.length) {
     blocks.push({ kind: "heading", level: 2, text: t3.documents, id: "documents" });
     blocks.push({ kind: "list", items: opts.links.map((l) => [{ text: l.text, href: l.href }]) });
@@ -69745,7 +70585,12 @@ function compositeDoc(result, opts = {}) {
   const lang = opts.lang ?? "en";
   const t3 = T4[lang];
   const h2 = headline(result, standard, lang);
-  const blocks = [...scopeBlocks(result, standard, lang), ...synthesisBlocks(result, standard, lang), ...criteriaGridBlocks(result, standard, lang)];
+  const blocks = [
+    ...summaryBlocks(result, standard, lang),
+    ...scopeBlocks(result, standard, lang),
+    ...synthesisBlocks(result, standard, lang),
+    ...criteriaGridBlocks(result, standard, lang)
+  ];
   if (h2.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
   blocks.push(...findingsBlocks(result, standard, lang, 2, opts.crops, opts.refusals));
   blocks.push(...scoreboardBlocks(result, standard, lang));
@@ -69989,7 +70834,7 @@ function noticeRuns(notices) {
 // src/dev.ts
 import { createServer } from "http";
 import { mkdirSync as mkdirSync16, readFileSync as readFileSync30, writeFileSync as writeFileSync19 } from "fs";
-import { dirname as dirname15, join as join47 } from "path";
+import { dirname as dirname16, join as join47 } from "path";
 var DEV_DEFAULT_PORT = 4111;
 function criterionLabel3(f, standard) {
   if (isCore(standard)) return `WCAG ${f.criteriaId}`;
@@ -70169,14 +71014,14 @@ export default Ultra11yOverlay;
 }
 function dashboardHtml(result, pages, standard, lang) {
   const fr = lang === "fr";
-  const title2 = `ultra11y \u2014 ${isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name}`;
+  const title = `ultra11y \u2014 ${isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name}`;
   if (!result || !pages.length) {
     const empty = fr ? "Aucune page captur\xE9e pour l'instant. Ouvrez votre application avec l'overlay actif : chaque page visit\xE9e appara\xEEtra ici." : "No page captured yet. Open your app with the overlay active: every page you visit shows up here.";
-    return renderHtmlDocument({ lang, title: title2, blocks: [{ kind: "para", runs: [{ text: empty }] }] });
+    return renderHtmlDocument({ lang, title, blocks: [{ kind: "para", runs: [{ text: empty }] }] });
   }
   return renderHtmlDocument({
     lang,
-    title: title2,
+    title,
     subtitle: [{ text: `${pages.length} ${fr ? "page(s) captur\xE9e(s)" : "page(s) captured"} \xB7 ` }, { text: result.date, mono: true }],
     blocks: [...scoreboardBlocks(result, standard, lang), ...crossGridBlocks(result, pages, standard, lang)]
   });
@@ -70347,7 +71192,7 @@ function startDevServer(opts) {
           let auditPath;
           if (applied.ok) {
             auditPath = join47(opts.root, "audits", "audit-latest.json");
-            mkdirSync16(dirname15(auditPath), { recursive: true });
+            mkdirSync16(dirname16(auditPath), { recursive: true });
             writeFileSync19(auditPath, `${JSON.stringify(applied.audit, null, 2)}
 `);
           }
@@ -71915,7 +72760,11 @@ function reportText(args2, tool) {
   if (!file) throw new ToolError(`\`report_text\` is required \u2014 the report markdown for ultra11y_${tool} to work on.`);
   if (!isAbsolute4(file)) throw new ToolError("`report_file` must be an absolute path.");
   if (!existsSync37(file)) throw new ToolError(`report file not found: ${file}`);
-  return readFileSync32(file, "utf8");
+  try {
+    return withReportAnnexes(readFileSync32(file, "utf8"), file, (p) => readFileSync32(p, "utf8"));
+  } catch (e) {
+    throw new ToolError(e instanceof Error ? e.message : String(e));
+  }
 }
 function handleCriteria(args2) {
   const lang = langOf(args2);
@@ -72652,12 +73501,12 @@ var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t3) => t3.name));
 
 // src/mcp/resources.ts
 import { existsSync as existsSync38, readdirSync as readdirSync7, readFileSync as readFileSync33, realpathSync as realpathSync6, statSync as statSync18 } from "fs";
-import { basename as basename4, dirname as dirname16, join as join51, resolve as resolve16, sep as sep6 } from "path";
+import { basename as basename4, dirname as dirname17, join as join51, resolve as resolve16, sep as sep6 } from "path";
 import { fileURLToPath as fileURLToPath4 } from "url";
 var SKILL_NAME = "ultra11y";
 var URI_SCHEME = "skill://";
 function resolveSkillRoot(moduleDir) {
-  const here = moduleDir ?? dirname16(fileURLToPath4(import.meta.url));
+  const here = moduleDir ?? dirname17(fileURLToPath4(import.meta.url));
   const candidates2 = [resolve16(here, ".."), resolve16(here, "..", "skills", SKILL_NAME), resolve16(here, "..", "..", "skills", SKILL_NAME)];
   return candidates2.find((dir) => existsSync38(join51(dir, "SKILL.md")));
 }
@@ -73937,6 +74786,16 @@ function readInputFile(path, cmd, flag) {
     return null;
   }
 }
+function readReportInput(path, cmd) {
+  const md = readInputFile(path, cmd, "--report");
+  if (md === null) return null;
+  try {
+    return withReportAnnexes(md, path, readText);
+  } catch (e) {
+    console.error(`ultra11y ${cmd}: ${e instanceof Error ? e.message : String(e)}`);
+    return null;
+  }
+}
 function webAllowed(flags2) {
   if (flags2["no-web"] === true) return false;
   if (flags2.web === true) return true;
@@ -74138,7 +74997,7 @@ async function cmdAudit(p) {
     const asFile = out2.toLowerCase().endsWith(".json");
     const target = asFile ? out2 : join52(out2, "audit-latest.json");
     try {
-      mkdirSync18(asFile ? dirname17(out2) : out2, { recursive: true });
+      mkdirSync18(asFile ? dirname18(out2) : out2, { recursive: true });
       writeFileSync21(target, JSON.stringify(document, null, 2) + "\n");
       console.error(lang === "fr" ? `\u2192 audit \xE9crit dans ${target}` : `\u2192 audit written to ${target}`);
     } catch {
@@ -74792,7 +75651,7 @@ async function cmdReport(p) {
     const c2 = manifest.crops.get(findingId(f));
     return c2 ? { href: c2.href, alt: c2.alt[lang] } : void 0;
   } : void 0;
-  const path = writeReport(result, { out: out2, lang, standard, ...cropFor ? { cropFor } : {} });
+  const { path, annexPath } = writeReportFiles(result, { out: out2, lang, standard, ...cropFor ? { cropFor } : {} });
   let html;
   if (p.flags.html === true) {
     html = emitHtml(result, { outDir: out2, standard, lang, ...manifest ? { evidence: manifest } : {}, inlineBudget: budgetOf(p) });
@@ -74805,6 +75664,7 @@ async function cmdReport(p) {
       JSON.stringify(
         {
           path,
+          annexPath,
           conformancePct: result.conformancePct,
           date: result.date,
           standard: typeof p.flags.standard === "string" ? p.flags.standard : "wcag",
@@ -75125,7 +75985,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const rel2 = ".ultra11y/capture-setup.mjs";
     const out2 = join52(root, rel2);
     try {
-      mkdirSync18(dirname17(out2), { recursive: true });
+      mkdirSync18(dirname18(out2), { recursive: true });
       writeFileSync21(out2, captureSetup());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out2}: ${e instanceof Error ? e.message : String(e)}`);
@@ -75265,7 +76125,7 @@ function cmdCheck(p) {
     }
   }
   const lang = resolveLang(p.flags, { standard });
-  const md = typeof rep === "string" && rep ? readInputFile(rep, "check", "--report") : "";
+  const md = typeof rep === "string" && rep ? readReportInput(rep, "check") : "";
   if (md === null) return 2;
   let audit2;
   const inFlag = p.flags.in;
@@ -75403,13 +76263,8 @@ function cmdVerify(p) {
     }
     const standard = stdOf(p, "verify");
     if (standard === null) return 2;
-    let repMd;
-    try {
-      repMd = readText(applyReport);
-    } catch {
-      console.error(`ultra11y verify: --report file not found: ${applyReport}.`);
-      return 2;
-    }
+    const repMd = readReportInput(applyReport, "verify");
+    if (repMd === null) return 2;
     const expectedNc = buildWorklist(repMd, standard, Number.POSITIVE_INFINITY);
     const expected = [...expectedNc, ...buildConformityWorklist(conformityClaimsFor(p, standard, lang), expectedNc.length, Number.POSITIVE_INFINITY)];
     const r = applyVerdicts(items, expected);
@@ -75558,7 +76413,7 @@ function cmdVerifyWorklist(p, langIn) {
     }
     max = n === 0 ? Number.POSITIVE_INFINITY : n;
   }
-  const repMd = readInputFile(rep, "verify", "--report");
+  const repMd = readReportInput(rep, "verify");
   if (repMd === null) return 2;
   const ncItems = buildWorklist(repMd, standard, max);
   const conformities = conformityClaimsFor(p, standard, lang);

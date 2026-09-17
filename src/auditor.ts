@@ -12,7 +12,8 @@ import { prdUnits, partitionUnits, effortOf, guidanceFor, guidanceExampleBlock, 
 import { getSC, guidelineTitle, principleTitle, techniques as scTechniques } from "./wcag.js";
 import { resolveMessage, resolveRemediation, resolveNote } from "./messages.js";
 import { type StandardId, isCore, loadPack, packTestIdsCited, standardLabel, themeName, vocabularyFor } from "./standards/index.js";
-import { mdText } from "./md.js";
+import { mdLink, mdText } from "./md.js";
+import { occurrencesByPage, type PageResolver } from "./pages.js";
 
 const SEV_ORDER: Severity[] = ["bloquant", "majeur", "mineur"];
 const ICON: Record<Severity, string> = { bloquant: "🔴", majeur: "🟠", mineur: "🟡" };
@@ -63,6 +64,15 @@ const L = {
     unknown: "inconnu",
     reproSteps: "état requis / étapes pour reproduire",
     associatedRec: "Recommandations associées (non normatives)",
+    // Compact (report) reading.
+    fix: "Correction attendue",
+    level: "niveau",
+    showOccurrences: (n: number) => `Voir les ${n} occurrences`,
+    pagesLabel: "Pages",
+    allPages: (n: number) => `toutes les pages (${n}/${n})`,
+    morePages: (n: number) => `+${n} autre(s)`,
+    offPage: (n: number) => `${n} occurrence(s) sans page identifiée`,
+    atLeast: "au moins sur",
   },
   en: {
     lead: "Auditor view",
@@ -102,6 +112,15 @@ const L = {
     unknown: "unknown",
     reproSteps: "required state / steps to reproduce",
     associatedRec: "Related recommendations (non-normative)",
+    // Compact (report) reading.
+    fix: "Expected fix",
+    level: "level",
+    showOccurrences: (n: number) => `Show the ${n} occurrences`,
+    pagesLabel: "Pages",
+    allPages: (n: number) => `all pages (${n}/${n})`,
+    morePages: (n: number) => `+${n} more`,
+    offPage: (n: number) => `${n} occurrence(s) on no page`,
+    atLeast: "at least on",
   },
 } as const;
 
@@ -126,7 +145,23 @@ export interface AuditorUnitOpts {
   // Hang the annotated crop under each occurrence that has one. Absent ⇒ the block is
   // byte-identical to what it was before evidence existed.
   cropFor?: AuditorCropLookup;
+  // The conformance REPORT's reading of the block: the criterion line the gates parse, the
+  // finding, the fix and the occurrence checklist — without the frame a standalone ticket needs
+  // (normative banner, theme, a priority the report's severity group already names, a
+  // verification sentence the report states once for all blocks). OFF by default, so `prd`,
+  // tracker issue bodies and their snapshots do not move a byte.
+  compact?: boolean;
+  // Which page each occurrence was found on. Given ⇒ the compact block says WHERE, page by page,
+  // with links; absent (a source-only audit, a tracker issue) ⇒ no page line at all.
+  pages?: PageResolver;
 }
+
+/** How many pages a compact block names before it counts the rest. */
+const PAGES_LISTED_MAX = 10;
+
+/** How many occurrences a compact block lists openly; beyond it the checklist folds behind a
+ *  toggle. Folding is visual only — every occurrence keeps its parseable line. */
+const COMPACT_OPEN_MAX = 5;
 
 /** Repeated occurrences of ONE (rule, selector) on one file, folded into groups.
  *
@@ -231,8 +266,9 @@ export function relatedLine(related: NonNullable<Finding["related"]>, lang: Lang
  *  false) Partie technique + Contexte de reproduction. Returns lines (caller joins). */
 export function renderAuditorUnit(unit: PrdUnit, standard: StandardId, lang: Lang, opts: AuditorUnitOpts = {}): string[] {
   const s = L[lang];
-  if (unit.advisory) return renderAdvisoryUnit(unit, lang, opts);
+  if (unit.advisory) return opts.compact ? renderCompactAdvisory(unit, lang) : renderAdvisoryUnit(unit, lang, opts);
   const m = auditorUnitModel(unit, standard, lang, opts);
+  if (opts.compact) return renderCompactUnit(m, lang, opts);
   const out: string[] = [];
   if (opts.heading) out.push(`${opts.heading} ${m.icon} ${m.label}`, "");
   out.push(`> ${m.normativeNote}`, "");
@@ -307,6 +343,13 @@ export interface AuditorUnitModel {
   label: string;
   normativeNote: string;
   fields: AuditorField[];
+  /** The criterion line on its own — the one line both gates parse (`check`'s NC projection,
+   *  `verify`'s worklist) — so a compact rendering can keep it without re-deriving it. */
+  criterion: AuditorField;
+  /** The pack tests this unit's non-conformities cite (empty under the WCAG core). */
+  tests: string[];
+  /** The WCAG conformance level of the success criterion (core only). */
+  level?: string;
   conformanceTerms: { conformant: string; nonConformant: string };
   /** Normative findings only — an advisory can never be counted as a non-conformity. */
   normative: Finding[];
@@ -321,6 +364,9 @@ export function auditorUnitModel(unit: PrdUnit, standard: StandardId, lang: Lang
   const s = L[lang];
   const v = vocabularyFor(standard, lang);
   const fields: AuditorField[] = [];
+  let criterion: AuditorField = { label: v.criterion, value: unit.criteriaId };
+  let tests: string[] = [];
+  let level: string | undefined;
 
   if (isCore(standard)) {
     const sc = getSC(unit.criteriaId);
@@ -329,7 +375,9 @@ export function auditorUnitModel(unit: PrdUnit, standard: StandardId, lang: Lang
       const gl = `${sc.guideline} ${guidelineTitle(sc.guideline, lang) ?? ""}`.trim();
       fields.push({ label: v.theme, value: [pr, gl].filter(Boolean).join(" · ") });
     }
-    fields.push({ label: v.criterion, value: `${unit.criteriaId}${sc ? ` — ${unit.title}` : ""}` });
+    criterion = { label: v.criterion, value: `${unit.criteriaId}${sc ? ` — ${unit.title}` : ""}` };
+    fields.push(criterion);
+    level = sc?.level;
     const techs = scTechniques(unit.criteriaId);
     if (techs.length) fields.push({ label: v.test, value: techs.join(", ") });
     fields.push({ label: "WCAG", value: `${unit.criteriaId}${sc ? ` (${sc.level})` : ""}` });
@@ -339,7 +387,8 @@ export function auditorUnitModel(unit: PrdUnit, standard: StandardId, lang: Lang
     // `.trimEnd()` on the VALUE, not on the rendered line: a pack whose theme has no localized
     // name must not leave a trailing space behind the colon.
     if (pc) fields.push({ label: v.theme, value: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trimEnd() });
-    fields.push({ label: v.criterion, value: `${unit.criteriaId} — ${unit.title}` });
+    criterion = { label: v.criterion, value: `${unit.criteriaId} — ${unit.title}` };
+    fields.push(criterion);
     // The tests THIS unit's non-conformities cite, not every test of the criterion. An RGAA
     // NC is a claim about one numbered test — the fold proved the citation resolves to a test
     // of this criterion — and listing the other two beside it says the auditor observed more
@@ -353,6 +402,7 @@ export function auditorUnitModel(unit: PrdUnit, standard: StandardId, lang: Lang
       unit.findings.filter((f) => !f.advisory).map((f) => f.normativeRef),
     );
     if (testNums.length) fields.push({ label: `${v.test}(s)`, value: testNums.join(" · ") });
+    tests = testNums;
     // NO WCAG CROSS-REFERENCE UNDER A PACK. A deliverable produced with `--standard rgaa` is
     // read by an auditor working to RGAA: it names RGAA themes, RGAA criteria and RGAA tests,
     // and a « WCAG 1.1.1 (A) » line beside them is a second referential to reconcile in a
@@ -369,6 +419,9 @@ export function auditorUnitModel(unit: PrdUnit, standard: StandardId, lang: Lang
     label: unit.label,
     normativeNote: v.normativeNote ?? `${s.lead} — ${standardLabel(standard)}. ${s.tail}`,
     fields,
+    criterion,
+    tests,
+    ...(level ? { level } : {}),
     conformanceTerms: { conformant: v.conformant, nonConformant: v.nonConformant },
     normative,
     advisories: unit.findings.filter((f) => f.advisory),
@@ -452,6 +505,77 @@ function renderReproductionContext(normative: Finding[], lang: Lang): string[] {
   }
   out.push(`- _${s.reproSteps}_`, "");
   return out;
+}
+
+/** The compact block the conformance report prints for one non-conforming criterion.
+ *
+ *  What a reader of the report needs to act on one criterion, in the order they need it: what
+ *  is wrong, what to do, where. The criterion line keeps the `**<criterion>** : <id> — <title>`
+ *  grammar verbatim — `check` projects the NC set from it and `verify` attributes every
+ *  checklist occurrence to it — and each field stands in its own paragraph, because a run of
+ *  `**label** : value` lines is ONE paragraph to a Markdown renderer and reads as a wall. */
+function renderCompactUnit(m: AuditorUnitModel, lang: Lang, opts: AuditorUnitOpts): string[] {
+  const s = L[lang];
+  const out: string[] = [];
+  if (opts.heading) out.push(`${opts.heading} ${m.icon} ${m.label}`, "");
+  // Test ids in parentheses and never followed by an em dash: `check`'s criterion scanner reads
+  // `<id> —`, and « 2.1.1 — » would hand it « 1.1 ».
+  const qualifier = m.tests.length ? ` (${m.tests.join(", ")})` : m.level ? ` (${s.level} ${m.level})` : "";
+  out.push(`**${m.criterion.label}** : ${m.criterion.value}${qualifier}`, "");
+  out.push(`**${s.finding}** : ${m.occurrences} ${s.occ} — ${m.messages.map(mdText).join(" ; ")}`, "");
+  const where = opts.pages?.pages.length ? pagesLine(m.normative, opts.pages, lang) : undefined;
+  if (where) out.push(`**${s.pagesLabel}** : ${where}`, "");
+  if (m.fixes.length) out.push(`**${s.fix}** : ${m.fixes.map(mdText).join(" ; ")}`, "");
+  const fold = m.occurrences > COMPACT_OPEN_MAX;
+  if (fold) out.push("<details>", `<summary>${s.showOccurrences(m.occurrences)}</summary>`, "");
+  for (const group of m.groups) {
+    if (group.count > 1) out.push(`- **\`${group.lead.selectorHint}\`** — ${mdText(resolveMessage(group.lead, lang))} · ×${group.count}`);
+    for (const f of group.findings) {
+      const indent = group.count > 1 ? "  " : "";
+      out.push(indent + occurrenceLine(f, lang, { marker: "checkbox" }));
+      renderOccurrenceDetails(out, f, lang, s, indent, opts.cropFor);
+    }
+  }
+  if (fold) out.push("", "</details>");
+  out.push("");
+  if (m.advisories.length) {
+    out.push(`_${s.associatedRec}_`, "");
+    for (const f of m.advisories) out.push(occurrenceLine(f, lang, { marker: "advisory" }));
+    out.push("");
+  }
+  return out;
+}
+
+/** « [Accueil](<url>) (3) · [Contact](<url>) (1) · 2 occurrence(s) hors page ». Never shaped
+ *  like `<id> —`, so `check`'s criterion scanner and `verify`'s criterion line both ignore it. */
+function pagesLine(findings: Finding[], resolver: PageResolver, lang: Lang): string | undefined {
+  const s = L[lang];
+  const { pages, orphans, approximate } = occurrencesByPage(findings, resolver);
+  const parts: string[] = [];
+  const total = resolver.pages.length;
+  const everywhere = pages.length > 3 && pages.length === total;
+  if (everywhere) parts.push(s.allPages(total));
+  else {
+    parts.push(...pages.slice(0, PAGES_LISTED_MAX).map(({ page, count }) => `${mdLink(page.name, page.url)} (${count})`));
+    if (pages.length > PAGES_LISTED_MAX) parts.push(s.morePages(pages.length - PAGES_LISTED_MAX));
+  }
+  if (orphans) parts.push(s.offPage(orphans));
+  if (!pages.length && !orphans) return undefined;
+  return `${approximate && !everywhere && pages.length ? `${s.atLeast} ` : ""}${parts.join(" · ")}`;
+}
+
+/** One recommendation as ONE line of the report: the criterion, what was observed, where, and
+ *  the suggestion. No checkbox and no `**label** : <id>` grammar, so neither `verify` nor
+ *  `check` can ever read a recommendation as a claimed non-conformity. */
+function renderCompactAdvisory(unit: PrdUnit, lang: Lang): string[] {
+  const s = L[lang];
+  const messages = uniq(unit.findings.map((f) => resolveMessage(f, lang)));
+  const fixes = uniq(unit.findings.map((f) => resolveRemediation(f, lang)));
+  const shown = unit.findings.slice(0, 3).map((f) => `\`${f.file}:${f.line}\``);
+  const more = unit.findings.length > shown.length ? ` +${unit.findings.length - shown.length}` : "";
+  const where = ` (${unit.findings.length} ${s.occ} : ${shown.join(", ")}${more})`;
+  const suggestion = fixes.length ? ` — _${s.suggestion}_ : ${fixes.map(mdText).join(" ; ")}` : "";
+  return [`- ${ADVISORY_ICON} **${unit.label}** — ${messages.map(mdText).join(" ; ")}${where}${suggestion}`];
 }
 
 /** The auditor block for ONE advisory (non-normative recommendation) unit. Rendered with

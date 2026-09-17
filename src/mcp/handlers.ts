@@ -7,7 +7,7 @@ import { runFix, fixSummary } from "../fix.js";
 import { writeHook, ciWorkflow } from "../init.js";
 import { runPackCheck } from "../pack.js";
 import { prdUnits, partitionUnits } from "../prd.js";
-import { renderReport, renderPackReport } from "../report.js";
+import { renderReport, renderPackReport, withReportAnnexes } from "../report.js";
 import { renderHtmlDocument } from "../html.js";
 import { compositeDoc, pagesIndexDoc } from "../html-report.js";
 import { buildTickets } from "../tickets/grain.js";
@@ -542,7 +542,12 @@ function reportText(args: Record<string, unknown>, tool: string): string {
   if (!file) throw new ToolError(`\`report_text\` is required — the report markdown for ultra11y_${tool} to work on.`);
   if (!isAbsolute(file)) throw new ToolError("`report_file` must be an absolute path.");
   if (!existsSync(file)) throw new ToolError(`report file not found: ${file}`);
-  return readFileSync(file, "utf8");
+  // The report and the technical annex it links to, as the CLI gates read them.
+  try {
+    return withReportAnnexes(readFileSync(file, "utf8"), file, (p) => readFileSync(p, "utf8"));
+  } catch (e) {
+    throw new ToolError(e instanceof Error ? e.message : String(e));
+  }
 }
 
 // The offline reference, for ANY registered standard.

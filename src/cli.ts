@@ -17,7 +17,7 @@ import {
 } from "./types.js";
 import { runAudit } from "./audit.js";
 import { decide, type PreToolUsePayload } from "./hook.js";
-import { writeReport, untestedNeedsRendering, partialAuditBanner } from "./report.js";
+import { writeReportFiles, untestedNeedsRendering, partialAuditBanner, withReportAnnexes } from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
 import { commentKindFrom, pushPrComment } from "./pr-comment.js";
 import { buildTickets } from "./tickets/grain.js";
@@ -875,6 +875,20 @@ function readInputFile(path: string, cmd: string, flag: string): string | null {
         ? `ultra11y ${cmd}: ${flag} file not found: ${path}.`
         : `ultra11y ${cmd}: cannot read ${flag} ${path}: ${e instanceof Error ? e.message : String(e)}.`,
     );
+    return null;
+  }
+}
+
+/** Read a `--report` for a gate: the report AND the technical annex it links to, joined as
+ *  `renderReport` joins them. A linked annex that cannot be read fails the command — the
+ *  occurrences every non-conformity is verified against live there. */
+function readReportInput(path: string, cmd: string): string | null {
+  const md = readInputFile(path, cmd, "--report");
+  if (md === null) return null;
+  try {
+    return withReportAnnexes(md, path, readText);
+  } catch (e) {
+    console.error(`ultra11y ${cmd}: ${e instanceof Error ? e.message : String(e)}`);
     return null;
   }
 }
@@ -2109,7 +2123,7 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
       }
     : undefined;
 
-  const path = writeReport(result, { out, lang, standard, ...(cropFor ? { cropFor } : {}) });
+  const { path, annexPath } = writeReportFiles(result, { out, lang, standard, ...(cropFor ? { cropFor } : {}) });
   // The HTML tier: the artifact's front door plus the detachable, printable composite. Written
   // beside the Markdown, in the same `--out`, so the directory stays one self-contained root.
   let html: ReturnType<typeof writeHtml> | undefined;
@@ -2128,6 +2142,7 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
       JSON.stringify(
         {
           path,
+          annexPath,
           conformancePct: result.conformancePct,
           date: result.date,
           standard: typeof p.flags.standard === "string" ? p.flags.standard : "wcag",
@@ -2706,7 +2721,7 @@ function cmdCheck(p: ParsedArgs): number {
     }
   }
   const lang = resolveLang(p.flags, { standard });
-  const md = typeof rep === "string" && rep ? readInputFile(rep, "check", "--report") : "";
+  const md = typeof rep === "string" && rep ? readReportInput(rep, "check") : "";
   if (md === null) return 2;
   // --in <audit.json>: enable the pack applicability gate (R1) — re-derive from the audit
   // and fail on any NC criterion the report over-/under-projects.
@@ -2905,13 +2920,8 @@ function cmdVerify(p: ParsedArgs): number {
     }
     const standard = stdOf(p, "verify");
     if (standard === null) return 2;
-    let repMd: string;
-    try {
-      repMd = readText(applyReport);
-    } catch {
-      console.error(`ultra11y verify: --report file not found: ${applyReport}.`);
-      return 2;
-    }
+    const repMd = readReportInput(applyReport, "verify");
+    if (repMd === null) return 2;
     // Coverage covers BOTH claim kinds. Rebuilt uncapped from the same two sources the
     // worklist was written from, so a verdicts file that quietly dropped every conformity item
     // fails as `missing` rather than passing green over the half it did adjudicate.
@@ -3141,7 +3151,7 @@ function cmdVerifyWorklist(p: ParsedArgs, langIn: Lang): number {
     }
     max = n === 0 ? Number.POSITIVE_INFINITY : n; // 0 = no cap
   }
-  const repMd = readInputFile(rep, "verify", "--report");
+  const repMd = readReportInput(rep, "verify");
   if (repMd === null) return 2;
   const ncItems = buildWorklist(repMd, standard, max);
   const conformities = conformityClaimsFor(p, standard, lang);

@@ -114,6 +114,15 @@ export interface SampleMethodology {
   requiredKinds: SampleRequiredKind[];
 }
 
+/** One step of the conformity scale a standard publishes, e.g. RGAA's « partiellement
+ *  conforme » from 50 % of the applicable criteria. `min` is a percentage of validated ÷
+ *  applicable criteria, inclusive. The report reads the scale to name the audited site's
+ *  level and the next step up; a pack that declares none simply gets no level. */
+export interface ConformityLevel {
+  min: number;
+  label: LocaleString;
+}
+
 // ---- Declarative pack RULES — a bounded, validatable matcher DSL (NO arbitrary code).
 // A pack ships its OWN detection for genuinely pack-only semantics WITHOUT forking the
 // engine: a rule matches source elements structurally and emits a namespaced finding
@@ -254,6 +263,9 @@ export interface StandardPack {
   criterionUrl?: string;
   vocabulary?: PackVocabulary; // localized auditor-display terms (optional; defaults apply)
   sampleMethodology?: SampleMethodology; // normative required page kinds (optional; advisory lint)
+  // The standard's published conformity scale, any order (optional). Drives the level line and
+  // the « next step » arithmetic of the report summary — see ConformityLevel.
+  conformityLevels?: ConformityLevel[];
   // Declarative pack-only detection (optional). Each rule runs AFTER the core engine
   // rules in the audit pipeline (src/audit.ts) and emits a `pack:<key>:<id>` finding that
   // projects onto its criterion via the same appliesTo/ruleMatches machinery as engine
