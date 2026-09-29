@@ -21,6 +21,7 @@
 //      criterion means one definite failure fired somewhere — not that the engine can rule
 //      on that criterion. Reading it as `C` on every other page is how a page with no images
 //      scored 100% on "does each image have a relevant alternative?". See `pageStatus`.
+import { findingId } from "./baseline.js";
 import { snapshotPageId } from "./snapshot.js";
 import { CORE, type StandardId, derivePackResults, isCore, isProvisionalJudgmentInapplicable, loadPack, themeName } from "./standards/index.js";
 import type { AuditResult, CriterionResult, Finding, Lang, PageCoverage, PageResult, PageScope, Status, ScanRedirect } from "./types.js";
@@ -162,6 +163,70 @@ export function attributePages(result: AuditResult, pages: PageScope[]): void {
       }
     }
   }
+}
+
+/** Which page an occurrence was found on — the answer the report's summary and §2 give next to
+ *  every non-conformity, because an RGAA reader asks « where? » before « how many? ». */
+export interface PageResolver {
+  /** Pages in scope, in the order the audit recorded them. Empty for a source-only audit. */
+  pages: PageScope[];
+  pageOf(f: Finding): PageScope | undefined;
+  /** True when the page was inferred from declared SOURCE files — rather than read off the
+   *  snapshot, the scanned URL or the sample page the finding came from — AND that source is
+   *  declared by more than one page. The link is first-match (see `attributePages`): a component
+   *  shared by five pages lands on one, so a page list built from it is a floor, and the report
+   *  says so. A source only one page declares has nowhere else to be: that list is complete. */
+  approximate(f: Finding): boolean;
+}
+
+/** Build the resolver for one audit. Attributes first (idempotent, as `render` always did), then
+ *  keys the stamp by finding identity: a pack criterion's findings are read off
+ *  `criteria[].findings`, which after a JSON round-trip are COPIES of `result.findings` — the
+ *  copy never received the stamp, and looking it up by object would find no page at all. */
+export function pageResolver(result: AuditResult): PageResolver {
+  const pages = pagesOf(result);
+  if (!pages.length) return { pages, pageOf: () => undefined, approximate: () => false };
+  attributePages(result, pages);
+  const byId = new Map(pages.map((p) => [p.id, p]));
+  const stamped = new Map<string, string>();
+  for (const f of [...result.findings, ...(result.packFindings ?? [])]) if (f.page) stamped.set(findingId(f), f.page);
+  const pageOf = (f: Finding): PageScope | undefined => {
+    const id = f.page ?? stamped.get(findingId(f));
+    return id === undefined ? undefined : byId.get(id);
+  };
+  const exact = (f: Finding): boolean =>
+    snapshotPageId(f.file) !== undefined || snapshotPageId(f.origin?.capture) !== undefined || isUrlPath(f.file) || Boolean(f.sample?.page);
+  const shared = (f: Finding): boolean => {
+    const src = f.origin?.sourceFile ?? f.file;
+    return pages.filter((p) => p.sources?.some((s) => pathMatch(src, s))).length > 1;
+  };
+  return { pages, pageOf, approximate: (f) => pageOf(f) !== undefined && !exact(f) && shared(f) };
+}
+
+/** The pages a set of occurrences was found on, most occurrences first (then scope order), and
+ *  how many occurrences no page claims. Shared by the summary table and the §2 blocks so the two
+ *  cannot list different pages for one criterion. */
+export function occurrencesByPage(
+  findings: Finding[],
+  resolver: PageResolver,
+): { pages: { page: PageScope; count: number }[]; orphans: number; approximate: boolean } {
+  const counts = new Map<string, { page: PageScope; count: number }>();
+  let orphans = 0;
+  let approximate = false;
+  for (const f of findings) {
+    const page = resolver.pageOf(f);
+    if (!page) {
+      orphans++;
+      continue;
+    }
+    if (resolver.approximate(f)) approximate = true;
+    const entry = counts.get(page.id);
+    if (entry) entry.count++;
+    else counts.set(page.id, { page, count: 1 });
+  }
+  const order = new Map(resolver.pages.map((p, i) => [p.id, i]));
+  const pages = [...counts.values()].sort((a, b) => b.count - a.count || (order.get(a.page.id) ?? 0) - (order.get(b.page.id) ?? 0));
+  return { pages, orphans, approximate };
 }
 
 /** Findings no page could claim. Reported explicitly — never silently dropped, never spread. */

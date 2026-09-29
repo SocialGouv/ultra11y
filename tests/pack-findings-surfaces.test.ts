@@ -142,13 +142,22 @@ describe("the work that is NOT a non-conformity is still shown", () => {
   // each, and the PRD skipped them entirely (`if (!pr.findings.length) continue`) — so the
   // backlog of an RGAA audit was silently missing ~93% of the job.
   const r = () => runAudit({ inputs: [PAGE] });
+  // §5 alone: the exhaustive grid follows it as an appendix and names every criterion.
+  const sectionFive = (md: string) => {
+    const from = md.indexOf("## 5.");
+    const next = md.indexOf("\n## ", from + 1);
+    return md.slice(from, next === -1 ? undefined : next);
+  };
 
   it("report §5 summarizes the work without repeating the exhaustive grid", () => {
     const md = renderPackReport(r(), loadPack("rgaa"), "fr");
-    const toRule = md.slice(md.indexOf("## 5."));
-    expect(toRule).toMatch(/\d+ critère\(s\) \/ \d+ test\(s\) restent à trancher/);
-    expect(toRule).toContain("grille exhaustive ci-dessus");
+    const toRule = sectionFive(md);
+    expect(toRule).toMatch(/\d+ critère\(s\) restent à évaluer/);
     expect(toRule).not.toMatch(/RGAA 6\.1|`6\.1\.1`/);
+    // The procedure — how many tests, where the grid is — is the technical annex's section D.
+    const procedure = md.slice(md.indexOf("## D. "), md.indexOf("## E. "));
+    expect(procedure).toMatch(/\d+ critère\(s\) \/ \d+ test\(s\) restent à trancher/);
+    expect(procedure).toContain("grille exhaustive (section E)");
   });
 
   it("does NOT list a criterion whose subject the page does not contain", () => {
@@ -157,7 +166,7 @@ describe("the work that is NOT a non-conformity is still shown", () => {
     // thoroughness, it is thirteen rows of work that does not exist. « Non applicable » is the
     // normative verdict for a criterion with no subject, and it keeps the backlog honest.
     const md = renderPackReport(r(), loadPack("rgaa"), "fr");
-    const toRule = md.slice(md.indexOf("## 5."));
+    const toRule = sectionFive(md);
     expect(toRule).not.toMatch(/RGAA 11\.2/);
   });
 

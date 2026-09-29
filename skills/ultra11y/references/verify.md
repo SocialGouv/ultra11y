@@ -7,6 +7,8 @@ Two assurance levels before shipping a report, plus the agent-adjudication workl
 ```
 node scripts/ultra11y.mjs check --report audits/wcag-YYYY-MM-DD.md
 ```
+Pass the report itself; the technical annex it links to (`annexe-technique-…md` /
+`technical-annex-…md`, same directory) is read with it, and a missing annex is refused (exit 2).
 Fails (non-zero) if: one of the 5 sections is missing, a cited criterion id does not exist in
 the active standard, an `NA` criterion has no justification, or the pass rate is absent. This
 is the baseline anti-hallucination guard. `--quiet` emits only the exit code; `--json` the

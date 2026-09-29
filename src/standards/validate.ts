@@ -389,6 +389,27 @@ export function validatePack(raw: unknown, opts: ValidateOpts = {}): PackValidat
     }
   }
 
+  // Optional conformity scale (src/standards/types.ts ConformityLevel). Presentation only — it
+  // names a level, it never changes a verdict — so a malformed step is a WARNING and the report
+  // simply prints no level, like the vocabulary block above.
+  if (p.conformityLevels !== undefined) {
+    if (!Array.isArray(p.conformityLevels)) {
+      warn("conformityLevels", "conformityLevels must be an array of { min, label } — ignored");
+    } else {
+      (p.conformityLevels as unknown[]).forEach((l, i) => {
+        const ll = l as Record<string, unknown> | null;
+        if (!ll || typeof ll !== "object" || Array.isArray(ll)) {
+          warn(`conformityLevels[${i}]`, "each level must be an object { min, label } — ignored");
+          return;
+        }
+        if (typeof ll.min !== "number" || ll.min < 0 || ll.min > 100) warn(`conformityLevels[${i}].min`, "min must be a percentage between 0 and 100");
+        const label = ll.label as Record<string, unknown> | undefined;
+        if (!label || typeof label !== "object" || Array.isArray(label) || typeof label[loc] !== "string")
+          warn(`conformityLevels[${i}].label`, `level should carry label[${loc}]`);
+      });
+    }
+  }
+
   // Optional normative page-sample methodology (src/standards/types.ts SampleMethodology).
   // Purely ADVISORY (drives `sample check` / `scan --sample` lint), so a malformation is a
   // WARNING and the field is ignored — never a hard failure that blocks the pack from

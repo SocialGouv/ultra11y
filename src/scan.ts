@@ -318,6 +318,12 @@ export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: str
     ...(collected.doctype !== undefined ? { doctype: collected.doctype } : {}),
     ...(page?.auth !== undefined ? { auth: page.auth } : {}),
     ...(page?.notes ? { notes: page.notes } : {}),
+    // The sample's `sources` are the one declared link between a page and the code that renders
+    // it: `attributePages` uses them to put a SOURCE finding on its page, and the capture comment
+    // cites the first as the component behind the DOM. Forwarding auth and notes but not these
+    // left every source finding of a scanned sample « on no page » — the report could say which
+    // URL a defect was measured on, never which URL the code defect lives on.
+    ...(page?.sources?.length ? { sources: page.sources } : {}),
   };
   // The producer is untrusted input even when it is us: a page id becomes a directory name.
   const v = validateSnapshotMeta(meta);

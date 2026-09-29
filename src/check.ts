@@ -183,8 +183,11 @@ export function checkReport(md: string, standard: StandardId = "wcag", lang: Lan
   // happens to be a percentage — « - **Opacité à 50 %** : 50 % » — was compared to the
   // automatic ratio and refused a perfectly good report. The header is everything before the
   // first `## `, which is exactly where a document-level rate belongs.
-  const header = md.slice(0, /^##\s/m.exec(md)?.index ?? md.length);
-  const rateLines = [...header.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*\**\s*(\d+(?:[.,]\d+)?)\s*%([^\n]*)$/gm)];
+  //
+  // EVERY DOCUMENT'S HEADER. The deliverable is a report followed by its technical annex (see
+  // src/report.ts `joinReportDocuments`), and the annex carries the automatic rate: a gate that
+  // read the first header only would let the second say anything.
+  const rateLines = documentHeaders(md).flatMap((header) => [...header.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*\**\s*(\d+(?:[.,]\d+)?)\s*%([^\n]*)$/gm)]);
   // A PER-PAGE REPORT HAS NO DOCUMENT-LEVEL RATE, so the block above finds nothing and passes
   // it — which left every one of its rates, one per page, unchecked by anything. Its grids are
   // per page and comparing them here would need the whole per-page derivation, so this does
@@ -415,6 +418,35 @@ function agentConformities(md: string): number {
     if (cells.length === 4 && (cells[1] === "C" || cells[1] === "NA") && (cells[3] === "AI" || cells[3] === "IA")) count++;
   }
   return count;
+}
+
+/** The header of each top-level document in `md` — everything between a `# ` title and its first
+ *  `## `. Fence-aware: an audited snippet may contain a line starting with `# `. */
+function documentHeaders(md: string): string[] {
+  const headers: string[] = [];
+  let current: string[] | null = [];
+  let fence: string | null = null;
+  for (const line of md.split("\n")) {
+    const f = /^\s*(```+|~~~+)/.exec(line);
+    if (f) {
+      const mark = f[1]!;
+      if (fence === null) fence = mark[0]!.repeat(mark.length);
+      else if (mark.startsWith(fence[0]!) && mark.length >= fence.length) fence = null;
+    }
+    if (fence === null && /^#\s/.test(line)) {
+      if (current?.length) headers.push(current.join("\n"));
+      current = [line];
+      continue;
+    }
+    if (fence === null && /^##\s/.test(line)) {
+      if (current?.length) headers.push(current.join("\n"));
+      current = null;
+      continue;
+    }
+    current?.push(line);
+  }
+  if (current?.length) headers.push(current.join("\n"));
+  return headers;
 }
 
 /** The body of section N (between "## N." and the next "## "). */

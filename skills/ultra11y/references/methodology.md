@@ -61,12 +61,50 @@ content, so the verdict is provisional — confirm against the rendered DOM or r
 
 ## Report format (`report`)
 
-`audits/wcag-YYYY-MM-DD.md` has 5 sections: (1) synthesis by WCAG guideline
-(C/NC/NA/to assess), (2) non-conformities by priority — one **auditor conformance block**
-per NC criterion (theme, criterion + official wording, test(s), WCAG mapping + level,
-finding, expected state, verification, `file:line` occurrences), the SAME block `prd` and
-`tickets` emit (see `references/tickets.md`), (3) conforming criteria, (4) justified
-not-applicable criteria, (5) criteria to assess manually.
+`report` writes TWO files side by side, from one derivation:
+
+**`audits/<standard>-YYYY-MM-DD.md` — the report, for every reader** (product owner, project
+lead, accessibility referent). It says where the site stands, what to fix and on which pages —
+never `file:line`, selectors, tool method or commands:
+
+- **Header** — date, the audited pages (or « source code only »), the headline rate (a pack
+  report: the standard's own conformity rate, validated ÷ applicable), the caveats that change
+  what a reader may conclude, and the link to the annex.
+- **Summary** — the level on the standard's published scale (`conformityLevels` in the pack;
+  RGAA: non conforme < 50 % ≤ partiellement conforme < 100 % = totalement conforme), or a
+  met / not met / not established verdict for the WCAG core; a « What to fix » table (priority,
+  criterion, occurrences, the pages it was found on — linked, or « all pages (N/N) » — and the
+  expected fix); and the next steps: what fixing the non-conformities does to the rate, how
+  many criteria the next level needs, the criteria still to assess. While criteria are open,
+  every figure is a floor.
+- **The 5 gated sections**: (1) synthesis by WCAG guideline / theme (C/NC/NA/to assess),
+  (2) non-conformities by priority — per criterion: the problem found (the engine's own
+  wording; axe-core's English messages and stock remediation are left to the annex), the pages
+  concerned with their URL and occurrence count, an evidence crop when `--evidence` drew one,
+  the expected fix — (3) conforming criteria, (4) justified not-applicable criteria, (5)
+  criteria to assess. Recommendations, the per-page rates (page, URL, rate), the folded
+  criteria × pages grid and, per page, its screenshot and the criteria failing there sit
+  between (2) and (3).
+
+**`audits/annexe-technique-<standard>-YYYY-MM-DD.md`** (`technical-annex-…` in English) **— the
+technical annex**, for the developer and the auditor: tool, scope files, rate computation,
+decision provenance, automatic rate, automation contract, every caveat with its command;
+(A) each non-conformity's compact auditor block with its `file:line` occurrence checklist,
+built from the SAME units `prd` and `tickets` emit (see `references/tickets.md`); (B)
+recommendations with their files; (C) each page's basis of judgment and findings with
+selectors; (D) the procedure for the criteria to assess; (E) the exhaustive grid.
+
+The report links the annex by its bare file name, and `check`, `verify` (and the MCP tools)
+read both as one document: the structure and headline are in the report, the occurrences
+`verify` adjudicates and the automatic rate `check` recomputes are in the annex. A report whose
+linked annex is missing is refused (exit 2) — keep the two files together.
+
+Pages come from captured snapshots (`.ultra11y/pages/`) or a merged `scan --sample`. A
+source-only audit has none, and its summary says so instead of printing an empty column (the
+annex gives the command). Declare each sample page's `sources` in `.ultra11yrc.json` so
+findings raised on the source code land on their page too; a page list is marked « (at least) »
+only when the defect sits in a source several pages declare, because such a finding is
+attributed to the first one.
 
 ## Worldwide: WCAG core, country standards as packs
 

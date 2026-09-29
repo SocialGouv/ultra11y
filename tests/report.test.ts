@@ -4,11 +4,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAudit, buildAudit } from "../src/audit.js";
 import { parseSource } from "../src/parse/source.js";
-import { renderReport, renderPackReport, writeReport, untestedNeedsRendering } from "../src/report.js";
+import {
+  annexFileName,
+  joinReportDocuments,
+  renderReport,
+  renderReportDocuments,
+  renderPackReport,
+  writeReport,
+  untestedNeedsRendering,
+} from "../src/report.js";
 import { renderedTestedScs } from "../src/rules/rendered.js";
 import { DOCKER_TESTED_SCS, mergeDynamic } from "../src/scan.js";
 import { localTestedScs } from "../src/scan-local.js";
 import { prdUnits, partitionUnits } from "../src/prd.js";
+import { renderAuditorBacklog } from "../src/auditor.js";
 import { derivePackResults, loadPack, packConformancePct, registerRuntimePack } from "../src/standards/index.js";
 import type { AuditResult, DynamicResult, Finding } from "../src/types.js";
 
@@ -25,10 +34,30 @@ describe("renderReport (WCAG 2.2 AA markdown)", () => {
     expect(md).toContain("## 2. Non-conformités (par priorité)");
     expect(md).toContain("## 3. Critères conformes (C)");
     expect(md).toContain("## 4. Critères conformes faute de sujet");
-    expect(md).toContain("## 5. Critères à adjuger (jugement / rendu) — non décidés par le moteur statique");
+    expect(md).toContain("## 5. Critères à évaluer (jugement / rendu)");
     expect(md).toMatch(/Taux de réussite automatique[^*]*\*\* : \d+%/);
     expect(md).toContain("Pages rendues réellement testées : 0");
-    expect(md).toContain("## Grille exhaustive des critères");
+    expect(md).toContain("## E. Grille exhaustive des critères");
+  });
+
+  it("opens on a summary: the verdict, what to fix, and the next steps — before the detail", () => {
+    const summary = md.indexOf("## Résumé");
+    expect(summary).toBeGreaterThan(-1);
+    expect(summary).toBeLessThan(md.indexOf("## 1."));
+    expect(md).toMatch(/\*\*Conformité WCAG 2\.2 niveau AA : non atteinte\*\* — \d+ critère\(s\) non conforme\(s\)/);
+    expect(md).toContain("### Ce qu'il faut corriger");
+    expect(md).toContain("| 🔴 Bloquant | 3.1.1 — Langue de la page |");
+    expect(md).toContain("### Prochaines étapes");
+  });
+
+  it("puts the method, the tool and the grid in the technical annex, after the report", () => {
+    const { report, annex } = renderReportDocuments(bad, "fr");
+    expect(md).toBe(joinReportDocuments(report, annex));
+    expect(report).not.toContain("- **Outil**");
+    expect(report).not.toContain("Grille exhaustive");
+    expect(report).toContain("[annexe technique](annexe-technique-wcag-");
+    expect(annex).toContain("- **Outil**");
+    expect(annex.indexOf("## E. Grille exhaustive des critères")).toBeGreaterThan(annex.indexOf("## A."));
   });
 
   it("synthesis table has WCAG guideline rows (localized fr titles) plus a Total row", () => {
@@ -45,12 +74,16 @@ describe("renderReport (WCAG 2.2 AA markdown)", () => {
   // Task 5 (Phase 4): every NC criterion in §2 is now rendered with the SAME auditor
   // conformance block `prd`/GitHub issues use (src/auditor.ts `renderAuditorUnit`),
   // reused via `prdUnits` — not a report-local re-implementation.
-  it("renders each NC criterion with the auditor conformance block (heading, criterion line, finding/expected/verification, checklist)", () => {
+  // The report prints the COMPACT reading of that block: the frame a standalone ticket needs
+  // (normative banner, theme, priority, techniques, per-block verification) is dropped, and
+  // every line a gate parses is kept.
+  it("renders each NC criterion with the compact auditor block (heading, criterion line, finding, fix, checklist)", () => {
     expect(md).toContain("#### 🔴 3.1.1 — Langue de la page"); // per-criterion heading (h4, under the h3 severity group)
-    expect(md).toContain("**Critère de succès** : 3.1.1 — Langue de la page"); // WCAG core vocabulary
-    expect(md).toMatch(/\*\*Constat \(Non conforme\)\*\* : \d+ occurrence\(s\)/);
-    expect(md).toContain("**Attendu (Conforme)** :");
-    expect(md).toContain("**Vérification** :");
+    expect(md).toContain("**Critère de succès** : 3.1.1 — Langue de la page (niveau A)"); // WCAG core vocabulary + level
+    expect(md).toMatch(/\*\*Constat\*\* : \d+ occurrence\(s\)/);
+    expect(md).toContain("**Correction attendue** :");
+    expect(md).not.toContain("**Vérification** :"); // said once, at the top of §2
+    expect(md).not.toContain("Lecture auditeur");
     expect(md).toMatch(/- \[ \] `.*bad\.html:\d+` \(`html`\) — .*lang/); // the actual finding checklist item
   });
 
@@ -62,7 +95,7 @@ describe("renderReport (WCAG 2.2 AA markdown)", () => {
     for (const u of nc) expect(md).toContain(`**Critère de succès** : ${u.criteriaId} — ${u.title}`);
     for (const u of advisory) {
       expect(md).not.toContain(`**Critère de succès** : ${u.criteriaId} — ${u.title}`);
-      expect(md).toContain(`**Recommandation (non normative)** — ${u.criteriaId}`);
+      expect(md.slice(md.indexOf("## 💡 Recommandations (non normatives)"))).toContain(`- 💡 **${u.label}** —`);
     }
   });
 
@@ -297,8 +330,10 @@ describe("renderPackReport (derived RGAA view)", () => {
   it("renders each NC criterion with the auditor conformance block using RGAA's own vocabulary", () => {
     const ncSection = md.slice(md.indexOf("## 2."), md.indexOf("## 3."));
     expect(ncSection).toMatch(/#### 🔴 RGAA 6\.2 —/);
-    expect(ncSection).toContain("**Thématique** : 6.");
-    expect(ncSection).toMatch(/\*\*Critère\*\* : 6\.2 —/);
+    expect(ncSection).toMatch(/^\*\*Critère\*\* : 6\.2 — /m); // RGAA's own noun
+    // …and, in the annex, the test it fails beside the occurrences it is verified against.
+    const annexNc = md.slice(md.indexOf("## A. "), md.indexOf("## D. "));
+    expect(annexNc).toMatch(/\*\*Critère\*\* : 6\.2 — .*\(6\.2\.1\)$/m);
     expect(ncSection).toContain("RGAA 8.3"); // missing language on both the page and visible text exhausts test 8.3.1
     expect(ncSection).not.toContain("RGAA 8.1"); // out-of-scope — §5 only, never a fake NC block
   });
@@ -403,8 +438,9 @@ describe("writeReport", () => {
     const rgaaPath = writeReport(bad, { out, lang: "fr", standard: "rgaa" });
     expect(wcagPath).toBe(join(out, `wcag-${bad.date}.md`));
     expect(rgaaPath).toBe(join(out, `rgaa-${bad.date}.md`));
-    // the core report is unchanged by the pack option
-    expect(readFileSync(wcagPath, "utf8")).toBe(renderReport(bad, "fr"));
+    // the core report is unchanged by the pack option — and its annex sits beside it
+    expect(readFileSync(wcagPath, "utf8")).toBe(renderReportDocuments(bad, "fr").report);
+    expect(existsSync(join(out, annexFileName("wcag", bad.date, "fr")))).toBe(true);
     expect(readFileSync(rgaaPath, "utf8")).toContain("RGAA 4.1.2");
   });
 });
@@ -423,7 +459,7 @@ describe("renderReport — advisory recommendations section", () => {
     expect(recIdx).toBeGreaterThan(ncIdx); // after §2
     expect(recIdx).toBeLessThan(conformingIdx); // before §3
     // The advisory 1.3.1 is a recommendation, never a non-conformity.
-    expect(md).toContain("Recommendation (non-normative)");
+    expect(md.slice(recIdx)).toMatch(/^- 💡 \*\*1\.3\.1 — /m);
     expect(md).not.toContain("### 🔴 Blocking");
     expect(md).not.toContain("### 🟠 Major");
     expect(md).toContain("No non-conformity detected by the static engine.");
@@ -444,7 +480,9 @@ describe("renderReport — advisory recommendations section", () => {
 });
 
 describe("report technique lists — full, never truncated (R7)", () => {
-  const md7 = renderReport(bad, "fr");
+  // The auditor backlog (`prd`) carries the technique line; the conformance report's compact
+  // block does not print techniques at all, so the truncation it guarded against lives here.
+  const md7 = renderAuditorBacklog(bad, "fr");
   it("renders the whole technique list for a criterion with many techniques (1.3.1 has 67)", () => {
     // bad.html raises 1.3.1 NCs; its auditor block lists WCAG techniques.
     expect(md7).not.toContain(", …"); // the old slice(0,12) + ellipsis is gone
