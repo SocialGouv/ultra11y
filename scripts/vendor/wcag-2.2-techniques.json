@@ -2,7 +2,7 @@
   "source": "https://github.com/w3c/wcag",
   "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/",
   "license": "W3C Document License (code samples: W3C Software License)",
-  "fetchedAt": "2026-10-04",
+  "fetchedAt": "2026-10-05",
   "criteria": {
     "1.1.1": {
       "slug": "non-text-content",
@@ -367,7 +367,7 @@
       "brief": {
         "goal": "Reduce accidental activation of keyboard shortcuts.",
         "whattodo": "Ensure character-only shortcut keys can be turned off or modified.",
-        "whyitsimportant": "Character-key shortcuts are easy to accidentally trigger, especially with speech input."
+        "whyitsimportant": "Character-key shortcuts are easy to accidentally trigger, especially for keyboard and some speech input users."
       }
     },
     "2.2.1": {
