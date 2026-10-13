@@ -15,7 +15,7 @@ permissions:
 steps:
   - uses: actions/checkout@v4
     with: { fetch-depth: 0 }        # the diff gate needs the base ref
-  - uses: maxgfr/ultra11y@v5      # or pin the exact version, as `init --ci` does
+  - uses: SocialGouv/ultra11y@v5      # or pin the exact version, as `init --ci` does
     with:
       since: auto                   # the PR's base branch
       standard: rgaa
@@ -27,7 +27,7 @@ steps:
 Page by page, with a real browser, in the same step:
 
 ```yaml
-  - uses: maxgfr/ultra11y@v5
+  - uses: SocialGouv/ultra11y@v5
     with:
       standard: rgaa
       start: npm run start
@@ -41,7 +41,7 @@ Page by page, with a real browser, in the same step:
 For an exhaustive certification run whose output must stay small, use the compact profile:
 
 ```yaml
-  - uses: maxgfr/ultra11y@v5
+  - uses: SocialGouv/ultra11y@v5
     with:
       standard: rgaa
       crawl: http://localhost:3000
@@ -98,7 +98,7 @@ A **ledger** is a file of verdicts committed to the audited repository
 FINGERPRINT of the evidence it was ruled against:
 
 ```yaml
-- uses: maxgfr/ultra11y@v5
+- uses: SocialGouv/ultra11y@v5
   with:
     standard: rgaa
     ledger: 'true'          # or an explicit path
@@ -147,7 +147,7 @@ has nothing left to rule on and costs nothing.
 env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # the job's env, never an input
 steps:
-  - uses: maxgfr/ultra11y@v5
+  - uses: SocialGouv/ultra11y@v5
     with:
       standard: rgaa
       adjudicate: api          # or `agent`
@@ -235,7 +235,7 @@ Because the tier is one engine command, there is no port to write. A ready templ
 
 ```yaml
 include:
-  - remote: 'https://raw.githubusercontent.com/maxgfr/ultra11y/main/skills/ultra11y/templates/gitlab-ci.yml'
+  - remote: 'https://raw.githubusercontent.com/SocialGouv/ultra11y/main/skills/ultra11y/templates/gitlab-ci.yml'
 
 variables:
   ULTRA11Y_STANDARD: rgaa
@@ -455,7 +455,7 @@ The action audits the **code** and, when you point it at a served app, the **pag
 list can come from three places, and none of them has to be written by hand:
 
 ```yaml
-- uses: maxgfr/ultra11y@v5
+- uses: SocialGouv/ultra11y@v5
   with:
     standard: rgaa
     start: npm run start
@@ -479,7 +479,7 @@ of a navigation — which stops the scan.
 
 The tier does not travel with the action, and that used to be a silent hole. `scan --runtime
 local` resolves `@playwright/test` + `@axe-core/playwright` from the audited project first and
-from ultra11y's own install second — and consumed as `uses: maxgfr/ultra11y@v5`, that second
+from ultra11y's own install second — and consumed as `uses: SocialGouv/ultra11y@v5`, that second
 anchor is a checkout with **no `node_modules` beside it**. So a repository that did not pin
 Playwright itself resolved nothing, degraded to Docker, and lost every rendering criterion:
 contrast, zoom, reflow, text spacing. The `urls` input meanwhile promised "a Chromium binary
@@ -565,7 +565,7 @@ the run looked at every page it declares. `require-rendered` asks the question u
 were the criteria that need a browser given one?
 
 ```yaml
-- uses: maxgfr/ultra11y@v5
+- uses: SocialGouv/ultra11y@v5
   with:
     standard: rgaa
     crawl: http://localhost:3000
@@ -592,7 +592,7 @@ the setup project their E2E suite depends on — and hand the action its path:
 
 ```yaml
 - run: npx playwright test --project=setup      # your existing login, writing the session file
-- uses: maxgfr/ultra11y@v5
+- uses: SocialGouv/ultra11y@v5
   with:
     standard: rgaa
     sample: 'true'
@@ -755,9 +755,9 @@ one job — the code diff, then the served pages — died on a `409 Conflict`, w
 written and never uploaded. Pass `artifact-name` on each invocation:
 
 ```yaml
-- uses: maxgfr/ultra11y@v5
+- uses: SocialGouv/ultra11y@v5
   with: { since: auto, artifact-name: a11y-code }
-- uses: maxgfr/ultra11y@v5
+- uses: SocialGouv/ultra11y@v5
   with: { crawl: http://localhost:3000, artifact-name: a11y-pages }
 ```
 

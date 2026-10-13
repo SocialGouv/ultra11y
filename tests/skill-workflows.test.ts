@@ -185,9 +185,9 @@ describe("ci.md teaches the CI output formats", () => {
     expect(t).toMatch(/no\s+\*\*?physical\*\*?\s*location|no\*\*? physical location|\*\*no\*\* physical location/i);
   });
   it("documents the shipped action, its permissions and the gate-runs-last ordering", () => {
-    expect(t).toContain("maxgfr/ultra11y@");
+    expect(t).toContain("SocialGouv/ultra11y@");
     // A moving branch would change under the reader with no version to blame.
-    expect(t).not.toMatch(/maxgfr\/ultra11y@(main|master|HEAD)\b/);
+    expect(t).not.toMatch(/SocialGouv\/ultra11y@(main|master|HEAD)\b/);
     expect(t).toContain("security-events: write");
     expect(t).toMatch(/gate\*\* runs last|gate runs last/i);
     expect(t).toContain("fail-on");
@@ -273,7 +273,7 @@ describe("the documented action pin tracks the version being shipped", () => {
     it(`pins only @v${MAJOR} in ${doc}`, () => {
       const text = readFileSync(join(ROOT, doc), "utf8");
       // Trailing punctuation belongs to the prose around the pin, not to the ref.
-      const pins = [...text.matchAll(/maxgfr\/ultra11y@(\S+)/g)].map((m) => (m[1] ?? "").replace(/[.,`)]+$/, ""));
+      const pins = [...text.matchAll(/SocialGouv\/ultra11y@(\S+)/g)].map((m) => (m[1] ?? "").replace(/[.,`)]+$/, ""));
       expect(pins.length, `${doc} documents no action pin at all`).toBeGreaterThan(0);
       for (const pin of pins) {
         // An exact `vX.Y.Z` is fine too — `init --ci` writes one — as long as it is this major.

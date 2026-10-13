@@ -18,7 +18,7 @@ Two things are worth knowing before the table:
 ## Claude Code
 
 ```
-/plugin marketplace add maxgfr/ultra11y
+/plugin marketplace add SocialGouv/ultra11y
 /plugin install ultra11y@ultra11y
 ```
 
@@ -33,13 +33,13 @@ inside the active Claude Code session wastes context and gives the report a weak
 The review arrives as `permissionDecision: "deny"` on the pending command, with the findings
 in `additionalContext`.
 
-Skills only, no hook: `npx skills add maxgfr/ultra11y`. Gate only, for an npm install:
+Skills only, no hook: `npx skills add SocialGouv/ultra11y`. Gate only, for an npm install:
 `ultra11y install --claude-code`.
 
 ## OpenAI Codex CLI
 
 ```
-codex plugin marketplace add maxgfr/ultra11y
+codex plugin marketplace add SocialGouv/ultra11y
 codex plugin add ultra11y@ultra11y
 ```
 
