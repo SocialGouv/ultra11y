@@ -15,7 +15,7 @@ Pin the version. `npx` resolves `latest` otherwise, so what runs can change with
 anywhere.
 
 ```sh
-npm_config_update_notifier=false npx -y ultra11y@5.42.1 --version   # → 5.42.1, exit 0
+npm_config_update_notifier=false npx -y ultra11y@5.43.0 --version   # → 5.43.0, exit 0
 ```
 
 - **`npm_config_update_notifier=false` is not optional.** Without it npm prints its
@@ -39,7 +39,7 @@ npm_config_update_notifier=false npx -y ultra11y@5.42.1 --version   # → 5.42.1
 Six steps. Four are deterministic; only step 3 involves a model.
 
 ```sh
-ENGINE="npx -y ultra11y@5.42.1"        # or "node $ULTRA11Y_BIN"
+ENGINE="npx -y ultra11y@5.43.0"        # or "node $ULTRA11Y_BIN"
 RUN=/tmp/a11y-run                          # out-of-tree: see "Where output lands"
 
 # 1. FIND — the static engine. No model. This is the finding set.
