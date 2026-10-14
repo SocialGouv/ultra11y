@@ -71,31 +71,31 @@ describe("CI workflow", () => {
   });
 
   it("consumes the shipped action, so a user gets the annotations and not just an exit code", () => {
-    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("maxgfr/ultra11y"));
+    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("SocialGouv/ultra11y"));
     expect(step, "the workflow must use the ultra11y action").toBeDefined();
   });
 
   it("PINS the action to a tag that exists — never a moving branch", () => {
-    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("maxgfr/ultra11y"));
+    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("SocialGouv/ultra11y"));
     // `@main` would silently change under the user; the engine's own version always has a
     // matching `v<version>` release tag, so pinning to it is both valid and reproducible.
-    expect(step?.uses).toBe(`maxgfr/ultra11y@v${VERSION}`);
+    expect(step?.uses).toBe(`SocialGouv/ultra11y@v${VERSION}`);
     expect(step?.uses).not.toContain("@main");
   });
 
   it("tells the reader the major alias exists, for those who want fixes automatically", () => {
-    expect(ciWorkflow("x", "bloquant")).toContain(`maxgfr/ultra11y@v${VERSION.split(".")[0]}`);
+    expect(ciWorkflow("x", "bloquant")).toContain(`SocialGouv/ultra11y@v${VERSION.split(".")[0]}`);
   });
 
   it("passes the regression gate through: diff vs the base ref, against the committed baseline", () => {
-    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("maxgfr/ultra11y"));
+    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("SocialGouv/ultra11y"));
     expect(step?.with?.since).toBe("auto");
     expect(step?.with?.baseline).toBe("audits/baseline.json");
     expect(step?.with?.["fail-on"]).toBe("blocking");
   });
 
   it("carries the chosen severity through", () => {
-    const step = doc("majeur").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("maxgfr/ultra11y"));
+    const step = doc("majeur").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("SocialGouv/ultra11y"));
     expect(step?.with?.["fail-on"]).toBe("major");
   });
 

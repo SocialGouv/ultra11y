@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.43.0](https://github.com/SocialGouv/ultra11y/compare/v5.42.1...v5.43.0) (2026-10-14)
+
+
+### Bug Fixes
+
+* migrer les références maxgfr/ultra11y vers SocialGouv ([#48](https://github.com/SocialGouv/ultra11y/issues/48)) ([096d22d](https://github.com/SocialGouv/ultra11y/commit/096d22d0e664a93b65c726c36b602ff259473c46))
+* **release:** publier depuis SocialGouv/ultra11y, plus depuis le fork maxgfr ([fc7cb3d](https://github.com/SocialGouv/ultra11y/commit/fc7cb3d38a1617b4eab25f0b121454373ac09eb1))
+
+
+### Features
+
+* **engine:** re-pin vendored engines ([4398eb8](https://github.com/SocialGouv/ultra11y/commit/4398eb8475a9e61929f86cd9fd7f0ee31a1eb702))
+* **report:** un compte rendu pour le métier, la technique en annexe ([ebfebdf](https://github.com/SocialGouv/ultra11y/commit/ebfebdf8540b75f3d35b0131c1569b809cdb7e78)), closes [SocialGouv/egapro#4471](https://github.com/SocialGouv/egapro/issues/4471)
+
 ## [5.42.1](https://github.com/maxgfr/ultra11y/compare/v5.42.0...v5.42.1) (2026-09-01)
 
 

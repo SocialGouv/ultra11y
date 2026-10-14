@@ -86,7 +86,7 @@ export function installForTargets(opts: InstallOptions): TargetResult[] {
           if (!opts.dryRun) r.reports.push(installClaudeCode({ settingsPath, command: cmd() }));
           else r.reports.push({ path: settingsPath, changed: false });
           r.guidance.push(
-            "claude-code: the plugin route (`/plugin marketplace add maxgfr/ultra11y` then `/plugin install ultra11y@ultra11y`) ships the skills too — this settings hook only wires the gate.",
+            "claude-code: the plugin route (`/plugin marketplace add SocialGouv/ultra11y` then `/plugin install ultra11y@ultra11y`) ships the skills too — this settings hook only wires the gate.",
             "claude-code: restart the session — hooks load at startup.",
           );
           break;

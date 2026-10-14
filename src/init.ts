@@ -99,7 +99,7 @@ exit 0
 
 /** GitHub Actions workflow auditing the PR diff against the committed baseline.
  *
- *  It consumes the SHIPPED composite action (`maxgfr/ultra11y`) rather than inlining a
+ *  It consumes the SHIPPED composite action (`SocialGouv/ultra11y`) rather than inlining a
  *  `node … audit` line, so a user's workflow gets the whole surface — SARIF for inline
  *  annotations on the diff, `::error::` fallback annotations, a job summary — instead of a
  *  bare exit code. `enginePath` stays a parameter for the local/vendored case: a repo that
@@ -115,7 +115,7 @@ export function ciWorkflow(enginePath: string, failOn: Severity): string {
 # \`pull-requests: write\`), and \`standard: 'rgaa'\` to report against a country standard.
 #
 # The action is PINNED to the engine version that generated this file, so a CI run stays
-# reproducible. \`maxgfr/ultra11y@v${VERSION.split(".")[0]}\` also resolves (a moving major
+# reproducible. \`SocialGouv/ultra11y@v${VERSION.split(".")[0]}\` also resolves (a moving major
 # tag) if you would rather track the major line and take fixes automatically.
 on:
   pull_request:
@@ -132,7 +132,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the diff gate needs the base ref
-      - uses: maxgfr/ultra11y@v${VERSION}
+      - uses: SocialGouv/ultra11y@v${VERSION}
         with:
           since: auto # the PR's base branch
           baseline: audits/baseline.json
