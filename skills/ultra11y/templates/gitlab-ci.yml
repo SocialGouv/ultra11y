@@ -9,7 +9,7 @@
 # Include it:
 #
 #   include:
-#     - remote: 'https://raw.githubusercontent.com/maxgfr/ultra11y/main/skills/ultra11y/templates/gitlab-ci.yml'
+#     - remote: 'https://raw.githubusercontent.com/SocialGouv/ultra11y/main/skills/ultra11y/templates/gitlab-ci.yml'
 #
 #   variables:
 #     ULTRA11Y_STANDARD: rgaa

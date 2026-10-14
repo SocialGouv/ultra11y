@@ -1,4 +1,4 @@
-// The shipped composite action. It is consumed as `maxgfr/ultra11y@vN`, so a mistake here
+// The shipped composite action. It is consumed as `SocialGouv/ultra11y@vN`, so a mistake here
 // breaks every user's CI and cannot be caught by a unit test of src/ — gate its structure.
 import { describe, it, expect } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -304,7 +304,7 @@ describe("it publishes the page dimension as outputs", () => {
 // THE BROWSER TIER, SHIPPED RATHER THAN ASSUMED.
 //
 // `scan --runtime local` resolves Playwright from the audited project first and from
-// ultra11y's own install second. Run as `uses: maxgfr/ultra11y@v5`, that second anchor is a
+// ultra11y's own install second. Run as `uses: SocialGouv/ultra11y@v5`, that second anchor is a
 // checkout with NO node_modules beside it — so a consumer who simply writes `crawl:` got no
 // local tier, degraded to Docker, and silently lost every rendering criterion. The action
 // installed nothing, while the `urls` input promised "a Chromium binary for the Playwright

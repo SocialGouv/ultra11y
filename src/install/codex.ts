@@ -11,7 +11,7 @@
 //   2. Codex asks the user to trust a hook command before running it, recording the answer
 //      as a sha256 in `[hooks.state]`. That hash is NOT forged here — see below.
 //
-// The native route (`codex plugin marketplace add maxgfr/ultra11y` then `codex plugin add`)
+// The native route (`codex plugin marketplace add SocialGouv/ultra11y` then `codex plugin add`)
 // is better where the user wants it: it carries the skills and the hook together. This
 // exists for an npm install, and for users who do not want a marketplace.
 import { existsSync, readFileSync } from "node:fs";
@@ -125,7 +125,7 @@ export function installCodex({ codexDir, command, skillsSource }: CodexInstall):
       // Codex changes it — and the failure mode of a wrong hash is a gate that never fires.
       "codex: Codex will ask you to trust this hook the first time it fires — accept it, or review it with /hooks.",
       "codex: restart the session — hooks load at startup.",
-      "codex: `codex plugin marketplace add maxgfr/ultra11y` then `codex plugin add ultra11y@ultra11y` is the native route; it ships the skills and the hook together.",
+      "codex: `codex plugin marketplace add SocialGouv/ultra11y` then `codex plugin add ultra11y@ultra11y` is the native route; it ships the skills and the hook together.",
     ],
   };
 }

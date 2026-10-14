@@ -3,8 +3,8 @@
   "description": "Accessibility for WCAG 2.2 AA and country standards (RGAA…): automatic review before commit, push and pull request, plus detailed evidenced Markdown, HTML and per-page conformance reports in interactive agent sessions.",
   "version": "5.42.1",
   "author": { "name": "maxgfr", "url": "https://github.com/maxgfr" },
-  "homepage": "https://github.com/maxgfr/ultra11y",
-  "repository": "https://github.com/maxgfr/ultra11y",
+  "homepage": "https://github.com/SocialGouv/ultra11y",
+  "repository": "https://github.com/SocialGouv/ultra11y",
   "license": "MIT",
   "keywords": ["accessibility", "a11y", "wcag", "rgaa", "code-review", "audit"],
   "skills": "./skills/",
@@ -15,7 +15,7 @@
     "developerName": "maxgfr",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
-    "websiteURL": "https://github.com/maxgfr/ultra11y",
+    "websiteURL": "https://github.com/SocialGouv/ultra11y",
     "defaultPrompt": "Review my staged changes for accessibility."
   }
 }

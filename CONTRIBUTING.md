@@ -14,7 +14,7 @@ criteria onto WCAG success criteria. Adding your country is a single PR.
   - `pnpm lint` / `pnpm lint:fix` — Biome
   - `pnpm run build` — bundle the engine (tsup → `scripts/ultra11y.mjs`, mirrored into the skill)
   - `pnpm run check:build` — verify the bundle is reproducible and the skill bundle is intact
-- The engine is **zero runtime dependencies** and **install-free** (`npx skills add maxgfr/ultra11y`).
+- The engine is **zero runtime dependencies** and **install-free** (`npx skills add SocialGouv/ultra11y`).
   Anything you add must keep that true: data is bundled via static `import`, never read from disk at runtime.
 
 ## Adding a country standards pack

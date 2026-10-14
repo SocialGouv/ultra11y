@@ -68155,7 +68155,7 @@ function ciWorkflow(enginePath, failOn) {
 # \`pull-requests: write\`), and \`standard: 'rgaa'\` to report against a country standard.
 #
 # The action is PINNED to the engine version that generated this file, so a CI run stays
-# reproducible. \`maxgfr/ultra11y@v${VERSION.split(".")[0]}\` also resolves (a moving major
+# reproducible. \`SocialGouv/ultra11y@v${VERSION.split(".")[0]}\` also resolves (a moving major
 # tag) if you would rather track the major line and take fixes automatically.
 on:
   pull_request:
@@ -68172,7 +68172,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the diff gate needs the base ref
-      - uses: maxgfr/ultra11y@v${VERSION}
+      - uses: SocialGouv/ultra11y@v${VERSION}
         with:
           since: auto # the PR's base branch
           baseline: audits/baseline.json
@@ -68546,7 +68546,7 @@ function installCodex({ codexDir, command, skillsSource }) {
       // Codex changes it — and the failure mode of a wrong hash is a gate that never fires.
       "codex: Codex will ask you to trust this hook the first time it fires \u2014 accept it, or review it with /hooks.",
       "codex: restart the session \u2014 hooks load at startup.",
-      "codex: `codex plugin marketplace add maxgfr/ultra11y` then `codex plugin add ultra11y@ultra11y` is the native route; it ships the skills and the hook together."
+      "codex: `codex plugin marketplace add SocialGouv/ultra11y` then `codex plugin add ultra11y@ultra11y` is the native route; it ships the skills and the hook together."
     ]
   };
 }
@@ -68666,7 +68666,7 @@ function installForTargets(opts) {
           if (!opts.dryRun) r.reports.push(installClaudeCode({ settingsPath, command: cmd() }));
           else r.reports.push({ path: settingsPath, changed: false });
           r.guidance.push(
-            "claude-code: the plugin route (`/plugin marketplace add maxgfr/ultra11y` then `/plugin install ultra11y@ultra11y`) ships the skills too \u2014 this settings hook only wires the gate.",
+            "claude-code: the plugin route (`/plugin marketplace add SocialGouv/ultra11y` then `/plugin install ultra11y@ultra11y`) ships the skills too \u2014 this settings hook only wires the gate.",
             "claude-code: restart the session \u2014 hooks load at startup."
           );
           break;
@@ -68958,7 +68958,7 @@ function captureCoverageSummary(cov, lang) {
 }
 
 // src/sarif.ts
-var INFO_URI = "https://github.com/maxgfr/ultra11y";
+var INFO_URI = "https://github.com/SocialGouv/ultra11y";
 var SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json";
 var FINGERPRINT_KEY = "ultra11yFindingId/v1";
 var LEVEL = { bloquant: "error", majeur: "warning", mineur: "note" };

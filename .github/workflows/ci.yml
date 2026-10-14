@@ -402,7 +402,7 @@ jobs:
     # and it was running on every push and every pull request.
     #
     # Know what this costs, because it is not free: `action.yml` is consumed as
-    # `maxgfr/ultra11y@vN` by other repositories, its bash cannot be proved by reading YAML,
+    # `SocialGouv/ultra11y@vN` by other repositories, its bash cannot be proved by reading YAML,
     # and the contract tests in tests/action.test.ts PARSE it rather than run it. A composite
     # action can be green in every one of them and still broken for every consumer — which is
     # exactly what happened the day `npm i --omit=dev` silently installed nothing. This job is
@@ -577,7 +577,7 @@ jobs:
       # Every step above runs with this repository's OWN Playwright resolved from its
       # node_modules, so `browser: auto` correctly finds a tier and skips installing. That
       # proves the leave-it-alone half and nothing else. A consumer of
-      # `uses: maxgfr/ultra11y@v5` has no such node_modules — the action is a bare checkout —
+      # `uses: SocialGouv/ultra11y@v5` has no such node_modules — the action is a bare checkout —
       # which is the case that silently lost every rendering criterion, and the case no unit
       # test can stage because it parses the YAML rather than running it.
       #

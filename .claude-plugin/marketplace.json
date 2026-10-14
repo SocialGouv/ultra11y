@@ -12,8 +12,8 @@
       "description": "Automatic accessibility review before commit, push and pull request, plus detailed evidenced Markdown, HTML and per-page WCAG 2.2 AA / RGAA reports in Claude Code.",
       "version": "5.42.1",
       "author": { "name": "maxgfr" },
-      "homepage": "https://github.com/maxgfr/ultra11y",
-      "repository": "https://github.com/maxgfr/ultra11y",
+      "homepage": "https://github.com/SocialGouv/ultra11y",
+      "repository": "https://github.com/SocialGouv/ultra11y",
       "license": "MIT",
       "category": "quality",
       "keywords": ["accessibility", "a11y", "wcag", "rgaa", "code-review", "audit"]

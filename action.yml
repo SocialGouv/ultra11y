@@ -64,7 +64,7 @@ inputs:
     required: false
     default: 'auto'
   browser:
-    description: 'Whether this action PROVIDES the browser tier the scan needs: `auto` (default) installs `@playwright/test` + `@axe-core/playwright` and a Chromium binary into the runner temp directory, but ONLY when the working directory does not already resolve them; `install` always installs; `off` never does. This exists because the tier does not travel with the action: `scan --runtime local` resolves Playwright from the audited project first and from ultra11y''s own install second, and consumed as `uses: maxgfr/ultra11y@vN` that second anchor is a checkout with no node_modules beside it. So a repository that does not pin Playwright itself got no local tier, degraded to Docker, and silently lost every rendering criterion — contrast, zoom, reflow, text spacing. `auto` leaves a project that pins its own alone, deliberately: two copies of Playwright in one process hand out `Page` objects the other one''s fixtures do not recognise. Costs ~30-60s on a cold runner; the Chromium download is cacheable with actions/cache on `~/.cache/ms-playwright`.'
+    description: 'Whether this action PROVIDES the browser tier the scan needs: `auto` (default) installs `@playwright/test` + `@axe-core/playwright` and a Chromium binary into the runner temp directory, but ONLY when the working directory does not already resolve them; `install` always installs; `off` never does. This exists because the tier does not travel with the action: `scan --runtime local` resolves Playwright from the audited project first and from ultra11y''s own install second, and consumed as `uses: SocialGouv/ultra11y@vN` that second anchor is a checkout with no node_modules beside it. So a repository that does not pin Playwright itself got no local tier, degraded to Docker, and silently lost every rendering criterion — contrast, zoom, reflow, text spacing. `auto` leaves a project that pins its own alone, deliberately: two copies of Playwright in one process hand out `Page` objects the other one''s fixtures do not recognise. Costs ~30-60s on a cold runner; the Chromium download is cacheable with actions/cache on `~/.cache/ms-playwright`.'
     required: false
     default: 'auto'
   storage-state:
@@ -454,7 +454,7 @@ runs:
     #
     # `scan --runtime local` resolves `@playwright/test` + `@axe-core/playwright` from the
     # audited project first and from ultra11y's own install second (src/scan-local.ts
-    # `resolveAnchors`). Consumed as `uses: maxgfr/ultra11y@vN`, that second anchor is
+    # `resolveAnchors`). Consumed as `uses: SocialGouv/ultra11y@vN`, that second anchor is
     # `$GITHUB_ACTION_PATH/scripts/ultra11y.mjs` — a checkout with NO node_modules beside it.
     # So a consumer who simply wrote `crawl: http://localhost:3000` resolved nothing, degraded
     # to Docker, and lost every rendering criterion — while the `urls` input promised them "a

@@ -22,7 +22,7 @@ import { VERSION } from "./types.js";
 import { isUrlPath, repoRelative } from "./util.js";
 import { scTitle, understanding } from "./wcag.js";
 
-const INFO_URI = "https://github.com/maxgfr/ultra11y";
+const INFO_URI = "https://github.com/SocialGouv/ultra11y";
 const SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json";
 const FINGERPRINT_KEY = "ultra11yFindingId/v1";
 

@@ -1,6 +1,6 @@
 # ultra11y
 
-[![CI](https://github.com/maxgfr/ultra11y/actions/workflows/ci.yml/badge.svg)](https://github.com/maxgfr/ultra11y/actions/workflows/ci.yml)
+[![CI](https://github.com/SocialGouv/ultra11y/actions/workflows/ci.yml/badge.svg)](https://github.com/SocialGouv/ultra11y/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/ultra11y?logo=npm)](https://www.npmjs.com/package/ultra11y)
 [![agent plugin](https://img.shields.io/badge/Claude_Code_·_Codex_·_OpenCode-plugin-6b46c1)](#add-to-your-coding-agent)
 [![node](https://img.shields.io/node/v/ultra11y)](https://nodejs.org)
@@ -13,12 +13,12 @@ pull request — you never type the skill's name:
 
 | | |
 |---|---|
-| **Claude Code** | `/plugin marketplace add maxgfr/ultra11y` then `/plugin install ultra11y@ultra11y` |
-| **OpenAI Codex CLI** | `codex plugin marketplace add maxgfr/ultra11y` then `codex plugin add ultra11y@ultra11y` |
+| **Claude Code** | `/plugin marketplace add SocialGouv/ultra11y` then `/plugin install ultra11y@ultra11y` |
+| **OpenAI Codex CLI** | `codex plugin marketplace add SocialGouv/ultra11y` then `codex plugin add ultra11y@ultra11y` |
 | **OpenCode** | `npx ultra11y install --opencode` — or pin `"plugin": ["ultra11y@latest"]` in `opencode.json` |
 | **Anything else** | `npx ultra11y install --agents-md` (no hook API: see the caveat below) |
 
-<sub>Prefer the skills only, without the automatic hook? `npx skills add maxgfr/ultra11y`
+<sub>Prefer the skills only, without the automatic hook? `npx skills add SocialGouv/ultra11y`
 (`--agent codex`, `--agent opencode`, …). Already on npm and just want the gate?
 `npx ultra11y install --all`, and `npx ultra11y status` to check what is actually wired.
 Full details, thresholds and off-switches under [Install](#install).</sub>
@@ -73,8 +73,8 @@ working diff, or branch vs merge-base) and reports like a code reviewer. Both bu
 install-free engine.
 
 ```sh
-npx skills add maxgfr/ultra11y                 # this agent
-npx skills add maxgfr/ultra11y --agent codex   # …or opencode, cursor, gemini, amp, zed…
+npx skills add SocialGouv/ultra11y                 # this agent
+npx skills add SocialGouv/ultra11y --agent codex   # …or opencode, cursor, gemini, amp, zed…
 ```
 
 **As an agent plugin** — the same two skills, plus the hook that makes the review
@@ -83,8 +83,8 @@ that carries accessibility findings is stopped once and the agent is handed the 
 so `review-a11y` runs before the work goes out — you never type the skill's name.
 
 ```
-/plugin marketplace add maxgfr/ultra11y          # Claude Code
-codex plugin marketplace add maxgfr/ultra11y     # Codex CLI
+/plugin marketplace add SocialGouv/ultra11y          # Claude Code
+codex plugin marketplace add SocialGouv/ultra11y     # Codex CLI
 npx ultra11y install --opencode                  # OpenCode
 ```
 
@@ -125,7 +125,7 @@ claude mcp add ultra11y -- npx -y ultra11y mcp
 **As a GitHub Action** — audits the PR diff and, optionally, the served pages:
 
 ```yaml
-- uses: maxgfr/ultra11y@v5
+- uses: SocialGouv/ultra11y@v5
   with: { since: auto, standard: rgaa, fail-on: blocking }
 ```
 
@@ -436,7 +436,7 @@ is the source of truth; CI rebuilds it from the vendored DINUM data and rejects 
   block. It re-decides nothing and invents no format, so a page sheet and the compliance report
   cannot disagree; `check` gates it against invented criteria like any other report.
   See `references/pages.md`.
-- **A shipped GitHub Action** — `uses: maxgfr/ultra11y@v5` audits the **code** (PR diff) and,
+- **A shipped GitHub Action** — `uses: SocialGouv/ultra11y@v5` audits the **code** (PR diff) and,
   optionally, the **pages** (it can start your app, wait for it, then scan real URLs or your
   declared sample). The engine ships inside the action, so there is nothing to install and no
   `setup-node`. With pages in scope, its job summary and `pages-status.md` artifact list every
