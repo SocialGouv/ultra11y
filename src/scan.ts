@@ -10,7 +10,7 @@ import { mkdtempSync, writeFileSync, existsSync, statSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AuditResult, DynamicEngine, DynamicFinding, DynamicResult, Finding, Lang, SamplePage, Severity } from "./types.js";
+import type { AuditResult, DynamicEngine, DynamicFinding, DynamicResult, Finding, Lang, SamplePage, ScanRedirect, Severity } from "./types.js";
 import { lineStartsOf, lineColAt } from "./parse/html.js";
 import { allGuidelines } from "./wcag.js";
 import { PROBE_SEVERITY, PROBE_WCAG, scForAxe, severityFromImpact, isAxeAdvisory } from "./axe-map.js";
@@ -714,6 +714,31 @@ function resolveHostAnchor(file: string, snippet: string): { line: number; col: 
     }
   }
   return null;
+}
+
+/** The `pages` block `scan --merge --json` prints in front of the merged document. A
+ *  PRINT-side envelope only — `audit-latest.json` keeps the plain audit schema — under a
+ *  top-level key no `--in` reader of the document looks at. */
+export interface ScanPageSummary {
+  // The declared sample's page count, on a `--sample` run; absent otherwise (a plain
+  // URL/sitemap/crawl scan has no sample to be short of).
+  sample?: number;
+  // Ids of the snapshots the run persisted under `.ultra11y/pages/<id>/`.
+  recorded: string[];
+  // Pages the scan refused to record, and why (see ScanRedirect).
+  refused: Array<{ id: string; reason?: ScanRedirect["reason"] }>;
+}
+
+/** What one scan RECORDED and REFUSED, page by page. Without it the merged `--json` output
+ *  carries neither: the refusals reach the caller on stderr only, and the recorded ids would
+ *  take a listing of `.ultra11y/pages` against the run's start time to recover — exactly the
+ *  re-derivation an orchestrator reporting « N pages capturées, M refusées » must not do. */
+export function scanPageSummary(dynamic: DynamicResult, sampleSize?: number): ScanPageSummary {
+  return {
+    ...(sampleSize === undefined ? {} : { sample: sampleSize }),
+    recorded: dynamic.snapshots ?? [],
+    refused: (dynamic.redirected ?? []).map((r) => ({ id: r.id, reason: r.reason })),
+  };
 }
 
 /** Fold dynamic findings into a static AuditResult: a needs-rendering/manual or

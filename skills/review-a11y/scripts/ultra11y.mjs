@@ -66879,6 +66879,13 @@ function resolveHostAnchor(file, snippet2) {
   }
   return null;
 }
+function scanPageSummary(dynamic, sampleSize) {
+  return {
+    ...sampleSize === void 0 ? {} : { sample: sampleSize },
+    recorded: dynamic.snapshots ?? [],
+    refused: (dynamic.redirected ?? []).map((r) => ({ id: r.id, reason: r.reason }))
+  };
+}
 function mergeDynamic(audit2, dynamic, lang = "en") {
   const merged = JSON.parse(JSON.stringify(audit2));
   const seenFindings = new Set(merged.findings.map(portableFindingId));
@@ -74493,7 +74500,9 @@ Options:
                      (exit 2 with the producing command if its worklist is missing)
   --eco              orchestrate: emit only RUNBOOK.md + agents/*.md \u2014 the explicit
                      sequential low-token path (also what a no-subagent harness follows)
-  --merge <file>     scan: fold dynamic findings into this AuditResult JSON
+  --merge <file>     scan: fold dynamic findings into this AuditResult JSON. With --json the
+                     printed document opens with a 'pages' summary of the run \u2014
+                     {sample, recorded, refused:[{id, reason}]} \u2014 beside the document
   --sitemap <url>    scan: scan every URL listed in a sitemap.xml
   --crawl <url>      scan: BFS same-origin links from a start URL (served HTML)
   --depth <n>        scan: crawl link-hop depth from the start URL   (default: no limit; 0 = no limit)
@@ -77216,7 +77225,19 @@ async function cmdScan(p) {
     mkdirSync18(out2, { recursive: true });
     const mergedDocument = auditDocumentFor(merged, standard, lang);
     writeFileSync21(join52(out2, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
-    if (p.flags.json) console.log(JSON.stringify(mergedDocument, null, 2));
+    if (p.flags.json)
+      console.log(
+        JSON.stringify(
+          // `pages` opens the printed document: what this scan recorded (the
+          // .ultra11y/pages ids) and refused, which the stderr warnings alone don't make
+          // countable. An extra top-level key the `--in` readers never look at, so the
+          // document beside it stays pipeable into report/verify — and the file above
+          // keeps the plain audit schema.
+          { pages: scanPageSummary(dynamic, sampleConfig?.pages.length), ...mergedDocument },
+          null,
+          2
+        )
+      );
     else {
       console.log(
         lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join52(out2, "audit-latest.json")} (${merged.conformancePct}% r\xE9ussite, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join52(out2, "audit-latest.json")} (${merged.conformancePct}% pass rate, ${merged.findings.length} findings).`

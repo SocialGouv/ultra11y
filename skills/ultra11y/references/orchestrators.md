@@ -208,6 +208,12 @@ Read exit codes from the process, **not** from a pipeline — `cmd --json | head
   standard's own conformance rate (validated ÷ validated + NC + à évaluer, NA excluded) is
   printed by the report; derive it from `criteria[]` if a number is needed in a pipeline.
 - `check --json` → `{ ok, issues[] }`.
+- `scan --merge --json` → the merged audit document, opened by a top-level `pages` summary:
+  `{ sample, recorded[], refused: [{id, reason}] }` — the declared sample's size (`--sample`),
+  the snapshot ids written under `.ultra11y/pages/`, and the pages the scan refused with
+  their reason (the refusal warnings also go to stderr). Report the rendered layer from it —
+  captured vs refused — instead of re-deriving it from directory mtimes. The document written
+  to `--out` keeps the plain audit schema; the summary travels in stdout only.
 
 ## Honesty rules an orchestrator has to carry
 

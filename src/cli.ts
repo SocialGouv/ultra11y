@@ -82,7 +82,7 @@ import {
 import { DEFAULT_CLI_MODEL, EFFORT_LEVELS, judgeBatchCli, refuteBatchCli } from "./agent-cli.js";
 import { CODEX_EFFORT_LEVELS, judgeBatchCodex, refuteBatchCodex } from "./agent-codex.js";
 import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, batchWorklist, isProviderUnavailableError, judgeAll, modelFromEnv, type LlmOptions } from "./llm.js";
-import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable } from "./scan.js";
+import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable, scanPageSummary } from "./scan.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable, localTierStatus } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
 import { createAdapter } from "./external/registry.js";
@@ -493,7 +493,9 @@ Options:
                      (exit 2 with the producing command if its worklist is missing)
   --eco              orchestrate: emit only RUNBOOK.md + agents/*.md — the explicit
                      sequential low-token path (also what a no-subagent harness follows)
-  --merge <file>     scan: fold dynamic findings into this AuditResult JSON
+  --merge <file>     scan: fold dynamic findings into this AuditResult JSON. With --json the
+                     printed document opens with a 'pages' summary of the run —
+                     {sample, recorded, refused:[{id, reason}]} — beside the document
   --sitemap <url>    scan: scan every URL listed in a sitemap.xml
   --crawl <url>      scan: BFS same-origin links from a start URL (served HTML)
   --depth <n>        scan: crawl link-hop depth from the start URL   (default: no limit; 0 = no limit)
@@ -4347,7 +4349,19 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     mkdirSync(out, { recursive: true });
     const mergedDocument = auditDocumentFor(merged, standard, lang);
     writeFileSync(join(out, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
-    if (p.flags.json) console.log(JSON.stringify(mergedDocument, null, 2));
+    if (p.flags.json)
+      console.log(
+        JSON.stringify(
+          // `pages` opens the printed document: what this scan recorded (the
+          // .ultra11y/pages ids) and refused, which the stderr warnings alone don't make
+          // countable. An extra top-level key the `--in` readers never look at, so the
+          // document beside it stays pipeable into report/verify — and the file above
+          // keeps the plain audit schema.
+          { pages: scanPageSummary(dynamic, sampleConfig?.pages.length), ...mergedDocument },
+          null,
+          2,
+        ),
+      );
     else {
       console.log(
         lang === "fr"
