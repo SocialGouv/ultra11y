@@ -64455,7 +64455,10 @@ function applyAdjudication(audit2, adj, opts = {}) {
   }
   for (const it of adj.items) {
     if (!open.has(it.criteriaId)) {
-      blame(it.criteriaId, `criterion ${it.criteriaId}: not open for adjudication \u2014 the engine already decided it, or it is not part of ${adj.standard}`);
+      blame(
+        it.criteriaId,
+        `criterion ${it.criteriaId}: not open for adjudication \u2014 already decided (by the engine or a previous fold), or not part of ${adj.standard}`
+      );
     }
   }
   const groundInputs = /* @__PURE__ */ new Map();
@@ -64487,6 +64490,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
     else groundInputs.set(criteriaId, [entry]);
   };
   for (const it of adj.items) {
+    if (!open.has(it.criteriaId)) continue;
     const v = it.verdict;
     if (v === null) {
       blame(it.criteriaId, `criterion ${it.criteriaId}: unadjudicated (verdict is null)`);

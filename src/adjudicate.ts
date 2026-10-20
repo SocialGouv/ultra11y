@@ -1016,7 +1016,10 @@ export function applyAdjudication(
   // citation, no normativeRef. Adjudication may only ever decide what the engine left open.
   for (const it of adj.items) {
     if (!open.has(it.criteriaId)) {
-      blame(it.criteriaId, `criterion ${it.criteriaId}: not open for adjudication — the engine already decided it, or it is not part of ${adj.standard}`);
+      blame(
+        it.criteriaId,
+        `criterion ${it.criteriaId}: not open for adjudication — already decided (by the engine or a previous fold), or not part of ${adj.standard}`,
+      );
     }
   }
 
@@ -1064,6 +1067,12 @@ export function applyAdjudication(
     else groundInputs.set(criteriaId, [entry]);
   };
   for (const it of adj.items) {
+    // A surplus verdict is already blamed above (« not open for adjudication ») and the fold
+    // below records nothing for it. Gating it further would read `it.evidence` — which
+    // `hydrateAdjudication` deliberately did not restore, the criterion being decided is WHY the
+    // item is surplus — so the gate crashed on `undefined.length` instead of refusing. The blame
+    // above IS the refusal; there is nothing left to validate.
+    if (!open.has(it.criteriaId)) continue;
     const v = it.verdict;
     if (v === null) {
       blame(it.criteriaId, `criterion ${it.criteriaId}: unadjudicated (verdict is null)`);

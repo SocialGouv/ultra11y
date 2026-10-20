@@ -87,7 +87,10 @@ Fold the verdicts back FAIL-CLOSED:
 node scripts/ultra11y.mjs verify --apply ADJUDICATE.todo.json --in audit.json --out .
 ```
 It rejects a null verdict, a `C`/`NA` without a `justification`, an `NC` without a groundable
-finding, a `manual` without a `reason`, or any uncovered residual criterion. Agent `NC`s become
+finding, a `manual` without a `reason`, or any uncovered residual criterion. A verdict for a
+criterion that is no longer open — one a previous fold already decided — is likewise refused by
+name (« not open for adjudication »), never re-applied: re-folding the same file on the
+written-back audit answers `ok: false` with that criterion in `rejectedCriteria[]`. Agent `NC`s become
 real `agent:<sc>` findings that re-render in the report's §2 and re-enter the verify worklist;
 `report`/`prd` re-render with the adjudicated statuses; §5 shrinks to only still-`manual` items.
 

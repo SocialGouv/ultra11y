@@ -59,7 +59,9 @@ $ENGINE verify --manual --in "$RUN/audit-latest.json" --out "$RUN" --json
 
 # 4. FOLD — partial by default: every verdict the gate accepts lands, every refusal is named
 #    in `rejectedCriteria[]` / `issues[]`, and a criterion absent from the file is refused as a
-#    coverage gap. Exit 1 only when nothing landed. `--strict` makes it all-or-nothing (exit 1
+#    coverage gap. A verdict for a criterion a previous fold already decided is refused too
+#    (« not open for adjudication »), so re-applying a file on the written-back audit is safe.
+#    Exit 1 only when nothing landed. `--strict` makes it all-or-nothing (exit 1
 #    on any refusal, audit left untouched).
 $ENGINE verify --apply "$RUN/ADJUDICATE.verdicts.json" --in "$RUN/audit-latest.json" --out "$RUN" --json
 
