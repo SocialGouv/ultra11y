@@ -469,8 +469,14 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
     const measured = measuredRescue(derived, pc, cov, ran, pageId);
     const decided = adjudicated?.get(pc.id);
     if (decided?.status === "manual") {
+      // An abstention keeps the criterion OPEN, so the absence-derived `inapplicable` must not
+      // ride along: the report counts NA inside C (src/report.ts tallyRows), and a row that is
+      // both « à évaluer » and « conforme faute de sujet » lands in both columns — NA then
+      // overtakes C in the synthesis and `check --report` refuses the document this engine
+      // itself wrote.
+      const { inapplicable: _absence, ...open } = measured;
       return {
-        ...measured,
+        ...open,
         status: measured.status === "NC" ? "NC" : "manual",
         ...(decided.justification ? { justification: decided.justification } : {}),
         decidedBy: "agent" as const,

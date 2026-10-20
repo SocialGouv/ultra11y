@@ -58325,8 +58325,9 @@ function derivePackResults(audit2, packKey, pageId) {
     const measured = measuredRescue(derived, pc, cov, ran, pageId);
     const decided = adjudicated?.get(pc.id);
     if (decided?.status === "manual") {
+      const { inapplicable: _absence, ...open } = measured;
       return {
-        ...measured,
+        ...open,
         status: measured.status === "NC" ? "NC" : "manual",
         ...decided.justification ? { justification: decided.justification } : {},
         decidedBy: "agent"
@@ -59853,8 +59854,9 @@ function pageTally(rows) {
     c: rows.filter((r) => r.status === "C").length,
     nc: rows.filter((r) => r.status === "NC").length,
     // No row carries `NA` any more (INAPPLICABLE_STATUS); this counts the conformities
-    // reached for want of a subject, and it is a SUBSET of `c` rather than a fourth bucket.
-    na: rows.filter((r) => r.inapplicable).length,
+    // reached for want of a subject, and it is a SUBSET of `c` rather than a fourth bucket
+    // (same predicate as src/report.ts tallyRows).
+    na: rows.filter((r) => r.status === "C" && r.inapplicable).length,
     manual: rows.filter((r) => r.status === "manual").length
   };
 }
@@ -60402,7 +60404,9 @@ function tallyRows(rows) {
   return {
     c: rows.filter((x) => x.status === "C").length,
     nc: rows.filter((x) => x.status === "NC").length,
-    na: rows.filter((x) => x.inapplicable).length,
+    // NA within C, structurally: a row that carried `inapplicable` under another status (a
+    // criterion that stayed open, say) must not be counted in both columns.
+    na: rows.filter((x) => x.status === "C" && x.inapplicable).length,
     manual: rows.filter((x) => x.status === "manual").length
   };
 }
@@ -60905,7 +60909,7 @@ function render(r, lang, opts) {
     }
   }
   out2.push(`## ${s.naTitle}`, "");
-  const na = rows.filter((x) => x.inapplicable);
+  const na = rows.filter((x) => x.status === "C" && x.inapplicable);
   if (!na.length) out2.push(s.nothing, "");
   else {
     out2.push(`> ${s.naNote}`, "");
@@ -68865,7 +68869,7 @@ function packAuditDocument(input, packKey, lang) {
       // worse than either being wrong.
       c: rows.filter((r) => r.status === "C").length,
       nc: rows.filter((r) => r.status === "NC").length,
-      na: rows.filter((r) => r.inapplicable).length,
+      na: rows.filter((r) => r.status === "C" && r.inapplicable).length,
       manual: rows.filter((r) => r.status === "manual").length
     };
   });

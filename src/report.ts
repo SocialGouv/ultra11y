@@ -627,7 +627,9 @@ export function tallyRows(rows: ReportRow[]): ReportTally {
   return {
     c: rows.filter((x) => x.status === "C").length,
     nc: rows.filter((x) => x.status === "NC").length,
-    na: rows.filter((x) => x.inapplicable).length,
+    // NA within C, structurally: a row that carried `inapplicable` under another status (a
+    // criterion that stayed open, say) must not be counted in both columns.
+    na: rows.filter((x) => x.status === "C" && x.inapplicable).length,
     manual: rows.filter((x) => x.status === "manual").length,
   };
 }
@@ -1522,9 +1524,10 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   }
 
   // 4. conforming for want of a subject — each with what was looked for, so the claim stays
-  // falsifiable rather than merely asserted.
+  // falsifiable rather than merely asserted. Same predicate as tallyRows: the section lists
+  // exactly the criteria the synthesis counts as NA.
   out.push(`## ${s.naTitle}`, "");
-  const na = rows.filter((x) => x.inapplicable);
+  const na = rows.filter((x) => x.status === "C" && x.inapplicable);
   if (!na.length) out.push(s.nothing, "");
   else {
     out.push(`> ${s.naNote}`, "");

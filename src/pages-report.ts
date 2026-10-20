@@ -262,8 +262,9 @@ export function pageTally(rows: PageCriterionRow[]): { c: number; nc: number; na
     c: rows.filter((r) => r.status === "C").length,
     nc: rows.filter((r) => r.status === "NC").length,
     // No row carries `NA` any more (INAPPLICABLE_STATUS); this counts the conformities
-    // reached for want of a subject, and it is a SUBSET of `c` rather than a fourth bucket.
-    na: rows.filter((r) => r.inapplicable).length,
+    // reached for want of a subject, and it is a SUBSET of `c` rather than a fourth bucket
+    // (same predicate as src/report.ts tallyRows).
+    na: rows.filter((r) => r.status === "C" && r.inapplicable).length,
     manual: rows.filter((r) => r.status === "manual").length,
   };
 }

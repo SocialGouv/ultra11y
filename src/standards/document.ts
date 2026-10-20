@@ -174,7 +174,7 @@ export function packAuditDocument(input: AuditResult | PackAuditResult, packKey:
       // worse than either being wrong.
       c: rows.filter((r) => r.status === "C").length,
       nc: rows.filter((r) => r.status === "NC").length,
-      na: rows.filter((r) => r.inapplicable).length,
+      na: rows.filter((r) => r.status === "C" && r.inapplicable).length,
       manual: rows.filter((r) => r.status === "manual").length,
     };
   });

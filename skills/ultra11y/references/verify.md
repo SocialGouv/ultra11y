@@ -93,6 +93,9 @@ name (« not open for adjudication »), never re-applied: re-folding the same fi
 written-back audit answers `ok: false` with that criterion in `rejectedCriteria[]`. Agent `NC`s become
 real `agent:<sc>` findings that re-render in the report's §2 and re-enter the verify worklist;
 `report`/`prd` re-render with the adjudicated statuses; §5 shrinks to only still-`manual` items.
+A `manual` verdict — or a coverage gap — on a criterion the engine had provisionally closed for
+want of a subject stays in §5 only: it is never counted in the NA column, which remains a subset
+of §3's C.
 
 ## Residual risk
 
