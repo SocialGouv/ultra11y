@@ -189,6 +189,16 @@ Read exit codes from the process, **not** from a pipeline — `cmd --json | head
 - `verify --apply --json` → `{ ok, auditPath, applied, stillManual, rejected, rejectedCriteria[], issues[],
   conformancePct, findings, grounding }`; `ok: false` when nothing landed. Count on
   `applied + stillManual + rejected`, never on the exit code alone.
+- With `--prune`, **`ok: false` does not mean "nothing was applied"**. The CLI computes the
+  coverage and grounding verdicts first, but `applyPrune` writes the pruned
+  `audit-latest.json` and repairs the `--ledger` file BEFORE `ok` is derived — so a trial that
+  fails on grounding still applied every refutation it decided. Read `pruned` in the JSON
+  (or the audit document itself) to know what the audit now says; never report `ok: false` as
+  "trial not applied".
+- `grounding` re-opens every cited file of a retained verdict. A `file` that is a served URL
+  (`^[a-z][a-z0-9+.-]*://` — a rendered finding whose page has no `.ultra11y/pages` capture
+  mapped back to source) has no on-disk source to re-open and is skipped like `stdin`, not
+  counted as `failed`.
 - Under a pack standard (`--standard rgaa`), `audit-latest.json` is a `pack-audit` document:
   its root `conformancePct` is the automatic pass rate for that standard, `core` is the WCAG
   audit, and `report --json` and `verify --apply --json` echo the **core** rate. The

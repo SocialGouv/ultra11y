@@ -62733,7 +62733,7 @@ import { existsSync as existsSync21, readFileSync as readFileSync18 } from "fs";
 import { resolve as resolve10 } from "path";
 var WINDOW = 10;
 var norm2 = (s) => s.normalize("NFKC").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").replace(/>\s+/g, ">").replace(/\s+</g, "<").trim();
-var isUnresolvable = (file) => !file || file === "-" || file === "<stdin>" || file === "stdin";
+var isUnresolvable = (file) => !file || file === "-" || file === "<stdin>" || file === "stdin" || /^[a-z][a-z0-9+.-]*:\/\//.test(file);
 var SEMANTIC_SELECTORS = /* @__PURE__ */ new Set(["handler"]);
 function selectorProbes(selector) {
   if (SEMANTIC_SELECTORS.has(selector.trim().toLowerCase())) return [];

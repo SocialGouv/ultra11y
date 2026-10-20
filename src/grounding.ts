@@ -39,8 +39,11 @@ const WINDOW = 10;
 const norm = (s: string) =>
   s.normalize("NFKC").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").replace(/>\s+/g, ">").replace(/\s+</g, "<").trim();
 
-/** Streams/aggregates have no on-disk source to re-open. */
-const isUnresolvable = (file: string) => !file || file === "-" || file === "<stdin>" || file === "stdin";
+/** Streams/aggregates have no on-disk source to re-open. Neither has a served URL: a rendered
+ *  finding whose page has no `.ultra11y/pages` capture keeps the page URL as its `file`, and
+ *  resolving that against the cwd can only report it missing. The `://` keeps a Windows drive
+ *  letter (`C:\…`) out — only a scheme + authority is a URL. */
+const isUnresolvable = (file: string) => !file || file === "-" || file === "<stdin>" || file === "stdin" || /^[a-z][a-z0-9+.-]*:\/\//.test(file);
 
 /** A markup token a selector implies. `ci` = case-INSENSITIVE (HTML tag & attribute
  *  names, which the HTML spec treats case-insensitively — `<IMG>` ≡ `<img>`); `cs` =

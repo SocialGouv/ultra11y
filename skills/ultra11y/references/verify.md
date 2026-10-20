@@ -23,6 +23,9 @@ node scripts/ultra11y.mjs check --report audits/wcag-YYYY-MM-DD.md --semantic [-
 Fails **closed** if there is no adjudicated verdicts artifact (never green-but-inactive),
 re-runs the **uncapped** coverage check, and re-grounds every passing verdict against the cited
 source. `--verdicts` points at the artifact (default `VERIFY.todo.json` next to the report).
+A `file` that is a served URL (a rendered finding whose page has no `.ultra11y/pages` capture
+mapped back to source) is not a path to re-open: it is skipped like `stdin`, never reported as
+« cited file not found ».
 
 ### Applicability gate — `check --report … --standard rgaa --in audit.json`
 
