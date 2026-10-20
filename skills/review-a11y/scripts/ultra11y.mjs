@@ -64510,10 +64510,10 @@ function applyAdjudication(audit2, adj, opts = {}) {
             `criterion ${it.criteriaId}: a C verdict needs evidence to cite, and none was harvested for this criterion \u2014 record "manual" (reason "undecidable"), or "NA" if nothing in scope is concerned`
           );
         }
-      } else if (cites.length === 0 && v === "C") {
+      } else if (cites.length === 0 && (v === "C" || v === "NA")) {
         blame(
           it.criteriaId,
-          `criterion ${it.criteriaId}: a C verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, \u2026}])`
+          v === "C" ? `criterion ${it.criteriaId}: a C verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, \u2026}])` : `criterion ${it.criteriaId}: a NA verdict on a criterion with evidence must cite it`
         );
       } else if (cites.length > 0) {
         const anchors = it.evidence.flatMap((e) => [`${e.file}:${e.line}`, ...e.alsoAt ?? []]);

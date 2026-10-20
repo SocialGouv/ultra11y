@@ -122,13 +122,12 @@ describe("check --require-decided", () => {
 });
 
 describe("a not-applicable verdict is not a conformity, and is not gated like one", () => {
-  it("accepts an NA with a justification and no citations", async () => {
-    // The engine's OWN NA carries a justification naming what it searched for, and no
-    // citations (src/audit.ts subjectMatterReason). Demanding citations from the agent was
-    // holding it to a stricter standard than the engine — and a contradictory one: an NA says
-    // "none of this is what the criterion is about", so citing the elements it just ruled out
-    // of scope makes no sense. Measured on a real run, six criteria were refused for this
-    // alone, every one of them an honest NA.
+  it("accepts an NA that cites the evidence it ruled out of scope", async () => {
+    // The contract requires a NA on a criterion WITH evidence to cite it (the fold refuses a
+    // bare one, like an uncited C) — but a NA is still not gated like a conformity: it needs
+    // no COMPLETE evidence set, and it never enters the conformance percentage. The engine's
+    // own NA carries a justification naming what it searched for and no citations, because the
+    // engine harvested nothing to cite (src/audit.ts subjectMatterReason).
     const { applyAdjudication, buildAdjudicationWorklist } = await import("../src/adjudicate.js");
     const { runAudit } = await import("../src/audit.js");
     const { mkdtempSync, writeFileSync } = await import("node:fs");
@@ -141,12 +140,17 @@ describe("a not-applicable verdict is not a conformity, and is not gated like on
     const audit = runAudit({ inputs: [f] });
     const items = buildAdjudicationWorklist(audit).map((it) =>
       it.criteriaId === "2.4.4"
-        ? { ...it, verdict: "NA" as const, justification: "Aucun lien de ce type n'est concerné dans le périmètre audité." }
+        ? {
+            ...it,
+            verdict: "NA" as const,
+            justification: "Aucun lien de ce type n'est concerné dans le périmètre audité.",
+            citations: [it.evidence[0]!],
+          }
         : { ...it, verdict: "manual" as const, reason: "undecidable" },
     );
     const r = applyAdjudication(audit, { tool: "ultra11y", kind: "adjudication", schemaVersion: 2, standard: "wcag", auditDate: audit.date, items });
 
-    expect(r.issues.join("\n")).not.toMatch(/must cite at least one/);
+    expect(r.issues.join("\n")).not.toMatch(/must cite/);
     expect(r.audit.criteria.find((c) => c.id === "2.4.4")?.status).toBe(INAPPLICABLE_STATUS);
   });
 });

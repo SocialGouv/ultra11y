@@ -1103,19 +1103,21 @@ export function applyAdjudication(
             `criterion ${it.criteriaId}: a C verdict needs evidence to cite, and none was harvested for this criterion — record "manual" (reason "undecidable"), or "NA" if nothing in scope is concerned`,
           );
         }
-      } else if (cites.length === 0 && v === "C") {
-        // Only a `C` must cite. A `C` says "everything here conforms", so it has to name what
-        // it cleared; an `NA` says "none of this is what the criterion is about", and there is
-        // nothing to clear — asking it to cite the very elements it just ruled out of scope is
-        // a contradiction, and one the engine does not hold ITSELF to: an engine-proved NA
-        // (src/audit.ts subjectMatterReason) carries a justification naming what was searched
-        // for, and no citations at all. Measured on a real run, six criteria were refused for
-        // this alone, each of them an honest NA.
+      } else if (cites.length === 0 && (v === "C" || v === "NA")) {
+        // Either clearing verdict must cite. A `C` says "everything here conforms" and a `NA`
+        // says "none of this is what the criterion is about" — both rule on the harvested
+        // evidence, and the contract the filler was given (adjudicationContract, echoed by the
+        // judge schema and the brief) already requires citations[] whenever evidence was
+        // presented: "to say which of those items fall outside the criterion's scope". The
+        // fold used to enforce only the `C` half, so a bare NA cleared shown evidence without
+        // naming it — an agent could wave what it had been shown out of scope with a sentence.
         //
         // The justification is what keeps an NA falsifiable, and it is still required above.
         blame(
           it.criteriaId,
-          `criterion ${it.criteriaId}: a C verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, …}])`,
+          v === "C"
+            ? `criterion ${it.criteriaId}: a C verdict must cite at least one of the ${it.evidence.length} evidence item(s) it was shown (citations: [{file, line, …}])`
+            : `criterion ${it.criteriaId}: a NA verdict on a criterion with evidence must cite it`,
         );
       } else if (cites.length > 0) {
         // Each citation must name evidence THIS item carried. Grounding alone would only
