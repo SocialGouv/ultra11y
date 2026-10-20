@@ -160,7 +160,7 @@ ultra11y verify   --report <md> [--conformities <ledger|adjudication.json> | --n
 ultra11y fix      <globs… | ->  [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--only <ids>] [--jsx] [--json]
 ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
 ultra11y pack     check <pack.json> [--guidance <g.json>]  |  scaffold                 # gate an (AI-)authored standards pack
-ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--out <dir>] [--json]
+ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--merge <audit.json>] [--out <dir>] [--json]
 ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime …] [--merge <audit.json>] [--json]
 ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote]
 

@@ -74160,9 +74160,9 @@ Usage:
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
   ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|claude|codex] [--grain batch|criterion] [--max <n>] [--model <id>] [--effort <level>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate manual criteria \u2014 api needs ANTHROPIC_API_KEY; claude/codex reuse their CLI login; cli aliases claude)
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
-  ultra11y scan     <url|file\u2026> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
-  ultra11y scan     --sample [--runtime \u2026] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
-  ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime \u2026] [--cwd <dir>] [--merge <audit.json>] [--json]
+  ultra11y scan     <url|file\u2026> [--runtime auto|local|docker] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
+  ultra11y scan     --sample [--runtime \u2026] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
+  ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime \u2026] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
   ultra11y scan     --clean        (remove the dynamic-tier Docker image + temp contexts)
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin \u2192 .ultra11y/pages/<id>/ + audit it)
@@ -74406,7 +74406,8 @@ Options:
   --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
   --e2e              render: write the Playwright/Cypress fixtures into .ultra11y/e2e/
   --runner <name>    render --e2e: force playwright|cypress instead of auto-detecting
-  --root <dir>       snapshot: project root holding .ultra11y/pages (default: .)
+  --root <dir>       snapshot, scan: project root holding .ultra11y/pages (default: . \u2014
+                     scan writes the snapshots it collects under it)
   --port <n>         dev: port for the side-car (default: 4111); mcp: HTTP transport port
   --transport <k>    mcp: stdio (default) or http
   --bind <addr>      mcp --transport http: address to bind (default 127.0.0.1)
@@ -77031,6 +77032,10 @@ Iterated over ${rounds} round(s) to a fixpoint \u2014 ${totalWritten} file(s) wr
   }
   return 0;
 }
+function scanSnapshotRoot(flags2) {
+  if (flags2["no-snapshot"] === true) return void 0;
+  return typeof flags2.root === "string" && flags2.root ? resolve17(flags2.root) : process.cwd();
+}
 async function cmdScan(p) {
   const standard = stdOf(p, "scan");
   if (standard === null) return 2;
@@ -77083,7 +77088,7 @@ async function cmdScan(p) {
   const interactClicks = p.flags["interact-clicks"] === true;
   const sitemap = typeof p.flags.sitemap === "string" ? p.flags.sitemap : void 0;
   const crawl = typeof p.flags.crawl === "string" ? p.flags.crawl : void 0;
-  const snapshotRoot = p.flags["no-snapshot"] === true ? void 0 : process.cwd();
+  const snapshotRoot = scanSnapshotRoot(p.flags);
   const useSample = p.flags.sample === true;
   let sampleConfig;
   if (useSample) {
@@ -77768,6 +77773,7 @@ export {
   COMMANDS,
   REMOVED_FLAGS,
   main,
-  parseArgs
+  parseArgs,
+  scanSnapshotRoot
 };
 // "Copyright" and "@license" are already caught by DIRECTIVE_RE.

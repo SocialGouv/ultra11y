@@ -233,7 +233,8 @@ and the scan stops there. Point `--crawl` at a real entry page, or pass the URLs
 `scan` does not only keep findings: each page it visits is persisted to
 `.ultra11y/pages/<id>/` (DOM + computed styles + boxes + stylesheets + a viewport
 screenshot). The browser is already on the page, so this costs one `evaluate`. `--no-snapshot`
-opts out.
+opts out; `--root <dir>` relocates the tree (default: the working directory — `--cwd` is
+where Playwright resolves from, not where snapshots land).
 
 ### …and what it MEASURED, not only what it saw
 

@@ -160,9 +160,9 @@ Usage:
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
   ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|claude|codex] [--grain batch|criterion] [--max <n>] [--model <id>] [--effort <level>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate manual criteria — api needs ANTHROPIC_API_KEY; claude/codex reuse their CLI login; cli aliases claude)
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
-  ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
-  ultra11y scan     --sample [--runtime …] [--cwd <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
-  ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime …] [--cwd <dir>] [--merge <audit.json>] [--json]
+  ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
+  ultra11y scan     --sample [--runtime …] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
+  ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime …] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
   ultra11y scan     --clean        (remove the dynamic-tier Docker image + temp contexts)
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
@@ -406,7 +406,8 @@ Options:
   --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
   --e2e              render: write the Playwright/Cypress fixtures into .ultra11y/e2e/
   --runner <name>    render --e2e: force playwright|cypress instead of auto-detecting
-  --root <dir>       snapshot: project root holding .ultra11y/pages (default: .)
+  --root <dir>       snapshot, scan: project root holding .ultra11y/pages (default: . —
+                     scan writes the snapshots it collects under it)
   --port <n>         dev: port for the side-car (default: 4111); mcp: HTTP transport port
   --transport <k>    mcp: stdio (default) or http
   --bind <addr>      mcp --transport http: address to bind (default 127.0.0.1)
@@ -4028,6 +4029,16 @@ async function cmdFix(p: ParsedArgs): Promise<number> {
   return 0;
 }
 
+/** Where `scan` writes the page snapshots it collects: `--root <dir>` when given — the same
+ *  contract as `snapshot write`, `dev` and `pages discover --from-snapshots` — else the
+ *  working directory. Absolute either way, as it always was: the merge audits the snapshot
+ *  DOMs by this path. Undefined under `--no-snapshot`: nothing is persisted. `--cwd` plays
+ *  no part here: it keeps its own meaning, where Playwright resolves from. */
+export function scanSnapshotRoot(flags: ParsedArgs["flags"]): string | undefined {
+  if (flags["no-snapshot"] === true) return undefined;
+  return typeof flags.root === "string" && flags.root ? resolve(flags.root) : process.cwd();
+}
+
 async function cmdScan(p: ParsedArgs): Promise<number> {
   // `scan` takes `--standard` for the same reason `audit` now does: it REWRITES
   // audit-latest.json mid-chain, and a merge that silently re-keyed an RGAA document back to
@@ -4135,7 +4146,7 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
   // is already on the page, so this costs one `evaluate` — and it is what lets the page be
   // re-audited offline and earn a real per-page verdict instead of staying "to assess"
   // forever (src/pages.ts). `--no-snapshot` opts out.
-  const snapshotRoot = p.flags["no-snapshot"] === true ? undefined : process.cwd();
+  const snapshotRoot = scanSnapshotRoot(p.flags);
 
   // --sample: iterate the NORMATIVE page sample from `.ultra11yrc.json` (per-page
   // storageState overrides --storage-state). Loaded + validated here (hard error on a

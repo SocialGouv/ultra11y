@@ -166,9 +166,10 @@ repo it does not own — write the run's intermediates out-of-tree and let only 
 dated report land in the project, if at all.
 
 `.ultra11y/pages/` is written only by the page-snapshot commands (`scan`, `snapshot`,
-`dev`). `snapshot`, `dev` and `pages discover` take `--root` to relocate it; `scan` does not —
-it writes under the current working directory, so run it from the directory that should
-hold the snapshots. `audit`, `report`, `prd`, `tickets`, `verify` and `check` never touch it.
+`dev`). All of them take `--root` to relocate it — for `scan`, where the snapshots it
+collects are written (`--cwd` stays where Playwright resolves from), so an orchestrator can
+run from the audited checkout without dirtying it. `audit`, `report`, `prd`, `tickets`,
+`verify` and `check` never touch it.
 
 ## Exit codes
 
