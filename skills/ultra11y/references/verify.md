@@ -55,10 +55,16 @@ so an agent can fill verdicts in-memory). **Prioritise `preliminary` findings** 
 source, see `references/false-positives.md`): refute the ones the rendered DOM disproves.
 Then apply the gate:
 ```
-node scripts/ultra11y.mjs verify --apply VERIFY.todo.json
+node scripts/ultra11y.mjs verify --apply VERIFY.todo.json --report audits/wcag-YYYY-MM-DD.md --in audit.json
 ```
-The gate fails (non-zero) if any entry is `refuted`, `unsupported`, or unadjudicated. Goal: no
-fabricated non-conformity survives into the final report.
+The gate fails (non-zero) if any entry is `refuted`, `unsupported`, or unadjudicated. Every
+retained claim is also re-grounded against the cited source. A conformity is grounded the way
+the fold grounded it: a citation that is one of its criterion's own harvested anchors falls
+back to that anchor (the engine read its snippet out of the file), so a retyping the fold
+accepted at `verify --apply <adjudication>` is not refused again at trial — pass `--in
+<audit.json>` so the harvest can be re-derived; a citation that is NOT one of the criterion's
+anchors must still match the source literally. Goal: no fabricated non-conformity survives
+into the final report, and no accepted conformity is re-refused one gate later.
 
 ## `verify --manual` — adjudicate the residual (judgment / needs-rendering) criteria
 

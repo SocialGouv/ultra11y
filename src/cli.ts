@@ -62,6 +62,9 @@ import {
   applyAdjudication,
   hydrateAdjudication,
   unrenderedResidual,
+  adjudicationLimits,
+  evidenceFallback,
+  evidenceForCriteria,
   type AdjudicationFile,
 } from "./adjudicate.js";
 import {
@@ -431,6 +434,11 @@ Options:
                      (requires --report — coverage is re-derived from the report, uncapped)
                      Also accepts an ADJUDICATION (--in <audit.json>), or a VERDICT LEDGER,
                      which it REPLAYS onto the audit with no model in the loop
+                     Retained conformities are grounded the way the fold grounded them:
+                     a citation that is one of its criterion's own harvested anchors
+                     (--in <audit.json>) falls back to that anchor, so a retyping the
+                     fold accepted is not refused again at trial; without the audit the
+                     cited snippet must match the source literally
   --ledger <file>    verify --apply / judge --apply: record the verdicts the fold ACCEPTED,
                      so a later run replays them for free (default:
                      .ultra11y/verdicts/<standard>.json). Replay re-derives the evidence
@@ -2929,9 +2937,13 @@ function cmdVerify(p: ParsedArgs): number {
     const expected = [...expectedNc, ...buildConformityWorklist(conformityClaimsFor(p, standard, lang), expectedNc.length, Number.POSITIVE_INFINITY)];
     const r = applyVerdicts(items, expected);
     // Content-level grounding of every verdict that passed adjudication: the cited
-    // file/line/snippet must still exist and match the source (see src/grounding.ts).
+    // file/line/snippet must still exist and match the source (see src/grounding.ts). A
+    // RETAINED CONFORMITY IS GROUNDED THE WAY THE FOLD GROUNDED IT: a citation that is one of
+    // its criterion's own harvested anchors falls back to the anchor, so a claim `verify
+    // --apply <adjudication>` accepted is not refused again here — on every later trial —
+    // for the retyping the fold already forgave.
     const passing = items.filter((it) => typeof it.verdict === "string" && ["supported", "partial"].includes(it.verdict.trim().toLowerCase()));
-    const grounding = groundItems(verifyGroundingInputs(passing));
+    const grounding = groundItems(verifyGroundingInputs(passing, trialAnchorFallbacks(p, standard, passing)));
     // --prune: APPLY the outcome instead of only reporting it. See src/refute.ts for why a
     // gate that can only go red is the wrong shape for a cheap adjudicator's run, and for the
     // asymmetry between withdrawing a non-conformity and withdrawing a conformity.
@@ -3166,6 +3178,45 @@ function cmdVerifyWorklist(p: ParsedArgs, langIn: Lang): number {
         : `${ncItems.length} non-conformity(ies)${cItems.length ? ` and ${cItems.length} claimed conformity(ies)` : ""} to verify → ${mdPath}, ${todoPath}`,
     );
   return 0;
+}
+
+/** The fold's evidence-anchor fallback, rebuilt for the trial (`verify --apply … --report`).
+ *
+ *  The fold grounds a citation that is one of its criterion's own harvested anchors against
+ *  THAT ANCHOR when the literal check fails — an adjudicator's retyping of an element it did
+ *  read. The trial of the same report must not refuse the claim one gate later for the
+ *  retyping the fold already forgave, so it re-derives the harvest from the audit under `--in`
+ *  (the worklist evidence is a pure function of the audit) and grants the same fallback,
+ *  through the very same `evidenceFallback` the fold runs. A citation that is NOT one of the
+ *  criterion's anchors still fails strictly: without the audit there is nothing to re-derive
+ *  and nothing is granted.
+ *
+ *  Returns the per-citation resolver `verifyGroundingInputs` applies; undefined when there is
+ *  nothing to resolve (no conformity on trial, no `--in`, unreadable audit). */
+function trialAnchorFallbacks(
+  p: ParsedArgs,
+  standard: StandardId,
+  passing: VerifyItem[],
+):
+  | ((
+      it: VerifyItem,
+      cite: { file: string; line: number; selector?: string; snippet?: string },
+    ) => { file: string; line: number; selector?: string; snippet?: string } | undefined)
+  | undefined {
+  const ids = [...new Set(passing.filter((it) => it.kind === "c").map((it) => it.criteriaId))];
+  const inFlag = p.flags.in;
+  if (!ids.length || typeof inFlag !== "string" || !inFlag || inFlag === "-") return undefined;
+  let audit: AuditResult;
+  try {
+    audit = unwrapAudit(JSON.parse(readText(inFlag))) as AuditResult;
+  } catch {
+    // The command that owns --in reports malformed input; the trial stays strict.
+    return undefined;
+  }
+  const cwd = typeof p.flags.cwd === "string" ? (p.flags.cwd as string) : undefined;
+  const evidence = evidenceForCriteria(audit, ids, { cwd, standard });
+  const { citationDrift } = adjudicationLimits(cwd);
+  return (it, cite) => evidenceFallback(evidence.get(it.criteriaId) ?? [], cite, citationDrift).fallback;
 }
 
 /**

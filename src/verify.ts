@@ -465,11 +465,20 @@ const resumableItemKey = (it: VerifyItem): string => {
 const legacyConformityKey = (criteriaId: string, file: string, line: number, selector: string, claim: string): string =>
   `${criteriaId}|${canonicalFile(file)}|${line}|${selector}|${claim}`;
 
-/** Every source anchor a passing claim asks the grounding gate to re-open. */
-export function verifyGroundingInputs(items: VerifyItem[]): Array<{ file: string; line: number; selector?: string; snippet?: string }> {
+/** Every source anchor a passing claim asks the grounding gate to re-open. `fallbackFor`
+ *  optionally attaches, per cited conformity, the harvested anchor that may stand in when the
+ *  literal check fails — the fold's evidence-anchor fallback (src/adjudicate.ts), so a claim
+ *  the fold accepted is grounded the same way here. */
+export function verifyGroundingInputs(
+  items: VerifyItem[],
+  fallbackFor?: (it: VerifyItem, cite: CriterionCitation) => { file: string; line: number; selector?: string; snippet?: string } | undefined,
+): Array<{ file: string; line: number; selector?: string; snippet?: string; fallback?: { file: string; line: number; selector?: string; snippet?: string } }> {
   return items.flatMap((it) =>
     it.kind === "c" && it.citations?.length
-      ? it.citations.map((cite) => ({ file: cite.file, line: cite.line, selector: cite.selector, snippet: cite.snippet }))
+      ? it.citations.map((cite) => {
+          const fallback = fallbackFor?.(it, cite);
+          return { file: cite.file, line: cite.line, selector: cite.selector, snippet: cite.snippet, ...(fallback ? { fallback } : {}) };
+        })
       : [{ file: it.file, line: it.line, selector: it.selector, snippet: (it as { snippet?: string }).snippet }],
   );
 }

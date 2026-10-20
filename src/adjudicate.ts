@@ -524,6 +524,40 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
   );
 }
 
+/** The harvested evidence behind ARBITRARY criteria — including ones a prior fold already
+ *  decided, which `buildAdjudicationWorklist` filters out on purpose (a prior agent decision
+ *  is never reopened). The trial (`verify --apply … --report`) needs them anyway: it grounds
+ *  a retained claim the way the fold grounded it, and the fold's evidence-anchor fallback
+ *  vouches only for a citation that is one of the criterion's OWN harvested anchors.
+ *
+ *  Same derivation, item for item, as the worklist the verdict was gated against — the worklist
+ *  is a pure function of the audit, so re-reading the audit's inputs rebuilds the very anchor
+ *  set the citation was checked against. When a criterion's harvest is empty, the candidate
+ *  browser-rule findings stand in, exactly as the worklist's items carry them. */
+export function evidenceForCriteria(
+  audit: AuditResult,
+  criteriaIds: readonly string[],
+  opts: { cwd?: string; standard?: StandardId } = {},
+): Map<string, Evidence[]> {
+  const limits = adjudicationLimits(opts.cwd);
+  const docs = docsForAudit(audit, opts.cwd);
+  const standard = opts.standard;
+  const pack = standard !== undefined && !isCore(standard) ? loadPack(standard) : undefined;
+  // Candidate findings only exist in pack mode, and a criterion's own `wcag` mapping decides
+  // its subjects the same way `buildAdjudicationWorklist` lets it (its OWN subjects first).
+  const candidates = new Map(pack && standard ? derivePackResults(audit, standard).map((pc) => [pc.id, pc.candidateFindings ?? []] as const) : []);
+  const out = new Map<string, Evidence[]>();
+  for (const id of criteriaIds) {
+    if (out.has(id)) continue;
+    const crit = pack ? getCriterion(pack, id) : undefined;
+    const subjects = pack && standard ? subjectsForPackCriterion(standard, id, crit?.wcag ?? []) : subjectsForSc(id);
+    let evidence = collapse(harvestSubjects(subjects, docs), limits).evidence;
+    if (!evidence.length) evidence = candidateFindingEvidence(candidates.get(id) ?? [], limits.maxClasses);
+    out.set(id, evidence);
+  }
+  return out;
+}
+
 /** THE CRITERIA THIS RUN COULD NOT POSSIBLY HAVE DECIDED — because nothing was rendered.
  *
  *  `applyAdjudication` already refuses a `needs-rendered-dom` verdict whose own evidence sits
@@ -766,6 +800,32 @@ function cites0(anchors: string[], c: { file: string; line: number }, drift: num
     if (Number.isFinite(line) && Math.abs(line - c.line) <= drift) return true;
   }
   return false;
+}
+
+/** The evidence-anchor stand-in the fold grants a citation: the harvested anchor of THIS
+ *  criterion the citation resolves to, grounding the anchor's own snippet — the engine read
+ *  it out of the file, so it is there by construction. A sibling from `alsoAt` carries no
+ *  snippet (it is a bare `file:line`), so its stand-in is the cited place itself. Undefined
+ *  fallback when the citation is off-harvest or claims a different KIND of element than the
+ *  anchor holds — those keep the strict literal check (`onAnchor` says which, because only a
+ *  genuinely off-harvest citation earns the off-harvest explanation).
+ *
+ *  SHARED WITH THE TRIAL on purpose: `verify --apply … --report` grounds a retained claim
+ *  through the very same function, so a conformity the fold accepted is not refused one gate
+ *  later for the retyping the fold already forgave. */
+export function evidenceFallback(
+  evidence: Evidence[],
+  c: { file: string; line: number; selector?: string; snippet?: string },
+  drift: number,
+): { fallback?: { file: string; line: number; selector?: string; snippet?: string }; onAnchor: boolean } {
+  const anchor = anchorFor(evidence, c, drift);
+  if (!anchor || !recognisablySame(c, anchor.at)) return { onAnchor: anchor !== undefined };
+  return {
+    onAnchor: true,
+    fallback: anchor.representative
+      ? { file: anchor.at.file, line: anchor.at.line, selector: anchor.at.selector ?? c.selector, snippet: anchor.at.snippet }
+      : { file: c.file, line: c.line, selector: anchor.at.selector ?? c.selector },
+  };
 }
 
 export interface ApplyAdjudicationResult {
@@ -1115,16 +1175,10 @@ export function applyAdjudication(
           // It is authoritative there: the engine read it out of the file itself. And only
           // then does recognisability have anything to say, because only then is the anchor
           // being used to vouch for something the file did not confirm on its own.
-          const anchor = anchorFor(it.evidence, c, citationDrift);
           const cite = { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet };
-          if (anchor && recognisablySame(c, anchor.at)) {
-            toGround(
-              it.criteriaId,
-              cite,
-              anchor.representative
-                ? { file: anchor.at.file, line: anchor.at.line, selector: anchor.at.selector ?? c.selector, snippet: anchor.at.snippet }
-                : { file: c.file, line: c.line, selector: anchor.at.selector ?? c.selector },
-            );
+          const { fallback, onAnchor } = evidenceFallback(it.evidence, c, citationDrift);
+          if (fallback) {
+            toGround(it.criteriaId, cite, fallback);
           } else {
             // WHY THE STRICT PATH APPLIED, said at the point it applies.
             //
@@ -1149,7 +1203,7 @@ export function applyAdjudication(
             // be false: the anchor is right there, it is the element that is wrong. That case
             // keeps the bare refusal, which already says the honest thing — this markup is not
             // in the file.
-            toGround(it.criteriaId, cite, undefined, anchor ? undefined : offHarvestHint(it.criteriaId, it.evidence));
+            toGround(it.criteriaId, cite, undefined, onAnchor ? undefined : offHarvestHint(it.criteriaId, it.evidence));
           }
         }
       }

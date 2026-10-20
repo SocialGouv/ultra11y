@@ -13,6 +13,11 @@ export interface GroundingInput {
   line: number;
   snippet?: string;
   selector?: string;
+  /** The criterion's harvested anchor standing in for this citation when the literal check
+   *  fails — the evidence-anchor fallback the fold grants a citation that is one of the
+   *  criterion's own harvested anchors (see src/adjudicate.ts). Optional; absent on the
+   *  strict inputs, which must ground literally. */
+  fallback?: GroundingInput;
 }
 
 export interface GroundingVerdict {
@@ -121,7 +126,14 @@ export function groundFinding(g: GroundingInput, opts: { cwd?: string } = {}): G
 export function groundItems(items: GroundingInput[], opts: { cwd?: string } = {}): GroundingSummary {
   const s: GroundingSummary = { grounded: 0, moved: 0, failed: 0, issues: [] };
   for (const it of items) {
-    const r = groundFinding(it, opts);
+    let r = groundFinding(it, opts);
+    // The harvested anchor vouches for a citation the file could not confirm on its own —
+    // an adjudicator's retyping of an element it did read. `moved` either way: what grounded
+    // is not verbatim what was cited (same contract as the fold, src/adjudicate.ts).
+    if (!r.ok && it.fallback) {
+      const viaAnchor = groundFinding(it.fallback, opts);
+      if (viaAnchor.ok) r = { ok: true, moved: true };
+    }
     if (r.ok) {
       s.grounded++;
       if (r.moved) s.moved++;

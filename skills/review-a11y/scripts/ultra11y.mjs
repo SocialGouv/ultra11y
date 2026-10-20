@@ -62643,9 +62643,12 @@ var resumableItemKey = (it) => {
   return `${it.kind ?? "nc"}|${it.criteriaId}|${canonicalFile(it.file)}|${it.line}|${it.selector}|${it.claim}|${citationSetKey(it)}`;
 };
 var legacyConformityKey = (criteriaId, file, line, selector, claim) => `${criteriaId}|${canonicalFile(file)}|${line}|${selector}|${claim}`;
-function verifyGroundingInputs(items) {
+function verifyGroundingInputs(items, fallbackFor) {
   return items.flatMap(
-    (it) => it.kind === "c" && it.citations?.length ? it.citations.map((cite) => ({ file: cite.file, line: cite.line, selector: cite.selector, snippet: cite.snippet })) : [{ file: it.file, line: it.line, selector: it.selector, snippet: it.snippet }]
+    (it) => it.kind === "c" && it.citations?.length ? it.citations.map((cite) => {
+      const fallback = fallbackFor?.(it, cite);
+      return { file: cite.file, line: cite.line, selector: cite.selector, snippet: cite.snippet, ...fallback ? { fallback } : {} };
+    }) : [{ file: it.file, line: it.line, selector: it.selector, snippet: it.snippet }]
   );
 }
 var PASSING = /* @__PURE__ */ new Set(["supported", "partial"]);
@@ -62783,7 +62786,11 @@ function groundFinding(g, opts = {}) {
 function groundItems(items, opts = {}) {
   const s = { grounded: 0, moved: 0, failed: 0, issues: [] };
   for (const it of items) {
-    const r = groundFinding(it, opts);
+    let r = groundFinding(it, opts);
+    if (!r.ok && it.fallback) {
+      const viaAnchor = groundFinding(it.fallback, opts);
+      if (viaAnchor.ok) r = { ok: true, moved: true };
+    }
     if (r.ok) {
       s.grounded++;
       if (r.moved) s.moved++;
@@ -64210,6 +64217,23 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
     (r) => blankItem(r.criteriaId, r.automatability, scTitle(r.criteriaId) ?? void 0, harvestSubjects(subjectsForSc2(r.criteriaId), docs), limits)
   );
 }
+function evidenceForCriteria(audit2, criteriaIds, opts = {}) {
+  const limits = adjudicationLimits(opts.cwd);
+  const docs = docsForAudit(audit2, opts.cwd);
+  const standard = opts.standard;
+  const pack = standard !== void 0 && !isCore(standard) ? loadPack(standard) : void 0;
+  const candidates2 = new Map(pack && standard ? derivePackResults(audit2, standard).map((pc) => [pc.id, pc.candidateFindings ?? []]) : []);
+  const out2 = /* @__PURE__ */ new Map();
+  for (const id of criteriaIds) {
+    if (out2.has(id)) continue;
+    const crit = pack ? getCriterion(pack, id) : void 0;
+    const subjects = pack && standard ? subjectsForPackCriterion2(standard, id, crit?.wcag ?? []) : subjectsForSc2(id);
+    let evidence = collapse2(harvestSubjects(subjects, docs), limits).evidence;
+    if (!evidence.length) evidence = candidateFindingEvidence(candidates2.get(id) ?? [], limits.maxClasses);
+    out2.set(id, evidence);
+  }
+  return out2;
+}
 function unrenderedResidual(audit2, items) {
   const audited = audit2.scope.pagesAudited;
   const readSomePage = audited === void 0 ? (audit2.scope.pages ?? []).length > 0 : audited.length > 0;
@@ -64335,6 +64359,14 @@ function cites0(anchors, c2, drift) {
     if (Number.isFinite(line) && Math.abs(line - c2.line) <= drift) return true;
   }
   return false;
+}
+function evidenceFallback(evidence, c2, drift) {
+  const anchor = anchorFor(evidence, c2, drift);
+  if (!anchor || !recognisablySame(c2, anchor.at)) return { onAnchor: anchor !== void 0 };
+  return {
+    onAnchor: true,
+    fallback: anchor.representative ? { file: anchor.at.file, line: anchor.at.line, selector: anchor.at.selector ?? c2.selector, snippet: anchor.at.snippet } : { file: c2.file, line: c2.line, selector: anchor.at.selector ?? c2.selector }
+  };
 }
 var NC_SEVERITY_DEFAULT = "majeur";
 var MANUAL_REASONS = /* @__PURE__ */ new Set(["needs-rendered-dom", "undecidable"]);
@@ -64485,16 +64517,12 @@ function applyAdjudication(audit2, adj, opts = {}) {
           if (!cites0(anchors, c2, citationDrift) && !inAuditScope(c2.file)) {
             blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c2.file}:${c2.line} is not among this criterion's harvested evidence (fabricated?)`);
           }
-          const anchor = anchorFor(it.evidence, c2, citationDrift);
           const cite = { file: c2.file, line: c2.line, selector: c2.selector, snippet: c2.snippet };
-          if (anchor && recognisablySame(c2, anchor.at)) {
-            toGround(
-              it.criteriaId,
-              cite,
-              anchor.representative ? { file: anchor.at.file, line: anchor.at.line, selector: anchor.at.selector ?? c2.selector, snippet: anchor.at.snippet } : { file: c2.file, line: c2.line, selector: anchor.at.selector ?? c2.selector }
-            );
+          const { fallback, onAnchor } = evidenceFallback(it.evidence, c2, citationDrift);
+          if (fallback) {
+            toGround(it.criteriaId, cite, fallback);
           } else {
-            toGround(it.criteriaId, cite, void 0, anchor ? void 0 : offHarvestHint(it.criteriaId, it.evidence));
+            toGround(it.criteriaId, cite, void 0, onAnchor ? void 0 : offHarvestHint(it.criteriaId, it.evidence));
           }
         }
       }
@@ -74398,6 +74426,11 @@ Options:
                      (requires --report \u2014 coverage is re-derived from the report, uncapped)
                      Also accepts an ADJUDICATION (--in <audit.json>), or a VERDICT LEDGER,
                      which it REPLAYS onto the audit with no model in the loop
+                     Retained conformities are grounded the way the fold grounded them:
+                     a citation that is one of its criterion's own harvested anchors
+                     (--in <audit.json>) falls back to that anchor, so a retyping the
+                     fold accepted is not refused again at trial; without the audit the
+                     cited snippet must match the source literally
   --ledger <file>    verify --apply / judge --apply: record the verdicts the fold ACCEPTED,
                      so a later run replays them for free (default:
                      .ultra11y/verdicts/<standard>.json). Replay re-derives the evidence
@@ -76267,7 +76300,7 @@ function cmdVerify(p) {
     const expected = [...expectedNc, ...buildConformityWorklist(conformityClaimsFor(p, standard, lang), expectedNc.length, Number.POSITIVE_INFINITY)];
     const r = applyVerdicts(items, expected);
     const passing = items.filter((it) => typeof it.verdict === "string" && ["supported", "partial"].includes(it.verdict.trim().toLowerCase()));
-    const grounding = groundItems(verifyGroundingInputs(passing));
+    const grounding = groundItems(verifyGroundingInputs(passing, trialAnchorFallbacks(p, standard, passing)));
     const pruned = p.flags.prune === true ? applyPrune(p, standard, items, lang) : void 0;
     const ok = (pruned ? r.unadjudicated + r.invalid + r.missing === 0 : r.ok) && grounding.failed === 0;
     if (p.flags.json) console.log(JSON.stringify({ ...r, ok, grounding, ...pruned ? { pruned } : {} }, null, 2));
@@ -76424,6 +76457,21 @@ function cmdVerifyWorklist(p, langIn) {
       lang === "fr" ? `${ncItems.length} non-conformit\xE9(s)${cItems.length ? ` et ${cItems.length} conformit\xE9(s) revendiqu\xE9e(s)` : ""} \xE0 v\xE9rifier \u2192 ${mdPath}, ${todoPath}` : `${ncItems.length} non-conformity(ies)${cItems.length ? ` and ${cItems.length} claimed conformity(ies)` : ""} to verify \u2192 ${mdPath}, ${todoPath}`
     );
   return 0;
+}
+function trialAnchorFallbacks(p, standard, passing) {
+  const ids = [...new Set(passing.filter((it) => it.kind === "c").map((it) => it.criteriaId))];
+  const inFlag = p.flags.in;
+  if (!ids.length || typeof inFlag !== "string" || !inFlag || inFlag === "-") return void 0;
+  let audit2;
+  try {
+    audit2 = unwrapAudit(JSON.parse(readText(inFlag)));
+  } catch {
+    return void 0;
+  }
+  const cwd = typeof p.flags.cwd === "string" ? p.flags.cwd : void 0;
+  const evidence = evidenceForCriteria(audit2, ids, { cwd, standard });
+  const { citationDrift } = adjudicationLimits(cwd);
+  return (it, cite) => evidenceFallback(evidence.get(it.criteriaId) ?? [], cite, citationDrift).fallback;
 }
 function conformityClaimsFor(p, standard, lang) {
   if (p.flags.conformities === false || p.flags["no-conformities"] === true) return [];
