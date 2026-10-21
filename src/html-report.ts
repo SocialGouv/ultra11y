@@ -76,6 +76,7 @@ function refusalBlocks(r: { headline: string; reasons: string[] } | undefined): 
 
 const T = {
   fr: {
+    contents: "Sommaire",
     reportTitle: "Rapport de conformité",
     indexTitle: "Rapport d'accessibilité",
     pagesTitle: "Rapport page par page",
@@ -141,6 +142,7 @@ const T = {
     owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "à adjuger" },
   },
   en: {
+    contents: "Contents",
     reportTitle: "Conformance report",
     indexTitle: "Accessibility report",
     pagesTitle: "Page-by-page report",
@@ -619,6 +621,10 @@ export function compositeDoc(result: AuditResult, opts: HtmlReportOpts = {}): Do
   blocks.push(...scoreboardBlocks(result, standard, lang));
   const scope = pagesOf(result);
   if (scope.length) blocks.push(...crossGridBlocks(result, derivePages(result, scope), standard, lang));
+  const contents: Run[][] = blocks
+    .filter((block): block is Extract<Block, { kind: "heading" }> => block.kind === "heading" && block.level === 2 && Boolean(block.id))
+    .map((block) => [{ text: block.text, href: `#${block.id}` }]);
+  blocks.unshift({ kind: "heading", level: 2, text: t.contents, id: "contents" }, { kind: "list", items: contents });
   return { lang, title: `${t.reportTitle} ${standardLabel(standard)} — ${result.date}`, subtitle: h.runs, ...(opts.nav ? { nav: opts.nav } : {}), blocks };
 }
 
