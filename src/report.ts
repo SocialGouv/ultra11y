@@ -91,6 +91,7 @@ const L = {
     warn: "Ce rapport couvre le sous-ensemble de critères vérifiables automatiquement. Les critères « à évaluer » (rendu / jugement) sont adjugés par l'agent IA (`verify --manual`, de façon gatée) ; le rendu passe par `scan` (voir la section 5).",
     derived: (std: string) =>
       `Rapport ${std}. Chaque critère est jugé sur ses propres tests ; la vérification d'intégrité (\`check\`/\`verify\`) opère sur le même périmètre.`,
+    contents: "Sommaire",
     synthTitle: (by: string) => `1. Synthèse par ${by}`,
     byGuideline: "règle WCAG",
     byTheme: "thématique",
@@ -317,6 +318,7 @@ const L = {
     warn: "This report covers the subset of criteria checkable automatically. The “to assess” criteria (rendering / judgment) are adjudicated by the AI agent (`verify --manual`, gated); rendering goes through `scan` (see section 5).",
     derived: (std: string) =>
       `${std} report. Every criterion is judged on its own tests; the integrity gates (\`check\`/\`verify\`) operate on the same scope.`,
+    contents: "Contents",
     synthTitle: (by: string) => `1. Synthesis by ${by}`,
     byGuideline: "WCAG guideline",
     byTheme: "theme",
@@ -1394,11 +1396,26 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   if (r.scope.truncated || r.scope.captureCoverage?.blindSpots.length) out.push(`> ⚠️ ${s.scopeCaveat}`, "");
   out.push(`> ${s.annexPointer(annexFile)}`, "");
 
+  // A short, linkable index helps readers move through the final report. Keep optional
+  // sections out when this run has no recommendations or audited pages.
+  const derivedPages = pageScope.length ? derivePages(r, pageScope) : [];
+  const contents: [string, string][] = [
+    ["synthesis", s.synthTitle(opts.groupHead)],
+    ["non-conformities", s.ncTitle],
+    ...(advisoryUnits.length ? [["recommendations", `💡 ${s.recTitle}`] as [string, string]] : []),
+    ...(derivedPages.length ? [["page-rates", `📋 ${s.pageRatesTitle}`] as [string, string]] : []),
+    ...(derivedPages.length ? [["page-findings", `📄 ${s.perPageTitle}`] as [string, string]] : []),
+    ["conforming", s.cTitle],
+    ["not-applicable", s.naTitle],
+    ["to-assess", s.manualTitle],
+  ];
+  out.push(`## ${s.contents}`, "", ...contents.map(([id, title]) => `- [${title}](#${id})`), "");
+
   out.push(...renderSummary(summaryModel(lang, opts.std, opts.standard, tot, ncUnits, advisoryUnits.length, resolver), lang));
 
   // 1. synthesis
   const th = s.th(opts.groupHead);
-  out.push(`## ${s.synthTitle(opts.groupHead)}`, "");
+  out.push('<a id="synthesis"></a>', `## ${s.synthTitle(opts.groupHead)}`, "");
   out.push(`| ${th.join(" | ")} |`);
   out.push(`|${"---|".repeat(th.length)}`);
   for (const g of opts.groups) {
@@ -1412,7 +1429,7 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
 
   // 2. non-conformities by priority — the reader's block: problem, pages, fix. Built from the
   // SAME units `prd`/GitHub issues use, so a criterion here is exactly a backlog item.
-  out.push(`## ${s.ncTitle}`, "");
+  out.push('<a id="non-conformities"></a>', `## ${s.ncTitle}`, "");
   if (ncUnits.length === 0) {
     out.push(s.none, "");
   } else {
@@ -1427,16 +1444,15 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
 
   // Recommendations (non-normative) — UNNUMBERED, outside §2, one line each: they change no level.
   if (advisoryUnits.length) {
-    out.push(`## 💡 ${s.recTitle}`, "", `> ${s.recNote}`, "");
+    out.push('<a id="recommendations"></a>', `## 💡 ${s.recTitle}`, "", `> ${s.recNote}`, "");
     for (const u of advisoryUnits) out.push(renderReaderAdvisory(u, lang, resolver));
     out.push("");
   }
 
   // « Taux par page » — each audited page, its URL and its rate with the denominator. Drawn from
   // `pageCriterionRows`/`pageRatePct`, the per-page dossier's own helpers.
-  const derivedPages = pageScope.length ? derivePages(r, pageScope) : [];
   if (derivedPages.length) {
-    out.push(`## 📋 ${s.pageRatesTitle}`, "", `> ${s.pageRatesNoteBusiness}`, "");
+    out.push('<a id="page-rates"></a>', `## 📋 ${s.pageRatesTitle}`, "", `> ${s.pageRatesNoteBusiness}`, "");
     out.push(`| ${s.pageCol} | ${s.urlCol} | ${s.rateCol} |`, "| --- | --- | --- |");
     for (const p of derivedPages) {
       const criteria = pageCriterionRows(r, p, opts.standard, lang);
@@ -1457,7 +1473,7 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   // « Constats par page » — each page folds: its screenshot and what fails on it, by criterion.
   // The selectors that used to sit on these lines are in the annex.
   if (derivedPages.length) {
-    out.push(`## 📄 ${s.perPageTitle}`, "", `> ${s.perPageNote}`, "");
+    out.push('<a id="page-findings"></a>', `## 📄 ${s.perPageTitle}`, "", `> ${s.perPageNote}`, "");
     if (r.scope.sample?.transverse?.length) out.push(`> ${s.transverseNote(r.scope.sample.transverse.join(", "))}`, "");
     // Pages the scan refused to record: a silently shorter deliverable reads as a complete one.
     if (r.scope.redirected?.length) out.push(...renderRedirected(r.scope.redirected, lang), "");
@@ -1499,7 +1515,7 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
 
   // 3. conforming — split by PROVENANCE. A criterion the deterministic engine decided and one an
   // agent ruled on are both "C", but they are not the same claim. Both lists fold.
-  out.push(`## ${s.cTitle}`, "");
+  out.push('<a id="conforming"></a>', `## ${s.cTitle}`, "");
   const conform = rows.filter((x) => x.status === "C" && !x.inapplicable);
   const byEngine = conform.filter((x) => x.decidedBy !== "agent");
   const byAgent = conform.filter((x) => x.decidedBy === "agent");
@@ -1526,7 +1542,7 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   // 4. conforming for want of a subject — each with what was looked for, so the claim stays
   // falsifiable rather than merely asserted. Same predicate as tallyRows: the section lists
   // exactly the criteria the synthesis counts as NA.
-  out.push(`## ${s.naTitle}`, "");
+  out.push('<a id="not-applicable"></a>', `## ${s.naTitle}`, "");
   const na = rows.filter((x) => x.status === "C" && x.inapplicable);
   if (!na.length) out.push(s.nothing, "");
   else {
@@ -1540,7 +1556,7 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   }
 
   // 5. what is still open — what it means for the reader; the procedure is in the annex.
-  out.push(`## ${s.manualTitle}`, "");
+  out.push('<a id="to-assess"></a>', `## ${s.manualTitle}`, "");
   const manual = rows.filter((x) => x.status === "manual");
   const pack5 = isCore(opts.standard) ? undefined : loadPack(opts.standard);
   const exhaustiveContract = pack5?.criteria.every((criterion) => criterion.automation !== undefined) === true;
