@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L’audit complet : une boucle, pas une passe — ultra11y</title>
+<meta name="description" content="La boucle d’audit d’ultra11y : audit du code, scan de la page, arbitrage par l’IA, contre-vérification, correction, puis livrables RGAA.">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/site.js"></script>
+</head>
+<body>
+<!-- gen:nav -->
+<a class="skip" href="#contenu">Aller au contenu</a>
+<header class="site-header">
+  <div class="bar">
+    <a class="brand" href="index.html">ultra11y</a>
+    <nav aria-label="Navigation principale">
+      <ul>
+        <li><a href="index.html">Accueil</a></li>
+        <li><a href="principes.html">Principes</a></li>
+        <li><a href="workflow.html">Intégration</a></li>
+        <li><a href="audit.html" aria-current="page">Audit</a></li>
+        <li><a href="couverture.html">Couverture</a></li>
+        <li><a href="fiabilite.html">Fiabilité</a></li>
+        <li><a href="commandes.html">Commandes</a></li>
+      </ul>
+    </nav>
+    <button type="button" class="theme-toggle" id="theme-toggle" hidden aria-pressed="false">Thème sombre</button>
+  </div>
+</header>
+<!-- /gen:nav -->
+<main id="contenu">
+<h1>L’audit complet : une boucle, pas une passe</h1>
+<p class="lede">Un audit ultra11y ne s’arrête pas au premier rapport. Il enchaîne la lecture du code, la page affichée, le jugement de l’IA et sa contre-vérification, puis recommence après correction.</p>
+
+<ol class="flow">
+  <li class="machine"><strong>Audit</strong><span><code>audit --graph</code> : le moteur lit le code</span></li>
+  <li class="machine"><strong>Rendu</strong><span><code>scan</code> : vraie page, mesures</span></li>
+  <li><strong>Arbitrage IA</strong><span><code>verify --manual</code> : une fiche par critère</span></li>
+  <li><strong>Contre-vérification</strong><span><code>verify --report</code> : verdicts contestés</span></li>
+  <li class="machine"><strong>Correction</strong><span><code>fix --write</code> : correctifs sûrs, puis retour à l’étape 1</span></li>
+</ol>
+<p>Quand tout est prouvé, la boucle sort vers les <strong>livrables</strong> (rapport RGAA daté, backlog, tickets), puis confie le diff corrigé à <code>review-a11y</code>, dans un sous-agent. Chaque étape est détaillée dans la suite de cette page.</p>
+
+<h2>1. Audit : le moteur lit le code</h2>
+<pre><code>npx ultra11y audit "src/**/*.{html,tsx}" --graph --standard rgaa --out audits --json</code></pre>
+<p>Le moteur applique ses <span data-gen="engine.staticRules">93</span> vérifications. <code>--graph</code> suit les imports entre fichiers : il repère par exemple un composant icône utilisé sans nom accessible dans un autre fichier. Le résultat, <code>audits/audit-latest.json</code>, classe chaque critère : C, NC, NA ou « à évaluer ».</p>
+<p>Un composant Vue, Svelte ou Astro est lu comme un modèle source : ce qu’injectent les <em lang="en">slots</em> et les liaisons dynamiques est invisible. Ses constats sont marqués « provisoires ». Pour un résultat fiable, on audite le HTML produit (voir <code>render --setup</code> dans <a href="commandes.html">Commandes</a>).</p>
+
+<h2>2. Rendu : scanner avant d’arbitrer</h2>
+<pre><code>npx ultra11y scan http://localhost:3000 --runtime local --merge audits/audit-latest.json --out audits</code></pre>
+<p><code>scan</code> ouvre la page dans un vrai navigateur, y lance axe-core et des sondes : focus visible, zoom à 200 %, espacement du texte, contenu au survol, affichage à 320 pixels. Il garde une copie de la page et de ses mesures, puis les fusionne dans l’audit.</p>
+<p>Cette étape passe <strong>avant</strong> le jugement de l’IA. Aucune lecture du code ne dit si un contraste calculé est suffisant ou si la page tient au zoom. Sans scan, ces critères ne sont pas seulement ouverts : personne ne peut les trancher. Sur un essai documenté dans la skill, le scan d’une seule page a refermé près de la moitié des critères qui restaient à juger depuis le code seul.</p>
+<p>Un audit RGAA porte normalement sur un <strong>échantillon de pages</strong> représentatif (accueil, contact, mentions légales, formulaires…). <code>pages discover --crawl &lt;url&gt; --write</code> le construit, <code>sample check</code> vérifie qu’il couvre les types de pages attendus, <code>scan --sample</code> le parcourt. Un rapport RGAA sans scan est signalé comme <strong>partiel</strong>.</p>
+
+<h2>3. Arbitrage : l’IA juge</h2>
+<pre><code>npx ultra11y verify --manual --in audits/audit-latest.json --out audits</code></pre>
+<p>Cette commande écrit une liste de travail : une fiche par critère non tranché. Chaque fiche contient les preuves collectées par le moteur (toutes les alternatives d’images, les intitulés de liens et leur contexte, les étiquettes de champs, le plan des titres…) et le texte officiel du critère, avec ses tests et la méthodologie publiée par la DINUM.</p>
+<p>L’agent IA rend un verdict pour chaque fiche :</p>
+<ul>
+  <li><strong>Conforme</strong>, en citant les éléments vérifiés ;</li>
+  <li><strong>Non conforme</strong>, en désignant l’élément fautif ;</li>
+  <li><strong>Non applicable</strong>, avec une justification ;</li>
+  <li><strong>Manuel</strong>, avec la raison pour laquelle il ne peut pas trancher.</li>
+</ul>
+<pre><code>npx ultra11y verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json --out audits</code></pre>
+<p>Les verdicts sont réintégrés <strong>en mode fermé</strong> : un verdict incomplet, une citation introuvable ou un « conforme » sur des preuves partielles sont refusés, et le critère reste « à évaluer ».</p>
+
+<h2>4. Contre-vérification : l’IA se fait contredire</h2>
+<div class="two">
+  <div class="card">
+    <h3>Premier temps : l’arbitrage</h3>
+    <p>Une fiche par critère non tranché : les preuves du code et le texte officiel du RGAA. L’agent IA juge (<code>verify --manual</code>) et conclut :</p>
+    <ul>
+      <li><strong>Conforme</strong>, avec la preuve citée ;</li>
+      <li><strong>Non conforme</strong>, avec l’élément fautif ;</li>
+      <li><strong>Manuel</strong>, avec une raison.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Second temps : la contre-vérification</h3>
+    <p>Chaque verdict est mis en doute (<code>verify --report</code>). Trois issues :</p>
+    <ul>
+      <li><strong>Tenu</strong> : le verdict reste ;</li>
+      <li><strong>Non-conformité réfutée</strong> : elle est retirée ;</li>
+      <li><strong>Conformité réfutée</strong> : le critère repart « à évaluer ».</li>
+    </ul>
+  </div>
+</div>
+<pre><code>npx ultra11y verify --report audits/rgaa-AAAA-MM-JJ.md --in audits/audit-latest.json</code></pre>
+<p>Cette seconde liste attaque les deux sens. Une non-conformité que la page réelle dément est retirée. Un « conforme » est rejugé avec une question inversée : <em>la preuve établit-elle le critère, ou montre-t-elle seulement que l’élément existe ?</em></p>
+<div class="callout">
+  <p><strong>Exemple.</strong> L’IA met le critère 1.1 en conforme parce que l’image a <code>alt="logo"</code>. La contre-vérification réfute : cela prouve qu’une alternative existe, pas qu’elle décrit l’image. Le critère repart « à évaluer ». Il ne passe pas en non conforme : réfuter une conformité ne prouve rien contre le critère.</p>
+</div>
+
+<h2>5. Correction, puis ré-audit</h2>
+<pre><code>npx ultra11y fix "src/**/*.html" --write --iterate</code></pre>
+<p><code>fix</code> applique seulement des corrections sûres et mécaniques (un attribut <code>lang</code> manquant, par exemple). Sans <code>--write</code>, il montre ce qu’il ferait. Le reste (alternatives, intitulés, structure) se corrige à la main, par ordre de gravité : bloquant, majeur, mineur. Puis on relance l’audit.</p>
+<p>La boucle s’arrête quand <code>check</code> et <code>verify --apply</code> passent, et que seuls restent des risques résiduels nommés.</p>
+
+<h2>Les garde-fous en résumé</h2>
+<div class="two">
+  <div class="card">
+    <h3><code>check</code></h3>
+    <p>Contrôle l’intégrité d’un rapport : aucune section manquante, aucun critère inventé, aucun NA sans justification, chaque élément cité existe. <code>check --require-decided</code> échoue tant qu’un critère reste « à évaluer » sans raison déclarée.</p>
+  </div>
+  <div class="card">
+    <h3><code>verify</code></h3>
+    <p>Confronte chaque affirmation à sa preuve. <code>--manual</code> produit les fiches d’arbitrage, <code>--report</code> la contre-vérification, <code>--apply</code> réintègre les verdicts sans jamais accepter un verdict non prouvé.</p>
+  </div>
+</div>
+
+<h2>Les livrables</h2>
+<ul>
+  <li><strong>Le rapport RGAA daté</strong> (<code>report --standard rgaa</code>) : niveau atteint, ce qu’il faut corriger, sur quelles pages, puis une annexe technique avec les occurrences fichier et ligne. Il existe aussi en HTML imprimable (<code>--html</code>).</li>
+  <li><strong>La grille page par page</strong> (<code>pages --standard rgaa</code>) : une ligne par critère, une colonne par page, ou un dossier par page avec sa capture d’écran.</li>
+  <li><strong>Le backlog</strong> (<code>prd</code>) : les mêmes blocs que le rapport, présentés comme une liste de travaux avec l’effort estimé.</li>
+  <li><strong>Les tickets</strong> (<code>tickets</code>) : GitHub, GitLab ou Jira, un ticket par critère, par page ou par fichier. Toujours essayer d’abord avec <code>--dry-run</code>.</li>
+</ul>
+<p>Chaque non-conformité y est décrite par le même <strong>bloc d’auditeur</strong> : thématique, critère et intitulé officiel, test, constat, état attendu, méthode de vérification, occurrences. Le rapport, le backlog et les tickets ne peuvent donc pas se contredire.</p>
+
+<h2>Dernière étape : la revue du changement</h2>
+<p>Une fois les corrections faites, la skill <code>ultra11y</code> confie le diff à <code>review-a11y</code>, dans un sous-agent. Un sous-agent part d’un contexte vierge : la revue n’est pas influencée par l’audit qui vient de tourner, de la même façon que <code>verify</code> rejuge les verdicts au lieu de leur faire confiance.</p>
+</main>
+<!-- gen:footer -->
+<footer class="site-footer">
+  <p>ultra11y 5.45.1 · licence MIT · <a href="https://github.com/SocialGouv/ultra11y">code source sur GitHub</a> · <a href="https://www.npmjs.com/package/ultra11y">paquet npm</a></p>
+  <p>Les chiffres de ce site sont calculés depuis le code à chaque publication (<code>pnpm run build:site</code>). RGAA 4.1.2 © DINUM, Licence Ouverte / Etalab 2.0. Corpus ACT © W3C ACT Rules Community Group.</p>
+</footer>
+<!-- /gen:footer -->
+</body>
+</html>

@@ -1,0 +1,1855 @@
+{
+  "version": "5.45.1",
+  "rgaa": {
+    "version": "4.1.2",
+    "criteria": 106,
+    "themes": [
+      {
+        "n": 1,
+        "name": "Images",
+        "count": 9
+      },
+      {
+        "n": 2,
+        "name": "Cadres",
+        "count": 2
+      },
+      {
+        "n": 3,
+        "name": "Couleurs",
+        "count": 3
+      },
+      {
+        "n": 4,
+        "name": "Multimédia",
+        "count": 13
+      },
+      {
+        "n": 5,
+        "name": "Tableaux",
+        "count": 8
+      },
+      {
+        "n": 6,
+        "name": "Liens",
+        "count": 2
+      },
+      {
+        "n": 7,
+        "name": "Scripts",
+        "count": 5
+      },
+      {
+        "n": 8,
+        "name": "Éléments obligatoires",
+        "count": 10
+      },
+      {
+        "n": 9,
+        "name": "Structuration de l’information",
+        "count": 4
+      },
+      {
+        "n": 10,
+        "name": "Présentation de l’information",
+        "count": 14
+      },
+      {
+        "n": 11,
+        "name": "Formulaires",
+        "count": 13
+      },
+      {
+        "n": 12,
+        "name": "Navigation",
+        "count": 11
+      },
+      {
+        "n": 13,
+        "name": "Consultation",
+        "count": 12
+      }
+    ],
+    "tests": {
+      "total": 258,
+      "static": 27,
+      "rendered": 3,
+      "judgment": 228,
+      "decidable": 30
+    },
+    "levels": {
+      "det": 2,
+      "nc": 19,
+      "hint": 28,
+      "llm": 57
+    },
+    "deterministic": [
+      "8.3",
+      "8.5"
+    ],
+    "touched": 49,
+    "cNeedsJudgment": 104
+  },
+  "wcag": {
+    "criteria": 55,
+    "static": 3,
+    "rendering": 14,
+    "judgment": 38
+  },
+  "engine": {
+    "staticRules": 93,
+    "crossRules": 7,
+    "renderedRules": 6,
+    "packRules": 4,
+    "axeRules": 62,
+    "probes": 10
+  },
+  "sources": [
+    {
+      "key": "static",
+      "touched": 39,
+      "decisive": 17,
+      "signalOnly": 22
+    },
+    {
+      "key": "axe",
+      "touched": 26,
+      "decisive": 10,
+      "signalOnly": 16
+    },
+    {
+      "key": "probe",
+      "touched": 7,
+      "decisive": 1,
+      "signalOnly": 6
+    },
+    {
+      "key": "rendered",
+      "touched": 5,
+      "decisive": 0,
+      "signalOnly": 5
+    },
+    {
+      "key": "pack",
+      "touched": 3,
+      "decisive": 3,
+      "signalOnly": 0
+    }
+  ],
+  "act": {
+    "examples": 1134,
+    "rules": 91,
+    "scoredRules": 40,
+    "caught": 125,
+    "failedScored": 176,
+    "recallPct": 71,
+    "clean": 364,
+    "falsePositives": 0,
+    "divergences": 9,
+    "gapRules": 5,
+    "renderedRules": 14,
+    "judgmentRules": 29,
+    "deprecatedRules": 3,
+    "failed": {
+      "total": 358,
+      "caught": 125,
+      "missed": 51,
+      "rendered": 52,
+      "judgment": 110,
+      "gap": 13,
+      "deprecated": 7,
+      "outside": 0
+    },
+    "overallPct": 35
+  },
+  "tests": {
+    "fixtures": 111
+  },
+  "criteria": [
+    {
+      "id": "1.1",
+      "theme": 1,
+      "title": "Chaque image porteuse d’information a-t-elle une alternative textuelle ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static",
+        "axe"
+      ],
+      "decisive": [
+        "axe:area-alt",
+        "axe:input-image-alt",
+        "input-image-alt-missing"
+      ],
+      "signals": [
+        "axe:image-alt",
+        "axe:object-alt",
+        "axe:role-img-alt",
+        "axe:svg-img-alt",
+        "canvas-fallback-missing",
+        "chart-no-accessible-name",
+        "img-alt-missing",
+        "object-embed-no-name"
+      ],
+      "advisory": [],
+      "tests": 8
+    },
+    {
+      "id": "1.2",
+      "theme": 1,
+      "title": "Chaque image de décoration est-elle correctement ignorée par les technologies d’assistance ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "axe:image-redundant-alt",
+        "decorative-alt-misuse",
+        "decorative-marked-exposed"
+      ],
+      "advisory": [],
+      "tests": 6
+    },
+    {
+      "id": "1.3",
+      "theme": 1,
+      "title": "Pour chaque image porteuse d’information ayant une alternative textuelle, cette alternative est-elle pertinente (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 9
+    },
+    {
+      "id": "1.4",
+      "theme": 1,
+      "title": "Pour chaque image utilisée comme CAPTCHA ou comme image-test, ayant une alternative textuelle, cette alternative permet-elle d’identifier la nature et la fonction de l’image ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 7
+    },
+    {
+      "id": "1.5",
+      "theme": 1,
+      "title": "Pour chaque image utilisée comme CAPTCHA, une solution d’accès alternatif au contenu ou à la fonction du CAPTCHA est-elle présente ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "1.6",
+      "theme": 1,
+      "title": "Chaque image porteuse d’information a-t-elle, si nécessaire, une description détaillée ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 10
+    },
+    {
+      "id": "1.7",
+      "theme": 1,
+      "title": "Pour chaque image porteuse d’information ayant une description détaillée, cette description est-elle pertinente ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 6
+    },
+    {
+      "id": "1.8",
+      "theme": 1,
+      "title": "Chaque image texte porteuse d’information, en l’absence d’un mécanisme de remplacement, doit si possible être remplacée par du texte stylé. Cette règle est-elle respectée (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 6
+    },
+    {
+      "id": "1.9",
+      "theme": 1,
+      "title": "Chaque légende d’image est-elle, si nécessaire, correctement reliée à l’image correspondante ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 5
+    },
+    {
+      "id": "2.1",
+      "theme": 2,
+      "title": "Chaque cadre a-t-il un titre de cadre ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static",
+        "axe"
+      ],
+      "decisive": [
+        "axe:frame-title",
+        "iframe-title-missing"
+      ],
+      "signals": [
+        "axe:frame-title-unique"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "2.2",
+      "theme": 2,
+      "title": "Pour chaque cadre ayant un titre de cadre, ce titre de cadre est-il pertinent ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "3.1",
+      "theme": 3,
+      "title": "Dans chaque page web, l’information ne doit pas être donnée uniquement par la couleur. Cette règle est-elle respectée ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 6
+    },
+    {
+      "id": "3.2",
+      "theme": 3,
+      "title": "Dans chaque page web, le contraste entre la couleur du texte et la couleur de son arrière-plan est-il suffisamment élevé (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe",
+        "rendered"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "axe:color-contrast",
+        "axe:color-contrast-enhanced",
+        "contrast-literal",
+        "rendered-contrast",
+        "rendered-contrast-pixel"
+      ],
+      "advisory": [],
+      "tests": 5
+    },
+    {
+      "id": "3.3",
+      "theme": 3,
+      "title": "Dans chaque page web, les couleurs utilisées dans les composants d’interface ou les éléments graphiques porteurs d’informations sont-elles suffisamment contrastées (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "rendered"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "rendered-nontext-contrast"
+      ],
+      "advisory": [],
+      "tests": 4
+    },
+    {
+      "id": "4.1",
+      "theme": 4,
+      "title": "Chaque média temporel pré-enregistré a-t-il, si nécessaire, une transcription textuelle ou une audiodescription (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "4.2",
+      "theme": 4,
+      "title": "Pour chaque média temporel pré-enregistré ayant une transcription textuelle ou une audiodescription synchronisée, celles-ci sont-elles pertinentes (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "4.3",
+      "theme": 4,
+      "title": "Chaque média temporel synchronisé pré-enregistré a-t-il, si nécessaire, des sous-titres synchronisés (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "axe:audio-caption",
+        "axe:video-caption",
+        "media-no-track"
+      ],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "4.4",
+      "theme": 4,
+      "title": "Pour chaque média temporel synchronisé pré-enregistré ayant des sous-titres synchronisés, ces sous-titres sont-ils pertinents ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "4.5",
+      "theme": 4,
+      "title": "Chaque média temporel pré-enregistré a-t-il, si nécessaire, une audiodescription synchronisée (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "4.6",
+      "theme": 4,
+      "title": "Pour chaque média temporel pré-enregistré ayant une audiodescription synchronisée, celle-ci est-elle pertinente ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "4.7",
+      "theme": 4,
+      "title": "Chaque média temporel est-il clairement identifiable (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "4.8",
+      "theme": 4,
+      "title": "Chaque média non temporel a-t-il, si nécessaire, une alternative (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "4.9",
+      "theme": 4,
+      "title": "Pour chaque média non temporel ayant une alternative, cette alternative est-elle pertinente ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "4.10",
+      "theme": 4,
+      "title": "Chaque son déclenché automatiquement est-il contrôlable par l’utilisateur ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "autoplay-media",
+        "axe:no-autoplay-audio"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "4.11",
+      "theme": 4,
+      "title": "La consultation de chaque média temporel est-elle, si nécessaire, contrôlable par le clavier et tout dispositif de pointage ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "4.12",
+      "theme": 4,
+      "title": "La consultation de chaque média non temporel est-elle contrôlable par le clavier et tout dispositif de pointage ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "4.13",
+      "theme": 4,
+      "title": "Chaque média temporel et non temporel est-il compatible avec les technologies d’assistance (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "5.1",
+      "theme": 5,
+      "title": "Chaque tableau de données complexe a-t-il un résumé ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "5.2",
+      "theme": 5,
+      "title": "Pour chaque tableau de données complexe ayant un résumé, celui-ci est-il pertinent ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "5.3",
+      "theme": 5,
+      "title": "Pour chaque tableau de mise en forme, le contenu linéarisé reste-t-il compréhensible ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "5.4",
+      "theme": 5,
+      "title": "Pour chaque tableau de données ayant un titre, le titre est-il correctement associé au tableau de données ?",
+      "level": "hint",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "table-caption-missing"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "5.5",
+      "theme": 5,
+      "title": "Pour chaque tableau de données ayant un titre, celui-ci est-il pertinent ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "5.6",
+      "theme": 5,
+      "title": "Pour chaque tableau de données, chaque en-tête de colonne et chaque en-tête de ligne sont-ils correctement déclarés ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "axe:td-has-header",
+        "axe:th-has-data-cells",
+        "data-table-no-headers",
+        "th-no-data-cells"
+      ],
+      "advisory": [],
+      "tests": 4
+    },
+    {
+      "id": "5.7",
+      "theme": 5,
+      "title": "Pour chaque tableau de données, la technique appropriée permettant d’associer chaque cellule avec ses en-têtes est-elle utilisée (hors cas particuliers) ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static"
+      ],
+      "decisive": [
+        "headers-attr-dangling",
+        "table-scope-invalid"
+      ],
+      "signals": [
+        "axe:scope-attr-valid",
+        "axe:td-headers-attr",
+        "data-table-no-headers"
+      ],
+      "advisory": [],
+      "tests": 5
+    },
+    {
+      "id": "5.8",
+      "theme": 5,
+      "title": "Chaque tableau de mise en forme ne doit pas utiliser d’éléments propres aux  tableaux de données. Cette règle est-elle respectée ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static"
+      ],
+      "decisive": [
+        "layout-table-data-markup"
+      ],
+      "signals": [
+        "axe:table-fake-caption"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "6.1",
+      "theme": 6,
+      "title": "Chaque lien est-il explicite (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [
+        "pack:rgaa:download-link-format"
+      ],
+      "tests": 5
+    },
+    {
+      "id": "6.2",
+      "theme": 6,
+      "title": "Dans chaque page web, chaque lien a-t-il un intitulé ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static",
+        "axe"
+      ],
+      "decisive": [
+        "axe:link-name",
+        "link-empty-name"
+      ],
+      "signals": [
+        "icon-only-control-unnamed"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "7.1",
+      "theme": 7,
+      "title": "Chaque script est-il, si nécessaire, compatible avec les technologies d’assistance ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static",
+        "axe"
+      ],
+      "decisive": [
+        "axe:button-name",
+        "axe:input-button-name",
+        "button-empty-name",
+        "label-in-name-mismatch",
+        "menuitem-empty-name"
+      ],
+      "signals": [
+        "aria-hidden-focusable",
+        "aria-ref-missing-id",
+        "aria-required-children",
+        "axe:aria-allowed-attr",
+        "axe:aria-allowed-role",
+        "axe:aria-hidden-focus",
+        "axe:aria-required-attr",
+        "axe:aria-required-children",
+        "axe:aria-required-parent",
+        "axe:aria-roles",
+        "axe:aria-valid-attr",
+        "axe:aria-valid-attr-value",
+        "axe:nested-interactive",
+        "axe:presentation-role-conflict",
+        "cross-prop-drilled-name-lost",
+        "disabled-context-content",
+        "invalid-aria-role",
+        "nested-interactive",
+        "presentational-children-focusable",
+        "redundant-aria"
+      ],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "7.2",
+      "theme": 7,
+      "title": "Pour chaque script ayant une alternative, cette alternative est-elle pertinente ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "7.3",
+      "theme": 7,
+      "title": "Chaque script est-il contrôlable par le clavier et par tout dispositif de pointage (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "clickable-noninteractive"
+      ],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "7.4",
+      "theme": 7,
+      "title": "Pour chaque script qui initie un changement de contexte, l’utilisateur est-il averti ou en a-t-il le contrôle ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "7.5",
+      "theme": 7,
+      "title": "Dans chaque page web, les messages de statut sont-ils correctement restitués par les technologies d’assistance ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "probe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "dyn-live-region",
+        "live-region-conflict",
+        "status-message-not-assertive"
+      ],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "8.1",
+      "theme": 8,
+      "title": "Chaque page web est-elle définie par un type de document ?",
+      "level": "nc",
+      "sources": [
+        "pack"
+      ],
+      "decisiveSources": [
+        "pack"
+      ],
+      "decisive": [
+        "pack:rgaa:doctype-missing"
+      ],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "8.2",
+      "theme": 8,
+      "title": "Pour chaque page web, le code source généré est-il valide selon le type de document spécifié ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static",
+        "axe"
+      ],
+      "decisive": [
+        "axe:duplicate-id",
+        "axe:duplicate-id-active",
+        "axe:duplicate-id-aria",
+        "duplicate-attribute",
+        "duplicate-id"
+      ],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "8.3",
+      "theme": 8,
+      "title": "Dans chaque page web, la langue par défaut est-elle présente ?",
+      "level": "det",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static"
+      ],
+      "decisive": [
+        "document-language-missing"
+      ],
+      "signals": [
+        "axe:html-has-lang",
+        "html-lang-missing"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "8.4",
+      "theme": 8,
+      "title": "Pour chaque page web ayant une langue par défaut, le code de langue est-il pertinent ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static",
+        "axe"
+      ],
+      "decisive": [
+        "axe:html-lang-valid",
+        "html-lang-xml-lang-mismatch",
+        "lang-invalid"
+      ],
+      "signals": [
+        "axe:html-xml-lang-mismatch"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "8.5",
+      "theme": 8,
+      "title": "Chaque page web a-t-elle un titre de page ?",
+      "level": "det",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static",
+        "axe"
+      ],
+      "decisive": [
+        "axe:document-title",
+        "title-missing-empty"
+      ],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "8.6",
+      "theme": 8,
+      "title": "Pour chaque page web ayant un titre de page, ce titre est-il pertinent ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "8.7",
+      "theme": 8,
+      "title": "Dans chaque page web, chaque changement de langue est-il indiqué dans le code source (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "inline-lang-change-missing"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "8.8",
+      "theme": 8,
+      "title": "Dans chaque page web, le code de langue de chaque changement de langue est-il valide et pertinent ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "axe:valid-lang",
+        "lang-invalid"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "8.9",
+      "theme": 8,
+      "title": "Dans chaque page web, les balises ne doivent pas être utilisées uniquement à des fins de présentation. Cette règle est-elle respectée ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "8.10",
+      "theme": 8,
+      "title": "Dans chaque page web, les changements du sens de lecture sont-ils signalés ?",
+      "level": "nc",
+      "sources": [
+        "pack"
+      ],
+      "decisiveSources": [
+        "pack"
+      ],
+      "decisive": [
+        "pack:rgaa:dir-value-invalid"
+      ],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "9.1",
+      "theme": 9,
+      "title": "Dans chaque page web, l’information est-elle structurée par l’utilisation appropriée de titres ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "axe:empty-heading",
+        "axe:heading-order",
+        "axe:page-has-heading-one",
+        "empty-heading",
+        "h1-missing",
+        "h1-multiple",
+        "heading-order-skip"
+      ],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "9.2",
+      "theme": 9,
+      "title": "Dans chaque page web, la structure du document est-elle cohérente (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "missing-main-landmark",
+        "multiple-main-landmark",
+        "nav-landmark-missing"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "9.3",
+      "theme": 9,
+      "title": "Dans chaque page web, chaque liste est-elle correctement structurée ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static",
+        "axe"
+      ],
+      "decisive": [
+        "axe:definition-list",
+        "axe:dlitem",
+        "axe:list",
+        "axe:listitem",
+        "list-structure"
+      ],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "9.4",
+      "theme": 9,
+      "title": "Dans chaque page web, chaque citation est-elle correctement indiquée ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "10.1",
+      "theme": 10,
+      "title": "Dans le site web, des feuilles de styles sont-elles utilisées pour contrôler la présentation de l’information ?",
+      "level": "nc",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [
+        "static"
+      ],
+      "decisive": [
+        "presentational-attribute",
+        "presentational-element",
+        "presentational-spacing"
+      ],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "10.2",
+      "theme": 10,
+      "title": "Dans chaque page web, le contenu visible porteur d’information reste-t-il présent lorsque les feuilles de styles sont désactivées ?",
+      "level": "hint",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "css-generated-content-informative"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "10.3",
+      "theme": 10,
+      "title": "Dans chaque page web, l’information reste-t-elle compréhensible lorsque les feuilles de styles sont désactivées ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "10.4",
+      "theme": 10,
+      "title": "Dans chaque page web, le texte reste-t-il lisible lorsque la taille des caractères est augmentée jusqu’à 200 %, au moins (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe",
+        "probe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "axe:meta-viewport",
+        "axe:meta-viewport-large",
+        "dyn-input-overflow-zoom",
+        "dyn-reflow-zoom",
+        "meta-viewport-zoom-block"
+      ],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "10.5",
+      "theme": 10,
+      "title": "Dans chaque page web, les déclarations CSS de couleurs de fond d’élément et de police sont-elles correctement utilisées ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "10.6",
+      "theme": 10,
+      "title": "Dans chaque page web, chaque lien dont la nature n’est pas évidente est-il visible par rapport au texte environnant ?",
+      "level": "hint",
+      "sources": [
+        "rendered"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "rendered-link-colour-only"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "10.7",
+      "theme": 10,
+      "title": "Dans chaque page web, pour chaque élément recevant le focus, la prise de focus est-elle visible ?",
+      "level": "nc",
+      "sources": [
+        "probe",
+        "rendered"
+      ],
+      "decisiveSources": [
+        "probe"
+      ],
+      "decisive": [
+        "dyn-focus-visible"
+      ],
+      "signals": [
+        "rendered-focus-not-visible"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "10.8",
+      "theme": 10,
+      "title": "Pour chaque page web, les contenus cachés ont-ils vocation à être ignorés par les technologies d’assistance ?",
+      "level": "hint",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "disabled-context-content"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "10.9",
+      "theme": 10,
+      "title": "Dans chaque page web, l’information ne doit pas être donnée uniquement par la forme, taille ou position. Cette règle est-elle respectée ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 4
+    },
+    {
+      "id": "10.10",
+      "theme": 10,
+      "title": "Dans chaque page web, l’information ne doit pas être donnée par la forme, taille ou position uniquement. Cette règle est-elle implémentée de façon pertinente ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 4
+    },
+    {
+      "id": "10.11",
+      "theme": 10,
+      "title": "Pour chaque page web, les contenus peuvent-ils être présentés sans perte d’information ou de fonctionnalité et sans avoir recours soit à un défilement vertical pour une fenêtre ayant une hauteur de 256 px, soit à un défilement horizontal pour une fenêtre ayant une largeur de 320 px (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "probe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "dyn-input-overflow-reflow",
+        "dyn-reflow"
+      ],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "10.12",
+      "theme": 10,
+      "title": "Dans chaque page web, les propriétés d’espacement du texte peuvent-elles être redéfinies par l’utilisateur sans perte de contenu ou de fonctionnalité (hors cas particuliers) ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "probe"
+      ],
+      "decisiveSources": [
+        "static"
+      ],
+      "decisive": [
+        "letter-spacing-important",
+        "line-height-important",
+        "word-spacing-important"
+      ],
+      "signals": [
+        "dyn-input-overflow-spacing",
+        "dyn-text-spacing"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "10.13",
+      "theme": 10,
+      "title": "Dans chaque page web, les contenus additionnels apparaissant à la prise de focus ou au survol d’un composant d’interface sont-ils contrôlables par l’utilisateur (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "probe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "dyn-hover"
+      ],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "10.14",
+      "theme": 10,
+      "title": "Dans chaque page web, les contenus additionnels apparaissant via les styles CSS uniquement peuvent-ils être rendus visibles au clavier et par tout dispositif de pointage ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "11.1",
+      "theme": 11,
+      "title": "Chaque champ de formulaire a-t-il une étiquette ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static",
+        "axe"
+      ],
+      "decisive": [
+        "axe:label",
+        "axe:select-name",
+        "control-label-missing"
+      ],
+      "signals": [
+        "axe:form-field-multiple-labels",
+        "axe:label-title-only",
+        "control-name-title-only",
+        "field-purpose-incomplete",
+        "form-field-multiple-labels",
+        "label-for-dangling",
+        "placeholder-as-label",
+        "select-has-option"
+      ],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "11.2",
+      "theme": 11,
+      "title": "Chaque étiquette associée à un champ de formulaire est-elle pertinente (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 6
+    },
+    {
+      "id": "11.3",
+      "theme": 11,
+      "title": "Dans chaque formulaire, chaque étiquette associée à un champ de formulaire ayant la même fonction et répétée plusieurs fois dans une même page ou dans un ensemble de pages est-elle cohérente ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "11.4",
+      "theme": 11,
+      "title": "Dans chaque formulaire, chaque étiquette de champ et son champ associé sont-ils accolés (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "11.5",
+      "theme": 11,
+      "title": "Dans chaque formulaire, les champs de même nature sont-ils regroupés, si nécessaire ?",
+      "level": "nc",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [
+        "static"
+      ],
+      "decisive": [
+        "radio-checkbox-group-ungrouped"
+      ],
+      "signals": [
+        "date-fields-ungrouped"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "11.6",
+      "theme": 11,
+      "title": "Dans chaque formulaire, chaque regroupement de champs de même nature a-t-il une légende ?",
+      "level": "nc",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [
+        "static",
+        "axe"
+      ],
+      "decisive": [
+        "axe:fieldset",
+        "fieldset-legend-missing"
+      ],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "11.7",
+      "theme": 11,
+      "title": "Dans chaque formulaire, chaque légende associée à un regroupement de champs de même nature est-elle pertinente ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "11.8",
+      "theme": 11,
+      "title": "Dans chaque formulaire, les items de même nature d’une liste de choix sont-ils regroupés de manière pertinente ?",
+      "level": "nc",
+      "sources": [
+        "pack"
+      ],
+      "decisiveSources": [
+        "pack"
+      ],
+      "decisive": [
+        "pack:rgaa:optgroup-without-label"
+      ],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "11.9",
+      "theme": 11,
+      "title": "Dans chaque formulaire, l’intitulé de chaque bouton est-il pertinent (hors cas particuliers) ?",
+      "level": "nc",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [
+        "static"
+      ],
+      "decisive": [
+        "form-button-empty-name",
+        "form-label-in-name-mismatch"
+      ],
+      "signals": [
+        "cross-icon-only-unnamed",
+        "icon-only-control-unnamed"
+      ],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "11.10",
+      "theme": 11,
+      "title": "Dans chaque formulaire, le contrôle de saisie est-il utilisé de manière pertinente (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "aria-invalid-no-description",
+        "error-not-associated"
+      ],
+      "advisory": [],
+      "tests": 7
+    },
+    {
+      "id": "11.11",
+      "theme": 11,
+      "title": "Dans chaque formulaire, le contrôle de saisie est-il accompagné, si nécessaire, de suggestions facilitant la correction des erreurs de saisie ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "11.12",
+      "theme": 11,
+      "title": "Pour chaque formulaire qui modifie ou supprime des données, ou qui transmet des réponses à un test ou à un examen, ou dont la validation a des conséquences financières ou juridiques, les données saisies peuvent-elles être modifiées, mises à jour ou récupérées par l’utilisateur ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "11.13",
+      "theme": 11,
+      "title": "La finalité d’un champ de saisie peut-elle être déduite pour faciliter le remplissage automatique des champs avec les données de l’utilisateur ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "autocomplete-token-invalid",
+        "axe:autocomplete-valid",
+        "field-purpose-incomplete"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "12.1",
+      "theme": 12,
+      "title": "Chaque ensemble de pages dispose-t-il de deux systèmes de navigation différents, au moins (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "12.2",
+      "theme": 12,
+      "title": "Dans chaque ensemble de pages, le menu et les barres de navigation sont-ils toujours à la même place (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "12.3",
+      "theme": 12,
+      "title": "La page « plan du site » est-elle pertinente ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "12.4",
+      "theme": 12,
+      "title": "Dans chaque ensemble de pages, la page « plan du site » est-elle accessible à partir d’une fonctionnalité identique ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "12.5",
+      "theme": 12,
+      "title": "Dans chaque ensemble de pages, le moteur de recherche est-il atteignable de manière identique ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "12.6",
+      "theme": 12,
+      "title": "Les zones de regroupement de contenus présentes dans plusieurs pages web (zones d’en-tête, de navigation principale, de contenu principal, de pied de page et de moteur de recherche) peuvent-elles être atteintes ou évitées ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "axe:landmark-one-main",
+        "missing-main-landmark",
+        "multiple-main-landmark",
+        "nav-landmark-missing",
+        "nav-landmark-unnamed"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "12.7",
+      "theme": 12,
+      "title": "Dans chaque page web, un lien d’évitement ou d’accès rapide à la zone de contenu principal est-il présent (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "axe:bypass",
+        "axe:skip-link",
+        "skip-link-target-missing"
+      ],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "12.8",
+      "theme": 12,
+      "title": "Dans chaque page web, l’ordre de tabulation est-il cohérent ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "axe:tabindex",
+        "positive-tabindex"
+      ],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "12.9",
+      "theme": 12,
+      "title": "Dans chaque page web, la navigation ne doit pas contenir de piège au clavier. Cette règle est-elle respectée ?",
+      "level": "hint",
+      "sources": [
+        "probe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "dyn-keyboard-trap"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "12.10",
+      "theme": 12,
+      "title": "Dans chaque page web, les raccourcis clavier n’utilisant qu’une seule touche (lettre minuscule ou majuscule, ponctuation, chiffre ou symbole) sont-ils contrôlables par l’utilisateur ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "12.11",
+      "theme": 12,
+      "title": "Dans chaque page web, les contenus additionnels apparaissant au survol, à la prise de focus ou à l’activation d’un composant d’interface sont-ils si nécessaire atteignables au clavier ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "13.1",
+      "theme": 13,
+      "title": "Pour chaque page web, l’utilisateur a-t-il le contrôle de chaque limite de temps modifiant le contenu (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "meta-refresh-redirect"
+      ],
+      "advisory": [],
+      "tests": 4
+    },
+    {
+      "id": "13.2",
+      "theme": 13,
+      "title": "Dans chaque page web, l’ouverture d’une nouvelle fenêtre ne doit pas être déclenchée sans action de l’utilisateur. Cette règle est-elle respectée ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "13.3",
+      "theme": 13,
+      "title": "Dans chaque page web, chaque document bureautique en téléchargement possède-t-il, si nécessaire, une version accessible (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "13.4",
+      "theme": 13,
+      "title": "Pour chaque document bureautique ayant une version accessible, cette version offre-t-elle la même information ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "13.5",
+      "theme": 13,
+      "title": "Dans chaque page web, chaque contenu cryptique (art ASCII, émoticône, syntaxe cryptique) a-t-il une alternative ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "13.6",
+      "theme": 13,
+      "title": "Dans chaque page web, pour chaque contenu cryptique (art ASCII, émoticône, syntaxe cryptique) ayant une alternative, cette alternative est-elle pertinente ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "13.7",
+      "theme": 13,
+      "title": "Dans chaque page web, les changements brusques de luminosité ou les effets de flash sont-ils correctement utilisés ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    },
+    {
+      "id": "13.8",
+      "theme": 13,
+      "title": "Dans chaque page web, chaque contenu en mouvement ou clignotant est-il contrôlable par l’utilisateur ?",
+      "level": "hint",
+      "sources": [
+        "static",
+        "axe"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "axe:blink",
+        "axe:marquee",
+        "blink-marquee"
+      ],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "13.9",
+      "theme": 13,
+      "title": "Dans chaque page web, le contenu proposé est-il consultable quelle que soit l’orientation de l’écran (portrait ou paysage) (hors cas particuliers) ?",
+      "level": "hint",
+      "sources": [
+        "rendered"
+      ],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [
+        "rendered-orientation-lock"
+      ],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "13.10",
+      "theme": 13,
+      "title": "Dans chaque page web, les fonctionnalités utilisables ou disponibles au moyen d’un geste complexe peuvent-elles être également disponibles au moyen d’un geste simple (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 2
+    },
+    {
+      "id": "13.11",
+      "theme": 13,
+      "title": "Dans chaque page web, les actions déclenchées au moyen d’un dispositif de pointage sur un point unique de l’écran peuvent-elles faire l’objet d’une annulation (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 1
+    },
+    {
+      "id": "13.12",
+      "theme": 13,
+      "title": "Dans chaque page web, les fonctionnalités qui impliquent un mouvement de l’appareil ou vers l’appareil peuvent-elles être satisfaites de manière alternative (hors cas particuliers) ?",
+      "level": "llm",
+      "sources": [],
+      "decisiveSources": [],
+      "decisive": [],
+      "signals": [],
+      "advisory": [],
+      "tests": 3
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Principes : qui décide quoi — ultra11y</title>
+<meta name="description" content="Pourquoi le RGAA se juge plus qu’il ne se mesure, comment ultra11y partage le travail entre moteur, navigateur et IA, et pourquoi « non testé » ne veut jamais dire « conforme ».">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/site.js"></script>
+</head>
+<body>
+<!-- gen:nav -->
+<a class="skip" href="#contenu">Aller au contenu</a>
+<header class="site-header">
+  <div class="bar">
+    <a class="brand" href="index.html">ultra11y</a>
+    <nav aria-label="Navigation principale">
+      <ul>
+        <li><a href="index.html">Accueil</a></li>
+        <li><a href="principes.html" aria-current="page">Principes</a></li>
+        <li><a href="workflow.html">Intégration</a></li>
+        <li><a href="audit.html">Audit</a></li>
+        <li><a href="couverture.html">Couverture</a></li>
+        <li><a href="fiabilite.html">Fiabilité</a></li>
+        <li><a href="commandes.html">Commandes</a></li>
+      </ul>
+    </nav>
+    <button type="button" class="theme-toggle" id="theme-toggle" hidden aria-pressed="false">Thème sombre</button>
+  </div>
+</header>
+<!-- /gen:nav -->
+<main id="contenu">
+<h1>Principes : chacun son travail</h1>
+<p class="lede">Un outil automatique ne voit qu’une partie de l’accessibilité. ultra11y l’assume : la machine fait ce qu’elle sait prouver, l’IA juge le reste sous contrôle, et ce que personne n’a vérifié reste affiché comme tel.</p>
+
+<h2>Le problème : le RGAA se juge plus qu’il ne se mesure</h2>
+<p>Le RGAA est la version française des WCAG 2.2. Il est obligatoire pour les services publics et pour certaines entreprises. Il compte <strong><span data-gen="rgaa.criteria">106</span> critères</strong>, regroupés en <span data-gen="rgaa.themes.length">13</span> thématiques (images, couleurs, formulaires…). Chaque critère se décompose en tests numérotés : <strong><span data-gen="rgaa.tests.total">258</span> tests</strong> au total. Le critère 1.1, par exemple, compte <span data-gen="criteria.0.tests">8</span> tests.</p>
+<div class="card">
+  <h3>Ce que demandent les <span data-gen="rgaa.tests.total">258</span> tests officiels</h3>
+  <!-- gen:tests-bar -->
+<div class="stack" role="img" aria-label="Les 258 tests du RGAA : 27 tranchés par le code, 3 demandent la page affichée, 228 demandent un jugement"><div class="t-static" style="flex:27 1 0">27</div><div class="t-rendered" style="flex:3 1 0">3</div><div class="t-judgment" style="flex:228 1 0">228</div></div>
+  <ul class="legend legend-col">
+    <li><span class="sw t-static"></span><span><strong>27 tests tranchés par le code</strong> — une règle du moteur peut prouver l’échec en lisant le code source</span></li>
+    <li><span class="sw t-rendered"></span><span><strong>3 tests demandent la page affichée</strong> — une règle peut prouver l’échec, mais sur la page rendue</span></li>
+    <li><span class="sw t-judgment"></span><span><strong>228 tests demandent un jugement</strong> — pertinence, cohérence, contenu : l’IA ou un humain décide</span></li>
+  </ul>
+<!-- /gen:tests-bar -->
+  <p class="cap">Classement tiré de la matrice générée dans le dépôt (<a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/rgaa-automation.md"><code>rgaa-automation.md</code></a>). Un test « tranché par le code » peut prouver une non-conformité ; il ne suffit pas toujours à prouver la conformité.</p>
+</div>
+<p>Exemple de jugement : le test 1.3.1 demande si l’alternative d’une image « est pertinente ». Une règle peut vérifier qu’un attribut <code>alt</code> existe. Elle ne peut pas savoir si « logo » décrit vraiment l’image.</p>
+
+<div class="callout">
+  <p><strong>Un outil qui ne trouve rien ne prouve rien.</strong> Le danger d’un outil automatique, c’est de prendre son silence pour un « conforme ». ultra11y ne le fait jamais.</p>
+</div>
+
+<h2>Les quatre statuts d’un critère</h2>
+<dl class="card">
+  <dt><strong>C : conforme</strong></dt>
+  <dd>Le critère est respecté, et le verdict cite les éléments vérifiés.</dd>
+  <dt><strong>NC : non conforme</strong></dt>
+  <dd>Au moins un élément réel du code échoue à un test. La non-conformité pointe vers le fichier et la ligne.</dd>
+  <dt><strong>NA : non applicable</strong></dt>
+  <dd>Le critère ne concerne pas la page (pas de vidéo, pas de tableau…). Le NA doit être justifié.</dd>
+  <dt><strong>À évaluer</strong></dt>
+  <dd>Personne n’a encore tranché. Ce n’est ni un échec ni une réussite : c’est un travail restant, affiché comme tel.</dd>
+</dl>
+<p>Un critère que personne n’a vérifié reste <strong>« à évaluer »</strong>, jamais « conforme » par défaut. Le moteur refuse de conclure « conforme » à partir d’une absence d’erreur, sauf pour les critères où cette absence suffit vraiment : <span data-gen="rgaa.deterministic">8.3 et 8.5</span> (langue et titre de la page).</p>
+
+<h2>Le process : qui fait quoi</h2>
+<ol class="flow" aria-label="Les six étapes, du code aux livrables">
+  <li><strong>Code</strong><span>HTML, JSX, Vue, Svelte, Astro</span></li>
+  <li class="machine"><strong>Moteur</strong><span><span data-gen="engine.staticRules">93</span> vérifications sur le code</span></li>
+  <li class="machine"><strong>Navigateur</strong><span>contraste, focus, zoom</span></li>
+  <li><strong>Agent IA</strong><span>juge et justifie</span></li>
+  <li><strong>Garde-fous</strong><span><code>verify</code>, <code>check</code> : preuve exigée</span></li>
+  <li><strong>Livrables</strong><span>rapport RGAA, backlog, tickets</span></li>
+</ol>
+<p>Les étapes 2 et 3 sont mécaniques : <strong>la machine décide</strong>. Les étapes 4 et 5 relèvent du jugement : <strong>l’IA juge, sous contrôle</strong>. Un verdict sans preuve est renvoyé à l’agent.</p>
+<ul>
+  <li><strong>Le moteur</strong> lit le code source. Il trouve les défauts que le code suffit à montrer : image sans <code>alt</code>, champ sans étiquette, identifiant en double, ARIA invalide. <em>ARIA</em> désigne les attributs <code>role</code> et <code>aria-*</code> qui décrivent un composant aux technologies d’assistance (lecteurs d’écran…).</li>
+  <li><strong>Le navigateur</strong> (commande <code>scan</code>) affiche la vraie page. Il mesure le contraste calculé, le focus visible, le zoom à 200 %, l’affichage à 320 pixels de large, le contenu au survol.</li>
+  <li><strong>L’agent IA</strong> reçoit, pour chaque critère non tranché, les preuves collectées et le texte officiel du RGAA. Il rend un verdict justifié, ou dit qu’il ne peut pas trancher.</li>
+  <li><strong>Les garde-fous</strong> rejettent tout verdict qui ne cite pas de preuve vérifiable. Une non-conformité qui ne pointe vers aucun élément réel est supprimée. Un « conforme » contesté repart « à évaluer ».</li>
+</ul>
+
+<h2>Règles et critères : deux choses différentes</h2>
+<p>Les <span data-gen="engine.staticRules">93</span> vérifications du moteur ne sont pas <span data-gen="engine.staticRules">93</span> tests RGAA. Plusieurs règles visent le même test, une règle peut servir à plusieurs critères, et la plupart ne donnent qu’un indice. Au total, le code seul tranche <span data-gen="rgaa.tests.static">27</span> tests sur <span data-gen="rgaa.tests.total">258</span>.</p>
+<p>Une règle a l’un de trois effets sur un critère :</p>
+<ul>
+  <li><strong>Décisive</strong> : le défaut observé suffit à faire échouer un test précis. Le critère passe en NC sans intervention de l’IA.</li>
+  <li><strong>Indice</strong> : la règle signale un candidat (une image dont l’<code>alt</code> semble générique, par exemple). L’IA tranche.</li>
+  <li><strong>Recommandation non normative</strong> : une bonne pratique qu’aucun test officiel n’exige. Elle apparaît à part dans le rapport et ne fait jamais passer un critère en NC.</li>
+</ul>
+<p>La page <a href="couverture.html">Couverture</a> détaille, critère par critère, quelles règles existent et ce qu’elles prouvent.</p>
+
+<h2>Deux règles qui ne se discutent pas</h2>
+<div class="two">
+  <div class="card">
+    <h3>Ne jamais inventer une non-conformité</h3>
+    <p>Chaque NC cite un élément réel, à un endroit précis du code. <code>check</code> vérifie que l’élément existe. Une NC qui ne se vérifie pas est retirée.</p>
+  </div>
+  <div class="card">
+    <h3>Ne jamais inventer une conformité</h3>
+    <p>Un « conforme » se justifie comme un « non conforme » : il cite les éléments vérifiés. Sans preuve, ou sur des preuves incomplètes, le critère reste « à évaluer ».</p>
+  </div>
+</div>
+</main>
+<!-- gen:footer -->
+<footer class="site-footer">
+  <p>ultra11y 5.45.1 · licence MIT · <a href="https://github.com/SocialGouv/ultra11y">code source sur GitHub</a> · <a href="https://www.npmjs.com/package/ultra11y">paquet npm</a></p>
+  <p>Les chiffres de ce site sont calculés depuis le code à chaque publication (<code>pnpm run build:site</code>). RGAA 4.1.2 © DINUM, Licence Ouverte / Etalab 2.0. Corpus ACT © W3C ACT Rules Community Group.</p>
+</footer>
+<!-- /gen:footer -->
+</body>
+</html>
