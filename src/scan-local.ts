@@ -9,9 +9,9 @@
 // Browser-context code is passed to page.evaluate AS STRINGS — like the Docker RUNNER —
 // because the engine's tsconfig ships no DOM lib (it is a Node program); a typed
 // arrow body referencing document/window would not type-check.
-import { existsSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { DynamicFinding, DynamicResult, Lang, SamplePage, ScanRedirect } from "./types.js";
 import { type DiscoverOpts, discoverUrls, type ProbeHit, type RunnerOutput, tagSampleFindings, toDynamicResult, writeRunnerSnapshot } from "./scan.js";
 // The stress probes live in their own module so the E2E plugin can run them on a page it
@@ -154,7 +154,16 @@ export function localTierStatus(cwd: string): LocalTierStatus {
     // No path at all ⇒ a Playwright that cannot tell us; treat as available and let the
     // launch report its own failure, rather than refusing a tier that might work.
     if (typeof bin === "string" && bin.length > 0 && !existsSync(bin)) {
-      return { ok: false, reason: `no browser binary at ${bin} — run \`npx playwright install chromium\`` };
+      // Name WHICH Playwright wanted it: the engine's own copy is the usual one, and `npx` run
+      // from the audited project would install a browser for a different revision. Not
+      // counting an installed Google Chrome as available is deliberate — `auto` (and the
+      // action's `status --browser`) keep their behaviour; `--runtime local` tries it.
+      const pw = resolvedPlaywright(cwd);
+      const cliJs = pw ? join(dirname(pw.path), "cli.js") : undefined;
+      return {
+        ok: false,
+        reason: `no browser binary at ${bin} for ${PW_SPEC}${pw?.version ? `@${pw.version}` : ""}${pw ? ` (${pw.path})` : ""} — run \`${cliJs ? `node ${cliJs}` : "npx playwright"} install chromium\`, or pass --runtime local to fall back on an installed Google Chrome`,
+      };
     }
     return { ok: true };
   } catch (e) {
@@ -202,18 +211,80 @@ export function resolveLocalDeps(cwd: string): LocalDeps {
   return { chromium, AxeBuilder };
 }
 
-async function launchChromium(chromium: Any): Promise<Any> {
-  try {
-    return await chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (/Executable doesn'?t exist|playwright install|browserType\.launch/i.test(msg)) {
-      throw new Error(
-        `Could not launch Chromium for the resolved Playwright. Install it from the --cwd project: \`npx playwright install chromium\`. (${msg})`,
-      );
+/** Which Playwright `resolveLocalDeps` would load from `cwd` — its path and version — so a
+ *  launch failure can name the install to fix. The engine resolves the TARGET project's
+ *  Playwright first and its OWN second; a message that only said « install it from the --cwd
+ *  project » sent a user whose project has no Playwright at all to the wrong place, when the
+ *  copy that failed was the engine's. Undefined when nothing resolves. */
+export function resolvedPlaywright(cwd: string): { path: string; version?: string } | undefined {
+  for (const from of resolveAnchors(cwd)) {
+    try {
+      const req = createRequire(from);
+      const path = req.resolve(PW_SPEC);
+      let version: string | undefined;
+      try {
+        version = (req(`${PW_SPEC}/package.json`) as { version?: string }).version;
+      } catch {
+        // A Playwright whose exports hide package.json still names its path.
+      }
+      return { path, version };
+    } catch {
+      // try the next anchor
     }
-    throw e;
   }
+  return undefined;
+}
+
+const realDir = (dir: string): string => {
+  try {
+    return realpathSync(dir);
+  } catch {
+    return resolve(dir);
+  }
+};
+
+const MISSING_BROWSER = /Executable doesn'?t exist|playwright install|browserType\.launch/i;
+
+/** Launch Chromium, falling back to a browser that is ALREADY on the machine.
+ *
+ *  Playwright's default headless launch wants the exact `chromium_headless_shell-<rev>` its own
+ *  version pins. Measured auditing a static site: Chrome stable installed, three other
+ *  Playwright revisions in the cache, and the scan refused to start until a 95 MB download of
+ *  the one revision the engine's Playwright wanted. So when the pinned binary is missing, try
+ *  the bundled full Chromium (`channel: "chromium"`), then the installed Google Chrome
+ *  (`channel: "chrome"`), and say on stderr which one ran. Only when all three fail is it an
+ *  error — and the error names the Playwright install that was resolved. */
+export async function launchChromium(chromium: Any, cwd = ".", warn: (msg: string) => void = (m) => console.error(m)): Promise<Any> {
+  const args = ["--no-sandbox", "--disable-dev-shm-usage"];
+  let first: unknown;
+  try {
+    return await chromium.launch({ args });
+  } catch (e) {
+    first = e;
+    if (!MISSING_BROWSER.test(e instanceof Error ? e.message : String(e))) throw e;
+  }
+  for (const channel of ["chromium", "chrome"] as const) {
+    try {
+      const browser = await chromium.launch({ args, channel });
+      warn(
+        channel === "chrome"
+          ? `ultra11y scan: Playwright's bundled Chromium is not installed — using the installed Google Chrome (channel "chrome").`
+          : `ultra11y scan: Playwright's headless shell is not installed — using its full Chromium build (channel "chromium").`,
+      );
+      return browser;
+    } catch {
+      // try the next channel
+    }
+  }
+  const msg = first instanceof Error ? first.message : String(first);
+  const pw = resolvedPlaywright(cwd);
+  const which = pw ? `${PW_SPEC}${pw.version ? `@${pw.version}` : ""} resolved at ${pw.path}` : `${PW_SPEC} (resolution path unknown)`;
+  const own = pw ? !pw.path.startsWith(realDir(cwd)) && !pw.path.startsWith(resolve(cwd)) : false;
+  const cliJs = pw ? join(dirname(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
+  throw new Error(
+    `Could not launch Chromium: the browser for ${which} is not installed, and no installed Google Chrome was found either. ` +
+      `Install the browser for THAT Playwright — \`node ${cliJs} install chromium\`${own ? " (this is ultra11y's own Playwright, not the audited project's)" : ""} — or install Google Chrome, or use --runtime docker. (${msg.split("\n")[0]})`,
+  );
 }
 
 // ---- residual-criteria probes (browser-context source, evaluated as strings) ----
@@ -794,7 +865,7 @@ export async function runScanLocal(opts: LocalScanOpts): Promise<DynamicResult> 
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
-  const browser = await launchChromium(chromium);
+  const browser = await launchChromium(chromium, opts.cwd);
   try {
     const out = await runOnPage(browser, AxeBuilder, opts.target, isFile, {
       storageState: opts.storageState,
@@ -825,7 +896,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
-  const browser = await launchChromium(chromium);
+  const browser = await launchChromium(chromium, opts.cwd);
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];
   // Kept so the run-level coverage stamp can be built from what each page ACTUALLY measured
@@ -921,7 +992,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
-  const browser = await launchChromium(chromium);
+  const browser = await launchChromium(chromium, opts.cwd);
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];
   // Kept so the run-level coverage stamp can be built from what each page ACTUALLY measured
