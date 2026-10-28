@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.48.0](https://github.com/SocialGouv/ultra11y/compare/v5.47.1...v5.48.0) (2026-10-28)
+
+
+### Features
+
+* **rgaa:** release the criterion-by-criterion review and the action's exclude input ([#74](https://github.com/SocialGouv/ultra11y/issues/74)) ([9fa8cd6](https://github.com/SocialGouv/ultra11y/commit/9fa8cd61e34ff65150db3a854444f5b68743e9aa)), closes [#73](https://github.com/SocialGouv/ultra11y/issues/73) [#65](https://github.com/SocialGouv/ultra11y/issues/65)
+
 ## [5.47.1](https://github.com/SocialGouv/ultra11y/compare/v5.47.0...v5.47.1) (2026-10-28)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "ultra11y",
-  "version": "5.47.1",
+  "version": "5.48.0",
   "description": "Audit d'accessibilité RGAA 4.1.2, le référentiel de l'État : rapport daté, grille des 106 critères, backlog et tickets. Moteur statique, navigateur et jugement IA contre-vérifié. Il ne déclare jamais conforme ce qu'il n'a pas vérifié. Socle WCAG 2.2 AA.",
   "homepage": "https://socialgouv.github.io/ultra11y/",
   "type": "module",

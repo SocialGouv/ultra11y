@@ -1,7 +1,7 @@
 {
   "name": "ultra11y",
   "description": "RGAA 4.1.2 accessibility audits, the French State's standard, on a WCAG 2.2 AA core: automatic review before commit, push and pull request, plus dated, evidenced Markdown, HTML and per-page conformance reports. Never declares conforming what it has not verified.",
-  "version": "5.47.1",
+  "version": "5.48.0",
   "author": { "name": "maxgfr" },
   "homepage": "https://github.com/SocialGouv/ultra11y",
   "repository": "https://github.com/SocialGouv/ultra11y",
