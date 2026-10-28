@@ -42,12 +42,16 @@ export interface SiteCriterion {
 
 export interface SiteData {
   version: string;
+  /** The oldest Node.js the CLI runs on, from package.json `engines.node` (">=22.18.0" → "22.18"). */
+  node: string;
   rgaa: {
     version: string;
     criteria: number;
     themes: { n: number; name: string; count: number }[];
     tests: { total: number; static: number; rendered: number; judgment: number; decidable: number };
     levels: Record<Level, number>;
+    /** Criteria where a rule can prove a non-conformity: deterministic + proven NC. */
+    provable: number;
     deterministic: string[];
     touched: number;
     /** Criteria where a « conforme » can only come from a judgment (not complete by silence). */
@@ -122,7 +126,9 @@ function countFiles(dir: string): number {
 
 /** Compute every number the site quotes. `root` is the repository root. */
 export function buildSiteData(root: string): SiteData {
-  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string };
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string; engines?: { node?: string } };
+  const nodeMin = /(\d+)\.(\d+)/.exec(pkg.engines?.node ?? "");
+  if (!nodeMin) throw new Error("site: package.json has no engines.node minimum");
   const pack = loadPack("rgaa");
   const crits = allCriteria(pack);
 
@@ -191,6 +197,7 @@ export function buildSiteData(root: string): SiteData {
 
   return {
     version: pkg.version,
+    node: `${nodeMin[1]}.${nodeMin[2]}`,
     rgaa: {
       version: pack.baseVersion ?? "",
       criteria: criteria.length,
@@ -207,6 +214,7 @@ export function buildSiteData(root: string): SiteData {
         decidable: tcount("static") + tcount("rendered"),
       },
       levels,
+      provable: levels.det + levels.nc,
       deterministic: criteria.filter((c) => c.level === "det").map((c) => c.id),
       touched: criteria.filter((c) => c.sources.length > 0).length,
       cNeedsJudgment: criteria.length - levels.det,
@@ -254,6 +262,7 @@ export const fmt = (n: number): string => String(n).replace(/\B(?=(\d{3})+(?!\d)
 
 export const PAGES: { file: string; label: string }[] = [
   { file: "index.html", label: "Accueil" },
+  { file: "installation.html", label: "Installer" },
   { file: "principes.html", label: "Principes" },
   { file: "workflow.html", label: "Intégration" },
   { file: "audit.html", label: "Audit" },
@@ -314,7 +323,7 @@ function testsBar(d: SiteData): string {
   const legend = parts
     .map((p) => `<li><span class="sw ${p.k}"></span><span><strong>${p.n} tests ${esc(p.label)}</strong> — ${esc(p.desc)}</span></li>`)
     .join("\n    ");
-  return `<div class="stack" role="img" aria-label="Les ${t.total} tests du RGAA : ${parts.map((p) => `${p.n} ${p.label}`).join(", ")}">${segs}</div>
+  return `<div class="stack stack-lg" role="img" aria-label="Les ${t.total} tests du RGAA : ${parts.map((p) => `${p.n} ${p.label}`).join(", ")}">${segs}</div>
   <ul class="legend legend-col">
     ${legend}
   </ul>`;
@@ -388,6 +397,64 @@ function actBar(d: SiteData): string {
   </ul>`;
 }
 
+/** Slide 3: Code → Moteur → Navigateur → Agent IA → Garde-fous → Livrables, with the two
+ *  bands (« la machine décide », « l’IA juge, sous contrôle ») and the loop back to the agent.
+ *  The steps are an ordered list; the bands and the loop are real text placed on the grid. */
+function processDiagram(d: SiteData): string {
+  return `<figure class="dia proc" aria-labelledby="proc-cap">
+  <p class="band band-solid proc-b1">La machine décide</p>
+  <p class="band band-dashed proc-b2">L’IA juge, sous contrôle</p>
+  <ol class="proc-steps">
+    <li class="bx bx-plain"><strong>Code</strong><span>HTML, JSX, Vue, Svelte, Astro</span></li>
+    <li class="bx bx-fill"><strong>Moteur</strong><span>${d.engine.staticRules} vérifications sur le code</span></li>
+    <li class="bx bx-fill"><strong>Navigateur</strong><span>contraste, focus, zoom</span></li>
+    <li class="bx bx-line"><strong>Agent IA</strong><span>juge et justifie</span></li>
+    <li class="bx bx-pale"><strong>Garde-fous</strong><span><code>verify</code>, <code>check</code> : preuve exigée</span></li>
+    <li class="bx bx-plain"><strong>Livrables</strong><span>rapport RGAA, backlog, tickets</span></li>
+  </ol>
+  <p class="proc-loop"><span class="loop-line" aria-hidden="true"></span><span class="loop-text">verdict sans preuve : renvoyé à l’agent</span></p>
+  <figcaption id="proc-cap">Le process en six étapes, du code aux livrables. Le moteur et le navigateur sont mécaniques : la machine décide. L’agent IA et les garde-fous relèvent du jugement : l’IA juge, sous contrôle. Un verdict sans preuve est renvoyé par les garde-fous à l’agent IA, qui doit le refaire.</figcaption>
+</figure>`;
+}
+
+/** Slide 8: one square per RGAA criterion, coloured by how far a rule can decide it. */
+function waffle(d: SiteData): string {
+  const order: Level[] = ["det", "nc", "hint", "llm"];
+  const squares = order.flatMap((k) => Array.from({ length: d.rgaa.levels[k] }, () => `<span class="sq c-${k}"></span>`)).join("");
+  const legend = order
+    .map(
+      (k) =>
+        `<li><span class="sw c-${k}"></span><span><strong><span class="mark mark-${k}"></span>${d.rgaa.levels[k]} critères · ${esc(LEVEL_LABEL[k].name)}</strong> — ${esc(LEVEL_LABEL[k].desc)}</span></li>`,
+    )
+    .join("\n    ");
+  const label = order.map((k) => `${d.rgaa.levels[k]} ${LEVEL_LABEL[k].count}`).join(", ");
+  return `<div class="waffle" role="img" aria-label="Les ${d.rgaa.criteria} critères, un carré par critère : ${esc(label)}">${squares}</div>
+  <ul class="legend legend-col">
+    ${legend}
+  </ul>`;
+}
+
+/** Slide 9: the W3C ACT score on the slide's dark-blue panel. Real text; only the bars are drawn. */
+function actScore(d: SiteData): string {
+  const a = d.act;
+  const w = (n: number, of: number): string => (of ? ((n / of) * 100).toFixed(2) : "0");
+  const fp = a.falsePositives === 0 ? "aucune fausse alerte inexpliquée" : `${a.falsePositives} fausse(s) alerte(s) inexpliquée(s)`;
+  return `<div class="act-score">
+  <p class="as-h"><strong>${a.failedScored}</strong> exemples fautifs, sur les ${a.scoredRules} règles ACT notées</p>
+  <div class="as-row">
+    <div class="as-track" aria-hidden="true"><div class="as-fill" style="width:${w(a.caught, a.failedScored)}%"></div></div>
+    <p class="as-in"><strong>${a.caught} signalés · ${a.recallPct} %</strong></p>
+    <p class="as-side">${a.failed.missed} manqués, listés un par un dans le dépôt</p>
+  </div>
+  <p class="as-h"><strong>${a.clean}</strong> exemples corrects</p>
+  <div class="as-row">
+    <div class="as-track" aria-hidden="true"><div class="as-fill" style="width:100%"></div></div>
+    <p class="as-in"><strong>${a.clean} laissés tranquilles</strong></p>
+    <p class="as-side">${esc(fp)}</p>
+  </div>
+</div>`;
+}
+
 function table(d: SiteData): string {
   const code = (xs: string[]): string => (xs.length ? xs.map((x) => `<code>${esc(x)}</code>`).join(", ") : "—");
   const rows = d.criteria
@@ -415,6 +482,9 @@ const BLOCKS: Record<string, (d: SiteData, file: string) => string> = {
   grid: (d) => grid(d),
   "source-bars": (d) => sourceBars(d),
   "act-bar": (d) => actBar(d),
+  "act-score": (d) => actScore(d),
+  process: (d) => processDiagram(d),
+  waffle: (d) => waffle(d),
   table: (d) => table(d),
 };
 

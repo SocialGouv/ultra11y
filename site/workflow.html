@@ -17,6 +17,7 @@
     <nav aria-label="Navigation principale">
       <ul>
         <li><a href="index.html">Accueil</a></li>
+        <li><a href="installation.html">Installer</a></li>
         <li><a href="principes.html">Principes</a></li>
         <li><a href="workflow.html" aria-current="page">Intégration</a></li>
         <li><a href="audit.html">Audit</a></li>
@@ -35,37 +36,53 @@
 
 <h2>Deux skills, un même moteur</h2>
 <p>Une <em lang="en">skill</em> est un mode d’emploi qu’un agent de code (Claude Code, Codex, OpenCode…) charge quand la tâche s’y prête. Les deux skills embarquent le même moteur, sans installation.</p>
-<div class="scroll" role="region" aria-label="Comparaison des deux skills" tabindex="0">
-<table>
-  <caption class="sr-only">Comparaison des skills review-a11y et ultra11y</caption>
-  <thead><tr><th scope="col"><span class="sr-only">Aspect comparé</span></th><th scope="col"><code>review-a11y</code> : la revue de code</th><th scope="col"><code>ultra11y</code> : l’audit de conformité</th></tr></thead>
-  <tbody>
-    <tr><th scope="row">Question</th><td>« Ce changement est-il accessible ? »</td><td>« Ce site est-il conforme au RGAA ? »</td></tr>
-    <tr><th scope="row">Périmètre</th><td>Le diff : fichiers indexés (<em lang="en">staged</em>), branche, pull request</td><td>Le dépôt, le site, un échantillon de pages</td></tr>
-    <tr><th scope="row">Déclenchement</th><td>Automatique : avant commit, push et pull request</td><td>À la demande</td></tr>
-    <tr><th scope="row">Résultat</th><td>Une revue classée par gravité, avec fichier et ligne</td><td>Rapport daté, grille RGAA, backlog, tickets</td></tr>
-  </tbody>
-</table>
+<div class="skills">
+  <section class="skill skill-review" aria-labelledby="skill-review">
+    <h3 id="skill-review"><code>review-a11y</code><span>La revue de code</span></h3>
+    <dl>
+      <dt>Question</dt><dd>« Ce changement est-il accessible ? »</dd>
+      <dt>Périmètre</dt><dd>Le diff : fichiers indexés (<em lang="en">staged</em>), branche, pull request</dd>
+      <dt>Déclenchement</dt><dd>Automatique : un hook avant commit, push et pull request</dd>
+      <dt>Résultat</dt><dd>Une revue classée par gravité, avec fichier et ligne</dd>
+    </dl>
+  </section>
+  <section class="skill skill-audit" aria-labelledby="skill-audit">
+    <h3 id="skill-audit"><code>ultra11y</code><span>L’audit de conformité RGAA</span></h3>
+    <dl>
+      <dt>Question</dt><dd>« Ce site est-il conforme au RGAA ? »</dd>
+      <dt>Périmètre</dt><dd>Le dépôt, le site, un échantillon de pages</dd>
+      <dt>Déclenchement</dt><dd>À la demande</dd>
+      <dt>Résultat</dt><dd>Rapport daté, grille RGAA, backlog, tickets</dd>
+    </dl>
+  </section>
 </div>
 <div class="callout">
   <p><strong>Règle commune : ne jamais inventer une non-conformité, ni une conformité.</strong></p>
 </div>
 
 <h2>Les quatre moments</h2>
-<ol class="flow">
-  <li><em class="tag">review-a11y</em><strong>J’écris du code</strong><span>dans mon agent (Claude Code, Codex…)</span></li>
-  <li><em class="tag">review-a11y</em><strong><code>git commit</code> ou <code>push</code></strong><span>le hook audite le diff et bloque une seule fois</span></li>
-  <li><em class="tag">review-a11y</em><strong>Pull request</strong><span>la GitHub Action annote le diff</span></li>
-  <li class="machine"><em class="tag">ultra11y</em><strong>Recette ou audit</strong><span>rapport RGAA daté, backlog, tickets</span></li>
-</ol>
-<p><code>review-a11y</code> accompagne les trois premiers moments, en boucle courte sur le changement. <code>ultra11y</code> prend le relais pour l’audit complet. S’y ajoutent <code>checkA11y(page)</code> dans les tests Playwright ou Cypress, et un serveur MCP. Chaque moment est détaillé dans la suite de cette page.</p>
+<figure class="dia tl" aria-labelledby="tl-cap">
+  <p class="tl-band tl-b1"><code>review-a11y</code> · boucle courte, sur le changement</p>
+  <p class="tl-band tl-b2"><code>ultra11y</code> · audit complet</p>
+  <ol class="tl-steps">
+    <li><strong>J’écris du code</strong><span>dans mon agent (Claude Code, Codex…)</span></li>
+    <li><strong><code>git commit</code> ou <code>push</code></strong><span>le hook audite le diff et bloque une seule fois</span></li>
+    <li><strong>Pull request</strong><span>la GitHub Action annote le diff</span></li>
+    <li><strong>Recette ou audit</strong><span>rapport RGAA daté, backlog, tickets</span></li>
+  </ol>
+  <p class="tl-note">Aussi : <code>checkA11y(page)</code> dans les tests Playwright ou Cypress, et un serveur MCP.</p>
+  <figcaption id="tl-cap">Les quatre moments où ultra11y se branche. La skill <code>review-a11y</code> couvre les trois premiers, en boucle courte sur le changement : pendant l’écriture du code, au commit ou au push, sur la pull request. La skill <code>ultra11y</code> prend le relais au quatrième, pour l’audit complet de recette.</figcaption>
+</figure>
+<p>Chaque moment est détaillé dans la suite de cette page.</p>
 
 <h3>1. Pendant que j’écris du code</h3>
 <p>Installé comme extension (<em lang="en">plugin</em>) de l’agent, ultra11y fournit les deux skills et un <em lang="en">hook</em> : un petit programme que l’agent exécute avant certaines commandes.</p>
-<pre><code>/plugin marketplace add SocialGouv/ultra11y     # Claude Code
+<pre><code>/plugin marketplace add SocialGouv/ultra11y        # Claude Code, dans la conversation
 /plugin install ultra11y@ultra11y
-codex plugin marketplace add SocialGouv/ultra11y  # Codex CLI
-npx ultra11y install --opencode                 # OpenCode</code></pre>
+codex plugin marketplace add SocialGouv/ultra11y   # Codex CLI, dans le terminal
+codex plugin add ultra11y@ultra11y
+npx ultra11y install --opencode                    # OpenCode</code></pre>
+<p>Pas à pas, depuis zéro : <a href="installation.html#agent">installer la skill dans Claude Code ou Codex</a>.</p>
 
 <h3>2. Au commit et au push</h3>
 <p>Quand l’agent lance <code>git commit</code>, <code>git push</code> ou <code>gh pr create</code>, le hook audite le diff. S’il trouve un problème, il bloque la commande <strong>une seule fois</strong> et transmet les constats à l’agent, qui lance alors <code>review-a11y</code>. Une nouvelle tentative passe toujours : le hook ne bloque jamais deux fois pour les mêmes constats.</p>

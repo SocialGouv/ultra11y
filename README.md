@@ -1,4 +1,4 @@
-# ultra11y
+# ultra11y — RGAA 4.1.2 accessibility audits, on a WCAG 2.2 AA core
 
 [![CI](https://github.com/SocialGouv/ultra11y/actions/workflows/ci.yml/badge.svg)](https://github.com/SocialGouv/ultra11y/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/ultra11y?logo=npm)](https://www.npmjs.com/package/ultra11y)
@@ -25,7 +25,7 @@ pull request — you never type the skill's name:
 `npx ultra11y install --all`, and `npx ultra11y status` to check what is actually wired.
 Full details, thresholds and off-switches under [Install](#install).</sub>
 
-> Audit HTML/CSS/JSX against **WCAG 2.2 AA** accessibility and produce a dated compliance report — or author/review accessible markup without regressions. A [skills.sh](https://skills.sh) agent skill: a deterministic, zero-dependency static engine **plus** the agent's judgment, with `check`/`verify` gates against hallucinated non-conformities. **The central deliverable is the auditor conformance block** — theme, criterion + official wording, test(s), WCAG mapping + level, finding, expected state, verification, `file:line` occurrences — rendered identically by the `report` (compliance doc), the `prd` backlog and the GitHub issues, in the active standard's vocabulary and **in your language** (`--lang auto` follows the conversation/repo). **WCAG is the worldwide core; country standards (RGAA, …) are pluggable in-repo packs.**
+> Audit a site against **RGAA 4.1.2**, the French State's accessibility standard (*référentiel général d'amélioration de l'accessibilité*), on its **WCAG 2.2 AA** core: a dated conformance report, the 106-criterion grid, a backlog and tickets — or author/review accessible markup without regressions. It never declares conforming what it has not verified. A [skills.sh](https://skills.sh) agent skill: a deterministic, zero-dependency static engine **plus** the agent's judgment, with `check`/`verify` gates against hallucinated non-conformities. **The central deliverable is the auditor conformance block** — theme, criterion + official wording, test(s), WCAG mapping + level, finding, expected state, verification, `file:line` occurrences — rendered identically by the `report` (compliance doc), the `prd` backlog and the GitHub issues, in the active standard's vocabulary and **in your language** (`--lang auto` follows the conversation/repo). **RGAA ships first; WCAG is the worldwide core it maps onto, and other country standards are pluggable in-repo packs.**
 
 ultra11y is built around an honest **division of labour**. Automated tools only catch a fraction of accessibility problems, so the engine does the *mechanical* work — 94 machine-detectable static checks tied to the WCAG 2.2 success criteria — and is explicit about everything it can't decide statically. What it can't, the **AI agent adjudicates** (statically, from the evidence, gated by `verify`/`check`) — not a deferral to a human:
 

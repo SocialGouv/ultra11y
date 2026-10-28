@@ -1,5 +1,6 @@
 {
   "version": "5.47.1",
+  "node": "22.18",
   "rgaa": {
     "version": "4.1.2",
     "criteria": 106,
@@ -83,6 +84,7 @@
       "hint": 28,
       "llm": 57
     },
+    "provable": 21,
     "deterministic": [
       "8.3",
       "8.5"
