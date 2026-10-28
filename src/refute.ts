@@ -42,10 +42,12 @@ const REASON = {
   fr: {
     nc: "Non-conformité réfutée à la contre-expertise : le constat ne tient pas sur l'élément cité. Le critère retourne « à évaluer » — réfuter une non-conformité n'établit pas la conformité.",
     c: "Conformité revendiquée non étayée à la contre-expertise : l'évidence citée constate une présence, pas une conformité. Le critère retourne « à évaluer » — il ne devient PAS une non-conformité.",
+    na: "« Non applicable » non étayé à la contre-expertise : rien n'avait été collecté, et l'absence de collecte ne prouve pas que le périmètre ne contient rien de concerné. Le critère retourne « à évaluer » — il ne devient PAS une non-conformité.",
   },
   en: {
     nc: "Non-conformity refuted on review: the observation does not hold on the cited element. The criterion goes back to “to assess” — refuting a non-conformity does not establish conformity.",
     c: "Claimed conformity unsupported on review: the cited evidence observes a presence, not a conformity. The criterion goes back to “to assess” — it does NOT become a non-conformity.",
+    na: "“Not applicable” unsupported on review: nothing had been harvested, and an empty harvest does not prove the scope holds nothing concerned. The criterion goes back to “to assess” — it does NOT become a non-conformity.",
   },
 } as const;
 
@@ -79,10 +81,15 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
   const withdrawn = items.filter((it) => WITHDRAWN.has((it.verdict ?? "").trim().toLowerCase()));
   const removedNc = new Map<string, Set<string>>(); // criterion → anchors to delete
   const withdrawnC = new Set<string>();
+  // Criteria whose withdrawn clearing claim cited NOTHING — an NA — so the recorded reason
+  // speaks of an empty harvest, not of « cited evidence » that never existed.
+  const withdrawnUncited = new Set<string>();
   const notes = new Map<string, string[]>();
   for (const it of withdrawn) {
-    if (it.kind === "c") withdrawnC.add(it.criteriaId);
-    else (removedNc.get(it.criteriaId) ?? removedNc.set(it.criteriaId, new Set()).get(it.criteriaId)!).add(key(it.file, it.line, it.selector));
+    if (it.kind === "c") {
+      withdrawnC.add(it.criteriaId);
+      if (it.uncited) withdrawnUncited.add(it.criteriaId);
+    } else (removedNc.get(it.criteriaId) ?? removedNc.set(it.criteriaId, new Set()).get(it.criteriaId)!).add(key(it.file, it.line, it.selector));
     if (it.note?.trim()) {
       const criterionNotes = notes.get(it.criteriaId) ?? [];
       if (!criterionNotes.includes(it.note.trim())) criterionNotes.push(it.note.trim());
@@ -139,7 +146,7 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
     if (withdrawnC.has(rec.id) && isAgent) {
       acted.add(rec.id);
       clearedConformities.push(rec.id);
-      setOpen(withReview(rec.id, reason.c));
+      setOpen(withReview(rec.id, withdrawnUncited.has(rec.id) ? reason.na : reason.c));
     }
   };
 

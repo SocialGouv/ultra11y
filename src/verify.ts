@@ -8,6 +8,7 @@ import { join } from "node:path";
 import type { AuditResult, CriterionCitation, Lang } from "./types.js";
 import { getSC, scTitle } from "./wcag.js";
 import { type StandardId, isCore, loadPack, getCriterion as getPackCriterion, idCaptureSource } from "./standards/index.js";
+import { subjectsAbsent, subjectsForPackCriterion, subjectsForSc } from "./adjudicate-subjects.js";
 
 export const VERIFY_MAX = 40;
 
@@ -45,6 +46,11 @@ export interface VerifyItem {
   /** A claimed conformity is established by its evidence SET, especially for cross-page
    * criteria. The primary file/line fields remain for compatibility and display. */
   citations?: CriterionCitation[];
+  /** A claim that cites NOTHING — in practice an agent's « non applicable » on a criterion
+   *  whose harvest came back empty. There is no anchor to re-open, so the trial asks the
+   *  scope-level question instead (is there really nothing here the criterion is about?) and
+   *  the grounding gate has nothing to check. `file` is empty and `line` 0 on such an item. */
+  uncited?: boolean;
 }
 
 const plain = (s: string) => s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
@@ -228,9 +234,25 @@ export function refuteSystemPrompt(lang: Lang = "en"): string {
     lang === "fr"
       ? "Pour une conformité qui porte `citations`, ouvrez et jugez le faisceau COMPLET : un critère transversal n'a pas à être prouvé par chaque ancre isolément."
       : "For a conformity carrying `citations`, open and judge the COMPLETE evidence set: a cross-cutting criterion need not be proved by each anchor in isolation.";
-  return [s.refuteRole, "", s.supported, s.partial, s.refuted, s.unsupported, "", s.refuteInverted, setRule, s.refuteAttach, s.refuteDoubt, s.refuteNever].join(
-    "\n",
-  );
+  const uncitedRule =
+    lang === "fr"
+      ? "Une conformité marquée `uncited` ne cite rien : c'est un « non applicable » déclaré sur un critère dont rien n'a été collecté. Ouvrez les pages auditées et demandez-vous s'il n'y a VRAIMENT rien de ce dont parle le critère ; l'absence de collecte n'est jamais une preuve à elle seule."
+      : "A conformity marked `uncited` cites nothing: it is a « not applicable » declared on a criterion nothing was harvested for. Open the audited pages and ask whether there is REALLY nothing the criterion is about; an empty harvest is never proof on its own.";
+  return [
+    s.refuteRole,
+    "",
+    s.supported,
+    s.partial,
+    s.refuted,
+    s.unsupported,
+    "",
+    s.refuteInverted,
+    setRule,
+    uncitedRule,
+    s.refuteAttach,
+    s.refuteDoubt,
+    s.refuteNever,
+  ].join("\n");
 }
 
 export function conformityClaimsFromAudit(audit: AuditResult, standard: StandardId): ConformityClaim[] {
@@ -240,18 +262,40 @@ export function conformityClaimsFromAudit(audit: AuditResult, standard: Standard
     justification: c.justification,
     citations: c.citations,
   });
+  // A pack adjudication keeps an agent's « non applicable » as `NA`; the core criteria fold it
+  // to `C`. Both clear the criterion and both count as conforming in the rate, so both stand
+  // trial — the pack filter used to read `C` only, which let every agent NA on an RGAA audit
+  // through untried.
+  const clears = (status: string | null | undefined): boolean => status === "C" || status === "NA";
+  // An UNCITED clearing claim is, in practice, an NA (applyAdjudication refuses an uncited C).
+  // It goes on trial — unless the engine's own absence fold already proves the agent right:
+  // every subject of the criterion is one whose emptiness proves absence, and none was seen
+  // anywhere in the scope. That is the test the engine closes a criterion on by itself
+  // (src/audit.ts), so trying it again would bill a refuter for the engine's arithmetic.
+  const seen = audit.scope?.subjectsSeen ? new Set(audit.scope.subjectsSeen) : undefined;
+  const needsTrial = (c: { citations?: CriterionCitation[] }, subjects: () => string[]): boolean =>
+    (c.citations?.length ?? 0) > 0 || seen === undefined || !subjectsAbsent(subjects(), seen);
   if (!isCore(standard)) {
     const pa = audit.packAdjudication;
     if (!pa || pa.standard !== standard) return [];
-    return pa.criteria.filter((c) => c.decidedBy === "agent" && c.status === "C").map(claim);
+    const pack = loadPack(standard);
+    return pa.criteria
+      .filter((c) => c.decidedBy === "agent" && clears(c.status))
+      .filter((c) => needsTrial(c, () => subjectsForPackCriterion(standard, c.id, getPackCriterion(pack, c.id)?.wcag ?? [])))
+      .map(claim);
   }
-  return audit.criteria.filter((c) => c.decidedBy === "agent" && c.status === "C").map(claim);
+  return audit.criteria
+    .filter((c) => c.decidedBy === "agent" && clears(c.status))
+    .filter((c) => needsTrial(c, () => subjectsForSc(c.id)))
+    .map(claim);
 }
 
 export function buildConformityWorklist(claims: ConformityClaim[], startAt = 0, max = VERIFY_MAX): VerifyItem[] {
   const items: VerifyItem[] = [];
   for (const c of claims) {
-    if (c.verdict !== "C") continue;
+    // A ledger records an agent's « non applicable » as `NA` (the audit folds it to `C`): both
+    // are clearing claims, and both stand trial.
+    if (c.verdict !== "C" && c.verdict !== "NA") continue;
     const citations: CriterionCitation[] = (c.citations ?? []).map((cite) => ({
       file: cite.file,
       line: cite.line ?? 1,
@@ -259,8 +303,26 @@ export function buildConformityWorklist(claims: ConformityClaim[], startAt = 0, 
       snippet: cite.snippet ?? "",
     }));
     const primary = citations[0];
-    if (!primary) continue;
     if (items.length >= max) return items;
+    if (!primary) {
+      // Nothing cited, so nothing to open: the claim is put on trial at the scope level. It
+      // used to be dropped here, which is how an agent's « non applicable » on a criterion
+      // whose harvest was empty (reading order, focus order, text spacing…) escaped every
+      // second reader while counting as conforming in the rate.
+      items.push({
+        n: startAt + items.length + 1,
+        criteriaId: c.criteriaId,
+        file: "",
+        line: 0,
+        selector: "",
+        claim: (c.justification ?? "").replace(/\s+/g, " ").trim(),
+        verdict: null,
+        note: "",
+        kind: "c",
+        uncited: true,
+      });
+      continue;
+    }
     items.push({
       n: startAt + items.length + 1,
       criteriaId: c.criteriaId,
@@ -295,6 +357,9 @@ const T = {
     conformityPartial: "- `partial` — elle l'établit pour l'élément cité, mais la justification déborde sur des cas qu'elle ne couvre pas ;",
     conformityRefuted: "- `refuted` — l'évidence n'établit pas la conformité (elle constate une présence, pas une pertinence) ;",
     conformityUnsupported: "- `unsupported` — l'évidence citée ne permet pas de trancher.",
+    uncitedScope: "_périmètre audité (aucune évidence citée)_",
+    uncitedQuestion:
+      "Rien n'a été collecté pour ce critère et l'agent l'a déclaré non applicable. Ouvrez les pages auditées : n'y a-t-il VRAIMENT rien de ce dont parle le critère ? L'absence de collecte n'est pas une preuve — une page avec du contenu a toujours un ordre de lecture, un ordre de tabulation, du texte à espacer, une mise en page à redistribuer ou à pivoter. `supported` seulement si l'absence est vérifiable sur les pages.",
     refuteRole:
       "Vous êtes le SECOND lecteur d'un audit d'accessibilité. Vous n'auditez pas : vous mettez à l'épreuve des constats déjà écrits. Pour chaque entrée, ouvrez le fichier à la ligne citée, lisez l'élément, et dites si l'évidence citée étaye la revendication :",
     refuteInverted:
@@ -333,6 +398,9 @@ const T = {
     conformityPartial: "- `partial` — it establishes it for the cited element, but the justification reaches beyond what it covers;",
     conformityRefuted: "- `refuted` — the evidence does not establish conformity (it observes a presence, not a relevance);",
     conformityUnsupported: "- `unsupported` — the cited evidence is not enough to decide.",
+    uncitedScope: "_audited scope (no evidence cited)_",
+    uncitedQuestion:
+      "Nothing was harvested for this criterion and the agent declared it not applicable. Open the audited pages: is there REALLY nothing here the criterion is about? An empty harvest is not proof — a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate. `supported` only if the absence can be checked on the pages.",
     refuteRole:
       "You are the SECOND reader of an accessibility audit. You are not auditing: you are putting already-written observations on trial. For each entry, open the file at the cited line, read the element, and say whether the cited evidence supports the claim:",
     refuteInverted:
@@ -378,7 +446,8 @@ export function formatWorklist(items: VerifyItem[], semantic: boolean, standard:
     for (const it of list) renderItem(it);
   };
   const renderItem = (it: VerifyItem) => {
-    out.push(`- [ ] #${it.n} **${it.criteriaId}** @ \`${it.file}:${it.line}\` (\`${it.selector}\`) — ${it.claim}`);
+    if (it.uncited) out.push(`- [ ] #${it.n} **${it.criteriaId}** @ ${s.uncitedScope} — ${it.claim}`, `      ${s.uncitedQuestion}`);
+    else out.push(`- [ ] #${it.n} **${it.criteriaId}** @ \`${it.file}:${it.line}\` (\`${it.selector}\`) — ${it.claim}`);
     if (it.kind === "c" && (it.citations?.length ?? 0) > 1) {
       out.push(lang === "fr" ? "  - Faisceau complet à vérifier ensemble :" : "  - Complete evidence set to verify together:");
       for (const cite of it.citations ?? []) {
@@ -474,12 +543,14 @@ export function verifyGroundingInputs(
   fallbackFor?: (it: VerifyItem, cite: CriterionCitation) => { file: string; line: number; selector?: string; snippet?: string } | undefined,
 ): Array<{ file: string; line: number; selector?: string; snippet?: string; fallback?: { file: string; line: number; selector?: string; snippet?: string } }> {
   return items.flatMap((it) =>
-    it.kind === "c" && it.citations?.length
-      ? it.citations.map((cite) => {
-          const fallback = fallbackFor?.(it, cite);
-          return { file: cite.file, line: cite.line, selector: cite.selector, snippet: cite.snippet, ...(fallback ? { fallback } : {}) };
-        })
-      : [{ file: it.file, line: it.line, selector: it.selector, snippet: (it as { snippet?: string }).snippet }],
+    it.uncited
+      ? [] // nothing was cited, so there is no anchor to re-open
+      : it.kind === "c" && it.citations?.length
+        ? it.citations.map((cite) => {
+            const fallback = fallbackFor?.(it, cite);
+            return { file: cite.file, line: cite.line, selector: cite.selector, snippet: cite.snippet, ...(fallback ? { fallback } : {}) };
+          })
+        : [{ file: it.file, line: it.line, selector: it.selector, snippet: (it as { snippet?: string }).snippet }],
   );
 }
 

@@ -18,7 +18,7 @@ import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
 import { attachSignals, PAGES_DIR, snapshotPageId } from "./snapshot.js";
 import { loadConfig } from "./config.js";
-import { type Harvested, harvestSubjects, isSnapshotFile, PACK_SUBJECTS, pageOfDoc, SC_SUBJECTS } from "./adjudicate-subjects.js";
+import { type Harvested, harvestSubjects, isSnapshotFile, pageOfDoc, subjectsForPackCriterion, subjectsForSc } from "./adjudicate-subjects.js";
 import type { Doc } from "./parse/html.js";
 import { ADJUDICATION, adjudicationForWcagRefs } from "./adjudication-data.js";
 import { scTitle, getSC, hasSC, techniquesFor, allSC, guidelineTitle, understanding } from "./wcag.js";
@@ -387,22 +387,6 @@ function blankItem(
     recommendations: [],
     decidedBy: "agent" as const,
   };
-}
-
-/** The subjects that decide a success criterion. Empty ⇒ the criterion has none declared,
- *  which `tests/harvest-coverage.test.ts` refuses for any criterion the engine hands over. */
-const subjectsForSc = (sc: string): string[] => SC_SUBJECTS[sc] ?? [];
-
-/** The subjects that decide a PACK criterion: its own when it declares them, else the union
- *  of its mapped success criteria's. The override is what stops RGAA 11.1 (are the fields
- *  labelled?) from being handed the page's heading outline because 1.3.1 happens to come
- *  first in its `wcag` list. */
-function subjectsForPackCriterion(standard: StandardId, id: string, scs: string[]): string[] {
-  const own = PACK_SUBJECTS[standard]?.[id];
-  if (own) return own;
-  const out: string[] = [];
-  for (const sc of scs) for (const subject of subjectsForSc(sc)) if (!out.includes(subject)) out.push(subject);
-  return out;
 }
 
 /** Whether a pack result still needs an agent ruling.
@@ -1094,13 +1078,16 @@ export function applyAdjudication(
       }
       if (it.evidence.length === 0) {
         // Nothing was harvested for this criterion, so there is nothing the agent could have
-        // read to clear it. `NA` is still legitimate (the honest "no element in scope is
-        // concerned"); `C` is not — it must stay `manual` and be ruled on against the
-        // criterion's own tests, from a rendered capture or by hand.
+        // read to clear it. `NA` is still accepted here (the honest "no element in scope is
+        // concerned" — a single page has no set of pages to navigate, a form with no CAPTCHA has
+        // none to label); `C` is not — it must stay `manual` and be ruled on against the
+        // criterion's own tests, from a rendered capture or by hand. An accepted NA is not the
+        // end of it: it cites nothing, so `verify` puts it on trial as an UNCITED claim
+        // (buildConformityWorklist) unless the engine itself proved the subject absent.
         if (v === "C") {
           blame(
             it.criteriaId,
-            `criterion ${it.criteriaId}: a C verdict needs evidence to cite, and none was harvested for this criterion — record "manual" (reason "undecidable"), or "NA" if nothing in scope is concerned`,
+            `criterion ${it.criteriaId}: a C verdict needs evidence to cite, and none was harvested for this criterion — record "manual" (reason "undecidable"); "NA" only if the scope provably contains nothing the criterion is about — an uncited NA is put on trial by verify`,
           );
         }
       } else if (cites.length === 0 && (v === "C" || v === "NA")) {
@@ -1720,7 +1707,7 @@ const T = {
       "- `NA` — not applicable (fill `justification`; when evidence is presented, cite it too in `citations[]` to say which items are out of scope);",
       "- `manual` — not statically decidable (fill `reason`: `needs-rendered-dom` → `scan`, or `undecidable`).",
     ],
-    rule: "> Report NC only if a precise test of the active standard fails — cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative). A purely UX concern is neither.\n>\n> A `C` is cited the same way an NC is: name the evidence you cleared in `citations[]`. **A criterion presented with no evidence at all cannot be `C`** — record `manual` (`undecidable`), or `NA` if nothing in scope is concerned.",
+    rule: "> Report NC only if a precise test of the active standard fails — cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative). A purely UX concern is neither.\n>\n> A `C` is cited the same way an NC is: name the evidence you cleared in `citations[]`. **A criterion presented with no evidence at all cannot be `C`** — record `manual` (`undecidable`), or `NA` only if the scope provably contains nothing the criterion is about. No harvested evidence is NOT that proof: a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate — an uncited NA is put on trial by `verify`.",
     then: "Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (fails if any verdict lacks its justification, citations, finding or reason).",
     evidence: "Evidence",
     classes: "distinct content classes",

@@ -66,6 +66,17 @@ accepted at `verify --apply <adjudication>` is not refused again at trial — pa
 anchors must still match the source literally. Goal: no fabricated non-conformity survives
 into the final report, and no accepted conformity is re-refused one gate later.
 
+**An agent's « non applicable » stands trial too.** An NA clears a criterion (the audit folds it
+to `C`, and the rate counts it as conforming), so the worklist carries it like any claimed
+conformity. When it cites nothing — the usual case: nothing was harvested for the criterion —
+the item is marked `uncited` and asks the scope-level question instead: is there REALLY nothing
+on the audited pages the criterion is about? An empty harvest is not proof: a page with content
+always has a reading order (RGAA 10.11, 10.12, 13.9), a focus order (12.8) and markup to
+validate (8.2). Refuted or unsupported, the criterion goes back to « à évaluer ». The one NA that
+is NOT tried is the one the engine's own absence fold already proves — every subject of the
+criterion is an element species (`<img>`, `<table>`, a form control…) and none exists anywhere in
+the scope.
+
 ## `verify --manual` — adjudicate the residual (judgment / needs-rendering) criteria
 
 The **AI agent** decides the `manual` criteria itself, gated. Run from the audit's cwd
