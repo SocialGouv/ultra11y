@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "id": "conforme-html",
+  "name": "Inscription aux ateliers municipaux — Mairie de Villeneuve",
+  "url": "http://villeneuve.test/conforme.html",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "runner": "scan",
+  "doctype": "<!DOCTYPE html>",
+  "notes": "source sha256 9258b1234e65684170fed506b8c5e4ca149314c1e5b9e96a506aea4a6699e3e7"
+}

@@ -1,0 +1,183 @@
+<!-- ultra11y:capture v="1" name="Accueil" page="non-conforme-html" url="http://villeneuve.test/non-conforme.html" -->
+<html lang="fr_FR"><head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="60">
+    <title>Accueil</title>
+    <style>
+      body { color: #222222; }
+      a { color: #333333; text-decoration: none; }
+      a:focus, button:focus, input:focus { outline: none; }
+      .bandeau { color: #ffffff; }
+      .nouveau::before { content: "Nouveau : "; }
+      .champ { border: 1px solid #e6e6e6; background-color: #ffffff; }
+      .menu-aide .infobulle { display: none; }
+      .menu-aide:hover .infobulle { display: block; }
+      .etapes { display: flex; }
+      .etape-1 { order: 1; }
+      .etape-2 { order: 2; }
+      .alerte { padding: 1rem; background-color: #000000; color: #ffffff; animation: clignote 0.1s infinite; }
+      @keyframes clignote { 50% { background-color: #ffffff; color: #000000; } }
+      @media (orientation: portrait) { .contenu { display: none; } }
+    </style>
+  </head>
+  <body onload="window.open('/promotion', 'promo')">
+    <div class="entete">
+      <img src="media/equipe.png" alt="" title="Motif décoratif">
+      <a href="/">Mairie de Villeneuve</a>
+      <a href="/profil"></a>
+      <a href="/aide"><svg aria-hidden="true" width="16" height="16"><circle cx="8" cy="8" r="7"></circle></svg></a>
+      <a href="/ateliers">Ateliers</a> | <a href="/plan">Plan</a> | <a href="/contact">Contact</a>
+      <span class="menu-aide">Aide<span class="infobulle">Appelez le 01 23 45 67 89 du lundi au vendredi.</span></span>
+      <button type="button" onclick="basculerMenu()"><svg aria-hidden="true" width="16" height="16"><rect width="16" height="16"></rect></svg></button>
+      <form action="/recherche">
+        <input type="text" name="q" class="champ" tabindex="3">
+        <input type="image" src="media/equipe.png">
+      </form>
+    </div>
+
+    <div class="contenu">
+      <h2>Inscription aux ateliers municipaux</h2>
+      <p class="titre"><strong>Nos ateliers de la rentrée</strong></p>
+      <h4>Le mot du maire</h4>
+      <blockquote><p>Les ateliers ont lieu à la maison des associations.</p></blockquote>
+      <p>Comme le dit le maire : "La culture est un droit pour chacun."</p>
+      <p>• Atelier peinture<br>• Atelier musique<br>• Atelier théâtre</p>
+      <p>Terms and conditions apply to every workshop of the season.</p>
+      <p lang="en_GB">Workshop</p>
+      <p lang="ar" dir="right">مرحبا بكم في ورشاتنا</p>
+      <p aria-hidden="true">Inscription obligatoire avant le 30 juin.</p>
+      <p style="color: #b0b0b0; background-color: #ffffff">Les places sont limitées à douze personnes par atelier.</p>
+      <p class="bandeau nouveau">atelier de céramique.</p>
+      <p class="alerte">Dernières places !</p>
+      <div style="height: 40px; overflow: hidden">Les ateliers se déroulent le mercredi après-midi et le samedi matin, hors vacances scolaires, dans les locaux de la maison des associations.</div>
+      <div style="width: 900px">Programme détaillé de la saison, salle par salle et semaine par semaine.</div>
+      <p style="line-height: 1.2 !important">Les tarifs sont dégressifs selon le quotient familial.</p>
+      <center>Mairie de Villeneuve</center>
+      <p align="center">Ouvert du lundi au samedi.</p>
+      <p>Pour vous inscrire, utilisez le bouton à droite. Pour en savoir plus, <a href="/infos">cliquez ici</a>.</p>
+      <p>Inscrivez-vous vite ¯\_(ツ)_/¯</p>
+
+      <p>La salle de peinture :</p>
+      <img src="media/equipe.png">
+      <img src="media/equipe.png" alt="photo">
+      <p>L'équipe d'animation au complet.</p>
+
+      <iframe src="https://example.com/carte"></iframe>
+      <iframe src="https://example.com/agenda" title="iframe"></iframe>
+
+      <video src="media/presentation.mp4" autoplay=""></video>
+      <audio src="media/annonce.mp3" autoplay="" loop=""></audio>
+
+      <div class="etapes">
+        <div class="etape-2">Étape 2 : payez en ligne.</div>
+        <div class="etape-1">Étape 1 : créez votre compte.</div>
+      </div>
+
+      <p><b>Tarifs</b></p>
+      <table>
+        <tbody><tr>
+          <td><b>Offre</b></td>
+          <td><b>Prix</b></td>
+        </tr>
+        <tr>
+          <td>Base</td>
+          <td>0 €</td>
+        </tr>
+      </tbody></table>
+
+      <table>
+        <caption>Tableau 1</caption>
+        <tbody><tr>
+          <th rowspan="2">Atelier</th>
+          <th colspan="2">Horaires</th>
+        </tr>
+        <tr>
+          <th scope="colonne">Mercredi</th>
+          <th scope="colonne">Samedi</th>
+        </tr>
+        <tr>
+          <th>Peinture</th>
+          <td>14 h</td>
+          <td>10 h</td>
+        </tr>
+      </tbody></table>
+
+      <table role="presentation">
+        <tbody><tr>
+          <th>Adresse</th>
+          <td>Maison des associations, 1 place de la Mairie</td>
+        </tr>
+      </tbody></table>
+
+      <p>Les champs obligatoires sont indiqués en rouge.</p>
+      <form action="/inscription" method="post">
+        <input type="text" class="champ">
+        <input type="email" placeholder="Votre email">
+        <label for="nom" style="color: #d00000">Champ 2</label>
+        <input id="nom" type="text" required="">
+        <input id="cp" type="text" onkeydown="if (event.key === 'Tab') event.preventDefault()">
+        <br><br><br>
+        <label for="cp">Code postal</label>
+        <label for="naissance">Date de naissance</label>
+        <input id="naissance" type="text">
+        <p class="erreur">Erreur : date invalide.</p>
+        <label for="courriel">Courriel</label>
+        <input id="courriel" type="email">
+        Civilité :
+        <input type="radio" name="civilite" id="mme"><label for="mme">Madame</label>
+        <input type="radio" name="civilite" id="m"><label for="m">Monsieur</label>
+        <fieldset>
+          <input type="checkbox" id="peinture" name="ateliers"><label for="peinture">Peinture</label>
+          <input type="checkbox" id="musique" name="ateliers"><label for="musique">Musique</label>
+        </fieldset>
+        <fieldset>
+          <legend>Groupe 1</legend>
+          <input type="checkbox" id="matin" name="creneau"><label for="matin">Matin</label>
+          <input type="checkbox" id="soir" name="creneau"><label for="soir">Soir</label>
+        </fieldset>
+        <label for="salle">Salle</label>
+        <select id="salle" onchange="location.href = this.value">
+          <optgroup>
+            <option value="/salle-a">Salle A</option>
+            <option value="/salle-b">Salle B</option>
+          </optgroup>
+        </select>
+        <input type="submit" value="Envoyer" aria-label="Valider">
+      </form>
+      <div id="message" class="message-succes"></div>
+
+      <form action="/newsletter">
+        <label for="mail-lettre">E-mail</label>
+        <input id="mail-lettre" type="email">
+        <button type="submit">S'abonner</button>
+      </form>
+
+      <form action="/compte/supprimer" method="post">
+        <button type="submit">Supprimer mon compte</button>
+      </form>
+
+      <div onclick="ouvrirDetail()">Ouvrir le détail</div>
+      <div class="carrousel" id="carrousel">Diapositive 1 sur 3</div>
+      <button type="button" onmousedown="supprimerPanier()">Vider le panier</button>
+      <p><a href="media/programme.odt">Programme de la saison</a></p>
+      <p id="doublon">Contact : mairie@villeneuve.example</p>
+      <p id="doublon">Accueil du public</p>
+    </div>
+
+    <script>
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "s") ouvrirRecherche();
+      });
+      document.getElementById("carrousel").addEventListener("touchmove", function () {
+        diapositiveSuivante();
+      });
+      window.addEventListener("devicemotion", function () {
+        annulerDerniereAction();
+      });
+      document.querySelector("form").addEventListener("submit", function () {
+        document.getElementById("message").textContent = "Votre inscription est enregistrée.";
+      });
+    </script>
+  
+
+</body></html>

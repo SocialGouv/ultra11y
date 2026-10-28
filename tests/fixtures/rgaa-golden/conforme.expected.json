@@ -1,0 +1,536 @@
+{
+  "$comment": "Ground truth for its CONFORMING twin: the verdict a human RGAA 4.1.2 auditor gives each of the 106 criteria, established from the official tests (src/data/standards/rgaa.json). verdict is C, NC, NA or manual (undeterminable from this one page). tests/rgaa-golden.test.ts holds the engine to it.",
+  "page": "conforme.html",
+  "criteria": {
+    "1.1": {
+      "verdict": "C",
+      "test": "1.1.1",
+      "reason": "the team photo and the image button (alt « Lancer la recherche ») carry an alternative"
+    },
+    "1.2": {
+      "verdict": "C",
+      "test": "1.2.1",
+      "reason": "the header image sits beside the link text with alt=\"\" and no other alternative attribute"
+    },
+    "1.3": {
+      "verdict": "C",
+      "test": "1.3.1",
+      "reason": "the photo's alternative describes the team, the image button's names its action"
+    },
+    "1.4": {
+      "verdict": "NA",
+      "test": "1.4.1",
+      "reason": "no image is used as a CAPTCHA or test image"
+    },
+    "1.5": {
+      "verdict": "NA",
+      "test": "1.5.1",
+      "reason": "no CAPTCHA on the page"
+    },
+    "1.6": {
+      "verdict": "NA",
+      "test": "1.6.1",
+      "reason": "no informative image needs a detailed description"
+    },
+    "1.7": {
+      "verdict": "NA",
+      "test": "1.7.1",
+      "reason": "no image has a detailed description"
+    },
+    "1.8": {
+      "verdict": "NA",
+      "test": "1.8.1",
+      "reason": "no image of text: media/equipe.png contains no text"
+    },
+    "1.9": {
+      "verdict": "C",
+      "test": "1.9.1",
+      "reason": "the photo and its caption are in a <figure role=\"figure\" aria-label> with a <figcaption> of the same text"
+    },
+    "2.1": {
+      "verdict": "C",
+      "test": "2.1.1",
+      "reason": "the only <iframe> has a title attribute"
+    },
+    "2.2": {
+      "verdict": "C",
+      "test": "2.2.1",
+      "reason": "« Carte d'accès à la maison des associations » describes the frame's content"
+    },
+    "3.1": {
+      "verdict": "C",
+      "test": "3.1.2",
+      "reason": "required fields say « (obligatoire) » in their label; links are underlined"
+    },
+    "3.2": {
+      "verdict": "C",
+      "test": "3.2.1",
+      "reason": "every text colour pair is above 4.5:1 (#222222/#ffffff, #0050a0/#ffffff, #ffffff/#1e3a8a)"
+    },
+    "3.3": {
+      "verdict": "C",
+      "test": "3.3.1",
+      "reason": "field borders are #595959 on #ffffff (7:1) and the focus outline #0050a0 (8:1)"
+    },
+    "4.1": {
+      "verdict": "C",
+      "test": "4.1.3",
+      "reason": "the video has an adjacent « Transcription de la vidéo », the audio an adjacent transcript (4.1.1)"
+    },
+    "4.2": {
+      "verdict": "C",
+      "test": "4.2.3",
+      "reason": "both transcripts render the speech and the on-screen text faithfully"
+    },
+    "4.3": {
+      "verdict": "C",
+      "test": "4.3.2",
+      "reason": "the video carries <track kind=\"captions\">"
+    },
+    "4.4": {
+      "verdict": "C",
+      "test": "4.4.1",
+      "reason": "media/presentation.vtt matches the spoken words"
+    },
+    "4.5": {
+      "verdict": "NA",
+      "test": "4.5.2",
+      "reason": "audio description is not needed: the only visual information (« Clôture : 30 juin ») is also spoken"
+    },
+    "4.6": {
+      "verdict": "NA",
+      "test": "4.6.2",
+      "reason": "no audio description exists"
+    },
+    "4.7": {
+      "verdict": "C",
+      "test": "4.7.1",
+      "reason": "the headings « Vidéo : présentation du portail des ateliers » and « Annonce sonore » identify each medium"
+    },
+    "4.8": {
+      "verdict": "NA",
+      "test": "4.8.1",
+      "reason": "no non-temporal media on the page"
+    },
+    "4.9": {
+      "verdict": "NA",
+      "test": "4.9.1",
+      "reason": "no non-temporal media on the page"
+    },
+    "4.10": {
+      "verdict": "NA",
+      "test": "4.10.1",
+      "reason": "no sound starts automatically (no autoplay)"
+    },
+    "4.11": {
+      "verdict": "C",
+      "test": "4.11.1",
+      "reason": "both media use the native controls (play, pause, volume, captions)"
+    },
+    "4.12": {
+      "verdict": "NA",
+      "test": "4.12.1",
+      "reason": "no non-temporal media on the page"
+    },
+    "4.13": {
+      "verdict": "C",
+      "test": "4.13.1",
+      "reason": "the native players expose their controls through the platform accessibility API"
+    },
+    "5.1": {
+      "verdict": "C",
+      "test": "5.1.1",
+      "reason": "the complex « Horaires » table is summarised by aria-describedby=\"resume-horaires\""
+    },
+    "5.2": {
+      "verdict": "C",
+      "test": "5.2.1",
+      "reason": "the summary states what the table gives (start time per workshop and day)"
+    },
+    "5.3": {
+      "verdict": "C",
+      "test": "5.3.1",
+      "reason": "the layout table has role=\"presentation\" and reads in a sensible order once linearised"
+    },
+    "5.4": {
+      "verdict": "C",
+      "test": "5.4.1",
+      "reason": "both data tables have a <caption>"
+    },
+    "5.5": {
+      "verdict": "C",
+      "test": "5.5.1",
+      "reason": "« Tarifs des ateliers » and « Horaires des ateliers par jour » identify the tables"
+    },
+    "5.6": {
+      "verdict": "C",
+      "test": "5.6.1",
+      "reason": "every header is a <th>"
+    },
+    "5.7": {
+      "verdict": "C",
+      "test": "5.7.1",
+      "reason": "simple-table headers carry scope=\"col\"; the complex table associates cells with id/headers (5.7.4)"
+    },
+    "5.8": {
+      "verdict": "C",
+      "test": "5.8.1",
+      "reason": "the layout table uses no <th>, <caption>, <thead>, <tfoot> or summary"
+    },
+    "6.1": {
+      "verdict": "C",
+      "test": "6.1.1",
+      "reason": "every link text states its destination (« Consulter les informations pratiques… », « Programme… (ODT, 12 Ko) »)"
+    },
+    "6.2": {
+      "verdict": "C",
+      "test": "6.2.1",
+      "reason": "every link has a text or an alternative between <a> and </a> (the help icon is an <svg role=\"img\" aria-label>)"
+    },
+    "7.1": {
+      "verdict": "C",
+      "test": "7.1.1",
+      "reason": "the script-driven buttons are native <button>s with names, and the disclosure exposes aria-expanded"
+    },
+    "7.2": {
+      "verdict": "NA",
+      "test": "7.2.1",
+      "reason": "no script has an alternative (no <noscript>, no fallback content)"
+    },
+    "7.3": {
+      "verdict": "C",
+      "test": "7.3.1",
+      "reason": "every handler sits on a native <button>; the touch swipe has « précédente/suivante » buttons"
+    },
+    "7.4": {
+      "verdict": "C",
+      "test": "7.4.1",
+      "reason": "every context change is initiated by an explicit submit button; the deletion asks for confirmation"
+    },
+    "7.5": {
+      "verdict": "C",
+      "test": "7.5.1",
+      "reason": "the success message goes into #message role=\"status\", the format error is role=\"alert\" (7.5.2)"
+    },
+    "8.1": {
+      "verdict": "C",
+      "test": "8.1.1",
+      "reason": "<!doctype html> is present, valid and before <html>"
+    },
+    "8.2": {
+      "verdict": "C",
+      "test": "8.2.1",
+      "reason": "the markup is valid: ids unique, nesting and attributes conform"
+    },
+    "8.3": {
+      "verdict": "C",
+      "test": "8.3.1",
+      "reason": "<html lang=\"fr\">"
+    },
+    "8.4": {
+      "verdict": "C",
+      "test": "8.4.1",
+      "reason": "« fr » is valid and is the language of the content"
+    },
+    "8.5": {
+      "verdict": "C",
+      "test": "8.5.1",
+      "reason": "the page has a <title>"
+    },
+    "8.6": {
+      "verdict": "C",
+      "test": "8.6.1",
+      "reason": "« Inscription aux ateliers municipaux — Mairie de Villeneuve » identifies the page and the site"
+    },
+    "8.7": {
+      "verdict": "C",
+      "test": "8.7.1",
+      "reason": "the English sentence carries lang=\"en\", the Arabic one lang=\"ar\""
+    },
+    "8.8": {
+      "verdict": "C",
+      "test": "8.8.1",
+      "reason": "« en » and « ar » are valid and pertinent"
+    },
+    "8.9": {
+      "verdict": "C",
+      "test": "8.9.1",
+      "reason": "no element is used for presentation only"
+    },
+    "8.10": {
+      "verdict": "C",
+      "test": "8.10.1",
+      "reason": "the Arabic text is in an element with dir=\"rtl\""
+    },
+    "9.1": {
+      "verdict": "C",
+      "test": "9.1.1",
+      "reason": "h1 > h2 > h3 outline, each heading describes its section"
+    },
+    "9.2": {
+      "verdict": "C",
+      "test": "9.2.1",
+      "reason": "<header>, <nav>, <main> and <footer> structure the page"
+    },
+    "9.3": {
+      "verdict": "C",
+      "test": "9.3.1",
+      "reason": "the workshops are a <ul>, the steps an <ol>, the navigation a <ul>"
+    },
+    "9.4": {
+      "verdict": "C",
+      "test": "9.4.1",
+      "reason": "the mayor's short quotation is in a <q>"
+    },
+    "10.1": {
+      "verdict": "C",
+      "test": "10.1.1",
+      "reason": "no presentational element, attribute or spacing"
+    },
+    "10.2": {
+      "verdict": "C",
+      "test": "10.2.1",
+      "reason": "no information is carried by CSS only"
+    },
+    "10.3": {
+      "verdict": "C",
+      "test": "10.3.1",
+      "reason": "source order is the reading order"
+    },
+    "10.4": {
+      "verdict": "C",
+      "test": "10.4.1",
+      "reason": "fluid layout with no fixed heights: text doubles without loss"
+    },
+    "10.5": {
+      "verdict": "C",
+      "test": "10.5.1",
+      "reason": "every colour declaration has its background (body, a, .bandeau, .champ)"
+    },
+    "10.6": {
+      "verdict": "C",
+      "test": "10.6.1",
+      "reason": "links are underlined"
+    },
+    "10.7": {
+      "verdict": "C",
+      "test": "10.7.1",
+      "reason": "a 3px #0050a0 outline marks focus on links, buttons and fields; main keeps the native one"
+    },
+    "10.8": {
+      "verdict": "C",
+      "test": "10.8.1",
+      "reason": "hidden content (#detail, the help bubble, decorative svg) is meant to be hidden until revealed"
+    },
+    "10.9": {
+      "verdict": "C",
+      "test": "10.9.1",
+      "reason": "instructions name the form rather than its position"
+    },
+    "10.10": {
+      "verdict": "C",
+      "test": "10.10.1",
+      "reason": "same instruction, implemented by naming the target"
+    },
+    "10.11": {
+      "verdict": "C",
+      "test": "10.11.1",
+      "reason": "max-width 60rem, fluid images: no horizontal scroll at 320px"
+    },
+    "10.12": {
+      "verdict": "C",
+      "test": "10.12.1",
+      "reason": "no !important spacing, no fixed heights: user spacing applies without loss"
+    },
+    "10.13": {
+      "verdict": "NA",
+      "test": "10.13.1",
+      "reason": "no content appears on hover or focus: the help bubble appears on button activation only"
+    },
+    "10.14": {
+      "verdict": "NA",
+      "test": "10.14.1",
+      "reason": "no additional content appears through CSS only"
+    },
+    "11.1": {
+      "verdict": "C",
+      "test": "11.1.1",
+      "reason": "every field has a <label for>"
+    },
+    "11.2": {
+      "verdict": "C",
+      "test": "11.2.1",
+      "reason": "every label states the field's function"
+    },
+    "11.3": {
+      "verdict": "C",
+      "test": "11.3.1",
+      "reason": "both e-mail fields are labelled « Adresse électronique (obligatoire) »"
+    },
+    "11.4": {
+      "verdict": "C",
+      "test": "11.4.1",
+      "reason": "each label sits immediately before (left of) its field, after it for radios and checkboxes"
+    },
+    "11.5": {
+      "verdict": "C",
+      "test": "11.5.1",
+      "reason": "radios and checkboxes are grouped in <fieldset>s"
+    },
+    "11.6": {
+      "verdict": "C",
+      "test": "11.6.1",
+      "reason": "each <fieldset> has a <legend>"
+    },
+    "11.7": {
+      "verdict": "C",
+      "test": "11.7.1",
+      "reason": "« Civilité » and « Ateliers choisis » describe their groups"
+    },
+    "11.8": {
+      "verdict": "C",
+      "test": "11.8.2",
+      "reason": "both <optgroup>s carry a pertinent label"
+    },
+    "11.9": {
+      "verdict": "C",
+      "test": "11.9.1",
+      "reason": "« Valider l'inscription », « S'abonner à la lettre d'information », « Supprimer mon compte », « Lancer la recherche »"
+    },
+    "11.10": {
+      "verdict": "C",
+      "test": "11.10.2",
+      "reason": "required fields say « (obligatoire) » in their label and carry required; the date format is in its label"
+    },
+    "11.11": {
+      "verdict": "C",
+      "test": "11.11.1",
+      "reason": "the date error gives the format and an example"
+    },
+    "11.12": {
+      "verdict": "C",
+      "test": "11.12.2",
+      "reason": "deleting the account asks for explicit confirmation"
+    },
+    "11.13": {
+      "verdict": "C",
+      "test": "11.13.1",
+      "reason": "fields about the user carry valid autocomplete tokens"
+    },
+    "12.1": {
+      "verdict": "manual",
+      "test": "12.1.1",
+      "reason": "a question about the set of pages; one page cannot settle it"
+    },
+    "12.2": {
+      "verdict": "manual",
+      "test": "12.2.1",
+      "reason": "a question about the set of pages; one page cannot settle it"
+    },
+    "12.3": {
+      "verdict": "manual",
+      "test": "12.3.1",
+      "reason": "the site map page is not in this scope"
+    },
+    "12.4": {
+      "verdict": "manual",
+      "test": "12.4.1",
+      "reason": "a question about the set of pages; one page cannot settle it"
+    },
+    "12.5": {
+      "verdict": "manual",
+      "test": "12.5.1",
+      "reason": "a question about the set of pages; one page cannot settle it"
+    },
+    "12.6": {
+      "verdict": "C",
+      "test": "12.6.1",
+      "reason": "header, navigation, main, footer and search have their landmarks"
+    },
+    "12.7": {
+      "verdict": "C",
+      "test": "12.7.1",
+      "reason": "« Aller au contenu principal » is the first link and targets #contenu"
+    },
+    "12.8": {
+      "verdict": "C",
+      "test": "12.8.1",
+      "reason": "source order is the tab order; only tabindex=\"-1\" on the skip target"
+    },
+    "12.9": {
+      "verdict": "C",
+      "test": "12.9.1",
+      "reason": "no handler holds keyboard focus"
+    },
+    "12.10": {
+      "verdict": "C",
+      "test": "12.10.1",
+      "reason": "the « s » shortcut can be switched off by a checkbox"
+    },
+    "12.11": {
+      "verdict": "C",
+      "test": "12.11.1",
+      "reason": "the help bubble is revealed by a focusable button"
+    },
+    "13.1": {
+      "verdict": "NA",
+      "test": "13.1.1",
+      "reason": "no time limit, refresh or redirect"
+    },
+    "13.2": {
+      "verdict": "C",
+      "test": "13.2.1",
+      "reason": "the only new window opens on a user click, announced « (nouvelle fenêtre) »"
+    },
+    "13.3": {
+      "verdict": "C",
+      "test": "13.3.1",
+      "reason": "the ODT programme has an accessible HTML version linked beside it"
+    },
+    "13.4": {
+      "verdict": "C",
+      "test": "13.4.1",
+      "reason": "the HTML version carries the same programme"
+    },
+    "13.5": {
+      "verdict": "C",
+      "test": "13.5.1",
+      "reason": "the ASCII-art shrug carries a title"
+    },
+    "13.6": {
+      "verdict": "C",
+      "test": "13.6.1",
+      "reason": "« haussement d'épaules amusé » is a pertinent alternative"
+    },
+    "13.7": {
+      "verdict": "NA",
+      "test": "13.7.1",
+      "reason": "nothing flashes"
+    },
+    "13.8": {
+      "verdict": "NA",
+      "test": "13.8.1",
+      "reason": "no moving or blinking content"
+    },
+    "13.9": {
+      "verdict": "C",
+      "test": "13.9.1",
+      "reason": "no orientation lock, no orientation-dependent hiding"
+    },
+    "13.10": {
+      "verdict": "C",
+      "test": "13.10.2",
+      "reason": "the swipe has single-pointer « précédente/suivante » buttons"
+    },
+    "13.11": {
+      "verdict": "C",
+      "test": "13.11.1",
+      "reason": "every pointer action fires on click (release)"
+    },
+    "13.12": {
+      "verdict": "C",
+      "test": "13.12.1",
+      "reason": "the shake-to-undo has an « Annuler la dernière action » button and can be switched off (13.12.3)"
+    }
+  }
+}
