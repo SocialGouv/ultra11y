@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.47.1](https://github.com/SocialGouv/ultra11y/compare/v5.47.0...v5.47.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **skill:** make the full RGAA route true, and never truncate the conformity trial ([#71](https://github.com/SocialGouv/ultra11y/issues/71)) ([29c78d4](https://github.com/SocialGouv/ultra11y/commit/29c78d40a73e9e5603c9f70820e1a19ca8fcce0d)), closes [#68](https://github.com/SocialGouv/ultra11y/issues/68)
+
 # [5.47.0](https://github.com/SocialGouv/ultra11y/compare/v5.46.0...v5.47.0) (2026-10-28)
 
 
