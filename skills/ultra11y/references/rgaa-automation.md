@@ -47,13 +47,13 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 5.8 | 1 / 0 / 0 | 1 / 1 / 0 | no | deterministic NC + AI residual |
 | 6.1 | 1 / 0 / 4 | 1 / 0 / 1 | no | deterministic NC + AI residual |
 | 6.2 | 1 / 0 / 0 | 3 / 0 / 0 | no | deterministic NC + AI residual |
-| 7.1 | 2 / 0 / 1 | 5 / 20 / 0 | no | deterministic NC + AI residual |
+| 7.1 | 2 / 0 / 1 | 5 / 29 / 0 | no | deterministic NC + AI residual |
 | 7.2 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
 | 7.3 | 0 / 0 / 2 | 0 / 1 / 0 | no | AI + signals |
-| 7.4 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
+| 7.4 | 0 / 0 / 1 | 0 / 1 / 0 | no | AI + signals |
 | 7.5 | 0 / 0 / 3 | 0 / 3 / 0 | no | AI + signals |
 | 8.1 | 0 / 1 / 2 | 1 / 0 / 0 | no | deterministic NC + AI residual |
-| 8.2 | 1 / 0 / 0 | 5 / 0 / 0 | no | deterministic NC + AI residual |
+| 8.2 | 1 / 0 / 0 | 7 / 0 / 0 | no | deterministic NC + AI residual |
 | 8.3 | 1 / 0 / 0 | 1 / 2 / 0 | yes | deterministic |
 | 8.4 | 1 / 0 / 0 | 3 / 1 / 0 | no | deterministic NC + AI residual |
 | 8.5 | 1 / 0 / 0 | 2 / 0 / 0 | yes | deterministic |
@@ -64,14 +64,14 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 8.10 | 1 / 0 / 1 | 1 / 0 / 0 | no | deterministic NC + AI residual |
 | 9.1 | 0 / 0 / 3 | 0 / 7 / 0 | no | AI + signals |
 | 9.2 | 0 / 0 / 1 | 0 / 3 / 0 | no | AI + signals |
-| 9.3 | 3 / 0 / 0 | 5 / 0 / 0 | no | deterministic NC + AI residual |
+| 9.3 | 3 / 0 / 0 | 5 / 1 / 0 | no | deterministic NC + AI residual |
 | 9.4 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
 | 10.1 | 3 / 0 / 0 | 3 / 0 / 0 | no | deterministic NC + AI residual |
 | 10.2 | 0 / 0 / 1 | 0 / 1 / 0 | no | AI + signals |
 | 10.3 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
 | 10.4 | 0 / 0 / 2 | 0 / 5 / 0 | no | AI + signals |
 | 10.5 | 0 / 0 / 3 | 0 / 0 / 0 | no | AI |
-| 10.6 | 0 / 0 / 1 | 0 / 1 / 0 | no | AI + signals |
+| 10.6 | 0 / 0 / 1 | 0 / 2 / 0 | no | AI + signals |
 | 10.7 | 0 / 1 / 0 | 1 / 1 / 0 | no | deterministic NC + AI residual |
 | 10.8 | 0 / 0 / 1 | 0 / 1 / 0 | no | AI + signals |
 | 10.9 | 0 / 0 / 4 | 0 / 0 / 0 | no | AI |
@@ -80,7 +80,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 10.12 | 1 / 0 / 0 | 3 / 2 / 0 | no | deterministic NC + AI residual |
 | 10.13 | 0 / 0 / 3 | 0 / 1 / 0 | no | AI + signals |
 | 10.14 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
-| 11.1 | 1 / 0 / 2 | 3 / 8 / 0 | no | deterministic NC + AI residual |
+| 11.1 | 1 / 0 / 2 | 5 / 8 / 0 | no | deterministic NC + AI residual |
 | 11.2 | 0 / 0 / 6 | 0 / 0 / 0 | no | AI |
 | 11.3 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
 | 11.4 | 0 / 0 / 3 | 0 / 0 / 0 | no | AI |
@@ -243,21 +243,21 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 6.1.4 | judgment | — | — |
 | 6.1.5 | static | `link-label-in-name-mismatch` | — |
 | 6.2.1 | static | `axe:link-name`, `icon-only-control-unnamed`, `link-empty-name` | — |
-| 7.1.1 | static | `axe:button-name`, `axe:input-button-name`, `button-empty-name`, `menuitem-empty-name` | `aria-hidden-focusable`, `aria-ref-missing-id`, `aria-required-children`, `axe:aria-allowed-attr`, `axe:aria-allowed-role`, `axe:aria-hidden-focus`, `axe:aria-required-attr`, `axe:aria-required-children`, `axe:aria-required-parent`, `axe:aria-roles`, `axe:aria-valid-attr`, `axe:aria-valid-attr-value`, `axe:nested-interactive`, `axe:presentation-role-conflict`, `cross-prop-drilled-name-lost`, `disabled-context-content`, `invalid-aria-role`, `nested-interactive`, `presentational-children-focusable`, `redundant-aria` |
-| 7.1.2 | judgment | — | `aria-hidden-focusable`, `aria-ref-missing-id`, `aria-required-children`, `axe:aria-allowed-attr`, `axe:aria-allowed-role`, `axe:aria-hidden-focus`, `axe:aria-required-attr`, `axe:aria-required-children`, `axe:aria-required-parent`, `axe:aria-roles`, `axe:aria-valid-attr`, `axe:aria-valid-attr-value`, `axe:nested-interactive`, `axe:presentation-role-conflict`, `cross-prop-drilled-name-lost`, `disabled-context-content`, `invalid-aria-role`, `nested-interactive`, `presentational-children-focusable`, `redundant-aria` |
-| 7.1.3 | static | `label-in-name-mismatch` | `aria-hidden-focusable`, `aria-ref-missing-id`, `aria-required-children`, `axe:aria-allowed-attr`, `axe:aria-allowed-role`, `axe:aria-hidden-focus`, `axe:aria-required-attr`, `axe:aria-required-children`, `axe:aria-required-parent`, `axe:aria-roles`, `axe:aria-valid-attr`, `axe:aria-valid-attr-value`, `axe:nested-interactive`, `axe:presentation-role-conflict`, `cross-prop-drilled-name-lost`, `disabled-context-content`, `invalid-aria-role`, `nested-interactive`, `redundant-aria` |
+| 7.1.1 | static | `axe:button-name`, `axe:input-button-name`, `button-empty-name`, `menuitem-empty-name` | `aria-hidden-focusable`, `aria-prohibited-attr`, `aria-ref-missing-id`, `aria-required-attr`, `aria-required-children`, `axe:aria-allowed-attr`, `axe:aria-allowed-role`, `axe:aria-command-name`, `axe:aria-dialog-name`, `axe:aria-hidden-focus`, `axe:aria-meter-name`, `axe:aria-progressbar-name`, `axe:aria-required-attr`, `axe:aria-required-children`, `axe:aria-required-parent`, `axe:aria-roles`, `axe:aria-tooltip-name`, `axe:aria-valid-attr`, `axe:aria-valid-attr-value`, `axe:nested-interactive`, `axe:presentation-role-conflict`, `cross-prop-drilled-name-lost`, `disabled-context-content`, `invalid-aria-attr`, `invalid-aria-role`, `invalid-aria-value`, `nested-interactive`, `presentational-children-focusable`, `redundant-aria` |
+| 7.1.2 | judgment | — | `aria-hidden-focusable`, `aria-prohibited-attr`, `aria-ref-missing-id`, `aria-required-attr`, `aria-required-children`, `axe:aria-allowed-attr`, `axe:aria-allowed-role`, `axe:aria-command-name`, `axe:aria-dialog-name`, `axe:aria-hidden-focus`, `axe:aria-meter-name`, `axe:aria-progressbar-name`, `axe:aria-required-attr`, `axe:aria-required-children`, `axe:aria-required-parent`, `axe:aria-roles`, `axe:aria-tooltip-name`, `axe:aria-valid-attr`, `axe:aria-valid-attr-value`, `axe:nested-interactive`, `axe:presentation-role-conflict`, `cross-prop-drilled-name-lost`, `disabled-context-content`, `invalid-aria-attr`, `invalid-aria-role`, `invalid-aria-value`, `nested-interactive`, `presentational-children-focusable`, `redundant-aria` |
+| 7.1.3 | static | `label-in-name-mismatch` | `aria-hidden-focusable`, `aria-prohibited-attr`, `aria-ref-missing-id`, `aria-required-attr`, `aria-required-children`, `axe:aria-allowed-attr`, `axe:aria-allowed-role`, `axe:aria-command-name`, `axe:aria-dialog-name`, `axe:aria-hidden-focus`, `axe:aria-meter-name`, `axe:aria-progressbar-name`, `axe:aria-required-attr`, `axe:aria-required-children`, `axe:aria-required-parent`, `axe:aria-roles`, `axe:aria-tooltip-name`, `axe:aria-valid-attr`, `axe:aria-valid-attr-value`, `axe:nested-interactive`, `axe:presentation-role-conflict`, `cross-prop-drilled-name-lost`, `disabled-context-content`, `invalid-aria-attr`, `invalid-aria-role`, `invalid-aria-value`, `nested-interactive`, `redundant-aria` |
 | 7.2.1 | judgment | — | — |
 | 7.2.2 | judgment | — | — |
 | 7.3.1 | judgment | — | `clickable-noninteractive` |
 | 7.3.2 | judgment | — | — |
-| 7.4.1 | judgment | — | — |
+| 7.4.1 | judgment | — | `on-input-context-change` |
 | 7.5.1 | judgment | — | `dyn-live-region`, `live-region-conflict`, `status-message-not-assertive` |
 | 7.5.2 | judgment | — | `dyn-live-region`, `live-region-conflict`, `status-message-not-assertive` |
 | 7.5.3 | judgment | — | `dyn-live-region`, `live-region-conflict`, `status-message-not-assertive` |
 | 8.1.1 | rendered | `pack:rgaa:doctype-missing` | — |
 | 8.1.2 | judgment | — | — |
 | 8.1.3 | judgment | — | — |
-| 8.2.1 | static | `axe:duplicate-id`, `axe:duplicate-id-active`, `axe:duplicate-id-aria`, `duplicate-attribute`, `duplicate-id` | — |
+| 8.2.1 | static | `axe:duplicate-id`, `axe:duplicate-id-active`, `axe:duplicate-id-aria`, `duplicate-attribute`, `duplicate-id`, `invalid-aria-attr`, `invalid-aria-value` | — |
 | 8.3.1 | static | `document-language-missing` | `axe:html-has-lang`, `html-lang-missing` |
 | 8.4.1 | static | `axe:html-lang-valid`, `html-lang-xml-lang-mismatch`, `lang-invalid` | `axe:html-xml-lang-mismatch` |
 | 8.5.1 | static | `axe:document-title`, `title-missing-empty` | — |
@@ -273,7 +273,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 9.2.1 | judgment | — | `missing-main-landmark`, `multiple-main-landmark`, `nav-landmark-missing` |
 | 9.3.1 | static | `axe:list`, `axe:listitem`, `list-structure` | — |
 | 9.3.2 | static | `axe:list`, `axe:listitem`, `list-structure` | — |
-| 9.3.3 | static | `axe:definition-list`, `axe:dlitem`, `list-structure` | — |
+| 9.3.3 | static | `axe:definition-list`, `axe:dlitem`, `list-structure` | `dl-structure` |
 | 9.4.1 | judgment | — | — |
 | 9.4.2 | judgment | — | — |
 | 10.1.1 | static | `presentational-element` | — |
@@ -286,7 +286,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 10.5.1 | judgment | — | — |
 | 10.5.2 | judgment | — | — |
 | 10.5.3 | judgment | — | — |
-| 10.6.1 | judgment | — | `rendered-link-colour-only` |
+| 10.6.1 | judgment | — | `axe:link-in-text-block`, `rendered-link-colour-only` |
 | 10.7.1 | rendered | `dyn-focus-visible` | `rendered-focus-not-visible` |
 | 10.8.1 | judgment | — | `disabled-context-content` |
 | 10.9.1 | judgment | — | — |
@@ -305,7 +305,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 10.13.3 | judgment | — | `dyn-hover` |
 | 10.14.1 | judgment | — | — |
 | 10.14.2 | judgment | — | — |
-| 11.1.1 | static | `axe:label`, `axe:select-name`, `control-label-missing` | `axe:label-title-only`, `control-name-title-only`, `field-purpose-incomplete`, `placeholder-as-label`, `select-has-option` |
+| 11.1.1 | static | `axe:aria-input-field-name`, `axe:aria-toggle-field-name`, `axe:label`, `axe:select-name`, `control-label-missing` | `axe:label-title-only`, `control-name-title-only`, `field-purpose-incomplete`, `placeholder-as-label`, `select-has-option` |
 | 11.1.2 | judgment | — | `axe:form-field-multiple-labels`, `form-field-multiple-labels`, `label-for-dangling` |
 | 11.1.3 | judgment | — | `axe:label-title-only`, `control-name-title-only`, `field-purpose-incomplete`, `placeholder-as-label` |
 | 11.2.1 | judgment | — | — |

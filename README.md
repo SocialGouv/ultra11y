@@ -329,8 +329,8 @@ tests**:
 - **3 `rendered` tests across 3 criteria:** `1.1`, `8.1`, `10.7`.
 - Those two tiers cover **22 distinct criteria that can produce a deterministic `NC`**;
   `1.1` belongs to both.
-- **50 criteria receive a normative engine signal:** 22 have at least one decisive rule and
-  40 receive candidate evidence, with overlap. One additional criterion receives only an
+- **51 criteria receive a normative engine signal:** 22 have at least one decisive rule and
+  42 receive candidate evidence, with overlap. One additional criterion receives only an
   advisory signal. A candidate is forwarded to adjudication and never changes a verdict by
   itself.
 - Only **8.3 and 8.5** may earn `C` from a complete silent measurement. For the other

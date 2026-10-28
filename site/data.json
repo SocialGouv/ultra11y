@@ -81,15 +81,15 @@
     "levels": {
       "det": 2,
       "nc": 20,
-      "hint": 28,
-      "llm": 56
+      "hint": 29,
+      "llm": 55
     },
     "provable": 22,
     "deterministic": [
       "8.3",
       "8.5"
     ],
-    "touched": 50,
+    "touched": 51,
     "cNeedsJudgment": 104
   },
   "wcag": {
@@ -103,21 +103,21 @@
     "crossRules": 7,
     "renderedRules": 6,
     "packRules": 4,
-    "axeRules": 62,
+    "axeRules": 70,
     "probes": 10
   },
   "sources": [
     {
       "key": "static",
-      "touched": 40,
+      "touched": 41,
       "decisive": 18,
-      "signalOnly": 22
+      "signalOnly": 23
     },
     {
       "key": "axe",
-      "touched": 26,
+      "touched": 27,
       "decisive": 10,
-      "signalOnly": 16
+      "signalOnly": 17
     },
     {
       "key": "probe",
@@ -749,22 +749,31 @@
       ],
       "signals": [
         "aria-hidden-focusable",
+        "aria-prohibited-attr",
         "aria-ref-missing-id",
+        "aria-required-attr",
         "aria-required-children",
         "axe:aria-allowed-attr",
         "axe:aria-allowed-role",
+        "axe:aria-command-name",
+        "axe:aria-dialog-name",
         "axe:aria-hidden-focus",
+        "axe:aria-meter-name",
+        "axe:aria-progressbar-name",
         "axe:aria-required-attr",
         "axe:aria-required-children",
         "axe:aria-required-parent",
         "axe:aria-roles",
+        "axe:aria-tooltip-name",
         "axe:aria-valid-attr",
         "axe:aria-valid-attr-value",
         "axe:nested-interactive",
         "axe:presentation-role-conflict",
         "cross-prop-drilled-name-lost",
         "disabled-context-content",
+        "invalid-aria-attr",
         "invalid-aria-role",
+        "invalid-aria-value",
         "nested-interactive",
         "presentational-children-focusable",
         "redundant-aria"
@@ -804,11 +813,15 @@
       "id": "7.4",
       "theme": 7,
       "title": "Pour chaque script qui initie un changement de contexte, l’utilisateur est-il averti ou en a-t-il le contrôle ?",
-      "level": "llm",
-      "sources": [],
+      "level": "hint",
+      "sources": [
+        "static"
+      ],
       "decisiveSources": [],
       "decisive": [],
-      "signals": [],
+      "signals": [
+        "on-input-context-change"
+      ],
       "advisory": [],
       "tests": 1
     },
@@ -867,7 +880,9 @@
         "axe:duplicate-id-active",
         "axe:duplicate-id-aria",
         "duplicate-attribute",
-        "duplicate-id"
+        "duplicate-id",
+        "invalid-aria-attr",
+        "invalid-aria-value"
       ],
       "signals": [],
       "advisory": [],
@@ -1077,7 +1092,9 @@
         "axe:listitem",
         "list-structure"
       ],
-      "signals": [],
+      "signals": [
+        "dl-structure"
+      ],
       "advisory": [],
       "tests": 3
     },
@@ -1181,11 +1198,13 @@
       "title": "Dans chaque page web, chaque lien dont la nature n’est pas évidente est-il visible par rapport au texte environnant ?",
       "level": "hint",
       "sources": [
+        "axe",
         "rendered"
       ],
       "decisiveSources": [],
       "decisive": [],
       "signals": [
+        "axe:link-in-text-block",
         "rendered-link-colour-only"
       ],
       "advisory": [],
@@ -1335,6 +1354,8 @@
         "axe"
       ],
       "decisive": [
+        "axe:aria-input-field-name",
+        "axe:aria-toggle-field-name",
         "axe:label",
         "axe:select-name",
         "control-label-missing"
