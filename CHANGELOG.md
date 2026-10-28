@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.46.0](https://github.com/SocialGouv/ultra11y/compare/v5.45.1...v5.46.0) (2026-10-28)
+
+
+### Features
+
+* **act:** raise static recall on the W3C ACT corpus to 168/187 ([#67](https://github.com/SocialGouv/ultra11y/issues/67)) ([9fdb85b](https://github.com/SocialGouv/ultra11y/commit/9fdb85b1a1b55bb499c78f655fcac608ec2a287c))
+
 ## [5.45.1](https://github.com/SocialGouv/ultra11y/compare/v5.45.0...v5.45.1) (2026-10-28)
 
 
