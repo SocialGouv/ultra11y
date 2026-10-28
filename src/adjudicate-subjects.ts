@@ -165,6 +165,32 @@ function linesOf(doc: Doc, re: RegExp, cap = 200): { line: number; text: string 
   return out;
 }
 
+/** `linesOf`, restricted to CODE: in an HTML document, a match counts only inside a tag (an
+ *  attribute) or inside a <script>/<style> element — never in the page's prose. Measured on the
+ *  documentation site: a table cell quoting RGAA 4.10 (« chaque son déclenché
+ *  automatiquement… ») was handed to 4.1–4.10 and 13.8 as « moving/auto-updating content », and
+ *  13.7's own title as « a possible scripted flash mechanism ». A component file is code
+ *  throughout, so it is searched whole. */
+function codeLinesOf(doc: Doc, re: RegExp, cap = 200): { line: number; text: string }[] {
+  if (doc.kind !== "html") return linesOf(doc, re, cap);
+  const blocks = doc.elements.filter((e) => e.tag === "script" || e.tag === "style").map((e) => [e.start, e.end] as const);
+  const out: { line: number; text: string }[] = [];
+  const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : `${re.flags}g`);
+  const lines = doc.source.split("\n");
+  let m: RegExpExecArray | null;
+  while ((m = g.exec(doc.source)) && out.length < cap) {
+    const at = m.index;
+    const inBlock = blocks.some(([s, e]) => at >= s && at <= e);
+    const inTag = doc.source.lastIndexOf("<", at) > doc.source.lastIndexOf(">", at - 1);
+    if (inBlock || inTag) {
+      const line = doc.source.slice(0, at).split("\n").length;
+      out.push({ line, text: (lines[line - 1] ?? "").trim().slice(0, 120) });
+    }
+    if (m.index === g.lastIndex) g.lastIndex++;
+  }
+  return out;
+}
+
 // Key/value display patterns (RGAA 8.9 div-presented fields / 9.3 <dl> semantics).
 const LABEL_LIKE = /(^|[-_ ])(field-label|field-key|label|key|term)([-_ ]|$)/i;
 const VALUE_LIKE = /(^|[-_ ])(field-value|field-data|value|data)([-_ ]|$)/i;
@@ -221,6 +247,10 @@ const PRESENTATIONAL_MARKUP_ATTRS = new Set([
 // minus archives and media, which are not office documents.
 const DOWNLOAD_HREF = /\.(pdf|docx?|dotx?|xlsx?|xlsm|pptx?|ppsx?|odt|ods|odp|odg|rtf|csv|epub)(?:[?#]|$)/i;
 const STATUS_CLASS = /(error|status|message|alert|notif|toast|feedback|live)/i;
+// Emoji, emoticons and the classic kaomoji — the « émoticône » of RGAA 13.5.
+const CRYPTIC = /\p{Extended_Pictographic}|(?:^|\s)[:;=][-']?[)(DPp/\\|]|¯\\_\(ツ\)_\/¯|\(╯°□°\)╯/u;
+const TEMPORAL_MEDIA_HOST =
+  /(youtube|youtu\.be|vimeo|dailymotion|soundcloud|spotify|twitch|wistia|brightcove|jwplayer|videopress|podcast|player|vid[eé]o|audio|baladodiffusion|\.(?:mp4|webm|ogv|ogg|mov|m4v|mp3|wav|m4a|m3u8))/i;
 const TEMPORAL_MEDIA_VALUE = /(?:^|[/.?=&_-])(?:audio|video|player|podcast|mp[34]|webm|ogg|ogv|wav|m4a|mov|avi|mpeg)(?:$|[/.?=&_-])/i;
 const ROUTER_IMPORT =
   /['"](?:react-router(?:-dom)?|next\/(?:router|navigation)|vue-router|@remix-run\/[\w-]+|@tanstack\/[\w-]*router|@sveltejs\/kit|\$app\/(?:navigation|stores))['"]/;
@@ -677,8 +707,10 @@ export const SUBJECTS: Record<string, Subject> = {
           (e) => (attr(e, "type") ?? "") === "search" || /search|recherch/i.test(`${attr(e, "name") ?? ""} ${attr(e, "id") ?? ""} ${attr(e, "class") ?? ""}`),
         )
         .map((e) => h(d, e, `search field — one of the "multiple ways" mechanisms`, `search|${attr(e, "name") ?? ""}`)),
+      // A site map by its address or its name. `index` used to be in the address pattern, and
+      // every brand link to `index.html` was presented as the site map.
       ...elementsByTag(d, "a")
-        .filter((e) => /plan-du-site|sitemap|site-map|index/i.test(attr(e, "href") ?? ""))
+        .filter((e) => /plan[-_]du[-_]site|sitemap|site[-_]map/i.test(attr(e, "href") ?? "") || /\bplan du site\b|\bsite ?map\b/i.test(t(e, 60)))
         .map((e) => h(d, e, `site map / index link text="${t(e, 40)}" href="${attr(e, "href")}"`, `sitemap|${attr(e, "href")}`)),
     ]),
 
@@ -948,9 +980,10 @@ export const SUBJECTS: Record<string, Subject> = {
       ...linesOf(d, /\b(?:draggable|onDragStart|useDrag|DndContext|react-beautiful-dnd|@dnd-kit)\b/).map((l) =>
         hAt(d, l.line, "drag", `drag interaction: ${l.text}`, `drag|${l.text}`),
       ),
-      ...linesOf(d, /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b|addEventListener\(\s*["'](?:touchmove|gesture\w*|pointermove)["']/i).map(
-        (l) => hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`),
-      ),
+      ...codeLinesOf(
+        d,
+        /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b|addEventListener\(\s*["'](?:touchmove|gesture\w*|pointermove)["']/i,
+      ).map((l) => hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`)),
       ...linesOf(d, /\b(?:devicemotion|deviceorientation|DeviceMotionEvent|DeviceOrientationEvent|Accelerometer|Gyroscope)\b/).map((l) =>
         hAt(d, l.line, "motion", `device-motion input — is there an interface alternative, and can it be switched off? ${l.text}`, `devicemotion|${l.text}`),
       ),
@@ -1014,8 +1047,8 @@ export const SUBJECTS: Record<string, Subject> = {
       ...d.elements
         .filter((e) => e.tag === "meta" && (attr(e, "http-equiv") ?? "").toLowerCase() === "refresh")
         .map((e) => h(d, e, `<meta http-equiv="refresh" content="${attr(e, "content") ?? ""}">`, `metarefresh|${attr(e, "content") ?? ""}`)),
-      ...linesOf(d, /\b(?:setTimeout|setInterval)\s*\(/).map((l) => hAt(d, l.line, "timer", `timer: ${l.text}`, `timer|${l.text}`)),
-      ...linesOf(d, /\b(?:sessionTimeout|maxAge|expiresIn|session_max|idleTimeout)\b/i).map((l) =>
+      ...codeLinesOf(d, /\b(?:setTimeout|setInterval)\s*\(/).map((l) => hAt(d, l.line, "timer", `timer: ${l.text}`, `timer|${l.text}`)),
+      ...codeLinesOf(d, /\b(?:sessionTimeout|maxAge|expiresIn|session_max|idleTimeout)\b/i).map((l) =>
         hAt(d, l.line, "session", `session/expiry config: ${l.text}`, `session|${l.text}`),
       ),
     ]),
@@ -1027,9 +1060,15 @@ export const SUBJECTS: Record<string, Subject> = {
       ...d.elements
         .filter((e) => /animation|transition/.test(attr(e, "style") ?? ""))
         .map((e) => h(d, e, `inline animation: ${(attr(e, "style") ?? "").slice(0, 80)}`, `inlineanim|${(attr(e, "style") ?? "").slice(0, 80)}`)),
-      ...linesOf(d, /\b(?:carousel|slider|autoplay|animation-iteration-count\s*:\s*infinite|requestAnimationFrame)\b/i).map((l) =>
+      ...codeLinesOf(d, /\b(?:carousel|carrousel|slider|autoplay|animation-iteration-count\s*:\s*infinite|requestAnimationFrame)\b/i).map((l) =>
         hAt(d, l.line, "motion", `moving/auto-updating content: ${l.text}`, `motion|${l.text}`),
       ),
+      // An animated image is moving content too — the glossary names « un gif animé ».
+      ...elementsByTag(d, "img")
+        .filter((e) => /\.gif(?:[?#]|$)/i.test(attr(e, "src") ?? ""))
+        .map((e) =>
+          h(d, e, `<img src="${attr(e, "src")}"> — a GIF may be animated: does it move for more than 5 s, and can it be stopped?`, `gif|${attr(e, "src")}`),
+        ),
       ...elementsByTag(d, "video", "audio").map((e) =>
         h(d, e, `<${e.tag} autoplay=${attr(e, "autoplay") !== undefined} controls=${attr(e, "controls") !== undefined}>`, `media|${e.tag}`),
       ),
@@ -1108,7 +1147,7 @@ export const SUBJECTS: Record<string, Subject> = {
             `flash-css|${r.selector}|${declsText(r.decls)}`,
           ),
         ),
-      ...linesOf(d, /\b(?:flash|flashing|strobe|setInterval|requestAnimationFrame|classList\.(?:add|remove|replace|toggle))\b|animation(?:-name)?\s*:/i)
+      ...codeLinesOf(d, /\b(?:flash|flashing|strobe|setInterval|requestAnimationFrame|classList\.(?:add|remove|replace|toggle))\b|animation(?:-name)?\s*:/i)
         .filter((l) => !/^\s*(?:<!--|\/\/|\/\*)/.test(l.text))
         .map((l) => hAt(d, l.line, "flash-code", `possible scripted/CSS flash mechanism: ${l.text}`, `flash-code|${l.text}`)),
     ]),
@@ -1424,6 +1463,57 @@ export const SUBJECTS: Record<string, Subject> = {
   // page's stylesheets, its declarations, and — once a browser has run — the measurements. The
   // subjects below hand those over. None of them is an existence subject: their silence proves
   // nothing, and they never close a criterion on their own.
+
+  // RGAA 13.5/13.6 — « contenu cryptique (art ASCII, émoticône, syntaxe cryptique) ». It used
+  // to inherit `images` through WCAG 1.1.1, so a page with an emoticon and no image closed both
+  // criteria « non applicable » over the very content they are about.
+  cryptic: (docs) =>
+    docs.flatMap((d) =>
+      d.elements
+        .filter((e) => !["script", "style", "title", "head"].includes(e.tag))
+        .filter((e) => {
+          const own = e.children
+            .filter((c) => c.type === "text")
+            .map((c) => (c as { data: string }).data)
+            .join(" ");
+          return CRYPTIC.test(own) || (e.tag === "pre" && /[^\w\s]{6,}/.test(own));
+        })
+        .slice(0, 40)
+        .map((e) =>
+          h(
+            d,
+            e,
+            `cryptic content: "${t(e, 60)}" title="${attr(e, "title") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" — is an alternative given (title or adjacent definition)?`,
+            `cryptic|${t(e, 40)}`,
+          ),
+        ),
+    ),
+
+  // Time-based media as the 1.2.x applicability predicate sees it (src/audit.ts hasMedia): the
+  // media elements, and an embed or iframe that points at a player. RGAA 4.7 (« chaque média
+  // temporel est-il clairement identifiable ? ») used to inherit `images` from WCAG 1.1.1 and
+  // closed NA on a page with a video and no image; 4.1–4.6 were never shown a YouTube iframe.
+  temporalMedia: (docs) =>
+    docs.flatMap((d) =>
+      d.elements
+        .filter(
+          (e) =>
+            ["video", "audio"].includes(e.tag) ||
+            (["object", "embed"].includes(e.tag) && embeddedMediaKind(e) !== "non-temporal") ||
+            (e.tag === "iframe" && TEMPORAL_MEDIA_HOST.test(`${attr(e, "src") ?? ""} ${attr(e, "title") ?? ""} ${attr(e, "allow") ?? ""}`)),
+        )
+        .map((e) => {
+          const tracks = elementsByTag(d, "track")
+            .filter((x) => ancestors(x).includes(e))
+            .map((x) => `${attr(x, "kind") ?? "subtitles"}:${attr(x, "srclang") ?? ""}`);
+          return h(
+            d,
+            e,
+            `<${e.tag}> src="${(attr(e, "src") ?? attr(e, "data") ?? "").slice(0, 80)}" controls=${attr(e, "controls") !== undefined} autoplay=${attr(e, "autoplay") !== undefined} tracks=[${tracks.join(", ")}] heading="${nearestHeading(d, e) ?? ""}" — is it identified by adjacent text, and does it have its transcript/captions/description?`,
+            `tmedia|${e.tag}|${attr(e, "src") ?? attr(e, "data") ?? ""}`,
+          );
+        }),
+    ),
 
   // The page's styling, as a whole: every stylesheet, the inline style attributes, and the
   // captured rules. Anchored on the document root too, so a page with NO author CSS still has
@@ -1763,6 +1853,10 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // Theme 6 — links.
     "6.1": ["links"],
     "6.2": ["links"],
+    // Theme 1 — the images themselves: 1.2 and 1.9 inherited `aria` from WCAG 4.1.2 too, and were
+    // handed every <nav> and aria-pressed button of the page beside the images they are about.
+    "1.2": ["images"],
+    "1.9": ["images"],
     // Theme 2 — frames. Both criteria are about the frame and its title, and nothing else.
     "2.1": ["frames"],
     "2.2": ["frames"],
@@ -1820,6 +1914,16 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // WCAG 1.4.2, which is `static` and therefore has no subject of its own — but the pack
     // flags 4.10 `judgment`, so judgmentGuard reopens it and it would arrive with nothing.
     "4.10": ["motion"],
+    // Theme 4's own population, so a YouTube iframe is shown and 4.7 is not closed by the
+    // absence of IMAGES (its WCAG mapping, 1.1.1).
+    "4.1": ["temporalMedia", "motion"],
+    "4.2": ["temporalMedia", "motion"],
+    "4.3": ["temporalMedia", "motion"],
+    "4.4": ["temporalMedia", "motion"],
+    "4.5": ["temporalMedia", "motion"],
+    "4.6": ["temporalMedia", "motion"],
+    "4.7": ["temporalMedia"],
+    "4.13": ["temporalMedia", "nonTemporalMediaControls"],
     // 4.11/4.12 map to the same keyboard SCs but ask about disjoint media populations.
     // Inheriting the union handed both criteria every pointer handler and focusable in scope.
     "4.11": ["temporalMediaControls"],
@@ -1868,6 +1972,8 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "13.2": ["newWindow"],
     "13.3": ["downloadDocs"],
     "13.4": ["downloadDocs"],
+    "13.5": ["cryptic"],
+    "13.6": ["cryptic"],
     "13.7": ["flashes"],
     "13.8": ["motion", "timers"],
     "13.9": ["orientation", "rendered:1.3.4", "stylesheets"],
@@ -1962,6 +2068,9 @@ export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   "frames",
   "downloadDocs",
   "buttons",
+  // Same elements as the 1.2.x applicability predicate, so « no media » means the same thing
+  // whichever layer concludes it.
+  "temporalMedia",
   "newWindow",
   "contextChange",
   "scriptAlternatives",
@@ -1987,7 +2096,7 @@ export const ALWAYS_APPLICABLE: Readonly<Record<string, ReadonlySet<string>>> = 
  *  INHERIT from its WCAG mapping (derive.ts `ownSubjectSeen`): RGAA 13.11 maps onto WCAG 2.5.2,
  *  whose predicate closes on « no down-event handler » — and a page full of click actions is
  *  then published « non applicable » for a criterion whose population is exactly those actions. */
-export const PRESENCE_SUBJECTS: ReadonlySet<string> = new Set(["pointerActions"]);
+export const PRESENCE_SUBJECTS: ReadonlySet<string> = new Set(["pointerActions", "cryptic"]);
 
 /** The subjects that decide a success criterion. Empty ⇒ the criterion has none declared,
  *  which `tests/harvest-coverage.test.ts` refuses for any criterion the engine hands over. */
