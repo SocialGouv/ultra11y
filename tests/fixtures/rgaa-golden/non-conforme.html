@@ -112,7 +112,10 @@
       <p>Les champs obligatoires sont indiqués en rouge.</p>
       <form action="/inscription" method="post">
         <input type="text" class="champ" />
-        <input type="email" placeholder="Votre email" />
+        <input type="email" placeholder="Votre email" aria-describedby="doublon" />
+        <select name="mois"><option>Janvier</option><option>Février</option></select>
+        <div role="textbox" contenteditable="true"></div>
+        <div role="checkbox" aria-checked="false" tabindex="0"></div>
         <label for="nom" style="color: #d00000">Champ 2</label>
         <input id="nom" type="text" required />
         <input id="cp" type="text" onkeydown="if (event.key === 'Tab') event.preventDefault()" />
@@ -157,6 +160,13 @@
       </form>
 
       <div onclick="ouvrirDetail()">Ouvrir le détail</div>
+      <input type="button" onclick="imprimer()" />
+      <ul><div>Ateliers enfants</div></ul>
+      <div><li>Inscription en ligne</li></div>
+      <div><dt>Tarif réduit</dt><dd>Sur justificatif</dd></div>
+      <dl><p>Horaires d’ouverture</p></dl>
+      <img src="media/equipe.png" usemap="#plan" alt="Plan des salles" />
+      <map name="plan"><area shape="rect" coords="0,0,32,24" href="/salle-a" /></map>
       <div class="carrousel" id="carrousel">Diapositive 1 sur 3</div>
       <button type="button" onmousedown="supprimerPanier()">Vider le panier</button>
       <p><a href="media/programme.odt">Programme de la saison</a></p>

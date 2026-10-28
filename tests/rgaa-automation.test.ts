@@ -134,7 +134,7 @@ describe("RGAA test-level automation contract", () => {
         rules: ["axe:aria-input-field-name", "axe:aria-toggle-field-name", "axe:label", "axe:select-name", "control-label-missing"],
       },
       { test: "11.5.1", tier: "static", rules: ["radio-checkbox-group-ungrouped"] },
-      { test: "11.6.1", tier: "static", rules: ["axe:fieldset", "fieldset-legend-missing"] },
+      { test: "11.6.1", tier: "static", rules: ["fieldset-legend-missing"] },
       { test: "11.8.2", tier: "static", rules: ["pack:rgaa:optgroup-without-label"] },
       { test: "11.9.1", tier: "static", rules: ["form-button-empty-name"] },
       { test: "11.9.2", tier: "static", rules: ["form-label-in-name-mismatch"] },

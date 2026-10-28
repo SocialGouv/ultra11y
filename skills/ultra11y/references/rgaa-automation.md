@@ -85,7 +85,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 11.3 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
 | 11.4 | 0 / 0 / 3 | 0 / 0 / 0 | no | AI |
 | 11.5 | 1 / 0 / 0 | 1 / 1 / 0 | no | deterministic NC + AI residual |
-| 11.6 | 1 / 0 / 0 | 2 / 0 / 0 | no | deterministic NC + AI residual |
+| 11.6 | 1 / 0 / 0 | 1 / 0 / 0 | no | deterministic NC + AI residual |
 | 11.7 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
 | 11.8 | 1 / 0 / 2 | 1 / 0 / 0 | no | deterministic NC + AI residual |
 | 11.9 | 2 / 0 / 0 | 2 / 2 / 0 | no | deterministic NC + AI residual |
@@ -320,7 +320,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 11.4.2 | judgment | — | — |
 | 11.4.3 | judgment | — | — |
 | 11.5.1 | static | `radio-checkbox-group-ungrouped` | `date-fields-ungrouped` |
-| 11.6.1 | static | `axe:fieldset`, `fieldset-legend-missing` | — |
+| 11.6.1 | static | `fieldset-legend-missing` | — |
 | 11.7.1 | judgment | — | — |
 | 11.8.1 | judgment | — | — |
 | 11.8.2 | static | `pack:rgaa:optgroup-without-label` | — |

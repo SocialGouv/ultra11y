@@ -103,7 +103,7 @@
     "crossRules": 7,
     "renderedRules": 6,
     "packRules": 4,
-    "axeRules": 70,
+    "axeRules": 69,
     "probes": 10
   },
   "sources": [
@@ -115,8 +115,8 @@
     },
     {
       "key": "axe",
-      "touched": 27,
-      "decisive": 10,
+      "touched": 26,
+      "decisive": 9,
       "signalOnly": 17
     },
     {
@@ -1435,15 +1435,12 @@
       "title": "Dans chaque formulaire, chaque regroupement de champs de même nature a-t-il une légende ?",
       "level": "nc",
       "sources": [
-        "static",
-        "axe"
+        "static"
       ],
       "decisiveSources": [
-        "static",
-        "axe"
+        "static"
       ],
       "decisive": [
-        "axe:fieldset",
         "fieldset-legend-missing"
       ],
       "signals": [],

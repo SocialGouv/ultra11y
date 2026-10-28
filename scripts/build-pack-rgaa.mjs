@@ -294,7 +294,8 @@ const RULE_TO_CRITERIA = {
   // An ARIA field (role=textbox, combobox, checkbox, switch…) with no accessible name at all has
   // none of the label mechanisms 11.1.1 lists either.
   "axe:aria-input-field-name": ["11.1"], "axe:aria-toggle-field-name": ["11.1"],
-  "axe:autocomplete-valid": ["11.13"], "axe:fieldset": ["11.6"],
+  // (axe-core has no `fieldset` rule — the entry that stood here was inert.)
+  "axe:autocomplete-valid": ["11.13"],
   // Theme 12 — navigation (12.7 skip link, 12.8 tab order, 12.9 keyboard trap)
   "skip-link-target-missing": ["12.7"], "axe:skip-link": ["12.7"], "axe:bypass": ["12.7"],
   // A page whose <nav> precedes content with no landmark, heading, button or in-page link at
@@ -360,7 +361,6 @@ const DECISIVE_RULE_TESTS = {
   "11.1|control-label-missing": ["1"],
   "11.1|axe:aria-input-field-name": ["1"],
   "11.1|axe:aria-toggle-field-name": ["1"],
-  "11.6|axe:fieldset": ["1"],
   "11.6|fieldset-legend-missing": ["1"],
   "11.9|form-button-empty-name": ["1"],
   "11.9|form-label-in-name-mismatch": ["2"],
