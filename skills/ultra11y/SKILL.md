@@ -62,9 +62,14 @@ adjudicates. So the engine's clean run is a starting point, never a verdict — 
 >    criterion carries is accepted, so cite the one you actually opened.
 > 4. **Residual is explicit, never silently conforming**: the AI agent *adjudicates* every
 >    *judgment* criterion itself (`verify --manual`, gated), and the *rendering* criteria go to
->    `scan` — which now CONCLUDES `C` (`decidedBy: "scan"`) when every rule carrying a
->    criterion ran on every page in scope and raised nothing, and stays silent when even one
->    page's signals were incomplete. Any criterion still unproven stays "to assess manually" —
+>    `scan`. Under the WCAG core, a clean scan CONCLUDES `C` (`decidedBy: "scan"`) when every
+>    rule carrying a criterion ran on every page in scope and raised nothing, and stays silent
+>    when even one page's signals were incomplete. **Under RGAA it never concludes `C`**: the
+>    pack's automation contract marks those rules as *candidate* evidence (RGAA 3.2, 3.3, 10.4,
+>    10.11, 10.12, 12.9…), so the scan can prove a non-conformity but its silence only yields
+>    signals, and the criterion stays « à évaluer » for you to adjudicate — or to declare
+>    undecidable, with its reason, when its brief carries no citable evidence (a `C` with
+>    nothing to cite is refused). Any criterion still unproven stays "to assess manually" —
 >    no status without a recorded, justified verdict. To make that a gate rather than a hope,
 >    `check --in <audit.json> --require-decided` fails while anything is still to assess, and
 >    `--allow-undecided <file>` takes the criteria you genuinely cannot decide, each with its
@@ -303,9 +308,13 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   read **`references/dynamic.md`**.
 - **"Close the criteria that came back `needs-rendered-dom`"** → they did not need a better
   model, they needed a browser. `scan` persists WHAT IT MEASURED beside each snapshot
-  (`probes.json`, `axe.json`), so a page it zoomed, reflowed and tabbed through can come back
-  **conforming** rather than « à évaluer » — RGAA 3.2/3.3/10.4/10.11/10.12 close on the
-  measurement, and 10.1/12.8 become adjudicable from the real DOM. `verify --manual` warns
+  (`probes.json`, `axe.json`), so under the WCAG core a page it zoomed, reflowed and tabbed
+  through can come back **conforming** rather than « to assess ». **Under RGAA it does not
+  close them**: 3.2/3.3/10.4/10.11/10.12 carry only *candidate* scan rules, so a clean scan
+  leaves them « à évaluer » — the scan can still raise their non-conformities, and 10.1/12.8
+  become adjudicable from the captured DOM. Rule on them in `verify --manual`; where a brief
+  shows no harvested evidence, a `C` is refused, so record `manual` (`undecidable`) with the
+  reason and list it under `--allow-undecided`. `verify --manual` warns
   before you spend a pass, `check --require-rendered` refuses, and the crawl is **unbounded by
   default** (`--max 0` / `--depth 0`), announcing every page it reaches. Read
   **`references/dynamic.md`** and **`references/pages.md`**.
@@ -313,7 +322,8 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 ## Orchestration — route by harness
 
 The judgment phases fan out: `ADJUDICATE.todo.json` (one item per residual criterion) and
-`VERIFY.todo.json` (one entry per NC claim) are independent per-item worklists, and
+`VERIFY.todo.json` (one entry per claim on trial — each non-conformity, and each agent
+`C`/`NA`) are independent per-item worklists, and
 `orchestrate --run <dir>` emits a launchable workflow, per-role dispatch contracts and a
 sequential RUNBOOK from whichever worklists currently exist. Fan-out is an optimization,
 never a requirement: the gates are harness-independent, every phase has a sequential
@@ -376,8 +386,9 @@ drive the judgment and content stages:
    source settles computed contrast, 200 % zoom, 320 px reflow or text spacing, so every
    adjudication pass over them costs a model and returns `needs-rendered-dom`. Measured on one
    RGAA run over a two-file fixture: **80 criteria to adjudicate from source alone, 41 once a
-   single page was scanned** — and of the seven a three-pass, $24.90 cascade was left holding,
-   six closed on the measurement. `verify --manual` now says so before you spend anything, and
+   single page was scanned**. Under RGAA the scan does not close a rendering criterion by
+   itself (its rules are *candidate* evidence there, see above), but without it you have no
+   rendered DOM to rule on. `verify --manual` now says so before you spend anything, and
    `check --in <audit.json> --require-rendered` makes it a gate.
 2. **Adjudicate & refute** with `verify`, two worklists. (a) `verify --manual --in audit.json`
    emits `ADJUDICATE.todo.json` — one item per residual *judgment* criterion, pre-loaded with the
@@ -386,15 +397,21 @@ drive the judgment and content stages:
    groundable finding; `verify --apply … --in audit.json` folds them back FAIL-CLOSED (agent NCs
    become real `agent:<sc>` findings that re-render in §2). (b) `verify --report … [--semantic]`
    builds `VERIFY.todo.json`, which attacks **both directions**. It refutes any
-   `preliminary`/SFC/library-source **non-conformity** the rendered DOM disproves, and — when a
-   verdict ledger exists, which is the default — it also puts the ledger's agent-adjudicated
-   **conformities** on trial, one item per citation, question inverted: *does this evidence
+   `preliminary`/SFC/library-source **non-conformity** the rendered DOM disproves, and — by
+   default — it also puts the agent-adjudicated
+   **conformities and « non applicable »** of `--in`'s audit (else the ledger) on trial, one
+   item per claim with its full citation set, question inverted: *does this evidence
    establish the criterion, or only show that its subject exists?* Nothing used to challenge a
    `C`, so a criterion cleared because its subject was PRESENT rather than RIGHT shipped as a
    conformance claim. Same verdicts (`supported`/`partial`/`refuted`/`unsupported`);
    `verify --apply` drops the refuted/unsupported non-conformities and sends a refuted
    conformity's criterion back to « à évaluer » — never to NC, because refuting a conformity
-   proves nothing against the criterion. `--no-conformities` opts out. This
+   proves nothing against the criterion; with `--prune` it writes that outcome back to the
+   audit, and a conformity the verdicts file never ruled on goes back to « à évaluer » too.
+   The conformity half is **never capped by default** (`--max-verify` bounds the
+   non-conformities only, default 40); pass `--max-verify 0` to put every claim on trial in
+   one worklist, and treat any « left out of the trial » warning as an incomplete run.
+   `--no-conformities` opts out. This
    includes **focus & interaction logic** (read the full component source: keyboard
    operability, focus order/visibility, traps, on-focus/on-input changes; see
    `references/focus-and-logic.md`) and the per-rule traps in `references/false-positives.md`.

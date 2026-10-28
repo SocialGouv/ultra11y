@@ -18,14 +18,17 @@ This phase makes each verdict defensible and recorded, never invented, never sil
    `alt`, every link's text + context, the literal colour pairs, control labels, the heading
    outline, ARIA state, `tabindex`, lang-of-parts.
 2. **Rule on each item**, filling its `verdict` in `ADJUDICATE.todo.json` (provenance
-   `decidedBy: "agent"` is recorded):
-   - `C` — conforming, with a `justification` from the evidence;
+   `decidedBy: "agent"` is recorded). With a shell, this is the one file you write — see
+   « When the adjudicator has no shell » for its evidence-free twin:
+   - `C` — conforming, with a `justification` from the evidence **and** `citations[]` naming
+     the evidence you cleared (shape below);
    - `NC` — non-conforming, with ≥1 **groundable** finding (`file`/`line`/`message`/`snippet`)
      **AND a `normativeRef`** citing the precise failed test of the *active standard* (a WCAG
      technique/SC, or an RGAA test number under `--standard rgaa`). The fold rejects a missing
      `normativeRef`, or one that does not resolve to a real test of the active standard
      (anti-fabrication) — a non-conformity must always name the normative rule it breaks;
-   - `NA` — not applicable, with a `justification`;
+   - `NA` — not applicable, with a `justification` (and `citations[]` whenever evidence was
+     presented, to say which items fall out of scope);
    - `manual` — undecidable from what is captured, with a `reason`: `"needs-rendered-dom"`
      (decide via `scan`) or `"undecidable"`.
    - `recommendations[]` — a **good practice with no failing normative test** (e.g. "state a
@@ -33,9 +36,24 @@ This phase makes each verdict defensible and recorded, never invented, never sil
      non-normative recommendation (groundable exactly like an NC, but **no `normativeRef`
      required**). It renders under « Recommandations (non normatives) » and never flips the
      criterion to NC. A purely UX concern is neither an NC nor a recommendation — leave it out.
-3. **Fold back FAIL-CLOSED**:
+   **`citations[]`** is an array of anchors, one per piece of harvested evidence the verdict
+   rests on:
+   ```jsonc
+   "citations": [
+     { "file": "site/index.html", "line": 42, "selector": "img.hero", "snippet": "<img class=\"hero\" src=\"hero.png\" alt=\"Un randonneur sur une crête\">" }
+   ]
    ```
-   node scripts/ultra11y.mjs verify --apply ADJUDICATE.todo.json --in audit.json --out .
+   Copy `file`, `line`, `selector` and `snippet` **from the evidence entry of that criterion**
+   rather than retyping the element: the fold accepts an anchor only if it is one of the
+   criterion's own harvested anchors (any occurrence of a content class, including its
+   `alsoAt`), and grounds `snippet` against the source. A `C` with no citation, or citing
+   evidence the criterion was never shown, is refused; a criterion presented with **no**
+   evidence cannot be `C` at all — record `manual` (`undecidable`) with what you checked.
+3. **Fold back FAIL-CLOSED** (add `--ledger` to record the accepted verdicts, so a later
+   `verify --apply VERIFY.todo.json … --prune --ledger` can repair them and a later run can
+   replay them):
+   ```
+   node scripts/ultra11y.mjs verify --apply ADJUDICATE.todo.json --in audit.json --out . --ledger
    ```
    rejects a null verdict, a `C`/`NA` without a `justification`, an `NC` without a groundable
    finding **or without a resolving `normativeRef`**, a `manual` without a `reason`, or any
@@ -82,8 +100,11 @@ test).
 
 | file | for |
 |---|---|
-| `ADJUDICATE.todo.json` · `ADJUDICATE.md` | a session **with a shell**: evidence inline, edit in place, fold yourself |
+| `ADJUDICATE.todo.json` · `ADJUDICATE.md` | a session **with a shell** (Claude Code, Codex…): evidence inline, fill `ADJUDICATE.todo.json` in place, fold yourself |
 | `ADJUDICATE.verdicts.json` | the **only file to write** when you have no shell — verdicts, no evidence |
+
+Fill exactly one of the two. `verify --apply` accepts either and runs the same fold, so the
+choice is about what fits your context, never about what the gate checks.
 | `adjudicate/<criteriaId>.md` | one small brief per criterion: its evidence, the criterion's own wording and tests (with the standard's test methodology), its glossary terms and its citable tests |
 
 Why the split exists, measured rather than assumed: under RGAA, up to 92 criteria carry
@@ -102,19 +123,27 @@ fold: same coverage checks in both directions, same citation matching against *t
 own anchors, same refusals. The smaller surface buys nothing from the gate — a `C` that cites
 an anchor it was never shown is refused exactly as before.
 
-## Adversarial verification of the non-conformities — `verify --report`
+## Adversarial verification of the claims — `verify --report`
 
-Unchanged: `node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md` writes `VERIFY.md`
-+ `VERIFY.todo.json`, one entry per detected non-conformity, each grounded in the **WCAG success
-criterion's W3C Understanding reference** + techniques. Rule each, opening the file at the cited
-line:
+`node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --in audit.json` writes
+`VERIFY.md` + `VERIFY.todo.json`, one entry per detected non-conformity, each grounded in the
+**WCAG success criterion's W3C Understanding reference** + techniques — and one per
+agent-claimed `C`/`NA` (`kind: "c"`, carrying its `citations[]`). `VERIFY.todo.json` is a bare
+JSON array (where `ADJUDICATE.todo.json` is an object with `items`); fill `verdict` and `note` in
+each entry. The conformity half is uncapped unless you pass `--max-verify`; pass
+`--max-verify 0` to lift the 40-item cap on non-conformities too. Rule each, opening the file at
+the cited line:
 - `supported` — the non-conformity is real and correctly tied;
 - `partial` — real but the criterion/wording is imprecise;
 - `refuted` — false (the cited element is actually conforming);
 - `unsupported` — the cited element is not enough to decide.
 
-Then `node scripts/ultra11y.mjs verify --apply VERIFY.todo.json` is green again (fails on any
-`refuted`/`unsupported`/missing verdict). `--semantic` folds the support-check into the same pass.
+Then `node scripts/ultra11y.mjs verify --apply VERIFY.todo.json --report <md> --in audit.json`
+is green again (fails on any `refuted`/`unsupported`/missing verdict). `--prune --out <dir>`
+applies the outcome instead: refuted non-conformities are deleted, refuted or never-tried
+conformities send their criterion back to « à évaluer » (never to NC), and `--ledger` repairs
+the ledger the same way — creating it, with a notice, if none exists yet. `--semantic` folds the
+support-check into the same pass.
 
 > For a country standard's own test grid, `criteria --standard rgaa <id>` shows the RGAA tests
 > behind a WCAG SC. The pre-completion checklist stops you concluding too early. The rule that
