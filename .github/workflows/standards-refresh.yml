@@ -73,6 +73,7 @@ jobs:
           pnpm run build:guidance:wcag
           pnpm run build:criteria
           pnpm run build:act
+          pnpm run build:site
 
       - name: Detect a change
         id: detect

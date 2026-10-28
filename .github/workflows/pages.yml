@@ -1,0 +1,72 @@
+name: Pages
+
+# Publishes the French documentation site (site/) to GitHub Pages:
+# https://socialgouv.github.io/ultra11y/
+#
+# The numbers the site quotes are generated from the code (`pnpm run build:site`, see
+# src/site-data.ts). The committed site/ is already up to date — tests/site-data.test.ts
+# fails otherwise — but the job regenerates it anyway, so a deploy can never publish
+# numbers the engine at that commit does not produce.
+#
+# One-time setup: Settings → Pages → Source: « GitHub Actions ».
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "src/**"
+      - "scripts/**"
+      - "package.json"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch: {}
+
+# Least privilege: read the repository, write the Pages deployment, and mint the OIDC token
+# deploy-pages uses to prove the artifact came from this workflow.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time. A newer push supersedes a queued one, but a deployment already
+# running is allowed to finish rather than being cut off half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate the site numbers from the code
+        run: pnpm run build:site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
