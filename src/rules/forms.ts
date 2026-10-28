@@ -107,6 +107,11 @@ const fieldsetLegendMissing: Rule = {
       if (legend && legend.type === "element" && visibleText(legend)) continue;
       if (hasAttr(el, "aria-label") || hasAttr(el, "aria-labelledby")) continue;
       if (contentInjected(el)) continue; // legend supplied via slot/{@render children()}/a component
+      // RGAA 11.6 asks for the legend of « chaque regroupement de champs de même nature ». One
+      // field is not a grouping: a fieldset wrapping a lone input is layout, and a legend-less
+      // one is no decisive failure of a test about groups.
+      // A component child counts: it may render a field (and the legend-less group stays visible).
+      if (descendants(el).filter((d) => isFormField(d) || !isIntrinsic(d.tag)).length < 2) continue;
       out.push({
         criteriaId: "1.3.1",
         el,
@@ -425,6 +430,13 @@ const disabledContextContent: Rule = {
   },
 };
 
+/** Every member sits in its own `<tr>` of the same table. */
+function checkboxPerTableRow(members: El[]): boolean {
+  const rows = members.map((m) => ancestors(m).find((a) => a.tag === "tr"));
+  if (rows.some((r) => r === undefined)) return false;
+  return new Set(rows).size === members.length;
+}
+
 // ≥2 radios (or a same-name checkbox cluster) sharing a `name` but NOT inside a
 // <fieldset>/role="radiogroup"/role="group" — the group relationship is lost (RGAA 11.5,
 // WCAG 1.3.1/3.3.2). Complements `fieldset-legend-missing` (which fires only once a
@@ -454,6 +466,11 @@ const radioCheckboxGroupUngrouped: Rule = {
       if (members.some(hasDynamicSpread)) continue; // a spread may inject role/group context
       if (members.some(inGroupingContext)) continue; // already grouped
       const type = (attr(members[0]!, "type") ?? "").trim().toLowerCase();
+      // One checkbox per row of a data table (`name="ids[]"` selecting messages, files, lines)
+      // is a per-row choice labelled by its row, not « un ensemble de cases qui se rapportent à
+      // une question ». The glossary groups fields only « lorsque les intitulés de label ne sont
+      // pas suffisants », and calling this a decisive 11.5 failure was an over-claim.
+      if (type === "checkbox" && checkboxPerTableRow(members)) continue;
       const name = (attr(members[0]!, "name") ?? "").trim();
       out.push({
         criteriaId: "1.3.1",

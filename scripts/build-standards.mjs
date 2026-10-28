@@ -664,7 +664,7 @@ const RULE_SC_COVERAGE = {
   "2.4.3": ["positive-tabindex"],
   "2.4.7": ["rendered-focus-not-visible"],
   "2.4.4": ["link-empty-name", "icon-only-control-unnamed"],
-  "2.5.3": ["label-in-name-mismatch", "form-label-in-name-mismatch"],
+  "2.5.3": ["label-in-name-mismatch", "form-label-in-name-mismatch", "link-label-in-name-mismatch"],
   "3.2.2": ["on-input-context-change"],
   "3.3.8": ["credential-entry-blocked"],
   "3.1.1": ["html-lang-missing", "document-language-missing", "html-lang-xml-lang-mismatch", "lang-invalid"],

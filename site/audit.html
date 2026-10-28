@@ -54,7 +54,7 @@
 
 <h2>1. Audit : le moteur lit le code</h2>
 <pre><code>npx ultra11y audit "src/**/*.{html,tsx}" --graph --standard rgaa --out audits --json</code></pre>
-<p>Le moteur applique ses <span data-gen="engine.staticRules">94</span> vérifications. <code>--graph</code> suit les imports entre fichiers : il repère par exemple un composant icône utilisé sans nom accessible dans un autre fichier. Le résultat, <code>audits/audit-latest.json</code>, classe chaque critère : C, NC, NA ou « à évaluer ».</p>
+<p>Le moteur applique ses <span data-gen="engine.staticRules">95</span> vérifications. <code>--graph</code> suit les imports entre fichiers : il repère par exemple un composant icône utilisé sans nom accessible dans un autre fichier. Le résultat, <code>audits/audit-latest.json</code>, classe chaque critère : C, NC, NA ou « à évaluer ».</p>
 <p>Un composant Vue, Svelte ou Astro est lu comme un modèle source : ce qu’injectent les <em lang="en">slots</em> et les liaisons dynamiques est invisible. Ses constats sont marqués « provisoires ». Pour un résultat fiable, on audite le HTML produit (voir <code>render --setup</code> dans <a href="commandes.html">Commandes</a>).</p>
 
 <h2>2. Rendu : scanner avant d’arbitrer</h2>

@@ -237,6 +237,10 @@ const presentationalAttribute: Rule = {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
       if (!intrinsic(el) || inSvg(el)) continue;
+      // Document metadata presents nothing. `<link rel="mask-icon" color="#…">` is conforming
+      // HTML5 (the pinned-tab colour), and calling it presentational markup was a decisive 10.1
+      // non-conformity on a page whose content carried none.
+      if (el.tag === "link" || el.tag === "meta") continue;
       for (const name of Object.keys(el.attribs)) {
         const n = name.toLowerCase();
         const hit = PRESENTATIONAL_ATTRS.has(n) || ((n === "width" || n === "height") && !DIMENSION_OK.has(el.tag)) || (n === "size" && !SIZE_OK.has(el.tag));

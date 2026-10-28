@@ -141,6 +141,17 @@ function nameFromContent(el: El, doc?: Doc, includeHiddenSubtree = false): strin
     // hidden too. Only the descendant's own state is checked here because aria-labelledby is
     // allowed to reference a hidden root; its otherwise-exposed descendants still name it.
     if (!includeHiddenSubtree && (isLocallyDisplayHidden(n) || attr(n, "aria-hidden") === "true")) return;
+    // A descendant that names ITSELF contributes that name (accname 2B/2C, applied to each
+    // child of the traversal): `<a href><svg role="img" aria-label="Aide">…</svg></a>` is a link
+    // named « Aide », and reading only the svg's <title> called it empty — a decisive RGAA 6.2
+    // non-conformity on a conforming link. Presentational nodes cannot be named this way.
+    if (!isPresentational(n)) {
+      const own = (attr(n, "aria-label") ?? "").trim();
+      if (own && !own.includes("{")) {
+        out += ` ${own} `;
+        return;
+      }
+    }
     if (n.tag === "img") {
       const a = embeddedImageName(n, doc);
       if (a) out += " " + a;

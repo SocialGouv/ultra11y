@@ -1,0 +1,536 @@
+{
+  "$comment": "Ground truth for the NON-conforming page: the verdict a human RGAA 4.1.2 auditor gives each of the 106 criteria, established from the official tests (src/data/standards/rgaa.json). verdict is C, NC, NA or manual (undeterminable from this one page). tests/rgaa-golden.test.ts holds the engine to it.",
+  "page": "non-conforme.html",
+  "criteria": {
+    "1.1": {
+      "verdict": "NC",
+      "test": "1.1.3",
+      "reason": "the search button <input type=\"image\"> has no alternative, and the « salle de peinture » photo <img> has none either (1.1.1)"
+    },
+    "1.2": {
+      "verdict": "NC",
+      "test": "1.2.1",
+      "reason": "the decorative header <img alt=\"\"> also carries title=\"Motif décoratif\", so it is not devoid of every other alternative attribute"
+    },
+    "1.3": {
+      "verdict": "NC",
+      "test": "1.3.1",
+      "reason": "the team photo's alt=\"photo\" does not convey the information the image carries"
+    },
+    "1.4": {
+      "verdict": "NA",
+      "test": "1.4.1",
+      "reason": "no image is used as a CAPTCHA or test image"
+    },
+    "1.5": {
+      "verdict": "NA",
+      "test": "1.5.1",
+      "reason": "no CAPTCHA on the page"
+    },
+    "1.6": {
+      "verdict": "NA",
+      "test": "1.6.1",
+      "reason": "no informative image needs a detailed description (two photos, both answerable by a short alternative)"
+    },
+    "1.7": {
+      "verdict": "NA",
+      "test": "1.7.1",
+      "reason": "no image has a detailed description"
+    },
+    "1.8": {
+      "verdict": "NA",
+      "test": "1.8.1",
+      "reason": "no image of text: media/equipe.png contains no text"
+    },
+    "1.9": {
+      "verdict": "NC",
+      "test": "1.9.1",
+      "reason": "the team photo and its adjacent caption « L'équipe d'animation au complet. » are not in a <figure> with <figcaption>, role and aria-label"
+    },
+    "2.1": {
+      "verdict": "NC",
+      "test": "2.1.1",
+      "reason": "the « carte » <iframe> has no title attribute"
+    },
+    "2.2": {
+      "verdict": "NC",
+      "test": "2.2.1",
+      "reason": "the « agenda » <iframe> has title=\"iframe\", which does not describe its content"
+    },
+    "3.1": {
+      "verdict": "NC",
+      "test": "3.1.2",
+      "reason": "« Les champs obligatoires sont indiqués en rouge » — the required field is distinguished by colour alone"
+    },
+    "3.2": {
+      "verdict": "NC",
+      "test": "3.2.1",
+      "reason": "#b0b0b0 text on #ffffff is 2.1:1, below 4.5:1 for normal-size text"
+    },
+    "3.3": {
+      "verdict": "NC",
+      "test": "3.3.1",
+      "reason": "the .champ text fields' only visible boundary is a #e6e6e6 border on #ffffff (1.2:1, below 3:1)"
+    },
+    "4.1": {
+      "verdict": "NC",
+      "test": "4.1.3",
+      "reason": "the synchronised video (speech plus on-screen text) has neither a transcript nor an audio description"
+    },
+    "4.2": {
+      "verdict": "NA",
+      "test": "4.2.3",
+      "reason": "no transcript or audio description exists to be pertinent"
+    },
+    "4.3": {
+      "verdict": "NC",
+      "test": "4.3.1",
+      "reason": "the video has spoken content and no synchronised captions, nor an alternative version with captions"
+    },
+    "4.4": {
+      "verdict": "NA",
+      "test": "4.4.1",
+      "reason": "no captions exist to be pertinent"
+    },
+    "4.5": {
+      "verdict": "NA",
+      "test": "4.5.2",
+      "reason": "audio description is not needed: the only visual information (« Clôture : 30 juin ») is also spoken"
+    },
+    "4.6": {
+      "verdict": "NA",
+      "test": "4.6.2",
+      "reason": "no audio description exists"
+    },
+    "4.7": {
+      "verdict": "NC",
+      "test": "4.7.1",
+      "reason": "no adjacent text identifies the video or the audio announcement"
+    },
+    "4.8": {
+      "verdict": "NA",
+      "test": "4.8.1",
+      "reason": "no non-temporal media on the page"
+    },
+    "4.9": {
+      "verdict": "NA",
+      "test": "4.9.1",
+      "reason": "no non-temporal media on the page"
+    },
+    "4.10": {
+      "verdict": "NC",
+      "test": "4.10.1",
+      "reason": "media/annonce.mp3 (6 s, autoplay loop) and the video (autoplay, with sound) start on their own and cannot be stopped"
+    },
+    "4.11": {
+      "verdict": "NC",
+      "test": "4.11.1",
+      "reason": "neither the <video> nor the <audio> has any consultation control (no controls attribute, no custom player)"
+    },
+    "4.12": {
+      "verdict": "NA",
+      "test": "4.12.1",
+      "reason": "no non-temporal media on the page"
+    },
+    "4.13": {
+      "verdict": "manual",
+      "test": "4.13.1",
+      "reason": "with no player control at all there is no component to expose; whether that fails 4.13 or only 4.11 is an auditor's call"
+    },
+    "5.1": {
+      "verdict": "NC",
+      "test": "5.1.1",
+      "reason": "the « Horaires » table is complex (two header rows, rowspan/colspan) and has no summary"
+    },
+    "5.2": {
+      "verdict": "NA",
+      "test": "5.2.1",
+      "reason": "no complex table has a summary"
+    },
+    "5.3": {
+      "verdict": "C",
+      "test": "5.3.1",
+      "reason": "the layout table has role=\"presentation\" and reads in a sensible order once linearised"
+    },
+    "5.4": {
+      "verdict": "NC",
+      "test": "5.4.1",
+      "reason": "the « Tarifs » data table's visible title is a preceding <p><b>, not associated with the table"
+    },
+    "5.5": {
+      "verdict": "NC",
+      "test": "5.5.1",
+      "reason": "the complex table's caption « Tableau 1 » does not identify its content"
+    },
+    "5.6": {
+      "verdict": "NC",
+      "test": "5.6.1",
+      "reason": "the « Tarifs » column headers are <td><b>, not <th>"
+    },
+    "5.7": {
+      "verdict": "NC",
+      "test": "5.7.2",
+      "reason": "scope=\"colonne\" is not a valid scope value (row/col)"
+    },
+    "5.8": {
+      "verdict": "NC",
+      "test": "5.8.1",
+      "reason": "the role=\"presentation\" layout table contains a <th>"
+    },
+    "6.1": {
+      "verdict": "NC",
+      "test": "6.1.1",
+      "reason": "« cliquez ici » — neither the link text nor its context says where it leads"
+    },
+    "6.2": {
+      "verdict": "NC",
+      "test": "6.2.1",
+      "reason": "<a href=\"/profil\"></a> is empty and <a href=\"/aide\"> contains only an aria-hidden svg"
+    },
+    "7.1": {
+      "verdict": "NC",
+      "test": "7.1.3",
+      "reason": "the script-driven menu <button onclick=\"basculerMenu()\"> contains only an aria-hidden svg: no accessible name"
+    },
+    "7.2": {
+      "verdict": "NA",
+      "test": "7.2.1",
+      "reason": "no script has an alternative (no <noscript>, no fallback content)"
+    },
+    "7.3": {
+      "verdict": "NC",
+      "test": "7.3.1",
+      "reason": "<div onclick=\"ouvrirDetail()\"> cannot be reached or activated with the keyboard"
+    },
+    "7.4": {
+      "verdict": "NC",
+      "test": "7.4.1",
+      "reason": "the « Salle » <select onchange> navigates on change, with no warning and no button"
+    },
+    "7.5": {
+      "verdict": "NC",
+      "test": "7.5.1",
+      "reason": "the success message injected into #message has no role=\"status\""
+    },
+    "8.1": {
+      "verdict": "NC",
+      "test": "8.1.1",
+      "reason": "the page has no doctype"
+    },
+    "8.2": {
+      "verdict": "NC",
+      "test": "8.2.1",
+      "reason": "id=\"doublon\" is used twice; the <input type=\"image\"> lacks its required alt"
+    },
+    "8.3": {
+      "verdict": "C",
+      "test": "8.3.1",
+      "reason": "<html> carries a lang attribute (whether its value is valid is 8.4's question)"
+    },
+    "8.4": {
+      "verdict": "NC",
+      "test": "8.4.1",
+      "reason": "lang=\"fr_FR\" is not a valid language code (underscore)"
+    },
+    "8.5": {
+      "verdict": "C",
+      "test": "8.5.1",
+      "reason": "the page has a <title>"
+    },
+    "8.6": {
+      "verdict": "NC",
+      "test": "8.6.1",
+      "reason": "« Accueil » identifies neither the page (workshop registration) nor the site"
+    },
+    "8.7": {
+      "verdict": "NC",
+      "test": "8.7.1",
+      "reason": "« Terms and conditions apply… » is English with no lang attribute"
+    },
+    "8.8": {
+      "verdict": "NC",
+      "test": "8.8.1",
+      "reason": "lang=\"en_GB\" is not a valid language code"
+    },
+    "8.9": {
+      "verdict": "NC",
+      "test": "8.9.1",
+      "reason": "<blockquote> indents text that is not a quotation, and a run of <br> is used for vertical spacing"
+    },
+    "8.10": {
+      "verdict": "NC",
+      "test": "8.10.2",
+      "reason": "dir=\"right\" is not a valid dir value (rtl/ltr)"
+    },
+    "9.1": {
+      "verdict": "NC",
+      "test": "9.1.1",
+      "reason": "no <h1>, the outline jumps from <h2> to <h4>, and « Nos ateliers de la rentrée » is a <p><strong> posing as a heading (9.1.3)"
+    },
+    "9.2": {
+      "verdict": "NC",
+      "test": "9.2.1",
+      "reason": "no <header>, <nav> or <main>: the navigation and the main content are plain <div>s"
+    },
+    "9.3": {
+      "verdict": "NC",
+      "test": "9.3.1",
+      "reason": "« • Atelier peinture / • Atelier musique / • Atelier théâtre » is a visual list built with <br>, not <ul>/<li>"
+    },
+    "9.4": {
+      "verdict": "NC",
+      "test": "9.4.1",
+      "reason": "the mayor's short quotation is in straight quotes, not a <q>"
+    },
+    "10.1": {
+      "verdict": "NC",
+      "test": "10.1.1",
+      "reason": "<center> (10.1.1) and align=\"center\" (10.1.2) are presentational markup"
+    },
+    "10.2": {
+      "verdict": "NC",
+      "test": "10.2.1",
+      "reason": "« Nouveau : » exists only as CSS ::before content and disappears without stylesheets"
+    },
+    "10.3": {
+      "verdict": "NC",
+      "test": "10.3.1",
+      "reason": "« Étape 2 » comes before « Étape 1 » in the source and is only put back in order by CSS order"
+    },
+    "10.4": {
+      "verdict": "NC",
+      "test": "10.4.1",
+      "reason": "a 40px-high overflow:hidden block clips its text when the text size is doubled"
+    },
+    "10.5": {
+      "verdict": "NC",
+      "test": "10.5.1",
+      "reason": ".bandeau and body declare a text colour with no background colour on the element or any ancestor"
+    },
+    "10.6": {
+      "verdict": "NC",
+      "test": "10.6.1",
+      "reason": "links are #333333 with no underline inside #222222 text (1.3:1, below 3:1) and nothing else marks them"
+    },
+    "10.7": {
+      "verdict": "NC",
+      "test": "10.7.1",
+      "reason": "a:focus, button:focus, input:focus { outline: none } removes the focus indicator with no replacement"
+    },
+    "10.8": {
+      "verdict": "NC",
+      "test": "10.8.1",
+      "reason": "« Inscription obligatoire avant le 30 juin. » is visible but aria-hidden: it is not meant to be ignored, and is"
+    },
+    "10.9": {
+      "verdict": "NC",
+      "test": "10.9.1",
+      "reason": "« utilisez le bouton à droite » identifies the control by its position only"
+    },
+    "10.10": {
+      "verdict": "NC",
+      "test": "10.10.1",
+      "reason": "the same instruction offers no other way to identify the control"
+    },
+    "10.11": {
+      "verdict": "NC",
+      "test": "10.11.1",
+      "reason": "a 900px-wide block forces horizontal scrolling in a 320px window"
+    },
+    "10.12": {
+      "verdict": "NC",
+      "test": "10.12.1",
+      "reason": "inline line-height: 1.2 !important prevents the user from raising line spacing to 1.5"
+    },
+    "10.13": {
+      "verdict": "NC",
+      "test": "10.13.1",
+      "reason": "the hover-revealed .infobulle cannot be dismissed without moving the pointer"
+    },
+    "10.14": {
+      "verdict": "NC",
+      "test": "10.14.1",
+      "reason": "the .infobulle appears via CSS :hover only, on a non-focusable span: no keyboard way to reveal it"
+    },
+    "11.1": {
+      "verdict": "NC",
+      "test": "11.1.1",
+      "reason": "the first text field and the « Votre email » field (placeholder only) have no label"
+    },
+    "11.2": {
+      "verdict": "NC",
+      "test": "11.2.1",
+      "reason": "the label « Champ 2 » does not say what the field is for"
+    },
+    "11.3": {
+      "verdict": "NC",
+      "test": "11.3.1",
+      "reason": "two e-mail fields with the same function are labelled « Courriel » and « E-mail » on the same page"
+    },
+    "11.4": {
+      "verdict": "NC",
+      "test": "11.4.2",
+      "reason": "the « Code postal » label sits three lines below its field"
+    },
+    "11.5": {
+      "verdict": "NC",
+      "test": "11.5.1",
+      "reason": "the « Civilité » radios are not grouped, and « Madame »/« Monsieur » alone do not carry the question"
+    },
+    "11.6": {
+      "verdict": "NC",
+      "test": "11.6.1",
+      "reason": "the workshops checkbox <fieldset> has no <legend>"
+    },
+    "11.7": {
+      "verdict": "NC",
+      "test": "11.7.1",
+      "reason": "the legend « Groupe 1 » does not describe the grouped fields"
+    },
+    "11.8": {
+      "verdict": "NC",
+      "test": "11.8.2",
+      "reason": "the « Salle » <optgroup> has no label attribute"
+    },
+    "11.9": {
+      "verdict": "NC",
+      "test": "11.9.2",
+      "reason": "the submit's aria-label « Valider » does not contain its visible label « Envoyer »; the image button has no name"
+    },
+    "11.10": {
+      "verdict": "NC",
+      "test": "11.10.2",
+      "reason": "the required field is signalled by red colour only, and the date field states no format before validation (11.10.5)"
+    },
+    "11.11": {
+      "verdict": "NC",
+      "test": "11.11.1",
+      "reason": "« Erreur : date invalide. » suggests neither the expected format nor an example"
+    },
+    "11.12": {
+      "verdict": "NC",
+      "test": "11.12.2",
+      "reason": "the « Supprimer mon compte » form deletes personal data with no confirmation or recovery"
+    },
+    "11.13": {
+      "verdict": "NC",
+      "test": "11.13.1",
+      "reason": "the e-mail, name, postal-code and birth-date fields collect data about the user and have no autocomplete"
+    },
+    "12.1": {
+      "verdict": "manual",
+      "test": "12.1.1",
+      "reason": "a question about the set of pages; one page cannot settle it"
+    },
+    "12.2": {
+      "verdict": "manual",
+      "test": "12.2.1",
+      "reason": "a question about the set of pages; one page cannot settle it"
+    },
+    "12.3": {
+      "verdict": "manual",
+      "test": "12.3.1",
+      "reason": "the site map page is not in this scope"
+    },
+    "12.4": {
+      "verdict": "manual",
+      "test": "12.4.1",
+      "reason": "a question about the set of pages; one page cannot settle it"
+    },
+    "12.5": {
+      "verdict": "manual",
+      "test": "12.5.1",
+      "reason": "a question about the set of pages; one page cannot settle it"
+    },
+    "12.6": {
+      "verdict": "NC",
+      "test": "12.6.1",
+      "reason": "the header, navigation and main zones have no landmark, no heading and no skip link"
+    },
+    "12.7": {
+      "verdict": "NC",
+      "test": "12.7.1",
+      "reason": "there is no skip link to the main content"
+    },
+    "12.8": {
+      "verdict": "NC",
+      "test": "12.8.1",
+      "reason": "tabindex=\"3\" on the search field puts it first in the tab order, ahead of the header links"
+    },
+    "12.9": {
+      "verdict": "NC",
+      "test": "12.9.1",
+      "reason": "the « cp » field's keydown handler cancels Tab: keyboard focus is trapped there"
+    },
+    "12.10": {
+      "verdict": "NC",
+      "test": "12.10.1",
+      "reason": "a single-key « s » shortcut is bound on document with no way to disable or remap it"
+    },
+    "12.11": {
+      "verdict": "NC",
+      "test": "12.11.1",
+      "reason": "the help .infobulle appears on hover of a non-focusable span and cannot be reached with the keyboard"
+    },
+    "13.1": {
+      "verdict": "NC",
+      "test": "13.1.1",
+      "reason": "<meta http-equiv=\"refresh\" content=\"60\"> reloads the page every minute with no way to stop it"
+    },
+    "13.2": {
+      "verdict": "NC",
+      "test": "13.2.1",
+      "reason": "<body onload=\"window.open(…)\"> opens a window with no user action"
+    },
+    "13.3": {
+      "verdict": "NC",
+      "test": "13.3.1",
+      "reason": "the ODT programme is offered with no accessible version"
+    },
+    "13.4": {
+      "verdict": "NA",
+      "test": "13.4.1",
+      "reason": "no office document has an accessible version"
+    },
+    "13.5": {
+      "verdict": "NC",
+      "test": "13.5.1",
+      "reason": "the ASCII-art shrug has neither a title nor an adjacent definition"
+    },
+    "13.6": {
+      "verdict": "NA",
+      "test": "13.6.1",
+      "reason": "no cryptic content has an alternative"
+    },
+    "13.7": {
+      "verdict": "NC",
+      "test": "13.7.3",
+      "reason": ".alerte flips black/white every 0.05 s (10 flashes per second) over a full-width padded block"
+    },
+    "13.8": {
+      "verdict": "NC",
+      "test": "13.8.2",
+      "reason": "the same blinking .alerte runs forever with no way to stop or hide it"
+    },
+    "13.9": {
+      "verdict": "NC",
+      "test": "13.9.1",
+      "reason": "@media (orientation: portrait) hides the whole .contenu block"
+    },
+    "13.10": {
+      "verdict": "NC",
+      "test": "13.10.2",
+      "reason": "the carousel advances only on touchmove (a path-based gesture) with no single-pointer alternative"
+    },
+    "13.11": {
+      "verdict": "NC",
+      "test": "13.11.1",
+      "reason": "« Vider le panier » acts on mousedown, with no abort on release and no undo"
+    },
+    "13.12": {
+      "verdict": "NC",
+      "test": "13.12.1",
+      "reason": "shaking the device (devicemotion) undoes the last action, with no interface alternative and no way to disable it (13.12.3)"
+    }
+  }
+}

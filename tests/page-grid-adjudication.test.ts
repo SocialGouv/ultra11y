@@ -128,6 +128,9 @@ describe("a strict page grid can adjudicate a run-level non-conformity", () => {
           ...target!,
           verdict: "NA",
           justification: "No informative image is present on the unaffected rendered page.",
+          // The image button IS harvested for 1.1 now (RGAA 1.1.3 is about it), so the NA has to
+          // say which of the evidence it rules out of scope — the gate refuses an uncited one.
+          citations: target!.evidence.slice(0, 1),
           findings: [],
         },
       ]),

@@ -13,7 +13,7 @@
 // trustworthy: it can say "non-conforming" because it can also say "I don't know".
 import { readFileSync } from "node:fs";
 import { contrastRatio, parseColor, type RGBA } from "../color.js";
-import type { Doc, El } from "../parse/html.js";
+import { attr, type Doc, type El } from "../parse/html.js";
 import { decodePng, dominantBackground, type Image } from "../pixel.js";
 import type { RenderSignals, StyleEntry } from "../types.js";
 import type { Rule, RuleFinding } from "./rule.js";
@@ -71,6 +71,27 @@ function elementIndex(doc: Doc): Map<El, number> {
   const m = new Map<El, number>();
   doc.elements.forEach((el, i) => m.set(el, i));
   return m;
+}
+
+/** Every visible text element whose computed colour and backdrop both resolve, with the ratio
+ *  the browser's own values give. The PASSING half of what `rendered-contrast` measures: an
+ *  adjudicator can rule RGAA 3.2 conforming only by citing the pairs it was shown, and the rule
+ *  alone hands over the failures and nothing else. */
+export function computedTextPairs(doc: Doc): { el: El; fg: RGBA; bg: RGBA; ratio: number; large: boolean }[] {
+  if (!doc.signals?.styles) return [];
+  const index = elementIndex(doc);
+  const out: { el: El; fg: RGBA; bg: RGBA; ratio: number; large: boolean }[] = [];
+  for (const [el, i] of index) {
+    if (SKIP_TAGS.has(el.tag) || !hasDirectText(el)) continue;
+    const css = styleAt(doc, i)?.css;
+    if (!css || invisible(css)) continue;
+    const fg = parseColor(css.color ?? "");
+    if (!fg || fg.a < 1) continue;
+    const bd = backdropOf(doc, index, el);
+    if (!bd) continue;
+    out.push({ el, fg, bg: bd.color, ratio: contrastRatio(fg, bd.color), large: isLargeText(css) });
+  }
+  return out;
 }
 
 // ---- 1.4.3 contrast, from computed styles -------------------------------------------------
@@ -315,6 +336,56 @@ function restoresIndicator(d: Record<string, string>): boolean {
 // affordance: a document-wide check, so a targeted `outline:none` that a sibling rule replaces
 // is never flagged. That leaves this unable to see a focus style applied by JS or by an
 // unreadable sheet — which is exactly why it declines in both cases rather than guessing.
+// Elements that are not in the sequential focus order unless an author puts them there. A
+// `main:focus { outline: none }` styles the TARGET of a skip link (`<main tabindex="-1">`),
+// which Tab never reaches — RGAA 10.7 and WCAG 2.4.7 are about the focus a keyboard user
+// moves. Measured on the documentation site: a majeur NC on all seven pages for exactly that.
+const NOT_TABBABLE_BY_DEFAULT = new Set([
+  "main",
+  "section",
+  "article",
+  "aside",
+  "header",
+  "footer",
+  "nav",
+  "div",
+  "span",
+  "p",
+  "body",
+  "html",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "ul",
+  "ol",
+  "li",
+  "dl",
+  "table",
+  "form",
+  "figure",
+  "img",
+]);
+
+/** Can this focus rule reach an element a keyboard user tabs to? Each comma part is read by
+ *  its subject (the last compound): a non-interactive tag only counts when some element of
+ *  that tag on the page carries `tabindex >= 0`. A part with no tag (`:focus`, `.btn:focus`)
+ *  may match anything, so it counts. */
+function reachesTabbable(selector: string, doc: Doc): boolean {
+  return selector.split(",").some((part) => {
+    const subject =
+      part
+        .trim()
+        .split(/[\s>+~]+/)
+        .pop() ?? "";
+    const tag = /^[a-z][a-z0-9-]*/i.exec(subject)?.[0]?.toLowerCase();
+    if (!tag || !NOT_TABBABLE_BY_DEFAULT.has(tag)) return true;
+    return doc.elements.some((e) => e.tag === tag && Number.parseInt(attr(e, "tabindex") ?? "-1", 10) >= 0);
+  });
+}
+
 const renderedFocusNotVisible: Rule = {
   id: "rendered-focus-not-visible",
   criteria: ["2.4.7"],
@@ -323,7 +394,7 @@ const renderedFocusNotVisible: Rule = {
   run(doc: Doc): RuleFinding[] {
     const css = doc.signals?.css;
     if (!css || css.unreadable > 0 || css.truncated) return [];
-    const focusRules = css.rules.filter((r) => FOCUS_SEL.test(r.selector));
+    const focusRules = css.rules.filter((r) => FOCUS_SEL.test(r.selector) && reachesTabbable(r.selector, doc));
     if (!focusRules.length) return []; // no focus styling at all is a different (manual) question
     if (!focusRules.some((r) => killsOutline(r.decls))) return [];
     if (focusRules.some((r) => restoresIndicator(r.decls))) return [];

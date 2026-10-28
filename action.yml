@@ -11,6 +11,10 @@ inputs:
     description: 'Files/globs to audit. Ignored in diff mode (see `since`).'
     required: false
     default: '.'
+  exclude:
+    description: 'Comma-separated globs the audit leaves out, in full and in diff mode alike (`--exclude`). Use it for markup that is bad by design — test fixtures, demo pages — so a PR that edits one does not fail the gate. Empty = nothing excluded beyond the engine defaults.'
+    required: false
+    default: ''
   standard:
     description: 'Country standard to report against (e.g. `rgaa`). Default `wcag` (the engine core).'
     required: false
@@ -423,6 +427,7 @@ runs:
           if [ -n "${GITHUB_BASE_REF:-}" ]; then since="origin/$GITHUB_BASE_REF"; else since=""; fi
         fi
         if [ -n "$since" ]; then args+=(--since "$since"); else args+=(${{ inputs.paths }}); fi
+        if [ -n '${{ inputs.exclude }}' ]; then args+=(--exclude '${{ inputs.exclude }}'); fi
         if [ '${{ inputs.jsx }}' = 'true' ]; then args+=(--jsx); fi
         if [ '${{ inputs.graph }}' = 'true' ]; then args+=(--graph); fi
         if [ -n '${{ inputs.baseline }}' ]; then args+=(--baseline '${{ inputs.baseline }}'); fi
@@ -2047,6 +2052,7 @@ runs:
           if [ -n "${GITHUB_BASE_REF:-}" ]; then since="origin/$GITHUB_BASE_REF"; else since=""; fi
         fi
         if [ -n "$since" ]; then args+=(--since "$since"); else args+=(${{ inputs.paths }}); fi
+        if [ -n '${{ inputs.exclude }}' ]; then args+=(--exclude '${{ inputs.exclude }}'); fi
         if [ '${{ inputs.jsx }}' = 'true' ]; then args+=(--jsx); fi
         if [ '${{ inputs.graph }}' = 'true' ]; then args+=(--graph); fi
         if [ -n '${{ inputs.baseline }}' ]; then args+=(--baseline '${{ inputs.baseline }}'); fi

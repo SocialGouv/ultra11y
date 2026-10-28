@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inscription aux ateliers municipaux — Mairie de Villeneuve</title>
+    <style>
+      body { color: #222222; background-color: #ffffff; max-width: 60rem; margin: 0 auto; }
+      a { color: #0050a0; background-color: #ffffff; text-decoration: underline; }
+      a:focus, button:focus, input:focus, select:focus { outline: 3px solid #0050a0; outline-offset: 2px; }
+      .bandeau { color: #ffffff; background-color: #1e3a8a; }
+      .champ { border: 1px solid #595959; background-color: #ffffff; color: #222222; }
+      .menu-aide .infobulle { display: none; }
+      .menu-aide.ouvert .infobulle { display: block; }
+      img, video { max-width: 100%; height: auto; }
+    </style>
+  </head>
+  <body>
+    <a href="#contenu">Aller au contenu principal</a>
+    <header>
+      <a href="/"><img src="media/equipe.png" alt="" /> Mairie de Villeneuve</a>
+      <nav aria-label="Navigation principale">
+        <ul>
+          <li><a href="/ateliers">Ateliers</a></li>
+          <li><a href="/plan-du-site">Plan du site</a></li>
+          <li><a href="/contact">Contact</a></li>
+          <li><a href="/profil">Mon profil</a></li>
+          <li>
+            <a href="/aide"><svg role="img" aria-label="Aide en ligne" focusable="false" width="16" height="16"><circle cx="8" cy="8" r="7"></circle></svg></a>
+          </li>
+        </ul>
+      </nav>
+      <div class="menu-aide" id="menu-aide">
+        <button type="button" aria-expanded="false" aria-controls="infobulle-aide" id="bouton-aide">Aide téléphonique</button>
+        <p class="infobulle" id="infobulle-aide">Appelez le 01 23 45 67 89 du lundi au vendredi.</p>
+      </div>
+      <form action="/recherche" role="search">
+        <label for="q">Rechercher sur le site</label>
+        <input type="search" id="q" name="q" class="champ" />
+        <input type="image" src="media/equipe.png" alt="Lancer la recherche" />
+      </form>
+    </header>
+
+    <main id="contenu" tabindex="-1">
+      <h1>Inscription aux ateliers municipaux</h1>
+      <h2>Nos ateliers de la rentrée</h2>
+      <h3>Le mot du maire</h3>
+      <p>Les ateliers ont lieu à la maison des associations.</p>
+      <p>Comme le dit le maire : <q>La culture est un droit pour chacun.</q></p>
+      <ul>
+        <li>Atelier peinture</li>
+        <li>Atelier musique</li>
+        <li>Atelier théâtre</li>
+      </ul>
+      <p lang="en">Terms and conditions apply to every workshop of the season.</p>
+      <p lang="ar" dir="rtl">مرحبا بكم في ورشاتنا</p>
+      <p>Inscription obligatoire avant le 30 juin.</p>
+      <p>Les places sont limitées à douze personnes par atelier.</p>
+      <p class="bandeau">Nouveau : atelier de céramique.</p>
+      <p>Les ateliers se déroulent le mercredi après-midi et le samedi matin, hors vacances scolaires, dans les locaux de la maison des associations.</p>
+      <p>Mairie de Villeneuve — ouvert du lundi au samedi.</p>
+      <p>Pour vous inscrire, utilisez le formulaire « Inscription » ci-après. <a href="/infos">Consulter les informations pratiques sur les ateliers</a>.</p>
+      <p>Inscrivez-vous vite <span role="img" aria-label="haussement d’épaules amusé" title="haussement d’épaules amusé">¯\_(ツ)_/¯</span></p>
+
+      <figure role="figure" aria-label="L’équipe d’animation au complet.">
+        <img src="media/equipe.png" alt="Photo de l’équipe d’animation : cinq animateurs devant la maison des associations" />
+        <figcaption>L’équipe d’animation au complet.</figcaption>
+      </figure>
+
+      <iframe src="https://example.com/carte" title="Carte d’accès à la maison des associations"></iframe>
+
+      <h2>Vidéo : présentation du portail des ateliers</h2>
+      <video src="media/presentation.mp4" controls>
+        <track kind="captions" src="media/presentation.vtt" srclang="fr" label="Français" default />
+      </video>
+      <details>
+        <summary>Transcription de la vidéo</summary>
+        <p>Écran bleu portant le texte « Clôture : 30 juin ». Voix off : « Présentation du portail. Clôture des inscriptions le trente juin. »</p>
+      </details>
+      <h2>Annonce sonore</h2>
+      <audio src="media/annonce.mp3" controls></audio>
+      <p>Transcription : « Bienvenue sur le portail des démarches. Les inscriptions ferment le trente juin. »</p>
+
+      <ol>
+        <li>Étape 1 : créez votre compte.</li>
+        <li>Étape 2 : payez en ligne.</li>
+      </ol>
+
+      <table>
+        <caption>Tarifs des ateliers</caption>
+        <tr>
+          <th scope="col">Offre</th>
+          <th scope="col">Prix</th>
+        </tr>
+        <tr>
+          <td>Base</td>
+          <td>0 €</td>
+        </tr>
+      </table>
+
+      <table aria-describedby="resume-horaires">
+        <caption>Horaires des ateliers par jour</caption>
+        <tr>
+          <th id="h-atelier" rowspan="2">Atelier</th>
+          <th id="h-horaires" colspan="2">Horaires</th>
+        </tr>
+        <tr>
+          <th id="h-mercredi" headers="h-horaires">Mercredi</th>
+          <th id="h-samedi" headers="h-horaires">Samedi</th>
+        </tr>
+        <tr>
+          <th id="h-peinture" headers="h-atelier">Peinture</th>
+          <td headers="h-peinture h-horaires h-mercredi">14 h</td>
+          <td headers="h-peinture h-horaires h-samedi">10 h</td>
+        </tr>
+      </table>
+      <p id="resume-horaires">Résumé : pour chaque atelier, l’heure de début le mercredi et le samedi.</p>
+
+      <table role="presentation">
+        <tr>
+          <td>Adresse</td>
+          <td>Maison des associations, 1 place de la Mairie</td>
+        </tr>
+      </table>
+
+      <h2>Formulaire d’inscription</h2>
+      <p>Les champs marqués « (obligatoire) » doivent être remplis.</p>
+      <form action="/inscription" method="post" id="inscription">
+        <label for="prenom">Prénom</label>
+        <input id="prenom" name="prenom" type="text" class="champ" autocomplete="given-name" />
+        <label for="email">Adresse électronique (obligatoire)</label>
+        <input id="email" name="email" type="email" required autocomplete="email" class="champ" />
+        <label for="nom">Nom de famille (obligatoire)</label>
+        <input id="nom" name="nom" type="text" required autocomplete="family-name" class="champ" />
+        <label for="cp">Code postal</label>
+        <input id="cp" name="cp" type="text" autocomplete="postal-code" class="champ" />
+        <label for="naissance">Date de naissance (format JJ/MM/AAAA)</label>
+        <input id="naissance" name="naissance" type="text" autocomplete="bday" class="champ" aria-invalid="true" aria-describedby="erreur-naissance" />
+        <p id="erreur-naissance" role="alert">Erreur : date invalide. Saisissez la date au format JJ/MM/AAAA, par exemple 14/07/1990.</p>
+        <fieldset>
+          <legend>Civilité</legend>
+          <input type="radio" name="civilite" id="mme" /><label for="mme">Madame</label>
+          <input type="radio" name="civilite" id="m" /><label for="m">Monsieur</label>
+        </fieldset>
+        <fieldset>
+          <legend>Ateliers choisis</legend>
+          <input type="checkbox" id="peinture" name="ateliers" /><label for="peinture">Peinture</label>
+          <input type="checkbox" id="musique" name="ateliers" /><label for="musique">Musique</label>
+        </fieldset>
+        <label for="salle">Salle</label>
+        <select id="salle" name="salle">
+          <optgroup label="Rez-de-chaussée">
+            <option value="a">Salle A</option>
+            <option value="b">Salle B</option>
+          </optgroup>
+          <optgroup label="Étage">
+            <option value="c">Salle C</option>
+          </optgroup>
+        </select>
+        <button type="submit">Valider l’inscription</button>
+      </form>
+      <div id="message" role="status"></div>
+
+      <form action="/newsletter">
+        <label for="mail-lettre">Adresse électronique (obligatoire)</label>
+        <input id="mail-lettre" name="mail" type="email" required autocomplete="email" class="champ" />
+        <button type="submit">S’abonner à la lettre d’information</button>
+      </form>
+
+      <h2>Mon compte</h2>
+      <form action="/compte/supprimer" method="post" onsubmit="return confirm('Confirmez-vous la suppression définitive de votre compte ?')">
+        <button type="submit">Supprimer mon compte</button>
+      </form>
+
+      <h2>Informations pratiques</h2>
+      <button type="button" onclick="ouvrirDetail()" aria-expanded="false" aria-controls="detail">Ouvrir le détail</button>
+      <div id="detail" hidden>Détail des ateliers.</div>
+      <section class="carrousel" id="carrousel" aria-roledescription="carrousel" aria-label="Photos des ateliers">
+        <p>Diapositive 1 sur 3</p>
+        <button type="button" onclick="diapositivePrecedente()">Diapositive précédente</button>
+        <button type="button" onclick="diapositiveSuivante()">Diapositive suivante</button>
+      </section>
+      <button type="button" onclick="supprimerPanier()">Vider le panier</button>
+      <p>
+        <a href="media/programme.odt">Programme de la saison (ODT, 12 Ko)</a> —
+        <a href="/programme">Programme de la saison, version HTML accessible</a>
+      </p>
+      <p>
+        <a href="https://www.service-public.fr/" target="_blank" rel="noopener">Service-public.fr (nouvelle fenêtre)</a>
+      </p>
+      <p>
+        <input type="checkbox" id="raccourcis" checked />
+        <label for="raccourcis">Activer le raccourci « s » pour afficher l’aide téléphonique</label>
+      </p>
+      <p>
+        <input type="checkbox" id="mouvement" checked />
+        <label for="mouvement">Activer l’annulation en secouant l’appareil</label>
+        <button type="button" onclick="annulerDerniereAction()">Annuler la dernière action</button>
+      </p>
+    </main>
+
+    <footer>
+      <p>Mairie de Villeneuve, 1 place de la Mairie.</p>
+    </footer>
+
+    <script>
+      document.addEventListener("keydown", function (event) {
+        if (document.getElementById("raccourcis").checked && event.key === "s") afficherAide();
+      });
+      document.getElementById("carrousel").addEventListener("touchmove", function () {
+        diapositiveSuivante();
+      });
+      window.addEventListener("devicemotion", function () {
+        if (document.getElementById("mouvement").checked) annulerDerniereAction();
+      });
+      var aide = document.getElementById("menu-aide");
+      var boutonAide = document.getElementById("bouton-aide");
+      boutonAide.addEventListener("click", function () {
+        var ouvert = aide.classList.toggle("ouvert");
+        boutonAide.setAttribute("aria-expanded", String(ouvert));
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          aide.classList.remove("ouvert");
+          boutonAide.setAttribute("aria-expanded", "false");
+        }
+      });
+      document.getElementById("inscription").addEventListener("submit", function () {
+        document.getElementById("message").textContent = "Votre inscription est enregistrée.";
+      });
+    </script>
+  </body>
+</html>

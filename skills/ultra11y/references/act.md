@@ -20,11 +20,11 @@ so beats quietly scoring zero.
 | Corpus | 1134 examples across 91 ACT rules |
 | Source | https://act-rules.github.io/testcases.json |
 | Rules scored | **44** |
-| Failed examples caught | **168 / 187** |
+| Failed examples caught | **169 / 187** |
 | Clean examples left alone | **401 / 401** — no unexplained false positive |
-| Consistent | 26 |
+| Consistent | 27 |
 | Divergent (documented, 9 cases) | 5 |
-| Partially consistent | 13 |
+| Partially consistent | 12 |
 | **Inconsistent** | **0** |
 | Declared gaps (static, not implemented) | 0 |
 
@@ -40,7 +40,7 @@ every deviation on that rule is listed below with the argument for it.
 | [Image has non-empty accessible name](https://act-rules.github.io/rules/23a2a8) | 1.1.1 | `img-alt-missing` | ✅ consistent | 5/5 |
 | [Letter spacing in style attributes is not !important](https://act-rules.github.io/rules/24afc2) | 1.4.12 | `letter-spacing-important` | 🟨 partially consistent | 3/4 |
 | [HTML page has non-empty title](https://act-rules.github.io/rules/2779a5) | 2.4.2 | `title-missing-empty` | ✅ consistent | 5/5 |
-| [Visible label is part of accessible name](https://act-rules.github.io/rules/2ee8b8) | 2.5.3 | `label-in-name-mismatch` | 🟦 divergent (documented) | 3/3 |
+| [Visible label is part of accessible name](https://act-rules.github.io/rules/2ee8b8) | 2.5.3 | `label-in-name-mismatch`, `link-label-in-name-mismatch` | 🟦 divergent (documented) | 3/3 |
 | [Element with presentational children has no focusable content](https://act-rules.github.io/rules/307n5z) | 4.1.2 | `presentational-children-focusable` | ✅ consistent | 3/3 |
 | [Id attribute value is unique](https://act-rules.github.io/rules/3ea0c8) | 4.1.1 | `duplicate-id` | ✅ consistent | 3/3 |
 | [Element marked as decorative is not exposed](https://act-rules.github.io/rules/46ca7f) | — | `decorative-marked-exposed` | ✅ consistent | 3/3 |
@@ -63,7 +63,7 @@ every deviation on that rule is listed below with the argument for it.
 | [Headers attribute specified on a cell refers to cells in the same table element](https://act-rules.github.io/rules/a25f45) | 1.3.1 | `headers-attr-dangling` | ✅ consistent | 4/4 |
 | [Document has a landmark with non-repeated content](https://act-rules.github.io/rules/b40fd1) | — | `bypass-blocks-missing` | 🟨 partially consistent | 1/3 |
 | [Meta viewport allows for zoom](https://act-rules.github.io/rules/b4f0c3) | 1.4.4 | `meta-viewport-zoom-block` | ✅ consistent | 4/4 |
-| [HTML page has lang attribute](https://act-rules.github.io/rules/b5c3f8) | 3.1.1 | `html-lang-missing` | 🟨 partially consistent | 3/4 |
+| [HTML page has lang attribute](https://act-rules.github.io/rules/b5c3f8) | 3.1.1 | `html-lang-missing` | ✅ consistent | 4/4 |
 | [ARIA required owned elements](https://act-rules.github.io/rules/bc4a75) | 1.3.1 | `aria-required-children` | ✅ consistent | 7/7 |
 | [Meta element has no refresh delay](https://act-rules.github.io/rules/bc659a) | 2.2.1, 2.2.4, 3.2.5 | `meta-refresh-redirect` | ✅ consistent | 4/4 |
 | [HTML page lang attribute has valid language tag](https://act-rules.github.io/rules/bf051a) | 3.1.1 | `lang-invalid` | 🟨 partially consistent | 3/4 |
@@ -97,7 +97,6 @@ every deviation on that rule is listed below with the argument for it.
 - **Audio or video element avoids automatically playing audio** · reports on *Passed Example 2*: a #t= media fragment shortening playback below 3s is not resolvable from source
 - **Word spacing in style attributes is not !important** — definite below-threshold author-important values; computed-unit cases remain rendered
 - **Document has a landmark with non-repeated content** — decided only where a <nav> marks the repeated block and no landmark, heading or skip link exists at all; which block is repeated is otherwise a cross-page judgment. `missing-main-landmark` is NOT mapped: it requires a <main>, a stricter claim than ACT's "some landmark"
-- **HTML page has lang attribute** — an `xml:lang` alone is accepted as a declared default language, as RGAA 8.3 accepts it; ACT requires the HTML `lang` attribute
 - **HTML page lang attribute has valid language tag** — beyond syntax, a primary subtag is checked against the closed two-letter registry and the ISO 639-2 spellings of languages that have one (`eng`, `fre`); the deprecated grandfathered `i-*` tags (`i-lux`) are knowingly accepted
 - **Meta element has no refresh delay (no exception)** — this variant drops the >20h exception the engine honours, so long delays are knowingly not reported
 - **Iframe element has non-empty accessible name** · reports on *Inapplicable Example 3*: a tabindex=-1 iframe is still exposed to assistive tech and still needs a title (RGAA 2.1 requires one unconditionally)

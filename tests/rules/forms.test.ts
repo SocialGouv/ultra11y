@@ -47,9 +47,12 @@ describe("fieldset-legend-missing (11.6)", () => {
     expect(findOf(`<fieldset><legend>Civilité</legend><input></fieldset>`, "fieldset-legend-missing")).toHaveLength(0);
   });
   it("non-conforming: fieldset without legend", () => {
-    const f = findOf(`<fieldset><input></fieldset>`, "fieldset-legend-missing");
+    const f = findOf(`<fieldset><input name="a"><input name="b"></fieldset>`, "fieldset-legend-missing");
     expect(f).toHaveLength(1);
     expect(f[0]!.criteriaId).toBe("1.3.1");
+  });
+  it("conforming: a fieldset around ONE field is no grouping of fields (RGAA 11.6.1)", () => {
+    expect(findOf(`<fieldset><input></fieldset>`, "fieldset-legend-missing")).toHaveLength(0);
   });
 });
 

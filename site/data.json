@@ -73,23 +73,23 @@
     ],
     "tests": {
       "total": 258,
-      "static": 27,
+      "static": 28,
       "rendered": 3,
-      "judgment": 228,
-      "decidable": 30
+      "judgment": 227,
+      "decidable": 31
     },
     "levels": {
       "det": 2,
-      "nc": 19,
-      "hint": 28,
-      "llm": 57
+      "nc": 20,
+      "hint": 29,
+      "llm": 55
     },
-    "provable": 21,
+    "provable": 22,
     "deterministic": [
       "8.3",
       "8.5"
     ],
-    "touched": 49,
+    "touched": 51,
     "cNeedsJudgment": 104
   },
   "wcag": {
@@ -99,25 +99,25 @@
     "judgment": 38
   },
   "engine": {
-    "staticRules": 94,
+    "staticRules": 95,
     "crossRules": 7,
     "renderedRules": 6,
     "packRules": 4,
-    "axeRules": 62,
+    "axeRules": 69,
     "probes": 10
   },
   "sources": [
     {
       "key": "static",
-      "touched": 39,
-      "decisive": 17,
-      "signalOnly": 22
+      "touched": 41,
+      "decisive": 18,
+      "signalOnly": 23
     },
     {
       "key": "axe",
       "touched": 26,
-      "decisive": 10,
-      "signalOnly": 16
+      "decisive": 9,
+      "signalOnly": 17
     },
     {
       "key": "probe",
@@ -142,7 +142,7 @@
     "examples": 1134,
     "rules": 91,
     "scoredRules": 44,
-    "caught": 168,
+    "caught": 169,
     "failedScored": 187,
     "recallPct": 90,
     "clean": 401,
@@ -154,8 +154,8 @@
     "deprecatedRules": 3,
     "failed": {
       "total": 358,
-      "caught": 168,
-      "missed": 19,
+      "caught": 169,
+      "missed": 18,
       "rendered": 52,
       "judgment": 112,
       "gap": 0,
@@ -165,7 +165,7 @@
     "overallPct": 47
   },
   "tests": {
-    "fixtures": 112
+    "fixtures": 134
   },
   "criteria": [
     {
@@ -689,10 +689,16 @@
       "id": "6.1",
       "theme": 6,
       "title": "Chaque lien est-il explicite (hors cas particuliers) ?",
-      "level": "llm",
-      "sources": [],
-      "decisiveSources": [],
-      "decisive": [],
+      "level": "nc",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [
+        "static"
+      ],
+      "decisive": [
+        "link-label-in-name-mismatch"
+      ],
       "signals": [],
       "advisory": [
         "pack:rgaa:download-link-format"
@@ -714,11 +720,10 @@
       ],
       "decisive": [
         "axe:link-name",
+        "icon-only-control-unnamed",
         "link-empty-name"
       ],
-      "signals": [
-        "icon-only-control-unnamed"
-      ],
+      "signals": [],
       "advisory": [],
       "tests": 1
     },
@@ -744,22 +749,31 @@
       ],
       "signals": [
         "aria-hidden-focusable",
+        "aria-prohibited-attr",
         "aria-ref-missing-id",
+        "aria-required-attr",
         "aria-required-children",
         "axe:aria-allowed-attr",
         "axe:aria-allowed-role",
+        "axe:aria-command-name",
+        "axe:aria-dialog-name",
         "axe:aria-hidden-focus",
+        "axe:aria-meter-name",
+        "axe:aria-progressbar-name",
         "axe:aria-required-attr",
         "axe:aria-required-children",
         "axe:aria-required-parent",
         "axe:aria-roles",
+        "axe:aria-tooltip-name",
         "axe:aria-valid-attr",
         "axe:aria-valid-attr-value",
         "axe:nested-interactive",
         "axe:presentation-role-conflict",
         "cross-prop-drilled-name-lost",
         "disabled-context-content",
+        "invalid-aria-attr",
         "invalid-aria-role",
+        "invalid-aria-value",
         "nested-interactive",
         "presentational-children-focusable",
         "redundant-aria"
@@ -799,11 +813,15 @@
       "id": "7.4",
       "theme": 7,
       "title": "Pour chaque script qui initie un changement de contexte, l’utilisateur est-il averti ou en a-t-il le contrôle ?",
-      "level": "llm",
-      "sources": [],
+      "level": "hint",
+      "sources": [
+        "static"
+      ],
       "decisiveSources": [],
       "decisive": [],
-      "signals": [],
+      "signals": [
+        "on-input-context-change"
+      ],
       "advisory": [],
       "tests": 1
     },
@@ -862,7 +880,9 @@
         "axe:duplicate-id-active",
         "axe:duplicate-id-aria",
         "duplicate-attribute",
-        "duplicate-id"
+        "duplicate-id",
+        "invalid-aria-attr",
+        "invalid-aria-value"
       ],
       "signals": [],
       "advisory": [],
@@ -1072,7 +1092,9 @@
         "axe:listitem",
         "list-structure"
       ],
-      "signals": [],
+      "signals": [
+        "dl-structure"
+      ],
       "advisory": [],
       "tests": 3
     },
@@ -1176,11 +1198,13 @@
       "title": "Dans chaque page web, chaque lien dont la nature n’est pas évidente est-il visible par rapport au texte environnant ?",
       "level": "hint",
       "sources": [
+        "axe",
         "rendered"
       ],
       "decisiveSources": [],
       "decisive": [],
       "signals": [
+        "axe:link-in-text-block",
         "rendered-link-colour-only"
       ],
       "advisory": [],
@@ -1330,6 +1354,8 @@
         "axe"
       ],
       "decisive": [
+        "axe:aria-input-field-name",
+        "axe:aria-toggle-field-name",
         "axe:label",
         "axe:select-name",
         "control-label-missing"
@@ -1409,15 +1435,12 @@
       "title": "Dans chaque formulaire, chaque regroupement de champs de même nature a-t-il une légende ?",
       "level": "nc",
       "sources": [
-        "static",
-        "axe"
+        "static"
       ],
       "decisiveSources": [
-        "static",
-        "axe"
+        "static"
       ],
       "decisive": [
-        "axe:fieldset",
         "fieldset-legend-missing"
       ],
       "signals": [],

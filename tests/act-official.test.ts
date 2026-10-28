@@ -78,8 +78,8 @@ describe("ACT corpus — precision (absolute)", () => {
 // coverage lowers the count and fails just as loudly as a recall regression.
 const RATCHET = {
   scoredRules: 44, // ACT rules with at least one mapped engine rule
-  cleanRules: 31, // of those, consistent or divergent-with-a-reason (i.e. no missed failure)
-  caughtFailures: 168, // `failed` examples caught across all scored rules
+  cleanRules: 32, // of those, consistent or divergent-with-a-reason (i.e. no missed failure)
+  caughtFailures: 169, // `failed` examples caught across all scored rules
   cleanCases: 401, // `passed`/`inapplicable` examples checked and left alone
 };
 

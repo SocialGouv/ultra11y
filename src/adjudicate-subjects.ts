@@ -26,6 +26,8 @@
 import { type Doc, type El, ancestors, attr, elementsByTag, snippet as elSnippet, textContent } from "./parse/html.js";
 import { parseInlineStyle } from "./color.js";
 import type { Evidence } from "./adjudicate.js";
+import { AXE_WCAG } from "./axe-map.js";
+import { computedTextPairs, renderedRulesFor, renderedRulesRan } from "./rules/rendered.js";
 
 /** Mask the parts of a text that change between runs without the code changing.
  *
@@ -163,6 +165,32 @@ function linesOf(doc: Doc, re: RegExp, cap = 200): { line: number; text: string 
   return out;
 }
 
+/** `linesOf`, restricted to CODE: in an HTML document, a match counts only inside a tag (an
+ *  attribute) or inside a <script>/<style> element — never in the page's prose. Measured on the
+ *  documentation site: a table cell quoting RGAA 4.10 (« chaque son déclenché
+ *  automatiquement… ») was handed to 4.1–4.10 and 13.8 as « moving/auto-updating content », and
+ *  13.7's own title as « a possible scripted flash mechanism ». A component file is code
+ *  throughout, so it is searched whole. */
+function codeLinesOf(doc: Doc, re: RegExp, cap = 200): { line: number; text: string }[] {
+  if (doc.kind !== "html") return linesOf(doc, re, cap);
+  const blocks = doc.elements.filter((e) => e.tag === "script" || e.tag === "style").map((e) => [e.start, e.end] as const);
+  const out: { line: number; text: string }[] = [];
+  const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : `${re.flags}g`);
+  const lines = doc.source.split("\n");
+  let m: RegExpExecArray | null;
+  while ((m = g.exec(doc.source)) && out.length < cap) {
+    const at = m.index;
+    const inBlock = blocks.some(([s, e]) => at >= s && at <= e);
+    const inTag = doc.source.lastIndexOf("<", at) > doc.source.lastIndexOf(">", at - 1);
+    if (inBlock || inTag) {
+      const line = doc.source.slice(0, at).split("\n").length;
+      out.push({ line, text: (lines[line - 1] ?? "").trim().slice(0, 120) });
+    }
+    if (m.index === g.lastIndex) g.lastIndex++;
+  }
+  return out;
+}
+
 // Key/value display patterns (RGAA 8.9 div-presented fields / 9.3 <dl> semantics).
 const LABEL_LIKE = /(^|[-_ ])(field-label|field-key|label|key|term)([-_ ]|$)/i;
 const VALUE_LIKE = /(^|[-_ ])(field-value|field-data|value|data)([-_ ]|$)/i;
@@ -212,8 +240,17 @@ const PRESENTATIONAL_MARKUP_ATTRS = new Set([
   "vspace",
 ]);
 
-const DOWNLOAD_HREF = /\.(pdf|docx?|xlsx?)(?:[?#]|$)/i;
+// « Document bureautique en téléchargement » — every office and publication format, not just the
+// three the first version knew. An .odt programme or a .pptx deck is exactly the document 13.3
+// asks about, and missing its extension published « nothing to download » over it. Kept in step
+// with the formats the pack's own download-link rule recognises (scripts/build-pack-rgaa.mjs),
+// minus archives and media, which are not office documents.
+const DOWNLOAD_HREF = /\.(pdf|docx?|dotx?|xlsx?|xlsm|pptx?|ppsx?|odt|ods|odp|odg|rtf|csv|epub)(?:[?#]|$)/i;
 const STATUS_CLASS = /(error|status|message|alert|notif|toast|feedback|live)/i;
+// Emoji, emoticons and the classic kaomoji — the « émoticône » of RGAA 13.5.
+const CRYPTIC = /\p{Extended_Pictographic}|(?:^|\s)[:;=][-']?[)(DPp/\\|]|¯\\_\(ツ\)_\/¯|\(╯°□°\)╯/u;
+const TEMPORAL_MEDIA_HOST =
+  /(youtube|youtu\.be|vimeo|dailymotion|soundcloud|spotify|twitch|wistia|brightcove|jwplayer|videopress|podcast|player|vid[eé]o|audio|baladodiffusion|\.(?:mp4|webm|ogv|ogg|mov|m4v|mp3|wav|m4a|m3u8))/i;
 const TEMPORAL_MEDIA_VALUE = /(?:^|[/.?=&_-])(?:audio|video|player|podcast|mp[34]|webm|ogg|ogv|wav|m4a|mov|avi|mpeg)(?:$|[/.?=&_-])/i;
 const ROUTER_IMPORT =
   /['"](?:react-router(?:-dom)?|next\/(?:router|navigation)|vue-router|@remix-run\/[\w-]+|@tanstack\/[\w-]*router|@sveltejs\/kit|\$app\/(?:navigation|stores))['"]/;
@@ -225,6 +262,69 @@ const FOREIGN_LEXICON =
   /\b(?:the|and|with|your|about|please|download|settings|welcome|dashboard|overview|read more|learn more|sign in|sign up|log in|get started|coming soon|powered by)\b/i;
 
 const CONTROL_TAGS = ["input", "select", "textarea"] as const;
+// The rest of the glossary's « champ de saisie de formulaire »: the native output elements it
+// names, and the ARIA roles that stand in for a field. A form built of ARIA widgets is still a
+// form, and a criterion about its labels is not « non applicable » because none is an <input>.
+const FIELD_TAGS = new Set(["datalist", "output", "progress", "meter"]);
+const FIELD_ROLES = new Set(["textbox", "searchbox", "combobox", "listbox", "checkbox", "radio", "switch", "slider", "spinbutton", "progressbar", "option"]);
+const roleOf = (e: El): string => (attr(e, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
+/** A form field in the RGAA glossary's sense, native or not. */
+function isFormField(e: El): boolean {
+  if ((CONTROL_TAGS as readonly string[]).includes(e.tag) || FIELD_TAGS.has(e.tag) || FIELD_ROLES.has(roleOf(e))) return true;
+  const editable = attr(e, "contenteditable");
+  return editable !== undefined && editable.trim().toLowerCase() !== "false";
+}
+// « Bouton (formulaire) »: the three HTML button forms the glossary lists, and role="button".
+const BUTTON_INPUT_TYPES = new Set(["submit", "reset", "button", "image"]);
+function isButton(e: El): boolean {
+  if (e.tag === "button") return true;
+  if (e.tag === "input") return BUTTON_INPUT_TYPES.has((attr(e, "type") ?? "").trim().toLowerCase());
+  return roleOf(e) === "button";
+}
+// A text run that READS as a list: two or more lines opening on a bullet or a numeral. RGAA
+// 9.3.1 asks about « les informations regroupées visuellement sous forme de liste », and the
+// list that fails it is precisely the one with no <ul> — drawn with « • » and <br>, or with one
+// paragraph per item.
+const BULLET_LINE = /^\s*(?:[•·▪◦‣●○■□➢➤►–—*-]|\d{1,2}[.)])\s+\S/;
+function looksLikeList(e: El): boolean {
+  if (["ul", "ol", "dl", "li", "script", "style", "pre", "code"].includes(e.tag)) return false;
+  if (ancestors(e).some((a) => a.tag === "li" || a.tag === "pre")) return false;
+  // Items split by <br> inside one element.
+  let lines = 0;
+  let run = "";
+  const flush = () => {
+    if (BULLET_LINE.test(run)) lines++;
+    run = "";
+  };
+  for (const c of e.children) {
+    if (c.type === "text") run += c.data;
+    else if (c.type === "element" && c.tag === "br") flush();
+    else if (c.type === "element") run += textContent(c);
+  }
+  flush();
+  return lines >= 2;
+}
+/** Consecutive sibling paragraphs/divs that each open on a bullet — one anchor per run. */
+function bulletParagraphRuns(doc: Doc): El[] {
+  const out: El[] = [];
+  for (const parent of doc.elements) {
+    if (["ul", "ol", "dl"].includes(parent.tag)) continue;
+    let start: El | undefined;
+    let count = 0;
+    const kids = parent.children.filter((c): c is El => c.type === "element");
+    for (const k of [...kids, undefined]) {
+      const bullet = k !== undefined && (k.tag === "p" || k.tag === "div") && BULLET_LINE.test(textContent(k));
+      if (bullet) {
+        if (!count) start = k;
+        count++;
+      } else {
+        if (count >= 2 && start) out.push(start);
+        count = 0;
+      }
+    }
+  }
+  return out;
+}
 const INTERACTIVE_TAGS = ["a", "button", "input", "select", "textarea", "summary", "details", "label"];
 
 /** An object/embed is ambiguous until its declared type or resource says what it carries.
@@ -267,6 +367,113 @@ export function pageOfDoc(file: string): string | undefined {
 
 export const isSnapshotFile = (file: string): boolean => pageOfDoc(file) !== undefined;
 
+/** The `<meta name="viewport">` of a document, with what it says about zoom. */
+function viewportMeta(d: Doc): Harvested[] {
+  return elementsByTag(d, "meta")
+    .filter((m) => (attr(m, "name") ?? "").toLowerCase() === "viewport")
+    .map((m) => {
+      const content = attr(m, "content") ?? "";
+      const blocks = /user-scalable\s*=\s*(?:no|0)\b|maximum-scale\s*=\s*(?:1(?:\.0+)?|0?\.\d+)\b/i.test(content);
+      return h(d, m, `<meta name="viewport" content="${content}">${blocks ? " — RESTRICTS zoom" : ""}`, `viewport|${content}`);
+    });
+}
+
+/** Stylesheet evidence for a layout criterion: matching declarations in the source (inline
+ *  `<style>`, a component's CSS, inline `style` attributes) and in the captured rules. */
+function cssEvidence(d: Doc, re: RegExp, captured: (r: { selector: string; decls: Record<string, string> }) => boolean, kind: string): Harvested[] {
+  return [
+    ...linesOf(d, re, 60).map((l) => hAt(d, l.line, "css", `${kind}-relevant declaration: ${l.text}`, `${kind}decl|${l.text}`)),
+    ...(d.signals?.css?.rules ?? [])
+      .filter(captured)
+      .slice(0, 40)
+      .map((r) => hAt(d, 1, `css:${r.selector}`, `captured rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }`, `${kind}css|${r.selector}`)),
+  ];
+}
+
+const INSTRUCTION =
+  /\b(?:cliquez|cliquer|sélectionnez|selectionnez|utilisez|appuyez|touchez|consultez|reportez-vous|remplissez|choisissez|ci-après|ci-contre|ci-dessus|ci-dessous|à droite|à gauche|en haut|en bas|click|select|press|tap|use the|see the|fill in|choose)\b/i;
+
+/** In the sequential tab order, as markup alone can tell. */
+function isTabbable(e: El): boolean {
+  const ti = attr(e, "tabindex");
+  if (ti !== undefined && Number.parseInt(ti, 10) < 0) return false;
+  if (attr(e, "disabled") !== undefined || attr(e, "hidden") !== undefined) return false;
+  if (ti !== undefined) return true;
+  if (e.tag === "a" || e.tag === "area") return attr(e, "href") !== undefined;
+  if (e.tag === "input") return (attr(e, "type") ?? "").toLowerCase() !== "hidden";
+  return ["button", "select", "textarea", "iframe", "summary"].includes(e.tag) || (attr(e, "contenteditable") ?? "false") !== "false";
+}
+
+/** What the RENDERED tier measured for one success criterion on a captured page: the live
+ *  probe (ran, how many issues, or why it was skipped), the offline rendered rules that ran,
+ *  and axe-core's verdict for that criterion. A measurement that found nothing is exactly what
+ *  a conformity is ruled on — and it used to be the one thing never shown. */
+function measured(sc: string): Subject {
+  return (docs) =>
+    docs.flatMap((d) => {
+      const page = pageOfDoc(d.file);
+      const s = d.signals;
+      if (page === undefined || !s) return [];
+      const out: Harvested[] = [];
+      const probes = s.probes;
+      if (probes?.probed?.includes(sc)) {
+        const issues = PROBE_KEYS[sc]?.flatMap((k) => ((probes as Record<string, unknown>)[k] as { detail: string }[] | undefined) ?? []) ?? [];
+        const scroll = sc === "1.4.10" && probes.reflow ? ` horizontal scroll at 320px: ${probes.reflow.horizontalScroll ? "YES" : "no"};` : "";
+        out.push(
+          hAt(
+            d,
+            1,
+            `probe:${sc}`,
+            `page="${page}" live probe for WCAG ${sc} RAN:${scroll} ${issues.length} issue(s)${issues.length ? ` — ${issues[0]!.detail.slice(0, 120)}` : ""}`,
+            `probe|${sc}|${issues.length}|${scroll}`,
+          ),
+        );
+      }
+      for (const sk of probes?.skipped ?? [])
+        if (sk.sc === sc)
+          out.push(
+            hAt(
+              d,
+              1,
+              `probe:${sc}`,
+              `page="${page}" live probe for WCAG ${sc} did NOT finish: ${sk.why.slice(0, 160)}`,
+              `probeskip|${sc}|${sk.why.slice(0, 60)}`,
+            ),
+          );
+      const ran = renderedRulesRan(s).filter((id) => renderedRulesFor(sc).includes(id));
+      if (ran.length)
+        out.push(
+          hAt(d, 1, `rendered:${sc}`, `page="${page}" rendered rule(s) ${ran.join(", ")} ran on the captured styles`, `renderedran|${sc}|${ran.join(",")}`),
+        );
+      if (s.axe?.ran) {
+        const hits = (s.axe.violations ?? []).filter((v) => AXE_WCAG[v.id] === sc);
+        out.push(
+          hAt(
+            d,
+            1,
+            `axe:${sc}`,
+            `page="${page}" axe-core ran: ${hits.length ? hits.map((v) => `${v.id} (${v.nodes?.length ?? 0} node(s))`).join(", ") : `no violation for WCAG ${sc}`}`,
+            `axe|${sc}|${hits.map((v) => v.id).join(",")}`,
+          ),
+        );
+      }
+      return out;
+    });
+}
+
+/** Which probe lists report on which success criterion (src/probes.ts). */
+const PROBE_KEYS: Record<string, string[]> = {
+  "1.4.4": ["reflowZoom", "inputOverflowZoom"],
+  "1.4.10": ["inputOverflowReflow"],
+  "1.4.12": ["textSpacing", "inputOverflowSpacing"],
+  "1.4.13": ["hover"],
+  "2.1.2": ["keyboardTrap"],
+  "2.4.7": ["focusVisible"],
+  "2.4.11": ["focusObscured"],
+  "4.1.3": ["liveRegion"],
+};
+const MEASURED_SCS = ["1.3.4", "1.4.1", "1.4.3", "1.4.4", "1.4.10", "1.4.11", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
+
 // ---- the subjects -------------------------------------------------------------------------
 
 export const SUBJECTS: Record<string, Subject> = {
@@ -275,28 +482,44 @@ export const SUBJECTS: Record<string, Subject> = {
   images: (docs) =>
     docs.flatMap((d) =>
       elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas")
+        // RGAA 1.1.3 is about nothing else: an image button is an image.
+        .concat(elementsByTag(d, "input").filter((e) => (attr(e, "type") ?? "").trim().toLowerCase() === "image"))
         .concat(d.elements.filter((e) => attr(e, "role") === "img"))
         .filter((e, i, a) => a.indexOf(e) === i)
-        .map((e) =>
-          h(
+        .map((e) => {
+          // The other mechanisms the RGAA tests name, when present — an image's verdict turns
+          // on title, aria-labelledby, aria-hidden and its caption as much as on alt.
+          const extra = ["title", "aria-labelledby", "aria-hidden", "role", "aria-describedby", "longdesc"]
+            .filter((a) => attr(e, a) !== undefined)
+            .map((a) => ` ${a}="${(attr(e, a) ?? "").slice(0, 60)}"`)
+            .join("");
+          const figure = ancestors(e).some((a) => a.tag === "figure");
+          return h(
             d,
             e,
-            `<${e.tag}> alt="${attr(e, "alt") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" src="${(attr(e, "src") ?? "").slice(0, 80)}"`,
+            `<${e.tag}${e.tag === "input" ? ' type="image"' : ""}> alt="${attr(e, "alt") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}"${extra} src="${(attr(e, "src") ?? "").slice(0, 80)}"${figure ? " (inside <figure>)" : ""}`,
             `image|${e.tag}|${attr(e, "alt") ?? ""}|${attr(e, "aria-label") ?? ""}|${attr(e, "src") ?? ""}`,
-          ),
-        ),
+          );
+        }),
     ),
 
   // Links: text + destination + the heading they are read under. Class = (text, href).
   links: (docs) =>
     docs.flatMap((d) =>
-      elementsByTag(d, "a")
-        .filter((e) => attr(e, "href") !== undefined)
+      // The glossary's « lien »: <a href>, and an element with role="link" whose navigation a
+      // script handles.
+      d.elements
+        .filter((e) => (e.tag === "a" && attr(e, "href") !== undefined) || roleOf(e) === "link")
         .map((e) => {
           const href = attr(e, "href") ?? "";
           const dl = DOWNLOAD_HREF.exec(href);
           const note = dl ? ` download-format=${dl[1]!.toLowerCase()} (naming the format, e.g. "(PDF)", is a recommendation — not an NC)` : "";
-          return h(d, e, `text="${t(e)}" href="${href}" under="${nearestHeading(d, e) ?? ""}"${note}`, `link|${t(e)}|${href}`);
+          const named = ["aria-label", "aria-labelledby", "title"]
+            .filter((a) => attr(e, a) !== undefined)
+            .map((a) => ` ${a}="${(attr(e, a) ?? "").slice(0, 60)}"`)
+            .join("");
+          const role = e.tag === "a" ? "" : ` role="link" on <${e.tag}>`;
+          return h(d, e, `text="${t(e)}"${named}${role} href="${href}" under="${nearestHeading(d, e) ?? ""}"${note}`, `link|${t(e)}|${href}`);
         }),
     ),
 
@@ -319,23 +542,48 @@ export const SUBJECTS: Record<string, Subject> = {
   // Headings, labels, legends and captions — the text judged for descriptiveness.
   headings: (docs) =>
     docs.flatMap((d) =>
-      elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption").map((e) =>
-        h(d, e, `<${e.tag}> text="${t(e)}"`, `heading|${e.tag}|${t(e)}`),
-      ),
+      elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption")
+        // RGAA 9.1's tests name `role="heading"` + `aria-level` beside <hx>.
+        .concat(d.elements.filter((e) => roleOf(e) === "heading"))
+        .map((e) =>
+          h(
+            d,
+            e,
+            `<${e.tag}${roleOf(e) === "heading" ? ` role="heading" aria-level="${attr(e, "aria-level") ?? ""}"` : ""}> text="${t(e)}"`,
+            `heading|${e.tag}|${attr(e, "aria-level") ?? ""}|${t(e)}`,
+          ),
+        ),
     ),
 
   // Form controls and the label/placeholder/instruction attached to them.
   controls: (docs) =>
     docs.flatMap((d) =>
-      elementsByTag(d, ...CONTROL_TAGS).map((e) =>
-        h(
+      d.elements.filter(isFormField).map((e) => {
+        const native = (CONTROL_TAGS as readonly string[]).includes(e.tag) || FIELD_TAGS.has(e.tag);
+        return h(
           d,
           e,
-          `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" required=${attr(e, "required") !== undefined} describedby="${attr(e, "aria-describedby") ?? ""}"`,
-          `control|${e.tag}|${attr(e, "type") ?? ""}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`,
+          `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}${native ? "" : ` role="${roleOf(e)}"`}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" aria-labelledby="${attr(e, "aria-labelledby") ?? ""}" title="${attr(e, "title") ?? ""}" required=${attr(e, "required") !== undefined || attr(e, "aria-required") === "true"} describedby="${attr(e, "aria-describedby") ?? ""}"`,
+          `control|${e.tag}|${attr(e, "type") ?? roleOf(e)}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`,
           labelElementTokens(d, e),
-        ),
-      ),
+        );
+      }),
+    ),
+
+  // Buttons — the subject of RGAA 11.9 (« l'intitulé de chaque bouton est-il pertinent ? »),
+  // which used to read `controls` and so was never shown a single button.
+  buttons: (docs) =>
+    docs.flatMap((d) =>
+      d.elements.filter(isButton).map((e) => {
+        const name = e.tag === "input" ? (attr(e, "value") ?? attr(e, "alt") ?? "") : t(e, 60);
+        const form = ancestors(e).some((a) => a.tag === "form") || attr(e, "form") !== undefined;
+        return h(
+          d,
+          e,
+          `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}${e.tag === "button" || e.tag === "input" ? "" : ' role="button"'}> label="${name}" aria-label="${attr(e, "aria-label") ?? ""}" aria-labelledby="${attr(e, "aria-labelledby") ?? ""}" title="${attr(e, "title") ?? ""}"${form ? " (in a form)" : " (outside any form: RGAA 7.1 rather than 11.9, unless it submits one)"}`,
+          `button|${e.tag}|${name}|${attr(e, "aria-label") ?? ""}`,
+        );
+      }),
     ),
 
   // The `autocomplete` token a field carries — the subject of "identify input purpose".
@@ -388,26 +636,49 @@ export const SUBJECTS: Record<string, Subject> = {
   // Tables, with the parts that decide whether they are data or layout.
   tables: (docs) =>
     docs.flatMap((d) =>
-      elementsByTag(d, "table").map((e) => {
-        const caption = elementsByTag(d, "caption").find((c) => ancestors(c)[0] === e);
-        const ths = elementsByTag(d, "th").filter((x) => ancestors(x).includes(e));
-        return h(
-          d,
-          e,
-          `<table> caption="${caption ? t(caption, 40) : ""}" role="${attr(e, "role") ?? ""}" th=${ths.length} summary="${attr(e, "summary") ?? ""}" — data table or layout?`,
-          `table|${caption ? t(caption, 40) : ""}|${ths.length}|${attr(e, "role") ?? ""}`,
-        );
-      }),
+      // <table>, and the ARIA tables 5.6/5.7 name outright (role="columnheader"/"rowheader").
+      d.elements
+        .filter((e) => e.tag === "table" || ["table", "grid", "treegrid"].includes(roleOf(e)))
+        .map((e) => {
+          const caption = elementsByTag(d, "caption").find((c) => ancestors(c)[0] === e);
+          const inside = (x: El) => ancestors(x).includes(e);
+          const ths = d.elements.filter((x) => inside(x) && (x.tag === "th" || ["columnheader", "rowheader"].includes(roleOf(x))));
+          const scoped = ths.filter((x) => attr(x, "scope") !== undefined).length;
+          const ids = ths.filter((x) => attr(x, "id") !== undefined).length;
+          const headers = d.elements.filter((x) => inside(x) && attr(x, "headers") !== undefined).length;
+          const named = attr(e, "aria-label") ?? attr(e, "aria-labelledby") ?? attr(e, "title") ?? "";
+          return h(
+            d,
+            e,
+            `<${e.tag}${e.tag === "table" ? "" : ` role="${roleOf(e)}"`}> caption="${caption ? t(caption, 40) : ""}" name="${named.slice(0, 40)}" role="${attr(e, "role") ?? ""}" th=${ths.length} (scope=${scoped}, id=${ids}) cells-with-headers=${headers} summary="${attr(e, "summary") ?? ""}" describedby="${attr(e, "aria-describedby") ?? ""}" — data table or layout?`,
+            `table|${caption ? t(caption, 40) : ""}|${ths.length}|${attr(e, "role") ?? ""}`,
+          );
+        }),
     ),
 
   // Lists and definition lists, for the technique-consistency question.
   lists: (docs) =>
-    docs.flatMap((d) =>
-      elementsByTag(d, "ul", "ol", "dl").map((e) => {
-        const items = e.children.filter((c): c is El => c.type === "element").length;
-        return h(d, e, `<${e.tag}> items=${items} first="${t(e, 40)}"`, `list|${e.tag}|${items}|${t(e, 40)}`);
-      }),
-    ),
+    docs.flatMap((d) => [
+      ...d.elements
+        .filter((e) => ["ul", "ol", "dl"].includes(e.tag) || roleOf(e) === "list")
+        .map((e) => {
+          const items = e.children.filter((c): c is El => c.type === "element").length;
+          const kind = ["ul", "ol", "dl"].includes(e.tag) ? `<${e.tag}>` : `<${e.tag} role="list">`;
+          return h(d, e, `${kind} items=${items} first="${t(e, 40)}"`, `list|${e.tag}|${items}|${t(e, 40)}`);
+        }),
+      // …and the list drawn without list markup, which is the one 9.3.1 fails on.
+      ...d.elements
+        .filter(looksLikeList)
+        .concat(bulletParagraphRuns(d))
+        .map((e) =>
+          h(
+            d,
+            e,
+            `<${e.tag}> reads as a list (lines opening on a bullet or a numeral) but is not marked up as one: "${t(e, 60)}" — RGAA 9.3.1/9.3.2`,
+            `fakelist|${t(e, 60)}`,
+          ),
+        ),
+    ]),
 
   // Landmarks and the navigation structure that lets a user bypass repeated blocks.
   landmarks: (docs) =>
@@ -444,8 +715,10 @@ export const SUBJECTS: Record<string, Subject> = {
           (e) => (attr(e, "type") ?? "") === "search" || /search|recherch/i.test(`${attr(e, "name") ?? ""} ${attr(e, "id") ?? ""} ${attr(e, "class") ?? ""}`),
         )
         .map((e) => h(d, e, `search field — one of the "multiple ways" mechanisms`, `search|${attr(e, "name") ?? ""}`)),
+      // A site map by its address or its name. `index` used to be in the address pattern, and
+      // every brand link to `index.html` was presented as the site map.
       ...elementsByTag(d, "a")
-        .filter((e) => /plan-du-site|sitemap|site-map|index/i.test(attr(e, "href") ?? ""))
+        .filter((e) => /plan[-_]du[-_]site|sitemap|site[-_]map/i.test(attr(e, "href") ?? "") || /\bplan du site\b|\bsite ?map\b/i.test(t(e, 60)))
         .map((e) => h(d, e, `site map / index link text="${t(e, 40)}" href="${attr(e, "href")}"`, `sitemap|${attr(e, "href")}`)),
     ]),
 
@@ -489,15 +762,26 @@ export const SUBJECTS: Record<string, Subject> = {
             h(d, e, `aria-live="${attr(e, "aria-live") ?? ""}" role="${attr(e, "role") ?? ""}"`, `live|${attr(e, "aria-live") ?? ""}|${attr(e, "role") ?? ""}`),
           ),
         ...d.elements
-          .filter((e) => !isRegion(e) && STATUS_CLASS.test(attr(e, "class") ?? "") && ancestors(e).some((a) => a.tag === "form"))
+          .filter((e) => !isRegion(e) && STATUS_CLASS.test(`${attr(e, "class") ?? ""} ${attr(e, "id") ?? ""}`) && e.tag !== "form")
           .map((e) =>
             h(
               d,
               e,
-              `status-like class="${(attr(e, "class") ?? "").slice(0, 40)}" in a form — verify async feedback is announced (role=status/alert or aria-live)`,
-              `statusclass|${(attr(e, "class") ?? "").slice(0, 40)}`,
+              `status-like <${e.tag}> id="${attr(e, "id") ?? ""}" class="${(attr(e, "class") ?? "").slice(0, 40)}" — verify async feedback is announced (role=status/alert or aria-live)`,
+              `statusclass|${(attr(e, "class") ?? "").slice(0, 40)}|${attr(e, "id") ?? ""}`,
             ),
           ),
+        // A script writing text into the page is where a status message comes from, marked up
+        // or not — and the unmarked one is precisely what 7.5 fails.
+        ...linesOf(d, /\.(?:textContent|innerText|innerHTML)\s*=|\.(?:append|prepend|insertAdjacentHTML|replaceChildren)\s*\(/).map((l) =>
+          hAt(
+            d,
+            l.line,
+            "script",
+            `script writes into the page — is this a status message, and is its container a live region? ${l.text}`,
+            `statuswrite|${l.text}`,
+          ),
+        ),
       ];
     }),
 
@@ -664,7 +948,12 @@ export const SUBJECTS: Record<string, Subject> = {
         return [hAt(d, 1, "doctype", `page="${page}" doctype=${dt === "" ? "(none on the page)" : dt}`, `doctype|${dt}`)];
       }
       const line = lineOf(d, /<!DOCTYPE/i);
-      if (line === undefined) return [];
+      if (line === undefined) {
+        // A full HTML document with no declaration IS the 8.1.1 failure, and it has to be
+        // shown to be ruled on; a fragment or a component has no doctype to carry.
+        const root = elementsByTag(d, "html")[0];
+        return root && d.kind === "html" ? [h(d, root, `source file declares NO doctype before <html>`, `doctype|none`)] : [];
+      }
       const decl = (d.source.split("\n")[line - 1] ?? "").trim().slice(0, 80);
       return [hAt(d, line, "doctype", `source file ${decl}`, `doctype|${decl}`)];
     }),
@@ -699,18 +988,75 @@ export const SUBJECTS: Record<string, Subject> = {
       ...linesOf(d, /\b(?:draggable|onDragStart|useDrag|DndContext|react-beautiful-dnd|@dnd-kit)\b/).map((l) =>
         hAt(d, l.line, "drag", `drag interaction: ${l.text}`, `drag|${l.text}`),
       ),
-      ...linesOf(d, /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b/i).map((l) =>
-        hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`),
+      ...codeLinesOf(
+        d,
+        /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b|addEventListener\(\s*["'](?:touchmove|gesture\w*|pointermove)["']/i,
+      ).map((l) => hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`)),
+      ...linesOf(d, /\b(?:devicemotion|deviceorientation|DeviceMotionEvent|DeviceOrientationEvent|Accelerometer|Gyroscope)\b/).map((l) =>
+        hAt(d, l.line, "motion", `device-motion input — is there an interface alternative, and can it be switched off? ${l.text}`, `devicemotion|${l.text}`),
       ),
     ]),
 
+  // RGAA 13.11 — « les actions déclenchées au moyen d'un dispositif de pointage sur un point
+  // unique de l'écran ». Its population is EVERY single-pointer action, and a page whose actions
+  // all fire on click conforms rather than being « non applicable »: the WCAG 2.5.2 predicate it
+  // maps onto only proves the absence of DOWN-event handlers. So it lists the scripted handlers
+  // and the native controls an action hangs on, which is what the adjudicator rules C from.
+  pointerActions: (docs) =>
+    docs.flatMap((d) => [
+      ...d.elements
+        .filter((e) => Object.keys(e.attribs).some((k) => /^on(?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend)$/i.test(k)))
+        .map((e) => {
+          const events = Object.keys(e.attribs)
+            .filter((k) => /^on(?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend)$/i.test(k))
+            .map((k) => k.toLowerCase());
+          const down = events.some((k) => /down|start/.test(k));
+          return h(
+            d,
+            e,
+            `<${e.tag}> ${events.join(",")} "${t(e, 40)}" — ${down ? "fires on the DOWN event: is it abortable or undoable?" : "fires on release"}`,
+            `pointer|${e.tag}|${events.join(",")}|${t(e, 40)}`,
+          );
+        }),
+      ...linesOf(d, /addEventListener\(\s*["'](?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend)["']/).map((l) =>
+        hAt(d, l.line, "listener", `pointer listener — does the action fire on release, or can it be aborted/undone? ${l.text}`, `pointerlistener|${l.text}`),
+      ),
+      ...d.elements
+        .filter((e) => isButton(e) && !Object.keys(e.attribs).some((k) => /^on/i.test(k)))
+        .slice(0, 1)
+        .map((e) => h(d, e, `native <${e.tag}> activation fires on release (click)`, `pointer|native|${e.tag}`)),
+    ]),
+
+  // The scripts a page LOADS. The code-construct criteria (12.10 shortcuts, 13.1 time limits,
+  // 13.8 motion, 13.10–13.12 gestures, pointer and device motion) are decided on code the page
+  // pulls in from elsewhere as often as on its inline handlers, and the audit reads markup: so
+  // the adjudicator is given the address to open.
+  externalScripts: (docs) =>
+    docs.flatMap((d) =>
+      elementsByTag(d, "script")
+        .filter((e) => (attr(e, "src") ?? "").trim() !== "")
+        .map((e) =>
+          h(
+            d,
+            e,
+            `external script src="${attr(e, "src")}" — not part of this file: open it to look for the construct this criterion is about`,
+            `extscript|${attr(e, "src")}`,
+          ),
+        ),
+    ),
+
   // Single-character keyboard shortcuts.
   shortcuts: (docs) =>
-    docs.flatMap((d) =>
-      linesOf(d, /\b(?:key|code|charCode)\s*===?\s*["'][a-zA-Z0-9]["']/).map((l) =>
+    docs.flatMap((d) => [
+      ...linesOf(d, /\b(?:key|code|charCode)\s*===?\s*["'][a-zA-Z0-9]["']/).map((l) =>
         hAt(d, l.line, "shortcut", `single-character key comparison: ${l.text}`, `shortcut|${l.text}`),
       ),
-    ),
+      // `accesskey` is a single-character shortcut the browser binds itself — and the thing this
+      // subject's « not applicable » sentence already claimed to have looked for.
+      ...d.elements
+        .filter((e) => attr(e, "accesskey") !== undefined)
+        .map((e) => h(d, e, `accesskey="${attr(e, "accesskey")}" on <${e.tag}> "${t(e, 40)}"`, `accesskey|${attr(e, "accesskey")}`)),
+    ]),
 
   // Instructions that lean on a sensory characteristic alone.
   sensoryText: (docs) =>
@@ -727,8 +1073,8 @@ export const SUBJECTS: Record<string, Subject> = {
       ...d.elements
         .filter((e) => e.tag === "meta" && (attr(e, "http-equiv") ?? "").toLowerCase() === "refresh")
         .map((e) => h(d, e, `<meta http-equiv="refresh" content="${attr(e, "content") ?? ""}">`, `metarefresh|${attr(e, "content") ?? ""}`)),
-      ...linesOf(d, /\b(?:setTimeout|setInterval)\s*\(/).map((l) => hAt(d, l.line, "timer", `timer: ${l.text}`, `timer|${l.text}`)),
-      ...linesOf(d, /\b(?:sessionTimeout|maxAge|expiresIn|session_max|idleTimeout)\b/i).map((l) =>
+      ...codeLinesOf(d, /\b(?:setTimeout|setInterval)\s*\(/).map((l) => hAt(d, l.line, "timer", `timer: ${l.text}`, `timer|${l.text}`)),
+      ...codeLinesOf(d, /\b(?:sessionTimeout|maxAge|expiresIn|session_max|idleTimeout)\b/i).map((l) =>
         hAt(d, l.line, "session", `session/expiry config: ${l.text}`, `session|${l.text}`),
       ),
     ]),
@@ -740,9 +1086,15 @@ export const SUBJECTS: Record<string, Subject> = {
       ...d.elements
         .filter((e) => /animation|transition/.test(attr(e, "style") ?? ""))
         .map((e) => h(d, e, `inline animation: ${(attr(e, "style") ?? "").slice(0, 80)}`, `inlineanim|${(attr(e, "style") ?? "").slice(0, 80)}`)),
-      ...linesOf(d, /\b(?:carousel|slider|autoplay|animation-iteration-count\s*:\s*infinite|requestAnimationFrame)\b/i).map((l) =>
+      ...codeLinesOf(d, /\b(?:carousel|carrousel|slider|autoplay|animation-iteration-count\s*:\s*infinite|requestAnimationFrame)\b/i).map((l) =>
         hAt(d, l.line, "motion", `moving/auto-updating content: ${l.text}`, `motion|${l.text}`),
       ),
+      // An animated image is moving content too — the glossary names « un gif animé ».
+      ...elementsByTag(d, "img")
+        .filter((e) => /\.gif(?:[?#]|$)/i.test(attr(e, "src") ?? ""))
+        .map((e) =>
+          h(d, e, `<img src="${attr(e, "src")}"> — a GIF may be animated: does it move for more than 5 s, and can it be stopped?`, `gif|${attr(e, "src")}`),
+        ),
       ...elementsByTag(d, "video", "audio").map((e) =>
         h(d, e, `<${e.tag} autoplay=${attr(e, "autoplay") !== undefined} controls=${attr(e, "controls") !== undefined}>`, `media|${e.tag}`),
       ),
@@ -821,7 +1173,7 @@ export const SUBJECTS: Record<string, Subject> = {
             `flash-css|${r.selector}|${declsText(r.decls)}`,
           ),
         ),
-      ...linesOf(d, /\b(?:flash|flashing|strobe|setInterval|requestAnimationFrame|classList\.(?:add|remove|replace|toggle))\b|animation(?:-name)?\s*:/i)
+      ...codeLinesOf(d, /\b(?:flash|flashing|strobe|setInterval|requestAnimationFrame|classList\.(?:add|remove|replace|toggle))\b|animation(?:-name)?\s*:/i)
         .filter((l) => !/^\s*(?:<!--|\/\/|\/\*)/.test(l.text))
         .map((l) => hAt(d, l.line, "flash-code", `possible scripted/CSS flash mechanism: ${l.text}`, `flash-code|${l.text}`)),
     ]),
@@ -990,7 +1342,9 @@ export const SUBJECTS: Record<string, Subject> = {
   downloadDocs: (docs) =>
     docs.flatMap((d) =>
       elementsByTag(d, "a")
-        .filter((e) => DOWNLOAD_HREF.test(attr(e, "href") ?? ""))
+        // A `download` link is a download whatever its URL says: an extensionless
+        // `/telecharger?id=3` is still a document handed to the user.
+        .filter((e) => DOWNLOAD_HREF.test(attr(e, "href") ?? "") || (attr(e, "download") !== undefined && attr(e, "href") !== undefined))
         .map((e) =>
           h(
             d,
@@ -1125,6 +1479,315 @@ export const SUBJECTS: Record<string, Subject> = {
       return out;
     }),
 
+  // ---- RENDERING CRITERIA: what an adjudicator can cite ----------------------------------
+  //
+  // Measured on the documentation site, scanned: 3.2, 3.3, 7.3, 10.1, 10.4, 10.5, 10.9, 10.10,
+  // 10.11, 10.12, 10.14, 12.9, 12.11, 13.9 and 13.11 all reached the worklist with NOTHING to
+  // cite, so the gate refused every `C` and the only answers left were « undecidable » or an
+  // NA — the five wrong NAs of #61 (8.2, 10.11, 10.12, 12.8, 13.9) were written exactly there.
+  // Each of these criteria applies to every page that has content; what it is decided ON is the
+  // page's stylesheets, its declarations, and — once a browser has run — the measurements. The
+  // subjects below hand those over. None of them is an existence subject: their silence proves
+  // nothing, and they never close a criterion on their own.
+
+  // RGAA 9.4 — quotations: the <q>/<blockquote> that mark them, and the text that quotes
+  // without them (« … », “…”, "…" of a dozen characters or more). It inherited `structure` —
+  // headings, tables and lists — which never held a quotation.
+  quotes: (docs) =>
+    docs.flatMap((d) => [
+      ...elementsByTag(d, "q", "blockquote").map((e) => h(d, e, `<${e.tag}> "${t(e, 80)}" — is it a quotation?`, `quote|${e.tag}|${t(e, 60)}`)),
+      ...d.elements
+        .filter(
+          (e) =>
+            !["q", "blockquote", "script", "style", "code", "pre"].includes(e.tag) &&
+            e.children.some((c) => c.type === "text" && /«[^»]{12,}»|“[^”]{12,}”|"[^"<>]{12,}"/.test(c.data)),
+        )
+        .slice(0, 40)
+        .map((e) => h(d, e, `quoted text without <q>/<blockquote>: "${t(e, 80)}" — a citation?`, `quotetext|${t(e, 60)}`)),
+    ]),
+
+  // RGAA 13.5/13.6 — « contenu cryptique (art ASCII, émoticône, syntaxe cryptique) ». It used
+  // to inherit `images` through WCAG 1.1.1, so a page with an emoticon and no image closed both
+  // criteria « non applicable » over the very content they are about.
+  cryptic: (docs) =>
+    docs.flatMap((d) =>
+      d.elements
+        .filter((e) => !["script", "style", "title", "head"].includes(e.tag))
+        .filter((e) => {
+          const own = e.children
+            .filter((c) => c.type === "text")
+            .map((c) => (c as { data: string }).data)
+            .join(" ");
+          return CRYPTIC.test(own) || (e.tag === "pre" && /[^\w\s]{6,}/.test(own));
+        })
+        .slice(0, 40)
+        .map((e) =>
+          h(
+            d,
+            e,
+            `cryptic content: "${t(e, 60)}" title="${attr(e, "title") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" — is an alternative given (title or adjacent definition)?`,
+            `cryptic|${t(e, 40)}`,
+          ),
+        ),
+    ),
+
+  // Time-based media as the 1.2.x applicability predicate sees it (src/audit.ts hasMedia): the
+  // media elements, and an embed or iframe that points at a player. RGAA 4.7 (« chaque média
+  // temporel est-il clairement identifiable ? ») used to inherit `images` from WCAG 1.1.1 and
+  // closed NA on a page with a video and no image; 4.1–4.6 were never shown a YouTube iframe.
+  temporalMedia: (docs) =>
+    docs.flatMap((d) =>
+      d.elements
+        .filter(
+          (e) =>
+            ["video", "audio"].includes(e.tag) ||
+            (["object", "embed"].includes(e.tag) && embeddedMediaKind(e) !== "non-temporal") ||
+            (e.tag === "iframe" && TEMPORAL_MEDIA_HOST.test(`${attr(e, "src") ?? ""} ${attr(e, "title") ?? ""} ${attr(e, "allow") ?? ""}`)),
+        )
+        .map((e) => {
+          const tracks = elementsByTag(d, "track")
+            .filter((x) => ancestors(x).includes(e))
+            .map((x) => `${attr(x, "kind") ?? "subtitles"}:${attr(x, "srclang") ?? ""}`);
+          return h(
+            d,
+            e,
+            `<${e.tag}> src="${(attr(e, "src") ?? attr(e, "data") ?? "").slice(0, 80)}" controls=${attr(e, "controls") !== undefined} autoplay=${attr(e, "autoplay") !== undefined} tracks=[${tracks.join(", ")}] heading="${nearestHeading(d, e) ?? ""}" — is it identified by adjacent text, and does it have its transcript/captions/description?`,
+            `tmedia|${e.tag}|${attr(e, "src") ?? attr(e, "data") ?? ""}`,
+          );
+        }),
+    ),
+
+  // The page's styling, as a whole: every stylesheet, the inline style attributes, and the
+  // captured rules. Anchored on the document root too, so a page with NO author CSS still has
+  // its one citable fact (« default rendering, nothing overrides the user's settings »).
+  stylesheets: (docs) =>
+    docs.flatMap((d) => {
+      const out: Harvested[] = [];
+      const inline = d.elements.filter((e) => (attr(e, "style") ?? "").trim() !== "");
+      const sheets = elementsByTag(d, "style");
+      const links = elementsByTag(d, "link").filter((l) => (attr(l, "rel") ?? "").toLowerCase().split(/\s+/).includes("stylesheet"));
+      const captured = d.signals?.css?.rules.length;
+      const root = elementsByTag(d, "html")[0];
+      if (root)
+        out.push(
+          h(
+            d,
+            root,
+            `page="${pageOfDoc(d.file) ?? "source"}" styling: ${sheets.length} <style>, ${links.length} linked stylesheet(s), ${inline.length} inline style attribute(s)${captured !== undefined ? `, ${captured} captured rule(s)${d.signals?.css?.unreadable ? ` (${d.signals.css.unreadable} sheet(s) unreadable)` : ""}` : ""}`,
+            `styling|${sheets.length}|${links.length}|${inline.length > 0}`,
+          ),
+        );
+      for (const s of sheets) out.push(h(d, s, `<style> block: ${t(s, 100)}`, `stylesheet|inline|${t(s, 60)}`));
+      for (const l of links)
+        out.push(h(d, l, `linked stylesheet href="${attr(l, "href") ?? ""}" — open it to read the rules`, `stylesheet|${attr(l, "href") ?? ""}`));
+      return out;
+    }),
+
+  // Colour declarations in the page's stylesheets — 3.2/3.3 contrast and 10.5's « déclarations
+  // CSS de couleurs de fond et de police ». Inline `style` colours are `colourPairs`.
+  colourDecls: (docs) =>
+    docs.flatMap((d) => [
+      ...linesOf(d, /(?:^|[\s;{])(?:color|background(?:-color)?)\s*:\s*[^;}"'<]+/i, 60)
+        .filter((l) => !/\bstyle\s*=/.test(l.text))
+        .map((l) => hAt(d, l.line, "css", `colour declaration: ${l.text}`, `colourdecl|${l.text}`)),
+      ...(d.signals?.css?.rules ?? [])
+        .filter((r) => r.decls.color !== undefined || r.decls.backgroundColor !== undefined || r.decls.background !== undefined)
+        .slice(0, 60)
+        .map((r) =>
+          hAt(
+            d,
+            1,
+            `css:${r.selector}`,
+            `stylesheet colours: ${r.selector.slice(0, 60)} { color: ${r.decls.color ?? "—"}; background: ${r.decls.backgroundColor ?? r.decls.background ?? "—"} }`,
+            `colourcss|${r.selector}|${r.decls.color ?? ""}|${r.decls.backgroundColor ?? r.decls.background ?? ""}`,
+          ),
+        ),
+    ]),
+
+  // The text colour pairs the BROWSER computed, with their ratio — the passing half of what
+  // the rendered contrast rule measures (it reports only failures).
+  computedColours: (docs) =>
+    docs.flatMap((d) => {
+      const seen = new Set<string>();
+      const out: Harvested[] = [];
+      for (const p of computedTextPairs(d)) {
+        const fg = `rgb(${p.fg.r}, ${p.fg.g}, ${p.fg.b})`;
+        const bg = `rgb(${p.bg.r}, ${p.bg.g}, ${p.bg.b})`;
+        const key = `${fg}|${bg}|${p.large}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(
+          h(
+            d,
+            p.el,
+            `computed text colour ${fg} on ${bg} — ${p.ratio.toFixed(2)}:1 (${p.large ? "large text, threshold 3:1" : "threshold 4.5:1"})`,
+            `computed|${key}`,
+          ),
+        );
+      }
+      return out;
+    }),
+
+  // RGAA 10.4 — text resized to 200 %. What clips it: a fixed height with overflow hidden, a
+  // font size frozen in px, and a viewport that forbids zoom.
+  zoom: (docs) =>
+    docs.flatMap((d) => [
+      ...viewportMeta(d),
+      ...cssEvidence(
+        d,
+        /\b(?:max-)?height\s*:\s*\d+(?:\.\d+)?px|\boverflow(?:-y)?\s*:\s*(?:hidden|clip)|\bfont-size\s*:\s*\d+(?:\.\d+)?px/i,
+        (r) => Boolean((r.decls.height ?? r.decls.maxHeight ?? "").endsWith("px") || /hidden|clip/.test(r.decls.overflow ?? r.decls.overflowY ?? "")),
+        "zoom",
+      ),
+    ]),
+
+  // RGAA 10.11 — 320 CSS px without horizontal scrolling. What forces it: a fixed or minimum
+  // width over 320px, unbreakable lines, preformatted blocks and wide tables (the last two being
+  // exactly what the criterion's « cas particuliers » exempt — they still have to be shown).
+  reflow: (docs) =>
+    docs.flatMap((d) => [
+      ...viewportMeta(d),
+      ...cssEvidence(
+        d,
+        /\b(?:min-)?width\s*:\s*(?:3[2-9]\d|[4-9]\d\d|\d{4,})px|\bwhite-space\s*:\s*(?:nowrap|pre)\b|\boverflow-x\s*:/i,
+        (r) =>
+          Boolean(/^(?:3[2-9]\d|[4-9]\d\d|\d{4,})px$/.test((r.decls.width ?? r.decls.minWidth ?? "").trim()) || /nowrap|pre/.test(r.decls.whiteSpace ?? "")),
+        "reflow",
+      ),
+      ...elementsByTag(d, "pre", "table").map((e) =>
+        h(d, e, `<${e.tag}> — two-dimensional content (an exempted case of 10.11 only if its layout requires it)`, `reflowblock|${e.tag}|${t(e, 30)}`),
+      ),
+    ]),
+
+  // RGAA 10.12 — the four text-spacing overrides. What resists them: a spacing declared
+  // !important (the decisive rules), any spacing at all, and a box too small to grow.
+  textSpacing: (docs) =>
+    docs.flatMap((d) =>
+      cssEvidence(
+        d,
+        /\b(?:line-height|letter-spacing|word-spacing)\s*:|\b(?:max-)?height\s*:\s*\d+(?:\.\d+)?px/i,
+        (r) =>
+          r.decls.lineHeight !== undefined || r.decls.letterSpacing !== undefined || r.decls.wordSpacing !== undefined || (r.decls.height ?? "").endsWith("px"),
+        "spacing",
+      ),
+    ),
+
+  // RGAA 13.9 — the orientation of the screen. What locks it: an orientation media query that
+  // hides or rotates content, a script calling `screen.orientation.lock`, a manifest pinning it.
+  orientation: (docs) =>
+    docs.flatMap((d) => [
+      ...viewportMeta(d),
+      ...linesOf(d, /@media[^{]*\borientation\b|\borientation\.lock\s*\(|\block(?:Orientation)?\s*\(\s*["'](?:portrait|landscape)|"orientation"\s*:/i).map(
+        (l) => hAt(d, l.line, "orientation", `orientation-dependent code: ${l.text}`, `orientation|${l.text}`),
+      ),
+      ...(d.signals?.css?.rules ?? [])
+        .filter((r) => /orientation/i.test(r.media ?? ""))
+        .slice(0, 30)
+        .map((r) =>
+          hAt(
+            d,
+            1,
+            `css:${r.selector}`,
+            `@media ${r.media} { ${r.selector.slice(0, 50)} { ${declsText(r.decls)} } }`,
+            `orientationcss|${r.media}|${r.selector}`,
+          ),
+        ),
+    ]),
+
+  // RGAA 10.7 — focus visibility: every rule keyed on a focus state, and what it does.
+  focusStyles: (docs) =>
+    docs.flatMap((d) => [
+      ...linesOf(d, /:focus(?:-visible|-within)?\b[^{]*\{?[^}]*/).map((l) =>
+        hAt(
+          d,
+          l.line,
+          "css",
+          `focus-state rule${/outline\s*:\s*(?:none|0)\b/.test(l.text) ? " REMOVING the outline — is another indicator put back?" : ""}: ${l.text}`,
+          `focusrule|${l.text}`,
+        ),
+      ),
+      ...(d.signals?.css?.rules ?? [])
+        .filter((r) => /:focus/.test(r.selector))
+        .slice(0, 40)
+        .map((r) =>
+          hAt(
+            d,
+            1,
+            `css:${r.selector}`,
+            `captured focus rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }`,
+            `focuscss|${r.selector}|${declsText(r.decls)}`,
+          ),
+        ),
+    ]),
+
+  // RGAA 12.8 — the tab order, as the DOM gives it: what Tab reaches, in order. One anchor per
+  // document, on the first focusable, so the population is one decision per page.
+  tabOrder: (docs) =>
+    docs.flatMap((d) => {
+      const focusables = d.elements.filter(isTabbable);
+      if (!focusables.length) return [];
+      const order = focusables
+        .slice(0, 15)
+        .map(
+          (e) =>
+            `${e.tag}${attr(e, "tabindex") !== undefined ? `[tabindex=${attr(e, "tabindex")}]` : ""} "${t(e, 20) || attr(e, "aria-label") || attr(e, "name") || ""}"`,
+        )
+        .join(" → ");
+      return [
+        h(
+          d,
+          focusables[0]!,
+          `page="${pageOfDoc(d.file) ?? "source"}" tab order (DOM): ${order}${focusables.length > 15 ? ` … (${focusables.length} focusable)` : ""} — does it follow the reading order?`,
+          `taborder|${pageOfDoc(d.file) ?? d.file}`,
+        ),
+      ];
+    }),
+
+  // RGAA 8.2 — the generated source, judged against the W3C checker. The engine's own validity
+  // rules report the failures; this is what the adjudicator rules a `C` on: the document, its
+  // doctype, and what a validator would flag first.
+  markupValidity: (docs) =>
+    docs.flatMap((d) => {
+      const out: Harvested[] = [];
+      const root = elementsByTag(d, "html")[0];
+      const page = pageOfDoc(d.file);
+      const dt = page !== undefined ? d.signals?.doctype : /<!doctype[^>]*>/i.exec(d.source.slice(0, 2000))?.[0];
+      if (root)
+        out.push(
+          h(
+            d,
+            root,
+            `page="${page ?? "source"}" doctype=${dt === undefined ? "(not recorded)" : dt === "" ? "(none)" : dt} — validate the GENERATED source (W3C Nu checker): tags, nesting, attributes, unique ids`,
+            `markup|${dt ?? ""}`,
+          ),
+        );
+      const byId = new Map<string, El[]>();
+      for (const e of d.elements) {
+        const id = attr(e, "id");
+        if (!id || id.includes("{")) continue;
+        byId.set(id, [...(byId.get(id) ?? []), e]);
+      }
+      for (const [id, els] of byId) if (els.length > 1) out.push(h(d, els[1]!, `id="${id}" used ${els.length} times`, `dupid|${id}`));
+      for (const e of d.elements) {
+        if ((e.tag === "a" || e.tag === "button") && ancestors(e).some((a) => a.tag === "a" || a.tag === "button"))
+          out.push(h(d, e, `<${e.tag}> nested inside an interactive element — not permitted`, `nesting|${e.tag}`));
+      }
+      return out;
+    }),
+
+  // Instructions — what RGAA 10.9/10.10 actually read. `sensoryText` keeps the leads that
+  // already lean on a sensory word; this adds every instruction, because a conformity is ruled
+  // on the ones that name their target too, and a page with none of the leads had nothing to cite.
+  instructions: (docs) =>
+    docs.flatMap((d) =>
+      d.elements
+        .filter(
+          (e) => !["script", "style", "title", "head", "html", "body"].includes(e.tag) && e.children.some((c) => c.type === "text" && INSTRUCTION.test(c.data)),
+        )
+        .slice(0, 40)
+        .map((e) => h(d, e, `instruction: "${t(e, 100)}" — does it rely on shape, size or position alone?`, `instruction|${t(e, 80)}`)),
+    ),
+
   // Content pinned over the page — what can obscure a focused element.
   stickies: (docs) =>
     docs.flatMap((d) => [
@@ -1145,6 +1808,8 @@ export const SUBJECTS: Record<string, Subject> = {
         ),
     ]),
 };
+
+for (const sc of MEASURED_SCS) SUBJECTS[`rendered:${sc}`] = measured(sc);
 
 // ---- which subjects serve which criterion ------------------------------------------------
 //
@@ -1230,6 +1895,10 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // Theme 6 — links.
     "6.1": ["links"],
     "6.2": ["links"],
+    // Theme 1 — the images themselves: 1.2 and 1.9 inherited `aria` from WCAG 4.1.2 too, and were
+    // handed every <nav> and aria-pressed button of the page beside the images they are about.
+    "1.2": ["images"],
+    "1.9": ["images"],
     // Theme 2 — frames. Both criteria are about the frame and its title, and nothing else.
     "2.1": ["frames"],
     "2.2": ["frames"],
@@ -1240,6 +1909,9 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // 8.4 asks about the CODE, 8.3 about the element — see `declaredLang`.
     "8.4": ["declaredLang"],
     "8.5": ["docTitle"],
+    // 8.2 inherited `aria` from WCAG 4.1.2: the ARIA attributes, and on a page without any, NOTHING
+    // — which is how « non applicable » got written for a criterion every page is subject to.
+    "8.2": ["markupValidity", "aria"],
     "8.6": ["docTitle"],
     "8.7": ["langParts"],
     "8.8": ["langParts"],
@@ -1249,7 +1921,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "9.1": ["headings"],
     "9.2": ["landmarks"],
     "9.3": ["lists"],
-    "9.4": ["structure"],
+    "9.4": ["quotes"],
     // Theme 11 — forms.
     "11.1": ["controls"],
     "11.2": ["controls"],
@@ -1259,7 +1931,10 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "11.6": ["controls", "landmarks"],
     "11.7": ["controls", "landmarks"],
     "11.8": ["controls"],
-    "11.9": ["controls"],
+    // « Bouton (formulaire) » — the buttons, which `controls` never held.
+    // Fields stay listed beside the buttons so an audit recorded before `buttons` existed (whose
+    // subjectsSeen cannot contain it) is never read as « no button anywhere ».
+    "11.9": ["buttons", "controls"],
     "11.10": ["controls", "errors"],
     "11.11": ["errors", "controls"],
     "11.12": ["controls", "errors"],
@@ -1269,32 +1944,43 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "12.2": ["repeatedBlocks"],
     "12.3": ["navMechanisms"],
     "12.4": ["repeatedBlocks", "navMechanisms"],
-    "12.5": ["repeatedBlocks"],
+    // The search engine is the criterion's subject, and `navMechanisms` is what finds it.
+    "12.5": ["repeatedBlocks", "navMechanisms"],
     "12.6": ["landmarks"],
     "12.7": ["landmarks"],
-    "12.8": ["focusOrder"],
-    "12.9": ["focusables", "pointerHandlers"],
-    "12.10": ["shortcuts"],
-    "12.11": ["additionalContent", "pointerHandlers", "focusables"],
+    "12.8": ["focusOrder", "tabOrder"],
+    "12.9": ["focusables", "rendered:2.1.2", "pointerHandlers", "tabOrder"],
+    "12.10": ["shortcuts", "externalScripts"],
+    "12.11": ["additionalContent", "rendered:1.4.13", "pointerHandlers", "focusables"],
     // Theme 4 — multimedia. 4.10 (is automatically-triggered sound controllable?) maps onto
     // WCAG 1.4.2, which is `static` and therefore has no subject of its own — but the pack
     // flags 4.10 `judgment`, so judgmentGuard reopens it and it would arrive with nothing.
     "4.10": ["motion"],
+    // Theme 4's own population, so a YouTube iframe is shown and 4.7 is not closed by the
+    // absence of IMAGES (its WCAG mapping, 1.1.1).
+    "4.1": ["temporalMedia", "motion"],
+    "4.2": ["temporalMedia", "motion"],
+    "4.3": ["temporalMedia", "motion"],
+    "4.4": ["temporalMedia", "motion"],
+    "4.5": ["temporalMedia", "motion"],
+    "4.6": ["temporalMedia", "motion"],
+    "4.7": ["temporalMedia"],
+    "4.13": ["temporalMedia", "nonTemporalMediaControls"],
     // 4.11/4.12 map to the same keyboard SCs but ask about disjoint media populations.
     // Inheriting the union handed both criteria every pointer handler and focusable in scope.
     "4.11": ["temporalMediaControls"],
     "4.12": ["nonTemporalMediaControls"],
     // Theme 3 — colour. The question is about what colour alone conveys, not the outline.
     "3.1": ["colourPairs", "links"],
-    "3.2": ["colourPairs"],
-    "3.3": ["colourPairs"],
+    "3.2": ["colourPairs", "computedColours", "colourDecls", "rendered:1.4.3", "stylesheets"],
+    "3.3": ["colourPairs", "colourDecls", "rendered:1.4.11", "controls", "buttons", "stylesheets"],
     // Theme 7 — scripts. "Is each script operable by keyboard AND pointer?" is about the
     // handlers and the focusable surface, never about the page's headings and lists.
     "7.1": ["aria", "pointerHandlers"],
     "7.2": ["scriptAlternatives"],
-    "7.3": ["pointerHandlers", "focusables"],
+    "7.3": ["pointerHandlers", "pointerActions", "focusables"],
     "7.4": ["contextChange"],
-    "7.5": ["liveRegions"],
+    "7.5": ["liveRegions", "rendered:4.1.3"],
     // Theme 10 — presentation. These ask what survives when CSS is off, what the stylesheet
     // reorders, and what is hidden on purpose.
     //
@@ -1303,29 +1989,39 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // markup — not reading order. `readingOrder` harvested nothing for it, so the criterion
     // reached the adjudicator with an empty brief and could not be ruled on at all. The engine
     // decides it now (src/rules/presentation.ts); this names what a reader would look at.
-    "10.1": ["presentationalMarkup"],
+    "10.1": ["presentationalMarkup", "stylesheets"],
     "10.2": ["hiddenContent", "structure"],
     "10.3": ["readingOrder", "structure"],
-    "10.4": ["readingOrder"],
+    // 10.4/10.11/10.12/13.9 used to inherit `readingOrder` from their WCAG mapping — `order`,
+    // flex-reverse and absolute positioning — which says nothing about zoom, reflow, spacing or
+    // orientation, harvested nothing on an ordinary page, and left an NA as the only answer.
+    "10.4": ["zoom", "rendered:1.4.4", "stylesheets"],
+    "10.5": ["colourDecls", "colourPairs", "stylesheets"],
+    "10.6": ["links", "rendered:1.4.1", "colourDecls"],
+    "10.7": ["focusStyles", "rendered:2.4.7", "stylesheets"],
     "10.8": ["hiddenContent", "aria"],
-    "10.9": ["sensoryText"],
-    "10.10": ["sensoryText"],
-    "10.11": ["readingOrder"],
-    "10.12": ["readingOrder"],
-    "10.13": ["aria", "stickies"],
-    "10.14": ["additionalContent", "focusables", "pointerHandlers"],
+    "10.9": ["sensoryText", "instructions"],
+    "10.10": ["sensoryText", "instructions"],
+    "10.11": ["reflow", "rendered:1.4.10", "stylesheets"],
+    "10.12": ["textSpacing", "rendered:1.4.12", "stylesheets"],
+    // 1.4.13's own subject was lost here: `additionalContent` is what 10.13 is about.
+    "10.13": ["additionalContent", "rendered:1.4.13", "aria", "stickies"],
+    "10.14": ["additionalContent", "rendered:1.4.13", "focusables", "pointerHandlers"],
     // Theme 13 — consultation.
-    "13.1": ["timers"],
+    "13.1": ["timers", "externalScripts"],
     // 13.2 asks about a window OPENING, which is not the context-change question it inherited
     // from WCAG 3.2.1. See `newWindow`.
     "13.2": ["newWindow"],
     "13.3": ["downloadDocs"],
     "13.4": ["downloadDocs"],
+    "13.5": ["cryptic"],
+    "13.6": ["cryptic"],
     "13.7": ["flashes"],
-    "13.8": ["motion", "timers"],
-    "13.9": ["readingOrder"],
-    "13.10": ["pointerHandlers"],
-    "13.11": ["pointerHandlers"],
+    "13.8": ["motion", "timers", "externalScripts"],
+    "13.9": ["orientation", "rendered:1.3.4", "stylesheets"],
+    "13.10": ["pointerHandlers", "externalScripts"],
+    "13.12": ["pointerHandlers", "externalScripts"],
+    "13.11": ["pointerActions", "pointerHandlers", "externalScripts"],
   },
 };
 
@@ -1414,6 +2110,10 @@ export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   "errors",
   "frames",
   "downloadDocs",
+  "buttons",
+  // Same elements as the 1.2.x applicability predicate, so « no media » means the same thing
+  // whichever layer concludes it.
+  "temporalMedia",
   "newWindow",
   "contextChange",
   "scriptAlternatives",
@@ -1421,6 +2121,25 @@ export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   // `<html>` element is always there; the attribute is what this subject looks for.
   "declaredLang",
 ]);
+
+/** Pack criteria that apply to EVERY page with content, so « non applicable » is never a
+ *  verdict an adjudicator may return for them. Each of these was answered NA on a real run
+ *  (#61: 8.2, 10.11, 10.12, 12.8, 13.9), always the same way: nothing was harvested, and an
+ *  empty harvest read as « nothing here is concerned ». A page always has a doctype to declare
+ *  (8.1), generated source to validate (8.2), a default language and a title to carry (8.3,
+ *  8.5), stylesheets that present it or not (10.1, 10.3), text to enlarge, reflow and respace
+ *  (10.4, 10.11, 10.12), a tab order (12.8 — for a page with no focusable element, the right
+ *  answer is C with that observation, not NA) and an orientation (13.9). */
+export const ALWAYS_APPLICABLE: Readonly<Record<string, ReadonlySet<string>>> = {
+  rgaa: new Set(["8.1", "8.2", "8.3", "8.5", "10.1", "10.3", "10.4", "10.11", "10.12", "12.8", "13.9"]),
+};
+
+/** Subjects whose PRESENCE is recorded in `scope.subjectsSeen` although their absence proves
+ *  nothing. Presence alone is what a pack criterion needs to refuse an absence it would only
+ *  INHERIT from its WCAG mapping (derive.ts `ownSubjectSeen`): RGAA 13.11 maps onto WCAG 2.5.2,
+ *  whose predicate closes on « no down-event handler » — and a page full of click actions is
+ *  then published « non applicable » for a criterion whose population is exactly those actions. */
+export const PRESENCE_SUBJECTS: ReadonlySet<string> = new Set(["pointerActions", "cryptic"]);
 
 /** The subjects that decide a success criterion. Empty ⇒ the criterion has none declared,
  *  which `tests/harvest-coverage.test.ts` refuses for any criterion the engine hands over. */
@@ -1467,7 +2186,7 @@ export function subjectsAbsent(ids: string[], seen: ReadonlySet<string>): boolea
  *  the first few documents this costs almost nothing. */
 export function subjectsPresentIn(doc: Doc, skip: ReadonlySet<string>): string[] {
   const out: string[] = [];
-  for (const id of EXISTENCE_SUBJECTS) {
+  for (const id of [...EXISTENCE_SUBJECTS, ...PRESENCE_SUBJECTS]) {
     if (skip.has(id)) continue;
     const run = SUBJECTS[id];
     if (!run) continue;

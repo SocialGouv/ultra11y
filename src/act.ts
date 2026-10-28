@@ -82,7 +82,6 @@ export const ACT_RULES: Record<string, ActMapping> = {
   b5c3f8: {
     engineRules: ["html-lang-missing"],
     scope: "static",
-    note: "an `xml:lang` alone is accepted as a declared default language, as RGAA 8.3 accepts it; ACT requires the HTML `lang` attribute",
   },
   bf051a: {
     engineRules: ["lang-invalid"],
@@ -147,7 +146,7 @@ export const ACT_RULES: Record<string, ActMapping> = {
   },
 
   "2ee8b8": {
-    engineRules: ["label-in-name-mismatch"],
+    engineRules: ["label-in-name-mismatch", "link-label-in-name-mismatch"],
     scope: "static",
     divergences: {
       "65be0004543e57d44dd4a53d9f582c482503727c":

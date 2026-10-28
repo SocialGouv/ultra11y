@@ -150,6 +150,9 @@ const RULE_SC = {
   "placeholder-as-label": ["4.1.2"], "positive-tabindex": ["2.4.3"], "redundant-aria": ["4.1.2"], "select-has-option": ["4.1.2"],
   "skip-link-target-missing": ["2.4.1"], "bypass-blocks-missing": ["2.4.1"], "sortable-header-no-aria-sort": ["1.3.1"], "status-message-not-assertive": ["4.1.3"],
   "table-caption-missing": ["1.3.1"], "table-empty-data-cell": ["1.3.1"], "title-missing-empty": ["2.4.2"],
+  "link-label-in-name-mismatch": ["2.5.3"],
+  "invalid-aria-attr": ["4.1.2"], "invalid-aria-value": ["4.1.2"], "aria-required-attr": ["4.1.2"], "aria-prohibited-attr": ["4.1.2"],
+  "dl-structure": ["1.3.1"], "on-input-context-change": ["3.2.2"],
 };
 
 // ---- Judgment criteria: RGAA wordings that ask MORE than their WCAG mapping ----
@@ -171,6 +174,11 @@ const JUDGMENT_CRITERIA = {
   "4.10": "« contrôlable par l’utilisateur » — l’arrêt/le réglage du son se constate au rendu, 1.4.2 ne prouve que l’absence d’autoplay détectable.",
   "8.4": "« le code de langue est-il pertinent ? » — 3.1.1 ne vérifie que la présence et la validité syntaxique de `lang`, pas sa cohérence avec la langue réelle du contenu.",
   "8.6": "« ce titre est-il pertinent ? » — 2.4.2 ne vérifie que la présence d’un `<title>` non vide.",
+  // Its tests are « static » because list-structure can PROVE a malformed list — but what they
+  // ask about is « les informations regroupées VISUELLEMENT sous forme de liste », and the list
+  // that fails them is the one drawn with no list markup at all. An absence of <ul> is not an
+  // absence of lists, so a clean or empty pass must never close 9.3 on its own.
+  "9.3": "« les informations regroupées visuellement sous forme de liste » — un regroupement visuel se constate à la lecture ; l’absence de <ul>/<ol>/<dl> ne prouve pas l’absence de liste.",
   "13.3": "« version accessible du document en téléchargement » — aucune règle moteur ne peut ouvrir le document ; les CS mappés ne portent que sur la page.",
   "13.4": "« cette version offre-t-elle la même information ? » — comparaison de deux documents, hors de portée d’un audit de la page.",
 };
@@ -216,6 +224,9 @@ const RULE_TO_CRITERIA = {
   // Theme 6 — links (6.2 link label)
   "link-empty-name": ["6.2"], "icon-only-control-unnamed": ["6.2", "11.9"], "cross-icon-only-unnamed": ["11.9"],
   "axe:link-name": ["6.2"],
+  // 6.1.5 — « pour chaque lien ayant un intitulé visible, le nom accessible du lien contient-il au
+  // moins l'intitulé visible ? ». The link half of label-in-name, which used to land on 7.1.
+  "link-label-in-name-mismatch": ["6.1"],
   // Theme 7 — scripts/ARIA (7.1 AT-compat, 7.3 keyboard, 7.5 status messages)
   "invalid-aria-role": ["7.1"], "aria-ref-missing-id": ["7.1"], "aria-required-children": ["7.1"],
   "aria-hidden-focusable": ["7.1"], "redundant-aria": ["7.1"], "nested-interactive": ["7.1"],
@@ -235,6 +246,18 @@ const RULE_TO_CRITERIA = {
   "axe:aria-valid-attr": ["7.1"], "axe:aria-valid-attr-value": ["7.1"], "axe:nested-interactive": ["7.1"],
   "axe:aria-hidden-focus": ["7.1"], "axe:presentation-role-conflict": ["7.1"],
   "axe:button-name": ["7.1"], "axe:input-button-name": ["7.1"],
+  // These fired, raised a WCAG 4.1.2 non-conformity, and reached NO RGAA criterion: their axe
+  // twins were mapped, the static rules never were. An unknown `aria-*` attribute and a value
+  // outside an ARIA attribute's grammar are also invalid code under the doctype (8.2.1, what the
+  // W3C checker reports); a missing required state or a prohibited name is evidence for 7.1.
+  // (aria-required-parent reports under 1.3.1, which 7.1 does not map — listing it would be inert.)
+  "invalid-aria-attr": ["7.1", "8.2"], "invalid-aria-value": ["7.1", "8.2"],
+  "aria-required-attr": ["7.1"], "aria-prohibited-attr": ["7.1"],
+  "axe:aria-command-name": ["7.1"], "axe:aria-tooltip-name": ["7.1"], "axe:aria-dialog-name": ["7.1"],
+  "axe:aria-meter-name": ["7.1"], "axe:aria-progressbar-name": ["7.1"],
+  // 7.4.1 — a <select> whose change navigates or submits is the criterion's textbook case. A
+  // candidate: the user may be warned by a text before it, which the rule cannot see.
+  "on-input-context-change": ["7.4"],
   // Theme 8 — document (8.2 valid code, 8.3 default lang, 8.4 lang relevant, 8.5 title, 8.7/8.8 lang changes)
   "duplicate-id": ["8.2"], "axe:duplicate-id": ["8.2"], "axe:duplicate-id-aria": ["8.2"], "axe:duplicate-id-active": ["8.2"],
   "html-lang-missing": ["8.3"], "axe:html-has-lang": ["8.3"],
@@ -248,6 +271,10 @@ const RULE_TO_CRITERIA = {
   "missing-main-landmark": ["9.2", "12.6"], "multiple-main-landmark": ["9.2", "12.6"], "axe:landmark-one-main": ["12.6"],
   "nav-landmark-missing": ["9.2", "12.6"], "nav-landmark-unnamed": ["12.6"],
   "list-structure": ["9.3"], "axe:list": ["9.3"], "axe:listitem": ["9.3"], "axe:definition-list": ["9.3"], "axe:dlitem": ["9.3"],
+  // The static twin of axe definition-list/dlitem, which were mapped while it was not.
+  "dl-structure": ["9.3"],
+  // 10.6 — axe's own « link distinguishable from surrounding text » check.
+  "axe:link-in-text-block": ["10.6"],
   // Theme 10 — presentation (10.2 CSS-off content, 10.4 zoom, 10.7 focus, 10.11 reflow, 10.12 text-spacing)
   "css-generated-content-informative": ["10.2"],
   "meta-viewport-zoom-block": ["10.4"], "axe:meta-viewport": ["10.4"], "axe:meta-viewport-large": ["10.4"],
@@ -264,7 +291,11 @@ const RULE_TO_CRITERIA = {
   "autocomplete-token-invalid": ["11.13"], "form-label-in-name-mismatch": ["11.9"],
   "error-not-associated": ["11.10"], "aria-invalid-no-description": ["11.10"],
   "axe:label": ["11.1"], "axe:form-field-multiple-labels": ["11.1"], "axe:select-name": ["11.1"], "axe:label-title-only": ["11.1"],
-  "axe:autocomplete-valid": ["11.13"], "axe:fieldset": ["11.6"],
+  // An ARIA field (role=textbox, combobox, checkbox, switch…) with no accessible name at all has
+  // none of the label mechanisms 11.1.1 lists either.
+  "axe:aria-input-field-name": ["11.1"], "axe:aria-toggle-field-name": ["11.1"],
+  // (axe-core has no `fieldset` rule — the entry that stood here was inert.)
+  "axe:autocomplete-valid": ["11.13"],
   // Theme 12 — navigation (12.7 skip link, 12.8 tab order, 12.9 keyboard trap)
   "skip-link-target-missing": ["12.7"], "axe:skip-link": ["12.7"], "axe:bypass": ["12.7"],
   // A page whose <nav> precedes content with no landmark, heading, button or in-page link at
@@ -298,11 +329,18 @@ const DECISIVE_RULE_TESTS = {
   "2.1|iframe-title-missing": ["1"],
   "6.2|link-empty-name": ["1"],
   "6.2|axe:link-name": ["1"],
+  // A link whose only content is an icon with no name has no intitulé between <a> and </a> — the
+  // same failure as an empty link, and its only difference is the icon. (On 6.2 the rule only
+  // ever projects its LINK findings: a button finding carries WCAG 4.1.2, which 6.2 does not map.)
+  "6.2|icon-only-control-unnamed": ["1"],
+  "6.1|link-label-in-name-mismatch": ["5"],
   "8.2|duplicate-id": ["1"],
   "8.2|axe:duplicate-id": ["1"],
   "8.2|axe:duplicate-id-aria": ["1"],
   "8.2|axe:duplicate-id-active": ["1"],
   "8.2|duplicate-attribute": ["1"],
+  "8.2|invalid-aria-attr": ["1"],
+  "8.2|invalid-aria-value": ["1"],
   "8.3|document-language-missing": ["1"],
   "8.4|axe:html-lang-valid": ["1"],
   "8.4|lang-invalid": ["1"],
@@ -321,7 +359,8 @@ const DECISIVE_RULE_TESTS = {
   "11.1|axe:label": ["1"],
   "11.1|axe:select-name": ["1"],
   "11.1|control-label-missing": ["1"],
-  "11.6|axe:fieldset": ["1"],
+  "11.1|axe:aria-input-field-name": ["1"],
+  "11.1|axe:aria-toggle-field-name": ["1"],
   "11.6|fieldset-legend-missing": ["1"],
   "11.9|form-button-empty-name": ["1"],
   "11.9|form-label-in-name-mismatch": ["2"],
@@ -395,6 +434,11 @@ const CANDIDATE_RULE_TESTS = {
   "12.7|skip-link-target-missing": ["2"],
   "12.8|axe:tabindex": ["1"],
   "12.8|positive-tabindex": ["1"],
+  "7.4|on-input-context-change": ["1"],
+  // Candidate, not decisive like its axe twins: in a component a <dt>/<dd> is routinely rendered
+  // into a parent component's <dl> that this file cannot see.
+  "9.3|dl-structure": ["3"],
+  "10.6|axe:link-in-text-block": ["1"],
   "13.1|meta-refresh-redirect": ["2"],
   "13.8|axe:blink": ["2"],
   "13.8|axe:marquee": ["1"],

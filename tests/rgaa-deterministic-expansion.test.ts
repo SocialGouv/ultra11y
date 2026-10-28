@@ -14,8 +14,14 @@ describe("RGAA deterministic expansion — fail-closed boundaries", () => {
     expect(ids(page('<p lang="fr">Bonjour</p><p lang="en">Hello</p>'))).not.toContain("document-language-missing");
   });
 
-  it("accepts xml:lang when an empty HTML lang attribute is also present", () => {
-    expect(ids(page("<p>Texte</p>", 'lang="" xml:lang="fr"'))).not.toContain("document-language-missing");
+  // The 8.3.1 methodology names the attribute per doctype: `lang` « si le code est du HTML5 ou
+  // du HTML4 », `xml:lang` alone only « si le code est du XHTML 1.1 ». An empty `lang` beside an
+  // `xml:lang` on an HTML5 page therefore declares no default language (xml:lang is inert in
+  // text/html, and ACT b5c3f8 fails it the same way).
+  it("accepts xml:lang alone only where the doctype is XHTML 1.1", () => {
+    expect(ids(page("<p>Texte</p>", 'lang="" xml:lang="fr"'))).toContain("document-language-missing");
+    const xhtml11 = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">';
+    expect(ids(page("<p>Texte</p>", 'lang="" xml:lang="fr"').replace("<!doctype html>", xhtml11))).not.toContain("document-language-missing");
   });
 
   it("reports only a genuinely uncovered visible text node for RGAA 8.3", () => {

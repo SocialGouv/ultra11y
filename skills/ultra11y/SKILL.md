@@ -1,6 +1,6 @@
 ---
 name: ultra11y
-description: "Use to AUDIT a site, repository, or page against RGAA 4.1.2, the French State's accessibility standard (référentiel de l'État), on a WCAG 2.2 AA core (other country standards as packs); produce a dated conformance report, criterion grid, PRD backlog, or tickets; AUTHOR accessible markup; fix accessibility; or wire a repo gate and rendered-DOM capture pipeline. The bundled install-free engine runs 94 static checks tied to success criteria, while the agent adjudicates judgment criteria and routes rendering criteria to browser scans; check/verify reject invented non-conformities and never declare conforming what was not verified. Use `review-a11y` instead for a review scoped only to a diff, branch, or PR."
+description: "Use to AUDIT a site, repository, or page against RGAA 4.1.2, the French State's accessibility standard (référentiel de l'État), on a WCAG 2.2 AA core (other country standards as packs); produce a dated conformance report, criterion grid, PRD backlog, or tickets; AUTHOR accessible markup; fix accessibility; or wire a repo gate and rendered-DOM capture pipeline. The bundled install-free engine runs 95 static checks tied to success criteria, while the agent adjudicates judgment criteria and routes rendering criteria to browser scans; check/verify reject invented non-conformities and never declare conforming what was not verified. Use `review-a11y` instead for a review scoped only to a diff, branch, or PR."
 license: MIT
 metadata:
   version: 5.47.1
@@ -20,7 +20,7 @@ criteria (computed contrast, visible focus, zoom/reflow, content-on-hover) fall 
 tier (axe-core in a real browser); a human is at most optional oversight. Gates stop any
 hallucinated non-conformity from surviving, and nothing is ever silently "conforming".
 
-**Do not confuse rules with criteria.** The bundle ships 94 static checks, WCAG AA has 55
+**Do not confuse rules with criteria.** The bundle ships 95 static checks, WCAG AA has 55
 success criteria, and RGAA has 106 criteria. Several rules may evidence one criterion, one
 rule may contribute to several pack criteria, and most criteria remain open until a scan or
 an adjudication. The only honest run-level coverage is the grid's live provenance tally
@@ -123,6 +123,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/focus-and-logic.md` | The focus/keyboard criteria you own, and how to reason about them |
 | `references/criteria.md` | The 55 criteria: level, automatability class, engine rules, pack mapping (generated) |
 | `references/rgaa-automation.md` | RGAA 4.1.2: generated 106-criterion / 258-test matrix, decisive rules, candidate signals and silence policy |
+| `references/rgaa-review.md` | RGAA 4.1.2 criterion by criterion: what the engine can be trusted for, what was fixed against the golden grids, and the known limits |
 | `references/act.md` | What the engine is measured to catch — and what it demonstrably does not (generated) |
 
 | Running the tool | |

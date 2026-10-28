@@ -41,6 +41,9 @@ jobs:
         uses: ./
         with:
           paths: .
+          # Fixtures are non-conformant by design (the golden grids, bad.html…): a PR that
+          # edits one must not fail on the defects it exists to carry.
+          exclude: "tests/fixtures/**"
           standard: rgaa
           since: auto
           fail-on: ${{ github.event_name == 'pull_request' && 'blocking' || '' }}

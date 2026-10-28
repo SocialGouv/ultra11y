@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { realpathSync as realpathSync8, writeFileSync as writeFileSync21, mkdirSync as mkdirSync18, existsSync as existsSync39, readFileSync as readFileSync34, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
-import { join as join53, relative as relative6, resolve as resolve17, sep as sep7, dirname as dirname19 } from "path";
+import { realpathSync as realpathSync8, writeFileSync as writeFileSync21, mkdirSync as mkdirSync18, existsSync as existsSync40, readFileSync as readFileSync35, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
+import { join as join53, relative as relative6, resolve as resolve17, sep as sep7, dirname as dirname20 } from "path";
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
@@ -12,6 +12,8 @@ var INAPPLICABLE_STATUS = "C";
 
 // src/audit.ts
 import { createHash as createHash4 } from "crypto";
+import { existsSync as existsSync16, readFileSync as readFileSync17, statSync as statSync11 } from "fs";
+import { dirname as dirname10, resolve as resolvePath } from "path";
 
 // src/data/wcag.json
 var wcag_default = {
@@ -950,7 +952,7 @@ var wcag_default = {
       level: "A",
       addedIn: "2.1",
       automatability: "judgment",
-      ruleIds: ["label-in-name-mismatch", "form-label-in-name-mismatch"],
+      ruleIds: ["label-in-name-mismatch", "form-label-in-name-mismatch", "link-label-in-name-mismatch"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html",
       techniques: [
         "ARIA14",
@@ -37885,8 +37887,16 @@ function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables
   // the probe reports \xAB no visible change \xBB \u2014 a finding rather than a silent pass. That is the
   // safe direction: this tool would rather name something a human can dismiss than clear
   // something nobody will look at again.
-  const __style = (e, pseudo) => { const s = getComputedStyle(e, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
-  const snap = (e) => [__style(e, null), __style(e, '::before'), __style(e, '::after')].join('#');
+  // THE INDICATOR MAY NOT BE ON THE ELEMENT. RGAA 10.7.1 accepts \xAB un style du focus d\xE9fini par
+  // l'auteur [qui] est visible \xBB, and authors put it on the wrapper (:focus-within outlining a
+  // card), on the next sibling (input:focus + .label \u2014 the visually-hidden checkbox pattern), or
+  // in a property the first version did not read (transform, text-shadow, a side border). Each
+  // was a decisive \xAB focus not visible \xBB on a visible indicator. So the parent, the grandparent
+  // and the next sibling are compared too, and the property list is wider.
+  // (No backticks in this comment: it lives inside a template literal.)
+  const __style = (e, pseudo) => { const s = getComputedStyle(e, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.borderLeftWidth, s.borderRightWidth, s.backgroundColor, s.backgroundImage, s.color, s.textDecorationLine, s.textShadow, s.transform, s.opacity, s.filter].join('|'); };
+  const __ctx = (e) => [e.parentElement, e.parentElement && e.parentElement.parentElement, e.nextElementSibling].map((x) => (x ? __style(x, null) : '-')).join('~');
+  const snap = (e) => [__style(e, null), __style(e, '::before'), __style(e, '::after')].join('#') + '@' + __ctx(e);
   // Visually-hidden radio/checkbox \u2192 measure its visible label/proxy, not the input.
   const proxyFor = (e) => {
     const type = (e.getAttribute('type') || '').toLowerCase();
@@ -37942,8 +37952,10 @@ var FOCUS_CHECK_PROBE = `(() => {
   // (No backticks in this comment: it lives inside a template literal.)
   // Same three boxes, same animation exclusion as pass 1 -- an animating box contributes a
   // constant on both sides, so it can never fabricate a difference (nor hide a real one).
-  const st = (pseudo) => { const s = getComputedStyle(proxy, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
-  const now = [st(null), st('::before'), st('::after')].join('#');
+  const sty = (el, pseudo) => { const s = getComputedStyle(el, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.borderLeftWidth, s.borderRightWidth, s.backgroundColor, s.backgroundImage, s.color, s.textDecorationLine, s.textShadow, s.transform, s.opacity, s.filter].join('|'); };
+  const st = (pseudo) => sty(proxy, pseudo);
+  const ctx = [proxy.parentElement, proxy.parentElement && proxy.parentElement.parentElement, proxy.nextElementSibling].map((x) => (x ? sty(x, null) : '-')).join('~');
+  const now = [st(null), st('::before'), st('::after')].join('#') + '@' + ctx;
   return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
 })()`;
 var FOCUS_OBSCURED_PROBE = `(() => { ${PRELUDE}
@@ -40280,6 +40292,22 @@ function elementIndex(doc) {
   doc.elements.forEach((el, i2) => m.set(el, i2));
   return m;
 }
+function computedTextPairs(doc) {
+  if (!doc.signals?.styles) return [];
+  const index = elementIndex(doc);
+  const out2 = [];
+  for (const [el, i2] of index) {
+    if (SKIP_TAGS.has(el.tag) || !hasDirectText(el)) continue;
+    const css = styleAt(doc, i2)?.css;
+    if (!css || invisible(css)) continue;
+    const fg = parseColor(css.color ?? "");
+    if (!fg || fg.a < 1) continue;
+    const bd = backdropOf(doc, index, el);
+    if (!bd) continue;
+    out2.push({ el, fg, bg: bd.color, ratio: contrastRatio(fg, bd.color), large: isLargeText(css) });
+  }
+  return out2;
+}
 var renderedContrast = {
   id: "rendered-contrast",
   criteria: ["1.4.3"],
@@ -40460,6 +40488,42 @@ function restoresIndicator(d) {
   }
   return d.filter !== void 0 || d.transform !== void 0 || d.color !== void 0;
 }
+var NOT_TABBABLE_BY_DEFAULT = /* @__PURE__ */ new Set([
+  "main",
+  "section",
+  "article",
+  "aside",
+  "header",
+  "footer",
+  "nav",
+  "div",
+  "span",
+  "p",
+  "body",
+  "html",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "ul",
+  "ol",
+  "li",
+  "dl",
+  "table",
+  "form",
+  "figure",
+  "img"
+]);
+function reachesTabbable(selector, doc) {
+  return selector.split(",").some((part) => {
+    const subject = part.trim().split(/[\s>+~]+/).pop() ?? "";
+    const tag = /^[a-z][a-z0-9-]*/i.exec(subject)?.[0]?.toLowerCase();
+    if (!tag || !NOT_TABBABLE_BY_DEFAULT.has(tag)) return true;
+    return doc.elements.some((e) => e.tag === tag && Number.parseInt(attr(e, "tabindex") ?? "-1", 10) >= 0);
+  });
+}
 var renderedFocusNotVisible = {
   id: "rendered-focus-not-visible",
   criteria: ["2.4.7"],
@@ -40468,7 +40532,7 @@ var renderedFocusNotVisible = {
   run(doc) {
     const css = doc.signals?.css;
     if (!css || css.unreadable > 0 || css.truncated) return [];
-    const focusRules = css.rules.filter((r) => FOCUS_SEL.test(r.selector));
+    const focusRules = css.rules.filter((r) => FOCUS_SEL.test(r.selector) && reachesTabbable(r.selector, doc));
     if (!focusRules.length) return [];
     if (!focusRules.some((r) => killsOutline(r.decls))) return [];
     if (focusRules.some((r) => restoresIndicator(r.decls))) return [];
@@ -43157,7 +43221,7 @@ var rgaa_default = {
       ],
       wcag: ["1.1.1", "2.4.4", "2.5.3"],
       appliesTo: {
-        ruleIds: ["pack:rgaa:download-link-format"]
+        ruleIds: ["link-label-in-name-mismatch", "pack:rgaa:download-link-format"]
       },
       automation: {
         tests: {
@@ -43165,9 +43229,15 @@ var rgaa_default = {
           "2": "judgment",
           "3": "judgment",
           "4": "judgment",
-          "5": "judgment"
+          "5": "static"
         },
         rules: [
+          {
+            id: "link-label-in-name-mismatch",
+            tests: ["5"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
           {
             id: "pack:rgaa:download-link-format",
             tests: ["1", "2", "3", "4", "5"],
@@ -43214,8 +43284,8 @@ var rgaa_default = {
           {
             id: "icon-only-control-unnamed",
             tests: ["1"],
-            effect: "candidate",
-            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
           },
           {
             id: "link-empty-name",
@@ -43274,15 +43344,22 @@ var rgaa_default = {
       appliesTo: {
         ruleIds: [
           "aria-hidden-focusable",
+          "aria-prohibited-attr",
           "aria-ref-missing-id",
+          "aria-required-attr",
           "aria-required-children",
           "axe:aria-allowed-attr",
           "axe:aria-allowed-role",
+          "axe:aria-command-name",
+          "axe:aria-dialog-name",
           "axe:aria-hidden-focus",
+          "axe:aria-meter-name",
+          "axe:aria-progressbar-name",
           "axe:aria-required-attr",
           "axe:aria-required-children",
           "axe:aria-required-parent",
           "axe:aria-roles",
+          "axe:aria-tooltip-name",
           "axe:aria-valid-attr",
           "axe:aria-valid-attr-value",
           "axe:button-name",
@@ -43292,7 +43369,9 @@ var rgaa_default = {
           "button-empty-name",
           "cross-prop-drilled-name-lost",
           "disabled-context-content",
+          "invalid-aria-attr",
           "invalid-aria-role",
+          "invalid-aria-value",
           "label-in-name-mismatch",
           "menuitem-empty-name",
           "nested-interactive",
@@ -43314,7 +43393,19 @@ var rgaa_default = {
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
+            id: "aria-prohibited-attr",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
             id: "aria-ref-missing-id",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "aria-required-attr",
             tests: ["1", "2", "3"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
@@ -43338,7 +43429,31 @@ var rgaa_default = {
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
+            id: "axe:aria-command-name",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-dialog-name",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
             id: "axe:aria-hidden-focus",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-meter-name",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-progressbar-name",
             tests: ["1", "2", "3"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
@@ -43363,6 +43478,12 @@ var rgaa_default = {
           },
           {
             id: "axe:aria-roles",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "axe:aria-tooltip-name",
             tests: ["1", "2", "3"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
@@ -43422,7 +43543,19 @@ var rgaa_default = {
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
+            id: "invalid-aria-attr",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
             id: "invalid-aria-role",
+            tests: ["1", "2", "3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "invalid-aria-value",
             tests: ["1", "2", "3"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
@@ -43568,13 +43701,20 @@ var rgaa_default = {
       techniques: ["G13", "G76", "G80", "G107", "H32", "H84", "F9", "F22", "F36", "F37", "F41", "SCR19"],
       wcag: ["3.2.1", "3.2.2"],
       appliesTo: {
-        ruleIds: []
+        ruleIds: ["on-input-context-change"]
       },
       automation: {
         tests: {
           "1": "judgment"
         },
-        rules: []
+        rules: [
+          {
+            id: "on-input-context-change",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -43709,7 +43849,15 @@ var rgaa_default = {
       techniques: ["H74", "H93", "H94", "F70", "F77"],
       wcag: ["4.1.1", "4.1.2"],
       appliesTo: {
-        ruleIds: ["axe:duplicate-id", "axe:duplicate-id-active", "axe:duplicate-id-aria", "duplicate-attribute", "duplicate-id"]
+        ruleIds: [
+          "axe:duplicate-id",
+          "axe:duplicate-id-active",
+          "axe:duplicate-id-aria",
+          "duplicate-attribute",
+          "duplicate-id",
+          "invalid-aria-attr",
+          "invalid-aria-value"
+        ]
       },
       automation: {
         tests: {
@@ -43742,6 +43890,18 @@ var rgaa_default = {
           },
           {
             id: "duplicate-id",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "invalid-aria-attr",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "invalid-aria-value",
             tests: ["1"],
             effect: "decisive-nc",
             rationale: "The observed failure exhausts the cited RGAA test."
@@ -44269,8 +44429,9 @@ var rgaa_default = {
       ],
       wcag: ["1.3.1"],
       appliesTo: {
-        ruleIds: ["axe:definition-list", "axe:dlitem", "axe:list", "axe:listitem", "list-structure"]
+        ruleIds: ["axe:definition-list", "axe:dlitem", "axe:list", "axe:listitem", "dl-structure", "list-structure"]
       },
+      judgment: true,
       automation: {
         tests: {
           "1": "static",
@@ -44301,6 +44462,12 @@ var rgaa_default = {
             tests: ["1", "2"],
             effect: "decisive-nc",
             rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "dl-structure",
+            tests: ["3"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
           {
             id: "list-structure",
@@ -44604,13 +44771,19 @@ var rgaa_default = {
       techniques: ["G183", "F73"],
       wcag: ["1.4.1"],
       appliesTo: {
-        ruleIds: ["rendered-link-colour-only"]
+        ruleIds: ["axe:link-in-text-block", "rendered-link-colour-only"]
       },
       automation: {
         tests: {
           "1": "judgment"
         },
         rules: [
+          {
+            id: "axe:link-in-text-block",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
           {
             id: "rendered-link-colour-only",
             tests: ["1"],
@@ -45056,6 +45229,8 @@ var rgaa_default = {
       wcag: ["1.3.1", "2.4.6", "3.3.2", "4.1.2"],
       appliesTo: {
         ruleIds: [
+          "axe:aria-input-field-name",
+          "axe:aria-toggle-field-name",
           "axe:form-field-multiple-labels",
           "axe:label",
           "axe:label-title-only",
@@ -45076,6 +45251,18 @@ var rgaa_default = {
           "3": "judgment"
         },
         rules: [
+          {
+            id: "axe:aria-input-field-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            id: "axe:aria-toggle-field-name",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          },
           {
             id: "axe:form-field-multiple-labels",
             tests: ["2"],
@@ -45357,19 +45544,13 @@ var rgaa_default = {
       techniques: ["H71", "ARIA17"],
       wcag: ["1.3.1", "3.3.2"],
       appliesTo: {
-        ruleIds: ["axe:fieldset", "fieldset-legend-missing"]
+        ruleIds: ["fieldset-legend-missing"]
       },
       automation: {
         tests: {
           "1": "static"
         },
         rules: [
-          {
-            id: "axe:fieldset",
-            tests: ["1"],
-            effect: "decisive-nc",
-            rationale: "The observed failure exhausts the cited RGAA test."
-          },
           {
             id: "fieldset-legend-missing",
             tests: ["1"],
@@ -47993,6 +48174,25 @@ function linesOf(doc, re, cap = 200) {
   }
   return out2;
 }
+function codeLinesOf(doc, re, cap = 200) {
+  if (doc.kind !== "html") return linesOf(doc, re, cap);
+  const blocks = doc.elements.filter((e) => e.tag === "script" || e.tag === "style").map((e) => [e.start, e.end]);
+  const out2 = [];
+  const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : `${re.flags}g`);
+  const lines = doc.source.split("\n");
+  let m;
+  while ((m = g.exec(doc.source)) && out2.length < cap) {
+    const at = m.index;
+    const inBlock = blocks.some(([s, e]) => at >= s && at <= e);
+    const inTag = doc.source.lastIndexOf("<", at) > doc.source.lastIndexOf(">", at - 1);
+    if (inBlock || inTag) {
+      const line = doc.source.slice(0, at).split("\n").length;
+      out2.push({ line, text: (lines[line - 1] ?? "").trim().slice(0, 120) });
+    }
+    if (m.index === g.lastIndex) g.lastIndex++;
+  }
+  return out2;
+}
 var LABEL_LIKE = /(^|[-_ ])(field-label|field-key|label|key|term)([-_ ]|$)/i;
 var VALUE_LIKE = /(^|[-_ ])(field-value|field-data|value|data)([-_ ]|$)/i;
 function keyValuePairs(doc) {
@@ -48036,12 +48236,66 @@ var PRESENTATIONAL_MARKUP_ATTRS = /* @__PURE__ */ new Set([
   "vlink",
   "vspace"
 ]);
-var DOWNLOAD_HREF = /\.(pdf|docx?|xlsx?)(?:[?#]|$)/i;
+var DOWNLOAD_HREF = /\.(pdf|docx?|dotx?|xlsx?|xlsm|pptx?|ppsx?|odt|ods|odp|odg|rtf|csv|epub)(?:[?#]|$)/i;
 var STATUS_CLASS = /(error|status|message|alert|notif|toast|feedback|live)/i;
+var CRYPTIC = new RegExp("\\p{Extended_Pictographic}|(?:^|\\s)[:;=][-']?[)(DPp/\\\\|]|\xAF\\\\_\\(\u30C4\\)_\\/\xAF|\\(\u256F\xB0\u25A1\xB0\\)\u256F", "u");
+var TEMPORAL_MEDIA_HOST = /(youtube|youtu\.be|vimeo|dailymotion|soundcloud|spotify|twitch|wistia|brightcove|jwplayer|videopress|podcast|player|vid[eé]o|audio|baladodiffusion|\.(?:mp4|webm|ogv|ogg|mov|m4v|mp3|wav|m4a|m3u8))/i;
 var TEMPORAL_MEDIA_VALUE = /(?:^|[/.?=&_-])(?:audio|video|player|podcast|mp[34]|webm|ogg|ogv|wav|m4a|mov|avi|mpeg)(?:$|[/.?=&_-])/i;
 var ROUTER_IMPORT = /['"](?:react-router(?:-dom)?|next\/(?:router|navigation)|vue-router|@remix-run\/[\w-]+|@tanstack\/[\w-]*router|@sveltejs\/kit|\$app\/(?:navigation|stores))['"]/;
 var FOREIGN_LEXICON = /\b(?:the|and|with|your|about|please|download|settings|welcome|dashboard|overview|read more|learn more|sign in|sign up|log in|get started|coming soon|powered by)\b/i;
 var CONTROL_TAGS = ["input", "select", "textarea"];
+var FIELD_TAGS = /* @__PURE__ */ new Set(["datalist", "output", "progress", "meter"]);
+var FIELD_ROLES = /* @__PURE__ */ new Set(["textbox", "searchbox", "combobox", "listbox", "checkbox", "radio", "switch", "slider", "spinbutton", "progressbar", "option"]);
+var roleOf = (e) => (attr(e, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
+function isFormField(e) {
+  if (CONTROL_TAGS.includes(e.tag) || FIELD_TAGS.has(e.tag) || FIELD_ROLES.has(roleOf(e))) return true;
+  const editable = attr(e, "contenteditable");
+  return editable !== void 0 && editable.trim().toLowerCase() !== "false";
+}
+var BUTTON_INPUT_TYPES = /* @__PURE__ */ new Set(["submit", "reset", "button", "image"]);
+function isButton(e) {
+  if (e.tag === "button") return true;
+  if (e.tag === "input") return BUTTON_INPUT_TYPES.has((attr(e, "type") ?? "").trim().toLowerCase());
+  return roleOf(e) === "button";
+}
+var BULLET_LINE = /^\s*(?:[•·▪◦‣●○■□➢➤►–—*-]|\d{1,2}[.)])\s+\S/;
+function looksLikeList(e) {
+  if (["ul", "ol", "dl", "li", "script", "style", "pre", "code"].includes(e.tag)) return false;
+  if (ancestors(e).some((a) => a.tag === "li" || a.tag === "pre")) return false;
+  let lines = 0;
+  let run2 = "";
+  const flush = () => {
+    if (BULLET_LINE.test(run2)) lines++;
+    run2 = "";
+  };
+  for (const c2 of e.children) {
+    if (c2.type === "text") run2 += c2.data;
+    else if (c2.type === "element" && c2.tag === "br") flush();
+    else if (c2.type === "element") run2 += textContent(c2);
+  }
+  flush();
+  return lines >= 2;
+}
+function bulletParagraphRuns(doc) {
+  const out2 = [];
+  for (const parent of doc.elements) {
+    if (["ul", "ol", "dl"].includes(parent.tag)) continue;
+    let start2;
+    let count = 0;
+    const kids = parent.children.filter((c2) => c2.type === "element");
+    for (const k of [...kids, void 0]) {
+      const bullet = k !== void 0 && (k.tag === "p" || k.tag === "div") && BULLET_LINE.test(textContent(k));
+      if (bullet) {
+        if (!count) start2 = k;
+        count++;
+      } else {
+        if (count >= 2 && start2) out2.push(start2);
+        count = 0;
+      }
+    }
+  }
+  return out2;
+}
 var INTERACTIVE_TAGS = ["a", "button", "input", "select", "textarea", "summary", "details", "label"];
 function embeddedMediaKind(el) {
   const type = (attr(el, "type") ?? "").toLowerCase();
@@ -48067,27 +48321,120 @@ function pageOfDoc(file) {
   return m ? m[1] : void 0;
 }
 var isSnapshotFile = (file) => pageOfDoc(file) !== void 0;
+function viewportMeta(d) {
+  return elementsByTag(d, "meta").filter((m) => (attr(m, "name") ?? "").toLowerCase() === "viewport").map((m) => {
+    const content = attr(m, "content") ?? "";
+    const blocks = /user-scalable\s*=\s*(?:no|0)\b|maximum-scale\s*=\s*(?:1(?:\.0+)?|0?\.\d+)\b/i.test(content);
+    return h(d, m, `<meta name="viewport" content="${content}">${blocks ? " \u2014 RESTRICTS zoom" : ""}`, `viewport|${content}`);
+  });
+}
+function cssEvidence(d, re, captured, kind) {
+  return [
+    ...linesOf(d, re, 60).map((l) => hAt(d, l.line, "css", `${kind}-relevant declaration: ${l.text}`, `${kind}decl|${l.text}`)),
+    ...(d.signals?.css?.rules ?? []).filter(captured).slice(0, 40).map((r) => hAt(d, 1, `css:${r.selector}`, `captured rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }`, `${kind}css|${r.selector}`))
+  ];
+}
+var INSTRUCTION = /\b(?:cliquez|cliquer|sélectionnez|selectionnez|utilisez|appuyez|touchez|consultez|reportez-vous|remplissez|choisissez|ci-après|ci-contre|ci-dessus|ci-dessous|à droite|à gauche|en haut|en bas|click|select|press|tap|use the|see the|fill in|choose)\b/i;
+function isTabbable(e) {
+  const ti = attr(e, "tabindex");
+  if (ti !== void 0 && Number.parseInt(ti, 10) < 0) return false;
+  if (attr(e, "disabled") !== void 0 || attr(e, "hidden") !== void 0) return false;
+  if (ti !== void 0) return true;
+  if (e.tag === "a" || e.tag === "area") return attr(e, "href") !== void 0;
+  if (e.tag === "input") return (attr(e, "type") ?? "").toLowerCase() !== "hidden";
+  return ["button", "select", "textarea", "iframe", "summary"].includes(e.tag) || (attr(e, "contenteditable") ?? "false") !== "false";
+}
+function measured(sc) {
+  return (docs) => docs.flatMap((d) => {
+    const page = pageOfDoc(d.file);
+    const s = d.signals;
+    if (page === void 0 || !s) return [];
+    const out2 = [];
+    const probes = s.probes;
+    if (probes?.probed?.includes(sc)) {
+      const issues = PROBE_KEYS[sc]?.flatMap((k) => probes[k] ?? []) ?? [];
+      const scroll = sc === "1.4.10" && probes.reflow ? ` horizontal scroll at 320px: ${probes.reflow.horizontalScroll ? "YES" : "no"};` : "";
+      out2.push(
+        hAt(
+          d,
+          1,
+          `probe:${sc}`,
+          `page="${page}" live probe for WCAG ${sc} RAN:${scroll} ${issues.length} issue(s)${issues.length ? ` \u2014 ${issues[0].detail.slice(0, 120)}` : ""}`,
+          `probe|${sc}|${issues.length}|${scroll}`
+        )
+      );
+    }
+    for (const sk of probes?.skipped ?? [])
+      if (sk.sc === sc)
+        out2.push(
+          hAt(
+            d,
+            1,
+            `probe:${sc}`,
+            `page="${page}" live probe for WCAG ${sc} did NOT finish: ${sk.why.slice(0, 160)}`,
+            `probeskip|${sc}|${sk.why.slice(0, 60)}`
+          )
+        );
+    const ran = renderedRulesRan(s).filter((id) => renderedRulesFor(sc).includes(id));
+    if (ran.length)
+      out2.push(
+        hAt(d, 1, `rendered:${sc}`, `page="${page}" rendered rule(s) ${ran.join(", ")} ran on the captured styles`, `renderedran|${sc}|${ran.join(",")}`)
+      );
+    if (s.axe?.ran) {
+      const hits = (s.axe.violations ?? []).filter((v) => AXE_WCAG[v.id] === sc);
+      out2.push(
+        hAt(
+          d,
+          1,
+          `axe:${sc}`,
+          `page="${page}" axe-core ran: ${hits.length ? hits.map((v) => `${v.id} (${v.nodes?.length ?? 0} node(s))`).join(", ") : `no violation for WCAG ${sc}`}`,
+          `axe|${sc}|${hits.map((v) => v.id).join(",")}`
+        )
+      );
+    }
+    return out2;
+  });
+}
+var PROBE_KEYS = {
+  "1.4.4": ["reflowZoom", "inputOverflowZoom"],
+  "1.4.10": ["inputOverflowReflow"],
+  "1.4.12": ["textSpacing", "inputOverflowSpacing"],
+  "1.4.13": ["hover"],
+  "2.1.2": ["keyboardTrap"],
+  "2.4.7": ["focusVisible"],
+  "2.4.11": ["focusObscured"],
+  "4.1.3": ["liveRegion"]
+};
+var MEASURED_SCS = ["1.3.4", "1.4.1", "1.4.3", "1.4.4", "1.4.10", "1.4.11", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
 var SUBJECTS = {
   // Every image-like element and the alternative it carries. Class = (alt, src): the same
   // logo on 38 pages is one decision, not 38.
   images: (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas").concat(d.elements.filter((e) => attr(e, "role") === "img")).filter((e, i2, a) => a.indexOf(e) === i2).map(
-      (e) => h(
+    (d) => elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas").concat(elementsByTag(d, "input").filter((e) => (attr(e, "type") ?? "").trim().toLowerCase() === "image")).concat(d.elements.filter((e) => attr(e, "role") === "img")).filter((e, i2, a) => a.indexOf(e) === i2).map((e) => {
+      const extra = ["title", "aria-labelledby", "aria-hidden", "role", "aria-describedby", "longdesc"].filter((a) => attr(e, a) !== void 0).map((a) => ` ${a}="${(attr(e, a) ?? "").slice(0, 60)}"`).join("");
+      const figure = ancestors(e).some((a) => a.tag === "figure");
+      return h(
         d,
         e,
-        `<${e.tag}> alt="${attr(e, "alt") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" src="${(attr(e, "src") ?? "").slice(0, 80)}"`,
+        `<${e.tag}${e.tag === "input" ? ' type="image"' : ""}> alt="${attr(e, "alt") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}"${extra} src="${(attr(e, "src") ?? "").slice(0, 80)}"${figure ? " (inside <figure>)" : ""}`,
         `image|${e.tag}|${attr(e, "alt") ?? ""}|${attr(e, "aria-label") ?? ""}|${attr(e, "src") ?? ""}`
-      )
-    )
+      );
+    })
   ),
   // Links: text + destination + the heading they are read under. Class = (text, href).
   links: (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "a").filter((e) => attr(e, "href") !== void 0).map((e) => {
-      const href = attr(e, "href") ?? "";
-      const dl = DOWNLOAD_HREF.exec(href);
-      const note = dl ? ` download-format=${dl[1].toLowerCase()} (naming the format, e.g. "(PDF)", is a recommendation \u2014 not an NC)` : "";
-      return h(d, e, `text="${t(e)}" href="${href}" under="${nearestHeading(d, e) ?? ""}"${note}`, `link|${t(e)}|${href}`);
-    })
+    (d) => (
+      // The glossary's « lien »: <a href>, and an element with role="link" whose navigation a
+      // script handles.
+      d.elements.filter((e) => e.tag === "a" && attr(e, "href") !== void 0 || roleOf(e) === "link").map((e) => {
+        const href = attr(e, "href") ?? "";
+        const dl = DOWNLOAD_HREF.exec(href);
+        const note = dl ? ` download-format=${dl[1].toLowerCase()} (naming the format, e.g. "(PDF)", is a recommendation \u2014 not an NC)` : "";
+        const named3 = ["aria-label", "aria-labelledby", "title"].filter((a) => attr(e, a) !== void 0).map((a) => ` ${a}="${(attr(e, a) ?? "").slice(0, 60)}"`).join("");
+        const role = e.tag === "a" ? "" : ` role="link" on <${e.tag}>`;
+        return h(d, e, `text="${t(e)}"${named3}${role} href="${href}" under="${nearestHeading(d, e) ?? ""}"${note}`, `link|${t(e)}|${href}`);
+      })
+    )
   ),
   // Literal inline colour pairs — the statically visible subset of contrast.
   colourPairs: (docs) => docs.flatMap(
@@ -48103,21 +48450,41 @@ var SUBJECTS = {
   ),
   // Headings, labels, legends and captions — the text judged for descriptiveness.
   headings: (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption").map(
-      (e) => h(d, e, `<${e.tag}> text="${t(e)}"`, `heading|${e.tag}|${t(e)}`)
+    (d) => elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption").concat(d.elements.filter((e) => roleOf(e) === "heading")).map(
+      (e) => h(
+        d,
+        e,
+        `<${e.tag}${roleOf(e) === "heading" ? ` role="heading" aria-level="${attr(e, "aria-level") ?? ""}"` : ""}> text="${t(e)}"`,
+        `heading|${e.tag}|${attr(e, "aria-level") ?? ""}|${t(e)}`
+      )
     )
   ),
   // Form controls and the label/placeholder/instruction attached to them.
   controls: (docs) => docs.flatMap(
-    (d) => elementsByTag(d, ...CONTROL_TAGS).map(
-      (e) => h(
+    (d) => d.elements.filter(isFormField).map((e) => {
+      const native = CONTROL_TAGS.includes(e.tag) || FIELD_TAGS.has(e.tag);
+      return h(
         d,
         e,
-        `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" required=${attr(e, "required") !== void 0} describedby="${attr(e, "aria-describedby") ?? ""}"`,
-        `control|${e.tag}|${attr(e, "type") ?? ""}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`,
+        `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}${native ? "" : ` role="${roleOf(e)}"`}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" aria-labelledby="${attr(e, "aria-labelledby") ?? ""}" title="${attr(e, "title") ?? ""}" required=${attr(e, "required") !== void 0 || attr(e, "aria-required") === "true"} describedby="${attr(e, "aria-describedby") ?? ""}"`,
+        `control|${e.tag}|${attr(e, "type") ?? roleOf(e)}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`,
         labelElementTokens(d, e)
-      )
-    )
+      );
+    })
+  ),
+  // Buttons — the subject of RGAA 11.9 (« l'intitulé de chaque bouton est-il pertinent ? »),
+  // which used to read `controls` and so was never shown a single button.
+  buttons: (docs) => docs.flatMap(
+    (d) => d.elements.filter(isButton).map((e) => {
+      const name2 = e.tag === "input" ? attr(e, "value") ?? attr(e, "alt") ?? "" : t(e, 60);
+      const form = ancestors(e).some((a) => a.tag === "form") || attr(e, "form") !== void 0;
+      return h(
+        d,
+        e,
+        `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}${e.tag === "button" || e.tag === "input" ? "" : ' role="button"'}> label="${name2}" aria-label="${attr(e, "aria-label") ?? ""}" aria-labelledby="${attr(e, "aria-labelledby") ?? ""}" title="${attr(e, "title") ?? ""}"${form ? " (in a form)" : " (outside any form: RGAA 7.1 rather than 11.9, unless it submits one)"}`,
+        `button|${e.tag}|${name2}|${attr(e, "aria-label") ?? ""}`
+      );
+    })
   ),
   // The `autocomplete` token a field carries — the subject of "identify input purpose".
   autocomplete: (docs) => docs.flatMap(
@@ -48158,24 +48525,42 @@ var SUBJECTS = {
   ]),
   // Tables, with the parts that decide whether they are data or layout.
   tables: (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "table").map((e) => {
-      const caption = elementsByTag(d, "caption").find((c2) => ancestors(c2)[0] === e);
-      const ths = elementsByTag(d, "th").filter((x) => ancestors(x).includes(e));
-      return h(
-        d,
-        e,
-        `<table> caption="${caption ? t(caption, 40) : ""}" role="${attr(e, "role") ?? ""}" th=${ths.length} summary="${attr(e, "summary") ?? ""}" \u2014 data table or layout?`,
-        `table|${caption ? t(caption, 40) : ""}|${ths.length}|${attr(e, "role") ?? ""}`
-      );
-    })
+    (d) => (
+      // <table>, and the ARIA tables 5.6/5.7 name outright (role="columnheader"/"rowheader").
+      d.elements.filter((e) => e.tag === "table" || ["table", "grid", "treegrid"].includes(roleOf(e))).map((e) => {
+        const caption = elementsByTag(d, "caption").find((c2) => ancestors(c2)[0] === e);
+        const inside = (x) => ancestors(x).includes(e);
+        const ths = d.elements.filter((x) => inside(x) && (x.tag === "th" || ["columnheader", "rowheader"].includes(roleOf(x))));
+        const scoped = ths.filter((x) => attr(x, "scope") !== void 0).length;
+        const ids = ths.filter((x) => attr(x, "id") !== void 0).length;
+        const headers = d.elements.filter((x) => inside(x) && attr(x, "headers") !== void 0).length;
+        const named3 = attr(e, "aria-label") ?? attr(e, "aria-labelledby") ?? attr(e, "title") ?? "";
+        return h(
+          d,
+          e,
+          `<${e.tag}${e.tag === "table" ? "" : ` role="${roleOf(e)}"`}> caption="${caption ? t(caption, 40) : ""}" name="${named3.slice(0, 40)}" role="${attr(e, "role") ?? ""}" th=${ths.length} (scope=${scoped}, id=${ids}) cells-with-headers=${headers} summary="${attr(e, "summary") ?? ""}" describedby="${attr(e, "aria-describedby") ?? ""}" \u2014 data table or layout?`,
+          `table|${caption ? t(caption, 40) : ""}|${ths.length}|${attr(e, "role") ?? ""}`
+        );
+      })
+    )
   ),
   // Lists and definition lists, for the technique-consistency question.
-  lists: (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "ul", "ol", "dl").map((e) => {
+  lists: (docs) => docs.flatMap((d) => [
+    ...d.elements.filter((e) => ["ul", "ol", "dl"].includes(e.tag) || roleOf(e) === "list").map((e) => {
       const items = e.children.filter((c2) => c2.type === "element").length;
-      return h(d, e, `<${e.tag}> items=${items} first="${t(e, 40)}"`, `list|${e.tag}|${items}|${t(e, 40)}`);
-    })
-  ),
+      const kind = ["ul", "ol", "dl"].includes(e.tag) ? `<${e.tag}>` : `<${e.tag} role="list">`;
+      return h(d, e, `${kind} items=${items} first="${t(e, 40)}"`, `list|${e.tag}|${items}|${t(e, 40)}`);
+    }),
+    // …and the list drawn without list markup, which is the one 9.3.1 fails on.
+    ...d.elements.filter(looksLikeList).concat(bulletParagraphRuns(d)).map(
+      (e) => h(
+        d,
+        e,
+        `<${e.tag}> reads as a list (lines opening on a bullet or a numeral) but is not marked up as one: "${t(e, 60)}" \u2014 RGAA 9.3.1/9.3.2`,
+        `fakelist|${t(e, 60)}`
+      )
+    )
+  ]),
   // Landmarks and the navigation structure that lets a user bypass repeated blocks.
   landmarks: (docs) => docs.flatMap((d) => [
     ...elementsByTag(d, "header", "nav", "main", "footer", "aside", "form", "section").concat(d.elements.filter((e) => ["banner", "navigation", "main", "contentinfo", "complementary", "search", "region"].includes(attr(e, "role") ?? ""))).filter((e, i2, a) => a.indexOf(e) === i2).map(
@@ -48201,7 +48586,9 @@ var SUBJECTS = {
     ...elementsByTag(d, ...CONTROL_TAGS).filter(
       (e) => (attr(e, "type") ?? "") === "search" || /search|recherch/i.test(`${attr(e, "name") ?? ""} ${attr(e, "id") ?? ""} ${attr(e, "class") ?? ""}`)
     ).map((e) => h(d, e, `search field \u2014 one of the "multiple ways" mechanisms`, `search|${attr(e, "name") ?? ""}`)),
-    ...elementsByTag(d, "a").filter((e) => /plan-du-site|sitemap|site-map|index/i.test(attr(e, "href") ?? "")).map((e) => h(d, e, `site map / index link text="${t(e, 40)}" href="${attr(e, "href")}"`, `sitemap|${attr(e, "href")}`))
+    // A site map by its address or its name. `index` used to be in the address pattern, and
+    // every brand link to `index.html` was presented as the site map.
+    ...elementsByTag(d, "a").filter((e) => /plan[-_]du[-_]site|sitemap|site[-_]map/i.test(attr(e, "href") ?? "") || /\bplan du site\b|\bsite ?map\b/i.test(t(e, 60))).map((e) => h(d, e, `site map / index link text="${t(e, 40)}" href="${attr(e, "href")}"`, `sitemap|${attr(e, "href")}`))
   ]),
   // The repeated blocks whose ORDER must not change from page to page. One class per page so
   // "same relative order everywhere" is answerable from the evidence itself.
@@ -48226,12 +48613,23 @@ var SUBJECTS = {
       ...d.elements.filter(isRegion).map(
         (e) => h(d, e, `aria-live="${attr(e, "aria-live") ?? ""}" role="${attr(e, "role") ?? ""}"`, `live|${attr(e, "aria-live") ?? ""}|${attr(e, "role") ?? ""}`)
       ),
-      ...d.elements.filter((e) => !isRegion(e) && STATUS_CLASS.test(attr(e, "class") ?? "") && ancestors(e).some((a) => a.tag === "form")).map(
+      ...d.elements.filter((e) => !isRegion(e) && STATUS_CLASS.test(`${attr(e, "class") ?? ""} ${attr(e, "id") ?? ""}`) && e.tag !== "form").map(
         (e) => h(
           d,
           e,
-          `status-like class="${(attr(e, "class") ?? "").slice(0, 40)}" in a form \u2014 verify async feedback is announced (role=status/alert or aria-live)`,
-          `statusclass|${(attr(e, "class") ?? "").slice(0, 40)}`
+          `status-like <${e.tag}> id="${attr(e, "id") ?? ""}" class="${(attr(e, "class") ?? "").slice(0, 40)}" \u2014 verify async feedback is announced (role=status/alert or aria-live)`,
+          `statusclass|${(attr(e, "class") ?? "").slice(0, 40)}|${attr(e, "id") ?? ""}`
+        )
+      ),
+      // A script writing text into the page is where a status message comes from, marked up
+      // or not — and the unmarked one is precisely what 7.5 fails.
+      ...linesOf(d, /\.(?:textContent|innerText|innerHTML)\s*=|\.(?:append|prepend|insertAdjacentHTML|replaceChildren)\s*\(/).map(
+        (l) => hAt(
+          d,
+          l.line,
+          "script",
+          `script writes into the page \u2014 is this a status message, and is its container a live region? ${l.text}`,
+          `statuswrite|${l.text}`
         )
       )
     ];
@@ -48370,7 +48768,10 @@ var SUBJECTS = {
       return [hAt(d, 1, "doctype", `page="${page}" doctype=${dt === "" ? "(none on the page)" : dt}`, `doctype|${dt}`)];
     }
     const line = lineOf(d, /<!DOCTYPE/i);
-    if (line === void 0) return [];
+    if (line === void 0) {
+      const root = elementsByTag(d, "html")[0];
+      return root && d.kind === "html" ? [h(d, root, `source file declares NO doctype before <html>`, `doctype|none`)] : [];
+    }
     const decl = (d.source.split("\n")[line - 1] ?? "").trim().slice(0, 80);
     return [hAt(d, line, "doctype", `source file ${decl}`, `doctype|${decl}`)];
   }),
@@ -48396,16 +48797,58 @@ var SUBJECTS = {
     ...linesOf(d, /\b(?:draggable|onDragStart|useDrag|DndContext|react-beautiful-dnd|@dnd-kit)\b/).map(
       (l) => hAt(d, l.line, "drag", `drag interaction: ${l.text}`, `drag|${l.text}`)
     ),
-    ...linesOf(d, /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b/i).map(
-      (l) => hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`)
+    ...codeLinesOf(
+      d,
+      /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b|addEventListener\(\s*["'](?:touchmove|gesture\w*|pointermove)["']/i
+    ).map((l) => hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`)),
+    ...linesOf(d, /\b(?:devicemotion|deviceorientation|DeviceMotionEvent|DeviceOrientationEvent|Accelerometer|Gyroscope)\b/).map(
+      (l) => hAt(d, l.line, "motion", `device-motion input \u2014 is there an interface alternative, and can it be switched off? ${l.text}`, `devicemotion|${l.text}`)
     )
   ]),
-  // Single-character keyboard shortcuts.
-  shortcuts: (docs) => docs.flatMap(
-    (d) => linesOf(d, /\b(?:key|code|charCode)\s*===?\s*["'][a-zA-Z0-9]["']/).map(
-      (l) => hAt(d, l.line, "shortcut", `single-character key comparison: ${l.text}`, `shortcut|${l.text}`)
+  // RGAA 13.11 — « les actions déclenchées au moyen d'un dispositif de pointage sur un point
+  // unique de l'écran ». Its population is EVERY single-pointer action, and a page whose actions
+  // all fire on click conforms rather than being « non applicable »: the WCAG 2.5.2 predicate it
+  // maps onto only proves the absence of DOWN-event handlers. So it lists the scripted handlers
+  // and the native controls an action hangs on, which is what the adjudicator rules C from.
+  pointerActions: (docs) => docs.flatMap((d) => [
+    ...d.elements.filter((e) => Object.keys(e.attribs).some((k) => /^on(?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend)$/i.test(k))).map((e) => {
+      const events = Object.keys(e.attribs).filter((k) => /^on(?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend)$/i.test(k)).map((k) => k.toLowerCase());
+      const down = events.some((k) => /down|start/.test(k));
+      return h(
+        d,
+        e,
+        `<${e.tag}> ${events.join(",")} "${t(e, 40)}" \u2014 ${down ? "fires on the DOWN event: is it abortable or undoable?" : "fires on release"}`,
+        `pointer|${e.tag}|${events.join(",")}|${t(e, 40)}`
+      );
+    }),
+    ...linesOf(d, /addEventListener\(\s*["'](?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend)["']/).map(
+      (l) => hAt(d, l.line, "listener", `pointer listener \u2014 does the action fire on release, or can it be aborted/undone? ${l.text}`, `pointerlistener|${l.text}`)
+    ),
+    ...d.elements.filter((e) => isButton(e) && !Object.keys(e.attribs).some((k) => /^on/i.test(k))).slice(0, 1).map((e) => h(d, e, `native <${e.tag}> activation fires on release (click)`, `pointer|native|${e.tag}`))
+  ]),
+  // The scripts a page LOADS. The code-construct criteria (12.10 shortcuts, 13.1 time limits,
+  // 13.8 motion, 13.10–13.12 gestures, pointer and device motion) are decided on code the page
+  // pulls in from elsewhere as often as on its inline handlers, and the audit reads markup: so
+  // the adjudicator is given the address to open.
+  externalScripts: (docs) => docs.flatMap(
+    (d) => elementsByTag(d, "script").filter((e) => (attr(e, "src") ?? "").trim() !== "").map(
+      (e) => h(
+        d,
+        e,
+        `external script src="${attr(e, "src")}" \u2014 not part of this file: open it to look for the construct this criterion is about`,
+        `extscript|${attr(e, "src")}`
+      )
     )
   ),
+  // Single-character keyboard shortcuts.
+  shortcuts: (docs) => docs.flatMap((d) => [
+    ...linesOf(d, /\b(?:key|code|charCode)\s*===?\s*["'][a-zA-Z0-9]["']/).map(
+      (l) => hAt(d, l.line, "shortcut", `single-character key comparison: ${l.text}`, `shortcut|${l.text}`)
+    ),
+    // `accesskey` is a single-character shortcut the browser binds itself — and the thing this
+    // subject's « not applicable » sentence already claimed to have looked for.
+    ...d.elements.filter((e) => attr(e, "accesskey") !== void 0).map((e) => h(d, e, `accesskey="${attr(e, "accesskey")}" on <${e.tag}> "${t(e, 40)}"`, `accesskey|${attr(e, "accesskey")}`))
+  ]),
   // Instructions that lean on a sensory characteristic alone.
   sensoryText: (docs) => docs.flatMap(
     (d) => linesOf(
@@ -48416,8 +48859,8 @@ var SUBJECTS = {
   // Time limits: session expiry, meta refresh, timed redirects.
   timers: (docs) => docs.flatMap((d) => [
     ...d.elements.filter((e) => e.tag === "meta" && (attr(e, "http-equiv") ?? "").toLowerCase() === "refresh").map((e) => h(d, e, `<meta http-equiv="refresh" content="${attr(e, "content") ?? ""}">`, `metarefresh|${attr(e, "content") ?? ""}`)),
-    ...linesOf(d, /\b(?:setTimeout|setInterval)\s*\(/).map((l) => hAt(d, l.line, "timer", `timer: ${l.text}`, `timer|${l.text}`)),
-    ...linesOf(d, /\b(?:sessionTimeout|maxAge|expiresIn|session_max|idleTimeout)\b/i).map(
+    ...codeLinesOf(d, /\b(?:setTimeout|setInterval)\s*\(/).map((l) => hAt(d, l.line, "timer", `timer: ${l.text}`, `timer|${l.text}`)),
+    ...codeLinesOf(d, /\b(?:sessionTimeout|maxAge|expiresIn|session_max|idleTimeout)\b/i).map(
       (l) => hAt(d, l.line, "session", `session/expiry config: ${l.text}`, `session|${l.text}`)
     )
   ]),
@@ -48425,8 +48868,12 @@ var SUBJECTS = {
   motion: (docs) => docs.flatMap((d) => [
     ...elementsByTag(d, "marquee", "blink").map((e) => h(d, e, `<${e.tag}> \u2014 moving content with no native control`, `marquee|${e.tag}`)),
     ...d.elements.filter((e) => /animation|transition/.test(attr(e, "style") ?? "")).map((e) => h(d, e, `inline animation: ${(attr(e, "style") ?? "").slice(0, 80)}`, `inlineanim|${(attr(e, "style") ?? "").slice(0, 80)}`)),
-    ...linesOf(d, /\b(?:carousel|slider|autoplay|animation-iteration-count\s*:\s*infinite|requestAnimationFrame)\b/i).map(
+    ...codeLinesOf(d, /\b(?:carousel|carrousel|slider|autoplay|animation-iteration-count\s*:\s*infinite|requestAnimationFrame)\b/i).map(
       (l) => hAt(d, l.line, "motion", `moving/auto-updating content: ${l.text}`, `motion|${l.text}`)
+    ),
+    // An animated image is moving content too — the glossary names « un gif animé ».
+    ...elementsByTag(d, "img").filter((e) => /\.gif(?:[?#]|$)/i.test(attr(e, "src") ?? "")).map(
+      (e) => h(d, e, `<img src="${attr(e, "src")}"> \u2014 a GIF may be animated: does it move for more than 5 s, and can it be stopped?`, `gif|${attr(e, "src")}`)
     ),
     ...elementsByTag(d, "video", "audio").map(
       (e) => h(d, e, `<${e.tag} autoplay=${attr(e, "autoplay") !== void 0} controls=${attr(e, "controls") !== void 0}>`, `media|${e.tag}`)
@@ -48490,7 +48937,7 @@ var SUBJECTS = {
         `flash-css|${r.selector}|${declsText(r.decls)}`
       )
     ),
-    ...linesOf(d, /\b(?:flash|flashing|strobe|setInterval|requestAnimationFrame|classList\.(?:add|remove|replace|toggle))\b|animation(?:-name)?\s*:/i).filter((l) => !/^\s*(?:<!--|\/\/|\/\*)/.test(l.text)).map((l) => hAt(d, l.line, "flash-code", `possible scripted/CSS flash mechanism: ${l.text}`, `flash-code|${l.text}`))
+    ...codeLinesOf(d, /\b(?:flash|flashing|strobe|setInterval|requestAnimationFrame|classList\.(?:add|remove|replace|toggle))\b|animation(?:-name)?\s*:/i).filter((l) => !/^\s*(?:<!--|\/\/|\/\*)/.test(l.text)).map((l) => hAt(d, l.line, "flash-code", `possible scripted/CSS flash mechanism: ${l.text}`, `flash-code|${l.text}`))
   ]),
   // RGAA 7.2 — the script AND the alternative whose relevance must be judged. Inheriting
   // WCAG 4.1.2 used to hand this criterion every ARIA-bearing element in the repository while
@@ -48631,7 +49078,7 @@ var SUBJECTS = {
   ]),
   // Office documents offered for download — the subject of "is there an accessible version?".
   downloadDocs: (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "a").filter((e) => DOWNLOAD_HREF.test(attr(e, "href") ?? "")).map(
+    (d) => elementsByTag(d, "a").filter((e) => DOWNLOAD_HREF.test(attr(e, "href") ?? "") || attr(e, "download") !== void 0 && attr(e, "href") !== void 0).map(
       (e) => h(
         d,
         e,
@@ -48740,6 +49187,247 @@ var SUBJECTS = {
     }
     return out2;
   }),
+  // ---- RENDERING CRITERIA: what an adjudicator can cite ----------------------------------
+  //
+  // Measured on the documentation site, scanned: 3.2, 3.3, 7.3, 10.1, 10.4, 10.5, 10.9, 10.10,
+  // 10.11, 10.12, 10.14, 12.9, 12.11, 13.9 and 13.11 all reached the worklist with NOTHING to
+  // cite, so the gate refused every `C` and the only answers left were « undecidable » or an
+  // NA — the five wrong NAs of #61 (8.2, 10.11, 10.12, 12.8, 13.9) were written exactly there.
+  // Each of these criteria applies to every page that has content; what it is decided ON is the
+  // page's stylesheets, its declarations, and — once a browser has run — the measurements. The
+  // subjects below hand those over. None of them is an existence subject: their silence proves
+  // nothing, and they never close a criterion on their own.
+  // RGAA 9.4 — quotations: the <q>/<blockquote> that mark them, and the text that quotes
+  // without them (« … », “…”, "…" of a dozen characters or more). It inherited `structure` —
+  // headings, tables and lists — which never held a quotation.
+  quotes: (docs) => docs.flatMap((d) => [
+    ...elementsByTag(d, "q", "blockquote").map((e) => h(d, e, `<${e.tag}> "${t(e, 80)}" \u2014 is it a quotation?`, `quote|${e.tag}|${t(e, 60)}`)),
+    ...d.elements.filter(
+      (e) => !["q", "blockquote", "script", "style", "code", "pre"].includes(e.tag) && e.children.some((c2) => c2.type === "text" && /«[^»]{12,}»|“[^”]{12,}”|"[^"<>]{12,}"/.test(c2.data))
+    ).slice(0, 40).map((e) => h(d, e, `quoted text without <q>/<blockquote>: "${t(e, 80)}" \u2014 a citation?`, `quotetext|${t(e, 60)}`))
+  ]),
+  // RGAA 13.5/13.6 — « contenu cryptique (art ASCII, émoticône, syntaxe cryptique) ». It used
+  // to inherit `images` through WCAG 1.1.1, so a page with an emoticon and no image closed both
+  // criteria « non applicable » over the very content they are about.
+  cryptic: (docs) => docs.flatMap(
+    (d) => d.elements.filter((e) => !["script", "style", "title", "head"].includes(e.tag)).filter((e) => {
+      const own = e.children.filter((c2) => c2.type === "text").map((c2) => c2.data).join(" ");
+      return CRYPTIC.test(own) || e.tag === "pre" && /[^\w\s]{6,}/.test(own);
+    }).slice(0, 40).map(
+      (e) => h(
+        d,
+        e,
+        `cryptic content: "${t(e, 60)}" title="${attr(e, "title") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" \u2014 is an alternative given (title or adjacent definition)?`,
+        `cryptic|${t(e, 40)}`
+      )
+    )
+  ),
+  // Time-based media as the 1.2.x applicability predicate sees it (src/audit.ts hasMedia): the
+  // media elements, and an embed or iframe that points at a player. RGAA 4.7 (« chaque média
+  // temporel est-il clairement identifiable ? ») used to inherit `images` from WCAG 1.1.1 and
+  // closed NA on a page with a video and no image; 4.1–4.6 were never shown a YouTube iframe.
+  temporalMedia: (docs) => docs.flatMap(
+    (d) => d.elements.filter(
+      (e) => ["video", "audio"].includes(e.tag) || ["object", "embed"].includes(e.tag) && embeddedMediaKind(e) !== "non-temporal" || e.tag === "iframe" && TEMPORAL_MEDIA_HOST.test(`${attr(e, "src") ?? ""} ${attr(e, "title") ?? ""} ${attr(e, "allow") ?? ""}`)
+    ).map((e) => {
+      const tracks = elementsByTag(d, "track").filter((x) => ancestors(x).includes(e)).map((x) => `${attr(x, "kind") ?? "subtitles"}:${attr(x, "srclang") ?? ""}`);
+      return h(
+        d,
+        e,
+        `<${e.tag}> src="${(attr(e, "src") ?? attr(e, "data") ?? "").slice(0, 80)}" controls=${attr(e, "controls") !== void 0} autoplay=${attr(e, "autoplay") !== void 0} tracks=[${tracks.join(", ")}] heading="${nearestHeading(d, e) ?? ""}" \u2014 is it identified by adjacent text, and does it have its transcript/captions/description?`,
+        `tmedia|${e.tag}|${attr(e, "src") ?? attr(e, "data") ?? ""}`
+      );
+    })
+  ),
+  // The page's styling, as a whole: every stylesheet, the inline style attributes, and the
+  // captured rules. Anchored on the document root too, so a page with NO author CSS still has
+  // its one citable fact (« default rendering, nothing overrides the user's settings »).
+  stylesheets: (docs) => docs.flatMap((d) => {
+    const out2 = [];
+    const inline = d.elements.filter((e) => (attr(e, "style") ?? "").trim() !== "");
+    const sheets = elementsByTag(d, "style");
+    const links = elementsByTag(d, "link").filter((l) => (attr(l, "rel") ?? "").toLowerCase().split(/\s+/).includes("stylesheet"));
+    const captured = d.signals?.css?.rules.length;
+    const root = elementsByTag(d, "html")[0];
+    if (root)
+      out2.push(
+        h(
+          d,
+          root,
+          `page="${pageOfDoc(d.file) ?? "source"}" styling: ${sheets.length} <style>, ${links.length} linked stylesheet(s), ${inline.length} inline style attribute(s)${captured !== void 0 ? `, ${captured} captured rule(s)${d.signals?.css?.unreadable ? ` (${d.signals.css.unreadable} sheet(s) unreadable)` : ""}` : ""}`,
+          `styling|${sheets.length}|${links.length}|${inline.length > 0}`
+        )
+      );
+    for (const s of sheets) out2.push(h(d, s, `<style> block: ${t(s, 100)}`, `stylesheet|inline|${t(s, 60)}`));
+    for (const l of links)
+      out2.push(h(d, l, `linked stylesheet href="${attr(l, "href") ?? ""}" \u2014 open it to read the rules`, `stylesheet|${attr(l, "href") ?? ""}`));
+    return out2;
+  }),
+  // Colour declarations in the page's stylesheets — 3.2/3.3 contrast and 10.5's « déclarations
+  // CSS de couleurs de fond et de police ». Inline `style` colours are `colourPairs`.
+  colourDecls: (docs) => docs.flatMap((d) => [
+    ...linesOf(d, /(?:^|[\s;{])(?:color|background(?:-color)?)\s*:\s*[^;}"'<]+/i, 60).filter((l) => !/\bstyle\s*=/.test(l.text)).map((l) => hAt(d, l.line, "css", `colour declaration: ${l.text}`, `colourdecl|${l.text}`)),
+    ...(d.signals?.css?.rules ?? []).filter((r) => r.decls.color !== void 0 || r.decls.backgroundColor !== void 0 || r.decls.background !== void 0).slice(0, 60).map(
+      (r) => hAt(
+        d,
+        1,
+        `css:${r.selector}`,
+        `stylesheet colours: ${r.selector.slice(0, 60)} { color: ${r.decls.color ?? "\u2014"}; background: ${r.decls.backgroundColor ?? r.decls.background ?? "\u2014"} }`,
+        `colourcss|${r.selector}|${r.decls.color ?? ""}|${r.decls.backgroundColor ?? r.decls.background ?? ""}`
+      )
+    )
+  ]),
+  // The text colour pairs the BROWSER computed, with their ratio — the passing half of what
+  // the rendered contrast rule measures (it reports only failures).
+  computedColours: (docs) => docs.flatMap((d) => {
+    const seen = /* @__PURE__ */ new Set();
+    const out2 = [];
+    for (const p of computedTextPairs(d)) {
+      const fg = `rgb(${p.fg.r}, ${p.fg.g}, ${p.fg.b})`;
+      const bg = `rgb(${p.bg.r}, ${p.bg.g}, ${p.bg.b})`;
+      const key2 = `${fg}|${bg}|${p.large}`;
+      if (seen.has(key2)) continue;
+      seen.add(key2);
+      out2.push(
+        h(
+          d,
+          p.el,
+          `computed text colour ${fg} on ${bg} \u2014 ${p.ratio.toFixed(2)}:1 (${p.large ? "large text, threshold 3:1" : "threshold 4.5:1"})`,
+          `computed|${key2}`
+        )
+      );
+    }
+    return out2;
+  }),
+  // RGAA 10.4 — text resized to 200 %. What clips it: a fixed height with overflow hidden, a
+  // font size frozen in px, and a viewport that forbids zoom.
+  zoom: (docs) => docs.flatMap((d) => [
+    ...viewportMeta(d),
+    ...cssEvidence(
+      d,
+      /\b(?:max-)?height\s*:\s*\d+(?:\.\d+)?px|\boverflow(?:-y)?\s*:\s*(?:hidden|clip)|\bfont-size\s*:\s*\d+(?:\.\d+)?px/i,
+      (r) => Boolean((r.decls.height ?? r.decls.maxHeight ?? "").endsWith("px") || /hidden|clip/.test(r.decls.overflow ?? r.decls.overflowY ?? "")),
+      "zoom"
+    )
+  ]),
+  // RGAA 10.11 — 320 CSS px without horizontal scrolling. What forces it: a fixed or minimum
+  // width over 320px, unbreakable lines, preformatted blocks and wide tables (the last two being
+  // exactly what the criterion's « cas particuliers » exempt — they still have to be shown).
+  reflow: (docs) => docs.flatMap((d) => [
+    ...viewportMeta(d),
+    ...cssEvidence(
+      d,
+      /\b(?:min-)?width\s*:\s*(?:3[2-9]\d|[4-9]\d\d|\d{4,})px|\bwhite-space\s*:\s*(?:nowrap|pre)\b|\boverflow-x\s*:/i,
+      (r) => Boolean(/^(?:3[2-9]\d|[4-9]\d\d|\d{4,})px$/.test((r.decls.width ?? r.decls.minWidth ?? "").trim()) || /nowrap|pre/.test(r.decls.whiteSpace ?? "")),
+      "reflow"
+    ),
+    ...elementsByTag(d, "pre", "table").map(
+      (e) => h(d, e, `<${e.tag}> \u2014 two-dimensional content (an exempted case of 10.11 only if its layout requires it)`, `reflowblock|${e.tag}|${t(e, 30)}`)
+    )
+  ]),
+  // RGAA 10.12 — the four text-spacing overrides. What resists them: a spacing declared
+  // !important (the decisive rules), any spacing at all, and a box too small to grow.
+  textSpacing: (docs) => docs.flatMap(
+    (d) => cssEvidence(
+      d,
+      /\b(?:line-height|letter-spacing|word-spacing)\s*:|\b(?:max-)?height\s*:\s*\d+(?:\.\d+)?px/i,
+      (r) => r.decls.lineHeight !== void 0 || r.decls.letterSpacing !== void 0 || r.decls.wordSpacing !== void 0 || (r.decls.height ?? "").endsWith("px"),
+      "spacing"
+    )
+  ),
+  // RGAA 13.9 — the orientation of the screen. What locks it: an orientation media query that
+  // hides or rotates content, a script calling `screen.orientation.lock`, a manifest pinning it.
+  orientation: (docs) => docs.flatMap((d) => [
+    ...viewportMeta(d),
+    ...linesOf(d, /@media[^{]*\borientation\b|\borientation\.lock\s*\(|\block(?:Orientation)?\s*\(\s*["'](?:portrait|landscape)|"orientation"\s*:/i).map(
+      (l) => hAt(d, l.line, "orientation", `orientation-dependent code: ${l.text}`, `orientation|${l.text}`)
+    ),
+    ...(d.signals?.css?.rules ?? []).filter((r) => /orientation/i.test(r.media ?? "")).slice(0, 30).map(
+      (r) => hAt(
+        d,
+        1,
+        `css:${r.selector}`,
+        `@media ${r.media} { ${r.selector.slice(0, 50)} { ${declsText(r.decls)} } }`,
+        `orientationcss|${r.media}|${r.selector}`
+      )
+    )
+  ]),
+  // RGAA 10.7 — focus visibility: every rule keyed on a focus state, and what it does.
+  focusStyles: (docs) => docs.flatMap((d) => [
+    ...linesOf(d, /:focus(?:-visible|-within)?\b[^{]*\{?[^}]*/).map(
+      (l) => hAt(
+        d,
+        l.line,
+        "css",
+        `focus-state rule${/outline\s*:\s*(?:none|0)\b/.test(l.text) ? " REMOVING the outline \u2014 is another indicator put back?" : ""}: ${l.text}`,
+        `focusrule|${l.text}`
+      )
+    ),
+    ...(d.signals?.css?.rules ?? []).filter((r) => /:focus/.test(r.selector)).slice(0, 40).map(
+      (r) => hAt(
+        d,
+        1,
+        `css:${r.selector}`,
+        `captured focus rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }`,
+        `focuscss|${r.selector}|${declsText(r.decls)}`
+      )
+    )
+  ]),
+  // RGAA 12.8 — the tab order, as the DOM gives it: what Tab reaches, in order. One anchor per
+  // document, on the first focusable, so the population is one decision per page.
+  tabOrder: (docs) => docs.flatMap((d) => {
+    const focusables = d.elements.filter(isTabbable);
+    if (!focusables.length) return [];
+    const order = focusables.slice(0, 15).map(
+      (e) => `${e.tag}${attr(e, "tabindex") !== void 0 ? `[tabindex=${attr(e, "tabindex")}]` : ""} "${t(e, 20) || attr(e, "aria-label") || attr(e, "name") || ""}"`
+    ).join(" \u2192 ");
+    return [
+      h(
+        d,
+        focusables[0],
+        `page="${pageOfDoc(d.file) ?? "source"}" tab order (DOM): ${order}${focusables.length > 15 ? ` \u2026 (${focusables.length} focusable)` : ""} \u2014 does it follow the reading order?`,
+        `taborder|${pageOfDoc(d.file) ?? d.file}`
+      )
+    ];
+  }),
+  // RGAA 8.2 — the generated source, judged against the W3C checker. The engine's own validity
+  // rules report the failures; this is what the adjudicator rules a `C` on: the document, its
+  // doctype, and what a validator would flag first.
+  markupValidity: (docs) => docs.flatMap((d) => {
+    const out2 = [];
+    const root = elementsByTag(d, "html")[0];
+    const page = pageOfDoc(d.file);
+    const dt = page !== void 0 ? d.signals?.doctype : /<!doctype[^>]*>/i.exec(d.source.slice(0, 2e3))?.[0];
+    if (root)
+      out2.push(
+        h(
+          d,
+          root,
+          `page="${page ?? "source"}" doctype=${dt === void 0 ? "(not recorded)" : dt === "" ? "(none)" : dt} \u2014 validate the GENERATED source (W3C Nu checker): tags, nesting, attributes, unique ids`,
+          `markup|${dt ?? ""}`
+        )
+      );
+    const byId2 = /* @__PURE__ */ new Map();
+    for (const e of d.elements) {
+      const id = attr(e, "id");
+      if (!id || id.includes("{")) continue;
+      byId2.set(id, [...byId2.get(id) ?? [], e]);
+    }
+    for (const [id, els] of byId2) if (els.length > 1) out2.push(h(d, els[1], `id="${id}" used ${els.length} times`, `dupid|${id}`));
+    for (const e of d.elements) {
+      if ((e.tag === "a" || e.tag === "button") && ancestors(e).some((a) => a.tag === "a" || a.tag === "button"))
+        out2.push(h(d, e, `<${e.tag}> nested inside an interactive element \u2014 not permitted`, `nesting|${e.tag}`));
+    }
+    return out2;
+  }),
+  // Instructions — what RGAA 10.9/10.10 actually read. `sensoryText` keeps the leads that
+  // already lean on a sensory word; this adds every instruction, because a conformity is ruled
+  // on the ones that name their target too, and a page with none of the leads had nothing to cite.
+  instructions: (docs) => docs.flatMap(
+    (d) => d.elements.filter(
+      (e) => !["script", "style", "title", "head", "html", "body"].includes(e.tag) && e.children.some((c2) => c2.type === "text" && INSTRUCTION.test(c2.data))
+    ).slice(0, 40).map((e) => h(d, e, `instruction: "${t(e, 100)}" \u2014 does it rely on shape, size or position alone?`, `instruction|${t(e, 80)}`))
+  ),
   // Content pinned over the page — what can obscure a focused element.
   stickies: (docs) => docs.flatMap((d) => [
     ...d.elements.filter((e) => /position\s*:\s*(?:fixed|sticky)/.test(attr(e, "style") ?? "")).map((e) => h(d, e, `pinned element (inline): ${(attr(e, "style") ?? "").slice(0, 60)} \u2014 can it cover a focused element?`, `sticky|${selectorFor(e)}`)),
@@ -48754,6 +49442,7 @@ var SUBJECTS = {
     )
   ])
 };
+for (const sc of MEASURED_SCS) SUBJECTS[`rendered:${sc}`] = measured(sc);
 var SC_SUBJECTS = {
   "1.1.1": ["images"],
   "1.2.1": ["motion"],
@@ -48824,6 +49513,10 @@ var PACK_SUBJECTS = {
     // Theme 6 — links.
     "6.1": ["links"],
     "6.2": ["links"],
+    // Theme 1 — the images themselves: 1.2 and 1.9 inherited `aria` from WCAG 4.1.2 too, and were
+    // handed every <nav> and aria-pressed button of the page beside the images they are about.
+    "1.2": ["images"],
+    "1.9": ["images"],
     // Theme 2 — frames. Both criteria are about the frame and its title, and nothing else.
     "2.1": ["frames"],
     "2.2": ["frames"],
@@ -48834,6 +49527,9 @@ var PACK_SUBJECTS = {
     // 8.4 asks about the CODE, 8.3 about the element — see `declaredLang`.
     "8.4": ["declaredLang"],
     "8.5": ["docTitle"],
+    // 8.2 inherited `aria` from WCAG 4.1.2: the ARIA attributes, and on a page without any, NOTHING
+    // — which is how « non applicable » got written for a criterion every page is subject to.
+    "8.2": ["markupValidity", "aria"],
     "8.6": ["docTitle"],
     "8.7": ["langParts"],
     "8.8": ["langParts"],
@@ -48843,7 +49539,7 @@ var PACK_SUBJECTS = {
     "9.1": ["headings"],
     "9.2": ["landmarks"],
     "9.3": ["lists"],
-    "9.4": ["structure"],
+    "9.4": ["quotes"],
     // Theme 11 — forms.
     "11.1": ["controls"],
     "11.2": ["controls"],
@@ -48853,7 +49549,10 @@ var PACK_SUBJECTS = {
     "11.6": ["controls", "landmarks"],
     "11.7": ["controls", "landmarks"],
     "11.8": ["controls"],
-    "11.9": ["controls"],
+    // « Bouton (formulaire) » — the buttons, which `controls` never held.
+    // Fields stay listed beside the buttons so an audit recorded before `buttons` existed (whose
+    // subjectsSeen cannot contain it) is never read as « no button anywhere ».
+    "11.9": ["buttons", "controls"],
     "11.10": ["controls", "errors"],
     "11.11": ["errors", "controls"],
     "11.12": ["controls", "errors"],
@@ -48863,32 +49562,43 @@ var PACK_SUBJECTS = {
     "12.2": ["repeatedBlocks"],
     "12.3": ["navMechanisms"],
     "12.4": ["repeatedBlocks", "navMechanisms"],
-    "12.5": ["repeatedBlocks"],
+    // The search engine is the criterion's subject, and `navMechanisms` is what finds it.
+    "12.5": ["repeatedBlocks", "navMechanisms"],
     "12.6": ["landmarks"],
     "12.7": ["landmarks"],
-    "12.8": ["focusOrder"],
-    "12.9": ["focusables", "pointerHandlers"],
-    "12.10": ["shortcuts"],
-    "12.11": ["additionalContent", "pointerHandlers", "focusables"],
+    "12.8": ["focusOrder", "tabOrder"],
+    "12.9": ["focusables", "rendered:2.1.2", "pointerHandlers", "tabOrder"],
+    "12.10": ["shortcuts", "externalScripts"],
+    "12.11": ["additionalContent", "rendered:1.4.13", "pointerHandlers", "focusables"],
     // Theme 4 — multimedia. 4.10 (is automatically-triggered sound controllable?) maps onto
     // WCAG 1.4.2, which is `static` and therefore has no subject of its own — but the pack
     // flags 4.10 `judgment`, so judgmentGuard reopens it and it would arrive with nothing.
     "4.10": ["motion"],
+    // Theme 4's own population, so a YouTube iframe is shown and 4.7 is not closed by the
+    // absence of IMAGES (its WCAG mapping, 1.1.1).
+    "4.1": ["temporalMedia", "motion"],
+    "4.2": ["temporalMedia", "motion"],
+    "4.3": ["temporalMedia", "motion"],
+    "4.4": ["temporalMedia", "motion"],
+    "4.5": ["temporalMedia", "motion"],
+    "4.6": ["temporalMedia", "motion"],
+    "4.7": ["temporalMedia"],
+    "4.13": ["temporalMedia", "nonTemporalMediaControls"],
     // 4.11/4.12 map to the same keyboard SCs but ask about disjoint media populations.
     // Inheriting the union handed both criteria every pointer handler and focusable in scope.
     "4.11": ["temporalMediaControls"],
     "4.12": ["nonTemporalMediaControls"],
     // Theme 3 — colour. The question is about what colour alone conveys, not the outline.
     "3.1": ["colourPairs", "links"],
-    "3.2": ["colourPairs"],
-    "3.3": ["colourPairs"],
+    "3.2": ["colourPairs", "computedColours", "colourDecls", "rendered:1.4.3", "stylesheets"],
+    "3.3": ["colourPairs", "colourDecls", "rendered:1.4.11", "controls", "buttons", "stylesheets"],
     // Theme 7 — scripts. "Is each script operable by keyboard AND pointer?" is about the
     // handlers and the focusable surface, never about the page's headings and lists.
     "7.1": ["aria", "pointerHandlers"],
     "7.2": ["scriptAlternatives"],
-    "7.3": ["pointerHandlers", "focusables"],
+    "7.3": ["pointerHandlers", "pointerActions", "focusables"],
     "7.4": ["contextChange"],
-    "7.5": ["liveRegions"],
+    "7.5": ["liveRegions", "rendered:4.1.3"],
     // Theme 10 — presentation. These ask what survives when CSS is off, what the stylesheet
     // reorders, and what is hidden on purpose.
     //
@@ -48897,29 +49607,39 @@ var PACK_SUBJECTS = {
     // markup — not reading order. `readingOrder` harvested nothing for it, so the criterion
     // reached the adjudicator with an empty brief and could not be ruled on at all. The engine
     // decides it now (src/rules/presentation.ts); this names what a reader would look at.
-    "10.1": ["presentationalMarkup"],
+    "10.1": ["presentationalMarkup", "stylesheets"],
     "10.2": ["hiddenContent", "structure"],
     "10.3": ["readingOrder", "structure"],
-    "10.4": ["readingOrder"],
+    // 10.4/10.11/10.12/13.9 used to inherit `readingOrder` from their WCAG mapping — `order`,
+    // flex-reverse and absolute positioning — which says nothing about zoom, reflow, spacing or
+    // orientation, harvested nothing on an ordinary page, and left an NA as the only answer.
+    "10.4": ["zoom", "rendered:1.4.4", "stylesheets"],
+    "10.5": ["colourDecls", "colourPairs", "stylesheets"],
+    "10.6": ["links", "rendered:1.4.1", "colourDecls"],
+    "10.7": ["focusStyles", "rendered:2.4.7", "stylesheets"],
     "10.8": ["hiddenContent", "aria"],
-    "10.9": ["sensoryText"],
-    "10.10": ["sensoryText"],
-    "10.11": ["readingOrder"],
-    "10.12": ["readingOrder"],
-    "10.13": ["aria", "stickies"],
-    "10.14": ["additionalContent", "focusables", "pointerHandlers"],
+    "10.9": ["sensoryText", "instructions"],
+    "10.10": ["sensoryText", "instructions"],
+    "10.11": ["reflow", "rendered:1.4.10", "stylesheets"],
+    "10.12": ["textSpacing", "rendered:1.4.12", "stylesheets"],
+    // 1.4.13's own subject was lost here: `additionalContent` is what 10.13 is about.
+    "10.13": ["additionalContent", "rendered:1.4.13", "aria", "stickies"],
+    "10.14": ["additionalContent", "rendered:1.4.13", "focusables", "pointerHandlers"],
     // Theme 13 — consultation.
-    "13.1": ["timers"],
+    "13.1": ["timers", "externalScripts"],
     // 13.2 asks about a window OPENING, which is not the context-change question it inherited
     // from WCAG 3.2.1. See `newWindow`.
     "13.2": ["newWindow"],
     "13.3": ["downloadDocs"],
     "13.4": ["downloadDocs"],
+    "13.5": ["cryptic"],
+    "13.6": ["cryptic"],
     "13.7": ["flashes"],
-    "13.8": ["motion", "timers"],
-    "13.9": ["readingOrder"],
-    "13.10": ["pointerHandlers"],
-    "13.11": ["pointerHandlers"]
+    "13.8": ["motion", "timers", "externalScripts"],
+    "13.9": ["orientation", "rendered:1.3.4", "stylesheets"],
+    "13.10": ["pointerHandlers", "externalScripts"],
+    "13.12": ["pointerHandlers", "externalScripts"],
+    "13.11": ["pointerActions", "pointerHandlers", "externalScripts"]
   }
 };
 var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set([
@@ -48932,6 +49652,10 @@ var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set([
   "errors",
   "frames",
   "downloadDocs",
+  "buttons",
+  // Same elements as the 1.2.x applicability predicate, so « no media » means the same thing
+  // whichever layer concludes it.
+  "temporalMedia",
   "newWindow",
   "contextChange",
   "scriptAlternatives",
@@ -48939,6 +49663,10 @@ var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set([
   // `<html>` element is always there; the attribute is what this subject looks for.
   "declaredLang"
 ]);
+var ALWAYS_APPLICABLE = {
+  rgaa: /* @__PURE__ */ new Set(["8.1", "8.2", "8.3", "8.5", "10.1", "10.3", "10.4", "10.11", "10.12", "12.8", "13.9"])
+};
+var PRESENCE_SUBJECTS = /* @__PURE__ */ new Set(["pointerActions", "cryptic"]);
 var subjectsForSc = (sc) => SC_SUBJECTS[sc] ?? [];
 var ownPackSubjects = (standard, id) => PACK_SUBJECTS[standard]?.[id];
 function subjectsForPackCriterion(standard, id, scs) {
@@ -48954,7 +49682,7 @@ function subjectsAbsent(ids, seen) {
 }
 function subjectsPresentIn(doc, skip) {
   const out2 = [];
-  for (const id of EXISTENCE_SUBJECTS) {
+  for (const id of [...EXISTENCE_SUBJECTS, ...PRESENCE_SUBJECTS]) {
     if (skip.has(id)) continue;
     const run2 = SUBJECTS[id];
     if (!run2) continue;
@@ -49052,6 +49780,13 @@ function nameFromContent(el, doc, includeHiddenSubtree = false) {
       return;
     }
     if (!includeHiddenSubtree && (isLocallyDisplayHidden(n) || attr(n, "aria-hidden") === "true")) return;
+    if (!isPresentational(n)) {
+      const own = (attr(n, "aria-label") ?? "").trim();
+      if (own && !own.includes("{")) {
+        out2 += ` ${own} `;
+        return;
+      }
+    }
     if (n.tag === "img") {
       const a = embeddedImageName(n, doc);
       if (a) out2 += " " + a;
@@ -49136,10 +49871,10 @@ function accessibleName(el, doc) {
   if (content) return content;
   return (attr(el, "title") ?? "").trim();
 }
-var FIELD_TAGS = /* @__PURE__ */ new Set(["input", "select", "textarea"]);
+var FIELD_TAGS2 = /* @__PURE__ */ new Set(["input", "select", "textarea"]);
 var NON_LABELABLE_INPUT = /* @__PURE__ */ new Set(["hidden", "submit", "reset", "button", "image"]);
-function isFormField(el) {
-  if (!FIELD_TAGS.has(el.tag)) return false;
+function isFormField2(el) {
+  if (!FIELD_TAGS2.has(el.tag)) return false;
   if (hasAttr(el, "hidden")) return false;
   if (el.tag === "input") {
     const type = (attr(el, "type") ?? "text").toLowerCase();
@@ -50286,8 +51021,14 @@ function titleSetByFramework(doc) {
   if (doc.kind === "html") return false;
   return NEXT_METADATA.test(doc.source) && /\btitle\s*:/.test(doc.source);
 }
-function declaredLanguage(el) {
-  return (attr(el, "lang") ?? "").trim() || (attr(el, "xml:lang") ?? "").trim();
+function doctypeOf(doc) {
+  if (doc.signals?.doctype !== void 0) return doc.signals.doctype;
+  return /<!doctype[^>]*>/i.exec(doc.source.slice(0, 2e3))?.[0] ?? "";
+}
+function declaredLanguage(doc, el) {
+  const lang = (attr(el, "lang") ?? "").trim();
+  if (lang) return lang;
+  return /XHTML\s+1\.1/i.test(doctypeOf(doc)) ? (attr(el, "xml:lang") ?? "").trim() : "";
 }
 function spreadMayDeclareLanguage(el) {
   return dynamicSpreadMayProvide(el, ["lang", "xml:lang"]);
@@ -50300,7 +51041,7 @@ var htmlLangMissing = {
   run(doc) {
     const html = elementsByTag(doc, "html")[0];
     if (!html) return [];
-    const lang = declaredLanguage(html);
+    const lang = declaredLanguage(doc, html);
     if (lang) return [];
     if (spreadMayDeclareLanguage(html)) return [];
     return [
@@ -50320,14 +51061,14 @@ var documentLanguageMissing = {
   run(doc) {
     const html = elementsByTag(doc, "html")[0];
     if (!html) return [];
-    if (declaredLanguage(html)) return [];
+    if (declaredLanguage(doc, html)) return [];
     if (spreadMayDeclareLanguage(html)) return [];
     const ignored = /* @__PURE__ */ new Set(["script", "style", "title", "noscript", "template", "svg"]);
     const uncovered = doc.elements.find((el) => {
       if (ignored.has(el.tag) || isDisplayHidden(el)) return false;
       const hasDirectText3 = el.children.some((child) => child.type === "text" && child.data.trim() !== "");
       if (!hasDirectText3) return false;
-      return ![el, ...ancestors(el)].some((node) => declaredLanguage(node) !== "");
+      return ![el, ...ancestors(el)].some((node) => declaredLanguage(doc, node) !== "");
     });
     if (!uncovered) return [];
     return [{ criteriaId: "3.1.1", el: uncovered, msgId: "document-language-missing" }];
@@ -50415,6 +51156,32 @@ function armsExclusive(a, b) {
   }
   return false;
 }
+var VUE_IF = "v-if";
+var VUE_ARMS = ["v-else-if", "v-else"];
+function vueArms(el) {
+  const out2 = /* @__PURE__ */ new Map();
+  for (const node of [el, ...ancestors(el)]) {
+    const isArm = VUE_ARMS.some((a) => node.attribs[a] !== void 0);
+    if (node.attribs[VUE_IF] === void 0 && !isArm) continue;
+    const siblings = (node.parent?.children ?? []).filter((c2) => c2.type === "element");
+    let i2 = siblings.indexOf(node);
+    let arm = 0;
+    while (i2 > 0 && VUE_ARMS.some((a) => siblings[i2].attribs[a] !== void 0)) {
+      i2--;
+      arm++;
+    }
+    if (siblings[i2]?.attribs[VUE_IF] === void 0) continue;
+    out2.set(siblings[i2].start, arm);
+  }
+  return out2;
+}
+function sfcArmsExclusive(a, b) {
+  const ma = vueArms(a);
+  if (!ma.size) return false;
+  const mb2 = vueArms(b);
+  for (const [head, arm] of ma) if (mb2.has(head) && mb2.get(head) !== arm) return true;
+  return false;
+}
 var duplicateId = {
   id: "duplicate-id",
   criteria: ["4.1.2"],
@@ -50429,7 +51196,7 @@ var duplicateId = {
         byId2.set(id, [el]);
         continue;
       }
-      if (prior.some((p) => !armsExclusive(p.branchArm, el.branchArm))) {
+      if (prior.some((p) => !armsExclusive(p.branchArm, el.branchArm) && !sfcArmsExclusive(p, el))) {
         out2.push({ criteriaId: "4.1.2", el, msgId: "duplicate-id", params: { id } });
       }
       prior.push(el);
@@ -50617,6 +51384,9 @@ var h1Multiple = {
   }
 };
 var ALLOWED_IN_LIST = /* @__PURE__ */ new Set(["li", "script", "template", "slot"]);
+function rendersElsewhere(tag) {
+  return !isIntrinsic(tag) || tag.includes("-") || tag === "component";
+}
 var listStructure = {
   id: "list-structure",
   criteria: ["1.3.1"],
@@ -50625,7 +51395,7 @@ var listStructure = {
     const out2 = [];
     for (const el of doc.elements) {
       if (el.tag === "ul" || el.tag === "ol") {
-        const bad = el.children.find((c2) => c2.type === "element" && isIntrinsic(c2.tag) && !ALLOWED_IN_LIST.has(c2.tag));
+        const bad = el.children.find((c2) => c2.type === "element" && !rendersElsewhere(c2.tag) && !ALLOWED_IN_LIST.has(c2.tag));
         if (bad && bad.type === "element") {
           out2.push({
             criteriaId: "1.3.1",
@@ -50637,7 +51407,7 @@ var listStructure = {
       } else if (el.tag === "li") {
         const parent = el.parent;
         if (!parent || ["ul", "ol", "menu"].includes(parent.tag)) continue;
-        if (parent.tag === "template" || ancestors(el).some((a) => a.tag === "template" || a.tag !== "#fragment" && !isIntrinsic(a.tag))) continue;
+        if (parent.tag === "template" || ancestors(el).some((a) => a.tag === "template" || a.tag !== "#fragment" && rendersElsewhere(a.tag))) continue;
         out2.push({
           criteriaId: "1.3.1",
           el,
@@ -51032,7 +51802,7 @@ function hasIconChild(el) {
     return false;
   });
 }
-var isButton = (el) => {
+var isButton2 = (el) => {
   if (el.tag === "button") return true;
   if ((attr(el, "role") ?? "") === "button") return true;
   if (el.tag === "input") return isButtonInput(el) || (attr(el, "type") ?? "").trim().toLowerCase() === "image";
@@ -51051,7 +51821,7 @@ function formOwner(el, doc) {
   return ancestors(el).find((ancestor) => ancestor.tag === "form") ?? null;
 }
 function isFormButton(el, doc) {
-  if (!isButton(el)) return false;
+  if (!isButton2(el)) return false;
   const role = (attr(el, "role") ?? "").trim().toLowerCase();
   if (role && role !== "button") return false;
   return formOwner(el, doc)?.tag === "form";
@@ -51087,7 +51857,7 @@ var linkEmptyName = {
 function emptyButtonFindings(doc, formSpecific) {
   const out2 = [];
   for (const el of doc.elements) {
-    if (!isButton(el)) continue;
+    if (!isButton2(el)) continue;
     if (isFormButton(el, doc) !== formSpecific) continue;
     if (isNameExempt(el)) continue;
     if (accessibleName(el, doc) !== "") continue;
@@ -51121,7 +51891,7 @@ var iconOnlyControlUnnamed = {
     const out2 = [];
     for (const el of doc.elements) {
       const link = el.tag === "a" && hasAttr(el, "href");
-      const button = isButton(el);
+      const button = isButton2(el);
       if (!link && !button) continue;
       if (isNameExempt(el)) continue;
       if (accessibleName(el, doc) !== "") continue;
@@ -51145,8 +51915,8 @@ var controlNameTitleOnly = {
     const out2 = [];
     for (const el of doc.elements) {
       const link = el.tag === "a" && hasAttr(el, "href");
-      const field = !link && !isButton(el) && isFormField(el);
-      if (!link && !isButton(el) && !field) continue;
+      const field = !link && !isButton2(el) && isFormField2(el);
+      if (!link && !isButton2(el) && !field) continue;
       if (isNameExempt(el)) continue;
       const title = (attr(el, "title") ?? "").trim();
       if (!title || title.includes("{")) continue;
@@ -51171,14 +51941,15 @@ var controlNameTitleOnly = {
   }
 };
 var normalizeName = (s) => s.toLowerCase().replace(/[\u2018\u2019\u201c\u201d]/g, "'").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-function labelInNameMismatchFindings(doc, formSpecific) {
+function labelInNameMismatchFindings(doc, scope) {
   const out2 = [];
   for (const el of doc.elements) {
     if (!isIntrinsic(el.tag)) continue;
-    const link = el.tag === "a" && hasAttr(el, "href");
     const role = (attr(el, "role") ?? "").trim().toLowerCase();
-    if (!link && !isButton(el) && !["button", "link", "menuitem", "tab", "checkbox", "radio", "switch"].includes(role)) continue;
-    if (isFormButton(el, doc) !== formSpecific) continue;
+    const link = el.tag === "a" && hasAttr(el, "href") && (!role || role === "link") || role === "link";
+    if (!link && !isButton2(el) && !["button", "menuitem", "tab", "checkbox", "radio", "switch"].includes(role)) continue;
+    if (link !== (scope === "link")) continue;
+    if (!link && isFormButton(el, doc) !== (scope === "form")) continue;
     if (isNameExempt(el)) continue;
     const ariaLabel = (attr(el, "aria-label") ?? "").trim();
     if (!ariaLabel || ariaLabel.includes("{")) continue;
@@ -51203,13 +51974,19 @@ var labelInNameMismatch = {
   id: "label-in-name-mismatch",
   criteria: ["2.5.3"],
   severity: "majeur",
-  run: (doc) => labelInNameMismatchFindings(doc, false)
+  run: (doc) => labelInNameMismatchFindings(doc, "control")
 };
 var formLabelInNameMismatch = {
   id: "form-label-in-name-mismatch",
   criteria: ["2.5.3"],
   severity: "majeur",
-  run: (doc) => labelInNameMismatchFindings(doc, true)
+  run: (doc) => labelInNameMismatchFindings(doc, "form")
+};
+var linkLabelInNameMismatch = {
+  id: "link-label-in-name-mismatch",
+  criteria: ["2.5.3"],
+  severity: "majeur",
+  run: (doc) => labelInNameMismatchFindings(doc, "link")
 };
 var linksRules = [
   linkEmptyName,
@@ -51218,7 +51995,8 @@ var linksRules = [
   iconOnlyControlUnnamed,
   controlNameTitleOnly,
   labelInNameMismatch,
-  formLabelInNameMismatch
+  formLabelInNameMismatch,
+  linkLabelInNameMismatch
 ];
 
 // src/autofill.ts
@@ -51330,7 +52108,7 @@ var controlLabelMissing = {
         if (!customFieldNamed(el, doc)) out2.push({ criteriaId: "4.1.2", el, msgId: "control-label-missing", params: { tag: el.tag } });
         continue;
       }
-      if (!isFormField(el)) continue;
+      if (!isFormField2(el)) continue;
       if (isNameExempt(el)) continue;
       const { via } = controlLabel(el, doc);
       if (via && REAL_LABEL.has(via)) continue;
@@ -51354,7 +52132,7 @@ var placeholderAsLabel = {
   run(doc) {
     const out2 = [];
     for (const el of doc.elements) {
-      if (!isFormField(el)) continue;
+      if (!isFormField2(el)) continue;
       if (!hasAttr(el, "placeholder")) continue;
       const { via } = controlLabel(el, doc);
       if (via && REAL_LABEL.has(via)) continue;
@@ -51380,6 +52158,7 @@ var fieldsetLegendMissing = {
       if (legend && legend.type === "element" && visibleText(legend)) continue;
       if (hasAttr(el, "aria-label") || hasAttr(el, "aria-labelledby")) continue;
       if (contentInjected(el)) continue;
+      if (descendants(el).filter((d) => isFormField2(d) || !isIntrinsic(d.tag)).length < 2) continue;
       out2.push({
         criteriaId: "1.3.1",
         el,
@@ -51402,7 +52181,7 @@ var formFieldMultipleLabels = {
     }
     const out2 = [];
     for (const el of doc.elements) {
-      if (!isFormField(el)) continue;
+      if (!isFormField2(el)) continue;
       const id = attr(el, "id");
       if (id && (counts.get(id) ?? 0) > 1) {
         out2.push({
@@ -51483,7 +52262,7 @@ var ariaInvalidNoDescription = {
   run(doc) {
     const out2 = [];
     for (const el of doc.elements) {
-      if (!isFormField(el)) continue;
+      if (!isFormField2(el)) continue;
       const invalid = attr(el, "aria-invalid");
       if (invalid === void 0 || invalid.includes("{")) continue;
       if (invalid.trim().toLowerCase() !== "true") continue;
@@ -51622,7 +52401,7 @@ var disabledContextContent = {
       const isInert = hasAttr(el, "inert");
       if (!isDisabledFieldset && !isInert) continue;
       const desc = descendants(el);
-      if (!desc.some(isFormField)) continue;
+      if (!desc.some(isFormField2)) continue;
       if (hasDynamicSpread(el)) continue;
       if (ariaBusyInScope(el)) continue;
       if (desc.some(isSubmitControl)) continue;
@@ -51632,6 +52411,11 @@ var disabledContextContent = {
     return out2;
   }
 };
+function checkboxPerTableRow(members) {
+  const rows = members.map((m) => ancestors(m).find((a) => a.tag === "tr"));
+  if (rows.some((r) => r === void 0)) return false;
+  return new Set(rows).size === members.length;
+}
 var radioCheckboxGroupUngrouped = {
   id: "radio-checkbox-group-ungrouped",
   criteria: ["1.3.1", "3.3.2"],
@@ -51657,6 +52441,7 @@ var radioCheckboxGroupUngrouped = {
       if (members.some(hasDynamicSpread)) continue;
       if (members.some(inGroupingContext)) continue;
       const type = (attr(members[0], "type") ?? "").trim().toLowerCase();
+      if (type === "checkbox" && checkboxPerTableRow(members)) continue;
       const name2 = (attr(members[0], "name") ?? "").trim();
       out2.push({
         criteriaId: "1.3.1",
@@ -51963,11 +52748,11 @@ var CONTENT_LANDMARK_ROLES = /* @__PURE__ */ new Set(["main", "complementary", "
 var CONTENT_LANDMARK_TAGS = /* @__PURE__ */ new Set(["main", "aside", "section", "form", "search"]);
 var NON_CONTENT_TEXT = /* @__PURE__ */ new Set(["script", "style", "template", "noscript", "title", "head"]);
 var BYPASS_MIN_TEXT = 20;
-function roleOf(el) {
+function roleOf2(el) {
   return (attr(el, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
 }
 function isRepeatedBlock(el) {
-  const role = roleOf(el);
+  const role = roleOf2(el);
   if (role) return role === "navigation" || role === "banner" || role === "contentinfo";
   return el.tag === "nav" || el.tag === "header" || el.tag === "footer";
 }
@@ -51975,7 +52760,7 @@ function couldBypass(el) {
   if (el.tag === "a" && (attr(el, "href") ?? "").trim().startsWith("#") && (attr(el, "href") ?? "").trim() !== "#") return true;
   if (el.tag === "button" || el.tag === "details" || el.tag === "summary" || el.tag === "dialog") return true;
   if (el.tag === "input" && ["button", "submit", "reset", "image", "checkbox"].includes((attr(el, "type") ?? "").trim().toLowerCase())) return true;
-  if (["button", "link", "switch", "checkbox", "tab"].includes(roleOf(el))) return true;
+  if (["button", "link", "switch", "checkbox", "tab"].includes(roleOf2(el))) return true;
   if (hasAttr(el, "aria-controls") || hasAttr(el, "aria-expanded") || hasAttr(el, "accesskey")) return true;
   return Object.keys(el.attribs).some((k) => k.startsWith("on"));
 }
@@ -51986,16 +52771,16 @@ var bypassBlocksMissing = {
   scope: "page",
   run(doc) {
     if (doc.kind !== "html" || shellBodyInjected(doc)) return [];
-    const nav = doc.elements.find((e) => (e.tag === "nav" || roleOf(e) === "navigation") && !isHiddenFromAT(e));
+    const nav = doc.elements.find((e) => (e.tag === "nav" || roleOf2(e) === "navigation") && !isHiddenFromAT(e));
     if (!nav) return [];
     const insideRepeated = (el) => [el, ...ancestors(el)].some(isRepeatedBlock);
     for (const el of doc.elements) {
       if (couldBypass(el)) return [];
       if (isHiddenFromAT(el)) continue;
-      const role = roleOf(el);
+      const role = roleOf2(el);
       if (CONTENT_LANDMARK_ROLES.has(role) || !role && CONTENT_LANDMARK_TAGS.has(el.tag)) return [];
       const heading = role === "heading" || !role && /^h[1-6]$/.test(el.tag);
-      if (heading && ![el, ...ancestors(el)].some((a) => a.tag === "nav" || roleOf(a) === "navigation")) return [];
+      if (heading && ![el, ...ancestors(el)].some((a) => a.tag === "nav" || roleOf2(a) === "navigation")) return [];
     }
     let text = "";
     for (const el of doc.elements) {
@@ -52226,6 +53011,7 @@ var presentationalAttribute = {
     const out2 = [];
     for (const el of doc.elements) {
       if (!intrinsic(el) || inSvg(el)) continue;
+      if (el.tag === "link" || el.tag === "meta") continue;
       for (const name2 of Object.keys(el.attribs)) {
         const n = name2.toLowerCase();
         const hit = PRESENTATIONAL_ATTRS.has(n) || (n === "width" || n === "height") && !DIMENSION_OK.has(el.tag) || n === "size" && !SIZE_OK.has(el.tag);
@@ -53607,8 +54393,9 @@ function residualReason(automatability2, sc) {
 var SUBJECT_NOUNS = {
   images: "no image element (<img>, <svg>, <picture>, <object>, <input type=image> or role=img)",
   tables: "no <table>, and no element with a table role",
-  lists: "no list (<ul>, <ol>, <dl> or a list role)",
-  links: "no link",
+  lists: "no list (<ul>, <ol>, <dl>, a list role, or text drawn as a list with bullets or numerals)",
+  links: "no link (<a href> or role=link)",
+  buttons: "no button (<button>, <input type=submit|reset|button|image> or role=button)",
   controls: "no form control (native, ARIA or contenteditable)",
   autocomplete: "no field carrying user information that autocomplete applies to",
   errors: "no error message and no field marked invalid",
@@ -53621,7 +54408,7 @@ var SUBJECT_NOUNS = {
   timers: "no time limit, timer or auto-refresh",
   motion: "no moving, blinking, auto-updating or media content",
   contextChange: "no control that changes context on its own",
-  downloadDocs: "no downloadable document",
+  downloadDocs: "no downloadable document (no link to a pdf, doc(x), xls(x), ppt(x), odt, ods, odp, rtf, csv or epub file, and no download link)",
   stickies: "no fixed or sticky positioned element"
 };
 function subjectAbsenceReason(criterionId, subjects, files) {
@@ -53645,6 +54432,31 @@ function subjectMatterReason(sc, files) {
   return `No element in scope is concerned by this success criterion (${scope}).`;
 }
 var STATIC_PREDS = allSC().filter((c2) => c2.automatability === "static").map((c2) => [c2.sc, APPLICABLE[c2.sc] ?? isFullDocument]);
+var SCRIPT_CONSTRUCT_SCS = ["2.1.4", "2.2.1", "2.2.2", "2.5.1", "2.5.2", "2.5.4", "2.5.7"];
+var SCRIPT_READ_LIMIT = 2e6;
+function externalScripts(doc) {
+  const readable = [];
+  let unreadable = 0;
+  if (doc.kind !== "html") return { readable, unreadable };
+  for (const el of elementsByTag(doc, "script")) {
+    const src = (attr(el, "src") ?? "").trim();
+    if (!src) continue;
+    const type = (attr(el, "type") ?? "").trim().toLowerCase();
+    if (type && !/^(?:module|text\/javascript|application\/javascript)$/.test(type)) continue;
+    if (/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(src) || src.startsWith("data:") || isSnapshotDom(doc.file)) {
+      unreadable++;
+      continue;
+    }
+    const path = resolvePath(dirname10(doc.file), src.split(/[?#]/)[0].replace(/^\//, ""));
+    try {
+      if (existsSync16(path) && statSync11(path).isFile() && statSync11(path).size <= SCRIPT_READ_LIMIT) readable.push(readFileSync17(path, "utf8"));
+      else unreadable++;
+    } catch {
+      unreadable++;
+    }
+  }
+  return { readable, unreadable };
+}
 var SUBJECT_PREDS = allSC().filter((c2) => c2.automatability !== "static" && SUBJECT_MATTER[c2.sc] !== void 0).map((c2) => [c2.sc, SUBJECT_MATTER[c2.sc]]);
 function newAccum() {
   return {
@@ -53713,6 +54525,14 @@ function foldDoc(acc, doc, graph) {
   }
   for (const [id, pred] of SUBJECT_PREDS) {
     if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
+  }
+  if (SCRIPT_CONSTRUCT_SCS.some((sc) => !acc.applicable.get(sc))) {
+    const scripts = externalScripts(doc);
+    for (const sc of SCRIPT_CONSTRUCT_SCS) {
+      if (acc.applicable.get(sc)) continue;
+      const pred = SUBJECT_MATTER[sc];
+      if (scripts.unreadable > 0 || pred && scripts.readable.some((source) => pred({ ...doc, source, elements: [] }))) acc.applicable.set(sc, true);
+    }
   }
   for (const id of subjectsPresentIn(doc, acc.subjectsSeen)) acc.subjectsSeen.add(id);
   if (doc.signals) for (const sc of renderedTestedScs(doc.signals)) acc.renderedScs.add(sc);
@@ -54125,7 +54945,7 @@ function runAudit(opts) {
 // src/hook.ts
 import { execFileSync as execFileSync2 } from "child_process";
 import { createHash as createHash5 } from "crypto";
-import { existsSync as existsSync18, mkdirSync as mkdirSync5, writeFileSync as writeFileSync6 } from "fs";
+import { existsSync as existsSync19, mkdirSync as mkdirSync5, writeFileSync as writeFileSync6 } from "fs";
 import { tmpdir } from "os";
 import { join as join29 } from "path";
 
@@ -54171,11 +54991,11 @@ function baselineSummary(diff, lang = "fr") {
 }
 
 // src/config.ts
-import { existsSync as existsSync17, statSync as statSync11 } from "fs";
+import { existsSync as existsSync18, statSync as statSync12 } from "fs";
 import { join as join28, isAbsolute as isAbsolute2 } from "path";
 
 // src/pack.ts
-import { existsSync as existsSync16 } from "fs";
+import { existsSync as existsSync17 } from "fs";
 
 // src/standards/pack.ts
 function localize(pack, s, lang) {
@@ -54354,7 +55174,7 @@ function checkGuidance(ds, pack) {
 function runPackCheck(packPath, guidancePath) {
   const errors = [];
   const warnings = [];
-  if (!existsSync16(packPath)) return { ok: false, errors: [`pack file not found: ${packPath}`], warnings };
+  if (!existsSync17(packPath)) return { ok: false, errors: [`pack file not found: ${packPath}`], warnings };
   let raw;
   try {
     raw = JSON.parse(readText(packPath));
@@ -54378,7 +55198,7 @@ function runPackCheck(packPath, guidancePath) {
     }
   }
   if (v.ok && v.pack && guidancePath) {
-    if (!existsSync16(guidancePath)) {
+    if (!existsSync17(guidancePath)) {
       errors.push(`guidance file not found: ${guidancePath}`);
     } else {
       let gRaw;
@@ -58301,7 +59121,7 @@ function getDataset(packKey) {
 var CONFIG_FILE = ".ultra11yrc.json";
 function loadConfig(cwd) {
   const p = join28(cwd, CONFIG_FILE);
-  if (!existsSync17(p)) return null;
+  if (!existsSync18(p)) return null;
   let parsed;
   try {
     parsed = JSON.parse(readText(p));
@@ -58314,16 +59134,16 @@ function loadConfig(cwd) {
   return parsed;
 }
 function packPaths(path) {
-  if (!existsSync17(path)) return null;
-  if (statSync11(path).isDirectory()) {
+  if (!existsSync18(path)) return null;
+  if (statSync12(path).isDirectory()) {
     const pack = join28(path, "pack.json");
-    if (!existsSync17(pack)) return null;
+    if (!existsSync18(pack)) return null;
     const glossary = join28(path, "glossary.json");
     const guidance = join28(path, "guidance.json");
     return {
       pack,
-      glossary: existsSync17(glossary) ? glossary : void 0,
-      guidance: existsSync17(guidance) ? guidance : void 0
+      glossary: existsSync18(glossary) ? glossary : void 0,
+      guidance: existsSync18(guidance) ? guidance : void 0
     };
   }
   return { pack: path };
@@ -58388,7 +59208,7 @@ ${formatIssues(v.issues).join("\n")}`);
   return result;
 }
 function loadGuidanceFile(path, result, onWarn) {
-  if (!existsSync17(path)) {
+  if (!existsSync18(path)) {
     onWarn(`ultra11y: guidance ${path} not found \u2014 skipping.`);
     return;
   }
@@ -58501,7 +59321,7 @@ function firstSighting(key2) {
     const dir = join29(tmpdir(), "ultra11y-hook");
     mkdirSync5(dir, { recursive: true });
     const marker = join29(dir, key2);
-    if (existsSync18(marker)) return false;
+    if (existsSync19(marker)) return false;
     writeFileSync6(marker, "");
     return true;
   } catch {
@@ -58584,8 +59404,8 @@ function decide(payload, deps = {}) {
 }
 
 // src/report.ts
-import { copyFileSync, existsSync as existsSync19, mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
-import { dirname as dirname10, join as join31, relative as relative3 } from "path";
+import { copyFileSync, existsSync as existsSync20, mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
+import { dirname as dirname11, join as join31, relative as relative3 } from "path";
 
 // src/prd.ts
 import { mkdirSync as mkdirSync6, writeFileSync as writeFileSync7 } from "fs";
@@ -58741,13 +59561,13 @@ function derivePackResults(audit2, packKey, pageId) {
   return pack.criteria.map((pc) => {
     const base = judgmentGuard(deriveBase(pc), pc);
     const derived = enabledSecondary.length ? applySecondaryMappings(base, pc, enabledSecondary, secondarySources, pack.defaultLocale) : base;
-    const measured = measuredRescue(derived, pc, cov, ran, pageId);
+    const measured2 = measuredRescue(derived, pc, cov, ran, pageId);
     const decided = adjudicated?.get(pc.id);
     if (decided?.status === "manual") {
-      const { inapplicable: _absence, ...open } = measured;
+      const { inapplicable: _absence, ...open } = measured2;
       return {
         ...open,
-        status: measured.status === "NC" ? "NC" : "manual",
+        status: measured2.status === "NC" ? "NC" : "manual",
         ...decided.justification ? { justification: decided.justification } : {},
         decidedBy: "agent"
       };
@@ -58765,7 +59585,7 @@ function derivePackResults(audit2, packKey, pageId) {
         decidedBy: "agent"
       };
     }
-    return isProvisionalJudgmentInapplicable(measured, pc) ? { ...measured, judgment: true } : measured;
+    return isProvisionalJudgmentInapplicable(measured2, pc) ? { ...measured2, judgment: true } : measured2;
   });
 }
 function findingsForStandard(audit2, standard) {
@@ -59213,9 +60033,9 @@ function derivePages(result, pages) {
     const criteria = result.criteria.map((c2) => {
       const pf = own.filter((f) => f.criteriaId === c2.id);
       const status = pageStatus(c2, pf, p.basis, p.coverage);
-      const measured = status === "C" && c2.status !== "C" && c2.decidedBy === void 0;
-      const decidedBy = c2.decidedBy ?? (measured ? "scan" : void 0);
-      const justification = measured ? measuredHereReason(c2.id, p.coverage) : c2.justification;
+      const measured2 = status === "C" && c2.status !== "C" && c2.decidedBy === void 0;
+      const decidedBy = c2.decidedBy ?? (measured2 ? "scan" : void 0);
+      const justification = measured2 ? measuredHereReason(c2.id, p.coverage) : c2.justification;
       return {
         id: c2.id,
         guideline: c2.guideline,
@@ -61113,7 +61933,7 @@ function withReportAnnexes(md, reportPath, read) {
   let out2 = md;
   for (const name2 of names) {
     if (md.includes(annexMarker(name2))) continue;
-    const path = join31(dirname10(reportPath), name2);
+    const path = join31(dirname11(reportPath), name2);
     let annex;
     try {
       annex = read(path);
@@ -61300,7 +62120,7 @@ function render(r, lang, opts) {
       const notes = pageScope.find((x) => x.id === pg.id)?.notes;
       if (notes) out2.push(`- _${notes}_`);
       const shot = join31(PAGES_DIR, pg.id, "screen.png");
-      if (existsSync19(shot)) {
+      if (existsSync20(shot)) {
         let href = relative3(opts.outDir ?? ".", shot).split("\\").join("/");
         if (opts.outDir) {
           try {
@@ -62802,11 +63622,11 @@ function renderCriteriaReference() {
 }
 
 // src/check.ts
-import { existsSync as existsSync22, readFileSync as readFileSync19, readdirSync as readdirSync5 } from "fs";
-import { dirname as dirname11, join as join33 } from "path";
+import { existsSync as existsSync23, readFileSync as readFileSync20, readdirSync as readdirSync5 } from "fs";
+import { dirname as dirname12, join as join33 } from "path";
 
 // src/verify.ts
-import { existsSync as existsSync20, mkdirSync as mkdirSync8, readFileSync as readFileSync17, writeFileSync as writeFileSync9 } from "fs";
+import { existsSync as existsSync21, mkdirSync as mkdirSync8, readFileSync as readFileSync18, writeFileSync as writeFileSync9 } from "fs";
 import { join as join32 } from "path";
 var VERIFY_MAX = 40;
 var plain = (s) => s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
@@ -63178,9 +63998,9 @@ function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") 
   const todoPath = join32(outDir, "VERIFY.todo.json");
   const mdPath = join32(outDir, "VERIFY.md");
   let carried = items;
-  if (existsSync20(todoPath)) {
+  if (existsSync21(todoPath)) {
     try {
-      const previous = JSON.parse(readFileSync17(todoPath, "utf8"));
+      const previous = JSON.parse(readFileSync18(todoPath, "utf8"));
       const byClaim = new Map(previous.map((it) => [resumableItemKey(it), it]));
       const legacyConformities = new Map(
         previous.filter((it) => it.kind === "c" && !it.citations?.length).map((it) => [legacyConformityKey(it.criteriaId, it.file, it.line, it.selector, it.claim), it])
@@ -63210,7 +64030,7 @@ function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") 
 }
 
 // src/grounding.ts
-import { existsSync as existsSync21, readFileSync as readFileSync18 } from "fs";
+import { existsSync as existsSync22, readFileSync as readFileSync19 } from "fs";
 import { resolve as resolve10 } from "path";
 var WINDOW = 10;
 var norm2 = (s) => s.normalize("NFKC").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").replace(/>\s+/g, ">").replace(/\s+</g, "<").trim();
@@ -63231,10 +64051,10 @@ function selectorProbes(selector) {
 function groundFinding(g, opts = {}) {
   if (isUnresolvable(g.file)) return { ok: true, moved: false };
   const path = resolve10(opts.cwd ?? process.cwd(), g.file);
-  if (!existsSync21(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
+  if (!existsSync22(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
   let text;
   try {
-    text = readFileSync18(path, "utf8");
+    text = readFileSync19(path, "utf8");
   } catch {
     return { ok: false, moved: false, issue: `cited file unreadable: ${g.file}` };
   }
@@ -63455,11 +64275,11 @@ function checkSemantic(md, opts) {
   const standard = opts.standard ?? "wcag";
   const s = M[lang];
   const empty = { total: 0, grounded: 0, moved: 0, failed: 0 };
-  const artifact = opts.verdictsPath ?? join33(dirname11(opts.reportPath), "VERIFY.todo.json");
-  if (!existsSync22(artifact)) return { ok: false, issues: [s.semanticMissing(artifact)], ...empty };
+  const artifact = opts.verdictsPath ?? join33(dirname12(opts.reportPath), "VERIFY.todo.json");
+  if (!existsSync23(artifact)) return { ok: false, issues: [s.semanticMissing(artifact)], ...empty };
   let items;
   try {
-    const parsed = JSON.parse(readFileSync19(artifact, "utf8"));
+    const parsed = JSON.parse(readFileSync20(artifact, "utf8"));
     if (!Array.isArray(parsed)) throw new Error("not an array");
     items = parsed;
   } catch {
@@ -63527,7 +64347,7 @@ function checkSampleCaptured(root = ".", lang = "en") {
   const rc = join33(root, ".ultra11yrc.json");
   let raw;
   try {
-    raw = readFileSync19(rc, "utf8");
+    raw = readFileSync20(rc, "utf8");
   } catch {
     return { ok: true, issues: [], missing: [], declared: 0, captured: 0 };
   }
@@ -63549,7 +64369,7 @@ function checkSampleCaptured(root = ".", lang = "en") {
   let captured = /* @__PURE__ */ new Set();
   try {
     captured = new Set(
-      readdirSync5(join33(root, PAGES_DIR), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).filter((id) => existsSync22(join33(root, PAGES_DIR, id, "dom.html")))
+      readdirSync5(join33(root, PAGES_DIR), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).filter((id) => existsSync23(join33(root, PAGES_DIR, id, "dom.html")))
     );
   } catch {
   }
@@ -63694,7 +64514,7 @@ function openPerPage(audit2, standard, lang) {
 }
 
 // src/adjudicate.ts
-import { mkdirSync as mkdirSync9, statSync as statSync12, writeFileSync as writeFileSync10 } from "fs";
+import { mkdirSync as mkdirSync9, statSync as statSync13, writeFileSync as writeFileSync10 } from "fs";
 import { isAbsolute as isAbsolute3, join as join34, relative as relative4, resolve as resolve11 } from "path";
 
 // src/data/adjudication.json
@@ -64627,6 +65447,11 @@ function candidateFindingEvidence(findings, limit) {
   }
   return evidence;
 }
+function withCandidates(harvest, findings, limit) {
+  const anchored = new Set(harvest.map((e) => `${e.file}:${e.line}:${e.selector}`));
+  const extra = candidateFindingEvidence(findings, limit).filter((e) => !anchored.has(`${e.file}:${e.line}:${e.selector}`));
+  return extra.length ? [...harvest, ...extra] : harvest;
+}
 function buildAdjudicationWorklist(audit2, opts = {}) {
   const docs = docsForAudit(audit2, opts.cwd);
   const standard = opts.standard;
@@ -64666,15 +65491,15 @@ function buildAdjudicationWorklist(audit2, opts = {}) {
         })),
         Object.keys(crit?.tests ?? {}).map((test) => `${pc.id}.${test}`)
       );
-      const candidates2 = item.evidence.length ? [] : candidateFindingEvidence(pc.candidateFindings ?? [], limits.maxClasses);
+      const candidates2 = withCandidates(item.evidence, pc.candidateFindings ?? [], limits.maxClasses);
       return {
         ...item,
         ...pc.status === "manual" && pc.justification?.match(/Contre-expertise\s*:/i) ? { previousReview: pc.justification } : {},
-        ...candidates2.length ? {
+        ...candidates2.length > item.evidence.length ? {
           evidence: candidates2,
           population: {
-            classes: candidates2.length,
-            occurrences: candidates2.length,
+            classes: (item.evidence.length ? item.population?.classes ?? item.evidence.length : 0) + candidates2.length - item.evidence.length,
+            occurrences: (item.evidence.length ? item.population?.occurrences ?? item.evidence.length : 0) + candidates2.length - item.evidence.length,
             files: new Set(candidates2.map((evidence) => evidence.file)).size,
             pages: new Set(candidates2.flatMap((evidence) => evidence.pages ?? [])).size
           }
@@ -64698,8 +65523,7 @@ function evidenceForCriteria(audit2, criteriaIds, opts = {}) {
     if (out2.has(id)) continue;
     const crit = pack ? getCriterion(pack, id) : void 0;
     const subjects = pack && standard ? subjectsForPackCriterion(standard, id, crit?.wcag ?? []) : subjectsForSc(id);
-    let evidence = collapse2(harvestSubjects(subjects, docs), limits).evidence;
-    if (!evidence.length) evidence = candidateFindingEvidence(candidates2.get(id) ?? [], limits.maxClasses);
+    const evidence = withCandidates(collapse2(harvestSubjects(subjects, docs), limits).evidence, candidates2.get(id) ?? [], limits.maxClasses);
     out2.set(id, evidence);
   }
   return out2;
@@ -64732,7 +65556,24 @@ function canonicalEvidenceFile(file) {
   const posix3 = file.replace(/\\/g, "/");
   const marker = `${PAGES_DIR}/`;
   const at = posix3.lastIndexOf(marker);
-  return at >= 0 ? posix3.slice(at) : posix3;
+  if (at >= 0) return posix3.slice(at);
+  return /^https?:\/\//i.test(posix3) ? posix3 : resolve11(posix3).replace(/\\/g, "/");
+}
+function worklistPath(file) {
+  if (!isAbsolute3(file)) return file;
+  const rel2 = relative4(process.cwd(), file);
+  return rel2 && !rel2.startsWith("..") && !isAbsolute3(rel2) ? rel2.replace(/\\/g, "/") : file;
+}
+function relativizeItem(it) {
+  const at = (a) => {
+    const i2 = a.lastIndexOf(":");
+    return i2 > 0 ? `${worklistPath(a.slice(0, i2))}${a.slice(i2)}` : a;
+  };
+  return {
+    ...it,
+    evidence: it.evidence.map((e) => ({ ...e, file: worklistPath(e.file), ...e.alsoAt ? { alsoAt: e.alsoAt.map(at) } : {} })),
+    ...it.signals ? { signals: it.signals.map((s) => ({ ...s, file: worklistPath(s.file) })) } : {}
+  };
 }
 function withinAuditInput(file, audit2, cwd) {
   const target = resolve11(cwd ?? process.cwd(), file);
@@ -64740,7 +65581,7 @@ function withinAuditInput(file, audit2, cwd) {
     if (input === "-" || input === "<stdin>") continue;
     const root = resolve11(cwd ?? process.cwd(), input);
     try {
-      if (statSync12(root).isDirectory()) {
+      if (statSync13(root).isDirectory()) {
         const rel2 = relative4(root, target);
         if (rel2 === "" || rel2 !== ".." && !rel2.startsWith("../") && !isAbsolute3(rel2)) return true;
       } else if (root === target) return true;
@@ -64797,7 +65638,7 @@ function anchorFor(evidence, c2, drift) {
     let top;
     let score = -1;
     for (const e of cands) {
-      const n = overlap(c2, e);
+      const n = overlap(c2, e) + overlap(c2, { snippet: e.note });
       if (n > score) {
         score = n;
         top = e;
@@ -64966,6 +65807,12 @@ function applyAdjudication(audit2, adj, opts = {}) {
       blame(it.criteriaId, `criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
     } else if (v === "C" || v === "NA") {
       if (!it.justification?.trim()) blame(it.criteriaId, `criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
+      if (v === "NA" && packMode && ALWAYS_APPLICABLE[adj.standard]?.has(it.criteriaId)) {
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: applies to every page with content \u2014 \xAB non applicable \xBB is refused. Rule C or NC on the page's own evidence (its stylesheets, its markup, the measurements), or record "manual" (reason "undecidable") if nothing here lets you see it`
+        );
+      }
       const cites = (it.citations ?? []).map(readCitation).filter((c2) => c2 !== null);
       if (v === "C" && it.evidenceComplete === false) {
         blame(
@@ -65543,6 +66390,7 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
 }
 function writeAdjudication(items, outDir, opts) {
   mkdirSync9(outDir, { recursive: true });
+  items = items.map(relativizeItem);
   const todoPath = join34(outDir, "ADJUDICATE.todo.json");
   const mdPath = join34(outDir, "ADJUDICATE.md");
   const file = {
@@ -65720,8 +66568,8 @@ function pruneRefuted(audit2, standard, items, lang = "en", untried = []) {
 
 // src/ledger.ts
 import { createHash as createHash6 } from "crypto";
-import { existsSync as existsSync23, mkdirSync as mkdirSync10, readFileSync as readFileSync20, writeFileSync as writeFileSync11 } from "fs";
-import { dirname as dirname12, join as join35 } from "path";
+import { existsSync as existsSync24, mkdirSync as mkdirSync10, readFileSync as readFileSync21, writeFileSync as writeFileSync11 } from "fs";
+import { dirname as dirname13, join as join35 } from "path";
 var LEDGER_DIR = ".ultra11y/verdicts";
 function ledgerPath(standard, root = ".") {
   return join35(root, LEDGER_DIR, `${standard}.json`);
@@ -65780,7 +66628,7 @@ function verdictStillHolds(entry, today2, opts) {
       `Ledger verdict is STALE \u2014 ${added.length} piece(s) of evidence are NEW since the verdict was recorded on ${entry.date} (${was} item(s) then, ${today2.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`
     );
   }
-  const exists = opts.fileExists ?? ((f) => existsSync23(f));
+  const exists = opts.fileExists ?? ((f) => existsSync24(f));
   const contributing = new Set(evidenceFilesOf(today2));
   const silent = (entry.evidenceFiles ?? []).filter((f) => !contributing.has(f) && exists(f));
   if (silent.length > 0) {
@@ -65818,19 +66666,19 @@ function isLedger(v) {
   return !!o && typeof o === "object" && o.tool === "ultra11y" && o.kind === "verdict-ledger" && Array.isArray(o.entries);
 }
 function readLedger(path) {
-  if (!existsSync23(path)) return void 0;
+  if (!existsSync24(path)) return void 0;
   try {
-    const parsed = JSON.parse(readFileSync20(path, "utf8"));
+    const parsed = JSON.parse(readFileSync21(path, "utf8"));
     return isLedger(parsed) ? parsed : void 0;
   } catch {
     return void 0;
   }
 }
 function unreadableCaptures(audit2, cwd = ".") {
-  return (audit2.scope.pagesAudited ?? []).filter((id) => !existsSync23(join35(cwd, PAGES_DIR, id, "dom.html")));
+  return (audit2.scope.pagesAudited ?? []).filter((id) => !existsSync24(join35(cwd, PAGES_DIR, id, "dom.html")));
 }
 function writeLedger(path, ledger) {
-  mkdirSync10(dirname12(path), { recursive: true });
+  mkdirSync10(dirname13(path), { recursive: true });
   const sorted = { ...ledger, entries: [...ledger.entries].sort((a, b) => a.criteriaId.localeCompare(b.criteriaId, "en", { numeric: true })) };
   writeFileSync11(path, `${JSON.stringify(sorted, null, 2)}
 `);
@@ -65922,7 +66770,7 @@ function replayLedger(audit2, ledger, opts = {}) {
   const unreadable = (audit2.scope.pagesAudited ?? []).filter((id) => {
     const canonical = `${PAGES_DIR}/${id}/dom.html`;
     const fromInputs = currentFiles.get(canonical);
-    return !(fromInputs && existsSync23(fromInputs)) && !existsSync23(join35(root, canonical));
+    return !(fromInputs && existsSync24(fromInputs)) && !existsSync24(join35(root, canonical));
   });
   const harvestComplete = unreadable.length === 0;
   for (const e of ledger.entries) if (!open.has(e.criteriaId)) obsolete.push(e.criteriaId);
@@ -65935,7 +66783,7 @@ function replayLedger(audit2, ledger, opts = {}) {
     }
     const held = verdictStillHolds(e, it.evidence, {
       harvestComplete,
-      fileExists: (f) => existsSync23(join35(opts.cwd ?? ".", f))
+      fileExists: (f) => existsSync24(join35(opts.cwd ?? ".", f))
     });
     if (!held.holds) {
       stale.push(it.criteriaId);
@@ -65966,7 +66814,7 @@ function replayLedger(audit2, ledger, opts = {}) {
 
 // src/agent-cli.ts
 import { spawn as spawn2 } from "child_process";
-import { existsSync as existsSync24 } from "fs";
+import { existsSync as existsSync25 } from "fs";
 import { delimiter, join as join36 } from "path";
 
 // src/verdict-rules.ts
@@ -66280,7 +67128,7 @@ function claudeBin() {
   for (const dir of (process.env.PATH ?? "").split(delimiter)) {
     if (!dir) continue;
     const candidate = join36(dir, "claude");
-    if (existsSync24(candidate)) return [candidate];
+    if (existsSync25(candidate)) return [candidate];
   }
   return ["npx", "--yes", "@anthropic-ai/claude-code"];
 }
@@ -66438,9 +67286,9 @@ async function runCli2(argv, prompt, opts, extract) {
 
 // src/agent-codex.ts
 import { spawn as spawn3 } from "child_process";
-import { existsSync as existsSync25, mkdtempSync as mkdtempSync3, rmSync as rmSync4, writeFileSync as writeFileSync12 } from "fs";
+import { existsSync as existsSync26, mkdtempSync as mkdtempSync3, rmSync as rmSync4, writeFileSync as writeFileSync12 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
-import { delimiter as delimiter2, dirname as dirname13, join as join37 } from "path";
+import { delimiter as delimiter2, dirname as dirname14, join as join37 } from "path";
 var MAX_ATTEMPTS3 = 4;
 var CODEX_EFFORT_LEVELS = ["minimal", "low", "medium", "high", "xhigh"];
 var DEFAULT_CODEX_TIMEOUT_MS = 10 * 6e4;
@@ -66477,7 +67325,7 @@ function codexBin() {
   for (const dir of (process.env.PATH ?? "").split(delimiter2)) {
     if (!dir) continue;
     const candidate = join37(dir, "codex");
-    if (existsSync25(candidate)) return [candidate];
+    if (existsSync26(candidate)) return [candidate];
   }
   return ["npx", "--yes", "@openai/codex"];
 }
@@ -66504,7 +67352,7 @@ function codexArgv(opts, schemaPath) {
     "multi_agent",
     "--strict-config",
     "--cd",
-    dirname13(schemaPath),
+    dirname14(schemaPath),
     "--skip-git-repo-check",
     "--sandbox",
     "read-only",
@@ -66646,7 +67494,7 @@ async function refuteBatchCodex(items, prompt, opts, lang = "en") {
 
 // src/scan.ts
 import { execFileSync as execFileSync6 } from "child_process";
-import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync13, existsSync as existsSync27, statSync as statSync13, readdirSync as readdirSync6, rmSync as rmSync5, readFileSync as readFileSync21 } from "fs";
+import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync13, existsSync as existsSync28, statSync as statSync14, readdirSync as readdirSync6, rmSync as rmSync5, readFileSync as readFileSync23 } from "fs";
 import { tmpdir as tmpdir3 } from "os";
 import { join as join38, resolve as resolve12 } from "path";
 import { fileURLToPath as fileURLToPath3 } from "url";
@@ -66754,7 +67602,7 @@ async function crawlUrls(start2, opts) {
 }
 
 // src/sample.ts
-import { existsSync as existsSync26 } from "fs";
+import { existsSync as existsSync27 } from "fs";
 function looksLikeTarget(u) {
   return /^https?:\/\//i.test(u) || /^(\.\.?[/\\]|[/\\])/.test(u) || /\.x?html?$/i.test(u);
 }
@@ -66790,7 +67638,7 @@ function validateSample(raw) {
     if (p.auth !== void 0 && typeof p.auth !== "boolean") err2(`sample.pages[${i2}].auth`, "auth must be a boolean");
     if (p.storageState !== void 0 && (typeof p.storageState !== "string" || p.storageState.trim() === "")) {
       err2(`sample.pages[${i2}].storageState`, "storageState must be a non-empty file path string");
-    } else if (typeof p.storageState === "string" && p.storageState.trim() !== "" && !existsSync26(p.storageState)) {
+    } else if (typeof p.storageState === "string" && p.storageState.trim() !== "" && !existsSync27(p.storageState)) {
       warn(
         `sample.pages[${i2}].storageState`,
         `storageState path not found: "${p.storageState}" (resolved from the current directory) \u2014 the scan will not be able to load this session`
@@ -67230,7 +68078,7 @@ function toDynamicResult(out2, target, lang = "en", engine = "axe-core@playwrigh
 var DOCKER_TESTED_SCS = ["1.4.10"];
 function runScan(opts) {
   const isUrl3 = /^https?:\/\//i.test(opts.target);
-  if (!isUrl3 && !existsSync27(opts.target)) {
+  if (!isUrl3 && !existsSync28(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
   if (!dockerAvailable()) {
@@ -67238,7 +68086,7 @@ function runScan(opts) {
   }
   const tag = opts.tag ?? IMAGE_TAG;
   if (!imageExists(tag)) buildImage(tag);
-  const isFile = !isUrl3 && existsSync27(opts.target) && statSync13(opts.target).isFile();
+  const isFile = !isUrl3 && existsSync28(opts.target) && statSync14(opts.target).isFile();
   const out2 = runRunner(opts.target, isFile, tag, Boolean(opts.snapshotRoot));
   const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, opts.target) : void 0;
   return { ...toDynamicResult(out2, opts.target), testedScs: [...DOCKER_TESTED_SCS], ...id ? { snapshots: [id] } : {} };
@@ -67328,10 +68176,10 @@ async function runCrawlScan(opts) {
 var sevRank = { bloquant: 3, majeur: 2, mineur: 1 };
 function resolveHostAnchor(file, snippet2) {
   const s = snippet2?.trim();
-  if (!s || !existsSync27(file)) return null;
+  if (!s || !existsSync28(file)) return null;
   let source;
   try {
-    source = readFileSync21(file, "utf8");
+    source = readFileSync23(file, "utf8");
   } catch {
     return null;
   }
@@ -67509,13 +68357,13 @@ function mergeSnapshotAudit(base, snap) {
   }
   for (const c2 of merged.criteria) {
     if (!c2.inapplicable) continue;
-    const measured = snapById.get(c2.id);
-    if (measured?.status !== "C" || measured.inapplicable) continue;
+    const measured2 = snapById.get(c2.id);
+    if (measured2?.status !== "C" || measured2.inapplicable) continue;
     c2.status = "C";
     delete c2.inapplicable;
-    if (measured.justification) c2.justification = measured.justification;
+    if (measured2.justification) c2.justification = measured2.justification;
     else delete c2.justification;
-    if (measured.decidedBy) c2.decidedBy = measured.decidedBy;
+    if (measured2.decidedBy) c2.decidedBy = measured2.decidedBy;
   }
   const nowNc = new Set(snap.findings.filter((f) => !f.advisory).map((f) => f.criteriaId));
   merged.residualRisks = merged.residualRisks.filter((r) => !nowNc.has(r.criteriaId));
@@ -67524,9 +68372,9 @@ function mergeSnapshotAudit(base, snap) {
 }
 
 // src/scan-local.ts
-import { existsSync as existsSync28, realpathSync as realpathSync3, statSync as statSync14 } from "fs";
+import { existsSync as existsSync29, realpathSync as realpathSync3, statSync as statSync15 } from "fs";
 import { createRequire } from "module";
-import { dirname as dirname14, join as join39, resolve as resolve13 } from "path";
+import { dirname as dirname15, join as join39, resolve as resolve13 } from "path";
 var LOCAL_ENGINE = "axe-core@playwright (local)";
 var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
 function localTestedScs(interact) {
@@ -67573,9 +68421,9 @@ function localTierStatus(cwd) {
   try {
     const pw = requireRuntime(cwd, PW_SPEC);
     const bin = pw.chromium?.executablePath?.();
-    if (typeof bin === "string" && bin.length > 0 && !existsSync28(bin)) {
+    if (typeof bin === "string" && bin.length > 0 && !existsSync29(bin)) {
       const pw2 = resolvedPlaywright(cwd);
-      const cliJs = pw2 ? join39(dirname14(pw2.path), "cli.js") : void 0;
+      const cliJs = pw2 ? join39(dirname15(pw2.path), "cli.js") : void 0;
       return {
         ok: false,
         reason: `no browser binary at ${bin} for ${PW_SPEC}${pw2?.version ? `@${pw2.version}` : ""}${pw2 ? ` (${pw2.path})` : ""} \u2014 run \`${cliJs ? `node ${cliJs}` : "npx playwright"} install chromium\`, or pass --runtime local to fall back on an installed Google Chrome`
@@ -67657,7 +68505,7 @@ async function launchChromium(chromium, cwd = ".", warn = (m) => console.error(m
   const pw = resolvedPlaywright(cwd);
   const which = pw ? `${PW_SPEC}${pw.version ? `@${pw.version}` : ""} resolved at ${pw.path}` : `${PW_SPEC} (resolution path unknown)`;
   const own = pw ? !pw.path.startsWith(realDir(cwd)) && !pw.path.startsWith(resolve13(cwd)) : false;
-  const cliJs = pw ? join39(dirname14(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
+  const cliJs = pw ? join39(dirname15(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
   throw new Error(
     `Could not launch Chromium: the browser for ${which} is not installed, and no installed Google Chrome was found either. Install the browser for THAT Playwright \u2014 \`node ${cliJs} install chromium\`${own ? " (this is ultra11y's own Playwright, not the audited project's)" : ""} \u2014 or install Google Chrome, or use --runtime docker. (${msg.split("\n")[0]})`
   );
@@ -67994,10 +68842,10 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
 }
 async function runScanLocal(opts) {
   const isUrl3 = /^https?:\/\//i.test(opts.target);
-  if (!isUrl3 && !existsSync28(opts.target)) {
+  if (!isUrl3 && !existsSync29(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
-  const isFile = !isUrl3 && statSync14(opts.target).isFile();
+  const isFile = !isUrl3 && statSync15(opts.target).isFile();
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
@@ -68784,8 +69632,8 @@ function writeCi(root, enginePath, failOn) {
 }
 
 // src/install/json-edit.ts
-import { copyFileSync as copyFileSync2, existsSync as existsSync29, mkdirSync as mkdirSync12, readFileSync as readFileSync23, renameSync as renameSync3, rmSync as rmSync6, writeFileSync as writeFileSync16 } from "fs";
-import { dirname as dirname15 } from "path";
+import { copyFileSync as copyFileSync2, existsSync as existsSync30, mkdirSync as mkdirSync12, readFileSync as readFileSync24, renameSync as renameSync3, rmSync as rmSync6, writeFileSync as writeFileSync16 } from "fs";
+import { dirname as dirname16 } from "path";
 var SettingsParseError = class extends Error {
   constructor(path, cause) {
     super(`${path} is not valid JSON (${cause}) \u2014 fix or move it, then run install again. It has NOT been modified.`);
@@ -68798,10 +69646,10 @@ function stamp() {
   return (/* @__PURE__ */ new Date()).toISOString().replaceAll(/[:.]/g, "-");
 }
 function writeTextWithBackup(path, content, marker = "ultra11y") {
-  if (existsSync29(path) && readFileSync23(path, "utf8") === content) return { path, changed: false };
-  mkdirSync12(dirname15(path), { recursive: true });
+  if (existsSync30(path) && readFileSync24(path, "utf8") === content) return { path, changed: false };
+  mkdirSync12(dirname16(path), { recursive: true });
   let backup;
-  if (existsSync29(path)) {
+  if (existsSync30(path)) {
     backup = `${path}.${marker}-backup-${stamp()}`;
     copyFileSync2(path, backup);
   }
@@ -68817,8 +69665,8 @@ function writeTextWithBackup(path, content, marker = "ultra11y") {
 }
 function editJsonFile(path, mutate) {
   let root = {};
-  if (existsSync29(path)) {
-    const raw = readFileSync23(path, "utf8");
+  if (existsSync30(path)) {
+    const raw = readFileSync24(path, "utf8");
     if (raw.trim()) {
       let parsed;
       try {
@@ -68834,13 +69682,13 @@ function editJsonFile(path, mutate) {
   }
   const before = JSON.stringify(root);
   mutate(root);
-  if (JSON.stringify(root) === before && existsSync29(path)) return { path, changed: false };
+  if (JSON.stringify(root) === before && existsSync30(path)) return { path, changed: false };
   return writeTextWithBackup(path, `${JSON.stringify(root, null, 2)}
 `);
 }
 function readJsonSafe(path) {
   try {
-    const parsed = JSON.parse(readFileSync23(path, "utf8"));
+    const parsed = JSON.parse(readFileSync24(path, "utf8"));
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
   } catch {
     return null;
@@ -68881,7 +69729,7 @@ function claudeCodeWired(settingsPath) {
 }
 
 // src/install/text-edit.ts
-import { existsSync as existsSync30, readFileSync as readFileSync24, rmSync as rmSync7 } from "fs";
+import { existsSync as existsSync31, readFileSync as readFileSync25, rmSync as rmSync7 } from "fs";
 var BLOCK_BEGIN = "<!-- BEGIN ultra11y (managed by `ultra11y install --agents-md`; edit outside this block) -->";
 var BLOCK_END = "<!-- END ultra11y -->";
 var blockRe = () => new RegExp(`${escapeRe2(BLOCK_BEGIN)}[\\s\\S]*?${escapeRe2(BLOCK_END)}\\n?`);
@@ -68893,15 +69741,15 @@ function upsertManagedBlock(path, body3) {
 ${body3.trim()}
 ${BLOCK_END}
 `;
-  if (!existsSync30(path)) return writeTextWithBackup(path, block);
-  const current = readFileSync24(path, "utf8");
+  if (!existsSync31(path)) return writeTextWithBackup(path, block);
+  const current = readFileSync25(path, "utf8");
   if (blockRe().test(current)) return writeTextWithBackup(path, current.replace(blockRe(), block));
   const sep8 = current.endsWith("\n\n") ? "" : current.endsWith("\n") ? "\n" : "\n\n";
   return writeTextWithBackup(path, `${current}${sep8}${block}`);
 }
 function removeManagedBlock(path) {
-  if (!existsSync30(path)) return { path, changed: false };
-  const current = readFileSync24(path, "utf8");
+  if (!existsSync31(path)) return { path, changed: false };
+  const current = readFileSync25(path, "utf8");
   if (!blockRe().test(current)) return { path, changed: false };
   const rest = current.replace(blockRe(), "");
   if (rest.trim() === "") {
@@ -68911,7 +69759,7 @@ function removeManagedBlock(path) {
   return writeTextWithBackup(path, rest.replace(/\n+$/, "\n"));
 }
 function hasManagedBlock(path) {
-  return existsSync30(path) && blockRe().test(readFileSync24(path, "utf8"));
+  return existsSync31(path) && blockRe().test(readFileSync25(path, "utf8"));
 }
 
 // src/install/agents-md.ts
@@ -68972,13 +69820,13 @@ function agentsMdWired(root) {
 }
 
 // src/install/codex.ts
-import { existsSync as existsSync32, readFileSync as readFileSync26 } from "fs";
+import { existsSync as existsSync33, readFileSync as readFileSync27 } from "fs";
 import { join as join43 } from "path";
 
 // src/install/paths.ts
-import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync31, mkdirSync as mkdirSync13, readFileSync as readFileSync25, realpathSync as realpathSync5, statSync as statSync15 } from "fs";
+import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync32, mkdirSync as mkdirSync13, readFileSync as readFileSync26, realpathSync as realpathSync5, statSync as statSync16 } from "fs";
 import { homedir as homedir2 } from "os";
-import { dirname as dirname16, join as join42 } from "path";
+import { dirname as dirname17, join as join42 } from "path";
 function codexHome() {
   return process.env.CODEX_HOME || join42(homedir2(), ".codex");
 }
@@ -69013,37 +69861,37 @@ function installedCliCommand() {
 function packageRoot() {
   let dir;
   try {
-    dir = dirname16(realpathSync5(process.argv[1] ?? ""));
+    dir = dirname17(realpathSync5(process.argv[1] ?? ""));
   } catch {
     return null;
   }
   for (let i2 = 0; i2 < 6 && dir && dir !== "/"; i2++) {
-    if (existsSync31(join42(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
-    dir = dirname16(dir);
+    if (existsSync32(join42(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
+    dir = dirname17(dir);
   }
   return null;
 }
 function bundledSkillsDir() {
   const root = packageRoot();
   const p = root ? join42(root, "skills") : null;
-  return p && existsSync31(p) ? p : null;
+  return p && existsSync32(p) ? p : null;
 }
 function bundledOpencodePlugin() {
   const root = packageRoot();
   const p = root ? join42(root, ".opencode", "plugins", "ultra11y.js") : null;
-  return p && existsSync31(p) ? p : null;
+  return p && existsSync32(p) ? p : null;
 }
 function copySkillsInto(source, dest) {
   const out2 = [];
   for (const name2 of ["ultra11y", "review-a11y"]) {
     const from = join42(source, name2);
-    if (!existsSync31(from)) continue;
+    if (!existsSync32(from)) continue;
     const to = join42(dest, name2);
     const same = ["SKILL.md", join42("scripts", "ultra11y.mjs")].every((f) => {
       const a = join42(from, f);
       const b = join42(to, f);
       try {
-        return existsSync31(b) && statSync15(a).size === statSync15(b).size && readFileSync25(a).equals(readFileSync25(b));
+        return existsSync32(b) && statSync16(a).size === statSync16(b).size && readFileSync26(a).equals(readFileSync26(b));
       } catch {
         return false;
       }
@@ -69102,7 +69950,7 @@ function installCodex({ codexDir, command, skillsSource }) {
     })
   );
   const configPath = join43(codexDir, "config.toml");
-  const current = existsSync32(configPath) ? readFileSync26(configPath, "utf8") : "";
+  const current = existsSync33(configPath) ? readFileSync27(configPath, "utf8") : "";
   const edit = enableHooksFeature(current);
   if (edit.changed) reports.push(writeTextWithBackup(configPath, edit.content));
   if (skillsSource) reports.push(...copySkillsInto(skillsSource, join43(codexDir, "skills")));
@@ -69121,7 +69969,7 @@ function installCodex({ codexDir, command, skillsSource }) {
 function uninstallCodex({ codexDir }) {
   const reports = [];
   const hooksPath = join43(codexDir, "hooks.json");
-  if (existsSync32(hooksPath)) {
+  if (existsSync33(hooksPath)) {
     reports.push(
       editJsonFile(hooksPath, (root) => {
         const hooks = root.hooks;
@@ -69143,11 +69991,11 @@ function codexWired(codexDir) {
 }
 function codexHooksEnabled(codexDir) {
   const p = join43(codexDir, "config.toml");
-  return existsSync32(p) && HOOKS_ON.test(featuresBody(readFileSync26(p, "utf8")));
+  return existsSync33(p) && HOOKS_ON.test(featuresBody(readFileSync27(p, "utf8")));
 }
 
 // src/install/opencode.ts
-import { existsSync as existsSync33, readFileSync as readFileSync27, rmSync as rmSync8 } from "fs";
+import { existsSync as existsSync34, readFileSync as readFileSync28, rmSync as rmSync8 } from "fs";
 import { join as join44 } from "path";
 var OPENCODE_MARKER = "ULTRA11Y_OPENCODE_PLUGIN";
 function pluginTarget(configDir) {
@@ -69155,12 +70003,12 @@ function pluginTarget(configDir) {
 }
 function installOpencode({ configDir, pluginSource, skillsSource, enginePath }) {
   const target = pluginTarget(configDir);
-  if (existsSync33(target) && !readFileSync27(target, "utf8").includes(OPENCODE_MARKER)) {
+  if (existsSync34(target) && !readFileSync28(target, "utf8").includes(OPENCODE_MARKER)) {
     throw new Error(`refusing to overwrite ${target}: it is not a file ultra11y wrote. Remove it manually if you want the plugin here.`);
   }
-  const reports = [writeTextWithBackup(target, readFileSync27(pluginSource, "utf8"))];
-  if (enginePath && existsSync33(enginePath)) {
-    reports.push(writeTextWithBackup(join44(configDir, "plugin", "ultra11y.mjs"), readFileSync27(enginePath, "utf8")));
+  const reports = [writeTextWithBackup(target, readFileSync28(pluginSource, "utf8"))];
+  if (enginePath && existsSync34(enginePath)) {
+    reports.push(writeTextWithBackup(join44(configDir, "plugin", "ultra11y.mjs"), readFileSync28(enginePath, "utf8")));
   }
   if (skillsSource) reports.push(...copySkillsInto(skillsSource, join44(configDir, "skills")));
   return {
@@ -69175,13 +70023,13 @@ function installOpencode({ configDir, pluginSource, skillsSource, enginePath }) 
 function uninstallOpencode({ configDir }) {
   const reports = [];
   const target = pluginTarget(configDir);
-  if (existsSync33(target) && readFileSync27(target, "utf8").includes(OPENCODE_MARKER)) {
+  if (existsSync34(target) && readFileSync28(target, "utf8").includes(OPENCODE_MARKER)) {
     rmSync8(target, { force: true });
     rmSync8(join44(configDir, "plugin", "ultra11y.mjs"), { force: true });
     reports.push({ path: target, changed: true });
   }
   const configPath = join44(configDir, "opencode.json");
-  if (existsSync33(configPath)) {
+  if (existsSync34(configPath)) {
     reports.push(
       editJsonFile(configPath, (root) => {
         if (!Array.isArray(root.plugin)) return;
@@ -69195,9 +70043,9 @@ function uninstallOpencode({ configDir }) {
 }
 function opencodeWired(configDir) {
   const target = pluginTarget(configDir);
-  if (existsSync33(target) && readFileSync27(target, "utf8").includes(OPENCODE_MARKER)) return true;
+  if (existsSync34(target) && readFileSync28(target, "utf8").includes(OPENCODE_MARKER)) return true;
   try {
-    const cfg = JSON.parse(readFileSync27(join44(configDir, "opencode.json"), "utf8"));
+    const cfg = JSON.parse(readFileSync28(join44(configDir, "opencode.json"), "utf8"));
     return Array.isArray(cfg.plugin) && cfg.plugin.some((p) => /^ultra11y(@|$)/.test(String(p)));
   } catch {
     return false;
@@ -69205,7 +70053,7 @@ function opencodeWired(configDir) {
 }
 
 // src/install/index.ts
-import { existsSync as existsSync34 } from "fs";
+import { existsSync as existsSync35 } from "fs";
 import { join as join45 } from "path";
 var ALL_TARGETS = ["claude-code", "codex", "opencode"];
 function parseTargets(flags2) {
@@ -69256,12 +70104,12 @@ function installForTargets(opts) {
           }
           const configDir = opts.project === true ? join45(cwd, ".opencode") : opencodeConfigDir();
           if (!opts.dryRun) {
-            const engine = existsSync34(pinnedEnginePath()) ? pinnedEnginePath() : join45(packageRoot() ?? "", "scripts", "ultra11y.mjs");
+            const engine = existsSync35(pinnedEnginePath()) ? pinnedEnginePath() : join45(packageRoot() ?? "", "scripts", "ultra11y.mjs");
             const out3 = installOpencode({
               configDir,
               pluginSource: source,
               skillsSource: opts.skills === false ? null : bundledSkillsDir(),
-              enginePath: existsSync34(engine) ? engine : null
+              enginePath: existsSync35(engine) ? engine : null
             });
             r.reports.push(...out3.reports);
             r.guidance.push(...out3.guidance);
@@ -70240,7 +71088,7 @@ function pagesComment(result, opts = {}) {
 
 // src/evidence.ts
 import { createHash as createHash7 } from "crypto";
-import { existsSync as existsSync35, mkdirSync as mkdirSync14, readFileSync as readFileSync28, writeFileSync as writeFileSync17 } from "fs";
+import { existsSync as existsSync36, mkdirSync as mkdirSync14, readFileSync as readFileSync29, writeFileSync as writeFileSync17 } from "fs";
 import { join as join46 } from "path";
 var DEFAULT_GEOMETRY = { pad: 24, minWidth: 320, minHeight: 120, maxWidth: 960, maxHeight: 540 };
 var DEFAULT_CAPS = { perRule: 6, perPage: 12, total: 200 };
@@ -70258,7 +71106,7 @@ function pageIdOfSnapshot(file) {
 }
 function readJson3(file) {
   try {
-    return JSON.parse(readFileSync28(file, "utf8"));
+    return JSON.parse(readFileSync29(file, "utf8"));
   } catch {
     return void 0;
   }
@@ -70276,13 +71124,13 @@ function loadPageEvidence(root, pageId) {
   const dir = snapshotDir(root, pageId);
   const domFile = join46(dir, "dom.html");
   const shotFile = join46(dir, "screen.png");
-  if (!existsSync35(domFile)) return { skip: "no-snapshot" };
-  if (!existsSync35(shotFile)) return { skip: "no-screenshot" };
+  if (!existsSync36(domFile)) return { skip: "no-snapshot" };
+  if (!existsSync36(shotFile)) return { skip: "no-screenshot" };
   let dom;
   let shot;
   try {
-    dom = readFileSync28(domFile, "utf8");
-    shot = readFileSync28(shotFile);
+    dom = readFileSync29(domFile, "utf8");
+    shot = readFileSync29(shotFile);
   } catch {
     return { skip: "no-snapshot" };
   }
@@ -70532,7 +71380,7 @@ function writeEvidence(result, opts) {
 }
 
 // src/html-emit.ts
-import { mkdirSync as mkdirSync15, readFileSync as readFileSync29, statSync as statSync16, writeFileSync as writeFileSync18 } from "fs";
+import { mkdirSync as mkdirSync15, readFileSync as readFileSync30, statSync as statSync17, writeFileSync as writeFileSync18 } from "fs";
 import { join as join47 } from "path";
 
 // src/html.ts
@@ -71254,14 +72102,14 @@ var T5 = {
 var mb = (n) => (n / (1024 * 1024)).toFixed(1);
 function inlineSize(path) {
   try {
-    return Math.ceil(statSync16(path).size / 3) * 4;
+    return Math.ceil(statSync17(path).size / 3) * 4;
   } catch {
     return 0;
   }
 }
 function dataUri(path) {
   try {
-    return `data:image/png;base64,${readFileSync29(path).toString("base64")}`;
+    return `data:image/png;base64,${readFileSync30(path).toString("base64")}`;
   } catch {
     return void 0;
   }
@@ -71414,8 +72262,8 @@ function noticeRuns(notices) {
 
 // src/dev.ts
 import { createServer } from "http";
-import { mkdirSync as mkdirSync16, readFileSync as readFileSync30, writeFileSync as writeFileSync19 } from "fs";
-import { dirname as dirname17, join as join48 } from "path";
+import { mkdirSync as mkdirSync16, readFileSync as readFileSync31, writeFileSync as writeFileSync19 } from "fs";
+import { dirname as dirname18, join as join48 } from "path";
 var DEV_DEFAULT_PORT = 4111;
 function criterionLabel3(f, standard) {
   if (isCore(standard)) return `WCAG ${f.criteriaId}`;
@@ -71657,7 +72505,7 @@ function judgePages(result) {
 function foldRecordedAdjudication(root, fresh) {
   let prior;
   try {
-    prior = JSON.parse(readFileSync30(join48(root, "audits", "audit-latest.json"), "utf8"));
+    prior = JSON.parse(readFileSync31(join48(root, "audits", "audit-latest.json"), "utf8"));
   } catch {
     return;
   }
@@ -71773,7 +72621,7 @@ function startDevServer(opts) {
           let auditPath;
           if (applied.ok) {
             auditPath = join48(opts.root, "audits", "audit-latest.json");
-            mkdirSync16(dirname17(auditPath), { recursive: true });
+            mkdirSync16(dirname18(auditPath), { recursive: true });
             writeFileSync19(auditPath, `${JSON.stringify(applied.audit, null, 2)}
 `);
           }
@@ -72092,7 +72940,7 @@ function e2eSetupPlan(runners, paths, lang = "en") {
 }
 
 // src/orchestrate.ts
-import { existsSync as existsSync36, mkdirSync as mkdirSync17, readFileSync as readFileSync31, rmSync as rmSync9, writeFileSync as writeFileSync20 } from "fs";
+import { existsSync as existsSync37, mkdirSync as mkdirSync17, readFileSync as readFileSync32, rmSync as rmSync9, writeFileSync as writeFileSync20 } from "fs";
 import { join as join50, resolve as resolve14 } from "path";
 
 // src/orchestrate-templates.ts
@@ -72381,9 +73229,9 @@ function listPhases(runDir, engineAbs) {
   const adjPath = join50(run2, "ADJUDICATE.todo.json");
   let adjIds = [];
   let adjReady = false;
-  if (existsSync36(adjPath)) {
+  if (existsSync37(adjPath)) {
     try {
-      const f = JSON.parse(readFileSync31(adjPath, "utf8"));
+      const f = JSON.parse(readFileSync32(adjPath, "utf8"));
       if (f && f.kind === "adjudication" && Array.isArray(f.items)) {
         adjReady = true;
         adjIds = f.items.map((i2) => i2.criteriaId);
@@ -72394,9 +73242,9 @@ function listPhases(runDir, engineAbs) {
   const verPath = join50(run2, "VERIFY.todo.json");
   let verIds = [];
   let verReady = false;
-  if (existsSync36(verPath)) {
+  if (existsSync37(verPath)) {
     try {
-      const items = JSON.parse(readFileSync31(verPath, "utf8"));
+      const items = JSON.parse(readFileSync32(verPath, "utf8"));
       if (Array.isArray(items)) {
         verReady = true;
         verIds = items.map((i2) => String(i2.n));
@@ -72425,8 +73273,8 @@ function listPhases(runDir, engineAbs) {
 }
 function unrenderedInRun(run2) {
   try {
-    const audit2 = JSON.parse(readFileSync31(join50(run2, "audit-latest.json"), "utf8"));
-    const todo = JSON.parse(readFileSync31(join50(run2, "ADJUDICATE.todo.json"), "utf8"));
+    const audit2 = JSON.parse(readFileSync32(join50(run2, "audit-latest.json"), "utf8"));
+    const todo = JSON.parse(readFileSync32(join50(run2, "ADJUDICATE.todo.json"), "utf8"));
     return unrenderedResidual(audit2, todo.items ?? []);
   } catch {
     return [];
@@ -72434,7 +73282,7 @@ function unrenderedInRun(run2) {
 }
 function orchestrateRun(runDir, engineAbs, opts = {}) {
   const run2 = resolve14(runDir);
-  if (!existsSync36(run2)) {
+  if (!existsSync37(run2)) {
     return { exitCode: 2, written: [], notices: [], errors: [`run dir not found: ${run2}`], phases: [] };
   }
   const phases = listPhases(run2, engineAbs);
@@ -72476,7 +73324,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
   for (const ph of phases) {
     if (emitted.has(ph.name)) continue;
     const stale = join50(orchDir, `${ph.name}.workflow.mjs`);
-    if (existsSync36(stale)) {
+    if (existsSync37(stale)) {
       rmSync9(stale, { force: true });
       notices.push(`phase "${ph.name}": stale workflow removed \u2014 its worklist ${ph.ready ? "is now empty" : "no longer exists"}.`);
     }
@@ -72505,7 +73353,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
 import { createInterface as createInterface2 } from "readline";
 
 // src/mcp/handlers.ts
-import { existsSync as existsSync37, readFileSync as readFileSync32, realpathSync as realpathSync6, statSync as statSync17 } from "fs";
+import { existsSync as existsSync38, readFileSync as readFileSync33, realpathSync as realpathSync6, statSync as statSync18 } from "fs";
 import { isAbsolute as isAbsolute4, join as join51, resolve as resolve15, sep as sep5 } from "path";
 
 // src/criteria-view.ts
@@ -72990,8 +73838,8 @@ function requiredCwd(args2, defaults) {
   const cwd = str2(args2.cwd) ?? defaults.defaultCwd;
   if (!cwd) throw new ToolError("`cwd` is required: an absolute path to the project root.");
   const abs = resolve15(cwd);
-  if (!existsSync37(abs)) throw new ToolError(`project root not found: ${abs}`);
-  if (!statSync17(abs).isDirectory()) throw new ToolError(`\`cwd\` is not a directory: ${abs}`);
+  if (!existsSync38(abs)) throw new ToolError(`project root not found: ${abs}`);
+  if (!statSync18(abs).isDirectory()) throw new ToolError(`\`cwd\` is not a directory: ${abs}`);
   return abs;
 }
 function optionalCwd(args2, defaults) {
@@ -73101,7 +73949,7 @@ function audit(args2, cwd) {
     process.chdir(cwd);
     const inputs = strArray2(args2.globs) ?? DEFAULT_GLOBS;
     const scopedToDiff = bool(args2.changed) || bool(args2.staged) || str2(args2.since) !== void 0;
-    const extra = [CAPTURES_DIR, PAGES_DIR].filter((d) => !scopedToDiff && existsSync37(d) && !inputs.includes(d));
+    const extra = [CAPTURES_DIR, PAGES_DIR].filter((d) => !scopedToDiff && existsSync38(d) && !inputs.includes(d));
     const result = runAudit({
       inputs: [...inputs, ...extra],
       include: strArray2(args2.include),
@@ -73221,12 +74069,12 @@ function handlePackCheck(args2, cwd) {
 }
 function handleSampleCheck(cwd, standard) {
   const file = join51(cwd, ".ultra11yrc.json");
-  if (!existsSync37(file)) {
+  if (!existsSync38(file)) {
     throw new ToolError(`no .ultra11yrc.json at ${cwd} \u2014 a page sample must be declared before it can be linted.`);
   }
   let raw;
   try {
-    raw = JSON.parse(readFileSync32(file, "utf8"));
+    raw = JSON.parse(readFileSync33(file, "utf8"));
   } catch (e) {
     throw new ToolError(`.ultra11yrc.json is not valid JSON: ${e.message}`);
   }
@@ -73340,9 +74188,9 @@ function reportText(args2, tool) {
   if (inline) return inline;
   if (!file) throw new ToolError(`\`report_text\` is required \u2014 the report markdown for ultra11y_${tool} to work on.`);
   if (!isAbsolute4(file)) throw new ToolError("`report_file` must be an absolute path.");
-  if (!existsSync37(file)) throw new ToolError(`report file not found: ${file}`);
+  if (!existsSync38(file)) throw new ToolError(`report file not found: ${file}`);
   try {
-    return withReportAnnexes(readFileSync32(file, "utf8"), file, (p) => readFileSync32(p, "utf8"));
+    return withReportAnnexes(readFileSync33(file, "utf8"), file, (p) => readFileSync33(p, "utf8"));
   } catch (e) {
     throw new ToolError(e instanceof Error ? e.message : String(e));
   }
@@ -73423,10 +74271,10 @@ function handleRead(args2, cwd) {
   if (real !== root && !real.startsWith(root + sep5)) {
     throw new ToolError(`path is outside the project: ${raw}. Use your own file tool for anything else.`);
   }
-  const st = statSync17(real);
+  const st = statSync18(real);
   if (!st.isFile()) throw new ToolError(`not a file: ${raw}`);
   if (st.size > MAX_READ_BYTES) throw new ToolError(`file is too large to read (${st.size} bytes): ${raw}`);
-  const lines = readFileSync32(real, "utf8").split("\n");
+  const lines = readFileSync33(real, "utf8").split("\n");
   const total = lines.length;
   const start2 = Math.max(1, Math.floor(num2(args2.start_line) ?? 1));
   if (start2 > total) throw new ToolError(`start_line ${start2} is past the end of the file (${total} lines).`);
@@ -74081,22 +74929,22 @@ function str3(v) {
 var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t3) => t3.name));
 
 // src/mcp/resources.ts
-import { existsSync as existsSync38, readdirSync as readdirSync7, readFileSync as readFileSync33, realpathSync as realpathSync7, statSync as statSync18 } from "fs";
-import { basename as basename4, dirname as dirname18, join as join52, resolve as resolve16, sep as sep6 } from "path";
+import { existsSync as existsSync39, readdirSync as readdirSync7, readFileSync as readFileSync34, realpathSync as realpathSync7, statSync as statSync19 } from "fs";
+import { basename as basename4, dirname as dirname19, join as join52, resolve as resolve16, sep as sep6 } from "path";
 import { fileURLToPath as fileURLToPath4 } from "url";
 var SKILL_NAME = "ultra11y";
 var URI_SCHEME = "skill://";
 function resolveSkillRoot(moduleDir) {
-  const here = moduleDir ?? dirname18(fileURLToPath4(import.meta.url));
+  const here = moduleDir ?? dirname19(fileURLToPath4(import.meta.url));
   const candidates2 = [resolve16(here, ".."), resolve16(here, "..", "skills", SKILL_NAME), resolve16(here, "..", "..", "skills", SKILL_NAME)];
-  return candidates2.find((dir) => existsSync38(join52(dir, "SKILL.md")));
+  return candidates2.find((dir) => existsSync39(join52(dir, "SKILL.md")));
 }
 function listResources(moduleDir) {
   const root = resolveSkillRoot(moduleDir);
   if (!root) return [];
   const out2 = [describe(root, "SKILL.md", `${SKILL_NAME}: the skill`)];
   const refDir = join52(root, "references");
-  if (!existsSync38(refDir)) return out2;
+  if (!existsSync39(refDir)) return out2;
   for (const file of readdirSync7(refDir).sort()) {
     if (!file.endsWith(".md")) continue;
     out2.push(describe(root, join52("references", file), `${SKILL_NAME} reference: ${basename4(file, ".md")}`));
@@ -74122,8 +74970,8 @@ function readResource(uri, moduleDir) {
   if (targetReal !== rootReal && !targetReal.startsWith(rootReal + sep6)) {
     throw new ResourceError(`resource path escapes the skill root: ${uri}`);
   }
-  if (!statSync18(targetReal).isFile()) throw new ResourceError(`not a file: ${uri}`);
-  return { uri, mimeType: "text/markdown", text: readFileSync33(targetReal, "utf8") };
+  if (!statSync19(targetReal).isFile()) throw new ResourceError(`not a file: ${uri}`);
+  return { uri, mimeType: "text/markdown", text: readFileSync34(targetReal, "utf8") };
 }
 var ResourceError = class extends Error {
 };
@@ -74141,7 +74989,7 @@ function describe(root, rel2, fallbackTitle) {
 function firstProse(file) {
   let text;
   try {
-    text = readFileSync33(file, "utf8");
+    text = readFileSync34(file, "utf8");
   } catch {
     return void 0;
   }
@@ -75542,9 +76390,9 @@ async function cmdAudit(p) {
   const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : void 0;
   const capturesDir = capturesFlag ?? CAPTURES_DIR;
   const scopedToDiff = p.flags.changed === true || p.flags.staged === true || since !== void 0;
-  const capturesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync39(capturesDir));
+  const capturesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync40(capturesDir));
   const useCaptures = capturesWanted && !scopedToDiff && !inputs.includes(capturesDir);
-  const pagesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && existsSync39(PAGES_DIR);
+  const pagesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && existsSync40(PAGES_DIR);
   const usePages = pagesWanted && !scopedToDiff && !inputs.includes(PAGES_DIR);
   const pagesInScope = pagesWanted && !scopedToDiff;
   const auditInputs = [...inputs, ...useCaptures ? [capturesDir] : [], ...usePages ? [PAGES_DIR] : []];
@@ -75589,7 +76437,7 @@ async function cmdAudit(p) {
     const asFile = out2.toLowerCase().endsWith(".json");
     const target = asFile ? out2 : join53(out2, "audit-latest.json");
     try {
-      mkdirSync18(asFile ? dirname19(out2) : out2, { recursive: true });
+      mkdirSync18(asFile ? dirname20(out2) : out2, { recursive: true });
       writeFileSync21(target, JSON.stringify(document, null, 2) + "\n");
       console.error(lang === "fr" ? `\u2192 audit \xE9crit dans ${target}` : `\u2192 audit written to ${target}`);
     } catch {
@@ -75609,7 +76457,7 @@ async function cmdAudit(p) {
   const baselineFlag = p.flags.baseline;
   if (typeof baselineFlag === "string" && baselineFlag) {
     let baseline = null;
-    if (existsSync39(baselineFlag)) {
+    if (existsSync40(baselineFlag)) {
       try {
         const parsed = unwrapAudit(JSON.parse(readText(baselineFlag)));
         if (isCurrentAudit(parsed)) baseline = parsed;
@@ -75799,7 +76647,7 @@ ${found} page(s) discovered, ${merged.added.length} new. Nothing was written \u2
   }
   const file = join53(process.cwd(), ".ultra11yrc.json");
   let doc = {};
-  if (existsSync39(file)) {
+  if (existsSync40(file)) {
     try {
       doc = JSON.parse(readText(file));
     } catch {
@@ -75880,13 +76728,13 @@ async function cmdPages(p) {
   const shotsRelative = (fileDir) => {
     const m = /* @__PURE__ */ new Map();
     for (const pg of derived) {
-      if (existsSync39(shotOf(pg.id))) m.set(pg.id, relative6(fileDir, shotOf(pg.id)).split("\\").join("/"));
+      if (existsSync40(shotOf(pg.id))) m.set(pg.id, relative6(fileDir, shotOf(pg.id)).split("\\").join("/"));
     }
     return m;
   };
   const shotPaths = (pages) => {
     const m = /* @__PURE__ */ new Map();
-    for (const pg of pages) if (existsSync39(shotOf(pg.id))) m.set(pg.id, shotOf(pg.id));
+    for (const pg of pages) if (existsSync40(shotOf(pg.id))) m.set(pg.id, shotOf(pg.id));
     return m;
   };
   const shotsCopiedInto = (dir) => {
@@ -75894,7 +76742,7 @@ async function cmdPages(p) {
     const assets = join53(dir, "assets");
     for (const pg of derived) {
       const src = shotOf(pg.id);
-      if (!existsSync39(src)) continue;
+      if (!existsSync40(src)) continue;
       mkdirSync18(assets, { recursive: true });
       copyFileSync4(src, join53(assets, `${pg.id}.png`));
       m.set(pg.id, `./assets/${pg.id}.png`);
@@ -76503,7 +77351,7 @@ async function cmdTickets(p) {
 }
 function depsAt(root) {
   const pkgPath = join53(root, "package.json");
-  if (!existsSync39(pkgPath)) return {};
+  if (!existsSync40(pkgPath)) return {};
   try {
     const pkg = JSON.parse(readText(pkgPath));
     return { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
@@ -76529,7 +77377,7 @@ function cmdRender(p) {
       console.error(`ultra11y render: --runner must be playwright|cypress|auto (got "${forced}").`);
       return 2;
     }
-    const detected = detectE2eRunner(depsAt(root), (f) => existsSync39(join53(root, f)));
+    const detected = detectE2eRunner(depsAt(root), (f) => existsSync40(join53(root, f)));
     const runners = forced && forced !== "auto" ? [forced] : detected;
     if (!runners.length) {
       console.error(e2eSetupPlan([], {}, lang));
@@ -76577,7 +77425,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const rel2 = ".ultra11y/capture-setup.mjs";
     const out2 = join53(root, rel2);
     try {
-      mkdirSync18(dirname19(out2), { recursive: true });
+      mkdirSync18(dirname20(out2), { recursive: true });
       writeFileSync21(out2, captureSetup());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out2}: ${e instanceof Error ? e.message : String(e)}`);
@@ -76585,19 +77433,19 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     }
     let setupDeps = {};
     const setupPkg = join53(root, "package.json");
-    if (existsSync39(setupPkg)) {
+    if (existsSync40(setupPkg)) {
       try {
         const pkg = JSON.parse(readText(setupPkg));
         setupDeps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
       } catch {
       }
     }
-    const tr = detectTestRunner(setupDeps, (f) => existsSync39(join53(root, f)));
+    const tr = detectTestRunner(setupDeps, (f) => existsSync40(join53(root, f)));
     console.log(captureSetupPlan(tr, rel2, lang));
     const gaLine = ".ultra11y/captures/*.html text eol=lf linguist-generated=true";
     const gaPath = join53(root, ".gitattributes");
     try {
-      const existing = existsSync39(gaPath) ? readFileSync34(gaPath, "utf8") : "";
+      const existing = existsSync40(gaPath) ? readFileSync35(gaPath, "utf8") : "";
       if (!existing.includes(".ultra11y/captures/")) {
         appendFileSync(gaPath, (existing && !existing.endsWith("\n") ? "\n" : "") + gaLine + "\n");
         console.log(lang === "fr" ? `.gitattributes : ajout\xE9 \xAB ${gaLine} \xBB` : `.gitattributes: added "${gaLine}"`);
@@ -76606,7 +77454,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     }
     try {
       const giPath = join53(root, ".gitignore");
-      if (existsSync39(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync34(giPath, "utf8")))
+      if (existsSync40(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync35(giPath, "utf8")))
         console.error(
           lang === "fr" ? "\u26A0\uFE0F .ultra11y semble ignor\xE9 par .gitignore \u2014 les captures doivent \xEAtre committ\xE9es pour le gate (ajoutez \xAB !.ultra11y/captures/ \xBB)." : '\u26A0\uFE0F .ultra11y appears gitignored \u2014 captures must be committed for the gate (add "!.ultra11y/captures/").'
         );
@@ -76616,8 +77464,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
   }
   if (p.flags.storybook === true || typeof p.flags.storybook === "string") {
     const sbDir = p.positionals[0] ?? "storybook-static";
-    const indexPath = existsSync39(join53(sbDir, "index.json")) ? join53(sbDir, "index.json") : join53(sbDir, "stories.json");
-    if (!existsSync39(indexPath)) {
+    const indexPath = existsSync40(join53(sbDir, "index.json")) ? join53(sbDir, "index.json") : join53(sbDir, "stories.json");
+    if (!existsSync40(indexPath)) {
       console.error(
         lang === "fr" ? `ultra11y render : aucun index Storybook (index.json/stories.json) dans ${sbDir}.` : `ultra11y render: no Storybook index (index.json/stories.json) in ${sbDir}.`
       );
@@ -76627,7 +77475,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const provById = new Map(stories.map((s) => [s.id, storyProvenance(s)]));
     const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : void 0;
     const htmlDir = capturesFlag ?? sbDir;
-    const htmlFiles = existsSync39(htmlDir) ? discover([htmlDir]).files.filter((f) => /\.html?$/i.test(f)) : [];
+    const htmlFiles = existsSync40(htmlDir) ? discover([htmlDir]).files.filter((f) => /\.html?$/i.test(f)) : [];
     const outDir = ".ultra11y/captures";
     let attributed = 0;
     let skipped = 0;
@@ -76676,7 +77524,7 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
     const graphExt = [...GRAPH_ONLY_EXT, ...asList(p.flags.ext) ?? []];
     const sourceFiles = discover([root], { include: asList(p.flags.include), exclude: asList(p.flags.exclude), ext: graphExt }).files;
     const graph = buildGraphStreaming(sourceFiles);
-    const capFiles = existsSync39(capturesDir) ? discover([capturesDir]).files : [];
+    const capFiles = existsSync40(capturesDir) ? discover([capturesDir]).files : [];
     const entries = capFiles.map((f) => ({ file: toPosix(f), provenance: parseCaptureProvenance(readText(f)) }));
     const cov = computeCaptureCoverage(graph, entries);
     if (p.flags.json) console.log(JSON.stringify(cov, null, 2));
@@ -76685,14 +77533,14 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
   }
   let deps = {};
   const pkgPath = join53(root, "package.json");
-  if (existsSync39(pkgPath)) {
+  if (existsSync40(pkgPath)) {
     try {
       const pkg = JSON.parse(readText(pkgPath));
       deps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
     } catch {
     }
   }
-  const detection = detectFrameworks(deps, (f) => existsSync39(join53(root, f)));
+  const detection = detectFrameworks(deps, (f) => existsSync40(join53(root, f)));
   if (p.flags.json) console.log(JSON.stringify(detection, null, 2));
   else console.log(renderPlan(detection, lang));
   return 0;
@@ -76914,7 +77762,7 @@ function applyPrune(p, standard, items, lang, untried = []) {
   let ledgerRepair;
   if (ledgerFile) {
     let ledger = readLedger(ledgerFile);
-    if (!ledger && !existsSync39(ledgerFile)) {
+    if (!ledger && !existsSync40(ledgerFile)) {
       ledger = emptyLedger(standard);
       console.error(
         lang === "fr" ? `\u26A0 Aucun registre en ${ledgerFile} \u2014 un registre vide est cr\xE9\xE9. Les verdicts d\xE9j\xE0 repli\xE9s n'y figurent pas : repliez-les avec \`verify --apply <ADJUDICATE.todo.json> --ledger\` pour qu'ils soient rejouables.` : `\u26A0 No ledger at ${ledgerFile} \u2014 creating an empty one. Verdicts folded earlier are not in it: fold them with \`verify --apply <ADJUDICATE.todo.json> --ledger\` to make them replayable.`
@@ -77072,7 +77920,7 @@ function conformityClaimsFor(p, standard, lang) {
     }
   }
   const path = named3 ?? ledgerPath(standard);
-  if (!existsSync39(path)) {
+  if (!existsSync40(path)) {
     if (named3) {
       console.error(
         lang === "fr" ? `ultra11y verify : fichier --conformities introuvable : ${named3}.` : `ultra11y verify: --conformities file not found: ${named3}.`
@@ -77625,7 +78473,7 @@ async function cmdScan(p) {
     return 0;
   }
   for (const target of p.positionals.filter((a) => a !== "-")) {
-    if (/^https?:\/\//i.test(target) || existsSync39(target)) continue;
+    if (/^https?:\/\//i.test(target) || existsSync40(target)) continue;
     console.error(
       lang === "fr" ? `ultra11y scan : fichier introuvable (file not found) : ${target}. Passez une URL http(s):// ou un fichier HTML existant.` : `ultra11y scan: File not found: ${target}. Pass an http(s):// URL or an existing HTML file.`
     );
@@ -77778,7 +78626,7 @@ async function cmdScan(p) {
     }
     let merged = mergeDynamic(audit2, dynamic, lang);
     if (dynamic.snapshots?.length) {
-      const doms = dynamic.snapshots.map((id) => join53(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f) => existsSync39(f));
+      const doms = dynamic.snapshots.map((id) => join53(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f) => existsSync40(f));
       if (doms.length) {
         const snapAudit = runAudit({ inputs: doms, onWarn: (m) => console.error(m) });
         merged = mergeSnapshotAudit(merged, snapAudit);
@@ -78192,7 +79040,7 @@ function cmdOrchestrate(p) {
   }
   const engineAbs = realpathSync8(fileURLToPath5(import.meta.url));
   if (p.flags.list === true) {
-    if (!existsSync39(runFlag)) {
+    if (!existsSync40(runFlag)) {
       console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
       return 2;
     }

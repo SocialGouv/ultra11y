@@ -200,14 +200,21 @@ const normalizeName = (s: string): string =>
 // CONTAINED in its accessible name. A voice-control user says what they see ("click Send");
 // if the accessible name is "Submit", the command silently does nothing. Only reported when
 // both halves are literal text — a dynamic name proves nothing either way.
-function labelInNameMismatchFindings(doc: Doc, formSpecific: boolean): RuleFinding[] {
+// Three populations, three rule ids, because three different RGAA tests own them: a LINK's
+// name is 6.1.5 (« le nom accessible du lien contient-il au moins l'intitulé visible ? »), a
+// form button's 11.9.2, and a scripted component's 7.1.3. One id for links and widgets alike
+// made a plain link's mismatch a decisive NC of 7.1, a criterion about scripts.
+type LabelInNameScope = "control" | "form" | "link";
+function labelInNameMismatchFindings(doc: Doc, scope: LabelInNameScope): RuleFinding[] {
   const out: RuleFinding[] = [];
   for (const el of doc.elements) {
     if (!isIntrinsic(el.tag)) continue;
-    const link = el.tag === "a" && hasAttr(el, "href");
     const role = (attr(el, "role") ?? "").trim().toLowerCase();
-    if (!link && !isButton(el) && !["button", "link", "menuitem", "tab", "checkbox", "radio", "switch"].includes(role)) continue;
-    if (isFormButton(el, doc) !== formSpecific) continue;
+    // An explicit widget role overrides the link semantics of the element carrying it.
+    const link = (el.tag === "a" && hasAttr(el, "href") && (!role || role === "link")) || role === "link";
+    if (!link && !isButton(el) && !["button", "menuitem", "tab", "checkbox", "radio", "switch"].includes(role)) continue;
+    if (link !== (scope === "link")) continue;
+    if (!link && isFormButton(el, doc) !== (scope === "form")) continue;
     if (isNameExempt(el)) continue;
     // The override must be a LITERAL aria-label: aria-labelledby points at text elsewhere
     // in the page, which the visible label may legitimately extend rather than contradict.
@@ -238,14 +245,21 @@ const labelInNameMismatch: Rule = {
   id: "label-in-name-mismatch",
   criteria: ["2.5.3"],
   severity: "majeur",
-  run: (doc) => labelInNameMismatchFindings(doc, false),
+  run: (doc) => labelInNameMismatchFindings(doc, "control"),
 };
 
 const formLabelInNameMismatch: Rule = {
   id: "form-label-in-name-mismatch",
   criteria: ["2.5.3"],
   severity: "majeur",
-  run: (doc) => labelInNameMismatchFindings(doc, true),
+  run: (doc) => labelInNameMismatchFindings(doc, "form"),
+};
+
+const linkLabelInNameMismatch: Rule = {
+  id: "link-label-in-name-mismatch",
+  criteria: ["2.5.3"],
+  severity: "majeur",
+  run: (doc) => labelInNameMismatchFindings(doc, "link"),
 };
 
 export const linksRules: Rule[] = [
@@ -256,4 +270,5 @@ export const linksRules: Rule[] = [
   controlNameTitleOnly,
   labelInNameMismatch,
   formLabelInNameMismatch,
+  linkLabelInNameMismatch,
 ];
