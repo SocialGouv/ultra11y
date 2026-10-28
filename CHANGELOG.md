@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.47.0](https://github.com/SocialGouv/ultra11y/compare/v5.46.0...v5.47.0) (2026-10-28)
+
+
+### Features
+
+* **report:** add table of contents ([#58](https://github.com/SocialGouv/ultra11y/issues/58)) ([5841a8b](https://github.com/SocialGouv/ultra11y/commit/5841a8b99f987e867f01fc7fbc04eece1a6f798c)), closes [#link](https://github.com/SocialGouv/ultra11y/issues/link)
+
 # [5.46.0](https://github.com/SocialGouv/ultra11y/compare/v5.45.1...v5.46.0) (2026-10-28)
 
 
