@@ -59,7 +59,7 @@
 <p>La commande lit les fichiers HTML, JSX, TSX, Vue, Svelte ou Astro du dossier <code>src</code>. Elle affiche les non-conformités trouvées, classées par critère RGAA, avec le fichier et la ligne. Pour un rapport daté, en Markdown et en HTML :</p>
 <pre><code>npx ultra11y audit src --standard rgaa --out audits
 npx ultra11y report --in audits/audit-latest.json --standard rgaa --html --out audits</code></pre>
-<p>Le rapport s’ouvre sur le résumé (niveau atteint, ce qu’il faut corriger), puis détaille chaque critère. Il liste aussi tout ce qui reste « à évaluer ». C’est normal : un outil automatique ne tranche qu’une petite partie du RGAA. La suite se fait avec un agent IA (voir <a href="audit.html">l’audit complet</a>).</p>
+<p>Le rapport s’ouvre sur le résumé (niveau atteint, ce qu’il faut corriger), puis un sommaire mène au détail de chaque critère. Il liste aussi tout ce qui reste « à évaluer ». C’est normal : un outil automatique ne tranche qu’une petite partie du RGAA. La suite se fait avec un agent IA (voir <a href="audit.html">l’audit complet</a>).</p>
 
 <h3>Dans un agent de code</h3>
 <p>Un <em>agent de code</em> est un assistant IA qui écrit et modifie du code dans votre dépôt (Claude Code, Codex, OpenCode…). Installé comme extension, ultra11y relit vos changements avant chaque commit, push ou <em lang="en">pull request</em>, sans que vous ayez à le demander.</p>
