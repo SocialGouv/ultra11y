@@ -612,6 +612,26 @@ describe("focus visibility on a pseudo-element ring", () => {
     expect(hit?.changed).toBe(true);
   }, 60_000);
 
+  // RGAA 10.7.1 accepts « un style du focus défini par l'auteur [qui] est visible », wherever the
+  // author put it. Two common places the probe never looked, each a decisive false NC (#65):
+  // the wrapper (`.card:focus-within`) and the next sibling (`input:focus + .label`).
+  it("sees an indicator painted on the wrapper or on the next sibling", async () => {
+    if (!browserAvailable) return;
+    const base = (css: string, body: string) =>
+      `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>F</title><style>${css}</style></head><body><main><h1>F</h1>${body}</main></body></html>`;
+    const wrapper = await focusHit(
+      base("a:focus { outline: none; } .carte:focus-within { outline: 3px solid #0050a0; }", '<div class="carte"><a href="/a">Carte</a></div>'),
+    );
+    expect(wrapper.hit?.changed).toBe(true);
+    const sibling = await focusHit(
+      base(
+        ".puce:focus { outline: none; } .puce:focus + .etiquette { outline: 2px solid #0050a0; }",
+        '<p><input type="checkbox" class="puce"><span class="etiquette">Option</span></p>',
+      ),
+    );
+    expect(sibling.hit?.changed).toBe(true);
+  }, 60_000);
+
   // THE RISK THE PSEUDO-ELEMENT READ INTRODUCES, TESTED RATHER THAN ASSUMED.
   //
   // Reading `::before` and `::after` on EVERY focusable — not just label proxies — means an

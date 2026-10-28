@@ -258,8 +258,16 @@ export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFoc
   // the probe reports « no visible change » — a finding rather than a silent pass. That is the
   // safe direction: this tool would rather name something a human can dismiss than clear
   // something nobody will look at again.
-  const __style = (e, pseudo) => { const s = getComputedStyle(e, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
-  const snap = (e) => [__style(e, null), __style(e, '::before'), __style(e, '::after')].join('#');
+  // THE INDICATOR MAY NOT BE ON THE ELEMENT. RGAA 10.7.1 accepts « un style du focus défini par
+  // l'auteur [qui] est visible », and authors put it on the wrapper (:focus-within outlining a
+  // card), on the next sibling (input:focus + .label — the visually-hidden checkbox pattern), or
+  // in a property the first version did not read (transform, text-shadow, a side border). Each
+  // was a decisive « focus not visible » on a visible indicator. So the parent, the grandparent
+  // and the next sibling are compared too, and the property list is wider.
+  // (No backticks in this comment: it lives inside a template literal.)
+  const __style = (e, pseudo) => { const s = getComputedStyle(e, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.borderLeftWidth, s.borderRightWidth, s.backgroundColor, s.backgroundImage, s.color, s.textDecorationLine, s.textShadow, s.transform, s.opacity, s.filter].join('|'); };
+  const __ctx = (e) => [e.parentElement, e.parentElement && e.parentElement.parentElement, e.nextElementSibling].map((x) => (x ? __style(x, null) : '-')).join('~');
+  const snap = (e) => [__style(e, null), __style(e, '::before'), __style(e, '::after')].join('#') + '@' + __ctx(e);
   // Visually-hidden radio/checkbox → measure its visible label/proxy, not the input.
   const proxyFor = (e) => {
     const type = (e.getAttribute('type') || '').toLowerCase();
@@ -319,8 +327,10 @@ export const FOCUS_CHECK_PROBE = `(() => {
   // (No backticks in this comment: it lives inside a template literal.)
   // Same three boxes, same animation exclusion as pass 1 -- an animating box contributes a
   // constant on both sides, so it can never fabricate a difference (nor hide a real one).
-  const st = (pseudo) => { const s = getComputedStyle(proxy, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.backgroundColor, s.color, s.textDecorationLine].join('|'); };
-  const now = [st(null), st('::before'), st('::after')].join('#');
+  const sty = (el, pseudo) => { const s = getComputedStyle(el, pseudo); if (s.animationName && s.animationName !== 'none') return 'animated'; return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderTopWidth, s.borderBottomWidth, s.borderLeftWidth, s.borderRightWidth, s.backgroundColor, s.backgroundImage, s.color, s.textDecorationLine, s.textShadow, s.transform, s.opacity, s.filter].join('|'); };
+  const st = (pseudo) => sty(proxy, pseudo);
+  const ctx = [proxy.parentElement, proxy.parentElement && proxy.parentElement.parentElement, proxy.nextElementSibling].map((x) => (x ? sty(x, null) : '-')).join('~');
+  const now = [st(null), st('::before'), st('::after')].join('#') + '@' + ctx;
   return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
 })()`;
 
