@@ -36,8 +36,8 @@
 <ul class="tiles">
   <li class="tile"><span class="v"><span data-gen="rgaa.tests.decidable">30</span> <small>/ <span data-gen="rgaa.tests.total">258</span></small></span><span class="l">tests RGAA officiels tranchables par une règle (<span data-gen="rgaa.tests.static">27</span> sur le code, <span data-gen="rgaa.tests.rendered">3</span> sur la page affichée) ; les <span data-gen="rgaa.tests.judgment">228</span> autres relèvent du jugement</span></li>
   <li class="tile"><span class="v">100 %</span><span class="l">des règles du moteur statique ont une page de test qui contient leur défaut</span></li>
-  <li class="tile"><span class="v"><span data-gen="act.recallPct">71</span> %</span><span class="l">des défauts du corpus W3C détectés, sur les <span data-gen="act.scoredRules">40</span> règles ACT que le moteur prétend couvrir</span></li>
-  <li class="tile"><span class="v"><span data-gen="act.falsePositives">0</span></span><span class="l">fausse alerte non expliquée sur <span data-gen="act.clean">364</span> exemples corrects du W3C</span></li>
+  <li class="tile"><span class="v"><span data-gen="act.recallPct">90</span> %</span><span class="l">des défauts du corpus W3C détectés, sur les <span data-gen="act.scoredRules">44</span> règles ACT que le moteur prétend couvrir</span></li>
+  <li class="tile"><span class="v"><span data-gen="act.falsePositives">0</span></span><span class="l">fausse alerte non expliquée sur <span data-gen="act.clean">401</span> exemples corrects du W3C</span></li>
 </ul>
 
 <h2>Trois batteries de tests, de la plus interne à la plus indépendante</h2>
@@ -47,7 +47,7 @@
   <thead><tr><th scope="col">Batterie</th><th scope="col">Ce qu’elle vérifie</th><th scope="col">Sa limite</th></tr></thead>
   <tbody>
     <tr><th scope="row">Classement RGAA</th><td>Chacun des <span data-gen="rgaa.tests.total">258</span> tests officiels a un niveau déclaré : code, page affichée ou jugement. La liste des <span data-gen="rgaa.tests.decidable">30</span> tests automatisables, et des règles qui les prouvent, est figée dans les tests : aucun ne peut en sortir sans faire échouer la CI. (<code>tests/rgaa-automation.test.ts</code>)</td><td>Vérifie le classement, pas la détection</td></tr>
-    <tr><th scope="row">Pages de test maison</th><td>Chaque règle du moteur statique doit se déclencher sur un HTML qui contient son défaut (<code>tests/recall-matrix.test.ts</code>). S’y ajoutent <span data-gen="tests.fixtures">111</span> fichiers dans <code>tests/fixtures/</code> : mini-site réaliste, pièges à fausses alertes, cas navigateur, retours de projets réels.</td><td>Circulaire : nos règles, testées sur nos exemples</td></tr>
+    <tr><th scope="row">Pages de test maison</th><td>Chaque règle du moteur statique doit se déclencher sur un HTML qui contient son défaut (<code>tests/recall-matrix.test.ts</code>). S’y ajoutent <span data-gen="tests.fixtures">112</span> fichiers dans <code>tests/fixtures/</code> : mini-site réaliste, pièges à fausses alertes, cas navigateur, retours de projets réels.</td><td>Circulaire : nos règles, testées sur nos exemples</td></tr>
     <tr><th scope="row">Corpus officiel W3C ACT</th><td><span data-gen="act.examples">1 134</span> exemples écrits par le groupe W3C ACT Rules, indépendamment du projet, chacun avec son résultat attendu. Une copie locale est mise à jour chaque jour par la CI. Une seule fausse alerte nouvelle, ou une baisse du nombre de défauts détectés, fait échouer les tests. (<code>tests/act-official.test.ts</code>)</td><td>Moteur statique seul (sans navigateur ni IA), et fondé sur les WCAG, pas sur le RGAA</td></tr>
   </tbody>
 </table>
@@ -55,23 +55,23 @@
 
 <h2>Le corpus W3C ACT</h2>
 <p><abbr title="Accessibility Conformance Testing">ACT</abbr> est un format du W3C pour écrire des règles de test d’accessibilité. Le groupe ACT Rules publie, pour chaque règle, de petits exemples HTML étiquetés « fautif » ou « correct ». Ils ne sont pas écrits par nous, donc pas taillés pour l’outil. Le corpus compte <span data-gen="act.examples">1 134</span> exemples répartis sur <span data-gen="act.rules">91</span> règles.</p>
-<p>Le moteur est noté sur les <span data-gen="act.scoredRules">40</span> règles ACT pour lesquelles il a une vérification équivalente. Il y détecte <strong><span data-gen="act.caught">125</span> défauts sur <span data-gen="act.failedScored">176</span></strong> et laisse tranquilles les <span data-gen="act.clean">364</span> exemples corrects, sans fausse alerte non expliquée. <span data-gen="act.divergences">9</span> écarts sont volontaires : chacun est argumenté dans <a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/act.md"><code>references/act.md</code></a>.</p>
+<p>Le moteur est noté sur les <span data-gen="act.scoredRules">44</span> règles ACT pour lesquelles il a une vérification équivalente. Il y détecte <strong><span data-gen="act.caught">168</span> défauts sur <span data-gen="act.failedScored">187</span></strong> et laisse tranquilles les <span data-gen="act.clean">401</span> exemples corrects, sans fausse alerte non expliquée. <span data-gen="act.divergences">9</span> écarts sont volontaires : chacun est argumenté dans <a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/act.md"><code>references/act.md</code></a>.</p>
 
 <h3>Les <span data-gen="act.failed.total">358</span> exemples fautifs du corpus</h3>
 <div class="card">
   <!-- gen:act-bar -->
-<div class="stack" role="img" aria-label="358 exemples fautifs : 125 détectés, 51 ratés dans le périmètre, 52 page affichée nécessaire, 110 jugement, 20 manques connus et règles obsolètes"><div class="a-caught" style="flex:125 1 0">125</div><div class="a-missed" style="flex:51 1 0">51</div><div class="a-rendered" style="flex:52 1 0">52</div><div class="a-judgment" style="flex:110 1 0">110</div><div class="a-other" style="flex:20 1 0">20</div></div>
+<div class="stack" role="img" aria-label="358 exemples fautifs : 168 détectés, 19 ratés dans le périmètre, 52 page affichée nécessaire, 112 jugement, 7 manques connus et règles obsolètes"><div class="a-caught" style="flex:168 1 0">168</div><div class="a-missed" style="flex:19 1 0">19</div><div class="a-rendered" style="flex:52 1 0">52</div><div class="a-judgment" style="flex:112 1 0">112</div><div class="a-other" style="flex:7 1 0">7</div></div>
   <ul class="legend legend-col">
-    <li><span class="sw a-caught"></span><span><strong>Détectés · 125</strong> — défauts trouvés par le moteur statique</span></li>
-    <li><span class="sw a-missed"></span><span><strong>Ratés dans le périmètre · 51</strong> — règle notée, défaut non détecté : la marge de progrès directe</span></li>
+    <li><span class="sw a-caught"></span><span><strong>Détectés · 168</strong> — défauts trouvés par le moteur statique</span></li>
+    <li><span class="sw a-missed"></span><span><strong>Ratés dans le périmètre · 19</strong> — règle notée, défaut non détecté : la marge de progrès directe</span></li>
     <li><span class="sw a-rendered"></span><span><strong>Page affichée nécessaire · 52</strong> — 14 règles ACT qui demandent un navigateur (axe, sondes) : non notées</span></li>
-    <li><span class="sw a-judgment"></span><span><strong>Jugement · 110</strong> — 29 règles ACT qui demandent l’IA ou un humain : non notées</span></li>
-    <li><span class="sw a-other"></span><span><strong>Manques connus et règles obsolètes · 20</strong> — 5 règles à implémenter (13 exemples) et 3 règles ACT obsolètes (7 exemples)</span></li>
+    <li><span class="sw a-judgment"></span><span><strong>Jugement · 112</strong> — 30 règles ACT qui demandent l’IA ou un humain : non notées</span></li>
+    <li><span class="sw a-other"></span><span><strong>Manques connus et règles obsolètes · 7</strong> — 0 règles à implémenter (0 exemples) et 3 règles ACT obsolètes (7 exemples)</span></li>
   </ul>
 <!-- /gen:act-bar -->
-  <p class="cap">Le <span data-gen="act.recallPct">71</span> % se calcule sur les règles notées (<span data-gen="act.caught">125</span> ÷ <span data-gen="act.failedScored">176</span>) ; sur tout le corpus, c’est <span data-gen="act.overallPct">35</span> % (<span data-gen="act.caught">125</span> ÷ <span data-gen="act.failed.total">358</span>). Les exemples « page affichée » pourraient être en partie détectés par <code>scan</code> (axe-core, sondes), mais ce n’est pas mesuré aujourd’hui.</p>
+  <p class="cap">Le <span data-gen="act.recallPct">90</span> % se calcule sur les règles notées (<span data-gen="act.caught">168</span> ÷ <span data-gen="act.failedScored">187</span>) ; sur tout le corpus, c’est <span data-gen="act.overallPct">47</span> % (<span data-gen="act.caught">168</span> ÷ <span data-gen="act.failed.total">358</span>). Les exemples « page affichée » pourraient être en partie détectés par <code>scan</code> (axe-core, sondes), mais ce n’est pas mesuré aujourd’hui.</p>
 </div>
-<p>Les règles qui demandent une page affichée ou un jugement sont <strong>déclarées</strong>, pas comptées comme des zéros silencieux. Les <span data-gen="act.gapRules">5</span> règles « à implémenter » sont des manques connus : le code suffirait à les décider, mais la vérification n’existe pas encore.</p>
+<p>Les règles qui demandent une page affichée ou un jugement sont <strong>déclarées</strong>, pas comptées comme des zéros silencieux. Les <span data-gen="act.gapRules">0</span> règles « à implémenter » sont des manques connus : le code suffirait à les décider, mais la vérification n’existe pas encore.</p>
 
 <div class="callout">
   <h2>Ce qu’aucune batterie ne mesure : la justesse de l’IA</h2>

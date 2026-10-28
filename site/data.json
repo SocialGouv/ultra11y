@@ -97,7 +97,7 @@
     "judgment": 38
   },
   "engine": {
-    "staticRules": 93,
+    "staticRules": 94,
     "crossRules": 7,
     "renderedRules": 6,
     "packRules": 4,
@@ -139,31 +139,31 @@
   "act": {
     "examples": 1134,
     "rules": 91,
-    "scoredRules": 40,
-    "caught": 125,
-    "failedScored": 176,
-    "recallPct": 71,
-    "clean": 364,
+    "scoredRules": 44,
+    "caught": 168,
+    "failedScored": 187,
+    "recallPct": 90,
+    "clean": 401,
     "falsePositives": 0,
     "divergences": 9,
-    "gapRules": 5,
+    "gapRules": 0,
     "renderedRules": 14,
-    "judgmentRules": 29,
+    "judgmentRules": 30,
     "deprecatedRules": 3,
     "failed": {
       "total": 358,
-      "caught": 125,
-      "missed": 51,
+      "caught": 168,
+      "missed": 19,
       "rendered": 52,
-      "judgment": 110,
-      "gap": 13,
+      "judgment": 112,
+      "gap": 0,
       "deprecated": 7,
       "outside": 0
     },
-    "overallPct": 35
+    "overallPct": 47
   },
   "tests": {
-    "fixtures": 111
+    "fixtures": 112
   },
   "criteria": [
     {
@@ -1607,6 +1607,7 @@
       "decisive": [],
       "signals": [
         "axe:landmark-one-main",
+        "bypass-blocks-missing",
         "missing-main-landmark",
         "multiple-main-landmark",
         "nav-landmark-missing",
@@ -1629,6 +1630,7 @@
       "signals": [
         "axe:bypass",
         "axe:skip-link",
+        "bypass-blocks-missing",
         "skip-link-target-missing"
       ],
       "advisory": [],
