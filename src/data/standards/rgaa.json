@@ -2400,7 +2400,7 @@
       ],
       "wcag": ["1.1.1", "2.4.4", "2.5.3"],
       "appliesTo": {
-        "ruleIds": ["pack:rgaa:download-link-format"]
+        "ruleIds": ["link-label-in-name-mismatch", "pack:rgaa:download-link-format"]
       },
       "automation": {
         "tests": {
@@ -2408,9 +2408,15 @@
           "2": "judgment",
           "3": "judgment",
           "4": "judgment",
-          "5": "judgment"
+          "5": "static"
         },
         "rules": [
+          {
+            "id": "link-label-in-name-mismatch",
+            "tests": ["5"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
           {
             "id": "pack:rgaa:download-link-format",
             "tests": ["1", "2", "3", "4", "5"],
@@ -2457,8 +2463,8 @@
           {
             "id": "icon-only-control-unnamed",
             "tests": ["1"],
-            "effect": "candidate",
-            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
           },
           {
             "id": "link-empty-name",

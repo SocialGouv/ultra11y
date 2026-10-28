@@ -23,7 +23,7 @@ describe("RGAA test-level automation contract", () => {
       static: tiers.filter((tier) => tier === "static").length,
       rendered: tiers.filter((tier) => tier === "rendered").length,
       judgment: tiers.filter((tier) => tier === "judgment").length,
-    }).toEqual({ static: 27, rendered: 3, judgment: 228 });
+    }).toEqual({ static: 28, rendered: 3, judgment: 227 });
     expect(pack.criteria.filter((criterion) => Object.values(criterion.automation!.tests).includes("judgment"))).toHaveLength(92);
   });
 
@@ -37,11 +37,11 @@ describe("RGAA test-level automation contract", () => {
 
   it("keeps the public README aligned with the generated automation contract", () => {
     const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
-    expect(readme).toContain("27 `static` tests across 19 criteria");
+    expect(readme).toContain("28 `static` tests across 20 criteria");
     expect(readme).toContain("3 `rendered` tests across 3 criteria");
-    expect(readme).toContain("21 distinct criteria that can produce a deterministic `NC`");
-    expect(readme).toContain("49 criteria receive a normative engine signal");
-    expect(readme).toContain("228 `judgment` tests across 92 criteria");
+    expect(readme).toContain("22 distinct criteria that can produce a deterministic `NC`");
+    expect(readme).toContain("50 criteria receive a normative engine signal");
+    expect(readme).toContain("227 `judgment` tests across 92 criteria");
     expect(readme).toContain("104 of 106 criteria require adjudication to earn `C`");
   });
 
@@ -98,7 +98,8 @@ describe("RGAA test-level automation contract", () => {
       { test: "5.7.3", tier: "static", rules: ["table-scope-invalid"] },
       { test: "5.7.4", tier: "static", rules: ["headers-attr-dangling"] },
       { test: "5.8.1", tier: "static", rules: ["layout-table-data-markup"] },
-      { test: "6.2.1", tier: "static", rules: ["axe:link-name", "link-empty-name"] },
+      { test: "6.1.5", tier: "static", rules: ["link-label-in-name-mismatch"] },
+      { test: "6.2.1", tier: "static", rules: ["axe:link-name", "icon-only-control-unnamed", "link-empty-name"] },
       { test: "7.1.1", tier: "static", rules: ["axe:button-name", "axe:input-button-name", "button-empty-name", "menuitem-empty-name"] },
       { test: "7.1.3", tier: "static", rules: ["label-in-name-mismatch"] },
       { test: "8.1.1", tier: "rendered", rules: ["pack:rgaa:doctype-missing"] },

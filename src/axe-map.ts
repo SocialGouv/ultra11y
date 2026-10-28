@@ -295,7 +295,7 @@ export const AXE_STATIC_TWIN: Record<string, string[]> = {
   "aria-valid-attr": ["invalid-aria-attr"],
   "aria-valid-attr-value": ["invalid-aria-value"],
   "autocomplete-valid": ["autocomplete-token-invalid"],
-  "label-content-name-mismatch": ["label-in-name-mismatch"],
+  "label-content-name-mismatch": ["label-in-name-mismatch", "link-label-in-name-mismatch"],
   "td-headers-attr": ["headers-attr-dangling"],
   "th-has-data-cells": ["th-no-data-cells"],
   "definition-list": ["dl-structure"],

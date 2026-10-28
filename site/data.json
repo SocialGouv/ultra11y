@@ -73,23 +73,23 @@
     ],
     "tests": {
       "total": 258,
-      "static": 27,
+      "static": 28,
       "rendered": 3,
-      "judgment": 228,
-      "decidable": 30
+      "judgment": 227,
+      "decidable": 31
     },
     "levels": {
       "det": 2,
-      "nc": 19,
+      "nc": 20,
       "hint": 28,
-      "llm": 57
+      "llm": 56
     },
-    "provable": 21,
+    "provable": 22,
     "deterministic": [
       "8.3",
       "8.5"
     ],
-    "touched": 49,
+    "touched": 50,
     "cNeedsJudgment": 104
   },
   "wcag": {
@@ -99,7 +99,7 @@
     "judgment": 38
   },
   "engine": {
-    "staticRules": 94,
+    "staticRules": 95,
     "crossRules": 7,
     "renderedRules": 6,
     "packRules": 4,
@@ -109,8 +109,8 @@
   "sources": [
     {
       "key": "static",
-      "touched": 39,
-      "decisive": 17,
+      "touched": 40,
+      "decisive": 18,
       "signalOnly": 22
     },
     {
@@ -142,7 +142,7 @@
     "examples": 1134,
     "rules": 91,
     "scoredRules": 44,
-    "caught": 168,
+    "caught": 169,
     "failedScored": 187,
     "recallPct": 90,
     "clean": 401,
@@ -154,8 +154,8 @@
     "deprecatedRules": 3,
     "failed": {
       "total": 358,
-      "caught": 168,
-      "missed": 19,
+      "caught": 169,
+      "missed": 18,
       "rendered": 52,
       "judgment": 112,
       "gap": 0,
@@ -689,10 +689,16 @@
       "id": "6.1",
       "theme": 6,
       "title": "Chaque lien est-il explicite (hors cas particuliers) ?",
-      "level": "llm",
-      "sources": [],
-      "decisiveSources": [],
-      "decisive": [],
+      "level": "nc",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [
+        "static"
+      ],
+      "decisive": [
+        "link-label-in-name-mismatch"
+      ],
       "signals": [],
       "advisory": [
         "pack:rgaa:download-link-format"
@@ -714,11 +720,10 @@
       ],
       "decisive": [
         "axe:link-name",
+        "icon-only-control-unnamed",
         "link-empty-name"
       ],
-      "signals": [
-        "icon-only-control-unnamed"
-      ],
+      "signals": [],
       "advisory": [],
       "tests": 1
     },

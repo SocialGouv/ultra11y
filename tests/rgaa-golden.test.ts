@@ -108,7 +108,6 @@ const SHAPES = ["source", "capture", "rendered"] as const;
 const gap = (page: string, shapes: readonly string[], ids: string[], kind: "verdict" | "evidence", why: string): [string, string][] =>
   shapes.flatMap((shape) => ids.map((id): [string, string] => [`${page} ${shape} ${id} ${kind}`, why]));
 const KNOWN_GAPS = new Map<string, string>([
-  ...gap("conforme", SHAPES, ["6.2"], "verdict", "link-empty-name ignores an <svg role=img aria-label> inside the link"),
   ...gap("non-conforme", SHAPES, ["7.5"], "evidence", "`liveRegions` harvests marked-up regions only: an unmarked status target is invisible"),
   ...gap("non-conforme", ["source"], ["8.1"], "evidence", "`doctype` harvests nothing when a source file has no doctype"),
   ...gap("non-conforme", ["source", "capture"], ["10.4", "10.11", "13.9"], "evidence", "`readingOrder` stands in for zoom, reflow and orientation"),

@@ -14,8 +14,22 @@ function titleSetByFramework(doc: Doc): boolean {
   return NEXT_METADATA.test(doc.source) && /\btitle\s*:/.test(doc.source);
 }
 
-function declaredLanguage(el: El): string {
-  return (attr(el, "lang") ?? "").trim() || (attr(el, "xml:lang") ?? "").trim();
+/** The doctype this document declares: the capture records it beside the DOM, a source file
+ *  carries it in its first lines. Empty when neither says. */
+function doctypeOf(doc: Doc): string {
+  if (doc.signals?.doctype !== undefined) return doc.signals.doctype;
+  return /<!doctype[^>]*>/i.exec(doc.source.slice(0, 2000))?.[0] ?? "";
+}
+
+/** The language a DEFAULT-language test may credit, per the RGAA 8.3.1 methodology: « l'attribut
+ *  lang sur la balise html si le code est du HTML5 ou du HTML4 », `xml:lang` alone only « si le
+ *  code est du XHTML 1.1 ». An `xml:lang` on an HTML5 page sets no language the browser exposes
+ *  (it is inert in text/html); accepting it published 8.3 conforming by silence over a page with
+ *  no usable default language. The ACT rule b5c3f8 fails it too. */
+function declaredLanguage(doc: Doc, el: El): string {
+  const lang = (attr(el, "lang") ?? "").trim();
+  if (lang) return lang;
+  return /XHTML\s+1\.1/i.test(doctypeOf(doc)) ? (attr(el, "xml:lang") ?? "").trim() : "";
 }
 
 /** A JSX spread can provide either language spelling unless later explicit attributes
@@ -32,7 +46,7 @@ const htmlLangMissing: Rule = {
   run(doc: Doc): RuleFinding[] {
     const html = elementsByTag(doc, "html")[0];
     if (!html) return [];
-    const lang = declaredLanguage(html);
+    const lang = declaredLanguage(doc, html);
     if (lang) return [];
     if (spreadMayDeclareLanguage(html)) return [];
     return [
@@ -57,14 +71,14 @@ const documentLanguageMissing: Rule = {
   run(doc: Doc): RuleFinding[] {
     const html = elementsByTag(doc, "html")[0];
     if (!html) return [];
-    if (declaredLanguage(html)) return [];
+    if (declaredLanguage(doc, html)) return [];
     if (spreadMayDeclareLanguage(html)) return [];
     const ignored = new Set(["script", "style", "title", "noscript", "template", "svg"]);
     const uncovered = doc.elements.find((el) => {
       if (ignored.has(el.tag) || isDisplayHidden(el)) return false;
       const hasDirectText = el.children.some((child) => child.type === "text" && child.data.trim() !== "");
       if (!hasDirectText) return false;
-      return ![el, ...ancestors(el)].some((node) => declaredLanguage(node) !== "");
+      return ![el, ...ancestors(el)].some((node) => declaredLanguage(doc, node) !== "");
     });
     if (!uncovered) return [];
     return [{ criteriaId: "3.1.1", el: uncovered, msgId: "document-language-missing" }];
@@ -174,6 +188,38 @@ function armsExclusive(a: string | undefined, b: string | undefined): boolean {
   return false; // one path is a prefix of the other → they can co-render
 }
 
+// The same exclusivity, written in an SFC template: a `v-if` and the `v-else-if`/`v-else`
+// siblings that follow it are ONE conditional, and only one of its arms renders. Each element
+// is mapped to the conditional chains it sits in (keyed by the chain head's offset) and the arm
+// it takes; two elements in different arms of one chain never coexist. Without it a Vue
+// template reusing an id across `v-if`/`v-else` was a decisive RGAA 8.2 failure.
+const VUE_IF = "v-if";
+const VUE_ARMS = ["v-else-if", "v-else"];
+function vueArms(el: El): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const node of [el, ...ancestors(el)]) {
+    const isArm = VUE_ARMS.some((a) => node.attribs[a] !== undefined);
+    if (node.attribs[VUE_IF] === undefined && !isArm) continue;
+    const siblings = (node.parent?.children ?? []).filter((c): c is El => c.type === "element");
+    let i = siblings.indexOf(node);
+    let arm = 0;
+    while (i > 0 && VUE_ARMS.some((a) => siblings[i]!.attribs[a] !== undefined)) {
+      i--;
+      arm++;
+    }
+    if (siblings[i]?.attribs[VUE_IF] === undefined) continue; // a stray v-else: no chain to belong to
+    out.set(siblings[i]!.start, arm);
+  }
+  return out;
+}
+function sfcArmsExclusive(a: El, b: El): boolean {
+  const ma = vueArms(a);
+  if (!ma.size) return false;
+  const mb = vueArms(b);
+  for (const [head, arm] of ma) if (mb.has(head) && mb.get(head) !== arm) return true;
+  return false;
+}
+
 const duplicateId: Rule = {
   id: "duplicate-id",
   criteria: ["4.1.2"],
@@ -190,7 +236,7 @@ const duplicateId: Rule = {
       }
       // A real collision only when this element can co-render with an earlier one of the
       // same id. Ids reused across mutually-exclusive JSX conditional arms never coexist.
-      if (prior.some((p) => !armsExclusive(p.branchArm, el.branchArm))) {
+      if (prior.some((p) => !armsExclusive(p.branchArm, el.branchArm) && !sfcArmsExclusive(p, el))) {
         out.push({ criteriaId: "4.1.2", el, msgId: "duplicate-id", params: { id } });
       }
       prior.push(el);

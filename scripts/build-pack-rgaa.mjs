@@ -150,6 +150,7 @@ const RULE_SC = {
   "placeholder-as-label": ["4.1.2"], "positive-tabindex": ["2.4.3"], "redundant-aria": ["4.1.2"], "select-has-option": ["4.1.2"],
   "skip-link-target-missing": ["2.4.1"], "bypass-blocks-missing": ["2.4.1"], "sortable-header-no-aria-sort": ["1.3.1"], "status-message-not-assertive": ["4.1.3"],
   "table-caption-missing": ["1.3.1"], "table-empty-data-cell": ["1.3.1"], "title-missing-empty": ["2.4.2"],
+  "link-label-in-name-mismatch": ["2.5.3"],
 };
 
 // ---- Judgment criteria: RGAA wordings that ask MORE than their WCAG mapping ----
@@ -221,6 +222,9 @@ const RULE_TO_CRITERIA = {
   // Theme 6 — links (6.2 link label)
   "link-empty-name": ["6.2"], "icon-only-control-unnamed": ["6.2", "11.9"], "cross-icon-only-unnamed": ["11.9"],
   "axe:link-name": ["6.2"],
+  // 6.1.5 — « pour chaque lien ayant un intitulé visible, le nom accessible du lien contient-il au
+  // moins l'intitulé visible ? ». The link half of label-in-name, which used to land on 7.1.
+  "link-label-in-name-mismatch": ["6.1"],
   // Theme 7 — scripts/ARIA (7.1 AT-compat, 7.3 keyboard, 7.5 status messages)
   "invalid-aria-role": ["7.1"], "aria-ref-missing-id": ["7.1"], "aria-required-children": ["7.1"],
   "aria-hidden-focusable": ["7.1"], "redundant-aria": ["7.1"], "nested-interactive": ["7.1"],
@@ -303,6 +307,11 @@ const DECISIVE_RULE_TESTS = {
   "2.1|iframe-title-missing": ["1"],
   "6.2|link-empty-name": ["1"],
   "6.2|axe:link-name": ["1"],
+  // A link whose only content is an icon with no name has no intitulé between <a> and </a> — the
+  // same failure as an empty link, and its only difference is the icon. (On 6.2 the rule only
+  // ever projects its LINK findings: a button finding carries WCAG 4.1.2, which 6.2 does not map.)
+  "6.2|icon-only-control-unnamed": ["1"],
+  "6.1|link-label-in-name-mismatch": ["5"],
   "8.2|duplicate-id": ["1"],
   "8.2|axe:duplicate-id": ["1"],
   "8.2|axe:duplicate-id-aria": ["1"],

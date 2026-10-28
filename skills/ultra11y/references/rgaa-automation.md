@@ -45,8 +45,8 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 5.6 | 0 / 0 / 4 | 0 / 4 / 0 | no | AI + signals |
 | 5.7 | 3 / 0 / 2 | 2 / 3 / 0 | no | deterministic NC + AI residual |
 | 5.8 | 1 / 0 / 0 | 1 / 1 / 0 | no | deterministic NC + AI residual |
-| 6.1 | 0 / 0 / 5 | 0 / 0 / 1 | no | AI |
-| 6.2 | 1 / 0 / 0 | 2 / 1 / 0 | no | deterministic NC + AI residual |
+| 6.1 | 1 / 0 / 4 | 1 / 0 / 1 | no | deterministic NC + AI residual |
+| 6.2 | 1 / 0 / 0 | 3 / 0 / 0 | no | deterministic NC + AI residual |
 | 7.1 | 2 / 0 / 1 | 5 / 20 / 0 | no | deterministic NC + AI residual |
 | 7.2 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
 | 7.3 | 0 / 0 / 2 | 0 / 1 / 0 | no | AI + signals |
@@ -241,8 +241,8 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 6.1.2 | judgment | — | — |
 | 6.1.3 | judgment | — | — |
 | 6.1.4 | judgment | — | — |
-| 6.1.5 | judgment | — | — |
-| 6.2.1 | static | `axe:link-name`, `link-empty-name` | `icon-only-control-unnamed` |
+| 6.1.5 | static | `link-label-in-name-mismatch` | — |
+| 6.2.1 | static | `axe:link-name`, `icon-only-control-unnamed`, `link-empty-name` | — |
 | 7.1.1 | static | `axe:button-name`, `axe:input-button-name`, `button-empty-name`, `menuitem-empty-name` | `aria-hidden-focusable`, `aria-ref-missing-id`, `aria-required-children`, `axe:aria-allowed-attr`, `axe:aria-allowed-role`, `axe:aria-hidden-focus`, `axe:aria-required-attr`, `axe:aria-required-children`, `axe:aria-required-parent`, `axe:aria-roles`, `axe:aria-valid-attr`, `axe:aria-valid-attr-value`, `axe:nested-interactive`, `axe:presentation-role-conflict`, `cross-prop-drilled-name-lost`, `disabled-context-content`, `invalid-aria-role`, `nested-interactive`, `presentational-children-focusable`, `redundant-aria` |
 | 7.1.2 | judgment | — | `aria-hidden-focusable`, `aria-ref-missing-id`, `aria-required-children`, `axe:aria-allowed-attr`, `axe:aria-allowed-role`, `axe:aria-hidden-focus`, `axe:aria-required-attr`, `axe:aria-required-children`, `axe:aria-required-parent`, `axe:aria-roles`, `axe:aria-valid-attr`, `axe:aria-valid-attr-value`, `axe:nested-interactive`, `axe:presentation-role-conflict`, `cross-prop-drilled-name-lost`, `disabled-context-content`, `invalid-aria-role`, `nested-interactive`, `presentational-children-focusable`, `redundant-aria` |
 | 7.1.3 | static | `label-in-name-mismatch` | `aria-hidden-focusable`, `aria-ref-missing-id`, `aria-required-children`, `axe:aria-allowed-attr`, `axe:aria-allowed-role`, `axe:aria-hidden-focus`, `axe:aria-required-attr`, `axe:aria-required-children`, `axe:aria-required-parent`, `axe:aria-roles`, `axe:aria-valid-attr`, `axe:aria-valid-attr-value`, `axe:nested-interactive`, `axe:presentation-role-conflict`, `cross-prop-drilled-name-lost`, `disabled-context-content`, `invalid-aria-role`, `nested-interactive`, `redundant-aria` |

@@ -88,7 +88,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 |---|---|---|---|---|---|
 | 2.5.1 | Pointer Gestures | A | judgment | — | 13.10 |
 | 2.5.2 | Pointer Cancellation | A | judgment | — | 13.11 |
-| 2.5.3 | Label in Name | A | judgment | label-in-name-mismatch, form-label-in-name-mismatch | 6.1, 7.1, 11.2, 11.9 |
+| 2.5.3 | Label in Name | A | judgment | label-in-name-mismatch, form-label-in-name-mismatch, link-label-in-name-mismatch | 6.1, 7.1, 11.2, 11.9 |
 | 2.5.4 | Motion Actuation | A | judgment | — | 13.12 |
 | 2.5.7 | Dragging Movements | AA | judgment | — | — |
 | 2.5.8 | Target Size (Minimum) | AA | needs-rendering | — | — |

@@ -178,11 +178,11 @@ describe("job summary", () => {
     expect(comment).not.toContain("92 %");
     expect(comment).not.toMatch(/4 constat\(s\).*aucune page/);
     expect(comment).toContain("0 page rendue : aucun test rendered n'a été exécuté");
-    expect(comment).toContain("27 test(s) static — critères :");
-    expect(comment).toContain("228 test(s) judgment sur 92 critère(s), tous transmis à l'IA");
-    expect(comment).toContain("49 critère(s) reçoivent un signal normatif");
-    expect(comment).toContain("21 critère(s) peuvent produire un NC décisif");
-    expect(comment).toContain("41 reçoivent des preuves candidates");
+    expect(comment).toContain("28 test(s) static — critères :");
+    expect(comment).toContain("227 test(s) judgment sur 92 critère(s), tous transmis à l'IA");
+    expect(comment).toContain("50 critère(s) reçoivent un signal normatif");
+    expect(comment).toContain("22 critère(s) peuvent produire un NC décisif");
+    expect(comment).toContain("40 reçoivent des preuves candidates");
     expect(comment).not.toContain("Grille exhaustive des critères");
     expect(comment).not.toContain("Synthèse par thématique");
   });

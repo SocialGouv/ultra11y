@@ -134,6 +134,15 @@ const h1Multiple: Rule = {
 // <slot> is allowed: it projects slotted <li>s (web components / SFC templates).
 const ALLOWED_IN_LIST = new Set(["li", "script", "template", "slot"]);
 
+/** A tag that renders something else, so its children's real parent is unknown statically: a
+ *  PascalCase component, and any HYPHENATED tag — a Vue component written in kebab-case, the
+ *  framework wrappers that render no element of their own (`<transition-group>`,
+ *  `<ng-container>`), a custom element. `isIntrinsic` reads only the first letter's case, so a
+ *  `<transition-group>` holding the `<li>`s of a `<ul>` was a decisive 9.3 failure. */
+function rendersElsewhere(tag: string): boolean {
+  return !isIntrinsic(tag) || tag.includes("-") || tag === "component";
+}
+
 const listStructure: Rule = {
   id: "list-structure",
   criteria: ["1.3.1"],
@@ -145,7 +154,7 @@ const listStructure: Rule = {
         // Only intrinsic (HTML) children are a definite violation; a PascalCase
         // component child may itself render an <li>, so it is left to the cross-file
         // graph / human, never asserted here.
-        const bad = el.children.find((c) => c.type === "element" && isIntrinsic(c.tag) && !ALLOWED_IN_LIST.has(c.tag));
+        const bad = el.children.find((c) => c.type === "element" && !rendersElsewhere(c.tag) && !ALLOWED_IN_LIST.has(c.tag));
         if (bad && bad.type === "element") {
           out.push({
             criteriaId: "1.3.1",
@@ -160,7 +169,7 @@ const listStructure: Rule = {
         // A <li> inside a <template> (named-slot definition) or a component subtree is
         // projected into a parent component's <ul> at render — its real parent is unknown
         // to static analysis, so this is not a definite violation.
-        if (parent.tag === "template" || ancestors(el).some((a) => a.tag === "template" || (a.tag !== "#fragment" && !isIntrinsic(a.tag)))) continue;
+        if (parent.tag === "template" || ancestors(el).some((a) => a.tag === "template" || (a.tag !== "#fragment" && rendersElsewhere(a.tag)))) continue;
         out.push({
           criteriaId: "1.3.1",
           el,
