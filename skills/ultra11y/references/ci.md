@@ -21,8 +21,14 @@ steps:
       standard: rgaa
       fail-on: blocking
       baseline: audits/baseline.json
+      exclude: 'tests/fixtures/**'   # markup that is bad by design never fails the gate
       comment: 'true'
 ```
+
+`exclude` takes comma-separated globs and applies in full and in diff mode alike. Test,
+spec and story files are already left out by default; use it for the rest — fixtures,
+demo pages — so a PR that edits a deliberately broken page does not go red on the defects
+it exists to carry.
 
 Page by page, with a real browser, in the same step:
 
