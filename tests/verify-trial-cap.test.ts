@@ -165,7 +165,24 @@ describe("verify --apply --prune --ledger with no ledger yet", () => {
     const ledger = join(out, "ledger", "rgaa.json");
     expect(existsSync(ledger)).toBe(false);
 
-    const a = await cli(["verify", "--apply", todoPath, "--report", DRAFT, "--in", auditPath, "--standard", "rgaa", "--out", out, "--prune", "--ledger", ledger, "--lang", "en"]);
+    const a = await cli([
+      "verify",
+      "--apply",
+      todoPath,
+      "--report",
+      DRAFT,
+      "--in",
+      auditPath,
+      "--standard",
+      "rgaa",
+      "--out",
+      out,
+      "--prune",
+      "--ledger",
+      ledger,
+      "--lang",
+      "en",
+    ]);
     expect(a.code, a.err).toBe(0);
     expect(a.err).toContain("No ledger at");
     expect(existsSync(ledger)).toBe(true);
@@ -182,7 +199,24 @@ describe("verify --apply --prune --ledger with no ledger yet", () => {
     writeFileSync(todoPath, JSON.stringify(todo));
     const bogus = join(out, "bogus.json");
     writeFileSync(bogus, "{}");
-    const a = await cli(["verify", "--apply", todoPath, "--report", DRAFT, "--in", auditPath, "--standard", "rgaa", "--out", out, "--prune", "--ledger", bogus, "--lang", "en"]);
+    const a = await cli([
+      "verify",
+      "--apply",
+      todoPath,
+      "--report",
+      DRAFT,
+      "--in",
+      auditPath,
+      "--standard",
+      "rgaa",
+      "--out",
+      out,
+      "--prune",
+      "--ledger",
+      bogus,
+      "--lang",
+      "en",
+    ]);
     expect(a.err).toContain("--ledger file missing, invalid, or for another standard");
     expect(readFileSync(bogus, "utf8")).toBe("{}");
   });

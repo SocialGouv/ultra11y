@@ -97,7 +97,9 @@ export function auditSummary(r: AuditResult, lang: Lang, standard: StandardId = 
   // a number that sounds like a verdict on the site. The count says what was settled.
   const sum = (k: "c" | "nc" | "manual") => rows.reduce((n, row) => n + row[k], 0);
   const total = sum("c") + sum("nc") + sum("manual");
-  lines.push(`${r.scope.files} ${t(lang, "files")} · ${total - sum("manual")}/${total} ${t(lang, "decided")} (C ${sum("c")} · NC ${sum("nc")}) · ${sum("manual")} ${t(lang, "toAdjudicate")}`);
+  lines.push(
+    `${r.scope.files} ${t(lang, "files")} · ${total - sum("manual")}/${total} ${t(lang, "decided")} (C ${sum("c")} · NC ${sum("nc")}) · ${sum("manual")} ${t(lang, "toAdjudicate")}`,
+  );
   lines.push("");
   // Columns sized to the widest cell, never truncated: « 9. Structuration de l'inform » was
   // the theme name a reader got, under a header that did not line up with its numbers.
