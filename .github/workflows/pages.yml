@@ -19,6 +19,13 @@ on:
       - "scripts/**"
       - "package.json"
       - ".github/workflows/pages.yml"
+  # The release commit carries [skip ci], which skips the push trigger above — so the site
+  # kept quoting the previous version. Redeploy once a release has run, from main's head,
+  # which by then holds the release commit and its regenerated site/.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
   workflow_dispatch: {}
 
 # Least privilege: read the repository, write the Pages deployment, and mint the OIDC token
@@ -36,6 +43,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
