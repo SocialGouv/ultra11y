@@ -452,7 +452,8 @@ describe("renderReport — advisory recommendations section", () => {
 
   it("renders a Recommendations section AFTER the non-conformities, and NOT among them", () => {
     const md = renderReport(twoH1, "en");
-    const recIdx = md.indexOf("Recommendations (non-normative)");
+    // The heading itself — the contents also name the section, above §2.
+    const recIdx = md.indexOf("## 💡 Recommendations (non-normative)");
     const ncIdx = md.indexOf("## 2. Non-conformities");
     const conformingIdx = md.indexOf("## 3. Conforming");
     expect(recIdx).toBeGreaterThan(-1);

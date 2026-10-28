@@ -60430,6 +60430,7 @@ var L5 = {
     autoRateNote: (c2, d) => `crit\xE8res valid\xE9s par le moteur seul \xF7 crit\xE8res d\xE9cid\xE9s sans l'agent (${c2} \xF7 ${d})`,
     warn: "Ce rapport couvre le sous-ensemble de crit\xE8res v\xE9rifiables automatiquement. Les crit\xE8res \xAB \xE0 \xE9valuer \xBB (rendu / jugement) sont adjug\xE9s par l'agent IA (`verify --manual`, de fa\xE7on gat\xE9e) ; le rendu passe par `scan` (voir la section 5).",
     derived: (std) => `Rapport ${std}. Chaque crit\xE8re est jug\xE9 sur ses propres tests ; la v\xE9rification d'int\xE9grit\xE9 (\`check\`/\`verify\`) op\xE8re sur le m\xEAme p\xE9rim\xE8tre.`,
+    contents: "Sommaire",
     synthTitle: (by) => `1. Synth\xE8se par ${by}`,
     byGuideline: "r\xE8gle WCAG",
     byTheme: "th\xE9matique",
@@ -60626,6 +60627,7 @@ var L5 = {
     autoRateNote: (c2, d) => `criteria validated by the engine alone \xF7 criteria decided without the agent (${c2} \xF7 ${d})`,
     warn: "This report covers the subset of criteria checkable automatically. The \u201Cto assess\u201D criteria (rendering / judgment) are adjudicated by the AI agent (`verify --manual`, gated); rendering goes through `scan` (see section 5).",
     derived: (std) => `${std} report. Every criterion is judged on its own tests; the integrity gates (\`check\`/\`verify\`) operate on the same scope.`,
+    contents: "Contents",
     synthTitle: (by) => `1. Synthesis by ${by}`,
     byGuideline: "WCAG guideline",
     byTheme: "theme",
@@ -61230,8 +61232,20 @@ function render(r, lang, opts) {
   if (r.scope.truncated || r.scope.captureCoverage?.blindSpots.length) out2.push(`> \u26A0\uFE0F ${s.scopeCaveat}`, "");
   out2.push(`> ${s.annexPointer(annexFile)}`, "");
   out2.push(...renderSummary(summaryModel(lang, opts.std, opts.standard, tot, ncUnits, advisoryUnits.length, resolver), lang));
+  const derivedPages = pageScope.length ? derivePages(r, pageScope) : [];
+  const contents = [
+    ["synthesis", s.synthTitle(opts.groupHead)],
+    ["non-conformities", s.ncTitle],
+    ...advisoryUnits.length ? [["recommendations", `\u{1F4A1} ${s.recTitle}`]] : [],
+    ...derivedPages.length ? [["page-rates", `\u{1F4CB} ${s.pageRatesTitle}`]] : [],
+    ...derivedPages.length ? [["page-findings", `\u{1F4C4} ${s.perPageTitle}`]] : [],
+    ["conforming", s.cTitle],
+    ["not-applicable", s.naTitle],
+    ["to-assess", s.manualTitle]
+  ];
+  out2.push(`## ${s.contents}`, "", ...contents.map(([id, title]) => `- [${title}](#${id})`), "");
   const th = s.th(opts.groupHead);
-  out2.push(`## ${s.synthTitle(opts.groupHead)}`, "");
+  out2.push('<a id="synthesis"></a>', `## ${s.synthTitle(opts.groupHead)}`, "");
   out2.push(`| ${th.join(" | ")} |`);
   out2.push(`|${"---|".repeat(th.length)}`);
   for (const g of opts.groups) {
@@ -61240,7 +61254,7 @@ function render(r, lang, opts) {
   }
   out2.push(`| **${s.total}** | **${tot.c}** | **${tot.nc}** | **${tot.na}** | **${tot.manual}** |`, "");
   out2.push(`> ${s.naSubset(tot.c + tot.nc + tot.manual)}`, "");
-  out2.push(`## ${s.ncTitle}`, "");
+  out2.push('<a id="non-conformities"></a>', `## ${s.ncTitle}`, "");
   if (ncUnits.length === 0) {
     out2.push(s.none, "");
   } else {
@@ -61253,13 +61267,12 @@ function render(r, lang, opts) {
     }
   }
   if (advisoryUnits.length) {
-    out2.push(`## \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
+    out2.push('<a id="recommendations"></a>', `## \u{1F4A1} ${s.recTitle}`, "", `> ${s.recNote}`, "");
     for (const u of advisoryUnits) out2.push(renderReaderAdvisory(u, lang, resolver));
     out2.push("");
   }
-  const derivedPages = pageScope.length ? derivePages(r, pageScope) : [];
   if (derivedPages.length) {
-    out2.push(`## \u{1F4CB} ${s.pageRatesTitle}`, "", `> ${s.pageRatesNoteBusiness}`, "");
+    out2.push('<a id="page-rates"></a>', `## \u{1F4CB} ${s.pageRatesTitle}`, "", `> ${s.pageRatesNoteBusiness}`, "");
     out2.push(`| ${s.pageCol} | ${s.urlCol} | ${s.rateCol} |`, "| --- | --- | --- |");
     for (const p of derivedPages) {
       const criteria = pageCriterionRows(r, p, opts.standard, lang);
@@ -61276,7 +61289,7 @@ function render(r, lang, opts) {
     else out2.push(grid);
   }
   if (derivedPages.length) {
-    out2.push(`## \u{1F4C4} ${s.perPageTitle}`, "", `> ${s.perPageNote}`, "");
+    out2.push('<a id="page-findings"></a>', `## \u{1F4C4} ${s.perPageTitle}`, "", `> ${s.perPageNote}`, "");
     if (r.scope.sample?.transverse?.length) out2.push(`> ${s.transverseNote(r.scope.sample.transverse.join(", "))}`, "");
     if (r.scope.redirected?.length) out2.push(...renderRedirected(r.scope.redirected, lang), "");
     for (const pg of derivedPages) {
@@ -61304,7 +61317,7 @@ function render(r, lang, opts) {
       out2.push("", "</details>", "");
     }
   }
-  out2.push(`## ${s.cTitle}`, "");
+  out2.push('<a id="conforming"></a>', `## ${s.cTitle}`, "");
   const conform = rows.filter((x) => x.status === "C" && !x.inapplicable);
   const byEngine = conform.filter((x) => x.decidedBy !== "agent");
   const byAgent = conform.filter((x) => x.decidedBy === "agent");
@@ -61327,7 +61340,7 @@ function render(r, lang, opts) {
       );
     }
   }
-  out2.push(`## ${s.naTitle}`, "");
+  out2.push('<a id="not-applicable"></a>', `## ${s.naTitle}`, "");
   const na = rows.filter((x) => x.status === "C" && x.inapplicable);
   if (!na.length) out2.push(s.nothing, "");
   else {
@@ -61339,7 +61352,7 @@ function render(r, lang, opts) {
       )
     );
   }
-  out2.push(`## ${s.manualTitle}`, "");
+  out2.push('<a id="to-assess"></a>', `## ${s.manualTitle}`, "");
   const manual = rows.filter((x) => x.status === "manual");
   const pack5 = isCore(opts.standard) ? void 0 : loadPack(opts.standard);
   const exhaustiveContract = pack5?.criteria.every((criterion) => criterion.automation !== void 0) === true;
@@ -70616,6 +70629,7 @@ function refusalBlocks(r) {
 }
 var T4 = {
   fr: {
+    contents: "Sommaire",
     reportTitle: "Rapport de conformit\xE9",
     indexTitle: "Rapport d'accessibilit\xE9",
     pagesTitle: "Rapport page par page",
@@ -70679,6 +70693,7 @@ var T4 = {
     owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "\xE0 adjuger" }
   },
   en: {
+    contents: "Contents",
     reportTitle: "Conformance report",
     indexTitle: "Accessibility report",
     pagesTitle: "Page-by-page report",
@@ -71078,8 +71093,9 @@ function compositeDoc(result, opts = {}) {
   const lang = opts.lang ?? "en";
   const t3 = T4[lang];
   const h2 = headline(result, standard, lang);
+  const summary = summaryBlocks(result, standard, lang);
   const blocks = [
-    ...summaryBlocks(result, standard, lang),
+    ...summary,
     ...scopeBlocks(result, standard, lang),
     ...synthesisBlocks(result, standard, lang),
     ...criteriaGridBlocks(result, standard, lang)
@@ -71089,6 +71105,8 @@ function compositeDoc(result, opts = {}) {
   blocks.push(...scoreboardBlocks(result, standard, lang));
   const scope = pagesOf(result);
   if (scope.length) blocks.push(...crossGridBlocks(result, derivePages(result, scope), standard, lang));
+  const contents = blocks.slice(summary.length).filter((block) => block.kind === "heading" && block.level === 2 && Boolean(block.id)).map((block) => [{ text: block.text, href: `#${block.id}` }]);
+  if (contents.length) blocks.splice(summary.length, 0, { kind: "heading", level: 2, text: t3.contents, id: "contents" }, { kind: "list", items: contents });
   return { lang, title: `${t3.reportTitle} ${standardLabel(standard)} \u2014 ${result.date}`, subtitle: h2.runs, ...opts.nav ? { nav: opts.nav } : {}, blocks };
 }
 function pagesIndexDoc(result, opts = { sheetHref: (id) => `./page-${id}.html` }) {

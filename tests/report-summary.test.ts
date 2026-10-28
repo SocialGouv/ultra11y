@@ -151,8 +151,21 @@ describe("the RGAA report opens on the summary", () => {
     for (const u of advisory) expect(rows.some((r) => r.includes(u.label))).toBe(false);
   });
 
-  it("prints plain criterion titles, not glossary links that resolve nowhere in the report", () => {
-    expect(md).not.toMatch(/\]\(#[a-z0-9-]+\)/);
+  // Criterion titles stay plain text: a glossary link would point at a definition this report
+  // does not carry. The only in-page links are the contents, and each must land on an anchor
+  // the report really writes — a link that resolves nowhere is the bug, not the link itself.
+  it("prints plain criterion titles, and every in-page link resolves to an anchor in the report", () => {
+    const targets = [...md.matchAll(/\]\(#([a-z0-9-]+)\)/g)].map((m) => m[1]!);
+    const anchors = new Set([...md.matchAll(/<a id="([a-z0-9-]+)"><\/a>/g)].map((m) => m[1]!));
+    expect(targets.length).toBeGreaterThan(0);
+    for (const id of targets) expect(anchors, `#${id} has no anchor`).toContain(id);
+    expect(md).not.toMatch(/\*\*\d+\.\d+ — \[[^\]]+\]\(#/);
+  });
+
+  it("puts the contents right after the summary, never before it", () => {
+    expect(md.indexOf("## Résumé")).toBeGreaterThan(-1);
+    expect(md.indexOf("## Sommaire")).toBeGreaterThan(md.indexOf("## Résumé"));
+    expect(md.indexOf("## Sommaire")).toBeLessThan(md.indexOf('<a id="synthesis"></a>'));
   });
 
   it("keeps the report's header to three lines, and the method in the annex's", () => {
