@@ -103,21 +103,9 @@ function renderedRun(name: string): Run {
 
 /** Where the engine still disagrees with the ground truth, each with the reason it is not fixed.
  *  Keys are `<page> <shape> <criterion> <verdict|evidence>`. An entry that stops happening fails
- *  the last test below, so this list can only shrink. */
-const SHAPES = ["source", "capture", "rendered"] as const;
-const gap = (page: string, shapes: readonly string[], ids: string[], kind: "verdict" | "evidence", why: string): [string, string][] =>
-  shapes.flatMap((shape) => ids.map((id): [string, string] => [`${page} ${shape} ${id} ${kind}`, why]));
-const KNOWN_GAPS = new Map<string, string>([
-  ...gap("non-conforme", SHAPES, ["7.5"], "evidence", "`liveRegions` harvests marked-up regions only: an unmarked status target is invisible"),
-  ...gap("non-conforme", ["source"], ["8.1"], "evidence", "`doctype` harvests nothing when a source file has no doctype"),
-  ...gap("non-conforme", ["source", "capture"], ["10.4", "10.11", "13.9"], "evidence", "`readingOrder` stands in for zoom, reflow and orientation"),
-  ...gap("conforme", SHAPES, ["10.4", "10.11", "10.12", "13.9"], "evidence", "`readingOrder` stands in for zoom, reflow, spacing and orientation"),
-  ...gap("conforme", SHAPES, ["10.1", "10.5"], "evidence", "no stylesheet is harvested for 10.1/10.5"),
-  ...gap("conforme", SHAPES, ["10.9", "10.10"], "evidence", "`sensoryText` harvests only the instructions that fail"),
-  ...gap("conforme", SHAPES, ["3.2"], "evidence", "`colourPairs` reads inline colours only"),
-  ...gap("conforme", ["source", "capture"], ["3.3"], "evidence", "`colourPairs` reads inline colours only"),
-  ...gap("conforme", SHAPES, ["13.10", "13.12"], "evidence", "`pointerHandlers` skips native controls and addEventListener gestures"),
-]);
+ *  the last test below, so this list can only shrink. Empty: every disagreement found when the
+ *  grids were written has been fixed (see skills/ultra11y/references/rgaa-review.md). */
+const KNOWN_GAPS = new Map<string, string>();
 
 const observed = new Set<string>();
 function unexplained(keys: string[]): string[] {

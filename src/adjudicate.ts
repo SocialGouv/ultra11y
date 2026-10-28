@@ -18,7 +18,15 @@ import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
 import { attachSignals, PAGES_DIR, snapshotPageId } from "./snapshot.js";
 import { loadConfig } from "./config.js";
-import { type Harvested, harvestSubjects, isSnapshotFile, pageOfDoc, subjectsForPackCriterion, subjectsForSc } from "./adjudicate-subjects.js";
+import {
+  ALWAYS_APPLICABLE,
+  type Harvested,
+  harvestSubjects,
+  isSnapshotFile,
+  pageOfDoc,
+  subjectsForPackCriterion,
+  subjectsForSc,
+} from "./adjudicate-subjects.js";
 import type { Doc } from "./parse/html.js";
 import { ADJUDICATION, adjudicationForWcagRefs } from "./adjudication-data.js";
 import { scTitle, getSC, hasSC, techniquesFor, allSC, guidelineTitle, understanding } from "./wcag.js";
@@ -427,6 +435,13 @@ function candidateFindingEvidence(findings: readonly Finding[], limit: number): 
   return evidence;
 }
 
+/** The harvest, followed by the candidate findings it does not already anchor. */
+function withCandidates(harvest: Evidence[], findings: readonly Finding[], limit: number): Evidence[] {
+  const anchored = new Set(harvest.map((e) => `${e.file}:${e.line}:${e.selector}`));
+  const extra = candidateFindingEvidence(findings, limit).filter((e) => !anchored.has(`${e.file}:${e.line}:${e.selector}`));
+  return extra.length ? [...harvest, ...extra] : harvest;
+}
+
 /** Build the adjudication worklist.
  *
  *  For the WCAG core: one item per residual-risk (manual) success criterion.
@@ -483,16 +498,19 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
           })),
           Object.keys(crit?.tests ?? {}).map((test) => `${pc.id}.${test}`),
         );
-        const candidates = item.evidence.length ? [] : candidateFindingEvidence(pc.candidateFindings ?? [], limits.maxClasses);
+        // A candidate finding is the most pointed evidence a criterion can carry, so it is cited
+        // beside the harvest rather than only in its place: once 10.11 harvested its stylesheets,
+        // the reflow probe's own finding would otherwise have dropped out of what can be cited.
+        const candidates = withCandidates(item.evidence, pc.candidateFindings ?? [], limits.maxClasses);
         return {
           ...item,
           ...(pc.status === "manual" && pc.justification?.match(/Contre-expertise\s*:/i) ? { previousReview: pc.justification } : {}),
-          ...(candidates.length
+          ...(candidates.length > item.evidence.length
             ? {
                 evidence: candidates,
                 population: {
-                  classes: candidates.length,
-                  occurrences: candidates.length,
+                  classes: (item.evidence.length ? (item.population?.classes ?? item.evidence.length) : 0) + candidates.length - item.evidence.length,
+                  occurrences: (item.evidence.length ? (item.population?.occurrences ?? item.evidence.length) : 0) + candidates.length - item.evidence.length,
                   files: new Set(candidates.map((evidence) => evidence.file)).size,
                   pages: new Set(candidates.flatMap((evidence) => evidence.pages ?? [])).size,
                 },
@@ -535,8 +553,7 @@ export function evidenceForCriteria(
     if (out.has(id)) continue;
     const crit = pack ? getCriterion(pack, id) : undefined;
     const subjects = pack && standard ? subjectsForPackCriterion(standard, id, crit?.wcag ?? []) : subjectsForSc(id);
-    let evidence = collapse(harvestSubjects(subjects, docs), limits).evidence;
-    if (!evidence.length) evidence = candidateFindingEvidence(candidates.get(id) ?? [], limits.maxClasses);
+    const evidence = withCandidates(collapse(harvestSubjects(subjects, docs), limits).evidence, candidates.get(id) ?? [], limits.maxClasses);
     out.set(id, evidence);
   }
   return out;
@@ -747,7 +764,9 @@ function anchorFor(
     let top: Evidence | undefined;
     let score = -1;
     for (const e of cands) {
-      const n = overlap(c, e);
+      // A candidate finding carries its measurement in `note` (its snippet is often empty), and an
+      // adjudicator naturally copies that note; let it win over a co-located element anchor.
+      const n = overlap(c, e) + overlap(c, { snippet: e.note });
       if (n > score) {
         score = n;
         top = e;
@@ -1062,6 +1081,12 @@ export function applyAdjudication(
       blame(it.criteriaId, `criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
     } else if (v === "C" || v === "NA") {
       if (!it.justification?.trim()) blame(it.criteriaId, `criterion ${it.criteriaId}: a ${v} verdict requires a justification`);
+      if (v === "NA" && packMode && ALWAYS_APPLICABLE[adj.standard]?.has(it.criteriaId)) {
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: applies to every page with content — « non applicable » is refused. Rule C or NC on the page's own evidence (its stylesheets, its markup, the measurements), or record "manual" (reason "undecidable") if nothing here lets you see it`,
+        );
+      }
       // A clearing verdict is gated exactly like an accusing one. Before this, the only
       // check was "the justification is a non-empty string", so `"x"` cleared a criterion —
       // and a model answering C to everything published a conformance nobody had assessed.

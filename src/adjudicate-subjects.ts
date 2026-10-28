@@ -26,6 +26,8 @@
 import { type Doc, type El, ancestors, attr, elementsByTag, snippet as elSnippet, textContent } from "./parse/html.js";
 import { parseInlineStyle } from "./color.js";
 import type { Evidence } from "./adjudicate.js";
+import { AXE_WCAG } from "./axe-map.js";
+import { computedTextPairs, renderedRulesFor, renderedRulesRan } from "./rules/rendered.js";
 
 /** Mask the parts of a text that change between runs without the code changing.
  *
@@ -335,6 +337,113 @@ export function pageOfDoc(file: string): string | undefined {
 
 export const isSnapshotFile = (file: string): boolean => pageOfDoc(file) !== undefined;
 
+/** The `<meta name="viewport">` of a document, with what it says about zoom. */
+function viewportMeta(d: Doc): Harvested[] {
+  return elementsByTag(d, "meta")
+    .filter((m) => (attr(m, "name") ?? "").toLowerCase() === "viewport")
+    .map((m) => {
+      const content = attr(m, "content") ?? "";
+      const blocks = /user-scalable\s*=\s*(?:no|0)\b|maximum-scale\s*=\s*(?:1(?:\.0+)?|0?\.\d+)\b/i.test(content);
+      return h(d, m, `<meta name="viewport" content="${content}">${blocks ? " — RESTRICTS zoom" : ""}`, `viewport|${content}`);
+    });
+}
+
+/** Stylesheet evidence for a layout criterion: matching declarations in the source (inline
+ *  `<style>`, a component's CSS, inline `style` attributes) and in the captured rules. */
+function cssEvidence(d: Doc, re: RegExp, captured: (r: { selector: string; decls: Record<string, string> }) => boolean, kind: string): Harvested[] {
+  return [
+    ...linesOf(d, re, 60).map((l) => hAt(d, l.line, "css", `${kind}-relevant declaration: ${l.text}`, `${kind}decl|${l.text}`)),
+    ...(d.signals?.css?.rules ?? [])
+      .filter(captured)
+      .slice(0, 40)
+      .map((r) => hAt(d, 1, `css:${r.selector}`, `captured rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }`, `${kind}css|${r.selector}`)),
+  ];
+}
+
+const INSTRUCTION =
+  /\b(?:cliquez|cliquer|sélectionnez|selectionnez|utilisez|appuyez|touchez|consultez|reportez-vous|remplissez|choisissez|ci-après|ci-contre|ci-dessus|ci-dessous|à droite|à gauche|en haut|en bas|click|select|press|tap|use the|see the|fill in|choose)\b/i;
+
+/** In the sequential tab order, as markup alone can tell. */
+function isTabbable(e: El): boolean {
+  const ti = attr(e, "tabindex");
+  if (ti !== undefined && Number.parseInt(ti, 10) < 0) return false;
+  if (attr(e, "disabled") !== undefined || attr(e, "hidden") !== undefined) return false;
+  if (ti !== undefined) return true;
+  if (e.tag === "a" || e.tag === "area") return attr(e, "href") !== undefined;
+  if (e.tag === "input") return (attr(e, "type") ?? "").toLowerCase() !== "hidden";
+  return ["button", "select", "textarea", "iframe", "summary"].includes(e.tag) || (attr(e, "contenteditable") ?? "false") !== "false";
+}
+
+/** What the RENDERED tier measured for one success criterion on a captured page: the live
+ *  probe (ran, how many issues, or why it was skipped), the offline rendered rules that ran,
+ *  and axe-core's verdict for that criterion. A measurement that found nothing is exactly what
+ *  a conformity is ruled on — and it used to be the one thing never shown. */
+function measured(sc: string): Subject {
+  return (docs) =>
+    docs.flatMap((d) => {
+      const page = pageOfDoc(d.file);
+      const s = d.signals;
+      if (page === undefined || !s) return [];
+      const out: Harvested[] = [];
+      const probes = s.probes;
+      if (probes?.probed?.includes(sc)) {
+        const issues = PROBE_KEYS[sc]?.flatMap((k) => ((probes as Record<string, unknown>)[k] as { detail: string }[] | undefined) ?? []) ?? [];
+        const scroll = sc === "1.4.10" && probes.reflow ? ` horizontal scroll at 320px: ${probes.reflow.horizontalScroll ? "YES" : "no"};` : "";
+        out.push(
+          hAt(
+            d,
+            1,
+            `probe:${sc}`,
+            `page="${page}" live probe for WCAG ${sc} RAN:${scroll} ${issues.length} issue(s)${issues.length ? ` — ${issues[0]!.detail.slice(0, 120)}` : ""}`,
+            `probe|${sc}|${issues.length}|${scroll}`,
+          ),
+        );
+      }
+      for (const sk of probes?.skipped ?? [])
+        if (sk.sc === sc)
+          out.push(
+            hAt(
+              d,
+              1,
+              `probe:${sc}`,
+              `page="${page}" live probe for WCAG ${sc} did NOT finish: ${sk.why.slice(0, 160)}`,
+              `probeskip|${sc}|${sk.why.slice(0, 60)}`,
+            ),
+          );
+      const ran = renderedRulesRan(s).filter((id) => renderedRulesFor(sc).includes(id));
+      if (ran.length)
+        out.push(
+          hAt(d, 1, `rendered:${sc}`, `page="${page}" rendered rule(s) ${ran.join(", ")} ran on the captured styles`, `renderedran|${sc}|${ran.join(",")}`),
+        );
+      if (s.axe?.ran) {
+        const hits = (s.axe.violations ?? []).filter((v) => AXE_WCAG[v.id] === sc);
+        out.push(
+          hAt(
+            d,
+            1,
+            `axe:${sc}`,
+            `page="${page}" axe-core ran: ${hits.length ? hits.map((v) => `${v.id} (${v.nodes?.length ?? 0} node(s))`).join(", ") : `no violation for WCAG ${sc}`}`,
+            `axe|${sc}|${hits.map((v) => v.id).join(",")}`,
+          ),
+        );
+      }
+      return out;
+    });
+}
+
+/** Which probe lists report on which success criterion (src/probes.ts). */
+const PROBE_KEYS: Record<string, string[]> = {
+  "1.4.4": ["reflowZoom", "inputOverflowZoom"],
+  "1.4.10": ["inputOverflowReflow"],
+  "1.4.12": ["textSpacing", "inputOverflowSpacing"],
+  "1.4.13": ["hover"],
+  "2.1.2": ["keyboardTrap"],
+  "2.4.7": ["focusVisible"],
+  "2.4.11": ["focusObscured"],
+  "4.1.3": ["liveRegion"],
+};
+const MEASURED_SCS = ["1.3.4", "1.4.1", "1.4.3", "1.4.4", "1.4.10", "1.4.11", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
+
 // ---- the subjects -------------------------------------------------------------------------
 
 export const SUBJECTS: Record<string, Subject> = {
@@ -613,15 +722,26 @@ export const SUBJECTS: Record<string, Subject> = {
             h(d, e, `aria-live="${attr(e, "aria-live") ?? ""}" role="${attr(e, "role") ?? ""}"`, `live|${attr(e, "aria-live") ?? ""}|${attr(e, "role") ?? ""}`),
           ),
         ...d.elements
-          .filter((e) => !isRegion(e) && STATUS_CLASS.test(attr(e, "class") ?? "") && ancestors(e).some((a) => a.tag === "form"))
+          .filter((e) => !isRegion(e) && STATUS_CLASS.test(`${attr(e, "class") ?? ""} ${attr(e, "id") ?? ""}`) && e.tag !== "form")
           .map((e) =>
             h(
               d,
               e,
-              `status-like class="${(attr(e, "class") ?? "").slice(0, 40)}" in a form — verify async feedback is announced (role=status/alert or aria-live)`,
-              `statusclass|${(attr(e, "class") ?? "").slice(0, 40)}`,
+              `status-like <${e.tag}> id="${attr(e, "id") ?? ""}" class="${(attr(e, "class") ?? "").slice(0, 40)}" — verify async feedback is announced (role=status/alert or aria-live)`,
+              `statusclass|${(attr(e, "class") ?? "").slice(0, 40)}|${attr(e, "id") ?? ""}`,
             ),
           ),
+        // A script writing text into the page is where a status message comes from, marked up
+        // or not — and the unmarked one is precisely what 7.5 fails.
+        ...linesOf(d, /\.(?:textContent|innerText|innerHTML)\s*=|\.(?:append|prepend|insertAdjacentHTML|replaceChildren)\s*\(/).map((l) =>
+          hAt(
+            d,
+            l.line,
+            "script",
+            `script writes into the page — is this a status message, and is its container a live region? ${l.text}`,
+            `statuswrite|${l.text}`,
+          ),
+        ),
       ];
     }),
 
@@ -788,7 +908,12 @@ export const SUBJECTS: Record<string, Subject> = {
         return [hAt(d, 1, "doctype", `page="${page}" doctype=${dt === "" ? "(none on the page)" : dt}`, `doctype|${dt}`)];
       }
       const line = lineOf(d, /<!DOCTYPE/i);
-      if (line === undefined) return [];
+      if (line === undefined) {
+        // A full HTML document with no declaration IS the 8.1.1 failure, and it has to be
+        // shown to be ruled on; a fragment or a component has no doctype to carry.
+        const root = elementsByTag(d, "html")[0];
+        return root && d.kind === "html" ? [h(d, root, `source file declares NO doctype before <html>`, `doctype|none`)] : [];
+      }
       const decl = (d.source.split("\n")[line - 1] ?? "").trim().slice(0, 80);
       return [hAt(d, line, "doctype", `source file ${decl}`, `doctype|${decl}`)];
     }),
@@ -823,8 +948,11 @@ export const SUBJECTS: Record<string, Subject> = {
       ...linesOf(d, /\b(?:draggable|onDragStart|useDrag|DndContext|react-beautiful-dnd|@dnd-kit)\b/).map((l) =>
         hAt(d, l.line, "drag", `drag interaction: ${l.text}`, `drag|${l.text}`),
       ),
-      ...linesOf(d, /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b/i).map((l) =>
-        hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`),
+      ...linesOf(d, /\bon(?:TouchMove|GestureStart)\s*=|\b(?:pinch|swipe|hammerjs)\b|addEventListener\(\s*["'](?:touchmove|gesture\w*|pointermove)["']/i).map(
+        (l) => hAt(d, l.line, "gesture", `gesture interaction: ${l.text}`, `gesture|${l.text}`),
+      ),
+      ...linesOf(d, /\b(?:devicemotion|deviceorientation|DeviceMotionEvent|DeviceOrientationEvent|Accelerometer|Gyroscope)\b/).map((l) =>
+        hAt(d, l.line, "motion", `device-motion input — is there an interface alternative, and can it be switched off? ${l.text}`, `devicemotion|${l.text}`),
       ),
     ]),
 
@@ -1286,6 +1414,248 @@ export const SUBJECTS: Record<string, Subject> = {
       return out;
     }),
 
+  // ---- RENDERING CRITERIA: what an adjudicator can cite ----------------------------------
+  //
+  // Measured on the documentation site, scanned: 3.2, 3.3, 7.3, 10.1, 10.4, 10.5, 10.9, 10.10,
+  // 10.11, 10.12, 10.14, 12.9, 12.11, 13.9 and 13.11 all reached the worklist with NOTHING to
+  // cite, so the gate refused every `C` and the only answers left were « undecidable » or an
+  // NA — the five wrong NAs of #61 (8.2, 10.11, 10.12, 12.8, 13.9) were written exactly there.
+  // Each of these criteria applies to every page that has content; what it is decided ON is the
+  // page's stylesheets, its declarations, and — once a browser has run — the measurements. The
+  // subjects below hand those over. None of them is an existence subject: their silence proves
+  // nothing, and they never close a criterion on their own.
+
+  // The page's styling, as a whole: every stylesheet, the inline style attributes, and the
+  // captured rules. Anchored on the document root too, so a page with NO author CSS still has
+  // its one citable fact (« default rendering, nothing overrides the user's settings »).
+  stylesheets: (docs) =>
+    docs.flatMap((d) => {
+      const out: Harvested[] = [];
+      const inline = d.elements.filter((e) => (attr(e, "style") ?? "").trim() !== "");
+      const sheets = elementsByTag(d, "style");
+      const links = elementsByTag(d, "link").filter((l) => (attr(l, "rel") ?? "").toLowerCase().split(/\s+/).includes("stylesheet"));
+      const captured = d.signals?.css?.rules.length;
+      const root = elementsByTag(d, "html")[0];
+      if (root)
+        out.push(
+          h(
+            d,
+            root,
+            `page="${pageOfDoc(d.file) ?? "source"}" styling: ${sheets.length} <style>, ${links.length} linked stylesheet(s), ${inline.length} inline style attribute(s)${captured !== undefined ? `, ${captured} captured rule(s)${d.signals?.css?.unreadable ? ` (${d.signals.css.unreadable} sheet(s) unreadable)` : ""}` : ""}`,
+            `styling|${sheets.length}|${links.length}|${inline.length > 0}`,
+          ),
+        );
+      for (const s of sheets) out.push(h(d, s, `<style> block: ${t(s, 100)}`, `stylesheet|inline|${t(s, 60)}`));
+      for (const l of links)
+        out.push(h(d, l, `linked stylesheet href="${attr(l, "href") ?? ""}" — open it to read the rules`, `stylesheet|${attr(l, "href") ?? ""}`));
+      return out;
+    }),
+
+  // Colour declarations in the page's stylesheets — 3.2/3.3 contrast and 10.5's « déclarations
+  // CSS de couleurs de fond et de police ». Inline `style` colours are `colourPairs`.
+  colourDecls: (docs) =>
+    docs.flatMap((d) => [
+      ...linesOf(d, /(?:^|[\s;{])(?:color|background(?:-color)?)\s*:\s*[^;}"'<]+/i, 60)
+        .filter((l) => !/\bstyle\s*=/.test(l.text))
+        .map((l) => hAt(d, l.line, "css", `colour declaration: ${l.text}`, `colourdecl|${l.text}`)),
+      ...(d.signals?.css?.rules ?? [])
+        .filter((r) => r.decls.color !== undefined || r.decls.backgroundColor !== undefined || r.decls.background !== undefined)
+        .slice(0, 60)
+        .map((r) =>
+          hAt(
+            d,
+            1,
+            `css:${r.selector}`,
+            `stylesheet colours: ${r.selector.slice(0, 60)} { color: ${r.decls.color ?? "—"}; background: ${r.decls.backgroundColor ?? r.decls.background ?? "—"} }`,
+            `colourcss|${r.selector}|${r.decls.color ?? ""}|${r.decls.backgroundColor ?? r.decls.background ?? ""}`,
+          ),
+        ),
+    ]),
+
+  // The text colour pairs the BROWSER computed, with their ratio — the passing half of what
+  // the rendered contrast rule measures (it reports only failures).
+  computedColours: (docs) =>
+    docs.flatMap((d) => {
+      const seen = new Set<string>();
+      const out: Harvested[] = [];
+      for (const p of computedTextPairs(d)) {
+        const fg = `rgb(${p.fg.r}, ${p.fg.g}, ${p.fg.b})`;
+        const bg = `rgb(${p.bg.r}, ${p.bg.g}, ${p.bg.b})`;
+        const key = `${fg}|${bg}|${p.large}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(
+          h(
+            d,
+            p.el,
+            `computed text colour ${fg} on ${bg} — ${p.ratio.toFixed(2)}:1 (${p.large ? "large text, threshold 3:1" : "threshold 4.5:1"})`,
+            `computed|${key}`,
+          ),
+        );
+      }
+      return out;
+    }),
+
+  // RGAA 10.4 — text resized to 200 %. What clips it: a fixed height with overflow hidden, a
+  // font size frozen in px, and a viewport that forbids zoom.
+  zoom: (docs) =>
+    docs.flatMap((d) => [
+      ...viewportMeta(d),
+      ...cssEvidence(
+        d,
+        /\b(?:max-)?height\s*:\s*\d+(?:\.\d+)?px|\boverflow(?:-y)?\s*:\s*(?:hidden|clip)|\bfont-size\s*:\s*\d+(?:\.\d+)?px/i,
+        (r) => Boolean((r.decls.height ?? r.decls.maxHeight ?? "").endsWith("px") || /hidden|clip/.test(r.decls.overflow ?? r.decls.overflowY ?? "")),
+        "zoom",
+      ),
+    ]),
+
+  // RGAA 10.11 — 320 CSS px without horizontal scrolling. What forces it: a fixed or minimum
+  // width over 320px, unbreakable lines, preformatted blocks and wide tables (the last two being
+  // exactly what the criterion's « cas particuliers » exempt — they still have to be shown).
+  reflow: (docs) =>
+    docs.flatMap((d) => [
+      ...viewportMeta(d),
+      ...cssEvidence(
+        d,
+        /\b(?:min-)?width\s*:\s*(?:3[2-9]\d|[4-9]\d\d|\d{4,})px|\bwhite-space\s*:\s*(?:nowrap|pre)\b|\boverflow-x\s*:/i,
+        (r) =>
+          Boolean(/^(?:3[2-9]\d|[4-9]\d\d|\d{4,})px$/.test((r.decls.width ?? r.decls.minWidth ?? "").trim()) || /nowrap|pre/.test(r.decls.whiteSpace ?? "")),
+        "reflow",
+      ),
+      ...elementsByTag(d, "pre", "table").map((e) =>
+        h(d, e, `<${e.tag}> — two-dimensional content (an exempted case of 10.11 only if its layout requires it)`, `reflowblock|${e.tag}|${t(e, 30)}`),
+      ),
+    ]),
+
+  // RGAA 10.12 — the four text-spacing overrides. What resists them: a spacing declared
+  // !important (the decisive rules), any spacing at all, and a box too small to grow.
+  textSpacing: (docs) =>
+    docs.flatMap((d) =>
+      cssEvidence(
+        d,
+        /\b(?:line-height|letter-spacing|word-spacing)\s*:|\b(?:max-)?height\s*:\s*\d+(?:\.\d+)?px/i,
+        (r) =>
+          r.decls.lineHeight !== undefined || r.decls.letterSpacing !== undefined || r.decls.wordSpacing !== undefined || (r.decls.height ?? "").endsWith("px"),
+        "spacing",
+      ),
+    ),
+
+  // RGAA 13.9 — the orientation of the screen. What locks it: an orientation media query that
+  // hides or rotates content, a script calling `screen.orientation.lock`, a manifest pinning it.
+  orientation: (docs) =>
+    docs.flatMap((d) => [
+      ...viewportMeta(d),
+      ...linesOf(d, /@media[^{]*\borientation\b|\borientation\.lock\s*\(|\block(?:Orientation)?\s*\(\s*["'](?:portrait|landscape)|"orientation"\s*:/i).map(
+        (l) => hAt(d, l.line, "orientation", `orientation-dependent code: ${l.text}`, `orientation|${l.text}`),
+      ),
+      ...(d.signals?.css?.rules ?? [])
+        .filter((r) => /orientation/i.test(r.media ?? ""))
+        .slice(0, 30)
+        .map((r) =>
+          hAt(
+            d,
+            1,
+            `css:${r.selector}`,
+            `@media ${r.media} { ${r.selector.slice(0, 50)} { ${declsText(r.decls)} } }`,
+            `orientationcss|${r.media}|${r.selector}`,
+          ),
+        ),
+    ]),
+
+  // RGAA 10.7 — focus visibility: every rule keyed on a focus state, and what it does.
+  focusStyles: (docs) =>
+    docs.flatMap((d) => [
+      ...linesOf(d, /:focus(?:-visible|-within)?\b[^{]*\{?[^}]*/).map((l) =>
+        hAt(
+          d,
+          l.line,
+          "css",
+          `focus-state rule${/outline\s*:\s*(?:none|0)\b/.test(l.text) ? " REMOVING the outline — is another indicator put back?" : ""}: ${l.text}`,
+          `focusrule|${l.text}`,
+        ),
+      ),
+      ...(d.signals?.css?.rules ?? [])
+        .filter((r) => /:focus/.test(r.selector))
+        .slice(0, 40)
+        .map((r) =>
+          hAt(
+            d,
+            1,
+            `css:${r.selector}`,
+            `captured focus rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }`,
+            `focuscss|${r.selector}|${declsText(r.decls)}`,
+          ),
+        ),
+    ]),
+
+  // RGAA 12.8 — the tab order, as the DOM gives it: what Tab reaches, in order. One anchor per
+  // document, on the first focusable, so the population is one decision per page.
+  tabOrder: (docs) =>
+    docs.flatMap((d) => {
+      const focusables = d.elements.filter(isTabbable);
+      if (!focusables.length) return [];
+      const order = focusables
+        .slice(0, 15)
+        .map(
+          (e) =>
+            `${e.tag}${attr(e, "tabindex") !== undefined ? `[tabindex=${attr(e, "tabindex")}]` : ""} "${t(e, 20) || attr(e, "aria-label") || attr(e, "name") || ""}"`,
+        )
+        .join(" → ");
+      return [
+        h(
+          d,
+          focusables[0]!,
+          `page="${pageOfDoc(d.file) ?? "source"}" tab order (DOM): ${order}${focusables.length > 15 ? ` … (${focusables.length} focusable)` : ""} — does it follow the reading order?`,
+          `taborder|${pageOfDoc(d.file) ?? d.file}`,
+        ),
+      ];
+    }),
+
+  // RGAA 8.2 — the generated source, judged against the W3C checker. The engine's own validity
+  // rules report the failures; this is what the adjudicator rules a `C` on: the document, its
+  // doctype, and what a validator would flag first.
+  markupValidity: (docs) =>
+    docs.flatMap((d) => {
+      const out: Harvested[] = [];
+      const root = elementsByTag(d, "html")[0];
+      const page = pageOfDoc(d.file);
+      const dt = page !== undefined ? d.signals?.doctype : /<!doctype[^>]*>/i.exec(d.source.slice(0, 2000))?.[0];
+      if (root)
+        out.push(
+          h(
+            d,
+            root,
+            `page="${page ?? "source"}" doctype=${dt === undefined ? "(not recorded)" : dt === "" ? "(none)" : dt} — validate the GENERATED source (W3C Nu checker): tags, nesting, attributes, unique ids`,
+            `markup|${dt ?? ""}`,
+          ),
+        );
+      const byId = new Map<string, El[]>();
+      for (const e of d.elements) {
+        const id = attr(e, "id");
+        if (!id || id.includes("{")) continue;
+        byId.set(id, [...(byId.get(id) ?? []), e]);
+      }
+      for (const [id, els] of byId) if (els.length > 1) out.push(h(d, els[1]!, `id="${id}" used ${els.length} times`, `dupid|${id}`));
+      for (const e of d.elements) {
+        if ((e.tag === "a" || e.tag === "button") && ancestors(e).some((a) => a.tag === "a" || a.tag === "button"))
+          out.push(h(d, e, `<${e.tag}> nested inside an interactive element — not permitted`, `nesting|${e.tag}`));
+      }
+      return out;
+    }),
+
+  // Instructions — what RGAA 10.9/10.10 actually read. `sensoryText` keeps the leads that
+  // already lean on a sensory word; this adds every instruction, because a conformity is ruled
+  // on the ones that name their target too, and a page with none of the leads had nothing to cite.
+  instructions: (docs) =>
+    docs.flatMap((d) =>
+      d.elements
+        .filter(
+          (e) => !["script", "style", "title", "head", "html", "body"].includes(e.tag) && e.children.some((c) => c.type === "text" && INSTRUCTION.test(c.data)),
+        )
+        .slice(0, 40)
+        .map((e) => h(d, e, `instruction: "${t(e, 100)}" — does it rely on shape, size or position alone?`, `instruction|${t(e, 80)}`)),
+    ),
+
   // Content pinned over the page — what can obscure a focused element.
   stickies: (docs) =>
     docs.flatMap((d) => [
@@ -1306,6 +1676,8 @@ export const SUBJECTS: Record<string, Subject> = {
         ),
     ]),
 };
+
+for (const sc of MEASURED_SCS) SUBJECTS[`rendered:${sc}`] = measured(sc);
 
 // ---- which subjects serve which criterion ------------------------------------------------
 //
@@ -1401,6 +1773,9 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // 8.4 asks about the CODE, 8.3 about the element — see `declaredLang`.
     "8.4": ["declaredLang"],
     "8.5": ["docTitle"],
+    // 8.2 inherited `aria` from WCAG 4.1.2: the ARIA attributes, and on a page without any, NOTHING
+    // — which is how « non applicable » got written for a criterion every page is subject to.
+    "8.2": ["markupValidity", "aria"],
     "8.6": ["docTitle"],
     "8.7": ["langParts"],
     "8.8": ["langParts"],
@@ -1433,13 +1808,14 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "12.2": ["repeatedBlocks"],
     "12.3": ["navMechanisms"],
     "12.4": ["repeatedBlocks", "navMechanisms"],
-    "12.5": ["repeatedBlocks"],
+    // The search engine is the criterion's subject, and `navMechanisms` is what finds it.
+    "12.5": ["repeatedBlocks", "navMechanisms"],
     "12.6": ["landmarks"],
     "12.7": ["landmarks"],
-    "12.8": ["focusOrder"],
-    "12.9": ["focusables", "pointerHandlers"],
+    "12.8": ["focusOrder", "tabOrder"],
+    "12.9": ["focusables", "rendered:2.1.2", "pointerHandlers", "tabOrder"],
     "12.10": ["shortcuts"],
-    "12.11": ["additionalContent", "pointerHandlers", "focusables"],
+    "12.11": ["additionalContent", "rendered:1.4.13", "pointerHandlers", "focusables"],
     // Theme 4 — multimedia. 4.10 (is automatically-triggered sound controllable?) maps onto
     // WCAG 1.4.2, which is `static` and therefore has no subject of its own — but the pack
     // flags 4.10 `judgment`, so judgmentGuard reopens it and it would arrive with nothing.
@@ -1450,15 +1826,15 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "4.12": ["nonTemporalMediaControls"],
     // Theme 3 — colour. The question is about what colour alone conveys, not the outline.
     "3.1": ["colourPairs", "links"],
-    "3.2": ["colourPairs"],
-    "3.3": ["colourPairs"],
+    "3.2": ["colourPairs", "computedColours", "colourDecls", "rendered:1.4.3", "stylesheets"],
+    "3.3": ["colourPairs", "colourDecls", "rendered:1.4.11", "controls", "buttons", "stylesheets"],
     // Theme 7 — scripts. "Is each script operable by keyboard AND pointer?" is about the
     // handlers and the focusable surface, never about the page's headings and lists.
     "7.1": ["aria", "pointerHandlers"],
     "7.2": ["scriptAlternatives"],
-    "7.3": ["pointerHandlers", "focusables"],
+    "7.3": ["pointerHandlers", "pointerActions", "focusables"],
     "7.4": ["contextChange"],
-    "7.5": ["liveRegions"],
+    "7.5": ["liveRegions", "rendered:4.1.3"],
     // Theme 10 — presentation. These ask what survives when CSS is off, what the stylesheet
     // reorders, and what is hidden on purpose.
     //
@@ -1467,17 +1843,24 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // markup — not reading order. `readingOrder` harvested nothing for it, so the criterion
     // reached the adjudicator with an empty brief and could not be ruled on at all. The engine
     // decides it now (src/rules/presentation.ts); this names what a reader would look at.
-    "10.1": ["presentationalMarkup"],
+    "10.1": ["presentationalMarkup", "stylesheets"],
     "10.2": ["hiddenContent", "structure"],
     "10.3": ["readingOrder", "structure"],
-    "10.4": ["readingOrder"],
+    // 10.4/10.11/10.12/13.9 used to inherit `readingOrder` from their WCAG mapping — `order`,
+    // flex-reverse and absolute positioning — which says nothing about zoom, reflow, spacing or
+    // orientation, harvested nothing on an ordinary page, and left an NA as the only answer.
+    "10.4": ["zoom", "rendered:1.4.4", "stylesheets"],
+    "10.5": ["colourDecls", "colourPairs", "stylesheets"],
+    "10.6": ["links", "rendered:1.4.1", "colourDecls"],
+    "10.7": ["focusStyles", "rendered:2.4.7", "stylesheets"],
     "10.8": ["hiddenContent", "aria"],
-    "10.9": ["sensoryText"],
-    "10.10": ["sensoryText"],
-    "10.11": ["readingOrder"],
-    "10.12": ["readingOrder"],
-    "10.13": ["aria", "stickies"],
-    "10.14": ["additionalContent", "focusables", "pointerHandlers"],
+    "10.9": ["sensoryText", "instructions"],
+    "10.10": ["sensoryText", "instructions"],
+    "10.11": ["reflow", "rendered:1.4.10", "stylesheets"],
+    "10.12": ["textSpacing", "rendered:1.4.12", "stylesheets"],
+    // 1.4.13's own subject was lost here: `additionalContent` is what 10.13 is about.
+    "10.13": ["additionalContent", "rendered:1.4.13", "aria", "stickies"],
+    "10.14": ["additionalContent", "rendered:1.4.13", "focusables", "pointerHandlers"],
     // Theme 13 — consultation.
     "13.1": ["timers"],
     // 13.2 asks about a window OPENING, which is not the context-change question it inherited
@@ -1487,7 +1870,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "13.4": ["downloadDocs"],
     "13.7": ["flashes"],
     "13.8": ["motion", "timers"],
-    "13.9": ["readingOrder"],
+    "13.9": ["orientation", "rendered:1.3.4", "stylesheets"],
     "13.10": ["pointerHandlers"],
     "13.11": ["pointerActions", "pointerHandlers"],
   },
@@ -1586,6 +1969,18 @@ export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   // `<html>` element is always there; the attribute is what this subject looks for.
   "declaredLang",
 ]);
+
+/** Pack criteria that apply to EVERY page with content, so « non applicable » is never a
+ *  verdict an adjudicator may return for them. Each of these was answered NA on a real run
+ *  (#61: 8.2, 10.11, 10.12, 12.8, 13.9), always the same way: nothing was harvested, and an
+ *  empty harvest read as « nothing here is concerned ». A page always has a doctype to declare
+ *  (8.1), generated source to validate (8.2), a default language and a title to carry (8.3,
+ *  8.5), stylesheets that present it or not (10.1, 10.3), text to enlarge, reflow and respace
+ *  (10.4, 10.11, 10.12), a tab order (12.8 — for a page with no focusable element, the right
+ *  answer is C with that observation, not NA) and an orientation (13.9). */
+export const ALWAYS_APPLICABLE: Readonly<Record<string, ReadonlySet<string>>> = {
+  rgaa: new Set(["8.1", "8.2", "8.3", "8.5", "10.1", "10.3", "10.4", "10.11", "10.12", "12.8", "13.9"]),
+};
 
 /** Subjects whose PRESENCE is recorded in `scope.subjectsSeen` although their absence proves
  *  nothing. Presence alone is what a pack criterion needs to refuse an absence it would only

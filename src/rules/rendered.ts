@@ -73,6 +73,27 @@ function elementIndex(doc: Doc): Map<El, number> {
   return m;
 }
 
+/** Every visible text element whose computed colour and backdrop both resolve, with the ratio
+ *  the browser's own values give. The PASSING half of what `rendered-contrast` measures: an
+ *  adjudicator can rule RGAA 3.2 conforming only by citing the pairs it was shown, and the rule
+ *  alone hands over the failures and nothing else. */
+export function computedTextPairs(doc: Doc): { el: El; fg: RGBA; bg: RGBA; ratio: number; large: boolean }[] {
+  if (!doc.signals?.styles) return [];
+  const index = elementIndex(doc);
+  const out: { el: El; fg: RGBA; bg: RGBA; ratio: number; large: boolean }[] = [];
+  for (const [el, i] of index) {
+    if (SKIP_TAGS.has(el.tag) || !hasDirectText(el)) continue;
+    const css = styleAt(doc, i)?.css;
+    if (!css || invisible(css)) continue;
+    const fg = parseColor(css.color ?? "");
+    if (!fg || fg.a < 1) continue;
+    const bd = backdropOf(doc, index, el);
+    if (!bd) continue;
+    out.push({ el, fg, bg: bd.color, ratio: contrastRatio(fg, bd.color), large: isLargeText(css) });
+  }
+  return out;
+}
+
 // ---- 1.4.3 contrast, from computed styles -------------------------------------------------
 
 const renderedContrast: Rule = {
