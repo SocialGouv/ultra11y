@@ -1019,6 +1019,24 @@ export const SUBJECTS: Record<string, Subject> = {
         .map((e) => h(d, e, `native <${e.tag}> activation fires on release (click)`, `pointer|native|${e.tag}`)),
     ]),
 
+  // The scripts a page LOADS. The code-construct criteria (12.10 shortcuts, 13.1 time limits,
+  // 13.8 motion, 13.10–13.12 gestures, pointer and device motion) are decided on code the page
+  // pulls in from elsewhere as often as on its inline handlers, and the audit reads markup: so
+  // the adjudicator is given the address to open.
+  externalScripts: (docs) =>
+    docs.flatMap((d) =>
+      elementsByTag(d, "script")
+        .filter((e) => (attr(e, "src") ?? "").trim() !== "")
+        .map((e) =>
+          h(
+            d,
+            e,
+            `external script src="${attr(e, "src")}" — not part of this file: open it to look for the construct this criterion is about`,
+            `extscript|${attr(e, "src")}`,
+          ),
+        ),
+    ),
+
   // Single-character keyboard shortcuts.
   shortcuts: (docs) =>
     docs.flatMap((d) => [
@@ -1908,7 +1926,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "12.7": ["landmarks"],
     "12.8": ["focusOrder", "tabOrder"],
     "12.9": ["focusables", "rendered:2.1.2", "pointerHandlers", "tabOrder"],
-    "12.10": ["shortcuts"],
+    "12.10": ["shortcuts", "externalScripts"],
     "12.11": ["additionalContent", "rendered:1.4.13", "pointerHandlers", "focusables"],
     // Theme 4 — multimedia. 4.10 (is automatically-triggered sound controllable?) maps onto
     // WCAG 1.4.2, which is `static` and therefore has no subject of its own — but the pack
@@ -1966,7 +1984,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "10.13": ["additionalContent", "rendered:1.4.13", "aria", "stickies"],
     "10.14": ["additionalContent", "rendered:1.4.13", "focusables", "pointerHandlers"],
     // Theme 13 — consultation.
-    "13.1": ["timers"],
+    "13.1": ["timers", "externalScripts"],
     // 13.2 asks about a window OPENING, which is not the context-change question it inherited
     // from WCAG 3.2.1. See `newWindow`.
     "13.2": ["newWindow"],
@@ -1975,10 +1993,11 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "13.5": ["cryptic"],
     "13.6": ["cryptic"],
     "13.7": ["flashes"],
-    "13.8": ["motion", "timers"],
+    "13.8": ["motion", "timers", "externalScripts"],
     "13.9": ["orientation", "rendered:1.3.4", "stylesheets"],
-    "13.10": ["pointerHandlers"],
-    "13.11": ["pointerActions", "pointerHandlers"],
+    "13.10": ["pointerHandlers", "externalScripts"],
+    "13.12": ["pointerHandlers", "externalScripts"],
+    "13.11": ["pointerActions", "pointerHandlers", "externalScripts"],
   },
 };
 

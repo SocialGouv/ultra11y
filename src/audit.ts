@@ -4,6 +4,8 @@
 // judgment, surfaced as residual risks). `report` renders this; Claude completes
 // the manual criteria.
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname, resolve as resolvePath } from "node:path";
 import type {
   AuditResult,
   CriterionResult,
@@ -426,6 +428,43 @@ const STATIC_PREDS: ReadonlyArray<readonly [string, (d: Doc) => boolean]> = allS
   .filter((c) => c.automatability === "static")
   .map((c) => [c.sc, APPLICABLE[c.sc] ?? isFullDocument] as const);
 
+// THE SCRIPTS A PAGE LOADS ARE PART OF ITS SOURCE.
+//
+// Every predicate below that looks for a CODE CONSTRUCT — a single-key shortcut, a timer, a
+// gesture, a down-event action, device motion, a drag — reads `doc.source`, and a plain `.js`
+// is never an audit target. A page whose shortcut lives in `app.js` therefore proved « no
+// shortcut anywhere » and closed RGAA 12.10 (and 13.1, 13.8, 13.10–13.12) « non applicable »
+// over the very code it is about. So a page's `<script src>` is read when it resolves to a local
+// file, and the predicates run on it too; when it cannot be read — a CDN, a capture's bundle
+// URL — the construct is UNKNOWN, and uncertainty resolves towards applicable, as everywhere
+// else in this fold.
+const SCRIPT_CONSTRUCT_SCS = ["2.1.4", "2.2.1", "2.2.2", "2.5.1", "2.5.2", "2.5.4", "2.5.7"] as const;
+const SCRIPT_READ_LIMIT = 2_000_000;
+
+function externalScripts(doc: Doc): { readable: string[]; unreadable: number } {
+  const readable: string[] = [];
+  let unreadable = 0;
+  if (doc.kind !== "html") return { readable, unreadable };
+  for (const el of elementsByTag(doc, "script")) {
+    const src = (attr(el, "src") ?? "").trim();
+    if (!src) continue;
+    const type = (attr(el, "type") ?? "").trim().toLowerCase();
+    if (type && !/^(?:module|text\/javascript|application\/javascript)$/.test(type)) continue;
+    if (/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(src) || src.startsWith("data:") || isSnapshotDom(doc.file)) {
+      unreadable++;
+      continue;
+    }
+    const path = resolvePath(dirname(doc.file), src.split(/[?#]/)[0]!.replace(/^\//, ""));
+    try {
+      if (existsSync(path) && statSync(path).isFile() && statSync(path).size <= SCRIPT_READ_LIMIT) readable.push(readFileSync(path, "utf8"));
+      else unreadable++;
+    } catch {
+      unreadable++;
+    }
+  }
+  return { readable, unreadable };
+}
+
 // The same fold, for the non-static criteria whose subject matter is source-visible. Kept as a
 // separate list so the `static` contract above ("clean ⇒ C") is untouched: a criterion here can
 // only ever gain `NA`, never `C`.
@@ -530,6 +569,14 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
   // criterion open for the entire audit (see SUBJECT_MATTER, rule 2).
   for (const [id, pred] of SUBJECT_PREDS) {
     if (!acc.applicable.get(id) && pred(doc)) acc.applicable.set(id, true);
+  }
+  if (SCRIPT_CONSTRUCT_SCS.some((sc) => !acc.applicable.get(sc))) {
+    const scripts = externalScripts(doc);
+    for (const sc of SCRIPT_CONSTRUCT_SCS) {
+      if (acc.applicable.get(sc)) continue;
+      const pred = SUBJECT_MATTER[sc];
+      if (scripts.unreadable > 0 || (pred && scripts.readable.some((source) => pred({ ...doc, source, elements: [] })))) acc.applicable.set(sc, true);
+    }
   }
   // The same OR fold, one level down: which SUBJECTS this document carries an anchor for. The
   // adjudication harvest already declares, per criterion, exactly which elements decide it —
