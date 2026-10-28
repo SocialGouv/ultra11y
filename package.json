@@ -1,7 +1,7 @@
 {
   "name": "ultra11y",
   "version": "5.47.1",
-  "description": "Audit HTML/CSS/JSX against WCAG 2.2 AA and produce a dated compliance report, or author/review accessible markup (native-HTML-first). A skills.sh agent skill: an install-free static engine (bundled, no npm install) plus the agent's judgment, with check/verify gates against hallucinated non-conformities, and pluggable in-repo standards packs (RGAA France first; Section 508 & EN 301 549 next).",
+  "description": "Audit d'accessibilité RGAA 4.1.2, le référentiel de l'État : rapport daté, grille des 106 critères, backlog et tickets. Moteur statique, navigateur et jugement IA contre-vérifié. Il ne déclare jamais conforme ce qu'il n'a pas vérifié. Socle WCAG 2.2 AA.",
   "homepage": "https://socialgouv.github.io/ultra11y/",
   "type": "module",
   "packageManager": "pnpm@10.33.0",

@@ -74672,11 +74672,12 @@ function readBody2(req) {
 
 // src/cli.ts
 var HELP2 = `ultra11y v${VERSION}
-Audit HTML/CSS/JSX against WCAG 2.2 AA and produce a dated compliance report, or
-author/review accessible markup (native-HTML-first). A deterministic, install-free
-static engine plus your judgment, with check/verify gates against hallucinated
-non-conformities. RGAA (France) and other country standards are pluggable packs
-(--standard <pack>); WCAG is the worldwide core.
+Audit a site against RGAA 4.1.2, the French State's accessibility standard, on a
+WCAG 2.2 AA core, and produce a dated conformance report, or author/review accessible
+markup (native-HTML-first). A deterministic, install-free static engine plus your
+judgment, with check/verify gates against hallucinated non-conformities: nothing is
+declared conforming that was not verified. --standard rgaa selects the RGAA pack;
+WCAG is the worldwide core, other country standards are pluggable packs.
 
 Usage:
   ultra11y audit    <globs\u2026 | -> [--out <dir>] [--include <glob>] [--exclude <glob>] [--ext <list>] [--jsx] [--graph] [--json] [--lang auto|en|fr] [--no-default-excludes]
