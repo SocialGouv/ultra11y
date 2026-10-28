@@ -542,9 +542,17 @@ export const SUBJECTS: Record<string, Subject> = {
   // Headings, labels, legends and captions — the text judged for descriptiveness.
   headings: (docs) =>
     docs.flatMap((d) =>
-      elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption").map((e) =>
-        h(d, e, `<${e.tag}> text="${t(e)}"`, `heading|${e.tag}|${t(e)}`),
-      ),
+      elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption")
+        // RGAA 9.1's tests name `role="heading"` + `aria-level` beside <hx>.
+        .concat(d.elements.filter((e) => roleOf(e) === "heading"))
+        .map((e) =>
+          h(
+            d,
+            e,
+            `<${e.tag}${roleOf(e) === "heading" ? ` role="heading" aria-level="${attr(e, "aria-level") ?? ""}"` : ""}> text="${t(e)}"`,
+            `heading|${e.tag}|${attr(e, "aria-level") ?? ""}|${t(e)}`,
+          ),
+        ),
     ),
 
   // Form controls and the label/placeholder/instruction attached to them.
@@ -1482,6 +1490,22 @@ export const SUBJECTS: Record<string, Subject> = {
   // subjects below hand those over. None of them is an existence subject: their silence proves
   // nothing, and they never close a criterion on their own.
 
+  // RGAA 9.4 — quotations: the <q>/<blockquote> that mark them, and the text that quotes
+  // without them (« … », “…”, "…" of a dozen characters or more). It inherited `structure` —
+  // headings, tables and lists — which never held a quotation.
+  quotes: (docs) =>
+    docs.flatMap((d) => [
+      ...elementsByTag(d, "q", "blockquote").map((e) => h(d, e, `<${e.tag}> "${t(e, 80)}" — is it a quotation?`, `quote|${e.tag}|${t(e, 60)}`)),
+      ...d.elements
+        .filter(
+          (e) =>
+            !["q", "blockquote", "script", "style", "code", "pre"].includes(e.tag) &&
+            e.children.some((c) => c.type === "text" && /«[^»]{12,}»|“[^”]{12,}”|"[^"<>]{12,}"/.test(c.data)),
+        )
+        .slice(0, 40)
+        .map((e) => h(d, e, `quoted text without <q>/<blockquote>: "${t(e, 80)}" — a citation?`, `quotetext|${t(e, 60)}`)),
+    ]),
+
   // RGAA 13.5/13.6 — « contenu cryptique (art ASCII, émoticône, syntaxe cryptique) ». It used
   // to inherit `images` through WCAG 1.1.1, so a page with an emoticon and no image closed both
   // criteria « non applicable » over the very content they are about.
@@ -1897,7 +1921,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "9.1": ["headings"],
     "9.2": ["landmarks"],
     "9.3": ["lists"],
-    "9.4": ["structure"],
+    "9.4": ["quotes"],
     // Theme 11 — forms.
     "11.1": ["controls"],
     "11.2": ["controls"],

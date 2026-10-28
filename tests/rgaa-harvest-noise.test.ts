@@ -61,6 +61,20 @@ describe("heuristic subjects read code, not prose", () => {
   it("an animated GIF is moving content (13.8)", () => {
     expect(harvest("13.8", '<img src="anim.gif" alt="Chargement">').some((x) => x.cls.startsWith("gif|"))).toBe(true);
   });
+
+  it("9.4 is shown quotations — marked up or not — rather than the outline", () => {
+    const ev = harvest(
+      "9.4",
+      "<h2>Le mot du maire</h2><p>Comme le dit le maire : « La culture est un droit pour chacun. »</p><blockquote><p>Texte</p></blockquote>",
+    );
+    expect(ev.some((x) => x.cls.startsWith("quotetext|"))).toBe(true);
+    expect(ev.some((x) => x.cls.startsWith("quote|blockquote"))).toBe(true);
+    expect(ev.some((x) => x.cls.startsWith("structure|"))).toBe(false);
+  });
+
+  it("9.1 is shown role=heading too, which its tests name", () => {
+    expect(harvest("9.1", '<div role="heading" aria-level="2">Nos ateliers</div>').some((x) => x.ev.note?.includes('role="heading"'))).toBe(true);
+  });
 });
 
 describe("a criterion is not closed by the absence of a subject that is not its own", () => {
