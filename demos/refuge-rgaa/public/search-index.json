@@ -1,0 +1,327 @@
+[
+  {
+    "title": "Vérifier votre demande",
+    "url": "/animaux/verification-image/",
+    "group": "Animaux à adopter"
+  },
+  {
+    "title": "Confirmer votre demande",
+    "url": "/animaux/verification-acces/",
+    "group": "Animaux à adopter"
+  },
+  {
+    "title": "Le bilan des adoptions",
+    "url": "/animaux/bilan-adoptions/",
+    "group": "Animaux à adopter"
+  },
+  {
+    "title": "L’évolution des adoptions",
+    "url": "/animaux/evolution-adoptions/",
+    "group": "Animaux à adopter"
+  },
+  {
+    "title": "Les horaires du refuge",
+    "url": "/animaux/horaires/",
+    "group": "Animaux à adopter"
+  },
+  {
+    "title": "Le portrait de Socke",
+    "url": "/animaux/portrait/",
+    "group": "Animaux à adopter"
+  },
+  {
+    "title": "La carte d’accès",
+    "url": "/visite/carte-acces/",
+    "group": "Visite interactive"
+  },
+  {
+    "title": "Votre itinéraire",
+    "url": "/visite/itineraire/",
+    "group": "Visite interactive"
+  },
+  {
+    "title": "Les horaires en audio",
+    "url": "/rencontres/annonce/",
+    "group": "Rencontrer nos animaux"
+  },
+  {
+    "title": "L’annonce de notre équipe",
+    "url": "/rencontres/transcription/",
+    "group": "Rencontrer nos animaux"
+  },
+  {
+    "title": "Votre prochaine visite",
+    "url": "/rencontres/video/",
+    "group": "Rencontrer nos animaux"
+  },
+  {
+    "title": "Le message de bienvenue",
+    "url": "/rencontres/sous-titres/",
+    "group": "Rencontrer nos animaux"
+  },
+  {
+    "title": "Préparer votre arrivée",
+    "url": "/rencontres/acces-video/",
+    "group": "Rencontrer nos animaux"
+  },
+  {
+    "title": "La visite décrite",
+    "url": "/rencontres/description-video/",
+    "group": "Rencontrer nos animaux"
+  },
+  {
+    "title": "Galerie",
+    "url": "/rencontres/galerie/",
+    "group": "Rencontrer nos animaux"
+  },
+  {
+    "title": "Explorer les espaces",
+    "url": "/visite/plan/",
+    "group": "Visite interactive"
+  },
+  {
+    "title": "Les capacités du refuge",
+    "url": "/visite/plan-equivalent/",
+    "group": "Visite interactive"
+  },
+  {
+    "title": "L’annonce à l’arrivée",
+    "url": "/rencontres/ambiance/",
+    "group": "Rencontrer nos animaux"
+  },
+  {
+    "title": "Regarder notre présentation",
+    "url": "/rencontres/lecteur/",
+    "group": "Rencontrer nos animaux"
+  },
+  {
+    "title": "Choisir un espace",
+    "url": "/visite/plan-clavier/",
+    "group": "Visite interactive"
+  },
+  {
+    "title": "La présentation interactive",
+    "url": "/rencontres/commandes/",
+    "group": "Rencontrer nos animaux"
+  },
+  {
+    "title": "Les adoptions par trimestre",
+    "url": "/comparer/bilan-trimestriel/",
+    "group": "Comparer les refuges"
+  },
+  {
+    "title": "Comprendre le bilan",
+    "url": "/comparer/lecture-bilan/",
+    "group": "Comparer les refuges"
+  },
+  {
+    "title": "Adopter ou parrainer",
+    "url": "/comparer/contacts/",
+    "group": "Comparer les refuges"
+  },
+  {
+    "title": "Places disponibles",
+    "url": "/comparer/places/",
+    "group": "Comparer les refuges"
+  },
+  {
+    "title": "Les résultats des refuges",
+    "url": "/comparer/resultats/",
+    "group": "Comparer les refuges"
+  },
+  {
+    "title": "Les effectifs accueillis",
+    "url": "/comparer/effectifs/",
+    "group": "Comparer les refuges"
+  },
+  {
+    "title": "Détail des résultats trimestriels",
+    "url": "/comparer/detail-trimestres/",
+    "group": "Comparer les refuges"
+  },
+  {
+    "title": "Les fiches pratiques",
+    "url": "/comparer/fiches/",
+    "group": "Comparer les refuges"
+  },
+  {
+    "title": "Les disponibilités actualisées",
+    "url": "/interactions/disponibilites/",
+    "group": "Services du refuge"
+  },
+  {
+    "title": "Parrainer un animal",
+    "url": "/dons/parrainage/",
+    "group": "Faire un don"
+  },
+  {
+    "title": "Nos bénévoles internationaux",
+    "url": "/journal/benevoles/",
+    "group": "La vie du refuge"
+  },
+  {
+    "title": "Le témoignage de Lucy",
+    "url": "/journal/temoignage/",
+    "group": "La vie du refuge"
+  },
+  {
+    "title": "Bienvenue à tous",
+    "url": "/journal/accueil-arabe/",
+    "group": "La vie du refuge"
+  },
+  {
+    "title": "Paroles d’adoptants",
+    "url": "/journal/paroles/",
+    "group": "La vie du refuge"
+  },
+  {
+    "title": "Prendre rendez-vous",
+    "url": "/interactions/rendez-vous/",
+    "group": "Services du refuge"
+  },
+  {
+    "title": "Consulter les conditions",
+    "url": "/interactions/conditions/",
+    "group": "Services du refuge"
+  },
+  {
+    "title": "Aide à la réservation",
+    "url": "/interactions/aide/",
+    "group": "Services du refuge"
+  },
+  {
+    "title": "Un conseil pour votre visite",
+    "url": "/interactions/conseil/",
+    "group": "Services du refuge"
+  },
+  {
+    "title": "Votre adresse de contact",
+    "url": "/adoption/contact/",
+    "group": "Demande d’adoption"
+  },
+  {
+    "title": "Votre foyer",
+    "url": "/adoption/foyer/",
+    "group": "Demande d’adoption"
+  },
+  {
+    "title": "Votre habitat",
+    "url": "/adoption/habitat/",
+    "group": "Demande d’adoption"
+  },
+  {
+    "title": "Votre jardin",
+    "url": "/adoption/jardin/",
+    "group": "Demande d’adoption"
+  },
+  {
+    "title": "Choisir votre refuge",
+    "url": "/adoption/region/",
+    "group": "Demande d’adoption"
+  },
+  {
+    "title": "Déposer votre demande",
+    "url": "/adoption/depot/",
+    "group": "Demande d’adoption"
+  },
+  {
+    "title": "Retrouver votre demande",
+    "url": "/adoption/code/",
+    "group": "Demande d’adoption"
+  },
+  {
+    "title": "Mes notes de préparation",
+    "url": "/espace/notes/",
+    "group": "Mon espace"
+  },
+  {
+    "title": "Parcourir les portraits",
+    "url": "/interactions/raccourcis/",
+    "group": "Services du refuge"
+  },
+  {
+    "title": "Les options de visite",
+    "url": "/interactions/options/",
+    "group": "Services du refuge"
+  },
+  {
+    "title": "Réserver une rencontre",
+    "url": "/interactions/reservation/",
+    "group": "Services du refuge"
+  },
+  {
+    "title": "Télécharger le dossier",
+    "url": "/documents/dossier/",
+    "group": "Documents d’adoption"
+  },
+  {
+    "title": "Le dossier et sa version texte",
+    "url": "/documents/version-texte/",
+    "group": "Documents d’adoption"
+  },
+  {
+    "title": "Faire défiler les portraits",
+    "url": "/visite/portraits/",
+    "group": "Visite interactive"
+  },
+  {
+    "title": "Rencontrer un animal au hasard",
+    "url": "/visite/surprise/",
+    "group": "Visite interactive"
+  },
+  {
+    "title": "Animaux à adopter",
+    "url": "/animaux/",
+    "group": "Animaux à adopter"
+  },
+  {
+    "title": "Rencontrer nos animaux",
+    "url": "/rencontres/",
+    "group": "Rencontrer nos animaux"
+  },
+  {
+    "title": "Comparer les refuges",
+    "url": "/comparer/",
+    "group": "Comparer les refuges"
+  },
+  {
+    "title": "Demande d’adoption",
+    "url": "/adoption/",
+    "group": "Demande d’adoption"
+  },
+  {
+    "title": "Faire un don",
+    "url": "/dons/",
+    "group": "Faire un don"
+  },
+  {
+    "title": "Mon espace",
+    "url": "/espace/",
+    "group": "Mon espace"
+  },
+  {
+    "title": "Documents d’adoption",
+    "url": "/documents/",
+    "group": "Documents d’adoption"
+  },
+  {
+    "title": "Visite interactive",
+    "url": "/visite/",
+    "group": "Visite interactive"
+  },
+  {
+    "title": "La vie du refuge",
+    "url": "/journal/",
+    "group": "La vie du refuge"
+  },
+  {
+    "title": "Services du refuge",
+    "url": "/interactions/",
+    "group": "Services du refuge"
+  },
+  {
+    "title": "Guides et plan du site",
+    "url": "/navigation/",
+    "group": "Guides et plan du site"
+  }
+]

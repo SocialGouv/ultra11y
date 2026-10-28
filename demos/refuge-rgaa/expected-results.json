@@ -1,0 +1,2237 @@
+{
+  "schemaVersion": 1,
+  "standard": "RGAA 4.1.2",
+  "baseUrl": "http://127.0.0.1:8765",
+  "contract": "Étendre la démo en refuge navigable ; couvrir par fixtures les 59 critères NA du précédent audit, avec cas NC et témoins séparés, actions reproductibles et ressources réelles. Ne pas modifier le moteur ultra11y ni la copie Microsoft.",
+  "baseline": "audits/microsoft-edge-a11y-20261028/tableaux/criteres-par-methode.json",
+  "targetCriteria": [
+    "1.4",
+    "1.5",
+    "1.6",
+    "1.7",
+    "1.8",
+    "1.9",
+    "2.1",
+    "2.2",
+    "4.1",
+    "4.2",
+    "4.3",
+    "4.4",
+    "4.5",
+    "4.6",
+    "4.7",
+    "4.8",
+    "4.9",
+    "4.10",
+    "4.11",
+    "4.12",
+    "4.13",
+    "5.1",
+    "5.2",
+    "5.3",
+    "5.4",
+    "5.5",
+    "5.6",
+    "5.7",
+    "5.8",
+    "7.2",
+    "7.5",
+    "8.7",
+    "8.8",
+    "8.10",
+    "9.4",
+    "10.6",
+    "10.8",
+    "10.13",
+    "10.14",
+    "11.3",
+    "11.5",
+    "11.6",
+    "11.7",
+    "11.8",
+    "11.10",
+    "11.11",
+    "11.12",
+    "12.1",
+    "12.2",
+    "12.3",
+    "12.4",
+    "12.5",
+    "12.10",
+    "12.11",
+    "13.1",
+    "13.3",
+    "13.4",
+    "13.10",
+    "13.12"
+  ],
+  "targetCount": 59,
+  "warning": "Les verdicts sont attendus par conception, pas des résultats mesurés. La présence de 59 scénarios ne prouve pas 59 détections. Les témoins ne certifient que le critère ciblé.",
+  "cases": [
+    {
+      "id": "1.4",
+      "group": "animaux",
+      "slug": "verification-image",
+      "title": "Vérifier votre demande",
+      "test": "1.4.1",
+      "defect": "Le CAPTCHA porte une alternative qui ne décrit ni sa nature ni sa fonction.",
+      "criterionTitle": "Pour chaque image utilisée comme CAPTCHA ou comme image-test, ayant une alternative textuelle, cette alternative permet-elle d’identifier la nature et la fonction de l’image ?",
+      "normativeWording": [
+        "Pour chaque image (balise `<img>`) utilisée comme [CAPTCHA](#captcha) ou comme [image-test](#image-test), ayant une [alternative textuelle](#alternative-textuelle-image), cette alternative est-elle pertinente ?",
+        "S’il est présent, le contenu de l’attribut `alt` est pertinent ;",
+        "S’il est présent, le contenu de l’attribut `title` est pertinent ;",
+        "S’il est présent, le contenu de l’attribut WAI-ARIA `aria-label` est pertinent ;",
+        "S’il est présent, le [passage de texte](#passage-de-texte-lie-par-aria-labelledby-ou-aria-describedby) associé via l’attribut WAI-ARIA `aria-labelledby` est pertinent."
+      ],
+      "bad": {
+        "url": "/animaux/verification-image/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/animaux/verification-image/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire l’image et son alternative.",
+        "Saisir REFUGE puis transmettre ; vérifier les autres voies d’accès."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "image"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "1.5",
+      "group": "animaux",
+      "slug": "verification-acces",
+      "title": "Confirmer votre demande",
+      "test": "1.5.1",
+      "defect": "Le CAPTCHA ne propose aucune autre forme ni voie d’accès.",
+      "criterionTitle": "Pour chaque image utilisée comme CAPTCHA, une solution d’accès alternatif au contenu ou à la fonction du CAPTCHA est-elle présente ?",
+      "normativeWording": [
+        "Chaque image (balises `<img>`, `<area>`, `<object>`, `<embed>`, `<svg>`, `<canvas>` ou possédant un attribut WAI-ARIA `role=\"img\"`) utilisée comme [CAPTCHA](#captcha) vérifie-t-elle une de ces conditions ?",
+        "Il existe une autre forme de [CAPTCHA](#captcha) non graphique, au moins ;",
+        "Il existe une autre solution d’accès à la fonctionnalité qui est sécurisée par le [CAPTCHA](#captcha)."
+      ],
+      "bad": {
+        "url": "/animaux/verification-acces/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/animaux/verification-acces/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire l’image et son alternative.",
+        "Saisir REFUGE puis transmettre ; vérifier les autres voies d’accès."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "image"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "1.6",
+      "group": "animaux",
+      "slug": "bilan-adoptions",
+      "title": "Le bilan des adoptions",
+      "test": "1.6.1",
+      "defect": "Le graphique chiffré ne possède aucune description détaillée.",
+      "criterionTitle": "Chaque image porteuse d’information a-t-elle, si nécessaire, une description détaillée ?",
+      "normativeWording": [
+        "Chaque image (balise `<img>`) [porteuse d’information](#image-porteuse-d-information), qui nécessite une [description détaillée](#description-detaillee-image), vérifie-t-elle une de ces conditions ?",
+        "Il existe un attribut `longdesc` qui donne l’adresse (URL) d’une page ou d’un emplacement dans la page contenant la [description détaillée](#description-detaillee-image) ;",
+        "Il existe une [alternative textuelle](#alternative-textuelle-image) contenant la référence à une [description détaillée](#description-detaillee-image) adjacente à l’image ;",
+        "Il existe un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) permettant d’accéder à la [description détaillée](#description-detaillee-image)."
+      ],
+      "bad": {
+        "url": "/animaux/bilan-adoptions/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/animaux/bilan-adoptions/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Comparer les barres et valeurs du graphique à la description éventuelle."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "image"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "1.7",
+      "group": "animaux",
+      "slug": "evolution-adoptions",
+      "title": "L’évolution des adoptions",
+      "test": "1.7.1",
+      "defect": "La description associée contredit les données du graphique.",
+      "criterionTitle": "Pour chaque image porteuse d’information ayant une description détaillée, cette description est-elle pertinente ?",
+      "normativeWording": [
+        "Chaque image (balise `<img>`) [porteuse d’information](#image-porteuse-d-information), ayant une [description détaillée](#description-detaillee-image), vérifie-t-elle ces conditions ?",
+        "La [description détaillée](#description-detaillee-image) via l’adresse référencée dans l’attribut `longdesc` est pertinente ;",
+        "La [description détaillée](#description-detaillee-image) dans la page et signalée par l’[alternative textuelle](#alternative-textuelle-image) est pertinente ;",
+        "La [description détaillée](#description-detaillee-image) via un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent) est pertinente ;",
+        "Le passage de texte associé via l’attribut WAI-ARIA `aria-describedby` est pertinent."
+      ],
+      "bad": {
+        "url": "/animaux/evolution-adoptions/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/animaux/evolution-adoptions/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Comparer les barres et valeurs du graphique à la description éventuelle."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "image"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "1.8",
+      "group": "animaux",
+      "slug": "horaires",
+      "title": "Les horaires du refuge",
+      "test": "1.8.1",
+      "defect": "Le texte informatif est une image sans mécanisme de remplacement.",
+      "criterionTitle": "Chaque image texte porteuse d’information, en l’absence d’un mécanisme de remplacement, doit si possible être remplacée par du texte stylé. Cette règle est-elle respectée (hors cas particuliers) ?",
+      "normativeWording": [
+        "Chaque [image texte](#image-texte) (balise `<img>` ou possédant un attribut WAI-ARIA `role=\"img\"`) [porteuse d’information](#image-porteuse-d-information), en l’absence d’un [mécanisme de remplacement](#mecanisme-de-remplacement), doit si possible être remplacée par du [texte stylé](#texte-style). Cette règle est-elle respectée (hors cas particuliers) ?"
+      ],
+      "bad": {
+        "url": "/animaux/horaires/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/animaux/horaires/",
+        "expected": [
+          "C",
+          "NA"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "image"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "1.9",
+      "group": "animaux",
+      "slug": "portrait",
+      "title": "Le portrait de Socke",
+      "test": "1.9.1",
+      "defect": "La légende n’est pas reliée à la photographie.",
+      "criterionTitle": "Chaque légende d’image est-elle, si nécessaire, correctement reliée à l’image correspondante ?",
+      "normativeWording": [
+        "Chaque image pourvue d’une [légende](#legende-d-image) (balise `<img>`, `<input>` avec l’attribut `type=\"image\"` ou possédant un attribut WAI-ARIA `role=\"img\"` associée à une [légende](#legende-d-image) adjacente), vérifie-t-elle, si nécessaire, ces conditions ?",
+        "L’image (balise `<img>`, `<input>` avec l’attribut `type=\"image\"` ou possédant un attribut WAI-ARIA `role=\"img\"`) et sa [légende](#legende-d-image) adjacente sont contenues dans une balise `<figure>` ;",
+        "La balise `<figure>` possède un attribut WAI-ARIA `role=\"figure\"` ou `role=\"group\"` ;",
+        "La balise `<figure>` possède un attribut WAI-ARIA `aria-label` dont le contenu est identique au contenu de la [légende](#legende-d-image) ;",
+        "La [légende](#legende-d-image) est contenue dans une balise `<figcaption>`."
+      ],
+      "bad": {
+        "url": "/animaux/portrait/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/animaux/portrait/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "image"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "2.1",
+      "group": "visite",
+      "slug": "carte-acces",
+      "title": "La carte d’accès",
+      "test": "2.1.1",
+      "defect": "L’iframe n’a pas de titre.",
+      "criterionTitle": "Chaque cadre a-t-il un titre de cadre ?",
+      "normativeWording": [
+        "Chaque cadre (balise `<iframe>` ou `<frame>`) a-t-il un attribut `title` ?"
+      ],
+      "bad": {
+        "url": "/visite/carte-acces/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/visite/carte-acces/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "2.2",
+      "group": "visite",
+      "slug": "itineraire",
+      "title": "Votre itinéraire",
+      "test": "2.2.1",
+      "defect": "Le titre du cadre décrit un contenu différent.",
+      "criterionTitle": "Pour chaque cadre ayant un titre de cadre, ce titre de cadre est-il pertinent ?",
+      "normativeWording": [
+        "Pour chaque cadre (balise `<iframe>` ou `<frame>`) ayant un attribut `title`, le contenu de cet attribut est-il pertinent ?"
+      ],
+      "bad": {
+        "url": "/visite/itineraire/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/visite/itineraire/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.1",
+      "group": "rencontres",
+      "slug": "annonce",
+      "title": "Les horaires en audio",
+      "test": "4.1.1",
+      "defect": "L’annonce audio informative ne possède pas de transcription.",
+      "criterionTitle": "Chaque média temporel pré-enregistré a-t-il, si nécessaire, une transcription textuelle ou une audiodescription (hors cas particuliers) ?",
+      "normativeWording": [
+        "Chaque [média temporel](#media-temporel-type-son-video-et-synchronise) pré-enregistré seulement audio, vérifie-t-il, si nécessaire, l’une de ces conditions (hors cas particuliers) ?",
+        "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent) ;",
+        "Il existe une [transcription textuelle](#transcription-textuelle-media-temporel) adjacente clairement identifiable."
+      ],
+      "bad": {
+        "url": "/rencontres/annonce/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/rencontres/annonce/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire l’audio en entier.",
+        "Comparer les paroles à la transcription éventuelle."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "audio"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.2",
+      "group": "rencontres",
+      "slug": "transcription",
+      "title": "L’annonce de notre équipe",
+      "test": "4.2.1",
+      "defect": "La transcription contredit les paroles de l’annonce.",
+      "criterionTitle": "Pour chaque média temporel pré-enregistré ayant une transcription textuelle ou une audiodescription synchronisée, celles-ci sont-elles pertinentes (hors cas particuliers) ?",
+      "normativeWording": [
+        "Pour chaque [média temporel](#media-temporel-type-son-video-et-synchronise) pré-enregistré seulement audio, ayant une [transcription textuelle](#transcription-textuelle-media-temporel), celle-ci est-elle pertinente (hors cas particuliers) ?"
+      ],
+      "bad": {
+        "url": "/rencontres/transcription/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/rencontres/transcription/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire l’audio en entier.",
+        "Comparer les paroles à la transcription éventuelle."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "audio"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.3",
+      "group": "rencontres",
+      "slug": "video",
+      "title": "Votre prochaine visite",
+      "test": "4.3.1",
+      "defect": "La vidéo parlée ne possède pas de sous-titres synchronisés.",
+      "criterionTitle": "Chaque média temporel synchronisé pré-enregistré a-t-il, si nécessaire, des sous-titres synchronisés (hors cas particuliers) ?",
+      "normativeWording": [
+        "Chaque [média temporel](#media-temporel-type-son-video-et-synchronise) synchronisé pré-enregistré vérifie-t-il, si nécessaire, l’une de ces conditions (hors cas particuliers) ?",
+        "Le [média temporel](#media-temporel-type-son-video-et-synchronise) synchronisé possède des [sous-titres synchronisés](#sous-titres-synchronises-objet-multimedia) ;",
+        "Il existe une version alternative possédant des [sous-titres synchronisés](#sous-titres-synchronises-objet-multimedia) accessible via un [lien ou bouton adjacent](#lien-ou-bouton-adjacent)."
+      ],
+      "bad": {
+        "url": "/rencontres/video/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/rencontres/video/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire les 18 secondes de vidéo, avec le son.",
+        "Afficher les sous-titres et comparer les paroles, l’image et les pistes.",
+        "Tester lecture, pause et commandes au clavier."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "video",
+        "audio",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.4",
+      "group": "rencontres",
+      "slug": "sous-titres",
+      "title": "Le message de bienvenue",
+      "test": "4.4.1",
+      "defect": "Les sous-titres sont faux et décalés.",
+      "criterionTitle": "Pour chaque média temporel synchronisé pré-enregistré ayant des sous-titres synchronisés, ces sous-titres sont-ils pertinents ?",
+      "normativeWording": [
+        "Pour chaque [média temporel](#media-temporel-type-son-video-et-synchronise) synchronisé pré-enregistré ayant des [sous-titres synchronisés](#sous-titres-synchronises-objet-multimedia), ces sous-titres sont-ils pertinents ?"
+      ],
+      "bad": {
+        "url": "/rencontres/sous-titres/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/rencontres/sous-titres/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire les 18 secondes de vidéo, avec le son.",
+        "Afficher les sous-titres et comparer les paroles, l’image et les pistes.",
+        "Tester lecture, pause et commandes au clavier."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "video",
+        "audio",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.5",
+      "group": "rencontres",
+      "slug": "acces-video",
+      "title": "Préparer votre arrivée",
+      "test": "4.5.2",
+      "defect": "L’horaire et l’accès montrés à l’image ne sont pas décrits dans le son.",
+      "criterionTitle": "Chaque média temporel pré-enregistré a-t-il, si nécessaire, une audiodescription synchronisée (hors cas particuliers) ?",
+      "normativeWording": [
+        "Chaque [média temporel](#media-temporel-type-son-video-et-synchronise) synchronisé pré-enregistré vérifie-t-il, si nécessaire, une de ces conditions (hors cas particuliers) ?",
+        "Il existe une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronisée ;",
+        "Il existe une version alternative avec une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronisée."
+      ],
+      "bad": {
+        "url": "/rencontres/acces-video/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/rencontres/acces-video/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire les 18 secondes de vidéo, avec le son.",
+        "Afficher les sous-titres et comparer les paroles, l’image et les pistes.",
+        "Tester lecture, pause et commandes au clavier."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "video",
+        "audio",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.6",
+      "group": "rencontres",
+      "slug": "description-video",
+      "title": "La visite décrite",
+      "test": "4.6.2",
+      "defect": "L’audiodescription annonce un jour, une heure et un accès incorrects.",
+      "criterionTitle": "Pour chaque média temporel pré-enregistré ayant une audiodescription synchronisée, celle-ci est-elle pertinente ?",
+      "normativeWording": [
+        "Pour chaque [média temporel](#media-temporel-type-son-video-et-synchronise) synchronisé ayant une [audiodescription](#audiodescription-synchronisee-media-temporel) synchronisée, celle-ci est-elle pertinente ?"
+      ],
+      "bad": {
+        "url": "/rencontres/description-video/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/rencontres/description-video/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire les 18 secondes de vidéo, avec le son.",
+        "Afficher les sous-titres et comparer les paroles, l’image et les pistes.",
+        "Tester lecture, pause et commandes au clavier."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "video",
+        "audio",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.7",
+      "group": "rencontres",
+      "slug": "galerie",
+      "title": "Galerie",
+      "test": "4.7.1",
+      "defect": "Le média informatif n’est pas clairement identifié par son contenu adjacent.",
+      "criterionTitle": "Chaque média temporel est-il clairement identifiable (hors cas particuliers) ?",
+      "normativeWording": [
+        "Pour chaque [média temporel](#media-temporel-type-son-video-et-synchronise) seulement son, seulement vidéo ou synchronisé, le contenu textuel adjacent permet-il d’identifier clairement le [média temporel](#media-temporel-type-son-video-et-synchronise) (hors cas particuliers) ?"
+      ],
+      "bad": {
+        "url": "/rencontres/galerie/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/rencontres/galerie/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire les 18 secondes de vidéo, avec le son.",
+        "Afficher les sous-titres et comparer les paroles, l’image et les pistes.",
+        "Tester lecture, pause et commandes au clavier."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "video",
+        "audio",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.8",
+      "group": "visite",
+      "slug": "plan",
+      "title": "Explorer les espaces",
+      "test": "4.8.1",
+      "defect": "Le plan interactif canvas n’a pas d’alternative.",
+      "criterionTitle": "Chaque média non temporel a-t-il, si nécessaire, une alternative (hors cas particuliers) ?",
+      "normativeWording": [
+        "Chaque [média non temporel](#media-non-temporel) vérifie-t-il, si nécessaire, une de ces conditions (hors cas particuliers) ?",
+        "Un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent), clairement identifiable, permet d’accéder à une page contenant une alternative ;",
+        "Un [lien ou un bouton adjacent](#lien-ou-bouton-adjacent), clairement identifiable, permet d’accéder à une alternative dans la page."
+      ],
+      "bad": {
+        "url": "/visite/plan/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/visite/plan/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Cliquer chacune des trois zones.",
+        "Vérifier les informations résultantes et les possibilités équivalentes au clavier."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "interaction",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.9",
+      "group": "visite",
+      "slug": "plan-equivalent",
+      "title": "Les capacités du refuge",
+      "test": "4.9.1",
+      "defect": "L’alternative du plan omet deux zones et leurs fonctionnalités.",
+      "criterionTitle": "Pour chaque média non temporel ayant une alternative, cette alternative est-elle pertinente ?",
+      "normativeWording": [
+        "Pour chaque [média non temporel](#media-non-temporel) ayant une alternative, cette alternative permet-elle d’accéder au même contenu et à des fonctionnalités similaires ?"
+      ],
+      "bad": {
+        "url": "/visite/plan-equivalent/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/visite/plan-equivalent/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Cliquer chacune des trois zones.",
+        "Vérifier les informations résultantes et les possibilités équivalentes au clavier."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "interaction",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.10",
+      "group": "rencontres",
+      "slug": "ambiance",
+      "title": "L’annonce à l’arrivée",
+      "test": "4.10.1",
+      "defect": "Le son démarre automatiquement plus de trois secondes sans arrêt ni volume.",
+      "criterionTitle": "Chaque son déclenché automatiquement est-il contrôlable par l’utilisateur ?",
+      "normativeWording": [
+        "Chaque séquence sonore déclenchée automatiquement via une balise `<object>`, `<video>`, `<audio>`, `<embed>`, `<bgsound>` ou un code JavaScript vérifie-t-elle une de ces conditions ?",
+        "La séquence sonore a une durée inférieure ou égale à 3 secondes ;",
+        "La séquence sonore peut être stoppée sur action de l’utilisateur ;",
+        "Le volume de la séquence sonore peut être contrôlé par l’utilisateur indépendamment du contrôle de volume du système."
+      ],
+      "bad": {
+        "url": "/rencontres/ambiance/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/rencontres/ambiance/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Charger la page sans lancer la lecture par un clic.",
+        "Vérifier paused=false, muted=false et currentTime supérieur à 3 secondes.",
+        "Rechercher une commande d’arrêt ou de volume."
+      ],
+      "preconditions": [
+        "Autoriser explicitement la lecture sonore automatique dans un profil navigateur de test. En cas de blocage, le scénario NC n’est pas observé."
+      ],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "audio",
+        "interaction"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.11",
+      "group": "rencontres",
+      "slug": "lecteur",
+      "title": "Regarder notre présentation",
+      "test": "4.11.2",
+      "defect": "Les commandes de lecture et pause sont inaccessibles au clavier.",
+      "criterionTitle": "La consultation de chaque média temporel est-elle, si nécessaire, contrôlable par le clavier et tout dispositif de pointage ?",
+      "normativeWording": [
+        "Pour chaque [média temporel](#media-temporel-type-son-video-et-synchronise), chaque fonctionnalité vérifie-t-elle une de ces conditions ?",
+        "La fonctionnalité est [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) ;",
+        "Une fonctionnalité [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de réaliser la même action est présente dans la page."
+      ],
+      "bad": {
+        "url": "/rencontres/lecteur/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/rencontres/lecteur/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire les 18 secondes de vidéo, avec le son.",
+        "Afficher les sous-titres et comparer les paroles, l’image et les pistes.",
+        "Tester lecture, pause et commandes au clavier."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "video",
+        "audio",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.12",
+      "group": "visite",
+      "slug": "plan-clavier",
+      "title": "Choisir un espace",
+      "test": "4.12.1",
+      "defect": "Les zones du plan sont activables au pointeur uniquement.",
+      "criterionTitle": "La consultation de chaque média non temporel est-elle contrôlable par le clavier et tout dispositif de pointage ?",
+      "normativeWording": [
+        "Pour chaque [média non temporel](#media-non-temporel), chaque fonctionnalité vérifie-t-elle une de ces conditions ?",
+        "La fonctionnalité est [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) ;",
+        "Une fonctionnalité [accessible par le clavier et tout dispositif de pointage](#accessible-et-activable-par-le-clavier-et-tout-dispositif-de-pointage) permettant de réaliser la même action est présente dans la page."
+      ],
+      "bad": {
+        "url": "/visite/plan-clavier/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/visite/plan-clavier/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Cliquer chacune des trois zones.",
+        "Vérifier les informations résultantes et les possibilités équivalentes au clavier."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "interaction",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "4.13",
+      "group": "rencontres",
+      "slug": "commandes",
+      "title": "La présentation interactive",
+      "test": "4.13.1",
+      "defect": "Les commandes canvas du lecteur n’exposent ni nom, ni rôle, ni état.",
+      "criterionTitle": "Chaque média temporel et non temporel est-il compatible avec les technologies d’assistance (hors cas particuliers) ?",
+      "normativeWording": [
+        "Chaque [média temporel](#media-temporel-type-son-video-et-synchronise) et [non temporel](#media-non-temporel) vérifie-t-il une de ces conditions (hors cas particuliers) ?",
+        "Le nom, le rôle, la valeur, le paramétrage et les changements d’états des composants d’interfaces sont accessibles aux technologies d’assistance via une API d’accessibilité ;",
+        "Une alternative [compatible avec une API d’accessibilité](#compatible-avec-les-technologies-d-assistance) permet d’accéder aux mêmes fonctionnalités."
+      ],
+      "bad": {
+        "url": "/rencontres/commandes/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/rencontres/commandes/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire les 18 secondes de vidéo, avec le son.",
+        "Afficher les sous-titres et comparer les paroles, l’image et les pistes.",
+        "Tester lecture, pause et commandes au clavier."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "video",
+        "audio",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "5.1",
+      "group": "comparer",
+      "slug": "bilan-trimestriel",
+      "title": "Les adoptions par trimestre",
+      "test": "5.1.1",
+      "defect": "Le tableau complexe n’a pas de résumé de son organisation.",
+      "criterionTitle": "Chaque tableau de données complexe a-t-il un résumé ?",
+      "normativeWording": [
+        "Pour chaque [tableau de données complexe](#tableau-de-donnees-complexe), un [résumé](#resume-de-tableau) est-il disponible ?"
+      ],
+      "bad": {
+        "url": "/comparer/bilan-trimestriel/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/comparer/bilan-trimestriel/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Examiner le résumé, les en-têtes et les associations de chaque cellule."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "5.2",
+      "group": "comparer",
+      "slug": "lecture-bilan",
+      "title": "Comprendre le bilan",
+      "test": "5.2.1",
+      "defect": "Le résumé du tableau complexe décrit une autre organisation.",
+      "criterionTitle": "Pour chaque tableau de données complexe ayant un résumé, celui-ci est-il pertinent ?",
+      "normativeWording": [
+        "Pour chaque [tableau de données complexe](#tableau-de-donnees-complexe) ayant un [résumé](#resume-de-tableau), celui-ci est-il pertinent ?"
+      ],
+      "bad": {
+        "url": "/comparer/lecture-bilan/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/comparer/lecture-bilan/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Examiner le résumé, les en-têtes et les associations de chaque cellule."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "5.3",
+      "group": "comparer",
+      "slug": "contacts",
+      "title": "Adopter ou parrainer",
+      "test": "5.3.1",
+      "defect": "Le tableau de mise en forme devient incohérent en lecture linéaire.",
+      "criterionTitle": "Pour chaque tableau de mise en forme, le contenu linéarisé reste-t-il compréhensible ?",
+      "normativeWording": [
+        "Chaque [tableau de mise en forme](#tableau-de-mise-en-forme) vérifie-t-il ces conditions ?",
+        "Le contenu linéarisé reste compréhensible ;",
+        "La balise `<table>` possède un attribut `role=\"presentation\"`."
+      ],
+      "bad": {
+        "url": "/comparer/contacts/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/comparer/contacts/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Lire les cellules dans leur ordre DOM, sans la disposition en colonnes."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "5.4",
+      "group": "comparer",
+      "slug": "places",
+      "title": "Places disponibles",
+      "test": "5.4.1",
+      "defect": "Le titre visible n’est pas associé au tableau.",
+      "criterionTitle": "Pour chaque tableau de données ayant un titre, le titre est-il correctement associé au tableau de données ?",
+      "normativeWording": [
+        "Pour chaque [tableau de données ayant un titre](#tableau-de-donnees-ayant-un-titre), le titre est-il correctement associé au tableau de données ?"
+      ],
+      "bad": {
+        "url": "/comparer/places/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/comparer/places/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "5.5",
+      "group": "comparer",
+      "slug": "resultats",
+      "title": "Les résultats des refuges",
+      "test": "5.5.1",
+      "defect": "Le titre du tableau décrit des données météorologiques.",
+      "criterionTitle": "Pour chaque tableau de données ayant un titre, celui-ci est-il pertinent ?",
+      "normativeWording": [
+        "Pour chaque [tableau de données ayant un titre](#tableau-de-donnees-ayant-un-titre), ce titre permet-il d’identifier le contenu du [tableau de données](#tableau-de-donnees) de manière claire et concise ?"
+      ],
+      "bad": {
+        "url": "/comparer/resultats/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/comparer/resultats/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "5.6",
+      "group": "comparer",
+      "slug": "effectifs",
+      "title": "Les effectifs accueillis",
+      "test": "5.6.1",
+      "defect": "Les en-têtes de colonnes sont des cellules ordinaires.",
+      "criterionTitle": "Pour chaque tableau de données, chaque en-tête de colonne et chaque en-tête de ligne sont-ils correctement déclarés ?",
+      "normativeWording": [
+        "Pour chaque [tableau de données](#tableau-de-donnees), chaque [en-tête de colonne](#en-tete-de-colonne-ou-de-ligne) s’appliquant à la totalité de la colonne vérifie-t-il une de ces conditions ?",
+        "L’[en-tête de colonnes](#en-tete-de-colonne-ou-de-ligne) est structuré au moyen d’une balise `<th>` ;",
+        "L’[en-tête de colonnes](#en-tete-de-colonne-ou-de-ligne) est structuré au moyen d’une balise pourvue d’un attribut WAI-ARIA `role=\"columnheader\"`."
+      ],
+      "bad": {
+        "url": "/comparer/effectifs/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/comparer/effectifs/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "5.7",
+      "group": "comparer",
+      "slug": "detail-trimestres",
+      "title": "Détail des résultats trimestriels",
+      "test": "5.7.4",
+      "defect": "Les cellules de données complexes référencent les mauvais en-têtes.",
+      "criterionTitle": "Pour chaque tableau de données, la technique appropriée permettant d’associer chaque cellule avec ses en-têtes est-elle utilisée (hors cas particuliers) ?",
+      "normativeWording": [
+        "Pour chaque contenu de balise `<td>` ou `<th>` associée à un ou plusieurs en-têtes possédant un attribut `id`, la balise vérifie-t-elle ces conditions ?",
+        "La balise possède un attribut `headers` ;",
+        "L’attribut `headers` possède la liste des valeurs d’attribut `id` des [en-têtes](#en-tete-de-colonne-ou-de-ligne) associés."
+      ],
+      "bad": {
+        "url": "/comparer/detail-trimestres/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/comparer/detail-trimestres/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Examiner le résumé, les en-têtes et les associations de chaque cellule."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "5.8",
+      "group": "comparer",
+      "slug": "fiches",
+      "title": "Les fiches pratiques",
+      "test": "5.8.1",
+      "defect": "Le tableau de mise en forme emploie des en-têtes de données.",
+      "criterionTitle": "Chaque tableau de mise en forme ne doit pas utiliser d’éléments propres aux  tableaux de données. Cette règle est-elle respectée ?",
+      "normativeWording": [
+        "Chaque [tableau de mise en forme](#tableau-de-mise-en-forme) (balise `<table>`) vérifie-t-il ces conditions ?",
+        "Le tableau de mise en forme (balise `<table>`) n’a pas d’attribut `summary` (sinon vide) et ne contient pas de balises `<caption>`, `<th>`, `<thead>`, `<tfoot>` ou de balises ayant un attribut WAI-ARIA `role=\"rowheader\"`, `role=\"columnheader\"` ;",
+        "Les cellules du tableau de mise en forme (balises `<td>`) ne possèdent pas d’attributs `scope`, `headers` et `axis`."
+      ],
+      "bad": {
+        "url": "/comparer/fiches/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/comparer/fiches/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "7.2",
+      "group": "interactions",
+      "slug": "disponibilites",
+      "title": "Les disponibilités actualisées",
+      "test": "7.2.2",
+      "defect": "L’alternative d’une image mise à jour par script reste périmée.",
+      "criterionTitle": "Pour chaque script ayant une alternative, cette alternative est-elle pertinente ?",
+      "normativeWording": [
+        "Chaque élément non textuel mis à jour par un [script](#script) (dans la page, ou dans un [cadre](#cadre)) et ayant une [alternative](#alternative-a-script) vérifie-t-il ces conditions ?",
+        "L’alternative de l’élément non textuel est mise à jour ;",
+        "L’alternative mise à jour est pertinente."
+      ],
+      "bad": {
+        "url": "/interactions/disponibilites/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/interactions/disponibilites/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Activer Afficher les horaires.",
+        "Comparer le texte de l’image avec son alternative après la mise à jour."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "image",
+        "interaction"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "7.5",
+      "group": "dons",
+      "slug": "parrainage",
+      "title": "Parrainer un animal",
+      "test": "7.5.1",
+      "defect": "Le message de confirmation dynamique n’a pas de rôle de statut.",
+      "criterionTitle": "Dans chaque page web, les messages de statut sont-ils correctement restitués par les technologies d’assistance ?",
+      "normativeWording": [
+        "Chaque [message de statut](#message-de-statut) qui informe de la réussite, du résultat d’une action ou bien de l’état d’une application utilise-t-il l’attribut WAI-ARIA `role=\"status\"` ?"
+      ],
+      "bad": {
+        "url": "/dons/parrainage/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/dons/parrainage/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Activer Parrainer Socke sans déplacer le focus.",
+        "Vérifier le rôle du message et sa restitution avec un lecteur d’écran."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "interaction",
+        "technologie-assistance"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "8.7",
+      "group": "journal",
+      "slug": "benevoles",
+      "title": "Nos bénévoles internationaux",
+      "test": "8.7.1",
+      "defect": "Le passage anglais ne déclare pas son changement de langue.",
+      "criterionTitle": "Dans chaque page web, chaque changement de langue est-il indiqué dans le code source (hors cas particuliers) ?",
+      "normativeWording": [
+        "Dans chaque page web, chaque texte écrit dans une langue différente de la [langue par défaut](#langue-par-defaut) vérifie-t-il une de ces conditions (hors cas particuliers) ?",
+        "L’indication de langue est donnée sur l’élément contenant le texte (attribut `lang` et/ou `xml:lang`) ;",
+        "L’indication de langue est donnée sur un des éléments parents (attribut `lang` et/ou `xml:lang`)"
+      ],
+      "bad": {
+        "url": "/journal/benevoles/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/journal/benevoles/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "8.8",
+      "group": "journal",
+      "slug": "temoignage",
+      "title": "Le témoignage de Lucy",
+      "test": "8.8.1",
+      "defect": "Le passage anglais est déclaré en allemand.",
+      "criterionTitle": "Dans chaque page web, le code de langue de chaque changement de langue est-il valide et pertinent ?",
+      "normativeWording": [
+        "Pour chaque page web, le code de langue de chaque [changement de langue](#changement-de-langue) vérifie-t-il ces conditions ?",
+        "Le code de langue est valide ;",
+        "Le code de langue est pertinent."
+      ],
+      "bad": {
+        "url": "/journal/temoignage/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/journal/temoignage/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "8.10",
+      "group": "journal",
+      "slug": "accueil-arabe",
+      "title": "Bienvenue à tous",
+      "test": "8.10.1",
+      "defect": "Le passage arabe ne déclare pas son sens de lecture.",
+      "criterionTitle": "Dans chaque page web, les changements du sens de lecture sont-ils signalés ?",
+      "normativeWording": [
+        "Dans chaque page web, chaque texte dont le sens de lecture est différent du [sens de lecture](#sens-de-lecture) par défaut est contenu dans une balise possédant un attribut `dir` ?"
+      ],
+      "bad": {
+        "url": "/journal/accueil-arabe/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/journal/accueil-arabe/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "9.4",
+      "group": "journal",
+      "slug": "paroles",
+      "title": "Paroles d’adoptants",
+      "test": "9.4.2",
+      "defect": "Un bloc de citation est balisé comme un simple paragraphe.",
+      "criterionTitle": "Dans chaque page web, chaque citation est-elle correctement indiquée ?",
+      "normativeWording": [
+        "Dans chaque page web, chaque bloc de citation utilise-t-il une balise `<blockquote>` ?"
+      ],
+      "bad": {
+        "url": "/journal/paroles/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/journal/paroles/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "10.6",
+      "group": "interactions",
+      "slug": "rendez-vous",
+      "title": "Prendre rendez-vous",
+      "test": "10.6.1",
+      "defect": "Le lien au milieu d’un paragraphe n’est distingué que par une couleur insuffisante.",
+      "criterionTitle": "Dans chaque page web, chaque lien dont la nature n’est pas évidente est-il visible par rapport au texte environnant ?",
+      "normativeWording": [
+        "Dans chaque page web, chaque [lien texte](#lien-texte) signalé uniquement par la couleur, et dont la nature n’est pas évidente, vérifie-t-il ces conditions ?",
+        "La couleur du lien a un rapport de [contraste](#contraste) supérieur ou égal à 3:1 par rapport au texte environnant ;",
+        "Le lien dispose d’une indication visuelle au survol autre qu’un changement de couleur ;",
+        "Le lien dispose d’une indication visuelle au focus autre qu’un changement de couleur."
+      ],
+      "bad": {
+        "url": "/interactions/rendez-vous/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/interactions/rendez-vous/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "rendu"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "10.8",
+      "group": "interactions",
+      "slug": "conditions",
+      "title": "Consulter les conditions",
+      "test": "10.8.1",
+      "defect": "Le contenu révélé reste aria-hidden pour les technologies d’assistance.",
+      "criterionTitle": "Pour chaque page web, les contenus cachés ont-ils vocation à être ignorés par les technologies d’assistance ?",
+      "normativeWording": [
+        "Dans chaque page web, chaque contenu caché vérifie-t-il une de ces conditions ?",
+        "Le [contenu caché](#contenu-cache) a vocation à être ignoré par les technologies d’assistance ;",
+        "Le [contenu caché](#contenu-cache) n’a pas vocation à être ignoré par les technologies d’assistance et est rendu restituable par les technologies d’assistance suite à une action de l’utilisateur réalisable au clavier ou par tout dispositif de pointage sur un élément précédent le contenu caché ou suite à un repositionnement du focus dessus."
+      ],
+      "bad": {
+        "url": "/interactions/conditions/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/interactions/conditions/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Activer Afficher les conditions.",
+        "Comparer la visibilité du texte à sa présence dans l’arbre d’accessibilité."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "interaction",
+        "technologie-assistance"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "10.13",
+      "group": "interactions",
+      "slug": "aide",
+      "title": "Aide à la réservation",
+      "test": "10.13.1",
+      "defect": "Le panneau de survol recouvre de l’information sans pouvoir être fermé sans déplacer le pointeur.",
+      "criterionTitle": "Dans chaque page web, les contenus additionnels apparaissant à la prise de focus ou au survol d’un composant d’interface sont-ils contrôlables par l’utilisateur (hors cas particuliers) ?",
+      "normativeWording": [
+        "Chaque contenu additionnel devenant visible à la prise de focus ou au survol d’un [composant d’interface](#composant-d-interface) peut-il être masqué par une action de l’utilisateur sans déplacer le focus ou le pointeur de la souris (hors cas particuliers) ?"
+      ],
+      "bad": {
+        "url": "/interactions/aide/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/interactions/aide/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Survoler Conseils de visite, puis essayer le même parcours au clavier.",
+        "Appuyer sur Échap sans déplacer le pointeur.",
+        "Parcourir le contenu additionnel avec Tab."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "interaction",
+        "rendu",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "10.14",
+      "group": "interactions",
+      "slug": "conseil",
+      "title": "Un conseil pour votre visite",
+      "test": "10.14.1",
+      "defect": "Le conseil révélé au survol CSS n’est pas disponible au clavier.",
+      "criterionTitle": "Dans chaque page web, les contenus additionnels apparaissant via les styles CSS uniquement peuvent-ils être rendus visibles au clavier et par tout dispositif de pointage ?",
+      "normativeWording": [
+        "Dans chaque page web, les contenus additionnels apparaissant au survol d’un [composant d’interface](#composant-d-interface) via les styles CSS respectent-ils si nécessaire une de ces conditions ?",
+        "Les contenus additionnels apparaissent également à l’activation du composant via le clavier et tout dispositif de pointage ;",
+        "Les contenus additionnels apparaissent également à la prise de focus du composant ;",
+        "Les contenus additionnels apparaissent également par le biais de l’activation ou de la prise de focus d’un autre composant."
+      ],
+      "bad": {
+        "url": "/interactions/conseil/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/interactions/conseil/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Survoler Conseils de visite, puis essayer le même parcours au clavier.",
+        "Appuyer sur Échap sans déplacer le pointeur.",
+        "Parcourir le contenu additionnel avec Tab."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "interaction",
+        "rendu",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "11.3",
+      "group": "adoption",
+      "slug": "contact",
+      "title": "Votre adresse de contact",
+      "test": "11.3.1",
+      "defect": "Deux champs de même fonction portent des étiquettes incohérentes.",
+      "criterionTitle": "Dans chaque formulaire, chaque étiquette associée à un champ de formulaire ayant la même fonction et répétée plusieurs fois dans une même page ou dans un ensemble de pages est-elle cohérente ?",
+      "normativeWording": [
+        "Chaque [étiquette](#etiquette-de-champ-de-formulaire) associée à un [champ de formulaire](#champ-de-saisie-de-formulaire) ayant la même fonction et répétée plusieurs fois dans une même page est-elle [cohérente](#etiquettes-coherentes) ?"
+      ],
+      "bad": {
+        "url": "/adoption/contact/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/adoption/contact/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "11.5",
+      "group": "adoption",
+      "slug": "foyer",
+      "title": "Votre foyer",
+      "test": "11.5.1",
+      "defect": "Les réponses Oui/Non à deux questions ne sont pas regroupées.",
+      "criterionTitle": "Dans chaque formulaire, les champs de même nature sont-ils regroupés, si nécessaire ?",
+      "normativeWording": [
+        "Les [champs de même nature](#champs-de-meme-nature) vérifient-ils l’une de ces conditions, si nécessaire ?",
+        "Les [champs de même nature](#champs-de-meme-nature) sont regroupés dans une balise `<fieldset>` ;",
+        "Les [champs de même nature](#champs-de-meme-nature) sont regroupés dans une balise possédant un attribut WAI-ARIA `role=\"group\"` ;",
+        "Les [champs de même nature](#champs-de-meme-nature) de type radio (`<input type=\"radio\">`) ou balises possédant un attribut WAI-ARIA `role=\"radio\"`) sont regroupés dans une balise possédant un attribut WAI-ARIA `role=\"radiogroup\"` ou `role=\"group\"`."
+      ],
+      "bad": {
+        "url": "/adoption/foyer/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/adoption/foyer/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "11.6",
+      "group": "adoption",
+      "slug": "habitat",
+      "title": "Votre habitat",
+      "test": "11.6.1",
+      "defect": "Le regroupement de champs n’a pas de légende.",
+      "criterionTitle": "Dans chaque formulaire, chaque regroupement de champs de même nature a-t-il une légende ?",
+      "normativeWording": [
+        "Chaque regroupement de [champs de même nature](#champs-de-meme-nature) possède-t-il une [légende](#legende) ?"
+      ],
+      "bad": {
+        "url": "/adoption/habitat/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/adoption/habitat/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "11.7",
+      "group": "adoption",
+      "slug": "jardin",
+      "title": "Votre jardin",
+      "test": "11.7.1",
+      "defect": "La légende du groupe décrit un mode de paiement.",
+      "criterionTitle": "Dans chaque formulaire, chaque légende associée à un regroupement de champs de même nature est-elle pertinente ?",
+      "normativeWording": [
+        "Chaque [légende](#legende) associée à un regroupement de [champs de même nature](#champs-de-meme-nature) est-elle pertinente ?"
+      ],
+      "bad": {
+        "url": "/adoption/jardin/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/adoption/jardin/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "11.8",
+      "group": "adoption",
+      "slug": "region",
+      "title": "Choisir votre refuge",
+      "test": "11.8.1",
+      "defect": "Les options de régions sont de faux titres sans regroupement.",
+      "criterionTitle": "Dans chaque formulaire, les items de même nature d’une liste de choix sont-ils regroupés de manière pertinente ?",
+      "normativeWording": [
+        "Pour chaque balise `<select>`, les [items de même nature d’une liste de choix](#items-de-meme-nature-d-une-liste-de-choix) sont-ils regroupés avec une balise `<optgroup>`, si nécessaire ?"
+      ],
+      "bad": {
+        "url": "/adoption/region/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/adoption/region/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir la page et examiner le contenu ciblé."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "11.10",
+      "group": "adoption",
+      "slug": "depot",
+      "title": "Déposer votre demande",
+      "test": "11.10.3",
+      "defect": "La validation rejette la saisie sans identifier le champ en erreur.",
+      "criterionTitle": "Dans chaque formulaire, le contrôle de saisie est-il utilisé de manière pertinente (hors cas particuliers) ?",
+      "normativeWording": [
+        "Les messages d’erreur indiquant l’absence de saisie d’un champ obligatoire vérifient-ils une de ces conditions ?",
+        "Le message d’erreur indiquant l’absence de saisie d’un champ obligatoire est visible et permet d’identifier nommément le champ concerné ;",
+        "Le champ obligatoire dispose de l’attribut `aria-invalid=\"true\"`."
+      ],
+      "bad": {
+        "url": "/adoption/depot/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/adoption/depot/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Valider une première fois avec Code de demande vide pour tester 11.10.3.",
+        "Saisir XYZ dans Code de demande et valider.",
+        "Examiner les instructions avant saisie et l’erreur après rejet.",
+        "Vérifier que AD-2048 est accepté."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "interaction"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "11.11",
+      "group": "adoption",
+      "slug": "code",
+      "title": "Retrouver votre demande",
+      "test": "11.11.1",
+      "defect": "La validation ne fournit pas le format attendu ni suggestion de correction.",
+      "criterionTitle": "Dans chaque formulaire, le contrôle de saisie est-il accompagné, si nécessaire, de suggestions facilitant la correction des erreurs de saisie ?",
+      "normativeWording": [
+        "Pour chaque erreur de saisie, les types et les formats de données sont-ils suggérés, si nécessaire ?"
+      ],
+      "bad": {
+        "url": "/adoption/code/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/adoption/code/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Saisir XYZ dans Code de demande et valider.",
+        "Examiner les instructions avant saisie et l’erreur après rejet.",
+        "Vérifier que AD-2048 est accepté."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "interaction"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "11.12",
+      "group": "espace",
+      "slug": "notes",
+      "title": "Mes notes de préparation",
+      "test": "11.12.1",
+      "defect": "La note persistante est supprimée immédiatement sans confirmation ni récupération.",
+      "criterionTitle": "Pour chaque formulaire qui modifie ou supprime des données, ou qui transmet des réponses à un test ou à un examen, ou dont la validation a des conséquences financières ou juridiques, les données saisies peuvent-elles être modifiées, mises à jour ou récupérées par l’utilisateur ?",
+      "normativeWording": [
+        "Pour chaque formulaire qui modifie ou supprime des données, ou qui transmet des réponses à un test ou un examen, ou dont la validation a des conséquences financières ou juridiques, la saisie des données vérifie-t-elle une de ces conditions ?",
+        "L’utilisateur peut [modifier ou annuler les données et les actions effectuées](#modifier-ou-annuler-les-donnees-et-les-actions-effectues) sur ces données après la validation du formulaire ;",
+        "L’utilisateur peut vérifier et corriger les données avant la validation d’un formulaire en plusieurs étapes ;",
+        "Un mécanisme de confirmation explicite, via une case à cocher (balise `<input>` de type `checkbox` ou balise ayant un attribut WAI-ARIA `role=\"checkbox\"`) ou une étape supplémentaire, est présent."
+      ],
+      "bad": {
+        "url": "/espace/notes/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/espace/notes/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Créer une note et l’enregistrer.",
+        "Recharger la page pour vérifier sa persistance.",
+        "Supprimer la note et chercher un moyen de confirmation ou récupération."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "interaction",
+        "stockage-local"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "12.1",
+      "group": "navigation",
+      "slug": "guides",
+      "title": "Les guides du refuge",
+      "test": "12.1.1",
+      "defect": "L’ensemble hiérarchisé de guides ne possède qu’un système de navigation.",
+      "criterionTitle": "Chaque ensemble de pages dispose-t-il de deux systèmes de navigation différents, au moins (hors cas particuliers) ?",
+      "normativeWording": [
+        "Chaque [ensemble de pages](#ensemble-de-pages) vérifie-t-il une de ces conditions (hors cas particuliers) ?",
+        "Un [menu de navigation](#menu-et-barre-de-navigation) et un [plan du site](#page-plan-du-site) sont présents ;",
+        "Un [menu de navigation](#menu-et-barre-de-navigation) et un [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) sont présents ;",
+        "Un [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) et un [plan du site](#page-plan-du-site) sont présents."
+      ],
+      "bad": {
+        "url": "/navigation/guides/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/navigation/guides/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Depuis l’accueil du sous-site, ouvrir rubrique-0.html puis guide-0-0.html et parcourir les autres rubriques et conseils.",
+        "Relever les systèmes de navigation disponibles sur ces pages : menu, plan et recherche."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "multi-pages",
+        "rendu"
+      ],
+      "observedVerdict": null,
+      "auditScope": "/navigation/guides/ et ses pages descendantes ; sous-site autonome. Ne pas utiliser le catalogue de test comme système de navigation."
+    },
+    {
+      "id": "12.2",
+      "group": "navigation",
+      "slug": "menus",
+      "title": "Parcourir nos rubriques",
+      "test": "12.2.1",
+      "defect": "Le même menu change de place entre deux pages intérieures.",
+      "criterionTitle": "Dans chaque ensemble de pages, le menu et les barres de navigation sont-ils toujours à la même place (hors cas particuliers) ?",
+      "normativeWording": [
+        "Dans chaque [ensemble de pages](#ensemble-de-pages), chaque page disposant d’un [menu et les barres de navigation](#menu-et-barre-de-navigation) vérifie-t-elle ces conditions (hors cas particuliers) ?",
+        "Le [menu et les barres de navigation](#menu-et-barre-de-navigation) sont toujours à la même place dans la présentation ;",
+        "Le [menu et les barres de navigation](#menu-et-barre-de-navigation) se présentent toujours dans le même ordre relatif dans le code source."
+      ],
+      "bad": {
+        "url": "/navigation/menus/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/navigation/menus/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Parcourir le sous-site de guides et ses pages intérieures.",
+        "Comparer les moyens de navigation sur page-a.html et page-b.html."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "multi-pages",
+        "rendu"
+      ],
+      "observedVerdict": null,
+      "auditScope": "/navigation/menus/ et ses pages descendantes ; sous-site autonome. Ne pas utiliser le catalogue de test comme système de navigation."
+    },
+    {
+      "id": "12.3",
+      "group": "navigation",
+      "slug": "plan",
+      "title": "Plan des rubriques",
+      "test": "12.3.3",
+      "defect": "Le plan omet une rubrique et associe un intitulé à la mauvaise destination.",
+      "criterionTitle": "La page « plan du site » est-elle pertinente ?",
+      "normativeWording": [
+        "Les liens du [plan du site](#page-plan-du-site) renvoient-ils bien vers les pages indiquées par l’intitulé ?"
+      ],
+      "bad": {
+        "url": "/navigation/plan/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/navigation/plan/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Parcourir le sous-site de guides et ses pages intérieures.",
+        "Comparer les moyens de navigation sur page-a.html et page-b.html."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "multi-pages",
+        "rendu"
+      ],
+      "observedVerdict": null,
+      "auditScope": "/navigation/plan/ et ses pages descendantes ; sous-site autonome. Ne pas utiliser le catalogue de test comme système de navigation."
+    },
+    {
+      "id": "12.4",
+      "group": "navigation",
+      "slug": "acces-plan",
+      "title": "Trouver le plan des rubriques",
+      "test": "12.4.2",
+      "defect": "Le lien vers le plan change de place entre pages intérieures.",
+      "criterionTitle": "Dans chaque ensemble de pages, la page « plan du site » est-elle accessible à partir d’une fonctionnalité identique ?",
+      "normativeWording": [
+        "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalité vers la [page « plan du site »](#page-plan-du-site) est-elle située à la même place dans la présentation ?"
+      ],
+      "bad": {
+        "url": "/navigation/acces-plan/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/navigation/acces-plan/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Parcourir le sous-site de guides et ses pages intérieures.",
+        "Comparer les moyens de navigation sur page-a.html et page-b.html."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "multi-pages",
+        "rendu"
+      ],
+      "observedVerdict": null,
+      "auditScope": "/navigation/acces-plan/ et ses pages descendantes ; sous-site autonome. Ne pas utiliser le catalogue de test comme système de navigation."
+    },
+    {
+      "id": "12.5",
+      "group": "navigation",
+      "slug": "recherche",
+      "title": "Rechercher dans les guides",
+      "test": "12.5.2",
+      "defect": "L’accès à une recherche fonctionnelle change de place entre pages intérieures.",
+      "criterionTitle": "Dans chaque ensemble de pages, le moteur de recherche est-il atteignable de manière identique ?",
+      "normativeWording": [
+        "Dans chaque [ensemble de pages](#ensemble-de-pages), la fonctionnalité vers le [moteur de recherche](#moteur-de-recherche-interne-a-un-site-web) est-elle située à la même place dans la présentation ?"
+      ],
+      "bad": {
+        "url": "/navigation/recherche/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/navigation/recherche/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Parcourir le sous-site de guides et ses pages intérieures.",
+        "Comparer les moyens de navigation sur page-a.html et page-b.html."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "multi-pages",
+        "rendu"
+      ],
+      "observedVerdict": null,
+      "auditScope": "/navigation/recherche/ et ses pages descendantes ; sous-site autonome. Ne pas utiliser le catalogue de test comme système de navigation."
+    },
+    {
+      "id": "12.10",
+      "group": "interactions",
+      "slug": "raccourcis",
+      "title": "Parcourir les portraits",
+      "test": "12.10.1",
+      "defect": "Le raccourci global N ne peut pas être désactivé ou reconfiguré.",
+      "criterionTitle": "Dans chaque page web, les raccourcis clavier n’utilisant qu’une seule touche (lettre minuscule ou majuscule, ponctuation, chiffre ou symbole) sont-ils contrôlables par l’utilisateur ?",
+      "normativeWording": [
+        "Dans chaque page web, chaque [raccourci clavier](#raccourci-clavier) n’utilisant qu’une seule touche (lettre minuscule ou majuscule, ponctuation, chiffre ou symbole) vérifie-t-il l’une de ces conditions ?",
+        "Un mécanisme est disponible pour désactiver le [raccourci clavier](#raccourci-clavier) ;",
+        "Un mécanisme est disponible pour configurer la touche de [raccourci clavier](#raccourci-clavier) au moyen des touches de modification (Ctrl, Alt, Maj, etc.) ;",
+        "Dans le cas d’un [composant d’interface](#composant-d-interface) utilisateur, le [raccourci clavier](#raccourci-clavier) qui lui est associé ne peut être activé que si le focus clavier est sur ce composant."
+      ],
+      "bad": {
+        "url": "/interactions/raccourcis/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/interactions/raccourcis/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Avec le focus sur la page, appuyer sur N.",
+        "Chercher un moyen de désactiver ou reconfigurer le raccourci."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "12.11",
+      "group": "interactions",
+      "slug": "options",
+      "title": "Les options de visite",
+      "test": "12.11.1",
+      "defect": "Le panneau dévoilé contient un lien exclu du parcours clavier.",
+      "criterionTitle": "Dans chaque page web, les contenus additionnels apparaissant au survol, à la prise de focus ou à l’activation d’un composant d’interface sont-ils si nécessaire atteignables au clavier ?",
+      "normativeWording": [
+        "Dans chaque page web, les contenus additionnels apparaissant au survol, à la prise de focus ou à l’activation d’un [composant d’interface](#composant-d-interface) sont-ils si nécessaire atteignables au clavier ?"
+      ],
+      "bad": {
+        "url": "/interactions/options/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/interactions/options/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Survoler Conseils de visite, puis essayer le même parcours au clavier.",
+        "Appuyer sur Échap sans déplacer le pointeur.",
+        "Parcourir le contenu additionnel avec Tab."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "interaction",
+        "rendu",
+        "clavier"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "13.1",
+      "group": "interactions",
+      "slug": "reservation",
+      "title": "Réserver une rencontre",
+      "test": "13.1.4",
+      "defect": "La session expire et efface la saisie sans prolongation possible.",
+      "criterionTitle": "Pour chaque page web, l’utilisateur a-t-il le contrôle de chaque limite de temps modifiant le contenu (hors cas particuliers) ?",
+      "normativeWording": [
+        "Pour chaque page web, chaque procédé limitant le temps d’une session vérifie-t-il une de ces conditions (hors cas particuliers) ?",
+        "L’utilisateur peut supprimer la limite de temps ;",
+        "L’utilisateur peut augmenter la limite de temps ;",
+        "La limite de temps avant la fin de la session est de vingt heures au moins."
+      ],
+      "bad": {
+        "url": "/interactions/reservation/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/interactions/reservation/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Saisir une note et attendre 16 secondes.",
+        "Vérifier les possibilités de prolonger ou supprimer la limite avant expiration."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "temps",
+        "interaction"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "13.3",
+      "group": "documents",
+      "slug": "dossier",
+      "title": "Télécharger le dossier",
+      "test": "13.3.1",
+      "defect": "Le PDF image ne possède aucune version accessible.",
+      "criterionTitle": "Dans chaque page web, chaque document bureautique en téléchargement possède-t-il, si nécessaire, une version accessible (hors cas particuliers) ?",
+      "normativeWording": [
+        "Dans chaque page web, chaque fonctionnalité de téléchargement d’un document bureautique vérifie-t-elle une de ces conditions ?",
+        "Le document en téléchargement est compatible avec l'accessibilité ;",
+        "Il en existe une version alternative en téléchargement compatible avec l'accessibilité ;",
+        "Il en existe une version alternative au format HTML compatible avec l'accessibilité."
+      ],
+      "bad": {
+        "url": "/documents/dossier/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/documents/dossier/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir le PDF et vérifier sa couche textuelle et sa structure.",
+        "Comparer le document avec la version HTML lorsqu’elle existe."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "document",
+        "image"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "13.4",
+      "group": "documents",
+      "slug": "version-texte",
+      "title": "Le dossier et sa version texte",
+      "test": "13.4.1",
+      "defect": "L’alternative HTML omet une condition et modifie le montant du PDF.",
+      "criterionTitle": "Pour chaque document bureautique ayant une version accessible, cette version offre-t-elle la même information ?",
+      "normativeWording": [
+        "Chaque document bureautique ayant une version accessible vérifie-t-il une de ces conditions ?",
+        "La version compatible avec l’accessibilité offre la même information ;",
+        "La version alternative au format HTML est pertinente et offre la même information."
+      ],
+      "bad": {
+        "url": "/documents/version-texte/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/documents/version-texte/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Ouvrir le PDF et vérifier sa couche textuelle et sa structure.",
+        "Comparer le document avec la version HTML lorsqu’elle existe."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "document",
+        "image"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "13.10",
+      "group": "visite",
+      "slug": "portraits",
+      "title": "Faire défiler les portraits",
+      "test": "13.10.2",
+      "defect": "Le carrousel exige une trajectoire de balayage sans geste simple alternatif.",
+      "criterionTitle": "Dans chaque page web, les fonctionnalités utilisables ou disponibles au moyen d’un geste complexe peuvent-elles être également disponibles au moyen d’un geste simple (hors cas particuliers) ?",
+      "normativeWording": [
+        "Dans chaque page web, chaque fonctionnalité utilisable ou disponible suite à un geste basé sur le suivi d’une trajectoire sur l’écran est-elle également utilisable ou disponible suite à un contact en un point unique de l’écran (hors cas particuliers)."
+      ],
+      "bad": {
+        "url": "/visite/portraits/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/visite/portraits/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Effectuer un balayage horizontal de plus de 70 pixels, avec moins de 40 pixels de déplacement vertical.",
+        "Chercher une commande offrant le même résultat par clic simple."
+      ],
+      "preconditions": [],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "geste",
+        "interaction"
+      ],
+      "observedVerdict": null
+    },
+    {
+      "id": "13.12",
+      "group": "visite",
+      "slug": "surprise",
+      "title": "Rencontrer un animal au hasard",
+      "test": "13.12.1",
+      "defect": "Le choix exige un mouvement de l’appareil sans commande alternative.",
+      "criterionTitle": "Dans chaque page web, les fonctionnalités qui impliquent un mouvement de l’appareil ou vers l’appareil peuvent-elles être satisfaites de manière alternative (hors cas particuliers) ?",
+      "normativeWording": [
+        "Dans chaque page web, les fonctionnalités disponibles en bougeant l’appareil peuvent-elles être accomplies avec des [composants d’interface](#composant-d-interface) utilisateur (hors cas particuliers) ?"
+      ],
+      "bad": {
+        "url": "/visite/surprise/",
+        "expected": "NC",
+        "selector": "#scenario"
+      },
+      "control": {
+        "url": "/temoins/visite/surprise/",
+        "expected": [
+          "C"
+        ],
+        "scope": "Critère ciblé uniquement ; pas une certification de toute la page."
+      },
+      "actions": [
+        "Autoriser le capteur si nécessaire, puis secouer l’appareil.",
+        "Chercher une commande alternative et un réglage désactivant le mouvement."
+      ],
+      "preconditions": [
+        "Appareil avec capteur devicemotion et permission accordée. Un événement synthétique vérifie le branchement logiciel, pas le capteur physique."
+      ],
+      "evidenceRequired": [
+        "code",
+        "DOM",
+        "capteur",
+        "interaction"
+      ],
+      "observedVerdict": null
+    }
+  ]
+}

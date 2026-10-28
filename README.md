@@ -564,6 +564,25 @@ without changing a workflow. See `references/ci.md`.
 
 The skill (`skills/ultra11y/SKILL.md` + `references/`) teaches the agent when and how to run these, how to complete the manual criteria, and the native-first authoring doctrine.
 
+## Démo RGAA : le refuge
+
+Le dépôt contient un [site de démonstration local](demos/refuge-rgaa/README.txt)
+avec **59 scénarios volontairement non conformes et 59 témoins séparés**.
+Il prolonge la démo Microsoft Edge, conservée avec sa licence et sa provenance
+dans [`demos/microsoft-edge-a11y`](demos/microsoft-edge-a11y).
+
+```sh
+pnpm run demo:refuge        # Python 3 ; http://127.0.0.1:8765/
+pnpm run demo:refuge:check  # ressources, liens, critères et séparation des témoins
+```
+
+Les pages et les médias sont fournis : aucune génération ni dépendance Python
+supplémentaire n’est nécessaire pour visiter le site. Le
+[guide de la démo](demos/refuge-rgaa/README.txt) décrit la reconstruction,
+les tests navigateur et les commandes d’audit. Le catalogue et les verdicts
+attendus restent hors du site audité ; ils ne constituent pas des détections
+mesurées de l’outil. Cette démo ne prétend pas couvrir les 106 critères du RGAA.
+
 ## Development
 
 ```sh

@@ -1,0 +1,36 @@
+{
+  "origin": "Assets originaux synthétiques créés pour le banc de test ; aucun service distant.",
+  "speech": {
+    "annonce": "Le refuge vous accueille le samedi de quatorze heures à dix-huit heures. Entrez par le portail nord.",
+    "intro": "Bienvenue au refuge. Voici les informations pour votre visite.",
+    "description": "Un panneau indique : rendez-vous samedi à quatorze heures. Entrée nord.",
+    "description-incorrecte": "Un panneau indique : rendez-vous dimanche à seize heures. Entrée sud."
+  },
+  "visualContent": [
+    "Votre prochaine visite au refuge",
+    "Rendez-vous samedi à 14 h",
+    "Entrée nord"
+  ],
+  "document": [
+    "Dossier d’adoption — Le Refuge",
+    "Visite : samedi à 14 h, entrée nord.",
+    "Pièces : justificatif de domicile et pièce d’identité.",
+    "Participation : 120 euros.",
+    "Condition : accord de tous les adultes du foyer.",
+    "Contact : accueil@refuge.example"
+  ],
+  "files": {
+    "captcha.png": "54fcd2cf5de1615709f2ae6d0b35dd804be2fcbc6b8d2e34853521d9b4294e40",
+    "horaires.png": "95b9448a0ec5c72d134c4b1e5e52f86def8b3907cce376f5b8eb4e2f1ad82f25",
+    "adoptions.png": "fbccefafc5884f77a32277945075f5f49f0cee208bb43d19055ea3c0a77c188a",
+    "visite.png": "11691e81591a5d41a6b82a3631ca33520459ace60da4bd7467375a4d5e7cb0bf",
+    "dossier.png": "1e7d722759b85e7da5349c4064eafd48c7a96b0d6bbd73fd0cf03923d595dfc4",
+    "dossier-adoption.pdf": "4f8f1a926e20baf62555b9128ab4fe494dfd3f988fe3471d55139f7018a20a6d",
+    "annonce.wav": "f7bd87ac660dbfc18c496ed5d72081a768ab27b8ec53182b2e3099e1c9c1487c",
+    "visite.webm": "727900bda2b27a1d186215c7c12c7e9d5ffeb6c97f7cd4e09d6027702c5693af",
+    "visite-decrite.webm": "51803ffe3dc130c2f369afaf72b2c53e09a7edb18562271dcd56f5b12075f64c",
+    "visite-description-incorrecte.webm": "0c79814d912d716ed8ab1788750215fb5b28f62e83cdf8881bcb0fb0ca93defa",
+    "captions.vtt": "7d9f59a8753d386d0dd5fdcec00c560e5d8ebf98978648a6cc9c75057d480af6",
+    "captions-incorrectes.vtt": "cb4069f1c23d81226f3c679b0a1114f7df1df0471c419e45d5d3d503b5000f2d"
+  }
+}

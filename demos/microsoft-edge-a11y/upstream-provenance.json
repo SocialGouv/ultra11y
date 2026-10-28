@@ -1,0 +1,79 @@
+{
+  "repository": "https://github.com/MicrosoftEdge/Demos",
+  "commit": "26310ea14603aa9b637f1a5c28e178e897fff69d",
+  "directory": "devtools-a11y-testing",
+  "upstreamDemo": "https://microsoftedge.github.io/Demos/devtools-a11y-testing/",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "30dcd1d29c07bf83dc754a7c3696b955ddb7e91ed05008cc2daf7753cc86d7c3",
+      "bytes": 480
+    },
+    {
+      "path": "buttons.js",
+      "sha256": "f8fb5c26e2c650bc2f997e383e8fcc18259cbeef30321553d1933b19a2828b17",
+      "bytes": 829
+    },
+    {
+      "path": "css/dark-theme.css",
+      "sha256": "e3e5df862b3b7ee8914f3c1a03a7c4ac883a1e58f19f4935db0fdd7d318b1647",
+      "bytes": 917
+    },
+    {
+      "path": "css/light-theme.css",
+      "sha256": "f0c63236194de72e04a802903ea24f3f90918ad53d19fa3eb6e5613fc0bb0f7f",
+      "bytes": 966
+    },
+    {
+      "path": "css/styles.css",
+      "sha256": "c0986d3b0970d6c6254ed2b33b8e8d00b6e18055fbd4c3f63e66751db90e5722",
+      "bytes": 5523
+    },
+    {
+      "path": "icons/arrow.svg",
+      "sha256": "dd3626aee8c9df01a3847262716f670bcd8da3e02315920f6a4f7093e3eba1a8",
+      "bytes": 524
+    },
+    {
+      "path": "index.html",
+      "sha256": "7aab0f25b8bc6ca1a33ac4db730474ed605474ea9562534aac59b625dcea9b29",
+      "bytes": 9366
+    },
+    {
+      "path": "photos/alpaca.jpg",
+      "sha256": "670488d62d9313c69fcf57514a40a92b501a3bcdfec3d2ed90da81f4810c6a55",
+      "bytes": 326409
+    },
+    {
+      "path": "photos/cat.jpg",
+      "sha256": "a3c60276e398d8ec4df37ac718b473bd8f0f6a52495d29283dd2129cf5fd479b",
+      "bytes": 146547
+    },
+    {
+      "path": "photos/deer.jpg",
+      "sha256": "74bf532ae7744b9d3100345890558dc7100aba24c85341e21349e6cdc3b9ade4",
+      "bytes": 370840
+    },
+    {
+      "path": "photos/horse.jpg",
+      "sha256": "81cbf7588a513ae1b67138a214eb67d65b70c5e532c7d667835b5ed9dce4956a",
+      "bytes": 295514
+    },
+    {
+      "path": "photos/sheep.jpg",
+      "sha256": "1d6c1f339b46ececbf0d6312662e6773751e4f2e68c19d02c5320a148a2c4dc9",
+      "bytes": 245936
+    },
+    {
+      "path": "photos/socke.jpg",
+      "sha256": "4f0a6dfdfb4e92b4dd1f99f40c737e363d7806bbc3964e4b2a316fbf1cb383cb",
+      "bytes": 224859
+    },
+    {
+      "path": "photos/unicorns.jpg",
+      "sha256": "84e89fd5abe2dfe3e606af7849acb19468d41f908263a7d2cd5946865be9ff50",
+      "bytes": 23763
+    }
+  ],
+  "sourceFilesUnmodified": true
+}

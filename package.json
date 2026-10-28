@@ -71,6 +71,10 @@
     "build:site": "node scripts/build-site.mjs",
     "check:site": "node scripts/build-site.mjs --check",
     "demo": "node scripts/ultra11y.mjs audit tests/fixtures/non-conforming/bad.html --out /tmp/ultra11y-demo --json > /dev/null && node scripts/ultra11y.mjs report --in /tmp/ultra11y-demo/audit-latest.json --out /tmp/ultra11y-demo && node scripts/ultra11y.mjs check --report /tmp/ultra11y-demo/wcag-*.md && node scripts/ultra11y.mjs criteria --list",
+    "demo:refuge": "python3 demos/refuge-rgaa/serve.py",
+    "demo:refuge:build": "python3 demos/refuge-rgaa/build.py",
+    "demo:refuge:check": "python3 demos/refuge-rgaa/verify-files.py",
+    "demo:refuge:test": "node demos/refuge-rgaa/verify-browser.mjs",
     "release": "semantic-release",
     "build:icons": "node scripts/build-extension-icons.mjs"
   },
