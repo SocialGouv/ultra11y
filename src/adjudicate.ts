@@ -624,7 +624,32 @@ function canonicalEvidenceFile(file: string): string {
   const posix = file.replace(/\\/g, "/");
   const marker = `${PAGES_DIR}/`;
   const at = posix.lastIndexOf(marker);
-  return at >= 0 ? posix.slice(at) : posix;
+  if (at >= 0) return posix.slice(at);
+  // The worklist is written with paths relative to the directory it was produced from (see
+  // `writeAdjudication`), the audit keeps whatever it was given — so the same file is spelled
+  // both ways, and must compare equal.
+  return /^https?:\/\//i.test(posix) ? posix : resolve(posix).replace(/\\/g, "/");
+}
+
+/** A path as the worklist prints it: relative to the current directory when it lies inside it.
+ *  Measured on 7 small pages: a 1.9 MB ADJUDICATE.todo.json, most of it the same absolute
+ *  `/private/tmp/…/.ultra11y/pages/<id>/dom.html` repeated in every `alsoAt`. */
+function worklistPath(file: string): string {
+  if (!isAbsolute(file)) return file;
+  const rel = relative(process.cwd(), file);
+  return rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel.replace(/\\/g, "/") : file;
+}
+
+function relativizeItem(it: AdjudicationItem): AdjudicationItem {
+  const at = (a: string): string => {
+    const i = a.lastIndexOf(":");
+    return i > 0 ? `${worklistPath(a.slice(0, i))}${a.slice(i)}` : a;
+  };
+  return {
+    ...it,
+    evidence: it.evidence.map((e) => ({ ...e, file: worklistPath(e.file), ...(e.alsoAt ? { alsoAt: e.alsoAt.map(at) } : {}) })),
+    ...(it.signals ? { signals: it.signals.map((s) => ({ ...s, file: worklistPath(s.file) })) } : {}),
+  };
 }
 
 /** A directory input scopes its supporting files too. The parser may select only markup, but
@@ -2271,6 +2296,7 @@ export function writeAdjudication(
   opts: { standard: StandardId; auditDate: string; lang?: Lang; unrendered?: string[]; web?: boolean },
 ): WriteAdjudicationResult {
   mkdirSync(outDir, { recursive: true });
+  items = items.map(relativizeItem);
   const todoPath = join(outDir, "ADJUDICATE.todo.json");
   const mdPath = join(outDir, "ADJUDICATE.md");
   const file: AdjudicationFile = {
