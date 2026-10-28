@@ -53,7 +53,7 @@
 <ul>
   <li><strong>Un ordinateur</strong> sous Windows 10 ou 11, ou sous macOS. Linux convient aussi.</li>
   <li><strong>Une connexion à Internet</strong>, pour les téléchargements de la première fois.</li>
-  <li><strong>Node.js</strong>, version <span data-gen="node">22.18</span> ou plus récente. C’est gratuit ; l’étape 2 explique comment l’installer.</li>
+  <li><strong>Node.js</strong>, version <span data-gen="node">22.18</span> ou plus récente. C’est gratuit ; la partie 2 explique comment l’installer.</li>
   <li><strong>Quelque chose à auditer</strong> : un dossier qui contient les fichiers de votre site (pages HTML, composants…), ou l’adresse d’un site en ligne.</li>
 </ul>
 <div class="two">
@@ -68,7 +68,7 @@
 </div>
 
 <h2 id="node">2. Installer Node.js</h2>
-<p>Si Node.js est peut-être déjà installé sur votre ordinateur, passez d’abord à l’<a href="#verifier">étape 4</a> pour le vérifier.</p>
+<p>Si Node.js est peut-être déjà installé sur votre ordinateur, passez d’abord à la <a href="#verifier">partie 4</a> pour le vérifier.</p>
 <div class="os">
   <section>
     <h3 id="node-win">Sur Windows</h3>
@@ -159,7 +159,7 @@ Non-conformités détectées :
   <li>
     <p>Fabriquez le rapport, en Markdown et en HTML :</p>
     <pre><code>npx ultra11y report --in audits/audit-latest.json --standard rgaa --html --out audits</code></pre>
-    <p class="expect">Vous devez voir la liste des fichiers écrits, dont <samp>audits/index.html</samp>. Passez à l’<a href="#rapport">étape 7</a> pour l’ouvrir.</p>
+    <p class="expect">Vous devez voir la liste des fichiers écrits, dont <samp>audits/index.html</samp>. Passez à la <a href="#rapport">partie 7</a> pour l’ouvrir.</p>
   </li>
 </ol>
 
@@ -177,7 +177,7 @@ Non-conformités détectées :
   <li>
     <p>Installez le navigateur d’audit. C’est un téléchargement d’une centaine de mégaoctets, à faire une seule fois :</p>
     <pre><code>npx playwright install chromium</code></pre>
-    <p class="expect">Comme à l’étape 4, tapez <kbd>y</kbd> puis <kbd>Entrée</kbd> si <code>npx</code> demande la permission. Un grand encadré <samp lang="en">WARNING</samp> peut s’afficher, qui conseille <code>npm install</code> : il vise les projets de développeurs, ignorez-le. Le téléchargement se termine sans message d’erreur.</p>
+    <p class="expect">Comme à la partie 4, tapez <kbd>y</kbd> puis <kbd>Entrée</kbd> si <code>npx</code> demande la permission. Un grand encadré <samp lang="en">WARNING</samp> peut s’afficher, qui conseille <code>npm install</code> : il vise les projets de développeurs, ignorez-le. Le téléchargement se termine sans message d’erreur.</p>
   </li>
   <li>
     <p>Ouvrez la page à auditer. Collez la commande, remplacez l’adresse par celle de votre site, puis appuyez sur <kbd>Entrée</kbd> :</p>
@@ -187,7 +187,7 @@ Non-conformités détectées :
   <li>
     <p>Auditez les pages enregistrées :</p>
     <pre><code>npx ultra11y audit --standard rgaa --out audits</code></pre>
-    <p class="expect">Vous devez voir <samp>instantanés de page ingérés depuis .ultra11y/pages</samp>, puis le même tableau qu’à l’étape 5.</p>
+    <p class="expect">Vous devez voir <samp>instantanés de page ingérés depuis .ultra11y/pages</samp>, puis le même tableau qu’à la partie 5.</p>
   </li>
   <li>
     <p>Fabriquez le rapport :</p>
@@ -249,7 +249,7 @@ Non-conformités détectées :
 <h2 id="probleme">Ça ne marche pas ?</h2>
 <dl class="trouble">
   <dt>« node » ou « npx » n’est pas reconnu, ou <samp lang="en">command not found</samp></dt>
-  <dd>Node.js n’est pas installé, ou le terminal a été ouvert avant son installation. Fermez le terminal, ouvrez-en un nouveau et retapez <code>node --version</code>. Toujours rien ? Refaites l’<a href="#node">étape 2</a>.</dd>
+  <dd>Node.js n’est pas installé, ou le terminal a été ouvert avant son installation. Fermez le terminal, ouvrez-en un nouveau et retapez <code>node --version</code>. Toujours rien ? Refaites la <a href="#node">partie 2</a>.</dd>
 
   <dt>Windows : « l’exécution de scripts est désactivée sur ce système »</dt>
   <dd>PowerShell bloque le petit script qui lance <code>npx</code>. Tapez <code>npx.cmd</code> à la place de <code>npx</code> dans chaque commande, par exemple :
@@ -260,7 +260,7 @@ Non-conformités détectées :
   <dd>ultra11y demande Node.js <span data-gen="node">22.18</span> ou plus récent. Avec une version plus ancienne, <code>npx</code> affiche un avertissement <samp lang="en">EBADENGINE</samp> (<samp lang="en">Unsupported engine</samp>) ou une erreur. Vérifiez avec <code>node --version</code>, puis installez la version LTS depuis <a href="https://nodejs.org/fr/download">nodejs.org</a> : elle remplace l’ancienne.</dd>
 
   <dt>« 0 fichiers analysés »</dt>
-  <dd>Le terminal n’est pas dans le bon dossier, ou ce dossier ne contient aucun fichier de page (HTML, JSX, Vue, Svelte, Astro…). Refaites l’<a href="#dossier">étape 5</a> depuis le début. Pour voir ce que contient le dossier courant, tapez <code>dir</code> sur Windows, <code>ls</code> sur macOS.</dd>
+  <dd>Le terminal n’est pas dans le bon dossier, ou ce dossier ne contient aucun fichier de page (HTML, JSX, Vue, Svelte, Astro…). Refaites la <a href="#dossier">partie 5</a> depuis le début. Pour voir ce que contient le dossier courant, tapez <code>dir</code> sur Windows, <code>ls</code> sur macOS.</dd>
 
   <dt><code>scan</code> ne trouve pas de navigateur</dt>
   <dd>Le message parle de <samp lang="en">no browser binary</samp>, d’<samp lang="en">Executable doesn’t exist</samp> ou de <samp lang="en">playwright install</samp> : le navigateur d’audit n’est pas installé. Lancez <code>npx playwright install chromium</code>, puis recommencez. Sur un réseau d’entreprise, le téléchargement peut être bloqué : demandez à votre service informatique.</dd>
@@ -269,7 +269,7 @@ Non-conformités détectées :
   <dd>Ouvrez le dossier <code>audits</code> dans l’Explorateur de fichiers ou le Finder, et faites un double-clic sur <code>index.html</code>.</dd>
 
   <dt>Le rapport est plein de « à évaluer »</dt>
-  <dd>C’est attendu : le moteur seul ne peut trancher qu’une partie des tests du RGAA. Le reste demande un jugement, celui d’un agent IA contre-vérifié (<a href="#agent">étape 8</a>) ou d’une personne compétente.</dd>
+  <dd>C’est attendu : le moteur seul ne peut trancher qu’une partie des tests du RGAA. Le reste demande un jugement, celui d’un agent IA contre-vérifié (<a href="#agent">partie 8</a>) ou d’une personne compétente.</dd>
 </dl>
 <p>Un autre problème ? Décrivez-le, avec la commande tapée et le message affiché, dans une <a href="https://github.com/SocialGouv/ultra11y/issues">demande sur GitHub</a>.</p>
 </main>
